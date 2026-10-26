@@ -1,5 +1,6 @@
 {
   "main.accounts.badTarget": "Hive won't link an account to {target}: it isn't one of {cli}'s own folders.",
+  "main.accounts.folderNotUsable": "{name}'s folder isn't the one Hive made (it is missing, or was moved or replaced), so nothing was started on it. Remove the account and add it again.",
   "main.accounts.inUse": "{name} is in use: stop the agents on it and close its sign-in, then remove it.",
   "main.accounts.leftover": "{name} is half removed: remove it again first.",
   "main.accounts.makeFailed": "Couldn't make the account's folder: {error}",

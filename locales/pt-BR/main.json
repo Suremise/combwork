@@ -1,5 +1,6 @@
 {
   "main.accounts.badTarget": "O Hive não vincula uma conta a {target}: não é uma das pastas do próprio {cli}.",
+  "main.accounts.folderNotUsable": "A pasta da conta {name} não é a que o Hive criou (está faltando, ou foi movida ou substituída), então nada foi iniciado nela. Remova a conta e adicione-a de novo.",
   "main.accounts.inUse": "A conta {name} está em uso: pare os agentes que rodam nela e feche o login dela, depois remova.",
   "main.accounts.leftover": "A conta {name} foi removida só em parte: remova de novo primeiro.",
   "main.accounts.makeFailed": "Não foi possível criar a pasta da conta: {error}",

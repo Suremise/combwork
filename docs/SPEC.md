@@ -788,6 +788,7 @@ The same rules apply to every provider's CLI; the details below are Claude Code'
   - Hive types nothing into it: the user signs in through Anthropic's browser flow.
   - Add Account… makes the folder and its junction, each checked, then opens it.
   - Hive never reads, stores or passes a token. The login stays in the folder's `.credentials.json`, which Hive never opens.
+  - **It starts under the account's lock**, so never while the account is being removed. The account must still be there, and its folder still the one Hive made (a real folder that resolves to itself). A folder replaced by a link would send the CLI's login writes elsewhere, so it is refused and nothing starts. A launch's claim (HI-1755) is taken the same way.
 - **Who it is signed in as** comes from the CLI's own status, `claude auth status --json` in the folder: `loggedIn`, `email`, `orgId` and `subscriptionType`. These field names, the check's timeout and the login files' names are advanced settings (`claude-code.accounts.*`), checked against `tests/fixtures/advanced/auth-status-claude-2.1.310.jsonl`.
   - **Two records, never merged:** `accepted` is who the user took the account on as (its first good sign-in, or **Keep the New Login**). `observed` is the latest check. A check writes only `observed`, so it can't clear a change the user hasn't answered.
   - **The states:**
@@ -795,6 +796,7 @@ The same rules apply to every provider's CLI; the details below are Claude Code'
     - **Signed out:** only when the CLI says `loggedIn: false`.
     - **Login changed:** signed in, but not as `accepted`, e.g. after a `/login` in a pane. It shows "Now signed in as y, was x", with Keep the New Login (then a rename offered) and Sign In Again.
     - **Couldn't check:** a timeout or unreadable output. It is never shown as signed out, and keeps the last identity.
+      Only a check that ended by itself counts: exit 0 with its answer, or exit 1 saying `loggedIn: false` (how the CLI says signed out). A timeout, any other exit, or exit 1 claiming signed in is a failed check, whatever it printed (`claudeAccountStatus`).
     - **Folder missing.**
     - **Not checked yet.**
   - Only a check that succeeds, says signed in, and has both an email and an organisation can set `accepted`.
@@ -815,12 +817,14 @@ The same rules apply to every provider's CLI; the details below are Claude Code'
   - Choosing a default records `lastUsedAccount[provider]`. A new workspace, made only (never one opened), starts with that account on, as its default.
   - Each window lists its own workspace's choice.
 - **Removing an account** deletes its folder for good, with its login on this PC, not to the Recycle Bin (Darren, 26 Oct). The confirmation says so.
-  - **Refused while it is in use:** its sessions (HI-1755 registers them), a launch's claim, or its sign-in terminal open. The check is made again under the account's lock.
+  - **Refused while it is in use:** its sessions (HI-1755 registers them), a launch's claim, or its sign-in open (from its start to its end). The check is made again under the account's lock, which sign-ins and claims take too.
   - **The steps:**
     1. The accounts folder and the account's folder must be real folders, not links, and the account's must resolve to itself.
     2. Each shared folder's junction is removed as the link alone, and checked gone. One already gone is a removal tried again. A real folder there, or a link elsewhere, refuses.
     3. The whole folder is searched for any other link, without following any, and one found refuses.
-    4. The folder is deleted by Hive's own walk: each folder's identity is read before and after listing it, and checked again before every delete in it. A link met, or a folder replaced, stops the walk at once.
+    4. The folder is renamed aside, to `<accounts>\.removing-<id>`: one rename, which follows nothing. A folder left aside by a crash or a quit is finished at the next start, or by Remove tried again.
+    5. The folder aside is deleted by Hive's own walk: each folder's identity is read before and after listing it, and checked again before every delete in it. A link met, or a folder replaced, stops the walk at once.
+  - **The threat model** (the Assistant's call on HI-980, 26 Oct): removal protects against Hive's own mistakes, the CLI's normal writes (it makes no junctions), and anything the user changed before removal began. It doesn't try to defeat another process racing the walk within milliseconds: such a process runs as the same user, with the same rights, and no userland walk on Windows can close that race.
   - **If it stops partway,** the account stays listed with what's left (`leftover`), and Remove tries again. Nothing outside its folder is ever touched.
   - Tested with junctions swapped in partway through (`tests/accounts.test.ts`).
 

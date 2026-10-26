@@ -1,5 +1,6 @@
 {
   "main.accounts.badTarget": "Hive nie połączy konta z {target}: to nie jest żaden z folderów {cli}.",
+  "main.accounts.folderNotUsable": "Folder konta {name} nie jest tym, który utworzył Hive (brakuje go albo został przeniesiony lub zastąpiony), więc nic w nim nie uruchomiono. Usuń konto i dodaj je ponownie.",
   "main.accounts.inUse": "Konto {name} jest w użyciu: zatrzymaj agentów, którzy na nim pracują, i zamknij jego logowanie, a potem je usuń.",
   "main.accounts.leftover": "Konto {name} jest usunięte tylko częściowo: najpierw usuń je jeszcze raz.",
   "main.accounts.makeFailed": "Nie udało się utworzyć folderu konta: {error}",

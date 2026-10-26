@@ -1,5 +1,6 @@
 {
   "main.accounts.badTarget": "Hive 不会把账户链接到 {target}：它不是 {cli} 自己的文件夹。",
+  "main.accounts.folderNotUsable": "{name} 的文件夹不是 Hive 创建的那个（它不存在，或已被移动或替换），因此没有在其中启动任何内容。请删除该账户，然后重新添加。",
   "main.accounts.inUse": "{name} 正在使用中：请先停止使用它的智能体并关闭它的登录，然后再删除它。",
   "main.accounts.leftover": "{name} 只删除了一部分：请先再删除一次。",
   "main.accounts.makeFailed": "无法创建账户的文件夹：{error}",

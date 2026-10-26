@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { join, resolve } from 'path'
 import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
-import { lstat, mkdir, readdir, readlink, realpath, rmdir, symlink, unlink } from 'original-fs/promises'
+import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
 import type { Account, AccountObserved, ProviderId, WorkspaceConfig } from '../shared/types'
 import { ACCOUNTS_PREVIEW } from '../shared/advanced'
 import { acceptable, workspaceAccounts, switchedOn, type AccountsView } from '../shared/accounts'
@@ -138,9 +138,16 @@ function locked<T>(id: string, fn: () => Promise<T>): Promise<T> {
 /** Launches under way on each account (HI-1755 takes one from confirm until its session is live or failed). */
 const claims = new Map<string, number>()
 
-/** Takes a launch's claim on an account: removal is refused while one is held. Returns its release. */
-export function claimAccount(id: string): () => void {
-  claims.set(id, (claims.get(id) ?? 0) + 1)
+/**
+ * Takes a launch's claim on an account (HI-1755 holds it through the launch's start): taken under the account's lock,
+ * so never while a removal runs, and only on an account still there whose folder is the one Hive made. Removal is
+ * refused while one is held. Returns its release.
+ */
+export async function claimAccount(id: string): Promise<() => void> {
+  await locked(id, async () => {
+    await assertUsable(mustGet(id))
+    claims.set(id, (claims.get(id) ?? 0) + 1)
+  })
   let released = false
   return () => {
     if (released) return
@@ -158,6 +165,9 @@ export function setAccountSessions(fn: (id: string) => boolean): void {
 }
 
 const loginKey = (a: Pick<Account, 'id' | 'provider'>): string => `task:${a.provider}:login:${a.id}`
+
+/** Accounts whose sign-in is open (from its start, under the lock, to its end): removal is refused meanwhile. */
+const loginsOpen = new Set<string>()
 
 /** Each account's generation: removing it (or making it again) moves it on, so a check started before is dropped. */
 const generations = new Map<string, number>()
@@ -295,12 +305,9 @@ async function deleteTree(dir: string): Promise<void> {
  */
 async function removeFolder(a: Account): Promise<void> {
   const dir = accountFolder(a.id)
-  try {
-    await lstat(dir)
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return
-    throw e
-  }
+  // One renamed aside by an earlier try that stopped: finished first.
+  await finishRemoving(removingFolder(a.id))
+  if (!(await exists(dir))) return
   await assertRealFolder(dir)
   const caps = providerDescriptor(a.provider).capabilities.accounts
   for (const name of caps?.shared ?? []) {
@@ -315,7 +322,56 @@ async function removeFolder(a: Account): Promise<void> {
   }
   const links = await linksUnder(dir)
   if (links.length) throw new Unsafe(`links Hive didn't make are in it: ${links.join(', ')}`) // i18n-ignore: for the log
-  await deleteTree(dir)
+  // Renamed aside, one rename that follows nothing, so no account is ever at its own path half deleted; then deleted
+  // there by the walk. The threat model (the Assistant's call on HI-980, 26 Oct): Hive's own junction, the CLI's
+  // writes and the user's changes before removal began, not another process racing the walk (SPEC §11.2).
+  const aside = removingFolder(a.id)
+  await rename(dir, aside)
+  await finishRemoving(aside)
+}
+
+/** Where an account's folder goes while it is deleted (`<accounts>\.removing-<id>`). */
+const removingFolder = (id: string): string => join(accountsRoot(), `${REMOVING}${id}`)
+const REMOVING = '.removing-'
+
+async function exists(p: string): Promise<boolean> {
+  try {
+    await lstat(p)
+    return true
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return false
+    throw e
+  }
+}
+
+/** Deletes a folder renamed aside for removal, if there is one: a real folder, with no link anywhere in it. */
+async function finishRemoving(aside: string): Promise<void> {
+  if (!(await exists(aside))) return
+  await assertRealFolder(aside)
+  const links = await linksUnder(aside)
+  if (links.length) throw new Unsafe(`links Hive didn't make are in it: ${links.join(', ')}`) // i18n-ignore: for the log
+  await deleteTree(aside)
+}
+
+let leftoversDone = false
+/** Once, at start (the first time accounts are used): finishLeftoverRemovals. */
+function startLeftovers(): void {
+  if (leftoversDone) return
+  leftoversDone = true
+  void finishLeftoverRemovals()
+}
+
+/** Finishes removals a crash or a quit stopped, their folders renamed aside (`.removing-<id>`). */
+export async function finishLeftoverRemovals(): Promise<void> {
+  let names: string[]
+  try {
+    names = await readdir(accountsRoot())
+  } catch {
+    return
+  }
+  for (const n of names.filter((x) => x.startsWith(REMOVING))) {
+    await finishRemoving(join(accountsRoot(), n)).catch((e) => log.warn(`a removed account's folder ${n} couldn't be finished: ${userText(String((e as Error).message ?? e))}`))
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -360,7 +416,7 @@ export function renameAccount(id: string, name: string): void {
 export async function removeAccount(id: string): Promise<void> {
   assertOn()
   const a = mustGet(id)
-  const inUse = (): boolean => sessionsOn(id) || (claims.get(id) ?? 0) > 0 || hasPty(loginKey(a))
+  const inUse = (): boolean => sessionsOn(id) || (claims.get(id) ?? 0) > 0 || loginsOpen.has(id) || hasPty(loginKey(a))
   const IN_USE = msg({ id: 'main.accounts.inUse', defaultMessage: '{name} is in use: stop the agents on it and close its sign-in, then remove it.', description: 'An error removing an account ({name}, its name in Settings → Accounts): agents run on it, or its sign-in terminal is open.' })
   if (inUse()) throw hiveError(IN_USE, { name: a.name }, { kind: 'conflict' })
   await locked(id, async () => {
@@ -485,20 +541,47 @@ export async function confirmAccount(id: string): Promise<{ observed: AccountObs
  * Opens the account's sign-in: the CLI's own login in a terminal of Hive's, on its folder. Once it ends, the account is
  * checked; its first good login becomes the one accepted. Returns the terminal's key.
  */
-export function signInAccount(id: string): string {
+export async function signInAccount(id: string): Promise<string> {
   assertOn()
-  const a = mustGet(id)
-  const { homeEnv } = support(a.provider)
-  if (a.leftover) throw hiveError(msg({ id: 'main.accounts.leftover', defaultMessage: '{name} is half removed: remove it again first.', description: "An error signing an account in ({name}): an earlier removal stopped partway, so it can't be used." }), { name: a.name }, { kind: 'conflict' })
-  const gen = generation(id)
-  return providerService.runAccountLogin(a.provider, id, { [homeEnv]: accountFolder(id) }, () => {
-    void checkAccount(id).then((o) => {
-      if (generation(id) !== gen) return
-      const ok = acceptable(o ?? undefined)
-      // Only a good, signed-in answer is taken on, and only when none is yet; a different one is a change to answer.
-      if (ok && !getAccount(id)?.accepted) changeAccount(id, (x) => (x.accepted = ok))
-    })
+  mustGet(id)
+  // Started under the account's lock, so never while it is being removed: the account checked still there (a removal
+  // before it wins), and its folder still the one Hive made (a folder replaced by a link would take the CLI's login
+  // writes elsewhere).
+  return locked(id, async () => {
+    const a = mustGet(id)
+    const { homeEnv } = support(a.provider)
+    await assertUsable(a)
+    const gen = generation(id)
+    loginsOpen.add(id)
+    try {
+      return providerService.runAccountLogin(a.provider, id, { [homeEnv]: accountFolder(id) }, () => {
+        loginsOpen.delete(id)
+        void checkAccount(id).then((o) => {
+          if (generation(id) !== gen) return
+          const ok = acceptable(o ?? undefined)
+          // Only a good, signed-in answer is taken on, and only when none is yet; a different one is a change to answer.
+          if (ok && !getAccount(id)?.accepted) changeAccount(id, (x) => (x.accepted = ok))
+        })
+      })
+    } catch (e) {
+      loginsOpen.delete(id)
+      throw e
+    }
   })
+}
+
+/**
+ * Refuses an account that can't be used now: half removed, or its folder not the one Hive made (missing, or replaced by
+ * a link). Called under its lock, before anything is started on it.
+ */
+async function assertUsable(a: Account): Promise<void> {
+  if (a.leftover) throw hiveError(msg({ id: 'main.accounts.leftover', defaultMessage: '{name} is half removed: remove it again first.', description: "An error signing an account in ({name}): an earlier removal stopped partway, so it can't be used." }), { name: a.name }, { kind: 'conflict' })
+  try {
+    await assertRealFolder(accountFolder(a.id))
+  } catch (e) {
+    log.warn(`account ${a.id}'s folder can't be used: ${userText(String((e as Error).message ?? e))}`)
+    throw hiveError(msg({ id: 'main.accounts.folderNotUsable', defaultMessage: "{name}'s folder isn't the one Hive made (it is missing, or was moved or replaced), so nothing was started on it. Remove the account and add it again.", description: "An error signing an account in or starting on it ({name}, its name): its folder is missing or isn't the one Hive made." }), { name: a.name }, { kind: 'conflict' })
+  }
 }
 
 /** Keeps the login an account is now signed in as (its change answered): refused without a good one to keep. */
@@ -638,6 +721,7 @@ function syncRoot(): void {
 
 /** Watches the accounts wanted now, and no others; each newly watched is checked. */
 export function syncWatches(): void {
+  if (accountsOn()) startLeftovers()
   const want = wantedIds()
   for (const id of [...watched.keys()]) if (!want.has(id)) unwatch(id)
   for (const id of want) {

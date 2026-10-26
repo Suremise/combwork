@@ -1,5 +1,6 @@
 {
   "main.accounts.badTarget": "Hive verknüpft kein Konto mit {target}: Das ist keiner der eigenen Ordner von {cli}.",
+  "main.accounts.folderNotUsable": "Der Ordner des Kontos {name} ist nicht der, den Hive angelegt hat (er fehlt oder wurde verschoben oder ersetzt), daher wurde darin nichts gestartet. Entferne das Konto und füge es erneut hinzu.",
   "main.accounts.inUse": "Das Konto {name} wird verwendet: Stoppe die Agenten darauf und schließe die Anmeldung, dann entferne es.",
   "main.accounts.leftover": "Das Konto {name} ist nur halb entfernt: Entferne es zuerst erneut.",
   "main.accounts.makeFailed": "Der Ordner des Kontos konnte nicht erstellt werden: {error}",

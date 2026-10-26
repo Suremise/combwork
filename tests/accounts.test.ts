@@ -23,7 +23,7 @@ const { advanced } = await import('../src/main/advanced')
 const { provider } = await import('../src/main/providers')
 const { providerService } = await import('../src/main/providerService')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
-const { parseClaudeAuthStatus } = await import('../src/main/providers/claude/adapter')
+const { claudeAccountStatus, parseClaudeAuthStatus } = await import('../src/main/providers/claude/adapter')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 10_000
@@ -39,6 +39,9 @@ const projects = join(home, 'projects')
 const keep = join(projects, 'C--work-alpha', 'conversation.jsonl')
 const folderOf = (a: Account): string => accounts.accountFolder(a.id)
 const outcome = (p: Promise<unknown>): Promise<string> => p.then(() => 'ok', (e: Error) => e.message)
+const aside = (id: string): string => join(base, 'profile', 'accounts', `.removing-${id}`)
+/** Each open sign-in's end, by account: the faked terminal stays open until a test ends it. */
+const logins = new Map<string, (code: number) => void>()
 
 beforeAll(async () => {
   advanced.load(join(base, 'profile'))
@@ -46,6 +49,13 @@ beforeAll(async () => {
   mkdirSync(home, { recursive: true })
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never
+  vi.spyOn(providerService, 'runAccountLogin').mockImplementation((_p, id, _env, onExit) => {
+    logins.set(id, (code) => {
+      logins.delete(id)
+      onExit(code)
+    })
+    return `task:claude-code:login:${id}`
+  })
   vi.spyOn(provider('claude-code'), 'accountStatus').mockImplementation(async (_exe, env) => {
     const dir = env.CLAUDE_CONFIG_DIR!
     asked.push(dir)
@@ -178,7 +188,34 @@ describe('removing an account', () => {
     rmSync(join(folderOf(a), 'plugins', 'sneaky'))
   })
 
-  it('a folder replaced by a junction partway through the removal: it stops, and never deletes through it', async () => {
+  it('renames the folder aside, then deletes it there; a folder left aside by a crash is finished later', async () => {
+    const a = await accounts.addAccount('claude-code', 'Aside')
+    writeFileSync(join(folderOf(a), 'one'), '1')
+    const seen: string[] = []
+    accounts.accountTestHooks.beforeDelete = async (dir) => void seen.push(dir)
+    await accounts.removeAccount(a.id)
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen.every((d) => d === aside(a.id))).toBe(true)
+    expect(existsSync(aside(a.id))).toBe(false)
+    accounts.accountTestHooks.beforeDelete = undefined
+    // A crash after the rename: the folder aside, its junction already gone.
+    const b = await accounts.addAccount('claude-code', 'Crashed')
+    rmSync(join(folderOf(b), 'projects'))
+    writeFileSync(join(folderOf(b), 'two'), '2')
+    renameSync(folderOf(b), aside(b.id))
+    await accounts.finishLeftoverRemovals()
+    expect(existsSync(aside(b.id))).toBe(false)
+    expect(readFileSync(keep, 'utf8')).toContain('kept')
+    // And a removal tried again for an account whose folder is only aside.
+    const c = await accounts.addAccount('claude-code', 'Again')
+    rmSync(join(folderOf(c), 'projects'))
+    renameSync(folderOf(c), aside(c.id))
+    await accounts.removeAccount(c.id)
+    expect(existsSync(aside(c.id))).toBe(false)
+    expect(accounts.getAccount(c.id)).toBeUndefined()
+  })
+
+  it('a folder replaced by a junction while the walk deletes: it stops, and never deletes through it', async () => {
     const a = await accounts.addAccount('claude-code', 'Race')
     mkdirSync(join(folderOf(a), 'cache'), { recursive: true })
     writeFileSync(join(folderOf(a), 'cache', 'one'), '1')
@@ -200,7 +237,7 @@ describe('removing an account', () => {
     expect(readFileSync(join(projects, 'two'), 'utf8')).toBe('theirs')
     expect(readFileSync(keep, 'utf8')).toContain('kept')
     accounts.accountTestHooks.beforeDelete = undefined
-    rmSync(join(folderOf(a), 'cache'))
+    rmSync(join(aside(a.id), 'cache'))
   })
 
   it('a subfolder that becomes a junction after it was read: never descended into', async () => {
@@ -211,8 +248,8 @@ describe('removing an account', () => {
     writeFileSync(join(projects, 'f'), 'theirs')
     let swapped = false
     accounts.accountTestHooks.beforeDelete = async (dir) => {
-      // At the delete of aa (in the account's folder), zz\ is swapped for a junction: read as a folder, now a link.
-      if (swapped || dir !== folderOf(a)) return
+      // At the delete of aa (in the folder renamed aside), zz\ is swapped for a junction: read as a folder, now a link.
+      if (swapped || dir !== aside(a.id)) return
       swapped = true
       renameSync(join(dir, 'zz'), join(dir, 'zz-moved'))
       symlinkSync(projects, join(dir, 'zz'), 'junction')
@@ -220,7 +257,7 @@ describe('removing an account', () => {
     expect(await outcome(accounts.removeAccount(a.id))).toMatch(/changed into a link|was replaced/)
     expect(readFileSync(join(projects, 'f'), 'utf8')).toBe('theirs')
     accounts.accountTestHooks.beforeDelete = undefined
-    rmSync(join(folderOf(a), 'zz'))
+    rmSync(join(aside(a.id), 'zz'))
   })
 
   it('the account folder itself a junction: refused, and its target untouched', async () => {
@@ -233,15 +270,67 @@ describe('removing an account', () => {
     rmSync(folderOf(a))
   })
 
-  it('is refused while a launch holds it, or its sign-in is open', async () => {
+  it('is refused while a launch holds it, its sessions run, or its sign-in is open', async () => {
     const a = await accounts.addAccount('claude-code', 'Busy')
-    const release = accounts.claimAccount(a.id)
+    const release = await accounts.claimAccount(a.id)
     expect(await outcome(accounts.removeAccount(a.id))).toMatch(/Busy is in use/)
     release()
     accounts.setAccountSessions((id) => id === a.id)
     expect(await outcome(accounts.removeAccount(a.id))).toMatch(/Busy is in use/)
     accounts.setAccountSessions(() => false)
+    // Its sign-in open (the terminal not ended yet).
+    await accounts.signInAccount(a.id)
+    expect(logins.has(a.id)).toBe(true)
+    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/Busy is in use/)
+    logins.get(a.id)!(0)
     await accounts.removeAccount(a.id)
+    expect(accounts.getAccount(a.id)).toBeUndefined()
+  })
+
+  it('a sign-in or launch asked for once removal has begun is never started: the account is gone by its turn', async () => {
+    const a = await accounts.addAccount('claude-code', 'Going')
+    writeFileSync(join(folderOf(a), 'x'), 'x')
+    let signIn: Promise<string> | null = null
+    let claim: Promise<unknown> | null = null
+    accounts.accountTestHooks.beforeDelete = async () => {
+      // Inside removal's critical section (its folder being deleted): both wait for its lock.
+      signIn ??= accounts.signInAccount(a.id)
+      claim ??= accounts.claimAccount(a.id)
+    }
+    await accounts.removeAccount(a.id)
+    accounts.accountTestHooks.beforeDelete = undefined
+    expect(await outcome(signIn!)).toMatch(/no such account/)
+    expect(await outcome(claim!)).toMatch(/no such account/)
+    expect(logins.has(a.id)).toBe(false)
+  })
+
+  it("a sign-in or launch on a folder replaced by a link is refused before anything starts (the CLI's writes would go elsewhere)", async () => {
+    const a = await accounts.addAccount('claude-code', 'Hijacked')
+    rmSync(join(folderOf(a), 'projects'))
+    renameSync(folderOf(a), `${folderOf(a)}-real`)
+    symlinkSync(home, folderOf(a), 'junction')
+    expect(await outcome(accounts.signInAccount(a.id))).toMatch(/isn't the one Hive made/)
+    expect(await outcome(accounts.claimAccount(a.id))).toMatch(/isn't the one Hive made/)
+    expect(logins.has(a.id)).toBe(false)
+    rmSync(folderOf(a))
+    // Missing altogether: the same.
+    expect(await outcome(accounts.signInAccount(a.id))).toMatch(/isn't the one Hive made/)
+  })
+})
+
+describe("what an account's status check counts (claudeAccountStatus)", () => {
+  const lines = readFileSync(FIX, 'utf8').trim().split(/\r?\n/)
+  it('exit 0 with its answer, and exit 1 saying signed out, are answers', () => {
+    expect(claudeAccountStatus({ stdout: lines[0], code: 0 }, FIELDS)).toMatchObject({ ok: true, loggedIn: true, email: 'user@example.com' })
+    expect(claudeAccountStatus({ stdout: lines[1], code: 1 }, FIELDS)).toMatchObject({ ok: true, loggedIn: false })
+  })
+  it('anything else fails, whatever it printed: a timeout, another exit, exit 1 claiming signed in', () => {
+    expect(claudeAccountStatus({ stdout: lines[0], code: 1, ended: true }, FIELDS).ok).toBe(false)
+    expect(claudeAccountStatus({ stdout: lines[1], code: 1, ended: true }, FIELDS).ok).toBe(false)
+    expect(claudeAccountStatus({ stdout: lines[0], code: 2 }, FIELDS).ok).toBe(false)
+    expect(claudeAccountStatus({ stdout: lines[0], code: 1 }, FIELDS).ok).toBe(false)
+    expect(claudeAccountStatus({ stdout: 'oops', code: 1 }, FIELDS).ok).toBe(false)
+    expect(claudeAccountStatus({ stdout: 'oops', code: 0 }, FIELDS).ok).toBe(false)
   })
 })
 

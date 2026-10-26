@@ -1,5 +1,6 @@
 {
   "main.accounts.badTarget": "Hive no vinculará una cuenta a {target}: no es una de las carpetas propias de {cli}.",
+  "main.accounts.folderNotUsable": "La carpeta de la cuenta {name} no es la que creó Hive (falta, o se movió o se reemplazó), así que no se inició nada en ella. Quita la cuenta y vuelve a añadirla.",
   "main.accounts.inUse": "La cuenta {name} está en uso: detén los agentes que la usan y cierra su inicio de sesión; después, quítala.",
   "main.accounts.leftover": "La cuenta {name} está quitada a medias: primero vuelve a quitarla.",
   "main.accounts.makeFailed": "No se pudo crear la carpeta de la cuenta: {error}",

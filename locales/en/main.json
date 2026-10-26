@@ -3,6 +3,10 @@
     "defaultMessage": "Hive won't link an account to {target}: it isn't one of {cli}'s own folders.",
     "description": "An error adding an account: the folder an account's shared folder would link to ({target}, a path) isn't in the coding agent CLI's ({cli}) own folder."
   },
+  "main.accounts.folderNotUsable": {
+    "defaultMessage": "{name}'s folder isn't the one Hive made (it is missing, or was moved or replaced), so nothing was started on it. Remove the account and add it again.",
+    "description": "An error signing an account in or starting on it ({name}, its name): its folder is missing or isn't the one Hive made."
+  },
   "main.accounts.inUse": {
     "defaultMessage": "{name} is in use: stop the agents on it and close its sign-in, then remove it.",
     "description": "An error removing an account ({name}, its name in Settings → Accounts): agents run on it, or its sign-in terminal is open."

@@ -101,6 +101,19 @@ export interface AuthStatusFields {
  * with the same JSON): only the fields named, never anything else it prints. Not told (no JSON, no boolean signed-in
  * field) is `ok: false`, never signed out.
  */
+/**
+ * An account's status from `claude auth status --json`'s run (HI-980): only a check that ended by itself counts. Exit
+ * 0 with its answer, or exit 1 with signed-out JSON (how it says signed out); anything else (a timeout, another exit,
+ * exit 1 claiming signed in) is a failed check, whatever it printed.
+ */
+export function claudeAccountStatus(r: { stdout: string; code: number; ended?: true }, f: AuthStatusFields): AccountStatus {
+  if (r.ended) return { ok: false, error: `it didn't finish (exit ${r.code})` } // i18n-ignore: for the log
+  const s = parseClaudeAuthStatus(r.stdout, f)
+  if (r.code === 0) return s
+  if (r.code === 1 && s.ok && !s.loggedIn) return s
+  return { ok: false, error: s.ok ? `it exited ${r.code} saying ${s.loggedIn ? 'signed in' : 'signed out'}` : `${s.error} (exit ${r.code})` } // i18n-ignore: for the log
+}
+
 export function parseClaudeAuthStatus(stdout: string, f: AuthStatusFields): AccountStatus {
   let j: unknown
   try {
@@ -320,10 +333,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       orgId: advanced.get<string>('claude-code.accounts.orgField'),
       plan: advanced.get<string>('claude-code.accounts.planField')
     }
-    const s = parseClaudeAuthStatus(r.stdout, fields)
-    // Exit 1 with signed-out JSON is its answer; any other failure without an answer is a failed check.
-    if (!s.ok && r.code !== 0) return { ok: false, error: `${s.error} (exit ${r.code})` } // i18n-ignore: for the log
-    return s
+    return claudeAccountStatus(r, fields)
   }
 
   accountSharedTarget(name: string): string {
