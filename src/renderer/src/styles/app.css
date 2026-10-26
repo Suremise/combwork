@@ -9291,22 +9291,47 @@ body.pane-resizing-v .monaco-editor {
   align-items: center;
   gap: 6px;
 }
-.for-you-offers {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* The actions an agent's question offers (#1630), as one grid (HI-1689): the buttons share a column as wide as the
+   widest label, so every reason box starts and ends at the same place. Narrow, each button is over its box. */
+.for-you-offers-box {
+  container-type: inline-size;
   margin-block-end: 8px;
 }
-/* An action an agent's question offers (#1630): its button, then the reason it is done with. */
-.for-you-offer {
-  display: flex;
-  align-items: center;
+.for-you-offers {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   gap: 6px;
+}
+/* An action: its button, then the reason it is done with, a row of the grid (a subgrid, so it keeps a box). */
+.for-you-offer {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
   min-inline-size: 0;
 }
-.for-you-offer .input {
+.for-you-offer > .tip-wrap {
+  display: flex;
+  align-self: stretch;
+}
+.for-you-offer > .tip-wrap > .btn {
   flex: 1;
+  justify-content: center;
+}
+.for-you-offer .input {
+  align-self: stretch;
   min-inline-size: 0;
+}
+/* Narrower than the widest label (German's, 179 px) and a reason box of about 155 px: a button over its box, the actions
+   further apart than a button and its box. */
+@container (max-width: 340px) {
+  .for-you-offers {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 10px;
+  }
+  .for-you-offer {
+    row-gap: 4px;
+  }
 }
 .for-you-rounds input {
   inline-size: 64px;
