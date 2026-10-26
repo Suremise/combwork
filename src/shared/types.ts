@@ -1812,6 +1812,12 @@ export interface LiveSessionState {
    * and takes the answer when it comes. It needs you (the attention inbox) until answered.
    */
   question?: { text: string; since: string }
+  /**
+   * Its last turn ended on an error (#1632: a failed stop, such as Claude Code's StopFailure on an API connection
+   * error), with what the CLI said and when: it needs you until its next turn starts. Its status stays as the turn's
+   * end made it (finished), so Hive still prompts and wakes it as an idle agent.
+   */
+  failedTurn?: { message: string; since: string }
   pid?: number
   startedAt: string
   /** Effective settings the session launched with — used to detect "restart to apply". */

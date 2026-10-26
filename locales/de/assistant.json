@@ -154,7 +154,7 @@
   "assistant.panel.allConversations": "Alle Unterhaltungen…",
   "assistant.panel.appliesNext": "Modell, Aufwand, Modus und Kontext gelten ab dem nächsten Start des Assistenten. Einen neuen Modus erfährt er sofort; ein neuer Anbieter startet ihn jetzt neu (nach Rückfrage).",
   "assistant.panel.asking": "Der Assistent hat eine Frage an dich",
-  "assistant.panel.attention": "{kind, select, waiting {wartet auf dich} question {hat eine Frage an dich} safeguard {hat nach einem Sicherheitsstopp das Modell gewechselt} other {ist fertig}}",
+  "assistant.panel.attention": "{kind, select, waiting {wartet auf dich} signin {braucht deine Anmeldung} question {hat eine Frage an dich} error {wurde durch einen Fehler angehalten} failed {konnte nicht starten} safeguard {hat nach einem Sicherheitsstopp das Modell gewechselt} other {ist fertig}}",
   "assistant.panel.attentionDismiss": "Ausblenden: {name} {kind, select, safeguard {hat nach einem Sicherheitsstopp das Modell gewechselt} other {ist fertig}}",
   "assistant.panel.attentionOpen": "{dismiss, select, yes {Klicken, um {name} zu öffnen und auszublenden} other {Klicken, um {name} zu öffnen}}",
   "assistant.panel.cancel": "Abbrechen",

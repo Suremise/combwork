@@ -154,7 +154,7 @@
   "assistant.panel.allConversations": "所有对话…",
   "assistant.panel.appliesNext": "模型、推理强度、模式和上下文将在助手下次启动时生效。新模式会立即告知助手；更换提供方会立即重启助手（会先询问）。",
   "assistant.panel.asking": "助手有问题要问你",
-  "assistant.panel.attention": "{kind, select, waiting {正在等你} question {有问题要问你} safeguard {在安全保护停止后切换了模型} other {已结束}}",
+  "assistant.panel.attention": "{kind, select, waiting {正在等你} signin {需要你登录} question {有问题要问你} error {因错误停止} failed {无法启动} safeguard {在安全保护停止后切换了模型} other {已结束}}",
   "assistant.panel.attentionDismiss": "忽略：{name} {kind, select, safeguard {在安全机制中止后更换了模型} other {已完成}}",
   "assistant.panel.attentionOpen": "{dismiss, select, yes {点击打开 {name} 并忽略此行} other {点击打开 {name}}}",
   "assistant.panel.cancel": "取消",

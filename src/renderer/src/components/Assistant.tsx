@@ -129,7 +129,7 @@ const M = {
   running: msg({ id: 'assistant.panel.running', defaultMessage: '{count} running', description: "The Assistant's overview: how many of a folded project's agents run. Lower case." }),
   workspace: msg({ id: 'assistant.panel.workspace', defaultMessage: 'Workspace', description: "The heading of the Assistant's overview of the workspace." }),
   counts: msg({ id: 'assistant.panel.counts', defaultMessage: '{running} running · {projects, plural, one {# project} other {# projects}}', description: "Beside Workspace in the Assistant's overview." }),
-  attention: msg({ id: 'assistant.panel.attention', defaultMessage: '{kind, select, waiting {is waiting for you} question {has a question for you} safeguard {changed models after a safeguard stop} other {has finished}}', description: "The Assistant's overview: what an agent that needs you is doing, after its project and name. Lower case: it follows them." }),
+  attention: msg({ id: 'assistant.panel.attention', defaultMessage: "{kind, select, waiting {is waiting for you} signin {needs you to sign in} question {has a question for you} error {was stopped by an error} failed {couldn't start} safeguard {changed models after a safeguard stop} other {has finished}}", description: "The Assistant's overview: what an agent that needs you is doing, after its project and name. Lower case: it follows them." }),
   attentionOpen: msg({ id: 'assistant.panel.attentionOpen', defaultMessage: '{dismiss, select, yes {Click to open {name} and dismiss} other {Click to open {name}}}', description: "Tooltip of a row in the Assistant's overview for an agent that needs you ({name}: the agent, or its project when it has one agent). \"and dismiss\" when going there also removes the row (it has finished)." }),
   attentionDismiss: msg({ id: 'assistant.panel.attentionDismiss', defaultMessage: 'Dismiss: {name} {kind, select, safeguard {changed models after a safeguard stop} other {has finished}}', description: "The × on a row in the Assistant's overview for an agent that has finished (its tooltip and name for screen readers): removes the row without going to the agent. {name}: the agent, or its project when it has one agent." }),
   noProjects: msg({ id: 'assistant.panel.noProjects', defaultMessage: 'No projects in this workspace yet.', description: "The Assistant's overview with no projects." }),
@@ -815,9 +815,10 @@ function WorkspaceOverview() {
     showView('projects')
     if (id) revealAgent(p, id)
   }
-  // The inbox's agents that need you, oldest first (the Assistant itself isn't listed in its own panel).
-  const needYou = useInbox().needYou
-  const attention = needYou.flatMap((i) => {
+  // The inbox's agents that need you, oldest first, then (#1632: not a need, kept apart) those finished since you last
+  // looked (the Assistant itself isn't listed in its own panel).
+  const box = useInbox()
+  const attention = [...box.needYou, ...box.finished].flatMap((i) => {
     const p = projects.find((x) => x.path === i.projectPath)
     const a = p?.agents.find((x) => x.id === i.agentId)
     return p && a ? [{ i, p, a }] : []

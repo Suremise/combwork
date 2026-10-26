@@ -620,7 +620,7 @@
     "description": "The hidden Assistant panel's bell: a question waits for you."
   },
   "assistant.panel.attention": {
-    "defaultMessage": "{kind, select, waiting {is waiting for you} question {has a question for you} safeguard {changed models after a safeguard stop} other {has finished}}",
+    "defaultMessage": "{kind, select, waiting {is waiting for you} signin {needs you to sign in} question {has a question for you} error {was stopped by an error} failed {couldn't start} safeguard {changed models after a safeguard stop} other {has finished}}",
     "description": "The Assistant's overview: what an agent that needs you is doing, after its project and name. Lower case: it follows them."
   },
   "assistant.panel.attentionDismiss": {

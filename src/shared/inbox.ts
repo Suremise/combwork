@@ -105,7 +105,9 @@ export function inbox(
         const label = providerDescriptor(live.provider).modelLabel
         needYou.push({ ...item('safeguard'), since: live.safeguard.switched.at, switched: { from: label(live.safeguard.switched.from), to: label(live.safeguard.switched.to) } })
       }
-      // Stopped by an error (an API connection error, say): it does nothing until someone looks.
+      // Stopped by an error (#1632: its turn ended on an API connection error, say): it does nothing until someone
+      // looks, and leaves once its next turn starts.
+      else if (live?.failedTurn) needYou.push({ ...item('error'), since: live.failedTurn.since, message: live.failedTurn.message })
       else if (live?.status === 'error') needYou.push(item('error'))
       else if (finishedUnseen(live)) finished.push(item('finished'))
       else if (hasWork(branch) && idle(live)) toReview.push(item('review'))

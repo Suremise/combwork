@@ -155,7 +155,7 @@
   "assistant.panel.allConversations": "All Conversations…",
   "assistant.panel.appliesNext": "Model, effort, mode and context apply when the Assistant next starts. A new mode is told to it at once; a new provider restarts it now (after asking).",
   "assistant.panel.asking": "The Assistant is asking you something",
-  "assistant.panel.attention": "{kind, select, waiting {is waiting for you} question {has a question for you} safeguard {changed models after a safeguard stop} other {has finished}}",
+  "assistant.panel.attention": "{kind, select, waiting {is waiting for you} signin {needs you to sign in} question {has a question for you} error {was stopped by an error} failed {couldn't start} safeguard {changed models after a safeguard stop} other {has finished}}",
   "assistant.panel.attentionDismiss": "Dismiss: {name} {kind, select, safeguard {changed models after a safeguard stop} other {has finished}}",
   "assistant.panel.attentionOpen": "{dismiss, select, yes {Click to open {name} and dismiss} other {Click to open {name}}}",
   "assistant.panel.cancel": "Cancel",

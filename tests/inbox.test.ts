@@ -69,6 +69,37 @@ describe('attention inbox', () => {
     expect(asksYou(p.agents[0].live)).toBe(false)
   })
 
+  it("needs you: a turn that ended on an error, from the CLI's own event, until its next turn starts (#1632 round 1)", async () => {
+    const { claudeCode } = await import('../src/main/providers/claude/adapter')
+    const { applyStep, hookStep } = await import('../src/main/hookStatus')
+    const at = (st: LiveSessionState) => inbox([project('alpha', [agent('one', st)])], null, () => null)
+    const step = (st: LiveSessionState, body: Record<string, unknown>) => {
+      const ev = claudeCode.normalizeHook(body).event
+      applyStep(st, hookStep(ev, { status: st.status, askedAtStart: false, compacting: null, backgroundWakes: false, tasks: 0, attention: 'hooks', reviewed: false, titleAsks: false, open: [], waitingOn: null, question: false, reviewing: false, safeguardPrompt: false }), '2026-10-25T21:40:00.000Z')
+    }
+    // 25 Oct's case: Claude Code's StopFailure on an API connection error.
+    const st = live('working', '2026-10-25T21:30:00Z')
+    step(st, { hook_event_name: 'StopFailure', error: 'unknown', last_assistant_message: 'API Error: Connection error.' })
+    // Still idle as a turn's end makes it (Hive prompts and wakes it as any idle agent), and it needs you.
+    expect(st.status).toBe('finished')
+    expect(at(st).needYou.map((i) => `${i.kind}/${i.message}/${i.since}`)).toEqual(['error/API Error: Connection error./2026-10-25T21:40:00.000Z'])
+    expect(inboxStateText(at(st).needYou[0])).toBe('Stopped by an error: API Error: Connection error.')
+    expect(at(st).finished).toEqual([])
+    // Looked at, it still needs you: only its next turn clears it.
+    st.unseen = false
+    expect(at(st).needYou).toHaveLength(1)
+    step(st, { hook_event_name: 'UserPromptSubmit', prompt: 'try again' })
+    expect(st.status).toBe('working')
+    expect(at(st).needYou).toEqual([])
+    // A turn that ends well is a finish, not an error; one with no words from the CLI still says it failed.
+    step(st, { hook_event_name: 'Stop', last_assistant_message: 'Done.' })
+    expect(st.failedTurn).toBeUndefined()
+    expect(at(st).finished.map((i) => i.kind)).toEqual(['finished'])
+    step(st, { hook_event_name: 'UserPromptSubmit', prompt: 'again' })
+    step(st, { hook_event_name: 'StopFailure', error: 'server_error' })
+    expect(at(st).needYou.map((i) => `${i.kind}/${i.message}`)).toEqual(['error/The turn ended on an error'])
+  })
+
   it('lists them across projects and the Assistant, oldest first', () => {
     const a = project('alpha', [agent('one', live('finished', '2026-10-02T10:05:00Z', true)), agent('two', live('working', '2026-10-02T09:00:00Z'))])
     const b = project('beta', [agent('three', live('waiting', '2026-10-02T10:01:00Z', false, { statusMessage: 'Allow Bash?' }))])

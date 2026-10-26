@@ -154,7 +154,7 @@
   "assistant.panel.allConversations": "すべての会話…",
   "assistant.panel.appliesNext": "モデル、エフォート、モード、コンテキストは、アシスタントの次回起動時に適用されます。新しいモードはすぐにアシスタントに伝えます。プロバイダーを変えると、確認の後すぐに再起動します。",
   "assistant.panel.asking": "アシスタントから質問があります",
-  "assistant.panel.attention": "{kind, select, waiting {入力待ち} question {質問あり} safeguard {セーフガードによる停止後にモデルを変更} other {完了}}",
+  "assistant.panel.attention": "{kind, select, waiting {入力待ち} signin {サインインが必要} question {質問あり} error {エラーで停止} failed {起動できませんでした} safeguard {セーフガードによる停止後にモデルを変更} other {完了}}",
   "assistant.panel.attentionDismiss": "閉じる：{name}{kind, select, safeguard {はセーフガードによる停止の後にモデルを変更しました} other {は完了しました}}",
   "assistant.panel.attentionOpen": "{dismiss, select, yes {クリックすると{name}を開き、この行を閉じます} other {クリックすると{name}を開きます}}",
   "assistant.panel.cancel": "キャンセル",
