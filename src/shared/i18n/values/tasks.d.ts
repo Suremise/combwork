@@ -87,6 +87,8 @@ interface HiveMessageValues {
   'tasks.error.unknownTask': { card: string | number }
   'tasks.error.verdictNotYours': { agent: string | number; card: string | number }
   'tasks.history.answerTold': { agent: string | number }
+  'tasks.history.answerUntold': { agent: string | number }
+  'tasks.history.answerUntoldNeed': { agent: string | number; action: string }
   'tasks.history.archived': undefined
   'tasks.history.archivedDone': { days: number }
   'tasks.history.archivedHidden': { project: string | number }

@@ -8,6 +8,7 @@
   "service.advanced.notObject": "advanced.jsonにはオブジェクトが必要です：{example}。",
   "service.advanced.notValues": "advanced.jsonの「values」は、設定と値の組のオブジェクトである必要があります。",
   "service.advanced.unknown": "詳細設定「{id}」はありません。",
+  "service.answerRelay.title": "{card}：あなたの回答は他の誰にも届いていません",
   "service.attachments.badFolder": "セッションのフォルダー名ではありません。",
   "service.attachments.badRecord": "{file}は移動したファイルの記録ではありません",
   "service.attachments.notOwn": "{folder}はリンクか、プロジェクト自身のフォルダーではないため、Hiveは添付ファイルを保存しません。",

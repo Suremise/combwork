@@ -343,6 +343,14 @@
     "defaultMessage": "Told {agent} of your answer",
     "description": "A line in a card's history: Hive told the agent {agent} (its name) of the user's answer to a request for them (For you: an approval, a reply, a decision, a choice at the round limit)."
   },
+  "tasks.history.answerUntold": {
+    "defaultMessage": "The Hive Assistant couldn't be told of your answer to {agent}'s question: only {agent} has it",
+    "description": "A line in a card's history (and a notification): the user answered a question the agent {agent} (its name) asked on the card; Hive gives such answers to the Hive Assistant too, in case they grant something the agent can't do itself, but the Assistant couldn't be told (its tools are off, or Settings → Assistant → Control doesn't let it change cards)."
+  },
+  "tasks.history.answerUntoldNeed": {
+    "defaultMessage": "{agent} can't {action, select, done {move this card to Done} noCode {make this card no code} skipReview {skip this card's review} other {unblock this card}} by itself, and the Hive Assistant couldn't be told of your answer: do it yourself if you agreed to it",
+    "description": "A line in a card's history (and a notification): the user answered a question the agent {agent} (its name) asked on the card; the card needs something only the user or the Hive Assistant may do (select: translate each; keep the keys), the agent can't, and the Assistant couldn't be told (its tools are off, or Settings → Assistant → Control doesn't let it change cards)."
+  },
   "tasks.history.archived": {
     "defaultMessage": "Archived",
     "description": "A line in a card's history: the user archived the card (hidden from the board, kept)."

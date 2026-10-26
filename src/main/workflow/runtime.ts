@@ -207,7 +207,7 @@ const REVIEW_MOVES: ReadonlySet<string> = new Set(['start review', 'verdict']) /
 /** The user's choice at the round limit, as an agent's wake says it (English). */
 const CHOICE_WORDS: Record<RoundChoice, string> = { carryOn: 'carry on', split: 'split it', accept: 'accept it with follow-ups', takeOver: 'the user takes it over' } // i18n-ignore: a wake, agent-facing
 /** What the user did with an action a question offered (#1630), as its answer's wake says it. */
-const ACTION_WORDS: Record<AskActionKind, string> = { done: 'moved it to Done', noCode: 'made it no code', unblock: 'unblocked it' } // i18n-ignore: a wake, agent-facing
+const ACTION_WORDS: Record<AskActionKind, string> = { done: 'moved it to Done', noCode: 'made it no code', unblock: 'unblocked it', skipReview: 'skipped its review' } // i18n-ignore: a wake, agent-facing
 
 /** How much of the question an answer's wake quotes before the user's reply (#1626). */
 const QUESTION_QUOTE_MAX = 200
@@ -1334,6 +1334,10 @@ export class Workflow {
     const before = await this.evidenceOf(card, s, r.options)
     const moved = args.pass && sub?.revision ? await this.platform(r.options).headMoved(card, s, r.options, { base: sub.base, revision: sub.revision, key: sub.key }) : null
     const fin = args.pass ? await this.finishInputs(card, s, r, moved?.same ? moved.to : sub?.revision) : {}
+    // HI-1734: a code card passing with nothing to merge (its change already in its target: HI-1449's checks only, which
+    // others' merges had superseded) is proposed no code. Read before the write; unknown is no proposal.
+    const merged = args.pass && card.kind === 'code' && sub?.revision && sub.base && s.started?.target && !this.store.facts(card.id).some((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided') ? await this.platform(r.options).contains(s.started.target, { base: sub.base, revision: sub.revision, key: sub.key }) : null
+    const nothingToMerge = !!merged && !isUnknown(merged)
     await this.cfg.hooks?.beforeWrite?.('verdict')
     if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.verdict(ref, actor, args))
     const out = await this.writeWhole(card, r, actor, (w) => {
@@ -1351,6 +1355,10 @@ export class Workflow {
       if (bad) return args.startReview ? undo(bad) : bad
       const st = w.state()
       w.fact('Verdict', { reviewer: agent ?? 'user', submission: subId!, revision: sub?.revision ?? null, pass: args.pass, ...(args.failKind ? { failKind: args.failKind } : {}), round: args.pass ? st.rounds : st.rounds + 1, generation: agent ? (st.received[agent] ?? 0) : st.generation, comment: args.comment }) // i18n-ignore: a fact's kind and codes, not text
+      // HI-1734: a code card passing with nothing to merge is proposed no code, as an agent's proposal is (the user
+      // confirms; then it finishes with nothing to merge). HI-1449 sat in Approved for two days. Once only: not after a
+      // proposal or a decision of its kind (`merged` was only read without either).
+      if (nothingToMerge) w.fact('KindProposed', { kind: 'no-code' })
       // A verdict frees its pooled reviewer for the next card, and with G1b = 2 a pass asks for the second (#1443).
       if (card.reviewerPool) w.action('assignReviewer', { submission: subId! })
       if (!args.pass) {
