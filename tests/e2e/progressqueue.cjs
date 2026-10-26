@@ -169,6 +169,12 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // A finished one (Zero's red check) has its log: Open log in its details.
     const zeroRun = (await inv('progress:snapshot')).runs.find((r) => r.source === 'hive' && r.card === zero.n && r.state === 'failed')
     const zeroRunRow = panel.locator(`.progress-tab-runs [data-run="${zeroRun?.id}"]`)
+    // Its card's runs and the queue's folded line opened (HI-1701: runs by card, the queue's checks in one line).
+    await until(async () => {
+      if ((await zeroRunRow.count()) === 1) return true
+      for (const t of await panel.locator('.progress-tab-runs .progress-card-toggle[aria-expanded="false"], .progress-tab-runs .progress-group-head[aria-expanded="false"]').all()) await t.click().catch(() => undefined)
+      return false
+    }, HUNG_MS)
     await zeroRunRow.locator('.progress-details-toggle').click()
     const before = ((await opened()) ?? []).length
     await zeroRunRow.locator('button', { hasText: 'Open log' }).click()
