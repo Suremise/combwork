@@ -7105,6 +7105,36 @@ button.agent-place:hover {
 .activity-node.act-card {
   border-left-color: var(--info);
 }
+/* Finished work dims where it is; what ended (or left the range) dims more, until a refresh (HI-1677). */
+.activity-node.act-done {
+  opacity: 0.72;
+}
+.activity-node.act-gone {
+  opacity: 0.45;
+  border-style: dashed;
+}
+.activity-range button {
+  padding: 2px 8px;
+}
+.activity-pick.on,
+.activity-live.on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.activity-hide {
+  font-size: 12px;
+}
+.activity-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.activity-paused {
+  font-size: 12px;
+}
 .activity-twisty {
   flex: none;
   width: 18px;

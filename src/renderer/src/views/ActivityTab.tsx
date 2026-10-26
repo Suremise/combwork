@@ -1,12 +1,13 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { ACTIVITY_HOURS, buildActivityTree, filetimeMs, type ActivityAgent, type ActivityCard, type ActivityDetail, type ActivityNode, type ActivityNow, type ActivityState, type ActivityTurns } from '@shared/activity'
+import { ACTIVITY_HOURS, ACTIVITY_RANGES, buildActivityTree, filetimeMs, keepGone, newOrder, stableRows, type ActivityAgent, type ActivityCard, type ActivityDetail, type ActivityNode, type ActivityNow, type ActivityRow, type ActivityState, type ActivityTurns } from '@shared/activity'
 import { agentState } from '@shared/agentState'
 import { cardLabel } from '@shared/projectKeys'
 import type { ProjectInfo, SessionListItem } from '@shared/types'
 import { call, errorMessage } from '../api'
 import * as actions from '../actions'
 import { confirm, notify, openInSessionsTab, revealAgent, set, useStore } from '../store'
-import { Icon, IconButton, statusText } from '../components/ui'
+import { Icon, IconButton, statusText, useContextMenu, type MenuEntry } from '../components/ui'
+import { loadActivityView, saveActivityView, type ActivityView } from '../activityView'
 import { cx } from '../util'
 import { boundedQueue, latestOnly } from '@shared/coalesce'
 import { fmt, msg, tr } from '@shared/i18n'
@@ -25,10 +26,11 @@ const NODE_H = 36
 /** Rows drawn beyond the visible ones, so scrolling doesn't show gaps. */
 const OVERSCAN = 12
 
-const NO_FILTER: { agentId?: string; card?: number } = {}
 /** Each project's session list as last read here: the tab opens on it at once and draws the fresh one when it comes. */
 const lastLists = new Map<string, SessionListItem[]>()
 const NO_NOW: ActivityNow = { launches: [], tasks: [] }
+/** How long after the pointer leaves the tree, or a scroll ends, it goes live again (HI-1677). */
+const RESUME_MS = 1500
 
 /**
  * Render times of the tab (ms, from its render to its layout effect), the latest last: the Activity tab's measurement
@@ -37,10 +39,21 @@ const NO_NOW: ActivityNow = { launches: [], tasks: [] }
 const renders: number[] = []
 ;(window as unknown as { __hiveActivityRenders?: number[] }).__hiveActivityRenders = renders
 
+/** What the tree is drawn from: held as it was while the tab is paused (HI-1677). */
+interface Reads {
+  agents: ActivityAgent[]
+  cards: ActivityCard[]
+  list: SessionListItem[] | null
+  turns: ReadonlyMap<string, ActivityTurns>
+  now: ActivityNow
+}
+
 /**
  * A project's Activity tab (#1254): its live work as a tree running left to right, card → agent → session → turn → tool
- * call, with subagents and processes; filtered to an agent or a card when opened from one. Nothing is read or drawn
- * while it is hidden; live changes are taken in about once a second.
+ * call, with subagents and processes. Nothing drawn moves (HI-1677): new work comes after it, finished work dims where
+ * it is, and what ended stays dimmed until a refresh. It pauses while the pointer is over the tree, while it scrolls
+ * and while a node is selected, or by hand, keeping what comes meanwhile for the pill. Nothing is read or drawn while it
+ * is hidden; live changes are taken in about once a second.
  */
 export function ActivityTab({ project }: { project: ProjectInfo }) {
   const renderStart = performance.now()
@@ -50,11 +63,25 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   const shown = useStore((s) => s.activity === 'projects' && s.selectedProject === project.path)
   const visible = usePageVisible()
   const active = shown && visible
-  const filter = useStore((s) => s.activityFilters[project.path] ?? NO_FILTER)
+  // The view (range, filters, paused by hand): the store's, else as this window last left it.
+  const stored = useStore((s) => s.activityFilters[project.path])
+  const [loaded] = useState(() => stored ?? loadActivityView(project.path))
+  const view = stored ?? loaded
+  const setView = useCallback(
+    (patch: Partial<ActivityView>): void =>
+      set((s) => {
+        const next = { ...(s.activityFilters[project.path] ?? loaded), ...patch }
+        saveActivityView(project.path, next)
+        return { activityFilters: { ...s.activityFilters, [project.path]: next } }
+      }),
+    [project.path, loaded]
+  )
   const [list, setList] = useState<SessionListItem[] | null>(() => lastLists.get(project.path) ?? null)
   const [listError, setListError] = useState<string | null>(null)
   const tasks = useStore((s) => s.tasks)
   const [now, setNow] = useState<ActivityNow>(NO_NOW)
+  // The first read of what runs now is in: the tree is whole enough to hold (a tab opened paused holds only then).
+  const [nowRead, setNowRead] = useState(false)
   const [turns, setTurns] = useState<ReadonlyMap<string, ActivityTurns>>(new Map())
   // Nodes opened or closed against their default, sessions' groups showing all, the node whose details show.
   const [toggled, setToggled] = useState<ReadonlySet<string>>(new Set())
@@ -113,6 +140,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
           if (stop || key === lastNow) return
           lastNow = key
           setNow(n)
+          setNowRead(true)
         })
         .catch(() => undefined)
       const live = agentsRef.current.map((a) => (a.live ? `${a.id}:${a.live.sessionId}:${a.live.status}:${statusText(a.live)}` : a.id)).join('|')
@@ -156,14 +184,76 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
         .map((c) => ({ number: c.number, label: cardLabel(c), title: c.title, column: c.column, agents: [c.agent, c.review?.agent].filter((x): x is string => !!x) })),
     [tasks, project.name]
   )
+  const reads = useMemo<Reads>(() => ({ agents, cards, list, turns, now }), [agents, cards, list, turns, now])
 
-  const tree = useMemo(() => buildActivityTree({ agents, cards, sessions: list ?? [], turns, now, at: Date.now(), filter, showAll }), [agents, cards, list, turns, now, filter, showAll])
+  // --- Pause (HI-1677): by hand, or while the pointer is over the tree, while it scrolls, while a node is selected.
+  const [hovering, setHovering] = useState(false)
+  const [scrolling, setScrolling] = useState(false)
+  const pausedBy = view.paused ? 'hand' : hovering || scrolling || selected ? 'auto' : null
+  // What the tree is drawn from while paused, and how many reads came since (each one an update the pill applies).
+  const [held, setHeld] = useState<Reads | null>(null)
+  const [pending, setPending] = useState(0)
+  // When the range is measured from: the last refresh, so nothing ages out while it is looked at.
+  const [asOf, setAsOf] = useState(() => Date.now())
+  // Bumped by a refresh: what ended is dropped then.
+  const [fresh, setFresh] = useState(0)
+  const refresh = useCallback((): void => {
+    setHeld((h) => (h ? reads : null))
+    setPending(0)
+    setAsOf(Date.now())
+    setFresh((n) => n + 1)
+  }, [reads])
+  const ready = !!list && nowRead
+  useEffect(() => {
+    if (pausedBy && !held && ready) setHeld(reads)
+    if (!pausedBy && held) {
+      setHeld(null)
+      setPending(0)
+    }
+    // Only a pause or resume (or the first whole read, opened paused): newer reads while paused are counted below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pausedBy, ready])
+  // A filter changed is the user's own doing: the tree is drawn afresh for it, not with what it hides kept as ended.
+  const filterKey = JSON.stringify([view.agents ?? [], view.cards ?? [], !!view.hideFinished])
+  const lastFilter = useRef(filterKey)
+  useEffect(() => {
+    if (lastFilter.current === filterKey) return
+    lastFilter.current = filterKey
+    setFresh((n) => n + 1)
+  }, [filterKey])
+  const lastReads = useRef(reads)
+  useEffect(() => {
+    const was = lastReads.current
+    lastReads.current = reads
+    if (!held || was === reads) return
+    // A session opened while paused shows its turns (asked for): their first read isn't an update to hold.
+    const onlyFirstTurns = was.agents === reads.agents && was.cards === reads.cards && was.list === reads.list && was.now === reads.now && [...reads.turns].every(([id, t]) => was.turns.get(id) === t || !held.turns.has(id))
+    if (!onlyFirstTurns) setPending((n) => n + 1)
+  }, [reads, held])
+  const drawn = useMemo<Reads>(() => {
+    if (!held) return reads
+    const extra = [...reads.turns].filter(([id]) => !held.turns.has(id))
+    return extra.length ? { ...held, turns: new Map([...held.turns, ...extra]) } : held
+  }, [held, reads])
+
+  const tree = useMemo(() => buildActivityTree({ agents: drawn.agents, cards: drawn.cards, sessions: drawn.list ?? [], turns: drawn.turns, now: drawn.now, at: Date.now(), rangeFrom: asOf, filter: view, showAll }), [drawn, asOf, view, showAll])
+  // What ended stays dimmed where it was until a refresh; the rows go by when each node was first drawn.
+  const keptRef = useRef<{ fresh: number; tree: ActivityNode[] }>({ fresh: -1, tree: [] })
+  const kept = useMemo(() => {
+    const t = keepGone(keptRef.current.fresh === fresh ? keptRef.current.tree : [], tree)
+    keptRef.current = { fresh, tree: t }
+    return t
+  }, [tree, fresh])
+  // When each node was first drawn, since the last refresh: a refresh draws the tree compact again, children back under
+  // their parents, so the long elbows from new work under older parents last only while it is live.
+  const order = useRef({ fresh, order: newOrder() })
+  if (order.current.fresh !== fresh) order.current = { fresh, order: newOrder() }
 
   const isOpen = useCallback((n: ActivityNode): boolean => toggled.has(n.key) !== openIn(mode, n), [toggled, mode])
-  const rows = useMemo(() => layout(tree, isOpen), [tree, isOpen])
+  const rows = useMemo(() => stableRows(kept, isOpen, order.current.order), [kept, isOpen])
 
   // The turns of each session shown open: read when it opens (the tick reads running ones again).
-  const openSessions = useMemo(() => rows.flatMap((r) => (r.node.kind === 'session' && isOpen(r.node) ? [{ id: r.node.session.id, live: r.node.live }] : [])), [rows, isOpen])
+  const openSessions = useMemo(() => rows.flatMap((r) => (r.node.kind === 'session' && !r.node.gone && isOpen(r.node) ? [{ id: r.node.session.id, live: r.node.live }] : [])), [rows, isOpen])
   openRef.current = openSessions
   const unread = openSessions.filter((x) => !turns.has(x.id)).map((x) => x.id).join(',')
   useEffect(() => {
@@ -178,9 +268,55 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
       return next
     })
 
+  // The pointer over the tree pauses it; leaving, it goes live again a moment later. So does a scroll.
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (leaveTimer.current) clearTimeout(leaveTimer.current)
+      if (scrollTimer.current) clearTimeout(scrollTimer.current)
+    },
+    []
+  )
+  const onEnter = useCallback(() => {
+    if (leaveTimer.current) clearTimeout(leaveTimer.current)
+    setHovering(true)
+  }, [])
+  const onLeave = useCallback(() => {
+    if (leaveTimer.current) clearTimeout(leaveTimer.current)
+    leaveTimer.current = setTimeout(() => setHovering(false), RESUME_MS)
+  }, [])
+  const onScroll = useCallback(() => {
+    setScrolling(true)
+    if (scrollTimer.current) clearTimeout(scrollTimer.current)
+    scrollTimer.current = setTimeout(() => setScrolling(false), RESUME_MS)
+  }, [])
+
   const byKey = useMemo(() => new Map(rows.map((r) => [r.node.key, r.node])), [rows])
   const chosen = selected ? (byKey.get(selected) ?? null) : null
-  const filterName = filter.agentId ? (project.agents.find((a) => a.id === filter.agentId)?.name ?? filter.agentId) : filter.card !== undefined ? (cards.find((c) => c.number === filter.card)?.label ?? `#${filter.card}`) : null
+  const filtered = !!view.agents?.length || !!view.cards?.length || !!view.hideFinished
+  const range = view.range ?? '24h'
+
+  // The Agents ▾ and Cards ▾ menus: several can be ticked; a click ticks one and the menu stays open.
+  const menu = useContextMenu()
+  const agentChoices = useMemo(() => [...new Map([...project.agents.map((a) => [a.id, a.name] as const), ...(list ?? []).flatMap((s) => (s.agentId ? [[s.agentId, s.agentName ?? s.agentId] as const] : []))]).entries()], [project.agents, list])
+  const openPick = (e: React.MouseEvent<HTMLElement>, what: 'agents' | 'cards'): void => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const show = (picked: readonly (string | number)[]): void => {
+      const choices: [string | number, string][] = what === 'agents' ? agentChoices : cards.map((c) => [c.number, `${c.label} ${c.title}`])
+      const items: MenuEntry[] = [
+        { label: tr(M.all), icon: picked.length ? undefined : 'check', onClick: () => pick([]) },
+        { separator: true },
+        ...choices.map(([id, label]): MenuEntry => ({ label, icon: picked.includes(id) ? 'check' : undefined, onClick: () => pick(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]) }))
+      ]
+      menu.openAt(r.left, r.bottom + 2, items)
+    }
+    const pick = (next: readonly (string | number)[]): void => {
+      setView(what === 'agents' ? { agents: next as string[] } : { cards: next as number[] })
+      show(next)
+    }
+    show(what === 'agents' ? (view.agents ?? []) : (view.cards ?? []))
+  }
 
   // Until the session list comes (the first open of a project), the tree has the running agents' sessions and the cards.
   const reading = !list && !listError
@@ -189,19 +325,47 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
       <div className="activity-main">
         <div className="activity-head">
           <span className="pane-header-title">{tr(M.heading)}</span>
-          <span className="faint">{tr(M.window)}</span>
+          <div className="segmented activity-range" role="group" aria-label={tr(M.rangeLabel)}>
+            {ACTIVITY_RANGES.map((r) => (
+              <button
+                key={r}
+                className={cx(r === range && 'active')}
+                aria-pressed={r === range}
+                onClick={() => {
+                  setView({ range: r })
+                  refresh()
+                }}
+              >
+                {tr(M.range, { range: r })}
+              </button>
+            ))}
+          </div>
+          <button className={cx('btn small subtle activity-pick', !!view.agents?.length && 'on') /* i18n-ignore: class names */} aria-haspopup="menu" onClick={(e) => openPick(e, 'agents')}>
+            {tr(M.agents, { n: view.agents?.length ?? 0 })} <Icon name="chevron-down" />
+          </button>
+          <button className={cx('btn small subtle activity-pick', !!view.cards?.length && 'on') /* i18n-ignore: class names */} aria-haspopup="menu" onClick={(e) => openPick(e, 'cards')}>
+            {tr(M.cards, { n: view.cards?.length ?? 0 })} <Icon name="chevron-down" />
+          </button>
+          <label className="flex muted activity-hide">
+            <input type="checkbox" className="checkbox" checked={!!view.hideFinished} onChange={(e) => setView({ hideFinished: e.target.checked })} /> {tr(M.hideFinished)}
+          </label>
           {reading && (
             <span className="faint">
               <Icon name="loading" spin /> {tr(M.reading)}
             </span>
           )}
           {!list && listError && <span className="error-text">{tr(M.loadFailed, { error: listError })}</span>}
-          {filterName && (
-            <button className="chip activity-filter" onClick={() => set((s) => ({ activityFilters: Object.fromEntries(Object.entries(s.activityFilters).filter(([k]) => k !== project.path)) }))} title={tr(M.clearFilter)}>
-              {tr(filter.agentId ? M.filterAgent : M.filterCard, { name: filterName })} <Icon name="close" />
-            </button>
-          )}
           <div className="actions">
+            {pausedBy && pending > 0 && (
+              <button className="chip activity-pill" onClick={refresh} title={tr(M.pillTip)}>
+                <Icon name="refresh" /> {tr(M.pill, { n: pending })}
+              </button>
+            )}
+            {pausedBy === 'auto' && !pending && <span className="faint activity-paused">{tr(M.pausedAuto)}</span>}
+            <button className={cx('btn small subtle activity-live', pausedBy === 'hand' && 'on') /* i18n-ignore: class names */} aria-pressed={pausedBy === 'hand'} title={tr(view.paused ? M.liveTip : M.pauseTip)} onClick={() => setView({ paused: !view.paused })}>
+              <Icon name={view.paused ? 'debug-continue' : 'debug-pause'} /> {tr(view.paused ? M.live : M.pause)}
+            </button>
+            <IconButton icon="refresh" title={tr(M.refresh)} onClick={refresh} />
             <IconButton
               icon="expand-all"
               title={tr(M.expandAll)}
@@ -220,13 +384,14 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
             />
           </div>
         </div>
-        {tree.length === 0 && !reading ? (
-          <div className="pane-empty">{tr(filterName ? M.emptyFiltered : M.empty)}</div>
+        {kept.length === 0 && !reading ? (
+          <div className="pane-empty">{tr(filtered || range !== '24h' ? M.emptyFiltered : M.empty)}</div>
         ) : (
-          <TreeView rows={rows} selected={selected} isOpen={isOpen} onSelect={setSelected} onToggle={toggle} onMore={(key) => setShowAll((s) => new Set(s).add(key.replace(/^more:/, '')))} />
+          <TreeView rows={rows} selected={selected} isOpen={isOpen} onSelect={setSelected} onToggle={toggle} onMore={(key) => setShowAll((s) => new Set(s).add(key.replace(/^more:/, '')))} onEnter={onEnter} onLeave={onLeave} onScroll={onScroll} />
         )}
       </div>
       {chosen && <Details project={project} node={chosen} onClose={() => setSelected(null)} />}
+      {menu.element}
     </div>
   )
 }
@@ -245,44 +410,27 @@ function openByDefault(n: ActivityNode): boolean {
   return false
 }
 
-interface Row {
-  node: ActivityNode
-  depth: number
-  /** The row of its parent, -1 for a top-level node. */
-  parent: number
-}
-
-/** The nodes shown, depth first: each open node's children follow it. */
-function layout(tree: readonly ActivityNode[], isOpen: (n: ActivityNode) => boolean): Row[] {
-  const rows: Row[] = []
-  const walk = (nodes: readonly ActivityNode[], depth: number, parent: number): void => {
-    for (const n of nodes) {
-      const at = rows.length
-      rows.push({ node: n, depth, parent })
-      if (n.children.length && isOpen(n)) walk(n.children, depth + 1, at)
-    }
-  }
-  walk(tree, 0, -1)
-  return rows
-}
-
 /** The tree drawn: rows in view (and a few more) as nodes, each joined to its parent by an elbow. */
-function TreeView({ rows, selected, isOpen, onSelect, onToggle, onMore }: { rows: Row[]; selected: string | null; isOpen: (n: ActivityNode) => boolean; onSelect: (key: string) => void; onToggle: (key: string) => void; onMore: (key: string) => void }) {
+function TreeView({ rows, selected, isOpen, onSelect, onToggle, onMore, onEnter, onLeave, onScroll }: { rows: ActivityRow[]; selected: string | null; isOpen: (n: ActivityNode) => boolean; onSelect: (key: string) => void; onToggle: (key: string) => void; onMore: (key: string) => void; onEnter: () => void; onLeave: () => void; onScroll: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const [view, setView] = useState({ top: 0, height: 800 })
   useEffect(() => {
     const el = ref.current
     if (!el) return
     const update = (): void => setView({ top: el.scrollTop, height: el.clientHeight })
+    const scrolled = (): void => {
+      update()
+      onScroll()
+    }
     update()
-    el.addEventListener('scroll', update, { passive: true })
+    el.addEventListener('scroll', scrolled, { passive: true })
     const ro = new ResizeObserver(update)
     ro.observe(el)
     return () => {
-      el.removeEventListener('scroll', update)
+      el.removeEventListener('scroll', scrolled)
       ro.disconnect()
     }
-  }, [])
+  }, [onScroll])
   const first = Math.max(0, Math.floor(view.top / ROW) - OVERSCAN)
   const last = Math.min(rows.length, Math.ceil((view.top + view.height) / ROW) + OVERSCAN)
   const depth = rows.reduce((m, r) => Math.max(m, r.depth), 0)
@@ -301,31 +449,33 @@ function TreeView({ rows, selected, isOpen, onSelect, onToggle, onMore }: { rows
   }
   // A parent above the drawn rows still joins its first drawn child: its line is drawn from where it is.
   return (
-    <div className="activity-tree" ref={ref} role="tree">
+    <div className="activity-tree" ref={ref} role="tree" onMouseEnter={onEnter} onMouseLeave={onLeave}>
       <div className="activity-canvas" style={{ width, height }}>
         <svg className="activity-lines" width={width} height={height} aria-hidden>
           <path d={lines.join('')} />
         </svg>
         {rows.slice(first, last).map((r, i) => (
-          <NodeBox key={r.node.key} node={r.node} x={r.depth * COL} y={(first + i) * ROW} open={isOpen(r.node)} selected={selected === r.node.key} onSelect={onSelect} onToggle={onToggle} onMore={onMore} />
+          <NodeBox key={r.node.key} node={r.node} parent={r.parent >= 0 ? rows[r.parent].node.key : undefined} x={r.depth * COL} y={(first + i) * ROW} open={isOpen(r.node)} selected={selected === r.node.key} onSelect={onSelect} onToggle={onToggle} onMore={onMore} />
         ))}
       </div>
     </div>
   )
 }
 
-const NodeBox = memo(function NodeBox({ node, x, y, open, selected, onSelect, onToggle, onMore }: { node: ActivityNode; x: number; y: number; open: boolean; selected: boolean; onSelect: (key: string) => void; onToggle: (key: string) => void; onMore: (key: string) => void }) {
-  const { icon, title, sub, state } = describe(node)
+const NodeBox = memo(function NodeBox({ node, parent, x, y, open, selected, onSelect, onToggle, onMore }: { node: ActivityNode; parent?: string; x: number; y: number; open: boolean; selected: boolean; onSelect: (key: string) => void; onToggle: (key: string) => void; onMore: (key: string) => void }) {
+  const { icon, title, sub: line, state } = describe(node)
+  const sub = node.gone ? tr(M.endedNode) : line
   const more = node.kind === 'more'
   return (
     <div
-      className={cx('activity-node', `act-${node.kind}`, state && `act-${state}`, selected && 'selected')}
+      className={cx('activity-node', `act-${node.kind}`, state && `act-${state}`, node.gone && 'act-gone', selected && 'selected')}
       style={{ left: x, top: y, width: NODE_W, height: NODE_H }}
       role="treeitem"
       aria-expanded={expandable(node) ? open : undefined}
       aria-selected={selected}
       tabIndex={0}
       data-key={node.key}
+      data-parent={parent}
       // Focused where it is: the browser's own focus would scroll the tree sideways to show all of a deep node.
       onMouseDown={(e) => {
         e.preventDefault()
@@ -534,15 +684,26 @@ function usePageVisible(): boolean {
 
 const M = {
   heading: msg({ id: 'activity.heading', defaultMessage: 'Activity', description: "The Activity tab's heading: the project's live work as a tree." }),
-  window: msg({ id: 'activity.window', defaultMessage: 'Running now and the last 24 hours', description: "Beside the Activity tab's heading: what it shows. Older work is in the Sessions tab." }),
   loading: msg({ id: 'activity.loading', defaultMessage: 'Loading…', description: 'The Activity tab, or a detail in it, while it loads.' }),
   reading: msg({ id: 'activity.reading', defaultMessage: 'Reading the sessions…', description: "Beside the Activity tab's heading while the project's sessions are read (the tree shows running agents meanwhile)." }),
   loadFailed: msg({ id: 'activity.loadFailed', defaultMessage: 'Could not load the activity: {error}', description: "The Activity tab when the project's sessions couldn't be read. {error} is the reason." }),
   empty: msg({ id: 'activity.empty', defaultMessage: 'Nothing ran in the last 24 hours. Start an agent to see its work here.', description: 'The Activity tab when no agent runs and no session was active in the last 24 hours.' }),
   emptyFiltered: msg({ id: 'activity.emptyFiltered', defaultMessage: 'Nothing for this filter in the last 24 hours.', description: 'The Activity tab, filtered to an agent or a card, when it has nothing to show.' }),
-  filterAgent: msg({ id: 'activity.filterAgent', defaultMessage: 'Agent: {name}', description: "A chip above the Activity tree when it shows one agent's work ({name}); clicking it shows everything." }),
-  filterCard: msg({ id: 'activity.filterCard', defaultMessage: 'Card: {name}', description: "A chip above the Activity tree when it shows one card's work ({name}: its key, such as HI-12); clicking it shows everything." }),
-  clearFilter: msg({ id: 'activity.clearFilter', defaultMessage: 'Show everything', description: 'Tooltip of the filter chip above the Activity tree: removes the filter.' }),
+  rangeLabel: msg({ id: 'activity.rangeLabel', defaultMessage: 'Time range', description: "The Activity tab's time range buttons, for screen readers." }),
+  range: msg({ id: 'activity.range', defaultMessage: '{range, select, live {Live} 15m {15 min} 1h {1 h} 6h {6 h} other {24 h}}', description: "A time range button above the Activity tree: Live (running work only), or what was active in the last 15 minutes, 1, 6 or 24 hours. Keep them short." }),
+  agents: msg({ id: 'activity.agents', defaultMessage: '{n, plural, =0 {All agents} one {# agent} other {# agents}}', description: 'A menu button above the Activity tree: which agents it shows (several can be ticked); with none ticked, all.' }),
+  cards: msg({ id: 'activity.cards', defaultMessage: '{n, plural, =0 {All cards} one {# card} other {# cards}}', description: 'A menu button above the Activity tree: which cards it shows (several can be ticked); with none ticked, all.' }),
+  all: msg({ id: 'activity.all', defaultMessage: 'All', description: "The first entry of the Activity tab's Agents and Cards menus: no filter, everything." }),
+  hideFinished: msg({ id: 'activity.hideFinished', defaultMessage: 'Hide finished', description: 'A checkbox above the Activity tree: shows only running work.' }),
+  pause: msg({ id: 'activity.pause', defaultMessage: 'Pause', description: "A button above the Activity tree: holds it as it is (updates wait, counted in the pill) until Live." }),
+  live: msg({ id: 'activity.live', defaultMessage: 'Live', description: 'A button above the Activity tree while it is paused by hand: shows updates as they come again.' }),
+  pauseTip: msg({ id: 'activity.pauseTip', defaultMessage: 'Hold the tree as it is: updates wait until you refresh or go live. It also holds by itself while the pointer is over it, while it scrolls and while a node is selected.', description: "Tooltip of the Activity tab's Pause button." }),
+  liveTip: msg({ id: 'activity.liveTip', defaultMessage: 'Show updates as they come again.', description: "Tooltip of the Activity tab's Live button (shown while paused by hand)." }),
+  pill: msg({ id: 'activity.pill', defaultMessage: '{n, plural, one {# update · Refresh} other {# updates · Refresh}}', description: 'A pill above the Activity tree while it is paused: how many updates are waiting; clicking it shows them. Keep "Refresh" as the action.' }),
+  pillTip: msg({ id: 'activity.pillTip', defaultMessage: 'Show the updates that came while it was paused. It stays paused if you paused it.', description: "Tooltip of the Activity tab's updates pill." }),
+  pausedAuto: msg({ id: 'activity.pausedAuto', defaultMessage: 'Held while you look', description: 'Above the Activity tree while it holds by itself (the pointer over it, a scroll, a node selected) and no update is waiting yet.' }),
+  refresh: msg({ id: 'activity.refresh', defaultMessage: 'Refresh', description: "Tooltip of the Activity tab's refresh button: shows what came since, drops what ended, and measures the time range from now." }),
+  endedNode: msg({ id: 'activity.endedNode', defaultMessage: 'Ended · gone at the next refresh', description: "A node's second line in the Activity tree once its work ended or left the range: it stays in place, dimmed, until a refresh." }),
   expandAll: msg({ id: 'activity.expandAll', defaultMessage: 'Expand All', description: "Tooltip of the Activity tab's button that opens every node." }),
   collapseAll: msg({ id: 'activity.collapseAll', defaultMessage: 'Collapse All', description: "Tooltip of the Activity tab's button that closes every node." }),
   expand: msg({ id: 'activity.expand', defaultMessage: 'Expand', description: "A node's open button in the Activity tree (screen readers)." }),

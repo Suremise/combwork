@@ -1,11 +1,19 @@
 {
+  "activity.agents": {
+    "defaultMessage": "{n, plural, =0 {All agents} one {# agent} other {# agents}}",
+    "description": "A menu button above the Activity tree: which agents it shows (several can be ticked); with none ticked, all."
+  },
+  "activity.all": {
+    "defaultMessage": "All",
+    "description": "The first entry of the Activity tab's Agents and Cards menus: no filter, everything."
+  },
+  "activity.cards": {
+    "defaultMessage": "{n, plural, =0 {All cards} one {# card} other {# cards}}",
+    "description": "A menu button above the Activity tree: which cards it shows (several can be ticked); with none ticked, all."
+  },
   "activity.cardsLabel": {
     "defaultMessage": "Cards",
     "description": "A label in the Activity tab's details: the cards a session worked on."
-  },
-  "activity.clearFilter": {
-    "defaultMessage": "Show everything",
-    "description": "Tooltip of the filter chip above the Activity tree: removes the filter."
   },
   "activity.cliProcess": {
     "defaultMessage": "The agent's CLI · process {pid}",
@@ -67,6 +75,10 @@
     "defaultMessage": "Ended {label}",
     "description": "A notification: the process ({label}: what it ran) was ended from the Activity tab."
   },
+  "activity.endedNode": {
+    "defaultMessage": "Ended · gone at the next refresh",
+    "description": "A node's second line in the Activity tree once its work ended or left the range: it stays in place, dimmed, until a refresh."
+  },
   "activity.expand": {
     "defaultMessage": "Expand",
     "description": "A node's open button in the Activity tree (screen readers)."
@@ -75,17 +87,13 @@
     "defaultMessage": "Expand All",
     "description": "Tooltip of the Activity tab's button that opens every node."
   },
-  "activity.filterAgent": {
-    "defaultMessage": "Agent: {name}",
-    "description": "A chip above the Activity tree when it shows one agent's work ({name}); clicking it shows everything."
-  },
-  "activity.filterCard": {
-    "defaultMessage": "Card: {name}",
-    "description": "A chip above the Activity tree when it shows one card's work ({name}: its key, such as HI-12); clicking it shows everything."
-  },
   "activity.heading": {
     "defaultMessage": "Activity",
     "description": "The Activity tab's heading: the project's live work as a tree."
+  },
+  "activity.hideFinished": {
+    "defaultMessage": "Hide finished",
+    "description": "A checkbox above the Activity tree: shows only running work."
   },
   "activity.input": {
     "defaultMessage": "Input",
@@ -98,6 +106,14 @@
   "activity.lastActive": {
     "defaultMessage": "Last active",
     "description": "A label in the Activity tab's details: when a session was last active."
+  },
+  "activity.live": {
+    "defaultMessage": "Live",
+    "description": "A button above the Activity tree while it is paused by hand: shows updates as they come again."
+  },
+  "activity.liveTip": {
+    "defaultMessage": "Show updates as they come again.",
+    "description": "Tooltip of the Activity tab's Live button (shown while paused by hand)."
   },
   "activity.loadFailed": {
     "defaultMessage": "Could not load the activity: {error}",
@@ -131,17 +147,49 @@
     "defaultMessage": "Started by process",
     "description": "A label in the Activity tab's details: the id of the process that started this one."
   },
+  "activity.pause": {
+    "defaultMessage": "Pause",
+    "description": "A button above the Activity tree: holds it as it is (updates wait, counted in the pill) until Live."
+  },
+  "activity.pauseTip": {
+    "defaultMessage": "Hold the tree as it is: updates wait until you refresh or go live. It also holds by itself while the pointer is over it, while it scrolls and while a node is selected.",
+    "description": "Tooltip of the Activity tab's Pause button."
+  },
+  "activity.pausedAuto": {
+    "defaultMessage": "Held while you look",
+    "description": "Above the Activity tree while it holds by itself (the pointer over it, a scroll, a node selected) and no update is waiting yet."
+  },
   "activity.pidLabel": {
     "defaultMessage": "Process id",
     "description": "A label in the Activity tab's details: a process's id."
+  },
+  "activity.pill": {
+    "defaultMessage": "{n, plural, one {# update · Refresh} other {# updates · Refresh}}",
+    "description": "A pill above the Activity tree while it is paused: how many updates are waiting; clicking it shows them. Keep \"Refresh\" as the action."
+  },
+  "activity.pillTip": {
+    "defaultMessage": "Show the updates that came while it was paused. It stays paused if you paused it.",
+    "description": "Tooltip of the Activity tab's updates pill."
   },
   "activity.process": {
     "defaultMessage": "Process {pid}",
     "description": "A process node's second line in the Activity tree. {pid} is its process id."
   },
+  "activity.range": {
+    "defaultMessage": "{range, select, live {Live} 15m {15 min} 1h {1 h} 6h {6 h} other {24 h}}",
+    "description": "A time range button above the Activity tree: Live (running work only), or what was active in the last 15 minutes, 1, 6 or 24 hours. Keep them short."
+  },
+  "activity.rangeLabel": {
+    "defaultMessage": "Time range",
+    "description": "The Activity tab's time range buttons, for screen readers."
+  },
   "activity.reading": {
     "defaultMessage": "Reading the sessions…",
     "description": "Beside the Activity tab's heading while the project's sessions are read (the tree shows running agents meanwhile)."
+  },
+  "activity.refresh": {
+    "defaultMessage": "Refresh",
+    "description": "Tooltip of the Activity tab's refresh button: shows what came since, drops what ended, and measures the time range from now."
   },
   "activity.showAgent": {
     "defaultMessage": "Show Agent",
@@ -170,9 +218,5 @@
   "activity.turns": {
     "defaultMessage": "{n, plural, one {# turn} other {# turns}}",
     "description": "A session node's second line in the Activity tree: how many turns (a prompt and what followed) it has."
-  },
-  "activity.window": {
-    "defaultMessage": "Running now and the last 24 hours",
-    "description": "Beside the Activity tab's heading: what it shows. Older work is in the Sessions tab."
   }
 }
