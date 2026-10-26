@@ -2,9 +2,12 @@
 // on a connection of their own, so the copy and its fsync never hold main's thread. Here: a checkpoint due runs there
 // (its answer comes after the tick, and the WAL starts again at the next write); a database closing waits for the
 // worker to let go of the file, so it can be moved at once (Windows refuses a file another connection holds); one asked
-// for before a close began is skipped; a file gone is never made again.
-import { existsSync, renameSync } from 'fs'
+// for before a close began is skipped; a file gone is never made again. A checkpoint that holds the file longer than the
+// close's warning (a stalled disk) is waited for until it lets go: the close never goes on with the file held (HR6's
+// round 1).
+import { existsSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { Worker } from 'worker_threads'
 import { build } from 'esbuild'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
@@ -88,5 +91,57 @@ describe("the WAL checkpoints' worker (HI-1691)", () => {
     const gone = join(base, 'gone.db')
     expect(runCheckpoint({ id: 3, file: gone, closing: 1 }, state)).toBeNull()
     expect(existsSync(gone)).toBe(false)
+  })
+
+  it('a close waits for a checkpoint holding the file, however long: past the warning, the file is free only once the worker lets go (HR6 round 1)', async () => {
+    // A stand-in for the worker whose checkpoint holds the file (as on a stalled disk) until the test's helper lets it go.
+    const holder = join(base, 'holding-worker.cjs')
+    writeFileSync(
+      holder,
+      `const { parentPort, workerData } = require('worker_threads')
+const { DatabaseSync } = require('node:sqlite')
+const fs = require('fs')
+const state = new Int32Array(workerData)
+const pause = new Int32Array(new SharedArrayBuffer(4))
+parentPort.on('message', (m) => {
+  Atomics.store(state, ${BUSY}, 1)
+  const db = new DatabaseSync(m.file, { timeout: 0 })
+  db.prepare('SELECT count(*) FROM t').get()
+  fs.writeFileSync(m.file + '.holding', '')
+  while (!fs.existsSync(m.file + '.release')) Atomics.wait(pause, 0, 0, 20)
+  db.close()
+  Atomics.store(state, ${BUSY}, 0)
+  Atomics.notify(state, ${BUSY})
+  parentPort.postMessage({ id: m.id, ok: true, value: null })
+})
+`
+    )
+    wal.useCheckpointWorker(holder)
+    wal.closeLimits.warnMs = 200
+    let helper: Worker | null = null
+    try {
+      const db = open()
+      write(db.writer, 20)
+      const t = performance.now()
+      wal.checkpointTick(t)
+      wal.checkpointTick(t + wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      await vi.waitFor(() => expect(existsSync(`${db.file}.holding`)).toBe(true), { timeout: HUNG_MS })
+      // The helper lets go well past the close's warning (four of them): main waits in the close meanwhile.
+      helper = new Worker(
+        `const { workerData } = require('worker_threads'); const fs = require('fs'); const pause = new Int32Array(new SharedArrayBuffer(4)); Atomics.wait(pause, 0, 0, workerData.after); fs.writeFileSync(workerData.file + '.release', '')`,
+        { eval: true, workerData: { file: db.file, after: 4 * wal.closeLimits.warnMs } }
+      )
+      const from = performance.now()
+      db.close()
+      const waited = performance.now() - from
+      // Only once the worker let go: past the warning, and the file free.
+      expect(existsSync(`${db.file}.release`)).toBe(true)
+      expect(waited).toBeGreaterThan(wal.closeLimits.warnMs)
+      expect(() => renameSync(db.file, `${db.file}.moved`)).not.toThrow()
+    } finally {
+      await helper?.terminate()
+      wal.closeLimits.warnMs = 10_000
+      wal.useCheckpointWorker(bundle)
+    }
   })
 })

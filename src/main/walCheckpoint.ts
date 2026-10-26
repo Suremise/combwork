@@ -217,14 +217,18 @@ class CheckpointThread {
   }
 
   /**
-   * A database is closing: checkpoints asked for before now are skipped, and one with a file open is waited for (at most
-   * CLOSE_WAIT_MS, blocking: a close is rare, and the file mustn't be held as it is closed, replaced or restored).
+   * A database is closing: checkpoints asked for before now are skipped, and one with a file open is waited for until it
+   * lets go, blocking, however long that takes (HR6's round 1): the file mustn't be held as it is closed, replaced or
+   * restored, and the database isn't admitted after (#1395). No worse than before HI-1691, when the close's own checkpoint
+   * ran on main: a checkpoint never waits for a lock (PASSIVE), so only the disk holds it. Logged while it waits.
    */
   closing(): void {
     if (!this.worker) return
     Atomics.add(this.state, CLOSING, 1)
-    const until = performance.now() + CLOSE_WAIT_MS
-    while (Atomics.load(this.state, BUSY) === 1 && performance.now() < until) Atomics.wait(this.state, BUSY, 1, Math.max(1, until - performance.now()))
+    const from = performance.now()
+    while (Atomics.load(this.state, BUSY) === 1) {
+      if (Atomics.wait(this.state, BUSY, 1, closeLimits.warnMs) === 'timed-out' && Atomics.load(this.state, BUSY) === 1) log.warn(`a database closing waits for its WAL's checkpoint in the worker to let go of the file (${Math.round(performance.now() - from)} ms so far)`)
+    }
   }
 
   private start(): Worker | null {
@@ -251,8 +255,8 @@ class CheckpointThread {
   }
 }
 
-/** The longest a database's close waits for its worker's checkpoint to let go of the file. */
-const CLOSE_WAIT_MS = 10_000
+/** How often a database's close, waiting for its worker's checkpoint to let go of the file, says so in the log (tests change it). */
+export const closeLimits = { warnMs: 10_000 }
 
 /** The worker's script, beside main's (as the repository lock's); a test's build of it (`useCheckpointWorker`). */
 let scriptForTests: string | null = null
