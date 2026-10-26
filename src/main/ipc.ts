@@ -103,7 +103,7 @@ import { CONSOLE_WINDOW_CHANNELS, consoleOwner, openConsoleWindow, sendToConsole
 import { isRecordingName, latestRecording, listCaptures, recordingOf, recordingsDir, startRecording, stopRecording, stopRecordingsWhere } from './consoleRecorder'
 import { mayRead, type ConsoleEvent } from '../shared/devConsole'
 import { benchContext, importBenchmark, keepReport, listBenchmarks, pinBenchmark, readBenchmark, removeBenchmark, selectBenchmarks } from './benchmarks'
-import { capturedText, HiveError, hiveError, windowError } from './hiveError'
+import { capturedText, englishError, HiveError, hiveError, windowError } from './hiveError'
 import { deleteJournalEntry, deleteWorkspaceJournal, editJournalEntry, forgetJournalEntries, forgetJournalPreview, journalEntry, journalStatus, setJournalSettings } from './journalService'
 import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
@@ -1578,6 +1578,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
         if (block?.ms) for (const until = Date.now() + block.ms; Date.now() < until; );
         return await senderStore.run(e.sender, () => inWorkspace(w.ws, () => (fn as (...a: unknown[]) => unknown)(...args)))
       } catch (err) {
+        // A failure that isn't one of Hive's own refusals (a file that couldn't be written, HI-1749): the window shows it, and
+        // hive.log has it too, so every "Could not …" notification has its line.
+        if (!(err instanceof HiveError)) log.warn(`ipc ${channel} failed: ${userText(englishError(err))}${typeof (err as NodeJS.ErrnoException)?.code === 'string' ? ` (${(err as NodeJS.ErrnoException).code})` : ''}`)
         throw windowError(err)
       } finally {
         done()

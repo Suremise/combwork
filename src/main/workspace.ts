@@ -18,6 +18,7 @@ import { fmt, msg, tr } from '../shared/i18n'
 import { HiveError, hiveError } from './hiveError'
 import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSessionState, ProjectConfig, ProjectInfo, RemovedData, SessionRecord, WorkspaceConfig, WorkspaceInfo, WorkspaceMoved } from '../shared/types'
 import { config } from './config'
+import { changesConfig, viewOf, withoutView } from '../shared/projectView'
 import { emit, emitTo } from './events'
 import { containsPlace, insideReal, isDir, placeKey, readJson, readKeptJson, removePath, retryWhileSaving, samePlace, withFileLock, writeKeptJson, type KeptReadOptions } from './fsutil'
 import { admit, dismiss, setFenceReason } from './openingFence'
@@ -35,6 +36,9 @@ import { duplicateAgentNames, suggestAgentName } from '../shared/agentNames'
 import { NO_PROJECT_IDS, isProjectId, settleProjectIds, type ProjectIdEntry, type ProjectIdIndex } from '../shared/projectIds'
 
 const log = createLogger('workspace')
+
+/** Where this user's view of a project is kept (AppConfig.ui.projectViews, HI-1749): by its id, which a rename or a move keeps, else by its folder. */
+export const projectViewKey = (cfg: Pick<ProjectConfig, 'id'>, projectPath: string): string => (cfg.id ? `id:${cfg.id}` : `path:${resolve(projectPath).toLowerCase()}`)
 /** A project's read for the window this slow is logged with its parts' times (HI-1694). */
 const SLOW_PROJECT_READ_MS = 1000
 /** What the board keeps in .hive (#1017): its database and the files beside it, the cards' old folders, backups and the deleted cards' staging. */
@@ -1037,7 +1041,7 @@ export class WorkspaceService {
       (async () => {
         await whenAll([mkdir(join(h, 'sessions'), { recursive: true }), mkdir(join(h, 'archive'), { recursive: true })])
         // Its platform is recorded as it is made, from what detection finds (SPEC §16.3.5): never switched silently after.
-        if (!existsSync(join(h, 'project.json'))) await writeKeptJson(join(h, 'project.json'), { ...DEFAULT_PROJECT_CONFIG, platform: detect(projectPath).platform })
+        if (!existsSync(join(h, 'project.json'))) await writeKeptJson(join(h, 'project.json'), withoutView({ ...DEFAULT_PROJECT_CONFIG, platform: detect(projectPath).platform }))
         // 0.1's launch folder for Agent 1; every agent now has launch-<id>.
         if (existsSync(join(h, 'launch'))) await removePath(join(h, 'launch')).catch(() => undefined)
       })()
@@ -1078,9 +1082,32 @@ export class WorkspaceService {
   /** A project's config; `opts` for a read that is written back (mutateProjectConfig, #1600). */
   async projectConfig(projectPath: string, opts?: KeptReadOptions): Promise<ProjectConfig> {
     const raw = await readKeptJson<Record<string, unknown>>(join(projectPath, HIVE_DIR, 'project.json'), {}, opts)
-    const cfg = mergeDefaults(structuredClone(DEFAULT_PROJECT_CONFIG), migrateProjectConfig(raw))
+    const cfg = this.withView(projectPath, mergeDefaults(structuredClone(DEFAULT_PROJECT_CONFIG), migrateProjectConfig(raw)), raw)
     // The Assistant's "project" settings are Settings → Assistant; its file keeps the workspace's own choices.
     return this.isAssistantHome(projectPath) ? assistantProjectConfig(cfg, config.settings) : cfg
+  }
+
+  /**
+   * A project's config with this user's view of it (HI-1749: AppConfig.ui.projectViews) over its file's. The first read of
+   * a project with none kept takes what its project.json has (from before the view moved out), so no one loses a layout.
+   */
+  private withView(projectPath: string, cfg: ProjectConfig, raw: Record<string, unknown>): ProjectConfig {
+    const views = config.get().ui.projectViews
+    // One kept by its folder before it had an id is still its view.
+    let view = views?.[projectViewKey(cfg, projectPath)] ?? views?.[projectViewKey({}, projectPath)]
+    if (!view) {
+      view = viewOf(Object.fromEntries(Object.keys(viewOf(raw as Partial<ProjectConfig>)).map((k) => [k, cfg[k as keyof ProjectConfig]])) as Partial<ProjectConfig>)
+      if (Object.keys(view).length) this.keepView(projectPath, { ...cfg, ...view })
+    }
+    return { ...cfg, ...view }
+  }
+
+  /** Keeps a project's view (its config's view fields) in this user's UI state, when it changed. */
+  private keepView(projectPath: string, cfg: ProjectConfig): void {
+    const key = projectViewKey(cfg, projectPath)
+    const view = viewOf(cfg)
+    if (JSON.stringify(config.get().ui.projectViews?.[key] ?? {}) === JSON.stringify(view)) return
+    config.update((c) => void (c.ui.projectViews = { ...c.ui.projectViews, [key]: view }))
   }
 
   /** A stamp of Hive's last write of this project's project.json (#1432, #1498): compared, whether it changed since a read. */
@@ -1138,7 +1165,10 @@ export class WorkspaceService {
         // The agents changed: each layout's pane placement takes in those added and lets go of those removed (#762), so
         // every agent keeps its cell (not one worked out again from the order on each read).
         if ('agents' in patch && updated.placement) updated = { ...updated, placement: settlePlacements(updated.placement, projectAgents(updated).map((a) => a.id)) }
-        await writeKeptJson(file, withLegacyProjectFields(updated))
+        // The view (HI-1749) to this user's UI state, saved a moment later and on quit; project.json only for a change of
+        // the config, written without the view (one from before moves out as it is written).
+        this.keepView(projectPath, updated)
+        if (changesConfig(patch)) await writeKeptJson(file, withLegacyProjectFields(withoutView(updated)))
         // As it is written: a read begun before now may have found the config from before.
         ticket = ++this.rootTickets
         // Kept only for the workspace it was asked in (#1498): one that closed (or gave way to another) meanwhile keeps

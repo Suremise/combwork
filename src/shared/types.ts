@@ -596,6 +596,12 @@ export interface AppConfig {
     assistantFold?: Record<string, boolean>
     /** Each workspace's board as the user left it, by workspace path in lower case (#170): collapsed columns, folded cards. */
     boardFold?: Record<string, BoardFold>
+    /**
+     * Each project's Session tab as the user left it (HI-1749: Panes or Tiles, its layout, where its panes are), by
+     * projectViewKey: this user's view, not the project's config, so it is never written to project.json (where another
+     * program holding the file made a view switch fail). A project's project.json from before keeps its view until read.
+     */
+    projectViews?: Record<string, ProjectView>
     /** Each workspace's Progress panel filter (#251), by workspace path in lower case: one project's runs (and agent's), or all. */
     progressFilter?: Record<string, { project: string; agent?: string }>
     /** Each workspace's running lanes in the order the user put them in the Progress panel (#568), by workspace path in lower case: lane ids. */
@@ -1203,6 +1209,9 @@ export interface PlatformSwitchCheck {
   /** A card in flight goes through Hive's merge queue (its ruleset's): the queue carries on, and stays shown. */
   queue: boolean
 }
+
+/** A project's Session tab as this user left it (AppConfig.ui.projectViews, HI-1749): ProjectConfig's view fields. */
+export type ProjectView = Partial<Pick<ProjectConfig, 'sessionView' | 'layout' | 'placement'>>
 
 export interface ProjectConfig {
   /** 2 since 0.2.0: agents are all equal and a project starts with none (0.1's agents are cleared). */

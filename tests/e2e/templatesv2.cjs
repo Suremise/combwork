@@ -56,7 +56,7 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
     await lib.waitForProvider(inv)
-    const projectCfg = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8'))
+    const projectCfg = () => lib.projectConfig(userData, alpha) // with this user's view over it (HI-1749)
     const shoot = async (name, target) => {
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })
@@ -150,7 +150,8 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     await teamLoad.getByRole('button', { name: 'Load template' }).click()
     const loaded = await until(async () => {
       const c = projectCfg()
-      return c.agents.length === 6 && c.agents[0].name === want[0] ? c : null
+      // The layout with them: this user's view, saved a moment after (HI-1749).
+      return c.agents.length === 6 && c.agents[0].name === want[0] && c.layout === 'grid6' ? c : null
     }, HUNG_MS)
     check('Team 3×3 makes six agents with their roles, paired both ways, all on Claude Code', !!loaded && JSON.stringify(loaded.agents.map((a) => [a.name, a.workflowRole, a.pairedWith, a.provider])) === JSON.stringify(want.map((n, i) => [n, i < 3 ? 'builder' : 'reviewer', want[i < 3 ? i + 3 : i - 3], 'claude-code'])), JSON.stringify(loaded?.agents))
     check('…in a grid of six, none in a worktree, no branch made', loaded?.layout === 'grid6' && loaded.agents.every((a) => !a.worktree) && lib.git(alpha, ['branch', '--list']) === branches, JSON.stringify(loaded?.layout))

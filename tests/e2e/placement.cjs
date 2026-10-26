@@ -44,7 +44,7 @@ const launch = async () => {
 
   let { app, page, inv } = await launch()
   await lib.openWorkspace(inv, page, ws)
-  const projectJson = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8'))
+  const projectJson = () => lib.projectConfig(userData, alpha) // with this user's view over it (HI-1749)
   /** A layout's saved cells by agent name ("." for an empty cell), joined: "One . . Two". */
   const savedCells = (layout) => {
     const c = projectJson()
