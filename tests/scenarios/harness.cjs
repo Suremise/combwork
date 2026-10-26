@@ -138,6 +138,15 @@ function promptRefused({ prompt = '', screen = '', auth = null } = {}) {
   return null
 }
 
+/**
+ * A prompt the CLI never took, nor refused for the environment (HI-1168): nothing of the model's ran, so the trial is a
+ * setup error (no checks, incomplete in the benchmark), never its checks failed as the model's. Null once it was taken.
+ */
+function promptNotTaken({ taken = false, screen = '' } = {}) {
+  if (taken) return null
+  return `setup: the prompt was never taken; its screen ends: ${JSON.stringify(lib.plainText(screen).trim().slice(-300))}`
+}
+
 /** The lines of Hive's log (a test profile's), or none. */
 const logLines = (file) => {
   try {
@@ -499,6 +508,8 @@ async function runScenario(sc, providerKey, opts = {}) {
     // A change made inside the measured window (a skill edited after the snapshot, before the launch), for scenarios
     // that compare the skill service's work on unchanged and changed revisions.
     if (sc.beforeLaunch) await sc.beforeLaunch(ctx)
+    // Hive's log as the session under test starts: its hive tools connecting is counted from here.
+    const launchMark = lib.hiveLogLines(userData).length
     await inv('session:start', host, { agentId })
     const key = lib.ptyKey(host, agentId)
     /** The session under test's conversation as Hive reads it (its transcript's items), or [] before it has one. */
@@ -596,14 +607,18 @@ async function runScenario(sc, providerKey, opts = {}) {
       const items = s?.sessionId ? ((await inv('transcript:read', host, s.sessionId).catch(() => null))?.items ?? []) : []
       return items.some((x) => x.kind === 'user' && x.text.includes(text.slice(0, 40)))
     }
+    let notTaken = null
     if (!endedAtLaunch) {
       turnBefore.set(text, (await live())?.turn?.id ?? null)
       const mark = String((await inv('pty:buffer', key).catch(() => '')) ?? '').length
-      if (!(await lib.sendPrompt(inv, key, text, { submitted, waitMs: 20000 }))) {
+      // Real Claude Code: its first prompt waits for its hive tools, as Hive's own first line does (HI-1148).
+      const ready = p.provider === 'claude-code' ? () => lib.hiveToolsConnected(userData, agentId, launchMark) : null
+      if (!(await lib.sendPrompt(inv, key, text, { submitted, ready, waitMs: 20000 }))) {
         // Never taken: a sign-in or a limit the CLI shows only once something is typed is the environment (#1321).
         const drawn = String((await inv('pty:buffer', key).catch(() => '')) ?? '').slice(mark)
         const refused = promptRefused({ prompt: text, screen: drawn, auth: p.provider === 'claude-code' ? claudeAuthStatus(path.join(userData, 'logs', 'hive.log'), agentId, env) : null })
         if (refused) return skipFor(refused)
+        notTaken = promptNotTaken({ taken: await submitted(), screen: drawn })
       }
     }
     const sentAt = Date.now()
@@ -611,8 +626,8 @@ async function runScenario(sc, providerKey, opts = {}) {
     // Wait for the turn to end: working (or background) first, then finished/ready for a few seconds. `during` sees the
     // board while it works, for scenarios that change things under it. A quick turn can start and end between two looks
     // (each look is several calls, slow under load: #1311), so the prompt answered counts as the work seen too.
-    // A session that ended at launch has no turn to wait for.
-    const limit = endedAtLaunch ? Date.now() : Date.now() + (opts.timeoutMs ?? 300000)
+    // A session that ended at launch, or whose prompt was never taken, has no turn to wait for.
+    const limit = endedAtLaunch || notTaken ? Date.now() : Date.now() + (opts.timeoutMs ?? 300000)
     let sawWork = false
     let quietSince = 0
     const trustAnswered = new Set()
@@ -658,6 +673,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     }
     const s = await live()
     if (endedAtLaunch) result.error = endedAtLaunch.error
+    else if (notTaken) result.error = notTaken
     else if (!s || Date.now() >= limit) result.error = s ? 'timed out' : 'the session ended'
     // The bridges report their calls to Hive a batch at a time (every 2 s, or as their CLI closes input): read the
     // metrics once they count every call the bridges logged (allCallsReported). Not all within the bound (a report
@@ -742,7 +758,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       await lib.until(async () => !(await live()), HUNG_MS)
       observed.leftovers = ((await inv('session:leftovers', true)) ?? []).filter((l) => l.projectPath.toLowerCase() === host.toLowerCase() && l.agentId === agentId)
     }
-    result.checks = (sc.expect?.(observed, ctx) ?? []).map(([name, ok, detail]) =>
+    result.checks = (notTaken ? [] : (sc.expect?.(observed, ctx) ?? [])).map(([name, ok, detail]) =>
       p.fake && (typeof sc.fakeSkips === 'function' ? sc.fakeSkips(providerKey) : (sc.fakeSkips ?? [])).includes(name) ? { name, ok: null, skipped: 'fake provider' } : { name, ok: !!ok, ...(ok ? {} : { detail: String(detail ?? '').slice(0, 300) }) }
     )
     // What a scenario records without checking it (#1611: whether the skill that owns the workflow was read, when the
@@ -782,4 +798,4 @@ async function runScenario(sc, providerKey, opts = {}) {
   return result
 }
 
-module.exports = { runScenario, observeTranscript, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
+module.exports = { runScenario, observeTranscript, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }

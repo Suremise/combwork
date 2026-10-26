@@ -600,6 +600,24 @@ describe('a trial the environment stops (trialEnvironment)', () => {
     })
   })
 
+  // HI-1168: the Assistant's wake line typed but never taken failed every check as the model's (`ready; null; calls:`).
+  describe('a prompt never taken, nor refused (promptNotTaken)', () => {
+    const { promptNotTaken } = require('./scenarios/harness.cjs') as {
+      promptNotTaken: (o: { taken?: boolean; screen?: string }) => string | null
+    }
+
+    it('is a setup error with the end of its screen', () => {
+      const why = promptNotTaken({ taken: false, screen: '\x1b[2K> [Hive] #1 is in Doing\r\n' })
+      expect(why).toMatch(/^setup: the prompt was never taken; its screen ends: /)
+      expect(why).toContain('[Hive] #1 is in Doing')
+      expect(why).not.toContain('\x1b')
+    })
+
+    it('is nothing once it was taken (late, after the last attempt)', () => {
+      expect(promptNotTaken({ taken: true, screen: '> hello' })).toBeNull()
+    })
+  })
+
   // #577: Claude Code 2.1.296 with an OAuth session it couldn't refresh printed this and exited with 1 at launch.
   describe('a CLI that exits at launch (launchEnded)', () => {
     const { launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus } = require('./scenarios/harness.cjs') as {
