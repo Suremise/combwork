@@ -1,3 +1,4 @@
+import { stat } from 'original-fs'
 import { parentPort, workerData } from 'worker_threads'
 
 /**
@@ -13,7 +14,15 @@ const TICK_MS = 50
 /** A gap in its ticks longer than this is noted. */
 const GAP_MS = 250
 const GAPS = 16
-export const WATCHDOG_SLOTS = 2 + 2 * GAPS
+/**
+ * It also times a file call through the thread pool (HI-1702): a stat every PROBE_MS, one at a time, the latest that took
+ * over PROBE_SLOW_MS kept after the gaps as (how many so far, its start, how long it took). Timed here, on a thread
+ * that only ticks, a main thread busy meanwhile isn't counted: only the pool's wait and the disk's.
+ */
+const PROBE = 2 + 2 * GAPS
+const PROBE_MS = 1000
+export const PROBE_SLOW_MS = 250
+export const WATCHDOG_SLOTS = PROBE + 3
 
 const at = (): number => performance.timeOrigin + performance.now()
 
@@ -44,7 +53,30 @@ export function pausedAlongside(ticks: Float64Array, from: number, to: number): 
   return false
 }
 
+/** A probe that has ended (ms since the epoch): kept when it was slow, its count raised last. */
+export function probeEnded(ticks: Float64Array, start: number, end: number): void {
+  if (end - start <= PROBE_SLOW_MS) return
+  ticks[PROBE + 1] = start
+  ticks[PROBE + 2] = end - start
+  ticks[PROBE]++
+}
+
+/** The latest slow probe: how many there have been, its start (ms since the epoch) and how long it took; null if none. */
+export function slowProbe(ticks: Float64Array): { n: number; start: number; ms: number } | null {
+  return ticks[PROBE] ? { n: ticks[PROBE], start: ticks[PROBE + 1], ms: ticks[PROBE + 2] } : null
+}
+
 if (parentPort && workerData instanceof SharedArrayBuffer) {
   const ticks = new Float64Array(workerData)
   setInterval(() => watchdogTick(ticks), TICK_MS)
+  let probing = false
+  setInterval(() => {
+    if (probing) return
+    probing = true
+    const start = at()
+    stat(process.execPath, () => {
+      probing = false
+      probeEnded(ticks, start, at())
+    })
+  }, PROBE_MS)
 }
