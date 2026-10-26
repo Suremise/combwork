@@ -160,7 +160,7 @@ const nothingToArchive = (dialog) => {
     await shoot('grouped-mix-narrow')
     // The toolbar in a narrow window (HI-1725: the search box was a sliver showing "S", Workflows cut to "V"): the row
     // wraps, the search box keeps its least width, and no control is cut or past the toolbar's edge.
-    const toolbar = () => page.evaluate(() => {
+    const toolbarRow = () => page.evaluate(() => {
       const bar = document.querySelector('.board-view .board-toolbar')
       const edge = bar.getBoundingClientRect()
       // The workflow button and, where it has a tooltip, its wrapper (then the toolbar's item) both: either could be cut.
@@ -185,9 +185,9 @@ const nothingToArchive = (dialog) => {
     // One row: every control's middle within a few pixels of the others' (align-items: center; their heights differ).
     const oneRow = (t) => Math.max(...t.controls.map((x) => x.mid)) - Math.min(...t.controls.map((x) => x.mid)) <= 3
     check('narrow: the toolbar wraps, its search box at least 160 px, every control whole, inside it and apart (HI-1725)', !!(await until(async () => {
-      const t = await toolbar()
+      const t = await toolbarRow()
       return toolbarWhole(t) && !oneRow(t)
-    }, HUNG_MS)), JSON.stringify(await toolbar()))
+    }, HUNG_MS)), JSON.stringify(await toolbarRow()))
     await shoot('toolbar-narrow')
     await fold(['doing', 'done'])
     check('…every column folded: all 34 px strips, narrow', !!(await foldedRight(OWN)), JSON.stringify(await widths()))
@@ -196,9 +196,9 @@ const nothingToArchive = (dialog) => {
     check('…and wide', !!(await foldedRight(OWN)), JSON.stringify(await widths()))
     await shoot('grouped-all-folded')
     check('wide: the toolbar is one row, every control whole (HI-1725)', !!(await until(async () => {
-      const t = await toolbar()
+      const t = await toolbarRow()
       return toolbarWhole(t) && oneRow(t)
-    }, HUNG_MS)), JSON.stringify(await toolbar()))
+    }, HUNG_MS)), JSON.stringify(await toolbarRow()))
     await shoot('toolbar-wide')
     for (const id of OWN) await col(id).getByRole('button', { name: /^Expand / }).click()
     check('…they open again, each at least 140 px', !!(await foldedRight([])), JSON.stringify(await widths()))
@@ -391,7 +391,7 @@ const nothingToArchive = (dialog) => {
     await shoot('merging-pl')
     // The toolbar's longer Polish labels in a narrow window (HI-1725).
     await lib.fitWindow(h.app, page, { width: 900, height: 900 })
-    check('Polish, narrow: the toolbar wraps, every control whole, inside it and apart (HI-1725)', !!(await until(async () => toolbarWhole(await toolbar()), HUNG_MS)), JSON.stringify(await toolbar()))
+    check('Polish, narrow: the toolbar wraps, every control whole, inside it and apart (HI-1725)', !!(await until(async () => toolbarWhole(await toolbarRow()), HUNG_MS)), JSON.stringify(await toolbarRow()))
     await shoot('toolbar-narrow-pl')
     await lib.fitWindow(h.app, page, { width: 1500, height: 900 })
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: { ...q.queueOptions(fx), stageNames: { active: 'W'.repeat(24) } } })
