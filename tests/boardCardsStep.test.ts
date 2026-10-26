@@ -97,6 +97,8 @@ async function readers(w: WS, numbers: number[], exportTo: string): Promise<Reco
     out.window = JSON.stringify(await tasks.windowTasks(w))
     out.holds = JSON.stringify(await tasks.cardHolds(w))
     out.places = JSON.stringify(await tasks.boardPlaces(w))
+    out.heads = JSON.stringify(await tasks.liveCardHeads(w))
+    out.done = JSON.stringify(await tasks.liveCardHeads(w, { done: true }))
     out.counts = JSON.stringify(store.archivedCounts(w))
     await store.exportBoard(w, exportTo)
     for (const f of readdirSync(exportTo).sort()) out[`export ${f}`] = readFileSync(join(exportTo, f), 'utf8')

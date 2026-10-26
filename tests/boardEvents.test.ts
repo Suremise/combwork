@@ -15,7 +15,8 @@ import { DatabaseSync } from 'node:sqlite'
 const base = tempDir('hive-board-events-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-// Every read of the whole board that recording the running agents' cards makes, counted (the reads themselves unchanged).
+// Every read of the whole board that recording the running agents' cards makes, counted (the reads themselves unchanged):
+// the board's cards in full, or the live cards' heads (HI-1690).
 const boardReads = vi.hoisted(() => ({ n: 0 }))
 vi.mock('../src/main/tasks', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../src/main/tasks')>()
@@ -24,6 +25,10 @@ vi.mock('../src/main/tasks', async (importOriginal) => {
     allTasks: (...a: Parameters<typeof orig.allTasks>) => {
       boardReads.n++
       return orig.allTasks(...a)
+    },
+    liveCardHeads: (...a: Parameters<typeof orig.liveCardHeads>) => {
+      boardReads.n++
+      return orig.liveCardHeads(...a)
     }
   }
 })

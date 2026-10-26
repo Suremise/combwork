@@ -1396,6 +1396,24 @@ export function cardPlaces(ws: WorkspaceService): { number: number; raw: { colum
   })
 }
 
+/** A card's head (HI-1690): whose it is, where it is (its column and order there), who works on it and who reviews it. */
+const HEAD_FIELDS = ['title', 'project', 'projectId', 'column', 'order', 'archived', 'agent', 'agentName', 'review']
+
+/**
+ * The live cards' heads (HI-1690: what readers run for each board change need of the board), or with `done` the live Done
+ * cards' alone: HEAD_FIELDS from their columns, nothing else of a card (its description, comments, history) and no
+ * archived card. In number order.
+ */
+export function cardHeadDocs(ws: WorkspaceService, o: { done?: boolean } = {}): { number: number; doc: Record<string, unknown> }[] {
+  const where = o.done ? "col = 'done' AND archived = 0" : 'archived = 0' // i18n-ignore: SQL
+  return readSnapshot(ws, (b, db) => {
+    if (!b.legacy) return cardFields(db, HEAD_FIELDS, { where, parts: [] }).map(({ r, fields }) => ({ number: r.card.number, doc: fields }))
+    const field = (k: string): string => `'${k}', doc -> '$.${k}'`
+    const rows = db.prepare(`SELECT number, json_object(${HEAD_FIELDS.map(field).join(', ')}) AS doc FROM cards WHERE ${where} ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
+    return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+  })
+}
+
 /**
  * These cards' project (as saved), column and agent, each as its document has it (null when it hasn't the field), from
  * their columns: what a change reads of its cards before it (#1216's reads), no document composed.
