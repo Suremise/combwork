@@ -164,13 +164,74 @@ describe('workflow scenarios, Git', () => {
       expect(s.entries.at(-1)).toMatchObject({ state: 'open', revision: rev })
       const back = e.store.facts(card.id).filter((f) => f.kind === 'CarriedOver')
       expect(back.map((f) => f.data)).toEqual([expect.objectContaining({ to: rev, how: 'sameRevision' })])
-      expect(e.wakes.some((w) => w.agent === 'B1' && w.why.includes('pass holds again and it is queued again'))).toBe(true)
+      expect(e.wakes.some((w) => w.agent === 'B1' && w.why.includes("pass holds again; it is queued again; don't submit it again"))).toBe(true)
       // Observed once: another look writes nothing more.
       await reconcile(e.wf, card)
       expect(e.store.facts(card.id).filter((f) => f.kind === 'CarriedOver')).toHaveLength(1)
       const [o] = await e.queue().drain('main')
       expect(o).toMatchObject({ outcome: 'integrated' })
       expect(e.wf.state(card).stage).toBe('done')
+    })
+
+    it('a newer head observed while the pass holding again waits for its write wins (HR2 r1 f1)', async () => {
+      const e = pair()
+      const { card, folder } = await approved(e)
+      const rev = e.wf.state(card).approved!.revision!
+      const other = commit(folder, { 'src/fix.txt': 'unreviewed\n' }, 'follow-up')
+      await reconcile(e.wf, card)
+      sh(folder, 'reset', '-q', '--hard', rev)
+      // Another observer sees the line move away again just before this one's write.
+      const write = e.wf.write.bind(e.wf)
+      let raced = false
+      e.wf.write = (async (...args: Parameters<typeof e.wf.write>) => {
+        if (!raced && args[2] === 'hive' && e.wf.state(card).stale && e.wf.state(card).head === rev) {
+          raced = true
+          sh(folder, 'reset', '-q', '--hard', other)
+          await reconcile(e.wf, card)
+        }
+        return write(...args)
+      }) as typeof e.wf.write
+      await reconcile(e.wf, card)
+      expect(raced).toBe(true)
+      expect(e.wf.state(card)).toMatchObject({ head: other, stage: 'approved', stale: { approved: rev } })
+      expect(e.store.facts(card.id).some((f) => f.kind === 'CarriedOver')).toBe(false)
+    })
+
+    it('away, back and away to the same commit again: each excursion is stale, each return holds again (HR2 r1 f2)', async () => {
+      const e = pair()
+      const { card, folder } = await approved(e)
+      const rev = e.wf.state(card).approved!.revision!
+      const other = commit(folder, { 'src/fix.txt': 'unreviewed\n' }, 'follow-up')
+      for (let i = 0; i < 2; i++) {
+        sh(folder, 'reset', '-q', '--hard', other)
+        await reconcile(e.wf, card)
+        expect(e.wf.state(card)).toMatchObject({ stage: 'approved', stale: { approved: rev, current: other } })
+        expect(e.wf.state(card).entries.at(-1)?.state).toBe('cancelled')
+        sh(folder, 'reset', '-q', '--hard', rev)
+        await reconcile(e.wf, card)
+        expect(e.wf.state(card)).toMatchObject({ stage: 'merging', stale: null })
+      }
+      expect(e.kinds(card.id).filter((k) => k === 'Stale')).toHaveLength(2)
+      expect(e.kinds(card.id).filter((k) => k === 'CarriedOver')).toHaveLength(2)
+      expect(e.kinds(card.id).filter((k) => k === 'IntegrationRequested')).toHaveLength(3)
+    })
+
+    it('a return recorded while the rules were off is acted on once they are on, once (HR2 r1 f3)', async () => {
+      const e = pair()
+      const { card, folder } = await approved(e)
+      const rev = e.wf.state(card).approved!.revision!
+      commit(folder, { 'src/fix.txt': 'unreviewed\n' }, 'follow-up')
+      await reconcile(e.wf, card)
+      e.wf.cfg.reconcileActs = false
+      sh(folder, 'reset', '-q', '--hard', rev)
+      await reconcile(e.wf, card)
+      expect(e.wf.state(card)).toMatchObject({ stage: 'approved', stale: null })
+      e.wf.cfg.reconcileActs = true
+      await reconcile(e.wf, card)
+      expect(e.wf.state(card).stage).toBe('merging')
+      await reconcile(e.wf, card)
+      expect(e.kinds(card.id).filter((k) => k === 'IntegrationRequested')).toHaveLength(2)
+      expect(e.wakes.filter((w) => w.agent === 'B1' && w.why.includes('pass holds again'))).toHaveLength(1)
     })
 
     it('where the agent merges, back at the approved commit: the pass holds again and its builder is told to merge it', async () => {
