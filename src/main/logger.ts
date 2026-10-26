@@ -34,25 +34,44 @@ function append(name: string, line: string): void {
 }
 
 /**
- * Whether lines go to the console too (an unpackaged build): no more once stdout or stderr is closed (HI-1684). A write
- * to a closed pipe throws EPIPE, or its stream reports it as an error; uncaught, that error was logged, and its console
+ * Whether lines go to the console too (an unpackaged build): no more once its console fails (HI-1684). A write to a
+ * closed pipe throws EPIPE, or its stream reports it as an error; uncaught, that error was logged, and its console
  * write threw again, without end. The file log goes on.
  */
 let toConsole = !app.isPackaged
-const consoleGone = (): void => {
+/** The errors of a console that was closed (its reader gone): expected, said once. */
+const PIPE_CLOSED = new Set(['EPIPE', 'ERR_STREAM_DESTROYED', 'ERR_STREAM_WRITE_AFTER_END'])
+
+/**
+ * The console failed (a write threw, or its stream reported an error): it isn't written to again, and the log file
+ * says so, never through the console. A closed pipe is said once; any other error each time, with its stack, as an
+ * uncaught one would have been before the console was guarded.
+ */
+function consoleFailed(where: 'stdout' | 'stderr', e: unknown): void {
+  const code = (e as { code?: unknown } | null)?.code
+  const closed = typeof code === 'string' && PIPE_CLOSED.has(code)
+  const wasOn = toConsole
   toConsole = false
+  if (closed && !wasOn) return
+  const at = new Date().toISOString()
+  if (closed) append('hive.log', `${at} [INFO] [logger] The console's ${where} is closed (${code}): log lines go to this file only from now\n`)
+  else append('hive.log', `${at} [ERROR] [logger] The console's ${where} failed, so log lines go to this file only from now: ${e instanceof Error ? (e.stack ?? e.message) : safeJson(e)}\n`)
 }
-if (toConsole) for (const s of [process.stdout, process.stderr]) s?.on?.('error', consoleGone)
+if (toConsole) {
+  process.stdout?.on?.('error', (e: unknown) => consoleFailed('stdout', e))
+  process.stderr?.on?.('error', (e: unknown) => consoleFailed('stderr', e))
+}
 
 function write(level: Level, scope: string, message: string, extra?: unknown): void {
   const detail = extra instanceof Error ? ` ${extra.stack ?? extra.message}` : extra !== undefined ? ` ${safeJson(extra)}` : ''
   const line = `${new Date().toISOString()} [${level.toUpperCase()}] [${scope}] ${message}${detail}\n`
-  if (toConsole && (process.stdout?.destroyed || process.stderr?.destroyed)) consoleGone()
+  const where = level === 'error' ? 'stderr' : 'stdout'
+  if (toConsole && process[where]?.destroyed) consoleFailed(where, { code: 'ERR_STREAM_DESTROYED' })
   if (toConsole) {
     try {
       ;(level === 'error' ? console.error : console.log)(line.trimEnd())
-    } catch {
-      consoleGone()
+    } catch (e) {
+      consoleFailed(where, e)
     }
   }
   append('hive.log', line)
