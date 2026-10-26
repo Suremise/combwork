@@ -176,6 +176,50 @@ describe('a turn that ended on an error (#1632, #1658)', () => {
     expect(needs(st)).toEqual([`error/${WORDS}`])
   })
 
+  it("HR5's continuation: a failure (and end) recorded before Hive continued the turn neither ends the continued work nor marks it; one after does", async () => {
+    const st = agent('k')
+    await prompt(st, T)
+    // Hive continues its Stop (its reply blocks it, as the inbox's notice does): the same turn goes on.
+    await run(() => sessions.handleHook(st.runId, { session_id: 'x', cwd: p, hook_event_name: 'Stop', turn_id: T, last_assistant_message: 'work' }, { decision: 'block', reason: 'Continue with the requested work' }))
+    expect(st.status).toBe('working')
+    // The record of the work it went on from (the fixture's time, before the continuation): history.
+    await read(st, RECORD)
+    await settled(st)
+    expect(st.status).toBe('working')
+    expect(needs(st)).toEqual([])
+    // The continued work's own failure, recorded after it went on: that run ends failed.
+    const later = new Date(Date.now() + 1000).toISOString()
+    await read(st, { ...RECORD, turnFailedAt: later, turnEnded: { turn: T, at: later } })
+    await vi.waitFor(() => expect(needs(st)).toEqual([`error/${WORDS}`]), HANG)
+    expect(st.status).toBe('finished')
+  })
+
+  it("HR5's continuation: the old failure first read after a new tool call reopened the same turn doesn't end or mark the reopened work", async () => {
+    const st = agent('l')
+    await prompt(st, T)
+    await stop(st, T)
+    // A tool call it never started, after its Stop: the same turn goes on (the ledger reopens it).
+    await hook(st, { hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'ls' }, tool_use_id: 'call-2', turn_id: T })
+    expect(st.status).toBe('working')
+    await read(st, RECORD)
+    await settled(st)
+    expect(st.status).toBe('working')
+    expect(needs(st)).toEqual([])
+    await stop(st, T)
+    expect(st.status).toBe('finished')
+    expect(needs(st)).toEqual([])
+  })
+
+  it('a turn marked failed that Hive continues (its Stop answered with more work) needs the user no more', async () => {
+    const st = agent('m')
+    await prompt(st, T)
+    await stop(st, T)
+    await read(st, RECORD)
+    await vi.waitFor(() => expect(needs(st)).toEqual([`error/${WORDS}`]), HANG)
+    await run(() => sessions.handleHook(st.runId, { session_id: 'x', cwd: p, hook_event_name: 'Stop', turn_id: T, last_assistant_message: 'work' }, { decision: 'block', reason: 'Continue with the requested work' }))
+    expect(needs(st)).toEqual([])
+  })
+
   it('7. Codex: a good end is no blocker; a failure from before the launch is history; no words still needs you', async () => {
     const good = agent('h')
     await prompt(good, T)

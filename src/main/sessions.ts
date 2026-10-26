@@ -4600,6 +4600,8 @@ class SessionManager {
       if (back) this.hooksBack(l)
     }
     let actions: readonly string[] = [took.verdict === 'stale' ? 'stale' : 'continued']
+    // Hive went on with a turn that had been marked failed (#1658): it carries on, so it needs the user no more.
+    if (took.verdict === 'continued' && st.failedTurn) this.carryOut(id, l, { next: null, failed: null, message: null, actions: [] }, 'continued')
     // A prompt about a safeguard stop says why (#606): told so now if the screen shows it, else when it draws it.
     const guard = this.guardCandidate(l, hook.event)
     if (took.verdict === 'apply') {
@@ -4678,7 +4680,7 @@ class SessionManager {
     if (!l.ledger) return null
     const rec = l.turnRecord
     // i18n-ignore: the log and the hook journal (English)
-    if (rec && reconciles(l.ledger, rec.turn)) return `${l.adapter.descriptor.name} recorded the end of turn ${rec.turn} at ${rec.at}`
+    if (rec && reconciles(l.ledger, rec.turn, Date.parse(rec.at))) return `${l.adapter.descriptor.name} recorded the end of turn ${rec.turn} at ${rec.at}`
     // i18n-ignore: the log and the hook journal (English)
     if (unheardStop(l.ledger, l.stopsAnswered ?? [])) return `${l.adapter.descriptor.name} recorded a Stop of its running turn answered at ${new Date(l.stopsAnswered!.at(-1)!).toISOString()} that never reached Hive`
     return null
