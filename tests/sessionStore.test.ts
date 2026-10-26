@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
+import { moveFolder } from './moveFolder'
 import type { SessionRecord } from '../src/shared/types'
 
 const base = tempDir('hive-session-store-')
@@ -295,10 +296,12 @@ describe('following the project', () => {
     const p = join(wsPath, 'alpha')
     const before = await run(() => workspace.sessionsFile(p))
     const renamed = join(wsPath, 'alpha-renamed')
-    renameSync(p, renamed)
+    // Tried again while Windows refuses it (HI-1163): a refresh the earlier tests' folder changes scheduled may still be
+    // reading the project's .hive, and any file or listing open in a folder stops it being renamed (EPERM).
+    await moveFolder(p, renamed)
     await run(() => workspace.projectIds({ fresh: true }))
     expect(await run(() => workspace.sessionsFile(renamed))).toEqual(before)
-    renameSync(renamed, p)
+    await moveFolder(renamed, p)
     await run(() => workspace.projectIds({ fresh: true }))
   })
 
