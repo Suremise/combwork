@@ -162,6 +162,8 @@
   "tips.forYouActions.title": "Responde con un clic",
   "tips.gitCheck.text": "Ayuda → Configuración de agentes… muestra el git que encontró Hive y su versión. Los agentes con worktree, la fusión y las secciones Git de la pestaña Control de versiones necesitan Git for Windows 2.38 o posterior.",
   "tips.gitCheck.title": "¿Está git listo para los worktrees?",
+  "tips.gitHistory.text": "Control de versiones → Historial se abre en la rama en la que se fusiona tu trabajo. Elige otra en su encabezado, tuya o de un remoto, y retrocede a commits más antiguos bajo la lista.",
+  "tips.gitHistory.title": "Ver el historial de cualquier rama",
   "tips.gitInit.text": "¿Un proyecto sin git? Inicializar repositorio…, en su pestaña Control de versiones, lo convierte en uno en main, deja .hive fuera, agrega un .gitignore inicial si quieres y hace el primer commit, para que los agentes puedan trabajar en worktrees enseguida.",
   "tips.gitInit.title": "Convierte un proyecto en repositorio git con un clic",
   "tips.gitRemotes.text": "Control de versiones → Ramas y remotos: Push a… envía esta rama, o todas las ramas y etiquetas, a cualquier remoto sin cambiar lo que sigue la rama. Ahí también puedes renombrar o eliminar un remoto, y Seguir de una rama elige qué usan Pull y Push.",

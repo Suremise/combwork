@@ -539,6 +539,42 @@ describe('remotes, tags, history and identity', () => {
     expect(h.tags.find((t) => t.name === 'light')).toMatchObject({ annotated: false, commit: head })
   })
 
+  it('History shows the project’s target by default, any branch asked for, a page at a time (#1643)', async () => {
+    git(proj, 'checkout', '-q', '-b', 'release')
+    for (let i = 1; i <= 25; i++) commit(proj, `r${i}.txt`)
+    git(proj, 'checkout', '-q', 'main')
+    // The target (where the work goes), not the folder's branch.
+    const first = await repo.repoHistory(proj, { workTarget: 'release' })
+    expect(first).toMatchObject({ ref: 'refs/heads/release', defaultRef: 'refs/heads/release', target: 'release', page: 1, pages: 2, total: 26 })
+    expect(first.commits).toHaveLength(20)
+    expect(first.commits[0].subject).toBe('add r25.txt')
+    expect(first.branches).toEqual(['main', 'release'])
+    expect(first.remoteBranches).toEqual(['origin/main'])
+    // Back through the older ones; a page past the last is the last.
+    const second = await repo.repoHistory(proj, { workTarget: 'release', page: 2 })
+    expect(second.commits.map((c) => c.subject)).toEqual([...Array.from({ length: 5 }, (_, i) => `add r${5 - i}.txt`), 'add a.txt'])
+    expect((await repo.repoHistory(proj, { workTarget: 'release', page: 99 })).page).toBe(2)
+    // Any branch, local or remote; one that isn't a branch here shows the default.
+    expect(await repo.repoHistory(proj, { workTarget: 'release', ref: 'refs/heads/main' })).toMatchObject({ ref: 'refs/heads/main', total: 1, pages: 1 })
+    expect(await repo.repoHistory(proj, { workTarget: 'release', ref: 'refs/remotes/origin/main' })).toMatchObject({ ref: 'refs/remotes/origin/main', total: 1 })
+    for (const bad of ['--all', 'main', 'refs/heads/nope', 'refs/tags/x']) expect(await repo.repoHistory(proj, { workTarget: 'release', ref: bad })).toMatchObject({ ref: 'refs/heads/release' })
+    // No target, or one that isn't a branch here: the folder's branch.
+    expect(await repo.repoHistory(proj, { workTarget: 'nope' })).toMatchObject({ ref: 'refs/heads/main', target: null })
+    expect(await repo.repoHistory(proj)).toMatchObject({ ref: 'refs/heads/main', target: null })
+    // A local branch named as a remote's (round 1): each shows its own commits, from its first page.
+    git(proj, 'checkout', '-q', '-b', 'origin/main')
+    commit(proj, 'local-only.txt')
+    git(proj, 'checkout', '-q', 'main')
+    const mine = await repo.repoHistory(proj, { workTarget: 'release', ref: 'refs/heads/origin/main', page: 2 })
+    const theirs = await repo.repoHistory(proj, { workTarget: 'release', ref: 'refs/remotes/origin/main', page: 2 })
+    expect(mine).toMatchObject({ ref: 'refs/heads/origin/main', page: 1, total: 2 })
+    expect(mine.commits[0].subject).toBe('add local-only.txt')
+    expect(theirs).toMatchObject({ ref: 'refs/remotes/origin/main', page: 1, total: 1 })
+    expect(theirs.commits[0].hash).toBe(git(proj, 'rev-parse', 'refs/remotes/origin/main'))
+    expect(mine.branches).toContain('origin/main')
+    expect(mine.remoteBranches).toContain('origin/main')
+  })
+
   it("sets this repository's identity, and removes it so the global one applies", async () => {
     expect(await repo.setIdentity(proj, 'Dev', '1+dev@users.noreply.github.com')).toBe("Set this repository's commit identity.")
     let info = await repo.repoInfo(proj)

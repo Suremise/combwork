@@ -162,6 +162,8 @@
   "tips.forYouActions.title": "Responda com um clique",
   "tips.gitCheck.text": "Ajuda → Configuração de agentes… mostra o git que o Hive encontrou e a versão dele. Agentes em worktree, o merge e as seções Git da aba Controle de versão precisam do Git for Windows 2.38 ou posterior.",
   "tips.gitCheck.title": "O git está pronto para worktrees?",
+  "tips.gitHistory.text": "Controle de versão → Histórico abre no branch em que seu trabalho recebe merge. Escolha outro no título, seu ou de um remoto, e volte a commits mais antigos abaixo da lista.",
+  "tips.gitHistory.title": "Veja o histórico de qualquer branch",
   "tips.gitInit.text": "Um projeto sem git? Inicializar repositório…, na aba Controle de versão dele, transforma o projeto em um repositório na main, mantém o .hive de fora, adiciona um .gitignore inicial se você quiser e faz o primeiro commit, para que os agentes possam trabalhar em worktrees na hora.",
   "tips.gitInit.title": "Transforme um projeto em repositório git com um clique",
   "tips.gitRemotes.text": "Controle de versão → Branches e remotes: Fazer push para… envia este branch, ou todos os branches e tags, para qualquer remote sem mudar o que o branch rastreia. Ali também dá para renomear ou remover um remote, e Rastrear… de um branch escolhe o que Fazer pull e Fazer push usam.",
