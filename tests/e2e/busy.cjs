@@ -59,8 +59,8 @@ const check = (name, ok, extra = '') => {
   }
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
   const tile = (n) => page.locator(`.task-card[data-task="${n}"]`)
-  // Its title: its key and number (#1221), or #n for a card with no key.
-  const cardDialog = (n) => page.locator('.dialog', { has: page.locator('.dialog-header h2', { hasText: new RegExp(`(^| \\()#${n}\\)?$`) }) })
+  // Its title names it alone: its key, or #n for a card with no key (HI-1661).
+  const cardDialog = (c) => lib.cardDialog(page, c.key ?? `#${c.number}`)
   const question = page.locator('.dialog', { hasText: 'Discard unsaved changes?' })
   const project = async () => (await inv('workspace:get')).projects.find((p) => p.name === 'alpha')
 
@@ -72,7 +72,7 @@ const check = (name, ok, extra = '') => {
 
   // --- Unsaved edits (#29) ---
   await tile(c1.number).click()
-  const d1 = cardDialog(c1.number)
+  const d1 = cardDialog(c1)
   await d1.waitFor({ timeout: 5000 })
   await page.keyboard.press('Escape')
   check('an unchanged card closes at once', !!(await until(async () => (await d1.count()) === 0, HUNG_MS)))
@@ -132,7 +132,7 @@ const check = (name, ok, extra = '') => {
 
   // --- Comment: posted once, Save with a draft keeps it ---
   await tile(c2.number).click()
-  const d2 = cardDialog(c2.number)
+  const d2 = cardDialog(c2)
   await d2.waitFor({ timeout: 5000 })
   await d2.locator('.task-comment-new textarea').fill('A comment draft')
   await page.keyboard.press('Escape')
