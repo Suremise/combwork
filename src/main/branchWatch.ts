@@ -1,12 +1,13 @@
 import { basename } from 'path'
 import type { AgentBranchStatus, HiveEvent, ProjectInfo } from '../shared/types'
-import { leasedLine, legacyWorktree } from './agentFolders'
+import { leasedLine, legacyWorktree, slotsMigrated } from './agentFolders'
 import { boardRead } from './boardStore'
 import { emit, onHiveEvent } from './events'
 import { createLogger, userText } from './logger'
 import { openWorkspaces, workspaceFor } from './workspace'
 import * as wt from './worktrees'
 import { gitProblem } from './gitTool'
+import { workTargetOf } from './gitRepo'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
 
@@ -42,6 +43,8 @@ function projectsOf(ws = openWorkspaces()): ProjectInfo[] {
 /** An agent's watched line: its project, its folder and branch, and for a slot's line the branch it merges into. */
 export interface Watched {
   project: ProjectInfo
+  /** The agent whose line it is. */
+  agentId?: string
   worktree: wt.WorktreeRef
   slot?: true
   target?: string
@@ -67,9 +70,9 @@ function findAgent(projectPath: string, agentId: string): Watched | null {
   }
   if (leased) {
     const branch = leased.line ?? (leased.carried ? (legacy?.branch ?? null) : null)
-    return branch ? { project, worktree: { path: leased.folder, branch, base: leased.target ?? legacy?.base ?? '' }, slot: true, ...(leased.target ? { target: leased.target } : {}) } : null
+    return branch ? { project, agentId, worktree: { path: leased.folder, branch, base: leased.target ?? legacy?.base ?? '' }, slot: true, ...(leased.target ? { target: leased.target } : {}) } : null
   }
-  return legacy ? { project, worktree: legacy } : null
+  return legacy ? { project, agentId, worktree: legacy } : null
 }
 
 /**
@@ -80,10 +83,18 @@ function findAgent(projectPath: string, agentId: string): Watched | null {
  */
 export async function lineStatus(found: Watched): Promise<AgentBranchStatus | null> {
   const { project, worktree } = found
-  if (!found.slot) return wt.branchStatus(project.path, worktree)
+  // A branch that isn't there has nothing to merge, and isn't an error to log (HI-1698: an agent's 0.9 branch gone with
+  // its worktree, a card's line deleted after its merge, each checked on every refresh): null, quietly.
   if ((await G.lineHead(project.path, worktree.branch)) === null) return null
-  const fallback = found.target ? null : await G.defaultBranch(project.path)
-  const target = found.target ?? (fallback && !isUnknown(fallback) ? fallback : undefined)
+  if (!found.slot) {
+    // An agent whose 0.9 worktree the slots took over (#1441) works in its slot's lines: that branch is no longer its own.
+    if (found.agentId && (await slotsMigrated(project.path, found.agentId))) return null
+    return wt.branchStatus(project.path, worktree)
+  }
+  // Its card's target, else the project's (HI-1698: 1.0.0 while that is where work merges, not main), else its default branch.
+  const own = found.target ?? (await workTargetOf(project.path))
+  const fallback = own ? null : await G.defaultBranch(project.path)
+  const target = own ?? (fallback && !isUnknown(fallback) ? fallback : undefined)
   return wt.branchStatus(project.path, target ? { ...worktree, base: worktree.base || target } : worktree, undefined, target)
 }
 
@@ -109,9 +120,10 @@ export function check(projectPath: string, agentId: string): Promise<void> {
   const p = lineStatus(found)
     .then(
       (st) => record(found.project.path, agentId, st),
-      (e) => {
-        // Git that can't run fails every check, every minute: Agent Setup and the status bar say so once (#346).
-        if (!gitProblem()) log.warn(`Couldn't check ${userText(found.worktree.branch)}`, e)
+      async (e) => {
+        // Git that can't run fails every check, every minute: Agent Setup and the status bar say so once (#346). A branch
+        // deleted while it was checked (a card's line, just merged) isn't worth a warning either (HI-1698).
+        if (!gitProblem() && (await G.lineHead(found.project.path, found.worktree.branch).catch(() => null)) !== null) log.warn(`Couldn't check ${userText(found.worktree.branch)}`, e)
         record(found.project.path, agentId, null)
       }
     )
