@@ -7333,6 +7333,66 @@ button.agent-place:hover {
 .running-row .small {
   font-size: 12px;
 }
+/* A running agent's first line (HI-1679): its name, its status and its card's chip on one line at any width. The
+   chip's title gives way first, then the name and status, each with "…"; the chip's icon and key never shrink or wrap.
+   In a narrow Overview the context column narrows with the line, so the line keeps room for them. */
+.running-row > .grow {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.running-row > .tip-wrap:has(> .running-ctx) {
+  flex: 0 1 180px;
+  min-width: 0;
+}
+.running-row .running-ctx {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+.running-row .running-ctx > .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A grid: the space there is goes to each part in turn up to its whole width, so the short name and status are cut
+   only once the title can't give more, and the chip's column never narrows past its icon and key. */
+.running-line {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-columns: minmax(1.5em, max-content) minmax(1.5em, max-content) minmax(auto, max-content);
+  justify-content: start;
+  align-items: center;
+  column-gap: 6px;
+  min-width: 0;
+}
+.running-line > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.running-line > .tip-wrap:has(> .running-status) {
+  min-width: 0;
+}
+.running-status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The chip as a grid here: the title's column (the third) is as wide as the title when there is room and nothing at
+   the least, so the chip shrinks down to its icon and key, never past them. */
+.running-line .card-chip {
+  flex: 0 1 auto;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: auto auto minmax(0, max-content) auto;
+  min-width: auto;
+  max-width: 100%;
+}
+.running-line .card-chip .codicon,
+.running-line .card-chip-number {
+  white-space: nowrap;
+}
 .running-ctx {
   width: 180px;
   display: flex;

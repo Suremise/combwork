@@ -70,6 +70,11 @@ export function TaskChip({ number, column, title, short, more = 0, label, blocke
   )
 }
 
+const CARD_LINE = msg({ id: 'board.chip.card', defaultMessage: '{card} {title}{decisions, plural, =0 {} one { (decisions: #)} other { (decisions: #)}}', description: "A card in the hover of an agent's card chip: its name (its key, such as AM-12, or #12 for a card with none), title (the user's own words) and how many decisions the user made about it (none: leave that branch empty)." })
+const CLICK_TO_OPEN = msg({ id: 'board.chip.clickToOpen', defaultMessage: 'Click to open {card}.', description: "The last line of the hover of an agent's card chip. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none." })
+/** A card in a chip's hover: its name, title and how many decisions it has (#357: what the user decided about it). */
+const cardLine = (c: TaskCard): string => tr(CARD_LINE, { card: cardLabel(c), title: c.title, decisions: c.decisions?.length ?? 0 })
+
 /**
  * The card an agent is working on (its first in Doing): `#4 title`, or only `#4` when `short`. Tinted with the Doing
  * column's colour (Settings → Board); clicking opens the card. With none in Doing, the card it is reviewing, with an
@@ -84,14 +89,23 @@ export function CardChip({ project, a, short, tip = true }: { project: ProjectIn
   const review = !doing.length
   const chip = <TaskChip number={first.number} column={review ? 'review' : 'doing'} title={first.title} short={short} more={more.length} />
   if (!tip) return chip
-  // Each card's decisions counted (#357): what the user decided about it, read in the card.
-  const line = (c: TaskCard): string => tr(msg({ id: 'board.chip.card', defaultMessage: '{card} {title}{decisions, plural, =0 {} one { (decisions: #)} other { (decisions: #)}}', description: "A card in the hover of an agent's card chip: its name (its key, such as AM-12, or #12 for a card with none), title (the user's own words) and how many decisions the user made about it (none: leave that branch empty)." }), { card: cardLabel(c), title: c.title, decisions: c.decisions?.length ?? 0 })
   const lines = [
-    ...(doing.length ? [tr(msg({ id: 'board.chip.doing', defaultMessage: 'Working on (Active):', description: "Heading in the hover of an agent's card chip, above the cards it works on. Active is the board column." })), ...doing.map(line)] : []),
-    ...(reviewing.length ? [tr(msg({ id: 'board.chip.reviewing', defaultMessage: 'Reviewing:', description: "Heading in the hover of an agent's card chip, above the cards it reviews." })), ...reviewing.map(line)] : []),
-    tr(msg({ id: 'board.chip.clickToOpen', defaultMessage: 'Click to open {card}.', description: "The last line of the hover of an agent's card chip. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none." }), { card: cardLabel(first) })
+    ...(doing.length ? [tr(msg({ id: 'board.chip.doing', defaultMessage: 'Working on (Active):', description: "Heading in the hover of an agent's card chip, above the cards it works on. Active is the board column." })), ...doing.map(cardLine)] : []),
+    ...(reviewing.length ? [tr(msg({ id: 'board.chip.reviewing', defaultMessage: 'Reviewing:', description: "Heading in the hover of an agent's card chip, above the cards it reviews." })), ...reviewing.map(cardLine)] : []),
+    tr(CLICK_TO_OPEN, { card: cardLabel(first) })
   ]
   return <Tooltip content={<span style={{ whiteSpace: 'pre-line' }}>{lines.join('\n')}</span>}>{chip}</Tooltip>
+}
+
+/**
+ * The one card a watching agent waits on (HI-1679), as the chip a working agent's card has: tinted with the column it is
+ * in, its title, a click opening it. A card the board doesn't have is its name alone.
+ */
+export function WatchedCardChip({ number, short }: { number: number; short?: boolean }) {
+  const card = useStore((s) => s.tasks.find((t) => t.number === number))
+  const chip = <TaskChip number={number} column={card?.column ?? null} title={card?.title} blocked={!!card?.blocked} short={short} />
+  if (!card) return chip
+  return <Tooltip content={<span style={{ whiteSpace: 'pre-line' }}>{[cardLine(card), tr(CLICK_TO_OPEN, { card: cardLabel(card) })].join('\n')}</span>}>{chip}</Tooltip>
 }
 
 /** The cards an agent's row in the focus view's strip names (agentRowCards), kept up to date with the board. */
