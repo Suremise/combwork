@@ -48,6 +48,8 @@ export default defineConfig({
           'repo-lock-worker': resolve(__dirname, 'src/main/repoLockWorker.ts'),
           // The stall watchdog's thread (HI-1692).
           'stall-watchdog': resolve(__dirname, 'src/main/stallWatchdog.ts'),
+          // The log's writer thread (HI-1730).
+          'log-writer': resolve(__dirname, 'src/main/logWriter.ts'),
           // The WAL checkpoints' worker thread (HI-1691).
           'wal-checkpoint-worker': resolve(__dirname, 'src/main/walCheckpointWorker.ts')
         }
