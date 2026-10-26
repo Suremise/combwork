@@ -2363,7 +2363,8 @@ and start. The chip sits on its tile, folded or not; the Task Board
 icon on the activity bar counts the cards (its accessible name "3 cards wait for you"; Review's count stays in the board
 sidebar's Waiting for review); the board's toolbar has a **For you** filter (remembered per board view, composing with
 the search); the card dialog's **For you** section lists each request (its kind, its text in the window's language or
-the agent's words, who asked and when, a Test request's checklist) with its answers: **Approve** / **Decline…** (a
+the agent's words rendered as Markdown the way card comments are, sanitized, single line breaks kept, folded to about
+ten lines with **Show all** (#1637), who asked and when, a Test request's checklist) with its answers: **Approve** / **Decline…** (a
 reason, required) for an approval, a reply (**Send Reply**: the user's comment on the card, and to the agent waiting
 on it an `answer` delivery from the user quoting the reply whole, its question quoted short, #1626) or **Record as
 Decision** for a question (each with a tooltip saying what it does), and the four

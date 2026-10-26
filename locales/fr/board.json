@@ -316,6 +316,7 @@
   "board.forYou.rounds": "Tours supplémentaires",
   "board.forYou.send": "Envoyer la réponse",
   "board.forYou.sendTip": "Envoie ta réponse à l’agent qui a posé la question, et l’ajoute à la carte comme ton commentaire.",
+  "board.forYou.showAll": "{all, select, yes {Afficher moins} other {Tout afficher}}",
   "board.forYou.showStuck": "Afficher les fichiers et les commandes",
   "board.forYou.tipAsks": "{kind, select, approve {{who} demande ton accord} decide {{who} te demande de décider} test {{who} te demande de tester} signIn {{who} te demande de te connecter} other {{who} te pose une question}}",
   "board.forYou.tipMore": "{n, plural, one {et # autre demande} many {et # autres demandes} other {et # autres demandes}}",

@@ -8921,6 +8921,23 @@ body.pane-resizing-v .monaco-editor {
   font-weight: 600;
   margin-inline-end: 4px;
 }
+/* A request's text (#1637): Markdown as card comments show it, folded to about ten lines until Show all. */
+.for-you-question.folded {
+  max-block-size: 14em;
+  overflow: hidden;
+}
+.for-you-question.faded {
+  mask-image: linear-gradient(to bottom, #000 75%, transparent);
+}
+.for-you-question .markdown > :first-child {
+  margin-block-start: 0;
+}
+.for-you-question .markdown > :last-child {
+  margin-block-end: 0;
+}
+.for-you-more {
+  margin-block: 2px 4px;
+}
 .for-you-asked {
   font-size: 11px;
   margin-block: 2px 6px;
@@ -9578,10 +9595,16 @@ textarea.input.task-blocked-input {
   padding: 2px 0 2px 10px;
   margin-bottom: 6px;
 }
+/* A decision's words, as Markdown (#1637), the way card comments show them. */
 .task-decision-text {
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: var(--fg-strong);
+}
+.task-decision-text > :first-child {
+  margin-block-start: 0;
+}
+.task-decision-text > :last-child {
+  margin-block-end: 0;
 }
 .task-decision-by {
   display: flex;

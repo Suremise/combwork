@@ -316,6 +316,7 @@
   "board.forYou.rounds": "Más rondas",
   "board.forYou.send": "Enviar respuesta",
   "board.forYou.sendTip": "Envía tu respuesta al agente que preguntó y la añade a la tarjeta como tu comentario.",
+  "board.forYou.showAll": "{all, select, yes {Mostrar menos} other {Mostrar todo}}",
   "board.forYou.showStuck": "Mostrar los archivos y los comandos",
   "board.forYou.tipAsks": "{kind, select, approve {{who} pide tu aprobación} decide {{who} te pide que decidas} test {{who} te pide que lo pruebes} signIn {{who} te pide que inicies sesión} other {{who} te pregunta}}",
   "board.forYou.tipMore": "{n, plural, one {y # solicitud más} many {y # solicitudes más} other {y # solicitudes más}}",
