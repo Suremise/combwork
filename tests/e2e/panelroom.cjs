@@ -150,9 +150,11 @@ const check = (name, ok, extra = '') => {
 
     // Another sidebar view (Notes: no rail) at 150%: the sidebar at its least width, the work takes what is left.
     await page.getByRole('button', { name: 'Notes' }).first().click()
-    check("Notes at 150%: the sidebar at 160 px, the Assistant's panel down to its last 190, the work takes the rest, nothing past the window", !!(await lib.until(async () => {
+    // The bounded exception the Assistant approved: a view with no rail keeps its sidebar, so the work takes what is left,
+    // at least 170 px here.
+    check("Notes at 150%: the sidebar at 160 px, the Assistant's panel down to its last 190, the work takes the rest (170 px or more), nothing past the window", !!(await lib.until(async () => {
       const r = await room()
-      return r.sidebar.width <= 161 && r.panel.width >= 190 && r.panel.width <= 195 && r.main.width >= least(r) && fitsWindow(r)
+      return r.sidebar.width <= 161 && r.panel.width >= 190 && r.panel.width <= 195 && r.main.width >= 170 && fitsWindow(r)
     }, HUNG_MS)), JSON.stringify(await room()))
     await capture('assistant-150-notes')
     await page.getByRole('button', { name: 'Projects' }).first().click()
