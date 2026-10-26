@@ -4018,9 +4018,13 @@ class SessionManager {
     const project = workspaceOf(st.projectPath).info()?.projects.find((x) => x.path.toLowerCase() === st.projectPath.toLowerCase())
     const limitMB = transcriptWarnLimit(project?.config, Number(config.settings.sessions.transcriptWarnMB) || 0)
     if (!limitMB || bytes < limitMB * 1024 * 1024 || !st.sessionId || l.sizeWarned === st.sessionId) return
+    const assistant = workspace.isAssistantHome(st.projectPath)
+    // In a turn, the notice waits for its end (HI-1695, Darren's option 1): a transcript grows only in a turn, so it is
+    // nearly always crossed then, and the notice made then had no Hand Over to…, never offered again. The look at the
+    // turn's end (or the next one) makes it, once, with the button when the agent may hand over then.
+    if (!assistant && (st.status === 'working' || st.status === 'starting' || st.status === 'waiting')) return
     l.sizeWarned = st.sessionId
     const label = this.label(st)
-    const assistant = workspace.isAssistantHome(st.projectPath)
     log.info(`${userText(label)}: transcript is ${(bytes / 1024 ** 2).toFixed(1)} MB, over ${limitMB} MB`)
     // What it can do (#1057): told, not pushed. Hand Over to… only while it may hand over now (checked again when it is
     // clicked, and by the hand-over); else that it can when it has finished.
