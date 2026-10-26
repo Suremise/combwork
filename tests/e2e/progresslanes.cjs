@@ -205,17 +205,30 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   // A paused lane says why in the paused colour (#1279), and that it is paused in its accessible name.
   const paused3 = section.locator(`[data-lane="${l3}"]`)
   check('a paused, an ended and an abandoned lane say so', /paused/.test((await paused3.getAttribute('aria-label')) ?? '') && (await paused3.locator('.progress-lane-why.paused').count()) === 1 && /merged/.test(await section.locator(`[data-lane="${l4}"]`).innerText()) && /abandoned/.test(await section.locator(`[data-lane="${l5}"]`).innerText()))
-  // Four rows show whole before it scrolls (#569); the fifth starts at the bottom edge and scrolls.
-  check('four lanes show by default, then the list scrolls', showsWhole(await fit(), 4), JSON.stringify(await fit()))
-  await shoot('lanes-four')
+  // Six rows show whole before it scrolls (#569; six since HI-1673); the seventh starts at the bottom edge and scrolls.
+  check('six lanes show by default, then the list scrolls', showsWhole(await fit(), 6), JSON.stringify(await fit()))
+  await shoot('lanes-six')
   // The section's top edge (#569): a splitter whose value is the lanes shown.
   const edge = section.locator('.progress-lanes-edge')
   const edgeSays = async () => ({ now: await edge.getAttribute('aria-valuenow'), text: await edge.getAttribute('aria-valuetext'), max: await edge.getAttribute('aria-valuemax') })
-  check('its top edge is a focusable splitter saying how many lanes show', (await edge.getAttribute('role')) === 'separator' && (await edge.getAttribute('tabindex')) === '0' && JSON.stringify(await edgeSays()) === JSON.stringify({ now: '4', text: '4 of 7 lanes shown', max: '7' }), JSON.stringify(await edgeSays()))
+  const edgeMin = async () => Number(await edge.getAttribute('aria-valuemin'))
+  check('its top edge is a focusable splitter saying how many lanes show', (await edge.getAttribute('role')) === 'separator' && (await edge.getAttribute('tabindex')) === '0' && JSON.stringify(await edgeSays()) === JSON.stringify({ now: '6', text: '6 of 7 lanes shown', max: '7' }), JSON.stringify(await edgeSays()))
   const pitch = (await fit()).tops[1] - (await fit()).tops[0]
+  /** Drags the edge by dy (px), the rows it should snap to between the splitter's range (its floor: HI-1673). */
+  const press = async (dy) => {
+    const b = await edge.boundingBox()
+    const x = b.x + b.width / 2
+    const y = b.y + b.height / 2
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(x, y + dy / 2, { steps: 4 })
+    await page.mouse.move(x, y + dy, { steps: 4 })
+    await page.mouse.up()
+    return b
+  }
   const drag = async (dy, what) => {
     const was = await edgeSays()
-    const rows = Math.max(1, Math.min(Number(was.max), Math.round(Number(was.now) - dy / pitch)))
+    const rows = Math.max(await edgeMin(), Math.min(Number(was.max), Math.round(Number(was.now) - dy / pitch)))
     const b = await edge.boundingBox()
     const x = b.x + b.width / 2
     const y = b.y + b.height / 2
@@ -231,12 +244,17 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     check(`the drag ${what} is kept and drawn (${rows} shown)`, !!done, JSON.stringify({ was, dy, kept: await kept(), says: await edgeSays(), box: b, now: await edge.boundingBox() }))
   }
   const kept = () => page.evaluate((w) => window.hive.invoke('ui:get').then((ui) => ui.panes?.[`progress-lanes-rows:${w.toLowerCase()}`] ?? null), ws)
-  // Dragged up by a lane and a half: snaps to six; down by just under one: five.
-  await drag(-pitch * 1.6, 'up a lane and a half')
-  check('dragging the top edge up shows more lanes, whole ones', !!(await until(async () => showsWhole(await fit(), 6), HUNG_MS)) && (await edgeSays()).now === '6', JSON.stringify({ fit: await fit(), pitch }))
-  check('…kept for the workspace', !!(await until(async () => (await kept()) === 6, HUNG_MS)), String(await kept()))
-  await drag(pitch * 0.9, 'down just under a lane')
-  check('…and down, fewer', !!(await until(async () => showsWhole(await fit(), 5), HUNG_MS)), JSON.stringify(await fit()))
+  // Its floor (HI-1673, Darren): with more lanes than six, a drag never shows fewer than six.
+  check('the splitter ranges from six (the floor) to the lanes there are', (await edgeMin()) === 6 && (await edgeSays()).max === '7', JSON.stringify({ min: await edgeMin(), says: await edgeSays() }))
+  // Dragged up by just under one: seven, kept.
+  await drag(-pitch * 0.9, 'up just under a lane')
+  check('dragging the top edge up shows more lanes, whole ones', !!(await until(async () => showsWhole(await fit(), 7), HUNG_MS)) && (await edgeSays()).now === '7', JSON.stringify({ fit: await fit(), pitch }))
+  check('…kept for the workspace', !!(await until(async () => (await kept()) === 7, HUNG_MS)), String(await kept()))
+  // From seven, dragged down two lanes and a half: it stops at the floor, six, kept and drawn (HR5's round 1: from
+  // above the floor, so the drag is seen to take effect).
+  await press(pitch * 2.5)
+  await page.mouse.move(5, 5)
+  check('dragging the top edge down never shows fewer than six', !!(await until(async () => (await kept()) === 6 && showsWhole(await fit(), 6) && (await edgeSays()).now === '6', HUNG_MS)), JSON.stringify({ kept: await kept(), fit: await fit(), says: await edgeSays(), pitch }))
   // All the way up: no more than there are, and the runs keep their room.
   const body = () => panel.locator('.progress-body').evaluate((el) => el.getBoundingClientRect().height)
   await drag(-2000, 'all the way up')
@@ -258,7 +276,8 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     const says = await edgeSays()
     return { f, says, body: await body(), ax: await axEdge() }
   }
-  const honest = (q, n) => showsWhole(q.f, n) && q.says.now === String(n) && q.says.max === String(n) && q.says.text === `${n} of 7 lanes shown` && q.body >= 119 && !!q.ax && Number(q.ax.value) === n && Number(q.ax.max) === n
+  // The lanes take priority (HI-1673): squeezed to the floor or below, the runs give way rather than keep their room.
+  const honest = (q, n) => showsWhole(q.f, n) && q.says.now === String(n) && q.says.max === String(n) && q.says.text === `${n} of 7 lanes shown` && (n <= 6 || q.body >= 119) && !!q.ax && Number(q.ax.value) === n && Number(q.ax.max) === n
   await lib.fitWindow(app, page, { width: 1400, height: 600 })
   await zoomTo(1.5)
   let tight = null
@@ -267,7 +286,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     tight = q
     return q.f.whole > 0 && q.f.whole < 7 && honest(q, q.f.whole)
   }, HUNG_MS)
-  check('kept seven, squeezed: whole lanes that fit, the runs keep their room, and the splitter says what shows and the most that fit', !!settles && (await kept()) === 7, JSON.stringify({ tight, kept: await kept() }))
+  check('kept seven, squeezed: whole lanes that fit, the runs giving way first, and the splitter says what shows and the most that fit', !!settles && (await kept()) === 7, JSON.stringify({ tight, kept: await kept() }))
   const fits = tight?.f.whole ?? 0
   await shoot('lanes-squeezed')
   await edge.focus()
@@ -296,39 +315,40 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const trace = []
   const snap = async (at) => trace.push({ at, says: await edgeSays(), kept: await kept(), box: await edge.boundingBox(), f: await fit(), body: await body() })
   await snap('before')
-  await drag(pitch, 'down a lane in the short window')
+  // Its range there: the floor and the most that fit (HI-1673); a drag stays within it.
+  await press(pitch)
+  await page.mouse.move(5, 5)
   await snap('after down')
-  await drag(-2000, 'all the way up in the short window')
+  await press(-2000)
+  await page.mouse.move(5, 5)
   await snap('after up')
   let shortFit = null
   const shortOk = await until(async () => {
     shortFit = { f: await fit(), body: await body() }
-    return shortFit.f.whole < 7 && showsWhole(shortFit.f, shortFit.f.whole) && shortFit.body >= 119 && shortFit.body < 119 + pitch
+    // Six (the floor) whole, the runs giving way to them if they must (HI-1673), never more than fit.
+    return shortFit.f.whole === 6 && showsWhole(shortFit.f, 6)
   }, HUNG_MS)
-  check('in a short window, dragged to the top, the runs keep their room and the list ends at a whole lane', !!shortOk, JSON.stringify({ shortFit, says: await edgeSays(), trace }))
+  check('in a short window, dragged either way, the floor shows whole and the list ends at a whole lane', !!shortOk, JSON.stringify({ shortFit, says: await edgeSays(), trace }))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await until(async () => (await page.evaluate(() => window.innerHeight)) === 850, HUNG_MS)
-  // Double-click: back to four, and nothing kept.
+  // Double-click: back to six, and nothing kept.
   await edge.dblclick()
-  check('double-clicking the top edge goes back to four', !!(await until(async () => showsWhole(await fit(), 4) && (await kept()) === null, HUNG_MS)), JSON.stringify({ fit: await fit(), kept: await kept() }))
-  // Keyboard: Up a lane more, Down one fewer, saying so.
+  check('double-clicking the top edge goes back to six', !!(await until(async () => showsWhole(await fit(), 6) && (await kept()) === null, HUNG_MS)), JSON.stringify({ fit: await fit(), kept: await kept() }))
+  // Keyboard: Up a lane more, Down one fewer, never below the floor, saying so.
   await edge.focus()
   await page.keyboard.press('ArrowUp')
-  check('focused, Up shows a lane more and says so', !!(await until(async () => showsWhole(await fit(), 5) && (await kept()) === 5, HUNG_MS)) && (await edgeSays()).text === '5 of 7 lanes shown', JSON.stringify(await edgeSays()))
+  check('focused, Up shows a lane more and says so', !!(await until(async () => showsWhole(await fit(), 7) && (await kept()) === 7, HUNG_MS)) && (await edgeSays()).text === '7 of 7 lanes shown', JSON.stringify(await edgeSays()))
   await shoot('lanes-edge-focused')
   await page.keyboard.press('ArrowDown')
   await page.keyboard.press('ArrowDown')
-  check('…Down, fewer', !!(await until(async () => showsWhole(await fit(), 3), HUNG_MS)) && (await edgeSays()).text === '3 of 7 lanes shown', JSON.stringify(await edgeSays()))
-  await page.keyboard.press('ArrowUp')
-  await page.keyboard.press('ArrowUp')
-  check('…and back to five', !!(await until(async () => showsWhole(await fit(), 5) && (await kept()) === 5, HUNG_MS)), JSON.stringify(await fit()))
+  check('…Down, fewer, but never below six', !!(await until(async () => showsWhole(await fit(), 6) && (await kept()) === 6, HUNG_MS)) && (await edgeSays()).text === '6 of 7 lanes shown', JSON.stringify(await edgeSays()))
   // Ended and abandoned lanes are still: nothing in them animates, and they show no current card.
   const still = await section.locator(`[data-lane="${l4}"] .lane-seg, [data-lane="${l5}"] .lane-seg`).evaluateAll((els) => els.map((e) => getComputedStyle(e, '::before').animationName))
   check('ended and abandoned lanes never animate, and name no current card', still.length === 4 && still.every((a) => a === 'none') && (await section.locator(`[data-lane="${l4}"] .progress-lane-current, [data-lane="${l5}"] .progress-lane-current`).count()) === 0, JSON.stringify(still))
   const panelBox = await panel.boundingBox()
   const sectionBox = await section.boundingBox()
   const runsBox = await panel.locator('.progress-tab-pulse > .progress-body').boundingBox()
-  check('the lanes follow the runs, with no gap (#1309: not pinned to the bottom)', Math.abs(sectionBox.y - (runsBox.y + runsBox.height)) <= 2 && sectionBox.y + sectionBox.height <= panelBox.y + panelBox.height + 1, JSON.stringify({ panelBox, runsBox, sectionBox }))
+  check('the lanes sit at the bottom of the panel, the runs right above them (HI-1673, as #484 had them)', Math.abs(sectionBox.y - (runsBox.y + runsBox.height)) <= 2 && Math.abs(sectionBox.y + sectionBox.height - (panelBox.y + panelBox.height)) <= 2, JSON.stringify({ panelBox, runsBox, sectionBox }))
   // Hover: the card and its round.
   await row1.locator(`.lane-seg[data-card="${n3}"]`).hover()
   const tip = page.locator('.tip', { hasText: `${K(n3)} Panel layout` })
@@ -408,7 +428,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   check('the lanes fold to their bar, after the runs', (await list.count()) === 0 && foldedBox.height < 40 && Math.abs(foldedBox.y - (runsNow.y + runsNow.height)) <= 2, JSON.stringify({ foldedBox, runsNow }))
   await section.locator('.progress-lanes-bar').click()
   check('…and open again', !!(await until(async () => (await list.count()) === 1, HUNG_MS)))
-  check('…with the lanes chosen', !!(await until(async () => showsWhole(await fit(), 5), HUNG_MS)), JSON.stringify(await fit()))
+  check('…with the lanes chosen', !!(await until(async () => showsWhole(await fit(), 6), HUNG_MS)), JSON.stringify(await fit()))
 
   // --- Merging: B1 holds the slot, running its full test set; B3 waits.
   const run = await api(t1, 'POST', '/v1/progress', { title: 'Full test set', total: 146, step: 112, stepName: 'mergeslot', estimateMs: 600000 })
@@ -447,8 +467,8 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await mergeCard.getByRole('button', { name: 'Show the merge in full' }).click()
   check('…and opens again', !!(await until(async () => (await mergeCard.locator('.progress-merge-branch').count()) === 1, HUNG_MS)))
 
-  // --- A short window, zoomed in (1000×650 at 150%): the merge card and the lanes give way, the lanes stay inside the
-  // panel at its bottom, and a run is still there to read and click. Both themes.
+  // --- A short window, zoomed in (1000×650 at 150%): the lanes take priority (HI-1673, Darren): they stay inside the
+  // panel at its bottom, whole lanes, and the runs give way above them. Both themes.
   await lib.fitWindow(app, page, { width: 1000, height: 650 })
   const zoom = (f) => app.evaluate(({ webContents }, z) => webContents.getAllWebContents().filter((w) => w.getType() === 'window').forEach((w) => w.setZoomFactor(z)), f)
   await zoom(1.5)
@@ -462,14 +482,11 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     })
     const inside = box.lanes && box.panel && box.lanes.bottom <= box.panel.bottom + 1 && box.lanes.top >= box.panel.top && Math.abs(box.lanes.bottom - box.panel.bottom) <= 2
     check(`${theme}, short and zoomed: the lanes stay inside the panel, at its bottom, with their bar`, !!inside && !!box.bar && box.bar.height > 20, JSON.stringify(box))
-    const runShows = box.run && box.body && box.body.height >= 60 && box.run.top >= box.body.top - 1 && box.run.top + 40 <= box.body.bottom
-    check(`${theme}, short and zoomed: a run still shows`, !!runShows, JSON.stringify(box))
+    const runsAbove = box.body && box.body.bottom <= box.lanes.top + 1
+    check(`${theme}, short and zoomed: the runs give way above the lanes`, !!runsAbove, JSON.stringify(box))
+    const whole = await list.evaluate((el) => { const r = el.getBoundingClientRect(); return [...el.querySelectorAll('.progress-lane')].filter((x) => { const b = x.getBoundingClientRect(); return b.top >= r.top - 1 && b.bottom <= r.bottom + 1 }).length })
+    check(`${theme}, short and zoomed: …and the lanes show whole`, whole >= 1, String(whole))
     await page.screenshot({ path: path.join(shots, `small-zoom-${theme}.png`) })
-    const run1 = panel.locator('.progress-run').first()
-    await run1.locator('.progress-title').click()
-    check(`${theme}, short and zoomed: …and opens its details when clicked`, !!(await until(async () => /\bopen\b/.test((await run1.getAttribute('class')) ?? ''), HUNG_MS)))
-    await run1.locator('.progress-title').click()
-    await until(async () => !/\bopen\b/.test((await run1.getAttribute('class')) ?? ''), HUNG_MS)
   }
   await zoom(1)
   await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -569,7 +586,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     await page.mouse.move(held.x, held.y)
     await page.mouse.up()
   }
-  // All seven lanes shown for the drags (the edge, End), so the list doesn't scroll under them; five again after.
+  // All seven lanes shown for the drags (the edge, End), so the list doesn't scroll under them; six again after.
   await edge.focus()
   await page.keyboard.press('End')
   await until(async () => showsWhole(await fit(), 7), HUNG_MS)
@@ -603,8 +620,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   check('…and dropped there, nothing moves', await ordered([...mine, l4, l5]), JSON.stringify(await order()))
   await edge.focus()
   await page.keyboard.press('ArrowDown')
-  await page.keyboard.press('ArrowDown')
-  check('(five lanes shown again)', !!(await until(async () => showsWhole(await fit(), 5) && (await kept()) === 5, HUNG_MS)), JSON.stringify(await fit()))
+  check('(six lanes shown again)', !!(await until(async () => showsWhole(await fit(), 6) && (await kept()) === 6, HUNG_MS)), JSON.stringify(await fit()))
   // The list scrolled to its end (l3 at the top of what shows): a drag in the middle of it lands where it was dropped.
   await list.evaluate((el) => (el.scrollTop = el.scrollHeight))
   await until(async () => (await scrollTop()) > 0, HUNG_MS)
@@ -681,10 +697,10 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const edge2 = page2.locator('.progress-lanes-edge')
   const rowsAfter = async () => {
     const now = await edge2.getAttribute('aria-valuenow').catch(() => null)
-    const f = await page2.locator('.progress-lanes-list').evaluate((el) => ({ client: el.clientHeight, sixthTop: [...el.querySelectorAll('.progress-lane')][5]?.getBoundingClientRect().top - el.getBoundingClientRect().top })).catch(() => null)
+    const f = await page2.locator('.progress-lanes-list').evaluate((el) => ({ client: el.clientHeight, seventhTop: [...el.querySelectorAll('.progress-lane')][6]?.getBoundingClientRect().top - el.getBoundingClientRect().top })).catch(() => null)
     return { now, f }
   }
-  check('after a restart, the lanes chosen are kept', !!(await until(async () => { const r = await rowsAfter(); return r.now === '5' && !!r.f && Math.abs(r.f.sixthTop - r.f.client) <= 1 }, 20000)), JSON.stringify(await rowsAfter()))
+  check('after a restart, the lanes chosen are kept', !!(await until(async () => { const r = await rowsAfter(); return r.now === '6' && !!r.f && Math.abs(r.f.seventhTop - r.f.client) <= 1 }, 20000)), JSON.stringify(await rowsAfter()))
   const order2 = () => page2.locator('.progress-lane').evaluateAll((els) => els.map((e) => e.getAttribute('data-lane')))
   check("…and the user's order of lanes (#568)", !!(await until(async () => (await order2()).join() === [...mine, l4, l5, l6].join(), HUNG_MS)), JSON.stringify(await order2()))
   // The usual order again, from a lane's context menu: running ones newest first; nothing kept.

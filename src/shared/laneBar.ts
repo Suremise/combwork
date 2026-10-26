@@ -505,12 +505,23 @@ export function laneSummary(cards: CardSegment[]): { finished: number; total: nu
 }
 
 /**
- * How many lanes the Progress panel's lanes section shows before it scrolls (#569): up to four by default (Settings →
- * Advanced → Progress panel: lanes shown, and a workspace's own: #367, the `fallback` below); the user drags
- * the section's top edge (or presses Up and Down on it) for more or fewer, in whole lanes, kept per workspace. With fewer
- * lanes than that, the section is only as tall as they are.
+ * How many lanes the Progress panel's lanes section shows before it scrolls (#569; HI-1673, Darren: as before #1309):
+ * all of them up to six (Settings → Advanced → Progress panel: lanes shown, and a workspace's own: #367, the `fallback`
+ * below), its floor: a drag never shows fewer lanes than there are up to it, nor fewer than it with more lanes (folding
+ * the section makes it smaller). The user drags the section's top edge (or presses Up and Down on it) for up to
+ * MORE_LANE_ROWS more, in whole lanes, kept per workspace, and back down to the floor. With fewer lanes than the floor,
+ * the section is only as tall as they are.
  */
-export const DEFAULT_LANE_ROWS = 4
+export const DEFAULT_LANE_ROWS = 6
+
+/** How many lanes more than the floor the top edge can be dragged up to show (HI-1673: six, then up to ten). */
+export const MORE_LANE_ROWS = 4
+
+/** The range a drag picks the lanes shown from: the floor (every lane up to `fallback`) and the most (up to MORE_LANE_ROWS more). */
+export function laneRowsRange(count: number, fallback = DEFAULT_LANE_ROWS): { min: number; top: number } {
+  const min = Math.max(1, Math.min(count, fallback))
+  return { min, top: Math.max(min, Math.min(count, fallback + MORE_LANE_ROWS)) }
+}
 
 /** The height the runs above keep (px) when the lanes are dragged up: about a run and a half. */
 export const RUNS_KEEP_PX = 120
@@ -520,9 +531,10 @@ export function chosenLaneRows(kept: number | null | undefined, fallback = DEFAU
   return typeof kept === 'number' && Number.isFinite(kept) ? Math.max(1, Math.round(kept)) : fallback
 }
 
-/** The lanes shown: the choice, but never more than there are (no empty space) and at least one. */
+/** The lanes shown: the choice, within the range (never fewer than the floor, nor more than there are or the most). */
 export function lanesShown(kept: number | null | undefined, count: number, fallback = DEFAULT_LANE_ROWS): number {
-  return Math.max(1, Math.min(count, chosenLaneRows(kept, fallback)))
+  const { min, top } = laneRowsRange(count, fallback)
+  return Math.max(min, Math.min(top, chosenLaneRows(kept, fallback)))
 }
 
 /**
@@ -535,24 +547,28 @@ export function maxLaneRows(count: number, roomPx: number, pitchPx: number): num
 }
 
 /**
- * The lanes shown now: the choice, but no more than fit in `roomPx` (null: not measured yet), so a panel too short for
- * the choice shows whole lanes and leaves the runs their room; the choice itself is kept for when there is room again.
- * `max` is the most that fit, the splitter's maximum.
+ * The lanes shown now: the choice, within the range. The lanes take priority (HI-1673: the runs go behind them): the
+ * floor takes all the room the runs could give up (`roomPx` is what they give up keeping RUNS_KEEP_PX, so RUNS_KEEP_PX
+ * more), and only a panel too short even for that shows fewer, as many whole lanes as fit, the rest scrolling. More than
+ * the floor only as far as they fit in `roomPx` (null: not measured yet), so dragging up leaves the runs their room; the
+ * choice itself is kept for when there is room again. `min` and `max` are the splitter's range now.
  */
-export function laneRowsNow(kept: number | null | undefined, count: number, roomPx: number | null, pitchPx: number, fallback = DEFAULT_LANE_ROWS): { chosen: number; shown: number; max: number } {
+export function laneRowsNow(kept: number | null | undefined, count: number, roomPx: number | null, pitchPx: number, fallback = DEFAULT_LANE_ROWS): { chosen: number; shown: number; min: number; max: number } {
+  const range = laneRowsRange(count, fallback)
+  const min = roomPx === null ? range.min : Math.min(range.min, maxLaneRows(count, roomPx + RUNS_KEEP_PX, pitchPx))
   const chosen = lanesShown(kept, count, fallback)
-  const max = roomPx === null ? count : maxLaneRows(count, roomPx, pitchPx)
-  return { chosen, shown: Math.min(chosen, max), max }
+  const max = Math.max(min, roomPx === null ? range.top : Math.min(range.top, maxLaneRows(count, roomPx, pitchPx)))
+  return { chosen, shown: Math.max(min, Math.min(chosen, max)), min, max }
 }
 
-/** Dragging the top edge by `dyPx` (negative is up, showing more) from `startRows`, snapped to whole lanes. */
-export function draggedLaneRows(startRows: number, dyPx: number, pitchPx: number, max: number): number {
+/** Dragging the top edge by `dyPx` (negative is up, showing more) from `startRows`, snapped to whole lanes, between `min` and `max`. */
+export function draggedLaneRows(startRows: number, dyPx: number, pitchPx: number, max: number, min = 1): number {
   const rows = pitchPx > 0 ? Math.round(startRows - dyPx / pitchPx) : startRows
-  return Math.max(1, Math.min(max, rows))
+  return Math.max(min, Math.min(max, rows))
 }
 
-/** A key on the focused edge: Up shows a lane more, Down one fewer, Home one, End as many as fit; null for other keys. */
-export function keyedLaneRows(rows: number, key: string, max: number): number | null {
-  const next = key === 'ArrowUp' ? rows + 1 : key === 'ArrowDown' ? rows - 1 : key === 'Home' ? 1 : key === 'End' ? max : null
-  return next === null ? null : Math.max(1, Math.min(max, next))
+/** A key on the focused edge: Up shows a lane more, Down one fewer, Home the floor, End as many as fit; null for other keys. */
+export function keyedLaneRows(rows: number, key: string, max: number, min = 1): number | null {
+  const next = key === 'ArrowUp' ? rows + 1 : key === 'ArrowDown' ? rows - 1 : key === 'Home' ? min : key === 'End' ? max : null
+  return next === null ? null : Math.max(min, Math.min(max, next))
 }

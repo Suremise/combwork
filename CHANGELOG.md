@@ -122,6 +122,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **The Pulse tab's lanes sit at the bottom of the Progress panel again,** growing upwards, with the runs above them: they had followed the runs, leaving empty space under them (HI-1673).
 - **A Codex agent stopped by an error needs you too.** Codex says nothing of a failed turn in its hooks, so Hive reads it from Codex's own record of the turn and lists the agent under **need you** as **Stopped by an error**, with Codex's message, until its next turn starts (#1658).
 - **For you no longer keeps questions that were settled another way.** A question on a card that reaches Done, or one whose agent carried on with the card (answered in its pane, say), is closed, with a line in the card's history, and a lane no longer waits for you on it. No question an agent or the Assistant asked about a Done card is listed under For you (#1638).
 - **Agents' questions under For you are formatted.** They showed their Markdown raw, with the line breaks lost: they now render as card comments do (numbered points, bold, code), a long one folded with **Show all**. Decisions on a card render the same way, and a question's notification shows its first sentence or two as plain text (#1637).

@@ -10921,16 +10921,18 @@ button.progress-run-show:focus-visible {
     display: none;
   }
 }
-/* A tab's content: the rest of the panel's height. Pulse lays out top to bottom, its lanes right after its runs (no
-   pinning, no gap between); Runs scrolls under its filters; Lanes shows every lane. */
+/* A tab's content: the rest of the panel's height. Pulse's runs take the room above its lanes, which sit at the
+   bottom of the panel and grow upwards (#484, as before #1309: HI-1673); Runs scrolls under its filters; Lanes shows
+   every lane from the top. */
 .progress-tab-body {
   flex: 1 1 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
+/* The lanes take priority (HI-1673): on a short panel the runs give way, down to nothing, and scroll behind them. */
 .progress-tab-pulse > .progress-body {
-  flex: 0 1 auto;
+  min-height: 0;
 }
 /* The lanes keep the whole lanes they show (#1620): the runs give way and scroll. Shrinking with them squeezed the list
    to part of a lane behind a scroll bar; how many fit, leaving the runs RUNS_KEEP_PX, is LanesSection's to measure. */

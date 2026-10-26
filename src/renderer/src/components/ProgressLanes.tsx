@@ -240,26 +240,32 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
   }
   useLayoutEffect(() => {
     const el = list.current
-    const panel = el?.closest<HTMLElement>('.progress-panel')
-    const body = panel?.querySelector<HTMLElement>('.progress-body')
+    const tab = el?.closest<HTMLElement>('.progress-tab-body')
+    const body = tab?.querySelector<HTMLElement>('.progress-body')
     const section = el?.closest<HTMLElement>('.progress-lanes')
-    if (full || !open || !el || !body || !panel || !section) return
+    if (full || !open || !el || !body || !tab || !section) return
     const row = el.querySelector<HTMLElement>('.progress-lane')
+    // The lanes sit at the bottom of the panel (#484, HI-1673): the room they could have is the list's height and what
+    // the runs above can give up, keeping RUNS_KEEP_PX. That sum doesn't change as the lanes shown do, so it settles at
+    // once; less whatever of the lanes runs past the panel's bottom (they don't shrink, #1620), which a short panel has
+    // until the lanes shown come down to what fits.
     const measure = (): void => {
       if (row) {
         const h = row.getBoundingClientRect().height + parseFloat(getComputedStyle(row).marginBottom || '0')
         if (h > 0) setPitch((was) => (Math.abs(was - h) < 0.1 ? was : h))
       }
-      // The lanes follow the runs (#1309: not pinned to the bottom), so the room left below them is theirs too.
-      const below = Math.max(0, panel.getBoundingClientRect().bottom - section.getBoundingClientRect().bottom)
-      const r = el.clientHeight + body.getBoundingClientRect().height + below - RUNS_KEEP_PX
+      const over = Math.max(0, section.getBoundingClientRect().bottom - tab.getBoundingClientRect().bottom)
+      // The runs give up their height but for their padding, which no squeeze takes.
+      const style = getComputedStyle(body)
+      const padding = parseFloat(style.paddingTop || '0') + parseFloat(style.paddingBottom || '0')
+      const r = el.clientHeight + body.getBoundingClientRect().height - padding - over - RUNS_KEEP_PX
       setRoom((was) => (was !== null && Math.abs(was - r) < 1 ? was : r))
     }
     measure()
     const watch = new ResizeObserver(measure)
     watch.observe(el)
     watch.observe(body)
-    watch.observe(panel)
+    watch.observe(tab)
     if (row) watch.observe(row)
     return () => watch.disconnect()
   }, [open, lanes, width, full])
@@ -272,14 +278,14 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
         </button>
       </div>
     ) : null
-  const { chosen, shown, max } = laneRowsNow(kept, lanes.length, room, pitch, fallback)
+  const { chosen, shown, min, max } = laneRowsNow(kept, lanes.length, room, pitch, fallback)
   // The legend (#1421): the stages the lanes shown have (old rules' too), by category, on the Lanes bar's hover and focus.
   const legend = laneLegend(legendSources(lanes, (p) => stages.get(p.toLowerCase()), badges), tr)
   const foldTip = folded ? tr(msg({ id: 'board.lanes.show', defaultMessage: 'Show the lanes', description: "Tooltip of the Progress panel's Lanes bar when the lanes are folded away." })) : tr(msg({ id: 'board.lanes.fold', defaultMessage: 'Fold the lanes', description: "Tooltip of the Progress panel's Lanes bar: folds the lanes down to the bar." }))
   const legendId = `lanes-legend-${full ? 'tab' : 'pulse'}`
   return (
     <div className={cx('progress-lanes', folded && 'folded', full && 'full')} role="region" aria-label={tr(LANES)}>
-      {!folded && !full && key && <LanesEdge rowsKey={key} chosen={chosen} shown={shown} max={max} count={lanes.length} pitch={pitch} fallback={fallback} />}
+      {!folded && !full && key && <LanesEdge rowsKey={key} chosen={chosen} shown={shown} min={min} max={max} count={lanes.length} pitch={pitch} fallback={fallback} />}
       {!full && (
         <Tooltip block focus className="lanes-legend-tip" content={<LaneLegend groups={legend} more={foldTip} />}>
           <button type="button" className="progress-lanes-bar" aria-expanded={!folded} aria-describedby={legendId} onClick={toggle}>
@@ -328,7 +334,7 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
  * shows; a double-click goes back to the default; focused, Up and Down change it by a lane, Home and End to one and to
  * all that fit. A drag or key sets the choice to what it shows, also where a short panel had shown fewer than chosen.
  */
-function LanesEdge({ rowsKey: key, chosen, shown, max, count, pitch, fallback }: { rowsKey: string; chosen: number; shown: number; max: number; count: number; pitch: number; fallback: number }) {
+function LanesEdge({ rowsKey: key, chosen, shown, min, max, count, pitch, fallback }: { rowsKey: string; chosen: number; shown: number; min: number; max: number; count: number; pitch: number; fallback: number }) {
   const [dragging, setDragging] = useState(false)
   const put = (rows: number | null): void => {
     set((s) => {
@@ -349,7 +355,7 @@ function LanesEdge({ rowsKey: key, chosen, shown, max, count, pitch, fallback }:
     setDragging(true)
     document.body.classList.add('pane-resizing-v')
     const move = (ev: PointerEvent): void => {
-      const rows = draggedLaneRows(shown, ev.clientY - startY, pitch, max)
+      const rows = draggedLaneRows(shown, ev.clientY - startY, pitch, max, min)
       if (rows === last) return
       last = rows
       put(rows)
@@ -376,7 +382,7 @@ function LanesEdge({ rowsKey: key, chosen, shown, max, count, pitch, fallback }:
       role="separator"
       aria-orientation="horizontal"
       aria-label={tr(msg({ id: 'board.lanes.edge', defaultMessage: 'Lanes shown', description: "Accessible name of the handle on the top edge of the Progress panel's lanes: drag it for more or fewer lanes." }))}
-      aria-valuemin={1}
+      aria-valuemin={min}
       aria-valuemax={max}
       aria-valuenow={shown}
       aria-valuetext={tr(msg({ id: 'board.lanes.edgeValue', defaultMessage: '{shown} of {count, plural, one {# lane} other {# lanes}} shown', description: "The value of the handle on the top edge of the Progress panel's lanes, for screen readers: {shown} of the {count} lanes show." }), { shown, count })}
@@ -385,7 +391,7 @@ function LanesEdge({ rowsKey: key, chosen, shown, max, count, pitch, fallback }:
       onPointerDown={start}
       onDoubleClick={reset}
       onKeyDown={(e) => {
-        const rows = keyedLaneRows(shown, e.key, max)
+        const rows = keyedLaneRows(shown, e.key, max, min)
         if (rows === null) return
         e.preventDefault()
         // Against the choice kept: on a short panel showing fewer than chosen, End keeps what fits.
