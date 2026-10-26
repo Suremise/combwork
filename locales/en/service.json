@@ -35,6 +35,10 @@
     "defaultMessage": "No advanced setting \"{id}\".",
     "description": "An error changing an advanced setting: Hive has none with the id {id}."
   },
+  "service.answerRelay.title": {
+    "defaultMessage": "{card}: nobody else has your answer",
+    "description": "A notification's title (a banner, a Windows notification): the user answered an agent's question on card {card} (its key, such as HI-12), and the Hive Assistant, which could act on it, couldn't be told."
+  },
   "service.attachments.badFolder": {
     "defaultMessage": "Not a session folder name.",
     "description": "An error: a name given for a session's attachments folder isn't one Hive makes (a session id)."

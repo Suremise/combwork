@@ -140,12 +140,14 @@ export function Sidebar() {
   const visible = useStore((s) => s.sidebarVisible)
   const width = useStore((s) => s.sidebarWidth)
   const compactSetting = useStore((s) => s.sidebarCompact)
+  // Folded to its rail for the room (HI-1737, layoutRoom.ts), unless the user expanded it meanwhile.
+  const folded = useStore((s) => s.sidebarFolded && !s.sidebarUnfolded)
   const last = useStore((s) => s.lastSideActivity)
   const [dragging, setDragging] = useState(false)
   if (!visible) return null
   const view = activity === 'docs' || activity === 'settings' ? last : activity
   // Only the Projects list has a compact form; the other panels always show at full width.
-  const compact = compactSetting && view === 'projects'
+  const compact = (compactSetting || folded) && view === 'projects'
 
   const startDrag = (e: React.MouseEvent): void => {
     e.preventDefault()

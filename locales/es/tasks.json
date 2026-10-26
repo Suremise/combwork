@@ -85,6 +85,8 @@
   "tasks.error.unknownTask": "Tarjeta desconocida {card}",
   "tasks.error.verdictNotYours": "El agente {agent} está revisando la tarjeta {card}: el veredicto es suyo.",
   "tasks.history.answerTold": "Avisó al agente {agent} de tu respuesta",
+  "tasks.history.answerUntold": "No se pudo avisar al Asistente de Hive de tu respuesta a la pregunta de {agent}: solo {agent} la tiene",
+  "tasks.history.answerUntoldNeed": "{agent} no puede {action, select, done {mover esta tarjeta a Hecho} noCode {hacer esta tarjeta sin código} skipReview {omitir la revisión de esta tarjeta} other {desbloquear esta tarjeta}} por sí mismo, y no se pudo avisar al Asistente de Hive de tu respuesta: hazlo tú si lo aceptaste",
   "tasks.history.archived": "Archivada",
   "tasks.history.archivedDone": "Archivada tras {days, plural, one {# día} many {# días} other {# días}} en Hecho",
   "tasks.history.archivedHidden": "Archivada: se ocultó el proyecto {project}",

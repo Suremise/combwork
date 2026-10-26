@@ -85,6 +85,8 @@
   "tasks.error.unknownTask": "Cartão desconhecido {card}",
   "tasks.error.verdictNotYours": "O agente {agent} está revisando {card}: o veredito é dele.",
   "tasks.history.answerTold": "Avisou o agente {agent} da sua resposta",
+  "tasks.history.answerUntold": "Não foi possível avisar o Assistente do Hive da sua resposta à pergunta de {agent}: só {agent} a tem",
+  "tasks.history.answerUntoldNeed": "{agent} não pode {action, select, done {mover este cartão para Concluído} noCode {tornar este cartão sem código} skipReview {pular a revisão deste cartão} other {desbloquear este cartão}} sozinho, e não foi possível avisar o Assistente do Hive da sua resposta: faça você mesmo se concordou",
   "tasks.history.archived": "Arquivado",
   "tasks.history.archivedDone": "Arquivado após {days, plural, =0 {# dias} one {# dia} other {# dias}} em Concluído",
   "tasks.history.archivedHidden": "Arquivado: o projeto {project} foi ocultado",

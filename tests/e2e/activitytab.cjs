@@ -1,15 +1,17 @@
-// The Activity tab (#1254): a project's live work as a tree, card → agent → session → turn → tool call, with subagents and
-// processes. Fixture sessions on cards (in the last 24 hours, and one older, left out) and an agent running the fake
-// Claude Code (a turn running a command with a token on its command line, a background subagent, two processes it
-// leaves running): the tree files them in place, the running agent first; a session opens to its turns and a turn to its
-// tool calls; details show a prompt and a tool call's input whole, as written (a multiline prompt, an input past round
-// 1's cut), and a process's command line, each with its secret masked; Expand All opens everything, turns read later
-// too; Activity in an agent's menu and in the card dialog open it filtered; a process the agent left running ends from
-// its details after a confirmation, and the agent's CLI has no End Process. Both themes. Fake Claude Code only (no
-// sign-in, no tokens). HI-1677: nodes drawn don't move as work comes and goes (positions compared across updates), what
-// ended stays dimmed; Pause holds the tree while updates count in the pill, which applies them; the time range, Hide
-// finished, and the Agents and Cards filters (opened from an agent's menu or a card too). Dev build, throwaway profile,
-// workspace and CLI homes; quiet.
+// The Activity tab (#1254, HI-1743): what runs now, a tab per running agent, each its current work as a list: its card
+// in progress as a header (or its session), Now (its prompt, then the tool call under way, or thinking or writing),
+// subagents and background tasks, processes. Nothing past: a session of an earlier card isn't shown. HB1 runs the fake
+// Claude Code on a card in Doing (a turn running a command through cmd /c with a token on its command line, then a
+// background subagent; two processes it leaves running); a sub-session of its turn gains a tool call while live; HB2 runs
+// on no card (a solo agent); the others don't run. The tab opens frozen: what comes meanwhile is counted in the pill, not
+// drawn; Refresh takes a new snapshot; Play goes live (the command that ended fades out and leaves, the subagent comes);
+// shown again after another view it is frozen again. No spinners: working is a pulse. The agent's own processes (its
+// CLI, its terminal, hive-mcp.js) show only on request; a command shows as given. Hide finished (on by default) hides the
+// agents with nothing running; Activity in an agent's menu opens its tab, filtered, frozen; a card in progress has
+// Activity in its dialog and its menu, on its builder's tab; a finished card has none. Details show a prompt with its
+// secret masked; a process the agent left running ends from its details after a confirmation, its CLI has no End
+// Process. Both themes. Fake Claude Code only (no sign-in, no tokens). Dev build, throwaway profile, workspace and CLI
+// homes; quiet.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -31,31 +33,23 @@ const check = (name, ok, extra = '') => {
 
 const now = Date.now()
 const ago = (min) => new Date(now - min * 60_000).toISOString()
-const AGENTS = ['HB1', 'HB2', 'HR1'].map((n) => ({ id: n.toLowerCase(), name: n, provider: 'claude-code' }))
-const SECRET = `sk-ant-api03-${'q'.repeat(40)}`
+// Eight agents, as a team has: two run, the others have nothing running.
+const AGENTS = ['HB1', 'HB2', 'HB3', 'HB4', 'HR1', 'HR2', 'HR3', 'HR4'].map((n) => ({ id: n.toLowerCase(), name: n, provider: 'claude-code' }))
 const GH = `ghp_${'z'.repeat(36)}`
-// A prompt of several lines, longer than a node shows; and an input past round 1's 4,000-character cut.
-const PROMPT = ['Fix the flaky test.', '', 'Steps:', '1. Reproduce it under load.', '2. Find the race.', `3. Fix it with a condition (key ${SECRET}).`, 'And then a long paragraph of plain words. '.repeat(10)].join('\n')
-const LONG = `npm test -- ${'--flag '.repeat(800)}--end`
 const line = (o) => JSON.stringify(o)
-/** A finished session's transcript: `turns` prompts, each with a Bash and a Read call and a reply. */
-function transcript(sid, turns, startMin) {
-  const out = []
+/** A finished session's transcript: one prompt with a Bash call and a reply. */
+function transcript(sid, startMin) {
   let t = now - startMin * 60_000
   const at = () => new Date((t += 2000)).toISOString()
-  for (let i = 0; i < turns; i++) {
-    out.push(line({ type: 'user', sessionId: sid, cwd: alpha, timestamp: at(), message: { role: 'user', content: i === 0 ? `Turn 0: ${PROMPT}` : `Turn ${i}: carry on with the card` } }))
-    for (const [k, tool] of [
-      [0, { name: 'Bash', input: { command: i === 0 ? LONG : `npm test -- --token ${SECRET}`, description: 'Run the tests' } }],
-      [1, { name: 'Read', input: { file_path: 'src/a.ts' } }]
-    ]) {
-      const id = `toolu_${sid.slice(0, 4)}_${i}_${k}`
-      out.push(line({ type: 'assistant', sessionId: sid, requestId: `r${i}${k}`, timestamp: at(), message: { model: 'claude-opus-5-5', content: [{ type: 'tool_use', id, ...tool }], usage: { input_tokens: 10, output_tokens: 5 } } }))
-      out.push(line({ type: 'user', sessionId: sid, timestamp: at(), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: 'ok', is_error: false }] } }))
-    }
-    out.push(line({ type: 'assistant', sessionId: sid, requestId: `e${i}`, timestamp: at(), message: { model: 'claude-opus-5-5', content: [{ type: 'text', text: `Done with turn ${i}.` }], usage: { input_tokens: 10, output_tokens: 5 } } }))
-  }
-  return out.join('\n') + '\n'
+  const id = `toolu_${sid.slice(0, 4)}`
+  return (
+    [
+      line({ type: 'user', sessionId: sid, cwd: alpha, timestamp: at(), message: { role: 'user', content: 'Build the earlier card' } }),
+      line({ type: 'assistant', sessionId: sid, requestId: 'r1', timestamp: at(), message: { model: 'claude-opus-5-5', content: [{ type: 'tool_use', id, name: 'Bash', input: { command: 'npm test' } }], usage: { input_tokens: 10, output_tokens: 5 } } }),
+      line({ type: 'user', sessionId: sid, timestamp: at(), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: 'ok', is_error: false }] } }),
+      line({ type: 'assistant', sessionId: sid, requestId: 'r2', timestamp: at(), message: { model: 'claude-opus-5-5', content: [{ type: 'text', text: 'Done.' }], usage: { input_tokens: 10, output_tokens: 5 } } })
+    ].join('\n') + '\n'
+  )
 }
 
 ;(async () => {
@@ -75,6 +69,8 @@ function transcript(sid, turns, startMin) {
 
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47931), ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
+  const shots = path.join(lib.WORK, 'activitytab-shots')
+  fs.mkdirSync(shots, { recursive: true })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -82,137 +78,104 @@ function transcript(sid, turns, startMin) {
     await lib.appReady(page)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
+    const shoot = (name) => page.screenshot({ path: path.join(shots, `${name}.png`) })
 
-    // --- Two cards; HB2's and HR1's sessions on them over the last hours, one of HR1's older than 24 hours.
-    const one = await inv('tasks:create', { title: 'Card one', project: 'alpha', column: 'doing' })
-    const two = await inv('tasks:create', { title: 'Card two', project: 'alpha', column: 'review' })
-    const rec = (sid, agent, min, card, name) => ({ id: sid, agent: 'claude-code', agentId: agent.id, agentName: agent.name, name, cwd: alpha, createdAt: ago(min + 5), lastActiveAt: ago(min), archived: false, cards: card ? [{ number: card.number, title: card.title }] : [] })
-    const S = { hb2: randomUUID(), hr1: randomUUID(), old: randomUUID(), loose: randomUUID() }
-    fs.writeFileSync(path.join(transcripts, `${S.hb2}.jsonl`), transcript(S.hb2, 3, 80))
-    fs.writeFileSync(path.join(transcripts, `${S.hr1}.jsonl`), transcript(S.hr1, 2, 50))
-    fs.writeFileSync(path.join(transcripts, `${S.old}.jsonl`), transcript(S.old, 1, 30 * 60))
-    fs.writeFileSync(path.join(transcripts, `${S.loose}.jsonl`), transcript(S.loose, 1, 15))
-    // Last active 70, 40 and 10 minutes ago, and 30 hours (out of the data's 24).
+    // --- HB1's card in Doing; a finished card of HB1's, with its session an hour ago (history: never shown here).
+    await inv('tasks:create', { title: 'Card one', project: 'alpha', agent: 'hb1', column: 'doing' })
+    const old = await inv('tasks:create', { title: 'An earlier card', project: 'alpha', agent: 'hb1', column: 'done' })
+    const S = { old: randomUUID() }
+    fs.writeFileSync(path.join(transcripts, `${S.old}.jsonl`), transcript(S.old, 60))
     const file = sessionsOf(alpha)
-    file.sessions.push(rec(S.hb2, AGENTS[1], 70, one, 'Building one'), rec(S.hr1, AGENTS[2], 40, two, 'Reviewing two'), rec(S.old, AGENTS[2], 30 * 60, two, 'An old review'), rec(S.loose, AGENTS[1], 10, null, 'A loose session'))
+    file.sessions.push({ id: S.old, agent: 'claude-code', agentId: 'hb1', agentName: 'HB1', name: 'Building the earlier card', cwd: alpha, createdAt: ago(65), lastActiveAt: ago(60), archived: false, cards: [{ number: old.number, title: old.title }] })
     putSessions(alpha, file)
 
-    // --- HB1 running: a long turn with a background subagent.
+    // --- HB1 running: a command for its turn (a token on its command line), then a background subagent.
     await page.getByText('alpha', { exact: true }).first().click()
     await inv('session:start', alpha, { agentId: 'hb1' })
-    const liveOf = async () => (await inv('session:live')).find((x) => x.agentId === 'hb1') ?? null
-    await lib.until(async () => ['ready', 'finished'].includes((await liveOf())?.status), HUNG_MS)
-    // A command running for the turn, with a token on its command line.
-    await lib.sendPrompt(inv, lib.ptyKey(alpha, 'hb1'), `shell: node -e "setTimeout(()=>{},20000)" ${GH} then subagent 50 then work 60`, { submitted: async () => (await liveOf())?.status === 'working' })
+    const liveOf = async (id) => (await inv('session:live')).find((x) => x.agentId === id) ?? null
+    await lib.until(async () => ['ready', 'finished'].includes((await liveOf('hb1'))?.status), HUNG_MS)
+    await lib.sendPrompt(inv, lib.ptyKey(alpha, 'hb1'), `shell: node -e "setTimeout(()=>{},15000)" ${GH} then subagent 60 then work 90`, { submitted: async () => (await liveOf('hb1'))?.status === 'working' })
+    const commandRuns = async () => (await inv('activity:now', alpha)).launches.flatMap((l) => l.processes).some((p) => /setTimeout/.test(p.command ?? p.label))
+    await lib.until(commandRuns, HUNG_MS, 250)
 
-    // --- The tab: the cards with their agents and sessions, then the agents' loose sessions, HB1's running one among them.
+    // --- The tab: HB1's tab only (the others have nothing running), its card in progress and what runs in it.
     await page.locator('.tab', { hasText: 'Activity' }).click()
-    const node = (kind, text) => page.locator(`.activity-node.act-${kind}`, text ? { hasText: text } : {})
-    const titles = async () => page.locator('.activity-node').evaluateAll((els) => els.map((e) => `${e.className.match(/act-(\w+)/)[1]}:${e.querySelector('.activity-node-title')?.textContent ?? ''}`))
-    await lib.until(async () => (await node('session', 'Reviewing two').count()) > 0 && (await node('process').count()) >= 2, HUNG_MS, 250)
-    const shown = await titles()
-    check('the cards, each with its agent and session, and the running agent with its session', ['card:', 'agent:HB2', 'session:Building one', 'agent:HR1', 'session:Reviewing two', 'agent:HB1'].every((t) => shown.some((s) => s.startsWith(t))), JSON.stringify(shown))
-    check('a session older than 24 hours is left out', !shown.some((s) => s.includes('An old review')))
-    check("HB2's session on no card is under HB2's own node", shown.includes('session:A loose session'))
-    check('the running session shows its processes: its CLI, the two it left running and the command it runs', !!(await lib.until(async () => (await node('process', 'setTimeout').count()) > 0, HUNG_MS, 250)) && (await node('process').count()) >= 5, String(await node('process').count()))
-    check("a process's command line shows with its token masked", !(await page.locator('.activity-tree').innerText()).includes(GH))
-    await page.screenshot({ path: path.join(lib.WORK, 'activitytab-1-live-dark.png') })
-    // HI-1677: where each node is drawn now; work then comes (the background subagent, after the command) and the command
-    // ends (its process stays, dimmed): nothing drawn moves. The pointer is off the tree, which goes live (not held).
-    await page.mouse.move(5, 5)
-    const positions = async () => Object.fromEntries(await page.locator('.activity-node').evaluateAll((els) => els.map((e) => [e.dataset.key, `${e.style.left},${e.style.top}`])))
-    const before = await positions()
-    check("…and the agent's background subagent", !!(await lib.until(async () => (await node('task').count()) === 1, HUNG_MS, 250)))
-    const ended = node('process', 'setTimeout')
-    // Its cmd and its node: both stay, dimmed.
-    const allGone = async () => (await ended.evaluateAll((els) => els.length > 0 && els.every((e) => e.classList.contains('act-gone')))) === true
-    check('the command that ended stays where it was, dimmed', !!(await lib.until(allGone, HUNG_MS, 250)))
-    const after = await positions()
-    const moved = Object.keys(before).filter((k) => after[k] && after[k] !== before[k])
-    check('nodes drawn before stay where they were as work comes and ends', Object.keys(before).length > 5 && moved.length === 0 && Object.keys(after).length > Object.keys(before).length, JSON.stringify({ moved, before: Object.keys(before).length, after: Object.keys(after).length }))
-    // Each drawn node's parent is the nearest node above it one column to its left: the tree in its own order, compact.
-    const compact = () =>
-      page.locator('.activity-node').evaluateAll((els) => {
-        const rows = els.map((e) => ({ key: e.dataset.key, parent: e.dataset.parent ?? null, x: parseFloat(e.style.left), y: parseFloat(e.style.top) })).sort((a, b) => a.y - b.y)
-        return rows.every((r, i) => {
-          if (r.parent === null) return r.x === 0
-          const above = rows.slice(0, i).reverse().find((p) => p.x < r.x)
-          return !!above && above.key === r.parent
-        })
-      })
-    check('while live, new work under an older parent comes last, joined by a longer elbow', !(await compact()))
-    // The Assistant's ask: a refresh draws it compact again, children back under their parents (ended work dropped).
-    await page.locator('.activity-head').getByRole('button', { name: 'Refresh' }).click()
-    check('Refresh draws the tree compact again, children under their parents', !!(await lib.until(compact, HUNG_MS, 250)) && (await page.locator('.activity-node.act-gone').count()) === 0)
-
-    // --- Pause: a new session while paused is counted in the pill, not drawn; the pill draws it, and it stays paused.
     const head = page.locator('.activity-head')
-    await head.locator('.activity-live').click()
-    await lib.until(async () => (await head.locator('.activity-live').getAttribute('aria-pressed')) === 'true', HUNG_MS)
-    const added = randomUUID()
-    fs.writeFileSync(path.join(transcripts, `${added}.jsonl`), transcript(added, 1, 2))
-    const more = sessionsOf(alpha)
-    more.sessions.push(rec(added, AGENTS[2], 1, null, 'A session while paused'))
-    putSessions(alpha, more)
-    const pill = head.locator('.activity-pill')
-    check('paused, updates wait in the pill', !!(await lib.until(async () => /update/.test(await pill.innerText().catch(() => '')), HUNG_MS, 250)), await pill.innerText().catch(() => ''))
-    check('…and the tree holds: the new session is not drawn', (await node('session', 'A session while paused').count()) === 0)
-    await page.screenshot({ path: path.join(lib.WORK, 'activitytab-2-paused-dark.png') })
-    await pill.click()
-    // What the pill applies is what was read by then: the session list is read every few seconds, so until it has the new
-    // session, the pill shows again for the next update and is clicked again, as a user would.
-    check('the pill draws what came while paused', !!(await lib.until(async () => {
-      if ((await node('session', 'A session while paused').count()) === 1) return true
-      if (await pill.count()) await pill.click().catch(() => undefined)
+    const node = (kind, text) => page.locator(`.activity-row.act-${kind}`, text ? { hasText: text } : {})
+    const tabsShown = async () => page.locator('.activity-agent-tab').evaluateAll((els) => els.map((e) => e.dataset.agent))
+    const refresh = () => head.getByRole('button', { name: 'Refresh', exact: true }).click()
+    const list = page.locator('.activity-list')
+    // The snapshot is of the tab's opening: refreshed (as a user would) until it has the command.
+    check('the tab opens with what runs: the command among the processes', !!(await lib.until(async () => {
+      if ((await node('process', 'setTimeout').count()) > 0) return true
+      await refresh()
       return false
-    }, HUNG_MS, 250)))
-    check('…and it stays paused, as paused by hand', (await head.locator('.activity-live').getAttribute('aria-pressed')) === 'true')
-    await head.locator('.activity-live').click()
-    await lib.until(async () => (await head.locator('.activity-live').getAttribute('aria-pressed')) === 'false', HUNG_MS)
+    }, HUNG_MS, 500)))
+    check('a tab per agent with something running: HB1 only (Hide finished, on by default)', JSON.stringify(await tabsShown()) === '["hb1"]', JSON.stringify(await tabsShown()))
+    const hb1Tab = page.locator('.activity-agent-tab[data-agent="hb1"]')
+    check("…with its state mark and its card's key", (await hb1Tab.locator('.state-mark').count()) === 1 && /\w+-\d+/.test(await hb1Tab.innerText()), await hb1Tab.innerText())
+    const cardHead = page.locator('.activity-card-head')
+    check('its card in progress is the header, a link to it; no card or agent rows', /Card one/.test(await cardHead.innerText()) && (await cardHead.locator('.activity-card-key').count()) === 1 && (await page.locator('.activity-row.act-card, .activity-row.act-agent').count()) === 0, await cardHead.innerText())
+    const groups = async () => page.locator('.activity-group').evaluateAll((els) => els.map((e) => e.dataset.group))
+    check('then Now (its turn), then its processes, top to bottom', JSON.stringify(await groups()) === '["now","processes"]' && (await node('turn', 'shell:').count()) === 1, JSON.stringify(await groups()))
+    check('nothing past: no earlier card, no earlier session', !/earlier card|Building the earlier/.test(await list.innerText()))
+    const titles = async () => page.locator('.activity-row.act-process .activity-row-title').allInnerTexts()
+    check("the command as given: a cmd /c wrapper shows what it runs, never 'cmd d s c'", (await titles()).some((t) => /^node -e "?setTimeout/.test(t)) && !(await titles()).some((t) => t.startsWith('cmd d s c')), JSON.stringify(await titles()))
+    check("the agent's own plumbing is hidden: no CLI, no terminal host, no hive-mcp.js; the processes it left running show", !(await titles()).some((t) => /fake-claude\.cjs|powershell|hive-mcp/.test(t)) && (await titles()).filter((t) => /linger/.test(t)).length === 2, JSON.stringify(await titles()))
+    check("a process's command line shows with its token masked", !(await list.innerText()).includes(GH))
+    check('no spinner anywhere; working is a pulse', (await page.locator('.activity-tab .spin, .activity-tab .codicon-loading').count()) === 0 && (await page.locator('.activity-tab .activity-pulse').count()) > 0)
 
-    // --- The range (from the last refresh) and Hide finished.
-    const range = (label) => head.locator('.activity-range button', { hasText: new RegExp(`^${label}$`) })
-    await range('1 h').click()
-    check('1 h: what was active in the last hour, and what runs', !!(await lib.until(async () => (await node('session', 'Building one').count()) === 0 && (await node('session', 'Reviewing two').count()) === 1 && (await node('session', 'A loose session').count()) === 1, HUNG_MS, 250)))
-    await page.screenshot({ path: path.join(lib.WORK, 'activitytab-3-1h-dark.png') })
-    await range('15 min').click()
-    check('15 min: the last 15 minutes and what runs', !!(await lib.until(async () => (await node('session', 'Reviewing two').count()) === 0 && (await node('session', 'A loose session').count()) === 1, HUNG_MS, 250)))
-    await range('Live').click()
-    check('Live: only what runs', !!(await lib.until(async () => (await node('session', 'A loose session').count()) === 0 && (await node('agent', 'HB1').count()) === 1, HUNG_MS, 250)))
-    await range('24 h').click()
-    await head.locator('.activity-hide input').check()
-    check('Hide finished: only what runs', !!(await lib.until(async () => (await node('session', 'Reviewing two').count()) === 0 && (await node('agent', 'HB1').count()) === 1, HUNG_MS, 250)))
-    await head.locator('.activity-hide input').uncheck()
-    await lib.until(async () => (await node('session', 'Reviewing two').count()) === 1, HUNG_MS, 250)
+    // --- Frozen: the command ends and nothing changes; the pill counts what came.
+    const live = head.locator('.activity-live')
+    check('it opens frozen (Play offered, not pressed)', (await live.getAttribute('aria-pressed')) === 'false' && /Play/.test(await live.innerText()))
+    const drawnCommand = await node('process', 'setTimeout').count()
+    await lib.until(async () => !(await commandRuns()), HUNG_MS, 250)
+    const pill = head.locator('.activity-pill')
+    check('frozen, what came since waits in the pill', !!(await lib.until(async () => /update/.test(await pill.innerText().catch(() => '')), HUNG_MS, 250)), await pill.innerText().catch(() => ''))
+    check('…and it holds: the command that ended is still shown, as it was', drawnCommand > 0 && (await node('process', 'setTimeout').count()) === drawnCommand && (await page.locator('.activity-row.act-gone').count()) === 0)
+    await page.mouse.move(5, 5)
+    await shoot('1-frozen-dark')
 
-    // --- A finished session opens to its turns (read only then), a turn to its tool calls; a call's details.
-    check("a finished session's turns aren't read until it opens", (await node('turn', 'Turn 0').count()) === 0)
-    await node('session', 'Building one').locator('.activity-twisty').click()
-    await lib.until(async () => (await node('turn', 'Turn').count()) >= 3, HUNG_MS)
-    check('opened, a session shows its turns', (await node('turn', 'Turn').count()) === 3)
-    // A prompt's details: the whole of it, as written (its line breaks), its key masked.
-    await node('turn', 'Turn 0').first().click()
+    // --- Play: live; the command fades out and leaves, the background subagent comes.
+    await live.click()
+    check('Play goes live', (await live.getAttribute('aria-pressed')) === 'true' && /Pause/.test(await live.innerText()))
+    check('live, the command that ended leaves', !!(await lib.until(async () => (await node('process', 'setTimeout').count()) === 0, HUNG_MS, 100)))
+    check('…and the background subagent shows under Subagents, a plain icon with its name (no pulse)', !!(await lib.until(async () => (await node('task').count()) === 1, HUNG_MS, 250)) && (await node('task').locator('.activity-pulse').count()) === 0 && JSON.stringify(await groups()) === '["now","subagents","processes"]', JSON.stringify(await groups()))
+    // HR6's round 1: a subagent's transcript read again while it runs. A sub-session of HB1's running one (as Claude Code
+    // records a subagent's), its tool call under way; then it goes on to another.
+    const parent = (await liveOf('hb1')).sessionId
+    const subId = randomUUID()
+    const subFile = path.join(transcripts, `${subId}.jsonl`)
+    const subLine = (o) => fs.appendFileSync(subFile, line({ sessionId: subId, cwd: alpha, timestamp: new Date().toISOString(), ...o }) + '\n')
+    subLine({ type: 'user', message: { role: 'user', content: 'Look for the race' } })
+    subLine({ type: 'assistant', requestId: 'sr1', message: { model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 'toolu_sub1', name: 'Grep', input: { pattern: 'race' } }], usage: { input_tokens: 10, output_tokens: 5 } } })
+    const subs = sessionsOf(alpha)
+    subs.sessions.push({ id: subId, agent: 'claude-code', agentId: 'hb1', agentName: 'HB1', name: 'A subagent', cwd: alpha, createdAt: new Date().toISOString(), lastActiveAt: new Date().toISOString(), archived: false, sub: { parentId: parent, kind: 'sub-agent' } })
+    putSessions(alpha, subs)
+    const subRow = node('session', 'A subagent')
+    check("a running subagent shows with its tool call under way", !!(await lib.until(async () => /Grep/.test(await subRow.innerText().catch(() => '')), HUNG_MS, 250)), await subRow.innerText().catch(() => ''))
+    subLine({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_sub1', content: 'found', is_error: false }] } })
+    subLine({ type: 'assistant', requestId: 'sr2', message: { model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 'toolu_sub2', name: 'Read', input: { file_path: 'src/race.ts' } }], usage: { input_tokens: 10, output_tokens: 5 } } })
+    check('…and its next tool call as its transcript grows, read again live', !!(await lib.until(async () => /Read/.test(await subRow.innerText().catch(() => '')), HUNG_MS, 250)), await subRow.innerText().catch(() => ''))
+    await page.mouse.move(5, 5)
+    await shoot('2-live-subagent-dark')
+    // HR6's round 2: its state is its own. It replies and is done, no pulse, while HB1 and its background subagent go on.
+    subLine({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_sub2', content: 'read', is_error: false }] } })
+    subLine({ type: 'assistant', requestId: 'sr3', message: { model: 'claude-opus-5-5', content: [{ type: 'text', text: 'The race is in src/race.ts.' }], usage: { input_tokens: 10, output_tokens: 5 } } })
+    check('a subagent that replied is Done, no pulse, while its parent goes on', !!(await lib.until(async () => /Done/.test(await subRow.innerText().catch(() => '')) && (await subRow.locator('.activity-pulse').count()) === 0, HUNG_MS, 250)) && (await node('task').count()) === 1, await subRow.innerText().catch(() => ''))
+    // HR6's round 1: shown again after another view, it is a new opening: frozen, though it was live.
+    await page.locator('.activity-btn[aria-label="Settings"]').click()
+    await lib.until(async () => !(await list.isVisible().catch(() => false)), HUNG_MS, 100)
+    await page.locator('.activity-btn[aria-label="Projects"]').click()
+    check('opened again from another view, it is frozen again (Play offered)', !!(await lib.until(async () => (await live.isVisible().catch(() => false)) && (await live.getAttribute('aria-pressed')) === 'false', HUNG_MS, 250)))
+
+    // --- Details: the running turn's prompt (its token masked); a process it left running ends; the CLI has no End Process.
+    await node('turn').first().click()
     const details = page.locator('.activity-details')
     const pre = details.locator('.activity-pre').first()
-    await lib.until(async () => /Steps:/.test(await pre.innerText().catch(() => '')), HUNG_MS)
-    const prompt = await pre.innerText()
-    check("a prompt's details show it whole, its lines as written", prompt.includes('Steps:\n1. Reproduce it under load.') && prompt.includes('And then a long paragraph of plain words. '.repeat(10).trim()), prompt.slice(0, 200))
-    check('…its key masked, as the log masks it', !prompt.includes('q'.repeat(40)) && prompt.includes('<redacted>'), prompt.slice(0, 300))
-    await node('turn', 'Turn 0').first().locator('.activity-twisty').click()
-    await lib.until(async () => (await node('tool', 'Bash').count()) > 0, HUNG_MS)
-    await node('tool', 'Bash').first().click()
-    await lib.until(async () => /--end/.test(await pre.innerText().catch(() => '')), HUNG_MS)
-    const text = await pre.innerText()
-    check("a tool call's details show its whole input, past round 1's 4,000-character cut", text.includes('--end') && text.length > 5000, String(text.length))
-    // Playwright's click scrolled the tree to the call: back to its start, for a screenshot of the whole tree.
-    await page.locator('.activity-tree').evaluate((el) => (el.scrollLeft = 0))
-    await page.screenshot({ path: path.join(lib.WORK, 'activitytab-5-details-dark.png') })
-
-    // --- Ending one of the agent's processes: its CLI has no End Process; one it left running ends after a confirmation.
+    await lib.until(async () => /shell:/.test(await pre.innerText().catch(() => '')), HUNG_MS)
+    check("the turn's details show its prompt, the token masked", !(await pre.innerText()).includes(GH), (await pre.innerText()).slice(0, 200))
     const endButton = details.locator('button', { hasText: 'End Process' })
-    await node('process', 'fake-claude').first().click()
-    await lib.until(async () => /fake-claude/.test(await details.innerText().catch(() => '')), HUNG_MS)
-    check("the agent's CLI has no End Process", (await endButton.count()) === 0)
     await node('process', 'linger').first().click()
     await lib.until(async () => (await endButton.count()) === 1, HUNG_MS)
     const pid = Number(/Process id\s+(\d+)/.exec(await details.innerText())?.[1])
@@ -221,117 +184,91 @@ function transcript(sid, turns, startMin) {
     await endButton.click()
     await page.getByRole('button', { name: 'End Process…' }).last().click()
     check('confirmed, that process ends', !!(await lib.until(async () => !(await running()), HUNG_MS, 250)), String(pid))
-    check('…and the agent still runs', !!(await liveOf()))
-    // Not the agent's (another pid, or a start time that doesn't match): nothing is ended.
+    check('…and the agent still runs', !!(await liveOf('hb1')))
     check("main refuses a process that isn't the agent's", (await inv('activity:endProcess', alpha, 'hb1', process.pid, '1')) === 'notOwn')
+    // Its own processes on request: its CLI among them, with no End Process.
+    const own = page.locator('.activity-own input')
+    await own.check()
+    check("Show the agent's own processes: its CLI too", !!(await lib.until(async () => (await titles()).some((t) => /fake-claude\.cjs/.test(t)), HUNG_MS, 250)), JSON.stringify(await titles()))
+    await node('process', 'fake-claude.cjs').first().click()
+    await lib.until(async () => /fake-claude/.test(await details.innerText().catch(() => '')), HUNG_MS)
+    check("the agent's CLI has no End Process", (await endButton.count()) === 0)
+    await details.getByRole('button', { name: 'Close details' }).click()
+    await own.uncheck()
 
-    // --- Opened filtered: from an agent's menu (HR1's work only), and from the card dialog (that card's).
+    // --- A solo agent: HB2 runs on no card; its tab is its work alone, thinking.
+    await inv('session:start', alpha, { agentId: 'hb2' })
+    await lib.until(async () => ['ready', 'finished'].includes((await liveOf('hb2'))?.status), HUNG_MS)
+    await lib.sendPrompt(inv, lib.ptyKey(alpha, 'hb2'), 'work 60', { submitted: async () => (await liveOf('hb2'))?.status === 'working' })
+    const hb2Tab = page.locator('.activity-agent-tab[data-agent="hb2"]')
+    check("a running agent's tab comes with a new snapshot", !!(await lib.until(async () => {
+      if ((await hb2Tab.count()) === 1) return true
+      await refresh()
+      return false
+    }, HUNG_MS, 500)))
+    await hb2Tab.click()
+    check('…a solo agent: its session as the header, no card; working with no tool call: Thinking…', !!(await lib.until(async () => {
+      if ((await page.locator('[data-doing="thinking"]').count()) === 1 && !/Card one/.test(await cardHead.innerText().catch(() => ''))) return true
+      await refresh()
+      return false
+    }, HUNG_MS, 500)), await list.innerText().catch(() => ''))
+    await page.mouse.move(5, 5)
+    await shoot('3-solo-dark')
+
+    // --- Hide finished off: every agent has a tab; one not running says so.
+    await head.locator('.activity-hide input').uncheck()
+    check('Hide finished off: a tab for every agent, in pane order', !!(await lib.until(async () => JSON.stringify(await tabsShown()) === JSON.stringify(AGENTS.map((a) => a.id)), HUNG_MS, 250)), JSON.stringify(await tabsShown()))
+    await page.locator('.activity-agent-tab[data-agent="hr3"]').click()
+    check('…an agent not running: Not running', !!(await lib.until(async () => /Not running/.test(await list.innerText().catch(() => '')), HUNG_MS, 250)), await list.innerText().catch(() => ''))
+    await page.mouse.move(5, 5)
+    await shoot('4-all-agents-dark')
+    await head.locator('.activity-hide input').check()
+
+    // --- From an agent's menu: its tab, filtered to it, frozen.
+    await live.click()
     await page.locator('.tab', { hasText: 'Session' }).first().click()
     await lib.agentMenu(page, 'HR1')
     await lib.menuEntry(page, 'Activity').click()
     const agentsPick = head.locator('.activity-pick').first()
-    await lib.until(async () => /1 agent/.test(await agentsPick.innerText().catch(() => '')), HUNG_MS)
-    await lib.until(async () => (await node('agent', 'HB2').count()) === 0, HUNG_MS)
-    const hr1 = await titles()
-    check("Activity in an agent's menu shows that agent's work", hr1.every((t) => !t.startsWith('agent:') || t === 'agent:HR1') && hr1.includes('session:Reviewing two'), JSON.stringify(hr1))
-    await page.screenshot({ path: path.join(lib.WORK, 'activitytab-4-filtered-dark.png') })
-    // Agents ▾: a second agent ticked, then All.
+    check("Activity in an agent's menu: its tab alone, filtered, frozen", !!(await lib.until(async () => /1 agent/.test(await agentsPick.innerText().catch(() => '')) && JSON.stringify(await tabsShown()) === '["hr1"]', HUNG_MS, 250)) && (await live.getAttribute('aria-pressed')) === 'false', JSON.stringify(await tabsShown()))
     await agentsPick.click()
-    await lib.menuEntry(page, 'HB2').click()
-    check('Agents ▾ takes several', !!(await lib.until(async () => /2 agents/.test(await agentsPick.innerText()) && (await node('agent', 'HB2').count()) > 0, HUNG_MS, 250)))
     await lib.menuEntry(page, 'All').click()
     await page.keyboard.press('Escape')
-    check('All clears it', !!(await lib.until(async () => /All agents/.test(await agentsPick.innerText()) && (await node('agent', 'HB1').count()) > 0, HUNG_MS, 250)))
-    // Expand All: everything opens, a closed session's turns (read only once it opens) and their tool calls too.
-    await node('session', 'Reviewing two').scrollIntoViewIfNeeded()
-    check('Reviewing two starts closed', (await node('session', 'Reviewing two').getAttribute('aria-expanded')) === 'false')
-    await page.locator('.activity-head').getByRole('button', { name: 'Expand All' }).click()
-    // Its turns come after everything drawn (HI-1677): at the bottom of the tree, scrolled to.
-    const tree = page.locator('.activity-tree')
-    const reviewTools = async () => {
-      await tree.evaluate((el) => (el.scrollTop = el.scrollHeight))
-      return page.locator(`.activity-node.act-tool[data-key^="tool:${S.hr1}"]`).count()
-    }
-    check('Expand All opens a session whose turns come later, and their tool calls', !!(await lib.until(async () => (await reviewTools()) >= 4, HUNG_MS, 250)), String(await reviewTools()))
-    await tree.evaluate((el) => (el.scrollTop = 0))
 
-    // --- HI-1678. Zoom to fit: the tree as shown fits the tab (or is at the smallest zoom, 25%).
-    const zoomValue = head.locator('.activity-zoom-value')
-    await head.getByRole('button', { name: 'Zoom to Fit (F)' }).click()
-    const fits = async () =>
-      page.evaluate(() => {
-        const t = document.querySelector('.activity-tree')
-        const s = document.querySelector('.activity-scaled')
-        return !!t && !!s && ((s.offsetWidth <= t.clientWidth && s.offsetHeight <= t.clientHeight) || /25/.test(document.querySelector('.activity-zoom-value')?.textContent ?? ''))
-      })
-    check('Zoom to Fit scales the tree to the tab', !!(await lib.until(async () => !(await zoomValue.innerText()).trim().startsWith('100') && (await fits()), HUNG_MS, 250)), await zoomValue.innerText())
-    await page.mouse.move(5, 5)
-    await page.screenshot({ path: path.join(lib.WORK, 'activitytab-7-fit-dark.png') })
-    // Levels ▾: every tool call, then every turn, closed at once; turns opened again.
-    const levelsMenu = async (label) => {
-      if (!(await lib.menuEntry(page, label).count())) await head.locator('.activity-levels').click()
-      await lib.menuEntry(page, label).click()
-    }
-    const toolsOpen = async () => page.locator('.activity-node.act-tool[aria-expanded="true"]').count()
-    await levelsMenu('Collapse all tool calls')
-    check('Levels: Collapse all tool calls closes every tool call', !!(await lib.until(async () => (await toolsOpen()) === 0 && (await node('tool').count()) > 0, HUNG_MS, 250)))
-    await page.screenshot({ path: path.join(lib.WORK, 'activitytab-8-levels-dark.png') })
-    await levelsMenu('Collapse all turns')
-    check('…Collapse all turns hides every tool call under them', !!(await lib.until(async () => (await node('tool').count()) === 0 && (await node('turn').count()) > 0, HUNG_MS, 250)))
-    await levelsMenu('Expand all turns')
-    check('…and Expand all turns shows them again', !!(await lib.until(async () => (await node('tool').count()) > 0, HUNG_MS, 250)))
-    await page.keyboard.press('Escape')
-    // Zoom out and in, and 0 back to actual size (a key while the tree has focus).
-    const pct = async () => Number((await zoomValue.innerText()).replace(/[^\d]/g, ''))
-    const was = await pct()
-    await head.getByRole('button', { name: 'Zoom Out (−)' }).click()
-    check('Zoom Out makes it smaller', !!(await lib.until(async () => (await pct()) < was, HUNG_MS, 250)))
-    // From a fitted zoom (between steps), out and in again lands on the next step up, not back on the fit.
-    const smaller = await pct()
-    await head.getByRole('button', { name: 'Zoom In (+)' }).click()
-    check('Zoom In makes it larger', !!(await lib.until(async () => (await pct()) > smaller, HUNG_MS, 250)))
-    await page.locator('.activity-node').first().focus()
-    await page.keyboard.press('0')
-    check('0 goes back to actual size', !!(await lib.until(async () => (await pct()) === 100, HUNG_MS, 250)))
-    // Jump to Selected: a node at the bottom selected, the tree scrolled back to the top; J brings it back in view.
-    await tree.evaluate((el) => (el.scrollTop = el.scrollHeight))
-    const lastNode = page.locator('.activity-node').last()
-    const pickedKey = await lastNode.getAttribute('data-key')
-    await lastNode.click()
-    await tree.evaluate((el) => (el.scrollTop = 0))
-    const inView = async () =>
-      page.evaluate((k) => {
-        const t = document.querySelector('.activity-tree')?.getBoundingClientRect()
-        const n = [...document.querySelectorAll('.activity-node')].find((e) => e.dataset.key === k)?.getBoundingClientRect()
-        return !!t && !!n && n.top >= t.top && n.bottom <= t.bottom
-      }, pickedKey)
-    await lib.until(async () => !(await inView()), HUNG_MS, 100)
-    await head.getByRole('button', { name: 'Jump to Selected (J)' }).click()
-    check('Jump to Selected scrolls the selected node into view', !!(await lib.until(inView, HUNG_MS, 100)), pickedKey)
-    await page.locator('.activity-details').getByRole('button', { name: 'Close details' }).click()
-    await page.locator('.activity-head').getByRole('button', { name: 'Collapse All' }).click()
-    check('Collapse All closes them all, down to the top-level nodes', !!(await lib.until(async () => (await node('turn').count()) === 0 && (await node('session').count()) === 0 && (await node('card').count()) > 0, HUNG_MS, 250)))
+    // --- A card in progress: Activity in its menu and its dialog, on its builder's tab; a finished card has none.
     await page.locator('.tab', { hasText: 'Tasks' }).first().click()
-    await page.locator('.task-card', { hasText: 'Card one' }).first().click()
-    await page.getByRole('button', { name: 'Activity' }).click()
+    const cardOne = page.locator('.task-card', { hasText: 'Card one' }).first()
+    await cardOne.click({ button: 'right' })
+    check("a card in progress has Activity in its menu", (await lib.menuEntry(page, 'Activity').count()) === 1)
+    await shoot('6-card-menu-dark')
+    await page.keyboard.press('Escape')
+    await page.locator('.task-card', { hasText: 'An earlier card' }).first().click()
+    const dialogActivity = page.locator('.dialog[role="dialog"]').getByRole('button', { name: 'Activity', exact: true })
+    await lib.until(async () => (await page.locator('.dialog[role="dialog"]').count()) > 0, HUNG_MS)
+    check('a finished card has no Activity', (await dialogActivity.count()) === 0)
+    await page.keyboard.press('Escape')
+    await lib.until(async () => (await page.locator('.dialog[role="dialog"]').count()) === 0, HUNG_MS)
+    await cardOne.click()
+    await dialogActivity.click()
     const cardsPick = head.locator('.activity-pick').nth(1)
-    await lib.until(async () => /1 card/.test(await cardsPick.innerText().catch(() => '')) && (await node('card').count()) === 1, HUNG_MS, 250)
-    const c1 = await titles()
-    check("Activity in the card dialog shows that card's work", c1.filter((t) => t.startsWith('card:')).length === 1 && c1.some((t) => t.startsWith('card:') && t.includes('Card one')) && c1.includes('session:Building one') && !c1.includes('session:Reviewing two'), JSON.stringify(c1))
+    check("the card dialog's Activity: its builder's tab, filtered to the card, frozen", !!(await lib.until(async () => /1 card/.test(await cardsPick.innerText().catch(() => '')) && (await hb1Tab.getAttribute('aria-selected')) === 'true' && /Card one/.test(await cardHead.innerText().catch(() => '')), HUNG_MS, 250)) && (await live.getAttribute('aria-pressed')) === 'false')
+    await cardsPick.click()
+    await lib.menuEntry(page, 'All').click()
+    await page.keyboard.press('Escape')
 
     // --- Light theme.
     await inv('settings:update', { appearance: { theme: 'light' } })
     await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === 'light', HUNG_MS)
-    await cardsPick.click()
-    await lib.menuEntry(page, 'All').click()
-    await page.keyboard.press('Escape')
+    await hb1Tab.click()
     await page.mouse.move(5, 5)
-    await lib.until(async () => (await node('card').count()) === 2, HUNG_MS, 250)
-    await page.screenshot({ path: path.join(lib.WORK, 'activitytab-6-light.png') })
+    await lib.until(async () => /Card one/.test(await cardHead.innerText().catch(() => '')) && (await node('process').count()) > 0, HUNG_MS, 250)
+    await shoot('5-light')
     await inv('session:stop', alpha, 'hb1').catch(() => undefined)
+    await inv('session:stop', alpha, 'hb2').catch(() => undefined)
   } finally {
     await app.close().catch(() => undefined)
   }
+  console.log(`Screenshots: ${shots}`)
   console.log(failed ? `${failed} check(s) failed` : 'All checks passed')
   process.exit(failed ? 1 : 0)
 })().catch((e) => {

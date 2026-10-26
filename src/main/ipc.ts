@@ -19,6 +19,7 @@ import { keptLaneOrder } from '../shared/laneBar'
 import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../shared/tips'
 import { allProviders } from './providers'
 import { providerService } from './providerService'
+import { accountsView, addAccount, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, signInAccount } from './accounts'
 import { config } from './config'
 import { clearRecent, recentChanged, recentFor, removeRecent } from './recentWorkspaces'
 import { emit, emitTo, onHiveEvent } from './events'
@@ -1508,6 +1509,18 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return providerService.runProviderTask(id, 'update', true)
     },
     'provider:stopAgents': (id) => sessions.stopProvider(id),
+
+    'connections:list': (check) => accountsView(check === true),
+    'connections:add': (id, name) => addAccount(id, name),
+    'connections:rename': (id, name) => renameAccount(id, name),
+    'connections:remove': (id) => removeAccount(id),
+    'connections:signIn': async (id) => {
+      await refreshPathBeforeStart()
+      return signInAccount(id)
+    },
+    'connections:keepLogin': (id) => keepNewLogin(id),
+    'connections:setOn': (id, on) => setAccountOn(id, on),
+    'connections:setDefault': (id) => setAccountDefault(id),
 
     'api:info': () => apiInfo(),
     'api:regenerateToken': async () => {

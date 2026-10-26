@@ -1,3 +1,5 @@
+// First, before React DOM loads: a test copy's watch on React's commits (HI-1387).
+import './commitWatch'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@vscode/codicons/dist/codicon.css'
@@ -6,6 +8,7 @@ import { App } from './App'
 import { ConsoleApp } from './ConsoleApp'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { initLanguage } from './i18n'
+import './commitLoop'
 
 // The same page is the developer console's window when opened with #console (#637).
 const isConsole = location.hash === '#console'

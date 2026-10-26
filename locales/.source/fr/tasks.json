@@ -85,6 +85,8 @@
   "tasks.error.unknownTask": "Unknown card {card}",
   "tasks.error.verdictNotYours": "{agent} is reviewing {card}: its verdict is its own.",
   "tasks.history.answerTold": "Told {agent} of your answer",
+  "tasks.history.answerUntold": "The Hive Assistant couldn't be told of your answer to {agent}'s question: only {agent} has it",
+  "tasks.history.answerUntoldNeed": "{agent} can't {action, select, done {move this card to Done} noCode {make this card no code} skipReview {skip this card's review} other {unblock this card}} by itself, and the Hive Assistant couldn't be told of your answer: do it yourself if you agreed to it",
   "tasks.history.archived": "Archived",
   "tasks.history.archivedDone": "Archived after {days, plural, one {# day} other {# days}} in Done",
   "tasks.history.archivedHidden": "Archived: {project} was hidden",

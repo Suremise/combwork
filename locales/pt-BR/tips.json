@@ -1,6 +1,6 @@
 {
-  "tips.activityTab.text": "A aba Atividade mostra o trabalho do projeto como uma árvore: cartões, seus agentes, sessões, turnos, chamadas de ferramenta e os processos que eles executam. Clique em um nó para ver a entrada exata e a última ação; o menu ⋯ de um agente abre a aba nesse agente.",
-  "tips.activityTab.title": "Veja ao vivo o que cada agente está fazendo",
+  "tips.activityTab.text": "A aba Atividade tem uma aba por agente em execução: seu cartão, seu turno e chamada de ferramenta, suas tarefas em segundo plano, subagentes e processos. Ela abre como um instantâneo; Reproduzir acompanha ao vivo. O menu ⋯ de um agente, ou um cartão em andamento, a abre nesse agente.",
+  "tips.activityTab.title": "Veja o que cada agente está executando",
   "tips.advancedSettings.text": "Depois de uma atualização de um agente de código, o Hive não vê mais a pergunta de confiança ou os erros de login dele? Configurações → Avançado tem os textos e os campos que o Hive procura, e os tempos limite dele: altere um, com o padrão ao lado, ou edite o advanced.json.",
   "tips.advancedSettings.title": "Corrija você mesmo uma mudança de CLI",
   "tips.agentConsole.text": "Configurações → Agent API → Permitir que agentes leiam o console do desenvolvedor dá aos agentes uma ferramenta somente leitura que mostra os hooks e a linha de status da CLI deles ao lado do que o Hive entendeu de cada um, com dados sensíveis ocultos, para que possam depurar o que o Hive vê.",

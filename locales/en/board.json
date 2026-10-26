@@ -897,11 +897,11 @@
   },
   "board.dialog.activity": {
     "defaultMessage": "Activity",
-    "description": "Button in the card dialog: opens its project's Activity tab showing this card's work."
+    "description": "A button in the card dialog and an item of a card's right-click menu, for a card in Doing or Review: opens its project's Activity tab on the agent working on it, showing what runs on it now."
   },
   "board.dialog.activityTip": {
-    "defaultMessage": "Show this card's agents, sessions, turns and processes in its project's Activity tab.",
-    "description": "Tooltip on the card dialog's Activity button."
+    "defaultMessage": "See what runs on this card now: the turn, tool calls, background tasks, subagents and processes of the agent working on it.",
+    "description": "Tooltip of the card dialog's Activity button, and the detail of the card menu's Activity item."
   },
   "board.dialog.addCard": {
     "defaultMessage": "Add Card",
@@ -1319,6 +1319,14 @@
     "defaultMessage": "Assistant and scripts",
     "description": "A choice of the Progress panel's project filter: the runs of the Hive Assistant and of scripts, which belong to no project."
   },
+  "board.forYou.agree": {
+    "defaultMessage": "{action, select, done {Move to Done With This Reply} noCode {Make It No Code With This Reply} skipReview {Skip Review With This Reply} other {Unblock With This Reply}}",
+    "description": "A button under an agent's question for the user (For you), beside Send, when the question offers one action: does that action as the user, with the reply typed in the box as its reason, and answers the question. Keep the select keys as they are; translate each choice."
+  },
+  "board.forYou.agreeTip": {
+    "defaultMessage": "Does what the agent asked as you, with your reply as the reason, and answers the question. Send only answers it: Hive never reads a yes into a reply.",
+    "description": "Tooltip of the button under an agent's question (For you) that does the action the question offers with the user's reply as its reason. Send is the button that only sends the reply."
+  },
   "board.forYou.answering": {
     "defaultMessage": "Answering…",
     "description": "A button while the user's answer to a request is being recorded."
@@ -1376,7 +1384,7 @@
     "description": "A heading in the card dialog, above what on the card waits for the user (approvals, decisions, questions). Glossary: For you."
   },
   "board.forYou.offer": {
-    "defaultMessage": "{action, select, done {Move to Done} noCode {Make It No Code} other {Unblock}}",
+    "defaultMessage": "{action, select, done {Move to Done} noCode {Make It No Code} skipReview {Skip Review} other {Unblock}}",
     "description": "A button under an agent's question for the user (For you): an action the agent offers on its card, done with one click. Keep the select keys as they are; translate each choice."
   },
   "board.forYou.offerReason": {
@@ -1384,7 +1392,7 @@
     "description": "The label (and placeholder) of the field beside an action an agent's question offers (For you): why the user does it, filled with the agent's suggestion; it is recorded with the action."
   },
   "board.forYou.offerTip": {
-    "defaultMessage": "{action, select, done {Moves the card to Done as you, skipping its project's rules where needed (recorded as an override, with the reason beside it), and answers the question.} noCode {Makes the card no code as you (recorded as an override, with the reason beside it), and answers the question.} other {Unblocks the card (the reason beside it is added as your comment), and answers the question.}}",
+    "defaultMessage": "{action, select, done {Moves the card to Done as you, skipping its project's rules where needed (recorded as an override, with the reason beside it), and answers the question.} noCode {Makes the card no code as you (recorded as an override, with the reason beside it), and answers the question.} skipReview {Skips the card's review as you (with the reason beside it), and answers the question.} other {Unblocks the card (the reason beside it is added as your comment), and answers the question.}}",
     "description": "Tooltip of a button under an agent's question for the user (For you): what the action the agent offers does. Keep the select keys as they are. Glossary: override, no-code card."
   },
   "board.forYou.reply": {

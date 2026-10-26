@@ -331,6 +331,8 @@ interface HiveMessageValues {
   'board.field.project': undefined
   'board.field.title': undefined
   'board.filter.noProject': undefined
+  'board.forYou.agree': { action: string }
+  'board.forYou.agreeTip': undefined
   'board.forYou.answering': undefined
   'board.forYou.approve': undefined
   'board.forYou.asDecision': undefined

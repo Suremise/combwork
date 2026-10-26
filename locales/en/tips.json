@@ -1,10 +1,10 @@
 {
   "tips.activityTab.text": {
-    "defaultMessage": "The Activity tab shows the project's work as a tree: cards, their agents, sessions, turns, tool calls and the processes they run. Click a node for its exact input and what it did last; an agent's ⋯ menu opens it on that agent.",
+    "defaultMessage": "The Activity tab has a tab per running agent: its card, its turn and tool call, its background tasks, subagents and processes. It opens as a snapshot; Play follows it live. An agent's ⋯ menu, or a card in progress, opens it on that agent.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.activityTab.title": {
-    "defaultMessage": "See what every agent is doing, live",
+    "defaultMessage": "See what each agent is running",
     "description": "A tip's title."
   },
   "tips.advancedSettings.text": {

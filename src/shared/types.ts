@@ -620,6 +620,10 @@ export interface AppConfig {
   planUsage: Record<ProviderId, PlanUsage>
   /** Highest warning shown per "provider:limit", and for which reset period. */
   planWarnings: Record<string, { resetsAt: string | null; level: number }>
+  /** The CLI accounts Hive keeps (HI-980: Settings → Accounts), each a folder of its own, in the order Settings lists them. */
+  connections?: Connection[]
+  /** Per provider: the account last chosen as a workspace's default (or launched on), which a new workspace starts with. */
+  lastUsedConnection?: Partial<Record<ProviderId, string>>
   /** A version the user chose to skip; automatic checks don't offer it. */
   skippedUpdate?: string
   /** Version that last ran, to say "Hive updated" once after an update. */
@@ -648,8 +652,65 @@ export interface PlanUsage {
   updatedAt: string
 }
 
+/** Who an account's folder is signed in as (HI-980): what the CLI's own status says, never a token. */
+export interface ConnectionIdentity {
+  email: string
+  /** The organisation's id: with the email, it tells two logins apart. */
+  orgId: string
+}
+
+/** An account's latest check (HI-980): what the CLI said, or why it couldn't be asked. */
+export interface ConnectionObserved {
+  at: string
+  /** null: the check failed (`error` says why), which never counts as signed out. */
+  loggedIn: boolean | null
+  email?: string
+  orgId?: string
+  /** Its plan, as the CLI names it ("max"). */
+  plan?: string | null
+  /** A check that failed (a timeout, output Hive couldn't read), in English for the log; the last good identity is kept. */
+  error?: string
+  /** Its folder isn't there, or isn't a folder Hive made (replaced from outside). */
+  missing?: boolean
+}
+
+/**
+ * A CLI login Hive keeps (HI-980), in a folder of its own under the accounts folder (`<accounts>\<id>\`), linked to the
+ * CLI's home by a junction for what all accounts share. `accepted` is who the user took it on as; `observed` the latest
+ * check: they differ when its login changed (a /login typed in a pane), which the user answers.
+ */
+export interface Connection {
+  /** Stable and random ("a-3f9c2e1b"): its folder's name. A rename never changes it. */
+  id: string
+  provider: ProviderId
+  /**
+   * How it runs its CLI (Darren, 26 Oct ~22:10: configured providers): `signIn`, a login folder of Hive's signed in
+   * through the CLI's own sign-in. The endpoint kind (a base URL and an API key) comes with its own card. Absent in a
+   * record from before it: signIn.
+   */
+  kind?: 'signIn'
+  /** The user's name for it ("Personal", "Hive overnight"). */
+  name: string
+  createdAt: string
+  accepted?: ConnectionIdentity
+  observed?: ConnectionObserved
+  /** A removal that stopped partway, in English: what is left, for Remove to try again. */
+  leftover?: string
+}
+
+/** A workspace's accounts for one provider (HI-980): those on in it, and its default among them (null: none). */
+export interface WorkspaceConnections {
+  on: string[]
+  default: string | null
+}
+
 export interface WorkspaceConfig {
   version: 1
+  /**
+   * The accounts on in this workspace, per provider (HI-980). No entry for a provider: not set up yet (nothing is turned
+   * on by itself); `{ on: [], default: null }`: the user turned them all off.
+   */
+  connections?: Partial<Record<ProviderId, WorkspaceConnections>>
   /** Where the workspace was last opened (#146): a different folder now means it was moved, and Repair… is offered. */
   lastPath?: string
   /** The last project rename (#514, `project-names.json`'s number) its hidden and removed projects follow. */
@@ -2974,6 +3035,8 @@ export type HiveEvent =
   /** A worktree agent's unmerged work changed (null: git couldn't check it). */
   | { type: 'branch-status'; projectPath: string; agentId: string; status: AgentBranchStatus | null }
   | { type: 'plan-usage'; provider: ProviderId; usage: PlanUsage }
+  /** Hive's accounts changed (HI-980: one added, renamed, removed, checked, or a workspace's choice of them): read them again. */
+  | { type: 'connections-changed' }
   | { type: 'window-state'; maximized: boolean; focused: boolean; alwaysOnTop: boolean }
   /** A window opened or closed: how many there are now (File → Exit says it closes them all). */
   | { type: 'windows-changed'; count: number }
