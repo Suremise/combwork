@@ -28,6 +28,7 @@ interface HiveMessageValues {
   'sessions.bulk.done': { action: string; n: number }
   'sessions.bulk.doneSkipped': { action: string; n: number; skipped: number; why: string | number }
   'sessions.bulk.failed': { action: string; kind: string }
+  'sessions.bulk.progress': { action: string; kind: string; done: number; total: number }
   'sessions.bulk.skipCount': { reason: string; n: number }
   'sessions.bulk.skipNote': { running: number }
   'sessions.bulk.skipReason': { reason: string }
