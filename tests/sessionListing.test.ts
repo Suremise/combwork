@@ -25,6 +25,8 @@ const { sessions } = await import('../src/main/sessions')
 let n = 0
 const newId = (): string => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`
 const old = new Date(Date.now() - 3600_000)
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
+const HUNG_MS = 15000
 const transcript = (sid: string): string =>
   [
     { type: 'user', sessionId: sid, timestamp: old.toISOString(), message: { role: 'user', content: 'Task' } },
@@ -155,7 +157,7 @@ describe('a session list (HI-1681)', () => {
     const records = vi.spyOn(sessions as unknown as { listOwn: (p: string) => Promise<unknown> }, 'listOwn')
     const first = run(() => sessions.list(p))
     // The first listing has asked for its folders before the others are asked for.
-    await vi.waitFor(() => expect(folders).toHaveBeenCalled(), { timeout: 15000 })
+    await vi.waitFor(() => expect(folders).toHaveBeenCalled(), { timeout: HUNG_MS })
     const asked = folders.mock.calls.length
     const second = run(() => sessions.list(p))
     const mine = run(() => sessions.list(p, { own: true }))
