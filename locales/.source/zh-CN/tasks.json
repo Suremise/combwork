@@ -124,6 +124,7 @@
   "tasks.history.placed": "Placed {place, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
   "tasks.history.renamed": "Renamed to \"{title}\"",
   "tasks.history.repaired": "Project: {from} → {to} (renamed or moved)",
+  "tasks.history.requestClosed": "{why, select, done {Closed a question for you: the card is in Done} other {Closed a question for you: the agent that asked carried on}}",
   "tasks.history.restored": "Brought back: {project} was restored",
   "tasks.history.returned": "Returned for review, round {round}",
   "tasks.history.reviewCopyLeased": "{agent} reviews in {copy} at {revision}",

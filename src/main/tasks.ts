@@ -1301,6 +1301,9 @@ export async function runIntent<R>(
           if (w.card.id !== n) return
           const extra = zero9(w, first)
           first = false
+          // Requests the write closed unanswered (#1638): a line each in the card's history.
+          const closed = w.written.flatMap((f) => (f.kind === 'RequestClosed' ? [storedText(HISTORY.requestClosed, { why: (f.data as { why: string }).why })] : []))
+          if (closed.length) extra.opts = { ...extra.opts, note: [...(extra.opts?.note ?? []), ...closed] }
           // The write's move, for the loop wake it makes (#1266: into Passed or Done wakes the builder).
           const moved = w.written.findLast((f) => f.kind === 'Moved')?.seq ?? null
           // Its column only when it moved: a write that moves nothing (an answer, a review's start) leaves the card's
@@ -1652,9 +1655,11 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
     // anything is done) and the action still allowed.
     if (!wf.state(wf.store.card(n)).requests.some((x) => x.request === request)) throw new WorkflowRefusedError(refusalOf('move.notFromHere', { card: `#${n}`, stage: CATEGORY_STAGE[head.column as TaskColumn] ?? 'todo', move: 'answer', moves: '' }))
     if (!askActionAvailable(action, { ...(await getTask(n, ws)), kind: wf.store.card(n).kind })) throw hiveError(ACTION_GONE, { action, n }, { kind: 'conflict' })
+    // The answer first (#1638: once the card is in Done, its requests are closed and none can be answered), then the
+    // action: either refused, both are undone.
+    await answerIt()
     await doAskAction(n, action, reason)
-    // A refused answer throws: the action is undone with it.
-    return answerIt()
+    return getTask(n, ws)
   })
 }
 

@@ -1326,6 +1326,7 @@ that can't be written fails the change whole.
 | `CommitAttributed` (observed) | commit, card (or none), how (trailer, only card, unattributed, assigned by the user) | A new commit on a shared folder's line (§16.3.2). |
 | `Stale` | approved revision, current revision, why (another change; a decision since; exact-only) | A newer revision that isn't the same change appears after a pass, or a decision is recorded after it (§16.4.6). |
 | `ApprovalRequested` | request id, kind (approve, decide, test, sign-in, other), gate, revision?, text | The ask-the-user intent, or a rule waiting on the user. |
+| `RequestClosed` | request id, why (`done`, `carriedOn`) | A request closed unanswered (#1638): its card reached Done, or the agent that asked moved the card on itself. |
 | `Approval` | request id, user, gate, submission?, answer (approved / declined / answered), note, decision generation | The user answers the request (in the card, the For you list, or a pane reply counted under #922). An answer is never a `Decision` (§16.4.6). |
 | `IntegrationRequested` | **entry id**, revision, candidate key, target, style | The card enters the merge queue (again, after a failure, with a new entry id). |
 | `IntegrationCancelled` | entry id, by, reason | **Remove from queue**, a stale pass, a card moved out by the user. |
@@ -2375,7 +2376,12 @@ code card; blocked) is a button with its reason, editable; one click does what t
 reason (Move to Done through the card's rules, the rules it skips an `Override` as Move Anyway's; Make It No Code the
 `card.kind` override; Unblock with the reason as the user's comment), then answers the question (`Approval.action`,
 the reason its `note`), and the asker is told which. An action refused, or no longer allowed, leaves the question open. A refused answer (answered or retired meanwhile) is said in a
-toast and the board read again; an answer clears the chip at once (`tasks-changed`).
+toast and the board read again; an answer clears the chip at once (`tasks-changed`). **A request settled another way
+is closed (#1638):** in the same write, an agent's question still open once its card is in Done (the asker told it no
+longer stands, unless it made the move), and an agent's own questions once it moves the card on itself (a submit, a put
+back: answered some other way, such as in its pane), each `RequestClosed` and a line in the card's history; For you lists
+no agent's question on a card in Done however it got there (Hive's own requests stay: a merge stopped part way), and a
+lane no longer waits for the user on a closed request.
 
 #### 16.8.6 A refused commit (#907)
 

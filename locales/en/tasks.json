@@ -499,6 +499,10 @@
     "defaultMessage": "Project: {from} → {to} (renamed or moved)",
     "description": "A line in a card's history, by Repair: the card was given to the project {to}, the new name of its project {from} (folder names), which was renamed or moved."
   },
+  "tasks.history.requestClosed": {
+    "defaultMessage": "{why, select, done {Closed a question for you: the card is in Done} other {Closed a question for you: the agent that asked carried on}}",
+    "description": "A line in a card's history (#1638): a question waiting for the user (For you) was closed without an answer, because the card reached Done, or because the agent that asked moved the card on itself (answered some other way). Keep the select keys."
+  },
   "tasks.history.restored": {
     "defaultMessage": "Brought back: {project} was restored",
     "description": "A line in a card's history: the card came back onto the board because the user restored its project {project} (its folder name)."

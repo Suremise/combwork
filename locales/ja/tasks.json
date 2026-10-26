@@ -124,6 +124,7 @@
   "tasks.history.placed": "「{column, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{column}}}」の{place, selectordinal, other {#番目}}に配置",
   "tasks.history.renamed": "タイトルを「{title}」に変更",
   "tasks.history.repaired": "プロジェクト：{from} → {to}（名前の変更または移動）",
+  "tasks.history.requestClosed": "{why, select, done {要対応の質問を閉じました：カードは完了にあります} other {要対応の質問を閉じました：質問したエージェントが作業を続けました}}",
   "tasks.history.restored": "復帰：{project}が復元されたため",
   "tasks.history.returned": "レビューに再提出（ラウンド{round}）",
   "tasks.history.reviewCopyLeased": "{agent}は{copy}（{revision}）でレビュー中",

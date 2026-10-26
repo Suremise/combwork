@@ -496,7 +496,9 @@ export class Workflow {
         const base = ruleset && this.skippedBases.get(ruleset.id)
         if (base) tx.saveRuleset(base)
         w = new Write(tx, tx.card(card.id), ruleset, actor, tx.card(card.id).stage)
-        return fn(w, prepared)
+        const written = fn(w, prepared)
+        this.closeSettled(w)
+        return written
       })
       // What the call runs alongside (the board's 0.9 fields), in the same transaction, once this write changed the card.
       if (also && w && (w as Write).written.length) await also.written(w)
@@ -504,6 +506,31 @@ export class Workflow {
     })
     if (this.cfg.autoRun !== false) await this.runActions()
     return out
+  }
+
+  /**
+   * Requests a write settled without an answer (#1638), closed in the same write: an agent's question still open once
+   * the card is in Done (its asker told, unless it made the move), and an agent's own questions once it moves the card
+   * on itself (a submit, a put back: it went on, answered some other way). Hive's own requests stay: a merge stopped part
+   * way still needs the user on a Done card.
+   */
+  private closeSettled(w: Write): void {
+    if (!w.written.length) return
+    const done = w.current === 'done'
+    const agent = agentOf(w.actor)
+    const movedOn = !!agent && w.written.some((f) => f.kind === 'Moved')
+    if (!done && !movedOn) return
+    for (const r of w.state().requests) {
+      if (!r.asker) continue
+      const own = movedOn && r.gate === 'ask' && r.asker === agent
+      if (!done && !own) continue
+      w.fact('RequestClosed', { request: r.request, why: done ? 'done' : 'carriedOn' }) // i18n-ignore: a fact's kind and codes, not text
+      if (done && r.asker && r.asker !== agent) {
+        const asked = [...r.text.replace(/\s+/g, ' ').trim()]
+        const quoted = asked.length > QUESTION_QUOTE_MAX ? `${asked.slice(0, QUESTION_QUOTE_MAX - 1).join('')}…` : asked.join('')
+        this.wake(w, r.asker, `${w.card.key}: your question "${quoted}" no longer stands: the card is in Done.`, 'answer') // i18n-ignore: a wake, agent-facing
+      }
+    }
   }
 
   /**

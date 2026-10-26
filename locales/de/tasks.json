@@ -124,6 +124,7 @@
   "tasks.history.placed": "Auf Platz {place, selectordinal, other {#}} in {column, select, hold {Geparkt} todo {Offen} doing {In Arbeit} review {Review} passed {Genehmigt} done {Erledigt} other {{column}}} gesetzt",
   "tasks.history.renamed": "Umbenannt in „{title}“",
   "tasks.history.repaired": "Projekt: {from} → {to} (umbenannt oder verschoben)",
+  "tasks.history.requestClosed": "{why, select, done {Eine Frage für dich geschlossen: die Karte ist in Erledigt} other {Eine Frage für dich geschlossen: der fragende Agent hat weitergemacht}}",
   "tasks.history.restored": "Zurückgeholt: {project} wurde wiederhergestellt",
   "tasks.history.returned": "Zurück zum Review, Runde {round}",
   "tasks.history.reviewCopyLeased": "{agent} reviewt in {copy} auf Revision {revision}",

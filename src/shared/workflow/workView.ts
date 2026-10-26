@@ -81,9 +81,13 @@ export function askActionAvailable(kind: AskActionKind, card: { column: string; 
   return !!card.blocked
 }
 
-/** A card's requests for the user, oldest first: from its facts folded (its open requests). */
+/**
+ * A card's requests for the user, oldest first: from its facts folded (its open requests). On a card in Done, an agent's
+ * question is settled however the card got there (#1638): only Hive's own requests are listed (a merge stopped part way).
+ */
 export function forYouItems(card: { card: number; project: string; stage: StageId }, facts: readonly Fact[]): ForYouItem[] {
-  return foldCard(facts, card.stage).requests.map((r) => ({
+  const open = foldCard(facts, card.stage).requests
+  return (card.stage === 'done' ? open.filter((r) => !r.asker) : open).map((r) => ({
     card: card.card,
     project: card.project,
     request: r.request,

@@ -223,6 +223,11 @@ export interface FactData {
   /** `text` in English (agents, the Agent API); `requestText`, Hive's own request as data for the window (an agent's words have none). */
   /** `entry` and `result`: the queue entry a merge queue's request is about, and its test merge's result (#1351). */
   ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number; for?: 'user'; asker?: string; checklist?: string[]; entry?: string; result?: string; actions?: AskAction[] }
+  /**
+   * A request closed without an answer (#1638): its card reached Done (`done`), or the agent that asked moved the card
+   * on itself (`carriedOn`: answered some other way, such as in its pane). It leaves For you as an answer does.
+   */
+  RequestClosed: { request: string; why: 'done' | 'carriedOn' }
   /** An answer (§16.8.5): `note` the user's reply; at the round limit, their `choice` and the rounds a carry on adds; `action`, an action the question offered, done (#1630; `note` its reason). */
   Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number; action?: AskActionKind }
   IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash'; requeue?: 'transient' | 'retry' }
@@ -523,6 +528,9 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         s.step = d.step === 'design' || d.step === 'followUp' ? { step: d.step, id: d.design ?? '', seq: f.seq, at: f.at, until: d.until ?? null, by } : null
         break
       }
+      case 'RequestClosed':
+        s.requests = s.requests.filter((r) => r.request !== (f.data as FactData['RequestClosed']).request)
+        break
       case 'Approval': {
         const d = f.data as FactData['Approval']
         s.approvals.push(d)

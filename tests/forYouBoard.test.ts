@@ -288,39 +288,49 @@ describe('For you on the board (#1269)', () => {
     // The runtime's answer, wherever the intent path calls it from.
     const proto = Object.getPrototypeOf(wf) as typeof wf
     const real = proto.answer
-    // HR5's probe: the second window's reply starts after the action is written, before its answer is.
+    // HR5's probe: another window's reply starts once this answer is under way. It starts from the test's own context
+    // (two windows never share a change of the board), so it waits for the board's lock as another window's would.
     const first = await ask('A write-up only?')
-    let other: Promise<unknown> | null = null
-    // What another connection (another window's Hive) sees of the card while the answer is being written.
-    let seenOutside: string | null = null
+    let underWay!: () => void
+    const started = new Promise<void>((r) => (underWay = r))
     const spy = vi.spyOn(proto, 'answer').mockImplementation(function (this: typeof wf, ...args: Parameters<typeof wf.answer>) {
-      if (!other) {
-        const own = FactStore.open(store.boardFile(w.path!), { project: 'p', key: 'p' })
-        try {
-          seenOutside = own.card(card).kind
-        } finally {
-          own.close()
-        }
-      }
-      if (!other) other = answer(w, card, first, { outcome: 'answered', reply: 'Keep it as code; I will finish it' }).then(() => 'answered', (e: unknown) => (e instanceof tasks.WorkflowRefusedError ? 'refused' : String(e)))
+      underWay()
       return real.apply(this, args)
     })
+    // What another connection (another window's Hive) sees of the card once the action has written its kind.
+    let seenOutside: string | null = null
+    const written = FactStore.prototype.updateCard
+    const kindSpy = vi.spyOn(FactStore.prototype, 'updateCard').mockImplementation(function (this: unknown, ...args: Parameters<typeof written>) {
+      const out = written.apply(this, args)
+      const own = FactStore.open(store.boardFile(w.path!), { project: 'p', key: 'p' })
+      try {
+        seenOutside = own.card(card).kind
+      } finally {
+        own.close()
+      }
+      return out
+    })
     try {
-      await answer(w, card, first, { outcome: 'answered', action: 'noCode', reason: 'a write-up' })
+      const mine = answer(w, card, first, { outcome: 'answered', action: 'noCode', reason: 'a write-up' })
+      await started
+      const other = answer(w, card, first, { outcome: 'answered', reply: 'Keep it as code; I will finish it' }).then(() => 'answered', (e: unknown) => (e instanceof tasks.WorkflowRefusedError ? 'refused' : String(e)))
+      await mine
       expect(await other).toBe('refused')
-      // The action isn't committed before its answer: nobody else sees the card changed and the question still open.
+      // Nothing is committed before the whole change is: nobody else sees the card changed and the question still open.
       expect(seenOutside).toBe('code')
     } finally {
       spy.mockRestore()
+      kindSpy.mockRestore()
     }
     expect(kind()).toBe('no-code')
     expect(of('Approval').map((f) => f.data)).toEqual([expect.objectContaining({ request: first, action: 'noCode', note: 'a write-up' })])
-    // Back to code, asked again: its answer refused after the action, the action is undone with it and the question stays.
+    // Back to code, asked again: the action refused after the answer is written, the answer is undone with it and the
+    // question stays.
     await inWorkspace(w, () => tasks.setKind(card, 'code', user, { confirm: true }))
     const second = await ask('A write-up after all?')
     const overrides = of('Override').length
-    const refuse = vi.spyOn(proto, 'answer').mockImplementation(async () => {
-      throw new Error('the answer was refused')
+    const refuse = vi.spyOn(FactStore.prototype, 'updateCard').mockImplementation(() => {
+      throw new Error('the kind was refused')
     })
     try {
       await expect(answer(w, card, second, { outcome: 'answered', action: 'noCode', reason: 'a write-up' })).rejects.toThrow(/refused/)
@@ -329,7 +339,38 @@ describe('For you on the board (#1269)', () => {
     }
     expect(kind()).toBe('code')
     expect(of('Override')).toHaveLength(overrides)
+    expect(of('Approval').some((f) => (f.data as { request: string }).request === second)).toBe(false)
     expect(forYou(w).items.map((i) => i.request)).toEqual([second])
+  })
+
+  it("#1638: an agent's question on a card the user then moves to Done is closed: For you drops it, its history says so, the asker is told", async () => {
+    const { w } = await workspace({ ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    // HB1's HI-1624: asked how to close it, then Darren moved it to Done himself, with a reason.
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Already done by #1277: how do I close it?' }))
+    expect(forYou(w).count).toBe(1)
+    await inWorkspace(w, () => tasks.moveTask(card, 'done', { confirm: true, reason: 'already done by #1277' }))
+    expect(forYou(w)).toEqual({ items: [], count: 0 })
+    expect(facts(w, card).find((f) => f.kind === 'RequestClosed')?.data).toMatchObject({ why: 'done' })
+    expect((await inWorkspace(w, () => tasks.getTask(card))).history.map((h) => h.what)).toContain('Closed a question for you: the card is in Done')
+    expect((await inboxOf(w, 'a1')).some((i) => i.text.includes('no longer stands: the card is in Done'))).toBe(true)
+  })
+
+  it("#1638: an agent that carries on (moves its card on itself) closes its own question, not another agent's", async () => {
+    const { w } = await workspace({ ...allOff('git'), review: 'agent', finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    // HB5's HI-1630: Darren answered "go" in its pane, and it went on.
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'OK to build it this way?' }))
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a2', { kind: 'decide', text: 'Should the review cover the docs?' }))
+    expect(forYou(w).count).toBe(2)
+    await inWorkspace(w, () => tasks.runIntent(wf, card, b1, (x) => x.putBack(`#${card}`, 'agent:a1', { why: 'The user said go in my pane; picking it up later' })))
+    expect(forYou(w).items.map((i) => i.text)).toEqual(['Should the review cover the docs?'])
+    expect(facts(w, card).filter((f) => f.kind === 'RequestClosed').map((f) => f.data)).toEqual([expect.objectContaining({ why: 'carriedOn' })])
+    expect((await inWorkspace(w, () => tasks.getTask(card))).history.map((h) => h.what)).toContain('Closed a question for you: the agent that asked carried on')
   })
 
   it("an agent's question: a decision as its answer is recorded on the card (a new generation), the asker told", async () => {
