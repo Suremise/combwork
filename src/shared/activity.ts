@@ -157,7 +157,11 @@ export function placeProcesses(processes: readonly AgentProcess[], turns: readon
 /** A node's state, as the tree colours it. */
 export type ActivityState = 'working' | 'waiting' | 'failed' | 'done' | 'idle'
 
-export type ActivityNode =
+/**
+ * A node of the tree. `gone`: drawn before and missing from the newest tree (a process that ended, a session out of the
+ * range): kept in its row, dimmed, until a refresh (HI-1677).
+ */
+export type ActivityNode = (
   | { kind: 'card'; key: string; number: number; label: string; title: string; column: string; children: ActivityNode[] }
   | { kind: 'agent'; key: string; agentId: string; name: string; state: ActivityState; status: SessionStatus | null; line: string; children: ActivityNode[] }
   | { kind: 'session'; key: string; agentId: string | null; session: SessionListItem; live: boolean; state: ActivityState; turnsLoaded: boolean; turnCount: number; children: ActivityNode[] }
@@ -166,6 +170,20 @@ export type ActivityNode =
   | { kind: 'tool'; key: string; sessionId: string; tool: ActivityTool; state: ActivityState; children: ActivityNode[] }
   | { kind: 'task'; key: string; task: ActivityTask; children: ActivityNode[] }
   | { kind: 'process'; key: string; agentId: string; process: ActivityProcess; cli: boolean; children: ActivityNode[] }
+) & { gone?: boolean }
+
+/** The time range the tree shows (HI-1677): running work only, or what was active within it, up to the data's 24 hours. */
+export const ACTIVITY_RANGES = ['live', '15m', '1h', '6h', '24h'] as const
+export type ActivityRange = (typeof ACTIVITY_RANGES)[number]
+const RANGE_MINUTES: Record<ActivityRange, number> = { live: 0, '15m': 15, '1h': 60, '6h': 360, '24h': ACTIVITY_HOURS * 60 }
+
+/** What the tree is narrowed to (HI-1677): agents and cards (none: all), the range, and only running work. */
+export interface ActivityFilter {
+  agents?: string[]
+  cards?: number[]
+  range?: ActivityRange
+  hideFinished?: boolean
+}
 
 /** An agent as the tree needs it: its id, name and live state (none: not running). */
 export interface ActivityAgent {
@@ -192,20 +210,22 @@ export interface ActivityInput {
   /** Turns read so far, by session id. */
   turns: ReadonlyMap<string, ActivityTurns>
   now: ActivityNow
-  /** Unix ms, for the 24 hours and open tool calls. */
+  /** Unix ms: now, for open tool calls. */
   at: number
-  /** Only this agent's, or this card's. */
-  filter?: { agentId?: string; card?: number }
+  /** Unix ms: when the range is measured from (the last refresh, so nothing ages out while it is looked at); default `at`. */
+  rangeFrom?: number
+  filter?: ActivityFilter
   /** Groups showing all their sessions (the "n more" opened), by key. */
   showAll?: ReadonlySet<string>
 }
 
-/** A session in the tab's window: running, or active within ACTIVITY_HOURS. */
-function recent(s: SessionListItem, live: ReadonlySet<string>, at: number): boolean {
+/** A session in the range: running, or (not hiding finished work) active within its minutes before `at`. */
+function inRange(s: SessionListItem, live: ReadonlySet<string>, at: number, f: ActivityFilter): boolean {
   if (live.has(s.id)) return true
-  if (s.archived || s.deleted) return false
+  const minutes = RANGE_MINUTES[f.range ?? '24h']
+  if (f.hideFinished || !minutes || s.archived || s.deleted) return false
   const last = Date.parse(s.lastActivity ?? s.lastActiveAt ?? '')
-  return Number.isFinite(last) && at - last <= ACTIVITY_HOURS * 3600_000
+  return Number.isFinite(last) && at - last <= minutes * 60_000
 }
 
 /** The card a session is filed under: the last it worked on that is listed, else none. */
@@ -214,6 +234,9 @@ const cardOf = (s: SessionListItem, cards: ReadonlyMap<number, ActivityCard>): n
 /** The tree (#1254): cards with their agents and sessions, then agents' sessions on no card; filtered as asked. */
 export function buildActivityTree(input: ActivityInput): ActivityNode[] {
   const { at } = input
+  const f = input.filter ?? {}
+  const wantAgent = (id: string): boolean => !f.agents?.length || f.agents.includes(id)
+  const wantCard = (n: number): boolean => !f.cards?.length || f.cards.includes(n)
   const liveIds = new Set(input.agents.flatMap((a) => (a.live ? [a.live.sessionId] : [])))
   const agents = new Map(input.agents.map((a) => [a.id, a]))
   const cards = new Map(input.cards.map((c) => [c.number, c]))
@@ -225,13 +248,13 @@ export function buildActivityTree(input: ActivityInput): ActivityNode[] {
     a.live && !listed.has(a.live.sessionId) ? [{ id: a.live.sessionId, agentId: a.id, agentName: a.name, name: a.live.sessionName ?? a.name, source: 'hive', lastActivity: a.live.startedAt ?? new Date(at).toISOString(), hasTranscript: true, hasBackup: false, title: null, usage: null, recache: null } as SessionListItem] : []
   )
   for (const s of [...input.sessions, ...started]) {
-    if (!recent(s, liveIds, at)) continue
+    if (!inRange(s, liveIds, input.rangeFrom ?? at, f)) continue
     if (s.sub?.parentId) subs.set(s.sub.parentId, [...(subs.get(s.sub.parentId) ?? []), s])
     else tops.push(s)
   }
-  // Newest first within a group.
-  const newest = (a: SessionListItem, b: SessionListItem): number => (b.lastActivity ?? b.lastActiveAt ?? '').localeCompare(a.lastActivity ?? a.lastActiveAt ?? '')
-  tops.sort(newest)
+  // Oldest first, the newest last (HI-1677): new work comes at the end, as the tab draws it.
+  const oldest = (a: SessionListItem, b: SessionListItem): number => (a.lastActivity ?? a.lastActiveAt ?? '').localeCompare(b.lastActivity ?? b.lastActiveAt ?? '')
+  tops.sort(oldest)
   const launches = new Map<string, ActivityLaunch[]>()
   for (const l of input.now.launches) launches.set(l.agentId, [...(launches.get(l.agentId) ?? []), l])
 
@@ -264,18 +287,16 @@ export function buildActivityTree(input: ActivityInput): ActivityNode[] {
       const cliProcs = all.filter((p) => cli.has(p.pid))
       for (const p of [...cliProcs, ...placed.rest]) children.push({ kind: 'process', key: `p:${p.pid}:${p.created ?? ''}`, agentId: s.agentId!, process: p, cli: cli.has(p.pid), children: [] })
     }
-    if (depth < 4) for (const sub of (subs.get(s.id) ?? []).sort(newest)) children.push(sessionNode(sub, depth + 1))
+    if (depth < 4) for (const sub of (subs.get(s.id) ?? []).sort(oldest)) children.push(sessionNode(sub, depth + 1))
     const state: ActivityState = live ? stateOf(agent!) : 'done'
     return { kind: 'session', key: `s:${s.id}`, agentId: s.agentId ?? null, session: s, live, state, turnsLoaded: !!turns, turnCount: turns?.total ?? 0, children }
   }
 
-  /** Sessions of a group, the newest ACTIVITY_SESSIONS first and the rest behind "n more" (running ones always shown). */
+  /** Sessions of a group, oldest first: the newest ACTIVITY_SESSIONS, the older ones behind "n more" before them (running ones always shown). */
   const group = (key: string, list: SessionListItem[]): ActivityNode[] => {
-    const shown = input.showAll?.has(key) ? list : list.filter((s, i) => i < ACTIVITY_SESSIONS || liveIds.has(s.id))
-    const nodes = shown.map((s) => sessionNode(s))
+    const shown = input.showAll?.has(key) ? list : list.filter((s, i) => i >= list.length - ACTIVITY_SESSIONS || liveIds.has(s.id))
     const hidden = list.length - shown.length
-    if (hidden > 0) nodes.push({ kind: 'more', key: `more:${key}`, count: hidden, children: [] })
-    return nodes
+    return [...(hidden > 0 ? [{ kind: 'more' as const, key: `more:${key}`, count: hidden, children: [] }] : []), ...shown.map((s) => sessionNode(s))]
   }
 
   const agentNode = (id: string, key: string, list: SessionListItem[]): ActivityNode => {
@@ -283,7 +304,6 @@ export function buildActivityTree(input: ActivityInput): ActivityNode[] {
     return { kind: 'agent', key, agentId: id, name: a?.name ?? list.find((s) => s.agentName)?.agentName ?? id, state: a ? stateOf(a) : 'idle', status: a?.live?.status ?? null, line: a?.live?.text ?? '', children: group(key, list) }
   }
 
-  const f = input.filter ?? {}
   const out: ActivityNode[] = []
   const underCards = new Set<string>()
   const filed = new Map<number, SessionListItem[]>()
@@ -294,29 +314,112 @@ export function buildActivityTree(input: ActivityInput): ActivityNode[] {
     else filed.set(c, [...(filed.get(c) ?? []), s])
   }
   for (const c of input.cards) {
-    if (f.card !== undefined && c.number !== f.card) continue
+    if (!wantCard(c.number)) continue
     const list = filed.get(c.number) ?? []
     // Its agents: those with sessions on it here, and its builder and reviewer while they run.
     const ids = [...new Set([...list.map((s) => s.agentId ?? ''), ...c.agents.filter((id) => agents.get(id)?.live)])].filter(Boolean)
-    const children = ids.filter((id) => !f.agentId || id === f.agentId).map((id) => agentNode(id, `c:${c.number}:a:${id}`, list.filter((s) => s.agentId === id)))
+    const children = ids.filter(wantAgent).map((id) => agentNode(id, `c:${c.number}:a:${id}`, list.filter((s) => s.agentId === id)))
     if (!children.length) continue
     for (const id of ids) underCards.add(id)
     out.push({ kind: 'card', key: `c:${c.number}`, number: c.number, label: c.label, title: c.title, column: c.column, children })
   }
-  if (f.card === undefined) {
+  if (!f.cards?.length) {
     const byAgent = new Map<string, SessionListItem[]>()
     for (const s of loose) byAgent.set(s.agentId ?? '', [...(byAgent.get(s.agentId ?? '') ?? []), s])
     // A running agent shown nowhere else (no session in the window yet) still has its node.
     for (const a of input.agents) if (a.live && !byAgent.has(a.id) && !underCards.has(a.id)) byAgent.set(a.id, [])
     for (const [id, list] of byAgent) {
-      if (!id || (f.agentId && id !== f.agentId)) continue
+      if (!id || !wantAgent(id)) continue
+      // Hiding finished work, an agent with nothing running isn't shown.
+      if (f.hideFinished && !list.length) continue
       out.push(agentNode(id, `a:${id}`, list))
     }
   }
-  // What runs now first (a card or an agent with a running session), then the rest as they were.
-  const running = (n: ActivityNode): boolean => (n.kind === 'session' && n.live) || n.children.some(running)
-  const first = out.filter(running)
-  return [...first, ...out.filter((n) => !first.includes(n))]
+  return out
+}
+
+/**
+ * The newest tree, reconciled with what was drawn before (HI-1677), so nothing drawn moves until a refresh (`prev`
+ * empty draws it afresh). Across the whole tree, each key is one node:
+ * - one drawn before and now under another parent (a process found to be a tool call's, a session filed under a card
+ *   since) stays under the parent it was drawn under;
+ * - one missing now (a process that ended, a session out of the range, an "n more" whose sessions left) stays where it
+ *   was, marked `gone`, with what it held.
+ */
+export function keepGone(prev: readonly ActivityNode[], next: readonly ActivityNode[]): ActivityNode[] {
+  if (!prev.length) return [...next]
+  // The newest tree copied, each node's children its own array, with each key's node and parent.
+  const top: ActivityNode[] = []
+  const at = new Map<string, { node: ActivityNode; parent: string | null }>()
+  const copy = (nodes: readonly ActivityNode[], parent: string | null, into: ActivityNode[]): void => {
+    for (const n of nodes) {
+      if (at.has(n.key)) continue
+      const c: ActivityNode = { ...n, children: [] }
+      at.set(n.key, { node: c, parent })
+      into.push(c)
+      copy(n.children, n.key, c.children)
+    }
+  }
+  copy(next, null, top)
+  const childrenOf = (parent: string | null): ActivityNode[] => (parent === null ? top : at.get(parent)!.node.children)
+  // What was drawn, parents first: each node goes back under the parent it was drawn under, or stays as gone there.
+  const walk = (nodes: readonly ActivityNode[], parent: string | null): void => {
+    for (const n of nodes) {
+      const now = at.get(n.key)
+      if (!now) {
+        const g: ActivityNode = { ...n, gone: true, children: [] }
+        at.set(n.key, { node: g, parent })
+        childrenOf(parent).push(g)
+      } else if (now.parent !== parent) {
+        const from = childrenOf(now.parent)
+        from.splice(from.indexOf(now.node), 1)
+        childrenOf(parent).push(now.node)
+        now.parent = parent
+      }
+      walk(n.children, n.key)
+    }
+  }
+  walk(prev, null)
+  return top
+}
+
+/** Rows of the tree as drawn: each node shown, its depth, and its parent's row (-1 at the top). */
+export interface ActivityRow {
+  node: ActivityNode
+  depth: number
+  parent: number
+}
+
+/** When each node was first drawn (HI-1677), by key: the rows' order. Kept for as long as the tab shows the project. */
+export interface ActivityOrder {
+  seq: Map<string, number>
+  next: number
+}
+
+export const newOrder = (): ActivityOrder => ({ seq: new Map(), next: 0 })
+
+/**
+ * The rows the tree shows (HI-1677: nothing that was drawn moves as work comes and goes). A node is numbered the first
+ * time it is seen (the first tree in its own order), and the rows go by those numbers: new work comes after everything
+ * already drawn, whatever its parent, and a node stays where it was as others are added, finish or end. A node always
+ * comes after its parent (a session filed under a card made since takes the card's place). Opening or closing a node
+ * changes only what is shown below it.
+ */
+export function stableRows(tree: readonly ActivityNode[], isOpen: (n: ActivityNode) => boolean, order: ActivityOrder): ActivityRow[] {
+  const shown: { node: ActivityNode; depth: number; parentKey: string | null; rank: number; dfs: number }[] = []
+  const walk = (nodes: readonly ActivityNode[], depth: number, parent: { key: string; rank: number } | null, visible: boolean): void => {
+    for (const n of nodes) {
+      let seq = order.seq.get(n.key)
+      if (seq === undefined) order.seq.set(n.key, (seq = order.next++))
+      const rank = Math.max(seq, parent?.rank ?? -1)
+      if (visible) shown.push({ node: n, depth, parentKey: parent?.key ?? null, rank, dfs: shown.length })
+      walk(n.children, depth + 1, { key: n.key, rank }, visible && isOpen(n))
+    }
+  }
+  walk(tree, 0, null, true)
+  shown.sort((a, b) => a.rank - b.rank || a.dfs - b.dfs)
+  const at = new Map(shown.map((r, i) => [r.node.key, i]))
+  return shown.map((r) => ({ node: r.node, depth: r.depth, parent: r.parentKey === null ? -1 : (at.get(r.parentKey) ?? -1) }))
 }
 
 /** An agent's state, for its nodes' colour. */
@@ -325,4 +428,41 @@ function stateOf(a: ActivityAgent): ActivityState {
   if (a.live.failed) return 'failed'
   if (a.live.waiting) return 'waiting'
   return a.live.working ? 'working' : 'idle'
+}
+
+/** The levels the tree folds at once (HI-1678), by what a node is: sub-sessions and background tasks are subagents. */
+export const ACTIVITY_LEVELS = ['agent', 'session', 'subagent', 'turn', 'tool', 'process'] as const
+export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number]
+
+/** A node's level for Levels ▾; cards and "n more" have none (they don't fold by level). */
+export function activityLevel(n: ActivityNode): ActivityLevel | null {
+  switch (n.kind) {
+    case 'agent':
+      return 'agent'
+    case 'session':
+      return n.session.sub ? 'subagent' : 'session'
+    case 'task':
+      return 'subagent'
+    case 'turn':
+      return 'turn'
+    case 'tool':
+      return 'tool'
+    case 'process':
+      return 'process'
+    default:
+      return null
+  }
+}
+
+/** The keys of every node at a level, anywhere in the tree. */
+export function keysAtLevel(tree: readonly ActivityNode[], level: ActivityLevel): Set<string> {
+  const out = new Set<string>()
+  const walk = (nodes: readonly ActivityNode[]): void => {
+    for (const n of nodes) {
+      if (activityLevel(n) === level) out.add(n.key)
+      walk(n.children)
+    }
+  }
+  walk(tree)
+  return out
 }

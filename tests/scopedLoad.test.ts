@@ -1,7 +1,7 @@
 // What a view keeps after a load finishes: results and errors belong to the scope (project, workspace, search) they
 // were loaded for. A failed refresh of the same scope keeps the last results; a failure for a new scope has none.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { settle, type Scoped } from '../src/shared/scoped'
+import { scopedLoads, settle, type Scoped } from '../src/shared/scoped'
 import { oneAtATime, withinTime } from '../src/shared/coalesce'
 
 const empty: Scoped<string[]> = { scope: 'alpha', data: null, error: null, at: 0 }
@@ -145,5 +145,104 @@ describe('a load with a time limit (#1646)', () => {
     vi.useFakeTimers()
     expect(await withinTime(Promise.resolve('sessions'), 60_000, () => 'late')).toBe('sessions')
     expect(vi.getTimerCount()).toBe(0)
+  })
+})
+
+/** A promise the test settles. */
+function deferred<T>() {
+  let resolve: (v: T) => void = () => undefined
+  let reject: (e: Error) => void = () => undefined
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
+describe("a load with an early part (HI-1681: Hive's sessions before the rest)", () => {
+  /** A view's state and its loads, the scope fixed unless `scope.now` changes. */
+  function view() {
+    let state: Scoped<string[]> = { scope: 'alpha', data: null, error: null, at: 0 }
+    const scope = { now: 'alpha' }
+    let t = 0
+    const load = scopedLoads<string[]>((next) => (state = next(state)), () => scope.now, () => ++t)
+    return { load, scope, get: () => state }
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('shows the early part while the load runs, then the whole', async () => {
+    const v = view()
+    const early = deferred<string[]>()
+    const whole = deferred<string[]>()
+    v.load('alpha', () => whole.promise, early.promise)
+    early.resolve(['own'])
+    await settled()
+    expect(v.get()).toMatchObject({ data: ['own'], error: null })
+    whole.resolve(['own', 'other'])
+    await settled()
+    expect(v.get()).toMatchObject({ data: ['own', 'other'], error: null })
+  })
+
+  it('an early part that never comes leaves the load to fail at its time limit, with the error shown', async () => {
+    const v = view()
+    const early = deferred<string[]>()
+    const whole = deferred<string[]>()
+    v.load('alpha', () => withinTime(whole.promise, 60_000, () => 'no answer after 60 s'), early.promise)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(v.get()).toMatchObject({ data: null, error: 'no answer after 60 s' })
+  })
+
+  it("an early part that comes after the load ended, or fails, changes nothing", async () => {
+    const v = view()
+    const early = deferred<string[]>()
+    const whole = deferred<string[]>()
+    v.load('alpha', () => whole.promise, early.promise)
+    whole.resolve(['own', 'other'])
+    await settled()
+    early.resolve(['own'])
+    await settled()
+    expect(v.get().data).toEqual(['own', 'other'])
+    // After a failed load: the error stays, with no stale early part as its results.
+    const late = deferred<string[]>()
+    const failing = deferred<string[]>()
+    const w = view()
+    w.load('alpha', () => failing.promise, late.promise)
+    failing.reject(new Error('boom'))
+    await settled()
+    late.resolve(['own'])
+    await settled()
+    expect(w.get()).toMatchObject({ data: null, error: 'boom' })
+    // A failing early part: the load's own result shows.
+    const bad = deferred<string[]>()
+    const good = deferred<string[]>()
+    const x = view()
+    x.load('alpha', () => good.promise, bad.promise)
+    bad.reject(new Error('own failed'))
+    good.resolve(['all'])
+    await settled()
+    expect(x.get()).toMatchObject({ data: ['all'], error: null })
+  })
+
+  it("an early part of an older load, or of another scope, isn't shown", async () => {
+    const v = view()
+    const early = deferred<string[]>()
+    v.load('alpha', () => new Promise<string[]>(() => undefined), early.promise)
+    const newer = deferred<string[]>()
+    v.load('alpha', () => newer.promise)
+    early.resolve(['old own'])
+    await settled()
+    expect(v.get().data).toBeNull()
+    const other = deferred<string[]>()
+    v.load('alpha', () => new Promise<string[]>(() => undefined), other.promise)
+    v.scope.now = 'beta'
+    other.resolve(['alpha own'])
+    await settled()
+    expect(v.get().data).toBeNull()
   })
 })

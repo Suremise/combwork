@@ -264,7 +264,8 @@ export interface FactData {
   LeftTarget: { revision: string; target: string }
   Accepted: { revision?: string; submission?: number }
   /** `why`: the agent's own reason, given with a put back (#1267). */
-  Moved: { from: StageId; to: StageId; cause: 'intent' | 'user' | 'derived' | 'override'; why?: string }
+  /** `repair` (HI-1674): a card the board had in Done while its stage wasn't, brought into line when its workspace opens. */
+  Moved: { from: StageId; to: StageId; cause: 'intent' | 'user' | 'derived' | 'override' | 'repair'; why?: string }
   /** The refusal's English (agents read it) and its rule and values, which the window shows translated (refusalLines). */
   Refused: { move: string; rule: string; message: string; next: string; values?: Record<string, string | number | StoredText> }
   Override: { rules: string[]; move: string; by: 'user' | 'assistant'; reason: string }

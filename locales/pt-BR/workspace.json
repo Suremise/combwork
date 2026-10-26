@@ -193,7 +193,7 @@
   "workspace.notes.workspaceNotes.off": "A entrega está desativada (Configurações → Avançado → Entregar Workspace notes aos agentes): os agentes não a recebem.",
   "workspace.notes.workspaceNotes.template": "# Workspace notes\n\nNotas sobre esta máquina que todo agente deveria saber: um caminho completo de que um comando precisa, a versão de uma ferramenta local. Regras para quem trabalha num projeto ficam no AGENTS.md dele.\n",
   "workspace.notes.workspaceNotes.title": "Workspace notes",
-  "workspace.overview.agentLabel": "{project} · {agent}",
+  "workspace.overview.agentLabel": "<in>{project} · </in>{agent}",
   "workspace.overview.apiCost": "Custo a preços de API",
   "workspace.overview.asReported": "conforme informado",
   "workspace.overview.assistant": "Assistente",

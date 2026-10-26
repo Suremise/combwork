@@ -15,6 +15,7 @@ import { safeguardText } from '@shared/safeguards'
 import { placeTip, type Box } from '@shared/tipPlacement'
 import { placeMenu } from '@shared/menuPlacement'
 import { msg, tr, tRich, type Msg } from '@shared/i18n'
+import { watchStatus } from './watchLine'
 import { headingId, slugOf } from '@shared/docSections'
 
 export function Icon({ name, className, title, spin }: { name: string; className?: string; title?: string; spin?: boolean }) {
@@ -532,8 +533,9 @@ export function statusText(live: Pick<LiveSessionState, 'status' | 'statusMessag
   const text = ((): string => {
     const projected = live.runtime ? runtimeLabel(live) : unknownStateText(live)
     if (projected) return projected
-    // Waiting on cards: what for ("Waiting for #12 → Review").
-    if (live.status === 'watching' && live.watch) return live.watch.label
+    // Waiting on cards: what for, in the window's words and its card names ("Waiting for HI-12 → Review", HI-1679: never
+    // the watch's `label`, the English agents read).
+    if (live.status === 'watching' && live.watch) return watchStatus(live.watch)
     // Hive's own words in the window's language (#847), or the CLI's as they came.
     if (live.statusMessage) return shownStatusMessage(live)!
     // At the merge slot (#350): waiting for it, or merging.

@@ -1,6 +1,6 @@
 // Reads the window repeats as things change (#1629): never two of the same at once.
 // - coalesced(): per key, one call in flight; callers asking meanwhile share one more call, started once it settles, so
-//   each gets data read after it asked.
+//   each gets data read after it asked. joined() (HI-1681): callers asking meanwhile share the call in flight.
 // - serialReads(): one read at a time for a source whose scope can change (the window's workspace); asked meanwhile,
 //   the newest scope is read once the current read settles, and a result is taken only when it is still the newest
 //   ask's scope and no newer read of that scope has been taken.
@@ -41,6 +41,31 @@ export function coalesced<T>(): (key: string, load: () => Promise<T>) => Promise
     )
     slot.queued = after.then(() => start(key, load))
     return slot.queued
+  }
+}
+
+/**
+ * A function that calls `load` for a key, joining the call in flight for it (HI-1681): asked while one runs, a caller
+ * gets that call's result, not one more call. For reads whose source changes without telling (a CLI's own session
+ * folders), where one more read after the one under way only doubles the wait.
+ */
+export function joined<T>(): (key: string, load: () => Promise<T>) => Promise<T> {
+  const running = new Map<string, Promise<T>>()
+  return (key, load) => {
+    const now = running.get(key)
+    if (now) return now
+    let p: Promise<T>
+    try {
+      p = load()
+    } catch (e) {
+      p = Promise.reject(e)
+    }
+    running.set(key, p)
+    const end = (): void => {
+      if (running.get(key) === p) running.delete(key)
+    }
+    p.then(end, end)
+    return p
   }
 }
 

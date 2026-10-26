@@ -776,8 +776,8 @@
     "description": "The title of the shared note Hive gives every agent when it starts (notes about this machine), over its editor. Keep Workspace notes in English: it is the note's name (its file is Workspace notes.md) and what agents are told."
   },
   "workspace.overview.agentLabel": {
-    "defaultMessage": "{project} · {agent}",
-    "description": "A running agent in the Workspace Overview: its project and name."
+    "defaultMessage": "<in>{project} · </in>{agent}",
+    "description": "A running agent in the Workspace Overview: its project and name. <in>…</in> holds the project part (keep the tags around it, with its separator): in a narrow row it is dropped first, so the agent’s name stays whole."
   },
   "workspace.overview.apiCost": {
     "defaultMessage": "API-equivalent cost",

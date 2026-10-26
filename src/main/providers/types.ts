@@ -160,6 +160,9 @@ export interface ExternalSession {
   id: string
   transcriptPath: string
   modified: string
+  /** The transcript's size and time, from the stat that found it (HI-1681): the list needn't stat it again. */
+  bytes?: number
+  mtimeMs?: number
   /** A session the CLI started for another one (from the transcript's first line). */
   sub?: SubSession
 }
@@ -517,9 +520,16 @@ export interface ProviderAdapter {
   transcriptPath(folder: string, sessionId: string, recorded?: string): Promise<string | null>
   /** Where to put a transcript restored from Hive's backup so the CLI can resume it; null if it can't be restored. */
   restorePath(folder: string, sessionId: string, recorded?: string): string | null
-  listSessions(folder: string): Promise<ExternalSession[]>
-  /** Whether a transcript (one of the CLI's, or Hive's copy of it) is a sub-session, from its first line; cached by mtime. */
-  subSessionOf(path: string, sessionId: string): Promise<SubSession | null>
+  /**
+   * The CLI's sessions run in a folder. `skip`: ids the caller has already (Hive's own sessions), left out before their
+   * files are looked at (HI-1681): a session list asks for every folder its sessions ran in, mostly Hive's own.
+   */
+  listSessions(folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]>
+  /**
+   * Whether a transcript (one of the CLI's, or Hive's copy of it) is a sub-session, from its first line; cached by mtime.
+   * `mtimeMs`: the file's, from a stat the caller has (HI-1681), so it isn't stat'd again.
+   */
+  subSessionOf(path: string, sessionId: string, mtimeMs?: number): Promise<SubSession | null>
   /**
    * What the CLI keeps by a folder's path rather than in it (Claude Code: ~/.claude/projects/<path as name>/, its
    * transcripts and auto memory), for a folder that moved (#146). With apply, copied to the new path's name: never moved

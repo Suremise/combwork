@@ -232,6 +232,7 @@ export const SUITES = [
   { name: 'replysize' },
   { name: 'replytell' },
   { name: 'repolock' },
+  { name: 'repolocktyping' },
   { name: 'resize' },
   { name: 'restart' },
   { name: 'resume' },

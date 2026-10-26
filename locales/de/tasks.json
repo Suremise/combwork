@@ -137,6 +137,7 @@
   "tasks.history.reviewStopped": "Review von Agent {agent} beendet",
   "tasks.history.reviewerRequest": "Den Bearbeiter gebeten: „{text}“",
   "tasks.history.safeguardStop": "**{agent}, nach einem Sicherheitsstopp:** {stops, plural, =0 {} other {Ein Sicherheitsklassifikator hat eine Antwort{model, select, none {} other { auf {model}}} um {time} gestoppt{stops, plural, =1 {} other { (# in dieser Sitzung)}}. }}Der Agent läuft jetzt mit {to} statt {from} (seit {since}).{state, select, asks { Seine CLI fragt, was zu tun ist.} idle { Nach dem Stopp untätig: Gib dem Agenten einen Anstoß.} other {}}{hasTools, select, yes { Davor seine letzten Tool-Aufrufe: {tools}.} other {}}{hasHelp, select, yes { {help}} other {}}",
+  "tasks.history.stageRepaired": "Als erledigt erfasst, wie das Board sie zeigte: ihr Workflow hatte sie noch in {stage, select, hold {Geparkt} todo {Offen} active {In Arbeit} review {Review} approved {Genehmigt} merging {Wird gemergt} other {{stage}}}",
   "tasks.history.takenFrom": "Agent {agent} entzogen",
   "tasks.history.takenFromAgent": "Dem Agenten entzogen",
   "tasks.history.takenFromOf": "Agent {agent} von {project} entzogen",

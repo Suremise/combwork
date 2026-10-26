@@ -459,7 +459,8 @@ export interface HiveRequests {
   /** Every live card's badges from its work (#1223), in number order; archived cards aren't read. */
   'tasks:workBadges': () => WorkBadge[]
 
-  'session:list': (projectPath: string) => SessionListItem[]
+  /** own: Hive's own sessions alone, for a view that shows them before the others (HI-1681). */
+  'session:list': (projectPath: string, opts?: { own?: boolean }) => SessionListItem[]
   /** agentId: without one, the project's only agent. skipSetup starts the agent even though the worktree's setup command hasn't succeeded. */
   'session:start': (projectPath: string, opts: { resumeId?: string; name?: string; agentId?: string; skipSetup?: boolean; auto?: boolean }) => LiveSessionState
   /** Stops the CLI's background job holding a conversation, then resumes it in the agent. */

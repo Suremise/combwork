@@ -27,12 +27,17 @@ import { codexTranscriptTurns } from './turns'
 import type { SafeguardEvent } from '../../../shared/safeguards'
 import { CodexConversationParser, CodexUsageParser, codexImageData, parseRollout, patchPaths, rolloutDetails, rolloutSubSession } from './rollout'
 import { parseCodexModels } from './models'
+import { atMost } from '../../../shared/atMost'
 import { permissionsMenuLabel, permissionsMenuNumber } from './permissionsMenu'
 import { strayCodexWarning } from './strayFolder'
 import { advanced } from '../../advanced'
 import { launchOverrides } from '../../advancedValues'
 
 const log = createLogger('codex')
+/** Rollouts stat'd at once while listing a folder's sessions (HI-1681). */
+const LIST_AT_ONCE = 8
+/** A rollout's session, from its session_meta. */
+type RolloutSession = { id: string; cwd: string; path: string; sub: SubSession | null }
 
 export function codexHome(): string {
   return process.env.CODEX_HOME || join(homedir(), '.codex')
@@ -1073,24 +1078,23 @@ export class CodexAdapter implements ProviderAdapter {
     return recorded ?? null
   }
 
-  /** The rollouts' sessions (each one's session_meta and stat), read once per rollout list: see rolloutSessions(). */
-  private rolloutSessionList: { list: Promise<string[]>; sessions: Promise<(ExternalSession & { cwd: string })[]> } | null = null
+  /** The rollouts' sessions (each one's session_meta), read once per rollout list: see rolloutSessions(). */
+  private rolloutSessionList: { list: Promise<string[]>; sessions: Promise<RolloutSession[]> } | null = null
 
   /**
    * Every rollout's session, read once per rollout list (#1646): a session list asks for each folder a project's
    * sessions ran in (its slots and worktrees), and looking at every rollout once per folder took a second on 1,100
-   * rollouts and eight folders.
+   * rollouts and eight folders. A rollout's session_meta (its first line) never changes once written, so one read before
+   * isn't looked at again (HI-1681): only a new rollout is opened, and none is stat'd here.
    */
-  private rolloutSessions(): Promise<(ExternalSession & { cwd: string })[]> {
+  private rolloutSessions(): Promise<RolloutSession[]> {
     const list = this.rollouts()
     if (this.rolloutSessionList?.list === list) return this.rolloutSessionList.sessions
     const sessions = (async () => {
-      const out: (ExternalSession & { cwd: string })[] = []
+      const out: RolloutSession[] = []
       for (const p of await list) {
-        const m = await this.meta(p)
-        if (!m || !isSessionId(m.id)) continue
-        const s = await stat(p).catch(() => null)
-        if (s && s.size > 0) out.push({ id: m.id, cwd: m.cwd, transcriptPath: p, modified: s.mtime.toISOString(), ...(m.sub ? { sub: m.sub } : {}) })
+        const m = this.metas.get(p) ?? (await this.meta(p))
+        if (m && isSessionId(m.id)) out.push({ id: m.id, cwd: m.cwd, path: p, sub: m.sub })
       }
       return out
     })()
@@ -1098,14 +1102,21 @@ export class CodexAdapter implements ProviderAdapter {
     return sessions
   }
 
-  async listSessions(folder: string): Promise<ExternalSession[]> {
+  async listSessions(folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]> {
     // Codex records the cwd as it was given; Hive may spell the folder another way now (a junction, an 8.3 name, #493).
     const here = placeMatcher(folder)
-    return (await this.rolloutSessions()).filter((s) => here(s.cwd)).map(({ cwd: _cwd, ...s }) => s)
+    const mine = (await this.rolloutSessions()).filter((s) => here(s.cwd) && !skip?.(s.id))
+    // Only the folder's sessions the caller doesn't have are stat'd (HI-1681), a few at once.
+    const found = await atMost(LIST_AT_ONCE, mine, async (s): Promise<ExternalSession | null> => {
+      const st = await stat(s.path).catch(() => null)
+      return st && st.size > 0 ? { id: s.id, transcriptPath: s.path, modified: st.mtime.toISOString(), bytes: st.size, mtimeMs: st.mtimeMs, ...(s.sub ? { sub: s.sub } : {}) } : null
+    })
+    return found.filter((x): x is ExternalSession => !!x)
   }
 
   async subSessionOf(path: string): Promise<SubSession | null> {
-    return (await this.meta(path))?.sub ?? null
+    // Its session_meta never changes once written (HI-1681): one read before is the answer.
+    return (this.metas.get(path) ?? (await this.meta(path)))?.sub ?? null
   }
 
   /** Session names from Codex's session_index.jsonl ({id, thread_name}). */

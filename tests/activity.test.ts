@@ -2,7 +2,7 @@
 // process under the one tool call open when it started, else under its session; and the tree, card → agent → session →
 // turn → tool call, with subagents and processes, filtered to an agent or a card, recent sessions only.
 import { describe, expect, it } from 'vitest'
-import { activityTurns, buildActivityTree, filetimeMs, placeProcesses, ACTIVITY_SESSIONS, type ActivityInput, type ActivityNode, type ActivityTurns } from '../src/shared/activity'
+import { ACTIVITY_LEVELS, activityLevel, activityTurns, buildActivityTree, keysAtLevel, filetimeMs, keepGone, newOrder, placeProcesses, stableRows, ACTIVITY_SESSIONS, type ActivityFilter, type ActivityInput, type ActivityNode, type ActivityOrder, type ActivityTurns } from '../src/shared/activity'
 import type { AgentProcess } from '../src/shared/agentProcesses'
 import type { SessionListItem, TranscriptItem } from '../src/shared/types'
 
@@ -84,7 +84,7 @@ describe('the tree', () => {
 
   it('files sessions under their card and agent, sub-sessions under their parent; loose ones under the agent; older than 24 h left out', () => {
     expect(keys(buildActivityTree(base()))).toEqual([
-      ['c:7', [['c:7:a:hb1', [['s:s1', ['task:s1:bg1', 'p:10:' + ft(-100), 'p:11:' + ft(-99), 'p:20:' + ft(15), 's:sub1']]]], ['c:7:a:hr1', ['s:r1']]]],
+      ['c:7', [['c:7:a:hr1', ['s:r1']], ['c:7:a:hb1', [['s:s1', ['task:s1:bg1', 'p:10:' + ft(-100), 'p:11:' + ft(-99), 'p:20:' + ft(15), 's:sub1']]]]]],
       ['a:hr1', ['s:loose']]
     ])
   })
@@ -93,7 +93,7 @@ describe('the tree', () => {
     const input = base()
     const t: ActivityTurns = { sessionId: 's1', version: 'v', ...activityTurns([user(1, 0, 'go'), tool(2, 10, 'Bash', { result: null })]) }
     input.turns = new Map([['s1', t]])
-    const s1 = (buildActivityTree(input)[0].children[0].children[0]) as Extract<ActivityNode, { kind: 'session' }>
+    const s1 = buildActivityTree(input)[0].children.find((n) => n.key === 'c:7:a:hb1')!.children[0] as Extract<ActivityNode, { kind: 'session' }>
     expect(s1).toMatchObject({ live: true, state: 'working', turnsLoaded: true, turnCount: 1 })
     expect(keys(s1.children)).toEqual([['turn:s1:1', [['tool:s1:2', ['p:20:' + ft(15)]]]], 'task:s1:bg1', 'p:10:' + ft(-100), 'p:11:' + ft(-99), 's:sub1'])
     const turn = s1.children[0] as Extract<ActivityNode, { kind: 'turn' }>
@@ -103,33 +103,178 @@ describe('the tree', () => {
     expect(cli).toEqual(['p:10:' + ft(-100), 'p:11:' + ft(-99)])
   })
 
-  it("draws a running agent's session the list doesn't have yet, with its processes, and puts what runs now first", () => {
+  it('each node has a level for Levels ▾ (HI-1678): sub-sessions and background tasks are subagents; cards fold on their own', () => {
+    const input = base()
+    input.turns = new Map([['s1', { sessionId: 's1', version: 'v', ...activityTurns([user(1, 0, 'go'), tool(2, 10, 'Bash', { result: null })]) }]])
+    const tree = buildActivityTree(input)
+    const levels: Record<string, string | null> = {}
+    const walk = (ns: ActivityNode[]): void => ns.forEach((n) => ((levels[n.key] = activityLevel(n)), walk(n.children)))
+    walk(tree)
+    expect(levels).toMatchObject({ 'c:7': null, 'c:7:a:hb1': 'agent', 's:s1': 'session', 's:sub1': 'subagent', 'task:s1:bg1': 'subagent', 'turn:s1:1': 'turn', 'tool:s1:2': 'tool', ['p:20:' + ft(15)]: 'process', 'a:hr1': 'agent', 's:loose': 'session' })
+    expect([...keysAtLevel(tree, 'subagent')].sort()).toEqual(['s:sub1', 'task:s1:bg1'])
+    expect([...keysAtLevel(tree, 'tool')]).toEqual(['tool:s1:2'])
+    expect(ACTIVITY_LEVELS).toEqual(['agent', 'session', 'subagent', 'turn', 'tool', 'process'])
+  })
+
+  it("draws a running agent's session the list doesn't have yet, with its processes, in the tree's own order (no re-sorting by what runs, HI-1677)", () => {
     const input = base()
     // HB1 started a new session since the list was read: on no card yet, so its agent's node holds it.
     input.agents[0].live = { ...input.agents[0].live!, sessionId: 'new', sessionName: 'Fresh' }
     input.now = { ...input.now, tasks: [] }
     const tree = buildActivityTree(input)
-    expect(tree[0].key).toBe('a:hb1')
-    const fresh = tree[0].children[0] as Extract<ActivityNode, { kind: 'session' }>
+    const hb1 = tree.find((n) => n.key === 'a:hb1')!
+    const fresh = hb1.children[0] as Extract<ActivityNode, { kind: 'session' }>
     expect(fresh).toMatchObject({ key: 's:new', live: true })
     expect(fresh.session.name).toBe('Fresh')
     expect(fresh.children.filter((n) => n.kind === 'process').length).toBe(3)
-    // The card it worked on before comes after, its old session no longer running.
-    expect(tree.map((n) => n.key)).toEqual(['a:hb1', 'c:7', 'a:hr1'])
+    // Cards first, then agents' loose work, the newest last: running work isn't moved to the top.
+    expect(tree.map((n) => n.key)).toEqual(['c:7', 'a:hr1', 'a:hb1'])
   })
 
-  it("filtered to an agent shows only that agent's work; to a card, only that card's", () => {
-    expect(keys(buildActivityTree({ ...base(), filter: { agentId: 'hr1' } }))).toEqual([['c:7', [['c:7:a:hr1', ['s:r1']]]], ['a:hr1', ['s:loose']]])
-    expect(keys(buildActivityTree({ ...base(), filter: { card: 7 } })).map((k) => (k as unknown[])[0])).toEqual(['c:7'])
+  it("filtered to agents shows only their work; to cards, only theirs; both combine (HI-1677)", () => {
+    expect(keys(buildActivityTree({ ...base(), filter: { agents: ['hr1'] } }))).toEqual([['c:7', [['c:7:a:hr1', ['s:r1']]]], ['a:hr1', ['s:loose']]])
+    expect(keys(buildActivityTree({ ...base(), filter: { cards: [7] } })).map((k) => (k as unknown[])[0])).toEqual(['c:7'])
+    expect(keys(buildActivityTree({ ...base(), filter: { cards: [7], agents: ['hb1'] } })).map((k) => (k as unknown[])[0])).toEqual(['c:7'])
+    expect(buildActivityTree({ ...base(), filter: { cards: [7], agents: ['hb1'] } })[0].children.map((n) => n.key)).toEqual(['c:7:a:hb1'])
+    expect(buildActivityTree({ ...base(), filter: { agents: ['hb1', 'hr1'] } }).length).toBe(2)
   })
 
-  it(`shows an agent's ${ACTIVITY_SESSIONS} newest sessions and "n more" for the rest, all once opened; running ones always`, () => {
+  it(`shows an agent's ${ACTIVITY_SESSIONS} newest sessions, oldest first, with "n more" for the older ones before them; all once opened`, () => {
     const input = base()
     input.sessions = Array.from({ length: ACTIVITY_SESSIONS + 3 }, (_, i) => session(`x${i}`, 'hr1', -i * 60))
     const agent = buildActivityTree(input).find((n) => n.key === 'a:hr1')!
     expect(agent.children.length).toBe(ACTIVITY_SESSIONS + 1)
-    expect(agent.children.at(-1)).toMatchObject({ kind: 'more', count: 3 })
+    expect(agent.children[0]).toMatchObject({ kind: 'more', count: 3 })
+    // The newest last.
+    expect(agent.children.at(-1)!.key).toBe('s:x0')
+    expect(agent.children[1].key).toBe(`s:x${ACTIVITY_SESSIONS - 1}`)
     const all = buildActivityTree({ ...input, showAll: new Set(['a:hr1']) }).find((n) => n.key === 'a:hr1')!
     expect(all.children.length).toBe(ACTIVITY_SESSIONS + 3)
+  })
+
+  it('a range keeps what was active within it before the last refresh (Live: running work only); Hide finished keeps only running work (HI-1677)', () => {
+    const input = base()
+    const min = 60
+    input.sessions = [session('s1', 'hb1', 0, { cards: [{ number: 7, title: 'Seven' }] }), session('m10', 'hr1', -10 * min), session('m50', 'hr1', -50 * min), session('h3', 'hr1', -3 * 3600), session('h20', 'hr1', -20 * 3600)]
+    const ids = (range?: ActivityFilter['range'], hideFinished?: boolean): string[] => {
+      const out: string[] = []
+      const walk = (ns: ActivityNode[]): void => ns.forEach((n) => (n.kind === 'session' ? out.push(n.session.id) : walk(n.children)))
+      walk(buildActivityTree({ ...input, filter: { range, hideFinished } }))
+      return out.sort()
+    }
+    expect(ids('live')).toEqual(['s1'])
+    expect(ids('15m')).toEqual(['m10', 's1'])
+    expect(ids('1h')).toEqual(['m10', 'm50', 's1'])
+    expect(ids('6h')).toEqual(['h3', 'm10', 'm50', 's1'])
+    expect(ids('24h')).toEqual(['h20', 'h3', 'm10', 'm50', 's1'])
+    expect(ids(undefined)).toEqual(['h20', 'h3', 'm10', 'm50', 's1'])
+    expect(ids('24h', true)).toEqual(['s1'])
+    // Measured from the tree's time (the last refresh), not the clock: a session doesn't age out while it is looked at.
+    expect(buildActivityTree({ ...input, at: input.at + 10 * min * 1000, filter: { range: '15m' } }).some((n) => JSON.stringify(n.key) && n.children.some((c) => c.children.some((s) => s.key === 's:m10')))).toBe(false)
+  })
+})
+
+describe('a layout that stays put (HI-1677)', () => {
+  const card = (n: number, kids: ActivityNode[]): ActivityNode => ({ kind: 'card', key: `c:${n}`, number: n, label: `HI-${n}`, title: `${n}`, column: 'doing', children: kids })
+  const agent = (key: string, kids: ActivityNode[]): ActivityNode => ({ kind: 'agent', key, agentId: key, name: key, state: 'idle', status: null, line: '', children: kids })
+  const proc1 = (pid: number): ActivityNode => ({ kind: 'process', key: `p:${pid}`, agentId: 'a', process: { pid, name: 'n', label: 'l' }, cli: false, children: [] })
+  const open = (): boolean => true
+  const rows = (tree: ActivityNode[], order: ActivityOrder): string[] => stableRows(tree, open, order).map((r) => r.node.key)
+
+  it('new work comes after everything already drawn, whatever its parent; nothing drawn moves', () => {
+    const order = newOrder()
+    const first = [card(1, [agent('a1', [proc1(1)])]), card(2, [agent('a2', [proc1(2)])])]
+    expect(rows(first, order)).toEqual(['c:1', 'a1', 'p:1', 'c:2', 'a2', 'p:2'])
+    // A process starts under card 1's agent, which is above card 2: it comes last, joined to its parent above.
+    const second = [card(1, [agent('a1', [proc1(1), proc1(3)])]), card(2, [agent('a2', [proc1(2)])])]
+    const r = stableRows(second, open, order)
+    expect(r.map((x) => x.node.key)).toEqual(['c:1', 'a1', 'p:1', 'c:2', 'a2', 'p:2', 'p:3'])
+    expect(r[6].parent).toBe(1)
+    expect(r[6].depth).toBe(2)
+    // A new card with its agent: after it all, the agent after its card.
+    const third = [card(3, [agent('a3', [])]), ...second]
+    expect(rows(third, order)).toEqual(['c:1', 'a1', 'p:1', 'c:2', 'a2', 'p:2', 'p:3', 'c:3', 'a3'])
+  })
+
+  it('a closed node hides its children; opened again they are where they were', () => {
+    const order = newOrder()
+    const tree = [card(1, [agent('a1', [proc1(1)])]), card(2, [])]
+    expect(rows(tree, order)).toEqual(['c:1', 'a1', 'p:1', 'c:2'])
+    expect(stableRows(tree, (n) => n.key !== 'c:1', order).map((x) => x.node.key)).toEqual(['c:1', 'c:2'])
+    expect(rows(tree, order)).toEqual(['c:1', 'a1', 'p:1', 'c:2'])
+  })
+
+  it('what ended stays in its row, dimmed (gone), with what it held, until a refresh', () => {
+    const before = [card(1, [agent('a1', [proc1(1), proc1(2)])])]
+    const after = [card(1, [agent('a1', [proc1(2)])])]
+    const kept = keepGone(before, after)
+    expect(kept[0].children[0].children.map((n) => [n.key, !!n.gone])).toEqual([
+      ['p:2', false],
+      ['p:1', true]
+    ])
+    const order = newOrder()
+    expect(rows(before, order)).toEqual(['c:1', 'a1', 'p:1', 'p:2'])
+    expect(rows(kept, order)).toEqual(['c:1', 'a1', 'p:1', 'p:2'])
+    // A refresh draws it afresh: what ended is gone.
+    expect(keepGone([], after)[0].children[0].children.map((n) => n.key)).toEqual(['p:2'])
+    // A whole branch that left keeps its children, all gone.
+    const left = keepGone([card(9, [agent('a9', [proc1(9)])])], [])
+    expect(left[0]).toMatchObject({ key: 'c:9', gone: true })
+    expect(left[0].children[0].children[0]).toMatchObject({ key: 'p:9', gone: true })
+  })
+
+  it('a node that changes parent stays one node, where it was drawn, until a refresh (HR6 round 1: a process found to be a tool call\'s)', () => {
+    const sessionNode = (kids: ActivityNode[]): ActivityNode => ({ kind: 'agent', key: 's:1', agentId: 's', name: 's', state: 'working', status: null, line: '', children: kids })
+    const toolNode = (kids: ActivityNode[]): ActivityNode => ({ kind: 'agent', key: 'tool:1', agentId: 't', name: 't', state: 'working', status: null, line: '', children: kids })
+    // Drawn under the session; the turns read since put it under its tool call.
+    const before = [sessionNode([proc1(42)])]
+    const after = [sessionNode([toolNode([proc1(42)])])]
+    const kept = keepGone(before, after)
+    const all: string[] = []
+    const walk = (ns: ActivityNode[]): void => ns.forEach((n) => (all.push(`${n.key}${n.gone ? '(gone)' : ''}`), walk(n.children)))
+    walk(kept)
+    expect(all.filter((k) => k.startsWith('p:42'))).toEqual(['p:42'])
+    expect(kept[0].children.map((n) => n.key)).toEqual(['tool:1', 'p:42'])
+    const order = newOrder()
+    rows(before, order)
+    const r = stableRows(kept, open, order)
+    expect(r.map((x) => x.node.key)).toEqual(['s:1', 'p:42', 'tool:1'])
+    expect(new Set(r.map((x) => x.node.key)).size).toBe(r.length)
+    expect(r[1].parent).toBe(0)
+    // Refreshed, it goes under its tool call.
+    expect(keepGone([], after)[0].children[0].children.map((n) => n.key)).toEqual(['p:42'])
+  })
+
+  it('a session filed under a card since stays under the agent it was drawn under, until a refresh', () => {
+    const sess: ActivityNode = { kind: 'agent', key: 's:9', agentId: 's9', name: 's9', state: 'idle', status: null, line: '', children: [] }
+    const before = [agent('a:x', [sess])]
+    const after = [card(7, [agent('c:7:a:x', [sess])])]
+    const kept = keepGone(before, after)
+    const order = newOrder()
+    rows(before, order)
+    const r = stableRows(kept, open, order).map((x) => `${x.node.key}${x.node.gone ? '(gone)' : ''}`)
+    expect(r).toEqual(['a:x(gone)', 's:9', 'c:7', 'c:7:a:x'])
+  })
+
+  it('"n more" whose sessions left stays as a placeholder: no row below it moves (HR6 round 1)', () => {
+    const sess = (i: number): ActivityNode => ({ kind: 'agent', key: `s:${i}`, agentId: `s${i}`, name: `s${i}`, state: 'idle', status: null, line: '', children: [] })
+    const shown = [7, 6, 5, 4, 3, 2, 1, 0].map(sess)
+    const before = [agent('a', [{ kind: 'more', key: 'more:a', count: 1, children: [] }, ...shown])]
+    // The hidden ninth crossed the 24 hours: no "n more" in the newest tree.
+    const after = [agent('a', shown)]
+    const order = newOrder()
+    const was = rows(before, order)
+    const now = rows(keepGone(before, after), order)
+    expect(now).toEqual(was)
+    expect(keepGone(before, after)[0].children.find((n) => n.key === 'more:a')).toMatchObject({ gone: true })
+  })
+
+  it('a refresh draws the tree compact again: a fresh order puts children back under their parents', () => {
+    const order = newOrder()
+    const first = [card(1, [agent('a1', [proc1(1)])]), card(2, [agent('a2', [])])]
+    rows(first, order)
+    const later = [card(1, [agent('a1', [proc1(1), proc1(3)])]), card(2, [agent('a2', [])])]
+    expect(rows(later, order)).toEqual(['c:1', 'a1', 'p:1', 'c:2', 'a2', 'p:3'])
+    expect(rows(later, newOrder())).toEqual(['c:1', 'a1', 'p:1', 'p:3', 'c:2', 'a2'])
   })
 })

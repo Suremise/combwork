@@ -410,7 +410,7 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
     }
     const ws = { path: e.home, lifetime: { aborted: false }, info: () => ({ projects: [] }), projectConfig: async () => ({ agents: [] }) } as never
     const pass = settleSlotCards(ws, e.project)
-    await vi.waitFor(() => expect(reads).toBe(1))
+    await vi.waitFor(() => expect(reads).toBe(1), { timeout: HUNG_MS })
     return { pass, go: release, reads: () => reads, ws, project: e.project }
   }
 
@@ -463,7 +463,7 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
     }
     const ws = { path: e.home, lifetime: { aborted: false }, info: () => ({ projects: [{ name: 'project', path: e.project }] }), projectConfig: async () => ({ agents: [] }) } as never
     const pass = settleSlotCards(ws, e.project)
-    await vi.waitFor(() => expect(lends).toBe(1))
+    await vi.waitFor(() => expect(lends).toBe(1), { timeout: HUNG_MS })
     const quitting = quitSlotCards(HUNG_MS)
     release()
     await quitting

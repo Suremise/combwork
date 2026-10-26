@@ -780,8 +780,10 @@ export class FactStore {
             return exists ? null : insert(card, { ...f, source: 'observed' })
           }),
         setStage: (card, stage) => {
-          // The stage cache, and the card's column its category (SPEC §16.4.3): the board shows where the fold put it.
-          this.conn.write(() => w.prepare('UPDATE cards SET stage = ?, col = ? WHERE number = ?').run(stage, STAGE_CATEGORY[stage], card))
+          // The stage cache, and the card's column its category (SPEC §16.4.3): the board shows where the fold put it. A
+          // card the workflow moves is a 1.0 card from then on (HI-1674: one from before 1.0 started by an intent kept its
+          // mark, so the board's moves of it skipped its rules, Done in the column and Active in the stage).
+          this.conn.write(() => w.prepare('UPDATE cards SET stage = ?, col = ?, pre_workflow = 0 WHERE number = ?').run(stage, STAGE_CATEGORY[stage], card))
         },
         action: (card, kind, payload, fact) => this.conn.write(() => Number(w.prepare('INSERT INTO card_actions (card, kind, payload, fact) VALUES (?, ?, ?, ?)').run(card, kind, JSON.stringify(payload), fact).lastInsertRowid)),
         saveRuleset: (r) => this.saveRuleset(r),

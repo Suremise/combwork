@@ -356,7 +356,9 @@ describe('Copilot sessions', () => {
   })
 
   it('lists the sessions with a conversation for a folder', async () => {
-    expect(await listCopilotSessions(HOME, 'C:\\work\\ws2')).toEqual([{ id: REAL, transcriptPath: copilotEventsPath(HOME, REAL), modified: expect.any(String) }])
+    expect(await listCopilotSessions(HOME, 'C:\\work\\ws2')).toEqual([{ id: REAL, transcriptPath: copilotEventsPath(HOME, REAL), modified: expect.any(String), bytes: expect.any(Number), mtimeMs: expect.any(Number) }])
+    // Ids the caller has are left out (HI-1681).
+    expect(await listCopilotSessions(HOME, 'C:\\work\\ws2', (id) => id === REAL)).toEqual([])
     // The folder compares as Windows does.
     expect((await listCopilotSessions(HOME, 'c:\\WORK\\ws1\\')).map((s) => s.id)).toEqual([STUB])
     expect(await listCopilotSessions(HOME, 'C:\\work\\other')).toEqual([])

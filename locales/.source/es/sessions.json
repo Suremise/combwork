@@ -97,6 +97,7 @@
   "sessions.list.infoAssistant": "Every conversation of this workspace's Hive Assistant, by provider. Select one to read it in full, including what came before each compaction.",
   "sessions.list.new": "{kind, select, conversation {New Conversation} other {New Session}}",
   "sessions.list.noneHere": "{kind, select, conversation {No conversations here: tick Archived to see archived ones.} other {No sessions here: tick Archived to see archived ones.}}",
+  "sessions.list.othersLoading": "Looking for sessions started outside Hive…",
   "sessions.list.refresh": "Refresh",
   "sessions.list.what": "{kind, select, conversation {the conversations} other {the sessions}}",
   "sessions.marker.cantResume": "can't resume",

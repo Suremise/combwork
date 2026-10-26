@@ -7052,6 +7052,20 @@ button.agent-place:hover {
 }
 .activity-canvas {
   position: relative;
+  transform-origin: 0 0;
+}
+/* The tree's box at its zoom (HI-1678): the canvas is scaled inside it, so the scrollbars follow the zoom. */
+.activity-scaled {
+  position: relative;
+}
+.activity-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.activity-zoom-value {
+  min-width: 46px;
+  font-variant-numeric: tabular-nums;
 }
 .activity-lines {
   position: absolute;
@@ -7104,6 +7118,36 @@ button.agent-place:hover {
 }
 .activity-node.act-card {
   border-left-color: var(--info);
+}
+/* Finished work dims where it is; what ended (or left the range) dims more, until a refresh (HI-1677). */
+.activity-node.act-done {
+  opacity: 0.72;
+}
+.activity-node.act-gone {
+  opacity: 0.45;
+  border-style: dashed;
+}
+.activity-range button {
+  padding: 2px 8px;
+}
+.activity-pick.on,
+.activity-live.on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.activity-hide {
+  font-size: 12px;
+}
+.activity-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.activity-paused {
+  font-size: 12px;
 }
 .activity-twisty {
   flex: none;
@@ -7332,6 +7376,104 @@ button.agent-place:hover {
 }
 .running-row .small {
   font-size: 12px;
+}
+/* A running agent's first line (HI-1679): its name, its status and its card's chip on one line at any width. As the
+   row narrows, the chip's title gives way first (down to the key), then the status (with "…"), then the project before
+   the agent's name; the agent's name and the card's key stay whole. In a narrow Overview the context column narrows with
+   the line, so the line keeps room for them. */
+.running-row > .grow {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.running-row > .tip-wrap:has(> .running-ctx) {
+  flex: 0 1 180px;
+  min-width: 0;
+}
+.running-row .running-ctx {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+.running-row .running-ctx > .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Shrink factors far apart give each part its turn: what a part with a far smaller factor would give up meanwhile
+   rounds to nothing, so it shows no "…" until the parts before it are as small as they go. */
+.running-line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+/* Spaced by margins, not a gap: the project and the agent's name are two items that read as one. */
+.running-line > .tip-wrap {
+  margin-left: 6px;
+}
+/* The name's parts are the line's own: its project shrinks to nothing first, its agent's name (no box of its own) never. */
+.running-line > strong {
+  display: contents;
+  white-space: nowrap;
+}
+.running-project {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: pre;
+}
+.running-line > .tip-wrap:has(> .running-status) {
+  flex: 0 100000 auto;
+  min-width: 0;
+}
+.running-status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.running-line > .tip-wrap:has(> .card-chip) {
+  flex: 0 10000000000 auto;
+}
+/* Several cards (WatchedCardChips): a chip each, keys only, giving way as one chip does; when they don't fit, how many
+   ("2 cards"), whole. The unseen copy measures what the chips need. */
+.running-line > .running-cards {
+  position: relative;
+  display: inline-flex;
+  gap: 4px;
+  flex: 0 10000000000 auto;
+  min-width: 0;
+  margin-left: 6px;
+  overflow: hidden;
+}
+.running-line > .running-cards.counted {
+  min-width: max-content;
+}
+.running-cards-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  gap: 4px;
+  visibility: hidden;
+  white-space: nowrap;
+}
+.running-cards-count {
+  cursor: default;
+  white-space: nowrap;
+}
+/* The chip as a grid here: the title's column (the third) is as wide as the title when there is room and nothing at
+   the least, so the chip shrinks down to its icon and key, never past them. */
+.running-line .card-chip {
+  flex: 0 1 auto;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: auto auto minmax(0, max-content) auto;
+  min-width: auto;
+  max-width: 100%;
+}
+.running-line .card-chip .codicon,
+.running-line .card-chip-number {
+  white-space: nowrap;
 }
 .running-ctx {
   width: 180px;
@@ -9179,22 +9321,47 @@ body.pane-resizing-v .monaco-editor {
   align-items: center;
   gap: 6px;
 }
-.for-you-offers {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* The actions an agent's question offers (#1630), as one grid (HI-1689): the buttons share a column as wide as the
+   widest label, so every reason box starts and ends at the same place. Narrow, each button is over its box. */
+.for-you-offers-box {
+  container-type: inline-size;
   margin-block-end: 8px;
 }
-/* An action an agent's question offers (#1630): its button, then the reason it is done with. */
-.for-you-offer {
-  display: flex;
-  align-items: center;
+.for-you-offers {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   gap: 6px;
+}
+/* An action: its button, then the reason it is done with, a row of the grid (a subgrid, so it keeps a box). */
+.for-you-offer {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
   min-inline-size: 0;
 }
-.for-you-offer .input {
+.for-you-offer > .tip-wrap {
+  display: flex;
+  align-self: stretch;
+}
+.for-you-offer > .tip-wrap > .btn {
   flex: 1;
+  justify-content: center;
+}
+.for-you-offer .input {
+  align-self: stretch;
   min-inline-size: 0;
+}
+/* Narrower than the widest label (German's, 179 px) and a reason box of about 155 px: a button over its box, the actions
+   further apart than a button and its box. */
+@container (max-width: 340px) {
+  .for-you-offers {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 10px;
+  }
+  .for-you-offer {
+    row-gap: 4px;
+  }
 }
 .for-you-rounds input {
   inline-size: 64px;
@@ -10764,11 +10931,6 @@ button.progress-run-show:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Under a finished run in a copy (#1446): lined up with its title, after its icon. */
-.progress-recent-item > .progress-run-for {
-  margin-top: 0;
-  padding: 0 12px 3px 32px;
-}
 /* A failed check that blocks its card's Review (#1279). */
 .progress-run-blocks {
   margin-top: 2px;
@@ -11036,7 +11198,67 @@ button.progress-run-show:focus-visible {
 .progress-runs-failed .codicon {
   color: var(--error);
 }
-/* A run and its retries the same day, one line (#1309): it opens to each run. */
+/* A day's runs by card (HI-1701): a heading per card (Other last), its runs under it, a line each. */
+.progress-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 8px 2px 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.progress-card-head:hover {
+  background: var(--bg-hover);
+}
+.progress-card-head > .codicon,
+.progress-card-key,
+.progress-card-summary,
+.progress-card-when {
+  flex-shrink: 0;
+}
+.progress-card-key {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+}
+button.progress-card-key {
+  cursor: pointer;
+}
+button.progress-card-key:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+/* The title gives way first, then the summary keeps its words. */
+.progress-card-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-card-runs.passed > .progress-card-head > .progress-card-icon {
+  color: var(--success);
+}
+.progress-card-runs.failed > .progress-card-head > .progress-card-icon,
+.progress-card-runs.failed .progress-card-summary {
+  color: var(--error);
+}
+.progress-card-runs.retried > .progress-card-head > .progress-card-icon,
+.progress-card-runs.stale > .progress-card-head > .progress-card-icon {
+  color: var(--warning);
+}
+.progress-card-runs.stopped > .progress-card-head > .progress-card-icon {
+  color: var(--fg-muted);
+}
+.progress-card-items {
+  margin-inline-start: 18px;
+  border-inline-start: 1px solid var(--border-subtle);
+}
+/* A run and its retries the same day, or the merge queue's checks of a card, one line (#1309, HI-1701): it opens to each run. */
 .progress-group-head {
   width: 100%;
   border: 0;
@@ -11044,6 +11266,15 @@ button.progress-run-show:focus-visible {
   font: inherit;
   text-align: start;
   cursor: pointer;
+}
+/* As wide and tall as a run's chevron button, so every line is the same height. */
+.progress-group-chevron {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
 }
 .progress-group-runs {
   margin-inline-start: var(--space-4);
@@ -11068,7 +11299,9 @@ button.progress-run-show:focus-visible {
   padding-right: 4px;
 }
 /* The line (its tooltip's), then the chevron after the time (#251): the title gives way first. */
-.progress-recent > .tip-wrap:first-child {
+.progress-recent > .tip-wrap:first-child,
+.progress-recent-line {
+  display: flex;
   flex: 1;
   min-width: 0;
   align-items: center;
@@ -11166,16 +11399,30 @@ button.progress-run-show:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.progress-recent.passed > .tip-wrap > .codicon {
+/* Who ran it, then what (HI-1701): its name keeps its width. */
+.progress-recent-who {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-muted);
+}
+.progress-recent.passed > .tip-wrap > .codicon,
+.progress-recent.passed > .progress-recent-line > .codicon {
   color: var(--success);
 }
-.progress-recent.failed > .tip-wrap > .codicon {
+.progress-recent.failed > .tip-wrap > .codicon,
+.progress-recent.failed > .progress-recent-line > .codicon {
   color: var(--error);
 }
-.progress-recent.stale > .tip-wrap > .codicon {
+.progress-recent.stale > .tip-wrap > .codicon,
+.progress-recent.stale > .progress-recent-line > .codicon,
+.progress-recent.retried > .progress-recent-line > .codicon {
   color: var(--warning);
 }
-.progress-recent.stopped > .tip-wrap > .codicon {
+.progress-recent.stopped > .tip-wrap > .codicon,
+.progress-recent.stopped > .progress-recent-line > .codicon {
   color: var(--fg-muted);
 }
 .progress-rail {

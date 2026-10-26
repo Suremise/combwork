@@ -22,6 +22,7 @@ import type { ProgressFilter } from '@shared/progress'
 import type { TemplateAgent, TemplateRef } from '@shared/templates'
 import type { GitTool } from '@shared/gitTool'
 import type { RunsFilter } from '@shared/progressTabs'
+import { loadActivityView, saveActivityView, type ActivityView } from './activityView'
 import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkspaceUsage, RecentWorkspace } from '@shared/types'
 import type { PresetId } from '@shared/workflow/options'
 import type {
@@ -225,8 +226,8 @@ interface State {
   /** Set to select a session in its project's Sessions tab. */
   /** Open the Sessions tab on a session, and in it at its nth compaction (from 0, oldest first) when given. */
   sessionsJump: { project: string; id: string; nonce: number; compaction?: number } | null
-  /** The Activity tab's filter per project (#1254): one agent's work, or one card's; none: everything. */
-  activityFilters: Record<string, { agentId?: string; card?: number }>
+  /** The Activity tab's view per project (#1254, HI-1677): its range, agents' and cards' filters, Hide finished, paused by hand. */
+  activityFilters: Record<string, ActivityView>
   /** A file to show in a project's Files tab (a terminal's file link): whose folder (`root`, a worktree agent's id or ''), the file and the line. */
   filesJump: { project: string; root: string; rel: string; line?: number; col?: number; nonce: number } | null
   /** Resizable pane sizes, saved with the window layout. */
@@ -981,11 +982,16 @@ export function openInSessionsTab(path: string, id: string, compaction?: number)
   setProjectTab(path, 'sessions')
 }
 
-/** Opens a project's Activity tab (#1254), filtered to an agent's work or a card's (null: everything). */
+/**
+ * Opens a project's Activity tab (#1254), filtered to an agent's work or a card's (null: as it was left). Its range,
+ * Hide finished and pause stay as they were (HI-1677).
+ */
 export function openActivity(path: string, filter: { agentId?: string; card?: number } | null): void {
   set((s) => {
-    const { [path]: _was, ...rest } = s.activityFilters
-    return { activityFilters: filter ? { ...rest, [path]: filter } : rest, selectedProject: path }
+    const was = s.activityFilters[path] ?? loadActivityView(path)
+    const view: ActivityView = filter ? { ...was, agents: filter.agentId ? [filter.agentId] : [], cards: filter.card !== undefined ? [filter.card] : [] } : was
+    saveActivityView(path, view)
+    return { activityFilters: { ...s.activityFilters, [path]: view }, selectedProject: path }
   })
   showView('projects')
   setProjectTab(path, 'activity')

@@ -193,7 +193,7 @@
   "workspace.notes.workspaceNotes.off": "Delivering it is turned off (Settings → Advanced → Deliver workspace notes to agents): agents don't get it.",
   "workspace.notes.workspaceNotes.template": "# Workspace notes\n\nNotes about this machine that every agent should know: a full path a command needs, a local tool's version. Rules for anyone who works on a project belong in its AGENTS.md instead.\n",
   "workspace.notes.workspaceNotes.title": "Workspace notes",
-  "workspace.overview.agentLabel": "{project} · {agent}",
+  "workspace.overview.agentLabel": "<in>{project} · </in>{agent}",
   "workspace.overview.apiCost": "API-equivalent cost",
   "workspace.overview.asReported": "as reported",
   "workspace.overview.assistant": "Assistant",

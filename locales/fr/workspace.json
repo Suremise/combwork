@@ -193,7 +193,7 @@
   "workspace.notes.workspaceNotes.off": "La fourniture est désactivée (Paramètres → Avancé → Fournir Workspace notes aux agents) : les agents ne la reçoivent pas.",
   "workspace.notes.workspaceNotes.template": "# Workspace notes\n\nDes notes sur cette machine que chaque agent devrait connaître : un chemin complet dont une commande a besoin, la version d’un outil local. Les règles pour quiconque travaille sur un projet vont plutôt dans son AGENTS.md.\n",
   "workspace.notes.workspaceNotes.title": "Workspace notes",
-  "workspace.overview.agentLabel": "{project} · {agent}",
+  "workspace.overview.agentLabel": "<in>{project} · </in>{agent}",
   "workspace.overview.apiCost": "Coût équivalent API",
   "workspace.overview.asReported": "tel que signalé",
   "workspace.overview.assistant": "Assistant",

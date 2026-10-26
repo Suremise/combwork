@@ -1,6 +1,7 @@
 import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AssistantMark } from '../components/AssistantMark'
-import { CardChip } from '../components/CardChip'
+import { CardChip, WatchedCardChip, WatchedCardChips } from '../components/CardChip'
+import { cardsWait } from '../components/watchLine'
 import { KeybindingsEditor } from '../components/Keybindings'
 import type { CompactionEvent, GitDiff, GitStatus, McpServerInfo, MemorySource, PlanLimit, ProjectConfig, ProjectInfo, ProviderId, SessionListItem, SessionUsage, SkillInfo, UnusedWorktree } from '@shared/types'
 import { unpricedModel, unpricedText, usesOwnPrices } from '@shared/prices'
@@ -335,15 +336,18 @@ const LIST_LIMIT_MS = 60_000
  * only on reload(). Only while a view using it is shown.
  */
 const NO_SESSIONS: SessionListItem[] = []
+/** A listing as shown: `othersLoading` while it is Hive's own sessions alone, the others still being read (HI-1681). */
+type SessionsData = { list: SessionListItem[]; kept: SessionListItem[]; othersLoading?: boolean }
 
 export function useSessions(project: ProjectInfo) {
   const mode = useStore((s) => s.settings?.sessions.overviewRefresh ?? 'live')
-  const usageVersion = useStore((s) => s.usageVersion[project.path] ?? 0)
   // A project's tabs stay mounted while another view (Notes, Settings…) is shown: they don't update then.
   const shown = useStore((s) => s.activity === 'projects' || s.workspace?.assistant?.path === project.path)
   // This project's sessions, and deleted sessions' usage (totals count it, lists don't show it). A failed load: views
   // say so (with this project's sessions from before, if any), not "no sessions".
-  const sessions = useScopedLoad<{ list: SessionListItem[]; kept: SessionListItem[] }>(project.path)
+  const sessions = useScopedLoad<SessionsData>(project.path)
+  const haveList = useRef(false)
+  haveList.current = !!sessions.data
   const last = useRef(0)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // One listing at a time (#1646): with listings slower than the updates asking for them (a busy disk, hundreds of
@@ -360,9 +364,19 @@ export function useSessions(project: ProjectInfo) {
       path,
       () => {
         // Deleted sessions' usage only adds to the totals: without it they are a little low, which beats no list.
-        const list = Promise.all([call('session:list', path), call('session:keptUsage', path).catch(() => [])]).then(([items, kept]) => ({ list: items, kept }))
+        const kept = call('session:keptUsage', path).catch(() => [] as SessionListItem[])
+        const list = Promise.all([call('session:list', path), kept]).then(([items, k]): SessionsData => ({ list: items, kept: k }))
         const bounded = withinTime(list, LIST_LIMIT_MS, () => tr(M.noAnswer, { seconds: LIST_LIMIT_MS / 1000 }))
-        loadScoped(path, () => bounded)
+        if (haveList.current) {
+          loadScoped(path, () => bounded)
+          return bounded
+        }
+        // Nothing shown yet (HI-1681): Hive's own sessions first, from its records, while the sessions its CLIs keep for
+        // the project's folders are read (seconds on a busy disk with hundreds of them); the whole list follows. Shown
+        // only while the whole list's load runs, which alone says how it ended (its time limit too); without deleted
+        // sessions' usage meanwhile, which only adds to totals.
+        const own = call('session:list', path, { own: true }).then((items): SessionsData => ({ list: items, kept: NO_SESSIONS, othersLoading: true }))
+        loadScoped(path, () => bounded, own)
         return bounded
       },
       () => latest.current()
@@ -378,29 +392,44 @@ export function useSessions(project: ProjectInfo) {
   // Live: a change (usage, or an agent starting or stopping) reloads, at most every LIVE_REFRESH_MS.
   // A card moving into an agent's Doing too: its session records it ("Worked on #5").
   const doingKey = useStore((s) => s.tasks.filter((c) => c.column === 'doing' && c.agent && c.project.toLowerCase() === project.name.toLowerCase()).map((c) => `${c.number}:${c.agent}`).join(','))
-  const liveKey = `${usageVersion}|${doingKey}|${project.agents.map((a) => `${a.live?.sessionId ?? ''}:${a.live?.status ?? ''}:${a.live?.sessionName ?? ''}`).join(',')}`
-  useEffect(() => {
+  const liveKey = `${doingKey}|${project.agents.map((a) => `${a.live?.sessionId ?? ''}:${a.live?.status ?? ''}:${a.live?.sessionName ?? ''}`).join(',')}`
+  const live = (): void => {
     if (mode !== 'live' || !last.current || !shown) return
     const wait = last.current + LIVE_REFRESH_MS - Date.now()
     if (wait <= 0) load()
     else if (!timer.current) timer.current = setTimeout(load, wait)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveKey, mode, shown])
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(live, [liveKey, mode, shown])
   // Sessions the usage history didn't have yet (#1106): their figures follow soon after the worker has them (it says so,
-  // usageVersion; else the next look), whatever the update setting: that's the list's first load finishing, not a refresh.
+  // usage-changed; else the next look), whatever the update setting: that's the list's first load finishing, not a refresh.
   const pending = sessions.data?.list.some((i) => i.pending) ?? false
+  const pendingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingSoon = (): void => {
+    if (pendingTimer.current) clearTimeout(pendingTimer.current)
+    pendingTimer.current = pending && shown ? setTimeout(load, PENDING_RELOAD_MS) : null
+  }
   useEffect(() => {
-    if (!pending || !shown) return
-    const t = setTimeout(load, PENDING_RELOAD_MS)
-    return () => clearTimeout(t)
+    pendingSoon()
+    return () => {
+      if (pendingTimer.current) clearTimeout(pendingTimer.current)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usageVersion, sessions.at, pending, shown])
+  }, [sessions.at, pending, shown])
+  // The usage history's changes, followed without rendering the view again for each (HI-1681): its first import tells
+  // of every session, and each render of a list of hundreds held the window up, the list read meanwhile shown seconds late.
+  const onUsage = useRef(() => undefined as void)
+  onUsage.current = () => {
+    live()
+    pendingSoon()
+  }
+  useEffect(() => useStore.subscribe((s, prev) => (s.usageVersion[project.path] ?? 0) !== (prev.usageVersion[project.path] ?? 0) && onUsage.current()), [project.path])
   useEffect(() => {
     if (mode !== 'minute' || !shown) return
     const t = setInterval(load, 60_000)
     return () => clearInterval(t)
   }, [mode, load, shown])
-  return { items: sessions.data?.list ?? null, kept: sessions.data?.kept ?? NO_SESSIONS, reload: load, loadedAt: sessions.at, error: sessions.error }
+  return { items: sessions.data?.list ?? null, kept: sessions.data?.kept ?? NO_SESSIONS, othersLoading: sessions.data?.othersLoading ?? false, reload: load, loadedAt: sessions.at, error: sessions.error }
 }
 
 
@@ -592,7 +621,7 @@ function AgentsByUsage({ rows }: { rows: AgentRow[] }) {
 }
 
 /** One running agent: provider, model, mode, status, context used and cost so far. `onOpen` makes it a link. */
-export function RunningAgent({ project, a, label, onOpen, assistant }: { project: ProjectInfo; a: ProjectInfo['agents'][number]; label?: string; onOpen?: () => void; assistant?: boolean }) {
+export function RunningAgent({ project, a, label, onOpen, assistant }: { project: ProjectInfo; a: ProjectInfo['agents'][number]; label?: React.ReactNode; onOpen?: () => void; assistant?: boolean }) {
   const live = a.live!
   const usage = useLiveUsage(project, a.id)
   const settings = useStore((s) => s.settings)
@@ -601,11 +630,14 @@ export function RunningAgent({ project, a, label, onOpen, assistant }: { project
   const pct = contextPercent(ctx, window)
   const cost = live.costUsd ?? usage?.costUsd ?? null
   const estimated = live.costUsd !== undefined ? !!live.costEstimated : !!usage?.costEstimated
+  const status = statusText(live)
+  // Waiting on cards (HI-1679): their chips, as a working agent's card, and the status says what for; its hover the whole.
+  const wait = cardsWait(live, status)
   return (
     <div className={cx('running-row', onOpen && 'clickable')} onClick={onOpen} role={onOpen ? 'button' : undefined}>
       {/* The Assistant's own status icon (#399), its status in the tooltip as a dot's is. */}
       {assistant ? (
-        <Tooltip content={statusText(live)}>
+        <Tooltip content={status}>
           <AssistantMark status={live.status} unseen={live.unseen} />
         </Tooltip>
       ) : (
@@ -613,8 +645,13 @@ export function RunningAgent({ project, a, label, onOpen, assistant }: { project
       )}
       <ProviderIcon provider={live.provider} />
       <div className="grow">
-        <div>
-          <strong>{label ?? a.name}</strong> <span className="faint">{statusText(live)}</span> <CardChip project={project} a={a} />
+        {/* One line (HI-1679): the status gives way with "…", the chip after it never wraps and keeps its key whole. */}
+        <div className="running-line">
+          <strong>{label ?? a.name}</strong>
+          <Tooltip content={status}>
+            <span className="faint running-status">{wait ? wait.line : status}</span>
+          </Tooltip>
+          {!wait ? <CardChip project={project} a={a} /> : wait.cards.length === 1 ? <WatchedCardChip number={wait.cards[0]} /> : <WatchedCardChips cards={wait.cards} status={status} />}
         </div>
         <div className="faint small">
           {[live.modelName ?? usage?.model ?? null, live.permissionMode ? permissionLabel(live.provider, live.permissionMode, tr) : null, live.planMode ? tr(M.plan) : null].filter(Boolean).join(' · ')}

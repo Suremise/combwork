@@ -551,6 +551,10 @@
     "defaultMessage": "**{agent}, after a safeguard stop:** {stops, plural, =0 {} other {A safety classifier stopped a response{model, select, none {} other { on {model}}} at {time}{stops, plural, =1 {} other { (# this session)}}. }}It now runs on {to} instead of {from} (since {since}).{state, select, asks { Its CLI asks what to do about it.} idle { Idle after the stop: give it a nudge.} other {}}{hasTools, select, yes { Before it, its last tool calls: {tools}.} other {}}{hasHelp, select, yes { {help}} other {}}",
     "description": "A comment Hive writes on the cards an agent works on, after its CLI's safety classifier stopped a response and the agent moved to another model. {agent}: the agent's name, in bold (keep the ** marks). Then, when it stopped any ({stops}: how many this session), on which model ({model}: its name; none: leave that branch empty) and when ({time}: \"15:12\"); the model it runs on now ({to}) instead of the old one ({from}) since a time ({since}); whether its CLI asks what to do (asks) or it sits idle (idle); its last tool calls before the stop ({tools}: tool names, keep them); and what to do about it in that CLI ({help}: its own sentence, already translated). Only names, never what was stopped."
   },
+  "tasks.history.stageRepaired": {
+    "defaultMessage": "Recorded as Done, as the board had it: its workflow still had it in {stage, select, hold {On Hold} todo {Todo} active {Active} review {Review} approved {Approved} merging {Merging} other {{stage}}}",
+    "description": "A line in a card's history, by Hive (HI-1674): the card was in the Done column, but a move had not reached its workflow, which still had it at an earlier stage ({stage}, select: a board stage; translate each); Hive recorded it as Done and closed its open questions."
+  },
   "tasks.history.takenFrom": {
     "defaultMessage": "Taken from {agent}",
     "description": "A line in a card's history: the card no longer belongs to the agent {agent} (its name)."
