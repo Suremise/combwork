@@ -140,6 +140,11 @@ export interface WorkflowConfig {
    * intent reads the cards' records); left out, none are.
    */
   locksSettled?: () => Promise<void>
+  /**
+   * The check runs' records still being written for the project (#1651: a check whose run has finished is in its card's
+   * facts before a submit reads them); left out, none are.
+   */
+  checksSettled?: () => Promise<void>
   /** Run the actions after each write (false: leave them pending, as a crash right after the commit would). */
   autoRun?: boolean
   effects?: Effects
@@ -1171,6 +1176,8 @@ export class Workflow {
     const warnings: string[] = []
     // A lock taken before the submission is in the cards' records before it reads them (G16, submit.clean: #1481).
     await this.cfg.locksSettled?.()
+    // A check run that finished before the submission is in the card's facts before it reads them (submit.checksPassed: #1651).
+    await this.cfg.checksSettled?.()
     // The card's declared paths (None) are its data: what the evidence and the revision are read with (args, else the
     // pre-fill), written with the submission.
     const setPaths = args.paths ?? (card.kind === 'code' && o.platform === 'none' && !card.paths ? this.prefill(card) : null)

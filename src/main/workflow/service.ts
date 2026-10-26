@@ -25,6 +25,7 @@ import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { WorkspaceService } from '../workspace'
 import { FactStore } from './factStore'
 import { locksSettled } from './lockRecord'
+import { checksSettled } from './runChecks'
 import { resolvedOf, type ResolvedOptions } from './rulesets'
 import { lastActionId, noteRequestsSince } from '../workflowNotices'
 import { Workflow, type SlotForStart } from './runtime'
@@ -194,6 +195,8 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     runsOf: (agent) => runsGoing?.(project.path, agent) ?? [],
     // G16 (#1481): the file locks seen before an intent are in the cards' records before it reads them.
     locksSettled: () => locksSettled(ws, project.path),
+    // #1651: a check run that has finished is in its card's facts before a submit reads them.
+    checksSettled: () => checksSettled(ws, project.path),
     // A branch rename Repair recorded and hasn't finished (#1305): its new name, which a card on the old line follows.
     pendingRename: async (line) => (await ws.projectConfig(project.path)).pendingBranchRenames?.find((r) => r.from.toLowerCase() === line.toLowerCase())?.to ?? null,
     // A move Repair hasn't recorded (#1343): the workspace's or the project's last folder isn't where it is now.

@@ -3776,7 +3776,9 @@ first; `lanes:end`).
 platform's adapter (Git: its folder's head on its own line, its newest attributed commit in a shared folder; None: its
 declared paths' hash), or the folder's head for a run for no card or for one not started [#1233]; backwards compatible).
 A finished run naming a card and revision writes `CheckRan`. The gates read the same facts the panel shows, so they
-agree by construction.
+agree by construction. Its end reads the folder again before the write (the watcher settling, git), so the record can
+come after hive-progress has exited: a submit waits for its project's records still being written, and a check that
+passed counts the moment its run finishes [#1651].
 
 **When a run counts for a revision** [P1, answering HR2's round 1 finding 5 and round 2 finding 2, HB3's F]: a green
 run proves something only about content it ran on. A run records its **tested checkout** (the revision checked out
