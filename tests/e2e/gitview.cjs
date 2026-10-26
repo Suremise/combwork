@@ -142,6 +142,33 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   check('Create tag… tags the commit and pushes it', !!(await lib.until(async () => (await history.locator('[data-tag="v0.1"]').count()) === 1, HUNG_MS)) && g(remote, 'tag', '--list').includes('v0.1'))
   await shot(page, '4-history')
 
+  // --- #1643: the project's work goes to release (its target), 25 commits past main, made as a terminal would.
+  let tip = g(alpha, 'rev-parse', 'main')
+  for (let i = 1; i <= 25; i++) tip = g(alpha, 'commit-tree', `${tip}^{tree}`, '-p', tip, '-m', `release work ${i}`)
+  g(alpha, 'branch', 'release', tip)
+  await inv('workflow:setOptions', alpha, { preset: null, options: { target: 'release' } })
+  await history.locator('[data-action="reload-history"]').click()
+  const onPage = async (ref, page_, n) => (await history.getAttribute('data-history-ref')) === ref && (await history.getAttribute('data-history-page')) === String(page_) && (await history.locator('.git-commit').count()) === n
+  check('History opens on the target, release, 20 commits a page', !!(await lib.until(() => onPage('release', 1, 20), HUNG_MS)) && (await text(history.locator('.git-commit').first())).includes('release work 25') && /Page 1 of 2/.test(await text(history.locator('.table-paging'))), await text(history.locator('h2').first()))
+  check('…its picker names it the target, and lists main and origin’s', (await history.locator('[data-history-branch] option:checked').innerText()) === 'release · target' && (await history.locator('[data-history-branch] option[value="main"]').innerText()) === 'main · project folder' && (await history.locator('[data-history-branch] option[value="origin/main"]').count()) === 1)
+  for (const t of ['dark', 'light']) {
+    await inv('settings:update', { appearance: { theme: t } })
+    await lib.until(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t), HUNG_MS)
+    await page.mouse.move(5, 5)
+    // The earlier notices closed, and the pager in view: the page as it shows.
+    for (const close of await page.locator('.toast .toast-close, .toast button[aria-label="Close"]').all()) await close.click().catch(() => undefined)
+    await lib.until(async () => (await page.locator('.toast').count()) === 0, HUNG_MS)
+    await history.locator('[data-history-branch]').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: path.join(lib.WORK, `gitview-5-history-target-${t}.png`) })
+    await history.locator('.table-paging').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: path.join(lib.WORK, `gitview-6-history-pager-${t}.png`) })
+  }
+  await inv('settings:update', { appearance: { theme: 'dark' } })
+  await history.getByRole('button', { name: 'Next page', exact: true }).click()
+  check('Next page: the older commits, back to the first', !!(await lib.until(() => onPage('release', 2, 7), HUNG_MS)) && (await text(history.locator('.git-commit').last())).includes('first commit'), await text(history))
+  await history.locator('[data-history-branch]').selectOption('main')
+  check('the picker shows main: its own commits, from its first page', !!(await lib.until(() => onPage('main', 1, 2), HUNG_MS)) && (await history.locator('.table-paging').count()) === 0)
+
   // --- Changes is still the default section's content.
   await page.locator('.git-sections button', { hasText: 'Changes' }).click()
   check('Changes shows the working tree', !!(await lib.until(async () => (await page.locator('.split-list .pane-header', { hasText: 'Changes' }).count()) === 1, HUNG_MS)))

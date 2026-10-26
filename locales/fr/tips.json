@@ -162,6 +162,8 @@
   "tips.forYouActions.title": "Répondre en un clic",
   "tips.gitCheck.text": "Aide → Configuration des agents… montre le git trouvé par Hive et sa version. Les agents en worktree, la fusion et les sections Git de l’onglet Gestion de versions nécessitent Git for Windows 2.38 ou ultérieur.",
   "tips.gitCheck.title": "Git est-il prêt pour les worktrees ?",
+  "tips.gitHistory.text": "Gestion de versions → Historique s’ouvre sur la branche où ton travail est fusionné. Choisis-en une autre dans son titre, la tienne ou celle d’un dépôt distant, et remonte vers les commits plus anciens sous la liste.",
+  "tips.gitHistory.title": "Voir l’historique de n’importe quelle branche",
   "tips.gitInit.text": "Un projet sans git ? Initialiser le dépôt…, dans son onglet Gestion de versions, en fait un dépôt sur main, garde .hive en dehors, ajoute un .gitignore de départ si tu veux et fait le premier commit, pour que les agents puissent tout de suite travailler dans des worktrees.",
   "tips.gitInit.title": "Faire d’un projet un dépôt git en un clic",
   "tips.gitRemotes.text": "Gestion de versions → Branches et dépôts distants : Push vers… envoie cette branche, ou toutes les branches et tous les tags, vers n’importe quel dépôt distant sans changer ce que suit la branche. On peut aussi y renommer ou supprimer un dépôt distant, et Suivre d’une branche choisit ce qu’utilisent Pull et Push.",

@@ -215,25 +215,41 @@
     "defaultMessage": "no commits yet",
     "description": "What the project folder has checked out in a repository with no commit yet. Lower case: also in the status bar."
   },
+  "git.history.branch": {
+    "defaultMessage": "Branch to show",
+    "description": "The name, for screen readers, of Git → History's branch picker (in its heading)."
+  },
   "git.history.heading": {
     "defaultMessage": "History",
     "description": "Heading of Git → History, before the branch is known."
   },
   "git.history.headingOf": {
     "defaultMessage": "History <faint>of {head}</faint>",
-    "description": "Heading of Git → History. {head} is the branch checked out (or \"detached at abc1234\"). <faint> is the part shown dimmed."
+    "description": "Heading of Git → History. {head} is the branch shown, a drop-down to choose another (or \"detached at abc1234\"). <faint> is the part shown dimmed."
   },
   "git.history.loadTarget": {
     "defaultMessage": "the history",
     "description": "What could not be read in Git → History: shown in \"Could not load {what}: {error}\" and \"Could not refresh {what}; last updated …\"."
   },
+  "git.history.local": {
+    "defaultMessage": "Branches",
+    "description": "A group in Git → History's branch picker: the repository's own branches."
+  },
   "git.history.noCommits": {
     "defaultMessage": "No commits yet.",
     "description": "Git → History when the repository has no commit."
   },
+  "git.history.option": {
+    "defaultMessage": "{kind, select, target {{branch} · target} folder {{branch} · project folder} other {{branch}}}",
+    "description": "A branch in Git → History's branch picker: the branch the project's work merges into (target), the one the project folder has checked out, or another. Keep the select keys."
+  },
   "git.history.reload": {
     "defaultMessage": "Read the history again",
     "description": "Tooltip on the refresh button in Git → History."
+  },
+  "git.history.remote": {
+    "defaultMessage": "Remote branches",
+    "description": "A group in Git → History's branch picker: the remotes' branches (origin/x)."
   },
   "git.hiveVcs.checking": {
     "defaultMessage": "Checking…",

@@ -37,7 +37,7 @@ import { localUse, remoteKept } from '../shared/branchCleanup'
 import { samePath } from '../shared/movePaths'
 import * as G from './platform/git'
 import { resolvedOf } from './workflow/rulesets'
-import { workBadges } from './workflow/cardWork'
+import { workBadges } from './workflow/cardWork'
 import { workflowWrite } from './workflow/writes'
 import { checkProject } from './branchWatch'
 import { samePlace } from './fsutil'
@@ -330,11 +330,31 @@ export async function workTargetOf(projectPath: string): Promise<string | null> 
 }
 
 /** The project folder's last commits, and its tags, newest first. */
-export async function repoHistory(root: string): Promise<GitHistory> {
+export async function repoHistory(root: string, opts: { ref?: string | null; page?: number; workTarget?: string | null } = {}): Promise<GitHistory> {
   const summary = await repoSummary(root)
-  if (!summary.isRepo || !summary.head) return { commits: [], tags: [], moreTags: 0 }
+  const none: GitHistory = { commits: [], tags: [], moreTags: 0, ref: null, defaultRef: null, target: null, branches: [], remoteBranches: [], page: 1, pages: 1, total: 0 }
+  if (!summary.isRepo || !summary.head) return none
+  // The branches it can show (#1643), named as the repository has them: a branch asked for that isn't one shows the default.
+  const refs = await git(root, ['for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/remotes'])
+  if (!refs.ok) throw commandFailed('git for-each-ref', refs) // i18n-ignore: a git command, as it is
+  const branches: string[] = []
+  const remoteBranches: string[] = []
+  for (const r of refs.out.split(/\r?\n/).filter(Boolean)) {
+    if (r.startsWith('refs/heads/')) branches.push(r.slice('refs/heads/'.length))
+    else if (r.startsWith('refs/remotes/') && !r.endsWith('/HEAD')) remoteBranches.push(r.slice('refs/remotes/'.length))
+  }
+  // By default the project's target (where its work goes: 1.0.0 for hive, not main), else the folder's branch.
+  const target = opts.workTarget && branches.includes(opts.workTarget) ? opts.workTarget : null
+  const defaultRef = target ?? summary.branch
+  const ref = opts.ref && (branches.includes(opts.ref) || remoteBranches.includes(opts.ref)) ? opts.ref : defaultRef
+  const spec = !ref ? 'HEAD' : branches.includes(ref) ? `refs/heads/${ref}` : `refs/remotes/${ref}`
+  const count = await git(root, ['rev-list', '--count', spec, '--'])
+  if (!count.ok) throw commandFailed('git rev-list', count) // i18n-ignore: a git command, as it is
+  const total = Number(count.out.trim()) || 0
+  const pages = Math.max(1, Math.ceil(total / HISTORY_COMMITS))
+  const page = Math.min(pages, Math.max(1, Math.floor(Number(opts.page) || 1)))
   const [log_, tags] = await Promise.all([
-    git(root, ['log', '-n', String(HISTORY_COMMITS), '--format=%H%x00%h%x00%an%x00%ae%x00%at%x00%D%x00%s%x1e', 'HEAD', '--']),
+    git(root, ['log', '-n', String(HISTORY_COMMITS), '--skip', String((page - 1) * HISTORY_COMMITS), '--format=%H%x00%h%x00%an%x00%ae%x00%at%x00%D%x00%s%x1e', spec, '--']),
     git(root, ['for-each-ref', '--sort=-creatordate', '--format=%(refname:short)%00%(objecttype)%00%(*objectname:short)%00%(objectname:short)%00%(creatordate:unix)%00%(contents:subject)%00%(*subject)', 'refs/tags'])
   ])
   if (!log_.ok) throw commandFailed('git log', log_) // i18n-ignore: a git command, as it is
@@ -355,7 +375,8 @@ export async function repoHistory(root: string): Promise<GitHistory> {
       const annotated = f[1] === 'tag'
       return { name: f[0], commit: annotated ? f[2] : f[3], date: Number(f[4]) * 1000, subject: (annotated ? f[5] : f[5] || f[6]) ?? '', annotated }
     })
-  return { commits, tags: all.slice(0, HISTORY_TAGS), moreTags: Math.max(0, all.length - HISTORY_TAGS) }
+  const byName = (a: string, b: string): number => a.localeCompare(b, 'en')
+  return { commits, tags: all.slice(0, HISTORY_TAGS), moreTags: Math.max(0, all.length - HISTORY_TAGS), ref, defaultRef, target, branches: branches.sort(byName), remoteBranches: remoteBranches.sort(byName), page, pages, total }
 }
 
 // ---------------------------------------------------------------------------

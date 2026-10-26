@@ -832,7 +832,7 @@ export interface HiveRequests {
   'git:deleteBranches': (projectPath: string, branches: BranchAt[], unmerged?: boolean) => string
   'git:deleteRemoteBranches': (projectPath: string, remote: string, branches: BranchAt[]) => string
   'git:branchDrops': (projectPath: string, branch: string) => BranchDrops
-  'git:history': (projectPath: string) => GitHistory
+  'git:history': (projectPath: string, ref?: string | null, page?: number) => GitHistory
   /** Each action replies with what it did, in a sentence. Switching (and creating a branch to switch to) or pulling is refused while an agent works in the folder or its merge slot is held (`folderBusy`). */
   'git:switch': (projectPath: string, branch: string) => string
   'git:createBranch': (projectPath: string, name: string, stay?: boolean) => string

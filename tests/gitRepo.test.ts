@@ -539,6 +539,30 @@ describe('remotes, tags, history and identity', () => {
     expect(h.tags.find((t) => t.name === 'light')).toMatchObject({ annotated: false, commit: head })
   })
 
+  it('History shows the project’s target by default, any branch asked for, a page at a time (#1643)', async () => {
+    git(proj, 'checkout', '-q', '-b', 'release')
+    for (let i = 1; i <= 25; i++) commit(proj, `r${i}.txt`)
+    git(proj, 'checkout', '-q', 'main')
+    // The target (where the work goes), not the folder's branch.
+    const first = await repo.repoHistory(proj, { workTarget: 'release' })
+    expect(first).toMatchObject({ ref: 'release', defaultRef: 'release', target: 'release', page: 1, pages: 2, total: 26 })
+    expect(first.commits).toHaveLength(20)
+    expect(first.commits[0].subject).toBe('add r25.txt')
+    expect(first.branches).toEqual(['main', 'release'])
+    expect(first.remoteBranches).toEqual(['origin/main'])
+    // Back through the older ones; a page past the last is the last.
+    const second = await repo.repoHistory(proj, { workTarget: 'release', page: 2 })
+    expect(second.commits.map((c) => c.subject)).toEqual([...Array.from({ length: 5 }, (_, i) => `add r${5 - i}.txt`), 'add a.txt'])
+    expect((await repo.repoHistory(proj, { workTarget: 'release', page: 99 })).page).toBe(2)
+    // Any branch, local or remote; one that isn't a branch here shows the default.
+    expect(await repo.repoHistory(proj, { workTarget: 'release', ref: 'main' })).toMatchObject({ ref: 'main', total: 1, pages: 1 })
+    expect(await repo.repoHistory(proj, { workTarget: 'release', ref: 'origin/main' })).toMatchObject({ ref: 'origin/main', total: 1 })
+    expect(await repo.repoHistory(proj, { workTarget: 'release', ref: '--all' })).toMatchObject({ ref: 'release' })
+    // No target, or one that isn't a branch here: the folder's branch.
+    expect(await repo.repoHistory(proj, { workTarget: 'nope' })).toMatchObject({ ref: 'main', target: null })
+    expect(await repo.repoHistory(proj)).toMatchObject({ ref: 'main', target: null })
+  })
+
   it("sets this repository's identity, and removes it so the global one applies", async () => {
     expect(await repo.setIdentity(proj, 'Dev', '1+dev@users.noreply.github.com')).toBe("Set this repository's commit identity.")
     let info = await repo.repoInfo(proj)

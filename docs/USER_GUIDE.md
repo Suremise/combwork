@@ -1353,7 +1353,7 @@ Hive checks your projects' git status in the background (this tab, branch status
 
 ### History <a id="history"></a>
 
-**History** lists the project folder's last 20 commits, newest first, with their branches and tags, and the repository's tags below them. **Create tag…** tags the commit the folder has checked out: give it a name, and a message for an annotated tag, and choose a remote to push it to if you like.
+**History** lists a branch's commits, newest first, 20 a page (the arrows under them go back through older ones), with their branches and tags. It opens on the branch your project's work merges into (its **Target branch** in Workflow, such as 1.0.0), or, with none set, the branch the project folder is on; the branch named in its heading is a picker for any other, yours or a remote's. Below the commits come the repository's tags. **Create tag…** tags the commit the folder has checked out: give it a name, and a message for an annotated tag, and choose a remote to push it to if you like.
 
 ### Branches & remotes <a id="branches--remotes"></a>
 

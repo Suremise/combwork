@@ -162,6 +162,8 @@
   "tips.forYouActions.title": "Mit einem Klick antworten",
   "tips.gitCheck.text": "Hilfe → Agent-Einrichtung… zeigt, welches Git Hive gefunden hat, und dessen Version. Worktree-Agenten, Mergen und die Git-Bereiche des Tabs „Versionsverwaltung“ brauchen Git for Windows 2.38 oder neuer.",
   "tips.gitCheck.title": "Ist Git bereit für Worktrees?",
+  "tips.gitHistory.text": "Versionsverwaltung → Verlauf öffnet den Branch, in den deine Arbeit gemergt wird. Wähle in der Überschrift einen anderen, deinen oder den eines Remotes, und blättere unter der Liste zu älteren Commits zurück.",
+  "tips.gitHistory.title": "Den Verlauf jedes Branches ansehen",
   "tips.gitInit.text": "Ein Projekt ohne Git? „Repository initialisieren…“ im Tab „Versionsverwaltung“ macht daraus ein Repository auf main, hält .hive heraus, legt auf Wunsch eine erste .gitignore an und erstellt den ersten Commit, damit Agenten sofort in Worktrees arbeiten können.",
   "tips.gitInit.title": "Ein Projekt mit einem Klick zum Git-Repository machen",
   "tips.gitRemotes.text": "Versionsverwaltung → Branches & Remotes: „Push nach…“ schickt diesen Branch oder alle Branches und Tags an ein beliebiges Remote, ohne zu ändern, was der Branch verfolgt. Dort lässt sich ein Remote auch umbenennen oder entfernen, und „Verfolgen“ eines Branches legt fest, was Pull und Push verwenden.",

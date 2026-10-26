@@ -1373,7 +1373,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'git:deleteBranches': (p, items, unmerged) => deleteBranches(p, Array.isArray(items) ? items : [], !!unmerged),
     'git:deleteRemoteBranches': (p, remote, items) => deleteRemoteBranches(p, String(remote ?? ''), Array.isArray(items) ? items : []),
     'git:branchDrops': (p, name) => branchDrops(p, String(name ?? '')),
-    'git:history': (p) => repoHistory(workspace.assertProject(p)),
+    'git:history': async (p, ref, page) => {
+      p = workspace.assertProject(p)
+      return repoHistory(p, { ref: typeof ref === 'string' ? ref : null, page: Number(page) || 1, workTarget: await workTargetOf(p) })
+    },
     'git:switch': (p, branch) => switchBranch(p, String(branch ?? '')),
     'git:createBranch': (p, name, stay) => createBranch(p, String(name ?? ''), !!stay),
     'git:addRemote': (p, name, url) => addRemote(p, String(name ?? ''), String(url ?? '')),

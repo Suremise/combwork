@@ -164,6 +164,8 @@ interface HiveMessageValues {
   'tips.forYouActions.title': undefined
   'tips.gitCheck.text': undefined
   'tips.gitCheck.title': undefined
+  'tips.gitHistory.text': undefined
+  'tips.gitHistory.title': undefined
   'tips.gitInit.text': undefined
   'tips.gitInit.title': undefined
   'tips.gitRemotes.text': undefined

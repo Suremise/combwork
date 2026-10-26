@@ -268,7 +268,14 @@ export function DataTable<T>({
       </div>
       {/* Also on one page while there are more rows than the fewest per page, so a bigger size can be made smaller again. */}
       {(view.pages > 1 || view.matched > Math.min(...pageSizes)) && (
-        <div className="table-paging" role="navigation" aria-label={tr(msg({ id: 'shell.table.pages', defaultMessage: 'Pages', description: "The name, for screen readers, of a table's page controls." }))}>
+        <Pager
+          page={view.page}
+          pages={view.pages}
+          from={view.from}
+          to={view.to}
+          total={view.matched}
+          onPage={setPage}
+          before={
           <label className="table-page-size">
             {tr(msg({ id: 'shell.table.rowsPerPage', defaultMessage: 'Rows per page', description: "Beside a table's choice of how many rows a page shows." }))}
             <select className="select" value={pageSize} onChange={(e) => setSize(Number(e.target.value))}>
@@ -279,19 +286,32 @@ export function DataTable<T>({
               ))}
             </select>
           </label>
-          <span className="faint table-range">
-            {tr(msg({ id: 'shell.table.range', defaultMessage: '{from, number}–{to, number} of {total, number}', description: 'Under a table: which of its rows the page shows.' }), { from: view.from, to: view.to, total: view.matched })}
-          </span>
-          <div className="grow" />
-          <PageButton label="«" title={tr(msg({ id: 'shell.table.first', defaultMessage: 'First page', description: "A table's button: its first page." }))} disabled={view.page === 1} onClick={() => setPage(1)} />
-          <IconButton icon="chevron-left" title={tr(msg({ id: 'shell.table.previous', defaultMessage: 'Previous page', description: "A table's button." }))} disabled={view.page === 1} onClick={() => setPage(view.page - 1)} />
-          <span className="table-page">
-            {tr(msg({ id: 'shell.table.page', defaultMessage: 'Page {page, number} of {pages, number}', description: 'Under a table: which page it shows.' }), { page: view.page, pages: view.pages })}
-          </span>
-          <IconButton icon="chevron-right" title={tr(msg({ id: 'shell.table.next', defaultMessage: 'Next page', description: "A table's button." }))} disabled={view.page === view.pages} onClick={() => setPage(view.page + 1)} />
-          <PageButton label="»" title={tr(msg({ id: 'shell.table.last', defaultMessage: 'Last page', description: "A table's button: its last page." }))} disabled={view.page === view.pages} onClick={() => setPage(view.pages)} />
-        </div>
+          }
+        />
       )}
+    </div>
+  )
+}
+
+/**
+ * A table's page controls (DataTable's, and Git → History's, #1643): which rows the page shows, then first, previous,
+ * "Page n of m", next and last. `before`: what comes first (DataTable's rows per page).
+ */
+export function Pager({ page, pages, from, to, total, onPage, before }: { page: number; pages: number; from: number; to: number; total: number; onPage: (page: number) => void; before?: React.ReactNode }) {
+  return (
+    <div className="table-paging" role="navigation" aria-label={tr(msg({ id: 'shell.table.pages', defaultMessage: 'Pages', description: "The name, for screen readers, of a table's page controls." }))}>
+      {before}
+      <span className="faint table-range">
+        {tr(msg({ id: 'shell.table.range', defaultMessage: '{from, number}–{to, number} of {total, number}', description: 'Under a table: which of its rows the page shows.' }), { from, to, total })}
+      </span>
+      <div className="grow" />
+      <PageButton label="«" title={tr(msg({ id: 'shell.table.first', defaultMessage: 'First page', description: "A table's button: its first page." }))} disabled={page === 1} onClick={() => onPage(1)} />
+      <IconButton icon="chevron-left" title={tr(msg({ id: 'shell.table.previous', defaultMessage: 'Previous page', description: "A table's button." }))} disabled={page === 1} onClick={() => onPage(page - 1)} />
+      <span className="table-page">
+        {tr(msg({ id: 'shell.table.page', defaultMessage: 'Page {page, number} of {pages, number}', description: 'Under a table: which page it shows.' }), { page, pages })}
+      </span>
+      <IconButton icon="chevron-right" title={tr(msg({ id: 'shell.table.next', defaultMessage: 'Next page', description: "A table's button." }))} disabled={page === pages} onClick={() => onPage(page + 1)} />
+      <PageButton label="»" title={tr(msg({ id: 'shell.table.last', defaultMessage: 'Last page', description: "A table's button: its last page." }))} disabled={page === pages} onClick={() => onPage(pages)} />
     </div>
   )
 }

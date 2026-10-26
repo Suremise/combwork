@@ -162,6 +162,8 @@
   "tips.forYouActions.title": "Odpowiedz jednym kliknięciem",
   "tips.gitCheck.text": "Pomoc → Konfiguracja agentów… pokazuje, jakiego gita znalazł Hive i w jakiej wersji. Agenci w worktree, scalanie i sekcje Git zakładki Kontrola wersji wymagają Git for Windows 2.38 lub nowszego.",
   "tips.gitCheck.title": "Czy git jest gotowy na worktree?",
+  "tips.gitHistory.text": "Kontrola wersji → Historia otwiera się na gałęzi, z którą scalana jest twoja praca. Wybierz inną w nagłówku, swoją lub zdalną, i cofaj się do starszych commitów pod listą.",
+  "tips.gitHistory.title": "Historia dowolnej gałęzi",
   "tips.gitInit.text": "Projekt bez gita? Zainicjuj repozytorium… w jego zakładce Kontrola wersji tworzy repozytorium na gałęzi main, wyklucza .hive, dodaje startowy .gitignore, jeśli chcesz, i robi pierwszy commit, więc agenci od razu mogą pracować w worktree.",
   "tips.gitInit.title": "Repozytorium git z projektu jednym kliknięciem",
   "tips.gitRemotes.text": "Kontrola wersji → Gałęzie i zdalne repozytoria: „Wypchnij do…” wysyła tę gałąź albo wszystkie gałęzie i tagi do dowolnego zdalnego repozytorium, nie zmieniając tego, co śledzi gałąź. Można tam też zmienić nazwę zdalnego repozytorium lub je usunąć, a „Śledź” przy gałęzi wybiera, czego używają „Ściągnij” i „Wypchnij”.",

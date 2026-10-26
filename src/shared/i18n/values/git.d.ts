@@ -55,11 +55,15 @@ interface HiveMessageValues {
   'git.form.enterName': undefined
   'git.head.detachedAt': { commit: string | number }
   'git.head.noCommits': undefined
+  'git.history.branch': undefined
   'git.history.heading': undefined
   'git.history.headingOf': { head: string | number }
   'git.history.loadTarget': undefined
+  'git.history.local': undefined
   'git.history.noCommits': undefined
+  'git.history.option': { kind: string; branch: string | number }
   'git.history.reload': undefined
+  'git.history.remote': undefined
   'git.hiveVcs.checking': undefined
   'git.hiveVcs.dismiss': undefined
   'git.hiveVcs.exclude': undefined

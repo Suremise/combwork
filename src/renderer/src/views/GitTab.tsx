@@ -1,7 +1,7 @@
 import { Children, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
-import { GIT_VIEW_GUIDE, folderBusy, gitStatusText, gitStatusTip, headText, type GitFolderAction, type GitHistory, type GitRepoSummary } from '@shared/gitRepo'
+import { GIT_VIEW_GUIDE, HISTORY_COMMITS, folderBusy, gitStatusText, gitStatusTip, headText, type GitFolderAction, type GitHistory, type GitRepoSummary } from '@shared/gitRepo'
 import { gitFixText, gitProblemText } from '@shared/gitTool'
 import type { HiveRequests } from '@shared/api'
 import { call, errorMessage } from '../api'
@@ -15,6 +15,7 @@ import { cx, timeAgo } from '../util'
 import { projectSlots, useMergeSlots } from '../components/MergeSlots'
 import { BusyButton, Icon, IconButton, LoadFailed, Modal, StaleNote, Tooltip, useBusy } from '../components/ui'
 import { InitRepoButton } from '../components/InitRepo'
+import { Pager } from '../components/DataTable'
 
 /** A message with markup, as React children (keyed, so a list of parts renders without warnings). */
 export const rich = (m: Msg, values: Parameters<typeof tRich<React.ReactNode>>[1]): React.ReactNode[] => Children.toArray(tRich<React.ReactNode>(m, values))
@@ -31,7 +32,11 @@ export const GIT_TEXT = {
   retry: msg({ id: 'git.retry', defaultMessage: 'Retry', description: 'Button: reads git again.' }),
   reading: msg({ id: 'git.reading', defaultMessage: 'Reading git…', description: "A Git tab section while it reads git for the first time." }),
   historyLoad: msg({ id: 'git.history.loadTarget', defaultMessage: 'the history', description: 'What could not be read in Git → History: shown in "Could not load {what}: {error}" and "Could not refresh {what}; last updated …".' }),
-  historyOf: msg({ id: 'git.history.headingOf', defaultMessage: 'History <faint>of {head}</faint>', description: 'Heading of Git → History. {head} is the branch checked out (or "detached at abc1234"). <faint> is the part shown dimmed.' }),
+  historyOf: msg({ id: 'git.history.headingOf', defaultMessage: 'History <faint>of {head}</faint>', description: 'Heading of Git → History. {head} is the branch shown, a drop-down to choose another (or "detached at abc1234"). <faint> is the part shown dimmed.' }),
+  historyBranch: msg({ id: 'git.history.branch', defaultMessage: 'Branch to show', description: "The name, for screen readers, of Git → History's branch picker (in its heading)." }),
+  historyLocal: msg({ id: 'git.history.local', defaultMessage: 'Branches', description: "A group in Git → History's branch picker: the repository's own branches." }),
+  historyRemote: msg({ id: 'git.history.remote', defaultMessage: 'Remote branches', description: "A group in Git → History's branch picker: the remotes' branches (origin/x)." }),
+  historyOption: msg({ id: 'git.history.option', defaultMessage: '{kind, select, target {{branch} · target} folder {{branch} · project folder} other {{branch}}}', description: "A branch in Git → History's branch picker: the branch the project's work merges into (target), the one the project folder has checked out, or another. Keep the select keys." }),
   historyHeading: msg({ id: 'git.history.heading', defaultMessage: 'History', description: 'Heading of Git → History, before the branch is known.' }),
   readHistoryAgain: msg({ id: 'git.history.reload', defaultMessage: 'Read the history again', description: 'Tooltip on the refresh button in Git → History.' }),
   noCommits: msg({ id: 'git.history.noCommits', defaultMessage: 'No commits yet.', description: 'Git → History when the repository has no commit.' }),
@@ -63,20 +68,25 @@ const M = GIT_TEXT
  * pulling is refused while an agent works there or holds its merge slot.
  */
 
+/** A read with no arguments but the project (stable: it is in an effect's dependencies). */
+const NO_ARGS: readonly (string | number | null)[] = []
+
 export const at = (ms: number | null): string | null => (ms ? timeAgo(new Date(ms).toISOString()) : null)
 
 /**
  * Reads a Git channel for the project: again when the project's git changes here, its agents work, the window gets
  * focus, or on `reload`; the last answer stays while it does.
  */
-export function useGitRead<C extends 'git:summary' | 'git:info' | 'git:history'>(channel: C, project: ProjectInfo): { data: Awaited<ReturnType<HiveRequests[C]>> | null; error: string | null; loading: boolean; at: number; reload: () => void } {
+export function useGitRead<C extends 'git:summary' | 'git:info' | 'git:history'>(channel: C, project: ProjectInfo, args: readonly (string | number | null)[] = NO_ARGS): { data: Awaited<ReturnType<HiveRequests[C]>> | null; error: string | null; loading: boolean; at: number; reload: () => void } {
   type T = Awaited<ReturnType<HiveRequests[C]>>
   const version = useStore((s) => s.gitVersion[project.path] ?? 0)
   const usage = useStore((s) => s.usageVersion[project.path] ?? 0)
-  const [state, setState] = useState<GitReadState<T>>({ for: project.path, data: null, error: null, loading: true, at: 0 })
+  // A read is the project's with its arguments (History's branch and page, #1643): another's answer never shows for it.
+  const key = args.length ? JSON.stringify([project.path, ...args]) : project.path
+  const [state, setState] = useState<GitReadState<T>>({ for: key, data: null, error: null, loading: true, at: 0 })
   // One read at a time, those asked meanwhile one more after it (#1366, gitReads.ts).
-  const reader = useMemo(() => gitReader<T>((path) => (call as (c: C, p: string) => Promise<T>)(channel, path), setState, errorMessage), [channel])
-  const reload = useCallback(() => reader(project.path), [reader, project.path])
+  const reader = useMemo(() => gitReader<T>((k) => (call as (c: C, ...a: unknown[]) => Promise<T>)(channel, ...(k.startsWith('[') ? (JSON.parse(k) as unknown[]) : [k])), setState, errorMessage), [channel])
+  const reload = useCallback(() => reader(key), [reader, key])
   useEffect(reload, [reload, version, usage, project.branch])
   // What the user did in a terminal meanwhile (a commit, git init) shows on coming back to the window.
   useEffect(() => {
@@ -84,7 +94,7 @@ export function useGitRead<C extends 'git:summary' | 'git:info' | 'git:history'>
     return () => window.removeEventListener('focus', reload)
   }, [reload])
   // Another project's answer never shows for this one.
-  const mine = state.for === project.path
+  const mine = state.for === key
   return { data: mine ? state.data : null, error: mine ? state.error : null, loading: !mine || state.loading, at: mine ? state.at : 0, reload }
 }
 
@@ -170,15 +180,46 @@ export function Loading<T>({ read, what, children }: { read: { data: T | null; e
 // ---------------------------------------------------------------------------
 
 export function HistorySection({ project, summary }: { project: ProjectInfo; summary: GitRepoSummary | null }) {
-  const read = useGitRead('git:history', project)
+  // The branch chosen (null: the default, the project's target) and the page, the project's own (#1643).
+  const [pick, setPick] = useState<{ for: string; ref: string | null; page: number }>({ for: project.path, ref: null, page: 1 })
+  const mine = pick.for === project.path ? pick : { for: project.path, ref: null, page: 1 }
+  const raw = useGitRead('git:history', project, [mine.ref, mine.page])
+  // The last page stays while another page or branch is read: no blank between them.
+  const [last, setLast] = useState<{ for: string; data: GitHistory } | null>(null)
+  useEffect(() => {
+    if (raw.data) setLast({ for: project.path, data: raw.data })
+  }, [raw.data, project.path])
+  const read = { ...raw, data: raw.data ?? (last?.for === project.path ? last.data : null) }
   const [form, setForm] = useState<OpenForm | null>(null)
   useNow(60000)
+  const optionText = (h: GitHistory, b: string): string => tr(M.historyOption, { branch: b, kind: b === h.target ? 'target' : b === summary?.branch ? 'folder' : 'other' /* i18n-ignore: a select's key, never shown */ })
+  const picker = (h: GitHistory): React.ReactNode => (
+    <select className="select git-history-branch" aria-label={tr(M.historyBranch)} data-history-branch="" value={h.ref ?? ''} onChange={(e) => setPick({ for: project.path, ref: e.target.value || null, page: 1 })}>
+      {!h.ref && <option value="">{summary ? headText(summary) : ''}</option>}
+      <optgroup label={tr(M.historyLocal)}>
+        {h.branches.map((b) => (
+          <option key={b} value={b}>
+            {optionText(h, b)}
+          </option>
+        ))}
+      </optgroup>
+      {h.remoteBranches.length > 0 && (
+        <optgroup label={tr(M.historyRemote)}>
+          {h.remoteBranches.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </optgroup>
+      )}
+    </select>
+  )
   return (
     <Loading read={read} what={tr(M.historyLoad)}>
       {(h: GitHistory) => (
-        <div className="git-history" data-git-history="">
+        <div className="git-history" data-git-history="" data-history-ref={h.ref ?? ''} data-history-page={h.page}>
           <h2 className="section git-section-head">
-            {summary ? rich(M.historyOf, { head: headText(summary), faint }) : tr(M.historyHeading)}
+            {rich(M.historyOf, { head: picker(h), faint })}
             <span className="git-section-actions">
               <IconButton icon={read.loading ? 'loading' : 'refresh'} spin={read.loading} title={tr(M.readHistoryAgain)} action="reload-history" onClick={read.reload} />
             </span>
@@ -205,6 +246,7 @@ export function HistorySection({ project, summary }: { project: ProjectInfo; sum
               ))}
             </div>
           )}
+          {h.pages > 1 && <Pager page={h.page} pages={h.pages} from={(h.page - 1) * HISTORY_COMMITS + 1} to={Math.min(h.page * HISTORY_COMMITS, h.total)} total={h.total} onPage={(page) => setPick({ ...mine, page })} />}
           <h2 className="section git-section-head">
             {tr(M.tags)} <span className="badge">{h.tags.length + h.moreTags}</span>
             <span className="git-section-actions">

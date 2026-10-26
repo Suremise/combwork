@@ -187,14 +187,28 @@ export interface GitTagRow {
 }
 
 export interface GitHistory {
-  /** The project folder's last commits, newest first (HISTORY_COMMITS). */
+  /** A page of the branch's commits, newest first (HISTORY_COMMITS a page). */
   commits: GitCommitRow[]
+  /** The branch shown (local, or remote as origin/x), null for a detached HEAD (#1643). */
+  ref: string | null
+  /** What it shows unless another is chosen: the project's target when it is a branch here, else the folder's. */
+  defaultRef: string | null
+  /** The project's target when it is a branch here. */
+  target: string | null
+  /** The branches it can show, by name: local, and remote ones. */
+  branches: string[]
+  remoteBranches: string[]
+  /** Which page, of how many, of how many commits in all. */
+  page: number
+  pages: number
+  total: number
   /** Newest first, at most HISTORY_TAGS. */
   tags: GitTagRow[]
   /** Tags not listed. */
   moreTags: number
 }
 
+/** Git → History's commits a page (#1643). */
 export const HISTORY_COMMITS = 20
 export const HISTORY_TAGS = 50
 /** Branches listed (local and remote, each); the rest are counted. */
