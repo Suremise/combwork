@@ -768,3 +768,121 @@ describe('workflow scenarios, Git', () => {
     expect((e.store.facts(card.id).find((f) => f.kind === 'Verdict')!.data as FactData['Verdict']).revision).toBe(s.latest!.revision)
   })
 })
+
+describe("a follow-up the reviewer OK'd is what its pass covers (HI-1763)", () => {
+  const reviewer = (who = 'R1') => ({ waitMinutes: 30, reviewer: async () => who })
+  const head = (folder: string): string => sh(folder, 'rev-parse', 'HEAD').trim()
+  /** The builder posts a follow-up (its pinned revision, as the reply gives it); the reviewer OKs it. */
+  async function followUpOk(e: Env, key: string, by = R1, who = 'R1'): Promise<string> {
+    const posted = await e.wf.loopStep(key, B1, 'followUp', 'One more assertion', reviewer(who))
+    moved(posted)
+    const data = (posted as { data?: Record<string, unknown> }).data!
+    moved(await e.wf.loopStep(key, by, 'ok', 'Checked', { ...reviewer(who), design: data.design as string }))
+    return data.revision as string
+  }
+
+  it("HI-1737's sequence: a follow-up commit in Review, OK'd, then the pass: queued at the follow-up's commit, no Stale", async () => {
+    const e = pair()
+    const { card, folder } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    const submitted = e.wf.state(card).latest!.revision!
+    moved(await e.wf.startReview(card.key, R1))
+    commit(folder, { 'tests/fix.test.txt': 'one more assertion\n' }, 'follow-up')
+    const pinned = await followUpOk(e, card.key)
+    expect(pinned).toBe(head(folder))
+    expect(pinned).not.toBe(submitted)
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'good' }))
+    const s = e.wf.state(card)
+    expect(s.stale).toBeNull()
+    expect(s.approved?.revision).toBe(pinned)
+    expect(s.stage).toBe('merging')
+    expect(s.entries.at(-1)).toMatchObject({ state: 'open', revision: pinned })
+    expect(e.kinds(card.id)).toContain('CarriedOver')
+  })
+
+  it("a commit past the OK'd one: stale, and the builder told at once what the pass is for and what to submit; the card's merge line says so", async () => {
+    const e = pair()
+    const { card, folder } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    const submitted = e.wf.state(card).latest!.revision!
+    moved(await e.wf.startReview(card.key, R1))
+    commit(folder, { 'tests/fix.test.txt': 'one more assertion\n' }, 'follow-up')
+    await followUpOk(e, card.key)
+    commit(folder, { 'src/more.txt': 'unreviewed\n' }, 'after the check')
+    const now = head(folder)
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'good' }))
+    const s = e.wf.state(card)
+    expect(s).toMatchObject({ stage: 'approved', stale: { approved: submitted, current: now, why: 'change' } })
+    expect(e.wakes.some((w) => w.agent === 'B1' && w.why === `${card.key}: its pass is for ${submitted.slice(0, 7)}, but its line is at ${now.slice(0, 7)} (changed since): submit ${now.slice(0, 7)} for review (hive_submit).`)).toBe(true)
+    expect(e.wf.queueLineOf(card.key)).toContain(`Its pass is for ${submitted.slice(0, 7)}, but its line is at ${now.slice(0, 7)}`)
+    expect(refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges').next).toBe(`Its pass is stale: its line changed since it was approved (it is at ${now.slice(0, 7)}). Submit it again for review; it is queued once that is approved.`)
+    expect(await e.queue().runOnce('main')).toBeNull()
+  })
+
+  it("the head moved after the verdict read it and before its write: refused (evidence changed), nothing carried; given again, stale", async () => {
+    const e = pair()
+    const { card, folder } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    moved(await e.wf.startReview(card.key, R1))
+    commit(folder, { 'tests/fix.test.txt': 'one more assertion\n' }, 'follow-up')
+    await followUpOk(e, card.key)
+    e.wf.cfg.hooks = {
+      beforeWrite: async (move) => {
+        if (move !== 'verdict') return
+        e.wf.cfg.hooks = {}
+        commit(folder, { 'src/late.txt': 'late\n' }, 'late')
+      }
+    }
+    refusedBy(await e.wf.verdict(card.key, R1, { pass: true, comment: 'good' }), 'evidence.changed')
+    expect(e.wf.state(card)).toMatchObject({ stage: 'review' })
+    expect(e.kinds(card.id)).not.toContain('CarriedOver')
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'good' }))
+    expect(e.wf.state(card).stale?.current).toBe(head(folder))
+  })
+
+  it("two reviewers: A passed the submitted revision, B OKs the follow-up and gives the final pass: A's old pass doesn't count, so it is stale", async () => {
+    const e = pair({}, { reviewers: 2 })
+    const { card, folder } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    const submitted = e.wf.state(card).latest!.revision!
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'A: good' }))
+    moved(await e.wf.startReview(card.key, R2))
+    commit(folder, { 'tests/fix.test.txt': 'one more assertion\n' }, 'follow-up')
+    const pinned = await followUpOk(e, card.key, R2, 'R2')
+    moved(await e.wf.verdict(card.key, R2, { pass: true, comment: 'B: good' }))
+    const s = e.wf.state(card)
+    expect(s).toMatchObject({ stage: 'approved', stale: { approved: submitted, current: pinned } })
+    expect(e.kinds(card.id)).not.toContain('CarriedOver')
+    expect(e.wakes.some((w) => w.agent === 'B1' && w.why.includes(`submit ${pinned.slice(0, 7)} for review`))).toBe(true)
+  })
+
+  it("in Approved: a follow-up OK'd by the reviewer who passed it carries the approval to it and queues it there", async () => {
+    const e = pair()
+    const { card, folder } = await approved(e)
+    expect(e.wf.state(card).stage).toBe('merging')
+    commit(folder, { 'tests/fix.test.txt': 'one more assertion\n' }, 'follow-up')
+    const pinned = await followUpOk(e, card.key)
+    const s = e.wf.state(card)
+    expect(s.stale).toBeNull()
+    expect(s.approved?.revision).toBe(pinned)
+    expect(s.stage).toBe('merging')
+    expect(s.entries.at(-1)).toMatchObject({ state: 'open', revision: pinned })
+  })
+
+  it("in Approved with two reviewers: one reviewer's ok doesn't extend the other's pass: stale, the builder told", async () => {
+    const e = pair({}, { reviewers: 2 })
+    const { card, folder } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'A' }))
+    moved(await e.wf.startReview(card.key, R2))
+    moved(await e.wf.verdict(card.key, R2, { pass: true, comment: 'B' }))
+    expect(e.wf.state(card).stage).toBe('merging')
+    commit(folder, { 'tests/fix.test.txt': 'one more assertion\n' }, 'follow-up')
+    const pinned = await followUpOk(e, card.key)
+    const s = e.wf.state(card)
+    expect(s).toMatchObject({ stage: 'approved', stale: { current: pinned } })
+    expect(s.entries.at(-1)?.state).toBe('cancelled')
+  })
+})

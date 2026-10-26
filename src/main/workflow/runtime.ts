@@ -10,7 +10,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, atRoundLimit, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, atRoundLimit, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, passesCover, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
@@ -29,7 +29,7 @@ import { NonePlatform } from '../platform/nonePlatform'
 import { isUnknown, unknown, type Maybe } from '../platform/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
-import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
+import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, staleWake, type QueueLive } from './queueState'
 
 import { ownRuleset, reviewSkipOf } from '../../shared/workflow/workView'
 
@@ -1333,7 +1333,12 @@ export class Workflow {
     // The head moved since the submission (a card with its own line): same change or not (§16.4.4).
     const before = await this.evidenceOf(card, s, r.options)
     const moved = args.pass && sub?.revision ? await this.platform(r.options).headMoved(card, s, r.options, { base: sub.base, revision: sub.revision, key: sub.key }) : null
-    const fin = args.pass ? await this.finishInputs(card, s, r, moved?.same ? moved.to : sub?.revision) : {}
+    // HI-1763: a head the reviewers' checks of a follow-up cover (passesCover: this verdict's reviewer's binding ok of the
+    // follow-up pinned there, and every other pass counted covering it too) carries the pass to it; checked again under
+    // the write.
+    const covered = (st: CardState): boolean => !!moved && !moved.same && passesCover(st, moved.to, r.options.reviewers, agent)
+    const carry = covered(s)
+    const fin = args.pass ? await this.finishInputs(card, s, r, moved?.same || carry ? moved!.to : sub?.revision) : {}
     // HI-1734: a code card passing with nothing to merge (its change already in its target: HI-1449's checks only, which
     // others' merges had superseded) is proposed no code. Read before the write; unknown is no proposal.
     const merged = args.pass && card.kind === 'code' && sub?.revision && sub.base && s.started?.target && !this.store.facts(card.id).some((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided') ? await this.platform(r.options).contains(s.started.target, { base: sub.base, revision: sub.revision, key: sub.key }) : null
@@ -1354,6 +1359,8 @@ export class Workflow {
       // Refused after the review it started: undone whole (writeWhole), the review start too.
       if (bad) return args.startReview ? undo(bad) : bad
       const st = w.state()
+      // What the carry was decided on changed meanwhile (an ok, a decision, a pass): gathered again.
+      if (args.pass && covered(st) !== carry) return { rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal
       w.fact('Verdict', { reviewer: agent ?? 'user', submission: subId!, revision: sub?.revision ?? null, pass: args.pass, ...(args.failKind ? { failKind: args.failKind } : {}), round: args.pass ? st.rounds : st.rounds + 1, generation: agent ? (st.received[agent] ?? 0) : st.generation, comment: args.comment }) // i18n-ignore: a fact's kind and codes, not text
       // HI-1734: a code card passing with nothing to merge is proposed no code, as an agent's proposal is (the user
       // confirms; then it finishes with nothing to merge). HI-1449 sat in Approved for two days. Once only: not after a
@@ -1367,13 +1374,15 @@ export class Workflow {
         this.askAtLimit(w)
         return null
       }
-      if (moved && !moved.same) {
+      if (moved && !moved.same && !carry) {
         w.fact('Stale', { approved: sub!.revision, current: moved.to, why: r.options.sameness === 'exact' ? 'exact' : 'change' }) // i18n-ignore: a fact's kind and codes, not text
         if (hasStage(r, 'approved')) w.move('approved', 'derived')
-        this.wake(w, st.started?.builder, 'stale: submit again') // i18n-ignore: a wake, agent-facing
+        this.wake(w, st.started?.builder, staleWake(card.key, sub!.revision, moved.to))
         return null
       }
       if (moved?.same) w.fact('CarriedOver', { from: sub!.revision!, to: moved.to, toBase: moved.base, how: 'replay' })
+      // HI-1763: the follow-up the reviewers checked is what they passed.
+      if (moved && carry) w.fact('CarriedOver', { from: sub!.revision!, to: moved.to, toBase: moved.base, how: 'followUp' })
       const now = w.state()
       if (passingReviewers(now).length < r.options.reviewers) return null
       if (reviewByYou(r.options.review) && !approvedByUser(now, 'review')) {
@@ -1538,6 +1547,7 @@ export class Workflow {
     const values: Record<string, string | number> = { card: card.key, queue: q.state }
     if (q.state === 'queued' || q.state === 'testing' || q.state === 'paused') values.target = q.target
     if (q.state === 'queued') values.n = q.position
+    if (q.state === 'stale') values.current = (q.current ?? '').slice(0, 7)
     // What the pause waits for (#1406): the refusal's next step says it.
     if (q.state === 'paused') values.waits = pauseWait(q.reason, q.stuck)
     return { rule: 'merge.hiveMerges', values }
@@ -1616,7 +1626,14 @@ export class Workflow {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
-    let posted: { design: string; until?: string } | null = null
+    // HI-1763: a follow-up pins the line's head it asks to be checked (read before the write; the evidence checked again
+    // under it, so a head moved meanwhile refuses: post it again).
+    const r0 = s.started ? this.rulesetOf(card, s) : null
+    const before = step === 'followUp' && r0 ? await this.evidenceOf(card, s, r0.options) : null
+    const from = s.approved?.revision ?? s.latest?.revision ?? null
+    const head = step === 'followUp' && r0 && from && s.latest ? await this.platform(r0.options).headMoved(card, s, r0.options, { base: s.approved?.base ?? s.latest.base, revision: from, key: s.latest.key }) : null
+    const pin = step === 'followUp' && from ? (head ? { revision: head.to, base: head.base } : { revision: from, base: s.approved?.base ?? s.latest?.base ?? null }) : null
+    let posted: { design: string; until?: string; revision?: string } | null = null
     const refused = await this.write(
       card,
       s.started ? this.rulesetOf(card, s) : null,
@@ -1648,6 +1665,8 @@ export class Workflow {
             if (step === 'proceed' && due > at) return { rule: 'loop.tooEarly', values: { card: card.key, minutes: Math.ceil((due - at) / 60_000) } } as GuardRefusal
           }
         }
+        const moved = before && r0 ? this.evidenceChanged(w, r0.options, before) : null
+        if (moved) return moved
         if (step === 'design') {
           posted = { design: `${card.key}/s${now.lastSeq + 1}`, until: new Date(at + opts.waitMinutes * 60_000).toISOString() }
           w.fact('LoopStep', { step, text, ...posted, waitMinutes: opts.waitMinutes })
@@ -1659,15 +1678,27 @@ export class Workflow {
             w.fact('IntegrationCancelled', { entry: open.id, reason: 'followUp' }) // i18n-ignore: a fact's kind and codes, not text
             if (w.current === 'merging') w.move('approved', 'derived')
           }
-          posted = { design: `${card.key}/s${w.state().lastSeq + 1}` }
-          w.fact('LoopStep', { step, text, ...posted })
+          posted = { design: `${card.key}/s${w.state().lastSeq + 1}`, ...(pin ? { revision: pin.revision } : {}) }
+          w.fact('LoopStep', { step, text, design: posted.design, ...(pin && now.latest ? { revision: pin.revision, base: pin.base, submission: now.latest.id, generation: now.generation } : {}) })
         } else {
           const about = opts.design ?? now.step?.id
-          w.fact('LoopStep', { step, text, ...(about ? { design: about } : {}), ...(now.step ? { of: now.step.step } : {}) })
-          // A follow-up checked on an approved card where Hive merges (#1623): queued again while its pass holds.
+          // An ok of a follow-up that pinned a revision binds to it (HI-1763): that revision, its round and generation.
+          const pinned = step === 'ok' && now.step?.step === 'followUp' && now.step.revision && now.step.submission !== undefined && now.step.generation !== undefined ? { revision: now.step.revision, base: now.step.base ?? null, submission: now.step.submission, generation: now.step.generation } : null
+          w.fact('LoopStep', { step, text, ...(about ? { design: about } : {}), ...(now.step ? { of: now.step.step } : {}), ...pinned })
           const r = w.ruleset
+          // A follow-up checked on an approved card (#1623) whose pinned revision isn't the approved one (HI-1763): the
+          // approval moves to it only when every pass counted covers it (passesCover), else it is stale, its builder told.
+          const approvedNow = w.state()
+          if (pinned && r && w.current === 'approved' && approvedNow.approved?.revision && pinned.revision !== approvedNow.approved.revision) {
+            if (passesCover(approvedNow, pinned.revision, r.options.reviewers)) w.fact('CarriedOver', { from: approvedNow.approved.revision, to: pinned.revision, toBase: pinned.base, how: 'followUp' })
+            else {
+              w.fact('Stale', { approved: approvedNow.approved.revision, current: pinned.revision, why: r.options.sameness === 'exact' ? 'exact' : 'change' }) // i18n-ignore: a fact's kind and codes, not text
+              this.wake(w, now.started?.builder, staleWake(card.key, approvedNow.approved.revision, pinned.revision))
+            }
+          }
+          // A follow-up checked on an approved card where Hive merges (#1623): queued again while its pass holds.
           const after = w.state()
-          if (step === 'ok' && now.step?.step === 'followUp' && r?.options.finish === 'hiveMerges' && w.current === 'approved' && !openEntry(after) && !notApproved(after, r, card.labels)) this.enqueue(w)
+          if (step === 'ok' && now.step?.step === 'followUp' && r?.options.finish === 'hiveMerges' && w.current === 'approved' && !after.stale && !openEntry(after) && !notApproved(after, r, card.labels)) this.enqueue(w)
         }
         // Its words are the fact's (loopWakes.ts' aboutOf); `why` is the action's own note.
         if (side === 'builder') this.wake(w, reviewer ?? 'reviewers', `${card.key}: ${step}`) // i18n-ignore: a wake, agent-facing
@@ -1677,8 +1708,8 @@ export class Workflow {
       opts.reviewer
     )
     if (refused) return this.refuse(card, actor, 'loop step', refused) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
-    const p = posted as { design: string; until?: string } | null
-    return this.ok(card, s.stage, s.stage, p ? { design: p.design, ...(p.until ? { until: p.until, waitMinutes: opts.waitMinutes } : {}) } : undefined)
+    const p = posted as { design: string; until?: string; revision?: string } | null
+    return this.ok(card, s.stage, s.stage, p ? { design: p.design, ...(p.until ? { until: p.until, waitMinutes: opts.waitMinutes } : {}), ...(p.revision ? { revision: p.revision } : {}) } : undefined)
   }
 
   /**

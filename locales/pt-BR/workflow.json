@@ -251,6 +251,7 @@
   "workflow.refused.merge.hiveMerges.nextPausedRules": "Ele está na fila de merge de {target}, que foi pausada enquanto as regras do fluxo de trabalho não eram aplicadas e continua quando elas voltarem a ser aplicadas (se já forem, quando o usuário retomá-la): espere por Concluído ou que ele volte.",
   "workflow.refused.merge.hiveMerges.nextQueued": "Ele está na fila de merge de {target} (posição {n, number}) e vai para Concluído após o merge: espere por isso ou que ele volte.",
   "workflow.refused.merge.hiveMerges.nextReturned": "Ele voltou da fila de merge: corrija no seu worktree, faça commit e envie de novo.",
+  "workflow.refused.merge.hiveMerges.nextStale": "A aprovação está desatualizada: a branch mudou desde que foi aprovada (agora está em {current}). Envie de novo para revisão; ele entra na fila assim que for aprovado.",
   "workflow.refused.merge.hiveMerges.nextTesting": "A fila de merge está fazendo o merge dele em {target} agora e o move para Concluído depois: espere por isso ou que ele volte.",
   "workflow.refused.move.needsOverride.change": "Essas regras são definidas em Controle de versão, onde o usuário pode alterá-las.",
   "workflow.refused.move.needsOverride.message": "Mover o cartão {card} para {stage} pula estas regras: {rules}.",

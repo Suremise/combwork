@@ -251,6 +251,7 @@
   "workflow.refused.merge.hiveMerges.nextPausedRules": "它在 {target} 的合并队列中，该队列在未强制执行工作流程规则时暂停，重新强制执行规则后会继续（如果规则已在强制执行，则在用户恢复后继续）：请等待它进入“已完成”，或等它被退回。",
   "workflow.refused.merge.hiveMerges.nextQueued": "它在 {target} 的合并队列中（第 {n, number} 位），合并后移到“已完成”：请等待，或等它被退回。",
   "workflow.refused.merge.hiveMerges.nextReturned": "它已从合并队列退回：请在你的工作树中修复、提交，然后重新提交。",
+  "workflow.refused.merge.hiveMerges.nextStale": "它的通过已过期：批准后其分支已有变化（现在位于 {current}）。请重新提交评审；获批后即进入队列。",
   "workflow.refused.merge.hiveMerges.nextTesting": "合并队列正在将它合并到 {target}，完成后移到“已完成”：请等待，或等它被退回。",
   "workflow.refused.move.needsOverride.change": "这些规则在“版本控制”中设置，用户可以在那里更改。",
   "workflow.refused.move.needsOverride.message": "将 {card} 移到“{stage}”会跳过以下规则：{rules}。",

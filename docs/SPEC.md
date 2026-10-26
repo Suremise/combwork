@@ -1395,7 +1395,7 @@ that can't be written fails the change whole.
 | `CheckRan` | name, command, revision, result (passed/failed/stopped), run id, duration, by, counted (bool), why not counted | A run naming the card finishes (§16.13, P3) [#1119 c]. |
 | `ReviewStarted` | reviewer, submission id, revision, review copy | The start-review intent (§16.8.1). |
 | `Verdict` | reviewer, submission id, revision, pass/fail, kind of fail (content / explanation), round, decision generation the reviewer had received, comment id | The verdict intent passes. |
-| `CarriedOver` | from revision, to revision, how (replay, same revision) | A pass is kept for a later revision that is the same change; with same revision, a stale pass holds again once its line is back at exactly the approved revision (#1623). |
+| `CarriedOver` | from revision, to revision, how (replay, same revision, follow-up) | A pass is kept for a later revision that is the same change; with same revision, a stale pass holds again once its line is back at exactly the approved revision (#1623); with follow-up, the revision a follow-up pinned that the passes counted cover (HI-1763, below). |
 | `Updated` | entry id, from revision, to revision, how (merged target in, rebased), carried (bool) | Strict: the queue brought the approved revision up to date on its own ref (§16.9.1). |
 | `LineMoved` | line, from, to, why (squash continuation) | Hive moved an agent's branch to the target between cards (§16.19.2). |
 | `LineRenamed` | from, to, why (repair) | Repair renamed the agent's branch the card works on, named after an old place (#1305): the fold's `started.line` is the new name from here (only when it was `from`), so the card's view and its reconciliation follow it, never finding it gone. |
@@ -2316,7 +2316,22 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   on a card in Review or Approved, queued included (`loop.stepNotHere` elsewhere; on a queued card it first takes its
   entry out of the queue, `IntegrationCancelled` with reason follow-up, so the queue can't merge the approved revision
   while the follow-up changes its line, and the reviewer's `ok` queues it again while its pass holds; refused once the
-  queue has begun merging it, `loop.followUpMerging`, #1623), named as a design is (`<key>/s<seq>`, its comment
+  queue has begun merging it, `loop.followUpMerging`, #1623). **It pins the revision it asks to be checked (HI-1763: on
+  26 Oct HR4 OK'd HB4's follow-up commit bd6ff9da, then passed the submitted e89aa2fc; the pass went stale at once, and
+  the card sat in Approved, its lane paused, nobody told):** the line's head (`LoopStep.revision`, its `base`, read
+  before the write, the evidence checked again under it), with the submission and decision generation it was posted in;
+  the reviewer's wake ("ready for your check at bd6ff9d") and the step's reply (`revision`) name it. An `ok` of it by the card's reviewer copies them, and
+  binds that reviewer's check to exactly that revision for that round and generation. A pass then covers a moved head
+  only when the passes counted (`passesCover`: each passed that revision itself, or its reviewer's binding `ok` covers
+  it; the verdict being given only by its own reviewer's) reach the ruleset's quorum: then `CarriedOver` (how
+  `followUp`) and the card finishes on that revision, checked again under the write. In Approved the same rule carries
+  the approval when the `ok` comes, before it is queued again; the checks, the user's OK and decisions apply to the new
+  revision as to any. Short of the quorum (another reviewer's old pass, a commit past the one checked, an `ok` of an
+  earlier round or before a decision), the pass is stale (`Stale`): its builder told at once what it was for and what to
+  submit, the card's merge line and a refused merge or move saying so (queue state `stale`, `merge.hiveMerges` next
+  `nextStale`), and a lane watch told `stalled` once it has stood 10 minutes from its `Stale` fact (`staleWaitReason`),
+  its builder idle or only watching. A follow-up is answered once, so one reviewer's `ok` never stands for another's.
+  Named as a design is (`<key>/s<seq>`, its comment
   headed "Follow-up HI-12/s41, for the reviewer's check (an answer names HI-12/s41):"), with the same reviewer rule
   (`loop.noReviewer` with none), the same `step` loop wake to the reviewer whatever its watch counts, and the same
   answers (`ok`, `gaps`, naming it; history "Checked the follow-up: OK: …"). It has no due time and no going ahead:

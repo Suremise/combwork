@@ -485,10 +485,12 @@ export const LOOP_WAKE_KINDS = ['review', 'verdict', 'approved', 'done', 'reques
  * A card loop's step (#1382, #1467) as its wake quotes it: what the step is, with the design or follow-up it is about
  * (its id, which an answer names; `of`: which an answer checked), then its text (English, agent-facing).
  */
-export function loopStepWords(step: string, text: string, design?: string, of?: string): string {
+export function loopStepWords(step: string, text: string, design?: string, of?: string, revision?: string): string {
   const id = design ? ` ${design}` : ''
   const checked = of === 'followUp' ? 'follow-up' : 'design'
-  const what: Record<string, string> = { design: `design${id} posted for your check (answer with its id)`, followUp: `follow-up${id} ready for your check (answer with its id)`, proceed: `no check of design${id} came in time: the builder goes ahead with it as posted`, ok: `${checked}${id} is OK`, gaps: `${checked}${id} has gaps` }
+  // HI-1763: a follow-up names the revision it pins, the one the reviewer checks (its ok is for exactly that).
+  const at = revision ? ` at ${revision.slice(0, 7)}` : ''
+  const what: Record<string, string> = { design: `design${id} posted for your check (answer with its id)`, followUp: `follow-up${id} ready for your check${at} (answer with its id)`, proceed: `no check of design${id} came in time: the builder goes ahead with it as posted`, ok: `${checked}${id} is OK`, gaps: `${checked}${id} has gaps` }
   return `${what[step] ?? step}: ${text}`
 }
 export type LoopWakeKind = (typeof LOOP_WAKE_KINDS)[number]

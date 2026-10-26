@@ -251,6 +251,7 @@
   "workflow.refused.merge.hiveMerges.nextPausedRules": "Jest w kolejce scalania do {target}, która została wstrzymana, gdy reguły przepływu pracy nie były egzekwowane, i ruszy, gdy znów będą egzekwowane (jeśli już są, gdy użytkownik ją wznowi): poczekaj na Gotowe albo na jej zwrot.",
   "workflow.refused.merge.hiveMerges.nextQueued": "Jest w kolejce scalania do {target} (pozycja {n, number}) i po scaleniu trafi do Gotowe: poczekaj na to albo na jej zwrot.",
   "workflow.refused.merge.hiveMerges.nextReturned": "Wróciła z kolejki scalania: popraw to w swoim worktree, zrób commit i przekaż ją ponownie.",
+  "workflow.refused.merge.hiveMerges.nextStale": "Jej zatwierdzenie jest nieaktualne: gałąź zmieniła się od zatwierdzenia (jest teraz na {current}). Prześlij ją ponownie do recenzji; trafi do kolejki, gdy zostanie zatwierdzona.",
   "workflow.refused.merge.hiveMerges.nextTesting": "Kolejka scalania właśnie scala ją do {target}, a potem przeniesie do Gotowe: poczekaj na to albo na jej zwrot.",
   "workflow.refused.move.needsOverride.change": "Te reguły ustawia się w zakładce Kontrola wersji, gdzie użytkownik może je zmienić.",
   "workflow.refused.move.needsOverride.message": "Przeniesienie karty {card} na etap {stage} pomija reguły: {rules}.",

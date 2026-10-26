@@ -251,6 +251,7 @@
   "workflow.refused.merge.hiveMerges.nextPausedRules": "{target}のマージキューに入っていますが、キューはワークフローのルールが適用されていない間に一時停止し、ルールが再び適用されると再開します（すでに適用されている場合は、ユーザーが再開したとき）。「完了」になるか、差し戻されるのを待ってください。",
   "workflow.refused.merge.hiveMerges.nextQueued": "{target}のマージキューに入っています（{n, number}番目）。マージされると「完了」に移ります。それを待つか、差し戻されるのを待ってください。",
   "workflow.refused.merge.hiveMerges.nextReturned": "マージキューから差し戻されました。ワークツリーで修正してコミットし、もう一度提出してください。",
+  "workflow.refused.merge.hiveMerges.nextStale": "承認が古くなっています。承認後にブランチが変わりました（現在は{current}）。もう一度レビューに提出してください。承認されるとキューに入ります。",
   "workflow.refused.merge.hiveMerges.nextTesting": "マージキューが今{target}にマージしています。終わると「完了」に移ります。それを待つか、差し戻されるのを待ってください。",
   "workflow.refused.move.needsOverride.change": "これらのルールは「バージョン管理」で設定され、ユーザーが変更できます。",
   "workflow.refused.move.needsOverride.message": "{card}を「{stage}」に移動すると、次のルールをスキップします：{rules}。",

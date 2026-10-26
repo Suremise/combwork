@@ -251,6 +251,7 @@
   "workflow.refused.merge.hiveMerges.nextPausedRules": "Sie steht in der Merge-Warteschlange für {target}, die angehalten wurde, während Workflow-Regeln nicht durchgesetzt wurden, und weiterläuft, sobald sie wieder durchgesetzt werden (werden sie es schon, sobald der Benutzer sie fortsetzt): Warte auf Erledigt oder darauf, dass sie zurückkommt.",
   "workflow.refused.merge.hiveMerges.nextQueued": "Sie steht in der Merge-Warteschlange für {target} (Position {n, number}) und kommt nach dem Merge nach Erledigt: Warte darauf oder darauf, dass sie zurückkommt.",
   "workflow.refused.merge.hiveMerges.nextReturned": "Sie kam aus der Merge-Warteschlange zurück: Behebe es in deinem Worktree, committe und reiche sie erneut ein.",
+  "workflow.refused.merge.hiveMerges.nextStale": "Die Freigabe ist veraltet: Der Branch hat sich seit der Freigabe geändert (er steht jetzt auf {current}). Reiche sie erneut zur Review ein; sie kommt in die Warteschlange, sobald diese freigegeben ist.",
   "workflow.refused.merge.hiveMerges.nextTesting": "Die Merge-Warteschlange mergt sie gerade in {target} und verschiebt sie danach nach Erledigt: Warte darauf oder darauf, dass sie zurückkommt.",
   "workflow.refused.move.needsOverride.change": "Diese Regeln werden unter Versionsverwaltung festgelegt, wo der Benutzer sie ändern kann.",
   "workflow.refused.move.needsOverride.message": "Das Verschieben von {card} nach {stage} überspringt: {rules}.",

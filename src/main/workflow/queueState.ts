@@ -21,6 +21,8 @@ export type QueueState =
   | { state: 'returned'; reason: IntegrationFailReason; transient: boolean; failure: FactData['IntegrationFailed'] }
   /** Left the queue: it isn't approved any more (its pass stale, or a decision since). */
   | { state: 'left'; why: 'stale' | 'decision' }
+  /** Approved, but its pass is stale (HI-1763): its line moved on since (`approved` what was passed, `current` its line). */
+  | { state: 'stale'; approved: string | null; current: string | null }
   | { state: 'merged' }
   /** Not in the queue yet: it goes in once approved. */
   | { state: 'notYet' }
@@ -38,6 +40,8 @@ export function queueStateOf(wf: Workflow, card: CardRecord, s: CardState = wf.s
     if (pause) return { state: 'paused', target: open.target, reason: pause.reason, card: pause.card, ...(pause.stuck ? { stuck: true as const } : {}) }
     return { state: 'queued', target: open.target, position: order.queued.findIndex((q) => q.entry === open.id) + 1 }
   }
+  // Approved with a stale pass, never queued (HI-1763: HI-1737 sat so, its lane paused, nobody told): said, with what to do.
+  if (s.stage === 'approved' && s.stale) return { state: 'stale', approved: s.stale.approved, current: s.stale.current }
   const last = s.entries.at(-1)
   if (last?.state === 'failed' && last.failure && (s.stage === 'active' || s.stage === 'todo')) return { state: 'returned', reason: last.failure.reason, transient: last.failure.transient, failure: last.failure }
   if (last?.state === 'cancelled' && (last.cancelled === 'stale' || last.cancelled === 'decision') && s.stage !== 'merging') return { state: 'left', why: last.cancelled }
@@ -182,6 +186,8 @@ export function queueLine(q: QueueState, enforced = true): string {
       return `${who} ${returnedText('It', q.failure, READ_MAX, READ_LINES)}`
     case 'left':
       return `${who} It left the merge queue: ${q.why === 'decision' ? 'a decision since its approval needs it reviewed again' : 'its pass is stale'}.`
+    case 'stale':
+      return `${who} Its pass is for ${shortRev(q.approved)}, but its line is at ${shortRev(q.current)} (changed since): submit it again for review (hive_submit); it is queued once that is approved.`
     case 'merged':
       return 'Hive merged this card.'
     case 'notYet':
@@ -303,6 +309,16 @@ export function returnedText(subject: string, f: FactData['IntegrationFailed'], 
   const shown = tail && fit >= LINES_MIN ? (tail.length > fit ? `…${tail.slice(tail.length - fit + 1)}` : tail) : ''
   return `${head}${path}${shown ? ` Its last lines: "${shown}".` : ''}${next}`
 }
+
+/** A revision as a wake or a line names it: its first 7 characters ("—" when there is none). */
+const shortRev = (r: string | null | undefined): string => (r ? r.slice(0, 7) : '—')
+
+/**
+ * A pass gone stale (HI-1763): what it was for, where the card's line is now, and what to do (its builder's wake, at
+ * once: HI-1737 sat in Approved, nobody told).
+ */
+export const staleWake = (key: string, approved: string | null | undefined, current: string | null | undefined): string =>
+  `${key}: its pass is for ${shortRev(approved)}, but its line is at ${shortRev(current)} (changed since): submit ${shortRev(current)} for review (hive_submit).` // i18n-ignore: a wake, agent-facing
 
 /** A returned card's wake (#1354): its key, what came back, and what to do next. */
 export const returnedWake = (key: string, f: FactData['IntegrationFailed']): string => returnedText(key, f)

@@ -259,6 +259,7 @@
   "workflow.refused.merge.hiveMerges.nextPausedRules": "It is in the merge queue for {target}, which paused while workflow rules were off and moves on once they are enforced again (if they already are, once the user resumes it): wait for Done, or for it to come back.",
   "workflow.refused.merge.hiveMerges.nextQueued": "It is in the merge queue for {target} (position {n, number}) and moves to Done once merged: wait for that, or for it to come back.",
   "workflow.refused.merge.hiveMerges.nextReturned": "It came back from the merge queue: fix it in your worktree, commit and submit again.",
+  "workflow.refused.merge.hiveMerges.nextStale": "Its pass is stale: its line changed since it was approved (it is at {current}). Submit it again for review; it is queued once that is approved.",
   "workflow.refused.merge.hiveMerges.nextTesting": "The merge queue is merging it into {target} now and moves it to Done once merged: wait for that, or for it to come back.",
   "workflow.refused.move.needsOverride.change": "These rules are set in Version Control, where the user can change them.",
   "workflow.refused.move.needsOverride.message": "Moving {card} to {stage} skips: {rules}.",

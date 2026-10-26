@@ -251,6 +251,7 @@
   "workflow.refused.merge.hiveMerges.nextPausedRules": "Está en la cola de fusión de {target}, que se pausó mientras no se aplicaban las reglas del flujo de trabajo y sigue cuando vuelvan a aplicarse (si ya se aplican, cuando el usuario la reanude): espera a Hecho o a que vuelva.",
   "workflow.refused.merge.hiveMerges.nextQueued": "Está en la cola de fusión de {target} (posición {n, number}) y pasa a Hecho al fusionarse: espera a eso o a que vuelva.",
   "workflow.refused.merge.hiveMerges.nextReturned": "Volvió de la cola de fusión: corrígelo en tu worktree, haz commit y vuelve a enviarla.",
+  "workflow.refused.merge.hiveMerges.nextStale": "Su aprobación está caducada: la rama cambió desde que se aprobó (ahora está en {current}). Vuelve a enviarla a revisión; entra en la cola en cuanto se apruebe.",
   "workflow.refused.merge.hiveMerges.nextTesting": "La cola de fusión la está fusionando en {target} ahora y la mueve a Hecho al terminar: espera a eso o a que vuelva.",
   "workflow.refused.move.needsOverride.change": "Estas reglas se configuran en Control de versiones, donde el usuario puede cambiarlas.",
   "workflow.refused.move.needsOverride.message": "Mover la tarjeta {card} a {stage} se salta estas reglas: {rules}.",

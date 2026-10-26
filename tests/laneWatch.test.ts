@@ -13,10 +13,10 @@ import { taskWaitText } from '../src/shared/toolReplies'
 import { REVIEW_WAIT_STALL_MS } from '../src/shared/tasks'
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
-import { LANE_NEXT_STALL_MS, laneNextWaitReason, RETURN_STALL_MS, returnedWaitReason } from '../src/main/cardStall'
+import { LANE_NEXT_STALL_MS, laneNextWaitReason, RETURN_STALL_MS, returnedWaitReason, STALE_STALL_MS, staleWaitReason } from '../src/main/cardStall'
 /** The merge queue's returns as queueReturnOf finds them (HI-1721), by card: none unless a test sets one. */
-const { returns } = vi.hoisted(() => ({ returns: new Map<number, { at: string; text: string; builder: string | null }>() }))
-vi.mock('../src/main/queueReturn', () => ({ queueReturnOf: async (_ws: unknown, _p: string, n: number) => returns.get(n) ?? null, returnIn: () => null }))
+const { returns, stales } = vi.hoisted(() => ({ returns: new Map<number, { at: string; text: string; builder: string | null }>(), stales: new Map<number, { since: string; approved: string | null; current: string | null }>() }))
+vi.mock('../src/main/queueReturn', () => ({ queueReturnOf: async (_ws: unknown, _p: string, n: number) => returns.get(n) ?? null, returnIn: () => null, staleApprovalOf: async (_ws: unknown, _p: string, n: number) => stales.get(n) ?? null, staleIn: () => null }))
 /** Agents queued to resume after a restart (HI-1707's isResuming), by id: none unless a test sets one. */
 const { resuming } = vi.hoisted(() => ({ resuming: new Set<string>() }))
 vi.mock('../src/main/restartResume', async (orig) => ({ ...(await orig<object>()), isResuming: (_p: string, id: string) => resuming.has(id) }))
@@ -195,6 +195,25 @@ describe('what a lane watch counts (#531)', () => {
       expect(Buffer.byteLength(JSON.stringify(many))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
       expect(many).toMatch(/^\[Hive\] .*Your lane watch has ended.*never answer it for them/)
     }
+  })
+})
+
+describe("an approved card whose pass went stale, waiting for its builder (HI-1763's staleWaitReason)", () => {
+  const since = '2026-10-26T21:55:12.000Z'
+  const t = Date.parse(since)
+  const c = { number: 1739, key: 'HI-1737', column: 'passed' as const, archived: false, blocked: null }
+  const stale = { since, approved: 'e89aa2fc1234', current: 'bd6ff9da5678' }
+  it('stalled once stale for 10 min since its Stale fact, its builder idle or only watching; never while it is in a turn, a watch kept or not', () => {
+    expect(staleWaitReason(c, stale, { name: 'HB4', status: 'watching', watching: true }, t + STALE_STALL_MS)).toBe("HI-1737's pass is for e89aa2f but its line is at bd6ff9d; HB4 is only watching it, not submitting it.")
+    expect(staleWaitReason(c, stale, { name: 'HB4', status: 'finished', watching: false }, t + STALE_STALL_MS)).toMatch(/HB4 is idle, not submitting it/)
+    for (const status of ['working', 'starting', 'waiting', 'background']) expect(staleWaitReason(c, stale, { name: 'HB4', status, watching: true }, t + 3 * STALE_STALL_MS), status).toBeNull()
+    expect(staleWaitReason(c, stale, { name: 'HB4', status: 'watching', watching: true }, t + STALE_STALL_MS - 1000)).toBeNull()
+  })
+  it('not for a card out of Passed, blocked, or with no stale pass', () => {
+    const watching = { name: 'HB4', status: 'watching', watching: true }
+    expect(staleWaitReason({ ...c, column: 'doing' }, stale, watching, t + 2 * STALE_STALL_MS)).toBeNull()
+    expect(staleWaitReason({ ...c, blocked: 'Which icon?' }, stale, watching, t + 2 * STALE_STALL_MS)).toBeNull()
+    expect(staleWaitReason(c, null, watching, t + 2 * STALE_STALL_MS)).toBeNull()
   })
 })
 
@@ -702,6 +721,41 @@ describe('lane watches (main/watches.ts, #531)', async () => {
       vi.useRealTimers()
     }
     expect(st.told[0]).toContain(`#${a} is stalled: "R1 started reviewing #${a} but has given no verdict, and has only been watching it for 16 min."`)
+    await disposeWorkspaceService(w)
+  })
+
+  it("an approved card whose pass went stale, its builder working with a watch kept, then only watching: stalled only then, 10 min after it went stale (HI-1763)", async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a] = await newCards(w, 'b1', 1)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    await rulesOff()
+    await inWorkspace(w, () => tasks.updateTask(a, { column: 'passed' }, user))
+    const since = new Date().toISOString()
+    stales.set(a, { since, approved: 'e89aa2fc1234', current: 'bd6ff9da5678' })
+    try {
+      let b1Status = 'working'
+      Object.assign(sessions, { liveStates: () => [{ projectPath: alpha, agentId: 'b1', agentName: 'B1', status: b1Status, watch: { cards: [a], changes: ['column'], column: 'done', label: '', since, limitAt: '' } }] })
+      await watchAll(w, home, st)
+      await watches.evaluateWatches(w)
+      await watches.settled()
+      expect(st.typed).toEqual([])
+      vi.useFakeTimers({ toFake: ['Date'] })
+      try {
+        vi.setSystemTime(Date.parse(since) + STALE_STALL_MS + 60_000)
+        await watches.evaluateWatches(w)
+        await watches.settled()
+        expect(st.typed).toEqual([])
+        b1Status = 'watching'
+        await watches.evaluateWatches(w)
+        await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+      } finally {
+        vi.useRealTimers()
+      }
+      expect(st.told[0]).toMatch(new RegExp(`#${a} is stalled: ".*'s pass is for e89aa2f but its line is at bd6ff9d; B1 is only watching it, not submitting it\\."`))
+    } finally {
+      stales.delete(a)
+    }
     await disposeWorkspaceService(w)
   })
 

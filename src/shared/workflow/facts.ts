@@ -208,7 +208,7 @@ export interface FactData {
    */
   ReviewerReleased: { reviewer: string; submission: number; why: 'leased' | 'notReviewer' | 'gone' }
   Verdict: { reviewer: string; submission: number; revision: string | null; pass: boolean; failKind?: 'content' | 'explanation'; round: number; generation: number; comment: string }
-  CarriedOver: { from: string; to: string; toBase: string | null; how: 'replay' | 'sameRevision' }
+  CarriedOver: { from: string; to: string; toBase: string | null; how: 'replay' | 'sameRevision' | 'followUp' }
   Updated: { entry: string; from: string; to: string; how: 'mergedTarget' | 'rebased'; carried: boolean }
   LineMoved: { line: string; from: string; to: string; why: 'squashContinuation' }
   /** The card's line renamed (#1305: Repair renaming an agent's branch named after an old place): its work follows it. */
@@ -304,7 +304,12 @@ export interface FactData {
    * the Design check wait then, `waitMinutes`); an answer or going ahead names the step it is about (`design`) and its
    * kind (`of`).
    */
-  LoopStep: { step: LoopStepId; text: string; design?: string; until?: string; waitMinutes?: number; of?: LoopAsk }
+  /**
+   * A loop step. A follow-up pins the line's head it asks the reviewer to check (`revision`, its `base`), the submission
+   * and the decision generation it was posted in (HI-1763); the reviewer's `ok` of it copies those, binding its check to
+   * exactly that revision for that round.
+   */
+  LoopStep: { step: LoopStepId; text: string; design?: string; until?: string; waitMinutes?: number; of?: LoopAsk; revision?: string; base?: string | null; submission?: number; generation?: number }
   HeadMoved: { line: string | null; from: string | null; to: string | null; key?: string | null }
   TargetMoved: { target: string; from: string | null; to: string | null }
   Gone: { what: 'line' | 'folder' | 'repository' | 'deliverables' }
@@ -408,7 +413,14 @@ export interface CardState {
    * reviewer's check, until the reviewer answers, the builder goes ahead with a design, or the card moves, is submitted or
    * given a verdict.
    */
-  step: { step: LoopAsk; id: string; seq: number; at: string; until: string | null; by: string | null } | null
+  step: { step: LoopAsk; id: string; seq: number; at: string; until: string | null; by: string | null; revision?: string; base?: string | null; submission?: number; generation?: number } | null
+  /**
+   * Each reviewer's `ok` of a follow-up that pinned a revision (HI-1763), oldest first: the follow-up's id, its revision
+   * and base, the submission and generation it was posted in, and who checked it. What may carry a pass to that revision.
+   */
+  followUpOks: { design: string; revision: string; base: string | null; submission: number; generation: number; by: string }[]
+  /** When the content-stale pass (`stale`) went stale: its `Stale` fact's time, which nothing later moves (HI-1763's stall). */
+  staleSince: string | null
   lastSeq: number
 }
 
@@ -437,6 +449,8 @@ export const emptyState = (): CardState => ({
   received: {},
   approved: null,
   stale: null,
+  staleSince: null,
+  followUpOks: [],
   requests: [],
   made: {},
   approvals: [],
@@ -502,6 +516,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         s.latest = sub
         s.approved = { revision: d.revision, base: d.base }
         s.stale = null
+        s.staleSince = null
         // A new submission retires the requests bound to an earlier one: they can't approve this one.
         s.requests = s.requests.filter((r) => r.submission === undefined)
         s.approvalOverridden = false
@@ -524,6 +539,9 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         s.approved = { revision: d.to, base: d.toBase }
         // Its line back at exactly the revision a stale pass was for (#1623): the reviewer passed that commit, so it holds.
         if (d.how === 'sameRevision' && s.stale?.approved === d.to) s.stale = null
+        // A follow-up's revision the reviewers' checks cover (HI-1763): the pass holds for it.
+        if (d.how === 'followUp') s.stale = null
+        if (!s.stale) s.staleSince = null
         break
       }
       case 'Updated': {
@@ -537,7 +555,11 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'Stale': {
         const d = f.data as FactData['Stale']
         // A decision makes passes stale by generation; only a content-stale pass waits for the builder (§16.4.6).
-        if (d.why !== 'decision') s.stale = d
+        if (d.why !== 'decision') {
+          // Its start, kept while the same stale pass stands (HI-1763: the stall counts from here).
+          if (!s.stale || s.stale.current !== d.current || s.stale.approved !== d.approved) s.staleSince = f.at
+          s.stale = d
+        }
         break
       }
       case 'ApprovalRequested': {
@@ -554,7 +576,9 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         const d = f.data as FactData['LoopStep']
         // A design or a follow-up (a new one replaces the one waiting); anything else ends the one it names (the runtime
         // refuses others).
-        s.step = d.step === 'design' || d.step === 'followUp' ? { step: d.step, id: d.design ?? '', seq: f.seq, at: f.at, until: d.until ?? null, by } : null
+        // The reviewer's ok of a follow-up that pinned a revision (HI-1763): kept, with who gave it.
+        if (d.step === 'ok' && d.of === 'followUp' && d.revision && d.submission !== undefined && d.generation !== undefined && by) s.followUpOks.push({ design: d.design ?? '', revision: d.revision, base: d.base ?? null, submission: d.submission, generation: d.generation, by })
+        s.step = d.step === 'design' || d.step === 'followUp' ? { step: d.step, id: d.design ?? '', seq: f.seq, at: f.at, until: d.until ?? null, by, ...(d.revision ? { revision: d.revision, base: d.base ?? null } : {}), ...(d.submission !== undefined ? { submission: d.submission } : {}), ...(d.generation !== undefined ? { generation: d.generation } : {}) } : null
         break
       }
       case 'RequestClosed':
@@ -689,6 +713,23 @@ export function passingReviewers(s: CardState): string[] {
   if (!s.latest) return []
   const id = s.latest.id
   return [...new Set(s.verdicts.filter((v) => v.submission === id && v.pass && v.generation === s.generation).map((v) => v.reviewer))]
+}
+
+/**
+ * Whether the latest submission's passes cover `revision`, a follow-up's pinned head (HI-1763): a pass counts only if it
+ * passed that revision itself, or its reviewer's `ok` of the follow-up pinned there binds it (this submission, this
+ * generation); `giving` is a pass being given now by that reviewer, which counts only by such an ok. True when those
+ * reach `quorum`: one reviewer's check never extends another's pass of the old revision.
+ */
+export function passesCover(s: CardState, revision: string, quorum: number, giving?: string | null): boolean {
+  if (!s.latest) return false
+  const id = s.latest.id
+  const bound = (who: string): boolean => s.followUpOks.some((o) => o.by === who && o.revision === revision && o.submission === id && o.generation === s.generation)
+  const passedIt = (who: string): boolean => s.verdicts.some((v) => v.reviewer === who && v.submission === id && v.pass && v.generation === s.generation && v.revision === revision)
+  const passers = new Set(passingReviewers(s))
+  if (giving) passers.add(giving)
+  if (giving && !bound(giving)) return false
+  return [...passers].filter((who) => bound(who) || passedIt(who)).length >= Math.max(1, quorum)
 }
 
 /** The user's approval of the latest submission at the current generation, for a request of this gate. */

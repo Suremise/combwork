@@ -253,6 +253,7 @@ interface HiveMessageValues {
   'workflow.refused.merge.hiveMerges.nextPausedRules': { target: string | number }
   'workflow.refused.merge.hiveMerges.nextQueued': { target: string | number; n: number }
   'workflow.refused.merge.hiveMerges.nextReturned': undefined
+  'workflow.refused.merge.hiveMerges.nextStale': { current: string | number }
   'workflow.refused.merge.hiveMerges.nextTesting': { target: string | number }
   'workflow.refused.move.needsOverride.change': undefined
   'workflow.refused.move.needsOverride.message': { card: string | number; stage: string | number; rules: string | number }
