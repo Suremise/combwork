@@ -122,6 +122,7 @@ export const SUITES = [
   { name: 'gitinit' },
   { name: 'gitmissing' },
   { name: 'gitremotes' },
+  { name: 'gitupdate' },
   { name: 'gitview' },
   { name: 'handovernotice' },
   { name: 'hivetools' },

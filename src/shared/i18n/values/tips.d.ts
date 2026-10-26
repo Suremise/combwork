@@ -411,6 +411,8 @@ interface HiveMessageValues {
   'tips.unmerged.title': undefined
   'tips.unusedWorktrees.text': undefined
   'tips.unusedWorktrees.title': undefined
+  'tips.updateFromTarget.text': undefined
+  'tips.updateFromTarget.title': undefined
   'tips.versionControlSwitch.text': undefined
   'tips.versionControlSwitch.title': undefined
   'tips.versionControlTab.text': undefined

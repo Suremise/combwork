@@ -1,4 +1,5 @@
-import { join, resolve } from 'path'
+import { randomUUID } from 'crypto'
+import { basename, join, resolve } from 'path'
 import { agentPlace, folderFacts } from './agentFolders'
 import { stat } from 'original-fs/promises'
 import { projectAgents } from '../shared/defaults'
@@ -31,7 +32,9 @@ import {
   type GitWorktreeRow,
   type BranchAt,
   type BranchDrops,
-  type GitRemoteBranchRow
+  type GitRemoteBranchRow,
+  type BranchUpdateHow,
+  type BranchUpdatePlan
 } from '../shared/gitRepo'
 import { localUse, remoteKept } from '../shared/branchCleanup'
 import { samePath } from '../shared/movePaths'
@@ -54,6 +57,9 @@ import { createLogger, userText } from './logger'
 import { mergeSlots } from './mergeSlotHost'
 import { sessions } from './sessions'
 import { workspace, workspaceOf } from './workspace'
+import { lineCard } from './branchMerge'
+import { queueStateOf } from './workflow/queueState'
+import { workflowFor } from './workflow/service'
 
 const log = createLogger('gitRepo')
 
@@ -298,8 +304,11 @@ async function measure(root: string, target: string, local: GitBranchRow[], remo
   for (const { ref, row } of rows) {
     if (inTarget.has(ref)) row.toTarget = 0
     else if (counted++ < COUNTED) {
-      const n = await git(root, ['rev-list', '--count', `refs/heads/${target}..${ref}`, '--'])
-      row.toTarget = n.ok ? Number(n.out.trim()) || null : null
+      // Both ways in one run: the target's commits it hasn't (HI-1180's Update from <target>), and its own.
+      const n = await git(root, ['rev-list', '--left-right', '--count', `refs/heads/${target}...${ref}`, '--'])
+      const [from, to] = n.ok ? n.out.trim().split(/\s+/).map(Number) : []
+      row.toTarget = n.ok ? to || null : null
+      if (ref.startsWith('refs/heads/')) (row as { fromTarget?: number | null }).fromTarget = n.ok && Number.isFinite(from) ? from : null
     } else row.toTarget = null
   }
 }
@@ -436,13 +445,13 @@ function scrubText(t: TextPart, secrets: string[]): TextPart {
  * round 1: a prompt or launch task given and not taken yet, or a line typed and not taken) counts as working: its CLI may
  * start that turn any moment, and the folder's fence can't take back what is in its input.
  */
-async function folderAgents(projectPath: string): Promise<{ name: string; status: string | null }[]> {
+async function folderAgents(projectPath: string, folder = projectPath): Promise<{ name: string; status: string | null }[]> {
   const cfg = await workspace.projectConfig(projectPath)
   const facts = await folderFacts(projectPath)
   const here: AgentDef[] = []
   for (const a of projectAgents(cfg)) {
     const live = sessions.liveFor(projectPath, a.id)
-    if (samePlace((await agentPlace(projectPath, a, live ? { cwd: live.cwd } : null, facts)).now.path, projectPath)) here.push(a)
+    if (samePlace((await agentPlace(projectPath, a, live ? { cwd: live.cwd } : null, facts)).now.path, folder)) here.push(a)
   }
   return here
     .map((a) => {
@@ -1081,4 +1090,160 @@ export async function branchDrops(projectPath: string, name: string): Promise<Br
     .map((l) => l.split('\0'))
     .map((f) => ({ short: f[0], date: Number(f[1]) * 1000, subject: f[2] ?? '' }))
   return { target: targets.target, total: Number(count.out.trim()) || 0, commits }
+}
+
+// ---------------------------------------------------------------------------
+// Update from <target> (HI-1180)
+// ---------------------------------------------------------------------------
+
+const UPDATE = {
+  noTarget: msg({ id: 'service.gitRepo.update.noTarget', defaultMessage: 'The project has no target branch here, so there is nothing to update {branch} from.', description: "An error updating a branch from its target (Version Control → Branches, HI-1180): the project's workflow target (or the repository's default branch) doesn't exist in this repository. {branch} is the branch." }),
+  isTarget: msg({ id: 'service.gitRepo.update.isTarget', defaultMessage: '{branch} is the target itself.', description: 'An error updating a branch from its target: the branch picked ({branch}) is the target.' }),
+  agentBusy: msg({
+    id: 'service.gitRepo.update.agentBusy',
+    defaultMessage:
+      '{agent} {status, select, starting {is starting} working {is working} waiting {is waiting for your answer} background {is waiting on background tasks it started} watching {is waiting for cards to change (a card watch)} other {stopped in the middle of a task when its sign-in expired}} in {folder}: update {branch} once it has finished.',
+    description: "Why updating a branch from its target is refused now: an agent works in the folder the branch is checked out in ({folder}: a slot's name, such as slot-a, or a folder's name or path). {agent} is the agent's name; {status} what it is doing (select: translate each); {branch} the branch."
+  }),
+  dirty: msg({ id: 'service.gitRepo.update.dirty', defaultMessage: '{folder} has uncommitted changes: commit them, or set them aside, before updating {branch}.', description: "Why updating a branch from its target is refused: the folder it is checked out in ({folder}: a slot's name, a folder's name or a path) has changes not committed. {branch} is the branch." }),
+  midOperation: msg({ id: 'service.gitRepo.update.midOperation', defaultMessage: 'Git is in the middle of a {state} in {folder}: finish or abort it first.', description: "Why updating a branch from its target is refused: a git operation ({state}: merge, rebase…, as git names it) is under way in the folder the branch is checked out in ({folder}: a slot's name, a folder's name or a path)." }),
+  queued: msg({ id: 'service.gitRepo.update.queued', defaultMessage: '{card} is in the merge queue, which brings it up to date itself: take it out of the queue first to update {branch} here.', description: "Why updating a branch from its target is refused: the branch is the line of a card ({card}: its key, such as HI-12) that Hive's merge queue is merging now. {branch} is the branch." }),
+  upToDate: msg({ id: 'service.gitRepo.update.upToDate', defaultMessage: '{branch} already has everything in {target}.', description: 'After Update from <target> (HI-1180): the branch {branch} already contains every commit of the target {target}; nothing was done.' }),
+  conflict: msg({ id: 'service.gitRepo.update.conflict', defaultMessage: '{how, select, rebase {Rebasing} other {Merging}} {branch} with {target} stopped at a conflict in {files}, so it was undone: {branch} is as it was. Update it by hand, or ask its builder to.', description: 'An error updating a branch from its target: git stopped at a conflict, and Hive aborted it, leaving the branch and its folder as they were. {how}: merge or rebase (select: translate each); {branch} the branch, {target} the target; {files} the files in conflict, joined (src/a.ts and src/b.ts).' }),
+  failed: msg({ id: 'service.gitRepo.update.failed', defaultMessage: "Couldn't update {branch} from {target}, so it is as it was: {why}", description: "An error updating a branch from its target that isn't a conflict (a hook refused the commit, signing failed…); Hive undid what git started. {why} is git's own words." }),
+  moved: msg({ id: 'service.gitRepo.update.moved', defaultMessage: '{branch} changed while it was being updated, so nothing was changed: try again.', description: 'An error updating a branch from its target: the branch moved to another commit meanwhile (a commit, a push), so Hive left it as it is.' }),
+  merged: msg({ id: 'service.gitRepo.update.merged', defaultMessage: 'Merged {target} into {branch} ({commit}).', description: 'After Update from <target> with Merge (HI-1180): the target {target} was merged into the branch {branch}, as the commit {commit} (a short id: keep it as it is).' }),
+  rebased: msg({ id: 'service.gitRepo.update.rebased', defaultMessage: "Rebased {branch}'s {n, plural, one {# commit} other {# commits}} onto {target} ({commit}).", description: 'After Update from <target> with Rebase (HI-1180): the branch {branch} has its {n} commits replayed onto the target {target}; {commit} is its new head (a short id: keep it as it is).' })
+}
+
+/** The sessions' statuses that keep a folder busy, as folderBusyData's. */
+const FOLDER_BUSY = new Set(['starting', 'working', 'waiting', 'background', 'watching', 'signin'])
+
+/** Where a branch is checked out: the project folder, another worktree (a slot's, or not), or nowhere (null). */
+async function branchFolder(projectPath: string, branch: string): Promise<Pick<BranchUpdatePlan, 'where' | 'folder' | 'slot'>> {
+  const s = await repoSummary(projectPath)
+  if (s.branch === branch) return { where: 'project', folder: projectPath, slot: null }
+  const trees = await git(projectPath, ['worktree', 'list', '--porcelain'])
+  const tree = (trees.ok ? parseWorktrees(trees.out) : []).find((w) => w.branch === branch && !samePlace(w.path, projectPath))
+  if (!tree) return { where: 'temporary', folder: null, slot: null }
+  const slot = (await folderFacts(projectPath).catch(() => null))?.slots.find((x) => samePlace(x.folder, tree.path))
+  return { where: slot ? 'slot' : 'worktree', folder: tree.path, slot: slot?.name ?? null }
+}
+
+/** A folder as the update's messages name it: its slot's name, the project folder's name, or its path. */
+const folderName = (p: Pick<BranchUpdatePlan, 'where' | 'folder' | 'slot'>, projectPath: string): string => p.slot ?? (p.where === 'project' ? basename(projectPath) : (p.folder ?? ''))
+
+/** Whether a folder has changes to tracked files (untracked files are left to git: a merge that would overwrite one stops). */
+async function dirtyIn(folder: string): Promise<boolean> {
+  const r = await git(folder, ['status', '--porcelain', '--untracked-files=no'])
+  return !r.ok || !!r.out.trim()
+}
+
+/** What Update from <target> would do to `branch` now (HI-1180), for its dialog; checked again when it runs. */
+export async function branchUpdatePlan(projectPath: string, branch: string): Promise<BranchUpdatePlan> {
+  projectPath = workspace.assertProject(projectPath)
+  await summaryOf(projectPath)
+  const { target } = await branchTargets(projectPath, await workTargetOf(projectPath))
+  if (!target) throw refusal(UPDATE.noTarget, { branch })
+  if (branch === target) throw refusal(UPDATE.isTarget, { branch })
+  if (!(await git(projectPath, ['show-ref', '--verify', '-q', `refs/heads/${branch}`])).ok) throw refusal(M.noBranch, { branch })
+  const counts = await git(projectPath, ['rev-list', '--left-right', '--count', `refs/heads/${target}...refs/heads/${branch}`, '--'])
+  if (!counts.ok) throw commandFailed('git rev-list', counts) // i18n-ignore: a git command, as it is
+  const [behind, ahead] = counts.out.trim().split(/\s+/).map(Number)
+  const place = await branchFolder(projectPath, branch)
+  const agents = place.folder ? await folderAgents(projectPath, place.folder) : []
+  const line = await lineCard(projectPath, branch)
+  const wf = line ? await workflowFor(workspaceOf(projectPath), projectPath).catch(() => null) : null
+  const rec = line && wf ? wf.store.cards().find((c) => c.id === line.number) : undefined
+  const st = rec && wf ? wf.state(rec) : null
+  const q = rec && wf && st ? queueStateOf(wf, rec, st) : null
+  const pushed = (await git(projectPath, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', `${branch}@{upstream}`])).ok
+  const where = folderName(place, projectPath)
+  let blocked: Text | null = null
+  const busy = agents.find((a) => a.status && FOLDER_BUSY.has(a.status))
+  if (busy) blocked = withValues(UPDATE.agentBusy, { agent: busy.name, status: busy.status!, folder: where, branch })
+  else if (line && q && (q.state === 'queued' || q.state === 'testing' || q.state === 'paused')) blocked = withValues(UPDATE.queued, { card: line.key, branch })
+  else if (place.folder) {
+    const state = (await repoSummary(place.folder)).state
+    if (state) blocked = withValues(UPDATE.midOperation, { state, folder: where })
+    else if (await dirtyIn(place.folder)) blocked = withValues(UPDATE.dirty, { folder: where, branch })
+  }
+  return {
+    branch,
+    target,
+    behind: behind || 0,
+    ahead: ahead || 0,
+    ...place,
+    card: line && st ? { key: line.key, stage: st.stage } : null,
+    agents,
+    approval: rec && wf && st?.stage === 'approved' ? (wf.rulesetOf(rec, st).options.sameness === 'change' ? 'carries' : 'reviewAgain') : null,
+    pushed,
+    blocked: blocked ? shownText(blocked) : null
+  }
+}
+
+/**
+ * Update from <target> (HI-1180): merges the target into `branch` (one merge commit, with the card's trailer for a card's
+ * line), or rebases its commits onto the target, where it is checked out, or, checked out nowhere, in a temporary
+ * worktree that is then removed, the branch moved only if it hasn't moved meanwhile. Refused while an agent works there,
+ * the folder has uncommitted changes or git is mid-operation, or its card is in the merge queue. As switch and pull: the
+ * folder fenced, the repository locked, the branch's merge slot held. A conflict is aborted at once, nothing left half
+ * done, naming its files. A card's pass then follows the rules (reconcile: carried over when the same change, else stale).
+ */
+export async function updateBranch(projectPath: string, branch: string, how: BranchUpdateHow): Promise<string> {
+  projectPath = workspace.assertProject(projectPath)
+  return oneAtATime(projectPath, () => mergeSlots.asUser(projectPath, branch, () => withRepoLock(projectPath, () => updateLocked(projectPath, branch, how), { project: projectPath })))
+}
+
+async function updateLocked(projectPath: string, branch: string, how: BranchUpdateHow): Promise<string> {
+  const place = await branchFolder(projectPath, branch)
+  // The folder fenced from the last check to git's end (#646): no Hive line typed into its agents, none started there.
+  // i18n-ignore: what changes the folder, for the log and an agent's reply (agent-facing, English)
+  const fenced = <T>(fn: () => Promise<T>): Promise<T> => (place.folder ? changingFolder(place.folder, 'a Git update from the target', fn) : fn())
+  return fenced(async () => {
+    // Checked again under the locks: nothing changes between this and git starting.
+    const plan = await branchUpdatePlan(projectPath, branch)
+    if (plan.blocked) throw new HiveError(linesOf([plan.blocked]))
+    if (plan.behind === 0) return tr(UPDATE.upToDate, { branch, target: plan.target })
+    const card = (await lineCard(projectPath, branch))?.key
+    // i18n-ignore: a commit message, in English
+    const message = ['-m', `Merge ${plan.target} into ${branch}`, ...(card ? ['-m', `Hive-Card: ${card}`] : [])]
+    // A rebase moves only the branch it rebases (HR4's #1352 round 1: never another ref with `rebase.updateRefs` on).
+    const step = (f: string): Promise<GitResult> =>
+      how === 'rebase' ? git(f, ['-c', 'rebase.updateRefs=false', 'rebase', '--no-update-refs', '--no-autostash', plan.target]) : git(f, ['merge', '--no-ff', '--no-edit', ...message, plan.target])
+    // What git started is undone at once: a conflict named by its files, any other failure by git's words.
+    const undo = async (f: string, r: GitResult): Promise<never> => {
+      const u = await git(f, ['diff', '--name-only', '--diff-filter=U'])
+      const files = u.ok ? u.out.split(/\r?\n/).filter(Boolean) : []
+      if ((await repoSummary(f)).state) await git(f, how === 'rebase' ? ['rebase', '--abort'] : ['merge', '--abort'])
+      log.info(`Update of ${userText(branch)} from ${userText(plan.target)} undone: ${files.length ? `${files.length} file(s) in conflict` : 'git failed'}`)
+      if (files.length) throw refusal(UPDATE.conflict, { how, branch, target: plan.target, files: listOf(files, 'unit') })
+      throw failed(UPDATE.failed, { branch, target: plan.target }, r)
+    }
+    let head: string
+    if (plan.folder) {
+      const r = await step(plan.folder)
+      if (!r.ok) return undo(plan.folder, r)
+      head = (await git(plan.folder, ['rev-parse', 'HEAD'])).out.trim()
+    } else {
+      // Checked out nowhere: a temporary detached worktree beside the merge queue's, removed whatever happens.
+      const was = (await git(projectPath, ['rev-parse', `refs/heads/${branch}`])).out.trim()
+      const tmp = join(workspaceOf(projectPath).worktreesRoot, basename(projectPath), `update-${randomUUID().slice(0, 8)}`)
+      const add = await git(projectPath, ['worktree', 'add', '--detach', tmp, was])
+      if (!add.ok) throw failed(UPDATE.failed, { branch, target: plan.target }, add)
+      try {
+        const r = await step(tmp)
+        if (!r.ok) return await undo(tmp, r)
+        head = (await git(tmp, ['rev-parse', 'HEAD'])).out.trim()
+        // Moved only from the commit it was updated from: a branch that moved meanwhile is left as it is.
+        if (!(await git(projectPath, ['update-ref', `refs/heads/${branch}`, head, was])).ok) throw refusal(UPDATE.moved, { branch })
+      } finally {
+        await git(projectPath, ['worktree', 'remove', '--force', tmp])
+      }
+    }
+    log.info(`Updated ${userText(branch)} from ${userText(plan.target)} by ${how} (${plan.where})`)
+    await changed(projectPath)
+    const commit = head.slice(0, 7)
+    return how === 'rebase' ? tr(UPDATE.rebased, { branch, n: plan.ahead, target: plan.target, commit }) : tr(UPDATE.merged, { target: plan.target, branch, commit })
+  })
 }

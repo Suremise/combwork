@@ -292,6 +292,23 @@ interface HiveMessageValues {
   'git.untrack.message': { branch: string | number }
   'git.untrack.tip': { upstream: string | number }
   'git.untrack.title': { branch: string | number; upstream: string | number }
+  'git.update.agents': { agents: string | number; n: number }
+  'git.update.approval': { approval: string; card: string | number }
+  'git.update.behind': { n: number; target: string | number }
+  'git.update.busy': undefined
+  'git.update.card': { card: string | number }
+  'git.update.confirm': undefined
+  'git.update.counts': { target: string | number; behind: number; branch: string | number; ahead: number }
+  'git.update.how': undefined
+  'git.update.merge': { target: string | number }
+  'git.update.mergeNote': { target: string | number; branch: string | number }
+  'git.update.planFailed': { branch: string | number }
+  'git.update.rebase': { target: string | number }
+  'git.update.rebaseNote': { branch: string | number; n: number; target: string | number; pushed: string }
+  'git.update.tip': { branch: string | number; target: string | number }
+  'git.update.title': { branch: string | number; target: string | number }
+  'git.update.undone': { branch: string | number }
+  'git.update.where': { where: string; branch: string | number; slot: string | number; folder: string | number }
   'git.upstream.gone': undefined
   'git.validate.enterName': undefined
   'git.validate.enterUrl': undefined

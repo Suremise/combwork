@@ -40,7 +40,7 @@ vi.mock('../src/main/workspace', () => ({
     // The folder contract (#1451) reads no slots here: no Assistant home, no board.
     isAssistantHome: () => false
   },
-  workspaceOf: () => ({ refresh: async () => ({}), path: 'ws', info: () => ({ projects: [{ path: proj, name: 'proj', platform: { id: 'git' } }] }), projectConfig: async () => ({ version: 2, agents }) })
+  workspaceOf: () => ({ refresh: async () => ({}), path: 'ws', worktreesRoot: `${proj}.worktrees`, info: () => ({ projects: [{ path: proj, name: 'proj', platform: { id: 'git' } }] }), projectConfig: async () => ({ version: 2, agents }) })
 }))
 /** The project's workflow target (#1642: '' for none, the default branch), and the board's open cards' lines. */
 let workTarget = ''
@@ -888,4 +888,121 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     await expect(repo.deleteRemoteBranches(proj, 'origin', [r('hive/hb2')])).rejects.toThrow(/origin refused to delete hive\/hb2/)
     expect(branchNames(remote)).toContain('hive/hb2')
   }, 120_000)
+})
+
+describe('Update from <target> (HI-1180)', () => {
+  /** A branch `card` with its own commit, checked out in a worktree (as a slot is), and a commit on main it hasn't. */
+  const cardBranch = (opts: { worktree?: boolean; same?: boolean } = {}): string => {
+    git(proj, 'branch', 'card')
+    const wt = join(proj, '..', 'wt-card')
+    if (opts.worktree !== false) git(proj, 'worktree', 'add', '-q', wt, 'card')
+    const at = opts.worktree !== false ? wt : proj
+    if (opts.worktree === false) git(proj, 'checkout', '-q', 'card')
+    // Both sides change x.txt alike (a conflict) when asked; else each its own file.
+    writeFileSync(join(at, opts.same ? 'x.txt' : 'c.txt'), 'the card\n')
+    git(at, 'add', '-A')
+    git(at, 'commit', '-qm', 'the card')
+    if (opts.worktree === false) git(proj, 'checkout', '-q', 'main')
+    writeFileSync(join(proj, opts.same ? 'x.txt' : 'm.txt'), 'main\n')
+    git(proj, 'add', '-A')
+    git(proj, 'commit', '-qm', 'on main')
+    return wt
+  }
+  const head = (ref: string): string => git(proj, 'rev-parse', ref)
+  const contains = (branch: string, sha: string): boolean => {
+    try {
+      git(proj, 'merge-base', '--is-ancestor', sha, branch)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  beforeEach(() => {
+    workTarget = 'main'
+  })
+
+  it('says what it would do, and the branch rows count the target commits a branch lacks', async () => {
+    cardBranch()
+    const plan = await repo.branchUpdatePlan(proj, 'card')
+    expect(plan).toMatchObject({ branch: 'card', target: 'main', behind: 1, ahead: 1, where: 'worktree', card: null, agents: [], approval: null, pushed: false, blocked: null })
+    const row = (await repo.repoInfo(proj, 'main')).branches.find((b) => b.name === 'card')
+    expect([row?.toTarget, row?.fromTarget]).toEqual([1, 1])
+    await expect(repo.branchUpdatePlan(proj, 'main')).rejects.toThrow('main is the target itself.')
+    await expect(repo.branchUpdatePlan(proj, 'nope')).rejects.toThrow("There's no branch nope.")
+  })
+
+  it('merges the target in where the branch is checked out: one merge commit, then nothing more to do', async () => {
+    const wt = cardBranch()
+    const main = head('main')
+    expect(await repo.updateBranch(proj, 'card', 'merge')).toMatch(/^Merged main into card \([0-9a-f]{7}\)\.$/)
+    expect(contains('card', main)).toBe(true)
+    expect(git(wt, 'log', '-1', '--format=%s%n%P').split('\n')).toEqual(['Merge main into card', expect.stringMatching(/^[0-9a-f]+ [0-9a-f]+$/)])
+    // Clean as Hive's git sees it (its line endings, not this test's git's).
+    expect((await repo.branchUpdatePlan(proj, 'card')).blocked).toBeNull()
+    expect(asUser).toHaveBeenCalledWith(proj, 'card', expect.any(Function))
+    expect(await repo.updateBranch(proj, 'card', 'merge')).toBe('card already has everything in main.')
+  })
+
+  it("rebases the branch's commits onto the target: no merge commit", async () => {
+    const wt = cardBranch()
+    expect(await repo.updateBranch(proj, 'card', 'rebase')).toMatch(/^Rebased card's 1 commit onto main \([0-9a-f]{7}\)\.$/)
+    expect(git(wt, 'rev-parse', 'HEAD~1')).toBe(head('main'))
+    expect(git(wt, 'log', '-1', '--format=%s')).toBe('the card')
+  })
+
+  for (const how of ['merge', 'rebase'] as const) {
+    it(`a conflict (${how}) is undone at once, naming its files: the branch and its folder as they were`, async () => {
+      const wt = cardBranch({ same: true })
+      const was = head('card')
+      await expect(repo.updateBranch(proj, 'card', how)).rejects.toThrow(`${how === 'rebase' ? 'Rebasing' : 'Merging'} card with main stopped at a conflict in x.txt, so it was undone: card is as it was.`)
+      expect(head('card')).toBe(was)
+      expect((await repo.repoSummary(wt)).state).toBeNull()
+      expect((await repo.branchUpdatePlan(proj, 'card')).blocked).toBeNull()
+    })
+  }
+
+  it('is refused while an agent works there, with uncommitted changes there, or git mid-operation there, saying why', async () => {
+    const wt = cardBranch()
+    agents = [{ id: 'a1', name: 'B1', worktree: { path: wt, branch: 'card', base: 'main' } }]
+    live = { a1: 'working' }
+    await expect(repo.updateBranch(proj, 'card', 'merge')).rejects.toThrow(`B1 is working in ${wt}: update card once it has finished.`)
+    // Idle there: named in the plan, not refused.
+    live = { a1: 'finished' }
+    expect((await repo.branchUpdatePlan(proj, 'card')).agents).toEqual([{ name: 'B1', status: 'finished' }])
+    writeFileSync(join(wt, 'c.txt'), 'changed\n')
+    expect((await repo.branchUpdatePlan(proj, 'card')).blocked).toBe(`${wt} has uncommitted changes: commit them, or set them aside, before updating card.`)
+    await expect(repo.updateBranch(proj, 'card', 'merge')).rejects.toThrow('has uncommitted changes')
+    git(wt, 'checkout', '-q', '--', 'c.txt')
+    // An untracked file is git's to judge (a merge that would overwrite it stops).
+    writeFileSync(join(wt, 'notes.txt'), 'mine\n')
+    expect((await repo.branchUpdatePlan(proj, 'card')).blocked).toBeNull()
+  })
+
+  it('updates the branch checked out in the project folder there', async () => {
+    cardBranch({ worktree: false })
+    git(proj, 'checkout', '-q', 'card')
+    expect((await repo.branchUpdatePlan(proj, 'card')).where).toBe('project')
+    expect(await repo.updateBranch(proj, 'card', 'merge')).toMatch(/^Merged main into card/)
+    expect(contains('HEAD', head('main'))).toBe(true)
+  })
+
+  for (const how of ['merge', 'rebase'] as const) {
+    it(`a branch checked out nowhere is updated (${how}) in a temporary worktree, removed after`, async () => {
+      cardBranch({ worktree: false })
+      expect((await repo.branchUpdatePlan(proj, 'card')).where).toBe('temporary')
+      await repo.updateBranch(proj, 'card', how)
+      expect(contains('card', head('main'))).toBe(true)
+      expect(git(proj, 'worktree', 'list', '--porcelain').split('\n').filter((l) => l.startsWith('worktree ')).length).toBe(1)
+      expect(git(proj, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('main')
+    })
+  }
+
+  it('a conflict in a temporary worktree is undone too, and the worktree removed', async () => {
+    cardBranch({ worktree: false, same: true })
+    const was = head('card')
+    await expect(repo.updateBranch(proj, 'card', 'merge')).rejects.toThrow('stopped at a conflict in x.txt')
+    expect(head('card')).toBe(was)
+    expect(git(proj, 'worktree', 'list', '--porcelain').split('\n').filter((l) => l.startsWith('worktree ')).length).toBe(1)
+  })
 })

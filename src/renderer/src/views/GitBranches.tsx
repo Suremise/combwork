@@ -15,7 +15,8 @@ import {
   type GitBranchRow,
   type GitRemoteBranchRow,
   type GitRepoInfo,
-  type GitRepoSummary
+  type GitRepoSummary,
+  type BranchUpdatePlan
 } from '@shared/gitRepo'
 import { BRANCH_GROUPS, busyLines, cleanupOffer, localGroup, localUse, remoteGroup, type BranchGroup, type CleanupOffer } from '@shared/branchCleanup'
 import { samePath } from '@shared/movePaths'
@@ -403,6 +404,12 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
         // Grouped by state against the project's target (#1642); with none known, the list as it was.
         const target = info.target ?? null
         const offer = cleanupOffer(info, busyBranches)
+        // Update from <target> (HI-1180): a branch with its own work that lacks some of the target's (never the target).
+        const updatable = (b: GitBranchRow): boolean => !!target && b.name !== target && !!b.toTarget && !!b.fromTarget
+        const updateFrom = async (b: GitBranchRow): Promise<void> => {
+          const plan = await attempt(tr(U.planFailed, { branch: b.name }), () => call('git:updatePlan', project.path, b.name))
+          if (plan) setForm({ make: () => updateForm(project, plan) })
+        }
         const warnings = identityWarnings(info.identity, info.remotes)
         // A folder's slot (#1450), and its agent: the slot's lease's, else the agent whose session runs there.
         const slotOf = (path: string | null): SlotView | undefined => (path ? slots.find((x) => samePath(x.folder, path)) : undefined)
@@ -549,6 +556,11 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                         {tr(C.ahead, { n: b.toTarget, target })}
                       </span>
                     )}
+                    {updatable(b) && (
+                      <span className="faint git-track" data-from-target={b.fromTarget}>
+                        {tr(U.behind, { n: b.fromTarget!, target: target! })}
+                      </span>
+                    )}
                     <span className="git-subject faint">{b.subject}</span>
                     <span className="git-meta faint">{at(b.date)}</span>
                     {info.remotes.length > 0 && (
@@ -557,6 +569,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                         {b.upstream && <IconButton icon="debug-disconnect" title={tr(M.untrackTip, { upstream: b.upstream })} action="untrack" disabled={off} onClick={() => void untrack(b.name, b.upstream!)} />}
                       </span>
                     )}
+                    {updatable(b) && <IconButton icon="repo-pull" title={tr(U.tip, { branch: b.name, target: target! })} action="update-branch" disabled={!!ro} onClick={() => void updateFrom(b)} />}
                     {!b.current && <IconButton icon="git-merge" title={tr(M.mergeBranch, { branch: b.name })} action="merge-branch" disabled={!!ro} onClick={() => set({ branchMergeFor: { project: project.path, branch: b.name } })} />}
                     {free && <IconButton icon="trash" title={tr(C.deleteTip, { branch: b.name })} action="delete-branch" disabled={off} onClick={() => void deleteOne(b, target!)} />}
                     {!b.current && (
@@ -786,6 +799,52 @@ function CleanupPicker({ offer, onChange }: { offer: CleanupOffer; onChange: (pi
       )}
     </div>
   )
+}
+
+/** Update from <target> (HI-1180): a branch's row action and its dialog. */
+const U = {
+  behind: msg({ id: 'git.update.behind', defaultMessage: "{n, plural, one {# commit of {target} it hasn't} other {# commits of {target} it hasn't}}", description: "On a branch in Version Control → Branches & remotes (HI-1180): how many commits of the target branch {target} the branch doesn't have yet (Update from {target} brings them in)." }),
+  tip: msg({ id: 'git.update.tip', defaultMessage: 'Update {branch} from {target}…', description: "Tooltip on a branch's Update button in Version Control → Branches & remotes (HI-1180): merges the target {target} into the branch {branch}, or rebases it onto {target} (a dialog asks which first)." }),
+  planFailed: msg({ id: 'git.update.planFailed', defaultMessage: "Couldn't read what updating {branch} would do", description: "An error notification's title (HI-1180): reading what Update from <target> would do to the branch {branch} failed." }),
+  title: msg({ id: 'git.update.title', defaultMessage: 'Update {branch} from {target}', description: 'Title of the Update from <target> dialog (HI-1180): bring the branch {branch} up to date with the target branch {target}.' }),
+  counts: msg({ id: 'git.update.counts', defaultMessage: "{target} has {behind, plural, one {# commit} other {# commits}} {branch} hasn't; {branch} has {ahead, plural, one {# commit} other {# commits}} of its own.", description: "The Update from <target> dialog's first sentence: how many commits of the target {target} the branch {branch} lacks ({behind}), and how many it has that the target hasn't ({ahead})." }),
+  where: msg({ id: 'git.update.where', defaultMessage: '{where, select, project {It runs in the project folder, where {branch} is checked out.} slot {It runs in {slot}, the slot {branch} is checked out in.} worktree {It runs in {folder}, where {branch} is checked out.} other {{branch} is checked out nowhere: Hive updates it in a temporary folder, removed after.}}', description: "The Update from <target> dialog: where the update runs (select: translate each): the project folder, a slot ({slot}: its name, such as slot-a), another worktree ({folder}: its path), or a temporary folder Hive makes when the branch isn't checked out anywhere." }),
+  card: msg({ id: 'git.update.card', defaultMessage: "It is {card}'s work.", description: "The Update from <target> dialog: the branch is the line of a card ({card}: its key, such as HI-12) that isn't Done." }),
+  agents: msg({ id: 'git.update.agents', defaultMessage: '{agents} {n, plural, one {works} other {work}} there: {n, plural, one {its} other {their}} next turn starts from the updated branch.', description: 'The Update from <target> dialog: agents ({agents}: their names, joined) work in the folder the update runs in, none in a turn now; what they do next starts from the updated branch.' }),
+  approval: msg({ id: 'git.update.approval', defaultMessage: '{approval, select, carries {{card} has passed review: its pass carries over when the update is the same change, as a clean merge or rebase is.} other {{card} has passed review: once updated, it goes back for review (the project keeps a pass only for the exact commit).}}', description: "The Update from <target> dialog, for a card that passed review ({card}: its key): whether the pass survives the update (carries: the project's \"A pass survives a clean rebase\" is on; other: the card is reviewed again). Select: translate each." }),
+  undone: msg({ id: 'git.update.undone', defaultMessage: 'A conflict is undone at once, leaving {branch} as it was.', description: 'The Update from <target> dialog: if git stops at a conflict, Hive aborts the merge or rebase, so the branch {branch} is never left half updated.' }),
+  how: msg({ id: 'git.update.how', defaultMessage: 'How', description: 'A label in the Update from <target> dialog: the choice of Merge or Rebase.' }),
+  merge: msg({ id: 'git.update.merge', defaultMessage: 'Merge {target} in', description: 'An option in the Update from <target> dialog (the default): merge the target branch {target} into the branch, as one merge commit.' }),
+  rebase: msg({ id: 'git.update.rebase', defaultMessage: 'Rebase onto {target}', description: "An option in the Update from <target> dialog: replay the branch's own commits on top of the target branch {target}." }),
+  mergeNote: msg({ id: 'git.update.mergeNote', defaultMessage: "One merge commit joins {target}'s commits to {branch}'s, which stay as they are.", description: 'What Merge does, under the choice in the Update from <target> dialog: one merge commit; the branch {branch} keeps its own commits as they are.' }),
+  rebaseNote: msg({ id: 'git.update.rebaseNote', defaultMessage: "{branch}'s {n, plural, one {commit is} other {# commits are}} replayed on top of {target}, as new commits.{pushed, select, yes { What was pushed of {branch} then differs from it, and Hive never forces a push.} other {}}", description: "What Rebase does, under the choice in the Update from <target> dialog: the branch's {n} commits are rewritten on top of {target}; with pushed yes, it tracks a remote branch, which then no longer matches (pushing it would need a force, which Hive never does)." }),
+  confirm: msg({ id: 'git.update.confirm', defaultMessage: 'Update', description: 'The Update from <target> dialog\'s button: updates the branch.' }),
+  busy: msg({ id: 'git.update.busy', defaultMessage: 'Updating…', description: 'The Update from <target> dialog\'s button while the branch is being updated.' })
+}
+
+/** Update from <target> (HI-1180): what it does to the branch, merge or rebase, as its plan says it now. */
+function updateForm(project: ProjectInfo, p: BranchUpdatePlan): FormSpec {
+  const lines = [
+    tr(U.counts, { target: p.target, behind: p.behind, branch: p.branch, ahead: p.ahead }),
+    tr(U.where, { where: p.where, branch: p.branch, slot: p.slot ?? '', folder: p.folder ?? '' }),
+    ...(p.card ? [tr(U.card, { card: p.card.key })] : []),
+    ...(p.agents.length ? [tr(U.agents, { agents: fmt.list(p.agents.map((a) => a.name)), n: p.agents.length })] : []),
+    ...(p.card && p.approval ? [tr(U.approval, { approval: p.approval, card: p.card.key })] : []),
+    tr(U.undone, { branch: p.branch })
+  ]
+  return {
+    project,
+    title: tr(U.title, { branch: p.branch, target: p.target }),
+    icon: 'repo-pull',
+    about: lines.join(' '),
+    fields: [{ key: 'how', label: tr(U.how), initial: 'merge', options: [{ label: tr(U.merge, { target: p.target }), value: 'merge' }, { label: tr(U.rebase, { target: p.target }), value: 'rebase' }] }],
+    confirm: tr(U.confirm),
+    busyLabel: tr(U.busy),
+    // Why it can't run now (an agent in a turn there, uncommitted changes…): shown, and Update off.
+    validate: () => p.blocked,
+    note: (v) => (v.how === 'rebase' ? tr(U.rebaseNote, { branch: p.branch, n: p.ahead, target: p.target, pushed: p.pushed ? 'yes' : 'no' }) : tr(U.mergeNote, { target: p.target, branch: p.branch })),
+    submit: (v) => call('git:updateBranch', project.path, p.branch, v.how === 'rebase' ? 'rebase' : 'merge')
+  }
 }
 
 function remoteForm(project: ProjectInfo): FormSpec {

@@ -117,6 +117,18 @@ interface HiveMessageValues {
   'service.gitRepo.tracking': { pushed: string; branch: string | number; upstream: string | number }
   'service.gitRepo.untracked': { branch: string | number; upstream: string | number }
   'service.gitRepo.upToDate': { branch: string | number; upstream: string | number }
+  'service.gitRepo.update.agentBusy': { agent: string | number; status: string; folder: string | number; branch: string | number }
+  'service.gitRepo.update.conflict': { how: string; branch: string | number; target: string | number; files: string | number }
+  'service.gitRepo.update.dirty': { folder: string | number; branch: string | number }
+  'service.gitRepo.update.failed': { branch: string | number; target: string | number; why: string | number }
+  'service.gitRepo.update.isTarget': { branch: string | number }
+  'service.gitRepo.update.merged': { target: string | number; branch: string | number; commit: string | number }
+  'service.gitRepo.update.midOperation': { state: string | number; folder: string | number }
+  'service.gitRepo.update.moved': { branch: string | number }
+  'service.gitRepo.update.noTarget': { branch: string | number }
+  'service.gitRepo.update.queued': { card: string | number; branch: string | number }
+  'service.gitRepo.update.rebased': { branch: string | number; n: number; target: string | number; commit: string | number }
+  'service.gitRepo.update.upToDate': { branch: string | number; target: string | number }
   'service.gitRepo.upstreamGone': { upstream: string | number }
   'service.gitRepo.urlChanged': { remote: string | number }
   'service.gitRepo.urlFailed': { remote: string | number; why: string | number }

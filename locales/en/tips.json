@@ -1639,6 +1639,14 @@
     "defaultMessage": "Tidy kept worktrees",
     "description": "A tip's title."
   },
+  "tips.updateFromTarget.text": {
+    "defaultMessage": "Version Control → Branches & remotes: a branch behind the target has Update. Merge the target in or rebase onto it, where the branch is checked out; a conflict is undone at once, naming its files.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.updateFromTarget.title": {
+    "defaultMessage": "Bring a branch up to date with its target",
+    "description": "A tip's title."
+  },
   "tips.versionControlSwitch.text": {
     "defaultMessage": "Click None or Git atop a project’s Version Control tab to switch it from its next card; cards in flight keep the old rules. Each keeps its own workflow options, and when the folder changes (git init, say), Hive offers the switch there.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: None, Git, Version Control, old rules, workflow). Keep git init as it is (a command)."

@@ -409,6 +409,8 @@
   "tips.unmerged.title": "Zobacz, co agent w worktree ma do scalenia",
   "tips.unusedWorktrees.text": "Usunięto agenta, ale zachowano jego worktree? Kontrola wersji → Zmiany otwiera się na worktree, których nie używa żaden agent, i pokazuje, kto utworzył każdy z nich: otwórz jeden, żeby zobaczyć jego pracę i ją scalić, albo usuń scalone razem z gałęziami.",
   "tips.unusedWorktrees.title": "Uporządkuj zachowane worktree",
+  "tips.updateFromTarget.text": "Kontrola wersji → Gałęzie i zdalne: gałąź pozostająca za celem ma Aktualizuj. Scal cel albo zrób rebase na niego tam, gdzie gałąź jest wybrana; konflikt jest od razu cofany, z nazwami jego plików.",
+  "tips.updateFromTarget.title": "Zaktualizuj gałąź do jej celu",
   "tips.versionControlSwitch.text": "Kliknij Brak lub Git u góry zakładki Kontrola wersji, aby przełączyć projekt od następnej karty; rozpoczęte karty zachowają stare reguły. Każdy wybór ma własne opcje przepływu pracy, a gdy folder się zmieni (np. git init), Hive zaproponuje tam przełączenie.",
   "tips.versionControlSwitch.title": "Przełączanie między opcjami Brak i Git",
   "tips.versionControlTab.text": "Zakładka Kontrola wersji projektu mówi, co Hive znalazł w jego folderze, i zaczyna się od sekcji Przepływ pracy: kto recenzuje, jakie sprawdzenia muszą przejść najpierw i kto scala. Nagłówek podaje ustawienie wstępne, a kliknięcie go otwiera opcje.",

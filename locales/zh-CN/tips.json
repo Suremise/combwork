@@ -409,6 +409,8 @@
   "tips.unmerged.title": "查看工作树智能体有哪些待合并",
   "tips.unusedWorktrees.text": "删除了智能体但保留了它的工作树？“版本控制”→“更改”会打开未被任何智能体使用的工作树，并注明各自由谁创建：打开一个查看并合并其工作，或连同分支删除已合并的工作树。",
   "tips.unusedWorktrees.title": "整理保留的工作树",
+  "tips.updateFromTarget.text": "版本控制 → 分支和远程：落后于目标的分支有“更新”。在分支检出的位置合并目标或变基到目标上；冲突会立即撤销，并列出其文件。",
+  "tips.updateFromTarget.title": "让分支与其目标保持同步",
   "tips.versionControlSwitch.text": "点击项目“版本控制”标签页顶部的“无”或 Git，即可从下一张卡片起切换；已开始的卡片保持旧规则。两者各自保留自己的工作流程选项；当文件夹发生变化（例如 git init）时，Hive 会在那里提出切换。",
   "tips.versionControlSwitch.title": "在“无”和 Git 之间切换",
   "tips.versionControlTab.text": "项目的“版本控制”标签页会说明 Hive 在其文件夹中找到了什么，并以“工作流程”开头：由谁评审、哪些检查需先通过、由谁合并。标题会显示预设名称，点击即可打开这些选项。",

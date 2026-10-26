@@ -409,6 +409,8 @@
   "tips.unmerged.title": "Veja o que um agente em worktree ainda precisa mesclar",
   "tips.unusedWorktrees.text": "Removeu um agente, mas manteve o worktree dele? Controle de versão → Alterações abre nos worktrees que nenhum agente usa, dizendo quem fez cada um: abra um para ver o trabalho e fazer merge, ou remova os mesclados com os branches deles.",
   "tips.unusedWorktrees.title": "Organize os worktrees mantidos",
+  "tips.updateFromTarget.text": "Controle de versão → Branches e remotos: um branch atrás do destino tem Atualizar. Faça merge do destino ou rebase sobre ele, onde o branch está em checkout; um conflito é desfeito na hora, com os arquivos nomeados.",
+  "tips.updateFromTarget.title": "Atualize um branch com o seu destino",
   "tips.versionControlSwitch.text": "Clique em Nenhum ou Git no topo da aba Controle de versão para mudar a partir do próximo cartão; cartões em andamento mantêm as regras antigas. Cada um guarda suas opções do fluxo de trabalho, e se a pasta mudar (git init), o Hive oferece a troca ali.",
   "tips.versionControlSwitch.title": "Alternar entre Nenhum e Git",
   "tips.versionControlTab.text": "A aba Controle de versão de um projeto diz o que o Hive encontrou na pasta e começa por Fluxo de trabalho: quem revisa, quais verificações passam antes e quem faz o merge. O cabeçalho mostra a predefinição, e um clique nele abre as opções.",
