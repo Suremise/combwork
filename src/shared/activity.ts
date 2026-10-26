@@ -61,14 +61,23 @@ export interface ActivityTask {
   at: number
 }
 
+/** A process as the tab lists it: Stop's tracking's, with its whole command line, masked like the log. */
+export type ActivityProcess = AgentProcess & { command?: string }
+
 /** A running launch's processes (Stop's tracking): its agent, the agent's CLI among them, and the rest. */
 export interface ActivityLaunch {
   agentId: string
   runId: string
   /** The agent's CLI and its terminal: never ended from the tab (Stop does). */
   cli: number[]
-  processes: AgentProcess[]
+  processes: ActivityProcess[]
   more: number
+}
+
+/** An item's whole input as written (line breaks kept, nothing cut), masked like the log: a prompt, or a tool call's input and result. */
+export interface ActivityDetail {
+  input: string
+  result: string | null
 }
 
 /** What runs now in a project's agents' launches: polled while the tab is shown. */
@@ -90,9 +99,24 @@ const cut = (s: string, n: number): string => {
  * like the log (secrets and sign-in codes) and cut short; the details read a tool call whole.
  */
 export function activityTurns(items: readonly TranscriptItem[], max = ACTIVITY_TURNS): { total: number; turns: ActivityTurn[] } {
+  // Linear, and only the tail is built (#1254 round 2): it runs on main whenever a running session's transcript grows.
+  let total = 0
+  let from = items.length
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (items[i].kind !== 'user') continue
+    total++
+    if (total <= max) from = i
+  }
   const turns: ActivityTurn[] = []
   let turn: ActivityTurn | null = null
-  for (let i = 0; i < items.length; i++) {
+  // When the next item with a time came after each one: read from the end, so each tool call's `until` costs nothing.
+  const nextAt: (string | null)[] = Array.from({ length: items.length - from }, () => null)
+  let seen: string | null = null
+  for (let i = items.length - 1; i >= from; i--) {
+    nextAt[i - from] = seen
+    if (items[i].timestamp) seen = items[i].timestamp
+  }
+  for (let i = from; i < items.length; i++) {
     const item = items[i]
     if (item.kind === 'user') {
       turn = { itemId: item.id, at: item.timestamp, prompt: cut(maskText(item.text), LINE), tools: [], reply: '' }
@@ -100,12 +124,10 @@ export function activityTurns(items: readonly TranscriptItem[], max = ACTIVITY_T
       continue
     }
     if (!turn) continue
-    if (item.kind === 'tool') {
-      const next = items.slice(i + 1).find((x) => x.timestamp)
-      turn.tools.push({ itemId: item.id, name: item.tool.name, summary: cut(maskText(item.tool.summary), LINE), at: item.timestamp, until: next?.timestamp ?? null, failed: item.tool.isError, done: item.tool.result !== null })
-    } else if (item.kind === 'assistant' && item.text.trim()) turn.reply = cut(maskText(item.text), LINE)
+    if (item.kind === 'tool') turn.tools.push({ itemId: item.id, name: item.tool.name, summary: cut(maskText(item.tool.summary), LINE), at: item.timestamp, until: nextAt[i - from], failed: item.tool.isError, done: item.tool.result !== null })
+    else if (item.kind === 'assistant' && item.text.trim()) turn.reply = cut(maskText(item.text), LINE)
   }
-  return { total: turns.length, turns: turns.slice(-max) }
+  return { total, turns }
 }
 
 /** A Windows FILETIME (100 ns since 1601, as text) as Unix ms; null when it isn't one. */
@@ -143,7 +165,7 @@ export type ActivityNode =
   | { kind: 'turn'; key: string; sessionId: string; turn: ActivityTurn; state: ActivityState; children: ActivityNode[] }
   | { kind: 'tool'; key: string; sessionId: string; tool: ActivityTool; state: ActivityState; children: ActivityNode[] }
   | { kind: 'task'; key: string; task: ActivityTask; children: ActivityNode[] }
-  | { kind: 'process'; key: string; agentId: string; process: AgentProcess; cli: boolean; children: ActivityNode[] }
+  | { kind: 'process'; key: string; agentId: string; process: ActivityProcess; cli: boolean; children: ActivityNode[] }
 
 /** An agent as the tree needs it: its id, name and live state (none: not running). */
 export interface ActivityAgent {

@@ -1,19 +1,21 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { buildActivityTree, DETAIL, filetimeMs, type ActivityAgent, type ActivityCard, type ActivityNode, type ActivityNow, type ActivityState, type ActivityTurns } from '@shared/activity'
+import { ACTIVITY_HOURS, buildActivityTree, filetimeMs, type ActivityAgent, type ActivityCard, type ActivityDetail, type ActivityNode, type ActivityNow, type ActivityState, type ActivityTurns } from '@shared/activity'
 import { agentState } from '@shared/agentState'
-import { maskText } from '@shared/redact'
 import { cardLabel } from '@shared/projectKeys'
-import type { ProjectInfo, SessionListItem, TranscriptTool } from '@shared/types'
+import type { ProjectInfo, SessionListItem } from '@shared/types'
 import { call, errorMessage } from '../api'
 import * as actions from '../actions'
 import { confirm, notify, openInSessionsTab, revealAgent, set, useStore } from '../store'
 import { Icon, IconButton, statusText } from '../components/ui'
 import { cx } from '../util'
-import { useSessions } from './ProjectTabs'
 import { fmt, msg, tr } from '@shared/i18n'
 
 /** How often what runs now is read, and live changes are drawn, while the tab is shown (#1254: batched, about once a second). */
 const TICK_MS = 1000
+/** The session list read again every this many ticks (and when an agent starts or stops). */
+const LIST_EVERY = 5
+/** Sessions whose turns are read at once. */
+const TURNS_AT_ONCE = 4
 /** The tree's geometry: a column per depth, a row per node shown. */
 const COL = 256
 const NODE_W = 224
@@ -23,10 +25,7 @@ const NODE_H = 36
 const OVERSCAN = 12
 
 const NO_FILTER: { agentId?: string; card?: number } = {}
-/**
- * Each project's session list as last read here: the tab opens on it at once and draws the fresh one when it comes
- * (#1254: under 500 ms with hundreds of sessions, whose listing alone can take that). Kept for this window's projects only.
- */
+/** Each project's session list as last read here: the tab opens on it at once and draws the fresh one when it comes. */
 const lastLists = new Map<string, SessionListItem[]>()
 const NO_NOW: ActivityNow = { launches: [], tasks: [] }
 
@@ -51,12 +50,15 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   const visible = usePageVisible()
   const active = shown && visible
   const filter = useStore((s) => s.activityFilters[project.path] ?? NO_FILTER)
-  const sessions = useSessions(project)
+  const [list, setList] = useState<SessionListItem[] | null>(() => lastLists.get(project.path) ?? null)
+  const [listError, setListError] = useState<string | null>(null)
   const tasks = useStore((s) => s.tasks)
   const [now, setNow] = useState<ActivityNow>(NO_NOW)
   const [turns, setTurns] = useState<ReadonlyMap<string, ActivityTurns>>(new Map())
   // Nodes opened or closed against their default, sessions' groups showing all, the node whose details show.
   const [toggled, setToggled] = useState<ReadonlySet<string>>(new Set())
+  // Expand All and Collapse All set every node's default, those that come later (a session's turns read once open) too.
+  const [mode, setMode] = useState<OpenMode>('default')
   const [showAll, setShowAll] = useState<ReadonlySet<string>>(new Set())
   const [selected, setSelected] = useState<string | null>(null)
   // The agents as last taken in: live state changes often, the tree follows once a tick, and only when it changed.
@@ -67,21 +69,46 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   const openRef = useRef<{ id: string; live: boolean }[]>([])
   const turnsRef = useRef(turns)
   turnsRef.current = turns
+  // Turns read a few sessions at a time (Expand All can open many); one asked for while it is read waits for that read.
+  const queue = useRef<{ ids: string[]; running: Set<string> }>({ ids: [], running: new Set() })
   const readTurns = useCallback(
     (ids: string[]): void => {
-      for (const id of ids)
-        void call('activity:turns', project.path, id, turnsRef.current.get(id)?.version)
-          .then((t) => t && setTurns((m) => new Map(m).set(id, t)))
-          .catch(() => undefined)
+      const q = queue.current
+      for (const id of ids) if (!q.ids.includes(id) && !q.running.has(id)) q.ids.push(id)
+      const next = (): void => {
+        while (q.running.size < TURNS_AT_ONCE && q.ids.length) {
+          const id = q.ids.shift()!
+          q.running.add(id)
+          void call('activity:turns', project.path, id, turnsRef.current.get(id)?.version)
+            .then((t) => t && setTurns((m) => new Map(m).set(id, t)))
+            .catch(() => undefined)
+            .finally(() => {
+              q.running.delete(id)
+              next()
+            })
+        }
+      }
+      next()
     },
     [project.path]
   )
+  const readList = useCallback(() => {
+    void call('activity:sessions', project.path, ACTIVITY_HOURS)
+      .then((l) => {
+        lastLists.set(project.path, l)
+        setList(l)
+        setListError(null)
+      })
+      .catch((e) => setListError(errorMessage(e)))
+  }, [project.path])
 
   useEffect(() => {
     if (!active) return
     let stop = false
     let lastNow = ''
     let lastLive = ''
+    let ticks = 0
+    readList()
     const read = (): void => {
       void call('activity:now', project.path)
         .then((n) => {
@@ -92,10 +119,13 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
         })
         .catch(() => undefined)
       const live = agentsRef.current.map((a) => (a.live ? `${a.id}:${a.live.sessionId}:${a.live.status}:${statusText(a.live)}` : a.id)).join('|')
-      if (live !== lastLive) {
+      const changed = live !== lastLive
+      if (changed) {
         lastLive = live
         setTick((t) => t + 1)
       }
+      // The session list again when an agent started or stopped, and every few seconds (a card moved, a session renamed).
+      if ((changed && ticks > 0) || ++ticks % LIST_EVERY === 0) readList()
       // Running sessions shown open: their turns again, only when their transcript changed (null back otherwise).
       readTurns(openRef.current.filter((x) => x.live).map((x) => x.id))
     }
@@ -105,7 +135,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
       stop = true
       clearInterval(t)
     }
-  }, [active, project.path, readTurns])
+  }, [active, project.path, readTurns, readList])
 
   const agents = useMemo<ActivityAgent[]>(
     () =>
@@ -126,15 +156,10 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
         .map((c) => ({ number: c.number, label: cardLabel(c), title: c.title, column: c.column, agents: [c.agent, c.review?.agent].filter((x): x is string => !!x) })),
     [tasks, project.name]
   )
-  const fresh = sessions.items
-  useEffect(() => {
-    if (fresh) lastLists.set(project.path, fresh)
-  }, [fresh, project.path])
-  const list = fresh ?? lastLists.get(project.path) ?? null
 
   const tree = useMemo(() => buildActivityTree({ agents, cards, sessions: list ?? [], turns, now, at: Date.now(), filter, showAll }), [agents, cards, list, turns, now, filter, showAll])
 
-  const isOpen = useCallback((n: ActivityNode): boolean => toggled.has(n.key) !== openByDefault(n), [toggled])
+  const isOpen = useCallback((n: ActivityNode): boolean => toggled.has(n.key) !== openIn(mode, n), [toggled, mode])
   const rows = useMemo(() => layout(tree, isOpen), [tree, isOpen])
 
   // The turns of each session shown open: read when it opens (the tick reads running ones again).
@@ -158,7 +183,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   const filterName = filter.agentId ? (project.agents.find((a) => a.id === filter.agentId)?.name ?? filter.agentId) : filter.card !== undefined ? (cards.find((c) => c.number === filter.card)?.label ?? `#${filter.card}`) : null
 
   // Until the session list comes (the first open of a project), the tree has the running agents' sessions and the cards.
-  const reading = !list && !sessions.error
+  const reading = !list && !listError
   return (
     <div className="activity-tab">
       <div className="activity-main">
@@ -170,15 +195,29 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
               <Icon name="loading" spin /> {tr(M.reading)}
             </span>
           )}
-          {!list && sessions.error && <span className="error-text">{tr(M.loadFailed, { error: sessions.error })}</span>}
+          {!list && listError && <span className="error-text">{tr(M.loadFailed, { error: listError })}</span>}
           {filterName && (
             <button className="chip activity-filter" onClick={() => set((s) => ({ activityFilters: Object.fromEntries(Object.entries(s.activityFilters).filter(([k]) => k !== project.path)) }))} title={tr(M.clearFilter)}>
               {tr(filter.agentId ? M.filterAgent : M.filterCard, { name: filterName })} <Icon name="close" />
             </button>
           )}
           <div className="actions">
-            <IconButton icon="expand-all" title={tr(M.expandAll)} onClick={() => setToggled(new Set(rows.filter((r) => expandable(r.node) && !openByDefault(r.node)).map((r) => r.node.key)))} />
-            <IconButton icon="collapse-all" title={tr(M.collapseAll)} onClick={() => setToggled(new Set(rows.filter((r) => openByDefault(r.node)).map((r) => r.node.key)))} />
+            <IconButton
+              icon="expand-all"
+              title={tr(M.expandAll)}
+              onClick={() => {
+                setMode('all')
+                setToggled(new Set())
+              }}
+            />
+            <IconButton
+              icon="collapse-all"
+              title={tr(M.collapseAll)}
+              onClick={() => {
+                setMode('none')
+                setToggled(new Set())
+              }}
+            />
           </div>
         </div>
         {tree.length === 0 && !reading ? (
@@ -192,10 +231,14 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   )
 }
 
-/** Whether a node starts open: cards and agents, and running sessions; turns, tool calls and the rest start closed. */
 /** Whether a node can open: it has children, or it is a session whose turns can be read (not read yet). */
 const expandable = (n: ActivityNode): boolean => n.children.length > 0 || (n.kind === 'session' && !n.turnsLoaded && (!!n.session.hasTranscript || !!n.session.hasBackup))
 
+/** The tree's open state before a node's own toggle: as it starts, all open (Expand All), or all closed (Collapse All). */
+type OpenMode = 'default' | 'all' | 'none'
+const openIn = (mode: OpenMode, n: ActivityNode): boolean => (mode === 'all' ? expandable(n) : mode === 'none' ? false : openByDefault(n))
+
+/** Whether a node starts open: cards and agents, and running sessions; turns, tool calls and the rest start closed. */
 function openByDefault(n: ActivityNode): boolean {
   if (n.kind === 'card' || n.kind === 'agent') return true
   if (n.kind === 'session') return n.live
@@ -353,22 +396,24 @@ const fmtWhen = (iso: string | undefined | null): string => {
 /** The selected node's details: its status, its input exactly (masked like the log), its last action, and what can be done. */
 function Details({ project, node, onClose }: { project: ProjectInfo; node: ActivityNode; onClose: () => void }) {
   const { title, state } = describe(node)
-  const [tool, setTool] = useState<TranscriptTool | null>(null)
+  const [detail, setDetail] = useState<ActivityDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const toolRef = node.kind === 'tool' ? `${node.sessionId}:${node.tool.itemId}` : null
+  // A prompt's or a tool call's whole input, as written, masked: read for the node shown.
+  const item = node.kind === 'tool' ? { sessionId: node.sessionId, itemId: node.tool.itemId } : node.kind === 'turn' ? { sessionId: node.sessionId, itemId: node.turn.itemId } : null
+  const itemKey = item ? `${item.sessionId}:${item.itemId}` : null
   useEffect(() => {
-    setTool(null)
+    setDetail(null)
     setError(null)
-    if (node.kind !== 'tool') return
+    if (!item) return
     let stop = false
-    call('transcript:tool', project.path, node.sessionId, node.tool.itemId)
-      .then((t) => !stop && setTool(t))
+    call('activity:detail', project.path, item.sessionId, item.itemId)
+      .then((d) => !stop && setDetail(d))
       .catch((e) => !stop && setError(errorMessage(e)))
     return () => {
       stop = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toolRef, project.path])
+  }, [itemKey, project.path])
   const rows: [string, string][] = []
   if (state) rows.push([tr(M.statusLabel), tr(M.state, { state })])
   let input: string | null = null
@@ -402,13 +447,13 @@ function Details({ project, node, onClose }: { project: ProjectInfo; node: Activ
       break
     case 'turn':
       if (node.turn.at) rows.push([tr(M.started), fmtWhen(node.turn.at)])
-      input = node.turn.prompt
+      input = detail?.input ?? null
       last = node.turn.reply || node.turn.tools.at(-1)?.summary || null
       break
     case 'tool':
       if (node.tool.at) rows.push([tr(M.started), fmtWhen(node.tool.at)])
-      input = tool ? cut(maskText(tool.input), DETAIL) : null
-      last = tool?.result !== undefined && tool?.result !== null ? cut(maskText(tool.result), DETAIL) : null
+      input = detail?.input ?? null
+      last = detail?.result ?? null
       break
     case 'task':
       rows.push([tr(M.started), fmt.relative(node.task.at - Date.now())])
@@ -419,7 +464,7 @@ function Details({ project, node, onClose }: { project: ProjectInfo; node: Activ
       rows.push([tr(M.pidLabel), String(node.process.pid)])
       if (node.process.parent) rows.push([tr(M.parentLabel), String(node.process.parent)])
       if (started) rows.push([tr(M.started), fmt.relative(started - Date.now())])
-      input = node.process.label
+      input = node.process.command ?? node.process.label
       if (!node.cli && node.process.created) buttons.push(<EndProcessButton key="end" project={project} agentId={node.agentId} pid={node.process.pid} created={node.process.created} label={node.process.label} />)
       break
     }
@@ -441,7 +486,7 @@ function Details({ project, node, onClose }: { project: ProjectInfo; node: Activ
             </div>
           ))}
         </dl>
-        {(input !== null || node.kind === 'tool') && (
+        {(input !== null || item) && (
           <>
             <div className="agent-dialog-h">{tr(M.input)}</div>
             {error ? <p className="error-text">{error}</p> : <pre className="activity-pre">{input ?? tr(M.loading)}</pre>}
@@ -458,8 +503,6 @@ function Details({ project, node, onClose }: { project: ProjectInfo; node: Activ
     </aside>
   )
 }
-
-const cut = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
 /** Ends one of the agent's own processes, after a confirmation; main checks it is still that agent's, that process. */
 function EndProcessButton({ project, agentId, pid, created, label }: { project: ProjectInfo; agentId: string; pid: number; created: string; label: string }) {

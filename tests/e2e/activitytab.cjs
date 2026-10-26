@@ -1,10 +1,12 @@
 // The Activity tab (#1254): a project's live work as a tree, card → agent → session → turn → tool call, with subagents and
 // processes. Fixture sessions on cards (in the last 24 hours, and one older, left out) and an agent running the fake
-// Claude Code (a long turn, a background subagent, two processes it leaves running): the tree files them in place, the
-// running agent first; a session opens to its turns and a turn to its tool calls, whose details show the input with
-// a secret masked; Activity in an agent's menu and in the card dialog open it filtered; a process the agent left running
-// ends from its details after a confirmation, and the agent's CLI has no End Process. Both themes. Fake Claude Code only
-// (no sign-in, no tokens). Dev build, throwaway profile, workspace and CLI homes; quiet.
+// Claude Code (a turn running a command with a token on its command line, a background subagent, two processes it
+// leaves running): the tree files them in place, the running agent first; a session opens to its turns and a turn to its
+// tool calls; details show a prompt and a tool call's input whole, as written (a multiline prompt, an input past round
+// 1's cut), and a process's command line, each with its secret masked; Expand All opens everything, turns read later
+// too; Activity in an agent's menu and in the card dialog open it filtered; a process the agent left running ends from
+// its details after a confirmation, and the agent's CLI has no End Process. Both themes. Fake Claude Code only (no
+// sign-in, no tokens). Dev build, throwaway profile, workspace and CLI homes; quiet.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -28,6 +30,10 @@ const now = Date.now()
 const ago = (min) => new Date(now - min * 60_000).toISOString()
 const AGENTS = ['HB1', 'HB2', 'HR1'].map((n) => ({ id: n.toLowerCase(), name: n, provider: 'claude-code' }))
 const SECRET = `sk-ant-api03-${'q'.repeat(40)}`
+const GH = `ghp_${'z'.repeat(36)}`
+// A prompt of several lines, longer than a node shows; and an input past round 1's 4,000-character cut.
+const PROMPT = ['Fix the flaky test.', '', 'Steps:', '1. Reproduce it under load.', '2. Find the race.', `3. Fix it with a condition (key ${SECRET}).`, 'And then a long paragraph of plain words. '.repeat(10)].join('\n')
+const LONG = `npm test -- ${'--flag '.repeat(800)}--end`
 const line = (o) => JSON.stringify(o)
 /** A finished session's transcript: `turns` prompts, each with a Bash and a Read call and a reply. */
 function transcript(sid, turns, startMin) {
@@ -35,9 +41,9 @@ function transcript(sid, turns, startMin) {
   let t = now - startMin * 60_000
   const at = () => new Date((t += 2000)).toISOString()
   for (let i = 0; i < turns; i++) {
-    out.push(line({ type: 'user', sessionId: sid, cwd: alpha, timestamp: at(), message: { role: 'user', content: `Turn ${i}: carry on with the card` } }))
+    out.push(line({ type: 'user', sessionId: sid, cwd: alpha, timestamp: at(), message: { role: 'user', content: i === 0 ? `Turn 0: ${PROMPT}` : `Turn ${i}: carry on with the card` } }))
     for (const [k, tool] of [
-      [0, { name: 'Bash', input: { command: `npm test -- --token ${SECRET}`, description: 'Run the tests' } }],
+      [0, { name: 'Bash', input: { command: i === 0 ? LONG : `npm test -- --token ${SECRET}`, description: 'Run the tests' } }],
       [1, { name: 'Read', input: { file_path: 'src/a.ts' } }]
     ]) {
       const id = `toolu_${sid.slice(0, 4)}_${i}_${k}`
@@ -92,7 +98,8 @@ function transcript(sid, turns, startMin) {
     await inv('session:start', alpha, { agentId: 'hb1' })
     const liveOf = async () => (await inv('session:live')).find((x) => x.agentId === 'hb1') ?? null
     await lib.until(async () => ['ready', 'finished'].includes((await liveOf())?.status), HUNG_MS)
-    await lib.sendPrompt(inv, lib.ptyKey(alpha, 'hb1'), 'work 60 subagent 50', { submitted: async () => (await liveOf())?.status === 'working' })
+    // A command running for the turn, with a token on its command line.
+    await lib.sendPrompt(inv, lib.ptyKey(alpha, 'hb1'), `shell: node -e "setTimeout(()=>{},20000)" ${GH} then subagent 50 then work 60`, { submitted: async () => (await liveOf())?.status === 'working' })
 
     // --- The tab: running work first, then the cards with their agents and sessions, then the agents' loose sessions.
     await page.locator('.tab', { hasText: 'Activity' }).click()
@@ -104,8 +111,9 @@ function transcript(sid, turns, startMin) {
     check('the cards follow, each with its agent and session', ['card:', 'agent:HB2', 'session:Building one', 'agent:HR1', 'session:Reviewing two'].every((t) => shown.some((s) => s.startsWith(t))), JSON.stringify(shown))
     check('a session older than 24 hours is left out', !shown.some((s) => s.includes('An old review')))
     check("HB2's session on no card is under HB2's own node", shown.includes('session:A loose session'))
-    check("the running session shows the agent's background subagent", !!(await lib.until(async () => (await node('task').count()) === 1, HUNG_MS, 250)))
-    check('…and its processes: its CLI and the two it left running', (await node('process').count()) >= 4, String(await node('process').count()))
+    check('the running session shows its processes: its CLI, the two it left running and the command it runs', !!(await lib.until(async () => (await node('process', 'setTimeout').count()) > 0, HUNG_MS, 250)) && (await node('process').count()) >= 5, String(await node('process').count()))
+    check("a process's command line shows with its token masked", !(await page.locator('.activity-tree').innerText()).includes(GH))
+    check("…and the agent's background subagent", !!(await lib.until(async () => (await node('task').count()) === 1, HUNG_MS, 250)))
     await page.screenshot({ path: path.join(lib.WORK, 'activitytab-1-dark.png') })
 
     // --- A finished session opens to its turns (read only then), a turn to its tool calls; a call's details.
@@ -113,14 +121,20 @@ function transcript(sid, turns, startMin) {
     await node('session', 'Building one').locator('.activity-twisty').click()
     await lib.until(async () => (await node('turn', 'Turn').count()) >= 3, HUNG_MS)
     check('opened, a session shows its turns', (await node('turn', 'Turn').count()) === 3)
+    // A prompt's details: the whole of it, as written (its line breaks), its key masked.
+    await node('turn', 'Turn 0').first().click()
+    const details = page.locator('.activity-details')
+    const pre = details.locator('.activity-pre').first()
+    await lib.until(async () => /Steps:/.test(await pre.innerText().catch(() => '')), HUNG_MS)
+    const prompt = await pre.innerText()
+    check("a prompt's details show it whole, its lines as written", prompt.includes('Steps:\n1. Reproduce it under load.') && prompt.includes('And then a long paragraph of plain words. '.repeat(10).trim()), prompt.slice(0, 200))
+    check('…its key masked, as the log masks it', !prompt.includes('q'.repeat(40)) && prompt.includes('<redacted>'), prompt.slice(0, 300))
     await node('turn', 'Turn 0').first().locator('.activity-twisty').click()
     await lib.until(async () => (await node('tool', 'Bash').count()) > 0, HUNG_MS)
     await node('tool', 'Bash').first().click()
-    const details = page.locator('.activity-details')
-    await lib.until(async () => /npm test/.test(await details.innerText().catch(() => '')), HUNG_MS)
-    const text = await details.innerText()
-    check("a tool call's details show its input", /npm test -- --token/.test(text), text)
-    check('…with the secret in it masked, as the log masks it', !text.includes('q'.repeat(40)), text)
+    await lib.until(async () => /--end/.test(await pre.innerText().catch(() => '')), HUNG_MS)
+    const text = await pre.innerText()
+    check("a tool call's details show its whole input, past round 1's 4,000-character cut", text.includes('--end') && text.length > 5000, String(text.length))
     // Playwright's click scrolled the tree to the call: back to its start, for a screenshot of the whole tree.
     await page.locator('.activity-tree').evaluate((el) => (el.scrollLeft = 0))
     await page.screenshot({ path: path.join(lib.WORK, 'activitytab-2-details-dark.png') })
@@ -153,6 +167,14 @@ function transcript(sid, turns, startMin) {
     await page.locator('.activity-filter').click()
     await lib.until(async () => (await page.locator('.activity-filter').count()) === 0 && (await node('agent', 'HB2').count()) > 0, HUNG_MS)
     check('its chip clears the filter', (await node('agent', 'HB2').count()) > 0)
+    // Expand All: everything opens, a closed session's turns (read only once it opens) and their tool calls too.
+    await node('session', 'Reviewing two').scrollIntoViewIfNeeded()
+    check('Reviewing two starts closed', (await node('session', 'Reviewing two').getAttribute('aria-expanded')) === 'false')
+    await page.locator('.activity-head').getByRole('button', { name: 'Expand All' }).click()
+    const reviewTools = async () => page.locator('.activity-node.act-tool').evaluateAll((els) => els.filter((e) => e.dataset.key?.includes(':')).length)
+    check('Expand All opens a session whose turns come later, and their tool calls', !!(await lib.until(async () => (await node('turn', 'Turn 1').count()) > 0 && (await reviewTools()) >= 8, HUNG_MS, 250)), String(await reviewTools()))
+    await page.locator('.activity-head').getByRole('button', { name: 'Collapse All' }).click()
+    check('Collapse All closes them all, down to the top-level nodes', !!(await lib.until(async () => (await node('turn').count()) === 0 && (await node('session').count()) === 0 && (await node('card').count()) > 0, HUNG_MS, 250)))
     await page.locator('.tab', { hasText: 'Tasks' }).first().click()
     await page.locator('.task-card', { hasText: 'Card one' }).first().click()
     await page.getByRole('button', { name: 'Activity' }).click()

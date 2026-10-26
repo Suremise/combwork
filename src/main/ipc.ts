@@ -1035,6 +1035,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return { launches: await projectLaunches(p), tasks: sessions.backgroundTasks(p) }
     },
     'activity:turns': (p, id, known) => transcripts.turns(p, id, known),
+    'activity:sessions': (p, hours) => sessions.activitySessions(workspace.assertProject(p), Math.max(1, Math.min(24 * 7, Number(hours) || 24))),
+    'activity:detail': (p, id, itemId) => transcripts.detail(p, id, Number(itemId)),
     'activity:endProcess': (p, agentId, pid, created) => endAgentProcess(workspace.assertProject(p), String(agentId), Number(pid), String(created)),
     'transcript:image': (p, id, imageId) => transcripts.image(p, id, imageId),
     'transcript:search': (p, query, id) => transcripts.search(p, query, id),

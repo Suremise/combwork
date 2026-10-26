@@ -1,4 +1,5 @@
-import { activityTurns, type ActivityTurns } from '../shared/activity'
+import { activityTurns, type ActivityDetail, type ActivityTurns } from '../shared/activity'
+import { maskText } from '../shared/redact'
 import { open, stat } from 'original-fs/promises'
 import type { ProviderId, Transcript, TranscriptItem, TranscriptSearchResult, TranscriptTool } from '../shared/types'
 import { TRANSCRIPT_WINDOW, assertSessionId } from '../shared/defaults'
@@ -160,6 +161,17 @@ export const transcripts = {
     const version = versionOf(e)
     if (knownVersion !== undefined && knownVersion === version) return null
     return { sessionId, version, ...activityTurns(e.parser.items) }
+  },
+
+  /**
+   * An item's whole text for the Activity tab's details (#1254): a prompt, or a tool call's input and result, as written
+   * (line breaks kept, nothing cut), masked like the log. Null when the item isn't a prompt or a tool call.
+   */
+  async detail(projectPath: string, sessionId: string, itemId: number): Promise<ActivityDetail | null> {
+    const item = (await parsed(projectPath, sessionId)).parser.items[itemId]
+    if (item?.kind === 'user') return { input: maskText(item.text), result: null }
+    if (item?.kind === 'tool') return { input: maskText(item.tool.input), result: item.tool.result === null ? null : maskText(item.tool.result) }
+    return null
   },
 
   async tool(projectPath: string, sessionId: string, itemId: number): Promise<TranscriptTool> {

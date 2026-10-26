@@ -1,4 +1,4 @@
-import type { ActivityNow, ActivityTurns, EndProcessResult } from './activity'
+import type { ActivityDetail, ActivityNow, ActivityTurns, EndProcessResult } from './activity'
 import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
@@ -622,6 +622,10 @@ export interface HiveRequests {
   'transcript:read': (projectPath: string, sessionId: string, opts?: { knownVersion?: string; from?: number }) => Transcript | null
   /** The Activity tab (#1254): what runs in a project's agents' launches now (their processes, by Stop's tracking, and background tasks). */
   'activity:now': (projectPath: string) => ActivityNow
+  /** The project's sessions running or active within `hours`, from their records alone (no transcript looked for). */
+  'activity:sessions': (projectPath: string, hours: number) => SessionListItem[]
+  /** An item's whole input (a prompt, a tool call's input and result) as written, masked like the log; null for another kind. */
+  'activity:detail': (projectPath: string, sessionId: string, itemId: number) => ActivityDetail | null
   /** A session's latest turns and their tool calls, from its transcript; null when unchanged since knownVersion. */
   'activity:turns': (projectPath: string, sessionId: string, knownVersion?: string) => ActivityTurns | null
   /** Ends one of an agent's own processes (pid and start time, as listed), never its CLI. */

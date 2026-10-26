@@ -35,6 +35,22 @@ describe('turns from a transcript', () => {
   })
 })
 
+describe('turns from a long transcript (#1254 round 2: one pass over the tail)', () => {
+  it('counts every turn and builds only the latest, each tool call timed to the next item', () => {
+    const items: TranscriptItem[] = []
+    for (let i = 0; i < 20000; i++) items.push(i % 5 === 0 ? user(i, i, `Prompt ${i}`) : i % 5 === 4 ? reply(i, i, `Reply ${i}`) : tool(i, i, 'Bash'))
+    const { total, turns } = activityTurns(items)
+    expect(total).toBe(4000)
+    expect(turns.map((t) => t.itemId)).toEqual(Array.from({ length: 50 }, (_, k) => 19750 + k * 5))
+    expect(turns.at(-1)!.tools.map((t) => [t.itemId, t.until])).toEqual([
+      [19996, iso(19997)],
+      [19997, iso(19998)],
+      [19998, iso(19999)]
+    ])
+    expect(turns.at(-1)!.reply).toBe('Reply 19999')
+  })
+})
+
 describe('where a process goes', () => {
   const { turns } = activityTurns([user(1, 0, 'go'), tool(2, 10, 'Bash'), reply(3, 20, 'ok'), tool(4, 30, 'Bash', { result: null })])
   it('under the one tool call open when it started; else under the session', () => {

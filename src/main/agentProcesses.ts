@@ -6,6 +6,8 @@ import { createLogger, userText } from './logger'
 import { JobHost, MAX_LISTED, type HostFailure, type JobList } from './processSupervisor'
 import { hiveError } from './hiveError'
 import { processLabel, progressRunTitle, type AgentLeftovers, type AgentProcess } from '../shared/agentProcesses'
+import type { ActivityProcess } from '../shared/activity'
+import { maskText } from '../shared/redact'
 import { englishText, shownText, withValues, type TextPart } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { MAX_MARKER_LAUNCHES, MAX_MARKER_PROCESSES, type LaunchProcesses } from '../shared/unexpectedClose'
@@ -271,7 +273,7 @@ export interface LaunchNow {
   runId: string
   /** The agent's CLI and its terminal: listed, never ended from here (Stop does). */
   cli: number[]
-  processes: AgentProcess[]
+  processes: ActivityProcess[]
   more: number
 }
 
@@ -284,7 +286,7 @@ export async function projectLaunches(projectPath: string): Promise<LaunchNow[]>
   const out: LaunchNow[] = []
   for (const l of running.values()) {
     if (l.projectPath.toLowerCase() !== projectPath.toLowerCase()) continue
-    const list = await listJob(l.runId)
+    const list = await listJob(l.runId, true)
     if (!list) continue
     out.push({ agentId: l.agentId, runId: l.runId, cli: cliOf(l, list.processes), processes: list.processes, more: list.more })
   }
@@ -347,15 +349,17 @@ async function findLeftovers(runId: string): Promise<AgentLeftovers | null> {
   return now
 }
 
-async function listJob(runId: string): Promise<{ processes: AgentProcess[]; more: number; adopted: number } | null> {
+async function listJob(runId: string, withCommands = false): Promise<{ processes: ActivityProcess[]; more: number; adopted: number } | null> {
   const r = (await host.request('list', runId)) as JobList | string | null
   if (!r || typeof r !== 'object' || !Array.isArray(r.processes)) return null
   const processes = r.processes
     // A console window's host belongs to a process of the job and ends with it: not one to list.
     .filter((p) => !/^(conhost|openconsole)\.exe$/i.test(p.name))
     .map((p) => {
-      const run = progressRunTitle(p.cmd ?? '')
-      return { pid: p.pid, name: p.name, label: processLabel(p.name, p.cmd), ...(p.created && p.created !== '0' ? { created: p.created } : {}), ...(p.parent ? { parent: p.parent } : {}), ...(run ? { run } : {}) }
+      // Masked before it is shortened (#1254): a secret on a command line (a token argument) is never shown or kept.
+      const cmd = p.cmd ? maskText(p.cmd) : p.cmd
+      const run = progressRunTitle(cmd ?? '')
+      return { pid: p.pid, name: p.name, label: processLabel(p.name, cmd), ...(p.created && p.created !== '0' ? { created: p.created } : {}), ...(p.parent ? { parent: p.parent } : {}), ...(run ? { run } : {}), ...(withCommands && cmd ? { command: cmd } : {}) }
     })
     .sort((a, b) => a.pid - b.pid)
     .slice(0, MAX_LISTED)
