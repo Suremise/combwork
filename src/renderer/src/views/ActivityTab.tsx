@@ -244,10 +244,13 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     keptRef.current = { fresh, tree: t }
     return t
   }, [tree, fresh])
-  const order = useRef(newOrder())
+  // When each node was first drawn, since the last refresh: a refresh draws the tree compact again, children back under
+  // their parents, so the long elbows from new work under older parents last only while it is live.
+  const order = useRef({ fresh, order: newOrder() })
+  if (order.current.fresh !== fresh) order.current = { fresh, order: newOrder() }
 
   const isOpen = useCallback((n: ActivityNode): boolean => toggled.has(n.key) !== openIn(mode, n), [toggled, mode])
-  const rows = useMemo(() => stableRows(kept, isOpen, order.current), [kept, isOpen])
+  const rows = useMemo(() => stableRows(kept, isOpen, order.current.order), [kept, isOpen])
 
   // The turns of each session shown open: read when it opens (the tick reads running ones again).
   const openSessions = useMemo(() => rows.flatMap((r) => (r.node.kind === 'session' && !r.node.gone && isOpen(r.node) ? [{ id: r.node.session.id, live: r.node.live }] : [])), [rows, isOpen])
@@ -452,14 +455,14 @@ function TreeView({ rows, selected, isOpen, onSelect, onToggle, onMore, onEnter,
           <path d={lines.join('')} />
         </svg>
         {rows.slice(first, last).map((r, i) => (
-          <NodeBox key={r.node.key} node={r.node} x={r.depth * COL} y={(first + i) * ROW} open={isOpen(r.node)} selected={selected === r.node.key} onSelect={onSelect} onToggle={onToggle} onMore={onMore} />
+          <NodeBox key={r.node.key} node={r.node} parent={r.parent >= 0 ? rows[r.parent].node.key : undefined} x={r.depth * COL} y={(first + i) * ROW} open={isOpen(r.node)} selected={selected === r.node.key} onSelect={onSelect} onToggle={onToggle} onMore={onMore} />
         ))}
       </div>
     </div>
   )
 }
 
-const NodeBox = memo(function NodeBox({ node, x, y, open, selected, onSelect, onToggle, onMore }: { node: ActivityNode; x: number; y: number; open: boolean; selected: boolean; onSelect: (key: string) => void; onToggle: (key: string) => void; onMore: (key: string) => void }) {
+const NodeBox = memo(function NodeBox({ node, parent, x, y, open, selected, onSelect, onToggle, onMore }: { node: ActivityNode; parent?: string; x: number; y: number; open: boolean; selected: boolean; onSelect: (key: string) => void; onToggle: (key: string) => void; onMore: (key: string) => void }) {
   const { icon, title, sub: line, state } = describe(node)
   const sub = node.gone ? tr(M.endedNode) : line
   const more = node.kind === 'more'
@@ -472,6 +475,7 @@ const NodeBox = memo(function NodeBox({ node, x, y, open, selected, onSelect, on
       aria-selected={selected}
       tabIndex={0}
       data-key={node.key}
+      data-parent={parent}
       // Focused where it is: the browser's own focus would scroll the tree sideways to show all of a deep node.
       onMouseDown={(e) => {
         e.preventDefault()

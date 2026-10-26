@@ -339,22 +339,49 @@ export function buildActivityTree(input: ActivityInput): ActivityNode[] {
 }
 
 /**
- * The newest tree with what the last one drew and this one lacks (HI-1677): a process that ended, a session out of the
- * range. Each is kept where it was, marked `gone`, until a refresh draws the tree afresh (`prev` empty). "n more" nodes
- * aren't kept: their count is the newest tree's.
+ * The newest tree, reconciled with what was drawn before (HI-1677), so nothing drawn moves until a refresh (`prev`
+ * empty draws it afresh). Across the whole tree, each key is one node:
+ * - one drawn before and now under another parent (a process found to be a tool call's, a session filed under a card
+ *   since) stays under the parent it was drawn under;
+ * - one missing now (a process that ended, a session out of the range, an "n more" whose sessions left) stays where it
+ *   was, marked `gone`, with what it held.
  */
 export function keepGone(prev: readonly ActivityNode[], next: readonly ActivityNode[]): ActivityNode[] {
-  const before = new Map(prev.map((n) => [n.key, n]))
-  const out = next.map((n): ActivityNode => {
-    const had = before.get(n.key)
-    return had && had.children.length ? { ...n, children: keepGone(had.children, n.children) } : n
-  })
-  const now = new Set(next.map((n) => n.key))
-  for (const n of prev) if (!now.has(n.key) && n.kind !== 'more') out.push(markGone(n))
-  return out
+  if (!prev.length) return [...next]
+  // The newest tree copied, each node's children its own array, with each key's node and parent.
+  const top: ActivityNode[] = []
+  const at = new Map<string, { node: ActivityNode; parent: string | null }>()
+  const copy = (nodes: readonly ActivityNode[], parent: string | null, into: ActivityNode[]): void => {
+    for (const n of nodes) {
+      if (at.has(n.key)) continue
+      const c: ActivityNode = { ...n, children: [] }
+      at.set(n.key, { node: c, parent })
+      into.push(c)
+      copy(n.children, n.key, c.children)
+    }
+  }
+  copy(next, null, top)
+  const childrenOf = (parent: string | null): ActivityNode[] => (parent === null ? top : at.get(parent)!.node.children)
+  // What was drawn, parents first: each node goes back under the parent it was drawn under, or stays as gone there.
+  const walk = (nodes: readonly ActivityNode[], parent: string | null): void => {
+    for (const n of nodes) {
+      const now = at.get(n.key)
+      if (!now) {
+        const g: ActivityNode = { ...n, gone: true, children: [] }
+        at.set(n.key, { node: g, parent })
+        childrenOf(parent).push(g)
+      } else if (now.parent !== parent) {
+        const from = childrenOf(now.parent)
+        from.splice(from.indexOf(now.node), 1)
+        childrenOf(parent).push(now.node)
+        now.parent = parent
+      }
+      walk(n.children, n.key)
+    }
+  }
+  walk(prev, null)
+  return top
 }
-
-const markGone = (n: ActivityNode): ActivityNode => ({ ...n, gone: true, children: n.children.filter((c) => c.kind !== 'more').map(markGone) })
 
 /** Rows of the tree as drawn: each node shown, its depth, and its parent's row (-1 at the top). */
 export interface ActivityRow {

@@ -130,6 +130,20 @@ function transcript(sid, turns, startMin) {
     const after = await positions()
     const moved = Object.keys(before).filter((k) => after[k] && after[k] !== before[k])
     check('nodes drawn before stay where they were as work comes and ends', Object.keys(before).length > 5 && moved.length === 0 && Object.keys(after).length > Object.keys(before).length, JSON.stringify({ moved, before: Object.keys(before).length, after: Object.keys(after).length }))
+    // Each drawn node's parent is the nearest node above it one column to its left: the tree in its own order, compact.
+    const compact = () =>
+      page.locator('.activity-node').evaluateAll((els) => {
+        const rows = els.map((e) => ({ key: e.dataset.key, parent: e.dataset.parent ?? null, x: parseFloat(e.style.left), y: parseFloat(e.style.top) })).sort((a, b) => a.y - b.y)
+        return rows.every((r, i) => {
+          if (r.parent === null) return r.x === 0
+          const above = rows.slice(0, i).reverse().find((p) => p.x < r.x)
+          return !!above && above.key === r.parent
+        })
+      })
+    check('while live, new work under an older parent comes last, joined by a longer elbow', !(await compact()))
+    // The Assistant's ask: a refresh draws it compact again, children back under their parents (ended work dropped).
+    await page.locator('.activity-head').getByRole('button', { name: 'Refresh' }).click()
+    check('Refresh draws the tree compact again, children under their parents', !!(await lib.until(compact, HUNG_MS, 250)) && (await page.locator('.activity-node.act-gone').count()) === 0)
 
     // --- Pause: a new session while paused is counted in the pill, not drawn; the pill draws it, and it stays paused.
     const head = page.locator('.activity-head')

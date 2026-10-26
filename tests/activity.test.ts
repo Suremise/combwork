@@ -191,18 +191,16 @@ describe('a layout that stays put (HI-1677)', () => {
     expect(rows(tree, order)).toEqual(['c:1', 'a1', 'p:1', 'c:2'])
   })
 
-  it('what ended stays in its row, dimmed (gone), until a refresh; "n more" is never kept', () => {
-    const before = [card(1, [agent('a1', [proc1(1), proc1(2)]), { kind: 'more', key: 'more:x', count: 2, children: [] }])]
+  it('what ended stays in its row, dimmed (gone), with what it held, until a refresh', () => {
+    const before = [card(1, [agent('a1', [proc1(1), proc1(2)])])]
     const after = [card(1, [agent('a1', [proc1(2)])])]
     const kept = keepGone(before, after)
-    const a1 = kept[0].children[0]
-    expect(a1.children.map((n) => [n.key, !!n.gone])).toEqual([
+    expect(kept[0].children[0].children.map((n) => [n.key, !!n.gone])).toEqual([
       ['p:2', false],
       ['p:1', true]
     ])
-    expect(kept[0].children.some((n) => n.kind === 'more')).toBe(false)
     const order = newOrder()
-    expect(rows(before, order)).toEqual(['c:1', 'a1', 'p:1', 'p:2', 'more:x'])
+    expect(rows(before, order)).toEqual(['c:1', 'a1', 'p:1', 'p:2'])
     expect(rows(kept, order)).toEqual(['c:1', 'a1', 'p:1', 'p:2'])
     // A refresh draws it afresh: what ended is gone.
     expect(keepGone([], after)[0].children[0].children.map((n) => n.key)).toEqual(['p:2'])
@@ -210,5 +208,60 @@ describe('a layout that stays put (HI-1677)', () => {
     const left = keepGone([card(9, [agent('a9', [proc1(9)])])], [])
     expect(left[0]).toMatchObject({ key: 'c:9', gone: true })
     expect(left[0].children[0].children[0]).toMatchObject({ key: 'p:9', gone: true })
+  })
+
+  it('a node that changes parent stays one node, where it was drawn, until a refresh (HR6 round 1: a process found to be a tool call\'s)', () => {
+    const sessionNode = (kids: ActivityNode[]): ActivityNode => ({ kind: 'agent', key: 's:1', agentId: 's', name: 's', state: 'working', status: null, line: '', children: kids })
+    const toolNode = (kids: ActivityNode[]): ActivityNode => ({ kind: 'agent', key: 'tool:1', agentId: 't', name: 't', state: 'working', status: null, line: '', children: kids })
+    // Drawn under the session; the turns read since put it under its tool call.
+    const before = [sessionNode([proc1(42)])]
+    const after = [sessionNode([toolNode([proc1(42)])])]
+    const kept = keepGone(before, after)
+    const all: string[] = []
+    const walk = (ns: ActivityNode[]): void => ns.forEach((n) => (all.push(`${n.key}${n.gone ? '(gone)' : ''}`), walk(n.children)))
+    walk(kept)
+    expect(all.filter((k) => k.startsWith('p:42'))).toEqual(['p:42'])
+    expect(kept[0].children.map((n) => n.key)).toEqual(['tool:1', 'p:42'])
+    const order = newOrder()
+    rows(before, order)
+    const r = stableRows(kept, open, order)
+    expect(r.map((x) => x.node.key)).toEqual(['s:1', 'p:42', 'tool:1'])
+    expect(new Set(r.map((x) => x.node.key)).size).toBe(r.length)
+    expect(r[1].parent).toBe(0)
+    // Refreshed, it goes under its tool call.
+    expect(keepGone([], after)[0].children[0].children.map((n) => n.key)).toEqual(['p:42'])
+  })
+
+  it('a session filed under a card since stays under the agent it was drawn under, until a refresh', () => {
+    const sess: ActivityNode = { kind: 'agent', key: 's:9', agentId: 's9', name: 's9', state: 'idle', status: null, line: '', children: [] }
+    const before = [agent('a:x', [sess])]
+    const after = [card(7, [agent('c:7:a:x', [sess])])]
+    const kept = keepGone(before, after)
+    const order = newOrder()
+    rows(before, order)
+    const r = stableRows(kept, open, order).map((x) => `${x.node.key}${x.node.gone ? '(gone)' : ''}`)
+    expect(r).toEqual(['a:x(gone)', 's:9', 'c:7', 'c:7:a:x'])
+  })
+
+  it('"n more" whose sessions left stays as a placeholder: no row below it moves (HR6 round 1)', () => {
+    const sess = (i: number): ActivityNode => ({ kind: 'agent', key: `s:${i}`, agentId: `s${i}`, name: `s${i}`, state: 'idle', status: null, line: '', children: [] })
+    const shown = [7, 6, 5, 4, 3, 2, 1, 0].map(sess)
+    const before = [agent('a', [{ kind: 'more', key: 'more:a', count: 1, children: [] }, ...shown])]
+    // The hidden ninth crossed the 24 hours: no "n more" in the newest tree.
+    const after = [agent('a', shown)]
+    const order = newOrder()
+    const was = rows(before, order)
+    const now = rows(keepGone(before, after), order)
+    expect(now).toEqual(was)
+    expect(keepGone(before, after)[0].children.find((n) => n.key === 'more:a')).toMatchObject({ gone: true })
+  })
+
+  it('a refresh draws the tree compact again: a fresh order puts children back under their parents', () => {
+    const order = newOrder()
+    const first = [card(1, [agent('a1', [proc1(1)])]), card(2, [agent('a2', [])])]
+    rows(first, order)
+    const later = [card(1, [agent('a1', [proc1(1), proc1(3)])]), card(2, [agent('a2', [])])]
+    expect(rows(later, order)).toEqual(['c:1', 'a1', 'p:1', 'c:2', 'a2', 'p:3'])
+    expect(rows(later, newOrder())).toEqual(['c:1', 'a1', 'p:1', 'p:3', 'c:2', 'a2'])
   })
 })
