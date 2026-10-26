@@ -1844,7 +1844,9 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
     // Copied as its only connection, then replaced: the checkpoints' worker lets go of it first (HI-1691), awaited
     // before the close, so nothing opens it again between the close and the copy.
     await checkpointsReleased(file)
-    // As they are after that wait.
+    // As they are after that wait: still a window's (#1395, HR6's round 3: closed meanwhile, nothing is changed), and no
+    // agent or other Hive on it.
+    assertAdmitted(file)
     if (agentsRunning() > 0) throw hiveError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
     if (othersPresent(hive, presenceId()).length) throw hiveError(M.inUse, undefined, { kind: 'conflict' })
     closeBoard(path)
