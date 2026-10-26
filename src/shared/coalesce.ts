@@ -7,13 +7,13 @@
 // - oneAtATime(): one load at a time per scope for a view that keeps its own results (#1646); asked meanwhile, once
 //   more after it. withinTime(): a load that fails once its time is up, so a view never waits on it without end.
 
-/** A function that calls `fetch` for a key, one call in flight per key, as above. */
-export function coalesced<T>(): (key: string, fetch: () => Promise<T>) => Promise<T> {
+/** A function that calls `load` for a key, one call in flight per key, as above. */
+export function coalesced<T>(): (key: string, load: () => Promise<T>) => Promise<T> {
   const slots = new Map<string, { running: Promise<T>; queued: Promise<T> | null }>()
-  const start = (key: string, fetch: () => Promise<T>): Promise<T> => {
+  const start = (key: string, load: () => Promise<T>): Promise<T> => {
     let p: Promise<T>
     try {
-      p = fetch()
+      p = load()
     } catch (e) {
       p = Promise.reject(e)
     }
@@ -29,15 +29,15 @@ export function coalesced<T>(): (key: string, fetch: () => Promise<T>) => Promis
     p.then(end, end)
     return p
   }
-  return (key, fetch) => {
+  return (key, load) => {
     const slot = slots.get(key)
-    if (!slot) return start(key, fetch)
+    if (!slot) return start(key, load)
     if (slot.queued) return slot.queued
     const after = slot.running.then(
       () => undefined,
       () => undefined
     )
-    slot.queued = after.then(() => start(key, fetch))
+    slot.queued = after.then(() => start(key, load))
     return slot.queued
   }
 }
@@ -47,7 +47,7 @@ export function coalesced<T>(): (key: string, fetch: () => Promise<T>) => Promis
  * for the newest scope asked); `take(scope, data)` gets a result only while its scope is the newest asked, and each
  * read's result in the order read. A failed read takes nothing.
  */
-export function serialReads<T>(fetch: (scope: string) => Promise<T>, take: (scope: string, data: T) => void): { ask: (scope: string) => void } {
+export function serialReads<T>(load: (scope: string) => Promise<T>, take: (scope: string, data: T) => void): { ask: (scope: string) => void } {
   let asked: string | null = null
   let reading = false
   let pending: string | null = null
@@ -62,7 +62,7 @@ export function serialReads<T>(fetch: (scope: string) => Promise<T>, take: (scop
     }
     let p: Promise<T>
     try {
-      p = fetch(scope)
+      p = load(scope)
     } catch (e) {
       p = Promise.reject(e)
     }
