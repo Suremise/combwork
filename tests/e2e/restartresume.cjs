@@ -20,6 +20,9 @@ const userData = path.join(lib.WORK, 'restartresume-profile')
 const claudeHome = path.join(lib.WORK, 'restartresume-claude-home')
 const ws = path.join(lib.WORK, 'restartresume-ws')
 const alpha = path.join(ws, 'alpha')
+// A second workspace, in a window of its own.
+const wsB = path.join(lib.WORK, 'restartresume-ws-b')
+const beta = path.join(wsB, 'beta')
 const PORT = Number(lib.port(47797))
 const recordFile = path.join(userData, 'restart.json')
 const requestFile = path.join(userData, 'restart-request.json')
@@ -87,7 +90,7 @@ async function start() {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   const token = () => JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   const api = async (method, route, body) => {
-    const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
+    const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', 'X-Hive-Workspace': ws }, ...(body ? { body: JSON.stringify(body) } : {}) })
     return { status: r.status, body: await r.json().catch(() => null) }
   }
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
@@ -125,18 +128,32 @@ function writeRequest(pid, nonce) {
 }
 
 /** The first prompt of the agent's conversation now (the note a resume gives, as its CLI took it). */
-async function notes(c, id) {
-  const s = await c.live(id)
+async function notes(c, id, project = alpha) {
+  const s = (await c.inv('session:live')).find((x) => x.projectPath.toLowerCase() === project.toLowerCase() && x.agentId === id)
   if (!s?.sessionId) return []
-  const t = await c.inv('transcript:read', alpha, s.sessionId).catch(() => null)
+  const t = await c.inv('transcript:read', project, s.sessionId).catch(() => null)
   return (t?.items ?? []).filter((x) => x.kind === 'user' && /^\[Hive\] Hive (restarted|was quit)/.test(x.text ?? '')).map((x) => x.text)
+}
+/** A notice's text in whichever window shows it (a notice goes to one window of several), and that window. */
+async function anyToast(c, re) {
+  for (const p of c.app.windows()) {
+    const text = await toastText(p, re).catch(() => '')
+    if (text) return { page: p, text }
+  }
+  return null
+}
+/** Clicks a notice's button in the window that shows it. */
+async function clickToast(c, title, button) {
+  const found = await lib.until(() => anyToast(c, new RegExp(title.replace(/[?()]/g, '\\$&'))), HUNG_MS)
+  await found.page.locator('.toast', { hasText: title }).first().getByRole('button', { name: button, exact: true }).click()
 }
 const toastText = (page, re) => page.evaluate((src) => [...document.querySelectorAll('.toast')].map((t) => t.innerText).find((t) => new RegExp(src).test(t)) ?? '', re.source)
 
 ;(async () => {
-  for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [userData, ws, wsB]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(alpha)
-  claudeEnv = lib.fakeClaude(userData, claudeHome, [alpha])
+  lib.gitProject(beta)
+  claudeEnv = lib.fakeClaude(userData, claudeHome, [alpha, beta])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
@@ -162,6 +179,20 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     await say(agents.Worker, 'holduntil go-worker')
     await say(agents.Watcher, `hive hive_wait_for_tasks {"cards":[${watched}],"wake":true,"limitMinutes":60}`)
     check('Worker works and Watcher watches its card', !!(await lib.until(async () => (await c.live(agents.Worker.id))?.status === 'working' && (await c.live(agents.Watcher.id))?.status === 'watching', HUNG_MS, 300)))
+    // A second workspace in a window of its own, its agent working too.
+    const nextWindow = c.app.waitForEvent('window')
+    await c.inv('window:new')
+    const pageB = await nextWindow
+    await pageB.waitForLoadState('domcontentloaded')
+    await lib.appReady(pageB)
+    const invB = (ch, ...a) => pageB.evaluate(([x, y]) => window.hive.invoke(x, ...y), [ch, a])
+    await lib.openWorkspace(invB, pageB, wsB)
+    agents.Other = await lib.addAgent(invB, beta, { name: 'Other' })
+    const liveOther = async () => (await c.inv('session:live')).find((s) => s.projectPath.toLowerCase() === beta.toLowerCase() && s.agentId === agents.Other.id)
+    await invB('session:start', beta, { agentId: agents.Other.id })
+    await lib.until(async () => (await liveOther())?.status === 'ready', HUNG_MS, 300)
+    await lib.sendPrompt(invB, lib.ptyKey(beta, agents.Other.id), 'holduntil go-other', { submitted: async () => (await liveOther())?.status === 'working' })
+    check('a second workspace, in a window of its own, has Other working', (await liveOther())?.status === 'working')
     // At the next start resumes have 10 s to be ready (Watcher won't be: below).
     await c.inv('advanced:set', 'hive.restart.resumeReadySeconds', 10)
     const firstPid = c.pid
@@ -173,6 +204,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     const rec = record()
     const entries = Object.fromEntries((rec?.entries ?? []).map((e) => [e.agentName, e]))
     check('the record has the four, as an install, pending', ['Worker', 'Watcher', 'Builder', 'Reviewer'].every((n) => entries[n]?.reason === 'install' && entries[n]?.state === 'pending'), JSON.stringify(rec))
+    check('…and Other, of the second workspace', entries.Other?.reason === 'install' && entries.Other?.workspace?.toLowerCase() === wsB.toLowerCase(), JSON.stringify(entries.Other))
     check('…Watcher watching, Builder and Reviewer in the lane, on its card', entries.Watcher?.status === 'watching' && entries.Builder?.lane?.role === 'builder' && entries.Reviewer?.lane?.role === 'reviewer' && entries.Builder?.card?.label === laneKey, JSON.stringify([entries.Watcher, entries.Builder]))
 
     // The next start: Watcher never gets ready (its CLI holds before its session), and resumes have 10 s to be ready.
@@ -201,7 +233,16 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     check("Worker's note says it restarted for an update, and when", /^\[Hive\] Hive restarted for an update.* at \d\d:\d\d UTC; your session was stopped and is resumed now\./.test(workerNote), workerNote)
     const builderNote = (await lib.until(async () => (await notes(c, agents.Builder.id))[0], HUNG_MS)) ?? ''
     check("Builder's note names its card, round and lane, and to re-arm its watch", builderNote.includes(`You were on ${laneKey}, round 1, in lane 'restart lane' (its builder).`) && builderNote.includes('re-arm your card watch'), builderNote)
-    const report = await lib.until(() => toastText(c.page, /Resumed 3 agents after the update/), HUNG_MS)
+    // Other, in the second workspace's window (restored with the first), resumes too: Watcher's failure holds up no one.
+    const otherNote = (await lib.until(async () => (await notes(c, agents.Other.id, beta))[0], HUNG_MS)) ?? ''
+    check("Other resumes in the second workspace, in its conversation, with its note", otherNote.startsWith('[Hive] Hive restarted for an update') && (await c.inv('session:live')).find((s) => s.agentId === agents.Other.id)?.sessionId === entries.Other?.sessionId, otherNote)
+    const report = await lib.until(async () => {
+      for (const p of c.app.windows()) {
+        const t = await toastText(p, /Resumed 4 agents after the update/).catch(() => '')
+        if (t) return t
+      }
+      return ''
+    }, HUNG_MS)
     check('one notice says what was resumed, and that Watcher was stopped, not ready in time', !!report && report.includes("Not resumed: Watcher (alpha): it didn't get ready in time, so it was stopped."), report)
     // One at a time: each agent's launch after the one before it was resumed or stopped.
     const lines = logLines().slice(before)
@@ -247,10 +288,10 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     c = null
     check('the quit recorded Worker, as a quit', record()?.entries?.some((e) => e.agentName === 'Worker' && e.reason === 'quit' && e.state === 'pending'), JSON.stringify(record()))
     c = await start()
-    const offer = await lib.until(() => toastText(c.page, /Resume the agent that was working\?/), HUNG_MS)
+    const offer = await lib.until(async () => (await anyToast(c, /Resume the agent that was working\?/))?.text, HUNG_MS)
     check('the next start offers to resume Worker', !!offer && /Hive was quit while they were working or in a card loop: Worker \(alpha\)/.test(offer), offer)
     check('…and resumes nothing meanwhile (the record has it offered)', record()?.entries?.find((e) => e.agentName === 'Worker')?.state === 'offered' && !(await c.live(agents.Worker.id)), JSON.stringify(record()))
-    await c.page.locator('.toast', { hasText: 'Resume the agent that was working?' }).first().getByRole('button', { name: 'Resume', exact: true }).click()
+    await clickToast(c, 'Resume the agent that was working?', 'Resume')
     check('Resume resumes it, its note saying Hive was quit', !!(await lib.until(async () => ((await notes(c, agents.Worker.id)).at(-1) ?? '').startsWith('[Hive] Hive was quit and started again'), HUNG_MS)))
 
     // --- 4. An offer left unanswered, then another quit with Builder working too: one offer of both; Don't Resume.
@@ -258,16 +299,16 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     check('Hive quits again', await quit(c))
     c = null
     c = await start()
-    await lib.until(() => toastText(c.page, /Resume the agent that was working\?/), HUNG_MS)
+    await lib.until(async () => (await anyToast(c, /Resume the agent that was working\?/))?.text, HUNG_MS)
     await c.inv('session:start', alpha, { agentId: agents.Builder.id }).catch(() => undefined)
     await lib.until(async () => (await c.live(agents.Builder.id))?.status === 'ready', HUNG_MS, 300)
     await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Builder.id), 'holduntil go-builder', { submitted: async () => (await c.live(agents.Builder.id))?.status === 'working' })
     check('Hive quits with the offer unanswered', await quit(c))
     c = null
     c = await start()
-    const both = await lib.until(() => toastText(c.page, /Resume the 2 agents that were working\?/), HUNG_MS)
+    const both = await lib.until(async () => (await anyToast(c, /Resume the 2 agents that were working\?/))?.text, HUNG_MS)
     check('the next start offers both: the earlier offer kept, Builder added', !!both && both.includes('Worker (alpha)') && both.includes('Builder (alpha)'), both)
-    await c.page.locator('.toast', { hasText: 'Resume the 2 agents that were working?' }).first().getByRole('button', { name: "Don't Resume" }).click()
+    await clickToast(c, 'Resume the 2 agents that were working?', "Don't Resume")
     check("Don't Resume resumes neither, and the record is gone", !!(await lib.until(() => !fs.existsSync(recordFile), HUNG_MS)) && !(await c.live(agents.Worker.id)) && !(await c.live(agents.Builder.id)))
 
     // --- 5. Resume agents after an update off: an install offers instead.
@@ -279,7 +320,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     check('Hive quits by itself for the install (the switch off)', !!(await gone(c.pid)))
     c = null
     c = await start()
-    const offered = await lib.until(() => toastText(c.page, /Resume the agent that was working\?/), HUNG_MS)
+    const offered = await lib.until(async () => (await anyToast(c, /Resume the agent that was working\?/))?.text, HUNG_MS)
     check('with the switch off, an install offers to resume, saying it was an update', !!offered && /Hive restarted for an update while they were working or in a card loop: Worker \(alpha\)/.test(offered) && !(await c.live(agents.Worker.id)), offered)
   } catch (e) {
     check('no error', false, e?.stack ?? String(e))

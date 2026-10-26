@@ -7,7 +7,7 @@ import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { RESTART_READY_SECONDS, RESUME_AFTER_UPDATE } from '../shared/advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { agentKey, atStart, checkRequest, isFinal, mergeSnapshot, parseRecord, recordOpen, REQUEST_FILE, REQUEST_MAX_BYTES, RESTARTING_LINE, resumeNote, STALL_HOLD_MS, ackFile, takenFile, type RestartEntry, type RestartReason, type RestartRecord, type RestartState } from '../shared/restartResume'
-import type { TaskCard, ToastAction } from '../shared/types'
+import type { LiveSessionState, TaskCard, ToastAction } from '../shared/types'
 import type { RunningAgent } from '../shared/unexpectedClose'
 import { advanced } from './advanced'
 import { assistantHome } from './assistantControl'
@@ -399,16 +399,23 @@ async function resumeOne(e: RestartEntry): Promise<void> {
   // Ready once it has taken its note (its first prompt): seen working, or past a turn, in any status change of this
   // launch. Not `ready` (a resumed conversation's transcript is there before its CLI is, and Hive's fallback reads that
   // as ready), nor `watching` (a watch the conversation had shows as it starts).
+  // Everything after the start is about this launch only (its runId): a session the user started meanwhile is never
+  // counted, waited for or stopped as this one.
+  let runId: string | null = null
   let took = false
   const off = onHiveEvent((ev) => {
-    if (ev.type === 'session-status' && ev.state.agentId === e.agentId && samePlace(ev.state.projectPath, e.projectPath) && TOOK_NOTE.has(ev.state.status)) took = true
+    if (ev.type === 'session-status' && runId !== null && ev.state.runId === runId && TOOK_NOTE.has(ev.state.status)) took = true
   })
+  const mine = (): LiveSessionState | null => {
+    const s = sessions.liveFor(e.projectPath, e.agentId)
+    return s && s.runId === runId ? s : null
+  }
   let ready = false
   try {
-    await inWorkspace(ws, () => sessions.start(e.projectPath, { agentId: e.agentId, resumeId: e.sessionId, auto: true, ...(e.sessionName ? { name: e.sessionName } : {}), prompt: resumeNote(e, app.getVersion()) }))
+    runId = (await inWorkspace(ws, () => sessions.start(e.projectPath, { agentId: e.agentId, resumeId: e.sessionId, auto: true, ...(e.sessionName ? { name: e.sessionName } : {}), prompt: resumeNote(e, app.getVersion()) }))).runId
     // Its launch ending meanwhile (stopped by the user, or its CLI exited) ends the wait too.
-    ready = await until(() => took || TOOK_NOTE.has(sessions.liveFor(e.projectPath, e.agentId)?.status ?? 'stopped') || !sessions.liveFor(e.projectPath, e.agentId), ms)
-    ready &&= took || TOOK_NOTE.has(sessions.liveFor(e.projectPath, e.agentId)?.status ?? 'stopped')
+    ready = await until(() => took || TOOK_NOTE.has(mine()?.status ?? 'stopped') || !mine(), ms)
+    ready &&= took || TOOK_NOTE.has(mine()?.status ?? 'stopped')
   } finally {
     off()
   }
@@ -419,15 +426,16 @@ async function resumeOne(e: RestartEntry): Promise<void> {
     return
   }
   // Its launch ended before it took its note: stopped (by the user, or its CLI exited), not resumed again later.
-  if (!sessions.liveFor(e.projectPath, e.agentId)) {
+  if (!mine()) {
     setState(e, 'failed', 'stopped')
     done.failed.push(e)
     log.info(`${userText(e.agentName)} in ${userText(e.project)} was stopped while it was resuming`)
     return
   }
   // Not ready: stopped, and gone, before the next one starts (never two starting at once).
-  sessions.stop(e.projectPath, e.agentId)
-  await until(() => !sessions.liveFor(e.projectPath, e.agentId), 10_000)
+  // Checked again just before the stop: still this launch (nothing awaited between the check and the stop).
+  if (mine()) sessions.stop(e.projectPath, e.agentId)
+  await until(() => !mine(), 10_000)
   setState(e, 'failed', 'notReady')
   done.failed.push(e)
   log.warn(`${userText(e.agentName)} in ${userText(e.project)} wasn't ready within ${Math.round(ms / 1000)} s of resuming: stopped`)
