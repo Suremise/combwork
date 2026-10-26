@@ -1643,7 +1643,7 @@ With agents working in several projects, the status bar tells you what is waitin
 - **Needs input**: an agent waiting for your answer, such as a permission. It stays in the list until you answer it.
 - **Asks**: an agent that asked you a question but carries on working meanwhile (Codex can). Its pane says **has a question for you**, and it stays in the list until you answer the question in its terminal.
 - **Needs sign-in**: an agent its CLI stopped because the sign-in has expired. It stays in the list until you sign in again (below).
-- **Stopped by an error**: an agent its CLI stopped on an error, such as a lost API connection, with what it said (Claude Code and GitHub Copilot; a Codex agent's error shows in its pane, and the agent as finished). It stays in the list until the agent goes on.
+- **Stopped by an error**: an agent its CLI stopped on an error, such as a lost API connection, with what it said (Claude Code, Codex and GitHub Copilot). It stays in the list until the agent goes on.
 - **After a safeguard stop**: an agent whose model changed after its CLI's safety classifier stopped a response (see [When a safety classifier stops an agent](#when-a-safety-classifier-stops-an-agent)). It leaves the list once its pane is on screen.
 Agents that only **finished** while you weren't looking at them (in another project, on another page of agents, on another tab, or while Hive was in the background) don't need you, so they aren't counted: a quieter **✓ 3 finished** beside the count tells you, and the list shows them under **Finished**. Each leaves once its pane is on screen.
 

@@ -71,9 +71,9 @@ import { presentWindow, showOsNotification, testNotifyLog, testQuiet } from './t
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
 import { COMPACTING_TEXT, HOOKS_MISSING_NOTE } from '../shared/runtime'
-import { applyStep, compactionOver, expireTasks, hookStep, idleAfter, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
+import { applyStep, compactionOver, expireTasks, failedTurnStep, hookStep, idleAfter, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
 import { memoModel, memoTools, memoTurn, noteSafeguard, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
-import { admit, describe as describeTurn, endRunning, expectInjected, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
+import { admit, describe as describeTurn, endRunning, expectInjected, failureTurn, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
 import { Compaction } from './compaction'
 import { lastTitle } from './terminalTitle'
 import { asksYou } from '../shared/inbox'
@@ -288,6 +288,14 @@ interface LiveSession {
   detailsMemo?: Record<string, unknown>
   /** The last interrupt read from the transcript and acted on (LiveDetails.interruptedAt), so each counts once. */
   interruptedAt?: string
+  /**
+   * A failed turn the transcript recorded (#1632, Codex, whose Stop says nothing of it) and not settled yet: the turn it
+   * names (or when, for records that name none) and the CLI's words. It belongs to that turn only (failureTurn): marked
+   * once that turn is over, ended failed by that turn's Stop, dropped once a newer turn has begun, kept while its turn
+   * is unknown. `failureDone`: the last record settled (applied or dropped), so a record read again isn't a new one.
+   */
+  failure?: { key: string; turn: string | null; at: number; words: string }
+  failureDone?: string
   /** The last compaction end read from the transcript (LiveDetails.compactedAt, #454), so each counts once. */
   compactedAt?: string
   /**
@@ -4120,6 +4128,19 @@ class SessionManager {
         this.noteTurn(l)
       })
     }
+    // A turn the log says ended on an error (#1632, Codex, whose Stop says nothing of it): of this launch, settled in
+    // order with the hooks by the turn it names, never by whichever turn is current (settleFailure). A read that hooks
+    // overtook is no reason to drop it: the turn it names decides.
+    const at = d.turnFailed !== undefined && d.turnFailedAt ? Date.parse(d.turnFailedAt) : NaN
+    if (at >= Date.parse(l.state.startedAt)) {
+      const rec = { key: `${d.turnFailedTurn ?? ''}@${d.turnFailedAt}`, turn: d.turnFailedTurn ?? null, at, words: d.turnFailed ?? '' }
+      const id = liveId(l.state.projectPath, l.state.agentId)
+      void this.inHookOrder(l.state.runId, () => {
+        if (this.live.get(id) !== l || rec.key === l.failureDone) return
+        l.failure = rec
+        this.settleFailure(id, l)
+      })
+    }
     // A turn interrupted without a hook (Copilot): as the interrupt hook would, once per recorded interrupt of this launch.
     // Not after a hook that came once the read began (the CLI carried on, its Stop, a new prompt): that one is newer.
     const interrupted = d.interruptedAt && Date.parse(d.interruptedAt) >= Date.parse(l.state.startedAt) && d.interruptedAt !== l.interruptedAt ? d.interruptedAt : null
@@ -4590,7 +4611,8 @@ class SessionManager {
       // Hooks are handled in order, so the next one waits for this read: a turn's end counts the tasks it started.
       if (ev.kind === 'stop') await this.beforeTurnEnd(l, ev.lastMessage)
       if (!current()) return
-      const step = hookStep(ev, this.statusInput(l))
+      const step = hookStep(this.failedIfRecorded(l, ev), this.statusInput(l))
+      if (ev.kind !== 'stop') this.settleFailure(id, l)
       this.carryOut(id, l, step, String(body.hook_event_name ?? ''), ev, arrived)
       actions = step.actions
       if (ev.kind !== 'ignore') (l.recentHooks ??= []).push({ kind: ev.kind, at: Date.now(), status: st.status })
@@ -4662,6 +4684,36 @@ class SessionManager {
     return null
   }
 
+  /**
+   * A turn's end as Hive applies it (#1632), once the turn ledger has it over: the Stop of the turn a recorded failure
+   * names ends it failed, with the CLI's words; a record of an older turn is dropped.
+   */
+  private failedIfRecorded(l: LiveSession, ev: HookEvent): HookEvent {
+    const rec = l.failure
+    if (ev.kind !== 'stop' || !rec || !l.ledger) return ev
+    const where = failureTurn(l.ledger, rec)
+    if (where === 'unknown' || where === 'running') return ev
+    l.failure = undefined
+    l.failureDone = rec.key
+    if (where === 'older' || ev.failed) return ev
+    return { kind: 'stop', lastMessage: rec.words || null, failed: true }
+  }
+
+  /**
+   * Settles a recorded failure (#1632) by the turn it names (failureTurn): that turn over, it is marked failed now; a
+   * newer turn begun, it is dropped; that turn running, its Stop ends it failed (failedIfRecorded); its turn unknown, it
+   * waits. Run in hook order: when it is read, and after each hook. With no turn ledger yet (no hook heard), it waits.
+   */
+  private settleFailure(id: string, l: LiveSession): void {
+    const rec = l.failure
+    if (!rec) return
+    const where = l.ledger ? failureTurn(l.ledger, rec) : 'unknown'
+    if (where === 'unknown' || where === 'running') return
+    l.failure = undefined
+    l.failureDone = rec.key
+    if (where === 'over') this.carryOut(id, l, { next: null, ...failedTurnStep(rec.words), actions: [] }, 'transcript')
+  }
+
   /** The CLI recorded the end of the turn Hive has running, whose Stop never came (#642): over, as that Stop would end it, in order with the hooks. */
   private reconcileTurn(l: LiveSession): void {
     const id = liveId(l.state.projectPath, l.state.agentId)
@@ -4677,7 +4729,7 @@ class SessionManager {
     const before = st.status
     const turn = describeTurn(l.ledger!)
     endRunning(l.ledger!, by)
-    const ev: HookEvent = { kind: 'stop', lastMessage: null }
+    const ev = this.failedIfRecorded(l, { kind: 'stop', lastMessage: null })
     await this.beforeTurnEnd(l, null)
     this.carryOut(id, l, hookStep(ev, this.statusInput(l)), by, ev)
     this.noteTurn(l)
@@ -4772,7 +4824,8 @@ class SessionManager {
       waitingOn: l.waitingOn ?? null,
       question: !!st.question,
       reviewing: !!st.review,
-      safeguardPrompt: this.guardAnswerable(l)
+      safeguardPrompt: this.guardAnswerable(l),
+      failedTurn: !!st.failedTurn
     }
   }
 

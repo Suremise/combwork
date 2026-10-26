@@ -51,6 +51,11 @@ export interface HookStatusInput {
   reviewing: boolean
   /** It waits on its CLI's prompt about a safeguard stop (#606: whether to switch models), which no hook answers. */
   safeguardPrompt: boolean
+  /**
+   * Its latest turn ended on an error (LiveSessionState.failedTurn, #1658). Only the next turn's start clears it, so
+   * while it is set a Stop is that same turn's, come late (after the CLI's own record ended it).
+   */
+  failedTurn?: boolean
 }
 
 export type HookAction =
@@ -282,7 +287,10 @@ export function hookStep(ev: HookEvent, s: HookStatusInput): HookStep {
       const notify = next === 'finished' && s.status !== 'finished'
       // Ended on an error (#1632: an API connection error, a rate limit): it needs you, with the CLI's words, until its
       // next turn starts; its status stays the turn's end, so it is prompted and woken as any idle agent is.
-      const failed = ev.failed ? failedTurnStep(ev.lastMessage) : { failed: null, message: null }
+      // A turn already marked failed keeps it (#1658, HR5's case 6): its Stop, come after the CLI's own record ended the
+      // turn failed, says nothing of the error and is no good end of it. A good end of a new turn clears it (the turn's
+      // start already did).
+      const failed = ev.failed ? failedTurnStep(ev.lastMessage) : s.failedTurn ? {} : { failed: null, message: null }
       return { next, ...failed, review: null, ...RESOLVED, actions: ['releaseLocks', ...(notify ? (['notifyFinished'] as const) : []), 'turnEnded'] }
     }
     case 'signIn':
