@@ -3260,19 +3260,25 @@ Whether a conversation may resume there is its **hold** (none: it may):
   - **Its turn over, as states say, no settle time** (`laneEndWaitsFor`): not in a turn as its status or its hooks say
     (a Stop the inbox drain carried on keeps the turn ledger's turn running), no line of Hive's or the user's waiting to
     be taken, no Progress run or background task, and nothing still to reach that run (queued, offered or uncertain,
-    given by the gate yet or not: the note among them until it is read). Looked at again at each status, Progress and
-    saved delivery change (`onDeliveriesChanged`, after the save) and every 5 s.
+    given by the gate yet or not: the note among them until it is read), all read at one moment with nothing awaited
+    (`laneEndHeldNow`), and asked again by the quit at each key and before Enter (HR1's round 1). Looked at again at
+    each status, Progress and saved delivery change (`onDeliveriesChanged`, after the save) and every 5 s.
   - **Ended by the CLI's own exit** (`sessions.quit`, only here): its `quitLine` typed, then Enter (Claude Code
     `/exit`, Codex `/quit`, recorded exiting by themselves with code 0 on 2.1.310 and 0.164.0:
     `tests/fixtures/advanced/exit-*.json`, and the real-tier suite `cliquit`), Copilot its Ctrl+C keys; killed only
     if that run still runs after the exit grace. Never typed while the user types, over their draft, over a line of
-    Hive's not taken, or while Hive types.
+    Hive's not taken, or while Hive types; any input of the user's or prompt its CLI takes once it has begun (whatever
+    the typing pause), or its turn found open again, stops it before the next key and before Enter, what it typed
+    cleared again unless the user typed since, and it is tried again later.
   - **Fenced** to that run, that lease and the workspace's lifetime, checked at each look, after each await and before
     each key and the kill: a restart, a closed workspace, a newer run or the slot's writer changing ends the wait with
     nothing typed or killed, and retires the note if unread.
   - **Bounded:** at `hive.lanes.endWaitMinutes` (10) after the lease's end, set once and never moved, it is ended
     whatever it waits for: its exit command once its input is free, killed instead where its prompt can't be typed
-    into; logged with why. The slot stays the writer's until the run exits, as above.
+    into; logged with why. The deadline and the fence never wait for work in flight (a note being made, the states
+    being read): each change, recheck and the deadline's own timer checks them first, and what a look still awaits
+    then acts on nothing (a note made late is retired); a quit already typing is waited for, never a second one beside
+    it. The slot stays the writer's until the run exits, as above.
   - **Off switch:** Settings → Advanced → **Lanes: let the builder finish when its lane ends** (`hive.lanes.gentleEnd`):
     off, it is stopped at its first idle moment, as before. A reviewer holds no lease, so a lane's end never stops it:
     it goes idle.

@@ -17,7 +17,7 @@ import { advanced } from './advanced'
 import { processSupervisor } from './agentProcesses'
 import { boardRead, boardWrite, boardWriteOp, cardKeyOf } from './boardStore'
 import { config } from './config'
-import { agentReadsInbox, cancelFromSource, createDelivery, deliveriesOf, fromSource, offerNow, onDeliveriesChanged, waitingForRun } from './deliveries'
+import { agentReadsInbox, cancelFromSource, createDelivery, deliveriesOf, fromSource, offerNow, onDeliveriesChanged, waitingForRunNow } from './deliveries'
 import { containsPlace } from './fsutil'
 import { getLane } from './lanes'
 import { createLogger, userText } from './logger'
@@ -313,17 +313,24 @@ export function laneEndNote(lane: string, abandoned: boolean, cards: readonly { 
  * Why a lane's builder's run isn't done with its turn yet (HI-1706), or null when it is: in a turn as its status or its
  * hooks say (a Stop the drain carried on is still one), a line of Hive's or the user's not taken, its runs or background
  * tasks going, or a delivery still to reach it (the lane's note among them until it is read), whether or not the gate
- * gives it yet. No settle time: each is a state, looked at again when it changes.
+ * gives it yet. No settle time: each is a state. All read at one moment with nothing awaited (HR1's round 1 finding 1),
+ * so the answer is never older than the look that acts on it; sessions.quit asks it again at each key and before Enter.
  */
-export async function laneEndWaitsFor(projectPath: string, agent: string, run: string): Promise<string | null> {
+export function laneEndHeldNow(projectPath: string, agent: string, run: string): string | null {
   if (agentBusy(projectPath, agent)) return 'it is in a turn'
   if (sessions.turnOpen(projectPath, agent, run)) return 'its turn is still open'
   const going = agentRunsGoing(projectPath, agent)
   if (going.length) return `its runs are going (${going.join(', ')})`
   if (sessions.lineWaiting(projectPath, agent)) return "a line typed into it isn't taken yet"
-  const waiting = await waitingForRun(projectPath, agent, run, sessions.liveFor(projectPath, agent)?.sessionId || null)
+  const waiting = waitingForRunNow(projectPath, agent, run, sessions.liveFor(projectPath, agent)?.sessionId || null)
   if (waiting.length) return `deliveries still to reach it (${waiting.map((r) => r.id).join(', ')})`
   return null
+}
+
+/** laneEndHeldNow once the project's deliveries are read (the only await, before every state is read). */
+export async function laneEndWaitsFor(projectPath: string, agent: string, run: string): Promise<string | null> {
+  await deliveriesOf(projectPath, agent)
+  return laneEndHeldNow(projectPath, agent, run)
 }
 
 /** What laneEnd works with (HI-1706): the real ones in Hive, a test's own in unit tests. */
@@ -336,7 +343,7 @@ export interface LaneEndDeps {
   note: () => Promise<string | null>
   /** Cancels the note if it hasn't been read (the end lost its run, or is over). */
   retire: (why: string) => Promise<void>
-  /** sessions.quit for the run, fenced. */
+  /** sessions.quit for the run, fenced; not forced, it asks laneEndHeldNow again at each key and before Enter. */
   quit: (why: string, force: boolean) => Promise<'sent' | 'held' | 'gone'>
   /** Calls the function at each change that may matter; returns the unsubscribe. */
   watch: (look: () => void) => () => void
@@ -351,13 +358,22 @@ export interface LaneEndDeps {
  * each change and every few seconds, one look at a time; the note is made at the first look. Ends when the quit is sent,
  * the fence is lost (nothing is typed or killed then, and the unread note is retired), or the run is gone. Past the
  * deadline it quits whatever it waits for (forced: killed where its prompt can't be typed into).
+ *
+ * The fence and the deadline never wait for a look's work (HR1's round 1 finding 2): each change, recheck and the
+ * deadline's own timer checks them at once, and past the deadline or with the fence lost, any look still awaiting its
+ * note, its states or its quit is dropped (its epoch is over: what it finds later acts on nothing). Only one quit runs at
+ * a time: the forced one waits for one already typing (bounded by its own typing) rather than start a second.
  */
 export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
   let over = false
   let looking = false
   let again = false
   let noted = false
+  let forcing = false
   let lastWhy: string | null = null
+  /** Bumped when the deadline or the fence's loss takes over: a look begun before acts on nothing it finds after. */
+  let epoch = 0
+  let quitting: Promise<'sent' | 'held' | 'gone'> | null = null
   let resolve!: (why: string) => void
   const done = new Promise<string>((r) => (resolve = r))
   const timers: NodeJS.Timeout[] = []
@@ -365,39 +381,78 @@ export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
   const finish = (why: string): void => {
     if (over) return
     over = true
+    epoch++
     unwatch?.()
     for (const t of timers) clearTimeout(t)
     d.log(why)
     resolve(why)
   }
-  const step = async (): Promise<void> => {
-    if (!d.fenced()) {
-      await d.retire('its lane end lost its run').catch(() => undefined) // i18n-ignore: for the log
-      return finish('the run or its lease is gone: nothing ended')
+  const lost = (): void => {
+    if (over) return
+    finish('the run or its lease is gone: nothing ended')
+    void d.retire('its lane end lost its run').catch(() => undefined) // i18n-ignore: for the log
+  }
+  /** The one quit at a time. */
+  const quitOnce = (why: string, force: boolean): Promise<'sent' | 'held' | 'gone'> => {
+    if (!quitting) quitting = d.quit(why, force).finally(() => (quitting = null))
+    return quitting
+  }
+  /** Past the deadline: whatever a look awaits is dropped, and the run is ended forced. */
+  const forced = async (): Promise<void> => {
+    if (over || forcing) return
+    forcing = true
+    epoch++
+    try {
+      // A quit already typing finishes (or gives up) first: never two at once.
+      if (quitting) await quitting.catch(() => 'held')
+      if (over) return
+      if (!d.fenced()) return lost()
+      const r = await quitOnce(`its lane ended and it didn't finish its turn in time (${lastWhy ?? 'unknown'})`, true)
+      if (over) return
+      if (r === 'gone') return lost()
+      // 'held': input arrived while it typed; the next recheck forces it again.
+      if (r === 'held') return
+      finish('ended past the deadline')
+      await d.retire('its run ended').catch(() => undefined) // i18n-ignore: for the log
+    } finally {
+      forcing = false
     }
+  }
+  const step = async (): Promise<void> => {
+    const mine = epoch
+    const dropped = (): boolean => over || epoch !== mine
     if (!noted) {
       noted = true
-      await d.note().catch((e) => void d.log(`its lane's note wasn't made: ${(e as Error).message}`))
-      if (!d.fenced()) return step()
-    }
-    const past = d.now() >= d.deadline
-    if (!past) {
-      const why = await d.waitsFor()
-      if (!d.fenced()) return step()
-      if (why) {
-        if (why !== lastWhy) d.log(`waiting: ${why}`)
-        lastWhy = why
-        return
+      try {
+        await d.note()
+      } catch (e) {
+        d.log(`its lane's note wasn't made: ${(e as Error).message}`)
       }
+      // Made after its end was over (the fence lost, or ended forced, meanwhile): retired, as the end retired none.
+      if (over) return void d.retire('its lane end was over before its note was made').catch(() => undefined) // i18n-ignore: for the log
+      if (dropped()) return
+      if (!d.fenced()) return lost()
     }
-    const r = await d.quit(past ? `its lane ended and it didn't finish its turn in time (${lastWhy ?? 'unknown'})` : 'its lane ended and its turn is over', past)
+    const why = await d.waitsFor()
+    if (dropped()) return
+    if (!d.fenced()) return lost()
+    if (d.now() >= d.deadline) return forced()
+    if (why) {
+      if (why !== lastWhy) d.log(`waiting: ${why}`)
+      lastWhy = why
+      return
+    }
+    const r = await quitOnce('its lane ended and its turn is over', false)
+    if (dropped()) return
     if (r === 'held') return
-    if (r === 'gone') return step()
-    if (past) await d.retire('its run ended').catch(() => undefined) // i18n-ignore: for the log
-    finish(past ? 'ended past the deadline' : 'ended once its turn was over')
+    if (r === 'gone') return lost()
+    finish('ended once its turn was over')
   }
   const look = (): void => {
     if (over) return
+    // The fence and the deadline first, whatever a look awaits.
+    if (!d.fenced()) return lost()
+    if (d.now() >= d.deadline) return void forced()
     if (looking) {
       again = true
       return
@@ -405,7 +460,7 @@ export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
     looking = true
     void (async () => {
       try {
-        // finish() (in step) sets `over`: read through a call, as the loop can't see that.
+        // finish() sets `over` (and the deadline `epoch`): read through a call, as the loop can't see that.
         const ended = (): boolean => over
         do {
           again = false
@@ -480,7 +535,7 @@ function laneEnd(projectPath: string, lease: SlotLease, slotName: string, w: Slo
     waitsFor: () => laneEndWaitsFor(projectPath, w.agent, w.run),
     note,
     retire: async (why) => void (await cancelFromSource(projectPath, LANE_END_SOURCE, lease.id, why)),
-    quit: (why, force) => sessions.quit(projectPath, w.agent, w.run, fenced, why, force),
+    quit: (why, force) => sessions.quit(projectPath, w.agent, w.run, { fenced, why, force, ready: () => laneEndHeldNow(projectPath, w.agent, w.run) }),
     watch: (look) => {
       const offEvents = onHiveEvent((e) => {
         if ((e.type === 'session-status' && e.state.agentId === w.agent && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
@@ -614,7 +669,7 @@ export async function slotTest(pool: SlotPool, op: SlotTestOp): Promise<unknown>
     case 'quit': {
       // A lane's end's quit of a running CLI (HI-1706's cliquit, the real Claude Code and Codex): its run now, unfenced.
       const r = sessions.runNow(pool.deps.project, op.agent)
-      return r ? sessions.quit(pool.deps.project, op.agent, r.run, () => true, 'a test asked') : 'gone' // i18n-ignore: for the log
+      return r ? sessions.quit(pool.deps.project, op.agent, r.run, { fenced: () => true, why: 'a test asked' }) : 'gone' // i18n-ignore: for the log
     }
     default:
       throw new Error('unknown slot test op') // i18n-ignore: a test channel, never shown

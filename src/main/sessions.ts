@@ -2166,11 +2166,15 @@ class SessionManager {
   /**
    * Ends an agent's run `runId` as a person would, at its lane's end (HI-1706): its CLI's quitLine typed, then Enter (or
    * its exitKeys), and killed if that run still runs after the grace. `fenced` is the caller's own check (its lease, its
-   * slot's writer), asked with the run's before each key and before the kill. 'held': its input is held (inputHeld),
-   * nothing typed, the caller looks again; 'gone': that run or the fence is; 'sent': typed (or already ending). `force`
-   * (the caller's deadline): a prompt that can't be typed into is killed rather than typed over.
+   * slot's writer), asked with the run's before each key and before the kill. `ready` (not forced): why its turn isn't
+   * over after all (the caller's own states), asked with the rest at each key and before Enter, so a turn that begins
+   * meanwhile stops it. 'held': its input is held (inputHeld), or the user typed, a prompt was taken or `ready` said no
+   * while it typed (what it typed cleared again unless the user typed since), the caller looks again; 'gone': that run
+   * or the fence is; 'sent': typed (or already ending). `force` (the caller's deadline): `ready` isn't asked, and a
+   * prompt that can't be typed into is killed rather than typed over; input arriving while it types still stops it.
    */
-  async quit(projectPath: string, agentId: string, runId: string, fenced: () => boolean, why: string, force = false): Promise<'sent' | 'held' | 'gone'> {
+  async quit(projectPath: string, agentId: string, runId: string, o: { fenced: () => boolean; why: string; force?: boolean; ready?: () => string | null }): Promise<'sent' | 'held' | 'gone'> {
+    const { fenced, why, force = false } = o
     const id = liveId(projectPath, agentId)
     const key = this.key(projectPath, agentId)
     const l = this.live.get(id)
@@ -2178,7 +2182,7 @@ class SessionManager {
     if (!l || !same()) return 'gone'
     if (l.ending) return 'sent'
     const label = userText(this.label(l.state))
-    const held = this.inputHeld(projectPath, agentId)
+    const held = this.inputHeld(projectPath, agentId) ?? (force ? null : (o.ready?.() ?? null))
     const line = l.adapter.quitLine
     const keys = l.adapter.exitKeys
     if (held || (!line && !keys)) {
@@ -2189,18 +2193,26 @@ class SessionManager {
       killPty(key)
       return 'sent'
     }
+    // From here, whatever the typing pause says: any input of the user's, any prompt its CLI takes (a turn beginning),
+    // or (not forced) its turn not over after all stops it before the next key and before Enter.
+    const since = Date.now()
+    const prompts = l.prompts ?? 0
+    const guard = (): void => {
+      if (!same()) throw new Error('its run or lease is gone') // i18n-ignore: for the log
+      if (this.userTypedAt(projectPath, agentId) >= since) throw new Error('the user typed there') // i18n-ignore: for the log
+      if ((l.prompts ?? 0) !== prompts) throw new Error('its CLI took a prompt') // i18n-ignore: for the log
+      const not = force ? null : (o.ready?.() ?? null)
+      if (not) throw new Error(not)
+    }
     // Ending from here: its exit is a stop asked for (not a crash), and Stop meanwhile kills it at once (endProcess).
     l.stopRequested = true
     l.ending = true
     try {
       if (line) {
-        await this.sendPrompt(projectPath, agentId, line.line, () => {
-          if (!same()) throw new Error('its run or lease is gone') // i18n-ignore: for the log
-          if (this.userMayBeTyping(projectPath, agentId)) throw new Error('the user is typing there') // i18n-ignore: for the log
-        })
+        await this.sendPrompt(projectPath, agentId, line.line, guard)
       } else {
         for (const k of keys!.keys) {
-          if (!same()) throw new Error('its run or lease is gone') // i18n-ignore: for the log
+          guard()
           writePty(key, k)
           await new Promise((r) => setTimeout(r, keys!.gapMs))
         }

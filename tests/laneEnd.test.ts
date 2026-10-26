@@ -3,9 +3,13 @@
 // past an absolute deadline whatever it waits for. These drive the waiter with a test's own states and clock.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../src/main/sessions', () => ({ sessions: { runNow: () => null, stop: () => undefined, runLive: () => true, liveStates: () => [] } }))
+vi.mock('../src/main/sessions', () => ({ sessions: { runNow: () => null, stop: () => undefined, runLive: () => true, liveStates: () => [], turnOpen: () => false, lineWaiting: () => false, liveFor: () => null } }))
+/** The project's deliveries being read (laneEndWaitsFor's one await): held until the test lets it go. */
+let reading: Promise<void> = Promise.resolve()
+vi.mock('../src/main/deliveries', async (orig) => ({ ...(await orig<typeof import('../src/main/deliveries')>()), deliveriesOf: async () => (await reading, []), waitingForRunNow: () => [] }))
 
-const { waitForLaneEnd, laneEndNote } = await import('../src/main/slotsApp')
+const { waitForLaneEnd, laneEndNote, laneEndWaitsFor } = await import('../src/main/slotsApp')
+const { setAgentBusy } = await import('../src/main/workflow/lineUpdates')
 type Deps = Parameters<typeof waitForLaneEnd>[0]
 
 /** A lane's end over states the test sets: what it waits for, whether it is fenced, what its quit answers. */
@@ -140,12 +144,84 @@ describe("a lane's end waits for its builder's turn to be over", () => {
     await expect(h.done).resolves.toBe('the run or its lease is gone: nothing ended')
   })
 
+  it("a note still being made at the deadline doesn't hold it: forced at the deadline, and the note made late is retired (HR1 round 1, finding 2)", async () => {
+    let made: (id: string) => void = () => undefined
+    const h = harness({ note: () => new Promise<string>((r) => (made = r)) })
+    h.s.now = 10 * 60_000
+    await vi.advanceTimersByTimeAsync(10 * 60_000 + 100)
+    await expect(h.done).resolves.toBe('ended past the deadline')
+    expect(h.quits.map((q) => q.force)).toEqual([true])
+    made('m1')
+    await vi.waitFor(() => expect(h.retired).toContain('its lane end was over before its note was made'), HUNG)
+    expect(h.quits).toHaveLength(1)
+  })
+
+  it('its states still being read at the deadline: forced, and their late answer quits nothing more', async () => {
+    let answer: (why: string | null) => void = () => undefined
+    const h = harness({ waitsFor: () => new Promise<string | null>((r) => (answer = r)) })
+    await vi.waitFor(() => expect(h.notes).toEqual(['m1']), HUNG)
+    h.s.now = 10 * 60_000
+    await vi.advanceTimersByTimeAsync(10 * 60_000 + 100)
+    await expect(h.done).resolves.toBe('ended past the deadline')
+    answer(null)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(h.quits.map((q) => q.force)).toEqual([true])
+  })
+
+  it('its note or its states still being read when the fence is lost: it ends at once, nothing quit, even when they answer later', async () => {
+    let made: (id: string) => void = () => undefined
+    const h = harness({ note: () => new Promise<string>((r) => (made = r)), waitsFor: async () => null })
+    h.s.fenced = false
+    h.change()
+    await expect(h.done).resolves.toBe('the run or its lease is gone: nothing ended')
+    made('m1')
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(h.quits).toEqual([])
+    expect(h.retired).toContain('its lane end lost its run')
+    expect(h.retired).toContain('its lane end was over before its note was made')
+  })
+
+  it('a quit still typing at the deadline is waited for, never a second one beside it', async () => {
+    let typed: (r: 'sent' | 'held' | 'gone') => void = () => undefined
+    const quits: boolean[] = []
+    const h = harness({ waitsFor: async () => null, quit: (_why, force) => (quits.push(force), force ? Promise.resolve('sent') : new Promise((r) => (typed = r))) })
+    await vi.waitFor(() => expect(quits).toEqual([false]), HUNG)
+    h.s.now = 10 * 60_000
+    await vi.advanceTimersByTimeAsync(10 * 60_000 + 100)
+    expect(quits).toEqual([false])
+    // The user typed while it typed: it gave up; then the forced one.
+    typed('held')
+    await expect(h.done).resolves.toBe('ended past the deadline')
+    expect(quits).toEqual([false, true])
+  })
+
   it("a note that couldn't be made (no inbox, refused) doesn't hold it: it ends once the turn is over", async () => {
     const h = harness({ note: async () => Promise.reject(new Error('refused')) })
     await vi.waitFor(() => expect(h.lines).toContain("its lane's note wasn't made: refused"), HUNG)
     h.s.why = null
     h.change()
     await expect(h.done).resolves.toBe('ended once its turn was over')
+  })
+})
+
+describe("its states (laneEndWaitsFor)", () => {
+  it('are read after its deliveries are, at one moment: a turn beginning while they are read is seen (HR1 round 1, finding 1)', async () => {
+    let busy = false
+    setAgentBusy(() => busy)
+    let let_go: () => void = () => undefined
+    reading = new Promise<void>((r) => (let_go = r))
+    try {
+      const answer = laneEndWaitsFor('C:/ws/alpha', 'b1', 'run-1')
+      // The read is under way: a doorbell's line is taken and a turn begins.
+      busy = true
+      let_go()
+      expect(await answer).toBe('it is in a turn')
+      busy = false
+      expect(await laneEndWaitsFor('C:/ws/alpha', 'b1', 'run-1')).toBeNull()
+    } finally {
+      setAgentBusy(null)
+      reading = Promise.resolve()
+    }
   })
 })
 

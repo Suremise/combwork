@@ -302,9 +302,14 @@ function tellChanged(host: string, agents: ReadonlySet<string>): void {
  * not expired, for its conversation (or none) and for that run (or any), whether or not the gate gives them yet.
  */
 export async function waitingForRun(host: string, agentId: string, run: string, conversation: string | null): Promise<DeliveryRecord[]> {
-  const store = await load(host)
+  await load(host)
+  return waitingForRunNow(host, agentId, run, conversation)
+}
+
+/** waitingForRun from what this Hive has read now, with nothing awaited (the host's deliveries loaded, else none). */
+export function waitingForRunNow(host: string, agentId: string, run: string, conversation: string | null): DeliveryRecord[] {
   const now = clock()
-  return store.records.filter((r) => r.agentId === agentId && (r.state === 'queued' || r.state === 'offered' || r.state === 'uncertain') && Date.parse(r.expires) > now && (!r.conversation || !conversation || r.conversation === conversation) && (!r.forRun || r.forRun === run))
+  return (stores.get(keyOf(host))?.records ?? []).filter((r) => r.agentId === agentId && (r.state === 'queued' || r.state === 'offered' || r.state === 'uncertain') && Date.parse(r.expires) > now && (!r.conversation || !conversation || r.conversation === conversation) && (!r.forRun || r.forRun === run))
 }
 
 /** Runs fn after the host's transactions before it (and before later ones). */
