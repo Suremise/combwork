@@ -514,13 +514,14 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
   it('a later listing that finds the folders as already read settles at once: an older read held meanwhile is dropped', async () => {
     const h = await heldReads('ws-cached')
     try {
-      const cachedKey = h.w.projectIdsNow().key
+      const cached = h.w.projectIdsNow()
       h.state.folders = [h.keep, h.gone]
       const older = h.w.projectIds({ fresh: true })
       await vi.waitFor(() => expect(h.reached()).toBe(true), { timeout: HUNG_MS })
       h.state.folders = [h.keep]
       const newer = await h.w.projectIds({ fresh: true })
-      expect(newer.key).toBe(cachedKey)
+      // The folders as already read: the standing index itself.
+      expect(newer).toBe(cached)
       h.release()
       await older
       expect(h.has()).toBe(false)
