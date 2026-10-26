@@ -160,14 +160,14 @@ export function NewProjectsNotice() {
     for (const p of projects) void call('workflow:presetNotNow', p.path, p.platform!.id).catch((e) => notify('error', errorMessage(e)))
   }
   return (
-    <div className="banner info step-notice" role="status" data-step-notice="">
+    <div className="banner info wrap-banner step-notice" role="status" data-step-notice="">
       {/* The icon with its text, so they wrap as one (HI-1717). */}
-      <span className="step-notice-text">
+      <span className="wrap-banner-text">
         <Icon name="info" />
         <span className="grow">{tr(N.text, { projects: fmt.list(projects.map((p) => p.name)), n: projects.length })}</span>
       </span>
       {/* Together, so in a narrow pane they wrap under the text as one (HI-1717). */}
-      <span className="step-notice-actions">
+      <span className="wrap-banner-actions">
         <button className="btn small primary" data-action="step-notice-choose" onClick={choose}>
           {tr(N.choose)}
         </button>

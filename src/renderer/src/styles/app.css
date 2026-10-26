@@ -1771,24 +1771,25 @@ textarea.input {
 .banner .btn {
   margin-left: auto;
 }
-/* The presets notice (HI-1717): its buttons go under the text, together, once the text would have less than 240 px beside
-   them; where even the pair doesn't fit the banner they stack, and a label wider than the banner wraps inside its button,
-   so each stays whole and clickable at any width. */
-.banner.step-notice {
+/* A notice banner (HI-1717: the presets notice and the providers banners): its icon and text, then its buttons, which go
+   under the text, together, once the text would have less than about 240 px beside them; where even they don't fit the
+   banner they stack, and a label wider than the banner wraps inside its button, so each stays whole and clickable at any
+   width. */
+.banner.wrap-banner {
   flex-wrap: wrap;
   row-gap: 6px;
 }
-.step-notice-text {
+.wrap-banner-text {
   display: flex;
   align-items: center;
   gap: 10px;
   flex: 1 1 266px;
   min-width: 0;
 }
-.step-notice-text > .grow {
+.wrap-banner-text > .grow {
   min-width: 0;
 }
-.step-notice-actions {
+.wrap-banner-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -1797,7 +1798,7 @@ textarea.input {
   max-width: 100%;
   margin-left: auto;
 }
-.step-notice-actions .btn {
+.banner .wrap-banner-actions .btn {
   margin-left: 0;
   max-width: 100%;
   height: auto;
@@ -4902,9 +4903,6 @@ h2.section#unused-worktrees {
 .banner.providers-banner {
   border-bottom: 1px solid var(--border);
   gap: 8px;
-}
-.banner.providers-banner .btn {
-  margin-left: auto;
 }
 
 .status-hex {
