@@ -22,6 +22,7 @@ import { emit, emitTo } from './events'
 import { containsPlace, insideReal, isDir, placeKey, readJson, readKeptJson, removePath, retryWhileSaving, samePlace, withFileLock, writeKeptJson, type KeptReadOptions } from './fsutil'
 import { admit, dismiss, setFenceReason } from './openingFence'
 import { AfterOpen } from './openProgress'
+import { whenAll } from '../shared/atMost'
 import { createLogger, userText } from './logger'
 import { changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
@@ -388,16 +389,20 @@ export class WorkspaceService {
         log.warn('setting up the Assistant', e)
       }
     })()
-    // Each project's own folders, all at once (HI-1705).
-    await Promise.all((await this.listProjectPaths()).map((p) => this.ensureProject(p).catch((e) => log.warn(`ensureProject ${userText(p)}`, e))))
-    done('its projects') // i18n-ignore: a part of a log line's timing
-    // Every project has its id (#508) before the board, lanes and watches are read by it.
-    await this.projectIds().catch((e) => log.warn('reading the project ids', e))
-    done('their ids') // i18n-ignore: a part of a log line's timing
-    // Before any session starts with them: MCP settings from before #1093 move to its model.
-    await this.migrateMcpModel().catch((e) => log.warn('moving the MCP settings to the workspace and project switches', e))
-    done('MCP settings') // i18n-ignore: a part of a log line's timing
-    await assistant
+    try {
+      // Each project's own folders, all at once (HI-1705).
+      await whenAll((await this.listProjectPaths()).map((p) => this.ensureProject(p).catch((e) => log.warn(`ensureProject ${userText(p)}`, e))))
+      done('its projects') // i18n-ignore: a part of a log line's timing
+      // Every project has its id (#508) before the board, lanes and watches are read by it.
+      await this.projectIds().catch((e) => log.warn('reading the project ids', e))
+      done('their ids') // i18n-ignore: a part of a log line's timing
+      // Before any session starts with them: MCP settings from before #1093 move to its model.
+      await this.migrateMcpModel().catch((e) => log.warn('moving the MCP settings to the workspace and project switches', e))
+      done('MCP settings') // i18n-ignore: a part of a log line's timing
+    } finally {
+      // Ended either way: an open that fails here leaves none of it going (its close follows).
+      await assistant
+    }
     done('the Assistant') // i18n-ignore: a part of a log line's timing
     // Its bundled skills and modes brought up to date once the window has the workspace, not before (HI-1705: hashing each
     // one's copies on every open was most of an ordinary open's file reads, queued behind other windows' work); none if
@@ -518,9 +523,9 @@ export class WorkspaceService {
     const h = this.hiveDir
     // The folders, then the files, each all at once (HI-1705: one after another, each waited its turn behind other
     // windows' file work). Each folder is made with those above it.
-    await Promise.all([join(h, 'shared', 'handovers'), join(h, 'skills'), join(h, 'mcp'), join(h, 'tasks')].map((d) => mkdir(d, { recursive: true })))
+    await whenAll([join(h, 'shared', 'handovers'), join(h, 'skills'), join(h, 'mcp'), join(h, 'tasks')].map((d) => mkdir(d, { recursive: true })))
     const hr = join(h, 'shared', 'handovers', 'README.md')
-    await Promise.all([
+    await whenAll([
       existsSync(join(h, 'workspace.json')) ? undefined : writeKeptJson(join(h, 'workspace.json'), DEFAULT_WORKSPACE_CONFIG),
       existsSync(join(h, 'README.md')) ? undefined : writeFile(join(h, 'README.md'), WORKSPACE_README),
       // The board's database and what its move from files left (#1017) are this machine's: kept out of git if the workspace is a repository.
@@ -673,7 +678,7 @@ export class WorkspaceService {
   private async migrateMcpModel(): Promise<void> {
     if (this.wsConfig.mcp.model === 2) return
     const allProjects = this.wsConfig.mcp.enabled
-    const paths = (await Promise.all([this.listProjectPaths(), this.listProjectPaths({ hidden: true })])).flat()
+    const paths = (await whenAll([this.listProjectPaths(), this.listProjectPaths({ hidden: true })])).flat()
     const configs = await Promise.all(paths.map((p) => this.projectConfig(p).then((c) => c.mcp, () => null)))
     for (const [i, p] of paths.entries()) {
       const was = configs[i]
@@ -784,7 +789,7 @@ export class WorkspaceService {
     // `fresh`: what is read in the second after that sees the same projects.
     if (this.ids && !opts.fresh && Date.now() - this.ids.at < 1000) return this.ids
     const listing = ++this.idsListed
-    const paths = (await Promise.all([this.listProjectPaths(), this.listProjectPaths({ hidden: true })])).flat()
+    const paths = (await whenAll([this.listProjectPaths(), this.listProjectPaths({ hidden: true })])).flat()
     // Each folder with its project.json's identity and time: a folder replaced by another of the same name, or two
     // projects that swapped names, read again too.
     const key = (
@@ -824,7 +829,7 @@ export class WorkspaceService {
     const entries: ProjectIdEntry[] = []
     const cfgs = new Map<string, ProjectConfig>()
     // Read all at once (HI-1705), kept in the listing's order.
-    const read = await Promise.all(paths.map((p) => (existsSync(join(p, HIVE_DIR, 'project.json')) ? this.projectConfig(p).catch(() => null) : null)))
+    const read = await whenAll(paths.map((p) => (existsSync(join(p, HIVE_DIR, 'project.json')) ? this.projectConfig(p).catch(() => null) : null)))
     paths.forEach((p, i) => {
       const cfg = read[i]
       if (!cfg) return
@@ -1027,10 +1032,10 @@ export class WorkspaceService {
   async ensureProject(projectPath: string): Promise<void> {
     const h = join(projectPath, HIVE_DIR)
     // Its folders and its exclusion from git at once (HI-1705).
-    await Promise.all([
+    await whenAll([
       this.ensureGitExclude(projectPath),
       (async () => {
-        await Promise.all([mkdir(join(h, 'sessions'), { recursive: true }), mkdir(join(h, 'archive'), { recursive: true })])
+        await whenAll([mkdir(join(h, 'sessions'), { recursive: true }), mkdir(join(h, 'archive'), { recursive: true })])
         // Its platform is recorded as it is made, from what detection finds (SPEC §16.3.5): never switched silently after.
         if (!existsSync(join(h, 'project.json'))) await writeKeptJson(join(h, 'project.json'), { ...DEFAULT_PROJECT_CONFIG, platform: detect(projectPath).platform })
         // 0.1's launch folder for Agent 1; every agent now has launch-<id>.
@@ -1253,7 +1258,7 @@ export class WorkspaceService {
   async unmanagedMcp(projectPath: string): Promise<string[]> {
     const names = new Set<string>()
     // Every provider's at once (HI-1705).
-    for (const servers of await Promise.all(allProviders().map((p) => p.projectMcpServers(projectPath).catch(() => ({}))))) for (const n of Object.keys(servers)) names.add(n)
+    for (const servers of await whenAll(allProviders().map((p) => p.projectMcpServers(projectPath).catch(() => ({}))))) for (const n of Object.keys(servers)) names.add(n)
     if (!names.size || !this.path) return []
     const deployed = new Set(
       (await readdir(this.mcpDir).catch(() => [] as string[])).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5))
@@ -1290,7 +1295,7 @@ export class WorkspaceService {
     // Its slots and homes are roots from this read on (#1442), fenced as its worktrees are (registerRoots' ticket).
     if (!this.isAssistantHome(projectPath)) this.registerRoots(projectPath, cfg, gen, ticket, (folders ?? []).map((f) => f.path))
     // The rest of the read at once (HI-1705): none of these needs another.
-    const [branch, unmanagedMcp, removed, vcs] = await Promise.all([
+    const [branch, unmanagedMcp, removed, vcs] = await whenAll([
       took('its branch', this.branch(projectPath)), // i18n-ignore: a part of a log line's timing
       took('its MCP servers', this.unmanagedMcp(projectPath)), // i18n-ignore: a part of a log line's timing
       took('removed data', removedData(projectPath)), // i18n-ignore: a part of a log line's timing
@@ -1371,8 +1376,8 @@ export class WorkspaceService {
     // file and git calls queued behind other windows' work, an open took seconds under load).
     const paths = await this.listProjectPaths()
     if (closed()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
-    const [read, assistant] = await Promise.all([
-      Promise.all(paths.map((p) => this.projectInfo(p, gen, scope))),
+    const [read, assistant] = await whenAll([
+      whenAll(paths.map((p) => this.projectInfo(p, gen, scope))),
       this.projectInfo(this.assistantHome, gen, scope).catch((e) => (log.warn('the Assistant', e), null))
     ])
     projects.push(...read)

@@ -23,7 +23,7 @@ import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSess
 import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
 import { coalesced, joined } from '../shared/coalesce'
-import { atMost } from '../shared/atMost'
+import { atMost, whenAll } from '../shared/atMost'
 import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter } from './agentFolders'
 import { slotEnv } from './slots'
 import { copiesDirOf, grantsCopies } from './copies'
@@ -1340,7 +1340,7 @@ class SessionManager {
     const reads = scope ? launchReadsOf(scope) : new LaunchReads()
     // Its sessions, and its slots and leases (#1434: an agent's conversations in its slots, and whether each may resume
     // now), read at once (HI-1705).
-    const [file, facts] = await Promise.all([workspace.sessionsFile(projectPath), folderFacts(projectPath).catch(() => null)])
+    const [file, facts] = await whenAll([workspace.sessionsFile(projectPath), folderFacts(projectPath).catch(() => null)])
     const records = file.sessions
     this.checkSubsOnce(projectPath, records)
     const openIds = new Set(this.projectStates(projectPath).map((s) => s.sessionId).filter(Boolean))
@@ -1351,7 +1351,7 @@ class SessionManager {
     // Slots held by an agent's run that is over, its processes not known ended (#1506): its ⋯ offers Release Slot….
     const held = facts?.slots.some((s) => s.writer) ? await heldSlots(projectPath).catch(() => new Map<string, string>()) : new Map<string, string>()
     // Every agent at once (HI-1705: one after another, each one's place waited behind other windows' file work), in order.
-    const agents: AgentInfo[] = await Promise.all(projectAgents(cfg).map(async (a): Promise<AgentInfo> => {
+    const agents: AgentInfo[] = await whenAll(projectAgents(cfg).map(async (a): Promise<AgentInfo> => {
         const l = this.live.get(liveId(projectPath, a.id))
         let restartNeeded = false
         if (l && !l.state.settingUp) {
