@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import type { HiveBridge } from '../shared/api'
 import type { HiveEvent } from '../shared/types'
+import { COMMIT_WATCH_ARG } from '../shared/commitWatch'
 
 const bridge: HiveBridge = {
   invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
@@ -20,7 +21,8 @@ const bridge: HiveBridge = {
     return () => ipcRenderer.removeListener('pty:exit', handler)
   },
   pathForFile: (file) => webUtils.getPathForFile(file),
-  platform: process.platform
+  platform: process.platform,
+  commitWatch: process.argv.includes(COMMIT_WATCH_ARG)
 }
 
 contextBridge.exposeInMainWorld('hive', bridge)

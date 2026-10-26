@@ -486,6 +486,9 @@ async function runOnce(k) {
   const summary = `${results.filter((r) => r.ok).length} passed, ${failed.length} failed, ${results.filter((r) => r.skipped).length} skipped${devOnly.size ? `, ${devOnly.size} not run (they need the dev build)` : ''} in ${minutes} min`
   console.log(`\n${repeat > 1 ? `Run ${k} of ${repeat}: ` : ''}${summary}. Logs: ${logDir}`)
   if (filesKept.length) console.log(`Kept the screenshots and files of ${filesKept.join(', ')} in ${filesKept.length === 1 ? `${logDir}\\${filesKept[0]}` : `${logDir}\\<suite>`} (--keep-files).`)
+  // React's commit bursts, recorded only (HI-1387): each suite's largest, the largest first, for step 2's threshold.
+  const bursts = results.map((r) => ({ name: r.name, n: Number(/^INFO React commit burst: the largest was (\d+)/m.exec(r.out ?? '')?.[1] ?? 0) })).filter((b) => b.n)
+  if (bursts.length) console.log(`React commit bursts (most commits within 250 ms, recorded only; 50 is a loop, HI-1387): ${bursts.sort((a, b) => b.n - a.n).map((b) => `${b.name} ${b.n}`).join(', ')}`)
   // A failed run outlives KEEP_RUNS for a day, with its failed suites' screenshots (#223): a path a builder cites in a
   // card is still there when the reviewer looks.
   if (failed.length) {

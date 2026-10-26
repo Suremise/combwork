@@ -923,4 +923,6 @@ export interface HiveBridge {
   /** Full path of a file dropped from Explorer. */
   pathForFile(file: File): string
   platform: string
+  /** A test copy's window: React's commits are watched (HI-1387, renderer commitWatch.ts). */
+  commitWatch: boolean
 }

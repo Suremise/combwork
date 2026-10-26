@@ -83,6 +83,7 @@ import { usageHistory } from './usageHistory'
 import { notificationIcon } from './paths'
 import { createTray, destroyTray, resourcesDir, setTrayPendingQuit, showWindow } from './tray'
 import { keepOffScreen, offScreenOrigin, showOsNotification, testQuiet } from './testQuiet'
+import { COMMIT_WATCH_ARG } from '../shared/commitWatch'
 import { pinFollower } from './pin'
 import { closedNotice, focusedHive, routeAppNotice, setFocusedHive, startNoticeResolver } from './notices'
 import { initUpdater, installNow, installsOnQuit } from './updater'
@@ -237,7 +238,9 @@ function createWindow(opts: { workspacePath?: string | null; bounds?: WindowStat
       backgroundThrottling: false,
       // Enables Chromium's built-in PDF viewer for the Files tab preview.
       plugins: true,
-      spellcheck: false
+      spellcheck: false,
+      // A test copy's watch on React's commits (HI-1387): the preload passes it on to the page.
+      additionalArguments: testQuiet() ? [COMMIT_WATCH_ARG] : []
     }
   })
   trackTitleBar(win, titleBarColors())

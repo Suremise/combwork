@@ -615,6 +615,7 @@ _electron.launch = async (...args) => {
     )
   apps.add(app)
   app.on('close', () => apps.delete(app))
+  watchCommitBursts(app)
   if (packaged) {
     const shown = await app.evaluate(keepPackagedQuiet).catch((e) => ({ error: e.message }))
     if (!Array.isArray(shown) || shown.length) {
@@ -631,6 +632,46 @@ _electron.launch = async (...args) => {
   // copy whose record isn't made (in time, or at all) is never ended by the runner, only listed.
   if (process.env.HIVE_E2E_DIR) recordMainProcess(WORK, app.process(), from, env.HIVE_USER_DATA ?? null).catch(() => undefined)
   return app
+}
+
+// React's commit bursts in the suite's test copies (HI-1387, step 1: recorded, nothing fails on them yet). Each window
+// of a test copy says each new largest burst on its console (src/shared/commitWatch.ts: `<marker> <n>`, n commits within
+// 250 ms); the suite's largest is said once as it exits, for the run's output (run.mjs), and once at the time it first
+// reaches React's nested-update limit (a loop). Step 2 fails a suite on that, once a full run shows normal bursts well under it.
+const COMMIT_BURST_MARKER = '[hive commit burst]'
+const COMMIT_BURST_LIMIT = 50
+let largestBurst = 0
+const commitBursts = () => largestBurst
+function noteBurst(text) {
+  if (!String(text).startsWith(COMMIT_BURST_MARKER)) return
+  const n = Number(String(text).slice(COMMIT_BURST_MARKER.length).trim())
+  if (!Number.isInteger(n) || n <= largestBurst) return
+  const first = !largestBurst
+  const reached = largestBurst < COMMIT_BURST_LIMIT && n >= COMMIT_BURST_LIMIT
+  largestBurst = n
+  if (reached) console.log(`INFO React commit burst: ${n} commits within 250 ms, React's nested-update limit (a render loop?): recorded only for now (HI-1387)`)
+  if (first) process.once('exit', () => console.log(`INFO React commit burst: the largest was ${largestBurst} commits within 250 ms (recorded only; ${COMMIT_BURST_LIMIT} is a loop, HI-1387)`))
+}
+function watchCommitBursts(app) {
+  const watch = (page) => {
+    try {
+      page.on('console', (m) => {
+        try {
+          noteBurst(m.text())
+        } catch {
+          // Only a record: never the suite's failure.
+        }
+      })
+    } catch {
+      // As above.
+    }
+  }
+  try {
+    for (const page of app.windows()) watch(page)
+    app.on('window', watch)
+  } catch {
+    // As above.
+  }
 }
 
 /** The Hives a suite may never start (#1253): the installed app (the one hosting the agents, with its own profile and app ID). */
@@ -1460,4 +1501,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, typeLine, fakePrompts, skip }
+module.exports = { commitBursts, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, typeLine, fakePrompts, skip }
