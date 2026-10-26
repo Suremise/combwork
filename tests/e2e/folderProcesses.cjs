@@ -272,25 +272,59 @@ function endChildTree(child) {
 
 /** Where a suite's test copies of Hive are recorded as they start: a line each in its work folder (lib.cjs). */
 const COPIES_FILE = '.hive-copies.jsonl'
-/** How far a copy's start may be from the window it was launched in (ms): Windows' and Node's clocks round apart. */
-const COPY_SLACK_MS = 1000
-
-/** Records a copy started in `dir`: { pid, from, to } (ms: its launch began and returned), and its profile. */
+/** Records a copy started in `dir`: { pid, started } (its identity, as processes() lists it), and its profile. */
 function recordCopy(dir, copy) {
   fs.appendFileSync(path.join(dir, COPIES_FILE), `${JSON.stringify(copy)}\n`)
 }
 
 /**
- * Records the copy of Hive that `launcher` (the pid Playwright started, `from`: ms before it did) is: its child that
- * started since, when Playwright started Electron through `cmd.exe /c` (Windows), else `launcher` itself. Lists the
- * processes without blocking (the launch has returned meanwhile). Off Windows, nothing.
+ * The profiles `commandLine` names: the values of its --hive-test-profile= (Hive's main process, lib.cjs) and
+ * --user-data-dir= (Chromium's processes) arguments, whether the argument is quoted whole (`"--x=C:\a b"`), its value
+ * is (`--x="C:\a b"`), or neither (the value then ends at a space).
  */
-async function recordMainProcess(dir, launcher, from, profile = null) {
-  if (process.platform !== 'win32' || !launcher) return
+function profilesIn(commandLine) {
+  const cmd = String(commandLine ?? '')
+  const out = []
+  const re = /--(?:hive-test-profile|user-data-dir)=/gi
+  for (let m = re.exec(cmd); m; m = re.exec(cmd)) {
+    let at = m.index + m[0].length
+    let end
+    if (cmd[at] === '"') end = cmd.indexOf('"', ++at)
+    else if (cmd[m.index - 1] === '"') end = cmd.indexOf('"', at)
+    else {
+      const space = cmd.slice(at).search(/\s/)
+      end = space < 0 ? cmd.length : at + space
+    }
+    out.push(cmd.slice(at, end < 0 ? cmd.length : end))
+  }
+  return out.filter(Boolean)
+}
+
+/** Whether path `p` is `folder` or inside it, in one spelling (case, separators): `lanes\1` never takes `lanes\10`. */
+function within(p, folder) {
+  const dir = norm(path.resolve(folder)).replace(/\\+$/, '')
+  const f = norm(path.resolve(p)).replace(/\\+$/, '')
+  return f === dir || f.startsWith(`${dir}\\`)
+}
+
+/**
+ * Records the copy of Hive that `launcher` (the pid Playwright started, `from`: ms before it did) is, by the identity it
+ * has (pid and start time): the launcher's child that started since with `profile` as its own profile, when Playwright
+ * started Electron through `cmd.exe /c` (Windows), else the launcher itself if it has that profile. Lists the processes
+ * without blocking (the launch has returned meanwhile). Off Windows, or with no profile to tell it by, nothing.
+ */
+async function recordMainProcess(dir, launcher, from, profile) {
+  if (process.platform !== 'win32' || !launcher || !profile) return
   const out = await new Promise((resolve, reject) => execFile('powershell.exe', ['-NoProfile', '-Command', PROCESS_LIST], { encoding: 'utf8', env: baseEnv(), maxBuffer: 64 * 1024 * 1024, windowsHide: true }, (e, stdout) => (e ? reject(e) : resolve(stdout))))
-  const list = parseProcesses(out)
-  const main = list.find((p) => p.parent === launcher && p.started >= from - COPY_SLACK_MS) ?? list.find((p) => p.pid === launcher && p.started >= from - COPY_SLACK_MS)
-  if (main) recordCopy(dir, { pid: main.pid, from, to: Date.now(), profile })
+  const main = launchedCopy(parseProcesses(out), launcher, from, profile)
+  if (main) recordCopy(dir, { pid: main.pid, started: main.started, profile })
+}
+
+/** Of `list`, the copy of Hive `launcher` started at or after `from`, with `profile` as its own (recordMainProcess). */
+function launchedCopy(list, launcher, from, profile) {
+  const want = norm(path.resolve(profile)).replace(/\\+$/, '')
+  const isIt = (p) => p.started >= from && profilesIn(p.commandLine).some((v) => norm(path.resolve(v)).replace(/\\+$/, '') === want)
+  return list.find((p) => p.parent === launcher && isIt(p)) ?? list.find((p) => p.pid === launcher && isIt(p)) ?? null
 }
 
 /** The copies recorded in `dir` and its folders `depth` deep (a runner inside a suite has its suites in nested/). */
@@ -314,7 +348,7 @@ function recordedCopies(dir, depth = 3) {
         for (const line of text.split(/\r?\n/)) {
           try {
             const c = JSON.parse(line)
-            if (Number(c.pid) > 0 && Number.isFinite(c.from) && Number.isFinite(c.to)) out.push(c)
+            if (Number(c.pid) > 0 && Number(c.started) > 0) out.push(c)
           } catch {
             // A line cut short (its writer killed): no copy.
           }
@@ -326,20 +360,22 @@ function recordedCopies(dir, depth = 3) {
   return out
 }
 
-/** Of `list` (processes()), the processes the recorded `copies` are: their pid, started within their launch's window. */
-const copiesIn = (list, copies) =>
-  list.filter((p) => copies.some((c) => c.pid === p.pid && p.started >= c.from - COPY_SLACK_MS && p.started <= c.to + COPY_SLACK_MS))
+/**
+ * Of `list` (processes()), the processes the recorded `copies` are: the same pid and start time (within endExactly's
+ * 1 ms), so a process given the pid since is never one.
+ */
+const copiesIn = (list, copies) => list.filter((p) => copies.some((c) => c.pid === p.pid && Math.abs(p.started - c.started) <= 1))
 
 /**
- * Whether `commandLine` is a test copy of Hive's with its profile in `folder`: Hive's own main process names it
- * (--hive-test-profile, lib.cjs), Chromium's processes their user data (--user-data-dir). Never by a program's name:
- * the installed Hive is Hive.exe too, and electron.exe runs other apps.
+ * Whether `commandLine` is a test copy of Hive's with its profile in `folder`: a profile it names (profilesIn) is
+ * there. Never by a program's name (the installed Hive is Hive.exe too, and electron.exe runs other apps), and never by
+ * another argument naming the folder (a viewer opening a screenshot there).
  */
-const hiveCopyIn = (commandLine, folder) => /--(hive-test-profile|user-data-dir)=/i.test(String(commandLine ?? '')) && namesFolder(commandLine, folder)
+const hiveCopyIn = (commandLine, folder) => profilesIn(commandLine).some((v) => within(v, folder))
 
 /**
  * Ends the test copies of Hive in `folders` that are still running, each with what it started: those recorded there
- * (recordCopy, by pid and start) and those whose profile is there (hiveCopyIn). `before` (ms): only copies started
+ * (recordCopy, by pid and start time) and those whose profile is there (hiveCopyIn). `before` (ms): only copies started
  * before it (a sweep's, so a copy a runner that has just claimed the folder starts is never taken). Each is ended as the
  * process it is in `list` (endExactly), children first. Returns how many processes were ended.
  */
@@ -364,4 +400,4 @@ function endCopies(folders, { before = Infinity, list } = {}) {
   return pick.size ? endExactly(childrenFirst(list, [...pick].map(([pid, started]) => ({ pid, started })))) : 0
 }
 
-module.exports = { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, processTree, processes, endExactly, suspendExactly, suspensions, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree, COPIES_FILE, recordCopy, recordMainProcess, recordedCopies, copiesIn, hiveCopyIn, endCopies }
+module.exports = { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, processTree, processes, endExactly, suspendExactly, suspensions, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree, COPIES_FILE, recordCopy, recordMainProcess, launchedCopy, profilesIn, recordedCopies, copiesIn, hiveCopyIn, endCopies }

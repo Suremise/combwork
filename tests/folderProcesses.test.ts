@@ -283,50 +283,77 @@ describe("a scenario's leftover processes (#542, #402)", () => {
 })
 
 // HI-1453: a test copy of Hive that outlived its suite (12 h, its runner gone). Each copy is recorded as it starts, and
-// the runner ends those still running: recorded (pid, started within its launch's window) or with their profile in the
-// folder, never by name. The real processes: the harnessleftovers e2e.
+// the runner ends those still running: recorded (their pid and start time) or with their profile in the folder, never by
+// name, never another process given the pid since. The real processes: the harnessleftovers e2e.
 describe("a suite's test copies of Hive (HI-1453)", () => {
-  const { COPIES_FILE, recordCopy, recordedCopies, copiesIn, hiveCopyIn } = req('./e2e/folderProcesses.cjs') as {
+  type Copy = { pid: number; started: number; profile?: string | null }
+  const { COPIES_FILE, recordCopy, recordedCopies, copiesIn, hiveCopyIn, profilesIn, launchedCopy } = req('./e2e/folderProcesses.cjs') as {
     COPIES_FILE: string
-    recordCopy: (dir: string, copy: { pid: number; from: number; to: number; profile?: string | null }) => void
-    recordedCopies: (dir: string, depth?: number) => { pid: number; from: number; to: number }[]
-    copiesIn: (list: Proc[], copies: { pid: number; from: number; to: number }[]) => Proc[]
+    recordCopy: (dir: string, copy: Copy) => void
+    recordedCopies: (dir: string, depth?: number) => Copy[]
+    copiesIn: (list: Proc[], copies: Copy[]) => Proc[]
     hiveCopyIn: (cmd: string, folder: string) => boolean
+    profilesIn: (cmd: string) => string[]
+    launchedCopy: (list: Proc[], launcher: number, from: number, profile: string) => Proc | null
   }
+  const lane = 'C:\\t\\hive-test\\e2e\\lanes\\1'
 
-  it('are read back from the folder and its own (a nested runner), a line cut short skipped', () => {
+  it('are read back from the folder and its own (a nested runner), a line cut short or without a start time skipped', () => {
     const dir = tempDir('hive-copies-')
-    recordCopy(dir, { pid: 10, from: 1000, to: 2000, profile: join(dir, 'p') })
+    recordCopy(dir, { pid: 10, started: 1500, profile: join(dir, 'p') })
     mkdirSync(join(dir, 'suite', 'nested', 'inner'), { recursive: true })
-    recordCopy(join(dir, 'suite', 'nested', 'inner'), { pid: 11, from: 3000, to: 4000 })
-    writeFileSync(join(dir, 'suite', COPIES_FILE), '{"pid": 12, "from": 5\n')
+    recordCopy(join(dir, 'suite', 'nested', 'inner'), { pid: 11, started: 3500 })
+    writeFileSync(join(dir, 'suite', COPIES_FILE), '{"pid": 13, "from": 1000, "to": 2000}\n{"pid": 12, "sta\n')
     expect(recordedCopies(dir).map((c) => c.pid).sort()).toEqual([10, 11])
     expect(recordedCopies(dir, 1).map((c) => c.pid)).toEqual([10])
   })
 
-  it('are the processes with their pid that started within their launch, never a later process given the pid', () => {
+  it('are the processes with their pid and start time, never a process given the pid since, however soon', () => {
     const list: Proc[] = [
       { pid: 10, commandLine: 'electron.exe .', started: 1500 },
-      { pid: 11, commandLine: 'node other.js', started: 90_000 },
-      { pid: 12, commandLine: 'electron.exe .', started: 2600 }
+      // The recorded copy (started 1500) has ended, and its pid went to another process 2 ms after: never it.
+      { pid: 42, commandLine: 'node unrelated.js', started: 1502 },
+      { pid: 12, commandLine: 'electron.exe .', started: 2601 }
     ]
     const copies = [
-      { pid: 10, from: 1000, to: 2000 },
-      { pid: 11, from: 1000, to: 2000 },
-      { pid: 12, from: 3000, to: 4000 }
+      { pid: 10, started: 1500 },
+      { pid: 42, started: 1500 },
+      // 1 ms apart: how the CIM and .NET start times round (endExactly's tolerance).
+      { pid: 12, started: 2600 }
     ]
-    // 12 started 400 ms before its window: within the clocks' slack (1 s). 11 is another process by now.
     expect(copiesIn(list, copies).map((p) => p.pid)).toEqual([10, 12])
   })
 
-  it("are found by the profile on their command line, in that folder only, never by a program's name", () => {
-    const lane = 'C:\\t\\hive-test\\e2e\\lanes\\1'
+  it("are found by their profile argument's value, in that folder only, never by a program's name or another argument", () => {
     expect(hiveCopyIn(`"C:\\wt\\node_modules\\electron\\dist\\electron.exe" C:\\wt --hive-test-profile=${lane}\\leftovers\\leftovers\\profile`, lane)).toBe(true)
-    expect(hiveCopyIn(`"C:\\wt\\electron.exe" --type=renderer --user-data-dir="${lane}\\x\\profile" --lang=en`, lane)).toBe(true)
+    // Playwright's own form: each argument quoted whole.
+    expect(hiveCopyIn(`"C:\\wt\\electron.exe"  "--inspect=0" "C:\\wt" "--hive-test-profile=${lane}\\a b\\profile"`, lane)).toBe(true)
+    expect(hiveCopyIn(`"C:\\wt\\electron.exe" --type=renderer --user-data-dir="${lane}\\x y\\profile" --lang=en`, lane)).toBe(true)
+    // Lane 10 isn't lane 1, nor is a folder that only starts the same.
     expect(hiveCopyIn(`electron.exe --hive-test-profile=${lane}0\\x\\profile`, lane)).toBe(false)
+    expect(hiveCopyIn(`"electron.exe" "--hive-test-profile=${lane}-old\\x\\profile"`, lane)).toBe(false)
     expect(hiveCopyIn(`"C:\\Users\\u\\AppData\\Local\\Programs\\Hive\\Hive.exe" --user-data-dir=C:\\Users\\u\\AppData\\Roaming\\Hive`, lane)).toBe(false)
-    // A program that only names the folder (a viewer opening a screenshot) isn't a copy.
+    // A program that only names the folder (a viewer opening a screenshot) isn't a copy, nor is one whose profile is
+    // elsewhere while another of its arguments names the folder (HR5's round 1).
     expect(hiveCopyIn(`photos.exe ${lane}\\x\\shot.png`, lane)).toBe(false)
+    expect(hiveCopyIn(`chrome.exe --user-data-dir=C:\\Users\\u\\Chrome ${lane}\\shot.png`, lane)).toBe(false)
+    expect(hiveCopyIn(`chrome.exe "--user-data-dir=C:\\Users\\u\\Chrome" "${lane}\\shot.png"`, lane)).toBe(false)
+    expect(profilesIn(`x "--hive-test-profile=C:\\a b" --user-data-dir="C:\\c d" --user-data-dir=C:\\e --flag`)).toEqual(['C:\\a b', 'C:\\c d', 'C:\\e'])
+  })
+
+  it("the one recorded is the launcher's child with the copy's own profile, started since the launch", () => {
+    const profile = `${lane}\\s\\profile`
+    const list: Proc[] = [
+      { pid: 5, parent: 1, commandLine: 'cmd.exe /d /s /c "electron.exe ..."', started: 1000 },
+      // Its child from before the launch (a reused pid's), and one with another profile: neither.
+      { pid: 6, parent: 5, commandLine: `"electron.exe" "--hive-test-profile=${profile}"`, started: 900 },
+      { pid: 7, parent: 5, commandLine: `"electron.exe" "--hive-test-profile=${lane}\\other\\profile"`, started: 1010 },
+      { pid: 8, parent: 5, commandLine: `"electron.exe" "--inspect=0" "C:\\wt" "--hive-test-profile=${profile}"`, started: 1020 }
+    ]
+    expect(launchedCopy(list, 5, 1000, profile)?.pid).toBe(8)
+    expect(launchedCopy(list, 5, 1000, `${lane}\\none\\profile`)).toBeNull()
+    // No shell in between: the launcher itself, if it has the profile.
+    expect(launchedCopy([{ pid: 9, parent: 1, commandLine: `Hive.exe --hive-test-profile=${profile}`, started: 2000 }], 9, 1990, profile)?.pid).toBe(9)
   })
 })
 

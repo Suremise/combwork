@@ -91,7 +91,7 @@ async function escaped(profile) {
     const byProfile = await escaped(path.join(laneWork(work, 2), 'old-suite', 'profile'))
     // Its profile outside the lane: found by the record its suite left there.
     const byRecord = await escaped(path.join(lib.WORK, 'elsewhere', 'profile'))
-    if (byRecord.id) recordCopy(path.join(laneWork(work, 2), 'old-suite'), { pid: byRecord.id.pid, from: byRecord.from, to: byRecord.to })
+    if (byRecord.id) recordCopy(path.join(laneWork(work, 2), 'old-suite'), { pid: byRecord.id.pid, started: byRecord.id.started })
     const held = await escaped(path.join(laneWork(work, 3), 'live-suite', 'profile'))
     check('three copies left running in the lanes', !!(byProfile.id && byRecord.id && held.id) && [byProfile, byRecord, held].every((c) => running(c.id)))
     const left = await endLeftCopies(pool, work)
