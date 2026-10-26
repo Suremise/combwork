@@ -2531,7 +2531,7 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    is Done and the push owed, or neither. Then, and before the queue's next entry (first thing in every run, so after a
    restart or Resume too), the queue settles it: the option off by then (read again just before the push begins), or
    the target no longer holding the result (reset since), drops it with no push; a read of the target that fails is
-   never taken for settled: it pauses `pushFailed`, still owed, so no later merge goes ahead of it; else it pushes `refs/heads/<target>` to what the target tracks
+   never taken for settled: it pauses `pushUnreadable` (Hive's own words, translated), still owed, so no later merge goes ahead of it; else it pushes `refs/heads/<target>` to what the target tracks
    (`branch.<target>.remote` and `.merge`), or with nothing tracked to the only remote or `origin` under the same name,
    never `--force` and never `--set-upstream`, with no prompt (`GIT_TERMINAL_PROMPT=0`, no askpass, the credential
    manager non-interactive) and within the Git view's 5 minutes. Pushed, or up to date already (a retry after a crash

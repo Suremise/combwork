@@ -224,13 +224,15 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
       const b = await queued(e, 'B', 'b.txt')
       const spy = vi.spyOn(G, read).mockResolvedValueOnce({ unknown: true, what: 'a read that failed for now' })
       try {
-        expect(await e.queue().runOnce('main')).toMatchObject({ outcome: 'paused', reason: 'pushFailed' })
+        expect(await e.queue().runOnce('main')).toMatchObject({ outcome: 'paused', reason: 'pushUnreadable' })
       } finally {
         spy.mockRestore()
       }
       expect(e.wf.state(b).stage).toBe('merging')
       expect(owed(e)).not.toBeNull()
-      expect(e.store.queuePause('main')?.message).toContain('a read that failed for now')
+      // Said in Hive's own words, a message the window translates (HR2's round 2): no English stored with it.
+      expect(e.store.queuePause('main')).toMatchObject({ reason: 'pushUnreadable' })
+      expect(e.store.queuePause('main')?.message).toBeFalsy()
       e.queue().resume('main')
       expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
       expect(e.wf.state(b).stage).toBe('done')

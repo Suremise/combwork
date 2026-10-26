@@ -588,6 +588,7 @@ interface HiveMessageValues {
   'board.queue.pause.pushFailed': { card: string | number; target: string | number }
   'board.queue.pause.pushNoRemote': { card: string | number; target: string | number }
   'board.queue.pause.pushRejected': { card: string | number; target: string | number }
+  'board.queue.pause.pushUnreadable': { card: string | number; target: string | number }
   'board.queue.pause.rulesOff': undefined
   'board.queue.pause.signing': undefined
   'board.queue.pause.signingWaits': undefined

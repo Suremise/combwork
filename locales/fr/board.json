@@ -586,6 +586,7 @@
   "board.queue.pause.pushFailed": "{card} est fusionnée, mais le push de {target} a échoué (le message de git suit). Corrige-le, puis reprends ; ou désactive « Pousser la branche cible après la fusion » et reprends pour continuer à fusionner en local.",
   "board.queue.pause.pushNoRemote": "{card} est fusionnée, mais {target} n’a aucun dépôt distant où pousser : elle n’en suit aucun, et le dépôt n’a ni origin ni un seul dépôt distant. Ajoutes-en un ou définis ce que suit {target}, puis reprends ; ou désactive « Pousser la branche cible après la fusion » et reprends.",
   "board.queue.pause.pushRejected": "{card} est fusionnée, mais son dépôt distant a refusé le push de {target} : il a des commits que {target} n’a pas (Hive ne force jamais un push). Fais un pull vers {target}, puis reprends ; ou désactive « Pousser la branche cible après la fusion » et reprends pour continuer à fusionner en local.",
+  "board.queue.pause.pushUnreadable": "{card} est fusionnée et {target} doit encore être poussée, mais Hive n’a pas pu lire {target} pour le faire. Reprends pour réessayer ; ou désactive « Pousser la branche cible après la fusion » et reprends pour continuer à fusionner en local.",
   "board.queue.pause.rulesOff": "Les règles du flux de travail sont désactivées (Paramètres → Avancé), la file ne fusionne donc pas.",
   "board.queue.pause.signing": "La signature du commit de fusion a échoué.",
   "board.queue.pause.signingWaits": "La signature du commit de fusion t’attend (une phrase secrète ou un code PIN). Déverrouille ta clé de signature, puis reprends.",

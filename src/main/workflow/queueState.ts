@@ -132,6 +132,7 @@ export function pauseWait(reason: PauseReason, stuck = false): PauseWait {
     case 'pushRejected':
     case 'pushFailed':
     case 'pushNoRemote':
+    case 'pushUnreadable':
       return 'fix'
     case 'wrongBranch':
     case 'staged':

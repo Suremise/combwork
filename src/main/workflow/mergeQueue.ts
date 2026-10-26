@@ -199,9 +199,10 @@ export interface QueueStepInfo {
  * Assistant's within Control: #1353). `approval`: an entry ready to advance into a checked-out target waits for the
  * user's Approve (Ask each time, #1351). `checkedOut`: a pause from before #1351, which Hive no longer makes.
  * `pushRejected`, `pushFailed`, `pushNoRemote` (G18, #1179): the push of the target after a merge was refused (the
- * remote has commits it lacks), failed (git's message: a sign-in, the network, the bound), or had no remote to go to.
+ * remote has commits it lacks), failed (git's message: a sign-in, the network, the bound), or had no remote to go to;
+ * `pushUnreadable`: owed, and the target (or whether it still has the merge) couldn't be read to settle it.
  */
-export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget' | 'pushRejected' | 'pushFailed' | 'pushNoRemote'
+export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget' | 'pushRejected' | 'pushFailed' | 'pushNoRemote' | 'pushUnreadable'
 
 /**
  * G18 (#1179): the push of a target Hive owes after merging into it, as store meta per target: the merge's result, its
@@ -619,12 +620,13 @@ export class MergeQueue {
       await this.clearOwed(target, owed.result)
       return null
     }
-    // Unreadable now (HR2's #1179 round 1): never taken for settled. Still owed, and the queue pauses saying so, so no
-    // later merge goes ahead of it; Resume reads again.
+    // Unreadable now (HR2's #1179 round 1): never taken for settled. Still owed, and the queue pauses saying so in its
+    // own words (`pushUnreadable`, a message the window translates: HR2's round 2), so no later merge goes ahead of it;
+    // Resume reads again.
     const head = await G.lineHead(this.project, target)
-    if (isUnknown(head)) return this.pausePush(target, owed, 'pushFailed', `Hive couldn't read ${target}: ${head.what}`) // i18n-ignore: beside git's own words in the pause, as they are
+    if (isUnknown(head)) return this.pausePush(target, owed, 'pushUnreadable')
     const has = head ? await G.isAncestor(this.project, owed.result, head) : false
-    if (isUnknown(has)) return this.pausePush(target, owed, 'pushFailed', `Hive couldn't read ${target}: ${has.what}`) // i18n-ignore: beside git's own words in the pause, as they are
+    if (isUnknown(has)) return this.pausePush(target, owed, 'pushUnreadable')
     if (!has) {
       await this.clearOwed(target, owed.result)
       return null

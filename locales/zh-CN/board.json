@@ -586,6 +586,7 @@
   "board.queue.pause.pushFailed": "{card} 已合并，但推送 {target} 失败（git 的消息见下）。请修复后恢复；或关闭“合并后推送目标分支”并恢复，继续在本地合并。",
   "board.queue.pause.pushNoRemote": "{card} 已合并，但 {target} 没有可推送的远程仓库：它不跟踪任何远程分支，仓库也没有 origin 或唯一的远程仓库。请添加一个远程仓库或设置 {target} 跟踪的分支，然后恢复；或关闭“合并后推送目标分支”并恢复。",
   "board.queue.pause.pushRejected": "{card} 已合并，但远程仓库拒绝了 {target} 的推送：它有 {target} 没有的提交（Hive 从不强制推送）。请把这些提交拉取到 {target}，然后恢复；或关闭“合并后推送目标分支”并恢复，继续在本地合并。",
+  "board.queue.pause.pushUnreadable": "{card} 已合并，{target} 仍需推送，但 Hive 无法读取 {target} 来完成推送。请恢复以重试；或关闭“合并后推送目标分支”并恢复，继续在本地合并。",
   "board.queue.pause.rulesOff": "工作流程规则已关闭（“设置”→“高级”），因此队列不会合并。",
   "board.queue.pause.signing": "合并提交签名失败。",
   "board.queue.pause.signingWaits": "合并提交的签名正在等待你（密码短语或 PIN）。请解锁你的签名密钥，然后恢复。",

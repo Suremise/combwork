@@ -2347,6 +2347,10 @@
     "defaultMessage": "{card} is merged, but its remote refused the push of {target}: it has commits {target} hasn’t (Hive never forces a push). Pull them into {target}, then resume; or turn off “Push the target branch after merging” and resume to keep merging locally.",
     "description": "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), pushing the target ({target}: a branch) was refused because the remote has newer commits. “Push the target branch after merging” is a workflow option's name: use its words."
   },
+  "board.queue.pause.pushUnreadable": {
+    "defaultMessage": "{card} is merged, and {target} still has to be pushed, but Hive couldn’t read {target} to do it. Resume to try again; or turn off “Push the target branch after merging” and resume to keep merging locally.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), Hive couldn't read the target ({target}: a branch) to push it (git didn't answer), so the push still waits. “Push the target branch after merging” is a workflow option's name: use its words."
+  },
   "board.queue.pause.rulesOff": {
     "defaultMessage": "The workflow's rules are off (Settings → Advanced), so the queue doesn't merge.",
     "description": "Why a merge queue is paused, on its card in the Progress panel: the workflow rules are turned off in Settings → Advanced."
