@@ -144,9 +144,9 @@ const nothingToArchive = (dialog) => {
     // --- The board's own columns fold to 34 px strips on a grouped board too (HI-1724: `.board.grouped > .board-column`
     // outranked `.collapsed`, so they kept 140 px); open ones keep their 140 px least width. A mix, then all, wide and narrow.
     const OWN = ['hold', 'todo', 'doing', 'review', 'done']
-    const fold = async (ids) => {
-      for (const id of ids) await col(id).locator('.board-column-header').getByRole('button', { name: /^Collapse / }).click()
-      await until(async () => (await Promise.all(ids.map(collapsed))).every(Boolean), HUNG_MS)
+    const fold = async (folding) => {
+      for (const id of folding) await col(id).locator('.board-column-header').getByRole('button', { name: /^Collapse / }).click()
+      await until(async () => (await Promise.all(folding.map(collapsed))).every(Boolean), HUNG_MS)
     }
     const foldedRight = (folded) => until(async () => {
       const w = await widths()
