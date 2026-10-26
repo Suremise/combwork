@@ -405,10 +405,12 @@ export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
     looking = true
     void (async () => {
       try {
+        // finish() (in step) sets `over`: read through a call, as the loop can't see that.
+        const ended = (): boolean => over
         do {
           again = false
           await step()
-        } while (again && !over)
+        } while (again && !ended())
       } catch (e) {
         d.log(`a look failed: ${(e as Error).message}`)
       } finally {

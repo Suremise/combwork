@@ -31,7 +31,7 @@ let n = 0
 function live(adapter: unknown = claudeCode) {
   const agentId = `b${++n}`
   const state = { provider: 'claude-code', runId: `run-${n}`, projectPath: P, agentId, agentName: `B${n}`, cwd: P, status: 'ready', startedAt: new Date().toISOString() }
-  const l = { state, adapter }
+  const l: { state: typeof state; adapter: unknown; ending?: boolean; stopRequested?: boolean } = { state, adapter }
   priv.live.set(`${P.toLowerCase()}#${agentId}`, l)
   priv.runs.set(state.runId, `${P.toLowerCase()}#${agentId}`)
   const key = `session:${P.toLowerCase()}#${agentId}`
