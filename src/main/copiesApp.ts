@@ -20,7 +20,7 @@ import { containsPlace } from './fsutil'
 import { createLogger, userText } from './logger'
 import { progress } from './progressService'
 import { sessions } from './sessions'
-import { appRunner, appSettle, boardConn, holder, journalsOf } from './slotsApp'
+import { appRunner, appSettle, boardConn, holder, journalsOf, retireSealOf, sweepSealsOf } from './slotsApp'
 import { slotOptionsOf } from './slots'
 import { openWorkspaces, WorkspaceService } from './workspace'
 import { CopyPool, CopyStore, copiesDirOf, copyPoolSize, IsolatedRequests, type CopyLease } from './copies'
@@ -52,7 +52,7 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
     const cfg = await ws.projectConfig(projectPath)
     const root = join(ws.worktreesRoot, basename(projectPath))
     const workspacePath = ws.path ?? ''
-    return new CopyPool({
+    const made = new CopyPool({
       store: new CopyStore(boardConn(ws), cfg.id ?? basename(projectPath)),
       project: projectPath,
       dir: copiesDirOf(ws.worktreesRoot, projectPath),
@@ -64,13 +64,17 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
       runner: appRunner(ws, projectPath, root),
       settle: async (job) => {
         const ok = await appSettle(root)(job)
-        if (ok)
+        if (ok) {
+          const closing: Promise<void>[] = []
           for (const [id, j] of jobs) {
             if (j.lease !== job) continue
             jobs.delete(id)
             assigned.delete(id)
-            void j.close().catch(() => undefined)
+            closing.push(j.close().catch(() => undefined))
           }
+          // Its seal goes once its job is gone (HI-1723): after this Hive let its own handle go.
+          void Promise.all(closing).then(() => retireSealOf(root, job))
+        }
         return ok
       },
       holder,
@@ -88,6 +92,9 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
       reviewOn: () => advanced.get(COPIES_REVIEW) !== false && advanced.get<boolean>(WORKFLOW_ENFORCE) !== false,
       quietWaitMs: () => Math.max(1, Number(advanced.get(COPIES_QUIET_WAIT)) || 10) * 60_000
     })
+    // The seals of jobs settled before this Hive started (HI-1723; the folder slots' jobs share).
+    sweepSealsOf(root, { once: true })
+    return made
   })()
   pools.set(key, { life: ws.lifetime, pool })
   pool.catch(() => pools.delete(key))
@@ -254,6 +261,7 @@ export async function lookAtCopies(tidy = false): Promise<void> {
           else await p.refresh()
         })
         .catch((e) => log.warn(`looking at the copies of ${userText(path)}`, e))
+      if (tidy) sweepSealsOf(join(ws.worktreesRoot, basename(path)))
     }
   }
   await afterLook?.().catch((e) => log.warn('leasing review copies for waiting reviews', e))
