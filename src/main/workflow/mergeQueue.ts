@@ -18,6 +18,7 @@ import { openEntry, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type F
 import type { TransientFailure } from '../../shared/types'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
+import type { CommitMessage } from '../../shared/workflow/options'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
 import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
@@ -26,6 +27,7 @@ import { LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
 import { leftWake, returnedWake } from './queueState'
 import { readConflicts } from './conflictRead'
+import { mergeMessage, updateMessage } from './mergeMessage'
 
 /**
  * The conflicted files `diff --name-only -z` lists, as they are named (HR4's HI-1181 round 1): split on NUL, never on
@@ -609,6 +611,11 @@ export class MergeQueue {
     return o.platform === 'git' && o.finish === 'hiveMerges' && o.pushTarget === true
   }
 
+  /** The message of Hive's merge commits (G19, HI-1697), as the project's options are now: like G18, never a ruleset's. */
+  private commitMessage(): CommitMessage {
+    return this.wf.cfg.options().commitMessage ?? 'hive'
+  }
+
   /** In a merge's `Integrated` write: the push of its target owed, when the options push it (G18). */
   private owePush(w: Write, entry: string, target: string, result: string): void {
     if (this.pushes()) w.tx.setMeta(pushOwedKey(target), JSON.stringify({ result, card: w.card.key, entry } satisfies PushOwed))
@@ -988,7 +995,7 @@ export class MergeQueue {
     const signs = await this.signs(reads, f)
     const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
     const target = entry.target
-    const message = `Merge ${target} into ${card.key}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}` // i18n-ignore: a commit message, in English
+    const message = updateMessage(this.commitMessage(), target, card.key, revision)
     // A rebase here rewrites only the queue's detached HEAD: never other refs at the rebased commits (HR4's #1352 round
     // 1: with the repository's `rebase.updateRefs` on, git would move the builder's branch, or a user's, to the update).
     // Overridden for this command only; the repository's config is left as it is.
@@ -1027,7 +1034,11 @@ export class MergeQueue {
     // The reviewers whose passes count for what is merged: the latest submission, at the current generation.
     const reviewers = [...new Set(s.verdicts.filter((v) => v.pass && v.submission === s.latest?.id && v.generation === s.generation).map((v) => v.reviewer))].join(', ')
     // The reviewed revision, and the queue's update of it when strict brought it up to date (#1352).
-    const message = `${card.key}: ${card.title}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}${updated ? `\nHive-Updated: ${updated}` : ''}${reviewers ? `\nHive-Reviewed-By: ${reviewers}` : ''}` // i18n-ignore: a commit message, in English
+    // G19 (HI-1697): Hive's, or the branch's own (its commits since it left the target, merges left out).
+    const how = this.commitMessage()
+    const own = how === 'branch' ? await G.messages(this.project, `${base || (await this.mergeBaseOf(revision, expected))}..${revision}`) : []
+    if (isUnknown(own)) return { pause: 'needsYou', message: `Hive couldn't read the messages of ${revision.slice(0, 7)}'s commits.` } // i18n-ignore: git's side of a pause, in English as git's messages are
+    const message = mergeMessage(how, { card, revision, updated, reviewers, messages: own })
     revision = updated ?? revision
     const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
     const squash = r.options.style === 'squash'

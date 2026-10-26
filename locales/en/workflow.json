@@ -543,6 +543,14 @@
     "defaultMessage": "Check commands",
     "description": "A workflow setting: the command each named check runs (the checks of “Checks pass before review”)."
   },
+  "workflow.option.commitMessage.desc": {
+    "defaultMessage": "The message of the commit the merge queue makes: Hive’s names the card’s key and title and adds Hive’s trailers; the branch’s own uses the message its commits have, with no card key or trailers. Either way, Hive knows which card it merged.",
+    "description": "What the workflow option “Commit message” does (glossary 2.1: merge queue). Trailers are git’s name for the “Key: value” lines at the end of a commit message: keep the word if your language’s git terms do."
+  },
+  "workflow.option.commitMessage.title": {
+    "defaultMessage": "Commit message",
+    "description": "A workflow option (glossary 2.6, G19): the message of the commit Hive’s merge queue makes when it merges a card (a merge commit, or a squash’s one commit)."
+  },
   "workflow.option.dependenciesDone.desc": {
     "defaultMessage": "A card that waits for others can’t start before their work is in.",
     "description": "What the workflow option “Cards start only when the cards they wait for are merged” does."
@@ -1735,6 +1743,14 @@
     "defaultMessage": "the files written in {folder}",
     "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": which files changed in a folder. {folder} is a folder path."
   },
+  "workflow.value.commitMessage.branch": {
+    "defaultMessage": "The branch’s own, with no card key or trailers",
+    "description": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit takes the message the branch’s commits have (with several, the first one’s subject and each one’s message), never the card’s key or Hive’s trailers. Trailers: git’s “Key: value” lines at a message’s end."
+  },
+  "workflow.value.commitMessage.hive": {
+    "defaultMessage": "Hive’s: the card’s key and title, with trailers",
+    "description": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Hive’s trailers (Hive-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end."
+  },
   "workflow.value.finish.agentMerges": {
     "defaultMessage": "The agent merges, Hive checks",
     "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
@@ -1826,6 +1842,10 @@
   "workflow.value.style.squash": {
     "defaultMessage": "Squash",
     "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."
+  },
+  "workflow.why.commitMessage": {
+    "defaultMessage": "The card’s key in the history links each merge to its card; a project that keeps card numbers out of its history uses the branch’s own.",
+    "description": "Why the presets set “Commit message” to Hive’s (the card’s key and title, with trailers)."
   },
   "workflow.why.dependenciesDone": {
     "defaultMessage": "It’s cheap, and no card is built on work that isn’t in yet.",

@@ -1738,6 +1738,7 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G16 | **Warn when a commit includes another agent's files** | On / Off | Shared folder only; a warning on submit, never a refusal [#1112 down] |
 | G17 | **Reviewers** | One per lane · A shared pool | §16.10.5 |
 | G18 | **Push the target branch after merging** | On / Off (default Off) | The merge queue (§16.9.1), Hive merges only. Not a rule: in no ruleset, read as the options are when the queue pushes (#1179). |
+| G19 | **Commit message** | Hive's: the card's key and title, with trailers (default) · The branch's own, with no card key or trailers | The message of the queue's merge commit or squash commit (§16.9.1 step 4); shown when Hive merges with Merge commit or Squash (Rebase makes no commit of its own). Not a rule, as G18: in no ruleset, read as the options are when the queue merges (HI-1697). |
 | — | Rounds, wait, loop wakes | Today's Card loops settings, shown here with a link | Owner stays Card loops [§5]. |
 
 An option the platform's capabilities can't support isn't shown (None has no G5–G9, G11, G15). Every option shows
@@ -1770,6 +1771,7 @@ afterwards makes it **Custom** (the header says which preset it started from). T
 | G16 shared-folder warning | On | — | — | Only matters in a shared folder. |
 | G17 reviewers | — | One per lane | One per lane | A pool is the 6+pool template's choice (§16.10.6). |
 | G18 push after merging | — | Off | Off | Pushing reaches your remote and its sign-in: it stays yours unless you turn it on (#1179). |
+| G19 commit message | — | Hive's | Hive's | The card's key links each merge to its card; a project that keeps card numbers out of its history picks the branch's own (HI-1697). |
 
 None's presets fill every option: Solo = N1 No one, N2 —, N3 none, N4 the whole folder except `.hive`, `node_modules` and `.venv`, N5 default names, N6 On, N7 as set; Pair = N1 A reviewer agent, N2 On, N3 the quick checks, the rest as Solo; Team = N1 A reviewer agent, then you, N2 On, N3 quick checks + tests, the rest as Solo. (N7 is shown, not set: its owner is Settings → Agents & Worktrees.)
 
@@ -2465,6 +2467,14 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    at the target's head (the **expected** revision); `git merge --no-ff <rev>` (or `merge --squash` + commit) with the
    message `AM-12: <title>` and trailers `Hive-Card: AM-12`, `Hive-Revision: <rev>`, `Hive-Reviewed-By: <reviewer>`;
    the result on a temporary ref `refs/hive/queue/<entry>` [P1].
+   **The branch's own message (G19, built [HI-1697]):** with *Commit message* set to the branch's own, the merge commit
+   or squash commit takes the messages of the branch's own commits (`git log --no-merges <base>..<rev>`, oldest
+   first): one commit's message as it is; several, each one's in turn, the first one's subject first, as git joins a
+   squash's. Any `Hive-…:` trailer line in them is left out; a branch with no message of its own takes the card's
+   title. No card key and no trailer, and strict's update (step 3) is git's plain `Merge branch '<target>'`. Which card
+   it was is never read from the message: the `Integrated` fact names the merge's result, and containment and the
+   board read that. Read as the project's options are when the queue merges (G19 isn't a rule). Commits on the card's
+   own line keep whatever their builder wrote.
    **Rebase and fast-forward (G6, built [#1184]):** the test merge is a rebase, under the **linear landing** policy:
    every commit the advance adds to the target (`expected..result`) has exactly one parent, and `expected` is an
    ancestor of `result`. In the queue's worktree, detached at the reviewed revision, `git rebase --onto <expected>

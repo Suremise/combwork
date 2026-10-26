@@ -137,6 +137,8 @@ interface HiveMessageValues {
   'workflow.move.verdict': undefined
   'workflow.option.commands.desc': undefined
   'workflow.option.commands.title': undefined
+  'workflow.option.commitMessage.desc': undefined
+  'workflow.option.commitMessage.title': undefined
   'workflow.option.dependenciesDone.desc': undefined
   'workflow.option.dependenciesDone.none': undefined
   'workflow.option.dependenciesDone.title': undefined
@@ -435,6 +437,8 @@ interface HiveMessageValues {
   'workflow.unreadable.uncommitted': { folder: string | number }
   'workflow.unreadable.worktrees': { folder: string | number }
   'workflow.unreadable.writes': { folder: string | number }
+  'workflow.value.commitMessage.branch': undefined
+  'workflow.value.commitMessage.hive': undefined
   'workflow.value.finish.agentMerges': undefined
   'workflow.value.finish.committed': undefined
   'workflow.value.finish.hiveMerges': undefined
@@ -458,6 +462,7 @@ interface HiveMessageValues {
   'workflow.value.style.merge': undefined
   'workflow.value.style.rebase': undefined
   'workflow.value.style.squash': undefined
+  'workflow.why.commitMessage': undefined
   'workflow.why.dependenciesDone': undefined
   'workflow.why.excluded': undefined
   'workflow.why.finish': undefined

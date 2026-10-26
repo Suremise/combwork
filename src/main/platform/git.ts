@@ -482,6 +482,16 @@ export async function commits(repo: string, range: string): Promise<Maybe<Commit
     })
 }
 
+/** The messages of a range's own commits, oldest first, with no merge commit (G19's branch's own message: HI-1697). */
+export async function messages(repo: string, range: string): Promise<Maybe<string[]>> {
+  const r = await git(repo, ['log', '--reverse', '--no-merges', '--format=%B%x1e', range])
+  if (!r.ok) return unknown(U.commitsOf, { range })
+  return r.out
+    .split('\x1e')
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
 /** Where each branch is checked out: line → folder (`git worktree list`). */
 export async function checkouts(repo: string): Promise<Maybe<Record<string, string>>> {
   const r = await git(repo, ['worktree', 'list', '--porcelain'])
