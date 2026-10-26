@@ -20,8 +20,18 @@ function useShown(project: string | null): ProjectInfo[] {
   return project === null ? projects : projects.filter((p) => p.name.toLowerCase() === project.toLowerCase())
 }
 
-/** Something read for each shown project by its path, again when a workflow is written or the projects change. */
-function usePerProject<T>(project: string | null, read: (path: string) => Promise<T>): Map<string, T> {
+/** What was last read for each project (by its path, lower case), kept while the board is closed: opened again, it
+ *  draws with them at once, and the new read replaces them (HI-1682: read only after the first paint, the Merging
+ *  column and the Approved group's heading came late, moving every column). */
+const STAGES = new Map<string, ProjectStages | null>()
+const FORMS = new Map<string, WorkflowForm>()
+
+/**
+ * Something read for each shown project by its path, again when a workflow is written or the projects change, starting
+ * from what `cache` kept from the last read. known: every shown project has a value, read now or kept (one whose read
+ * failed counts once it was tried).
+ */
+function usePerProject<T>(project: string | null, cache: Map<string, T>, read: (path: string) => Promise<T>): { values: Map<string, T>; known: boolean } {
   const shown = useShown(project)
   const version = useStore((s) => s.workflowVersion)
   const key = shown.map((p) => `${p.path}|${JSON.stringify(p.config.workflow ?? null)}|${p.platform?.id ?? ''}`).join('\n')
@@ -29,21 +39,35 @@ function usePerProject<T>(project: string | null, read: (path: string) => Promis
   useEffect(() => {
     let live = true
     void Promise.all(shown.map((p) => read(p.path).then((v) => [p.path.toLowerCase(), v] as const, () => null))).then((all) => {
-      if (live) setRead({ key, values: new Map(all.filter((x): x is readonly [string, Awaited<T>] => !!x)) })
+      if (!live) return
+      const values = new Map(all.filter((x): x is readonly [string, Awaited<T>] => !!x))
+      for (const [path, v] of values) cache.set(path, v)
+      setRead({ key, values })
     })
     return () => {
       live = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, version])
-  return read_?.values ?? new Map()
+  if (read_?.key === key) return { values: read_.values, known: true }
+  // Every read is kept too, so what is kept stands in for an older read as well.
+  const kept = new Map<string, T>()
+  for (const p of shown) {
+    const path = p.path.toLowerCase()
+    if (cache.has(path)) kept.set(path, cache.get(path) as T)
+  }
+  return { values: kept, known: kept.size === shown.length }
 }
 
-/** The shown projects with their stages, for the board's columns. */
-export function useBoardProjects(project: string | null): BoardProject[] {
+/**
+ * The shown projects with their stages, for the board's columns; null until they are known (read, or kept from the
+ * board's last open), so the board never draws a default set of columns that the workflow then changes (HI-1682).
+ */
+export function useBoardProjects(project: string | null): BoardProject[] | null {
   const shown = useShown(project)
-  const stages = usePerProject<ProjectStages | null>(project, (path) => call('workflow:stages', path))
-  return shown.map((p) => ({ name: p.name, stages: stages.get(p.path.toLowerCase()) ?? null }))
+  const { values, known } = usePerProject<ProjectStages | null>(project, STAGES, (path) => call('workflow:stages', path))
+  if (!known) return null
+  return shown.map((p) => ({ name: p.name, stages: values.get(p.path.toLowerCase()) ?? null }))
 }
 
 /** "Workflow: Git · Team" for a project, as its Version Control tab says it. */
@@ -58,7 +82,7 @@ const WORKFLOWS = msg({ id: 'board.workflows', defaultMessage: 'Workflows', desc
 export function BoardWorkflowLink({ project }: { project: string | null }) {
   useLanguage()
   const shown = useShown(project).filter((p) => p.platform)
-  const forms = usePerProject<WorkflowForm>(project, (path) => call('workflow:form', path))
+  const forms = usePerProject<WorkflowForm>(project, FORMS, (path) => call('workflow:form', path)).values
   const menu = useContextMenu()
   if (!shown.length) return null
   const open = (p: ProjectInfo): void => showVersionControl(p.path, 'workflow')

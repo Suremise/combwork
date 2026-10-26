@@ -331,6 +331,101 @@ const nothingToArchive = (dialog) => {
     await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: base })
     fs.writeFileSync(fx.go, 'go')
     await until(async () => (await h.card(second.n))?.column === 'done', HUNG_MS)
+
+    // --- No shift when the workflow arrives (HI-1682): the board's columns, their tops and the toolbar's height are the
+    // same from the first paint on. main's stages and workflow reads are held, to see the board meanwhile: the first
+    // open of a session shows its frame without columns, never a default set (no Merging) the workflow then changes;
+    // opened again, the columns kept from its last open at once. Each layout the board takes is recorded as it is made.
+    const stages = { [fx.alpha]: await inv('workflow:stages', fx.alpha), [beta]: await inv('workflow:stages', beta), [notes]: await inv('workflow:stages', notes) }
+    const forms = { [fx.alpha]: await inv('workflow:form', fx.alpha), [beta]: await inv('workflow:form', beta), [notes]: await inv('workflow:form', notes) }
+    await h.app.evaluate(({ ipcMain }, m) => {
+      globalThis.__hold = { on: false, held: [] }
+      for (const channel of ['workflow:stages', 'workflow:form']) {
+        ipcMain.removeHandler(channel)
+        ipcMain.handle(channel, (_e, p) => {
+          const v = m[channel][p] ?? null
+          return globalThis.__hold.on ? new Promise((r) => globalThis.__hold.held.push(() => r(v))) : v
+        })
+      }
+    }, { 'workflow:stages': stages, 'workflow:form': forms })
+    const hold = (on) => h.app.evaluate((_, v) => void (globalThis.__hold.on = v), on)
+    const heldReads = () => h.app.evaluate(() => globalThis.__hold.held.length)
+    const release = () => h.app.evaluate(() => {
+      for (const r of globalThis.__hold.held.splice(0)) r()
+    })
+    const record = () => page.evaluate(() => {
+      window.__layouts = []
+      const take = () => {
+        const b = document.querySelector('.board')
+        if (!b) return
+        const cols = [...b.querySelectorAll('.board-column')]
+        const toolbar = document.querySelector('.board-toolbar')
+        const r = {
+          columns: cols.map((c) => c.getAttribute('data-column') + (c.classList.contains('collapsed') ? '*' : '')).join(' '),
+          tops: [...new Set(cols.map((c) => Math.round(c.getBoundingClientRect().top)))].join(','),
+          toolbar: toolbar ? Math.round(toolbar.getBoundingClientRect().height) : null,
+          chip: !!document.querySelector('.board-workflow')
+        }
+        const last = window.__layouts[window.__layouts.length - 1]
+        if (!last || JSON.stringify(last) !== JSON.stringify(r)) window.__layouts.push(r)
+      }
+      window.__observer?.disconnect()
+      window.__observer = new MutationObserver(take)
+      window.__observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] })
+      take()
+    })
+    const layouts = () => page.evaluate(() => window.__layouts)
+    /** The recorded layouts with columns: one set of columns, all at one top, the toolbar one height throughout. */
+    const steady = (all) => {
+      const drawn = all.filter((l) => l.columns)
+      return drawn.length > 0 && new Set(drawn.map((l) => `${l.columns}|${l.tops}`)).size === 1 && !drawn[0].tops.includes(',') && new Set(all.map((l) => l.toolbar)).size === 1
+    }
+    const topShot = (name) => page.screenshot({ path: path.join(fx.shots, `boardstages-${name}.png`), clip: { x: 0, y: 0, width: 1500, height: 260 } })
+    // Away from the board and back: it is drawn anew.
+    const reopen = async (project) => {
+      await page.getByRole('button', { name: 'Projects' }).click()
+      await until(async () => (await board.count()) === 0, HUNG_MS)
+      await record()
+      await showBoard(project)
+    }
+    // A reload (the session's first open), the reads held: the frame without columns, then all at once.
+    const firstOpen = async (project, expected, shot) => {
+      // Held before the reload: the board, shown already, reads its workflows as the window opens.
+      await hold(true)
+      await page.reload()
+      await lib.appReady(page)
+      await record()
+      await showBoard(project)
+      const waiting = !!(await until(async () => (await heldReads()) > 0 && (await board.count()) === 1, HUNG_MS))
+      check(`${project}, first open: while the workflow is read, the board's frame shows without columns`, waiting && (await col('todo').count()) === 0, JSON.stringify(await layouts()))
+      if (shot) await topShot(`${shot}-before`)
+      await release()
+      await hold(false)
+      check(`…then its columns, at once: ${expected}`, !!(await until(async () => (await columns()) === expected.replace(/\*/g, '') && (project !== 'alpha' || (await page.locator('[data-action="board-workflow"]').count()) === 1), HUNG_MS)), await columns())
+      if (shot) await topShot(`${shot}-after`)
+      check('…no column moved, none came or went, the toolbar kept its height', steady(await layouts()), JSON.stringify(await layouts()))
+    }
+    await firstOpen('alpha', 'hold todo doing review passed merging done', 'noshift-first')
+    // Opened again with the reads held: drawn as before from the first paint, the workflow link too.
+    await hold(true)
+    await reopen('alpha')
+    check('alpha, opened again: its columns and the workflow link from the first paint', !!(await until(async () => (await columns()) === 'hold todo doing review passed merging done', HUNG_MS)) && (await layouts()).filter((l) => l.columns).every((l) => l.chip), JSON.stringify(await layouts()))
+    await topShot('noshift-again')
+    await release()
+    await hold(false)
+    check('…and nothing moves once the reads come', !!(await until(async () => (await heldReads()) === 0, HUNG_MS)) && steady(await layouts()), JSON.stringify(await layouts()))
+    // Merging collapsed (HI-1662), then the whole Approved group.
+    await col('merging').getByRole('button', { name: 'Collapse Merging' }).click()
+    await until(async () => (await collapsed('merging')), HUNG_MS)
+    await firstOpen('alpha', 'hold todo doing review passed merging* done')
+    await col('passed').getByRole('button', { name: 'Collapse Approved' }).click()
+    await until(async () => (await collapsed('passed')), HUNG_MS)
+    await firstOpen('alpha', 'hold todo doing review passed* merging* done', 'noshift-collapsed')
+    await col('merging').getByRole('button', { name: 'Expand Merging' }).click()
+    await col('passed').getByRole('button', { name: 'Expand Approved' }).click()
+    // No group (beta: no review, no Merging): Merging never flashes in.
+    await firstOpen('beta', 'hold todo doing done', 'noshift-nogroup')
+    check('beta: no Merging or Approved at any point', (await layouts()).every((l) => !/passed|merging/.test(l.columns)), JSON.stringify(await layouts()))
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))
     await h.page.screenshot({ path: path.join(fx.shots, 'boardstages-failed.png') }).catch(() => {})
