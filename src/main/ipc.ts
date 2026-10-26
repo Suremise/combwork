@@ -761,6 +761,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return restoreBoardBackup(ws, () => (ws.path ? sessions.agentsIn(ws.path) : 0))
     },
     'tasks:list': (fullArchive) => tasks.windowTasks(workspace, fullArchive === true),
+    'tasks:changes': (since) => tasks.windowChanges(workspace, since && typeof since === 'object' && typeof since.board === 'string' && Number.isSafeInteger(since.mark) ? { board: since.board, mark: since.mark } : null),
     'tasks:export': async () => {
       // The board as this window shows it now; the files go in a folder of their own inside the one chosen.
       const ws = currentWorkspace()

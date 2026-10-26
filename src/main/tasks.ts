@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto'
+import { createHash, randomBytes } from 'crypto'
 import { basename, join } from 'path'
 import { mkdir, writeFile } from 'original-fs/promises'
 import { projectAgents } from '../shared/defaults'
@@ -12,7 +12,7 @@ import { contextProblems } from './docSections'
 import { providerMessage } from '../shared/providers'
 import type { HiveErrorKind, TaskMoveResult } from '../shared/types'
 import { workflowMessage } from '../shared/workflow/texts'
-import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, UnarchiveResult } from '../shared/types'
+import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskChanges, TaskCursor, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, UnarchiveResult } from '../shared/types'
 import { returnRound } from '../shared/watch'
 import { INTENT_TOOL } from '../shared/toolReplies'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
@@ -31,7 +31,7 @@ import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, STAGE_CATEGORY, type AskAction
 import { askActionAvailable, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
-import { afterBoardWrite, archiveBatchDocs, boardSavepoint, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
+import { afterBoardWrite, archiveBatchDocs, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
@@ -258,6 +258,42 @@ export async function windowTasks(ws: WorkspaceService = workspace, full = false
   const live = cardDocs(ws, { archived: false }).map((d) => withoutGone(clean(d.doc, d.number, ids, keys.get(d.number)), (x) => numbers.has(x)))
   const short = archivedSummaryDocs(ws).map((d): TaskCard => ({ ...clean(d.doc, d.number, ids, keys.get(d.number)), summary: true }))
   return sortCards([...live, ...short])
+}
+
+/**
+ * The board as the window keeps it (HI-1715): the cards changed since its cursor, or every card when it has none, its
+ * board's stamp changed or the board keeps no revisions (windowTasks' cards: archived ones in short). The stamp is the
+ * board's opening and what a card shows from outside its rows (its key, its project's name by id): either changing makes
+ * the read whole. The project ids are the only await: the board opened again or the workspace changed meanwhile, the read
+ * is `stale` (the window reads again); everything else is one snapshot (cardChanges).
+ */
+export async function windowChanges(ws: WorkspaceService = workspace, since: TaskCursor | null = null): Promise<TaskChanges> {
+  const path = ws.path
+  if (!path) return { stale: true }
+  const generation = boardGeneration(ws)
+  const ids = await ws.projectIds()
+  if (ws.path !== path) return { stale: true }
+  let read = cardChanges(ws, since ? since.mark : null)
+  if (read.generation !== generation) return { stale: true }
+  let board = boardStamp(read.generation, ids, read.keys)
+  const full = !since || read.mark === null || since.board !== board
+  if (full && since) {
+    read = cardChanges(ws, null)
+    if (read.generation !== generation) return { stale: true }
+    board = boardStamp(read.generation, ids, read.keys)
+  }
+  const numbers = new Set(read.numbers)
+  const live = read.live.map((d) => withoutGone(clean(d.doc, d.number, ids, read.keys.get(d.number)), (x) => numbers.has(x)))
+  const short = read.summaries.map((d): TaskCard => ({ ...clean(d.doc, d.number, ids, read.keys.get(d.number)), summary: true }))
+  return { board, mark: read.mark, full, cards: [...live, ...short], numbers: read.numbers }
+}
+
+/** A board's stamp for a window's cursor: its opening, and a hash of the project names by id and the cards' keys. */
+function boardStamp(generation: number, ids: ProjectIdIndex, keys: Map<number, string>): string {
+  const h = createHash('sha1')
+  h.update(JSON.stringify([...ids.byId]))
+  h.update(JSON.stringify([...keys]))
+  return `${generation}:${h.digest('hex')}`
 }
 
 /** A card's holds, project, agent and reviewer, for costs; its history only when it keeps no holds (holdsFromHistory). */

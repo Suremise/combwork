@@ -23,6 +23,7 @@ import type { TemplateAgent, TemplateRef } from '@shared/templates'
 import type { GitTool } from '@shared/gitTool'
 import type { RunsFilter } from '@shared/progressTabs'
 import { loadActivityView, saveActivityView, type ActivityView } from './activityView'
+import { boardReader } from './boardReads'
 import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkspaceUsage, RecentWorkspace } from '@shared/types'
 import type { PresetId } from '@shared/workflow/options'
 import type {
@@ -1302,18 +1303,29 @@ export function loadTasks(): Promise<void> {
 async function readTasks(): Promise<void> {
   const ws = get().workspace?.path
   const mine = ++tasksLoad
-  if (!ws) return set({ tasks: [], boardState: null, boardStages: null, projectKeys: [], movedCardNames: {} })
+  if (!ws) {
+    boardReads.clear()
+    return set({ tasks: [], boardState: null, boardStages: null, projectKeys: [], movedCardNames: {} })
+  }
   try {
     // The stages too when a workflow was written or the projects changed since they were read (HI-1682); a failed read
     // of them leaves each project's columns as its cards' stages give them.
     const stagesFor = boardStagesFor(get())
     const readStages = get().boardStages?.for !== stagesFor
-    const [tasks, boardState, projectKeys, movedCardNames, stages] = await Promise.all([window.hive.invoke('tasks:list', fullArchive > 0), window.hive.invoke('board:state'), window.hive.invoke('project:keys'), window.hive.invoke('project:movedCardNames'), readStages ? window.hive.invoke('board:stages').catch(() => ({})) : null])
-    if (mine === tasksLoad && get().workspace?.path === ws) set({ tasks, boardState, projectKeys, movedCardNames, ...(stages ? { boardStages: { for: stagesFor, byPath: stages } } : {}) })
+    // What changed since this window's copy of the board (HI-1715), or the whole board while the archived cards are wanted in full.
+    const board = boardReads.begin(ws, fullArchive > 0)
+    const [cards, boardState, projectKeys, movedCardNames, stages] = await Promise.all([board.request, window.hive.invoke('board:state'), window.hive.invoke('project:keys'), window.hive.invoke('project:movedCardNames'), readStages ? window.hive.invoke('board:stages').catch(() => ({})) : null])
+    if (mine !== tasksLoad) return
+    const tasks = board.take(cards, { ws: get().workspace?.path ?? null, whole: fullArchive > 0 })
+    if (tasks === 'again') return void loadTasks()
+    if (tasks) set({ tasks, boardState, projectKeys, movedCardNames, ...(stages ? { boardStages: { for: stagesFor, byPath: stages } } : {}) })
   } catch {
     // The workspace closed meanwhile.
   }
 }
+
+/** The window's board reads, with the board as main last sent it (HI-1715). */
+const boardReads = boardReader({ list: () => window.hive.invoke('tasks:list', true), changes: (since) => window.hive.invoke('tasks:changes', since) })
 
 /**
  * What the board's stages are read for: the workspace, its projects and their version control, and the workflows

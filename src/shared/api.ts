@@ -104,6 +104,8 @@ import type {
   SkillInfo,
   SkillTarget,
   TaskCard,
+  TaskChanges,
+  TaskCursor,
   TaskColumn,
   TaskMoveResult,
   TaskPatch,
@@ -407,6 +409,8 @@ export interface HiveRequests {
   /** Every card on the workspace's board, archived ones too. */
   /** The board as the window shows it: archived cards in short (TaskCard.summary) unless `fullArchive` (#1017). */
   'tasks:list': (fullArchive?: boolean) => TaskCard[]
+  /** The board's cards changed since the window's cursor, or all of them (HI-1715, windowChanges). */
+  'tasks:changes': (since: TaskCursor | null) => TaskChanges
   /** Exports the board to a folder of JSON files the user picks (#1017); null when the user cancelled. */
   'tasks:export': () => { dir: string; cards: number } | null
   /** The workspace's Assistant journal (#1031): its settings and size, a change of them, deleting it. */
