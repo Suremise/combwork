@@ -219,7 +219,8 @@ describe("a carried lease kept for a card its builder has left (HI-1731)", () =>
     for (const l of store.openLeases().filter((x) => x.agent === 'b2' && x.kind === 'card')) await pool.release(l.id, 'putBack')
   }
 
-  it("kept while that card is Active, while a start is refused, or while its folder has changes not committed", async () => {
+  // One scenario: each step needs the one before it (the card Active, then left; the folder dirty, then clean; then ended).
+  it("kept while that card is Active, while a start is refused, or while its folder has changes not committed; then ended (superseded) once B2 holds its new lease, its run never stopped", async () => {
     const a = kept()!
     const carried = open('b2')!
     expect(await stage(a)).toBe('active')
@@ -256,11 +257,10 @@ describe("a carried lease kept for a card its builder has left (HI-1731)", () =>
     await drop()
     expect(store.openLeases().filter((l) => l.agent === 'b2').map((l) => l.kind)).toEqual(['carried'])
     expect(stops).toEqual([])
-  })
 
-  it('ended (superseded) once B2 holds its new lease; its run, now under that lease, is never stopped; the slot drains once it leaves; the line stays', async () => {
-    const a = kept()!
-    const carried = open('b2')!
+    // Then, with that card left (On Hold) and the folder clean: ended (superseded) once B2 holds its new lease; its run,
+    // now under that lease, is never stopped; the slot drains once it leaves; the line stays.
+    expect(kept()).toBe(a)
     const line = lineOf(wt('hb2'))
     const b = await card("B2's last")
     const r = await start(b, 'b2', false)
@@ -276,7 +276,6 @@ describe("a carried lease kept for a card its builder has left (HI-1731)", () =>
     expect(store.openLease('hb2')).toBeNull()
     expect(await stage(a)).not.toBe('active')
     // The run leaves (its next start elsewhere): hb2 drains, free to retire as any free slot.
-    const pool = await run(() => poolFor(ws, project))
     expect(await store.clearWriterRun(RUN)).toContain('hb2')
     await pool.drained('hb2')
     expect(writerOf('hb2')).toMatchObject({ run: null })
