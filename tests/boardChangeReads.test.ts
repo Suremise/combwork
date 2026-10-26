@@ -98,7 +98,11 @@ describe('the live cards\' heads (HI-1690)', () => {
     let heads: TaskCard[] = []
     expect(await readsOf(async () => void (heads = await run(() => tasks.liveCardHeads(w))))).toBe(0)
     const full = await run(() => tasks.allTasks(w, { archived: false }))
-    expect(heads.map(head)).toEqual([...full].sort((a, b) => a.number - b.number).map(head))
+    // In board order, as allTasks gives them (HR6's round 1): a reader taking the first card that fits takes the one
+    // highest in its column. The board's order runs against the cards' numbers here, so number order would differ.
+    expect(heads.map(head)).toEqual(full.map(head))
+    const doing = heads.filter((c) => c.column === 'doing' && c.agent === 'a1')
+    expect(doing[0].number).toBe(Math.max(...doing.map((c) => c.number)))
     expect(heads.length).toBe(BOARD - BOARD / 4)
     // Nothing else of a card: its description, comments and history as a card without them has them.
     expect(heads.every((c) => c.description === '' && c.comments.length === 0 && c.history.length === 0)).toBe(true)
@@ -107,7 +111,7 @@ describe('the live cards\' heads (HI-1690)', () => {
   it('with done, the live Done cards alone', async () => {
     let done: TaskCard[] = []
     expect(await readsOf(async () => void (done = await run(() => tasks.liveCardHeads(w, { done: true }))))).toBe(0)
-    const want = Array.from({ length: BOARD }, (_, i) => i + 1).filter((n) => COLUMNS[n % 5] === 'done' && n % 4 !== 0)
+    const want = Array.from({ length: BOARD }, (_, i) => i + 1).filter((n) => COLUMNS[n % 5] === 'done' && n % 4 !== 0).reverse()
     expect(done.map((c) => c.number)).toEqual(want)
     expect(done.every((c) => c.column === 'done' && !c.archived)).toBe(true)
   })

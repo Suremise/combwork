@@ -289,13 +289,14 @@ export async function costCards(ws: WorkspaceService, numbers: number[]): Promis
 /**
  * The live cards (with `done`, the live Done ones alone) with what readers run on each board change need (HI-1690:
  * number, title, project, column, agent and reviewer; the rest as a card without them has it): no archived card, and no
- * card's description, comments, decisions or history read. In number order.
+ * card's description, comments, decisions or history read. In board order, as allTasks gives them (a reader taking the
+ * first card that fits takes the one highest in its column: HR6's round 1).
  */
 export async function liveCardHeads(ws: WorkspaceService, o: { done?: boolean } = {}): Promise<TaskCard[]> {
   if (!ws.path) return []
   const ids = await ws.projectIds()
   if (!ws.path) return []
-  return cardHeadDocs(ws, o).map(({ number, doc }) => clean(doc as Partial<TaskCard> & { projectId?: unknown }, number, ids))
+  return sortCards(cardHeadDocs(ws, o).map(({ number, doc }) => clean(doc as Partial<TaskCard> & { projectId?: unknown }, number, ids)))
 }
 
 /** A card's place on the board: all that placing another card needs of it (#458). */
