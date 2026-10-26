@@ -442,6 +442,45 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
       await disposeWorkspaceService(w)
     }
   })
+
+  // HI-1668: the root watcher's read (250 ms after a folder changes) listed p4 before it went, and settled after the read
+  // that no longer listed it: the older listing became the projects' ids and what is remembered (4 kept, not 3).
+  it('a read that listed the folders before a later one settles after it: the later listing stands', async () => {
+    const wsPath = join(base, 'ws-overlap')
+    project(wsPath, 'keep')
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    try {
+      await w.refreshesSettled()
+      const gone = join(wsPath, 'gone')
+      // The older read, the first to list `gone`, is held where it reads it, until the newer one has settled.
+      let release!: () => void
+      const held = new Promise<void>((r) => (release = r))
+      const read = w.projectConfig.bind(w)
+      let holding = true
+      let reached = false
+      w.projectConfig = (async (p: string, o?: never) => {
+        if (holding && p.toLowerCase() === gone.toLowerCase()) {
+          reached = true
+          await held
+        }
+        return read(p, o)
+      }) as typeof w.projectConfig
+      project(wsPath, 'gone')
+      const older = w.projectIds({ fresh: true })
+      await vi.waitFor(() => expect(reached).toBe(true), { timeout: HUNG_MS })
+      await moveFolder(gone, join(base, 'ws-overlap-out'))
+      const newer = await w.projectIds({ fresh: true })
+      expect(newer.byPath.has(gone.toLowerCase())).toBe(false)
+      holding = false
+      release()
+      await older
+      expect(w.projectIdsNow().byPath.has(gone.toLowerCase())).toBe(false)
+      expect(w.projectIdsNow().byPath.size).toBe(1)
+    } finally {
+      await disposeWorkspaceService(w)
+    }
+  })
 })
 
 describe('merge holds Hive closed under are told in their project now (#508 round 3)', () => {
