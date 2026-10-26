@@ -17,7 +17,7 @@ mkdirSync(join(base, 'profile'), { recursive: true })
 
 const { Observer } = await import('../src/main/platform/observe')
 const { isUnknown } = await import('../src/main/platform/types')
-const { checkStart, checkEnd, bracketFor, bracketStarted, bracketFinished, cardRunRevision } = await import('../src/main/workflow/runChecks')
+const { checkStart, checkEnd, bracketFor, bracketStarted, bracketFinished, cardRunRevision, checksSettled } = await import('../src/main/workflow/runChecks')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
@@ -253,6 +253,32 @@ describe("a run's bracket in the app (#1222)", () => {
     // A start that names the check but reports another command: recorded as run, not counted.
     bracketStarted('run-2', (await bracketFor(w, link))!)
     expect(await bracketFinished({ ...(run as object), id: 'run-2', command: 'echo skipped' } as never)).toMatchObject({ name: 'typecheck', command: 'echo skipped', counted: false, whyNot: 'notCheck' })
+  })
+
+  it("a finished run's record still being written is waited for by its project's submits, not another project's (#1651)", async () => {
+    const ws = join(base, 'ws-settled')
+    const p = join(ws, 'p')
+    mkdirSync(join(p, '.hive'), { recursive: true })
+    git(ws, 'init', '-q', '-b', 'main', p)
+    for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(p, 'config', k, v)
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'git', workflow: { options: { commands: COMMANDS } } }))
+    writeFileSync(join(p, '.gitignore'), '.hive/\n')
+    const head = commit(p, 'a.txt', 'a\n')
+    const w = createWorkspaceService()
+    await w.open(ws)
+    opened.push(w)
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Settled', project: 'p' }, { kind: 'user' }))).number
+    const link = { card, revision: head, testedCheckout: head, check: { name: 'typecheck', command: 'npm run typecheck' }, folder: p }
+    bracketStarted('run-s1', (await bracketFor(w, link))!)
+    // As the finish route does: the record started, not waited for (hive-progress has exited meanwhile).
+    const recorded = bracketFinished({ id: 'run-s1', finishedAt: Date.now(), state: 'passed', source: 'agent', agentId: 'a1', agentName: 'Agent 1', title: 'typecheck', command: 'npm run typecheck' } as never)
+    expect(cardWork(w, card)!.checks).toEqual([])
+    await checksSettled(w, join(ws, 'other'))
+    await checksSettled(w, p.toUpperCase())
+    expect(cardWork(w, card)!.checks).toMatchObject([{ name: 'typecheck', revision: head, result: 'passed', counted: true }])
+    await recorded
+    // Nothing left to wait for.
+    await checksSettled(w, p)
   })
 
   it('a failed run of a check its card needs before Review says it blocks review; one it needs no more, or that passed, says nothing (#1279)', async () => {

@@ -14,8 +14,8 @@
 //   (`revisionChanged`), and no deliverable (the options' exclusions left out) was written in between (`changed`).
 // Nothing gates on it in P3: the card's facts and the run's details say it.
 
-import { join } from 'path'
-import { boardWrite, cardDoc, hasCard } from '../boardStore'
+import { join, resolve } from 'path'
+import { boardWrite, cardDoc, hasCard, inBoardWrite } from '../boardStore'
 import { git } from '../git'
 import { getTask } from '../tasks'
 import type { WorkspaceService } from '../workspace'
@@ -257,13 +257,44 @@ export function bracketStarted(runId: string, b: Bracket): void {
 }
 
 /**
- * A run finished: its `CheckRan`, written in its card's facts inside a board change, or null when it wasn't bracketed,
- * didn't end with a result, or its workspace or card has gone meanwhile.
+ * Each project's check records still being written, by workspace and project folder (#1651): a submit right after
+ * hive-progress exits waits for them (`checksSettled`), since a run's end reads the folder (the watcher settling, git)
+ * before its `CheckRan` is written, and a passed check counts for its commit as soon as its run has finished.
  */
-export async function bracketFinished(run: ProgressRun): Promise<(CheckRanData & { blocks?: 'review' }) | null> {
+const recording = new WeakMap<WorkspaceService, Map<string, Set<Promise<unknown>>>>()
+const projectKey = (p: string): string => resolve(p).toLowerCase()
+
+/** The check records still being written for a project. Inside a write to its board they can't be waited for (they wait for it). */
+export async function checksSettled(ws: WorkspaceService, projectPath: string): Promise<void> {
+  if (ws.path && inBoardWrite(ws.path)) return
+  const going = recording.get(ws)?.get(projectKey(projectPath))
+  if (going?.size) await Promise.allSettled([...going])
+}
+
+/**
+ * A run finished: its `CheckRan`, written in its card's facts inside a board change, or null when it wasn't bracketed,
+ * didn't end with a result, or its workspace or card has gone meanwhile. Its project's submits wait for it meanwhile.
+ */
+export function bracketFinished(run: ProgressRun): Promise<(CheckRanData & { blocks?: 'review' }) | null> {
   const b = open.get(run.id)
   open.delete(run.id)
-  if (!b || run.finishedAt === null || (run.state !== 'passed' && run.state !== 'failed' && run.state !== 'stopped')) return null
+  if (!b) return Promise.resolve(null)
+  let byProject = recording.get(b.ws)
+  if (!byProject) recording.set(b.ws, (byProject = new Map()))
+  const k = projectKey(b.for.project)
+  const going = byProject.get(k) ?? new Set()
+  byProject.set(k, going)
+  const work = record(run, b)
+  going.add(work)
+  void work.catch(() => undefined).then(() => {
+    going.delete(work)
+    if (!going.size && byProject.get(k) === going) byProject.delete(k)
+  })
+  return work
+}
+
+async function record(run: ProgressRun, b: Bracket): Promise<(CheckRanData & { blocks?: 'review' }) | null> {
+  if (run.finishedAt === null || (run.state !== 'passed' && run.state !== 'failed' && run.state !== 'stopped')) return null
   if (b.ws.path !== b.workspacePath || !cardOf(b)) return null
   // Its command as its reporter said (hive-progress: the check's command, or its command line); None's declared paths
   // as they are now: a list changed during the run is a new revision.

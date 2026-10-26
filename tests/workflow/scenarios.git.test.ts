@@ -300,6 +300,23 @@ describe('workflow scenarios, Git', () => {
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
   })
 
+  it('#1651: a passed check whose record is still being written when submit comes is waited for: accepted the first time', async () => {
+    // The check's command ends only once the submit waits for the project's check records (as hive-progress exits
+    // before its run's CheckRan is written): without the wait the submit reads no passed lint and is refused.
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((r) => (release = r))
+    let recording: Promise<unknown> = Promise.resolve()
+    const checksSettled = async (): Promise<void> => {
+      release()
+      await recording
+    }
+    const e = pair({ checksSettled }, { preChecks: ['lint'], commands: { lint: 'npm run lint' } })
+    const { card } = await started(e)
+    recording = runCheck(e.wf, { card, name: 'lint', by: 'B1', exec: () => gate.then(() => ({ ok: true })) })
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    expect(e.wf.state(card).checks).toMatchObject([{ name: 'lint', result: 'passed', counted: true }])
+  })
+
   it('S38: a no-code card with no review → submit with a summary → Done, no revision, no Integrated', async () => {
     const e = (env = setup({ platform: 'git' }))
     const card = e.wf.createCard({ title: 'Write it down', kind: 'no-code' })
