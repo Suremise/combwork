@@ -118,6 +118,7 @@ export const SUITES = [
   { name: 'foryou' },
   { name: 'freshpath' },
   { name: 'gitbranchcards' },
+  { name: 'gitcleanup' },
   { name: 'gitinit' },
   { name: 'gitmissing' },
   { name: 'gitremotes' },

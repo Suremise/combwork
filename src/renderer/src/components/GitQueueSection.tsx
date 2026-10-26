@@ -145,7 +145,7 @@ function historyColumns(v: QueueView, runs: readonly ProgressRun[], short: (id: 
       filter: { kind: 'choice', value: (r) => r.outcome },
       choiceLabel: outcomeLabel
     },
-    { key: 'result', header: tr(M.result), className: 'nowrap git-queue-result', cell: (r) => revision(r.outcome === 'merged' ? r.result : undefined) },
+    { key: 'result', header: tr(M.result), className: 'nowrap git-queue-result', cell: (r) => revision(r.outcome === 'merged' ? r.result : undefined) }, // i18n-ignore: class names
     { key: 'when', header: tr(M.when), className: 'nowrap', descFirst: true, cell: (r) => <span title={formatDateTime(r.at)}>{timeAgo(r.at)}</span>, sortValue: (r) => r.at }
   ]
 }

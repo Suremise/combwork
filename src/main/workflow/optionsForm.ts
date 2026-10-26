@@ -33,6 +33,7 @@ import { APPLY_OPTIONS } from './runtime'
 import { queueChanged } from './queueHost'
 import { isUnknown } from '../platform/types'
 import { workflowWrite } from './writes'
+import { withRepoLocks } from '../repoLock'
 
 const log = createLogger('workflow')
 
@@ -237,8 +238,10 @@ export class WorkflowRefused extends HiveError {
  * form as it is now.
  */
 export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[] } = {}): Promise<WorkflowForm> {
-  // Checked against the levels as they are now and written in the same turn of workflow writes (#1422).
-  return workflowWrite(() => saveWorkflowOptions(ws, projectPath, raw, o))
+  // Checked against the levels as they are now and written in the same turn of workflow writes (#1422), holding the
+  // project's repository lock first (#1642 round 5): its target can't move while a clean-up checks a branch against it,
+  // from this Hive or another.
+  return withRepoLocks([projectPath], () => workflowWrite(() => saveWorkflowOptions(ws, projectPath, raw, o)), { quiet: true, project: projectPath })
 }
 
 async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[] }): Promise<WorkflowForm> {

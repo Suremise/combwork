@@ -66,6 +66,38 @@ export interface GitBranchRow {
   subject: string
   /** The remote its upstream is on (#1385: Remove remote names the branches tracking it), or null: none, or a local branch. */
   upstreamRemote?: string | null
+  /** Its commit, whole: what a deletion is checked against (#1642). */
+  sha?: string
+  /** Its commits not in the project's target (#1642): 0 merged into it, null not counted (no target, or too many to count). */
+  toTarget?: number | null
+}
+
+/** A remote branch as Branches & remotes groups it (#1642). */
+export interface GitRemoteBranchRow {
+  /** As git names it: nas/hive/hb1. */
+  name: string
+  remote: string
+  /** On the remote: hive/hb1. */
+  branch: string
+  sha: string
+  date: number
+  /** As GitBranchRow's. */
+  toTarget: number | null
+  /** The remote's own default branch (its HEAD), never offered for deletion. */
+  remoteHead: boolean
+}
+
+/** What a deletion of branches (#1642) is given for each: its name and the commit the user saw it at. */
+export interface BranchAt {
+  name: string
+  sha: string
+}
+
+/** The commits deleting an unmerged branch drops (#1642): the newest few, and how many in all. */
+export interface BranchDrops {
+  target: string
+  total: number
+  commits: { short: string; subject: string; date: number }[]
 }
 
 /** What a push did to one ref (#1385), from `git push --porcelain`. */
@@ -123,6 +155,12 @@ export interface GitRepoInfo {
   /** The repository's other worktrees (agents' and unused ones): shown, never changed here. */
   worktrees: GitWorktreeRow[]
   identity: GitIdentity
+  /** The branch the project's work merges into (its workflow's target, else the default branch) when it exists (#1642). */
+  target?: string | null
+  /** The repository's default branch (main or master, else the folder's). */
+  defaultBranch?: string | null
+  /** The remote branches with their state (#1642), as remoteBranches. */
+  remoteRows?: GitRemoteBranchRow[]
 }
 
 export interface GitCommitRow {

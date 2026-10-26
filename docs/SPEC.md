@@ -2990,6 +2990,30 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
 - **Branches & remotes** reads `slots:list`: a slot's row names its lease (card or lane, its agent; carried for whom; not
   lent), a branch checked out in a slot shows the slot's name, and a folder's agent is its slot lease's, else the agent
   whose session runs there (#1424's worktree badge becomes the slot's).
+- **Branches by state, and Clean Up Merged Branches** (#1642; Darren's decision: the list stays a list, its rows as they
+  were). `git:info` measures each branch against the project's target (its options' `target`, else the default branch;
+  none counted when that branch doesn't exist): merged into it (`for-each-ref --merged`), else how many commits it has
+  that the target hasn't (`rev-list --count`, the first 60 such branches). `shared/branchCleanup.ts` groups them, In use
+  (the target, the default branch, the folder's, a worktree's or slot's, an open card's line: any stage but Done),
+  Merged, Not merged, the remote branches too (In use: the remote's HEAD, the target, the default branch), and makes
+  the offer: merged local branches nothing uses, ticked; apart, under a warning, merged remote branches whose local
+  branch isn't in use, none ticked (outward-facing, the Assistant's requirement; one whose local branch is ticked says
+  so). Main checks each again: `git:deleteBranches` under the repository's lock (where slots are made), at the commit
+  the window was shown (`update-ref -d <ref> <sha>`, compare-and-delete; never `branch -D`, nor `-d`, which measures
+  against HEAD, not the target),
+  merged unless it is one unmerged branch the user confirmed with the commits
+  it drops (`git:branchDrops`); `git:deleteRemoteBranches` with `push --force-with-lease=<ref>:<sha> :<ref>`, so one
+  that moved on the remote is refused there. Each one kept is said, why. What a branch is to the project (the target,
+  read from its options again; the folder's branch, the worktrees and slots, the board's open cards) is read for each
+  branch right before it goes (HR1's round 1), and the check and the deletion are one hold (round 2's finding): the
+  repository's lock, across Hives (slot preparation, merges, branch switches, and every workflow options write that can
+  move a Git project's target: a project's, a level's for each Git project it reaches, a setting's tool, a platform
+  switch, through `withRepoLocks`, each repository once in its git folder's order; round 4's finding), then this Hive's
+  turn of workflow writes (`workflowWrite`), held through a remote's push. The same order everywhere. A branch moved by a git outside the lock meanwhile is refused by git and kept (round 3's finding); one
+  checked out in a worktree after all is put back at that commit and kept, said as in use. The dialog keeps what it deleted, so Try Again after a remote's
+  failure, or a tick changed after one, asks only for what is left. A card's own line is deleted by
+  `deleteMergedLine` (#1438) once the card is Done and no worktree has it checked out: in a lane that is when its slot
+  moves to the next card's line, so until then it shows In use.
 
 #### 16.10.3 Agents unbound from folders, and resuming
 
