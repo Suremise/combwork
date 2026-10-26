@@ -25,6 +25,10 @@ export const EVERYTHING = [
   'src/main/openingFence.ts',
   'src/main/paths.ts',
   'src/main/logger.ts',
+  // Its thread writes every line hive.log and hooks.log get (HI-1730).
+  'src/main/logWriter.ts',
+  // Every IPC call, database step and slow log write is marked through it (HI-1692).
+  'src/main/stallWork.ts',
   'src/main/ptyHost.ts',
   'src/main/testQuiet.ts',
   // Every IPC call's errors and the Agent API's go through it (#845).
