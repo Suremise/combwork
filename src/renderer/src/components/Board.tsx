@@ -309,11 +309,12 @@ function cardMenu(c: TaskCard, readOnly: string | null): MenuEntry[] {
       : [
           { label: tr(msg({ id: 'board.menu.start', defaultMessage: 'Start…', description: 'Menu item on a card (right-click): gives it to an agent to start (opens a dialog).' })), icon: 'play', disabled: !c.project || !!readOnly, ...(readOnly ? { detail: readOnly } : {}), onClick: () => set({ taskStartFor: c.number }) },
           ...(c.column === 'todo' && c.project ? [{ label: tr(msg({ id: 'board.menu.startLane', defaultMessage: 'Start Lane with It…', description: "Menu item on a Todo card (right-click): opens Start Lane with this card first in the lane's list (a lane: a builder and a reviewer working through cards in turn). Glossary: lane." })), icon: 'list-ordered', disabled: !!readOnly, onClick: () => openLaneStart(c.project, [c.number]) }] : []),
+          // What runs on it now (HI-1743), for a card in progress.
+          ...(cardHasActivity(c) ? [{ label: tr(ACTIVITY), icon: 'type-hierarchy', onClick: () => openCardActivity(c) }] : []),
           { separator: true },
           { header: true, label: tr(msg({ id: 'board.menu.moveTo', defaultMessage: 'Move to', description: "A heading in a card's right-click menu, above the board columns it can move to." })) },
           ...TASK_COLUMNS.filter((x) => x.id !== c.column).map((x) => ({ label: tr(COLUMN_TEXT[x.id].label), icon: 'arrow-right', disabled: !!readOnly, onClick: () => (x.id === 'doing' ? moveToDoing({ n: c.number, project: c.project, agent: c.agent }) : void moveCard(c, x.id)) })),
           // A failed card still in Review goes back to its reviewer for the next round (#214).
-          ...(cardHasActivity(c) ? [{ label: tr(ACTIVITY), icon: 'type-hierarchy', onClick: () => openCardActivity(c) }] : []),
           ...(returnRound(c) ? [{ label: tr(msg({ id: 'board.menu.nextRound', defaultMessage: 'Review (next round)', description: "Menu item on a card that failed review and is still in Review: returns it to its reviewer for the next round. Review is the board column." })), icon: 'refresh', disabled: !!readOnly, onClick: () => void moveCard(c, 'review') }] : []),
           { separator: true }
         ]),

@@ -216,6 +216,7 @@ function transcript(sid, startMin) {
     const cardOne = page.locator('.task-card', { hasText: 'Card one' }).first()
     await cardOne.click({ button: 'right' })
     check("a card in progress has Activity in its menu", (await lib.menuEntry(page, 'Activity').count()) === 1)
+    await shoot('6-card-menu-dark')
     await page.keyboard.press('Escape')
     await page.locator('.task-card', { hasText: 'An earlier card' }).first().click()
     const dialogActivity = page.locator('.dialog[role="dialog"]').getByRole('button', { name: 'Activity', exact: true })
