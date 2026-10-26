@@ -123,9 +123,17 @@ function RequestText({ text }: { text: string }) {
   const ref = useRef<HTMLDivElement>(null)
   const [all, setAll] = useState(false)
   const [long, setLong] = useState(false)
+  // Measured again whenever the fold or what it holds changes size (HR5's round 1: a narrower window or a zoom wraps a
+  // question that fitted, and its last lines must not be cut off without Show all).
   useLayoutEffect(() => {
     const el = ref.current
-    if (el && !all) setLong(el.scrollHeight > el.clientHeight + 1)
+    if (!el || all) return
+    const measure = (): void => setLong(el.scrollHeight > el.clientHeight + 1)
+    measure()
+    const watch = new ResizeObserver(measure)
+    watch.observe(el)
+    if (el.firstElementChild) watch.observe(el.firstElementChild)
+    return () => watch.disconnect()
   }, [text, all])
   return (
     <>

@@ -339,6 +339,28 @@ const check = (name, ok, extra = '') => {
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     await more.click()
     check('…Show all shows it whole', !!(await lib.until(async () => (await question.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)) && (await more.innerText()).trim() === 'Show less', HUNG_MS)), await more.innerText().catch(() => ''))
+    await page.keyboard.press('Escape')
+
+    // HR5's round 1 (#1637): a question that fits, then wraps past the fold once the window is zoomed in, is folded
+    // with Show all then, and not once it fits again. Zoomed to 300%: the dialog narrows with the window's width.
+    const f = (await inv('tasks:create', { title: 'Fits at first', project: 'beta' })).number
+    await inv('tasks:move', f, 'doing', { agent: maker.id })
+    const fits = Array.from({ length: 6 }, (_, i) => `Line ${i + 1}: a sentence that fits on one line here, and wraps once the window is zoomed in.`).join('\n')
+    await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${f}`, kind: 'decide', text: fits })}`)
+    await openByTitle(page, f)
+    const fDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
+    await fDialog.waitFor({ timeout: HUNG_MS })
+    const fQuestion = fDialog.locator('[data-section="for-you"] .for-you-question')
+    const fMore = fDialog.locator('.for-you-more')
+    check('a question that fits has no Show all', !!(await lib.until(async () => (await fQuestion.locator('p br').count()) === 5, HUNG_MS)) && (await fMore.count()) === 0, await fQuestion.innerHTML().catch(() => ''))
+    const zoom = (factor) => app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), factor)
+    await zoom(3)
+    try {
+      check('…zoomed in, it wraps past the fold: Show all appears', !!(await lib.until(async () => (await fMore.count()) === 1 && (await fQuestion.evaluate((el) => el.scrollHeight > el.clientHeight + 1)), HUNG_MS)), JSON.stringify({ more: await fMore.count(), box: await fQuestion.evaluate((el) => [el.clientWidth, el.clientHeight, el.scrollHeight, window.devicePixelRatio]) }))
+    } finally {
+      await zoom(1)
+    }
+    check('…and goes once it fits again', !!(await lib.until(async () => (await fMore.count()) === 0, HUNG_MS)), String(await fMore.count()))
   } finally {
     await app.close()
   }
