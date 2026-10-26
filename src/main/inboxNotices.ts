@@ -1,7 +1,7 @@
 import { isUnread, type DeliveryRecord } from '../shared/deliveries'
 import { inboxNotice, type NoticeItem } from '../shared/doorbell'
 import type { LiveSessionState } from '../shared/types'
-import { agentReadsInbox, deliveriesOf, inboxSwitch } from './deliveries'
+import { agentReadsInbox, countable, inboxSwitch } from './deliveries'
 import { sessions } from './sessions'
 
 /**
@@ -22,10 +22,14 @@ import { sessions } from './sessions'
 /** What each launch was told at its checkpoints (its live state lives as long as the launch). */
 const told = new WeakMap<LiveSessionState, Set<string>>()
 
-/** The deliveries an agent has unread that may still reach it: not expired, and not for another conversation. */
+/**
+ * The deliveries an agent has unread that hive_inbox would give it now (HI-1687: what a notice names, a read gives and an
+ * ack takes): `countable`, the gate's own check without making anything again; not expired, and not for another
+ * conversation.
+ */
 async function unreadFor(st: LiveSessionState): Promise<DeliveryRecord[]> {
   const now = Date.now()
-  return (await deliveriesOf(st.projectPath, st.agentId)).filter((r) => isUnread(r) && Date.parse(r.expires) > now && !(r.conversation && st.sessionId && r.conversation !== st.sessionId))
+  return (await countable(st.projectPath, st.agentId)).filter((r) => isUnread(r) && Date.parse(r.expires) > now && !(r.conversation && st.sessionId && r.conversation !== st.sessionId))
 }
 
 const item = (r: DeliveryRecord): NoticeItem => ({ id: r.id, kind: r.kind, ...(r.card ? { card: r.card } : {}) })

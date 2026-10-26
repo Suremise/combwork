@@ -245,16 +245,20 @@ export class DeliveriesFull extends Error {}
 /** A delivery wanted now (deliverNow) that couldn't be given: why. It was cancelled. */
 export class NotGiven extends Error {}
 
+/** How a delivery is given out: typed as an offer, or handed out by a read (hive_inbox; the notices counting what it would give). */
+export type HandOut = 'offer' | 'read'
+
 /**
  * A producer's part in its deliveries (#649), registered once by name (`source` on the delivery): made again just before
  * it is offered or handed out (`refresh`: the line from things as they are now, with what its receipt will need, `meta`,
  * saved on the delivery as that version; or cancelled when it is no longer due); checked before each piece and Enter of
- * its line (`holds`); told when it is received (`received`: its cursor moves on, from the received version's own `meta`,
- * never from what a later refresh prepared) or ends without that (`ended`). Called outside the host's lock.
+ * its line (`holds`, by an offer, or as it is handed out by a read: `by`, HandOut); told when it is received (`received`:
+ * its cursor moves on, from the received version's own `meta`, never from what a later refresh prepared) or ends without
+ * that (`ended`). Called outside the host's lock. `holds` is pure: the notices ask it to count (countable).
  */
 export interface DeliverySource {
   refresh?: (r: DeliveryRecord, host: string) => Promise<Fresh | null>
-  holds?: (r: DeliveryRecord, host: string) => boolean
+  holds?: (r: DeliveryRecord, host: string, by: HandOut) => boolean
   received?: (r: DeliveryRecord, host: string) => void
   ended?: (r: DeliveryRecord, host: string) => void
 }
@@ -1086,13 +1090,14 @@ export async function readInbox(host: string, agentId: string): Promise<{ items:
   const given: DeliveryRecord[] = []
   let unacked: string[] | null = null
   // An offered one its agent was rung for that this read didn't give (what it was made from changed again while it was
-  // made again for the read: a loop wake's roles, a decision line's board) is tried again, a few times at most (#650).
+  // made again for the read: a loop wake's roles, a decision line's board) is tried again, a few times at most (#650);
+  // so is one made again for this read that its source no longer held at the hand-out (HI-1687: its card changed meanwhile).
   for (let attempt = 0; attempt < 3; attempt++) {
     let r: { give: DeliveryRecord[]; before: string[]; missed: boolean }
     try {
-      // Through the one gate (#649), as an offer: a reply the user no longer lets be told, a watch that has ended, a wake
+      // Through the one gate (#649), as a read: a reply the user no longer lets be told, a watch that has ended, a wake
       // that is someone else's now, isn't handed out.
-      const gate = await mayGive(store, store.records.filter((x) => x.agentId === agentId && isUnread(x)))
+      const gate = await mayGive(store, store.records.filter((x) => x.agentId === agentId && isUnread(x)), 'read')
       // Relevance (#652) is read under the lock, so a card that moved on while this read waited for it is seen.
       r = await transactAfter(
         store,
@@ -1105,7 +1110,8 @@ export async function readInbox(host: string, agentId: string): Promise<{ items:
           const give = mine.filter((x) => may(x) && !held.has(x.id))
           const before = mine.filter((x) => x.state === 'received' && needsAck(x.kind)).map((x) => x.id)
           for (const x of give) set(store, d, x, 'received', undefined, 'inbox')
-          return { give, before, missed: mine.some((x) => x.state === 'offered' && !give.includes(x)) }
+          const refused = (x: DeliveryRecord): boolean => isUnread(x) && !give.includes(x) && !held.has(x.id) && !sourceHolds(store, x, 'read')
+          return { give, before, missed: mine.some((x) => (x.state === 'offered' && !give.includes(x)) || refused(x)) }
         },
         overtaken
       )
@@ -1168,12 +1174,12 @@ export async function ackThenRead(host: string, agentId: string, ids: readonly s
  * holds; one that no longer does is made again (#650: its doorbell named it by id, never its text, so it can be, rather
  * than never given at all). Its receipt, in the same transaction as the read, covers exactly the version read.
  */
-function applyFresh(store: Store, d: Draft, fresh: Map<string, Fresh>): void {
+function applyFresh(store: Store, d: Draft, fresh: Map<string, Fresh>, by: HandOut): void {
   for (const [id, f] of fresh) {
     const r = byId(d.records, id)
     if (!r || !isUnread(r)) continue
     if ('cancel' in f) set(store, d, r, 'cancelled', f.cancel)
-    else if (r.state === 'offered' && eligible(store, r)) continue
+    else if (r.state === 'offered' && eligible(store, r, by)) continue
     else if (f.body.length > DELIVERY_BODY_MAX_CHARS) set(store, d, r, 'cancelled', 'cancelled: made again, it was too long to keep')
     else if (f.body !== r.body || (f.meta && JSON.stringify(f.meta) !== JSON.stringify(r.meta))) put(d, r, { ...r, body: f.body, ...(f.meta ? { meta: f.meta } : {}) })
   }
@@ -1184,8 +1190,10 @@ function applyFresh(store: Store, d: Draft, fresh: Map<string, Fresh>): void {
  * expired, it is for the agent's conversation (and launch), and its source and producer still hold it. The one check
  * the gate (mayGive) and the writer before each key (offerHolds) both ask.
  */
-const eligible = (store: Store, r: DeliveryRecord): boolean =>
-  !whyNot(store, r) && (r.source ? sources.get(r.source)?.holds?.(r, store.host) : undefined) !== false && producerHolds(store, r)
+const eligible = (store: Store, r: DeliveryRecord, by: HandOut = 'offer'): boolean => !whyNot(store, r) && sourceHolds(store, r, by) && producerHolds(store, r)
+
+/** Whether a delivery's source still holds it (its `holds`), for this way of giving it out; one with no source does. */
+const sourceHolds = (store: Store, r: DeliveryRecord, by: HandOut): boolean => (r.source ? sources.get(r.source)?.holds?.(r, store.host, by) : undefined) !== false
 
 /**
  * Whether a delivery's producer still wants it given (its DeliveryHooks.holds: a task while its agent is free, the
@@ -1201,13 +1209,24 @@ const producerHolds = (store: Store, r: DeliveryRecord): boolean => (r.state ===
  * producer no longer wants is cancelled. Applied in the caller's transaction, it says of each whether it may be given out
  * (unread and eligible). Already received ones aren't its business: they can still be acked.
  */
-async function mayGive(store: Store, records: readonly DeliveryRecord[]): Promise<(d: Draft) => (r: DeliveryRecord) => boolean> {
+async function mayGive(store: Store, records: readonly DeliveryRecord[], by: HandOut = 'offer'): Promise<(d: Draft) => (r: DeliveryRecord) => boolean> {
   const fresh = await refreshAll(store, records)
   for (const r of records) if (!fresh.has(r.id) && !producerHolds(store, r)) fresh.set(r.id, { cancel: 'cancelled: no longer wanted' })
   return (d) => {
-    applyFresh(store, d, fresh)
-    return (r) => isUnread(r) && eligible(store, r)
+    applyFresh(store, d, fresh, by)
+    return (r) => isUnread(r) && eligible(store, r, by)
   }
+}
+
+/**
+ * What an agent has unread that a read would give it now (HI-1687), for the notices that name it (inboxNotices.ts): the
+ * gate's own check (`eligible`, as a read asks it) on what is already made, with nothing made again, so counting changes
+ * nothing (no source's `refresh`, no version, no wake for another agent). A delivery its source holds back until it is
+ * made again (a loop wake nothing has made yet, or one whose card changed since) isn't named: the doorbell offers it.
+ */
+export async function countable(host: string, agentId: string): Promise<DeliveryRecord[]> {
+  const store = await load(host)
+  return store.records.filter((r) => r.agentId === agentId && isUnread(r) && eligible(store, r, 'read'))
 }
 
 /** A card's round under way (#652): its failed reviews plus one (the fix after a failed review is the next round). */
@@ -1407,7 +1426,7 @@ function whyOfferFails(store: Store, o: Offer): string | null {
     if (r?.state !== 'offered' || r.offerRun !== o.runId) return `${id} is no longer offered by it (${r?.state ?? 'gone'})`
     const not = whyNot(store, r)
     if (not) return `${id} may no longer be given out (${not})`
-    if (r.source && sources.get(r.source)?.holds?.(r, store.host) === false) return `${id} is no longer wanted by its source (${r.source})`
+    if (!sourceHolds(store, r, 'offer')) return `${id} is no longer wanted by its source (${r.source})`
     if (!producerHolds(store, r)) return `${id} is no longer wanted by its producer`
   }
   return null
