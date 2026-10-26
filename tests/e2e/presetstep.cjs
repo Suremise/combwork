@@ -111,7 +111,27 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
         b.scrollIntoView({ block: 'nearest', inline: 'nearest' })
         const r = b.getBoundingClientRect()
         const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
-        return { ...at, cut: b.scrollWidth > b.clientWidth + 1 || b.scrollHeight > b.clientHeight + 1, hit: !!hit && b.contains(hit) }
+        // Its label's lines, read from each letter's line: a word broken across two lines leaves neither part a stray
+        // letter ("fournisseur" / "s"); hyphenated, it breaks at a syllable ("fournis-" / "seurs").
+        const label = [...b.childNodes].filter((c) => c.nodeType === 3).map((c) => c.textContent).join('').trim()
+        const node = [...b.childNodes].find((c) => c.nodeType === 3 && c.textContent.trim())
+        const lines = []
+        if (node) {
+          const range = document.createRange()
+          let top = null
+          for (let i = 0; i < node.textContent.length; i++) {
+            range.setStart(node, i)
+            range.setEnd(node, i + 1)
+            const letter = range.getClientRects()[0]
+            if (!letter) continue
+            if (top === null || letter.top > top + 2) lines.push('')
+            top = letter.top
+            lines[lines.length - 1] += node.textContent[i]
+          }
+        }
+        const words = lines.map((l) => l.trim())
+        const stray = words.some((w, i) => i > 0 && /\S$/.test(lines[i - 1]) && !/\s$/.test(lines[i - 1]) && /^\S/.test(lines[i]) && (w.split(/\s/)[0].length < 2 || words[i - 1].split(/\s/).pop().length < 2))
+        return { ...at, label, lines: lines.length > 1 ? words : undefined, stray, cut: b.scrollWidth > b.clientWidth + 1 || b.scrollHeight > b.clientHeight + 1, hit: !!hit && b.contains(hit) }
       })
       return { inner: window.innerWidth, box: { left: Math.round(box.left), right: Math.round(box.right), top: Math.round(box.top), bottom: Math.round(box.bottom), width: Math.round(box.right - box.left) }, ...parts, buttons }
     }, sel)
@@ -120,13 +140,14 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     const apart = (a, b) => a.right <= b.left + 1 || b.right <= a.left + 1 || a.bottom <= b.top + 1 || b.bottom <= a.top + 1
     // Every part inside the banner's content box and the window, none over another, each button whole and the one hit
     // at its middle; the actions under the text when they don't share its row, and then the text has its whole row.
-    const whole = (l, count) => {
+    // A label narrower than its longest word (the 70 px case) may break anywhere: there is no hyphenation in Electron.
+    const whole = (l, count, anyBreak = false) => {
       if (!l) return false
       const parts = [l.icon, l.text, l.actions]
       if (l.buttons.length !== count || !parts.concat(l.buttons).every((r) => inside(r, l.box) && r.right <= l.inner)) return false
       if (!parts.every((a, i) => parts.slice(i + 1).every((b) => apart(a, b)))) return false
       if (!l.buttons.every((a, i) => l.buttons.slice(i + 1).every((b) => apart(a, b)))) return false
-      if (!l.buttons.every((b) => !b.cut && b.hit && inside(b, l.actions))) return false
+      if (!l.buttons.every((b) => !b.cut && b.hit && (anyBreak || !b.stray) && inside(b, l.actions))) return false
       const besideText = l.actions.top < l.text.bottom - 1
       return besideText || l.text.width >= l.box.right - l.text.left - 2
     }
@@ -164,11 +185,11 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     // At 100% and one banner at a time, so even the tallest of these fits the window's height.
     await zoomTo(1, 900)
     for (const [key, sel] of Object.entries(BANNERS)) {
-      for (const [width, what] of [[150, 'narrower than its buttons: they stack'], [70, 'narrower than a label: it wraps in its button']]) {
+      for (const [width, what] of [[150, 'narrower than its buttons: they stack'], [70, 'narrower than a word: it wraps in its button']]) {
         await sized(sel, `${width}px`)
         check(`French, the ${key} banner ${width} px wide, ${what}, each whole`, !!(await lib.until(async () => {
           const l = await layout(sel)
-          return whole(l, key === 'notice' ? 2 : 1) && stacked(l)
+          return whole(l, key === 'notice' ? 2 : 1, width === 70) && stacked(l)
         }, HUNG_MS)), JSON.stringify(await layout(sel)))
       }
       await sized(sel, '')
