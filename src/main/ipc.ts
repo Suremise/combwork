@@ -105,6 +105,7 @@ import { deleteJournalEntry, deleteWorkspaceJournal, editJournalEntry, forgetJou
 import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
+import { repairStages } from './workflow/stageRepair'
 import { settleSlotsUpToDate } from './workflow/slotsUpToDateStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
 import { heldWriter, releaseHeldWriter } from './agentFolders'
@@ -345,9 +346,11 @@ function boardSteps(ws: WorkspaceService): void {
   // then what changed in its projects while it was closed, recorded as observed facts (#1217): the cards adopted too.
   // Then its agents' worktrees become slots (#1441), each project once, before what changed is observed.
   // And G15 saved before P7 settled once (#1445), so a Pair or Team project gets its preset's On.
+  // And a card the board has in Done while its stage isn't (HI-1674) brought into line, before what changed is observed.
   void adoptWorkspace(ws)
     .then(() => settleSlotsUpToDate(ws))
     .then(() => migrateSlots(ws))
+    .then(() => repairStages(ws))
     .finally(() => reconcileWorkspace(ws))
   // 0.9's agent templates copied into the 0.9 backup once after the upgrade (#1436), and a quiet notice saying so.
   void copyV09Templates(ws)

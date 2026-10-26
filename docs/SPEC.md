@@ -1298,7 +1298,14 @@ never edited or deleted, except with the card itself (Delete permanently) [P1]: 
 **before 1.0** (`preWorkflow: true`); Hive invents none. A card in flight gets only observed evidence, marked
 `adopted`: an **`Adopted`** fact (Doing, Review, Passed) and, for a card in Review, an adopted submission at its line's
 head; never a verdict history can't prove (§16.17) [P1, answering HR2's round 1 note and HB3's finding 1]. Such a card
-that starts after the upgrade loses the mark and is a 1.0 card from then on [Darren, #1119 decision 4].
+that starts after the upgrade loses the mark and is a 1.0 card from then on [Darren, #1119 decision 4]. **Fixed in rc.4** [HI-1674]: a
+  start through an intent (hive_start_card) kept the mark, only P3's recorder cleared it, so the user's and the
+  Assistant's later moves of the card took P3's path around its rules: on rc.1 two such cards went to Done in the column
+  and stayed Active in the stage, their agents' questions still For you. Now any stage the workflow writes clears the
+  mark (factStore's `setStage`), so such a move goes through the rules (recorded with the stage, its questions closed by
+  `closeSettled`, or refused). Each time a workspace opens, `workflow/stageRepair.ts` clears the mark of every card with
+  facts, and brings a card the board has in Done while its stage isn't into line: a `Moved` to done with cause `repair`,
+  its asked questions closed, "Recorded as Done, as the board had it" in its history.
 
 **P3 records facts from today's moves, refusing nothing** [#1216]: every card change writes its facts in its own
 transaction (into Doing with an agent `Started`; into Review `Submitted`; a review's start and verdict; each column change

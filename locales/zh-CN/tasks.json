@@ -137,6 +137,7 @@
   "tasks.history.reviewStopped": "{agent} 的评审已停止",
   "tasks.history.reviewerRequest": "向构建者提出请求：“{text}”",
   "tasks.history.safeguardStop": "**{agent}，曾被安全机制中止**：{stops, plural, =0 {} other {安全分类器于 {time} 中止了{model, select, none {} other { {model} 上的}}一次响应{stops, plural, =1 {} other {（本会话共 # 次）}}。}}它现在改用 {to}，不再使用 {from}（自 {since} 起）。{state, select, asks {它的 CLI 正在询问如何处理。} idle {中止后处于空闲：请提醒它继续。} other {}}{hasTools, select, yes {中止前它最后的工具调用：{tools}。} other {}}{hasHelp, select, yes {{help}} other {}}",
+  "tasks.history.stageRepaired": "已按看板所示记录为“已完成”：其工作流仍将其停留在“{stage, select, hold {搁置} todo {待办} active {进行中} review {评审} approved {已批准} merging {合并中} other {{stage}}}”",
   "tasks.history.takenFrom": "已从 {agent} 收回",
   "tasks.history.takenFromAgent": "已从其智能体收回",
   "tasks.history.takenFromOf": "已从 {project} 的 {agent} 收回",

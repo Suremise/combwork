@@ -122,6 +122,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **A card moved to Done stays Done in its workflow too.** A card from before 1.0, started by its agent, could be moved to Done on the board while its workflow still had it active, so its agent's question stayed under For you. Such moves now go through the card's rules, and cards left that way are put right when the workspace opens (HI-1674).
 - **A Codex agent stopped by an error needs you too.** Codex says nothing of a failed turn in its hooks, so Hive reads it from Codex's own record of the turn and lists the agent under **need you** as **Stopped by an error**, with Codex's message, until its next turn starts (#1658).
 - **For you no longer keeps questions that were settled another way.** A question on a card that reaches Done, or one whose agent carried on with the card (answered in its pane, say), is closed, with a line in the card's history, and a lane no longer waits for you on it. No question an agent or the Assistant asked about a Done card is listed under For you (#1638).
 - **Agents' questions under For you are formatted.** They showed their Markdown raw, with the line breaks lost: they now render as card comments do (numbered points, bold, code), a long one folded with **Show all**. Decisions on a card render the same way, and a question's notification shows its first sentence or two as plain text (#1637).
