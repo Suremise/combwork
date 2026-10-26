@@ -59,7 +59,7 @@ export function parseArgs(argv: string[]): WrapperArgs {
     const v = VALUED.exec(a)
     if (v) {
       const name = v[1] as 'title' | 'card' | 'revision' | 'check'
-      if (v[2] === undefined && i + 1 >= argv.length) return { error: name === 'card' ? '--card needs a value: the card\'s key, as in --card HI-12.' : `--${name} needs a value.` }
+      if (v[2] === undefined && i + 1 >= argv.length) return { error: name === 'card' ? '--card needs a value: the card\'s key, as in --card HI-12 (an old --card "#1061" needs its quotes: a shell takes an unquoted # for the start of a comment).' : `--${name} needs a value.` }
       opts[name] = v[2] ?? argv[++i]
     } else if (a === '--isolated') opts.isolated = true
     else if (a.startsWith('-')) return { error: `Unknown option ${a}.` }

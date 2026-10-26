@@ -123,8 +123,9 @@ describe('the hive-progress command line', () => {
     expect(parseArgs(['--check', 'test', '--isolated'])).toEqual({ check: 'test', isolated: true, command: [] })
     expect(parseArgs(['--isolated', '--check=test'])).toEqual({ check: 'test', isolated: true, command: [] })
     expect(parseArgs(['--isolated', '--', 'npm', 'test'])).toMatchObject({ error: expect.stringContaining('use it with --check') })
-    // A shell took an unquoted "#12" for a comment: say how to quote it.
-    expect(parseArgs(['--card'])).toMatchObject({ error: expect.stringContaining('--card "#1061"') })
+    // A shell took an unquoted "#12" for a comment: name the key (HI-1661), and say how to quote the old form.
+    expect(parseArgs(['--card'])).toMatchObject({ error: expect.stringContaining('--card HI-12') })
+    expect(parseArgs(['--card'])).toMatchObject({ error: expect.stringContaining('--card "#1061" needs its quotes') })
     expect(parseArgs(['--card', '#12'])).toEqual({ error: 'No command given.' })
   })
 
