@@ -384,7 +384,7 @@ export async function addAccount(id: ProviderId, name: string): Promise<Account>
   support(id)
   const n = name.trim()
   if (!n) throw hiveError(msg({ id: 'main.accounts.noName', defaultMessage: 'Give the account a name.', description: 'An error adding or renaming an account in Settings → Accounts: its name is empty.' }), undefined, { kind: 'invalid' })
-  const a: Account = { id: `a-${randomBytes(4).toString('hex')}`, provider: id, name: n, createdAt: new Date().toISOString() }
+  const a: Account = { id: `a-${randomBytes(4).toString('hex')}`, provider: id, kind: 'signIn', name: n, createdAt: new Date().toISOString() }
   return locked(a.id, async () => {
     try {
       await makeFolder(a)

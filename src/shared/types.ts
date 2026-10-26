@@ -677,6 +677,12 @@ export interface Account {
   /** Stable and random ("a-3f9c2e1b"): its folder's name. A rename never changes it. */
   id: string
   provider: ProviderId
+  /**
+   * How it runs its CLI (Darren, 26 Oct ~22:10: configured providers): `signIn`, a login folder of Hive's signed in
+   * through the CLI's own sign-in. The endpoint kind (a base URL and an API key) comes with its own card. Absent in a
+   * record from before it: signIn.
+   */
+  kind?: 'signIn'
   /** The user's name for it ("Personal", "Hive overnight"). */
   name: string
   createdAt: string

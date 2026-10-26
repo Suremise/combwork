@@ -99,7 +99,7 @@ describe('what `claude auth status --json` says (the recorded fixture)', () => {
 describe('an account’s folder and its junction', () => {
   it('is a folder of its own under the profile’s accounts, with projects a junction to the CLI home’s, checked', async () => {
     const a = await accounts.addAccount('claude-code', ' Personal ')
-    expect(a).toMatchObject({ provider: 'claude-code', name: 'Personal' })
+    expect(a).toMatchObject({ provider: 'claude-code', kind: 'signIn', name: 'Personal' })
     expect(folderOf(a)).toBe(join(base, 'profile', 'accounts', a.id))
     const link = join(folderOf(a), 'projects')
     expect(lstatSync(link).isSymbolicLink()).toBe(true)
