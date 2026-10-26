@@ -119,7 +119,7 @@ const check = (name, ok, extra = '') => {
     await ld.locator('select').selectOption('rebase')
     await ld.getByRole('button', { name: 'Update', exact: true }).click()
     check('Rebase: loose replayed onto main', !!(await lib.until(async () => (await page.locator('.toast', { hasText: /Rebased loose's 1 commit onto main/ }).count()) >= 1, HUNG_MS)) && g(alpha, 'rev-parse', 'loose~1') === main)
-    check('…the temporary worktree gone, the project folder still on main', g(alpha, 'worktree', 'list', '--porcelain').split('\n').filter((l) => l.startsWith('worktree ')).length === 2 && g(alpha, 'rev-parse', '--abbrev-ref', 'HEAD') === 'main')
+    check('…the temporary worktree gone, the project folder still on main', !g(alpha, 'worktree', 'list', '--porcelain').split('\n').some((l) => /^worktree .*update-[0-9a-f]{8}$/.test(l)) && g(alpha, 'rev-parse', '--abbrev-ref', 'HEAD') === 'main')
 
     // --- clash: the conflict is undone at once, naming its file; clash as it was.
     await update('clash').click()
