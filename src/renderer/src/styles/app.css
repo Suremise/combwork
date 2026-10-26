@@ -8786,8 +8786,9 @@ body.pane-resizing-v .monaco-editor {
 .board-category-columns > .board-column:not(.collapsed) {
   min-width: 120px;
 }
-/* Seven columns where six were: each a little narrower at least, so they still fit where six did. */
-.board.grouped > .board-column {
+/* Seven columns where six were: each a little narrower at least, so they still fit where six did. Open ones only: it
+   outranks `.board-column.collapsed`, so a folded column kept 140 px (HI-1724). */
+.board.grouped > .board-column:not(.collapsed) {
   min-width: 140px;
 }
 .board-column-strip {
@@ -9373,6 +9374,16 @@ body.pane-resizing-v .monaco-editor {
 .for-you-rounds input {
   inline-size: 64px;
   margin-inline-start: 6px;
+}
+/* The merge queue's question before an upgraded project's first merge (HI-1697): a label over each choice, then Save. */
+.for-you-merge-choice {
+  display: grid;
+  gap: 8px;
+}
+.for-you-merge-choice > label {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
 }
 /* A move past the card's rules (#1275): its own icon (an open lock) and colour, beside the other marks. */
 .task-work-badge.override .codicon {

@@ -18,6 +18,8 @@ export type Finisher = 'hiveMerges' | 'agentMerges' | 'committed' | 'notChecked'
 export type FolderMode = 'slots' | 'project'
 /** G9's install: from scratch when the manifests changed (the default, and always so), or before every merge. */
 export type MergeInstall = 'onManifestChange' | 'always'
+/** G19: the message of Hive's merge commit: Hive's (`KEY: title` and trailers) or the branch's own. */
+export type CommitMessage = 'hive' | 'branch'
 /** G10: your OK before merging. */
 export interface OkBefore {
   mode: 'never' | 'labels' | 'every'
@@ -56,6 +58,12 @@ export interface WorkflowOptions {
    * they are when it pushes, and turning it off takes effect at once.
    */
   pushTarget: boolean
+  /**
+   * G19 (HI-1697): the message of the commit Hive's merge makes (a merge commit, or a squash's commit): Hive's, the
+   * card's key and title with its `Hive-` trailers, or the branch's own, with neither. Not a rule, as G18: left out of
+   * every ruleset (`ruleOptions`), the queue reads it from the project's options as they are when it merges.
+   */
+  commitMessage: CommitMessage
   /** G9: named checks on the merged result (Hive merges only). */
   mergeChecks: string[]
   /**
@@ -131,6 +139,7 @@ const BASE: Omit<WorkflowOptions, 'platform'> = {
   target: '',
   strict: false,
   pushTarget: false,
+  commitMessage: 'hive',
   mergeChecks: [],
   mergeInstall: 'onManifestChange',
   okBefore: { mode: 'never', labels: [] },
@@ -339,6 +348,7 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   targetOwn: (v) => v === true,
   strict: bool,
   pushTarget: bool,
+  commitMessage: oneOf<CommitMessage>(['hive', 'branch']),
   mergeChecks: strings,
   mergeInstall: oneOf<MergeInstall>(['onManifestChange', 'always']),
   okBefore: (v) => isRecord(v) && oneOf<OkBefore['mode']>(['never', 'labels', 'every'])(v.mode) && strings(v.labels),
@@ -374,7 +384,7 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
   git: [
     { id: 'review', options: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'] },
     { id: 'checks', options: ['preChecks', 'mergeChecks', 'mergeInstall'] },
-    { id: 'merging', options: ['finish', 'style', 'target', 'strict', 'pushTarget', 'dependenciesDone'] },
+    { id: 'merging', options: ['finish', 'style', 'target', 'strict', 'pushTarget', 'commitMessage', 'dependenciesDone'] },
     { id: 'where', options: ['folder', 'slotsUpToDate', 'identity', 'stopOwnRuns', 'sharedFolderWarning'] },
     { id: 'stages', options: ['stageNames'] },
     { id: 'elsewhere', options: [] }
@@ -409,6 +419,8 @@ export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
   if (key === 'strict') return o.finish === 'hiveMerges'
   // G18 (#1179): only the merge queue pushes.
   if (key === 'pushTarget') return o.finish === 'hiveMerges'
+  // G19 (HI-1697): only the merge queue makes a merge's commit, and Rebase makes none (the branch's commits land).
+  if (key === 'commitMessage') return o.finish === 'hiveMerges' && o.style !== 'rebase'
   if (key === 'sharedFolderWarning') return o.folder === 'project'
   // G15 depends on G11 alone: only with each card in a slot. G17 whenever a reviewer agent reviews, whatever G11 is
   // (with everyone in the project folder the pool's reviewers read in review copies, #1439).

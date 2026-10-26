@@ -96,3 +96,21 @@ LangString hiveInstallerBusy 2052 "另一个 Hive 安装程序仍在运行，或
 !macroend
 !endif
 !endif
+
+; Before the template's check ends a running Hive (HI-1707): the Hive of this install folder is asked to close for the
+; install, so it records its agents and tells them, and resumes them when it starts again (hiveAskToClose.ps1 says how).
+; Its result goes to the installer's log only: whatever it was, the template's check runs after it as before, ending a
+; Hive that didn't close. The outer instance only (the user's, whose profile Hive's is), never the uninstaller.
+!ifndef BUILD_UNINSTALLER
+; This file's folder (build), as it is included: inside the macro, __FILEDIR__ would be where the macro is inserted.
+!define HIVE_BUILD_DIR "${__FILEDIR__}"
+!macro customInit
+  ${IfNot} ${UAC_IsInnerInstance}
+    InitPluginsDir
+    File "/oname=$PLUGINSDIR\hiveAskToClose.ps1" "${HIVE_BUILD_DIR}\hiveAskToClose.ps1"
+    nsExec::Exec '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\hiveAskToClose.ps1" -InstallDir "$INSTDIR"'
+    Pop $0
+    DetailPrint "Asked Hive to close for the install: $0"
+  ${EndIf}
+!macroend
+!endif

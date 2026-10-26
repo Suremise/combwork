@@ -1395,6 +1395,10 @@
     "defaultMessage": "More rounds",
     "description": "The label of the number box beside Carry on, at a card loop's round limit: how many more review rounds the card gets."
   },
+  "board.forYou.saveAndMerge": {
+    "defaultMessage": "Save and Carry On Merging",
+    "description": "A button under the merge queue's question before an upgraded project's first merge (HI-1697, For you): saves the merge style and commit message chosen above as the project's workflow options, and the merge queue carries on."
+  },
   "board.forYou.send": {
     "defaultMessage": "Send Reply",
     "description": "A button under a question for the user (For you): sends the answer typed above to the agent that asked."
@@ -1422,6 +1426,10 @@
   "board.forYou.tipOpen": {
     "defaultMessage": "Click to open the card and answer under For you.",
     "description": "The last line of the tooltip of a card's For you chip: a click opens the card, whose For you section shows each request in full with its answers. Glossary: For you."
+  },
+  "board.forYou.todayValue": {
+    "defaultMessage": "{today, select, yes {{value} (as until now)} other {{value}}}",
+    "description": "A choice in the merge queue's question before an upgraded project's first merge (HI-1697, For you): a value of a workflow option ({value}), marked when it is how Hive merged until now. Keep the select keys as they are."
   },
   "board.inbox.asks": {
     "defaultMessage": "Asks you something",
@@ -2462,6 +2470,10 @@
   "board.queue.pause.identity": {
     "defaultMessage": "The repository has no commit identity, so Hive can't make its merge commit. Set one in Version Control → Branches & remotes, then resume.",
     "description": "Why a merge queue is paused, on its card in the Progress panel: git has no user name and email for the repository. Version Control → Branches & remotes is a place in Hive."
+  },
+  "board.queue.pause.mergeChoice": {
+    "defaultMessage": "{card} is the first card to merge since the upgrade to Hive 1.0: choose how Hive merges this project (merge style and commit message) in For you, or in Version Control → Workflow.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-1697): a project from before Hive 1.0 reached the merge queue for the first time ({card}: its key), and nobody chose its merge style and commit message (workflow options' names, glossary 2.6), so it waits for the user. For you is the list of what waits on the user (glossary 2.3); Version Control → Workflow is a place in Hive."
   },
   "board.queue.pause.needsYou": {
     "defaultMessage": "Needs you: Hive stopped part way and changes nothing more on its own. Open the card for its state and the commands that finish or undo it.",

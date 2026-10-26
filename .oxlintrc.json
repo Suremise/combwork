@@ -44,8 +44,8 @@
       }
     },
     {
-      // Node's worker threads (the usage worker, #1106; the repository lock's, HI-1680): their postMessage has no target origin (a browser window's has).
-      "files": ["src/main/usageWorker.ts", "src/main/usageHistory.ts", "src/main/repoLockWorker.ts", "src/main/repoLock.ts", "tests/repoLockWorker.test.ts"],
+      // Node's worker threads (the usage worker, #1106; the repository lock's, HI-1680; the WAL checkpoints', HI-1691): their postMessage has no target origin (a browser window's has).
+      "files": ["src/main/usageWorker.ts", "src/main/usageHistory.ts", "src/main/repoLockWorker.ts", "src/main/repoLock.ts", "tests/repoLockWorker.test.ts", "src/main/walCheckpointWorker.ts", "src/main/walCheckpoint.ts"],
       "rules": { "unicorn/require-post-message-target-origin": "off" }
     },
     {

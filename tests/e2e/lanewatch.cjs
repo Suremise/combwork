@@ -86,6 +86,8 @@ const check = (name, ok, extra = '') => {
 
   // A release card in no lane (#726), Builder2's.
   const rel = await newCard('Release 0.7.0', builder2.id)
+  // Its name in a watch's label: its key (HI-1688).
+  const relKey = await lib.cardLabel(inv, rel)
   const watchAgain = async () => {
     await until(async () => ['ready', 'finished'].includes((await live(home, 'assistant'))?.status), 20000)
     await say(home, 'assistant', 'hive hive_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}')
@@ -94,7 +96,7 @@ const check = (name, ok, extra = '') => {
 
   // The Assistant watches every running lane and the release card in one watch.
   await say(home, 'assistant', `hive hive_wait_for_tasks {"lanes":["all"],"cards":[${rel}],"wake":true,"limitMinutes":360}`)
-  check(`the Assistant watches the lanes and #${rel}: "Waiting on all running lanes and #${rel}"`, !!(await until(async () => (await live(home, 'assistant'))?.status === 'watching' && (await live(home, 'assistant'))?.watch?.label === `Waiting on all running lanes and #${rel}`, 15000)), JSON.stringify((await live(home, 'assistant'))?.watch))
+  check(`the Assistant watches the lanes and #${rel}: "Waiting on all running lanes and ${relKey}"`, !!(await until(async () => (await live(home, 'assistant'))?.status === 'watching' && (await live(home, 'assistant'))?.watch?.label === `Waiting on all running lanes and ${relKey}`, 15000)), JSON.stringify((await live(home, 'assistant'))?.watch))
   const before = wakes().length
   await inv('tasks:update', a, { column: 'review' })
   await lib.sleep(3000) // A fixed wait on purpose: this checks that a plain move into Review does NOT wake it.
@@ -105,7 +107,7 @@ const check = (name, ok, extra = '') => {
   const relLine = () => wakes().slice(before).find((t) => t.startsWith(`[Hive] #${rel} `))
   check('a comment on the card outside the lanes wakes it', !!(await until(async () => !!relLine(), 20000)) && relLine().includes('"Draft release is up: push when ready"') && relLine().includes('Your lane watch has ended'), JSON.stringify(wakes().slice(before)))
   const kept = await watchAgain()
-  check(`watched again with no cards, it keeps #${rel}`, kept?.label === `Waiting on all running lanes and #${rel}`, JSON.stringify(kept))
+  check(`watched again with no cards, it keeps #${rel}`, kept?.label === `Waiting on all running lanes and ${relKey}`, JSON.stringify(kept))
 
   // The review fails: one line, naming the lane and the card.
   await until(() => idle(alpha, reviewer.id), 20000)

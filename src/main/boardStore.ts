@@ -14,7 +14,7 @@ import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, curre
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
 import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
-import { checkpointWhenIdle, timedCommit } from './walCheckpoint'
+import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
 import { placeKey, realPath, withFileLock } from './fsutil'
@@ -1807,7 +1807,10 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
     const pending = boardOf(path).db.pending
     if (!pending) return { backup: null }
     const from09 = pending.from < FIRST_10
-    // Opened for keeps: only while a window holds it (#1395), as boardOf above checked, nothing awaited since.
+    // The group runs with the file locked to one connection: the checkpoints' worker lets go of it first (HI-1691),
+    // awaited before the close, so nothing opens it again between the close and the upgrade's open.
+    await checkpointsReleased(join(path, HIVE_DIR, DB_FILE))
+    // Opened for keeps: only while a window holds it (#1395), checked after that wait, nothing awaited since.
     assertAdmitted(join(path, HIVE_DIR, DB_FILE))
     closeBoard(path)
     try {
@@ -1859,6 +1862,14 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
     // The file itself, not only its name: a 0.9 board, which a 0.9 Hive can change again.
     if (!kept || !(fileSchemaVersion(kept.file) < FIRST_10)) throw hiveError(M.noBackup, undefined, { kind: 'conflict' })
     // The board put back takes no writes here: an agent running on would go unrecorded. Starts are refused from then on.
+    if (agentsRunning() > 0) throw hiveError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
+    if (othersPresent(hive, presenceId()).length) throw hiveError(M.inUse, undefined, { kind: 'conflict' })
+    // Copied as its only connection, then replaced: the checkpoints' worker lets go of it first (HI-1691), awaited
+    // before the close, so nothing opens it again between the close and the copy.
+    await checkpointsReleased(file)
+    // As they are after that wait: still a window's (#1395, HR6's round 3: closed meanwhile, nothing is changed), and no
+    // agent or other Hive on it.
+    assertAdmitted(file)
     if (agentsRunning() > 0) throw hiveError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
     if (othersPresent(hive, presenceId()).length) throw hiveError(M.inUse, undefined, { kind: 'conflict' })
     closeBoard(path)

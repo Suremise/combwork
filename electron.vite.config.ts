@@ -45,7 +45,9 @@ export default defineConfig({
           // The usage history's worker thread (#1106).
           'usage-worker': resolve(__dirname, 'src/main/usageWorker.ts'),
           // The repository lock's worker thread (HI-1680).
-          'repo-lock-worker': resolve(__dirname, 'src/main/repoLockWorker.ts')
+          'repo-lock-worker': resolve(__dirname, 'src/main/repoLockWorker.ts'),
+          // The WAL checkpoints' worker thread (HI-1691).
+          'wal-checkpoint-worker': resolve(__dirname, 'src/main/walCheckpointWorker.ts')
         }
       }
     }

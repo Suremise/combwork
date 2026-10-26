@@ -62,6 +62,7 @@ export const EXCLUDED = [
   [/^src\/main\/workflow\/queueJobs\.ts$/, "the merge queue's job supervisor and launcher: their C#, PowerShell and protocol, no text (#1360)"],
   [/^src\/main\/(copies|slotJobs)\.ts$/, "the copies pool's SQL, its refusals and held reasons in English for agents and the log; settling jobs: no window text (#1435)"],
   [/^src\/main\/slots\.ts$/, "the slot pool's SQL, and its refusals and kept reasons in English for agents and the log: no window text (#1429)"],
+  [/^src\/shared\/restartResume\.ts$/, "agent-facing: the lines agents are given as Hive restarts, and the installer request's checks for the log (HI-1707)"],
   [/^src\/shared\/appName\.ts$/, 'brand names'],
   [/^src\/shared\/redact\.ts$/, 'log markers'],
   [/^src\/main\/freshPath\.ts$/, 'a registry key, not text'],

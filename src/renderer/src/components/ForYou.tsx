@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { msg, tr } from '@shared/i18n'
 import type { TaskCard } from '@shared/types'
 import { LANE_MAX_ROUNDS } from '@shared/lanes'
-import { QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type AskActionKind, type CardKind, type RoundChoice } from '@shared/workflow/facts'
+import { MERGE_CHOICE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type AskActionKind, type CardKind, type RoundChoice } from '@shared/workflow/facts'
 import { FOR_YOU_KIND, ROUND_CHOICE, workflowLine } from '@shared/workflow/texts'
 import { gist } from '@shared/gist'
 import { askActionAvailable, type ForYouAnswer, type ForYouItem } from '@shared/workflow/workView'
@@ -12,6 +12,8 @@ import { loadTasks, notify, prompt, useLanguage, useStore } from '../store'
 import { cx, timeAgo } from '../util'
 import { BusyButton, Icon, Markdown, Tooltip, useBusy } from './ui'
 import { SHOW_QUEUE_WORK } from './CardQueue'
+import { OPTION_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
+import type { CommitMessage, WorkflowOptions } from '@shared/workflow/options'
 
 // For you in the window (#1276, SPEC §16.8.5): a card's requests for the user, as a chip on its tile and a section in
 // its dialog where the user answers them (tasks:answer, #1269: only the user answers). Hive's own requests are shown
@@ -37,6 +39,8 @@ const M = {
   asDecisionTip: msg({ id: 'board.forYou.asDecisionTip', defaultMessage: "Records your answer as one of the card's decisions, which its agents must follow from now on, and answers the question with it.", description: "Tooltip of the Record as Decision button under a question for the user (For you): what it does. Glossary: decision." }),
   offer: msg({ id: 'board.forYou.offer', defaultMessage: '{action, select, done {Move to Done} noCode {Make It No Code} other {Unblock}}', description: "A button under an agent's question for the user (For you): an action the agent offers on its card, done with one click. Keep the select keys as they are; translate each choice." }),
   offerTip: msg({ id: 'board.forYou.offerTip', defaultMessage: "{action, select, done {Moves the card to Done as you, skipping its project's rules where needed (recorded as an override, with the reason beside it), and answers the question.} noCode {Makes the card no code as you (recorded as an override, with the reason beside it), and answers the question.} other {Unblocks the card (the reason beside it is added as your comment), and answers the question.}}", description: "Tooltip of a button under an agent's question for the user (For you): what the action the agent offers does. Keep the select keys as they are. Glossary: override, no-code card." }),
+  todayValue: msg({ id: 'board.forYou.todayValue', defaultMessage: '{today, select, yes {{value} (as until now)} other {{value}}}', description: "A choice in the merge queue's question before an upgraded project's first merge (HI-1697, For you): a value of a workflow option ({value}), marked when it is how Hive merged until now. Keep the select keys as they are." }),
+  saveAndMerge: msg({ id: 'board.forYou.saveAndMerge', defaultMessage: 'Save and Carry On Merging', description: "A button under the merge queue's question before an upgraded project's first merge (HI-1697, For you): saves the merge style and commit message chosen above as the project's workflow options, and the merge queue carries on." }),
   offerReason: msg({ id: 'board.forYou.offerReason', defaultMessage: 'Reason (optional)', description: "The label (and placeholder) of the field beside an action an agent's question offers (For you): why the user does it, filled with the agent's suggestion; it is recorded with the action." }),
   rounds: msg({ id: 'board.forYou.rounds', defaultMessage: 'More rounds', description: "The label of the number box beside Carry on, at a card loop's round limit: how many more review rounds the card gets." }),
   checklist: msg({ id: 'board.forYou.checklist', defaultMessage: 'To try:', description: 'Above the checklist of a Test request (For you): what the user is asked to try.' }),
@@ -185,6 +189,28 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
   }
   const busy = (name: string): boolean => action.busy === name
   const limit = item.gate === ROUND_LIMIT_GATE
+  const projectPath = useStore((s) => s.workspace?.projects.find((p) => p.name.toLowerCase() === card.project.toLowerCase())?.path)
+  const [style, setStyle] = useState<WorkflowOptions['style']>('merge')
+  const [message, setMessage] = useState<CommitMessage>('hive')
+  // HI-1697: the merge queue's question before an upgraded project's first merge, answered with the two options.
+  const chooseMerge = async (): Promise<void> => {
+    if (!projectPath) return
+    let failed: string | null = null
+    setAnswering(true)
+    try {
+      await action.run('mergeChoice', async () => {
+        try {
+          await call('workflow:chooseMerge', projectPath, { card: card.number, request: item.request, style, commitMessage: message })
+        } catch (e) {
+          failed = errorMessage(e)
+        }
+      })
+    } finally {
+      setAnswering(false)
+    }
+    if (failed !== null) notify('error', tr(M.failed), failed)
+    await loadTasks()
+  }
   const choose = (choice: RoundChoice): Promise<void> => answer(choice, { outcome: 'answered', choice, ...(choice === 'carryOn' ? { rounds: Number(rounds) } : {}) })
   const roundsOk = /^\d+$/.test(rounds) && Number(rounds) >= 1 && Number(rounds) <= LANE_MAX_ROUNDS
   return (
@@ -227,7 +253,38 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
           </div>
         </div>
       )}
-      {limit ? (
+      {item.gate === MERGE_CHOICE_GATE ? (
+        <div className="for-you-merge-choice" data-merge-choice="">
+          <label className="flex">
+            {tr(OPTION_TEXT.style!.title)}
+            <select className="select" data-option="style" value={style} onChange={(e) => setStyle(e.target.value as WorkflowOptions['style'])}>
+              {(['merge', 'squash', 'rebase'] as const).map((v) => (
+                <option key={v} value={v}>
+                  {tr(M.todayValue, { value: tr(VALUE_TEXT.style[v]), today: v === 'merge' ? 'yes' : 'no' })}
+                </option>
+              ))}
+            </select>
+          </label>
+          {/* Rebase makes no commit of its own: its commits land with their own messages (G19 isn't shown with it). */}
+          {style !== 'rebase' && (
+            <label className="flex">
+              {tr(OPTION_TEXT.commitMessage!.title)}
+              <select className="select" data-option="commitMessage" value={message} onChange={(e) => setMessage(e.target.value as CommitMessage)}>
+                {(['hive', 'branch'] as const).map((v) => (
+                  <option key={v} value={v}>
+                    {tr(M.todayValue, { value: tr(VALUE_TEXT.commitMessage[v]), today: v === 'hive' ? 'yes' : 'no' })}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <div className="for-you-actions">
+            <BusyButton className="primary" busy={busy('mergeChoice')} busyLabel={tr(M.answering)} disabled={!!action.busy || !projectPath} onClick={() => void chooseMerge()}>
+              {tr(M.saveAndMerge)}
+            </BusyButton>
+          </div>
+        </div>
+      ) : limit ? (
         <div className="for-you-actions">
           <label className="flex for-you-rounds">
             {tr(M.rounds)}

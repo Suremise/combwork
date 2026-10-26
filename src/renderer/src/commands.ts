@@ -362,6 +362,22 @@ const COMMAND_DEFS: CommandDef[] = [
     run: () => void actions.attempt(tr(msg({ id: 'shell.error.stopLeftAfterClose', defaultMessage: 'Could not stop the processes', description: "An error's title: ending the processes the agents had started before Hive closed unexpectedly failed." })), () => call('app:stopLeftAfterClose'))
   },
   {
+    id: 'session.resumeRestart',
+    name: msg({ id: 'shell.command.session.resumeRestart', defaultMessage: 'Resume the Agents Working When Hive Closed', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: resumes the agents that were working when Hive was last quit or restarted. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
+    category: 'session',
+    // Only from the notice offering it (HI-1707), which lists them.
+    internal: true,
+    run: () => void actions.attempt(tr(msg({ id: 'shell.error.resumeRestart', defaultMessage: 'Could not resume the agents', description: "An error's title: resuming the agents that were working when Hive was last quit or restarted failed." })), () => call('app:resumeRestart'))
+  },
+  {
+    id: 'session.dismissRestart',
+    name: msg({ id: 'shell.command.session.dismissRestart', defaultMessage: "Don't Resume the Agents Working When Hive Closed", description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: declines the offer to resume the agents that were working when Hive was last quit or restarted. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
+    category: 'session',
+    // Only from the notice offering it (HI-1707).
+    internal: true,
+    run: () => void call('app:dismissRestart')
+  },
+  {
     id: 'session.applyPermissionModes',
     name: msg({ id: 'shell.command.session.applyPermissionModes', defaultMessage: 'Switch Running Agents to Their Permission Mode Settings', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category.' }),
     category: 'session',

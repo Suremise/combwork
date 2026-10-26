@@ -11,13 +11,14 @@
 import { spawn, type ChildProcess } from 'child_process'
 import { createHash, randomUUID } from 'crypto'
 import { existsSync, readFileSync } from 'original-fs'
-import { join, resolve } from 'path'
+import { basename, join, resolve } from 'path'
 import { git, GIT_PREFIX } from '../git'
 import { endTree } from '../progressReporters/wrapper'
-import { openEntry, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type FactData, type QueueEntry } from '../../shared/workflow/facts'
+import { MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type FactData, type QueueEntry } from '../../shared/workflow/facts'
 import type { TransientFailure } from '../../shared/types'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
+import type { CommitMessage } from '../../shared/workflow/options'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
 import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
@@ -26,6 +27,7 @@ import { LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
 import { leftWake, returnedWake } from './queueState'
 import { readConflicts } from './conflictRead'
+import { mergeMessage, updateMessage } from './mergeMessage'
 
 /**
  * The conflicted files `diff --name-only -z` lists, as they are named (HR4's HI-1181 round 1): split on NUL, never on
@@ -76,6 +78,13 @@ export interface QueueConfig {
    * pauses the queue rather than merge into the whole repository's default branch (a backstop: the options refuse it).
    */
   subfolder?: () => boolean
+  /**
+   * Whether the project's merge style and commit message are still to be chosen (HI-1697: a project the 1.0 upgrade gave
+   * its options, `mergeAsk`): the queue then asks in For you (paused `mergeChoice`) before its first merge.
+   */
+  mergeAsk?: () => Promise<boolean>
+  /** HI-1697: brings the project's options in line with the board's recorded merge choice, when its write is pending. */
+  settle?: () => Promise<void>
   /** Runs a named merge check (its configured command) in a folder, on the test merge's result. */
   runCheck: (name: string, command: string, folder: string, ctx: CheckContext) => Promise<CheckResult>
   /** Installs dependencies there; `clean` from scratch (`npm ci`). `skipped`: there was nothing to install. */
@@ -209,8 +218,9 @@ export interface QueueStepInfo {
  * `pushRejected`, `pushFailed`, `pushNoRemote` (G18, #1179): the push of the target after a merge was refused (the
  * remote has commits it lacks), failed (git's message: a sign-in, the network, the bound), or had no remote to go to;
  * `pushUnreadable`: owed, and the target (or whether it still has the merge) couldn't be read to settle it.
+ * `mergeChoice` (HI-1697): an upgraded project's merge style and commit message wait for the user's answer in For you.
  */
-export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget' | 'pushRejected' | 'pushFailed' | 'pushNoRemote' | 'pushUnreadable'
+export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget' | 'pushRejected' | 'pushFailed' | 'pushNoRemote' | 'pushUnreadable' | 'mergeChoice'
 
 /**
  * G18 (#1179): the push of a target Hive owes after merging into it, as store meta per target: the merge's result, its
@@ -584,8 +594,16 @@ export class MergeQueue {
 
   /** Takes the next entry for the target and takes it as far as it goes. Null when there's none or the queue is paused. */
   async runOnce(target: string): Promise<QueueOutcome | null> {
+    // HI-1697: the project's options brought in line with the board's recorded merge choice first, if their write is
+    // pending (a save stopped after the board's commit), and read again. Only a project with a choice recorded: a waiting
+    // card's style is its own Override's either way.
+    if (this.wf.store.meta(MERGE_CHOICE_KEY)) await this.cfg.settle?.()
     const p = this.paused(target)
     if (p?.reason === 'approval') return this.fenced(target, async () => this.thenPush(target, await this.answered(target, p.card))).catch(lostIsNull)
+    // HI-1697: lifted once the merge style and commit message are chosen (the answer, or a save of the options), the
+    // choice carried to the cards waiting first. Still to be chosen with no question open (answered in words, say):
+    // lifted too, so the next entry asks again.
+    if (p?.reason === 'mergeChoice' && (!(await this.mergeAsked()) || !this.asking(p.card)) && (await this.fenced(target, () => this.chosen(target, p.card)).catch(lostIsNull))) return this.runOnce(target)
     if (p) return null
     return this.fenced(target, async () => {
       // A push owed by an earlier merge goes first (G18: after a restart or a Resume), and the next entry waits for it.
@@ -607,6 +625,11 @@ export class MergeQueue {
   private pushes(): boolean {
     const o = this.wf.cfg.options()
     return o.platform === 'git' && o.finish === 'hiveMerges' && o.pushTarget === true
+  }
+
+  /** The message of Hive's merge commits (G19, HI-1697), as the project's options are now: like G18, never a ruleset's. */
+  private commitMessage(): CommitMessage {
+    return this.wf.cfg.options().commitMessage ?? 'hive'
   }
 
   /** In a merge's `Integrated` write: the push of its target owed, when the options push it (G18). */
@@ -788,6 +811,8 @@ export class MergeQueue {
       // OP-29's backstop (#1419): inside a larger repository, only into a branch the project itself named in the card's
       // ruleset (`targetOwn`, kept with a lane's rules too), never one inherited from the workspace's or Hive's defaults.
       if (!this.wf.rulesetOf(card, s).options.targetOwn && this.cfg.subfolder?.()) return this.pause(target, card, entry, 'subfolderTarget')
+      // HI-1697: an upgraded project's first merge waits for its merge style and commit message to be chosen.
+      if (await this.mergeAsked()) return this.askMerge(card, entry, target)
       const revision = s.approved?.revision ?? entry.revision
       const step = (now: QueueStep, expected: string | null): void => this.cfg.onStep?.({ card: card.key, number: card.id, entry: entry.id, revision, expected, step: now, started })
       let expected: string
@@ -988,7 +1013,7 @@ export class MergeQueue {
     const signs = await this.signs(reads, f)
     const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
     const target = entry.target
-    const message = `Merge ${target} into ${card.key}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}` // i18n-ignore: a commit message, in English
+    const message = updateMessage(this.commitMessage(), target, card.key, revision)
     // A rebase here rewrites only the queue's detached HEAD: never other refs at the rebased commits (HR4's #1352 round
     // 1: with the repository's `rebase.updateRefs` on, git would move the builder's branch, or a user's, to the update).
     // Overridden for this command only; the repository's config is left as it is.
@@ -1027,7 +1052,11 @@ export class MergeQueue {
     // The reviewers whose passes count for what is merged: the latest submission, at the current generation.
     const reviewers = [...new Set(s.verdicts.filter((v) => v.pass && v.submission === s.latest?.id && v.generation === s.generation).map((v) => v.reviewer))].join(', ')
     // The reviewed revision, and the queue's update of it when strict brought it up to date (#1352).
-    const message = `${card.key}: ${card.title}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}${updated ? `\nHive-Updated: ${updated}` : ''}${reviewers ? `\nHive-Reviewed-By: ${reviewers}` : ''}` // i18n-ignore: a commit message, in English
+    // G19 (HI-1697): Hive's, or the branch's own (its commits since it left the target, merges left out).
+    const how = this.commitMessage()
+    const own = how === 'branch' ? await G.messages(this.project, `${base || (await this.mergeBaseOf(revision, expected))}..${revision}`) : []
+    if (isUnknown(own)) return { pause: 'needsYou', message: `Hive couldn't read the messages of ${revision.slice(0, 7)}'s commits.` } // i18n-ignore: git's side of a pause, in English as git's messages are
+    const message = mergeMessage(how, { card, revision, updated, reviewers, messages: own })
     revision = updated ?? revision
     const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
     const squash = r.options.style === 'squash'
@@ -1182,6 +1211,43 @@ export class MergeQueue {
       this.wf.askUser(w, 'approve', QUEUE_ADVANCE_GATE, workflowText(FOR_YOU.queueAdvance, { card: card.key, target, folder }), { unbound: true, entry: entry.id, revision: expected, result })
     })
     return out
+  }
+
+  /**
+   * HI-1697: "How should Hive merge <project>'s cards into <target>?", a Decide on the card in For you; the queue waits
+   * for it (paused `mergeChoice`). Asked once: a request of the gate already open on the card stands.
+   */
+  private async askMerge(card: CardRecord, entry: QueueEntry, target: string): Promise<QueueOutcome> {
+    const out = await this.pause(target, card, entry, 'mergeChoice')
+    if (this.paused(target)?.reason !== 'mergeChoice' || this.paused(target)?.card !== card.key) return out
+    await this.write(card, (w) => {
+      if (w.state().requests.some((r) => r.gate === MERGE_CHOICE_GATE)) return
+      this.wf.askUser(w, 'decide', MERGE_CHOICE_GATE, workflowText(FOR_YOU.mergeChoice, { project: basename(this.project), target }), { unbound: true, entry: entry.id })
+    })
+    return out
+  }
+
+  /** HI-1697: the project's merge style and commit message still to be chosen: the upgrade's mark, and no choice on the board. */
+  private async mergeAsked(): Promise<boolean> {
+    return !!(await this.cfg.mergeAsk?.()) && !this.wf.store.meta(MERGE_CHOICE_KEY)
+  }
+
+  /** Whether the card's question about the merge style and message (HI-1697) is open. */
+  private asking(key: string): boolean {
+    const card = this.wf.store.cardByKey(key)
+    return !!card && this.wf.state(card).requests.some((r) => r.gate === MERGE_CHOICE_GATE)
+  }
+
+  /** The merge style and message chosen (HI-1697): the pause lifted, and the question still open on its card closed. */
+  private async chosen(target: string, key: string): Promise<boolean> {
+    if (!(await this.wf.locked(() => this.wf.store.clearQueuePause(target, 'mergeChoice')))) return false
+    const card = this.wf.store.cardByKey(key)
+    if (card && this.wf.state(card).requests.some((r) => r.gate === MERGE_CHOICE_GATE)) {
+      await this.write(card, (w) => {
+        for (const r of w.state().requests.filter((x) => x.gate === MERGE_CHOICE_GATE)) w.fact('RequestClosed', { request: r.request, why: 'done' }) // i18n-ignore: a fact's kind and codes, not text
+      })
+    }
+    return true
   }
 
   /** The lease, checked just before git touches the target: a runner that lost it touches nothing. */

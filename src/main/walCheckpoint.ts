@@ -1,7 +1,9 @@
-import { statSync } from 'original-fs'
-import { basename } from 'path'
+import { existsSync, statSync } from 'original-fs'
+import { basename, join } from 'path'
+import { Worker } from 'worker_threads'
 import type { DatabaseSync } from 'node:sqlite'
 import { createLogger } from './logger'
+import { CLOSING, runCheckpoint, type CheckpointDone, type CheckpointReply, type CheckpointRequest } from './walCheckpointWorker'
 
 /**
  * The WAL's checkpoints out of the commits (#1633). SQLite checkpoints a WAL database itself inside whichever COMMIT
@@ -19,7 +21,14 @@ import { createLogger } from './logger'
  * Bounded: `incomplete` checkpoints in a row that couldn't copy the whole WAL (a reader on an old snapshot, another
  * process's checkpoint) or threw (a statement of the writer's still running, an I/O error) give the writer SQLite's own
  * auto-checkpoint back, logged; one that copies it whole takes it off again. A failed one is tried again at the
- * triggers' pace (its attempt counts as its last checkpoint), never at every tick. Kept simple on purpose: an off-thread checkpointer is a later card's, if the field's logs call for it.
+ * triggers' pace (its attempt counts as its last checkpoint), never at every tick.
+ *
+ * Off main's thread (HI-1691): the field's logs had idle checkpoints of 100-893 ms on main, so the checkpoint itself runs
+ * in a worker, on a connection of its own (walCheckpointWorker.ts); the triggers (a stat a second) and the fallback (a
+ * pragma on the writer) stay here. One checkpoint of a database at a time. Closing a database never waits for the worker
+ * (the Assistant's design call, HR6's rounds 1 and 2: a wait on main for another thread either went on with the file held
+ * or, the worker dead, never ended): only what needs the file free (a restore, the upgrade, deleting the journal) awaits
+ * `checkpointsReleased`. Without the worker's script (unit tests) the checkpoint runs here, on a connection of its own.
  */
 
 const log = createLogger('db')
@@ -60,6 +69,8 @@ interface Registered {
   last: number
   /** Checkpoints in a row that couldn't copy the whole WAL. */
   short: number
+  /** A checkpoint of it is under way in the worker. */
+  inFlight: boolean
 }
 
 const dbs = new Map<DatabaseSync, Registered>()
@@ -91,33 +102,32 @@ const walStat = (file: string): { size: number; mtime: number } => {
 }
 
 /**
- * Checkpoints `r` now (PASSIVE, on its writer). One that couldn't copy the whole WAL, or threw (a statement of the
- * writer's still running, an I/O error), counts towards the fallback alike, and the database stays due from this
- * attempt on: tried again at the triggers' pace, not at every tick.
+ * Checkpoints `r` (PASSIVE, on a connection of the worker's): its answer is taken when it comes. One that couldn't copy
+ * the whole WAL, or threw (SQLite refused it, an I/O error), counts towards the fallback alike, and the database stays due
+ * from this attempt on: tried again at the triggers' pace, not at every tick.
  */
 function checkpoint(r: Registered, now: number, why: string): void {
-  const t = performance.now()
   r.last = now
-  let res: { busy: number; log: number; checkpointed: number }
-  try {
-    res = r.writer.prepare('PRAGMA wal_checkpoint(PASSIVE)').get() as typeof res // i18n-ignore: SQL
-  } catch (e) {
-    checkpointStats.failed++
-    log.warn(`checkpointing ${basename(r.file)}'s WAL`, e)
-    unfinished(r, 'failed') // i18n-ignore: for the log
-    return
-  }
-  const ms = performance.now() - t
-  if (ms >= SLOW_MS) log.info(`checkpointed ${basename(r.file)}'s WAL in ${Math.round(ms)} ms (${why}; ${res.checkpointed} of ${res.log} pages)`)
-  if (res.busy || res.checkpointed < res.log) {
-    checkpointStats.incomplete++
-    unfinished(r, "couldn't copy its whole WAL") // i18n-ignore: for the log
-    return
-  }
-  checkpointStats.done++
-  r.dirty = false
-  r.short = 0
-  setAuto(r, false, 'a checkpoint copied its whole WAL') // i18n-ignore: for the log
+  r.inFlight = true
+  thread.run(r.file, (res, where) => {
+    r.inFlight = false
+    // Closed meanwhile: nothing more of it.
+    if (dbs.get(r.writer) !== r || res === null) return
+    if ('error' in res) {
+      checkpointStats.failed++
+      log.warn(`checkpointing ${basename(r.file)}'s WAL${where}: ${res.error}`)
+      return unfinished(r, 'failed') // i18n-ignore: for the log
+    }
+    if (res.ms >= SLOW_MS) log.info(`checkpointed ${basename(r.file)}'s WAL in ${Math.round(res.ms)} ms${where} (${why}; ${res.checkpointed} of ${res.log} pages)`)
+    if (res.busy || res.checkpointed < res.log) {
+      checkpointStats.incomplete++
+      return unfinished(r, "couldn't copy its whole WAL") // i18n-ignore: for the log
+    }
+    checkpointStats.done++
+    r.dirty = false
+    r.short = 0
+    setAuto(r, false, 'a checkpoint copied its whole WAL') // i18n-ignore: for the log
+  })
 }
 
 /** A checkpoint that didn't finish: still due, and `incomplete` in a row give SQLite its own back until one finishes. */
@@ -129,8 +139,8 @@ function unfinished(r: Registered, how: string): void {
 /** One look at each database: checkpointed if it is idle and due, or its WAL is growing past the bound. */
 export function checkpointTick(now = performance.now()): void {
   for (const r of dbs.values()) {
-    // A write under way (a board change spans awaits): never inside its transaction.
-    if (r.writer.isTransaction) continue
+    // A write under way (a board change spans awaits): never inside its transaction; and one checkpoint at a time.
+    if (r.writer.isTransaction || r.inFlight) continue
     const s = walStat(r.file)
     const grew = s.size > r.size
     if (s.size !== r.size || s.mtime !== r.mtime) {
@@ -153,7 +163,7 @@ export function checkpointTick(now = performance.now()): void {
 export function checkpointWhenIdle(file: string, writer: DatabaseSync): () => void {
   const s = walStat(file)
   const now = performance.now()
-  const r: Registered = { file, writer, auto: true, size: s.size, mtime: s.mtime, changed: now, dirty: false, last: now, short: 0 }
+  const r: Registered = { file, writer, auto: true, size: s.size, mtime: s.mtime, changed: now, dirty: false, last: now, short: 0, inFlight: false }
   dbs.set(writer, r)
   setAuto(r, false, 'opened') // i18n-ignore: for the log
   if (!timer) {
@@ -168,11 +178,131 @@ export function checkpointWhenIdle(file: string, writer: DatabaseSync): () => vo
   }
   return () => {
     dbs.delete(writer)
+    // A checkpoint asked for before now is skipped; one under way finishes on its own connection (checkpointsReleased).
+    thread.closing()
     if (!dbs.size && timer) {
       clearInterval(timer)
       timer = null
     }
   }
+}
+
+/** A checkpoint's answer: done, refused (its error), or skipped (null); `where` says where it ran, for the log. */
+type Answer = (res: CheckpointDone | { error: string } | null, where: string) => void
+
+/**
+ * The checkpoints' worker (HI-1691), started with the first checkpoint, as the repository lock's is (HI-1680). Without its
+ * script (unit tests), each checkpoint runs at once, here. It answers each checkpoint once its connection is closed, so a
+ * file's checkpoints in flight say whether the worker still holds it.
+ */
+class CheckpointThread {
+  private worker: Worker | null = null
+  /** CLOSING, shared with the worker (walCheckpointWorker.ts). */
+  private state = new Int32Array(new SharedArrayBuffer(4))
+  private calls = new Map<number, { key: string; answer: Answer }>()
+  private next = 0
+  /** Checkpoints in flight, and what waits for them to end, by file (lower case). */
+  private flying = new Map<string, number>()
+  private waiting = new Map<string, (() => void)[]>()
+
+  run(file: string, answer: Answer): void {
+    const w = this.worker ?? this.start()
+    if (!w) {
+      let res: CheckpointDone | { error: string } | null
+      try {
+        res = runCheckpoint({ id: 0, file, closing: 0 }, null)
+      } catch (e) {
+        res = { error: e instanceof Error ? e.message : String(e) }
+      }
+      return answer(res, '')
+    }
+    const id = ++this.next
+    const key = file.toLowerCase()
+    this.calls.set(id, { key, answer })
+    this.flying.set(key, (this.flying.get(key) ?? 0) + 1)
+    const m: CheckpointRequest = { id, file, closing: Atomics.load(this.state, CLOSING) }
+    w.postMessage(m)
+  }
+
+  /** A database is closing: checkpoints asked for before now are skipped (never waited for). */
+  closing(): void {
+    Atomics.add(this.state, CLOSING, 1)
+  }
+
+  /** Resolves once no checkpoint of `file` is in flight: the worker has let go of it, or ended. */
+  released(file: string): Promise<void> {
+    const key = file.toLowerCase()
+    if (!this.flying.get(key)) return Promise.resolve()
+    return new Promise<void>((resolve) => {
+      const from = performance.now()
+      const say = setInterval(() => log.warn(`waiting for the WAL's checkpoint of ${basename(file)} in its worker to let go of the file (${Math.round(performance.now() - from)} ms so far)`), closeLimits.warnMs)
+      say.unref?.()
+      this.waiting.set(key, [
+        ...(this.waiting.get(key) ?? []),
+        () => {
+          clearInterval(say)
+          resolve()
+        }
+      ])
+    })
+  }
+
+  /** One of `key`'s checkpoints ended: what waited for the last of them goes on. */
+  private landed(key: string): void {
+    const left = (this.flying.get(key) ?? 1) - 1
+    if (left > 0) return void this.flying.set(key, left)
+    this.flying.delete(key)
+    for (const go of this.waiting.get(key) ?? []) go()
+    this.waiting.delete(key)
+  }
+
+  private start(): Worker | null {
+    if (!existsSync(workerScript())) return null
+    const w = new Worker(workerScript(), { workerData: this.state.buffer })
+    this.worker = w
+    w.on('message', (m: CheckpointReply) => {
+      const call = this.calls.get(m.id)
+      if (!call) return
+      this.calls.delete(m.id)
+      this.landed(call.key)
+      call.answer(m.ok ? m.value : { error: m.error }, ' in its worker')
+    })
+    const gone = (why: string): void => {
+      if (this.worker !== w) return
+      this.worker = null
+      log.warn(`the WAL checkpoints' worker ended (${why}); it starts again with the next checkpoint`)
+      const calls = [...this.calls.values()]
+      this.calls.clear()
+      // Ended, it holds nothing (a handle it leaked is the process's: a rename then says why it failed).
+      for (const c of calls) this.landed(c.key)
+      for (const c of calls) c.answer({ error: `its worker ended (${why})` }, ' in its worker') // i18n-ignore: for the log
+    }
+    w.on('error', (e: Error) => gone(e.message))
+    w.on('exit', (code) => gone(`exit code ${code}`)) // i18n-ignore: for the log
+    w.unref()
+    return w
+  }
+}
+
+/** How often something waiting for a database's file to be let go of by the worker says so in the log (tests change it). */
+export const closeLimits = { warnMs: 10_000 }
+
+/**
+ * Resolves once the checkpoints' worker has let go of `file` (HI-1691): awaited after a database is closed by what renames,
+ * replaces or deletes its file. At once when no checkpoint of it is in flight.
+ */
+export const checkpointsReleased = (file: string): Promise<void> => thread.released(file)
+
+/** The worker's script, beside main's (as the repository lock's); a test's build of it (`useCheckpointWorker`). */
+let scriptForTests: string | null = null
+const workerScript = (): string => scriptForTests ?? join(__dirname, 'wal-checkpoint-worker.js')
+
+let thread = new CheckpointThread()
+
+/** Tests: the checkpoints' worker from this script (a build of walCheckpointWorker.ts), or null for the default; a new thread. */
+export function useCheckpointWorker(file: string | null): void {
+  scriptForTests = file
+  thread = new CheckpointThread()
 }
 
 /** Whether SQLite checkpoints this writer's WAL itself (not registered, or fallen back): tests and timedCommit. */

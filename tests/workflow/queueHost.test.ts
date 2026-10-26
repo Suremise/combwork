@@ -85,7 +85,7 @@ async function begun(hook: 'afterStarted' | 'afterAdvance') {
   await expect(e.queue({ hooks: { [hook]: crash } }).drain('main')).rejects.toThrow('crash')
   ctx.wf = e.wf
   ctx.folder = `${e.home}/queue`
-  const ws = { path: e.home, lifetime: new AbortController().signal, worktreesRoot: `${e.home}/worktrees`, emit: () => undefined } as unknown as WorkspaceService
+  const ws = { path: e.home, lifetime: new AbortController().signal, worktreesRoot: `${e.home}/worktrees`, emit: () => undefined, projectConfig: async () => ({}) } as unknown as WorkspaceService
   return { e, card, ws }
 }
 
@@ -136,7 +136,7 @@ async function heldByA() {
   /** A workspace object for e.home, as one opening of it: its own lifetime (abort it to close it). */
   const open = () => {
     const life = new AbortController()
-    return { life, ws: { path: e.home, lifetime: life.signal, worktreesRoot: `${e.home}/worktrees`, emit: () => undefined } as unknown as WorkspaceService }
+    return { life, ws: { path: e.home, lifetime: life.signal, worktreesRoot: `${e.home}/worktrees`, emit: () => undefined, projectConfig: async () => ({}) } as unknown as WorkspaceService }
   }
   const at = new Date().toISOString()
   e.store.takeQueueLease({ target: 'main', lease: 'la', token: 'ta', profile: 'Hive-A', pid: process.pid, started: 1, takenAt: at, renewedAt: at }, null)
@@ -278,7 +278,7 @@ async function approved() {
   moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
   ctx.wf = e.wf
   ctx.folder = `${e.home}/queue`
-  const ws = { path: e.home, lifetime: new AbortController().signal, worktreesRoot: `${e.home}/worktrees`, emit: () => undefined, info: () => ({ projects: [{ path: e.project, name: 'project', platform: 'git' }] }) } as unknown as WorkspaceService
+  const ws = { path: e.home, lifetime: new AbortController().signal, worktreesRoot: `${e.home}/worktrees`, emit: () => undefined, projectConfig: async () => ({}), info: () => ({ projects: [{ path: e.project, name: 'project', platform: 'git' }] }) } as unknown as WorkspaceService
   return { e, card, ws }
 }
 

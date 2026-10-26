@@ -19,7 +19,8 @@
 //   launches a subagent in the background that finishes after N seconds, told the same way (#1584). "pad N" adds N KB to the
 //   transcript. "context N": the reply's request reports N input tokens, so the session's context is about N. "ask" first asks for permission (a permission_prompt Notification), then carries on by itself.
 //   It connects the launch's hive MCP server as it starts (#865: the real server, which tells Hive it has connected);
-//   with fake-mcp-hold-<agent> in its home, only once the test makes fake-mcp-go-<agent>.
+//   with fake-mcp-hold-<agent> in its home, only once the test makes fake-mcp-go-<agent>. With fake-start-hold-<agent>,
+//   its session doesn't start (no SessionStart: Hive sees it starting) until fake-start-go-<agent> (HI-1707: never ready).
 //   "holduntil NAME": the turn doesn't end until the test makes a file NAME in its home (CLAUDE_CONFIG_DIR).
 //   "askwhen NAME": the permission prompt once the test makes a file NAME in its home (#667), not after a set time.
 //   "waitfile NAME" as a step ("waitfile go then hive hive_inbox {}"): the steps after it wait for that file.
@@ -1126,6 +1127,7 @@ async function main() {
       })()
     : null
   void connectHive(hive, held)
+  if (take('fake-start-hold')) while (!take('fake-start-go')) await sleep(100)
   await sessionStart(opts['--resume'] ? 'resume' : 'startup')
   promptLine()
   setInterval(() => void whileIdle(), 200)

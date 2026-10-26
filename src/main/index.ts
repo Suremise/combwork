@@ -99,6 +99,8 @@ import { startHandOverCheck } from './handOverCheck'
 import { checkInstallDir } from './installDir'
 import { exitBy, logCrashDumps, startCrashDumps, startExitLog } from './exitLog'
 import { checkLastRun, startRunMarker, startupStep, tellUnexpectedClose } from './lastRun'
+import { initRestartRecovery, loadRestartRecord, recordClosing, startRestartRecovery, stopRestartRecovery, stopWatchingRestartRequests, watchRestartRequests } from './restartResume'
+import type { RestartReason } from '../shared/restartResume'
 import { chooseStartLanguage, languageInfo, startI18n, switchLanguage } from './i18n'
 import { fmt, msg, tr } from '../shared/i18n'
 
@@ -393,6 +395,8 @@ let pendingQuit = false
 let installOnQuit = false
 /** Restart Hive was chosen (#676: a value that applies when Hive restarts): start again after quitting. */
 let relaunchOnQuit = false
+/** An installer asked Hive to close for an install (HI-1707): the quit records its agents as an install's. */
+let quitReason: RestartReason | null = null
 
 /** The running sessions of every window, or of one workspace. */
 const quitSessions = (ws?: WorkspaceService): QuitSession[] =>
@@ -610,6 +614,12 @@ async function quitNow(tellUser: boolean): Promise<void> {
   // The slots' passes (#1628): none starts as the sessions stop (no builder placed), and one running ends before the
   // boards close (will-quit); what it didn't get to is the next start's.
   const slotsQuiet = quitSlotCards()
+  // The agents that were working, watching or in a lane (HI-1707): recorded for the next start, and told when Hive is
+  // restarting for an update, an install or a restart (an ordinary quit is offered back at the next start instead).
+  stopRestartRecovery()
+  stopWatchingRestartRequests()
+  const reason: RestartReason = quitReason ?? (installOnQuit || installsOnQuit() ? 'update' : relaunchOnQuit ? 'restart' : 'quit')
+  await recordClosing(reason).catch((e) => log.warn('recording the agents as Hive closes', e))
   await sessions.stopAllAndWait(3000)
   await quitLeftovers()
   // The merge queues' runners: their processes ended and their leases given up, so another Hive can run them at once.
@@ -840,8 +850,16 @@ app.whenReady().then(async () => {
   log.info(`Hive ${app.getVersion()} starting (Electron ${process.versions.electron}; ${MARKED_LOG})`)
   logCrashDumps()
   // The last run's marker (#984): still there, it ended without quitting; then this run's own.
+  // The agents a restart or quit recorded (HI-1707), read first: the unexpected-close notice leaves those to it.
+  loadRestartRecord()
   checkLastRun()
   startRunMarker()
+  initRestartRecovery()
+  // An installer asking Hive to close for an install (installer.nsh): the agents are recorded and told, then Hive quits.
+  watchRestartRequests(() => {
+    quitReason = 'install'
+    void quitNow(false)
+  })
   // The main process's memory, now and every 5 minutes, and a snapshot before it runs out if the setting says so (#1005).
   startMemoryLog()
   startHeapSnapshots(app.getPath('userData'), heapSnapshots)
@@ -1101,11 +1119,13 @@ app.whenReady().then(async () => {
       for (const r of corruptReports.splice(0)) showCorrupt(...r)
       void offerRestoredLeftovers().catch((e) => log.warn('offering what agents left running before Hive restarted', e))
       void tellUnexpectedClose().catch((e) => log.warn('telling Hive closed unexpectedly', e))
+      void startRestartRecovery().catch((e) => log.warn('resuming the agents a restart recorded', e))
     }, 1500)
   })
   if (!first) {
     void offerRestoredLeftovers().catch((e) => log.warn('offering what agents left running before Hive restarted', e))
     void tellUnexpectedClose().catch((e) => log.warn('telling Hive closed unexpectedly', e))
+    void startRestartRecovery().catch((e) => log.warn('resuming the agents a restart recorded', e))
   }
   createTray(() => lastFocused()?.win ?? null, {
     quit: () => void requestQuit(),
