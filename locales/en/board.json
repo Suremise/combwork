@@ -3615,6 +3615,10 @@
     "defaultMessage": "Retry merge…",
     "description": "A button in the card dialog's Work section on a card the merge queue returned: queues its approved revision again, unchanged (asks first)."
   },
+  "board.workQueue.retryApprovedMessage": {
+    "defaultMessage": "This queues {revision} again, unchanged: the revision that was approved, not a new one.",
+    "description": "The confirmation before Retry merge on a card taken out of the merge queue and still approved (in Approved): the same approved revision ({revision}, a short commit id) goes back into the queue. Unlike after a return, there's no once-per-revision limit here. Glossary: revision."
+  },
   "board.workQueue.retryConfirm": {
     "defaultMessage": "Retry merge",
     "description": "The button confirming Retry merge. Keep it short."
@@ -3630,6 +3634,14 @@
   "board.workQueue.retryTitle": {
     "defaultMessage": "Retry {card}’s merge?",
     "description": "Title of the confirmation before Retry merge ({card}: the card's key)."
+  },
+  "board.workQueue.retryUsed": {
+    "defaultMessage": "Retry merge was used for this revision: a new revision goes to the queue once it is submitted and passes review.",
+    "description": "The card dialog's Work section, on a card the merge queue returned after a Retry merge: Retry merge works once per revision, so it isn't offered again; the next way back into the queue is a new revision through review. Glossary: revision."
+  },
+  "board.workQueue.retryWaits": {
+    "defaultMessage": "{step, select, followUp {Retry merge comes back once its reviewer has checked the follow-up.} other {Retry merge comes back once its reviewer has checked the design.}}",
+    "description": "The card dialog's Work section, on a card taken out of the merge queue while a card loop's step waits for its reviewer (a follow-up of reviewed work, or a design): Retry merge isn't offered until the reviewer answers it. Keep the select keys. Glossary: follow-up, design."
   },
   "board.workQueue.returned": {
     "defaultMessage": "Returned {when}: {why}",

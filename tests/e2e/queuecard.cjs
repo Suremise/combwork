@@ -2,6 +2,8 @@
 // "Hive merges" into `integration` (queueFixture.cjs), fake Claude Code agents acting by their own tokens.
 // - a red check's return in the card's Work section: why (the check by name), its output's last lines, Show log
 //   (its run's log), Retry merge; a conflict's return with its files;
+// - Retry merge as the runtime allows it (HI-1667): once per revision after a return, asked so, then not offered and
+//   why; none while a follow-up waits for its reviewer, and why; after Remove from queue, asked with no such limit;
 // - the Git tab's Merge queue section: the queue now and its history (each card, revision, result or reason, when);
 // - the Merge dialog on a branch whose card Hive merges: the card's queue state, Merge disabled with why, Merge
 //   anyway (asks first) merging it and recorded on the card as an override;
@@ -83,6 +85,49 @@ const f = q.folderHelpers(fx)
     check('…Show log opens its check\'s log', !!(await until(async () => ((await opened()) ?? []).some((p) => /\.log$/i.test(p)), HUNG_MS)), JSON.stringify(await opened()))
     await shoot(dialog.locator('.card-work'), 'returned-checks')
     await closeCard()
+
+    // --- HI-1667: Retry merge as the runtime allows it. After a return, it asks with "Once per revision"; used for the
+    // revision (returned again: the check still fails), it isn't offered again, and the Work section says why.
+    part = await openCard(red.n)
+    await part.locator('[data-action="retry"]').click()
+    const onceAsk = page.locator('.dialog').filter({ hasText: 'Once per revision.' })
+    check('Retry merge after a return: its confirmation says once per revision', !!(await until(async () => (await onceAsk.count()) === 1, HUNG_MS)))
+    await onceAsk.getByRole('button', { name: 'Retry merge', exact: true }).click()
+    const returnedTwice = async () => (await h.facts(red.n)).filter((x) => x.kind === 'IntegrationFailed').length === 2 && (await column(red.n)) === 'doing'
+    check('…queued again, and returned again (its check still fails)', !!(await until(returnedTwice, HUNG_MS)), JSON.stringify(await h.kinds(red.n)))
+    check('…Retry merge not offered again for the revision, and why', !!(await until(async () => (await part.locator('[data-retry-used]').count()) === 1, HUNG_MS)) && (await part.locator('[data-action="retry"]').count()) === 0, await text(part))
+    await shoot(dialog.locator('.card-work'), 'retry-used')
+    await closeCard()
+
+    // In Approved, taken out of the queue for a follow-up that waits for its reviewer: not offered (the runtime refuses
+    // it), and why. Once the reviewer has checked it and it is taken out by Remove from queue, Retry merge asks with no
+    // once-per-revision limit (none applies there). The queue is paused meanwhile, so the card stays in Approved.
+    q.steer(fx, 'pass')
+    await inv('queue:pause', fx.alpha, 'integration')
+    const held = await q.approve(fx, h, reviewer, 'Held', { 'held.txt': 'held\n' })
+    check('a card approved while the queue is paused waits in Approved, queued', !!(await until(async () => (await column(held.n)) === 'passed' && (await h.kinds(held.n)).includes('IntegrationRequested'), HUNG_MS)), JSON.stringify(await h.kinds(held.n)))
+    const fu = await q.intent(h, held.builder, held.n, 'loop-step', { step: 'followUp', text: 'One more screenshot.' })
+    const outFor = async (reason) => (await h.facts(held.n)).some((x) => x.kind === 'IntegrationCancelled' && x.data?.reason === reason)
+    check('its builder posts a follow-up: taken out of the queue for it', fu.status === 200 && !!(await until(() => outFor('followUp'), HUNG_MS)), JSON.stringify(fu.body))
+    part = await openCard(held.n)
+    check('Work section: no Retry merge while the follow-up waits for its reviewer, and why', !!(await until(async () => (await part.locator('[data-retry-waits="followUp"]').count()) === 1, HUNG_MS)) && (await part.locator('[data-action="retry"]').count()) === 0, await text(part))
+    await shoot(dialog.locator('.card-work'), 'retry-waits')
+    await closeCard()
+    // The follow-up's id, as its reply names it: its card's key and the LoopStep fact's seq.
+    const posted = (await h.facts(held.n)).findLast((x) => x.kind === 'LoopStep' && x.data?.step === 'followUp')
+    const ok = await q.intent(h, reviewer, held.n, 'loop-step', { step: 'ok', text: 'Checked.', design: `${(await h.card(held.n)).key}/s${posted?.seq}` })
+    check('…its reviewer checks it: queued again', ok.status === 200 && !!(await until(async () => (await h.facts(held.n)).filter((x) => x.kind === 'IntegrationRequested').length === 2, HUNG_MS)), JSON.stringify(ok.body))
+    await inv('queue:remove', held.n, '')
+    check('…then Remove from queue: in Approved, taken out', !!(await until(() => outFor('removed'), HUNG_MS)) && (await column(held.n)) === 'passed')
+    part = await openCard(held.n)
+    check('…Retry merge offered again', !!(await until(async () => (await part.locator('[data-action="retry"]').count()) === 1, HUNG_MS)), await text(part))
+    await part.locator('[data-action="retry"]').click()
+    const approvedAsk = page.locator('.dialog').filter({ hasText: 'This queues' })
+    check('…and it asks with no once-per-revision limit', !!(await until(async () => (await approvedAsk.count()) === 1, HUNG_MS)) && !/Once per revision/.test(await text(approvedAsk)), await text(approvedAsk))
+    await approvedAsk.getByRole('button', { name: 'Cancel' }).click()
+    await until(async () => (await approvedAsk.count()) === 0, HUNG_MS)
+    await closeCard()
+    await inv('queue:resume', fx.alpha, 'integration')
 
     // --- A conflict's return, with its files: One merges a line, Two changes the same line from the same base.
     q.steer(fx, 'pass')
