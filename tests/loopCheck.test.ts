@@ -1,7 +1,7 @@
 // An agent in a card loop that ends its turn with no card watch (#376): which of its cards are still in play, and what a
 // stalled card says. (The e2e loopwatch suite runs it on fake Claude Code agents: the grace, the flag, the notice.)
 import { describe, expect, it } from 'vitest'
-import { cardsInPlay, unwatched } from '../src/main/loopCheck'
+import { cardsInPlay, owedCards, unwatched } from '../src/main/loopCheck'
 import { providerDescriptor } from '../src/shared/providers'
 import { laneOrderWait, laneOrderWaitReason, LOOP_STEP_STALL_GRACE_MS, loopStepWait, loopStepWaitReason, notWatchingAgent, pendingDesign, pendingStep, notWatchingReason, REVIEW_WAIT_STALL_MS, reviewVerdictWaitReason, reviewWaitReason } from '../src/shared/tasks'
 import type { TaskCard } from '../src/shared/types'
@@ -56,6 +56,28 @@ describe('cards in play for a loop agent (#376)', () => {
     expect(unwatched({ provider: 'codex', status: 'finished', backgroundTasks: 1 })).toBe(true)
     expect(unwatched({ provider: 'claude-code', status: 'watching', watch: { cards: [1], changes: ['column'], label: '', since: '', limitAt: '' } })).toBe(false)
     expect(unwatched(null)).toBe(false)
+  })
+})
+
+describe("what a loop agent with no watch owes, while Hive's loop wakes reach it (HI-1693)", () => {
+  const h = (what: string) => ({ at: '2026-10-26T11:00:00.000Z', by: 'HB1 (alpha)', what })
+  const reach = { wakes: true, reviewerOf: () => 'r1' }
+  const own = (over: Partial<TaskCard>) => card(1, { agent: 'b1', ...over })
+  it("the other side's move isn't owed: a builder's card in Review or with its design waiting, a reviewer's card in Doing", () => {
+    expect(owedCards([own({ column: 'review', history: [h('Moved to Review')] })], 'alpha', 'b1', [1], reach)).toEqual([])
+    expect(owedCards([own({ column: 'doing', history: [h('Moved to Doing'), h('Posted a design for the reviewer to check: "Plan"')] })], 'alpha', 'b1', [1], reach)).toEqual([])
+    expect(owedCards([own({ column: 'doing' })], 'alpha', 'r1', [1], reach)).toEqual([])
+  })
+  it('its own move is: a builder on its card in Doing, or failed and left in Review; a reviewer with a step to answer, or on a card in Review', () => {
+    expect(owedCards([own({ column: 'doing' })], 'alpha', 'b1', [1], reach)).toEqual([1])
+    expect(owedCards([own({ column: 'review', history: [h('Moved to Review'), h('Started reviewing'), h('Review failed')] })], 'alpha', 'b1', [1], reach)).toEqual([1])
+    expect(owedCards([own({ column: 'doing', history: [h('Moved to Doing'), h('Posted a design for the reviewer to check: "Plan"')] })], 'alpha', 'r1', [1], reach)).toEqual([1])
+    expect(owedCards([own({ column: 'review', history: [h('Moved to Review')] })], 'alpha', 'r1', [1], reach)).toEqual([1])
+  })
+  it('everything is owed where no loop wake reaches it: none can (loop wakes off, no inbox), or the card has no reviewer', () => {
+    const inReview = [own({ column: 'review', history: [h('Moved to Review')] })]
+    expect(owedCards(inReview, 'alpha', 'b1', [1], { ...reach, wakes: false })).toEqual([1])
+    expect(owedCards(inReview, 'alpha', 'b1', [1], { wakes: true, reviewerOf: () => null })).toEqual([1])
   })
 })
 
