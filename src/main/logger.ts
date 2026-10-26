@@ -54,8 +54,8 @@ function consoleFailed(where: 'stdout' | 'stderr', e: unknown): void {
   toConsole = false
   if (closed && !wasOn) return
   const at = new Date().toISOString()
-  if (closed) append('hive.log', `${at} [INFO] [logger] The console's ${where} is closed (${code}): log lines go to this file only from now\n`)
-  else append('hive.log', `${at} [ERROR] [logger] The console's ${where} failed, so log lines go to this file only from now: ${e instanceof Error ? (e.stack ?? e.message) : safeJson(e)}\n`)
+  if (closed) append('hive.log', `${at} [INFO] [logger] The console's ${where} is closed (${code}): log lines go to this file only from now\n`) // i18n-ignore: a line of hive.log
+  else append('hive.log', `${at} [ERROR] [logger] The console's ${where} failed, so log lines go to this file only from now: ${e instanceof Error ? (e.stack ?? e.message) : safeJson(e)}\n`) // i18n-ignore: a line of hive.log
 }
 if (toConsole) {
   process.stdout?.on?.('error', (e: unknown) => consoleFailed('stdout', e))
