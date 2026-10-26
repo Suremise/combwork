@@ -1,6 +1,6 @@
 import { closeSync, constants, existsSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statSync, writeFileSync, writeSync, type Dirent, type Stats } from 'original-fs'
 import { copyFile, link, lstat, mkdir, open, opendir, readFile, readlink, rename, writeFile, stat, symlink, cp, rm, utimes } from 'original-fs/promises'
-import { dirname, isAbsolute, relative, resolve, sep } from 'path'
+import { basename, dirname, isAbsolute, relative, resolve, sep } from 'path'
 import { createHash } from 'crypto'
 import { readdir } from 'original-fs/promises'
 import { join } from 'path'
@@ -8,6 +8,7 @@ import { msg } from '../shared/i18n'
 import { withValues } from '../shared/advanced'
 import { HiveError } from './hiveError'
 import { createLogger, userText } from './logger'
+import { timedStep } from './stallWork'
 
 const log = createLogger('files')
 
@@ -216,6 +217,11 @@ export async function readKeptJson<T>(path: string, fallback: T, opts: KeptReadO
 
 /** The same, for reads at startup that must be synchronous (config.json). */
 export function readKeptJsonSync<T>(path: string, fallback: T): T {
+  // Marked (HI-1692): read at start, and settled with pauses when it doesn't parse.
+  return timedStep(`kept file read ${basename(path)}`, () => readKeptJsonSyncNow(path, fallback))
+}
+
+function readKeptJsonSyncNow<T>(path: string, fallback: T): T {
   let text: string
   try {
     text = readFileSync(path, 'utf8')

@@ -1,7 +1,10 @@
 // "The main process was busy" (#1109): a gap spanning the PC's sleep isn't a stall, and a real one names the work that
-// overlapped it (IPC calls, Agent API requests, hooks) and the main thread's CPU time.
+// overlapped it (IPC calls, Agent API requests, hooks, and HI-1692's synchronous steps: a database's BEGIN or commit) and
+// the main thread's CPU time. A gap the watchdog thread had too is the whole process paused, not a stall (HI-1692).
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { apiLabel, beginWork, hookLabel, stallClock, stallWatcher, workDuring, STALL_TIMING } from '../src/main/mainStalls'
+import { apiLabel, beginWork, hookLabel, stallClock, stallWatcher, timedStep, workDuring, STALL_TIMING } from '../src/main/mainStalls'
+import { noteStep } from '../src/main/stallWork'
+import { pausedAlongside, watchdogTick, WATCHDOG_SLOTS } from '../src/main/stallWatchdog'
 
 let now = 0
 let base = 0
@@ -23,6 +26,8 @@ function watcher() {
   const deferred: (() => void)[] = []
   const warnings: string[] = []
   const infos: string[] = []
+  /** Whether the watchdog thread stopped over a span too (the whole process paused). */
+  const watchdog = { paused: false, asked: [] as [number, number][] }
   const w = stallWatcher({
     now: () => now,
     longestDelayMs: () => {
@@ -33,12 +38,17 @@ function watcher() {
     cpuMs: () => cpu,
     defer: (fn) => deferred.push(fn),
     warn: (l) => warnings.push(l),
-    info: (l) => infos.push(l)
+    info: (l) => infos.push(l),
+    pausedAlongside: (from, to) => {
+      watchdog.asked.push([from, to])
+      return watchdog.paused
+    }
   })
   return {
     w,
     warnings,
     infos,
+    watchdog,
     /** The loop held for `ms` (using `cpuMs` of CPU), then the next tick. */
     stall(ms: number, cpuMs = ms) {
       now += ms
@@ -191,7 +201,7 @@ describe('main process stalls (#1109)', () => {
     const w = stallWatcher({ now: () => t, longestDelayMs: () => 0, cpuMs: () => null, defer: (fn) => fn(), warn: (l) => lines.push(l), info: () => undefined })
     t += 500 + 800
     w.tick()
-    expect(lines).toEqual(['The main process was busy for 800 ms; no IPC call, Agent API request or hook was under way'])
+    expect(lines).toEqual(['The main process was busy for 800 ms; nothing marked was under way (no IPC call, Agent API request or hook, nor a database or kept file step)'])
   })
 
   it('ignores short delays and a power event long before the stall', () => {
@@ -230,5 +240,95 @@ describe('main process stalls (#1109)', () => {
     done()
     now += 1000
     expect(workDuring(base + 900, base + 1200).work).toEqual(['ipc inside (0.1 s)'])
+  })
+})
+
+describe('the steps that can wait, and a whole-process pause (HI-1692)', () => {
+  it('names a synchronous step that held main: a busy wait in BEGIN IMMEDIATE, with no CPU', () => {
+    const s = watcher()
+    s.tick()
+    // The step blocks the thread: the clock moves on inside it, and the next tick finds the loop held as long.
+    timedStep('db begin hive.db', () => s.stall(5200, 3))
+    s.settle()
+    expect(s.warnings).toEqual(['The main process was busy for 5200 ms (main thread CPU 3 ms); during it: db begin hive.db (5.2 s)'])
+  })
+
+  it('names the step over the IPC call that only waited behind it: the most overlap first', () => {
+    const s = watcher()
+    s.tick()
+    const call = beginWork('ipc tasks:list')
+    timedStep('db commit hive.db', () => s.stall(900, 0))
+    call()
+    s.settle()
+    expect(s.warnings[0]).toMatch(/during it: (db commit hive\.db \(0\.9 s\), ipc tasks:list|ipc tasks:list \(0\.9 s\), db commit hive\.db)/)
+    expect(s.warnings[0]).toContain('db commit hive.db (0.9 s)')
+  })
+
+  it("names the step first when five calls waited behind it, beyond the five named (HR6's round 1)", () => {
+    const s = watcher()
+    s.tick()
+    // A burst of calls begins, then a step blocks the thread; the tick runs only once the step has returned.
+    const calls = [0, 1, 2, 3, 4].map((i) => {
+      now += 1
+      return beginWork(`ipc waiting-${i}`)
+    })
+    timedStep('db begin hive.db', () => {
+      now += 4000
+    })
+    now += 10
+    s.stall(0, 2)
+    for (const done of calls) done()
+    // The loop's delay as the tick measured it: the step's whole block.
+    s.settle()
+    const line = s.warnings[0] ?? ''
+    expect(line).toMatch(/during it: db begin hive\.db \(4\.0 s\), ipc waiting-/)
+    expect(line).toMatch(/ and 1 more$/)
+  })
+
+  it("names a log write noted only because it was slow: a restore point freezing the profile's drive held hooks.log", () => {
+    const s = watcher()
+    s.tick()
+    const call = beginWork('hook PreToolUse')
+    const start = now
+    s.stall(7957, 0)
+    noteStep('log write hooks.log', start)
+    call()
+    s.settle()
+    expect(s.warnings[0]).toMatch(/^The main process was busy for 7957 ms \(main thread CPU 0 ms\); during it: /)
+    expect(s.warnings[0]).toContain('log write hooks.log (8.0 s)')
+  })
+
+  it("a stall the watchdog thread had too is the whole process paused: an info line, not counted as busy", () => {
+    const s = watcher()
+    s.tick()
+    s.watchdog.paused = true
+    s.stall(7957, 0)
+    s.settle()
+    expect(s.warnings).toEqual([])
+    expect(s.infos).toEqual(["The main process was paused for 7957 ms with the rest of Hive's process (its watchdog thread stopped too: the PC or the process was paused): not counted as busy"])
+    // Asked about the stall's own span.
+    expect(s.watchdog.asked.at(-1)).toEqual([now - 7957, now])
+    // One it ticked through is main's own: warned.
+    s.watchdog.paused = false
+    s.stall(7119, 0)
+    s.settle()
+    expect(s.warnings[0]).toMatch(/^The main process was busy for 7119 ms/)
+  })
+
+  it("the watchdog's ticks: a gap of its own covering most of a span is a pause; one it ticked through isn't; one it can't speak for isn't", () => {
+    const ticks = new Float64Array(WATCHDOG_SLOTS)
+    let t = 1_000_000
+    for (let i = 0; i < 10; i++) watchdogTick(ticks, (t += 50))
+    // Paused 8 s with the rest of the process, then ticking again.
+    const from = t
+    watchdogTick(ticks, (t += 8000))
+    for (let i = 0; i < 10; i++) watchdogTick(ticks, (t += 50))
+    expect(pausedAlongside(ticks, from + 100, from + 7900)).toBe(true)
+    // A stall of main's own, at a time it ticked through.
+    expect(pausedAlongside(ticks, t - 400, t - 100)).toBe(false)
+    // Mostly outside its gap: not a pause of the whole process.
+    expect(pausedAlongside(ticks, from + 6000, from + 12_000)).toBe(false)
+    // After its last tick: it can't say.
+    expect(pausedAlongside(ticks, t + 100, t + 500)).toBe(false)
   })
 })

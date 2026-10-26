@@ -15,6 +15,7 @@ import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
 import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
+import { timedStep } from './stallWork'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
 import { placeKey, realPath, withFileLock } from './fsutil'
@@ -484,7 +485,7 @@ function importFiles(b: Board, hive: string, hiveVersion: string): void {
   const folder = `${TASKS}.imported-${stamp()}`
   const t0 = performance.now()
   const record: Imported = { at: new Date().toISOString(), cards: cards.length, damaged, hiveVersion, folder, pendingRename: names.length > 0 || existsSync(join(dir, 'board.json')) || existsSync(join(dir, 'archive-batches.json')) }
-  db.exec('BEGIN IMMEDIATE')
+  timedStep(`db begin ${DB_FILE}`, () => db.exec('BEGIN IMMEDIATE'))
   try {
     for (const c of cards) writeCardRows(db, decomposeCard(c.n, c.doc))
     // Cards from before 1.0 keep their number in their project (#1219: #1061 is HI-1061).
@@ -966,7 +967,7 @@ export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>, 
     const state: WriteState = { key, open: true, changed: false, after: [], undone: [], lost: null }
     const db = b.db.writer
     let committed = false
-    db.exec('BEGIN IMMEDIATE')
+    timedStep(`db begin ${DB_FILE}`, () => db.exec('BEGIN IMMEDIATE'))
     try {
       const out = await writing.run(state, fn)
       if (!boards.has(key)) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })

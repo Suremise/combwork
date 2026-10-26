@@ -3,6 +3,7 @@ import { basename, join } from 'path'
 import { Worker } from 'worker_threads'
 import type { DatabaseSync } from 'node:sqlite'
 import { createLogger } from './logger'
+import { timedStep } from './stallWork'
 import { CLOSING, runCheckpoint, type CheckpointDone, type CheckpointReply, type CheckpointRequest } from './walCheckpointWorker'
 
 /**
@@ -319,7 +320,7 @@ export const SLOW_COMMIT_MS = 100
 export function timedCommit(db: DatabaseSync, file: string): void {
   const before = walStat(file).size
   const t = performance.now()
-  db.exec('COMMIT')
+  timedStep(`db commit ${basename(file)}`, () => db.exec('COMMIT'))
   const ms = performance.now() - t
   if (ms < SLOW_COMMIT_MS) return
   const mb = (n: number): string => (n / 1048576).toFixed(1)
