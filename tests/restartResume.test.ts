@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { app } from 'electron'
-import { atStart, checkRequest, mergeSnapshot, resumeNote, REQUEST_FILE, type RestartEntry, type RestartRecord, type RequestTarget } from '../src/shared/restartResume'
+import { atStart, checkRequest, mergeSnapshot, parseRecord, resumeNote, REQUEST_FILE, type RestartEntry, type RestartRecord, type RequestTarget } from '../src/shared/restartResume'
 import { tempDir } from './tempDir'
 
 const HUNG_MS = 15_000
@@ -42,12 +42,13 @@ describe("the installer's request to close (checkRequest)", () => {
   })
 })
 
-const entry = (o: Partial<RestartEntry>): RestartEntry => ({ workspace: 'C:\\ws', projectPath: 'C:\\ws\\alpha', project: 'alpha', agentId: 'a1', agentName: 'Coder', provider: 'claude-code', sessionId: 's1', status: 'working', reason: 'install', from: '1.0.0-rc.4', at: new Date(NOW).toISOString(), state: 'pending', changedAt: new Date(NOW).toISOString(), ...o })
+const entry = (o: Partial<RestartEntry>): RestartEntry => ({ workspace: 'C:\\ws', projectPath: 'C:\\ws\\alpha', project: 'alpha', agentId: 'a1', agentName: 'Coder', provider: 'claude-code', sessionId: 's1', status: 'working', from: '1.0.0-rc.4', at: new Date(NOW).toISOString(), state: 'pending', changedAt: new Date(NOW).toISOString(), ...o })
 
 describe('the restart record', () => {
-  it("keeps an earlier offer the user hasn't answered when Hive closes again, and replaces an agent's entry with its newer one", () => {
-    const before: RestartRecord = { version: 1, entries: [entry({ agentId: 'offered', state: 'offered', reason: 'quit' }), entry({ agentId: 'a1', sessionId: 'old', state: 'offered' }), entry({ agentId: 'done', state: 'resumed' })] }
-    const after = mergeSnapshot(before, [entry({ agentId: 'a1', sessionId: 'new' }), entry({ agentId: 'a2' })])
+  it("keeps an earlier offer the user hasn't answered when Hive closes again, replaces an agent's entry with its newer one, and takes the latest close's reason", () => {
+    const before: RestartRecord = { version: 1, reason: 'quit', entries: [entry({ agentId: 'offered', state: 'offered' }), entry({ agentId: 'a1', sessionId: 'old', state: 'offered' }), entry({ agentId: 'done', state: 'resumed' })] }
+    const after = mergeSnapshot(before, [entry({ agentId: 'a1', sessionId: 'new' }), entry({ agentId: 'a2' })], 'update')
+    expect(after.reason).toBe('update')
     expect(after.entries.map((e) => [e.agentId, e.sessionId, e.state])).toEqual([
       ['offered', 's1', 'offered'],
       ['a1', 'new', 'pending'],
@@ -56,24 +57,30 @@ describe('the restart record', () => {
   })
 
   it('at a start: what the last run left queued or starting is pending again, and what waited over a day is skipped', () => {
-    const r = atStart({ version: 1, entries: [entry({ agentId: 'q', state: 'queued' }), entry({ agentId: 's', state: 'starting' }), entry({ agentId: 'old', state: 'offered', at: new Date(NOW - 25 * 3_600_000).toISOString() }), entry({ agentId: 'r', state: 'resumed' })] }, NOW)
+    const r = atStart({ version: 1, reason: 'install', entries: [entry({ agentId: 'q', state: 'queued' }), entry({ agentId: 's', state: 'starting' }), entry({ agentId: 'old', state: 'offered', at: new Date(NOW - 25 * 3_600_000).toISOString() }), entry({ agentId: 'r', state: 'resumed' })] }, NOW)
     expect(r.entries.map((e) => [e.agentId, e.state, e.why ?? null])).toEqual([
       ['q', 'pending', null],
       ['s', 'pending', null],
       ['old', 'skipped', 'expired'],
       ['r', 'resumed', null]
     ])
+    expect(r.reason).toBe('install')
+  })
+
+  it("a record with no reason it knows is a quit's: it offers, never resumes by itself on a guess", () => {
+    expect(parseRecord(JSON.stringify({ version: 1, entries: [entry({})] }))?.reason).toBe('quit')
+    expect(parseRecord(JSON.stringify({ version: 1, reason: 'update', entries: [entry({})] }))?.reason).toBe('update')
   })
 })
 
 describe('the line a resumed agent is given (resumeNote)', () => {
   it('says why, from which version to which and when, its card, round and lane, and to re-arm its watch', () => {
-    const note = resumeNote(entry({ status: 'watching', card: { label: 'HI-1673', round: 2 }, lane: { id: 'lane-1', name: 'Lanes from the bottom', role: 'builder' }, at: '2026-10-26T10:00:00.000Z' }), '1.0.0-rc.5')
+    const note = resumeNote(entry({ status: 'watching', card: { label: 'HI-1673', round: 2 }, lane: { id: 'lane-1', name: 'Lanes from the bottom', role: 'builder' }, at: '2026-10-26T10:00:00.000Z' }), '1.0.0-rc.5', 'install')
     expect(note).toBe("[Hive] Hive restarted for an update (1.0.0-rc.4 → 1.0.0-rc.5) at 10:00 UTC; your session was stopped and is resumed now. You were on HI-1673, round 2, in lane 'Lanes from the bottom' (its builder). Carry on: re-arm your card watch if you were waiting.")
   })
 
   it('after a quit, with no card or lane: why, and to carry on', () => {
-    expect(resumeNote(entry({ reason: 'quit', from: '1.0.0', at: '2026-10-26T09:30:00.000Z' }), '1.0.0')).toBe('[Hive] Hive was quit and started again at 09:30 UTC; your session was stopped and is resumed now. Carry on where you were.')
+    expect(resumeNote(entry({ from: '1.0.0', at: '2026-10-26T09:30:00.000Z' }), '1.0.0', 'quit')).toBe('[Hive] Hive was quit and started again at 09:30 UTC; your session was stopped and is resumed now. Carry on where you were.')
   })
 })
 

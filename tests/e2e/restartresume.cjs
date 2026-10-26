@@ -203,8 +203,8 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     c = null
     const rec = record()
     const entries = Object.fromEntries((rec?.entries ?? []).map((e) => [e.agentName, e]))
-    check('the record has the four, as an install, pending', ['Worker', 'Watcher', 'Builder', 'Reviewer'].every((n) => entries[n]?.reason === 'install' && entries[n]?.state === 'pending'), JSON.stringify(rec))
-    check('…and Other, of the second workspace', entries.Other?.reason === 'install' && entries.Other?.workspace?.toLowerCase() === wsB.toLowerCase(), JSON.stringify(entries.Other))
+    check('the record is an install, with the four pending', rec?.reason === 'install' && ['Worker', 'Watcher', 'Builder', 'Reviewer'].every((n) => entries[n]?.state === 'pending'), JSON.stringify(rec))
+    check('…and Other, of the second workspace', entries.Other?.state === 'pending' && entries.Other?.workspace?.toLowerCase() === wsB.toLowerCase(), JSON.stringify(entries.Other))
     check('…Watcher watching, Builder and Reviewer in the lane, on its card', entries.Watcher?.status === 'watching' && entries.Builder?.lane?.role === 'builder' && entries.Reviewer?.lane?.role === 'reviewer' && entries.Builder?.card?.label === laneKey, JSON.stringify([entries.Watcher, entries.Builder]))
 
     // The next start: Watcher never gets ready (its CLI holds before its session), and resumes have 10 s to be ready.
@@ -286,7 +286,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-3', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
     check('Hive quits', await quit(c))
     c = null
-    check('the quit recorded Worker, as a quit', record()?.entries?.some((e) => e.agentName === 'Worker' && e.reason === 'quit' && e.state === 'pending'), JSON.stringify(record()))
+    check('the quit recorded Worker, and the record is a quit', record()?.reason === 'quit' && record()?.entries?.some((e) => e.agentName === 'Worker' && e.state === 'pending'), JSON.stringify(record()))
     c = await start()
     const offer = await lib.until(async () => (await anyToast(c, /Resume the agent that was working\?/))?.text, HUNG_MS)
     check('the next start offers to resume Worker', !!offer && /Hive was quit while they were working or in a card loop: Worker \(alpha\)/.test(offer), offer)

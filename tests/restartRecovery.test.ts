@@ -66,25 +66,25 @@ function workspace(path: string, agents: string[], o: { read?: boolean; advanced
   }
   return w
 }
-const entry = (ws: string, agentId: string, o: Record<string, unknown> = {}) => ({ workspace: ws, projectPath: join(ws, 'alpha'), project: 'alpha', agentId, agentName: agentId, provider: 'claude-code', sessionId: `s-${agentId}`, status: 'working', reason: 'install', from: '1.0.0', at: new Date().toISOString(), state: 'pending', changedAt: new Date().toISOString(), ...o })
+const entry = (ws: string, agentId: string, o: Record<string, unknown> = {}) => ({ workspace: ws, projectPath: join(ws, 'alpha'), project: 'alpha', agentId, agentName: agentId, provider: 'claude-code', sessionId: `s-${agentId}`, status: 'working', from: '1.0.0', at: new Date().toISOString(), state: 'pending', changedAt: new Date().toISOString(), ...o })
 
 let dir = ''
 let m: typeof import('../src/main/restartResume')
 let events: typeof import('../src/main/events')
 
-/** A fresh module with a record of these entries, read as a start reads it. */
-async function startWith(entries: unknown[], o: { readyMs?: number } = {}) {
+/** A fresh module with a record of these entries (and how they resume: the last close's reason), read as a start reads it. */
+async function startWith(entries: unknown[], o: { readyMs?: number; reason?: string } = {}) {
   vi.resetModules()
   m = await import('../src/main/restartResume')
   events = await import('../src/main/events')
   const file = join(dir, 'restart.json')
   m.setTimingsForTests({ recordFile: file, readyMs: o.readyMs ?? 300, stopMs: 50 })
   const { writeFileSync } = await import('fs')
-  writeFileSync(file, JSON.stringify({ version: 1, entries }))
+  writeFileSync(file, JSON.stringify({ version: 1, reason: o.reason ?? 'install', entries }))
   m.loadRestartRecord(file)
   m.initRestartRecovery()
 }
-const saved = (): { entries: { agentId: string; state: string; why?: string }[] } | null => {
+const saved = (): { reason: string; entries: { agentId: string; state: string; why?: string }[] } | null => {
   try {
     return JSON.parse(readFileSync(join(dir, 'restart.json'), 'utf8'))
   } catch {
@@ -106,6 +106,20 @@ async function queueSettles(step: () => unknown): Promise<void> {
     },
     { timeout: HUNG_MS }
   )
+}
+/**
+ * Hive started again on the record the last run saved: a new run (no launches yet), the workspace opening. Its
+ * entries are then decided: queued (and the first started), or offered.
+ */
+async function relaunch(ws: { path: string }, o: { readyMs?: number } = {}): Promise<void> {
+  const r = saved()
+  if (!r) throw new Error('no record saved')
+  m.stopRestartRecovery()
+  h.lives = []
+  h.starts = []
+  await startWith(r.entries, { reason: r.reason, readyMs: o.readyMs })
+  m.workspaceRecovering(ws.path, Promise.resolve())
+  await m.startRestartRecovery()
 }
 /** The agent's launch takes its note: a turn begins (a status event of its own launch). */
 function takesNote(agentId: string): void {
@@ -176,20 +190,61 @@ describe('the restart queue (HI-1707)', () => {
     await vi.waitFor(() => expect(m.restartRecord()?.entries.find((e) => e.agentId === 'a2')?.state ?? 'gone').toMatch(/resumed|gone/), { timeout: HUNG_MS })
   })
 
-  it('Hive quitting while a resumed agent is still starting: its own entry is kept, with its reason, card and lane, for the next start', async () => {
-    const ws = workspace(join(dir, 'ws'), ['a1'])
+  it("an install, then a quit while it resumes: the next start offers every agent not yet ready, with its card, round and lane, and starts none", async () => {
+    const ws = workspace(join(dir, 'ws'), ['a1', 'a2'])
     h.workspaces = [ws]
     const lane = { id: 'l1', name: 'Lane', role: 'builder' }
-    await startWith([entry(ws.path, 'a1', { card: { label: 'HI-1', round: 2 }, lane })], { readyMs: HUNG_MS })
+    await startWith([entry(ws.path, 'a1', { card: { label: 'HI-1', round: 2 }, lane }), entry(ws.path, 'a2', { card: { label: 'HI-2', round: 1 } })], { reason: 'install', readyMs: HUNG_MS })
     m.workspaceRecovering(ws.path, Promise.resolve())
     await m.startRestartRecovery()
-    // Launched, and still starting (its note not taken): an idle-looking agent in no lane.
+    // a1 launched and still starting (its note not taken: an idle-looking agent in no lane), a2 queued behind it.
     await vi.waitFor(() => expect(h.starts).toEqual(['a1']), { timeout: HUNG_MS })
     expect(h.lives[0].status).toBe('starting')
     await queueSettles(() => m.recordClosing('quit', { snapshotMs: 1000, tellMs: 50 }))
     await m.restartRecordSaved()
-    const e = saved()?.entries.find((x) => x.agentId === 'a1') as Record<string, unknown> | undefined
-    expect(e).toMatchObject({ state: 'pending', reason: 'install', card: { label: 'HI-1', round: 2 }, lane })
+    const r = saved()
+    expect(r?.reason).toBe('quit')
+    expect(r?.entries).toEqual([
+      expect.objectContaining({ agentId: 'a1', state: 'pending', card: { label: 'HI-1', round: 2 }, lane }),
+      expect.objectContaining({ agentId: 'a2', state: 'pending', card: { label: 'HI-2', round: 1 } })
+    ])
+    // The next start: a quit's, so both are offered, and nothing starts by itself.
+    await relaunch(ws)
+    await vi.waitFor(() => expect(m.restartRecord()?.entries.map((e) => [e.agentId, e.state])).toEqual([['a1', 'offered'], ['a2', 'offered']]), { timeout: HUNG_MS })
+    await queueSettles(() => events.emit({ type: 'workspace-changed', workspace: null }))
+    expect(h.starts).toEqual([])
+  })
+
+  it('a quit, then an update before the offer is answered: the next start resumes them by itself', async () => {
+    const ws = workspace(join(dir, 'ws'), ['a1'])
+    h.workspaces = [ws]
+    await startWith([entry(ws.path, 'a1', { card: { label: 'HI-1', round: 3 } })], { reason: 'quit' })
+    m.workspaceRecovering(ws.path, Promise.resolve())
+    await m.startRestartRecovery()
+    await vi.waitFor(() => expect(m.restartRecord()?.entries[0].state).toBe('offered'), { timeout: HUNG_MS })
+    expect(h.starts).toEqual([])
+    // Hive closes for an update with the offer unanswered: the latest close decides how.
+    await m.recordClosing('update', { snapshotMs: 1000, tellMs: 50 })
+    await m.restartRecordSaved()
+    expect(saved()).toMatchObject({ reason: 'update', entries: [expect.objectContaining({ agentId: 'a1', state: 'pending', card: { label: 'HI-1', round: 3 } })] })
+    await relaunch(ws, { readyMs: HUNG_MS })
+    await vi.waitFor(() => expect(h.starts).toEqual(['a1']), { timeout: HUNG_MS })
+  })
+
+  it('an agent that was ready before the close: its entry is gone', async () => {
+    const ws = workspace(join(dir, 'ws'), ['a1'])
+    h.workspaces = [ws]
+    await startWith([entry(ws.path, 'a1')], { readyMs: HUNG_MS })
+    m.workspaceRecovering(ws.path, Promise.resolve())
+    await m.startRestartRecovery()
+    await vi.waitFor(() => expect(h.starts).toEqual(['a1']), { timeout: HUNG_MS })
+    takesNote('a1')
+    await vi.waitFor(() => expect(m.restartRecord()?.entries[0]?.state ?? 'gone').toMatch(/resumed|gone/), { timeout: HUNG_MS })
+    // Its session ended afterwards: nothing running is recorded as Hive closes, and the resumed entry leaves.
+    h.lives = []
+    await m.recordClosing('update', { snapshotMs: 1000, tellMs: 50 })
+    await m.restartRecordSaved()
+    expect(saved()).toBeNull()
   })
 
   it("a launch that doesn't take its note but stops: notReady, confirmed gone before the next starts", async () => {

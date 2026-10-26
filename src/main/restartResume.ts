@@ -82,6 +82,9 @@ let loadedAt: number | null = null
 /** The record as it is now (tests, diagnostics). */
 export const restartRecord = (): RestartRecord | null => record
 
+/** How the record's entries resume: the latest close's reason (a quit offers them; with no record, a quit's). */
+const policy = (): RestartReason => record?.reason ?? 'quit'
+
 /** Writes the record as it is now (removed once nothing in it is open), after any write under way. */
 function save(): Promise<void> {
   const snapshot = record && recordOpen(record) ? `${JSON.stringify(record, null, 2)}\n` : null
@@ -131,7 +134,7 @@ export function isResuming(projectPath: string, agentId: string): boolean {
   const key = agentKey({ projectPath, agentId })
   const e = entryOf(key)
   if (!e) return false
-  const waiting = e.state === 'queued' || e.state === 'starting' || (e.state === 'pending' && auto(e, openWorkspaceOf(e)))
+  const waiting = e.state === 'queued' || e.state === 'starting' || (e.state === 'pending' && auto(openWorkspaceOf(e)))
   const at = queuedAt.get(key) ?? loadedAt
   return waiting && at !== null && Date.now() - at < STALL_HOLD_MS
 }
@@ -155,7 +158,7 @@ function cardFor(cards: readonly TaskCard[], project: string, agentId: string, l
  * nothing read or awaited, so the conversations are recorded whatever a read would cost. Narrowed and given their
  * cards and lanes by `enrich`.
  */
-export function baseEntries(reason: RestartReason): RestartEntry[] {
+export function baseEntries(): RestartEntry[] {
   const at = new Date().toISOString()
   const out: RestartEntry[] = []
   for (const s of sessions.liveStates()) {
@@ -166,7 +169,7 @@ export function baseEntries(reason: RestartReason): RestartEntry[] {
       continue
     }
     if (!ws.path || ws.isAssistantHome(s.projectPath) || !s.sessionId) continue
-    out.push({ workspace: ws.path, projectPath: s.projectPath, project: basename(s.projectPath), agentId: s.agentId, agentName: s.agentName ?? s.agentId, provider: s.provider, sessionId: s.sessionId, ...(s.sessionName ? { sessionName: s.sessionName } : {}), status: s.status, reason, from: app.getVersion(), at, state: 'pending', changedAt: at })
+    out.push({ workspace: ws.path, projectPath: s.projectPath, project: basename(s.projectPath), agentId: s.agentId, agentName: s.agentName ?? s.agentId, provider: s.provider, sessionId: s.sessionId, ...(s.sessionName ? { sessionName: s.sessionName } : {}), status: s.status, from: app.getVersion(), at, state: 'pending', changedAt: at })
   }
   return out
 }
@@ -206,23 +209,25 @@ export async function recordClosing(reason: RestartReason, o: { snapshotMs?: num
   stopping = true
   generation++
   const bounded = <T>(p: Promise<T>, ms: number, fallback: T): Promise<T> => Promise.race([p, new Promise<T>((r) => setTimeout(() => r(fallback), ms).unref())])
-  // This run's queue, unfinished: its entries go back to pending (the next start checks them again). One being resumed
-  // keeps its own entry (its reason, card and lane), never replaced by its live launch, which is still starting and
-  // in no lane, so narrowing would drop it.
+  // Who: an entry leaves only once its agent is ready (resumed). One not yet resumed, queued, starting or offered at
+  // this close, is pending again, as it was (its conversation, card, round and lane): one being resumed is never
+  // replaced by its live launch, which is still starting and in no lane, so narrowing would drop it. How: this close's
+  // reason, for every entry (the next start resumes them by itself after an install, an update or a restart, and offers
+  // them after a quit), so none keeps an older close's.
   const inFlight = new Set<string>()
   for (const e of record?.entries ?? [])
-    if (e.state === 'queued' || e.state === 'starting') {
+    if (e.state === 'queued' || e.state === 'starting' || e.state === 'offered') {
+      if (e.state !== 'offered') inFlight.add(agentKey(e))
       setState(e, 'pending')
-      inFlight.add(agentKey(e))
     }
-  const base = baseEntries(reason).filter((e) => !inFlight.has(agentKey(e)))
-  record = mergeSnapshot(record, base)
+  const base = baseEntries().filter((e) => !inFlight.has(agentKey(e)))
+  record = mergeSnapshot(record, base, reason)
   await save()
   const enriched = await bounded(enrich(base).catch((e) => (log.warn('Reading the cards and lanes of the agents as Hive closes', e), null)), o.snapshotMs ?? 2000, null)
   let snapshot = base
   if (enriched) {
     const narrowed = new Set(base.map(agentKey))
-    record = mergeSnapshot({ version: 1, entries: (record?.entries ?? []).filter((e) => !narrowed.has(agentKey(e))) }, enriched)
+    record = mergeSnapshot({ version: 1, reason, entries: (record?.entries ?? []).filter((e) => !narrowed.has(agentKey(e))) }, enriched, reason)
     snapshot = enriched
     await save()
   } else log.warn(`Reading the cards and lanes of the agents took over ${o.snapshotMs ?? 2000} ms as Hive closed: every running conversation is kept to resume`)
@@ -242,9 +247,9 @@ export async function recordClosing(reason: RestartReason, o: { snapshotMs?: num
 export function adoptInstalledRun(agents: readonly RunningAgent[], from: string, at: string): void {
   const entries: RestartEntry[] = agents
     .filter((a) => !!a.sessionId && !ownsResume(a.projectPath, a.agentId))
-    .map((a) => ({ workspace: a.workspace, projectPath: a.projectPath, project: a.project, agentId: a.agentId, agentName: a.agentName, provider: a.provider, sessionId: a.sessionId!, ...(a.sessionName ? { sessionName: a.sessionName } : {}), status: 'unknown', reason: 'install', from, at, state: 'pending', changedAt: new Date().toISOString() })) // i18n-ignore: the record's values, not text
+    .map((a) => ({ workspace: a.workspace, projectPath: a.projectPath, project: a.project, agentId: a.agentId, agentName: a.agentName, provider: a.provider, sessionId: a.sessionId!, ...(a.sessionName ? { sessionName: a.sessionName } : {}), status: 'unknown', from, at, state: 'pending', changedAt: new Date().toISOString() })) // i18n-ignore: the record's values, not text
   if (!entries.length) return
-  record = mergeSnapshot(record, entries)
+  record = mergeSnapshot(record, entries, 'install')
   void save()
   log.info(`The last run (Hive ${from}) was ended for an install without being asked to close: ${entries.length} agent(s) recorded to resume`)
 }
@@ -257,10 +262,10 @@ export function adoptInstalledRun(agents: readonly RunningAgent[], from: string,
 const workspaceValues = (ws: WorkspaceService | undefined): Record<string, unknown> | null => ws?.config?.advanced ?? null
 
 /**
- * Whether an entry resumes on its own: closed for an update, an install or a restart, with Resume agents after an
- * update on for its workspace (its own value, else Hive's).
+ * Whether an entry resumes on its own: Hive last closed for an update, an install or a restart (the record's policy),
+ * with Resume agents after an update on for the entry's workspace (its own value, else Hive's).
  */
-const auto = (e: RestartEntry, ws: WorkspaceService | undefined): boolean => e.reason !== 'quit' && advanced.get<boolean>(RESUME_AFTER_UPDATE, workspaceValues(ws)) !== false
+const auto = (ws: WorkspaceService | undefined): boolean => policy() !== 'quit' && advanced.get<boolean>(RESUME_AFTER_UPDATE, workspaceValues(ws)) !== false
 
 /**
  * Once Hive's window is up: entries already offered (or held) are offered again in one notice, and the queue started.
@@ -294,7 +299,7 @@ function enqueue(e: RestartEntry): void {
 function tellOffer(entries: readonly RestartEntry[]): void {
   const n = entries.length
   const names = fmt.list(entries.map((e) => `${e.agentName} (${e.project})`))
-  const quit = entries.every((e) => e.reason === 'quit')
+  const quit = policy() === 'quit'
   const title = tr(msg({ id: 'main.restart.offerTitle', defaultMessage: '{n, plural, one {Resume the agent that was working?} other {Resume the # agents that were working?}}', description: "A notice at start: Hive was quit (or restarted for an update with resuming turned off) while agents worked. {n} is how many; Resume starts them again in their conversations." }), { n })
   const body = quit
     ? tr(msg({ id: 'main.restart.offerQuit', defaultMessage: 'Hive was quit while they were working or in a card loop: {names}. Resume starts each again in its conversation, one at a time.', description: 'The notice offering to resume agents after an ordinary quit. {names} lists them, each with its project.' }), { names })
@@ -394,7 +399,7 @@ function pump(): void {
           if (e.state !== 'pending') continue
           const ws = readyWorkspaceOf(e)
           if (!ws) continue
-          if (auto(e, ws)) enqueue(e)
+          if (auto(ws)) enqueue(e)
           else {
             setState(e, 'offered')
             offer.push(e)
@@ -527,7 +532,7 @@ async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancel
   }
   let ready = false
   try {
-    runId = (await inWorkspace(ws, () => sessions.start(e.projectPath, { agentId: e.agentId, resumeId: e.sessionId, auto: true, ...(e.sessionName ? { name: e.sessionName } : {}), prompt: resumeNote(e, app.getVersion()) }))).runId
+    runId = (await inWorkspace(ws, () => sessions.start(e.projectPath, { agentId: e.agentId, resumeId: e.sessionId, auto: true, ...(e.sessionName ? { name: e.sessionName } : {}), prompt: resumeNote(e, app.getVersion(), policy()) }))).runId
     // Its launch ending meanwhile (stopped by the user, or its CLI exited), Hive closing, or its workspace closing end
     // the wait too.
     ready = await until(() => took || TOOK_NOTE.has(mine()?.status ?? 'stopped') || !mine() || cancelled() || !openWorkspaceOf(e), ms)
@@ -540,7 +545,7 @@ async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancel
   if (ready) {
     setState(e, 'resumed')
     done.resumed.push(e)
-    log.info(`Resumed ${userText(e.agentName)} in ${userText(e.project)} after Hive restarted (${e.reason})`)
+    log.info(`Resumed ${userText(e.agentName)} in ${userText(e.project)} after Hive restarted (${policy()})`)
     return 'done'
   }
   if (!openWorkspaceOf(e)) return closed()
@@ -595,7 +600,7 @@ function whyText(e: RestartEntry): string {
 function report(): void {
   const { resumed, failed, held, skipped } = done
   if (!resumed.length && !failed.length && !held.length && !skipped.length) return
-  const update = [...resumed, ...failed, ...held, ...skipped].some((e) => e.reason !== 'quit')
+  const update = policy() !== 'quit'
   const lines: string[] = []
   if (resumed.length) lines.push(tr(msg({ id: 'main.restart.resumedLine', defaultMessage: 'Resumed: {names}.', description: 'A line of the notice after Hive resumed agents when it started again. {names} lists them, each with its project.' }), { names: fmt.list(resumed.map((e) => `${e.agentName} (${e.project})`)) }))
   for (const e of [...failed, ...held, ...skipped]) lines.push(tr(msg({ id: 'main.restart.notResumedLine', defaultMessage: 'Not resumed: {agent} ({project}): {why}.', description: 'A line of the notice after Hive resumed agents when it started again: one it did not resume, and why.' }), { agent: e.agentName, project: e.project, why: whyText(e) }))
@@ -624,7 +629,7 @@ async function tellAssistants(resumed: readonly RestartEntry[], not: readonly Re
     if (!existsSync(join(home, '.hive', 'project.json'))) continue
     const first = r.resumed[0] ?? r.not[0]
     const versions = first.from && first.from !== app.getVersion() ? ` (${first.from} → ${app.getVersion()})` : ''
-    const body = `Hive restarted${first.reason === 'quit' ? ' after a quit' : ' for an update'}${versions}. Resumed: ${r.resumed.map((e) => `${e.agentName} (${e.project})`).join(', ') || 'none'}.${r.not.length ? ` Not resumed: ${r.not.map((e) => `${e.agentName} (${e.project}): ${e.state}${e.why ? `, ${e.why}` : ''}`).join('; ')}.` : ''} Each resumed agent was told where it was; check their lanes carry on.` // i18n-ignore: the Assistant's inbox (agent-facing, English)
+    const body = `Hive restarted${policy() === 'quit' ? ' after a quit' : ' for an update'}${versions}. Resumed: ${r.resumed.map((e) => `${e.agentName} (${e.project})`).join(', ') || 'none'}.${r.not.length ? ` Not resumed: ${r.not.map((e) => `${e.agentName} (${e.project}): ${e.state}${e.why ? `, ${e.why}` : ''}`).join('; ')}.` : ''} Each resumed agent was told where it was; check their lanes carry on.` // i18n-ignore: the Assistant's inbox (agent-facing, English)
     await leaveDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body }).catch((e) => log.warn('telling the Assistant what was resumed after the restart', e))
   }
 }

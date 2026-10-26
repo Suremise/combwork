@@ -18,7 +18,7 @@ export const FINAL_STATES: readonly RestartState[] = ['resumed', 'failed', 'dism
 /** The states the user still has to see: held (its slot), and offered. */
 const OPEN_STATES: readonly RestartState[] = ['pending', 'offered', 'queued', 'starting', 'held']
 
-/** An agent Hive closed under, and where its resume stands. */
+/** An agent Hive closed under, and where its resume stands: who is resumed (how is the record's `reason`). */
 export interface RestartEntry {
   workspace: string
   projectPath: string
@@ -34,7 +34,6 @@ export interface RestartEntry {
   card?: { label: string; round?: number }
   /** The running lane it was the builder or reviewer of. */
   lane?: { id: string; name: string | null; role: 'builder' | 'reviewer' }
-  reason: RestartReason
   /** Hive's version as it closed. */
   from: string
   /** When Hive closed. */
@@ -46,10 +45,18 @@ export interface RestartEntry {
   changedAt: string
 }
 
+/**
+ * The record: who (its entries) and how (`reason`, the latest close's: every close overwrites it). An install, an update
+ * or a restart resumes the entries by itself; a quit offers them. Entries carry no reason of their own, so none can
+ * carry an older close's.
+ */
 export interface RestartRecord {
   version: 1
+  reason: RestartReason
   entries: RestartEntry[]
 }
+
+const REASONS: readonly RestartReason[] = ['install', 'update', 'restart', 'quit']
 
 /** How long an entry no start has taken up is kept, then skipped. */
 export const ENTRY_EXPIRY_MS = 24 * 60 * 60 * 1000
@@ -63,14 +70,14 @@ export const isFinal = (s: RestartState): boolean => FINAL_STATES.includes(s)
 export const isOpen = (s: RestartState): boolean => OPEN_STATES.includes(s)
 
 /**
- * A new snapshot (Hive closing again) added to the record: each agent in it replaces its earlier entry (it ran in this
- * run, so that entry is out of date), and entries of agents not in it are kept as they are, so an offer the user hasn't
- * answered isn't lost. Final entries are dropped.
+ * A new snapshot (Hive closing again) added to the record, with that close's reason: each agent in it replaces its
+ * earlier entry (it ran in this run, so that entry is out of date), and entries of agents not in it are kept as they
+ * are, so an offer the user hasn't answered isn't lost. Final entries are dropped.
  */
-export function mergeSnapshot(record: RestartRecord | null, snapshot: readonly RestartEntry[]): RestartRecord {
+export function mergeSnapshot(record: RestartRecord | null, snapshot: readonly RestartEntry[], reason: RestartReason): RestartRecord {
   const now = new Set(snapshot.map(agentKey))
   const kept = (record?.entries ?? []).filter((e) => !isFinal(e.state) && !now.has(agentKey(e)))
-  return { version: 1, entries: [...kept, ...snapshot] }
+  return { version: 1, reason, entries: [...kept, ...snapshot] }
 }
 
 /**
@@ -80,6 +87,7 @@ export function mergeSnapshot(record: RestartRecord | null, snapshot: readonly R
 export function atStart(record: RestartRecord, now: number): RestartRecord {
   return {
     version: 1,
+    reason: record.reason,
     entries: record.entries.map((e) => {
       if (isOpen(e.state) && now - Date.parse(e.at) > ENTRY_EXPIRY_MS) return { ...e, state: 'skipped', why: 'expired', changedAt: new Date(now).toISOString() }
       if (e.state === 'queued' || e.state === 'starting') return { ...e, state: 'pending', changedAt: new Date(now).toISOString() }
@@ -97,7 +105,9 @@ export function parseRecord(text: string): RestartRecord | null {
     const v = JSON.parse(text) as Partial<RestartRecord>
     if (v?.version !== 1 || !Array.isArray(v.entries)) return null
     const ok = (e: Partial<RestartEntry>): e is RestartEntry => typeof e?.projectPath === 'string' && typeof e.agentId === 'string' && typeof e.sessionId === 'string' && typeof e.state === 'string' && typeof e.at === 'string'
-    return { version: 1, entries: v.entries.filter(ok) }
+    // A record with no reason we know offers (a quit's): Hive never resumes by itself on a guess.
+    const reason = REASONS.includes(v.reason as RestartReason) ? (v.reason as RestartReason) : 'quit'
+    return { version: 1, reason, entries: v.entries.filter(ok) }
   } catch {
     return null
   }
@@ -187,9 +197,9 @@ const clock = (iso: string): string => `${iso.slice(11, 16)} UTC`
  * The first line a resumed agent is given: why Hive restarted, from which version to which and when, what it was on,
  * and to re-arm its watch if it was waiting.
  */
-export function resumeNote(e: Pick<RestartEntry, 'reason' | 'from' | 'at' | 'status' | 'card' | 'lane'>, to: string): string {
+export function resumeNote(e: Pick<RestartEntry, 'from' | 'at' | 'status' | 'card' | 'lane'>, to: string, reason: RestartReason): string {
   const versions = e.from && e.from !== to ? ` (${e.from} → ${to})` : ''
-  const why = e.reason === 'quit' ? `Hive was quit and started again${versions}` : e.reason === 'restart' ? `Hive restarted${versions}` : `Hive restarted for an update${versions}`
+  const why = reason === 'quit' ? `Hive was quit and started again${versions}` : reason === 'restart' ? `Hive restarted${versions}` : `Hive restarted for an update${versions}`
   const on = e.card ? `You were on ${e.card.label}${e.card.round ? `, round ${e.card.round}` : ''}` : ''
   const lane = e.lane ? `${on ? ',' : 'You were'} in lane '${e.lane.name ?? e.lane.id}' (its ${e.lane.role})` : ''
   const was = on || lane ? ` ${on}${lane}.` : ''
