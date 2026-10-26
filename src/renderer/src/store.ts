@@ -23,6 +23,7 @@ import type { TemplateAgent, TemplateRef } from '@shared/templates'
 import type { GitTool } from '@shared/gitTool'
 import type { RunsFilter } from '@shared/progressTabs'
 import { loadActivityView, saveActivityView, type ActivityView } from './activityView'
+import { cardWorker } from '@shared/activity'
 import { boardReader } from './boardReads'
 import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkspaceUsage, RecentWorkspace } from '@shared/types'
 import type { PresetId } from '@shared/workflow/options'
@@ -1017,18 +1018,33 @@ export function openInSessionsTab(path: string, id: string, compaction?: number)
 }
 
 /**
- * Opens a project's Activity tab (#1254), filtered to an agent's work or a card's (null: as it was left). Its range,
- * Hide finished and pause stay as they were (HI-1677).
+ * Opens a project's Activity tab (#1254), frozen (HI-1743): filtered to an agent, its tab shown; or to a card, on the tab
+ * of the agent working on it (`agentId`); null: as it was left. Hide finished and the zoom stay as they were.
  */
 export function openActivity(path: string, filter: { agentId?: string; card?: number } | null): void {
   set((s) => {
     const was = s.activityFilters[path] ?? loadActivityView(path)
-    const view: ActivityView = filter ? { ...was, agents: filter.agentId ? [filter.agentId] : [], cards: filter.card !== undefined ? [filter.card] : [] } : was
+    const opened = Date.now()
+    const view: ActivityView = filter ? { ...was, agents: filter.agentId && filter.card === undefined ? [filter.agentId] : [], cards: filter.card !== undefined ? [filter.card] : [], ...(filter.agentId ? { tab: filter.agentId } : {}), opened } : { ...was, opened }
     saveActivityView(path, view)
     return { activityFilters: { ...s.activityFilters, [path]: view }, selectedProject: path }
   })
   showView('projects')
   setProjectTab(path, 'activity')
+}
+
+/** Whether a card has an Activity to open (HI-1743): in progress (Doing or Review) in a project of this window. */
+export const cardHasActivity = (c: Pick<TaskCard, 'column' | 'project' | 'archived'>): boolean => !c.archived && !!c.project && (c.column === 'doing' || c.column === 'review')
+
+/** Opens a card's Activity (HI-1743): its project's tab, frozen, on the agent working on it (its builder while it runs, else its reviewer). */
+export function openCardActivity(c: TaskCard): void {
+  const p = get().workspace?.projects.find((x) => x.name.toLowerCase() === c.project.toLowerCase())
+  if (!p || !cardHasActivity(c)) return
+  // The agent on this card now: a builder gone on to its next card isn't (HR6's round 1).
+  const asActivity = (t: TaskCard) => ({ number: t.number, label: '', title: t.title, column: t.column, builder: t.agent, reviewer: t.review?.agent ?? null })
+  const cards = get().tasks.filter((t) => !t.archived && t.project.toLowerCase() === c.project.toLowerCase()).map(asActivity)
+  const worker = cardWorker(asActivity(c), cards, (id) => !!p.agents.find((a) => a.id === id)?.live)
+  openActivity(p.path, { card: c.number, ...(worker ? { agentId: worker } : {}) })
 }
 
 /** Shows an agent's pane on the Session tab and focuses it. */

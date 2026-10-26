@@ -224,7 +224,7 @@
   "board.details.transient": "{cause, select, spawn {它无法启动} notFound {找不到它的程序} timeout {它超时了} killed {它被外部结束} exit75 {它以代码 75 退出，即项目的“临时失败，请重试”} other {它的最后几行中有网络错误（{code}）}}：卡片已退回给构建者，构建者可以再次提交同一修订版本（最多连续两次），而不必提交新的修订版本。",
   "board.details.waitingSince": "自 {since} 起等待：{waiting}",
   "board.dialog.activity": "活动",
-  "board.dialog.activityTip": "在项目的“活动”标签页中显示这张卡片的智能体、会话、轮次和进程。",
+  "board.dialog.activityTip": "查看此卡片上正在运行的内容：处理它的智能体的轮次、工具调用、后台任务、子智能体和进程。",
   "board.dialog.addCard": "添加卡片",
   "board.dialog.added": "{who, select, you {由你添加于 {added}} assistant {由助手添加于 {added}} repair {由“修复”添加于 {added}} other {由 {by} 添加于 {added}}} · 更改于 {changed}",
   "board.dialog.addedUnknown": "添加者未知 · 添加于 {added} · 更改于 {changed}",

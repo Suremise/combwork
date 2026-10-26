@@ -332,18 +332,15 @@ Hive only ever ends processes the agent's session started: never one you started
 
 ### The Activity tab <a id="the-activity-tab"></a>
 
-**Activity** (Alt+9) shows the project's work as a tree, from left to right: each card, the agents working on it, their sessions, each session's turns (a prompt and what followed) and the tool calls they made, with background subagents and the processes an agent's session runs. It covers what runs now and the last 24 hours; older sessions are in the **Sessions** tab. It follows the agents live without jumping around: what's drawn keeps its place, new work is added at the end, finished work dims where it is, and what ended stays dimmed until you refresh.
+**Activity** (Alt+9) shows what the project's agents are running now. Each running agent has a tab across the top, with its state (a pulsing dot while it works) and the card it's on. A tab is a list you read top to bottom: the card it's working on (its key opens the card), or its session when it has no card; then **Now**, its prompt and what it's doing (the tool call under way and how long it has run, or *Thinking…* or *Writing…*); then its **subagents and background tasks**; then the **processes** it started (commands, test runs, dev servers), each with how long it has run. Past work isn't here: a card's comments and history are its story.
 
-- **Pause**: the tree holds still while your pointer is over it, while you scroll it or while a node is selected, and goes live again a moment after. **Pause** in the toolbar holds it until you click **Live**. While it's held, a pill counts what's waiting (*12 updates · Refresh*): click it to see them all at once.
-- **Time range**: **Live** (only what runs now), **15 min**, **1 h**, **6 h** or **24 h**.
-- **Filters**: **Agents ▾** and **Cards ▾** (tick several, or **All**), and **Hide finished** to see only running work. The tab remembers your range and filters for each project.
-- **Zoom**: **Zoom out**, **Zoom in** and **Zoom to fit** (keys **−**, **+** and **F** while the tree has focus); click the percentage, or press **0**, for actual size.
-- **Levels ▾** collapses or expands every node at one level at once: all turns, all tool calls, all subagents, and so on. You can still open or close single nodes afterwards.
-- **Jump to selected** (key **J**) scrolls back to the node you selected, or to the agent or card you opened the tab for.
+- **Frozen when it opens**: the tab is a snapshot of when you opened it, so nothing moves while you read it. A pill counts what changed since (*12 updates · Refresh*). **Refresh** takes a new snapshot. **Play** follows the agents live (a process that ends fades out); **Pause** freezes it again.
+- **The agent's own processes** (its CLI and Hive's connection to it) are hidden: tick **Show the agent's own processes** beside **Processes** to see them.
+- When a card's builder and reviewer are both on it, the tab shows both, each under its name.
+- **Hide finished** (on unless you turn it off) hides the agents with nothing running. **Agents ▾** and **Cards ▾** (tick several, or **All**) narrow the tabs to those agents, or to the agents working on those cards. The tab remembers them for each project.
 
-- Open a node with its arrow. A finished session's turns are read when you open it.
-- Click a node to see its details: its status, its input exactly (a prompt, a tool call's input, a command line, with secrets hidden as in Hive's log) and what it did last.
-- **Activity** in an agent's **⋯** menu shows only that agent's work; **Activity** in a card shows only that card's. Choose **All** in **Agents ▾** or **Cards ▾** to see everything again.
+- Click a row to see its details: its status, its input exactly (a prompt, a tool call's input, a command line, with secrets hidden as in Hive's log) and what it did last.
+- **Activity** in an agent's **⋯** menu opens that agent's tab. A card in **Doing** or **Review** has **Activity** in its dialog and its right-click menu: it opens on the agent working on it.
 - A process an agent's session started has **End Process…** in its details. It ends only that process, after you confirm, and only while it is still the one listed. The agent's own CLI isn't ended here: use **Stop**.
 
 ### Reading past sessions <a id="reading-past-sessions"></a>
