@@ -136,6 +136,8 @@ export const QUEUE_ADVANCE_GATE = 'queueAdvance'
 
 /** HI-1697: the merge queue's question before an upgraded project's first merge: its merge style and commit message. */
 export const MERGE_CHOICE_GATE = 'mergeChoice'
+/** HI-1697: the project's board meta recording its answer to that question, first (the file follows: optionsForm.ts). */
+export const MERGE_CHOICE_KEY = 'mergeChoice'
 
 /** The gate of Hive's notice that an advance into a checked-out target stopped part way (§16.9.2's terminal state, #1351). */
 export const QUEUE_STUCK_GATE = 'queueStuck'

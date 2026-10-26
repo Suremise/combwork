@@ -28,7 +28,7 @@ import { queueOrder } from './queueState'
 import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import type { CardRecord, QueuePause } from './factStore'
-import { QUEUE_ADVANCE_GATE, type Fact, type FactData } from '../../shared/workflow/facts'
+import { MERGE_CHOICE_KEY, QUEUE_ADVANCE_GATE, type Fact, type FactData } from '../../shared/workflow/facts'
 import { HISTORY_MAX, RECENT_MAX, RETURN_SEEN_SHOWN_MS, RETURNS_MAX, type BranchQueueCard, type QueueRecent, type QueueResumed, type QueueView } from '../../shared/workflow/queue'
 
 /**
@@ -321,7 +321,7 @@ async function stillPaused(ws: WorkspaceService, wf: Workflow, projectPath: stri
     }
     // HI-1697: the merge style and commit message still to be chosen (the For you answer, or a save of the options).
     case 'mergeChoice':
-      return (await ws.projectConfig(projectPath).catch(() => null))?.workflow?.mergeAsk ? {} : null
+      return (await ws.projectConfig(projectPath).catch(() => null))?.workflow?.mergeAsk && !wf.store.meta(MERGE_CHOICE_KEY) ? {} : null
     case 'wrongBranch':
     case 'staged':
     case 'unstagedChanges': {

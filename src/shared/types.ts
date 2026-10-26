@@ -1022,7 +1022,8 @@ export interface ProjectWorkflow {
   presetAsked?: PresetAsked
   /**
    * HI-1697: set by the 1.0 upgrade on a Git project from 0.9, whose merge style and commit message (G6, G19) nobody
-   * chose: the merge queue asks before its first merge (For you), and the answer, or a save that changes either, clears it.
+   * chose, and kept: the merge queue asks before its first merge (For you) until the board records a choice (the answer,
+   * or a save that changes either; optionsForm.ts).
    */
   mergeAsk?: true
 }

@@ -110,7 +110,7 @@ import { settleSlotsUpToDate } from './workflow/slotsUpToDateStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
 import { heldWriter, releaseHeldWriter } from './agentFolders'
 import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
-import { checkWorkflowChange, chooseMerge, presetsNotice, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
+import { checkWorkflowChange, chooseMerge, presetsNotice, settleMergeChoices, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
 import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
@@ -351,6 +351,8 @@ function boardSteps(ws: WorkspaceService): void {
     .then(() => settleSlotsUpToDate(ws))
     .then(() => migrateSlots(ws))
     .then(() => repairStages(ws))
+    // HI-1697: a merge choice the board recorded and a save stopped before writing to project.json, written there now.
+    .then(() => settleMergeChoices(ws))
     .finally(() => reconcileWorkspace(ws))
   // 0.9's agent templates copied into the 0.9 backup once after the upgrade (#1436), and a quiet notice saying so.
   void copyV09Templates(ws)

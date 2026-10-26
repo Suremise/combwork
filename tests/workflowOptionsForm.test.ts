@@ -424,32 +424,22 @@ describe("the Version Control tab's Workflow section (#1418)", () => {
 })
 
 describe("the upgrade's merge question (HI-1697)", () => {
-  const asks = async (w: WS, repo: string): Promise<unknown> => ((await w.projectConfig(repo)).workflow as unknown as Record<string, unknown>).mergeAsk
   const marked = async (w: WS, repo: string): Promise<void> => {
     await w.mutateProjectConfig(repo, (cfg) => ({ workflow: { ...cfg.workflow!, mergeAsk: true } }))
   }
-
-  it('a save keeps the question unless it changes the merge style or the commit message', async () => {
-    const { platform: _p, ...pair } = preset('git', 'pair')
-    const { w, repo } = await workspace({ project: pair, preset: 'pair' })
-    await marked(w, repo)
-    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, strict: true } })
-    expect(await asks(w, repo)).toBe(true)
-    // Left out, it inherits the same value: not a choice either.
-    const { commitMessage: _m, style: _s, ...inheriting } = pair
-    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...inheriting, strict: true } })
-    expect(await asks(w, repo)).toBe(true)
-    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, strict: true, commitMessage: 'branch' } })
-    expect(await asks(w, repo)).toBeUndefined()
-    await marked(w, repo)
-    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, strict: true, commitMessage: 'branch', style: 'squash' } })
-    expect(await asks(w, repo)).toBeUndefined()
+  /** The board's record of the project's choice (the board decides; project.json follows), or null. */
+  const recorded = (w: WS): { style: string; commitMessage: string; pending: boolean } | null => {
+    const row = store.boardRead(w, (db) => db.prepare("SELECT value FROM board_meta WHERE key = 'workflow:p:mergeChoice'").get() as { value: string } | undefined)
+    return row ? JSON.parse(row.value) : null
+  }
+  afterEach(() => {
+    for (const k of Object.keys(form.saveSeams) as (keyof typeof form.saveSeams)[]) form.saveSeams[k] = undefined
   })
 
-  /** A marked Pair project with a started card, queued (an open entry) and asked the question, as the queue asks it. */
+  /** A marked Pair project (strict on, an unrelated option of its own) with a started card, queued and asked the question. */
   async function asked() {
     const { platform: _p, ...pair } = preset('git', 'pair')
-    const { w, repo } = await workspace({ project: pair, preset: 'pair' })
+    const { w, repo, ws } = await workspace({ project: { ...pair, strict: true }, preset: 'pair' })
     await marked(w, repo)
     const card = await inWorkspace(w, () => tasks.createTask({ title: 'Waits in the queue', project: 'p' }, user))
     const wf = (await workflowFor(w, repo))!
@@ -462,37 +452,57 @@ describe("the upgrade's merge question (HI-1697)", () => {
           return wf.askUser(x, 'decide', gate, 'How should Hive merge?', { unbound: true, ...(entry ? { entry } : {}) })
         })
       )
-    const choose = (request: string, style: string, commitMessage: string, number = card.number) => inWorkspace(w, () => form.chooseMerge(w, repo, { card: number, request, style, commitMessage }))
-    const state = async () => {
-      const wf2 = (await workflowFor(w, repo))!
+    const choose = (request: string, style: string, commitMessage: string, number = card.number, on = w) => inWorkspace(on, () => form.chooseMerge(on, repo, { card: number, request, style, commitMessage }))
+    const state = async (on = w) => {
+      const wf2 = (await workflowFor(on, repo))!
       return wf2.state(wf2.store.card(card.number))
     }
-    const options = async () => (await w.projectConfig(repo)).workflow?.options
-    return { w, repo, card, ask, choose, state, options, wf }
+    const styleOf = async (on = w) => {
+      const wf2 = (await workflowFor(on, repo))!
+      return wf2.rulesetOf(wf2.store.card(card.number)).options.style
+    }
+    const options = async (on = w) => (await on.projectConfig(repo)).workflow?.options
+    return { w, ws, repo, card, ask, choose, state, styleOf, options, pair }
   }
 
-  it("the answer saves the project's merge style and commit message, applies them to its cards in flight and answers the request", async () => {
-    const { w, repo, card, ask, choose, state, options, wf } = await asked()
+  it('a save keeps the question unless it changes the merge style or the commit message; one that does records the choice first', async () => {
+    const { platform: _p, ...pair } = preset('git', 'pair')
+    const { w, repo } = await workspace({ project: pair, preset: 'pair' })
+    await marked(w, repo)
+    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, strict: true } })
+    // Left out, it inherits the same value: not a choice either.
+    const { commitMessage: _m, style: _s, ...inheriting } = pair
+    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...inheriting, strict: true } })
+    expect(recorded(w)).toBeNull()
+    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, strict: true, commitMessage: 'branch' } })
+    expect(recorded(w)).toMatchObject({ style: 'merge', commitMessage: 'branch', pending: false })
+    expect((await w.projectConfig(repo)).workflow).toMatchObject({ mergeAsk: true, options: { commitMessage: 'branch', strict: true } })
+    // Chosen: later saves are ordinary ones, whatever they change, and the record never takes them back.
+    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, strict: true, commitMessage: 'hive', style: 'squash' } })
+    await form.settleMergeChoice(w, repo)
+    expect((await w.projectConfig(repo)).workflow?.options).toMatchObject({ style: 'squash', commitMessage: 'hive' })
+  })
+
+  it("the answer records the choice on the board, then project.json follows; the waiting card works under it", async () => {
+    const { w, card, ask, choose, state, styleOf, options } = await asked()
     const request = await ask(MERGE_CHOICE_GATE, 'e1')
     await choose(request, 'squash', 'branch')
-    expect((await w.projectConfig(repo)).workflow).toMatchObject({ preset: 'pair', options: { style: 'squash', commitMessage: 'branch' } })
-    expect(await asks(w, repo)).toBeUndefined()
+    expect(recorded(w)).toMatchObject({ style: 'squash', commitMessage: 'branch', pending: false })
+    expect(await options()).toMatchObject({ style: 'squash', commitMessage: 'branch', strict: true })
     const s = await state()
     expect(s.requests).toEqual([])
     expect(s.approvals).toEqual([expect.objectContaining({ request, answer: 'answered', note: "Merge style: squash; commit message: the branch's own." })])
-    // The card waiting works under them from now (its ruleset has the merge style it was approved under).
-    expect(wf.rulesetOf(wf.store.card(card.number)).options.style).toBe('squash')
-    expect(await options()).toMatchObject({ style: 'squash' })
+    expect(await styleOf()).toBe('squash')
     // Answered: the same request again (a stale dialog) is refused, and changes nothing.
     await expect(choose(request, 'rebase', 'hive')).rejects.toThrow()
     expect(await options()).toMatchObject({ style: 'squash', commitMessage: 'branch' })
     await expect(choose(request, 'sideways', 'branch')).rejects.toThrow(/card, request, style, commitMessage/)
+    expect(card.number).toBeGreaterThan(0)
   })
 
   it('refuses an answer that is not to an open question of this card, its queue entry open, before changing anything', async () => {
-    const { w, repo, card, ask, choose, options } = await asked()
+    const { w, ask, choose, options } = await asked()
     const before = await options()
-    // An unknown card, an unknown request, another gate's request, and the question with no open queue entry.
     const other = await ask('lineUpdate')
     const unbound = await ask(MERGE_CHOICE_GATE)
     await expect(choose('no-such-request', 'squash', 'branch', 999999)).rejects.toThrow()
@@ -500,12 +510,21 @@ describe("the upgrade's merge question (HI-1697)", () => {
     await expect(choose(other, 'squash', 'branch')).rejects.toThrow()
     await expect(choose(unbound, 'squash', 'branch')).rejects.toThrow()
     expect(await options()).toEqual(before)
-    expect(await asks(w, repo)).toBe(true)
-    expect(card.number).toBeGreaterThan(0)
+    expect(recorded(w)).toBeNull()
   })
 
+  /** The workspace closed and opened again (a restart of Hive): its board and files as they were left. */
+  async function restart(w: WS, ws: string): Promise<WS> {
+    opened.splice(opened.indexOf(w), 1)
+    await disposeWorkspaceService(w)
+    const w2 = createWorkspaceService()
+    await w2.open(ws)
+    opened.push(w2)
+    return w2
+  }
+
   /** A seam held until released: `reached` once the save gets there. */
-  function held(seam: 'beforeBoard' | 'written') {
+  function held(seam: 'beforeBoard') {
     let reach!: () => void
     let go!: () => void
     const reached = new Promise<void>((r) => (reach = r))
@@ -517,76 +536,94 @@ describe("the upgrade's merge question (HI-1697)", () => {
     }
     return { reached, release: () => go() }
   }
-  afterEach(() => {
-    form.saveSeams.beforeBoard = undefined
-    form.saveSeams.written = undefined
-  })
 
-  it('the question answered elsewhere while the choice waits for the board: refused, with options, mark and card rules unchanged', async () => {
-    const { w, repo, card, ask, choose, state, options, wf } = await asked()
+  it('the question answered elsewhere while the choice waits for the board: refused, with options, record and card rules unchanged', async () => {
+    const { w, card, ask, choose, state, styleOf, options } = await asked()
     const request = await ask(MERGE_CHOICE_GATE, 'e1')
-    const before = { options: await options(), style: wf.rulesetOf(wf.store.card(card.number)).options.style }
+    const before = { options: await options(), style: await styleOf() }
     const seam = held('beforeBoard')
     const choice = choose(request, 'squash', 'branch')
     await seam.reached
-    // Meanwhile, the request answered in words through For you's own path.
     await inWorkspace(w, () => tasks.answerTask(card.number, request, { outcome: 'answered', reply: 'merge as before' }))
     seam.release()
     await expect(choice).rejects.toThrow()
     expect(await options()).toEqual(before.options)
-    expect(await asks(w, repo)).toBe(true)
-    expect(wf.rulesetOf(wf.store.card(card.number)).options.style).toBe(before.style)
+    expect(recorded(w)).toBeNull()
+    expect(await styleOf()).toBe(before.style)
     expect((await state()).approvals).toEqual([expect.objectContaining({ request, note: 'merge as before' })])
   })
 
   it('the question retired while the choice waits for the board: refused, nothing changed', async () => {
-    const { w, repo, card, ask, choose, options, wf } = await asked()
+    const { w, repo, card, ask, choose, options } = await asked()
     const request = await ask(MERGE_CHOICE_GATE, 'e1')
     const before = await options()
     const seam = held('beforeBoard')
     const choice = choose(request, 'rebase', 'branch')
     await seam.reached
+    const wf = (await workflowFor(w, repo))!
     const rec = wf.store.card(card.number)
     await store.boardWrite(w, async () => wf.write(rec, wf.rulesetOf(rec), 'hive', (x) => x.fact('RequestClosed', { request, why: 'done' })))
     seam.release()
     await expect(choice).rejects.toThrow()
     expect(await options()).toEqual(before)
-    expect(await asks(w, repo)).toBe(true)
+    expect(recorded(w)).toBeNull()
   })
 
-  it('a failure after project.json is written undoes the board change and puts project.json back', async () => {
-    const { w, repo, card, ask, choose, state, options, wf } = await asked()
+  it("stopped inside the board's change (before its commit): nothing is kept, the question still open; a restart changes nothing", async () => {
+    const { w, ws, repo, card, ask, choose, state, styleOf, options } = await asked()
     const request = await ask(MERGE_CHOICE_GATE, 'e1')
     const before = await options()
-    form.saveSeams.written = async () => {
-      throw new Error('a failure part way')
+    form.saveSeams.recorded = async () => {
+      throw new Error('stopped before the commit')
     }
-    await expect(choose(request, 'squash', 'branch')).rejects.toThrow(/part way/)
-    expect(await options()).toEqual(before)
-    expect(await asks(w, repo)).toBe(true)
-    expect((await state()).requests.map((r) => r.request)).toContain(request)
-    expect(wf.store.facts(card.number).filter((f) => f.kind === 'Override')).toEqual([])
+    await expect(choose(request, 'squash', 'branch')).rejects.toThrow(/before the commit/)
+    // Another Hive on the same files (a restart): it settles what the board says, which is nothing.
+    const w2 = await restart(w, ws)
+    await form.settleMergeChoices(w2)
+    expect(await options(w2)).toEqual(before)
+    expect(recorded(w2)).toBeNull()
+    expect((await state(w2)).requests.map((r) => r.request)).toContain(request)
+    expect(await styleOf(w2)).toBe('merge')
+    expect(repo && card.number).toBeTruthy()
+  })
+
+  it('stopped after the commit, before project.json: a restart writes the file from the board, unrelated options kept', async () => {
+    const { w, ws, ask, choose, state, styleOf, options } = await asked()
+    const request = await ask(MERGE_CHOICE_GATE, 'e1')
+    form.saveSeams.beforeFile = async () => {
+      throw new Error('stopped before the file')
+    }
+    await expect(choose(request, 'squash', 'branch')).rejects.toThrow(/before the file/)
+    // The board has it all: the choice (its file write pending), the answer, the card's rules; the file doesn't yet.
+    expect(recorded(w)).toMatchObject({ style: 'squash', commitMessage: 'branch', pending: true })
+    expect(await options()).toMatchObject({ style: 'merge', strict: true })
+    expect(await styleOf()).toBe('squash')
+    expect((await state()).requests).toEqual([])
+    const w2 = await restart(w, ws)
+    await form.settleMergeChoices(w2)
+    expect(await options(w2)).toMatchObject({ style: 'squash', commitMessage: 'branch', strict: true })
+    expect(recorded(w2)).toMatchObject({ pending: false })
   })
 
   it('two answers at once (two windows): one is recorded and saved, the other refused, never written over it', async () => {
-    const { w, repo, ask, choose, state, options } = await asked()
+    const { w, ask, choose, state, options } = await asked()
     const request = await ask(MERGE_CHOICE_GATE, 'e1')
     const [a, b] = await Promise.allSettled([choose(request, 'squash', 'branch'), choose(request, 'rebase', 'hive')])
     const won = a.status === 'fulfilled' ? { style: 'squash', commitMessage: 'branch' } : { style: 'rebase', commitMessage: 'hive' }
     expect([a.status, b.status].sort()).toEqual(['fulfilled', 'rejected'])
     expect(await options()).toMatchObject(won)
+    expect(recorded(w)).toMatchObject(won)
     expect((await state()).approvals).toHaveLength(1)
-    expect(await asks(w, repo)).toBeUndefined()
   })
 
-  it('a Workflow save that answers it carries the choice to the card waiting in the queue', async () => {
-    const { w, repo, card, ask, wf } = await asked()
+  it('a Workflow save that answers it records the choice, closes the question and carries it to the card waiting in the queue', async () => {
+    const { w, repo, ask, state, styleOf, pair } = await asked()
     await ask(MERGE_CHOICE_GATE, 'e1')
-    const { platform: _p, ...pair } = preset('git', 'pair')
     // No card ticked to apply to: the waiting one gets the new options anyway.
-    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, style: 'squash', commitMessage: 'branch' } })
-    expect(await asks(w, repo)).toBeUndefined()
-    expect(wf.rulesetOf(wf.store.card(card.number)).options.style).toBe('squash')
+    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, strict: true, style: 'squash', commitMessage: 'branch' } })
+    expect(recorded(w)).toMatchObject({ style: 'squash', commitMessage: 'branch', pending: false })
+    expect(await styleOf()).toBe('squash')
+    expect((await state()).requests).toEqual([])
   })
 })
 

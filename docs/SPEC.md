@@ -4473,22 +4473,30 @@ when a role or name says *review*.
   (Hive records it as it makes a project.json, which no Hive before 1.0 did), whatever the board (an upgraded board
   with no cards included). A project made by 1.0 gets none, and asks "How do you work?" (§16.3.5) instead.
 - **[HI-1697] The merge style and commit message are asked, never set silently.** A Git project given the upgrade's
-  options is marked `mergeAsk` in project.json's `workflow`. Its first card to reach the merge queue (once the project
-  has Hive merge it, a preset or a save later) pauses the queue (`mergeChoice`) with a Decide on the card in For you:
-  "How should Hive merge <project>'s cards into <target>?", with G6 (Merge commit, as until now; Squash; Rebase and
-  fast-forward) and G19 (Hive's, as until now; the branch's own; not shown with Rebase) and **Save and Carry On
-  Merging** (`workflow:chooseMerge`). The answer and a Workflow save are one function (`saveWorkflowOptions`), and
-  while the mark is set (or for an answer) a save is one change of the board, under the repository's lock, in its turn
-  of workflow writes, then in the board's lock and transaction, which every answer, move and retirement of a request
-  takes, from this Hive or another. In it: an answer's request checked still open, of the gate and bound to the card's
-  open queue entry (else refused, nothing written: a stale dialog, or one answered or retired while the save waited);
-  the options written as they are now, checked as any save is (an answer sets G6 and G19 over them), the mark cleared
-  in the same write; the cards' rules (an answer's: the project's cards in flight; a save's: those ticked and the card
-  waiting with the question, whose ruleset has the style it was approved under); then the request answered as the
-  user, or, a save that changes G6 or G19 as they resolve, the question closed. Any of it refused or failing, the
-  transaction is undone and project.json put back: all of it, or nothing. The queue then lifts its pause and merges
-  the card as chosen. Answered in words with the mark still set, the queue asks again.
-  A project marked with no card in the queue is never interrupted. Projects upgraded before HI-1697 have no mark.
+  options is marked `mergeAsk` in project.json's `workflow` (for good). Its question is open while it has the mark and
+  the board has no choice recorded for it (board meta `workflow:<project>:mergeChoice`). Its first card to reach the
+  merge queue (once the project has Hive merge it, a preset or a save later) pauses the queue (`mergeChoice`) with a
+  Decide on the card in For you: "How should Hive merge <project>'s cards into <target>?", with G6 (Merge commit, as
+  until now; Squash; Rebase and fast-forward) and G19 (Hive's, as until now; the branch's own; not shown with Rebase)
+  and **Save and Carry On Merging** (`workflow:chooseMerge`).
+  **The board records the choice atomically; the file follows it and is repaired on start.** The answer and a Workflow
+  save that chooses (changes G6 or G19 as they resolve, while the question is open) are one function
+  (`saveWorkflowOptions`), under the repository's lock and in its turn of workflow writes, and the options are checked
+  against the project's as they are now, as any save is. Then one change of the board (its lock and transaction, which
+  every answer, move and retirement of a request takes, from this Hive or another): an answer's request checked still
+  open, of the gate and bound to the card's open queue entry (else refused, nothing written: a stale dialog, or one
+  answered or retired while the save waited); the choice recorded, its file write pending; the cards' rules (Overrides
+  under the chosen options: an answer's, the project's cards in flight; a save's, those ticked and the card waiting
+  with the question); then the request answered as the user, or the question closed. Only once that has committed is
+  project.json written (G6 and G19 over its options as they are, the rest kept), and the record marked written. Stopped
+  inside the board's change, nothing is kept and the question is still open. Stopped after its commit, the waiting
+  card already merges by its Override's style, and a pending record is written to project.json at the workspace's
+  open, before the queue goes on (`QueueConfig.settle`, which then reads the options again, so the merge's G19 is the
+  one chosen; a save still writing it holds the same locks, so the queue waits for it) and before the next save. Once
+  chosen, a project's saves are ordinary ones and the record never takes them back (it is written to the file only
+  while pending). The queue then lifts its pause, closes any question still open, and merges the card as chosen.
+  Answered in words, the queue asks again. A project marked with no card in the queue is never interrupted. Projects
+  upgraded before HI-1697 have no mark.
 
 **Agents' old moves, for one transition** [HB3's finding 7]: from P4 until P8 rewrites the skills, an agent's
 `hive_update_task` column move is translated into the matching intent instead of refused: `review` → submit, `passed`

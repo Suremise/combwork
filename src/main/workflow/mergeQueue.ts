@@ -14,7 +14,7 @@ import { existsSync, readFileSync } from 'original-fs'
 import { basename, join, resolve } from 'path'
 import { git, GIT_PREFIX } from '../git'
 import { endTree } from '../progressReporters/wrapper'
-import { MERGE_CHOICE_GATE, openEntry, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type FactData, type QueueEntry } from '../../shared/workflow/facts'
+import { MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type FactData, type QueueEntry } from '../../shared/workflow/facts'
 import type { TransientFailure } from '../../shared/types'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
@@ -83,6 +83,8 @@ export interface QueueConfig {
    * its options, `mergeAsk`): the queue then asks in For you (paused `mergeChoice`) before its first merge.
    */
   mergeAsk?: () => Promise<boolean>
+  /** HI-1697: brings the project's options in line with the board's recorded merge choice, when its write is pending. */
+  settle?: () => Promise<void>
   /** Runs a named merge check (its configured command) in a folder, on the test merge's result. */
   runCheck: (name: string, command: string, folder: string, ctx: CheckContext) => Promise<CheckResult>
   /** Installs dependencies there; `clean` from scratch (`npm ci`). `skipped`: there was nothing to install. */
@@ -592,11 +594,15 @@ export class MergeQueue {
 
   /** Takes the next entry for the target and takes it as far as it goes. Null when there's none or the queue is paused. */
   async runOnce(target: string): Promise<QueueOutcome | null> {
+    // HI-1697: the project's options brought in line with the board's recorded merge choice first, if their write is
+    // pending (a save stopped after the board's commit). A waiting card's style is its own Override's either way.
+    await this.cfg.settle?.()
     const p = this.paused(target)
     if (p?.reason === 'approval') return this.fenced(target, async () => this.thenPush(target, await this.answered(target, p.card))).catch(lostIsNull)
-    // HI-1697: lifted once the merge style and commit message are chosen (the answer, or a save of the options).
-    // Still to be chosen with no question open (answered in words, say): lifted too, so the next entry asks again.
-    if (p?.reason === 'mergeChoice' && (!(await this.cfg.mergeAsk?.()) || !this.asking(p.card)) && (await this.fenced(target, () => this.chosen(target, p.card)).catch(lostIsNull))) return this.runOnce(target)
+    // HI-1697: lifted once the merge style and commit message are chosen (the answer, or a save of the options), the
+    // choice carried to the cards waiting first. Still to be chosen with no question open (answered in words, say):
+    // lifted too, so the next entry asks again.
+    if (p?.reason === 'mergeChoice' && (!(await this.mergeAsked()) || !this.asking(p.card)) && (await this.fenced(target, () => this.chosen(target, p.card)).catch(lostIsNull))) return this.runOnce(target)
     if (p) return null
     return this.fenced(target, async () => {
       // A push owed by an earlier merge goes first (G18: after a restart or a Resume), and the next entry waits for it.
@@ -805,7 +811,7 @@ export class MergeQueue {
       // ruleset (`targetOwn`, kept with a lane's rules too), never one inherited from the workspace's or Hive's defaults.
       if (!this.wf.rulesetOf(card, s).options.targetOwn && this.cfg.subfolder?.()) return this.pause(target, card, entry, 'subfolderTarget')
       // HI-1697: an upgraded project's first merge waits for its merge style and commit message to be chosen.
-      if (await this.cfg.mergeAsk?.()) return this.askMerge(card, entry, target)
+      if (await this.mergeAsked()) return this.askMerge(card, entry, target)
       const revision = s.approved?.revision ?? entry.revision
       const step = (now: QueueStep, expected: string | null): void => this.cfg.onStep?.({ card: card.key, number: card.id, entry: entry.id, revision, expected, step: now, started })
       let expected: string
@@ -1218,6 +1224,11 @@ export class MergeQueue {
       this.wf.askUser(w, 'decide', MERGE_CHOICE_GATE, workflowText(FOR_YOU.mergeChoice, { project: basename(this.project), target }), { unbound: true, entry: entry.id })
     })
     return out
+  }
+
+  /** HI-1697: the project's merge style and commit message still to be chosen: the upgrade's mark, and no choice on the board. */
+  private async mergeAsked(): Promise<boolean> {
+    return !!(await this.cfg.mergeAsk?.()) && !this.wf.store.meta(MERGE_CHOICE_KEY)
   }
 
   /** Whether the card's question about the merge style and message (HI-1697) is open. */

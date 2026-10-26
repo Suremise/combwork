@@ -5,12 +5,13 @@
 // each gets an Override naming the options changed, carrying the new ruleset, which the card works under from then on.
 // Also the one-time notice offering the presets after the upgrade (§16.17, OP-22).
 
+import { app } from 'electron'
 import { existsSync } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { join } from 'path'
 import { ADOPTION_UPTO, boardState, boardValue, boardWrite, cardKeys, setBoardValue } from '../boardStore'
 import { cardLabel } from '../../shared/projectKeys'
-import { MERGE_CHOICE_GATE, openEntry } from '../../shared/workflow/facts'
+import { MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry } from '../../shared/workflow/facts'
 import { refusal } from '../../shared/workflow/refusals'
 import { config } from '../config'
 import { HiveError, hiveError } from '../hiveError'
@@ -25,8 +26,8 @@ import { allOff, NAME_OPTIONS, PRESETS, preset, takesOption, type CommitMessage,
 import { setPresetAsked, writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
 import type { PlatformId } from '../../shared/platform/descriptors'
-import type { ProjectStages, ProjectWorkflow, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowProblem } from '../../shared/types'
-import { compile, mustCompile } from '../../shared/workflow/compile'
+import type { ProjectConfig, ProjectStages, ProjectWorkflow, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowProblem } from '../../shared/types'
+import { compile, mustCompile, type Ruleset } from '../../shared/workflow/compile'
 import type { WorkspaceService } from '../workspace'
 import { FactStore } from './factStore'
 import { checkOptions, problemText, problemShownOf, resolvedOf, resolveOptions, workflowChanged, type OptionLevels } from './rulesets'
@@ -36,6 +37,7 @@ import { kickQueue, queueChanged } from './queueHost'
 import { isUnknown } from '../platform/types'
 import { workflowWrite } from './writes'
 import { withRepoLocks } from '../repoLock'
+import { exitBy } from '../exitLog'
 
 const log = createLogger('workflow')
 
@@ -267,101 +269,158 @@ export async function chooseMerge(ws: WorkspaceService, projectPath: string, raw
 }
 
 /**
- * A save, under the repository's lock and in its turn of workflow writes. HI-1697: a project whose merge question is
- * still open (the upgrade's mark), or a save that answers it, saves as one change of the board (its lock and
- * transaction, which every answer, move and retirement of a request takes, in this Hive or another): the answer's
- * request checked there, still open, of its gate, bound to the card's open entry (else refused, nothing written); the
- * options written as they are now, checked as any save is (an answer's choice set over them), the mark cleared with
- * them; the cards' rules (the waiting card's too: its ruleset has the style it was approved under); then the request
- * answered as the user, or, a save choosing them, the question closed. Any of it refused or failing, the transaction is
- * undone and project.json put back as it was: either all of it, or nothing.
+ * A save, under the repository's lock and in its turn of workflow writes. HI-1697: the upgrade's merge question is open
+ * while the project has the upgrade's mark (`mergeAsk`, kept for good) and the board no recorded choice
+ * (`MERGE_CHOICE_KEY`). Its answer, or a save that chooses (changes G6 or G19 as they resolve), is recorded on the board
+ * first, as one change of the board (its lock and transaction, which every answer, move and retirement of a request
+ * takes, in this Hive or another): the answer's request checked there (still open, of its gate, bound to the card's
+ * open entry; else refused, nothing written), the choice recorded with its file write pending, the cards' rules (an
+ * answer's: the project's cards in flight; a save's: those ticked and the card waiting with the question), then the
+ * request answered as the user, or the question closed. project.json follows once that has committed, and the record
+ * is marked written. A save stopped between the two leaves the board's record pending: `settleMergeChoice` writes the
+ * file from it (at the workspace's open, before the queue goes on, before the next save). The board decides; the file
+ * follows.
  */
 async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answer?: MergeAnswer }): Promise<WorkflowForm> {
   const project = projectOf(ws, projectPath)
-  const asked = !!o.answer || !!(await ws.projectConfig(project.path)).workflow?.mergeAsk
-  let saved: Saved
-  if (!asked) {
-    saved = await writeOptions(ws, project, shapeOf(raw), false)
-    if (!namesOnly(saved.changed) && o.applyTo?.length && saved.changed.length) await applyToInFlight(ws, project, [...new Set(o.applyTo)], saved.changed)
+  await settleLocked(ws, project)
+  const cfg = await ws.projectConfig(project.path)
+  const asking = !!cfg.workflow?.mergeAsk && !mergeChoiceOf(ws, project.name)
+  if (o.answer && !asking) throw await refusedAnswer(ws, project, o.answer)
+  const change: WorkflowChange = o.answer ? answerChange(cfg, project.platform, o.answer) : shapeOf(raw)
+  // Checked against the options as they are now (they can't change meanwhile: this save holds the repository's lock and
+  // the turn of workflow writes, which every other write of a project's options takes too).
+  const plan = planOptions(ws, project, cfg, change, asking && !!o.answer)
+  let target = change.options.target ?? ''
+  if (!plan.chosen) {
+    await ws.mutateProjectConfig(project.path, (c) => ({ workflow: planOptions(ws, project, c, change, false).workflow }))
+    if (!namesOnly(plan.changed) && o.applyTo?.length && plan.changed.length) await applyToInFlight(ws, project, [...new Set(o.applyTo)], plan.changed)
   } else {
-    let before: { workflow?: ProjectWorkflow } | null = null
+    const store = FactStore.forBoard(ws, { project: project.name, key: project.name })
+    const options = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow: plan.workflow }).options
     await saveSeams.beforeBoard?.()
-    try {
-      saved = await boardWrite(ws, async () => {
-        const target = o.answer ? await stillAsked(ws, project, o.answer) : null
-        const cfg = await ws.projectConfig(project.path)
-        before = { workflow: cfg.workflow }
-        const change: WorkflowChange = o.answer ? answerChange(cfg, project.platform, o.answer) : shapeOf(raw)
-        const s = await writeOptions(ws, project, change, !!o.answer)
-        await saveSeams.written?.()
-        // The answer's choice is how Hive merges the project's cards: all those in flight; a save's, those ticked, and
-        // the card waiting with the question once it chooses.
-        const cards = o.answer ? (await cardsInFlight(ws, project)).map((c) => c.number) : [...(o.applyTo ?? []), ...(s.chosen ? await askedCards(ws, project.path) : [])]
-        if (!namesOnly(s.changed) && cards.length && s.changed.length) await applyToInFlight(ws, project, [...new Set(cards)], s.changed)
-        if (o.answer) await answerIt(o.answer)
-        else if (s.chosen) await closeAsked(ws, project.path)
-        return { ...s, target: target ?? s.target }
-      })
-    } catch (e) {
-      if (before) await putBack(ws, project.path, before)
-      throw e
-    }
+    await boardWrite(ws, async () => {
+      if (o.answer) target = await stillAsked(ws, project, o.answer)
+      // Chosen meanwhile (another Hive's answer): this one is refused, as an answered question's is.
+      else if (mergeChoiceOf(ws, project.name)) throw new WorkflowStale()
+      const ruleset = mustCompile(options)
+      store.saveRuleset(ruleset)
+      const cards = o.answer ? (await cardsInFlight(ws, project)).map((c) => c.number) : [...(o.applyTo ?? []), ...(await askedCards(ws, project.path))]
+      if (cards.length) await applyToInFlight(ws, project, [...new Set(cards)], [...new Set([...plan.changed, 'style' as const])], ruleset)
+      store.setMeta(MERGE_CHOICE_KEY, JSON.stringify({ style: options.style, commitMessage: options.commitMessage, at: new Date().toISOString(), pending: true } satisfies MergeChoiceRecord))
+      if (o.answer) await answerIt(o.answer)
+      else await closeAsked(ws, project.path)
+      await saveSeams.recorded?.()
+    })
+    // The board has the choice: the file follows it, then the record is marked written.
+    await saveSeams.beforeFile?.()
+    await settleLocked(ws, project, plan.workflow)
   }
-  log.info(`the workflow options of ${userText(project.name)} changed: ${saved.changed.join(', ') || 'none'}${saved.chosen ? ' (the merge question answered)' : ''}`)
+  log.info(`the workflow options of ${userText(project.name)} changed: ${plan.changed.join(', ') || 'none'}${plan.chosen ? ' (the merge question answered)' : ''}`)
   workflowChanged(ws, project.path)
   // Names alone change no card's rules (#1417): nothing to apply to cards in flight, nor any queue to read again.
-  if (namesOnly(saved.changed) && !saved.chosen) return workflowForm(ws, project.path)
+  if (namesOnly(plan.changed) && !plan.chosen) return workflowForm(ws, project.path)
   // Whether Hive merges, and into what, may have changed: the windows read the project's queues again (#1356: which
   // show follows the options too), whoever changed them (the window, the Assistant). A queue waiting for the merge
   // question (paused `mergeChoice`) carries on.
-  const t = saved.target || (await G.defaultBranch(project.path).catch(() => null))
+  const t = target || (await G.defaultBranch(project.path).catch(() => null))
   if (t && !isUnknown(t)) {
     queueChanged(ws, project.path, t)
-    if (saved.chosen) void kickQueue(ws, project.path, t)
+    if (plan.chosen) void kickQueue(ws, project.path, t)
   }
   return workflowForm(ws, project.path)
 }
 
-/**
- * Tests only (HI-1697's races): seams in a save made with the merge question open, just before it takes the board's lock,
- * and once project.json is written, inside the board's change.
- */
-export const saveSeams: { beforeBoard?: () => Promise<void>; written?: () => Promise<void> } = {}
-
-/** What a save wrote: the options it changed, whether it chose the merge question's (HI-1697), its target if named. */
-interface Saved {
-  changed: (keyof WorkflowOptions)[]
-  chosen: boolean
-  target: string
+interface MergeChoiceRecord {
+  style: WorkflowOptions['style']
+  commitMessage: CommitMessage
+  at: string
+  pending: boolean
 }
 
-/** Writes a change to the project's options as they are now (`answering`: the merge question's answer clears its mark). */
-async function writeOptions(ws: WorkspaceService, project: { path: string; name: string; platform: PlatformId }, change: WorkflowChange, answering: boolean): Promise<Saved> {
-  let changed: (keyof WorkflowOptions)[] = []
-  let chosen = false
-  await ws.mutateProjectConfig(project.path, (cfg) => {
-    // Its version control switched since the form was read (#1419): these options are the other platform's, refused.
-    const now = projectPlatform(project.path, cfg.platform).id
-    if (now !== project.platform) throw hiveError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[now] }, { kind: 'conflict' })
-    // A form read before another change (the Assistant's tool, another window) never writes over it (#1418).
-    if (change.base && !sameBase(change.base, ownNow(cfg, project.platform))) throw new WorkflowStale()
-    const c = changeOf(ws, project.platform, ownOf(cfg, project.platform), change, project.path)
-    if (c.problems.length) throw new WorkflowRefused(c.problems)
-    changed = c.changed
-    const options = Object.fromEntries(Object.entries(change.options).filter(([k, v]) => k !== 'platform' && v !== undefined))
-    // Saved from the Workflow section: the answer to "How do you work?" for this platform is given (#1423).
-    const workflow = setPresetAsked(writeWorkflow(cfg.workflow, { platform: project.platform, preset: change.preset, options }), project.platform, 'chosen')
-    // HI-1697: a change to the merge style or the commit message, as they resolve (one left out inherits), chooses
-    // them; so does the answer, whatever it chose.
-    if (workflow.mergeAsk && answering) chosen = true
-    else if (workflow.mergeAsk) {
-      const was = resolvedOf(ws, project.path, project.platform, cfg).options
-      const next = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow }).options
-      chosen = was.style !== next.style || was.commitMessage !== next.commitMessage
-    }
-    return { workflow: chosen ? withoutMergeAsk(workflow) : workflow }
+/** The project's recorded merge choice (HI-1697), or null; one that can't be read counts as recorded, never asked again. */
+function mergeChoiceOf(ws: WorkspaceService, projectName: string): MergeChoiceRecord | null {
+  const v = FactStore.forBoard(ws, { project: projectName, key: projectName }).meta(MERGE_CHOICE_KEY)
+  if (!v) return null
+  try {
+    const r = JSON.parse(v) as Partial<MergeChoiceRecord>
+    return takesOption('style', r.style) && takesOption('commitMessage', r.commitMessage) ? (r as MergeChoiceRecord) : { style: 'merge', commitMessage: 'hive', at: '', pending: false }
+  } catch {
+    return { style: 'merge', commitMessage: 'hive', at: '', pending: false }
+  }
+}
+
+/**
+ * HI-1697: project.json brought in line with the board's recorded merge choice while its file write is pending (a save
+ * stopped after the board's commit): G6 and G19 set as recorded over the project's options as they are now, then the
+ * record marked written. Under the repository's lock and in a turn of workflow writes, as every save. At the
+ * workspace's open, and before the queue goes on (`QueueConfig.settle`).
+ */
+export async function settleMergeChoice(ws: WorkspaceService, projectPath: string): Promise<void> {
+  const project = projectOf(ws, projectPath)
+  if (!mergeChoiceOf(ws, project.name)?.pending) return
+  await withRepoLocks([project.path], () => workflowWrite(() => settleLocked(ws, project)), { quiet: true, project: project.path })
+}
+
+/** Every project of the workspace settled (its open), each on its own: one that fails is logged and tried again later. */
+export async function settleMergeChoices(ws: WorkspaceService): Promise<void> {
+  for (const p of ws.info()?.projects ?? []) {
+    if (!p.platform) continue
+    await settleMergeChoice(ws, p.path).catch((e: unknown) => log.warn(`writing the merge choice of ${userText(p.name)} to its options (tried again later)`, e))
+  }
+}
+
+/** Settles a pending record, holding the locks; `workflow`: the save's own workflow to write (its whole change), else G6 and G19 only. */
+async function settleLocked(ws: WorkspaceService, project: { path: string; name: string; platform: PlatformId }, workflow?: ProjectWorkflow): Promise<void> {
+  const rec = mergeChoiceOf(ws, project.name)
+  if (!rec?.pending) return
+  await ws.mutateProjectConfig(project.path, (c) => {
+    if (workflow) return { workflow }
+    const own = ownOf(c, project.platform)
+    return { workflow: writeWorkflow(c.workflow, { platform: project.platform, preset: c.workflow?.platform === project.platform ? c.workflow.preset : null, options: { ...own, style: rec.style, commitMessage: rec.commitMessage } }) }
   })
-  return { changed, chosen, target: change.options.target ?? '' }
+  await boardWrite(ws, async () => {
+    const now = mergeChoiceOf(ws, project.name)
+    if (now?.at === rec.at) FactStore.forBoard(ws, { project: project.name, key: project.name }).setMeta(MERGE_CHOICE_KEY, JSON.stringify({ ...rec, pending: false }))
+  })
+  if (!workflow) {
+    log.info(`the merge choice of ${userText(project.name)} written to its options from the board (${rec.style}, ${rec.commitMessage})`)
+    workflowChanged(ws, project.path)
+  }
+}
+
+/**
+ * Tests only (HI-1697's races and crash boundaries): seams in a save that answers the merge question: before it takes
+ * the board's lock, inside the board's change once the choice is recorded, and after its commit, before project.json.
+ */
+export const saveSeams: { beforeBoard?: () => Promise<void>; recorded?: () => Promise<void>; beforeFile?: () => Promise<void> } = {}
+
+// A test copy (an unpackaged build) crashes at one of them when HIVE_TEST_MERGE_CHOICE_CRASH names it (HI-1697's crash
+// boundaries, tests/e2e/queueupgrade.cjs): Hive gone part way, as a crash leaves it.
+const crashAt = app?.isPackaged ? undefined : process.env.HIVE_TEST_MERGE_CHOICE_CRASH
+if (crashAt === 'recorded' || crashAt === 'beforeFile') saveSeams[crashAt] = () => (exitBy('app.exit', `a test crash at the merge choice's ${crashAt}`, () => app.exit(1)), new Promise<void>(() => undefined))
+
+/** What a save makes of the project's options: its workflow, the options it changes, whether it chooses (HI-1697). */
+function planOptions(ws: WorkspaceService, project: { path: string; name: string; platform: PlatformId }, cfg: ProjectConfig, change: WorkflowChange, answering: boolean): { workflow: ProjectWorkflow; changed: (keyof WorkflowOptions)[]; chosen: boolean } {
+  // Its version control switched since the form was read (#1419): these options are the other platform's, refused.
+  const now = projectPlatform(project.path, cfg.platform).id
+  if (now !== project.platform) throw hiveError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[now] }, { kind: 'conflict' })
+  // A form read before another change (the Assistant's tool, another window) never writes over it (#1418).
+  if (change.base && !sameBase(change.base, ownNow(cfg, project.platform))) throw new WorkflowStale()
+  const c = changeOf(ws, project.platform, ownOf(cfg, project.platform), change, project.path)
+  if (c.problems.length) throw new WorkflowRefused(c.problems)
+  const options = Object.fromEntries(Object.entries(change.options).filter(([k, v]) => k !== 'platform' && v !== undefined))
+  // Saved from the Workflow section: the answer to "How do you work?" for this platform is given (#1423).
+  const workflow = setPresetAsked(writeWorkflow(cfg.workflow, { platform: project.platform, preset: change.preset, options }), project.platform, 'chosen')
+  // HI-1697: with the question open, the answer chooses; so does a change to G6 or G19 as they resolve (one left out
+  // inherits).
+  let chosen = answering
+  if (!chosen && workflow.mergeAsk && !mergeChoiceOf(ws, project.name)) {
+    const was = resolvedOf(ws, project.path, project.platform, cfg).options
+    const next = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow }).options
+    chosen = was.style !== next.style || was.commitMessage !== next.commitMessage
+  }
+  return { workflow, changed: c.changed, chosen }
 }
 
 /** The answer's change: the project's own options and preset as they are now, its merge style and commit message set. */
@@ -370,19 +429,26 @@ function answerChange(cfg: { workflow?: ProjectWorkflow }, platform: PlatformId,
   return { preset: from, options: { ...ownOf(cfg, platform), style: a.style, commitMessage: a.commitMessage } }
 }
 
+/** An answer refused as `tasks:answer` refuses one: a stale dialog's, or one answered or retired meanwhile. */
+async function refusedAnswer(ws: WorkspaceService, project: { path: string }, a: MergeAnswer): Promise<Error> {
+  const { WorkflowRefusedError } = await import('../tasks')
+  const wf = await workflowFor(ws, project.path)
+  const rec = wf?.store.cards().find((c) => c.id === a.card)
+  const s = wf && rec ? wf.state(rec) : null
+  return new WorkflowRefusedError(refusal('move.notFromHere', { card: rec ? cardLabel({ number: a.card, key: rec.key }) : `#${a.card}`, stage: s?.stage ?? 'todo', move: 'answer', moves: '' }))
+}
+
 /**
  * The answer's request still asks, checked under the board's lock: the card this project's, the request open, the merge
- * question, bound to the card's open queue entry; its target. Else refused (a stale dialog's answer, or one answered or
- * retired meanwhile), as `tasks:answer` refuses one.
+ * question, bound to the card's open queue entry; its target. Else refused.
  */
 async function stillAsked(ws: WorkspaceService, project: { path: string }, a: MergeAnswer): Promise<string> {
-  const { WorkflowRefusedError } = await import('../tasks')
   const wf = await workflowFor(ws, project.path)
   const rec = wf?.store.cards().find((c) => c.id === a.card)
   const s = wf && rec ? wf.state(rec) : null
   const req = s?.requests.find((r) => r.request === a.request)
   const entry = s ? openEntry(s) : undefined
-  if (!s || !req || req.gate !== MERGE_CHOICE_GATE || !entry || req.entry !== entry.id) throw new WorkflowRefusedError(refusal('move.notFromHere', { card: rec ? cardLabel({ number: a.card, key: rec.key }) : `#${a.card}`, stage: s?.stage ?? 'todo', move: 'answer', moves: '' }))
+  if (!s || !req || req.gate !== MERGE_CHOICE_GATE || !entry || req.entry !== entry.id) throw await refusedAnswer(ws, project, a)
   return entry.target
 }
 
@@ -406,16 +472,6 @@ async function closeAsked(ws: WorkspaceService, projectPath: string): Promise<vo
   }
 }
 
-/** project.json's workflow put back as it was, after a save whose board change was undone. */
-async function putBack(ws: WorkspaceService, projectPath: string, before: { workflow?: ProjectWorkflow }): Promise<void> {
-  await ws.mutateProjectConfig(projectPath, () => ({ workflow: before.workflow })).catch((e: unknown) => log.warn(`putting back the workflow options of ${userText(projectPath)}`, e))
-}
-
-const withoutMergeAsk = (w: ProjectWorkflow): ProjectWorkflow => {
-  const { mergeAsk: _asked, ...rest } = w
-  return rest
-}
-
 /** The project's cards whose merge waits for the upgrade's question (HI-1697): a request of its gate open. */
 async function askedCards(ws: WorkspaceService, projectPath: string): Promise<number[]> {
   const wf = await workflowFor(ws, projectPath)
@@ -423,12 +479,13 @@ async function askedCards(ws: WorkspaceService, projectPath: string): Promise<nu
 }
 
 /** The user applies the options now in force to cards in flight: an Override on each that is still in flight. */
-async function applyToInFlight(ws: WorkspaceService, project: { path: string; name: string }, cards: number[], changed: (keyof WorkflowOptions)[]): Promise<void> {
+async function applyToInFlight(ws: WorkspaceService, project: { path: string; name: string }, cards: number[], changed: (keyof WorkflowOptions)[], given?: Ruleset): Promise<void> {
   const wf = await workflowFor(ws, project.path)
   if (!wf) return
   const store = FactStore.forBoard(ws, { project: project.name, key: project.name })
   await boardWrite(ws, async () => {
-    const ruleset = wf.currentRuleset()
+    // The options now in force, or the ruleset given (HI-1697: the merge choice's, recorded before project.json has it).
+    const ruleset = given ?? wf.currentRuleset()
     store.tx((tx) => {
       for (const n of cards) {
         const card = store.cards().find((c) => c.id === n)
