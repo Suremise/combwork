@@ -20,8 +20,9 @@ export default defineConfig({
     environment: 'node',
     // fs.watch watches real paths, so a short (8.3) temp folder can't trip Node's libuv (tests/watchRealPaths.ts, #389), and
     // git runs with none of the shell's GIT_* variables (tests/cleanGitEnv.ts, #425, first) and no global config, as on
-    // GitHub's runner (tests/noGlobalGit.ts, #448). Each file's temp folders go when it ends (tests/tempCleanup.ts, #995).
-    setupFiles: ['tests/cleanGitEnv.ts', 'tests/watchRealPaths.ts', 'tests/noGlobalGit.ts', 'tests/tempCleanup.ts'],
+    // GitHub's runner (tests/noGlobalGit.ts, #448). Claude Code, Codex and Copilot get empty homes, never the user's
+    // (tests/cliHomes.ts, HI-1703). Each file's temp folders go when it ends (tests/tempCleanup.ts, #995).
+    setupFiles: ['tests/cleanGitEnv.ts', 'tests/watchRealPaths.ts', 'tests/noGlobalGit.ts', 'tests/cliHomes.ts', 'tests/tempCleanup.ts'],
     // A full run is a heavy run: it waits for a test slot as a full e2e set does (tests/unitSlot.ts, #599).
     globalSetup: ['tests/unitSlot.ts', 'tests/tempRun.ts'],
     // Under load (e2e sets, scenario runs and other agents' tests on the same machine), Vitest's defaults (5 s a test, a
