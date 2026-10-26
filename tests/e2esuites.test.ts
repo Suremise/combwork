@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, unlinkSync, u
 import { userInfo } from 'os'
 import { basename, join } from 'path'
 import { pathToFileURL } from 'url'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
 import { SUITES } from './e2e/suites.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -1665,68 +1665,126 @@ describe('whether a process still runs (lib.processRunning, #339)', () => {
 })
 
 describe('sending a prompt to a CLI until it takes it (lib.sendPrompt, #190)', () => {
-  type Send = (inv: (ch: string, ...a: unknown[]) => Promise<unknown>, key: string, text: string, o: { submitted: () => Promise<boolean>; tries?: number; waitMs?: number }) => Promise<number>
+  type Send = (inv: (ch: string, ...a: unknown[]) => Promise<unknown>, key: string, text: string, o: { submitted: () => boolean | Promise<boolean>; ready?: () => boolean; tries?: number; waitMs?: number }) => Promise<number>
   const { sendPrompt } = createRequire(import.meta.url)('./e2e/lib.cjs') as { sendPrompt: Send }
   const text = 'Use apply_patch to add a file notes.txt containing hi.'
   /**
-   * A terminal that drops the first `dropText` prompts typed and ignores the first `dropEnter` Enters. With `paste` it
-   * has bracketed paste on and reads as Claude Code 2.1.309 does (#1547): each write is one read, however it was split; a
-   * long typed read is a paste, a Ctrl+U in it kept as an invisible character that leaves the prompt unsent; a Ctrl+U
-   * before a bracketed paste clears the line.
+   * A terminal that drops the first `dropText` prompts typed and ignores the first `dropEnter` Enters (a new line in
+   * the input instead). With `paste` it has bracketed paste on and reads as Claude Code 2.1.309 does (#1547): each write
+   * is one read, however it was split; a long typed read is a paste, a Ctrl+U in it kept as an invisible character that
+   * leaves the prompt unsent; a Ctrl+U read alone clears the input. With `emptyAfterFirst` it empties its input after
+   * drawing the first prompt, as Claude Code does drawing its weekly limit line just after start (#1148, #1556).
    */
-  const terminal = ({ dropText = 0, dropEnter = 0, paste = false, prompt = text }) => {
-    const t = { writes: [] as string[], screen: paste ? '\x1b[?2004h' : '', input: '', submitted: false }
+  const terminal = ({ dropText = 0, dropEnter = 0, paste = false, emptyAfterFirst = false, prompt = text }) => {
+    const t = { writes: [] as string[], screen: paste ? '\x1b[?2004h' : '', input: '', submitted: false, taken: [] as string[] }
+    let drawn = 0
     const inv = async (ch: string, _key: unknown, data?: unknown) => {
       if (ch === 'pty:buffer') return t.screen
       const d = String(data)
       t.writes.push(d)
-      if (d === '\r') {
+      if (d === '\x15') t.input = ''
+      else if (d === '\r') {
         if (dropEnter-- > 0) t.input += '\n'
-        else if (t.input.trim() && !t.input.includes('\x15')) t.submitted = true
+        else if (t.input.trim() && !t.input.includes('\x15')) {
+          t.submitted = true
+          t.taken.push(t.input)
+        }
       } else if (dropText-- <= 0) {
-        const pasted = /^\x15?\x1b\[200~([^]*)\x1b\[201~$/.exec(d)
-        t.input = pasted ? pasted[1] : paste && d.length > 20 ? d : d.replace(/^\x15/, '')
+        const pasted = /^\x1b\[200~([^]*)\x1b\[201~$/.exec(d)
+        t.input = pasted ? pasted[1] : d
         t.screen += `\x1b[2m> ${t.input}`
+        if (emptyAfterFirst && ++drawn === 1) {
+          t.input = ''
+          t.screen += '\r\nYou\'ve used 95% of your weekly limit\r\n> Try "how does <filepath> work?"'
+        }
       }
       return undefined
     }
-    return { t, run: (tries?: number) => sendPrompt(inv, 'k', prompt, { submitted: async () => t.submitted, waitMs: 50, ...(tries ? { tries } : {}) }) }
+    return { t, run: (tries?: number, o: { submitted?: () => boolean; ready?: () => boolean } = {}) => sendPrompt(inv, 'k', prompt, { submitted: () => t.submitted, waitMs: 50, ...(tries ? { tries } : {}), ...o }) }
   }
+  /** An attempt as typed: Ctrl+U as a write of its own, the prompt (pasted or typed), Enter. */
+  const attempt = (prompt: string, paste: boolean) => ['\x15', paste ? `\x1b[200~${prompt}\x1b[201~` : prompt, '\r']
+  afterEach(() => vi.restoreAllMocks())
 
-  it('taken at once: one prompt, one Enter', async () => {
-    const { t, run } = terminal({})
-    expect(await run()).toBe(1)
-    expect(t.writes).toEqual([text, '\r'])
+  it('taken at once: Ctrl+U on its own, one prompt, one Enter; pasted while the CLI has bracketed paste on', async () => {
+    const typed = terminal({})
+    expect(await typed.run()).toBe(1)
+    expect(typed.t.writes).toEqual(attempt(text, false))
+    const pasted = terminal({ paste: true })
+    expect(await pasted.run()).toBe(1)
+    expect(pasted.t.writes).toEqual(attempt(text, true))
   })
 
-  it('an Enter that became a new line: Enter again, without typing the prompt twice', async () => {
+  it('typed, an Enter that became a new line: Enter again, without typing the prompt twice', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
     const { t, run } = terminal({ dropEnter: 1 })
     expect(await run()).toBe(2)
-    expect(t.writes).toEqual([text, '\r', '\r'])
+    expect(t.writes).toEqual([...attempt(text, false), '\r'])
   })
 
-  it('a prompt dropped while the CLI was drawing: typed again over a cleared line', async () => {
+  it('a prompt dropped while the CLI was drawing: typed again over a cleared input', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
     const { t, run } = terminal({ dropText: 1 })
     expect(await run()).toBe(2)
-    expect(t.writes).toEqual([text, '\r', `\x15${text}`, '\r'])
+    expect(t.writes).toEqual([...attempt(text, false), ...attempt(text, false)])
   })
 
-  it('with bracketed paste on, the prompt goes again as a paste after Ctrl+U, which a read of both together still sends (#1547)', async () => {
+  it('pasted, an input the CLI emptied after drawing the prompt: pasted again whole, taken once, never Enter on nothing (#1148, #1556)', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const { t, run } = terminal({ paste: true, emptyAfterFirst: true })
+    expect(await run()).toBe(2)
+    expect(t.writes).toEqual([...attempt(text, true), ...attempt(text, true)])
+    expect(t.taken).toEqual([text])
+    expect(String(log.mock.calls[0][0])).toMatch(/^INFO sendPrompt attempt 1 not taken: pasted, echoed yes, its text not on the last input line/)
+  })
+
+  it('with bracketed paste on, a dropped prompt goes again as a paste after a Ctrl+U of its own (#1547)', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
     const { t, run } = terminal({ dropText: 1, paste: true })
     expect(await run()).toBe(2)
-    expect(t.writes).toEqual([text, '\r', `\x15\x1b[200~${text}\x1b[201~`, '\r'])
+    expect(t.writes).toEqual([...attempt(text, true), ...attempt(text, true)])
   })
 
   it('a slash command is typed again, never pasted (pasted, it would be sent as a message)', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
     const { t, run } = terminal({ dropText: 1, paste: true, prompt: '/exit' })
     expect(await run()).toBe(2)
-    expect(t.writes).toEqual(['/exit', '\r', '\x15/exit', '\r'])
+    expect(t.writes).toEqual([...attempt('/exit', false), ...attempt('/exit', false)])
   })
 
-  it('never taken: 0 after the tries', async () => {
+  it('a prompt taken after its attempt gave up is not typed again: submitted() is checked before a retry', async () => {
+    // The CLI took it, but says so only once the attempt's wait is over (a slow hook).
+    let late = false
+    vi.spyOn(console, 'log').mockImplementation(() => {
+      late = true
+    })
+    const { t, run } = terminal({ paste: true })
+    expect(await run(3, { submitted: () => late })).toBe(1)
+    expect(t.writes).toEqual(attempt(text, true))
+  })
+
+  it('waits for ready() before the first attempt, and types anyway, saying so, when it never comes', async () => {
+    const { t, run } = terminal({ paste: true })
+    let polls = 0
+    const ready = () => {
+      // Nothing typed while it isn't ready.
+      expect(t.writes).toEqual([])
+      return ++polls >= 2
+    }
+    expect(await run(3, { ready })).toBe(1)
+    expect(polls).toBe(2)
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const never = terminal({ paste: true })
+    expect(await never.run(3, { ready: () => false })).toBe(1)
+    expect(String(log.mock.calls[0][0])).toBe('INFO sendPrompt: not ready within 0.05 s, typed anyway')
+    expect(never.t.taken).toEqual([text])
+  })
+
+  it('never taken: 0 after the tries, the last typed again whole', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
     const { t, run } = terminal({ dropEnter: 9 })
     expect(await run(3)).toBe(0)
-    expect(t.writes.filter((w) => w === '\r')).toHaveLength(3)
+    expect(t.writes).toEqual([...attempt(text, false), '\r', ...attempt(text, false)])
   })
 })
 
