@@ -9,6 +9,7 @@ import { tempDir } from './tempDir'
 
 const { openDb, transaction } = await import('../src/main/db')
 const wal = await import('../src/main/walCheckpoint')
+const { checkpointHooks } = await import('../src/main/walCheckpointWorker')
 
 const base = tempDir('hive-wal-checkpoint-')
 let n = 0
@@ -167,10 +168,8 @@ describe('checkpoints out of the commits (#1633)', () => {
     const db = open(wal.checkpointWhenIdle)
     try {
       write(db.writer, 5)
-      // A statement of the writer's still running: SQLite refuses the checkpoint ("database table is locked").
-      const rows = db.writer.prepare('SELECT id FROM t').iterate()
-      rows.next()
-      expect(db.writer.isTransaction).toBe(false)
+      // SQLite (or the disk) refuses the checkpoint: on its own connection, as the worker runs it (HI-1691).
+      checkpointHooks.fail = (file) => file === db.file
       const step = wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs
       const failed = wal.checkpointStats.failed
       let t = performance.now()
@@ -186,13 +185,14 @@ describe('checkpoints out of the commits (#1633)', () => {
       expect(wal.checkpointStats.failed).toBe(failed + 2)
       expect(autoPages(db.writer)).toBe(1000)
       expect(wal.checkpointsInCommits(db.writer)).toBe(true)
-      // The statement ends: the next checkpoint due finishes, and the fallback goes.
-      rows.return?.()
+      // The cause goes: the next checkpoint due finishes, and the fallback goes.
+      checkpointHooks.fail = null
       const done = wal.checkpointStats.done
       wal.checkpointTick((t += step))
       expect(wal.checkpointStats.done).toBe(done + 1)
       expect(autoPages(db.writer)).toBe(0)
     } finally {
+      checkpointHooks.fail = null
       db.close()
     }
   })

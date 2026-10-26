@@ -11,6 +11,20 @@ import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
 import { as09 } from './boardDb'
 
+// The checkpoints' worker letting go of a file (HI-1691), held by a test: `gate` set, checkpointsReleased waits for it,
+// telling `reached` as it starts to.
+const held = vi.hoisted(() => ({ gate: null as Promise<void> | null, reached: null as (() => void) | null }))
+vi.mock('../src/main/walCheckpoint', async (original) => {
+  const real = await original<typeof import('../src/main/walCheckpoint')>()
+  return {
+    ...real,
+    checkpointsReleased: (file: string) => {
+      held.reached?.()
+      return held.gate ?? real.checkpointsReleased(file)
+    }
+  }
+})
+
 const base = tempDir('hive-board-upgrade-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -35,7 +49,17 @@ afterAll(async () => {
 afterEach(() => {
   store.boardTestHooks.upgradeAnswer = null
   store.boardTestHooks.whileUpgrading = null
+  held.gate = null
+  held.reached = null
 })
+
+/** Holds checkpointsReleased (HI-1691): resolves once the code under test waits there; `release` lets it go on. */
+function holdRelease(): { waiting: Promise<void>; release: () => void } {
+  let release = (): void => undefined
+  held.gate = new Promise<void>((r) => (release = r))
+  const waiting = new Promise<void>((r) => (held.reached = r))
+  return { waiting, release }
+}
 
 const fileIn = (): { file: string; backups: string } => {
   const dir = join(base, `db-${++n}`)
@@ -349,6 +373,36 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     await inWorkspace(w, () => store.upgradeBoard(w))
     expect(await titles(w)).toEqual(['From 0.9'])
     await close(w)
+  })
+
+  it("the workspace closing while Restore or the upgrade waits for the checkpoints' worker: refused, the file and its copies as they were (HI-1691, HR6's round 3)", async () => {
+    // Restore: the 1.0 board, upgraded from 0.9, kept as it is.
+    const ws = await board09()
+    const w = await open(ws)
+    await inWorkspace(w, () => store.upgradeBoard(w))
+    const backups = join(hiveOf(ws), 'backups')
+    const copies = readdirSync(backups).sort()
+    const version = fileSchemaVersion(store.boardFile(ws))
+    let hold = holdRelease()
+    const restoring = inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
+    restoring.catch(() => undefined)
+    await hold.waiting
+    await close(w)
+    hold.release()
+    await expect(restoring).rejects.toThrow()
+    expect(fileSchemaVersion(store.boardFile(ws))).toBe(version)
+    expect(readdirSync(backups).sort()).toEqual(copies)
+    // The upgrade: a 0.9 board, left waiting for it.
+    const ws2 = await board09()
+    const w2 = await open(ws2)
+    hold = holdRelease()
+    const upgrading = inWorkspace(w2, () => store.upgradeBoard(w2))
+    upgrading.catch(() => undefined)
+    await hold.waiting
+    await close(w2)
+    hold.release()
+    await expect(upgrading).rejects.toThrow()
+    expect(fileSchemaVersion(store.boardFile(ws2))).toBe(2)
   })
 
   it('Restore is refused while another Hive has the file open, the 1.0 board left as it was', async () => {
