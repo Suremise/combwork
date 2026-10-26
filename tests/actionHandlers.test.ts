@@ -1260,3 +1260,76 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     expect(lines).toEqual([`Notified you that it has stalled: ${why}`])
   })
 })
+
+describe("a lane builder whose watch a decision's notice ended, and that ends its turn without another (HI-1693)", () => {
+  it("isn't flagged as not watching; the reviewer's verdict reaches it through its loop wake, and only then, its move again, is it flagged when it sits idle", async () => {
+    process.env.HIVE_TEST_LOOP_GRACE_MS = '0'
+    const loopCheck = await import('../src/main/loopCheck')
+    const { emit } = await import('../src/main/events')
+    loopCheck.initLoopCheck()
+    const { w, alpha } = await open({ workflow: { platform: 'none', preset: null, options: { ...allOff('none'), review: 'agent', noSelfReview: true } } })
+    const c = (await inWorkspace(w, () => tasks.createTask({ title: 'Work', project: 'alpha' }, user))).number
+    await store.boardWrite(w, async () => void FactStore.forBoard(w, { project: 'alpha', key: 'alpha' }).updateCard(c, { kind: 'no-code' }))
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+    const act = (who: typeof b1 | typeof r1, intent: Parameters<typeof runCardIntent>[2]) => inWorkspace(w, () => runCardIntent({ n: c, plain: false }, who, intent))
+    const st = fake(alpha, { b1: 'working', r1: 'working' })
+    // What loopCheck reads and marks of each session: its status (the stand-in's), no watch of its own, its stalled cards.
+    const marked = new Map<string, number[] | null>()
+    const told: number[][] = []
+    const liveFor = sessions.liveFor.bind(sessions)
+    Object.assign(sessions, {
+      liveFor: (p: string, id: string) => {
+        const s = liveFor(p, id) as Record<string, unknown> | null
+        // As sessions.ts does: a mark lasts only while the agent is idle.
+        if (s && s.status !== 'ready' && s.status !== 'finished') marked.delete(id)
+        return s ? { ...s, provider: 'claude-code', notWatching: marked.get(id) ?? undefined } : null
+      },
+      setNotWatching: (_p: string, id: string, cards: number[] | null) => void marked.set(id, cards),
+      notifyNotWatching: (_p: string, _id: string, cards: number[]) => void told.push(cards)
+    })
+    /** Its turn ends: idle with no watch, as a session-status event says; then its own grace check has run. */
+    const idleChecked = async (id: string) => {
+      const from = loopCheck.loopChecksOf(alpha, id)
+      st.status.set(id, 'finished')
+      emit({ type: 'session-status', state: sessions.liveFor(alpha, id) as never })
+      await vi.waitFor(() => expect(loopCheck.loopChecksOf(alpha, id)).toBeGreaterThan(from), HANG)
+    }
+    await act(b1, { kind: 'start' })
+    await act(b1, { kind: 'submit', summary: 'Round 1 ready' })
+    await act(r1, { kind: 'startReview' })
+    await settled()
+    st.typed.length = 0
+    // HB5 on HI-1682: the builder watches for its verdict; the reviewer is at work.
+    st.status.set('b1', 'watching')
+    await watches.registerWatch(w, alpha, 'b1', readCondition({ cards: [c], changes: ['verdict', 'column', 'comment'], column: 'passed' }) as WatchCondition)
+    // The user records a decision: its line ends the builder's watch, and it reads it.
+    await inWorkspace(w, () => tasks.updateTask(c, { decision: 'Keep the old wording.' }, user))
+    await watches.evaluateWatches(w)
+    await vi.waitFor(async () => {
+      await deliveries.offerAllForTests()
+      expect(st.typed.filter((t) => t.agent === 'b1')).toHaveLength(1)
+    }, HANG)
+    expect(st.typed.find((t) => t.agent === 'b1')!.text).toMatch(/a new decision from the user.*Your card watch has ended/)
+    // It ends its turn without a new watch: the verdict is the reviewer's to give, so it isn't flagged.
+    await idleChecked('b1')
+    expect(marked.get('b1') ?? null).toBeNull()
+    expect(told).toEqual([])
+    // The reviewer, idle a moment, reads the decision (a verdict needs it received), and fails the card.
+    st.status.set('r1', 'ready')
+    await vi.waitFor(async () => {
+      await deliveries.offerAllForTests()
+      await act(r1, { kind: 'verdict', pass: false, failKind: 'content', comment: 'Round 1: FAILED. 1. Fix it.' })
+    }, HANG)
+    // The verdict reaches the builder through its loop wake, read through its inbox: no watch needed.
+    await vi.waitFor(async () => {
+      await deliveries.offerAllForTests()
+      expect(st.typed.filter((t) => t.agent === 'b1')).toHaveLength(2)
+    }, HANG)
+    expect(st.typed.filter((t) => t.agent === 'b1')[1].text).toMatch(new RegExp(`^\\[Hive\\] #${c} is in Doing; latest comment by R1 \\(alpha\\): "Round 1: FAILED`))
+    // Its move now: idle again with no watch, it is flagged, and the user told (in Hive the grace lets the wake land
+    // first; here, with none, a check can also flag it in the moment before it is typed).
+    await idleChecked('b1')
+    await vi.waitFor(() => expect(marked.get('b1')).toEqual([c]), HANG)
+    expect(told.at(-1)).toEqual([c])
+  })
+})
