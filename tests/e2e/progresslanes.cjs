@@ -246,13 +246,15 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const kept = () => page.evaluate((w) => window.hive.invoke('ui:get').then((ui) => ui.panes?.[`progress-lanes-rows:${w.toLowerCase()}`] ?? null), ws)
   // Its floor (HI-1673, Darren): with more lanes than six, a drag never shows fewer than six.
   check('the splitter ranges from six (the floor) to the lanes there are', (await edgeMin()) === 6 && (await edgeSays()).max === '7', JSON.stringify({ min: await edgeMin(), says: await edgeSays() }))
-  await press(pitch * 1.6)
-  await page.mouse.move(5, 5)
-  check('dragging the top edge down never shows fewer than six', showsWhole(await fit(), 6) && (await edgeSays()).now === '6', JSON.stringify({ fit: await fit(), says: await edgeSays(), pitch }))
   // Dragged up by just under one: seven, kept.
   await drag(-pitch * 0.9, 'up just under a lane')
-  check('…and up, more, whole ones', !!(await until(async () => showsWhole(await fit(), 7), HUNG_MS)) && (await edgeSays()).now === '7', JSON.stringify({ fit: await fit(), pitch }))
+  check('dragging the top edge up shows more lanes, whole ones', !!(await until(async () => showsWhole(await fit(), 7), HUNG_MS)) && (await edgeSays()).now === '7', JSON.stringify({ fit: await fit(), pitch }))
   check('…kept for the workspace', !!(await until(async () => (await kept()) === 7, HUNG_MS)), String(await kept()))
+  // From seven, dragged down two lanes and a half: it stops at the floor, six, kept and drawn (HR5's round 1: from
+  // above the floor, so the drag is seen to take effect).
+  await press(pitch * 2.5)
+  await page.mouse.move(5, 5)
+  check('dragging the top edge down never shows fewer than six', !!(await until(async () => (await kept()) === 6 && showsWhole(await fit(), 6) && (await edgeSays()).now === '6', HUNG_MS)), JSON.stringify({ kept: await kept(), fit: await fit(), says: await edgeSays(), pitch }))
   // All the way up: no more than there are, and the runs keep their room.
   const body = () => panel.locator('.progress-body').evaluate((el) => el.getBoundingClientRect().height)
   await drag(-2000, 'all the way up')
