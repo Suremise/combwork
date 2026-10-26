@@ -2,6 +2,7 @@
 import type { CleanupItem, CleanupOptions, PurgeItem } from './types'
 import { tr } from './i18n'
 import { msg } from './i18n/msg'
+import { isSessionFolder } from './attachments'
 
 const M = {
   neverStarted: msg({ id: 'workspace.storage.neverStarted', defaultMessage: 'A launch that never got a session', description: "Storage, a folder of attachments to clean up: pasted into a launch that never became a session." }),
@@ -47,7 +48,8 @@ export function planCleanup(facts: CleanupFacts, opts: CleanupOptions): CleanupI
   const byId = new Map(facts.sessions.map((s) => [s.id.toLowerCase(), s]))
   const label = (s: CleanupSession): string => s.name || s.id.slice(0, 8)
   for (const f of facts.attachmentFolders) {
-    if (facts.liveNames.has(f.name.toLowerCase())) continue
+    // Cards' attachments (HI-1700) are never a session's to clean up, whatever the facts say.
+    if (!isSessionFolder(f.name) || facts.liveNames.has(f.name.toLowerCase())) continue
     const s = byId.get(f.name.toLowerCase())
     if (s) {
       if (!s.running && s.archived && opts.archivedAttachmentsDays !== null && old(s, opts.archivedAttachmentsDays)) items.push({ kind: 'archived-attachments', path: f.path, bytes: f.bytes, sessionId: s.id, label: label(s) })
@@ -138,7 +140,7 @@ export function planPurge(facts: PurgeFacts, only?: string): { items: PurgeItem[
     else items.push({ kind: 'leftover-backup', key: purgeKey('leftover-backup', f.path), ...at, ...file(f), sessionId: s?.id ?? f.id, label: s ? label(s) : gone(f.id) })
   }
   for (const d of facts.attachmentFolders) {
-    if (!want(d.name)) continue
+    if (!isSessionFolder(d.name) || !want(d.name)) continue
     if (live(d.name)) {
       if (d.files.length) running.add(d.name.toLowerCase())
       continue

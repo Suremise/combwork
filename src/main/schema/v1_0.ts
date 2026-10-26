@@ -964,8 +964,33 @@ export const SESSION_LEASES_STEP: SchemaStep = {
   ]
 }
 
+/**
+ * Card attachments (HI-1700): files kept with a card, in `<host>/.hive/attachments/cards/<number>` (its project's folder,
+ * the workspace's for a card with none), named there `file` (`<time>_<name>`), `name` as given. One copy of a file per card
+ * (`sha256`); `comment`, the id of the comment that brought it (none: added to the card itself, or by its description).
+ * Gone with the card (its folder to the Recycle Bin, cardAttachments.ts).
+ */
+export const CARD_ATTACHMENTS_STEP: SchemaStep = {
+  name: 'card attachments',
+  ddl: [
+    `CREATE TABLE card_attachments (
+      card    INTEGER NOT NULL REFERENCES cards (number) ON DELETE CASCADE,
+      id      TEXT    NOT NULL,
+      file    TEXT    NOT NULL,
+      name    TEXT    NOT NULL,
+      size    INTEGER NOT NULL,
+      sha256  TEXT    NOT NULL,
+      by      TEXT    NOT NULL,
+      at      TEXT    NOT NULL,
+      comment TEXT,
+      PRIMARY KEY (card, id),
+      UNIQUE (card, sha256)
+    ) STRICT, WITHOUT ROWID`
+  ]
+}
+
 /** The 1.0 group's steps (P3's, then P4's, then P5's, then P7's), in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_SEEN_STEP, SLOTS_STEP, COPIES_STEP, SKILL_COPIES_STEP, SESSION_LEASES_STEP]
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_SEEN_STEP, SLOTS_STEP, COPIES_STEP, SKILL_COPIES_STEP, SESSION_LEASES_STEP, CARD_ATTACHMENTS_STEP]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {

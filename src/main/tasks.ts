@@ -23,6 +23,7 @@ import { FactStore } from './workflow/factStore'
 import { gitStep } from './platform/git'
 import type { CardKind } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
+import { moveCardFolder, trashCardFolder } from './cardAttachments'
 import { hasStage, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT } from '../shared/workflow/stages'
 import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, STAGE_CATEGORY, type AskActionKind, type RoundChoice, type StageId } from '../shared/workflow/facts'
@@ -497,6 +498,7 @@ export function moveOrphanCards(ws: WorkspaceService, m: { from: string; to: str
         if (!raw || isProjectId(raw.projectId) || typeof raw.project !== 'string' || raw.project.toLowerCase() !== m.from.toLowerCase()) return false
         const history = Array.isArray(raw.history) ? raw.history : []
         const entry = entryOf(new Date().toISOString(), BY.repair, storedText(HISTORY.repaired, { from: m.from, to: m.to }))
+        await moveCardFolder(ws, x, raw.project, m.to)
         putCard(ws, x, { ...withProject(raw, m.to, projectId), history: [...history, entry].slice(-MAX_HISTORY) })
         return true
       })()
@@ -1773,6 +1775,8 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
           said.push(storedText(HISTORY.reviewStopped, { agent: card.review.agentName }))
           delete card.review
         }
+        // Its attachments (HI-1700) follow it: copied to the new project in this change (refused if they can't be).
+        await moveCardFolder(ws, n, card.project, p)
         card.project = p
         card.agent = null
         delete card.agentName
@@ -2438,6 +2442,8 @@ async function binCard(ws: WorkspaceService, n: number): Promise<boolean> {
   const file = join(dir, `${n}.json`)
   await writeFile(file, JSON.stringify(doc, null, 2) + '\n', 'utf8')
   await trash(file)
+  // Its attachments (HI-1700) go with it: renamed into the cards' trash in this change, to the Recycle Bin once it commits.
+  await trashCardFolder(ws, n, typeof doc.project === 'string' ? doc.project : null)
   return deleteCard(ws, n)
 }
 

@@ -239,6 +239,9 @@ export const DELIVER_WORKSPACE_NOTES = 'hive.notes.deliverWorkspaceNotes'
 
 /** How much of the Workspace notes note a launch delivers at most, in bytes (#1433): main's workspaceNotes.ts and the note's editor. */
 export const WORKSPACE_NOTES_MAX_ID = 'hive.notes.workspaceNotesMax'
+/** The largest file kept with a card (HI-1700), in bytes. */
+export const CARD_ATTACHMENT_MAX_ID = 'hive.cards.attachmentMax'
+export const CARD_ATTACHMENT_MAX = 25 * 1024 * 1024
 
 /**
  * Where Hive removes its skill copies (.agents/skills/hive-*) once no agent of Hive's works in the folder (#1431, #966 row
@@ -895,6 +898,22 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 32768,
     unit: 'bytes',
     applies: 'sessions'
+  },
+  {
+    id: CARD_ATTACHMENT_MAX_ID,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.cards.attachmentMax.title', defaultMessage: 'Card attachments: largest file', description: "An advanced setting's title (Settings → Advanced), followed by its value in bytes: the largest file Hive keeps with a card (pasted, dropped or attached to it)." }),
+    desc: msg({
+      id: 'settings.advanced.hive.cards.attachmentMax.desc',
+      defaultMessage: "The largest file Hive keeps with a card, in bytes: pasted or dropped into the card, attached from an agent's pane, or given by an agent or the Assistant. A larger file is refused, saying so. Files already kept stay.",
+      description: 'What the advanced setting "Card attachments: largest file" does (Settings → Advanced, under Hive).'
+    }),
+    kind: 'number',
+    default: CARD_ATTACHMENT_MAX,
+    min: 1024 * 1024,
+    max: 1024 * 1024 * 1024,
+    unit: 'bytes',
+    applies: 'now'
   },
   // Hive's skill copies for Codex and Copilot outlive their sessions (#1431, #966 row 15): a CLI run on its own in the
   // folder would still see them. Removed by default where Hive's own folders are (slots), kept in the project folder.

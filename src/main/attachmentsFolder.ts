@@ -3,7 +3,7 @@
 // folder, its session folders or any folder above them.
 import { lstat, mkdir, readdir, readFile, rename, rmdir } from 'original-fs/promises'
 import { extname, join, relative, sep } from 'path'
-import { ATTACHMENTS_DIR, OLD_ATTACHMENTS_DIR, movedAttachmentPath } from '../shared/attachments'
+import { ATTACHMENTS_DIR, CARD_ATTACHMENTS_DIR, OLD_ATTACHMENTS_DIR, isSessionFolder, movedAttachmentPath } from '../shared/attachments'
 import { HIVE_DIR } from '../shared/defaults'
 import { insideReal, writeJsonAtomic } from './fsutil'
 import { msg } from '../shared/i18n'
@@ -71,6 +71,41 @@ export async function ownAttachmentsFolder(host: string, sessionFolder?: string)
   return chain[chain.length - 1]
 }
 
+/**
+ * A card's attachments folder (HI-1700), `<host>\.hive\attachments\cards\<card number>`, made where missing, every folder
+ * from the host down to it a real folder of the host's own (ownAttachmentsFolder's rules); throws otherwise.
+ */
+export async function ownCardFolder(host: string, card: number): Promise<string> {
+  if (!Number.isInteger(card) || card < 1) throw hiveError(msg({ id: 'service.attachments.badCard', defaultMessage: 'Not a card number.', description: "An error: a card's attachments folder was asked for with something that isn't a card's number." }), undefined, { kind: 'invalid' })
+  const root = await ownAttachmentsFolder(host)
+  const chain = [join(root, CARD_ATTACHMENTS_DIR), join(root, CARD_ATTACHMENTS_DIR, String(card))]
+  for (const p of chain) {
+    if (!(await lstat(p).catch(() => null))) await mkdir(p).catch((e: NodeJS.ErrnoException) => (e.code === 'EEXIST' ? undefined : Promise.reject(e)))
+    if (!(await isOwnFolder(host, p))) {
+      log.warn(`${userText(p)} is a link or not a folder: no attachments are kept through it`)
+      throw hiveError(msg({ id: 'service.attachments.notOwn', defaultMessage: "{folder} is a link or not a folder of the project's own, so Hive keeps no attachments in it.", description: "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .hive) is a link or leads elsewhere, so Hive writes nothing through it." }), { folder: p })
+    }
+  }
+  return chain[1]
+}
+
+/** Where a card's attachments folder is (HI-1700), made or not. */
+export const cardFolderPath = (host: string, card: number): string => join(host, HIVE_DIR, ATTACHMENTS_DIR, CARD_ATTACHMENTS_DIR, String(card))
+
+/**
+ * An attachment's name in its folder: the time it came, then the file's own name (a clipboard image has none), so they
+ * list in the order they came and an agent sees what each is. Characters Windows refuses, and control characters,
+ * become "_"; a long name keeps its end (the extension).
+ */
+export function attachmentName(name: string | null, at = new Date()): string {
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  const stamp = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}_${pad(at.getHours())}-${pad(at.getMinutes())}-${pad(at.getSeconds())}`
+  const own = name ? name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/, '').slice(-100) : ''
+  const ext = own ? extname(own) : '.png'
+  const base = own ? `${stamp}_${own.slice(0, own.length - ext.length)}` : stamp
+  return `${base}${ext}`
+}
+
 /** A name free in a folder: taken means anything there, a link (even a broken one) included. */
 export async function freeName(dir: string, name: string, suffix: (i: number) => string): Promise<string> {
   const ext = extname(name)
@@ -110,7 +145,7 @@ async function moveOldFolder(host: string): Promise<void> {
   for (const d of await readdir(old)) {
     const from = join(old, d)
     const to = join(dest, d)
-    if (!SESSION_FOLDER.test(d) || !(await isOwnFolder(host, from))) {
+    if (!SESSION_FOLDER.test(d) || !isSessionFolder(d) || !(await isOwnFolder(host, from))) {
       left++
       continue
     }
