@@ -328,7 +328,8 @@ kbd {
 
 .main-area {
   flex: 1;
-  min-width: 0;
+  /* The work keeps its room while it can (HI-1737): layoutRoom.ts sets the least width the window leaves it. */
+  min-width: var(--main-min, 0px);
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -606,7 +607,10 @@ kbd {
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  min-width: 200px;
+  /* Narrowed for the work only once the side panels have given way (their shrink far outweighs this one), down to its
+     least width (HI-1737); a drag still keeps it 200 px or more. */
+  flex-shrink: 1;
+  min-width: 160px;
   max-width: 600px;
   position: relative;
 }
@@ -8054,8 +8058,9 @@ button.mode-badge.badge:hover {
   position: relative;
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
-  min-width: 300px;
+  /* Gives way first when the window is short of room for the work (HI-1737), down to its least width. */
+  flex-shrink: 1000;
+  min-width: 240px;
   max-width: 70vw;
   background: var(--bg-sidebar);
   border-left: 1px solid var(--border-subtle);
@@ -10940,7 +10945,8 @@ textarea.input.task-blocked-input {
   position: relative;
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
+  /* Gives way first, as the Assistant's panel does (HI-1737), down to its least width. */
+  flex-shrink: 1000;
   min-width: 240px;
   max-width: 50vw;
   background: var(--bg-sidebar);

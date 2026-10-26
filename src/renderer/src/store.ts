@@ -226,6 +226,12 @@ interface State {
   sidebarWidth: number
   /** Projects sidebar collapsed to a rail of status dots. */
   sidebarCompact: boolean
+  /**
+   * The Projects sidebar folded to its rail for now (HI-1737): the window too narrow for it beside the side panels and
+   * the work (layoutRoom.ts). Never saved; `sidebarUnfolded`: the user's Expand Sidebar meanwhile, until there's room.
+   */
+  sidebarFolded: boolean
+  sidebarUnfolded: boolean
   /** Set to select a session in its project's Sessions tab. */
   /** Open the Sessions tab on a session, and in it at its nth compaction (from 0, oldest first) when given. */
   sessionsJump: { project: string; id: string; nonce: number; compaction?: number } | null
@@ -499,6 +505,8 @@ export const useStore = create<State>(() => ({
   sidebarVisible: true,
   sidebarWidth: 280,
   sidebarCompact: false,
+  sidebarFolded: false,
+  sidebarUnfolded: false,
   sessionsJump: null,
   activityFilters: {},
   filesJump: null,
@@ -964,9 +972,11 @@ export function setActivity(a: Activity): void {
 }
 
 /** Collapses the Projects sidebar to a rail of status dots, or expands it again. Either way the Projects list is shown. */
-export function toggleCompactSidebar(compact = !get().sidebarCompact): void {
+export function toggleCompactSidebar(compact = !(get().sidebarCompact || (get().sidebarFolded && !get().sidebarUnfolded))): void {
   set((s) => ({
     sidebarCompact: compact,
+    // Folded for the room (HI-1737): Expand shows the list anyway, until there's room again; Collapse folds it back.
+    sidebarUnfolded: s.sidebarFolded && !compact,
     sidebarVisible: true,
     lastSideActivity: 'projects',
     activity: s.activity === 'docs' || s.activity === 'settings' ? s.activity : 'projects'
