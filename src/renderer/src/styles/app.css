@@ -9972,6 +9972,97 @@ textarea.input.task-blocked-input {
   min-height: 56px;
   resize: vertical;
 }
+/* Card attachments (HI-1700): an image in a card's text shown inline, at most a thumbnail's height; a link to one removed. */
+.task-description .markdown img,
+.task-comment .markdown img {
+  max-width: 100%;
+  max-height: 240px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+.attachment-gone {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 9px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  background: var(--bg-active);
+}
+/* Files pasted or dropped into a box, not saved yet: a chip each, under the box. */
+.attach-drafts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  align-self: stretch;
+  margin-top: 4px;
+}
+.attach-draft {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+  padding: 2px 2px 2px 4px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.attach-draft img {
+  width: 24px;
+  height: 24px;
+  object-fit: cover;
+  border-radius: 3px;
+}
+.attach-draft-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The card's attachments: a row each, its thumbnail or icon, its name and size, and its actions. */
+.card-attachments {
+  margin-top: 8px;
+}
+.card-attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card-attachment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+}
+.card-attachment.missing {
+  border-style: dashed;
+}
+.card-attachment-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex: none;
+}
+.card-attachment-icon {
+  width: 40px;
+  text-align: center;
+  font-size: 20px;
+  flex: none;
+}
+.card-attachment-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.card-attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* A card's decisions (#357), pinned above its comments: compact, an accent rule like a quote, "new since start" marked. */
 .task-decisions {
   margin-bottom: 4px;

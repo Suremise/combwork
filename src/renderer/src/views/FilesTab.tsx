@@ -11,7 +11,8 @@ import { discardDrafts, draftsUnder, FILES_TEXT, FileView, hasDraft, moveDrafts,
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { pasteIntoTerminal } from '../components/TerminalView'
 import { Icon, IconButton, InfoTip, LoadFailed, Modal, SearchInput, StaleNote, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
-import { confirm, filesListeners, focusedAgentId, get, notify, openInSessionsTab, projectKey, set, setProjectTab, showAgent, useDateStyle, useStore } from '../store'
+import { cardLabelOf, confirm, filesListeners, focusedAgentId, get, notify, openInSessionsTab, projectKey, set, setProjectTab, showAgent, useDateStyle, useStore } from '../store'
+import { attachToCardMenu, CardAttachmentSection, useProjectCardAttachments } from '../components/CardAttachments'
 import { useScopedLoad } from '../scopedLoad'
 import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
 import { cx, formatBytes, formatKeybinding, HIVE_FILES_MIME, IMAGE_EXT, imageUrl, quotePath, timeAgo } from '../util'
@@ -26,6 +27,7 @@ const faint = (chunks: React.ReactNode[]): React.ReactNode => <span className="f
 const rich = (m: Msg, values: Parameters<typeof tRich<React.ReactNode>>[1]): React.ReactNode[] => Children.toArray(tRich<React.ReactNode>(m, values))
 
 const M = {
+  attachToCard: msg({ id: 'files.attach.toCard', defaultMessage: 'Attach to a card', description: "A session attachment's menu entry in the Attachments tab (HI-1700): opens a menu of the project's cards, to copy the file to one." }),
   rootTip: msg({ id: 'files.root.tip', defaultMessage: 'Show the project folder, or the folder an agent works in: its slot or worktree', description: "Tooltip on the Files tab's folder picker, shown when agents work outside the project folder (in slots, Hive's worktrees lent to cards, or their own worktrees from before 1.0)." }),
   projectFolder: msg({ id: 'files.root.projectFolder', defaultMessage: 'Project folder', description: "The Files tab's folder picker: the project's own folder." }),
   agentPlace: msg({ id: 'files.root.place', defaultMessage: '{agent} · {place}', description: "The Files tab's folder picker: the folder an agent works in. {agent} is the agent's name, {place} where (agents.place.short: \"in slot-b\", \"carried: hb2\", \"home: hr4\")." }),
@@ -997,6 +999,9 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
     setFilter(null)
   }, [project.path])
   const menu = useContextMenu()
+  // The project's cards' attachments (HI-1700), a section of their own above the sessions'.
+  const cardFiles = useProjectCardAttachments(assistant ? null : project.path)
+  const cardCount = cardFiles.groups.reduce((n, g) => n + g.attachments.length, 0)
 
   const { load: loadScoped } = loaded
   const load = useCallback(() => {
@@ -1011,9 +1016,9 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
   // How many of each kind there are: a filter is offered for each kind present.
   const counts = useMemo(() => {
     const c = new Map<AttachmentKind, number>()
-    for (const g of all ?? []) for (const a of g.attachments) c.set(a.kind, (c.get(a.kind) ?? 0) + 1)
+    for (const g of [...(all ?? []), ...cardFiles.groups]) for (const a of g.attachments) c.set(a.kind, (c.get(a.kind) ?? 0) + 1)
     return c
-  }, [all])
+  }, [all, cardFiles.groups])
   // A filter whose kind is all gone shows everything again.
   const shownKind = filter && counts.get(filter) ? filter : null
   const groups = useMemo(
@@ -1064,9 +1069,13 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
     const id = a.path.split(/[\\/]/).slice(-2)[0]
     return owner.agents.some((x) => x.live?.sessionId === id)
   }
-  const menuFor = (a: SessionAttachment): MenuEntry[] => [
+  const menuFor = (a: SessionAttachment, at?: { x: number; y: number }): MenuEntry[] => [
     { label: tr(M.view), icon: 'eye', onClick: () => setViewing(a) },
     ...(project.live ? [{ label: tr(M.insertIntoSession), icon: 'terminal', onClick: () => void insertIntoSession(project, [a.path]) }] : []),
+    // Copied to a card (HI-1700), so it outlives the session's Clean Up.
+    ...(!assistant && at
+      ? [{ label: tr(M.attachToCard), icon: 'pinned', more: true, onClick: () => { const s = get(); menu.openAt(at.x, at.y, attachToCardMenu({ hostPath: project.path, project: project.name, agentId: null, path: a.path, name: shownName(a.name), cards: s.tasks, label: (t) => cardLabelOf(s, t.number) })) } }]
+      : []),
     { separator: true },
     ...(a.kind === 'image' ? [{ label: tr(M.copyImage), icon: 'copy', onClick: () => void actions.attempt(tr(M.copyImageFailed), () => call('attachments:copyImage', a.path)) }] : []),
     { label: tr(M.copyPath), icon: a.kind === 'image' ? 'blank' : 'copy', onClick: () => copyText(a.path) },
@@ -1079,7 +1088,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
   ]
 
   if (!all) return error ? <LoadFailed what={tr(M.attachmentsLoadTarget)} error={error} onRetry={load} /> : <div className="empty-state"><Icon name="loading" spin />{tr(M.loading)}</div>
-  if (!all.length && !error) {
+  if (!all.length && !error && !cardCount) {
     return (
       <div className="empty-state" style={{ paddingTop: '15vh' }}>
         <Icon name="attach" />
@@ -1129,7 +1138,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
                   data-kind={a.kind}
                   draggable
                   onClick={() => setViewing(a)}
-                  onContextMenu={(e) => menu.open(e, menuFor(a))}
+                  onContextMenu={(e) => menu.open(e, menuFor(a, { x: e.clientX, y: e.clientY }))}
                   onDragStart={(e) => {
                     e.dataTransfer.setData(HIVE_FILES_MIME, JSON.stringify({ project: project.path, paths: [a.path] }))
                     e.dataTransfer.setData('text/plain', quotePath(a.path))
@@ -1180,6 +1189,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
         </div>
       )}
       {error && <StaleNote what={tr(M.attachmentsRefreshTarget)} error={error} at={loaded.at} onRetry={load} />}
+      <CardAttachmentSection groups={cardFiles.groups} kind={shownKind} reload={cardFiles.reload} />
       {current.map(renderGroup)}
       {archived.length > 0 && (
         <>

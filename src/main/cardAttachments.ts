@@ -23,7 +23,7 @@ import { formatBytes } from '../shared/units'
 import { legacyWorktree } from '../shared/agentFolders'
 import { advanced } from './advanced'
 import { attachmentName, freeName, ownAttachmentsFolder } from './attachmentsFolder'
-import { afterBoardWrite, boardRead, boardWrite, boardWriteOp, cardKeys, onBoardUndone } from './boardStore'
+import { afterBoardWrite, boardChanged, boardRead, boardWrite, boardWriteOp, cardKeys, onBoardUndone } from './boardStore'
 import { insideReal, realPath } from './fsutil'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
@@ -352,7 +352,12 @@ export async function attachToCard(ws: WorkspaceService, card: number, sources: 
   if (!project) throw hiveError(M.noCard, undefined, { kind: 'notFound' })
   const staging = await stage(cardHost(ws, project.project), card, sources)
   try {
-    return await boardWrite(ws, () => publish(ws, card, staging, by, comment))
+    return await boardWrite(ws, async () => {
+      const out = await publish(ws, card, staging, by, comment)
+      // Told to the windows once it commits: a card dialog open on it shows the file.
+      if (out.added.some(Boolean)) boardChanged(ws)
+      return out
+    })
   } finally {
     await staging.dispose()
   }
@@ -409,6 +414,7 @@ export async function removeCardAttachment(ws: WorkspaceService, card: number, i
       afterBoardWrite(ws, () => void finishTrash(dir).catch((e) => log.warn('sending a removed card attachment to the Recycle Bin', e)))
     }
     boardWriteOp(ws, (db) => db.prepare('DELETE FROM card_attachments WHERE card = ? AND id = ?').run(card, id)) // i18n-ignore: SQL
+    boardChanged(ws)
   })
 }
 

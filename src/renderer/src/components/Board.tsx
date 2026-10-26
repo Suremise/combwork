@@ -28,6 +28,8 @@ import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
 import { formatDateTime } from '@shared/dates'
 import { returnRound } from '@shared/watch'
 import { BusyButton, Icon, IconButton, InfoTip, Markdown, Modal, SearchInput, STATUS_TEXT, statusText, Tooltip, useBusy, useContextMenu, type MenuEntry } from './ui'
+import { attachmentLookup, CardAttachmentList, DraftChips, openAttachmentLink, useAttachDrafts, useCardAttachments } from './CardAttachments'
+import { withAttachmentUrls } from '../cardAttachLinks'
 import { DataTable, type DataColumn } from './DataTable'
 import { DialogList } from './Overlays'
 import { openLaneStart } from './LaneStartDialog'
@@ -1716,6 +1718,11 @@ export function TaskDialog() {
   const drafts = useRef<{ decision: string; comment: string; edit: DecisionEdit | null }>({ decision: '', comment: '', edit: null })
   drafts.current = { decision, comment, edit: decisionEdit }
   const action = useBusy()
+  // Its attachments (HI-1700), and files pasted or dropped into its description or comment box, kept until Save or Post.
+  const files = useCardAttachments(card?.number ?? null)
+  const attach = useAttachDrafts((text) => action.setError(text))
+  const lookup = attachmentLookup(files.list, attach.drafts)
+  const onAttachmentLink = (href: string): boolean => openAttachmentLink(href, files.list)
   // Answers to its For you requests being written, by request (#1276 round 1): kept here, so closing asks first, as for a
   // comment; and whether one is being sent (the dialog doesn't close meanwhile).
   const [answerDrafts, setAnswerDrafts] = useState<Record<string, string>>({})
@@ -1830,7 +1837,8 @@ export function TaskDialog() {
   const persist = async (hold = false): Promise<void> => {
     if (!title.trim()) throw new Error(tr(NEEDS_TITLE))
     if (isNew) {
-      const c = await call('tasks:create', { title, description, project, agent: agent || null, column, labels: labelList, ...(splitDocRefs(context).length ? { context: splitDocRefs(context) } : {}), ...(noCode ? { kind: 'no-code' as const } : {}), ...(skipReview && projectReviews === true ? { skipReview: skipNote.trim() } : {}) })
+      const c = await call('tasks:create', { title, description, project, agent: agent || null, column, labels: labelList, ...(splitDocRefs(context).length ? { context: splitDocRefs(context) } : {}), ...(noCode ? { kind: 'no-code' as const } : {}), ...(skipReview && projectReviews === true ? { skipReview: skipNote.trim() } : {}) }, await attach.payload({ description }))
+      attach.clear('description')
       const extra: TaskPatch = {}
       if (blocked.trim()) extra.blocked = blocked
       if (refs(blockedBy).length) extra.blockedBy = refs(blockedBy)
@@ -1869,7 +1877,17 @@ export function TaskDialog() {
       // The column last, through the card's rules (#1275): asked first when the move skips one.
       const to = patch.column
       delete patch.column
-      if (Object.keys(patch).length) await call('tasks:update', card.number, patch)
+      // Files pasted or dropped (HI-1700) go with the change, the comment's too (and the comment with them), in one call.
+      const said = drafts.current.comment
+      const withComment = Object.keys(patch).length > 0 && !!said.trim() && attach.drafts.comment.length > 0
+      const sent = Object.keys(patch).length ? await attach.payload({ ...(patch.description !== undefined ? { description: patch.description } : {}), ...(withComment ? { comment: said } : {}) }) : undefined
+      if (Object.keys(patch).length) await call('tasks:update', card.number, patch, sent || withComment ? { ...(withComment ? { comment: said } : {}), ...(sent ? { drafts: sent } : {}) } : undefined)
+      attach.clear('description')
+      if (withComment) {
+        drafts.current.comment = ''
+        setComment('')
+        attach.clear('comment')
+      }
       if (give) await call('tasks:update', card.number, { agent: give })
       if (to !== undefined && !(await moveCard(card, to, { rethrow: true }))) {
         // Where the move left it (back where it was, or part of the way: started, say), as the board has just read it:
@@ -1928,9 +1946,10 @@ export function TaskDialog() {
   const postComment = async (): Promise<void> => {
     const c = drafts.current.comment
     if (!card || !c.trim()) return
-    await call('tasks:comment', card.number, c)
+    await call('tasks:comment', card.number, c, await attach.payload({ comment: c }))
     drafts.current.comment = ''
     setComment('')
+    attach.clear('comment')
     await loadTasks()
   }
 
@@ -1974,10 +1993,13 @@ export function TaskDialog() {
   const addComment = async (): Promise<void> => {
     if (!card || !comment.trim()) return
     const r = await action.run('comment', async () => {
-      await call('tasks:comment', card.number, comment)
+      await call('tasks:comment', card.number, comment, await attach.payload({ comment }))
       await loadTasks()
     })
-    if (r) setComment('')
+    if (r) {
+      setComment('')
+      attach.clear('comment')
+    }
   }
 
   return (
@@ -2172,11 +2194,13 @@ export function TaskDialog() {
         </div>
         {preview ? (
           <div className="task-description" onDoubleClick={() => !ro && setPreview(false)}>
-            {description.trim() ? <Markdown source={description} cards={MARKDOWN_CARDS} /> : <span className="faint">{tr(msg({ id: 'board.dialog.noDescription', defaultMessage: 'No description. Double-click to write one.', description: "The card dialog's description preview when there is none." }))}</span>}
+            {description.trim() ? <Markdown source={withAttachmentUrls(description, lookup)} cards={MARKDOWN_CARDS} onLink={onAttachmentLink} /> : <span className="faint">{tr(msg({ id: 'board.dialog.noDescription', defaultMessage: 'No description. Double-click to write one.', description: "The card dialog's description preview when there is none." }))}</span>}
           </div>
         ) : (
-          <textarea className="input task-description-input" placeholder={tr(msg({ id: 'board.dialog.descriptionPlaceholder', defaultMessage: "What to do, and how to tell it's done (Markdown). Whoever starts the card reads only this.", description: "Placeholder of the card dialog's description box." }))} value={description} readOnly={ro} title={readOnly ?? undefined} onChange={(e) => setDescription(e.target.value)} />
+          <textarea className="input task-description-input" placeholder={tr(msg({ id: 'board.dialog.descriptionPlaceholder', defaultMessage: "What to do, and how to tell it's done (Markdown). Whoever starts the card reads only this.", description: "Placeholder of the card dialog's description box." }))} value={description} readOnly={ro} title={readOnly ?? undefined} onChange={(e) => setDescription(e.target.value)} {...(ro ? {} : attach.boxProps('description', description, setDescription))} />
         )}
+        <DraftChips box="description" drafts={attach.drafts.description} onRemove={(key) => attach.remove('description', key, description, setDescription)} />
+        {card && <CardAttachmentList card={card} label={cardLabel(card)} list={files.list} reload={files.reload} readOnly={ro} />}
         {card && (
           <>
             <Decisions card={card} draft={decision} setDraft={setDecision} editing={decisionEdit} setEditing={setDecisionEdit} setBusy={setDecisionBusy} readOnly={readOnly} />
@@ -2187,12 +2211,13 @@ export function TaskDialog() {
                 <div className="task-comment-by">
                   <strong>{byText(c.by)}</strong> <span className="faint">{timeAgo(c.at)}</span>
                 </div>
-                <Markdown source={storedLine(c.text, c.hiveText)} cards={MARKDOWN_CARDS} />
+                <Markdown source={withAttachmentUrls(storedLine(c.text, c.hiveText), lookup)} cards={MARKDOWN_CARDS} onLink={onAttachmentLink} />
               </div>
             ))}
             {!card.archived && (
               <div className="task-comment-new">
-                <textarea className="input" aria-label={tr(msg({ id: 'board.dialog.newComment', defaultMessage: 'New comment', description: 'Accessible name of the box where a comment is written (card dialog).' }))} placeholder={tr(msg({ id: 'board.dialog.commentPlaceholder', defaultMessage: 'Add a comment', description: "Placeholder of the card dialog's comment box." }))} title={readOnly ?? undefined} disabled={ro} value={comment} onChange={(e) => setComment(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && void addComment()} />
+                <textarea className="input" aria-label={tr(msg({ id: 'board.dialog.newComment', defaultMessage: 'New comment', description: 'Accessible name of the box where a comment is written (card dialog).' }))} placeholder={tr(msg({ id: 'board.dialog.commentPlaceholder', defaultMessage: 'Add a comment', description: "Placeholder of the card dialog's comment box." }))} title={readOnly ?? undefined} disabled={ro} value={comment} onChange={(e) => setComment(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && void addComment()} {...(ro ? {} : attach.boxProps('comment', comment, setComment))} />
+                <DraftChips box="comment" drafts={attach.drafts.comment} onRemove={(key) => attach.remove('comment', key, comment, setComment)} />
                 <div className="task-new-actions">
                   {comment.trim() && <span className="faint">{tr(msg({ id: 'board.dialog.savePostsIt', defaultMessage: 'Save posts it too', description: "Beside the Comment button once something is written: the card dialog's Save button posts the comment as well." }))}</span>}
                   <Tooltip content={readOnly}>
