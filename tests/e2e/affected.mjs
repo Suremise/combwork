@@ -302,7 +302,7 @@ export const AREAS = [
   // A long conversation's Hand Over (#1057): the notice, the footer, the dialog and the hand-over's own checks.
   { paths: ['src/main/handOverCheck.ts', 'src/shared/handOver.ts', 'src/main/sessions.ts', 'src/main/lanes.ts', 'src/renderer/src/components/AgentPanes.tsx', 'src/renderer/src/components/AgentDialogs.tsx'], suites: ['handovernotice', 'longsession', 'sessionsize'] },
   // Hive's loop wakes (#405).
-  { paths: ['src/main/loopWakes.ts', 'src/main/lanes.ts'], suites: ['loopwakes', 'lanenotices'] },
+  { paths: ['src/main/loopWakes.ts', 'src/main/lanes.ts', 'src/main/queueReturn.ts'], suites: ['loopwakes', 'lanenotices'] },
   // A card's loop reviewer (#1382): who loop wakes go to, and who answers a builder's design.
   { paths: ['src/main/loopReviewer.ts'], suites: ['loopwakes', 'intents'] },
   // Hive's own notices of the work (#1266): a card's request for the user, a lane's events without the Assistant.

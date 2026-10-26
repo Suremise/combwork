@@ -855,8 +855,18 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
   sessions.watchChanged(projectPath, agentId)
   // It waits on cards: an agent in a card loop, checked when its turn ends with no watch (#376).
   noteLoopWatch(projectPath, agentId, cond.cards)
-  if ('watching' in result) inBackground('checking watches', evaluate(ws))
+  if ('watching' in result) {
+    inBackground('checking watches', evaluate(ws))
+    for (const fn of watchStarted) inBackground('telling of a watch begun', Promise.resolve().then(() => fn(ws, projectPath, agentId, cond)))
+  }
   return result
+}
+
+/** Told when an agent's card watch begins (HI-1721: loopWakes tells a builder of its returned card it waits on). */
+const watchStarted = new Set<(ws: WorkspaceService, projectPath: string, agentId: string, cond: WatchCondition) => Promise<void> | void>()
+export function onWatchStarted(fn: (ws: WorkspaceService, projectPath: string, agentId: string, cond: WatchCondition) => Promise<void> | void): () => void {
+  watchStarted.add(fn)
+  return () => watchStarted.delete(fn)
 }
 
 /** Ends an agent's watch (the agent itself, or the user's Cancel), also one being typed. Whether it had one. */

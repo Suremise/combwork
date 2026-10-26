@@ -13,6 +13,10 @@ import { taskWaitText } from '../src/shared/toolReplies'
 import { REVIEW_WAIT_STALL_MS } from '../src/shared/tasks'
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
+import { RETURN_STALL_MS, returnedWaitReason } from '../src/main/cardStall'
+/** The merge queue's returns as queueReturnOf finds them (HI-1721), by card: none unless a test sets one. */
+const { returns } = vi.hoisted(() => ({ returns: new Map<number, { at: string; text: string; builder: string | null }>() }))
+vi.mock('../src/main/queueReturn', () => ({ queueReturnOf: async (_ws: unknown, _p: string, n: number) => returns.get(n) ?? null, returnIn: () => null }))
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
 
@@ -188,6 +192,29 @@ describe('what a lane watch counts (#531)', () => {
       expect(Buffer.byteLength(JSON.stringify(many))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
       expect(many).toMatch(/^\[Hive\] .*Your lane watch has ended.*never answer it for them/)
     }
+  })
+})
+
+describe("a card the merge queue returned, waiting for its builder (HI-1721's returnedWaitReason)", () => {
+  const at = '2026-10-26T12:34:35.000Z'
+  const t = Date.parse(at)
+  const c = { number: 1696, key: 'HI-1694', column: 'doing' as const, archived: false, blocked: null, updatedAt: at }
+  const back = { at }
+  it('stalled once it has waited 15 min, its builder idle or only watching; not while it works, nor before', () => {
+    expect(returnedWaitReason(c, back, { name: 'HB2', status: 'watching', watching: true }, t + RETURN_STALL_MS)).toBe('HI-1694 came back from the merge queue 15 min ago; HB2 is only watching it, not fixing it.')
+    expect(returnedWaitReason(c, back, { name: 'HB2', status: 'finished', watching: false }, t + RETURN_STALL_MS + 60_000)).toMatch(/16 min ago; HB2 is idle, not fixing it/)
+    expect(returnedWaitReason(c, back, { name: 'HB2', status: 'working', watching: false }, t + 3 * RETURN_STALL_MS)).toBeNull()
+    // In a turn with a watch still kept (a loop wake leaves it running): at work, never "only watching" (HR1's round 1).
+    for (const status of ['working', 'starting', 'background', 'waiting']) expect(returnedWaitReason(c, back, { name: 'HB2', status, watching: true }, t + RETURN_STALL_MS + 2 * 60_000), status).toBeNull()
+    expect(returnedWaitReason(c, back, { name: 'HB2', status: 'watching', watching: true }, t + RETURN_STALL_MS - 1000)).toBeNull()
+  })
+  it('not for a card that changed since, is blocked, out of Doing, or not returned', () => {
+    const later = new Date(t + 10 * 60_000).toISOString()
+    const watching = { name: 'HB2', status: 'watching', watching: true }
+    expect(returnedWaitReason({ ...c, updatedAt: later }, back, watching, t + RETURN_STALL_MS + 60_000)).toBeNull()
+    expect(returnedWaitReason({ ...c, blocked: 'Which icon?' }, back, watching, t + 2 * RETURN_STALL_MS)).toBeNull()
+    expect(returnedWaitReason({ ...c, column: 'review' }, back, watching, t + 2 * RETURN_STALL_MS)).toBeNull()
+    expect(returnedWaitReason(c, null, watching, t + 2 * RETURN_STALL_MS)).toBeNull()
   })
 })
 
@@ -645,6 +672,42 @@ describe('lane watches (main/watches.ts, #531)', async () => {
       vi.useRealTimers()
     }
     expect(st.told[0]).toContain(`#${a} is stalled: "R1 started reviewing #${a} but has given no verdict, and has only been watching it for 16 min."`)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a card the merge queue returned, its builder only watching it for Done, is stalled once it has waited 15 min (HI-1721)", async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a] = await newCards(w, 'b1', 1)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    const since = new Date().toISOString()
+    returns.set(a, { at: since, text: `#${a} came back from the merge queue: a conflict.`, builder: 'b1' })
+    try {
+      // B1 watches its card for Done, as HB2 did HI-1694: the card waits for B1 in Doing. First B1 is at work with
+      // that watch still kept (it read the return and is fixing the conflict): no stall however long it takes.
+      let b1Status = 'working'
+      Object.assign(sessions, { liveStates: () => [{ projectPath: alpha, agentId: 'b1', agentName: 'B1', status: b1Status, watch: { cards: [a], changes: ['column'], column: 'done', label: '', since, limitAt: '' } }] })
+      await watchAll(w, home, st)
+      await watches.evaluateWatches(w)
+      await watches.settled()
+      expect(st.typed).toEqual([])
+      vi.useFakeTimers({ toFake: ['Date'] })
+      try {
+        vi.setSystemTime(Date.parse(since) + RETURN_STALL_MS + 60_000)
+        await watches.evaluateWatches(w)
+        await watches.settled()
+        expect(st.typed).toEqual([])
+        // Its turn over, it only watches: stalled.
+        b1Status = 'watching'
+        await watches.evaluateWatches(w)
+        await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+      } finally {
+        vi.useRealTimers()
+      }
+      expect(st.told[0]).toMatch(new RegExp(`#${a} is stalled: ".* came back from the merge queue 16 min ago; B1 is only watching it, not fixing it\\."`))
+    } finally {
+      returns.delete(a)
+    }
     await disposeWorkspaceService(w)
   })
 

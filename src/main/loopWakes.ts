@@ -13,11 +13,12 @@ import { getTask, noteOnCard } from './tasks'
 import { actionsRunning, actionsSettled, onAction } from './workflow/actionWorker'
 import type { ActionRow } from './workflow/factStore'
 import { cardFacts } from './workflow/recorder'
-import { inFlightNow as watchesInFlight, settled as watchesSettled, watchCovers, watchTold } from './watches'
+import { inFlightNow as watchesInFlight, onWatchStarted, settled as watchesSettled, watchCovers, watchTold } from './watches'
 import { actionDelivered, cancelFromSource, createDelivery, everyFromSource, offerNow, registerSource } from './deliveries'
 import { isWaiting, type DeliveryRecord } from '../shared/deliveries'
 import { workspaceFor, type WorkspaceService } from './workspace'
 import { scopeOfHost, withCardNames } from './projectKeys'
+import { queueReturnOf } from './queueReturn'
 
 /**
  * Hive's loop wakes (#405): a card loop's routine handoffs, delivered by Hive whether or not the agent set a card watch.
@@ -247,7 +248,8 @@ function historySince(card: TaskCard, since: TaskHistoryEntry | null): TaskHisto
 /**
  * Whether a waiting wake still has something to tell, from the card as it is now and what was done since its handoff:
  * a reviewer's while the card is in Review and nobody has reviewed that round (no review started nor verdict given
- * since: a round reviewed and failed meanwhile is the builder's now, #405 round 2 finding); a builder's (a verdict, a
+ * since: a round reviewed and failed meanwhile is the builder's now, #405 round 2 finding); the user's answer until it is
+ * read, while the card is open or its lane runs (HI-1721); a builder's (a verdict, a
  * move into Passed or Done, a request, a note) while the card is still its own and, since the handoff, neither it acted
  * on the card nor another round started; one of a card that is Done, only while a lane running holds it (`inLane`: the
  * next card follows; with its lane over, the lane's end tells the builder, and nothing is left to carry on with, HI-1687).
@@ -257,8 +259,10 @@ function stillDue(p: Wake & { agentId: string }, card: TaskCard | null, inLane: 
   if (!card || card.archived) return false
   const since = historySince(card, p.since)
   if (p.kind === 'review') return card.column === 'review' && !card.review && !since.some((h) => /^(Started reviewing|Review (passed|failed))$/.test(h.what))
-  // The user's answer, to whoever waits on it (the card's agent or the one that asked): due until that agent acts on it.
-  if (p.kind === 'answer') return !since.some((h) => same(h.by, p.agentName))
+  // The user's answer, to whoever waits on it (the card's agent or the one that asked): due until it reads it (its
+  // receipt ends it), while the card is open or its lane still runs. Not on the agent's acting on the card meanwhile
+  // (HI-1721: HB2 submitted its next round before reading the user's answer on HI-1694, and the answer was dropped).
+  if (p.kind === 'answer') return card.column !== 'done' || inLane
   // A builder's loop step (#1382, #1467), to its reviewer: due until the reviewer acts on the card; a design or a
   // follow-up to check, only while one still waits (answered by someone else, or the card moved on: nothing left to check).
   if (toReviewer(p.kind)) return !since.some((h) => same(h.by, p.agentName)) && (p.kind !== 'step' || !!pendingStep(card))
@@ -340,8 +344,11 @@ registerSource('loop', {
     await loopWakeTestHooks.afterKey?.()
     const card = await getTask(p.n, ws).catch(() => null)
     // Its own watch told it already (#578): a watch whose line had read this handoff's own history entry, even one that
-    // has ended since (a handoff slower than the watch's settle and typing found no watch to leave it to).
-    const told = !!card && !!p.since && watchTold(host, r.agentId, card, p.since, p.kind === 'request' || isStep(p.kind))
+    // has ended since (a handoff slower than the watch's settle and typing found no watch to leave it to). Never a note
+    // or the user's answer (HI-1721): no watch's line says what they say, and their `since` is only the card's latest
+    // entry when they were made (the merge queue's return writes none of its own), which a watch begun after them has
+    // read, so the return to its builder was dropped as told and the builder waited for Done for three hours.
+    const told = !!card && !!p.since && p.kind !== 'note' && p.kind !== 'answer' && watchTold(host, r.agentId, card, p.since, p.kind === 'request' || isStep(p.kind))
     if (!card || !stillDue({ ...p, agentId: r.agentId }, card, inRunningLane(ws, p.n)) || covered(host, r.agentId, card, p.kind) || told || !(await wakesOn(ws, host))) return { cancel: 'no longer due' }
     // Only to whose wake it is now: another reviewer given the lane meanwhile gets it instead (#405 round 1 finding).
     // The user's answer stays with the agent waiting on it (#1626), while it is one of the project's agents.
@@ -393,6 +400,28 @@ export function initLoopWakes(): void {
   onHiveEvent((e) => {
     if (e.type === 'tasks-changed' || e.type === 'lanes-changed') rolesSeq++
   })
+  onWatchStarted((ws, projectPath, agentId, cond) => track('telling a builder of its returned card', tellReturned(ws, projectPath, agentId, cond.cards, cond.column)))
+}
+
+/**
+ * A builder watching its own card while the merge queue has returned it (HI-1721): the card waits for that builder in
+ * Doing, so no watch for another column can end but by its limit (HB2 waited three hours for Done on HI-1694). Told of the
+ * return at once, from the card's state as it is (queueReturnOf, not a replay of the queue's wake): a loop wake as the
+ * queue's own (a note, the latest per card), offered by the doorbell, its watch carrying on. Not when it watches for the
+ * card to come back to Doing itself (nothing it can't reach).
+ */
+async function tellReturned(ws: WorkspaceService, projectPath: string, agentId: string, cards: readonly number[], column: string | undefined): Promise<void> {
+  if (column === 'doing' || !ws.path || !(await wakesOn(ws, projectPath))) return
+  for (const n of cards) {
+    const card = await getTask(n, ws).catch(() => null)
+    if (!card || card.archived || card.agent !== agentId || card.column !== 'doing') continue
+    const back = await queueReturnOf(ws, projectPath, n)
+    if (!back || (back.builder && back.builder !== agentId)) continue
+    const agent = projectAgents(await ws.projectConfig(projectPath)).find((a) => a.id === agentId)
+    if (!agent) continue
+    log.info(`#${n} came back from the merge queue and ${userText(agent.name)} watches it for another column: told of the return`)
+    await enqueue(ws, projectPath, card, { kind: 'note', since: card.history.at(-1) ?? null, text: back.text }, { id: agent.id, name: `${agent.name} (${card.project})` })
+  }
 }
 
 /** The wakes waiting now (agent and card), for tests. */
