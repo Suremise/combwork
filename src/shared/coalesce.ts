@@ -1,9 +1,11 @@
-// Reads the window repeats as things change (#1629): never two of the same at once. Two shapes:
+// Reads the window repeats as things change (#1629): never two of the same at once.
 // - coalesced(): per key, one call in flight; callers asking meanwhile share one more call, started once it settles, so
 //   each gets data read after it asked.
 // - serialReads(): one read at a time for a source whose scope can change (the window's workspace); asked meanwhile,
 //   the newest scope is read once the current read settles, and a result is taken only when it is still the newest
 //   ask's scope and no newer read of that scope has been taken.
+// - oneAtATime(): one load at a time per scope for a view that keeps its own results (#1646); asked meanwhile, once
+//   more after it. withinTime(): a load that fails once its time is up, so a view never waits on it without end.
 
 /** A function that calls `fetch` for a key, one call in flight per key, as above. */
 export function coalesced<T>(): (key: string, fetch: () => Promise<T>) => Promise<T> {
@@ -74,6 +76,51 @@ export function serialReads<T>(fetch: (scope: string) => Promise<T>, take: (scop
       asked = scope
       if (reading) pending = scope
       else read(scope)
+    }
+  }
+}
+
+/** `p`, or a failure with `error()` once `ms` pass without its answer (#1646): a load shows as failed, with Retry, never as a spinner without end. */
+export function withinTime<T>(p: Promise<T>, ms: number, error: () => string): Promise<T> {
+  let t: ReturnType<typeof setTimeout> | undefined
+  const late = new Promise<never>((_, reject) => {
+    t = setTimeout(() => reject(new Error(error())), ms)
+  })
+  return Promise.race([p, late]).finally(() => clearTimeout(t))
+}
+
+/**
+ * One load at a time per scope, for a view that asks again as things change (#1646). `run(scope, start, rerun)` calls
+ * `start` now, unless a load for that scope is under way: then the last `rerun` asked for it is called once, after
+ * that load ends, however many times it was asked meanwhile. Per scope, whatever was asked between (A, then B, then A
+ * again while the first A runs starts no second A), so a scope's loads never overlap and never end out of order. With
+ * numbered loads (useScopedLoad) a newer load drops the one under way, so loads slower than the changes asking for
+ * them never showed anything; one at a time, each is shown. Bounded by the scopes with a load under way.
+ */
+export function oneAtATime(): { run: (scope: string, start: () => Promise<unknown>, rerun: () => void) => void } {
+  const running = new Set<string>()
+  const again = new Map<string, () => void>()
+  return {
+    run(scope, start, rerun) {
+      if (running.has(scope)) {
+        again.set(scope, rerun)
+        return
+      }
+      running.add(scope)
+      const ended = (): void => {
+        running.delete(scope)
+        const next = again.get(scope)
+        again.delete(scope)
+        // After whatever took this load's result.
+        if (next) setTimeout(next, 0)
+      }
+      let p: Promise<unknown>
+      try {
+        p = start()
+      } catch (e) {
+        p = Promise.reject(e)
+      }
+      p.then(ended, ended)
     }
   }
 }

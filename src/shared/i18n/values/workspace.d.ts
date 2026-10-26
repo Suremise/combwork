@@ -217,6 +217,7 @@ interface HiveMessageValues {
   'workspace.overview.importingStart': undefined
   'workspace.overview.loadTarget': undefined
   'workspace.overview.loading': undefined
+  'workspace.overview.noAnswer': { seconds: number }
   'workspace.overview.noWorkspace': undefined
   'workspace.overview.nothingUsed': undefined
   'workspace.overview.openAssistant': undefined
