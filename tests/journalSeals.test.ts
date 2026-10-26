@@ -3,11 +3,16 @@
 // supervisor still holds the job (this Hive's, or one that outlived its Hive), while the journal holds a settle's
 // evidence, or while that can't be told (fail-closed). With Hive's real process supervisor (Windows), as
 // queueRunner.test does, and with `gone` simulated for the rest.
+import { spawn } from 'child_process'
+import { createRequire } from 'module'
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { junction } from './pathAliases'
 import { clearJournal, journalPath, LeaseJob, leaseJobGone, queueHost, retireSeal, sealJournal, sweepSeals } from '../src/main/workflow/queueJobs'
+
+const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 
 const ends: (() => void)[] = []
 afterAll(() => {
@@ -29,18 +34,43 @@ async function settled(root: string, dir: string, lease: string): Promise<string
 }
 
 describe.runIf(process.platform === 'win32')("a seal goes once its job is gone (the real supervisor)", () => {
-  it('stays while this Hive still holds the job, and goes once it lets it go', async () => {
+  it('stays, and so does the process running in its job, while this Hive holds the job; goes once it lets it go', async () => {
     const { root, dir } = folders()
     const host = queueHost()
     const lease = `copy-seal-${Date.now()}`
-    const job = await LeaseJob.open(host, lease, await journalPath(root, lease, dir))
+    const job = (await LeaseJob.open(host, lease, await journalPath(root, lease, dir))) as LeaseJob
     expect(job).toBeInstanceOf(LeaseJob)
+    // A process in the job, running (HR4's design review: a sweep must never end what a held job runs).
+    const after = Date.now() - 1
+    const k = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true, windowsHide: true, env: baseEnv() })
+    k.unref()
+    const pid = k.pid!
+    ends.push(() => {
+      try {
+        process.kill(pid)
+      } catch {
+        // gone
+      }
+    })
+    expect(await job.assign(pid, after, Date.now() + 1)).toBe(true)
+    const runs = (): boolean => {
+      try {
+        process.kill(pid, 0)
+        return true
+      } catch {
+        return false
+      }
+    }
     const seal = await settled(root, dir, lease)
     const gone = (l: string) => leaseJobGone(host, l)
-    // Held (ended and empty, but its handle still open here): a writer could exist, so the seal stays.
+    // Held (its handle still open here): a writer could exist, so the seal stays, and nothing in the job is touched.
     expect(await retireSeal(root, lease, dir, gone)).toBe(false)
+    expect(await sweepSeals(root, dir, gone)).toBe(0)
     expect(existsSync(seal)).toBe(true)
-    await (job as LeaseJob).close()
+    expect(runs()).toBe(true)
+    // Let go: kill on close ends what it ran, and the seal goes.
+    await job.close()
+    await vi.waitFor(() => expect(runs()).toBe(false), { timeout: 30_000, interval: 100 })
     expect(await retireSeal(root, lease, dir, gone)).toBe(true)
     expect(existsSync(seal)).toBe(false)
     expect(readdirSync(dir)).toEqual([])
@@ -108,8 +138,8 @@ describe('what a seal needs before it goes', () => {
     expect(await retireSeal(root, 'slot-live', dir, gone)).toBe(false)
     expect(await retireSeal(root, 'slot-odd', dir, gone)).toBe(false)
     expect(await retireSeal(root, 'slot-none', dir, gone)).toBe(false)
-    // A live lease's journal (a file) never has its job asked about.
-    expect(asked).toEqual(['slot-odd'])
+    // None of them has its job asked about: a live lease's journal (a file) least of all.
+    expect(asked).toEqual([])
     expect(existsSync(file)).toBe(true)
     expect(existsSync(join(dir, 'slot-odd.followed', 'x'))).toBe(true)
   })
@@ -130,6 +160,32 @@ describe('what a seal needs before it goes', () => {
     expect(await sweepSeals(root, dir, gone)).toBe(3)
     expect(most).toBe(1)
     expect(readdirSync(dir).sort()).toEqual(['copy-2.followed', 'notes.txt', 'slot-5.followed'])
+  })
+
+  it('never follows a link: a journals folder that is a junction, or a seal that is one, stays as it is', async () => {
+    const { root, dir } = folders()
+    const elsewhere = tempDir('journal-seals-elsewhere-')
+    mkdirSync(join(elsewhere, 'slot-x.followed'))
+    junction(elsewhere, dir)
+    expect(await sweepSeals(root, dir, yes)).toBe(0)
+    expect(await retireSeal(root, 'slot-x', dir, yes)).toBe(false)
+    expect(existsSync(join(elsewhere, 'slot-x.followed'))).toBe(true)
+    const other = folders()
+    mkdirSync(other.dir)
+    const target = tempDir('journal-seals-target-')
+    junction(target, join(other.dir, 'slot-y.followed'))
+    expect(await retireSeal(other.root, 'slot-y', other.dir, yes)).toBe(false)
+    expect(existsSync(target)).toBe(true)
+  })
+
+  it('looks again once its job is known gone: a part or a file arriving meanwhile keeps it', async () => {
+    const { root, dir } = folders()
+    const seal = await settled(root, dir, 'slot-p')
+    expect(await retireSeal(root, 'slot-p', dir, async () => (writeFileSync(join(dir, 'slot-p.sealed-1-0'), ''), true))).toBe(false)
+    expect(existsSync(seal)).toBe(true)
+    const seal2 = await settled(root, dir, 'slot-q')
+    expect(await retireSeal(root, 'slot-q', dir, async () => (writeFileSync(join(seal2, 'late'), 'x'), true))).toBe(false)
+    expect(existsSync(join(seal2, 'late'))).toBe(true)
   })
 
   it('a missing journals folder sweeps nothing', async () => {

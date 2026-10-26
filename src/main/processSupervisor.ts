@@ -28,7 +28,7 @@ const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'Wi
 export type HostFailure = { kind: 'test' } | { kind: 'noPowerShell'; error: string } | { kind: 'slowHelper'; seconds: number } | { kind: 'refused' } | { kind: 'helperFailed'; why: string }
 
 /** The host's requests (HiveJobs.Answer). */
-export type HostCommand = 'add' | 'list' | 'kill' | 'forget' | 'identify' | 'endexact' | 'endtree' | 'memory' | 'open' | 'assign' | 'empty' | 'endnamed' | 'follow'
+export type HostCommand = 'add' | 'list' | 'kill' | 'forget' | 'identify' | 'endexact' | 'endtree' | 'memory' | 'open' | 'assign' | 'empty' | 'endnamed' | 'hasjob' | 'follow'
 
 export interface JobHostOptions {
   /** How long it gets to start, and then to answer each request. */
@@ -754,6 +754,17 @@ public static class HiveJobs {
       } finally { Marshal.FreeHGlobal(buf); }
     } finally { CloseHandle(h); }
   }
+  /**
+   * Whether a lease's job exists, by its name (HI-1723), asked with the right to query it only (JOB_OBJECT_QUERY):
+   * nothing in it is touched. "exists" (some process, a supervisor, holds it), "nojob" (none by that name: nothing holds
+   * it, kill on close ended what was in it), else why it can't be told (access denied, a name that isn't a job's).
+   */
+  public static string HasJob(string id) {
+    IntPtr h = OpenNamedJob(0x0004, false, QueueJobName(id));
+    if (h == IntPtr.Zero) { int e = Marshal.GetLastWin32Error(); return e == 2 ? "nojob" : "unknown: " + e; }
+    CloseHandle(h);
+    return "exists";
+  }
   /** One request ("<n> <command> <job> [pid]") answered as "<n> <JSON>". */
   public static string Answer(string line) {
     string[] a = line.Split(' ');
@@ -778,6 +789,7 @@ public static class HiveJobs {
         case "open": r = Q(Open(a[2], a.Length > 3 ? Encoding.UTF8.GetString(Convert.FromBase64String(a[3].Replace('-', '+').Replace('_', '/').PadRight(a[3].Length + (4 - a[3].Length % 4) % 4, '='))) : null)); break;
         case "assign": r = Q(Assign(a[2], int.Parse(a[3]), long.Parse(a[4]), long.Parse(a[5]))); break;
         case "empty": r = Empty(a[2]) ? "true" : "false"; break;
+        case "hasjob": r = Q(HasJob(a[2])); break;
         // Tests only (the host refuses to send it otherwise): follows a process, as Take does a packaged app's.
         case "follow": r = Follow(a[2], int.Parse(a[3]), 0x0001 | 0x100000) ? "true" : "false"; break;
         default: r = Q("unknown command"); break;

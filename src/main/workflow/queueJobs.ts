@@ -21,7 +21,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { mkdir, readdir, readFile, rename, rm, rmdir, stat } from 'original-fs/promises'
+import { lstat, mkdir, readdir, readFile, rename, rm, rmdir, stat } from 'original-fs/promises'
 import { JobHost } from '../processSupervisor'
 import { createLogger } from '../logger'
 
@@ -121,12 +121,14 @@ export async function endLeaseJob(host: JobHost, lease: string): Promise<boolean
 }
 
 /**
- * Whether a lease's job is gone: no process holds it (no supervisor, this Hive's or one that outlived its Hive), so
- * nothing can write its journal again (HI-1723). Asked as endLeaseJob does: a job still there is ended, which for a
- * settled lease (the only kind asked) changes nothing. False when it is still held, or that can't be told.
+ * Whether a lease's job is definitely gone (HI-1723): no job by its name, so no process holds it. A journal's only
+ * writer is the supervisor that opened the lease's job (`open` gives it the path, `forget` takes it back, both in its
+ * turn) and holds it while it may write; lease names are random and never opened twice. So with the job gone nothing
+ * can write the journal again. Asked read-only (`hasjob`): nothing in a job is ended. False when it exists, or that
+ * can't be told (no supervisor, no answer, access denied).
  */
 export async function leaseJobGone(host: JobHost, lease: string): Promise<boolean> {
-  return (await host.request('endnamed', lease)) === 'nojob'
+  return (await host.request('hasjob', lease)) === 'nojob'
 }
 
 /** A FILETIME (the supervisor's start times) in Unix ms. */
@@ -270,14 +272,14 @@ export async function clearJournal(root: string, lease: string, dir?: string): P
 
 /**
  * Removes a lease's seal once nothing can write its journal again (HI-1723: one empty folder per job, never removed,
- * piled up): only a sealed journal already cleared (a folder, no moved-aside part left: a settle's evidence), and only
- * when `gone` says its job is (leaseJobGone). An error, a part, anything in the folder or a job that may still be held
- * keeps it (fail-closed). Whether it was removed.
+ * piled up): only a sealed journal already cleared (a real folder, no moved-aside part left: a settle's evidence), and
+ * only when `gone` says its job definitely is (leaseJobGone). Fail-closed: a listing or a look that fails, a part, a
+ * link (the journals folder or the seal: never followed), anything in the folder, or a job that may still be held keeps
+ * it. Looked at again just before it goes. Whether it was removed.
  */
 export async function retireSeal(root: string, lease: string, dir: string | undefined, gone: (lease: string) => Promise<boolean>): Promise<boolean> {
   const folder = journalsOf(root, dir)
-  const names = await readdir(folder).catch(() => null)
-  return names ? retireIn(folder, names, lease, gone) : false
+  return (await listed(folder)) ? retireIn(folder, lease, gone) : false
 }
 
 /**
@@ -286,23 +288,37 @@ export async function retireSeal(root: string, lease: string, dir: string | unde
  */
 export async function sweepSeals(root: string, dir: string | undefined, gone: (lease: string) => Promise<boolean>): Promise<number> {
   const folder = journalsOf(root, dir)
-  const names = await readdir(folder).catch(() => null)
+  const names = await listed(folder)
   if (!names) return 0
   let removed = 0
   for (const n of names) {
     if (!n.endsWith('.followed')) continue
-    if (await retireIn(folder, names, n.slice(0, -'.followed'.length), gone)) removed++
+    if (await retireIn(folder, n.slice(0, -'.followed'.length), gone)) removed++
   }
   return removed
 }
 
-async function retireIn(folder: string, names: string[], lease: string, gone: (lease: string) => Promise<boolean>): Promise<boolean> {
-  if (!names.includes(`${lease}.followed`) || names.some((n) => n.startsWith(`${lease}.sealed-`))) return false
+/** A journals folder's names, only when it is a real folder (not a link) that can be read; null otherwise. */
+async function listed(folder: string): Promise<string[] | null> {
+  const real = await lstat(folder).then((st) => st.isDirectory() && !st.isSymbolicLink(), () => false)
+  return real ? readdir(folder).catch(() => null) : null
+}
+
+/** A cleared seal (a real, empty folder in place of the journal, no part beside it), as it is now. */
+async function cleared(folder: string, lease: string): Promise<boolean> {
+  const names = await listed(folder)
+  if (!names || !names.includes(`${lease}.followed`) || names.some((n) => n.startsWith(`${lease}.sealed-`))) return false
   const main = join(folder, `${lease}.followed`)
-  if (!(await stat(main).then((st) => st.isDirectory(), () => false))) return false
+  if (!(await lstat(main).then((st) => st.isDirectory() && !st.isSymbolicLink(), () => false))) return false
+  return readdir(main).then((inside) => inside.length === 0, () => false)
+}
+
+async function retireIn(folder: string, lease: string, gone: (lease: string) => Promise<boolean>): Promise<boolean> {
+  if (!(await cleared(folder, lease))) return false
   if (!(await gone(lease).catch(() => false))) return false
-  // Not recursive: a folder with anything in it isn't a seal as sealJournal makes it, and stays.
-  return rmdir(main).then(() => true, () => false)
+  // Again, after the wait for the answer; then not recursive: a folder with anything in it stays.
+  if (!(await cleared(folder, lease))) return false
+  return rmdir(join(folder, `${lease}.followed`)).then(() => true, () => false)
 }
 
 // The launcher (run by Node, waiting for its go-ahead) is launcher.ts's, shared with hive-progress's isolated checks (#1435).
