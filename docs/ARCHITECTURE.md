@@ -518,7 +518,14 @@ every move's guards (`idsOf`) and `skippedRules`.
 apart from that, in the same write, whenever `reconcileActs` is on and it isn't applied yet: an integration
 (`integratedOutside`) until the card is Done; a stale pass (`staleEffects`) once per `Stale` fact, its builder's wake
 written for that fact (`card_actions.fact`, read with `hasAction`) as the record that it was applied. So an observation
-recorded while the rules were off is acted on at the next run once they're on, and repeated runs add nothing.
+recorded while the rules were off is acted on at the next run once they're on, and repeated runs add nothing. A stale
+pass whose line is back at exactly the approved revision is observed as a `CarriedOver` (how `sameRevision`, once per
+head observation), which the fold reads as the stale pass cleared (#1623). What is done about a pass is decided from the
+newest observed head, not by replaying transitions: at the approved revision, a card the queue let go of for a stale
+pass is queued again (`requeueable`, `ensureQueued`: idempotent, so a return recorded with the rules off is acted on
+once they're on, from the head as it is then); elsewhere it is carried over or stale. Each of these writes checks under
+its lock that the head observation it read is still the newest (`newest`): a newer one wins and the next run decides.
+The return comes before applying a stale pass's effects, so a pass that holds again never wakes for them.
 
 **Reconciliation in the app (#1217, P3; acting since #1263).** `workflow/reconciler.ts` follows the open workspaces' projects (as
 `platform/watching.ts` does) and subscribes to the watcher for each: a line or a folder's head moved, or a write,
@@ -530,8 +537,8 @@ MergedInPart, Stale, CarriedOver, CommitAttributed, LeftTarget, Gone), and the t
 actions and wakes run only with `reconcileActs`, the switch `hive.workflow.enforce` (on by default; off, P3's
 record-only). It
 reconciles the project's unfinished cards, a card asked for, and Done cards whose target line moved. Every observed
-fact has a dedupe key (`prev:`, `cycle:`, `commit:`, `part:`, `left:`, `gone:`; `stale:` and `carried:` per cycle and
-revision), so two Hives write each once, and a writer that lost the race reads again and writes what is true now
+fact has a dedupe key (`prev:`, `cycle:`, `commit:`, `part:`, `left:`, `gone:`; `stale:`, `carried:` and `back:` per cycle and
+head observation, `HeadMoved`'s seq: a line that returns to a revision is observed again, #1623), so two Hives write each once, and a writer that lost the race reads again and writes what is true now
 (`observeHead`). Every delayed observation is written only in the cycle it was read in (`sameCycle`, checked under the
 write's lock; a `HeadMoved` also after the very fact it was read after), so a head read before a card started again
 never lands in its new cycle; shared-folder attribution, immutable once written, waits for the next run when the

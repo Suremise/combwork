@@ -217,6 +217,8 @@
   "workflow.refused.lane.oneAtATime.next": "请先完成 {earlier}：完成后通道会继续处理 {card}。",
   "workflow.refused.loop.followUpChecked.message": "{card}：后续修改在等评审者检查，没有检查就不能继续。",
   "workflow.refused.loop.followUpChecked.next": "请等待评审者的 ok 或 gaps；如果没有回复，请询问用户。",
+  "workflow.refused.loop.followUpMerging.message": "{card} 正在合并：后续修改已无法将它移出合并队列。",
+  "workflow.refused.loop.followUpMerging.next": "请等待合并完成；如果仍需要后续修改，请放到新卡片上。",
   "workflow.refused.loop.noReviewer.message": "{card} 没有评审者来检查：它不在任何有评审者的通道中，也还没有人评审过它。",
   "workflow.refused.loop.noReviewer.next": "为这张卡片启动一个有评审者的通道，或改为写在评论里。",
   "workflow.refused.loop.noStep.message": "{card} 没有等待检查的设计方案或后续修改。",

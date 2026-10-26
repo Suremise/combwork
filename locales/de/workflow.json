@@ -217,6 +217,8 @@
   "workflow.refused.lane.oneAtATime.next": "Schließe zuerst {earlier} ab: Sobald die Karte erledigt ist, geht die Lane mit {card} weiter.",
   "workflow.refused.loop.followUpChecked.message": "{card}: Ein Follow-up wartet auf die Prüfung durch seinen Reviewer; ohne sie geht es nicht weiter.",
   "workflow.refused.loop.followUpChecked.next": "Warte auf ok oder gaps vom Reviewer; kommt keine Antwort, frag den Benutzer.",
+  "workflow.refused.loop.followUpMerging.message": "{card} wird gerade gemergt: Ein Follow-up kann die Karte nicht mehr aus der Merge-Warteschlange nehmen.",
+  "workflow.refused.loop.followUpMerging.next": "Warte auf den Merge; wird das Follow-up noch gebraucht, leg es auf eine neue Karte.",
   "workflow.refused.loop.noReviewer.message": "{card} hat keinen Reviewer, der die Karte prüfen könnte: Sie ist in keiner Lane mit Reviewer, und niemand hat sie bisher geprüft.",
   "workflow.refused.loop.noReviewer.next": "Starte für die Karte eine Lane mit Reviewer, oder schreib es stattdessen in einen Kommentar.",
   "workflow.refused.loop.noStep.message": "Auf {card} wartet kein Entwurf und kein Follow-up auf eine Prüfung.",

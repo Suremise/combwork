@@ -871,6 +871,14 @@
     "defaultMessage": "Wait for the reviewer's ok or gaps; if none comes, ask the user.",
     "description": "The next step after going ahead with a follow-up unchecked (#1467). ok and gaps are the reviewer's answers, as agents name them: keep them as they are."
   },
+  "workflow.refused.loop.followUpMerging.message": {
+    "defaultMessage": "{card} is being merged now: a follow-up can no longer take it out of the merge queue.",
+    "description": "A refused follow-up (#1623): a follow-up on a queued card takes it out of the merge queue first, but the queue has already begun merging this one. {card} is a card key."
+  },
+  "workflow.refused.loop.followUpMerging.next": {
+    "defaultMessage": "Wait for the merge; if the follow-up is still needed, put it on a new card.",
+    "description": "The next step after a follow-up refused because the card is being merged now (#1623)."
+  },
   "workflow.refused.loop.noReviewer.message": {
     "defaultMessage": "{card} has no reviewer to check it: it is in no lane with a reviewer, and nobody has reviewed it yet.",
     "description": "A refused design or follow-up posted for a check (#1382, #1467): nobody can be woken to check it. {card} is a card key. A lane: a card loop's record of its builder and reviewer."

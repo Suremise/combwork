@@ -694,7 +694,7 @@ When agents work in pairs, a builder and a reviewer taking cards in turn (the **
   - **Blocked**, or **On Hold** waiting for you: red cross-hatching.
   - **A failed review** underlines the segment in red until the card goes back for its next round.
   - **A refused request** (workflow rules on): a small red notch in the segment's corner, when the card's latest request was refused (an agent submitting before its checks passed, say, or starting a lane's card before the one before it is Done). Its hover says why and what to do next, as the agent was told, and how many times in a row; it clears when the card next moves.
-  - **A stale pass:** amber dashed edges on a passed card whose work changed after its review into something that isn't the same change. Its hover says *Pass was for a3f2c1d; now at b71e09a*; the mark goes when it is submitted again.
+  - **A stale pass:** amber dashed edges on a passed card whose work changed after its review into something that isn't the same change. Its hover says *Pass was for a3f2c1d; now at b71e09a*; the mark goes when it is submitted again, or when its branch is put back at the revision that passed.
   - **A move past its rules** (yours or the Assistant's): a small dot in the corner; its hover says who moved it, past which rules, and why.
   - **Old rules:** a small hollow square in the bottom corner, on a card started before its project's workflow options changed. It keeps the options it started with until it's Done, unless you apply the new ones to it when you save them.
 
@@ -941,7 +941,9 @@ You stay in charge of each queue:
 - **Pause queue** stops a target's queue before its next card; a card whose checks are running finishes them and waits, unmerged. The pause is saved, so it holds after a restart and in every Hive on the workspace, with who paused it.
 - **Resume** runs it again, starting the waiting card from a fresh test merge. When Hive paused the queue itself (workflow rules are off, you have changes in a file the merge changes, a merge was interrupted with files changed since), Resume first looks again, and if the cause is still there the queue stays paused and says why.
 - **Remove from queue** takes a card out: it goes back to Approved, is never merged (after a restart too), and its builder is told. Once its merge has begun it can't be taken out; it finishes.
-- **Retry merge** puts a card the queue sent back (a failed check you know is flaky, say) into the queue again, as it was approved, once.
+- **Retry merge** puts a card the queue sent back (a failed check you know is flaky, say) into the queue again, as it was approved, once. It also queues again a passed card that was taken out of the queue and is still approved.
+- **A follow-up on a queued card** (a change its reviewer is asked to check, such as a screenshot's) takes it out of the queue first, so the queue can't merge it while the follow-up changes it; the reviewer's OK queues it again. Once its merge has begun, a follow-up waits for a new card.
+- **A stale pass** (the card's work changed after its review into something that isn't the same change) takes it out of the queue: its builder submits it again, or puts its branch back at the revision that passed, which makes the pass count again and queues it again by itself.
 
 The Hive Assistant can do these for you within **Settings → Assistant → Control** (it gives your reason when it takes a card out or retries one), and lists them among its actions. Agents can see a queue but never change it. You see each queue in the Progress panel's **Merges** tab, in the project's Version Control tab (**Merge queue**, with its history), and on each card in its **Work** section.
 

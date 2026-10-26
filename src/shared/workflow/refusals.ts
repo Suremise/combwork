@@ -10,7 +10,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'merge.hiveMerges' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.hiveMerges' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -200,6 +200,10 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'loop.followUpChecked': r(
     msg({ id: 'workflow.refused.loop.followUpChecked.message', defaultMessage: "{card}: a follow-up waits for its reviewer's check, with no going ahead without it.", description: "A refused going ahead unchecked (#1467): what waits is a follow-up (a change asked of reviewed work, such as a screenshot's), which only its reviewer's answer settles. {card} is a card key." }),
     msg({ id: 'workflow.refused.loop.followUpChecked.next', defaultMessage: "Wait for the reviewer's ok or gaps; if none comes, ask the user.", description: "The next step after going ahead with a follow-up unchecked (#1467). ok and gaps are the reviewer's answers, as agents name them: keep them as they are." })
+  ),
+  'loop.followUpMerging': r(
+    msg({ id: 'workflow.refused.loop.followUpMerging.message', defaultMessage: '{card} is being merged now: a follow-up can no longer take it out of the merge queue.', description: 'A refused follow-up (#1623): a follow-up on a queued card takes it out of the merge queue first, but the queue has already begun merging this one. {card} is a card key.' }),
+    msg({ id: 'workflow.refused.loop.followUpMerging.next', defaultMessage: 'Wait for the merge; if the follow-up is still needed, put it on a new card.', description: 'The next step after a follow-up refused because the card is being merged now (#1623).' })
   ),
   'queue.advancing': r(
     msg({ id: 'workflow.refused.queue.advancing.message', defaultMessage: '{card} is being merged into {target} now: it can no longer be taken out of the merge queue.', description: "A refused Remove from queue: the merge queue has begun moving the target to the card's merge (it finishes even after a restart). {card} is a card key, {target} a branch name." }),

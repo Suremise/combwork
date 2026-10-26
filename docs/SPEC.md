@@ -1318,7 +1318,7 @@ that can't be written fails the change whole.
 | `CheckRan` | name, command, revision, result (passed/failed/stopped), run id, duration, by, counted (bool), why not counted | A run naming the card finishes (§16.13, P3) [#1119 c]. |
 | `ReviewStarted` | reviewer, submission id, revision, review copy | The start-review intent (§16.8.1). |
 | `Verdict` | reviewer, submission id, revision, pass/fail, kind of fail (content / explanation), round, decision generation the reviewer had received, comment id | The verdict intent passes. |
-| `CarriedOver` | from revision, to revision, how (replay, same revision) | A pass is kept for a later revision that is the same change. |
+| `CarriedOver` | from revision, to revision, how (replay, same revision) | A pass is kept for a later revision that is the same change; with same revision, a stale pass holds again once its line is back at exactly the approved revision (#1623). |
 | `Updated` | entry id, from revision, to revision, how (merged target in, rebased), carried (bool) | Strict: the queue brought the approved revision up to date on its own ref (§16.9.1). |
 | `LineMoved` | line, from, to, why (squash continuation) | Hive moved an agent's branch to the target between cards (§16.19.2). |
 | `LineRenamed` | from, to, why (repair) | Repair renamed the agent's branch the card works on, named after an old place (#1305): the fold's `started.line` is the new name from here (only when it was `from`), so the card's view and its reconciliation follow it, never finding it gone. |
@@ -1328,7 +1328,7 @@ that can't be written fails the change whole.
 | `ApprovalRequested` | request id, kind (approve, decide, test, sign-in, other), gate, revision?, text | The ask-the-user intent, or a rule waiting on the user. |
 | `Approval` | request id, user, gate, submission?, answer (approved / declined / answered), note, decision generation | The user answers the request (in the card, the For you list, or a pane reply counted under #922). An answer is never a `Decision` (§16.4.6). |
 | `IntegrationRequested` | **entry id**, revision, candidate key, target, style | The card enters the merge queue (again, after a failure, with a new entry id). |
-| `IntegrationCancelled` | entry id, by, reason | **Remove from queue**, a stale pass, a card moved out by the user. |
+| `IntegrationCancelled` | entry id, by, reason | **Remove from queue**, a stale pass, a card moved out by the user, a follow-up posted on the queued card (#1623). |
 | `IntegrationStarted` | entry id, expected target revision, result revision | The queue is about to advance the target (written **before** it does, §16.9.2). |
 | `IntegrationPhase` | entry id, phase (files, ref, rollback) | Before each step of a checked-out target's advance (§16.9.2). |
 | `IntegrationFailed` | entry id, revision, target, reason (conflict, checks, target moved, folder busy, not up to date), files, log, transient (bool) | The queue's test merge or checks fail. |
@@ -1399,6 +1399,7 @@ tied to its `Stale` fact) [HR2's #1263 round 1]. Its rules:
 | A new revision after Submitted, while in Review | `HeadMoved`. The review is of the submitted revision, and its verdict is **always recorded** [answering HB3's round 1 finding 8]: a fail stands as it is; a pass is recorded on the submitted revision and, if the head is now a different change, made `Stale` at once (the card goes to Approved with the stale mark, the builder is woken: "stale: submit again"). |
 | A new revision after a pass that **is** the same change (a clean rebase, a squash) | `CarriedOver`; the card stays Approved [#1112 B]. With "Exact revision only" (G4), it is `Stale`. |
 | A new revision after a pass that isn't the same change | `Stale`; the card stays in Approved with a **stale** mark until the builder submits again (it then goes to Review); its queue entry is cancelled (`IntegrationCancelled`); the builder is woken, and its lane shows "paused: stale, submit again" [#1120 c; HB3's round 1 finding 8]. |
+| A stale pass's line back at **exactly** the approved revision (the same commit: a follow-up taken back) | `CarriedOver` (how: same revision), once per return, written only while the head it follows is still the newest observed: the reviewer passed that commit, so the stale mark goes and the pass holds again. Where Hive merges, the Approved card with no queue entry is queued again (unless a follow-up waits for its reviewer's check, whose `ok` queues it, or the OK before merging is still to come, which is asked again); the builder is woken: no need to submit again. Where the agent merges, the builder is woken to merge it. Recorded while the rules are off, this is done once they're on [#1623]. |
 | **Integration needs a change** [answering HB3's round 1 finding 2] | Containment and observed integration count only a card with a **non-empty change**: its revision differs from `Started.base` and isn't an ancestor of it. A card just started (its revision is its base, an ancestor of the target) is never found "in the target". |
 | A card with its own line, in **Approved**: the approved revision (or one that replays to it) found in the target, not by Hive | `Integrated` (observed, `by: outside`) → Done; the queue cancels its entry; the lane counts it [#1112 C]. |
 | A card with its own line, in **Review**, whose revision was merged by hand before its review passed | `Integrated` (observed) → Done, with an **outside the rules** mark naming the rules skipped (shown like an override). Hive never moves it back (OP-25) [#1112 C]. |
@@ -2029,6 +2030,7 @@ folder (the folder's line is the target); G10 is hidden when R includes you; Q =
 | Approved | **user approves** (G10's request) | `approval.given` | **Finish (merge step)** |
 | Approved | **report merge** (builder; M = the agent merges, or not checked) | `done.contained` (not with not checked); `approval.given` when G10 applies, and with not checked a stale pass refuses it too (`integrate.approved`, cause stale: nothing checks what was merged, so the OK must be for the work there) (#1592) | Done · `recordIntegrated (by agent)`; with not checked, Done with no `Integrated` (nothing was checked, and §16.8.4 never fakes one; a later observed integration adds it) [P2] |
 | Approved | **submit** after a stale pass | as Active's submit | Review |
+| Approved | **retry merge** (the user's, or the Assistant's with a reason; Hive merges, no queue entry, no follow-up waiting) | `integrate.approved` (a stale pass refuses it, naming **submit** as the way on) | Merging · `enqueue` [#1623] |
 | Merging | queue: merged | `integrate.*`, `done.contained` | Done · `recordIntegrated`, `releaseSlot`, `endLaneIfDone` |
 | Merging | queue: returned | — | Active · `returnToBuilder` (§16.9) |
 | Active | **submit** after a queue failure, same approved unstale revision | `submit.notDuplicate`, `requeue.allowed`, `integrate.approved` | Merging · `enqueue` (no review, no round) |
@@ -2226,7 +2228,10 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
 - **A follow-up checked** (#1467, built [#1467]). On 22 Oct #1417 and #1419 stalled the same way in Review and Approved:
   the Assistant's screenshot OK asked for changes for the reviewer to check, the builder posted its fixes as a comment,
   and the reviewer watched for a move into Review that never came. The card loop step has a `followUp`: the builder's,
-  on a card in Review or Approved (`loop.stepNotHere` elsewhere), named as a design is (`<key>/s<seq>`, its comment
+  on a card in Review or Approved, queued included (`loop.stepNotHere` elsewhere; on a queued card it first takes its
+  entry out of the queue, `IntegrationCancelled` with reason follow-up, so the queue can't merge the approved revision
+  while the follow-up changes its line, and the reviewer's `ok` queues it again while its pass holds; refused once the
+  queue has begun merging it, `loop.followUpMerging`, #1623), named as a design is (`<key>/s<seq>`, its comment
   headed "Follow-up HI-12/s41, for the reviewer's check (an answer names HI-12/s41):"), with the same reviewer rule
   (`loop.noReviewer` with none), the same `step` loop wake to the reviewer whatever its watch counts, and the same
   answers (`ok`, `gaps`, naming it; history "Checked the follow-up: OK: …"). It has no due time and no going ahead:
@@ -2835,7 +2840,9 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   merged, after a restart too (S33a). Refused once its advance has begun (`queue.advancing`): it is being merged, and
   its recovery finishes it.
 - **Retry merge** (an override): a card the queue returned, a red check included, is queued again with its approved
-  revision unchanged, once per revision (S32's last part).
+  revision unchanged, once per revision (S32's last part). A card in Approved with no entry (taken out of the queue, or
+  for a follow-up), approved and not stale, is queued again too, overriding nothing (#1623); a stale one is refused with
+  **submit** as the way on, never **report merge**, which is the agent's own merge, not Hive's.
 
 **Built [#1357]** (the queue on the card, in the Git tab and in the Merge dialog):
 - **The card's Work section** (`CardQueue.tsx`) shows the card's newest entry this cycle, from its facts (the work view's
@@ -4280,7 +4287,9 @@ deliveries keep their in-memory store (published after each transaction), the ta
   reopening a card and merging the same revision in a new cycle is recorded again.
   - **One key for every observed fact** [P2]: the store keeps a dedupe key per observed fact, unique per card and
     kind: `prev:<seq>` for transitions (`HeadMoved`), `cycle:<seq>` for an observed `Integrated`, `commit:<id>` for
-    `CommitAttributed`, and the mark's own (`part:<cycle>:<revision>`, `left:<cycle>:<target head>`). One unique
+    `CommitAttributed`, the mark's own (`part:<cycle>:<revision>`, `left:<cycle>:<target head>`), and for a pass's
+    `Stale` and `CarriedOver` the head observation they follow (`stale:`, `carried:`, `back:<cycle>:<HeadMoved seq>`,
+    #1623: a line away, back and away to the same commit again is observed each time). One unique
     index covers them all.
   - **The view comes first** [P2]: an observer takes the fact it follows (its view of the log) **before** it reads the
     platform. Read after, a loser that saw B would find the winner's C as its `prev` and write C→B, a stale value

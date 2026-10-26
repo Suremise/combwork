@@ -139,6 +139,207 @@ describe('workflow scenarios, Git', () => {
     expect(e.wf.state(card).stage).toBe('review')
   })
 
+  describe('a line that moves away from its approved revision and comes back (#1623)', () => {
+    const reviewer = { waitMinutes: 30, reviewer: async () => 'R1' }
+
+    it('stale, then back at exactly the approved commit: the pass holds again and the card is queued again, and merged', async () => {
+      const e = pair()
+      const { card, folder } = await approved(e)
+      const rev = e.wf.state(card).approved!.revision!
+      expect(e.wf.state(card).stage).toBe('merging')
+      commit(folder, { 'src/fix.txt': 'a follow-up\n' }, 'follow-up')
+      await reconcile(e.wf, card)
+      expect(e.wf.state(card)).toMatchObject({ stage: 'approved', stale: { approved: rev, why: 'change' } })
+      // Stale in Approved under Hive merges: Retry merge is refused, naming submit (not report merge) as the way on.
+      const r = refusedBy(await e.wf.retryMerge(card.key, 'just merge it'), 'move.notFromHere')
+      expect(r.next).toBe('From Approved, use: submit.')
+      expect(e.wf.movesFrom('approved', e.wf.rulesetOf(e.wf.store.card(card.id)), e.wf.state(card))).toEqual(['submit'])
+      // The follow-up withdrawn: the line put back at the approved commit.
+      sh(folder, 'reset', '-q', '--hard', rev)
+      await reconcile(e.wf, card)
+      const s = e.wf.state(card)
+      expect(s.stale).toBeNull()
+      expect(s.approved?.revision).toBe(rev)
+      expect(s.stage).toBe('merging')
+      expect(s.entries.at(-1)).toMatchObject({ state: 'open', revision: rev })
+      const back = e.store.facts(card.id).filter((f) => f.kind === 'CarriedOver')
+      expect(back.map((f) => f.data)).toEqual([expect.objectContaining({ to: rev, how: 'sameRevision' })])
+      expect(e.wakes.some((w) => w.agent === 'B1' && w.why.includes("pass holds again; it is queued again; don't submit it again"))).toBe(true)
+      // Observed once: another look writes nothing more.
+      await reconcile(e.wf, card)
+      expect(e.store.facts(card.id).filter((f) => f.kind === 'CarriedOver')).toHaveLength(1)
+      const [o] = await e.queue().drain('main')
+      expect(o).toMatchObject({ outcome: 'integrated' })
+      expect(e.wf.state(card).stage).toBe('done')
+    })
+
+    it('a newer head observed while the pass holding again waits for its write wins (HR2 r1 f1)', async () => {
+      const e = pair()
+      const { card, folder } = await approved(e)
+      const rev = e.wf.state(card).approved!.revision!
+      const other = commit(folder, { 'src/fix.txt': 'unreviewed\n' }, 'follow-up')
+      await reconcile(e.wf, card)
+      sh(folder, 'reset', '-q', '--hard', rev)
+      // Another observer sees the line move away again just before this one's write.
+      const write = e.wf.write.bind(e.wf)
+      let raced = false
+      e.wf.write = (async (...args: Parameters<typeof e.wf.write>) => {
+        if (!raced && args[2] === 'hive' && e.wf.state(card).stale && e.wf.state(card).head === rev) {
+          raced = true
+          sh(folder, 'reset', '-q', '--hard', other)
+          await reconcile(e.wf, card)
+        }
+        return write(...args)
+      }) as typeof e.wf.write
+      await reconcile(e.wf, card)
+      expect(raced).toBe(true)
+      expect(e.wf.state(card)).toMatchObject({ head: other, stage: 'approved', stale: { approved: rev } })
+      expect(e.store.facts(card.id).some((f) => f.kind === 'CarriedOver')).toBe(false)
+    })
+
+    it('away, back and away to the same commit again: each excursion is stale, each return holds again (HR2 r1 f2)', async () => {
+      const e = pair()
+      const { card, folder } = await approved(e)
+      const rev = e.wf.state(card).approved!.revision!
+      const other = commit(folder, { 'src/fix.txt': 'unreviewed\n' }, 'follow-up')
+      for (let i = 0; i < 2; i++) {
+        sh(folder, 'reset', '-q', '--hard', other)
+        await reconcile(e.wf, card)
+        expect(e.wf.state(card)).toMatchObject({ stage: 'approved', stale: { approved: rev, current: other } })
+        expect(e.wf.state(card).entries.at(-1)?.state).toBe('cancelled')
+        sh(folder, 'reset', '-q', '--hard', rev)
+        await reconcile(e.wf, card)
+        expect(e.wf.state(card)).toMatchObject({ stage: 'merging', stale: null })
+      }
+      expect(e.kinds(card.id).filter((k) => k === 'Stale')).toHaveLength(2)
+      expect(e.kinds(card.id).filter((k) => k === 'CarriedOver')).toHaveLength(2)
+      expect(e.kinds(card.id).filter((k) => k === 'IntegrationRequested')).toHaveLength(3)
+    })
+
+    it('a return recorded while the rules were off is acted on once they are on, once (HR2 r1 f3)', async () => {
+      const e = pair()
+      const { card, folder } = await approved(e)
+      const rev = e.wf.state(card).approved!.revision!
+      commit(folder, { 'src/fix.txt': 'unreviewed\n' }, 'follow-up')
+      await reconcile(e.wf, card)
+      e.wf.cfg.reconcileActs = false
+      sh(folder, 'reset', '-q', '--hard', rev)
+      await reconcile(e.wf, card)
+      expect(e.wf.state(card)).toMatchObject({ stage: 'approved', stale: null })
+      e.wf.cfg.reconcileActs = true
+      await reconcile(e.wf, card)
+      expect(e.wf.state(card).stage).toBe('merging')
+      await reconcile(e.wf, card)
+      expect(e.kinds(card.id).filter((k) => k === 'IntegrationRequested')).toHaveLength(2)
+      expect(e.wakes.filter((w) => w.agent === 'B1' && w.why.includes('pass holds again'))).toHaveLength(1)
+    })
+
+    it('a return recorded while the rules were off, then a move away again before they are on: stale, never queued (HR2 r2)', async () => {
+      const e = pair()
+      const { card, folder } = await approved(e)
+      const rev = e.wf.state(card).approved!.revision!
+      const other = commit(folder, { 'src/fix.txt': 'unreviewed\n' }, 'follow-up')
+      await reconcile(e.wf, card)
+      e.wf.cfg.reconcileActs = false
+      sh(folder, 'reset', '-q', '--hard', rev)
+      await reconcile(e.wf, card)
+      expect(e.wf.state(card).stale).toBeNull()
+      sh(folder, 'reset', '-q', '--hard', other)
+      e.wf.cfg.reconcileActs = true
+      await reconcile(e.wf, card)
+      expect(e.wf.state(card)).toMatchObject({ head: other, stage: 'approved', stale: { approved: rev, current: other } })
+      expect(e.kinds(card.id).filter((k) => k === 'IntegrationRequested')).toHaveLength(1)
+    })
+
+    it('a newer head observed while the queueing write waits wins: nothing is queued (the Assistant\'s call, r2)', async () => {
+      const e = pair()
+      const { card, folder } = await approved(e)
+      const rev = e.wf.state(card).approved!.revision!
+      const other = commit(folder, { 'src/fix.txt': 'unreviewed\n' }, 'follow-up')
+      await reconcile(e.wf, card)
+      e.wf.cfg.reconcileActs = false
+      sh(folder, 'reset', '-q', '--hard', rev)
+      await reconcile(e.wf, card)
+      e.wf.cfg.reconcileActs = true
+      // Just before the queueing write, another observer sees the line move away again.
+      const write = e.wf.write.bind(e.wf)
+      let raced = false
+      e.wf.write = (async (...args: Parameters<typeof e.wf.write>) => {
+        if (!raced && args[2] === 'hive' && !e.wf.state(card).stale && e.wf.state(card).head === rev) {
+          raced = true
+          sh(folder, 'reset', '-q', '--hard', other)
+          await reconcile(e.wf, card)
+        }
+        return write(...args)
+      }) as typeof e.wf.write
+      await reconcile(e.wf, card)
+      expect(raced).toBe(true)
+      expect(e.wf.state(card)).toMatchObject({ head: other, stage: 'approved', stale: { current: other } })
+      expect(e.kinds(card.id).filter((k) => k === 'IntegrationRequested')).toHaveLength(1)
+    })
+
+    it('Remove from queue is never undone: a card the user took out stays out at its approved revision', async () => {
+      const e = pair()
+      const { card } = await approved(e)
+      moved(await e.wf.removeFromQueue(card.key, 'not yet'))
+      await reconcile(e.wf, card)
+      expect(e.wf.state(card)).toMatchObject({ stage: 'approved' })
+      expect(e.wf.state(card).entries.at(-1)?.state).toBe('cancelled')
+    })
+
+    it('where the agent merges, back at the approved commit: the pass holds again and its builder is told to merge it', async () => {
+      const e = agentMerges()
+      const { card, folder } = await approved(e)
+      const rev = e.wf.state(card).approved!.revision!
+      commit(folder, { 'src/fix.txt': 'a follow-up\n' }, 'follow-up')
+      await reconcile(e.wf, card)
+      expect(e.wf.state(card).stale).not.toBeNull()
+      sh(folder, 'reset', '-q', '--hard', rev)
+      await reconcile(e.wf, card)
+      expect(e.wf.state(card)).toMatchObject({ stage: 'approved', stale: null })
+      expect(e.wakes.some((w) => w.agent === 'B1' && w.why.includes('pass holds again; merge it and report the merge'))).toBe(true)
+    })
+
+    it('a follow-up on a queued card takes it out of the queue first; the reviewer\'s ok queues it again', async () => {
+      const e = pair()
+      const { card } = await approved(e)
+      expect(e.wf.state(card).stage).toBe('merging')
+      const posted = await e.wf.loopStep(card.key, B1, 'followUp', 'Screenshot fixed', reviewer)
+      moved(posted)
+      let s = e.wf.state(card)
+      expect(s.stage).toBe('approved')
+      expect(s.entries.at(-1)).toMatchObject({ state: 'cancelled', cancelled: 'followUp' })
+      expect(await e.queue().runOnce('main')).toBeNull()
+      // While it waits for the check, Retry merge doesn't queue it either.
+      refusedBy(await e.wf.retryMerge(card.key), 'move.notFromHere')
+      moved(await e.wf.loopStep(card.key, R1, 'ok', 'Looks right', { ...reviewer, design: (posted as { data?: Record<string, unknown> }).data?.design as string }))
+      s = e.wf.state(card)
+      expect(s.stage).toBe('merging')
+      expect(s.entries.at(-1)?.state).toBe('open')
+    })
+
+    it('a follow-up is refused once the queue has begun merging the card', async () => {
+      const e = pair()
+      const { card } = await approved(e)
+      const entry = e.wf.state(card).entries.at(-1)!
+      await e.wf.write(e.wf.store.card(card.id), e.wf.rulesetOf(e.wf.store.card(card.id)), 'hive', (w) => {
+        w.fact('IntegrationStarted', { entry: entry.id, expected: 'x', result: 'y' })
+      })
+      refusedBy(await e.wf.loopStep(card.key, B1, 'followUp', 'One more', reviewer), 'loop.followUpMerging')
+      expect(e.wf.state(card).entries.at(-1)?.state).toBe('started')
+    })
+
+    it('taken out of the queue in Approved: Retry merge queues it again', async () => {
+      const e = pair()
+      const { card } = await approved(e)
+      moved(await e.wf.removeFromQueue(card.key, 'not yet'))
+      expect(e.wf.state(card).stage).toBe('approved')
+      moved(await e.wf.retryMerge(card.key))
+      expect(e.wf.state(card)).toMatchObject({ stage: 'merging' })
+      expect(e.wf.state(card).entries.at(-1)).toMatchObject({ state: 'open', requeue: 'retry' })
+    })
+  })
+
   it('S9: a clean rebase onto a newer target carries the pass over; with "Exact revision only" it goes stale', async () => {
     for (const sameness of ['change', 'exact'] as const) {
       const e = agentMerges({ sameness })
