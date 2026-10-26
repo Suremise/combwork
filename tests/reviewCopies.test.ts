@@ -32,7 +32,7 @@ const { boardFile, closeBoard, workspaceDb } = await import('../src/main/boardSt
 const { COPIES_DIR, CopyPool, CopyStore, copiesDirOf, grantsCopies } = await import('../src/main/copies')
 const { fileSlotConn } = await import('../src/main/slots')
 const { BoundedLog, execCommand, FILE_IO } = await import('../src/main/workflow/queueChecks')
-const { ReviewCopies, reviewCopyText } = await import('../src/main/reviewCopies')
+const { COPY_WAIT_STALL_MS, copyWaitStall, ReviewCopies, reviewCopyText } = await import('../src/main/reviewCopies')
 const { reviewsWork } = await import('../src/shared/workflow/roles')
 const { PROVIDERS } = await import('../src/shared/providers')
 
@@ -315,7 +315,9 @@ describe('waiting when none is free', () => {
     expect(waiting.is).toBe('waiting')
     expect(reviewCopyText(waiting)).toMatch(/^Waiting for a review copy \(/)
     expect(w.notes.filter((n) => n.id === 'tasks.history.reviewCopyWaiting')).toEqual([{ card: 13, id: 'tasks.history.reviewCopyWaiting', values: { agent: 'R2' } }])
-    expect(w.rc.waits()).toEqual([{ card: 13, agent: R2.id }])
+    expect(w.rc.waits()).toEqual([expect.objectContaining({ card: 13, agent: R2.id, name: 'R2', since: expect.any(Number) })])
+    // It says what holds each copy, and when Hive tries again (HI-1764: it was told only "pending").
+    expect(w.rc.waits()[0].why).toMatch(/^the pool's copies are in use: copy-1 lent to a review of \S*12 for \d+ min\. Hive tries again as each is freed, and every 30 s$/)
     // Asked again meanwhile: still waiting, said on the card once.
     expect((await w.rc.start(13, R2)).is).toBe('waiting')
     expect(w.notes.filter((n) => n.id === 'tasks.history.reviewCopyWaiting')).toHaveLength(1)
@@ -332,6 +334,22 @@ describe('waiting when none is free', () => {
     expect(w.told).toHaveLength(1)
     expect(w.told[0]).toMatchObject({ agent: R2.id, card: 13 })
     expect(w.told[0].text).toMatch(/^#13's review copy is ready\. Review in .*copy-1 at /)
+  })
+
+  it('a review waiting for a copy past COPY_WAIT_STALL_MS stalls its card, for a lane watch to notice (HI-1764)', async () => {
+    const w = world(1)
+    const rev = head(w.project)
+    review(w, 12, R1.id, 1, rev)
+    review(w, 13, R2.id, 1, rev)
+    expect((await w.rc.start(12, R1)).is).toBe('ready')
+    expect((await w.rc.start(13, R2)).is).toBe('waiting')
+    const waits = w.rc.waits()
+    const card = { number: 13, key: 'HI-13', column: 'review' }
+    expect(copyWaitStall(card, waits, waits[0].since + COPY_WAIT_STALL_MS - 1)).toBeNull()
+    expect(copyWaitStall(card, waits, waits[0].since + 7 * 60_000)).toMatch(/^HI-13's review by R2 has waited 7 min for a review copy: the pool's copies are in use: copy-1 lent to a review of \S*12 for \d+ min\. /)
+    // Only its own card, and only in Review.
+    expect(copyWaitStall({ ...card, number: 12 }, waits, waits[0].since + 7 * 60_000)).toBeNull()
+    expect(copyWaitStall({ ...card, column: 'doing' }, waits, waits[0].since + 7 * 60_000)).toBeNull()
   })
 
   it('two reviews at once with a pool of two; a third waits', async () => {

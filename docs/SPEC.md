@@ -3566,9 +3566,13 @@ it to the revision (`git checkout --detach --force`, `git clean -fd`; a new or g
 --detach` and the project's copied files), installing when its lock files changed (Hive's run, credited to the lease's agent: HI-1710).
 A lease carries the holder Hive's profile, pid and start. **Returning** makes it `returning`; the **quiescence barrier**
 frees it only when, in order, no Progress run has its folder in the copy, its lease's job (an isolated run's processes)
-is settled (#1429's `slotJobs.ts`: ended, journal sealed and read, seen gone), its holder agent isn't in a turn or
-running background tasks, and a rename of its folder aside and back succeeds; otherwise it stays returning, looked at
-again every 30 s and on each lease. Past Settings → Advanced, **Copies: wait for one to be free**
+is settled (#1429's `slotJobs.ts`: ended, journal sealed and read, seen gone), a review's holder agent isn't in a turn or
+running background tasks (a check's isn't waited for, HI-1764: every process of its run is in its job, and a builder in
+a card loop is nearly always busy, so its check copies stayed held and reviewers got none), and a rename of its folder
+aside and back succeeds; otherwise it stays returning, tried again within seconds of its return (0.5, 1, 2, 4 and 8 s)
+and then looked at again every 30 s and on each lease. A review waiting for a copy is told what holds each one (lent
+to a review or check of which card, since when; returned, and what holds it back) and that Hive tries again as each is
+freed; one that has waited 5 minutes stalls its card for lane watches (`cardStall.ts`). Past Settings → Advanced, **Copies: wait for one to be free**
 (`hive.copies.quietWaitMinutes`, 10), a lease that finds none free says which copy is still in use and by what. At a
 restart a lease whose Hive is gone, or (this Hive's) whose run is over, is returned and goes through the barrier. A free
 copy is looked at again under its next reservation (a run or a process in it since: passed over, never reset under

@@ -79,6 +79,21 @@ interface Waiting {
   leasing: Promise<ReviewCopyAnswer> | null
   /** Whether it was told it waits: it is told again once it has a copy. */
   told: boolean
+  /** When it began waiting (ms): a lane watch counts a wait past COPY_WAIT_STALL_MS as stalled (HI-1764). */
+  since: number
+}
+
+/** How long a review waits for a copy before a lane watch counts its card stalled (HI-1764). */
+export const COPY_WAIT_STALL_MS = 5 * 60_000
+
+/**
+ * Why every copy is in use, for a waiting reviewer (HI-1764: it was told only "pending"): each copy, what it is lent for
+ * and since when, or when it was returned and what holds it back; and when Hive tries again. Agent-facing.
+ */
+export function copiesInUseText(held: ReturnType<CopyPool['inUse']>, name: (card: number) => string, now = Date.now()): string {
+  const ago = (iso: string): string => `${Math.max(0, Math.round((now - Date.parse(iso)) / 60_000))} min`
+  const each = held.map((h) => (h.returned ? `${h.copy} returned ${ago(h.returned)} ago${h.by ? `, held back by ${h.by}` : ''}` : `${h.copy} lent to a ${h.kind} of ${name(h.card)} for ${ago(h.from)}`))
+  return `the pool's copies are in use${each.length ? `: ${each.join('; ')}` : ''}. Hive tries again as each is freed, and every 30 s` // i18n-ignore: agent-facing
 }
 
 const key = (card: number, agent: string): string => `${card}|${agent}`
@@ -100,9 +115,9 @@ export class ReviewCopies {
     return this.deps.cardName?.(card) ?? `#${card}`
   }
 
-  /** The reviews waiting for a copy now (cards and reviewers). */
-  waits(): { card: number; agent: string }[] {
-    return [...this.waiting.values()].map((w) => ({ card: w.card, agent: w.agent.id }))
+  /** The reviews waiting for a copy now (cards and reviewers), since when (ms) and why. */
+  waits(): { card: number; agent: string; name: string; since: number; why: string }[] {
+    return [...this.waiting.values()].map((w) => ({ card: w.card, agent: w.agent.id, name: w.agent.name, since: w.since, why: w.why }))
   }
 
   private mine(pool: CopyPool, card: number, agent: string): CopyLease[] {
@@ -135,7 +150,7 @@ export class ReviewCopies {
     }
     if (!w) {
       while (this.waiting.size >= MAX_WAITING) this.waiting.delete(this.waiting.keys().next().value!)
-      w = { card, agent, revision: now.revision, submission: now.submission, why: 'one is being set up', leasing: null, told: false } // i18n-ignore: agent-facing
+      w = { card, agent, revision: now.revision, submission: now.submission, why: 'one is being set up', leasing: null, told: false, since: Date.now() } // i18n-ignore: agent-facing
       this.waiting.set(k, w)
     }
     const leasing = this.attempt(w)
@@ -161,7 +176,7 @@ export class ReviewCopies {
       if (!r.ok) {
         const why = r.refusal.why
         if (why === 'noCopy' || why === 'stillInUse' || why === 'returned') {
-          w.why = why === 'stillInUse' ? copyRefusalText(r.refusal) : `the pool's copies are in use` // i18n-ignore: agent-facing
+          w.why = copiesInUseText(pool.inUse(), (c) => this.named(c))
           return { is: 'waiting', why: w.why }
         }
         if (this.waiting.get(k) === w) this.waiting.delete(k)
@@ -249,6 +264,27 @@ async function reviewOf(ws: WorkspaceService, projectPath: string, card: number,
     // A card the runtime doesn't have (0.9's): no submission.
   }
   return { going, submission: latest?.id ?? null, revision: latest?.revision ?? null }
+}
+
+/**
+ * Why a card in Review is stalled waiting for a review copy (HI-1764), or null: a review of it (in `waits`) has waited
+ * COPY_WAIT_STALL_MS or more, so a lane watch notices reviewers kept from reviewing. Agent-facing.
+ */
+export function copyWaitStall(c: { number: number; key?: string; column: string }, waits: ReturnType<ReviewCopies['waits']>, now = Date.now()): string | null {
+  if (c.column !== 'review') return null
+  const w = waits.find((x) => x.card === c.number && now - x.since >= COPY_WAIT_STALL_MS)
+  return w ? `${c.key ?? `#${c.number}`}'s review by ${w.name} has waited ${Math.round((now - w.since) / 60_000)} min for a review copy: ${w.why}.` : null // i18n-ignore: agent-facing (the Agent API's stalled)
+}
+
+/** copyWaitStall over the reviews waiting in a workspace (by its folder): the lane watches' (cardStall.ts). */
+export function reviewCopyWaitReason(c: { number: number; key?: string; column: string }, wsPath: string | null): string | null {
+  if (c.column !== 'review' || !wsPath) return null
+  const ws = `${wsPath.toLowerCase()}\n`
+  for (const [k, v] of instances) {
+    const why = k.startsWith(ws) && !v.life.aborted ? copyWaitStall(c, v.rc.waits()) : null
+    if (why) return why
+  }
+  return null
 }
 
 /** Why review copies are off now (agent-facing): either switch in Settings → Advanced. Null while both are on. */

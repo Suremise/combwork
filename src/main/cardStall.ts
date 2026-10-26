@@ -5,6 +5,7 @@ import { columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason
 import type { TaskCard } from '../shared/types'
 import { loopStepWaitMinutes } from '../shared/lanes'
 import { queueReturnOf } from './queueReturn'
+import { reviewCopyWaitReason } from './reviewCopies'
 import { isResuming } from './restartResume'
 import { sessions } from './sessions'
 import { workspaceOf, type WorkspaceService } from './workspace'
@@ -16,7 +17,8 @@ import { workspaceOf, type WorkspaceService } from './workspace'
  * or one whose lane is deadlocked, its reviewer waiting for another of its cards while its builder waits on it (#1410),
  * or a card whose builder waits on a check nobody gives: of its design in Doing (#1382), or of its follow-up in Review or
  * Passed (#1467), or a card the merge queue returned that its builder, idle or only watching, hasn't taken up (HI-1721),
- * or a running lane's next card its builder, idle, only watching or not running, hasn't started (HI-1741).
+ * or a running lane's next card its builder, idle, only watching or not running, hasn't started (HI-1741), or a card in
+ * Review whose reviewer has waited minutes for a review copy (HI-1764).
  * Null when it isn't.
  */
 
@@ -85,7 +87,7 @@ export function cardStall(c: TaskCard, agentNow: { name: string; running: boolea
   const watchers = live.filter((a) => a.cards.length)
   const builder = returned && c.agent && c.project ? live.find((a) => a.agentId === c.agent && a.project.toLowerCase() === c.project!.toLowerCase()) : undefined
   const back = builder ? returnedWaitReason(c, returned, { name: builder.name, status: builder.status, watching: builder.cards.length > 0 }) : null
-  return stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? reviewWaitReason(c, watchers) ?? reviewVerdictWaitReason(c, watchers) ?? laneOrderWaitReason(c, lane, watchers) ?? loopStepWaitReason(c, watchers, stepWaitMs) ?? laneNext(c, lane, live, agentNow)
+  return stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? reviewWaitReason(c, watchers) ?? reviewVerdictWaitReason(c, watchers) ?? laneOrderWaitReason(c, lane, watchers) ?? loopStepWaitReason(c, watchers, stepWaitMs) ?? laneNext(c, lane, live, agentNow) ?? reviewCopyWaitReason(c, wsPath)
 }
 
 /**
