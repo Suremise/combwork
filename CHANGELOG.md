@@ -125,6 +125,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **Hive's log names what held it up.** A pause's line in hive.log now names a database step or log write that waited for the disk, and a pause of all of Hive (the PC or the process paused) is no longer counted as busy (HI-1692).
 - **Saving the board's database no longer holds Hive up.** Copying its log into the file (a checkpoint) now runs in a thread of its own; on a busy disk it held typing and replies for up to most of a second (HI-1691).
 - **No more pauses when several views read a merge queue at once.** The Progress panel, the Version Control tab and a card's Work section each listed a project's merge queue from the board as it changed, about ten at a time, holding Hive up for 300–400 ms on a big board. A queue's listing is now worked out once for each state and shared (HI-1683).
 - **Less lag on a big board.** Each change to the board made Hive read every card in full, archived ones included, to find cards newly Done; on a board of 1,600 cards that held up typing and replies for about 200 ms at a time while agents worked. Hive now reads only what it needs, from the board's index (HI-1690).

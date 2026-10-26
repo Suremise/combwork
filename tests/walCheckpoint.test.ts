@@ -107,16 +107,18 @@ describe('checkpoints out of the commits (#1633)', () => {
   })
 
   it('written to without a pause: checkpointed once the longest gap has passed', () => {
+    // Its registration (its "last checkpoint") falls between t0 and t1, however long the open takes on a loaded machine.
+    const t0 = performance.now()
     const db = open(wal.checkpointWhenIdle)
+    const t1 = performance.now()
     try {
-      const t = performance.now()
       const done = wal.checkpointStats.done
       write(db.writer, 5)
-      wal.checkpointTick(t + wal.checkpointLimits.maxGapMs - 1)
+      wal.checkpointTick(t0 + wal.checkpointLimits.maxGapMs - 1)
       expect(wal.checkpointStats.done).toBe(done)
       write(db.writer, 5)
       // Just written again (not idle), but past the longest gap since its last checkpoint.
-      wal.checkpointTick(t + wal.checkpointLimits.maxGapMs)
+      wal.checkpointTick(t1 + wal.checkpointLimits.maxGapMs)
       expect(wal.checkpointStats.done).toBe(done + 1)
     } finally {
       db.close()
