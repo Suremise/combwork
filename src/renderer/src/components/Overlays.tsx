@@ -1240,21 +1240,31 @@ export function ProvidersBanner() {
   const on = enabledProviders(settings)
   if (!on.length) {
     return (
-      <div className="banner warn providers-banner">
-        <Icon name="hubot" /> {tr(msg({ id: 'shell.providers.noneOn', defaultMessage: 'No coding agents are turned on. Choose the ones you use (Claude Code, …) to run sessions.', description: 'A banner when no provider is turned on.' }))}
-        <button className="btn small primary" onClick={() => runCommand('settings.providers')}>
-          {tr(msg({ id: 'shell.providers.choose', defaultMessage: 'Choose providers', description: "The banner's button: opens Settings → Providers." }))}
-        </button>
+      <div className="banner warn wrap-banner providers-banner">
+        <span className="wrap-banner-text">
+          <Icon name="hubot" />
+          <span className="grow">{tr(msg({ id: 'shell.providers.noneOn', defaultMessage: 'No coding agents are turned on. Choose the ones you use (Claude Code, …) to run sessions.', description: 'A banner when no provider is turned on.' }))}</span>
+        </span>
+        <span className="wrap-banner-actions">
+          <button className="btn small primary" onClick={() => runCommand('settings.providers')}>
+            {tr(msg({ id: 'shell.providers.choose', defaultMessage: 'Choose providers', description: "The banner's button: opens Settings → Providers." }))}
+          </button>
+        </span>
       </div>
     )
   }
   if (warn.noneInstalled) {
     return (
-      <div className="banner warn providers-banner" data-none-installed="">
-        <Icon name="hubot" /> {tr(msg({ id: 'shell.providers.noneInstalled', defaultMessage: '{several, select, yes {No coding agent CLI is installed. Install one of those you turned on to run agents.} other {No coding agent CLI is installed. Install {provider} to run agents.}}', description: "A banner when no turned-on provider's CLI is installed. {provider} is the one turned on, when only one is." }), { several: on.length > 1 ? 'yes' : 'no', provider: on[0].name })}
-        <button className="btn small primary" onClick={() => set({ setupOpen: on[0].id })}>
-          {tr(msg({ id: 'shell.providers.setup', defaultMessage: 'Agent Setup', description: "The banner's button: opens Agent Setup." }))}
-        </button>
+      <div className="banner warn wrap-banner providers-banner" data-none-installed="">
+        <span className="wrap-banner-text">
+          <Icon name="hubot" />
+          <span className="grow">{tr(msg({ id: 'shell.providers.noneInstalled', defaultMessage: '{several, select, yes {No coding agent CLI is installed. Install one of those you turned on to run agents.} other {No coding agent CLI is installed. Install {provider} to run agents.}}', description: "A banner when no turned-on provider's CLI is installed. {provider} is the one turned on, when only one is." }), { several: on.length > 1 ? 'yes' : 'no', provider: on[0].name })}</span>
+        </span>
+        <span className="wrap-banner-actions">
+          <button className="btn small primary" onClick={() => set({ setupOpen: on[0].id })}>
+            {tr(msg({ id: 'shell.providers.setup', defaultMessage: 'Agent Setup', description: "The banner's button: opens Agent Setup." }))}
+          </button>
+        </span>
       </div>
     )
   }
@@ -1267,11 +1277,16 @@ export function ProvidersBanner() {
   return (
     <>
       {issues.map(({ p, r }) => (
-        <div key={`${p.id}:${r.id}`} className={cx('banner providers-banner' /* i18n-ignore: class names */, r.level === 'error' ? 'warn' : 'info')}>
-          <ProviderIcon provider={p.id} /> {r.message}
-          <button className="btn small primary" onClick={() => set({ setupOpen: p.id })}>
-            {r.action?.label ?? tr(msg({ id: 'shell.providers.setUp', defaultMessage: 'Set up', description: "A provider's banner's button when Hive names no other action: opens Agent Setup." }))}
-          </button>
+        <div key={`${p.id}:${r.id}`} className={cx('banner wrap-banner providers-banner' /* i18n-ignore: class names */, r.level === 'error' ? 'warn' : 'info')}>
+          <span className="wrap-banner-text">
+            <ProviderIcon provider={p.id} />
+            <span className="grow">{r.message}</span>
+          </span>
+          <span className="wrap-banner-actions">
+            <button className="btn small primary" onClick={() => set({ setupOpen: p.id })}>
+              {r.action?.label ?? tr(msg({ id: 'shell.providers.setUp', defaultMessage: 'Set up', description: "A provider's banner's button when Hive names no other action: opens Agent Setup." }))}
+            </button>
+          </span>
         </div>
       ))}
     </>
