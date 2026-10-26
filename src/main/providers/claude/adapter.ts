@@ -40,8 +40,12 @@ const LIST_AT_ONCE = 8
  * bottom, its choices within about a dozen lines of the end (more when a narrow pane wraps their descriptions).
  */
 const SAFEGUARD_PROMPT_LINES = 24
-/** A ~/.claude/projects folder name that may hold an 8.3 short name: `~1` is encoded `-1`. */
-const MAY_BE_SHORT = /-\d+(-|$)/
+/**
+ * A ~/.claude/projects folder name that may hold an 8.3 short name: `~1` is encoded `-1`, after at most six characters
+ * of the name, its own `-`s included (`BUILD-~1` is `BUILD--1`). `project-12` can't be one (HI-1681): looking in every
+ * folder named like it took most of a cold session list.
+ */
+export const MAY_BE_SHORT = /(^|-).{1,6}-\d+(-|$)/
 /** How much of a transcript is read for the cwd it records (its first lines carry none). */
 const CWD_HEAD = 64 * 1024
 
@@ -690,15 +694,11 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   private async shortNamed(root: string, names: string[], folder: string): Promise<{ dirs: string[]; settled: boolean }> {
     const drive = encodeProjectPath(realPath(folder)).slice(0, 3).toLowerCase()
     const here = placeMatcher(folder)
-    const dirs: string[] = []
-    let settled = true
-    for (const n of names) {
-      if (!n.toLowerCase().startsWith(drive) || !MAY_BE_SHORT.test(n)) continue
-      const cwd = await this.recordedCwd(join(root, n))
-      if (!cwd) settled = false
-      else if (cwd.includes('~') && here(cwd)) dirs.push(join(root, n))
-    }
-    return { dirs, settled }
+    const candidates = names.filter((n) => n.toLowerCase().startsWith(drive) && MAY_BE_SHORT.test(n))
+    // A few at once: each is read once, the first time (HI-1681).
+    const cwds = await atMost(LIST_AT_ONCE, candidates, (n) => this.recordedCwd(join(root, n)))
+    const dirs = candidates.filter((n, i) => cwds[i]?.includes('~') && here(cwds[i]!)).map((n) => join(root, n))
+    return { dirs, settled: cwds.every((c) => !!c) }
   }
 
   /**

@@ -371,10 +371,11 @@ export function useSessions(project: ProjectInfo) {
           return bounded
         }
         // Nothing shown yet (HI-1681): Hive's own sessions first, from its records, while the sessions its CLIs keep for
-        // the project's folders are read (seconds on a busy disk with hundreds of them); the whole list follows.
-        const own = Promise.all([call('session:list', path, { own: true }), kept]).then(([items, k]): SessionsData => ({ list: items, kept: k, othersLoading: true }))
-        loadScoped(path, () => own.catch(() => bounded))
-        void own.catch(() => undefined).then(() => loadScoped(path, () => bounded))
+        // the project's folders are read (seconds on a busy disk with hundreds of them); the whole list follows. Shown
+        // only while the whole list's load runs, which alone says how it ended (its time limit too); without deleted
+        // sessions' usage meanwhile, which only adds to totals.
+        const own = call('session:list', path, { own: true }).then((items): SessionsData => ({ list: items, kept: NO_SESSIONS, othersLoading: true }))
+        loadScoped(path, () => bounded, own)
         return bounded
       },
       () => latest.current()
