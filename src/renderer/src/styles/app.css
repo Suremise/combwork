@@ -7014,7 +7014,16 @@ button.agent-place:hover {
   justify-content: space-between;
   gap: 8px 12px;
 }
-/* The usage history's import under way (#1106): a spinner beside its note. */
+/* The usage history's import under way (#1106), a bulk action on sessions (#1659): a spinner beside its note. */
+.sessions-bulk-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sessions-list .sessions-bulk-progress {
+  margin: 0;
+  padding: 0 10px 6px 14px;
+}
 .overview-importing {
   display: flex;
   align-items: center;

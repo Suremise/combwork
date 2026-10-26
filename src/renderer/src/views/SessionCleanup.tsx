@@ -3,6 +3,7 @@ import type { SessionBulkResult, SessionListItem } from '@shared/types'
 import { CLEANUP_AGES, cleanupPlan, type CleanupAction, type CleanupAge, type CleanupPlan, type CleanupSkip } from '@shared/sessionCleanup'
 import { countText } from '@shared/sessionTree'
 import { call } from '../api'
+import { useStore } from '../store'
 import { BusyButton, Icon, Modal, useBusy } from '../components/ui'
 import { cx } from '../util'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
@@ -103,7 +104,22 @@ export function SessionCleanup({
       </p>
       {plan.skipped.length > 0 && <p className="faint cleanup-skips">{tr(M.skipped, { skips })}</p>}
       <p className="faint">{tr(M.inUse)}</p>
+      <BulkProgressNote projectPath={projectPath} kind={kind} />
     </Modal>
+  )
+}
+
+/**
+ * How far a bulk action on a host's sessions has got (#1659: 300 can take a minute), from main's session-bulk events,
+ * in every window showing the host; nothing when none runs.
+ */
+export function BulkProgressNote({ projectPath, kind }: { projectPath: string; kind: 'session' | 'conversation' }) {
+  const p = useStore((s) => s.sessionBulk[projectPath.toLowerCase()] ?? null)
+  if (!p) return null
+  return (
+    <p className="hint sessions-bulk-progress" role="status">
+      <Icon name="loading" spin /> {tr(M.progress, { action: p.action, kind, done: p.done, total: p.total })}
+    </p>
   )
 }
 
@@ -134,5 +150,11 @@ const M = {
   inUse: msg({ id: 'sessions.cleanup.inUse', defaultMessage: 'Running sessions, the one open here and any whose files are in use are always left alone; the result says which.', description: 'In Clean Up: which sessions are never archived or deleted (running, the transcript open in the tab, files in use), and that the result lists them.' }),
   cancel: msg({ id: 'sessions.cleanup.cancel', defaultMessage: 'Cancel', description: 'Button: closes Clean Up without doing anything.' }),
   go: msg({ id: 'sessions.cleanup.go', defaultMessage: '{action, select, archive {Archive} other {Delete}}', description: 'Button of Clean Up: archives or deletes the old sessions. Keep it short.' }),
+  progress: msg({
+    id: 'sessions.bulk.progress',
+    defaultMessage:
+      '{action, select, archive {{kind, select, conversation {Archiving {done, number} of {total, plural, one {# conversation} other {# conversations}}…} other {Archiving {done, number} of {total, plural, one {# session} other {# sessions}}…}}} unarchive {{kind, select, conversation {Unarchiving {done, number} of {total, plural, one {# conversation} other {# conversations}}…} other {Unarchiving {done, number} of {total, plural, one {# session} other {# sessions}}…}}} other {{kind, select, conversation {Deleting {done, number} of {total, plural, one {# conversation} other {# conversations}}…} other {Deleting {done, number} of {total, plural, one {# session} other {# sessions}}…}}}}',
+    description: "While many sessions are archived, unarchived or deleted at once (Clean Up, or a branch's Archive All): how many of them ({done}) of how many ({total}) it has been through so far. The Hive Assistant's: conversations."
+  }),
   busy: msg({ id: 'sessions.cleanup.busy', defaultMessage: '{action, select, archive {Archiving…} other {Deleting…}}', description: 'The Clean Up button while it archives or deletes.' })
 }

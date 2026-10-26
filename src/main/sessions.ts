@@ -43,6 +43,7 @@ import type {
   ProviderId,
   InboxSummary,
   SessionBulkAction,
+  SessionBulkProgress,
   SessionBulkResult,
   Attached,
   AttachmentPlan,
@@ -528,6 +529,30 @@ const MAX_USAGE_SEEN = 200
 const SLOW_LIST_MS = 1000
 /** How many of Hive's sessions a listing looks at at once (#1649): enough to overlap their file checks, not to flood the disk's threads. */
 const LIST_AT_ONCE = 8
+
+/** One session of a bulk action: no reason when it was done, else why it was left alone. */
+type BulkOutcome = { id: string; reason?: SessionSkipReason; message?: string }
+/** How many sessions a bulk action works on at once (#1659). */
+const BULK_AT_ONCE = 4
+/** A bulk action's progress is sent to the windows at most this often, and when it ends (#1659). */
+const BULK_PROGRESS_MS = 250
+
+/** Tells the windows how far a bulk action on a host's sessions has got (#1659): at the start, as it goes, and once it ends. */
+function bulkProgress(projectPath: string, action: SessionBulkAction, total: number): { step: () => void; end: () => void } {
+  let done = 0
+  let sent = Date.now()
+  const send = (progress: SessionBulkProgress | null): void => emit({ type: 'session-bulk', projectPath, progress })
+  send({ action, done, total })
+  return {
+    step() {
+      done++
+      if (Date.now() - sent < BULK_PROGRESS_MS && done < total) return
+      sent = Date.now()
+      send({ action, done, total })
+    },
+    end: () => send(null)
+  }
+}
 
 /** `fn` on each of `items`, at most `n` at once; the results in the items' order. */
 async function atMost<T, R>(n: number, items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -5705,27 +5730,42 @@ class SessionManager {
     // i18n-ignore: refusals no person sees (the window sends only these)
     if (action !== 'archive' && action !== 'unarchive' && action !== 'delete') throw new Error(`Unknown action: ${String(action)}`)
     if (!Array.isArray(sessionIds)) throw new Error('sessionIds: a list of session ids') // i18n-ignore: a refusal no person sees (the window sends a list)
-    const out: SessionBulkResult = { done: [], skipped: [] }
-    for (const id of [...new Set(sessionIds)]) {
-      if (!isSessionId(id)) {
-        out.skipped.push({ id: String(id), reason: 'failed', message: tr(msg({ id: 'session.bulk.notAnId', defaultMessage: 'Not a session id.', description: "Why a session was left alone by Archive or Delete in the Sessions tab: its id isn't one." })) }) // i18n-ignore: a reason's key
-        continue
-      }
-      try {
-        if (action === 'delete') await this.deleteOne(projectPath, id)
-        else if (!(await workspace.sessionsFile(projectPath)).sessions.some((s) => s.id === id)) {
-          out.skipped.push({ id, reason: 'external' }) // i18n-ignore: a reason's key, which the window words
-          continue
-        } else await this.archive(projectPath, id, action === 'archive')
-        out.done.push(id)
-      } catch (e) {
-        // A failure's message in the window's language: bulk is the window's (session:bulk).
-        out.skipped.push(e instanceof SessionInUse ? { id, reason: e.reason } : { id, reason: 'failed', message: shownError(e) }) // i18n-ignore: a reason's key
-      }
+    const ids = [...new Set(sessionIds)]
+    // Hive's own sessions, read once for the whole action (#1659), not once for each.
+    const kept = new Set((await workspace.sessionsFile(projectPath)).sessions.map((s) => s.id))
+    const progress = bulkProgress(projectPath, action, ids.length)
+    let results: BulkOutcome[]
+    try {
+      // A few at a time (#1659): each waits mostly on its files, and one after another 300 took 8 s. Each is still all or
+      // nothing, under its own reservation and locks.
+      results = await atMost(BULK_AT_ONCE, ids, async (id) => {
+        try {
+          return await this.bulkOne(projectPath, action, id, kept)
+        } finally {
+          progress.step()
+        }
+      })
+    } finally {
+      progress.end()
     }
+    const out: SessionBulkResult = { done: results.filter((r) => !r.reason).map((r) => r.id), skipped: results.filter((r): r is SessionBulkResult['skipped'][number] => !!r.reason) }
     log.info(`Sessions: ${action} ${out.done.length}, skipped ${out.skipped.length} (${[...new Set(out.skipped.map((s) => s.reason))].join(', ') || 'none'}) in ${userText(projectPath)}`)
     workspaceOf(projectPath).scheduleRefresh()
     return out
+  }
+
+  /** One session of a bulk action (see BulkOutcome). */
+  private async bulkOne(projectPath: string, action: SessionBulkAction, id: string, kept: Set<string>): Promise<BulkOutcome> {
+    if (!isSessionId(id)) return { id: String(id), reason: 'failed', message: tr(msg({ id: 'session.bulk.notAnId', defaultMessage: 'Not a session id.', description: "Why a session was left alone by Archive or Delete in the Sessions tab: its id isn't one." })) } // i18n-ignore: a reason's key
+    try {
+      if (action === 'delete') await this.deleteOne(projectPath, id)
+      else if (!kept.has(id)) return { id, reason: 'external' } // i18n-ignore: a reason's key, which the window words
+      else await this.archive(projectPath, id, action === 'archive')
+      return { id }
+    } catch (e) {
+      // A failure's message in the window's language: bulk is the window's (session:bulk).
+      return e instanceof SessionInUse ? { id, reason: e.reason } : { id, reason: 'failed', message: shownError(e) } // i18n-ignore: a reason's key
+    }
   }
 
   /** Hive's copies of a session's transcript that exist (the active backup, the archived one). */

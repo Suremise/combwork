@@ -239,6 +239,15 @@ function handleEvent(e: HiveEvent): void {
       // The usage history's import (#1106): the Workspace Overview's note follows it.
       set((s) => (s.workspaceUsage && s.workspaceUsage.workspacePath.toLowerCase() === e.workspacePath.toLowerCase() ? { workspaceUsage: { ...s.workspaceUsage, history: e.progress } } : {}))
       break
+    case 'session-bulk': {
+      // A bulk action on a host's sessions (#1659): its Sessions tab shows how far it has got, in every window.
+      const k = e.projectPath.toLowerCase()
+      set((s) => {
+        const { [k]: _ended, ...rest } = s.sessionBulk
+        return { sessionBulk: e.progress ? { ...rest, [k]: e.progress } : rest }
+      })
+      break
+    }
     case 'progress-runs':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) progressRunsChanged(e)
       break

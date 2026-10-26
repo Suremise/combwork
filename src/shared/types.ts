@@ -1683,6 +1683,13 @@ export interface SessionBulkResult {
   skipped: { id: string; reason: SessionSkipReason; message?: string }[]
 }
 
+/** A bulk action under way on a host's sessions (#1659): how many of them it has been through, done or skipped. */
+export interface SessionBulkProgress {
+  action: SessionBulkAction
+  done: number
+  total: number
+}
+
 /** background: the agent's turn has ended, but it has background tasks that will start it again when they end. */
 /**
  * `watching`: its turn has ended and it waits on cards (a wake-on-change watch, #128): Hive types one line to wake it
@@ -2892,6 +2899,8 @@ export type HiveEvent =
   | { type: 'usage-changed'; projectPath: string; sessionId: string }
   /** A workspace's usage history: its one-time import of existing sessions under way, or done (#1106). */
   | { type: 'usage-history'; workspacePath: string; progress: UsageHistoryProgress }
+  /** A bulk action on a host's sessions (#1659): how far it has got, then null once it has ended. */
+  | { type: 'session-bulk'; projectPath: string; progress: SessionBulkProgress | null }
   | { type: 'notes-changed' }
   /** The workspace's task board changed (its path names the window). */
   | { type: 'tasks-changed'; workspacePath: string }

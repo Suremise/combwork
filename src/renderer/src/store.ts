@@ -22,7 +22,7 @@ import type { ProgressFilter } from '@shared/progress'
 import type { TemplateAgent, TemplateRef } from '@shared/templates'
 import type { GitTool } from '@shared/gitTool'
 import type { RunsFilter } from '@shared/progressTabs'
-import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, QuitScope, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkspaceUsage, RecentWorkspace } from '@shared/types'
+import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkspaceUsage, RecentWorkspace } from '@shared/types'
 import type { PresetId } from '@shared/workflow/options'
 import type {
   AgentApiInfo,
@@ -348,6 +348,8 @@ interface State {
   windowCount: number
   /** Working agents keeping the PC awake (0: none). */
   keepAwake: number
+  /** Bulk actions under way on hosts' sessions, by host path lower-cased (#1659). */
+  sessionBulk: Record<string, SessionBulkProgress>
   /** The agent whose Compact dialog is open. */
   compactFor: AgentRef | null
   /** Project whose Add Agent dialog is open. */
@@ -558,6 +560,7 @@ export const useStore = create<State>(() => ({
   quitPending: null,
   windowCount: 1,
   keepAwake: 0,
+  sessionBulk: {},
   compactFor: null,
   addAgentFor: null,
   agentSettingsFor: null,
