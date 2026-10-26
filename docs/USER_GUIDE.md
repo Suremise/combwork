@@ -337,6 +337,9 @@ Hive only ever ends processes the agent's session started: never one you started
 - **Pause**: the tree holds still while your pointer is over it, while you scroll it or while a node is selected, and goes live again a moment after. **Pause** in the toolbar holds it until you click **Live**. While it's held, a pill counts what's waiting (*12 updates · Refresh*): click it to see them all at once.
 - **Time range**: **Live** (only what runs now), **15 min**, **1 h**, **6 h** or **24 h**.
 - **Filters**: **Agents ▾** and **Cards ▾** (tick several, or **All**), and **Hide finished** to see only running work. The tab remembers your range and filters for each project.
+- **Zoom**: **Zoom out**, **Zoom in** and **Zoom to fit** (keys **−**, **+** and **F** while the tree has focus); click the percentage, or press **0**, for actual size.
+- **Levels ▾** collapses or expands every node at one level at once: all turns, all tool calls, all subagents, and so on. You can still open or close single nodes afterwards.
+- **Jump to selected** (key **J**) scrolls back to the node you selected, or to the agent or card you opened the tab for.
 
 - Open a node with its arrow. A finished session's turns are read when you open it.
 - Click a node to see its details: its status, its input exactly (a prompt, a tool call's input, a command line, with secrets hidden as in Hive's log) and what it did last.

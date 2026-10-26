@@ -21,11 +21,16 @@
   "activity.endedNode": "Terminado · desaparece al actualizar",
   "activity.expand": "Expandir",
   "activity.expandAll": "Expandir todo",
+  "activity.fit": "Ajustar a la ventana (F)",
   "activity.heading": "Actividad",
   "activity.hideFinished": "Ocultar terminados",
   "activity.input": "Entrada",
+  "activity.jump": "Ir a la selección (J)",
   "activity.lastAction": "Última acción",
   "activity.lastActive": "Última actividad",
+  "activity.levelCollapse": "{level, select, agent {Contraer todos los agentes} session {Contraer todas las sesiones} subagent {Contraer todos los subagentes} turn {Contraer todos los turnos} tool {Contraer todas las llamadas a herramientas} other {Contraer todos los procesos}}",
+  "activity.levelExpand": "{level, select, agent {Expandir todos los agentes} session {Expandir todas las sesiones} subagent {Expandir todos los subagentes} turn {Expandir todos los turnos} tool {Expandir todas las llamadas a herramientas} other {Expandir todos los procesos}}",
+  "activity.levels": "Niveles",
   "activity.live": "En vivo",
   "activity.liveTip": "Volver a mostrar las actualizaciones a medida que llegan.",
   "activity.loadFailed": "No se pudo cargar la actividad: {error}",
@@ -53,5 +58,9 @@
   "activity.statusLabel": "Estado",
   "activity.task": "{type, select, subagent {Subagente en segundo plano} command {Comando en segundo plano} monitor {Monitor} workflow {Flujo de trabajo} other {Tarea en segundo plano}}",
   "activity.tools": "{n, plural, =0 {Sin llamadas a herramientas} one {# llamada a herramienta} many {# llamadas a herramientas} other {# llamadas a herramientas}}",
-  "activity.turns": "{n, plural, one {# turno} many {# turnos} other {# turnos}}"
+  "activity.turns": "{n, plural, one {# turno} many {# turnos} other {# turnos}}",
+  "activity.zoomIn": "Acercar (+)",
+  "activity.zoomLabel": "Zoom",
+  "activity.zoomOut": "Alejar (−)",
+  "activity.zoomReset": "Tamaño real (0)"
 }

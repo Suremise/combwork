@@ -21,11 +21,16 @@
   "activity.endedNode": "終了 · 次の再読み込みで消えます",
   "activity.expand": "展開",
   "activity.expandAll": "すべて展開",
+  "activity.fit": "全体を表示 (F)",
   "activity.heading": "アクティビティ",
   "activity.hideFinished": "終了したものを隠す",
   "activity.input": "入力",
+  "activity.jump": "選択項目へ移動 (J)",
   "activity.lastAction": "最後の動作",
   "activity.lastActive": "最終アクティブ",
+  "activity.levelCollapse": "{level, select, agent {すべてのエージェントを折りたたむ} session {すべてのセッションを折りたたむ} subagent {すべてのサブエージェントを折りたたむ} turn {すべてのターンを折りたたむ} tool {すべてのツール呼び出しを折りたたむ} other {すべてのプロセスを折りたたむ}}",
+  "activity.levelExpand": "{level, select, agent {すべてのエージェントを展開} session {すべてのセッションを展開} subagent {すべてのサブエージェントを展開} turn {すべてのターンを展開} tool {すべてのツール呼び出しを展開} other {すべてのプロセスを展開}}",
+  "activity.levels": "階層",
   "activity.live": "ライブ",
   "activity.liveTip": "更新を再びリアルタイムで表示します。",
   "activity.loadFailed": "アクティビティを読み込めませんでした：{error}",
@@ -53,5 +58,9 @@
   "activity.statusLabel": "状態",
   "activity.task": "{type, select, subagent {バックグラウンドのサブエージェント} command {バックグラウンドのコマンド} monitor {モニター} workflow {ワークフロー} other {バックグラウンドのタスク}}",
   "activity.tools": "{n, plural, =0 {ツール呼び出しなし} other {ツール呼び出し#件}}",
-  "activity.turns": "{n, plural, other {#ターン}}"
+  "activity.turns": "{n, plural, other {#ターン}}",
+  "activity.zoomIn": "拡大 (+)",
+  "activity.zoomLabel": "ズーム",
+  "activity.zoomOut": "縮小 (−)",
+  "activity.zoomReset": "実際のサイズ (0)"
 }

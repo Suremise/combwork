@@ -21,11 +21,16 @@
   "activity.endedNode": "Terminé · disparaît à la prochaine actualisation",
   "activity.expand": "Développer",
   "activity.expandAll": "Tout développer",
+  "activity.fit": "Ajuster à la fenêtre (F)",
   "activity.heading": "Activité",
   "activity.hideFinished": "Masquer ce qui est fini",
   "activity.input": "Entrée",
+  "activity.jump": "Aller à la sélection (J)",
   "activity.lastAction": "Dernière action",
   "activity.lastActive": "Dernière activité",
+  "activity.levelCollapse": "{level, select, agent {Réduire tous les agents} session {Réduire toutes les sessions} subagent {Réduire tous les sous-agents} turn {Réduire tous les tours} tool {Réduire tous les appels d’outils} other {Réduire tous les processus}}",
+  "activity.levelExpand": "{level, select, agent {Développer tous les agents} session {Développer toutes les sessions} subagent {Développer tous les sous-agents} turn {Développer tous les tours} tool {Développer tous les appels d’outils} other {Développer tous les processus}}",
+  "activity.levels": "Niveaux",
   "activity.live": "En direct",
   "activity.liveTip": "Afficher de nouveau les mises à jour au fil de l’eau.",
   "activity.loadFailed": "Impossible de charger l’activité : {error}",
@@ -53,5 +58,9 @@
   "activity.statusLabel": "État",
   "activity.task": "{type, select, subagent {Sous-agent en arrière-plan} command {Commande en arrière-plan} monitor {Surveillance} workflow {Flux de travail} other {Tâche en arrière-plan}}",
   "activity.tools": "{n, plural, =0 {Aucun appel d’outil} one {# appel d’outil} many {# appels d’outils} other {# appels d’outils}}",
-  "activity.turns": "{n, plural, one {# tour} many {# tours} other {# tours}}"
+  "activity.turns": "{n, plural, one {# tour} many {# tours} other {# tours}}",
+  "activity.zoomIn": "Zoom avant (+)",
+  "activity.zoomLabel": "Zoom",
+  "activity.zoomOut": "Zoom arrière (−)",
+  "activity.zoomReset": "Taille réelle (0)"
 }

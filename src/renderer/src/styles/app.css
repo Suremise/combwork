@@ -7052,6 +7052,20 @@ button.agent-place:hover {
 }
 .activity-canvas {
   position: relative;
+  transform-origin: 0 0;
+}
+/* The tree's box at its zoom (HI-1678): the canvas is scaled inside it, so the scrollbars follow the zoom. */
+.activity-scaled {
+  position: relative;
+}
+.activity-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.activity-zoom-value {
+  min-width: 46px;
+  font-variant-numeric: tabular-nums;
 }
 .activity-lines {
   position: absolute;
