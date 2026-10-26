@@ -135,6 +135,12 @@ const columnArg = { type: 'string', enum: [...COLUMN_IDS] }
 /** The Assistant's override of a card's workflow rules for a move (#1265, SPEC §16.8.4): why, recorded on the card. */
 const overrideArg = { type: 'object', properties: { reason: { type: 'string' } }, required: ['reason'], description: "Moves the card across the workflow rules the move skips: reason is the user's own why (recorded on the card with the rules), given with the request or after you told them what it skips; never made up." }
 const cardsArg = (what: string) => ({ type: 'array', items: { type: ['number', 'string'] }, description: `${what} Each its key ("HI-12").` })
+/** Files kept with a card (HI-1700): local paths, copied in. */
+const attachmentsArg = (where: string) => ({
+  type: 'array',
+  items: { type: 'string' },
+  description: `Files to keep with the card (screenshots, logs): local paths, ${ASSISTANT ? "in the workspace, your pasted files' or the temp folder" : 'in your project, its slots or the temp folder'}; at most 10 and 100 MB in all, each copied in (the same file once) and ${where}. hive_read_task lists them by path.`
+})
 /** Numbers that aren't cards (a console's events). */
 const numbersArg = (what: string) => ({ type: 'array', items: { type: 'number' }, description: what })
 
@@ -699,11 +705,12 @@ const tools: Tool[] = [
         links: cardsArg('Related cards.'),
         context: contextArg,
         kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? 'no-code: work with no commits (a decision, a write-up, a trial), submitted with a summary. Default code.' : 'no-code proposes work with no commits (a decision, a write-up, a trial); the user confirms it. Default code.' },
-        skipReview: { type: 'string', description: ASSISTANT ? "The user's reason it skips review, in their words: submitting it then finishes it (a code card goes on to its merge, merge checks kept). Only where its rules review." : 'Proposes it skip review, with your reason; the user confirms it. Only where its rules review.' }
+        skipReview: { type: 'string', description: ASSISTANT ? "The user's reason it skips review, in their words: submitting it then finishes it (a code card goes on to its merge, merge checks kept). Only where its rules review." : 'Proposes it skip review, with your reason; the user confirms it. Only where its rules review.' },
+        attachments: attachmentsArg('linked at the end of its description')
       },
       required: ['title']
     },
-    run: async (a) => createdText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), reply: 'short' })) as TaskChange)
+    run: async (a) => createdText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), ...(a.attachments !== undefined ? { attachments: a.attachments } : {}), reply: 'short' })) as TaskChange)
   },
   {
     name: 'hive_update_task',
@@ -730,6 +737,7 @@ const tools: Tool[] = [
         links: cardsArg('Related cards (replaces the list).'),
         context: contextArg,
         decision: { type: 'string', description: "Records a decision the user made about the card (scope, wording, a default), in a sentence; it is attributed to the user. Only what the user decided, never your own choice. Only the user changes or removes decisions." },
+        attachments: attachmentsArg('linked in the comment, or at the end of its description without one'),
         ...(ASSISTANT
           ? {
               override: overrideArg,
@@ -743,7 +751,7 @@ const tools: Tool[] = [
     },
     run: async (a) => {
       const body: Record<string, unknown> = { reply: 'short' }
-      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview']) if (a[k] !== undefined) body[k] = a[k]
+      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview', 'attachments']) if (a[k] !== undefined) body[k] = a[k]
       const text = changedText((await api('PATCH', `/v1/tasks/${enc(String(a.number))}`, body)) as TaskChange)
       // #1346 item 8: an Assistant with its journal on recorded six decisions and wrote none of them down.
       return ASSISTANT && JOURNAL && typeof a.decision === 'string' && a.decision.trim() ? `${text}\nNote it in your journal (hive_journal_write).` : text

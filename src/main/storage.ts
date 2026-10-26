@@ -20,6 +20,7 @@ import { folderFacts, legacyWorktree } from './agentFolders'
 import { unusedWorktreeFolders } from './unusedWorktrees'
 import { trash } from './trash'
 import { attachmentsDir } from './attachmentsFolder'
+import { CARD_ATTACHMENTS_DIR, isSessionFolder } from '../shared/attachments'
 import { gzSize, isGz } from './transcriptFiles'
 
 const log = createLogger('storage')
@@ -206,7 +207,10 @@ async function measure(projectPath: string, refresh: boolean, signal: AbortSigna
   // What they hold before compression (#1110).
   const sessionsRaw = await beforeCompression(join(hive, 'sessions'), backups)
   const archiveRaw = await beforeCompression(join(hive, 'archive'), archive)
-  const attachments = await folderSize(await attachmentsDir(projectPath), cache, signal)
+  const attachmentsRoot = await attachmentsDir(projectPath)
+  // Cards' attachments (HI-1700) on a row of their own: the sessions' are the rest of the folder.
+  const cardAttachments = await folderSize(join(attachmentsRoot, CARD_ATTACHMENTS_DIR), cache, signal)
+  const attachments = (await folderSize(attachmentsRoot, cache, signal)) - cardAttachments
   // The folders agents work in (#1451), each once by its real path: the project's slots on disk, lent now (to the agent
   // with the lease) or not (a free slot is kept for the next card), and an agent's 0.9 worktree while its project isn't
   // migrated.
@@ -245,10 +249,11 @@ async function measure(projectPath: string, refresh: boolean, signal: AbortSigna
     ...(sessionsRaw !== backups ? { sessionsRaw } : {}),
     ...(archiveRaw !== archive ? { archiveRaw } : {}),
     attachments,
+    ...(cardAttachments ? { cardAttachments } : {}),
     worktrees,
     ...(copies ? { copies } : {}),
     ...(unused.length ? { unusedWorktrees: unused } : {}),
-    total: backups + archive + attachments + (copies?.bytes ?? 0) + [...worktrees, ...unused].reduce((n, w) => n + w.bytes, 0),
+    total: backups + archive + attachments + cardAttachments + (copies?.bytes ?? 0) + [...worktrees, ...unused].reduce((n, w) => n + w.bytes, 0),
     computedAt: new Date().toISOString()
   }
   results.set(projectPath.toLowerCase(), result)
@@ -305,7 +310,8 @@ async function cleanupFacts(projectPath: string): Promise<CleanupFacts> {
   const dir = await attachmentsDir(projectPath)
   const attachmentFolders: CleanupFacts['attachmentFolders'] = []
   for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
-    if (!e.isDirectory()) continue
+    // The cards' folder (HI-1700) is never a session's: Clean Up leaves a live card's files alone.
+    if (!e.isDirectory() || !isSessionFolder(e.name)) continue
     const path = join(dir, e.name)
     attachmentFolders.push({ name: e.name, path, bytes: await folderSize(path, 'use') })
   }
@@ -433,7 +439,7 @@ async function purgeFacts(host: string): Promise<PurgeFacts> {
   const dir = await attachmentsDir(host)
   for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
     // Only real folders named as Hive names them, and in them only plain files: anything else isn't Hive's.
-    if (!e.isDirectory() || !isSessionId(e.name)) continue
+    if (!e.isDirectory() || !isSessionId(e.name) || !isSessionFolder(e.name)) continue
     const path = join(dir, e.name)
     const inside: PurgeFile[] = []
     for (const f of await readdir(path, { withFileTypes: true }).catch(() => [])) {

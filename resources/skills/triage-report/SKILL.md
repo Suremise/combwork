@@ -22,7 +22,7 @@ Restate in a line what the user saw and what they did just before. If a piece yo
 
 ## 3. Card it
 
-`hive_create_task` with, in its description:
+`hive_create_task` with `attachments` for what the user showed you (the screenshot they pasted, a log: their paths), so the card keeps them, and in its description:
 - **What the user saw**, quoted, and the steps.
 - **Likely cause**: the file and line, and why.
 - **Evidence**: what you read or reproduced.

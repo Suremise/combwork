@@ -195,6 +195,90 @@
     "defaultMessage": "Bring {card} back to the end of {column}",
     "description": "Tooltip on an archived card's Unarchive button. {card} is its name: its key, such as AM-12, or #12 for a card with none, {column} the board column it was archived from."
   },
+  "board.attach.already": {
+    "defaultMessage": "{card} already has {file}",
+    "description": "A notice (HI-1700): the card {card} already keeps the same file ({file}), so nothing was added."
+  },
+  "board.attach.attached": {
+    "defaultMessage": "{file} attached to {card}",
+    "description": "A notice (HI-1700): a session's attachment ({file}: its name) was copied to the card {card} (its key)."
+  },
+  "board.attach.drafts": {
+    "defaultMessage": "Not saved yet: kept with the card when you {box, select, comment {post the comment} other {save}}",
+    "description": "Under a box of the card dialog (HI-1700), beside files pasted or dropped into it: they are kept with the card only once the comment is posted, or the card saved."
+  },
+  "board.attach.failed": {
+    "defaultMessage": "Could not attach {file}",
+    "description": "An error's title (HI-1700): copying a session's attachment ({file}) to a card failed."
+  },
+  "board.attach.heading": {
+    "defaultMessage": "Attachments ({n, number})",
+    "description": "A heading in the card dialog (HI-1700): the files kept with the card, and how many ({n})."
+  },
+  "board.attach.hint": {
+    "defaultMessage": "Paste or drop files into the description or a comment to keep them with the card.",
+    "description": "Under the Attachments heading of the card dialog when the card has none yet (HI-1700)."
+  },
+  "board.attach.meta": {
+    "defaultMessage": "{size} · {by}, {when}",
+    "description": "Under a card attachment's name (HI-1700): its size, who added it and when ({when}: \"4 minutes ago\")."
+  },
+  "board.attach.missing": {
+    "defaultMessage": "Its file is gone",
+    "description": "A card attachment whose file is no longer on disk (HI-1700): shown on it, with Remove."
+  },
+  "board.attach.open": {
+    "defaultMessage": "Open",
+    "description": "A card attachment's action (HI-1700): opens an image or PDF in its program."
+  },
+  "board.attach.otherCards": {
+    "defaultMessage": "The project's other open cards",
+    "description": "A heading in the menu that copies a session's attachment to a card (HI-1700): the project's cards the agent isn't on."
+  },
+  "board.attach.paneHeader": {
+    "defaultMessage": "Attach {file} to a card",
+    "description": "The heading of the menu that copies a session's attachment ({file}: its name) to a card (HI-1700), from an agent's pane or the Attachments tab."
+  },
+  "board.attach.remove": {
+    "defaultMessage": "Remove",
+    "description": "A card attachment's action (HI-1700): takes it off the card (to the Recycle Bin), after asking."
+  },
+  "board.attach.removeDraft": {
+    "defaultMessage": "Remove {name}",
+    "description": "Button on a file pasted or dropped into the card dialog, not saved yet (HI-1700): takes it out, with its link in the text."
+  },
+  "board.attach.removeMessage": {
+    "defaultMessage": "{used, select, none {It goes to the Recycle Bin.} other {It goes to the Recycle Bin. It is shown in {used}: those links will say it was removed.}}",
+    "description": "The confirmation before removing a card attachment (HI-1700); {used}: where the card shows it (\"the description and 2 comments\"), or none."
+  },
+  "board.attach.removeTitle": {
+    "defaultMessage": "Remove {name} from {card}?",
+    "description": "Title of the confirmation before removing a card attachment (HI-1700). {card} is the card’s name: its key, such as AM-12."
+  },
+  "board.attach.removed": {
+    "defaultMessage": "{name} (removed)",
+    "description": "In a card's description or comment (HI-1700): a link to an attachment that was removed from the card since; {name} is the file's name as the text gave it."
+  },
+  "board.attach.show": {
+    "defaultMessage": "Show in Folder",
+    "description": "A card attachment's action (HI-1700): shows the file in File Explorer."
+  },
+  "board.attach.toCard": {
+    "defaultMessage": "Attach to {card}",
+    "description": "A menu entry (HI-1700): copies a session's attachment to the card {card} (its key, such as AM-12) that the agent works on or reviews."
+  },
+  "board.attach.tooLarge": {
+    "defaultMessage": "{name} is larger than {max}, the most a card keeps in one file (Settings → Advanced → Card attachments: largest file).",
+    "description": "An error in the card dialog (HI-1700): a pasted or dropped file is larger than the limit ({max}: a size such as 25 MB); it was not added."
+  },
+  "board.attach.tooMuch": {
+    "defaultMessage": "At most {files, number} files and {total} can be saved at once, the description and the comment together.",
+    "description": "An error in the card dialog (HI-1700): more files, or more bytes in all ({total}: a size such as 100 MB), than one Save or Post takes; the last ones were not added."
+  },
+  "board.attach.where": {
+    "defaultMessage": "{description, select, yes {the description} other {}}{both, select, yes { and } other {}}{comments, plural, =0 {} one {a comment} other {# comments}}",
+    "description": "Where a card shows an attachment (HI-1700), in the remove confirmation: the description, and/or how many comments."
+  },
   "board.batch.andMore": {
     "defaultMessage": "{cards} and {n, number} more",
     "description": "Cards that could not be brought back from an archive, cut short: the first six card numbers ({cards}: \"#3, #4\") and how many more ({n})."

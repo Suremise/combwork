@@ -3,6 +3,8 @@ import { AsyncLocalStorage } from 'async_hooks'
 import { randomBytes, timingSafeEqual } from 'crypto'
 import { app } from 'electron'
 import { basename, dirname, join, resolve as resolvePath } from 'path'
+import { attachableSource, cardAttachments, cardHost, checkBatch, stage as stageFiles, type AttachCaller } from './cardAttachments'
+import { withAttachmentPaths, type CardAttachment } from '../shared/cardAttachments'
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
 import type { AgentApiInfo, AgentDef, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage } from '../shared/types'
@@ -2186,12 +2188,16 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
   // Its running lane, for a card waiting in Review: its lane may be deadlocked (#1410).
   const lane = c.column === 'review' && c.project ? (await lanes.listLanes(workspace, { project: c.project }).catch(() => [])).find((l) => (l.state === 'active' || l.state === 'paused') && l.cards.some((x) => x.number === c.number)) : undefined
   const inLane = lane ? new Map((await tasks.allTasks(workspace, { numbers: lane.cards.map((x) => x.number) }).catch(() => [])).map((x) => [x.number, x])) : null
+  // Its attachments (HI-1700): full paths, and its text's links to them as those paths (agents open them by path).
+  const files = await cardAttachments(workspace, c.number)
+  const paths = (t: string): string => withAttachmentPaths(t, files)
   const view: Omit<TaskView, 'stage'> = {
     number,
     title,
     ...(decisions?.length ? { decisions: decisions.map(tasks.withoutId) } : {}),
     ...rest,
-    comments: c.comments.map(entryForAgents),
+    ...(files.length ? { description: paths(c.description) } : {}),
+    comments: c.comments.map(entryForAgents).map((e) => (files.length ? { ...e, text: paths(e.text) } : e)),
     history: c.history.map(entryForAgents),
     agent,
     // A Doing card nobody works on, a card an agent was looping on and left with no watch (#376), or one in Review its
@@ -2222,7 +2228,15 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
   const rs = cardReviewSkip(workspace, c.number)
   // Who merges it and where it is with the merge queue, by its own rules (#1354): additive, only when Hive merges it.
   const merge = c.project && !c.archived ? await queueLineFor(c.project, c.number) : null
-  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), ...(rs?.skip ? { reviewSkipped: rs.skip } : {}), ...(rs?.proposed != null ? { reviewSkipProposed: rs.proposed } : {}), stage, ...(merge ? { merge } : {}) }
+  const attachments = files.length ? files.map((a) => attachmentForAgents(a, c)) : null
+  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(attachments ? { attachments } : {}), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), ...(rs?.skip ? { reviewSkipped: rs.skip } : {}), ...(rs?.proposed != null ? { reviewSkipProposed: rs.proposed } : {}), stage, ...(merge ? { merge } : {}) }
+}
+
+/** A card attachment as agents read it (HI-1700): its path, name and size, who added it and when, and where it came. */
+function attachmentForAgents(a: CardAttachment, c: TaskCard): NonNullable<TaskView['attachments']>[number] {
+  const said = a.comment && a.comment !== 'description' && a.comment !== 'pane' ? c.comments.find((x) => x.id === a.comment) : undefined
+  const from = said ? `comment by ${said.by} at ${said.at}` : a.comment === 'description' ? 'description' : a.comment === 'pane' ? 'attached from a session' : a.comment ? 'a comment no longer on the card' : 'attached to the card' // i18n-ignore: agent-facing
+  return { path: a.path, name: a.name, size: a.size, by: a.by, at: a.at, from, ...(a.missing ? { missing: true as const } : {}) }
 }
 
 /** The project a project agent's calls are confined to on the board, or null (the Assistant and scripts see it all). */
@@ -2230,6 +2244,45 @@ function callerScope(): string | null {
   const a = agentCaller()
   return a ? basename(a.projectPath) : null
 }
+
+/** A change's `attachments` (HI-1700): local paths, checked as a list (shape and count) before anything; null without any. */
+function attachmentList(body: any): string[] | null {
+  const raw = body?.attachments
+  if (raw === undefined || (Array.isArray(raw) && !raw.length)) return null
+  if (!Array.isArray(raw) || raw.some((x) => typeof x !== 'string' || !x)) throw new HttpError(400, 'attachments is a list of file paths (strings).')
+  checkBatch(raw.map(() => ({})))
+  return raw as string[]
+}
+
+/**
+ * Runs a card's change (`fn`) with its files (HI-1700), inside the operation that makes it (the Assistant's: once admitted):
+ * the card's project checked first (a project of the workspace; a project agent's own), then each path against what its
+ * caller may attach from (a project agent: its own project's folders and the temp folder; the Assistant and scripts: the
+ * workspace's), then copied into the card's host's staging; nothing is copied before the destination is known to be
+ * allowed, and the staging is removed whatever happens. Without files, `fn(null)`.
+ */
+async function withAttachments<T>(paths: string[] | null, project: string | null, fn: (files: tasks.ChangeAttachments | null) => Promise<T>): Promise<T> {
+  if (!paths) return fn(null)
+  const ws = requireWorkspace()
+  const agent = agentCaller()
+  if (project !== null) {
+    const known = [...(await ws.listProjectPaths()), ...(await ws.listProjectPaths({ hidden: true }))].some((p) => basename(p).toLowerCase() === project.toLowerCase())
+    if (!known) throw new HttpError(404, `Unknown project "${project}"`)
+    if (agent && basename(agent.projectPath).toLowerCase() !== project.toLowerCase()) throw new HttpError(403, `Cards stay in your project (${basename(agent.projectPath)}).`)
+  } else if (agent) throw new HttpError(403, `Cards stay in your project (${basename(agent.projectPath)}).`)
+  const caller: AttachCaller = agent ? { kind: 'agent', project: basename(agent.projectPath) } : { kind: 'workspace' }
+  const real: string[] = []
+  for (const p of paths) real.push(await attachableSource(ws, caller, p))
+  const staging = await stageFiles(cardHost(ws, project), null, real.map((path, i) => ({ path, name: basename(paths[i]) })))
+  try {
+    return await fn({ staging, drafts: real.map(() => null) })
+  } finally {
+    await staging.dispose()
+  }
+}
+
+/** A change's lines for the files it attached (HI-1700): stored, or already kept with the card (the same bytes). */
+const attachedLines = (c: TaskCard & { attached?: { name: string; path: string; added: boolean }[] }): string[] => (c.attached ?? []).map((a) => `${a.added ? 'Attached' : 'Already attached'}: ${a.name} (${a.path})`)
 
 /** The short reply a hive tool asks for (reply: "short") instead of the whole card or column. */
 const shortReply = (body: any): boolean => body?.reply === 'short'
@@ -2371,12 +2424,16 @@ route('POST', '/v1/tasks', async ({ body }) => {
   if (!title) throw new HttpError(400, 'title is required')
   const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}), ...(body?.skipReview !== undefined ? { skipReview: body.skipReview as string } : {}) }
   const actor = await taskActor()
-  const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, []) : taskView(c))
-  if (actor.kind !== 'assistant') return reply(await tasks.createTask(input, actor))
+  // Files to keep with it (HI-1700): the list checked now; copied inside the operation that makes the card, once its
+  // project is known to be allowed, and published with it.
+  const paths = attachmentList(body)
+  const create = () => withAttachments(paths, typeof input.project === 'string' && input.project ? input.project : callerScope(), (files) => tasks.changeWithAttachments(actor, files, 'description', () => tasks.createTask(input, actor)))
+  const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, attachedLines(c)) : taskView(c))
+  if (actor.kind !== 'assistant') return reply(await create())
   const project = typeof input.project === 'string' && input.project ? input.project : null
   const given = await knownAgent(project, input.agent)
   return assistantChange('agents', `add the task "${clip(title, 60)}" to the board`, { kind: 'create-task', ...(project ? { project } : {}), ...(given ? { agent: given } : {}) }, async () => {
-    const c = await tasks.createTask(input, actor)
+    const c = await create()
     return { done: `Added ${cardName(c)} to the board${c.project ? ` (${c.project})` : ''}: ${clip(c.title, 80)}`, act: { card: c.number, column: c.column, ...(c.project ? { project: c.project } : {}), agent: await cardAgent(c) }, result: await reply(c) }
   })
 })
@@ -2416,8 +2473,17 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
     if (comment) changes.push('Commented')
     return c
   }
+  // Files to keep with it (HI-1700), with its comment if it has one: checked and copied first, published in its change.
+  if (body?.attachments !== undefined && patch.project !== undefined) throw new HttpError(400, 'Move the card to the other project first, then attach files to it.')
+  const paths = attachmentList(body)
   // A change of its kind with anything else is one board change (HR3's #1277 round 1): refused part way, none of it.
-  const apply = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
+  const once = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
+  const apply = async (commit?: () => void): Promise<TaskCard> => {
+    // Its files copied here, inside the operation (the Assistant's: once admitted), to the card's own project.
+    const c = await withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, comment ? 'comment' : 'description', () => once(commit)))
+    changes.push(...attachedLines(c))
+    return c
+  }
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, changes) : taskView(c))
   if (actor.kind !== 'assistant') {
     const c = await apply()
@@ -2568,9 +2634,11 @@ route('POST', '/v1/tasks/:n/comments', async ({ params, body }) => {
   const n = taskNumber(params[0])
   const text = typeof body?.text === 'string' ? body.text : ''
   const actor = await taskActor()
-  const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, ['Commented']) : taskView(c))
-  if (actor.kind !== 'assistant') return reply(await tasks.commentTask(n, text, actor))
-  return assistantChange('agents', `comment on ${cardRef(n)}`, { kind: 'comment-task', card: n }, async () => ({ done: `Commented on ${cardRef(n)}`, result: await reply(await tasks.commentTask(n, text, actor)) }))
+  const paths = attachmentList(body)
+  const comment = async () => withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, 'comment', () => tasks.commentTask(n, text, actor)))
+  const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, ['Commented', ...attachedLines(c)]) : taskView(c))
+  if (actor.kind !== 'assistant') return reply(await comment())
+  return assistantChange('agents', `comment on ${cardRef(n)}`, { kind: 'comment-task', card: n }, async () => ({ done: `Commented on ${cardRef(n)}`, result: await reply(await comment()) }))
 })
 
 /** Bounded waits running now, per caller (an agent, the Assistant, a script): at most WAITS_PER_CALLER at a time. */

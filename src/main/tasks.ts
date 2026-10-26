@@ -23,6 +23,8 @@ import { FactStore } from './workflow/factStore'
 import { gitStep } from './platform/git'
 import type { CardKind } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
+import { linkToComment, moveCardFolder, publish, trashCardFolder, type Staging } from './cardAttachments'
+import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT } from '../shared/workflow/stages'
 import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, STAGE_CATEGORY, type AskActionKind, type RoundChoice, type StageId } from '../shared/workflow/facts'
@@ -510,6 +512,7 @@ export function moveOrphanCards(ws: WorkspaceService, m: { from: string; to: str
         if (!raw || isProjectId(raw.projectId) || typeof raw.project !== 'string' || raw.project.toLowerCase() !== m.from.toLowerCase()) return false
         const history = Array.isArray(raw.history) ? raw.history : []
         const entry = entryOf(new Date().toISOString(), BY.repair, storedText(HISTORY.repaired, { from: m.from, to: m.to }))
+        await moveCardFolder(ws, x, raw.project, m.to)
         putCard(ws, x, { ...withProject(raw, m.to, projectId), history: [...history, entry].slice(-MAX_HISTORY) })
         return true
       })()
@@ -1786,6 +1789,8 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
           said.push(storedText(HISTORY.reviewStopped, { agent: card.review.agentName }))
           delete card.review
         }
+        // Its attachments (HI-1700) follow it: copied to the new project in this change (refused if they can't be).
+        await moveCardFolder(ws, n, card.project, p)
         card.project = p
         card.agent = null
         delete card.agentName
@@ -2163,6 +2168,57 @@ export async function commentTask(n: number, comment: string, actor: TaskActor):
   }))
 }
 
+/** Files attached with a card's change (HI-1700): staged (cardAttachments.stage), and the draft link each stands for, if any. */
+export interface ChangeAttachments {
+  staging: Staging
+  /** By source, in order: the draft (`draft-<k>`) the change's text links to it by, or null (a link to it is added). */
+  drafts: (string | null)[]
+}
+
+/**
+ * A card's change (`run`: a new card, a change, a comment) with files attached in the same change of the board (HI-1700,
+ * s11 §4): published after it, the draft links in the text it made (the new comment's, else the description's) given the
+ * stored ids and a link added for each file the text doesn't name; all of it saved, or none (the files go again). The
+ * staging is removed whatever happens. Without files, just `run`.
+ */
+export async function changeWithAttachments(actor: TaskActor, files: ChangeAttachments | null, where: 'comment' | 'description', run: () => Promise<TaskCard>): Promise<TaskCard & { attached?: { name: string; path: string; added: boolean }[] }> {
+  if (!files) return run()
+  const ws = workspace
+  try {
+    return await boardLock(ws, async () => {
+      const made = await run()
+      const n = made.number
+      const before = await getTask(n, ws)
+      const card = structuredClone(before)
+      const comment = where === 'comment' ? card.comments.at(-1) : undefined
+      const pub = await publish(ws, n, files.staging, actorName(actor), null)
+      // Drafts (the window's) get their stored ids wherever the change's text links them; a file no draft names (an
+      // agent's) gets a link of its own, in the comment, else at the end of the description.
+      const ids = new Map<string, string>()
+      const added: string[] = []
+      for (const [i, a] of pub.attachments.entries()) {
+        const draft = files.drafts[i]
+        if (draft) ids.set(draft, a.id)
+        else if (!added.some((l) => l.includes(a.id))) added.push(attachmentMarkdown(a.name, a.kind, attachmentHref(a.id)))
+      }
+      const withAdded = (t: string): string => (added.length ? `${t}${t.trim() ? '\n\n' : ''}${added.join('\n')}` : t)
+      card.description = withStoredIds(card.description, ids)
+      if (comment) comment.text = withAdded(withStoredIds(comment.text, ids))
+      else card.description = withAdded(card.description)
+      // Where each new file came: the comment that links it, else the description.
+      const inComment = new Set(comment ? attachmentRefs(comment.text) : [])
+      const fresh = pub.attachments.filter((_a, i) => pub.added[i]).map((a) => a.id)
+      if (comment?.id) linkToComment(ws, n, fresh.filter((id) => inComment.has(id)), comment.id)
+      linkToComment(ws, n, fresh.filter((id) => !inComment.has(id)), 'description')
+      await saveCard(ws, n, card, before)
+      changed(ws)
+      return { ...card, attached: pub.attachments.map((a, i) => ({ name: a.name, path: a.path, added: pub.added[i] })) }
+    })
+  } finally {
+    await files.staging.dispose()
+  }
+}
+
 /**
  * Changes the words of one of a card's decisions, or removes it (text null): the user's alone (#357). Agents and the
  * Assistant only record decisions; the history keeps what each said.
@@ -2451,6 +2507,8 @@ async function binCard(ws: WorkspaceService, n: number): Promise<boolean> {
   const file = join(dir, `${n}.json`)
   await writeFile(file, JSON.stringify(doc, null, 2) + '\n', 'utf8')
   await trash(file)
+  // Its attachments (HI-1700) go with it: renamed into the cards' trash in this change, to the Recycle Bin once it commits.
+  await trashCardFolder(ws, n, typeof doc.project === 'string' ? doc.project : null)
   return deleteCard(ws, n)
 }
 

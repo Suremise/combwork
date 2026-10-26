@@ -2385,8 +2385,10 @@ export interface ProjectStorage {
   /** What the backups and the archive hold before compression (#1110: a compressed backup's own size), when any is. */
   sessionsRaw?: number
   archiveRaw?: number
-  /** Files pasted or dropped into sessions (.hive/attachments). */
+  /** Files pasted or dropped into sessions (.hive/attachments, but its cards' folder). */
   attachments: number
+  /** Files kept with cards (HI-1700: .hive/attachments/cards), when there are any; never cleaned up. */
+  cardAttachments?: number
   /**
    * The folders agents work in (#1451): each of the project's slots on disk (`slot`, and the agent it is lent to now, if
    * any), and an agent's 0.9 worktree while its project isn't migrated; each folder once.

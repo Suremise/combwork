@@ -50,6 +50,27 @@ interface HiveMessageValues {
   'board.archived.unarchiveSelected': undefined
   'board.archived.unarchiveSelectedN': { n: number }
   'board.archived.unarchiveTip': { card: string | number; column: string | number }
+  'board.attach.already': { card: string | number; file: string | number }
+  'board.attach.attached': { file: string | number; card: string | number }
+  'board.attach.drafts': { box: string }
+  'board.attach.failed': { file: string | number }
+  'board.attach.heading': { n: number }
+  'board.attach.hint': undefined
+  'board.attach.meta': { size: string | number; by: string | number; when: string | number }
+  'board.attach.missing': undefined
+  'board.attach.open': undefined
+  'board.attach.otherCards': undefined
+  'board.attach.paneHeader': { file: string | number }
+  'board.attach.remove': undefined
+  'board.attach.removeDraft': { name: string | number }
+  'board.attach.removeMessage': { used: string }
+  'board.attach.removeTitle': { name: string | number; card: string | number }
+  'board.attach.removed': { name: string | number }
+  'board.attach.show': undefined
+  'board.attach.toCard': { card: string | number }
+  'board.attach.tooLarge': { name: string | number; max: string | number }
+  'board.attach.tooMuch': { files: number; total: string | number }
+  'board.attach.where': { description: string; both: string; comments: number }
   'board.batch.andMore': { cards: string | number; n: number }
   'board.batch.archived': { n: number }
   'board.batch.backFailed': undefined

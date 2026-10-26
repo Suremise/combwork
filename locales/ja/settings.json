@@ -166,6 +166,8 @@
   "settings.advanced.hive.assistant.otherMcpServers.title": "アシスタントがワークスペースの他のMCPサーバーを使う",
   "settings.advanced.hive.assistant.startView.desc": "Hive Assistantのジャーナルがオンの間、Hiveは起動時とコンパクト化のたびに、ワークスペースの短い概要を渡します。進行中のものと待機中のもの、そしてジャーナルの最近のエントリです。オフにすると、実行中のアシスタントも含め、次の起動またはコンパクト化から概要を受け取らなくなり、必要なものはツールで読み取ります。",
   "settings.advanced.hive.assistant.startView.title": "アシスタントをHiveの開始ビューで始める",
+  "settings.advanced.hive.cards.attachmentMax.desc": "Hive がカードと一緒に保持する最大のファイル（バイト単位）：カードに貼り付けまたはドロップしたもの、エージェントのペインから添付したもの、エージェントやアシスタントが渡したもの。これより大きいファイルは理由を示して拒否されます。すでに保持しているファイルはそのままです。",
+  "settings.advanced.hive.cards.attachmentMax.title": "カードの添付ファイル：最大ファイル",
   "settings.advanced.hive.console.showText.desc": "開発者コンソールにテキスト（プロンプト、返答、コマンド、ツールの引数）を、マスクなしであることを示すバナーの下に表示し、各記録は「テキスト」にチェックが入った状態で始まります。トークン、APIキー、サインイン情報はこの設定に関係なくマスクされます。エージェントのhive_consoleは機密情報を伏せたままで、テキストを含む記録が「診断情報をコピー」に添付されることはありません。",
   "settings.advanced.hive.console.showText.title": "開発者コンソール：プロンプト、返答、コマンドのテキストを表示",
   "settings.advanced.hive.copies.quietWaitMinutes.desc": "返却されたレビュー用またはチェック用コピーは、中で何も動いていない状態（実行中の処理がなく、そのチェックが起動したプロセスもなく、レビュアーが待機中）になってから再利用されます。この分数を過ぎると、コピーを待っているチェックは、どのコピーが何によってまだ使われているかを表示します。Hiveは何かが動いているコピーを決してリセットしません。",
