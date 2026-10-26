@@ -332,9 +332,9 @@ async function choose(ws: WorkspaceService, projectPath: string, raw: unknown): 
   if (!s || !req || req.gate !== MERGE_CHOICE_GATE || !entry || req.entry !== entry.id) throw new WorkflowRefusedError(refusal('move.notFromHere', { card: rec ? cardLabel({ number: n, key: rec.key }) : `#${n}`, stage: s?.stage ?? 'todo', move: 'answer', moves: '' }))
   const cfg = await ws.projectConfig(project.path)
   const own = ownOf(cfg, project.platform)
-  const preset = cfg.workflow?.platform === project.platform ? cfg.workflow.preset : null
+  const presetNow = cfg.workflow?.platform === project.platform ? cfg.workflow.preset : null
   const inFlight = (await cardsInFlight(ws, project)).map((c) => c.number)
-  await setWorkflowOptions(ws, project.path, { preset, options: { ...own, style, commitMessage: message }, base: { preset, options: own } }, { applyTo: inFlight, answering: true })
+  await setWorkflowOptions(ws, project.path, { preset: presetNow, options: { ...own, style, commitMessage: message }, base: { preset: presetNow, options: own } }, { applyTo: inFlight, answering: true })
   log.info(`${userText(project.name)}'s merge style and commit message chosen: ${style}, ${message}`)
   // i18n-ignore: the answer's words, kept on the card as the user's comment and read by agents (English)
   await answerTask(n, request, { outcome: 'answered', reply: `Merge style: ${style === 'merge' ? 'merge commit' : style === 'squash' ? 'squash' : 'rebase and fast-forward'}; commit message: ${message === 'branch' ? "the branch's own" : "Hive's"}.` })

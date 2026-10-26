@@ -462,7 +462,7 @@ describe("the upgrade's merge question (HI-1697)", () => {
           return wf.askUser(x, 'decide', gate, 'How should Hive merge?', { unbound: true, ...(entry ? { entry } : {}) })
         })
       )
-    const choose = (request: string, style: string, commitMessage: string, n = card.number) => inWorkspace(w, () => form.chooseMerge(w, repo, { card: n, request, style, commitMessage }))
+    const choose = (request: string, style: string, commitMessage: string, number = card.number) => inWorkspace(w, () => form.chooseMerge(w, repo, { card: number, request, style, commitMessage }))
     const state = async () => {
       const wf2 = (await workflowFor(w, repo))!
       return wf2.state(wf2.store.card(card.number))
