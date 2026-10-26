@@ -115,7 +115,10 @@ const M = {
   total: msg({ id: 'files.attachments.total', defaultMessage: '{host, select, assistant {{total, number} in {groups, plural, one {# conversation} other {# conversations}}} other {{total, number} in {groups, plural, one {# session} other {# sessions}}}}', description: 'Beside the Attachments heading: how many attachments, in how many sessions (conversations for the Hive Assistant).' }),
   openFolder: msg({ id: 'files.attachments.openFolder', defaultMessage: 'Open Attachments Folder', description: "Tooltip on the button that opens the attachments' folder in File Explorer." }),
   descAssistant: msg({ id: 'files.attachments.descAssistant', defaultMessage: 'Files pasted or dropped into the Assistant, by conversation.', description: "Under the Hive Assistant's Attachments heading." }),
-  desc: msg({ id: 'files.attachments.desc', defaultMessage: "Files pasted or dropped into this project's agents' sessions, by session.", description: "Under a project's Attachments heading." }),
+  desc: msg({ id: 'files.attachments.desc', defaultMessage: "Files kept with this project's cards, and files pasted or dropped into its agents' sessions.", description: "Under a project's Attachments heading (HI-1700: cards' files, then sessions')." }),
+  totalWithCards: msg({ id: 'files.attachments.totalWithCards', defaultMessage: '{total, plural, one {# file} other {# files}} · {cards, number} on cards, {sessions, number} in {groups, plural, one {# session} other {# sessions}}', description: "Beside a project's Attachments heading when its cards keep files too (HI-1700): how many files in all, how many on cards, and how many in how many sessions." }),
+  sessionsHeading: msg({ id: 'files.attachments.sessionsHeading', defaultMessage: 'Sessions ({n, number})', description: "A section of a project's Attachments tab (HI-1700), after Cards: the files pasted or dropped into its agents' sessions, and how many ({n})." }),
+  sessionsKept: msg({ id: 'files.attachments.sessionsKept', defaultMessage: 'Kept with their session: Clean Up and Purge can remove them with it.', description: "Under the Sessions heading of a project's Attachments tab (HI-1700)." }),
   show: msg({ id: 'files.attachments.filters', defaultMessage: 'Show', description: "Accessible name of the Attachments tab's filter buttons (All, Images, PDFs…)." }),
   all: msg({ id: 'files.attachments.all', defaultMessage: 'All', description: 'Attachments filter: every kind. Followed by a count.' }),
   archivedHeading: msg({ id: 'files.attachments.archived', defaultMessage: '{host, select, assistant {Archived conversations} other {Archived sessions}}', description: "Heading over the archived sessions' attachments." }),
@@ -1170,7 +1173,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
       <div className="images-toolbar">
         <h2>{tr(M.attachments)}</h2>
         <InfoTip text={tr(assistant ? M.infoAssistant : M.info)} />
-        <span className="faint">{tr(M.total, { host, total, groups: all.length })}</span>
+        <span className="faint">{!assistant && cardCount ? tr(M.totalWithCards, { total: total + cardCount, cards: cardCount, sessions: total, groups: all.length }) : tr(M.total, { host, total, groups: all.length })}</span>
         <div className="grow" />
         <IconButton icon="refresh" title={tr(M.refresh)} action="refresh-attachments" onClick={load} />
         <IconButton icon="folder-opened" title={tr(M.openFolder)} onClick={() => void call('app:openPath', `${project.path}\\.hive\\attachments`)} />
@@ -1190,6 +1193,15 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
       )}
       {error && <StaleNote what={tr(M.attachmentsRefreshTarget)} error={error} at={loaded.at} onRetry={load} />}
       <CardAttachmentSection groups={cardFiles.groups} kind={shownKind} reload={cardFiles.reload} />
+      {/* Beside the cards' section (HI-1700), the sessions' has a heading of its own. */}
+      {!assistant && cardCount > 0 && groups.length > 0 && (
+        <>
+          <h3 className="images-archived" data-section="session-attachments">
+            <Icon name="comment-discussion" /> {tr(M.sessionsHeading, { n: total })}
+          </h3>
+          <p className="hint">{tr(M.sessionsKept)}</p>
+        </>
+      )}
       {current.map(renderGroup)}
       {archived.length > 0 && (
         <>

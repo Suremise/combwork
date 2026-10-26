@@ -9972,13 +9972,17 @@ textarea.input.task-blocked-input {
   min-height: 56px;
   resize: vertical;
 }
-/* Card attachments (HI-1700): an image in a card's text shown inline, at most a thumbnail's height; a link to one removed. */
+/* Card attachments (HI-1700): an image in a card's text shown as a thumbnail under the text it follows (a click opens it);
+   a link to one removed. */
 .task-description .markdown img,
 .task-comment .markdown img {
-  max-width: 100%;
+  display: block;
+  max-width: min(240px, 100%);
   max-height: 240px;
+  margin: 4px 0;
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
+  cursor: pointer;
 }
 .attachment-gone {
   display: inline-block;

@@ -29,7 +29,8 @@ export function withAttachmentUrls(text: string, lookup: AttachmentLookup): stri
     if (!a) return `<span class="attachment-gone">${escapeHtml(tr(REMOVED, { name: label.replace(/\\(.)/g, '$1') }))}</span>` // i18n-ignore: markup around a message
     // A relative source (the sanitiser keeps it), given its URL once shown (Markdown's `images`): hive-img: and blob:
     // aren't sources the sanitiser lets through.
-    if (a.kind === 'image' && a.url) return `![${label}](${ATTACHMENT_IMAGE}${id})`
+    // A link around it: a click opens it (the dialog's onLink).
+    if (a.kind === 'image' && a.url) return `[![${label}](${ATTACHMENT_IMAGE}${id})](${ATTACHMENT_ANCHOR}${id})`
     return `[${label}](${ATTACHMENT_ANCHOR}${id})`
   })
 }

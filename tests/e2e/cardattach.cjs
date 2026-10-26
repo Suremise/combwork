@@ -124,6 +124,8 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     check("Attach to a card copies a session's file to the card", !!copied && fs.existsSync(sessionFile), JSON.stringify(copied))
     const section = page.locator('[data-section="card-attachments"]')
     check("the tab's Cards section lists it under its card", !!(await until(async () => (await section.locator(`[data-card="${other.number}"] .thumb`).count()) === 1)))
+    check('…the sessions under a heading of their own, Sessions (1)', (await page.locator('[data-section="session-attachments"]').innerText().catch(() => '')).toLowerCase().includes('sessions (1)'), await page.locator('[data-section="session-attachments"]').innerText().catch(() => ''))
+    check("…and the tab's total counts both", (await page.locator('.images-toolbar .faint').first().innerText()).includes('1 on cards, 1 in 1 session'), await page.locator('.images-toolbar .faint').first().innerText())
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
       await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)

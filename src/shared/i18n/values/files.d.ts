@@ -39,8 +39,11 @@ interface HiveMessageValues {
   'files.attachments.refreshTarget': undefined
   'files.attachments.running': { host: string }
   'files.attachments.runningBadge': undefined
+  'files.attachments.sessionsHeading': { n: number }
+  'files.attachments.sessionsKept': undefined
   'files.attachments.title': undefined
   'files.attachments.total': { host: string; total: number; groups: number }
+  'files.attachments.totalWithCards': { total: number; cards: number; sessions: number; groups: number }
   'files.attachments.unnamed': { host: string; id: string | number }
   'files.attachments.view': undefined
   'files.collapseAll': undefined

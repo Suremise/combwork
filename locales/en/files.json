@@ -52,8 +52,8 @@
     "description": "The confirmation before deleting an attachment. {name} is its file name."
   },
   "files.attachments.desc": {
-    "defaultMessage": "Files pasted or dropped into this project's agents' sessions, by session.",
-    "description": "Under a project's Attachments heading."
+    "defaultMessage": "Files kept with this project's cards, and files pasted or dropped into its agents' sessions.",
+    "description": "Under a project's Attachments heading (HI-1700: cards' files, then sessions')."
   },
   "files.attachments.descAssistant": {
     "defaultMessage": "Files pasted or dropped into the Assistant, by conversation.",
@@ -151,6 +151,14 @@
     "defaultMessage": "Running",
     "description": "Badge beside a session's name in the Attachments tab: it is running now."
   },
+  "files.attachments.sessionsHeading": {
+    "defaultMessage": "Sessions ({n, number})",
+    "description": "A section of a project's Attachments tab (HI-1700), after Cards: the files pasted or dropped into its agents' sessions, and how many ({n})."
+  },
+  "files.attachments.sessionsKept": {
+    "defaultMessage": "Kept with their session: Clean Up and Purge can remove them with it.",
+    "description": "Under the Sessions heading of a project's Attachments tab (HI-1700)."
+  },
   "files.attachments.title": {
     "defaultMessage": "Attachments",
     "description": "Heading of the Attachments tab."
@@ -158,6 +166,10 @@
   "files.attachments.total": {
     "defaultMessage": "{host, select, assistant {{total, number} in {groups, plural, one {# conversation} other {# conversations}}} other {{total, number} in {groups, plural, one {# session} other {# sessions}}}}",
     "description": "Beside the Attachments heading: how many attachments, in how many sessions (conversations for the Hive Assistant)."
+  },
+  "files.attachments.totalWithCards": {
+    "defaultMessage": "{total, plural, one {# file} other {# files}} · {cards, number} on cards, {sessions, number} in {groups, plural, one {# session} other {# sessions}}",
+    "description": "Beside a project's Attachments heading when its cards keep files too (HI-1700): how many files in all, how many on cards, and how many in how many sessions."
   },
   "files.attachments.unnamed": {
     "defaultMessage": "{host, select, assistant {Conversation {id}} other {Session {id}}}",
