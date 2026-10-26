@@ -5,6 +5,7 @@ import { pauseText, returnRun, returnWhy, runCheckName, stepText } from '@shared
 import { QUEUE_ADVANCE_GATE } from '@shared/workflow/facts'
 import type { QueueRecent, QueueStuck, QueueView } from '@shared/workflow/queue'
 import type { WorkView } from '@shared/workflow/workView'
+import type { ConflictFile, ConflictsRecord } from '@shared/workflow/conflicts'
 import type { ProgressRun, TaskCard } from '@shared/types'
 import { attempt } from '../actions'
 import { call, callShared } from '../api'
@@ -191,13 +192,17 @@ function Returned({ card, q, queue, short, runs }: { card: TaskCard; q: NonNulla
       {q.failure === 'conflict' && q.files?.length ? (
         <>
           <div className="faint">{tr(M.conflictFiles)}</div>
-          <ul className="card-work-files">
-            {q.files.map((f) => (
-              <li key={f}>
-                <code>{f}</code>
-              </li>
-            ))}
-          </ul>
+          {q.conflicts ? (
+            <ConflictList c={q.conflicts} files={q.files} target={q.target} card={card.key ?? `#${card.number}`} />
+          ) : (
+            <ul className="card-work-files">
+              {q.files.map((f) => (
+                <li key={f}>
+                  <code>{f}</code>
+                </li>
+              ))}
+            </ul>
+          )}
         </>
       ) : null}
       {q.log && (
@@ -220,6 +225,107 @@ function Returned({ card, q, queue, short, runs }: { card: TaskCard; q: NonNulla
         {card.column !== 'done' && <RetryButton card={card} revision={short(q.revision)} />}
       </div>
     </div>
+  )
+}
+
+/** A conflict's files and hunks (HI-1181), as the queue's folder had them: read-only. */
+const C = {
+  count: msg({ id: 'board.conflicts.count', defaultMessage: '{n, plural, one {# conflict} other {# conflicts}}', description: "Beside a file in conflict in the card dialog's Work section (HI-1181): how many conflict regions git left in it." }),
+  notRead: msg({ id: 'board.conflicts.notRead', defaultMessage: "{why, select, link {not read: it is a link} outside {not read: outside the queue's folder} missing {not read: not a file there} binary {not read: not text (binary)} notText {not read: not UTF-8 text} budget {not read: past how much Hive reads} other {not read: it couldn't be read}}", description: "Beside a file in conflict in the card dialog's Work section (HI-1181): Hive didn't read its text, and why (select: translate each): a link it never follows, a path outside the merge queue's folder, not a file there (deleted on one side), binary, not UTF-8 text, past the amount Hive reads for one return, or an error." }),
+  noText: msg({ id: 'board.conflicts.noText', defaultMessage: 'no text conflict', description: "Beside a file in conflict in the card dialog's Work section (HI-1181): Hive read the whole file and git left no conflict markers in it (a conflict over the file itself: deleted, renamed, its mode)." }),
+  readInPart: msg({ id: 'board.conflicts.readInPart', defaultMessage: 'read in part: it may have more', description: "Beside a file in conflict in the card dialog's Work section (HI-1181): it is large, so Hive read only its start; there may be more conflicts than shown." }),
+  more: msg({ id: 'board.conflicts.more', defaultMessage: '{n, plural, one {# more not shown} other {# more not shown}}', description: "Beside a file in conflict in the card dialog's Work section (HI-1181): it has {n} more conflict regions than are shown (an exact count)." }),
+  mayHaveMore: msg({ id: 'board.conflicts.mayHaveMore', defaultMessage: 'it may have more, not shown', description: "Beside a file in conflict in the card dialog's Work section (HI-1181): Hive stopped recording its conflicts (it had shown enough), so there may be more than shown." }),
+  line: msg({ id: 'board.conflicts.line', defaultMessage: 'From line {line, number}', description: "Above a conflict's text in the card dialog's Work section (HI-1181): the line of the file where the conflict starts." }),
+  base: msg({ id: 'board.conflicts.base', defaultMessage: 'Common ancestor', description: "A label inside a conflict's text in the card dialog's Work section (HI-1181): the lines both sides started from (git's diff3 base) follow." }),
+  cut: msg({ id: 'board.conflicts.cut', defaultMessage: '{n, plural, one {# line left out} other {# lines left out}}', description: "Inside a conflict's text in the card dialog's Work section (HI-1181): this side has {n} more lines than are shown." }),
+  clipped: msg({ id: 'board.conflicts.clipped', defaultMessage: '{n, plural, one {# long line shortened} other {# long lines shortened}}', description: "Under a conflict's text in the card dialog's Work section (HI-1181): {n} of its lines were longer than Hive keeps, so only their start is shown." }),
+  filesLeft: msg({ id: 'board.conflicts.filesLeft', defaultMessage: '{n, plural, one {# more file in conflict, not read} other {# more files in conflict, not read}}', description: "Under the files in conflict in the card dialog's Work section (HI-1181): git named {n} more conflicting files than Hive reads for one return." })
+}
+
+/** What Hive knows of a file's conflicts, in a few words: never "no conflict" for a file it didn't read whole. */
+function conflictSummary(f: ConflictFile): string {
+  if (f.notRead) return tr(C.notRead, { why: f.notRead })
+  if (!f.hunks.length && !f.partial) return tr(C.noText)
+  const parts = [tr(C.count, { n: f.hunks.length + (f.more ?? 0) })]
+  if (f.partial === 'size') parts.push(tr(C.readInPart))
+  else if (f.more) parts.push(tr(C.more, { n: f.more }))
+  else if (f.partial) parts.push(tr(C.mayHaveMore))
+  return parts.join(' · ')
+}
+
+/** A conflict's files, each unfolding its hunks: the sides named (the target, the card), context lines apart. */
+function ConflictList({ c, files, target, card }: { c: ConflictsRecord; files: string[]; target: string; card: string }) {
+  const [open, setOpen] = useState<string | null>(null)
+  const [first, second] = c.oursIs === 'target' ? [target, card] : [card, target]
+  return (
+    <ul className="card-work-files card-work-conflicts">
+      {files.map((name) => {
+        const f = c.files.find((x) => x.file === name)
+        if (!f)
+          return (
+            <li key={name}>
+              <code>{name}</code>
+            </li>
+          )
+        const shown = open === name
+        return (
+          <li key={name} data-conflict-file={name}>
+            <button type="button" className="link" aria-expanded={f.hunks.length ? shown : undefined} disabled={!f.hunks.length} onClick={() => setOpen(shown ? null : name)}>
+              {f.hunks.length > 0 && <Icon name={shown ? 'chevron-down' : 'chevron-right'} />} <code>{name}</code>
+            </button>{' '}
+            <span className="faint">{conflictSummary(f)}</span>
+            {shown &&
+              f.hunks.map((h) => (
+                <div key={h.line} className="card-work-hunk" data-hunk-line={h.line}>
+                  <div className="faint">{tr(C.line, { line: h.line })}</div>
+                  <pre className="card-work-queue-log card-work-hunk-text">
+                    {h.before.map((l, i) => (
+                      <span key={`b${i}`} className="hunk-context">
+                        {l}
+                        {'\n'}
+                      </span>
+                    ))}
+                    <HunkSide name={first} lines={h.ours} cut={h.cut?.ours} />
+                    {h.base && <HunkSide name={tr(C.base)} lines={h.base} cut={h.cut?.base} />}
+                    <HunkSide name={second} lines={h.theirs} cut={h.cut?.theirs} />
+                    {h.after.map((l, i) => (
+                      <span key={`a${i}`} className="hunk-context">
+                        {l}
+                        {'\n'}
+                      </span>
+                    ))}
+                  </pre>
+                  {!!h.clipped && <div className="faint">{tr(C.clipped, { n: h.clipped })}</div>}
+                </div>
+              ))}
+          </li>
+        )
+      })}
+      {!!c.filesLeft && <li className="faint">{tr(C.filesLeft, { n: c.filesLeft })}</li>}
+    </ul>
+  )
+}
+
+/** One side of a hunk under its name, and how many of its lines were left out (never put in the text). */
+function HunkSide({ name, lines, cut }: { name: string; lines: string[]; cut?: number }) {
+  return (
+    <span className="hunk-side">
+      <span className="hunk-side-name">{name}</span>
+      {'\n'}
+      {lines.map((l, i) => (
+        <span key={i}>
+          {l}
+          {'\n'}
+        </span>
+      ))}
+      {!!cut && (
+        <span className="hunk-cut">
+          {tr(C.cut, { n: cut })}
+          {'\n'}
+        </span>
+      )}
+    </span>
   )
 }
 

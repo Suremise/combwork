@@ -128,6 +128,8 @@ interface HiveMessageValues {
   'tips.compactSidebar.title': undefined
   'tips.compactionHistory.text': undefined
   'tips.compactionHistory.title': undefined
+  'tips.conflictHunks.text': undefined
+  'tips.conflictHunks.title': undefined
   'tips.consoleRecording.text': undefined
   'tips.consoleRecording.title': undefined
   'tips.consoleText.text': undefined

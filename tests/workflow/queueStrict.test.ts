@@ -125,6 +125,8 @@ describe('strict (G8): the queue brings the reviewed revision up to date', () =>
     expect(o).toMatchObject({ outcome: 'returned', reason: 'notUpToDate', transient: false })
     const f = e.wf.state(card).entries[0].failure!
     expect(f).toMatchObject({ reason: 'notUpToDate', files: ['src/a.txt'] })
+    // Its hunks (HI-1181): strict merges the target into the card's revision, so the card's side comes first.
+    expect(f.conflicts).toMatchObject({ oursIs: 'card', files: [{ file: 'src/a.txt', hunks: [{ ours: ['the card'], theirs: ['someone else'] }] }] })
     expect(e.wf.state(card).stage).toBe('active')
     expect(sh(e.project, 'rev-parse', 'main')).toBe(atConflict)
     expect(lineState(e, folder, line)).toEqual(before)

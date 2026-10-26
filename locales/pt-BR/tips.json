@@ -126,6 +126,8 @@
   "tips.compactSidebar.title": "Uma lista de projetos compacta",
   "tips.compactionHistory.text": "O histórico de compactações da Visão geral pagina, filtra e ordena as compactações de uma sessão longa; clique em uma para lê-la na transcrição, com o resumo a partir do qual o agente continuou.",
   "tips.compactionHistory.title": "Leia uma compactação onde ela aconteceu",
+  "tips.conflictHunks.text": "Quando a fila de merge devolve um cartão por um conflito, a seção Trabalho dele lista os arquivos: clique em um para ver os conflitos, o lado do destino e o do cartão sob seus nomes, como o merge de teste da fila os deixou.",
+  "tips.conflictHunks.title": "Veja os conflitos de um cartão devolvido",
   "tips.consoleRecording.text": "No console do desenvolvedor, Gravar grava em um arquivo o que a CLI de um agente envia ao Hive, com dados sensíveis ocultos, a menos que você marque Texto para essa gravação, e Copiar diagnóstico pode anexá-la a um relatório de bug.",
   "tips.consoleRecording.title": "Grave o que uma CLI envia",
   "tips.consoleText.text": "Configurações → Avançado → Console do desenvolvedor: mostrar texto de prompts, respostas e comandos mostra esses textos no console do desenvolvedor, sob um banner que avisa isso, e marca Texto nas novas gravações. Tokens e logins continuam mascarados, e o hive_console dos agentes continua com dados sensíveis ocultos.",

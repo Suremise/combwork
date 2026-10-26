@@ -132,6 +132,8 @@ describe("G6's Rebase and fast-forward (#1184)", () => {
     const [o] = await e.queue().drain('main')
     expect(o).toMatchObject({ outcome: 'returned', reason: 'conflict' })
     expect(e.wf.state(card).entries.at(-1)?.failure?.files).toEqual(['src/a.txt'])
+    // Its hunks (HI-1181): rebased onto the target, whose side git wrote first.
+    expect(e.wf.state(card).entries.at(-1)?.failure?.conflicts).toMatchObject({ oursIs: 'target', files: [{ file: 'src/a.txt', hunks: [{ ours: ['target'], theirs: ['card'] }] }] })
     expect(sh(e.project, 'rev-parse', 'main')).toBe(before)
   })
 

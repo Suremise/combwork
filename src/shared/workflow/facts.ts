@@ -5,6 +5,7 @@
 //
 // In the app since P3: hive.db's `card_facts` (main/workflow/factStore.ts), folded wherever a card's state is read.
 
+import type { ConflictsRecord } from './conflicts'
 import type { StoredText, TransientCause } from '../types'
 import { samePath } from '../movePaths'
 
@@ -254,7 +255,8 @@ export interface FactData {
   IntegrationPhase: { entry: string; phase: 'files' | 'ref' | 'rollback' }
   /** `cause` and `code`: why a transient failure was one (#1362), as codes; `code` is the network error code found. */
   /** `check`: the merge check that failed (`install` for the install before them), `logPath` its log (#1354). */
-  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean; cause?: TransientCause; code?: string; check?: string; logPath?: string }
+  /** `conflicts` (HI-1181): a conflict's files and hunks as the queue's folder had them, bounded (shared/workflow/conflicts.ts). */
+  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean; cause?: TransientCause; code?: string; check?: string; logPath?: string; conflicts?: ConflictsRecord }
   Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'hive' | 'agent' | 'outside'; outsideRules?: string[] }
   /** Some of an unfinished card's work found in the target (a partial hand merge): a mark, not a move (§16.4.4). */
   MergedInPart: { revision: string; target: string }

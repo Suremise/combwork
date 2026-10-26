@@ -8,6 +8,7 @@ import type { QueueQueued, QueueStep, QueueTesting } from '../../shared/workflow
 import type { CardRecord } from './factStore'
 import type { PauseReason, QueueStepInfo } from './mergeQueue'
 import type { Workflow } from './runtime'
+import { conflictPlaces } from '../../shared/workflow/conflicts'
 
 export type QueueState =
   /** Waiting in the queue: `position` 1 is next, after the one testing now. */
@@ -222,7 +223,14 @@ function failureText(f: FactData['IntegrationFailed'], room: number): string {
   switch (f.reason) {
     case 'conflict': {
       const head = `a conflict with ${f.target}`
-      return f.files?.length ? `${head} in ${listed(f.files, room - head.length - ' in '.length)}` : head
+      if (!f.files?.length) return head
+      const fits = room - head.length - ' in '.length
+      // Where each file's conflicts are (HI-1181), when they all fit; else the files alone, as before.
+      const placed = f.files.map((x) => {
+        const c = f.conflicts?.files.find((y) => y.file === x)
+        return c ? `${x} (${conflictPlaces(c)})` : x
+      })
+      return `${head} in ${placed.length <= FILES_NAMED && placed.join(', ').length <= fits ? placed.join(', ') : listed(f.files, fits)}`
     }
     case 'checks': {
       const what = f.check === 'install' ? 'the install before the merge checks' : f.check ? `the merge check ${f.check}` : 'a merge check'
