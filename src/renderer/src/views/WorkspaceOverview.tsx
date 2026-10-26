@@ -23,6 +23,9 @@ const LIVE_REFRESH_MS = 15_000
 /** A load with no answer by then shows as failed, with Retry (#1646). */
 const LOAD_LIMIT_MS = 60_000
 
+/** A running agent's project in its label (HI-1679): dropped first in a narrow row, so the agent's name stays whole. */
+const projectPart = (c: React.ReactNode[]): React.ReactNode => <span className="running-project">{c}</span>
+
 const M = {
   noAnswer: msg({ id: 'workspace.overview.noAnswer', defaultMessage: 'no answer after {seconds, number} s', description: "Why the workspace's usage could not be loaded: Hive read it for this long without finishing. Shown as {error} in \"Could not load {what}: {error}\", with Retry." }),
   costTip: msg({ id: 'workspace.overview.costTip', defaultMessage: 'What this work would have cost at API prices: reported by the provider where it does (Claude Code), else estimated by Hive from token counts and the prices in Settings → the provider. On a subscription you are not charged this; it shows how heavy the work was.', description: "The Workspace Overview: tooltip on API-equivalent cost." }),
@@ -59,7 +62,7 @@ const M = {
   prompts: msg({ id: 'workspace.overview.prompts', defaultMessage: 'Prompts', description: "A figure's title: prompts sent." }),
   compactions: msg({ id: 'workspace.overview.compactions', defaultMessage: '{count, plural, one {# compaction} other {# compactions}}', description: 'Under Prompts: how many times sessions were compacted.' }),
   runningHeading: msg({ id: 'workspace.overview.runningHeading', defaultMessage: 'Running now', description: "The Workspace Overview: the heading over the agents running now." }),
-  agentLabel: msg({ id: 'workspace.overview.agentLabel', defaultMessage: '{project} · {agent}', description: 'A running agent in the Workspace Overview: its project and name.' }),
+  agentLabel: msg({ id: 'workspace.overview.agentLabel', defaultMessage: '<in>{project} · </in>{agent}', description: 'A running agent in the Workspace Overview: its project and name. <in>…</in> holds the project part (keep the tags around it, with its separator): in a narrow row it is dropped first, so the agent’s name stays whole.' }),
   byProject: msg({ id: 'workspace.overview.byProject', defaultMessage: 'By project', description: "The Workspace Overview: the heading over the table by project." }),
   openAssistant: msg({ id: 'workspace.overview.openAssistant', defaultMessage: 'Open the Assistant view', description: "The table by project: the Assistant's row, for screen readers." }),
   openProject: msg({ id: 'workspace.overview.openProject', defaultMessage: "Open {project}'s Overview", description: "The table by project: a project's row, for screen readers." }),
@@ -351,7 +354,7 @@ export function WorkspaceOverviewView() {
                     key={`${p.path}#${a.id}`}
                     project={p}
                     a={a}
-                    label={isAssistant ? tr(M.assistant) : tr(M.agentLabel, { project: p.name, agent: a.name })}
+                    label={isAssistant ? tr(M.assistant) : Children.toArray(tRich<React.ReactNode>(M.agentLabel, { project: p.name, agent: a.name, in: projectPart }))}
                     assistant={isAssistant}
                     onOpen={() => {
                       if (isAssistant) return setAssistantOpen(true)

@@ -193,7 +193,7 @@
   "workspace.notes.workspaceNotes.off": "Dostarczanie jest wyłączone (Ustawienia → Zaawansowane → Dostarczaj Workspace notes agentom): agenci jej nie dostają.",
   "workspace.notes.workspaceNotes.template": "# Workspace notes\n\nNotatki o tym komputerze, które każdy agent powinien znać: pełna ścieżka potrzebna poleceniu, wersja lokalnego narzędzia. Zasady dla każdego, kto pracuje nad projektem, należą do jego AGENTS.md.\n",
   "workspace.notes.workspaceNotes.title": "Workspace notes",
-  "workspace.overview.agentLabel": "{project} · {agent}",
+  "workspace.overview.agentLabel": "<in>{project} · </in>{agent}",
   "workspace.overview.apiCost": "Koszt według cen API",
   "workspace.overview.asReported": "według dostawcy",
   "workspace.overview.assistant": "Asystent",

@@ -193,7 +193,7 @@
   "workspace.notes.workspaceNotes.off": "提供はオフになっています（「設定」→「詳細」→「Workspace notesをエージェントに提供」）。エージェントは受け取りません。",
   "workspace.notes.workspaceNotes.template": "# Workspace notes\n\nすべてのエージェントが知っておくべき、このマシンについてのノート：コマンドに必要なフルパス、ローカルツールのバージョンなど。プロジェクトで作業する誰にでも当てはまるルールは、そのプロジェクトのAGENTS.mdに書きます。\n",
   "workspace.notes.workspaceNotes.title": "Workspace notes",
-  "workspace.overview.agentLabel": "{project} · {agent}",
+  "workspace.overview.agentLabel": "<in>{project} · </in>{agent}",
   "workspace.overview.apiCost": "API換算コスト",
   "workspace.overview.asReported": "報告値",
   "workspace.overview.assistant": "アシスタント",

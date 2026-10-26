@@ -593,7 +593,7 @@ function AgentsByUsage({ rows }: { rows: AgentRow[] }) {
 }
 
 /** One running agent: provider, model, mode, status, context used and cost so far. `onOpen` makes it a link. */
-export function RunningAgent({ project, a, label, onOpen, assistant }: { project: ProjectInfo; a: ProjectInfo['agents'][number]; label?: string; onOpen?: () => void; assistant?: boolean }) {
+export function RunningAgent({ project, a, label, onOpen, assistant }: { project: ProjectInfo; a: ProjectInfo['agents'][number]; label?: React.ReactNode; onOpen?: () => void; assistant?: boolean }) {
   const live = a.live!
   const usage = useLiveUsage(project, a.id)
   const settings = useStore((s) => s.settings)

@@ -193,7 +193,7 @@
   "workspace.notes.workspaceNotes.off": "Die Auslieferung ist ausgeschaltet (Einstellungen → Erweitert → Workspace notes an Agenten ausliefern): Die Agenten bekommen sie nicht.",
   "workspace.notes.workspaceNotes.template": "# Workspace notes\n\nNotizen über diesen Rechner, die jeder Agent kennen sollte: ein vollständiger Pfad, den ein Befehl braucht, die Version eines lokalen Tools. Regeln für alle, die an einem Projekt arbeiten, gehören stattdessen in dessen AGENTS.md.\n",
   "workspace.notes.workspaceNotes.title": "Workspace notes",
-  "workspace.overview.agentLabel": "{project} · {agent}",
+  "workspace.overview.agentLabel": "<in>{project} · </in>{agent}",
   "workspace.overview.apiCost": "Kosten zu API-Preisen",
   "workspace.overview.asReported": "laut Anbieter",
   "workspace.overview.assistant": "Assistent",
