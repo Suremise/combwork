@@ -278,53 +278,27 @@ function recordCopy(dir, copy) {
 }
 
 /**
- * The profiles `commandLine` names: the values of its --hive-test-profile= (Hive's main process, lib.cjs) and
- * --user-data-dir= (Chromium's processes) arguments, whether the argument is quoted whole (`"--x=C:\a b"`), its value
- * is (`--x="C:\a b"`), or neither (the value then ends at a space).
- */
-function profilesIn(commandLine) {
-  const cmd = String(commandLine ?? '')
-  const out = []
-  const re = /--(?:hive-test-profile|user-data-dir)=/gi
-  for (let m = re.exec(cmd); m; m = re.exec(cmd)) {
-    let at = m.index + m[0].length
-    let end
-    if (cmd[at] === '"') end = cmd.indexOf('"', ++at)
-    else if (cmd[m.index - 1] === '"') end = cmd.indexOf('"', at)
-    else {
-      const space = cmd.slice(at).search(/\s/)
-      end = space < 0 ? cmd.length : at + space
-    }
-    out.push(cmd.slice(at, end < 0 ? cmd.length : end))
-  }
-  return out.filter(Boolean)
-}
-
-/** Whether path `p` is `folder` or inside it, in one spelling (case, separators): `lanes\1` never takes `lanes\10`. */
-function within(p, folder) {
-  const dir = norm(path.resolve(folder)).replace(/\\+$/, '')
-  const f = norm(path.resolve(p)).replace(/\\+$/, '')
-  return f === dir || f.startsWith(`${dir}\\`)
-}
-
-/**
  * Records the copy of Hive that `launcher` (the pid Playwright started, `from`: ms before it did) is, by the identity it
- * has (pid and start time): the launcher's child that started since with `profile` as its own profile, when Playwright
- * started Electron through `cmd.exe /c` (Windows), else the launcher itself if it has that profile. Lists the processes
- * without blocking (the launch has returned meanwhile). Off Windows, or with no profile to tell it by, nothing.
+ * has (pid and start time), from the process tree alone: no command line is read. Playwright starts Electron through
+ * `cmd.exe /c` on Windows, so `launcher` is that shell and the copy its child (launchedCopy). Lists the processes without
+ * blocking (the launch has returned meanwhile). Off Windows, nothing.
  */
-async function recordMainProcess(dir, launcher, from, profile) {
-  if (process.platform !== 'win32' || !launcher || !profile) return
+async function recordMainProcess(dir, launcher, from, profile = null) {
+  if (process.platform !== 'win32' || !launcher) return
   const out = await new Promise((resolve, reject) => execFile('powershell.exe', ['-NoProfile', '-Command', PROCESS_LIST], { encoding: 'utf8', env: baseEnv(), maxBuffer: 64 * 1024 * 1024, windowsHide: true }, (e, stdout) => (e ? reject(e) : resolve(stdout))))
-  const main = launchedCopy(parseProcesses(out), launcher, from, profile)
+  const main = launchedCopy(parseProcesses(out), launcher, from)
   if (main) recordCopy(dir, { pid: main.pid, started: main.started, profile })
 }
 
-/** Of `list`, the copy of Hive `launcher` started at or after `from`, with `profile` as its own (recordMainProcess). */
-function launchedCopy(list, launcher, from, profile) {
-  const want = norm(path.resolve(profile)).replace(/\\+$/, '')
-  const isIt = (p) => p.started >= from && profilesIn(p.commandLine).some((v) => norm(path.resolve(v)).replace(/\\+$/, '') === want)
-  return list.find((p) => p.parent === launcher && isIt(p)) ?? list.find((p) => p.pid === launcher && isIt(p)) ?? null
+/**
+ * Of `list`, the copy of Hive `launcher` started: `launcher` must itself have started at or after `from` (else its pid
+ * is another process's by now); then its child that started since (the shell's Electron), or, with none, `launcher`
+ * itself. null when `launcher` is gone, or isn't the process started then.
+ */
+function launchedCopy(list, launcher, from) {
+  const self = list.find((p) => p.pid === launcher)
+  if (!self || self.started < from) return null
+  return list.find((p) => p.parent === launcher && p.started >= self.started) ?? self
 }
 
 /** The copies recorded in `dir` and its folders `depth` deep (a runner inside a suite has its suites in nested/). */
@@ -367,37 +341,36 @@ function recordedCopies(dir, depth = 3) {
 const copiesIn = (list, copies) => list.filter((p) => copies.some((c) => c.pid === p.pid && Math.abs(p.started - c.started) <= 1))
 
 /**
- * Whether `commandLine` is a test copy of Hive's with its profile in `folder`: a profile it names (profilesIn) is
- * there. Never by a program's name (the installed Hive is Hive.exe too, and electron.exe runs other apps), and never by
- * another argument naming the folder (a viewer opening a screenshot there).
+ * A guess, for a report only, never for ending anything: processes that look like test copies of Hive with something in
+ * one of `folders` (a profile flag on their command line, and the folder named on it). Command lines can't be read
+ * reliably (each program splits its own), so such a process is listed for a person to look at.
  */
-const hiveCopyIn = (commandLine, folder) => profilesIn(commandLine).some((v) => within(v, folder))
+const lookLikeCopies = (list, folders) => list.filter((p) => p.pid !== process.pid && /--(hive-test-profile|user-data-dir)=/i.test(p.commandLine ?? '') && folders.some((f) => namesFolder(p.commandLine, f)))
 
 /**
- * Ends the test copies of Hive in `folders` that are still running, each with what it started: those recorded there
- * (recordCopy, by pid and start time) and those whose profile is there (hiveCopyIn). `before` (ms): only copies started
- * before it (a sweep's, so a copy a runner that has just claimed the folder starts is never taken). Each is ended as the
- * process it is in `list` (endExactly), children first. Returns how many processes were ended.
+ * Ends the test copies of Hive recorded in `folders` (recordCopy) that still run as the process recorded (its pid and
+ * start time), each with what it started, children first (endExactly); nothing else. `before` (ms): only copies started
+ * before it (a sweep's, so a copy a runner that has just claimed the folder starts is never taken). Returns
+ * { ended: how many processes were ended, unrecorded: what looks like a copy there but has no record (lookLikeCopies:
+ * { pid, commandLine }), left running for a person to look at }.
  */
 function endCopies(folders, { before = Infinity, list } = {}) {
-  if (process.platform !== 'win32' || !folders.length) return 0
+  if (process.platform !== 'win32' || !folders.length) return { ended: 0, unrecorded: [] }
   try {
     list ??= processes()
   } catch {
-    return 0
+    return { ended: 0, unrecorded: [] }
   }
-  const roots = new Map()
-  for (const f of folders) {
-    for (const p of copiesIn(list, recordedCopies(f))) roots.set(p.pid, p)
-    for (const p of list) if (hiveCopyIn(p.commandLine, f)) roots.set(p.pid, p)
-  }
+  const copies = copiesIn(list, folders.flatMap((f) => recordedCopies(f))).filter((p) => p.pid !== process.pid && p.started < before)
   const pick = new Map()
-  for (const p of roots.values()) {
-    if (p.pid === process.pid || p.started >= before) continue
+  for (const p of copies) {
     pick.set(p.pid, p.started)
     for (const d of descendantsIn(list, p.pid)) pick.set(d.pid, d.started)
   }
-  return pick.size ? endExactly(childrenFirst(list, [...pick].map(([pid, started]) => ({ pid, started })))) : 0
+  const unrecorded = lookLikeCopies(list, folders)
+    .filter((p) => !pick.has(p.pid) && p.started < before)
+    .map((p) => ({ pid: p.pid, commandLine: p.commandLine }))
+  return { ended: pick.size ? endExactly(childrenFirst(list, [...pick].map(([pid, started]) => ({ pid, started })))) : 0, unrecorded }
 }
 
-module.exports = { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, processTree, processes, endExactly, suspendExactly, suspensions, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree, COPIES_FILE, recordCopy, recordMainProcess, launchedCopy, profilesIn, recordedCopies, copiesIn, hiveCopyIn, endCopies }
+module.exports = { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, processTree, processes, endExactly, suspendExactly, suspensions, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree, COPIES_FILE, recordCopy, recordMainProcess, launchedCopy, recordedCopies, copiesIn, lookLikeCopies, endCopies }

@@ -283,18 +283,18 @@ describe("a scenario's leftover processes (#542, #402)", () => {
 })
 
 // HI-1453: a test copy of Hive that outlived its suite (12 h, its runner gone). Each copy is recorded as it starts, and
-// the runner ends those still running: recorded (their pid and start time) or with their profile in the folder, never by
-// name, never another process given the pid since. The real processes: the harnessleftovers e2e.
+// the runner ends those still running as the processes recorded (pid and start time): nothing else, never by name or by a
+// command line (the Assistant's design call in round 3), never another process given the pid since. What only looks
+// like a copy is listed for a person. The real processes: the harnessleftovers e2e.
 describe("a suite's test copies of Hive (HI-1453)", () => {
   type Copy = { pid: number; started: number; profile?: string | null }
-  const { COPIES_FILE, recordCopy, recordedCopies, copiesIn, hiveCopyIn, profilesIn, launchedCopy } = req('./e2e/folderProcesses.cjs') as {
+  const { COPIES_FILE, recordCopy, recordedCopies, copiesIn, lookLikeCopies, launchedCopy } = req('./e2e/folderProcesses.cjs') as {
     COPIES_FILE: string
     recordCopy: (dir: string, copy: Copy) => void
     recordedCopies: (dir: string, depth?: number) => Copy[]
     copiesIn: (list: Proc[], copies: Copy[]) => Proc[]
-    hiveCopyIn: (cmd: string, folder: string) => boolean
-    profilesIn: (cmd: string) => string[]
-    launchedCopy: (list: Proc[], launcher: number, from: number, profile: string) => Proc | null
+    lookLikeCopies: (list: Proc[], folders: string[]) => Proc[]
+    launchedCopy: (list: Proc[], launcher: number, from: number) => Proc | null
   }
   const lane = 'C:\\t\\hive-test\\e2e\\lanes\\1'
 
@@ -324,36 +324,28 @@ describe("a suite's test copies of Hive (HI-1453)", () => {
     expect(copiesIn(list, copies).map((p) => p.pid)).toEqual([10, 12])
   })
 
-  it("are found by their profile argument's value, in that folder only, never by a program's name or another argument", () => {
-    expect(hiveCopyIn(`"C:\\wt\\node_modules\\electron\\dist\\electron.exe" C:\\wt --hive-test-profile=${lane}\\leftovers\\leftovers\\profile`, lane)).toBe(true)
-    // Playwright's own form: each argument quoted whole.
-    expect(hiveCopyIn(`"C:\\wt\\electron.exe"  "--inspect=0" "C:\\wt" "--hive-test-profile=${lane}\\a b\\profile"`, lane)).toBe(true)
-    expect(hiveCopyIn(`"C:\\wt\\electron.exe" --type=renderer --user-data-dir="${lane}\\x y\\profile" --lang=en`, lane)).toBe(true)
-    // Lane 10 isn't lane 1, nor is a folder that only starts the same.
-    expect(hiveCopyIn(`electron.exe --hive-test-profile=${lane}0\\x\\profile`, lane)).toBe(false)
-    expect(hiveCopyIn(`"electron.exe" "--hive-test-profile=${lane}-old\\x\\profile"`, lane)).toBe(false)
-    expect(hiveCopyIn(`"C:\\Users\\u\\AppData\\Local\\Programs\\Hive\\Hive.exe" --user-data-dir=C:\\Users\\u\\AppData\\Roaming\\Hive`, lane)).toBe(false)
-    // A program that only names the folder (a viewer opening a screenshot) isn't a copy, nor is one whose profile is
-    // elsewhere while another of its arguments names the folder (HR5's round 1).
-    expect(hiveCopyIn(`photos.exe ${lane}\\x\\shot.png`, lane)).toBe(false)
-    expect(hiveCopyIn(`chrome.exe --user-data-dir=C:\\Users\\u\\Chrome ${lane}\\shot.png`, lane)).toBe(false)
-    expect(hiveCopyIn(`chrome.exe "--user-data-dir=C:\\Users\\u\\Chrome" "${lane}\\shot.png"`, lane)).toBe(false)
-    expect(profilesIn(`x "--hive-test-profile=C:\\a b" --user-data-dir="C:\\c d" --user-data-dir=C:\\e --flag`)).toEqual(['C:\\a b', 'C:\\c d', 'C:\\e'])
+  it("the one recorded is the launcher shell's child started since, found by the process tree alone (no command line)", () => {
+    const list: Proc[] = [
+      { pid: 5, parent: 1, commandLine: '', started: 1000 },
+      // A child from before the shell started (a parent id reused): not its.
+      { pid: 6, parent: 5, commandLine: '', started: 900 },
+      { pid: 8, parent: 5, commandLine: '', started: 1020 }
+    ]
+    expect(launchedCopy(list, 5, 1000)?.pid).toBe(8)
+    // No shell in between: the launcher itself.
+    expect(launchedCopy([{ pid: 9, parent: 1, commandLine: '', started: 2000 }], 9, 1990)?.pid).toBe(9)
+    // The launcher's pid naming a process older than the launch (it ended, the pid was reused): nothing recorded.
+    expect(launchedCopy([{ pid: 5, parent: 1, commandLine: '', started: 500 }, { pid: 8, parent: 5, commandLine: '', started: 1020 }], 5, 1000)).toBeNull()
+    expect(launchedCopy([], 5, 1000)).toBeNull()
   })
 
-  it("the one recorded is the launcher's child with the copy's own profile, started since the launch", () => {
-    const profile = `${lane}\\s\\profile`
+  it('what only looks like a copy in a folder (for the report, never ended) has a profile flag and names the folder', () => {
     const list: Proc[] = [
-      { pid: 5, parent: 1, commandLine: 'cmd.exe /d /s /c "electron.exe ..."', started: 1000 },
-      // Its child from before the launch (a reused pid's), and one with another profile: neither.
-      { pid: 6, parent: 5, commandLine: `"electron.exe" "--hive-test-profile=${profile}"`, started: 900 },
-      { pid: 7, parent: 5, commandLine: `"electron.exe" "--hive-test-profile=${lane}\\other\\profile"`, started: 1010 },
-      { pid: 8, parent: 5, commandLine: `"electron.exe" "--inspect=0" "C:\\wt" "--hive-test-profile=${profile}"`, started: 1020 }
+      { pid: 1, commandLine: `"electron.exe" "--hive-test-profile=${lane}\\a\\profile"`, started: 1 },
+      { pid: 2, commandLine: `photos.exe ${lane}\\x\\shot.png`, started: 1 },
+      { pid: 3, commandLine: `electron.exe --hive-test-profile=${lane}0\\x\\profile`, started: 1 }
     ]
-    expect(launchedCopy(list, 5, 1000, profile)?.pid).toBe(8)
-    expect(launchedCopy(list, 5, 1000, `${lane}\\none\\profile`)).toBeNull()
-    // No shell in between: the launcher itself, if it has the profile.
-    expect(launchedCopy([{ pid: 9, parent: 1, commandLine: `Hive.exe --hive-test-profile=${profile}`, started: 2000 }], 9, 1990, profile)?.pid).toBe(9)
+    expect(lookLikeCopies(list, [lane]).map((p) => p.pid)).toEqual([1])
   })
 })
 

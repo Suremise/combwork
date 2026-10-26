@@ -172,6 +172,8 @@ if (!nested) {
   try {
     const left = await endLeftCopies(runContext.LANES_DIR, lib.WORK)
     if (left.ended) console.log(`Ended ${left.ended} process(es) of test copies of Hive an earlier run left running in its lanes (HI-1453).\n`)
+    // Never ended without a record: listed, for a person to look at.
+    if (left.unrecorded.length) console.log(`Still running in lanes no runner holds, with no record of a run starting them (not ended; look at them, HI-1453):\n${left.unrecorded.map((p) => `  ${p.pid}: ${p.commandLine}`).join('\n')}\n`)
   } catch (e) {
     console.warn(`Couldn't look for test copies of Hive an earlier run left running (HI-1453): ${e.message}\n`)
   }
@@ -311,8 +313,9 @@ const run = (name, port) =>
       const outcome = { ...suiteOutcome({ code, out }), clis: suiteClis(dir), windows }
       // What a suite's agents left running from its folder (a command through hive-progress, a server: #542) would hold
       // the folder and outlive the run: stopped, by command line (its folder, started since the suite did), never by name.
-      // Its test copies of Hive first (HI-1453): those it recorded, and those with their profile in its folder.
-      const copies = dir ? endCopies([dir]) : 0
+      // Its test copies of Hive first (HI-1453): those it recorded, as the processes recorded. One not recorded is the
+      // folder's sweep's below (#542), which takes what names the folder and started since the suite did.
+      const copies = dir ? endCopies([dir]).ended : 0
       if (copies) out += `\n(${copies} process(es) of its test copies of Hive still running after it ended were ended, HI-1453)\n`
       const stopped = dir ? stopProcessesIn(dir, started) : 0
       if (stopped) out += `\n(${stopped} process(es) still running from its folder after it ended were stopped, #542)\n`

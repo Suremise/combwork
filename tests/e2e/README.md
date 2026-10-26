@@ -593,13 +593,16 @@ startup failure shows no dialog.
 **Test copies of Hive never outlive their run** (HI-1453: one ran on 12 hours after its suite, its runner gone, and held
 its lane's port, so no later runner took that lane). Playwright starts Electron through `cmd.exe /c`, so the pid it
 gives is that shell's: a killed suite takes the shell with it, while Hive's main process, the shell's child, runs on.
-`lib.cjs` records each copy's main process as it starts, by pid and when it started, in the suite's folder
-(`.hive-copies.jsonl`, looked up in the background, so a launch returns as before); once a suite has ended, however it ended (passed, failed, timed out,
-killed), the runner ends what is left of its copies, recorded or with their profile in its folder
-(`folderProcesses.cjs` `endCopies`); and each run's start, before it takes a lane, ends the copies an earlier run left
-in the lanes no running runner holds, started before it looked (`leftCopies.mjs`). Each is ended as the process it was
-listed as (pid and start time), never by name: the installed Hive is `Hive.exe` too. `harnessleftovers` checks both
-with real copies.
+`lib.cjs` records each copy's main process as it starts (the shell's child, by the process tree), by pid and when it
+started, in the suite's folder (`.hive-copies.jsonl`, looked up in the background, so a launch returns as before).
+Once a suite has ended, however it ended (passed, failed, timed out, killed), the runner ends what is left of the
+copies it recorded (`folderProcesses.cjs` `endCopies`); and each run's start, before it takes a lane, ends the copies
+an earlier run recorded in the lanes no running runner holds, started before it looked (`leftCopies.mjs`). Only what
+was recorded, and only while it is still the process recorded (pid and start time): never by name (the installed Hive
+is `Hive.exe` too) or by reading command lines, which can't be read reliably. What only looks like a copy there (a
+profile flag naming the lane's folder) with no record (a record not made before its suite was killed, a run from
+before records) is listed in the run's output with its pid and command line, for you to look at, and left running.
+`harnessleftovers` checks all of it with real copies.
 
 What the tests leave in `%LOCALAPPDATA%\hive-test` is removed once it is no longer needed (`clean.mjs`, #253). The e2e
 runner and the scenario runner do it when they finish (at most a minute; what is left goes next time), and
