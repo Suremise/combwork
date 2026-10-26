@@ -35,7 +35,9 @@ function held() {
   return { loads, start }
 }
 /** Runs what the loads' endings queued (their callbacks and the zero-delay reruns), on controlled timers. */
-const settled = (): Promise<void> => vi.runAllTimersAsync()
+const settled = async (): Promise<void> => {
+  await vi.runAllTimersAsync()
+}
 
 describe('one load at a time (#1646)', () => {
   beforeEach(() => {
