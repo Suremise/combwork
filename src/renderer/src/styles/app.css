@@ -10945,8 +10945,9 @@ textarea.input.task-blocked-input {
   position: relative;
   display: flex;
   flex-direction: column;
-  /* Gives way first, as the Assistant's panel does (HI-1737), down to its least width. */
-  flex-shrink: 1000;
+  /* Gives way after the Assistant's panel and before the sidebar (HI-1737: their shrinks far apart), down to its least
+     width. */
+  flex-shrink: 10;
   min-width: 240px;
   max-width: 50vw;
   background: var(--bg-sidebar);

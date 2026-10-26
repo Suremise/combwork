@@ -3,9 +3,9 @@ import { get, set } from './store'
 
 /**
  * Room for the work beside the side panels (HI-1737, Darren's decision): in a narrow or zoomed window the work area keeps
- * MAIN_MIN while it can, and what is beside it gives way in order, covering nothing. The Assistant's and Progress
- * panels narrow first (to their CSS min-width: their flex-shrink far outweighs the sidebar's), then the sidebar (to its
- * own), then the Projects sidebar folds to its rail while the window stays narrow (`sidebarFolded`, never saved), back
+ * MAIN_MIN while it can, and what is beside it gives way in order, covering nothing. The Assistant's panel narrows
+ * first, then the Progress panel (each to its CSS min-width: their flex-shrinks, 1000 and 10, far outweigh the
+ * sidebar's 1), then the sidebar (to its own), then the Projects sidebar folds to its rail while the window stays narrow (`sidebarFolded`, never saved), back
  * on its own once there's room. With less room than that, the work area takes what is left (never pushing a panel off
  * the window). At 900 px and 150% (600 CSS px) the Assistant's panel had left it nothing.
  */

@@ -54,6 +54,7 @@ const check = (name, ok, extra = '') => {
         sidebar: w('.workbench > .sidebar'),
         compact: !!document.querySelector('.workbench > .sidebar.compact'),
         panel: w('.workbench > .assistant-panel'),
+        progress: w('.workbench > .progress-panel'),
         widest: Math.max(...[...bench.children].map((c) => Math.round(c.getBoundingClientRect().right))),
         // What never gives way: the activity bar, the Progress panel's folded strip.
         others: [...bench.children].filter((c) => !c.matches('.main-area, .sidebar, .assistant-panel, .progress-panel')).reduce((n, c) => n + Math.round(c.getBoundingClientRect().width), 0),
@@ -63,7 +64,7 @@ const check = (name, ok, extra = '') => {
     const fitsWindow = (r) => r.widest <= r.window + 1 && r.overflow <= 1
     // The work's least room: 280 px, or all that is left beside everything else at its least (the sidebar's rail or 160
     // px, the panel's 240) when the window hasn't 280 to give (a pixel for rounding).
-    const least = (r) => Math.min(280, r.window - r.others - (r.compact ? 48 : 160) - 240) - 1
+    const least = (r) => Math.min(280, r.window - r.others - (r.compact ? 48 : 160) - 240 - (r.progress ? 240 : 0)) - 1
     const capture = async (name) => {
       await page.mouse.move(5, 5)
       for (const theme of ['dark', 'light']) {
@@ -142,6 +143,67 @@ const check = (name, ok, extra = '') => {
     await page.getByRole('button', { name: 'Projects' }).first().click()
     await zoomTo(1, 900)
     check('back at 100%: the list, as saved', !!(await lib.until(async () => !(await room()).compact, HUNG_MS)) && JSON.stringify(await saved()) === JSON.stringify(before), JSON.stringify(await saved()))
+
+    // The Progress panel open too: the Assistant's panel narrows before it, each down to 240 px; at 150% everything
+    // still inside the window, the work taking what is left.
+    // Each panel's own width, read in a window wide enough for both.
+    await lib.fitWindow(app, page, { width: 1400, height: 850 })
+    const panelSaved = (await lib.until(async () => (await room()).main.width > 400 && (await room()), HUNG_MS)).panel.width
+    await page.locator('.progress-rail').click()
+    await lib.until(async () => (await page.locator('.workbench > .progress-panel').count()) === 1, HUNG_MS)
+    const progressOwn = (await lib.until(async () => {
+      const r = await room()
+      return r.progress && r.panel.width === panelSaved && r
+    }, HUNG_MS))?.progress?.width
+    await lib.fitWindow(app, page, { width: 900, height: 850 })
+    check("the Progress panel open too, at 100%: the Assistant's panel gave way first (Progress kept its own width while the Assistant's was over 240)", !!(await lib.until(async () => {
+      const r = await room()
+      return r.progress && fitsWindow(r) && r.main.width >= least(r) && (r.progress.width >= progressOwn - 1 || r.panel.width <= 241) && r
+    }, HUNG_MS)), JSON.stringify({ progressOwn, ...(await room()) }))
+    await zoomTo(1.5, 900)
+    check('…at 150%: each panel at 240 px or more, the work takes what is left, nothing past the window', !!(await lib.until(async () => {
+      const r = await room()
+      return r.progress && r.compact && r.panel.width >= 240 && r.progress.width >= 240 && r.main.width >= least(r) && fitsWindow(r)
+    }, HUNG_MS)), JSON.stringify(await room()))
+    await capture('assistant-progress-150')
+    await zoomTo(1, 900)
+    await page.keyboard.press('Control+Alt+P')
+    await lib.until(async () => (await page.locator('.workbench > .progress-panel').count()) === 0, HUNG_MS)
+
+    // The Assistant's panel on the left: the same room, in the same order.
+    await inv('settings:update', { assistant: { panelSide: 'left' } })
+    await lib.until(async () => (await page.locator('.assistant-panel.on-left').count()) === 1, HUNG_MS)
+    for (const z of [1, 1.5]) {
+      await zoomTo(z, 900)
+      check(`the panel on the left, at ${Math.round(z * 100)}%: left of the work, at 240 px or more, the work keeps its room, nothing past the window${z > 1 ? ', the list folded' : ''}`, !!(await lib.until(async () => {
+        const r = await room()
+        return r.panel.right <= r.main.right - r.main.width + 1 && r.panel.width >= 240 && r.main.width >= least(r) && fitsWindow(r) && r.compact === z > 1
+      }, HUNG_MS)), JSON.stringify(await room()))
+      await capture(`assistant-left-${Math.round(z * 100)}`)
+    }
+    await zoomTo(1, 900)
+    await inv('settings:update', { assistant: { panelSide: 'right' } })
+    await lib.until(async () => (await page.locator('.assistant-panel:not(.on-left)').count()) === 1, HUNG_MS)
+
+    // Compact saved by the user: a rail at every zoom, still compact when there is room again.
+    await page.keyboard.press('Control+Alt+B')
+    await lib.until(async () => (await saved()).compact, HUNG_MS)
+    for (const z of [1.5, 1]) {
+      await zoomTo(z, 900)
+      check(`compact by choice, at ${Math.round(z * 100)}%: the rail, the work keeps its room, nothing past the window, still saved compact`, !!(await lib.until(async () => {
+        const r = await room()
+        return r.compact && r.main.width >= least(r) && fitsWindow(r)
+      }, HUNG_MS)) && (await saved()).compact, JSON.stringify(await room()))
+    }
+    await page.keyboard.press('Control+Alt+B')
+    await lib.until(async () => !(await saved()).compact, HUNG_MS)
+
+    // Wide again: both kept what was theirs (the sidebar's saved width, the Assistant's panel its own).
+    await lib.fitWindow(app, page, { width: 1400, height: 850 })
+    check('a wide window again: the sidebar at its saved width, the panel at its own, the list shown', !!(await lib.until(async () => {
+      const r = await room()
+      return !r.compact && r.sidebar.width >= before.width && r.panel.width === panelSaved && r
+    }, HUNG_MS)) && JSON.stringify(await saved()) === JSON.stringify(before), JSON.stringify({ panelSaved, ...(await room()), saved: await saved() }))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {
