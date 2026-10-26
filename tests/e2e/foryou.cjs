@@ -191,7 +191,7 @@ const check = (name, ok, extra = '') => {
     }
     let qDialog = await openQ()
     const section = qDialog.locator('[data-section="for-you"]')
-    check('the card dialog shows the request: its kind, its words and who asks', !!(await lib.until(async () => /Approve OK to push the release tag\?[\s\S]*Maker asks/.test(await section.innerText().catch(() => '')), HUNG_MS)), await section.innerText().catch(() => ''))
+    check('the card dialog shows the request: its kind, its words and who asks', !!(await lib.until(async () => /Approve\s+OK to push the release tag\?[\s\S]*Maker asks/.test(await section.innerText().catch(() => '')), HUNG_MS)), await section.innerText().catch(() => ''))
     for (const theme of ['dark', 'light']) {
       await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
       await section.screenshot({ path: path.join(lib.WORK, `foryou-dialog-${theme}.png`) })
@@ -303,6 +303,42 @@ const check = (name, ok, extra = '') => {
     const chose = (await inv('tasks:facts', s)).find((f) => f.kind === 'Approval')
     check('…recording the action and its reason', chose?.data.action === 'done' && chose?.data.note === 'already done by #1277', JSON.stringify(chose))
     check('…and the builder hears what was chosen', !!(await lib.until(async () => wakes('Maker').some((w) => w.startsWith(`[Hive] ${sKey} (#${s})`) && w.includes('moved it to Done (already done by #1277)')), HUNG_MS)), JSON.stringify(wakes('Maker')))
+    await page.keyboard.press('Escape')
+
+    // #1637: an agent's question is Markdown (HB5's HI-1630 design question): rendered as card comments are, never the
+    // raw marks, and a long one folded with Show all.
+    const m = (await inv('tasks:create', { title: 'Design question', project: 'beta' })).number
+    await inv('tasks:move', m, 'doing', { agent: maker.id })
+    const point = (num, label, body) => `${num}. **${label}:** ${body}`
+    const design = [
+      'HI-1630 design: OK to build it this way?',
+      '',
+      point(1, 'Agent side', '`hive_ask_user` gets an optional `actions` list, at most 3: `done`, `noCode`, `unblock`.'),
+      point(2, 'For you', 'each action shows as a button with its reason, which you can edit.'),
+      point(3, 'One click', 'it does what the board does today, as you, with the reason.'),
+      point(4, 'Send Reply and Record as Decision', 'get tooltips that say what each does.'),
+      point(5, 'Agent guidance', 'one sentence in the tool description saying when to offer actions.'),
+      '',
+      ...Array.from({ length: 8 }, (_, i) => `A further paragraph ${i + 1}, so the question is longer than the fold.`)
+    ].join('\n')
+    await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${m}`, kind: 'decide', text: design })}`)
+    await openByTitle(page, m)
+    const mDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
+    await mDialog.waitFor({ timeout: HUNG_MS })
+    const question = mDialog.locator('[data-section="for-you"] .for-you-question')
+    check('an agent’s question renders as Markdown: numbered points', !!(await lib.until(async () => (await question.locator('ol > li').count()) === 5, HUNG_MS)), await question.innerHTML().catch(() => ''))
+    check('…bold labels and code', (await question.locator('strong', { hasText: 'Agent side:' }).count()) === 1 && (await question.locator('code', { hasText: 'hive_ask_user' }).count()) === 1)
+    check('…none of the raw marks', !/\*\*|`/.test(await question.innerText()), await question.innerText())
+    check('…its line breaks kept', (await question.locator('p br').count()) >= 7, await question.innerHTML())
+    const more = mDialog.locator('.for-you-more')
+    check('a long question is folded, with Show all', (await more.count()) === 1 && (await more.innerText()).trim() === 'Show all' && (await question.evaluate((el) => el.scrollHeight > el.clientHeight + 1)), await more.innerText().catch(() => ''))
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      await mDialog.locator('[data-section="for-you"]').screenshot({ path: path.join(lib.WORK, `foryou-markdown-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await more.click()
+    check('…Show all shows it whole', !!(await lib.until(async () => (await question.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)) && (await more.innerText()).trim() === 'Show less', HUNG_MS)), await more.innerText().catch(() => ''))
   } finally {
     await app.close()
   }

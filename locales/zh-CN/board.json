@@ -316,6 +316,7 @@
   "board.forYou.rounds": "更多轮次",
   "board.forYou.send": "发送回复",
   "board.forYou.sendTip": "把你的回答发给提问的智能体，并作为你的评论添加到卡片上。",
+  "board.forYou.showAll": "{all, select, yes {收起} other {全部显示}}",
   "board.forYou.showStuck": "显示文件和命令",
   "board.forYou.tipAsks": "{kind, select, approve {{who} 请求你批准} decide {{who} 请你做决定} test {{who} 请你测试} signIn {{who} 请你登录} other {{who} 向你提问}}",
   "board.forYou.tipMore": "{n, plural, other {还有 # 项}}",

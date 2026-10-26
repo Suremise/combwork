@@ -318,6 +318,7 @@ interface HiveMessageValues {
   'board.forYou.rounds': undefined
   'board.forYou.send': undefined
   'board.forYou.sendTip': undefined
+  'board.forYou.showAll': { all: string }
   'board.forYou.showStuck': undefined
   'board.forYou.tipAsks': { kind: string; who: string | number }
   'board.forYou.tipMore': { n: number }

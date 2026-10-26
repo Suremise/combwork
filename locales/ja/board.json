@@ -316,6 +316,7 @@
   "board.forYou.rounds": "追加ラウンド",
   "board.forYou.send": "返信を送信",
   "board.forYou.sendTip": "回答を質問したエージェントに送り、あなたのコメントとしてカードにも追加します。",
+  "board.forYou.showAll": "{all, select, yes {折りたたむ} other {すべて表示}}",
   "board.forYou.showStuck": "ファイルとコマンドを表示",
   "board.forYou.tipAsks": "{kind, select, approve {{who}が承認を求めています} decide {{who}が判断を求めています} test {{who}がテストを求めています} signIn {{who}がサインインを求めています} other {{who}から質問があります}}",
   "board.forYou.tipMore": "{n, plural, other {ほか#件}}",

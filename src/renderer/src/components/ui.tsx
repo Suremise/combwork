@@ -971,9 +971,12 @@ function linkCards(html: string, cards: MarkdownCards): string {
   return doc.body.innerHTML
 }
 
-/** Markdown, sanitized. `cards`: card references (AM-12, #1061) link to their cards, as in a card's description and comments. */
-export function Markdown({ source, className, onLink, cards }: { source: string; className?: string; onLink?: (href: string) => boolean; cards?: MarkdownCards }) {
-  const clean = DOMPurify.sanitize(marked.parse(source, { async: false }) as string)
+/**
+ * Markdown, sanitized. `cards`: card references (AM-12, #1061) link to their cards, as in a card's description and comments.
+ * `breaks`: a single line break is kept (#1637: an agent's question written line by line), not run into its paragraph.
+ */
+export function Markdown({ source, className, onLink, cards, breaks }: { source: string; className?: string; onLink?: (href: string) => boolean; cards?: MarkdownCards; breaks?: boolean }) {
+  const clean = DOMPurify.sanitize(marked.parse(source, { async: false, ...(breaks ? { breaks: true } : {}) }) as string)
   const html = cards ? linkCards(clean, cards) : clean
   return (
     <div

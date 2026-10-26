@@ -1,6 +1,7 @@
 import { join } from 'path'
 import type { DatabaseSync } from 'node:sqlite'
 import { shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { gist } from '../shared/gist'
 import { msg } from '../shared/i18n'
 import { laneHits, newLaneBase, type LaneCardMark, type LaneEvent, type LaneMark } from '../shared/laneWatch'
 import { cardLabel } from '../shared/projectKeys'
@@ -87,10 +88,15 @@ async function notifyFromAction(a: ActionRow, ws: WorkspaceService, ctx: Paramet
   if (!at) return
   const text = typeof a.payload.text === 'string' ? a.payload.text : ''
   const shown = a.payload.shown ? workflowLine(a.payload.shown, (m, values) => shownText(values ? withValues(m, values) : m)) : null
-  const body: TextPart[] = shown ? [{ shown, english: text || shown }] : text ? [text] : []
+  // An agent's own words are Markdown (#1637): the notice (a banner, a Windows notification: plain text) has their gist,
+  // the Agent API them whole; the card's For you shows them rendered.
+  const body: TextPart[] = shown ? [{ shown, english: text || shown }] : text ? [{ shown: gist(text, NOTICE_GIST), english: text }] : []
   // Shown once its dispatch is counted under a lease that holds (uncertain until the action is marked).
   await ctx.dispatch(() => tell(at.projectPath, withValues(M.forYou, { card: cardLabel(at.card) }), body))
 }
+
+/** How much of an agent's question a request's notice shows (its first sentence or two). */
+const NOTICE_GIST = 200
 
 /** A lane notice's event as its action keeps it: what happened, to which card (none: the lane's merge), and why. */
 interface Told {

@@ -1267,6 +1267,10 @@
     "defaultMessage": "Sends your answer to the agent that asked, and adds it to the card as your comment.",
     "description": "Tooltip of the Send Reply button under a question for the user (For you): what it does."
   },
+  "board.forYou.showAll": {
+    "defaultMessage": "{all, select, yes {Show less} other {Show all}}",
+    "description": "A button under a long request for the user (For you) in the card dialog, shown only partly: shows all of it, or (yes) folds it again."
+  },
   "board.forYou.showStuck": {
     "defaultMessage": "Show the files and commands",
     "description": "A button on a For you request about a merge that stopped part way: shows the card's Work section, where each file and the commands that finish or undo the merge are listed."
