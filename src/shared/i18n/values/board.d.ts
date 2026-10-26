@@ -905,10 +905,13 @@ interface HiveMessageValues {
   'board.workQueue.result': undefined
   'board.workQueue.retried': undefined
   'board.workQueue.retry': undefined
+  'board.workQueue.retryApprovedMessage': { revision: string | number }
   'board.workQueue.retryConfirm': undefined
   'board.workQueue.retryFailed': undefined
   'board.workQueue.retryMessage': { revision: string | number }
   'board.workQueue.retryTitle': { card: string | number }
+  'board.workQueue.retryUsed': undefined
+  'board.workQueue.retryWaits': { step: string }
   'board.workQueue.returned': { when: string | number; why: string | number }
   'board.workQueue.showRun': undefined
   'board.workQueue.side': { side: string }

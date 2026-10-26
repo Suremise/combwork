@@ -183,6 +183,12 @@ describe("a card's work view (#1223)", () => {
     expect(workView(card, red).queue).toMatchObject({ state: 'failed', failure: 'checks', transient: true, log: 'unit\nfailed: 2' })
     const retried = workView(card, [...red, fact('IntegrationRequested', { entry: 'e2', revision: 'rev2222bbbb', key: null, target: 'main', style: 'merge', requeue: 'retry' })])
     expect(retried.queue).toEqual({ entry: 'e2', revision: 'rev2222bbbb', target: 'main', state: 'open', requeue: 'retry' })
+    // HI-1667: Retry merge used since the latest submission (the runtime allows it once per revision after a return).
+    expect(workView(card, red).retried).toBe(false)
+    expect(retried.retried).toBe(true)
+    // …and a loop step waiting for its reviewer (a follow-up), during which the runtime refuses it.
+    expect(workView(card, queued).loopStep).toBeNull()
+    expect(workView(card, [...queued, fact('LoopStep', { step: 'followUp', text: 'the screenshot changed' })]).loopStep).toBe('followUp')
     // Merged by hand before its rules passed: a squash has no merge commit, and the mark says which rules.
     const outside = workView({ ...card, stage: 'done' }, [...facts, fact('Integrated', { revision: 'rev2222bbbb', target: 'main', result: 'sq6666', method: 'squash', by: 'outside', outsideRules: ['review.passed'] }, 'outside', 'observed')])
     expect(outside.integration).toMatchObject({ method: 'squash', by: 'outside', mergeCommit: null })

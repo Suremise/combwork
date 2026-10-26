@@ -2927,7 +2927,12 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
 - **Retry merge** (an override): a card the queue returned, a red check included, is queued again with its approved
   revision unchanged, once per revision (S32's last part). A card in Approved with no entry (taken out of the queue, or
   for a follow-up), approved and not stale, is queued again too, overriding nothing (#1623); a stale one is refused with
-  **submit** as the way on, never **report merge**, which is the agent's own merge, not Hive's.
+  **submit** as the way on, never **report merge**, which is the agent's own merge, not Hive's. While a card loop's
+  step waits for its reviewer (a follow-up), it is refused: the follow-up's check queues the card again itself.
+  **The window offers it only where it runs [HI-1667]:** after a return, while it hasn't been used since the latest
+  submission (the work view's `retried`), its confirmation saying once per revision, and once used a line saying the
+  next way is a new revision; in Approved, not while a loop step waits (`loopStep`: a line says Retry merge comes back
+  once the reviewer has checked it), its confirmation with no such limit.
 
 **Built [#1357]** (the queue on the card, in the Git tab and in the Merge dialog):
 - **The card's Work section** (`CardQueue.tsx`) shows the card's newest entry this cycle, from its facts (the work view's
