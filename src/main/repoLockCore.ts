@@ -230,6 +230,21 @@ function heldLock(db: DatabaseSync, token: string, slow: TakeOptions['onSlow']):
   }
 }
 
+/**
+ * Releases the lock in `commonDir` by its token, on a connection of its own: for a holder whose own connection is gone
+ * (the lock's worker started again while main held it, repoLockWorker.ts). As a release: only that token's row.
+ */
+export function releaseRepoLock(commonDir: string, token: string, onSlow?: TakeOptions['onSlow']): void {
+  heldHere.delete(token)
+  const db = timed('open', onSlow, () => openLockDb(join(commonDir, REPO_LOCK_FILE), BUSY_MS, SCHEMA))
+  try {
+    // i18n-ignore: SQL, not text
+    timed('release', onSlow, () => db.prepare('DELETE FROM repo_lock WHERE token = ?').run(token))
+  } finally {
+    db.close()
+  }
+}
+
 /** Who holds the lock in `commonDir` now (a row, alive or not), or null. For tests and diagnostics. */
 export function repoLockHolder(commonDir: string): RepoLockHolder | null {
   const db = openLockDb(join(commonDir, REPO_LOCK_FILE), BUSY_MS, SCHEMA)
