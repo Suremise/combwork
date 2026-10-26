@@ -86,9 +86,11 @@ describe.runIf(process.platform === 'win32')("a seal goes once its job is gone (
     const lease = `slot-seal-${Date.now()}`
     expect(await LeaseJob.open(other, lease, await journalPath(root, lease, dir))).toBeInstanceOf(LeaseJob)
     // That supervisor by its identity, taken now while it is known to be the test's own.
+    // Its cleanup is registered before anything can fail, so a failing check never leaves it behind (endExactly is
+    // synchronous: done when the cleanup returns).
     const relay = identify([other.pid!])
-    expect(relay).toHaveLength(1)
     ends.push(() => void endExactly(relay))
+    expect(relay).toHaveLength(1)
     const seal = await settled(root, dir, lease)
     const gone = (l: string) => leaseJobGone(host, l)
     expect(await sweepSeals(root, dir, gone)).toBe(0)
