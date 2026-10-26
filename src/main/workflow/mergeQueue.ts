@@ -595,8 +595,9 @@ export class MergeQueue {
   /** Takes the next entry for the target and takes it as far as it goes. Null when there's none or the queue is paused. */
   async runOnce(target: string): Promise<QueueOutcome | null> {
     // HI-1697: the project's options brought in line with the board's recorded merge choice first, if their write is
-    // pending (a save stopped after the board's commit). A waiting card's style is its own Override's either way.
-    await this.cfg.settle?.()
+    // pending (a save stopped after the board's commit), and read again. Only a project with a choice recorded: a waiting
+    // card's style is its own Override's either way.
+    if (this.wf.store.meta(MERGE_CHOICE_KEY)) await this.cfg.settle?.()
     const p = this.paused(target)
     if (p?.reason === 'approval') return this.fenced(target, async () => this.thenPush(target, await this.answered(target, p.card))).catch(lostIsNull)
     // HI-1697: lifted once the merge style and commit message are chosen (the answer, or a save of the options), the
