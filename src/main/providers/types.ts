@@ -546,6 +546,12 @@ export interface ProviderAdapter {
    * Without it, Stop kills the process.
    */
   readonly exitKeys?: { keys: string[]; gapMs: number; graceMs: number }
+  /**
+   * The command a person types to end the CLI (Claude Code's /exit, Codex's /quit), which Hive types, then Enter, at a
+   * lane's end once its builder's turn is over (HI-1706, sessions.quit), killing it if it is still running after graceMs.
+   * Only that end uses it: Stop and restarts don't. A CLI without one is ended there by its exitKeys, or killed.
+   */
+  readonly quitLine?: { line: string; graceMs: number }
   parseUsage(text: string, sessionId: string): SessionUsage
   /** Reads a transcript's usage a piece at a time (whole lines), for transcripts that keep growing. */
   usageParser(sessionId: string): UsageParser

@@ -4,6 +4,7 @@
 // is never stopped for the old lease, nor a run of another lease, nor anything once that run is over.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { LiveSessionState } from '../src/shared/types'
+import { tempDir } from './tempDir'
 
 /** The agent's run now, as sessions.runNow gives it. */
 const runs = new Map<string, { run: string; starting: boolean }>()
@@ -25,11 +26,17 @@ const { tellListeners } = await import('../src/main/events')
 const { setAgentBusy } = await import('../src/main/workflow/lineUpdates')
 const { setRunsGoing } = await import('../src/main/workflow/service')
 const { stopLeaseSession } = await import('../src/main/slotsApp')
+const { advanced } = await import('../src/main/advanced')
+const { LANES_GENTLE_END } = await import('../src/shared/advanced')
+advanced.load(tempDir('hive-leaseend-'))
 
 const P = 'C:\\ws\\project'
 type SlotArg = Parameters<typeof stopLeaseSession>[2]
 const slotWith = (writer: { run: string; lease: string } | null): SlotArg => ({ name: 'slot-b', folder: 'C:\\ws.worktrees\\project\\slot-b', writer: writer && { ...writer, agent: 'b1', pid: 1, started: 1 } }) as SlotArg
 const LEASE = { id: 'l1', agent: 'b1', why: 'done' } as Parameters<typeof stopLeaseSession>[1]
+/** A lane's lease, and the workspace and pool its end is given (a pool whose slot's writer is still run-1). */
+const LANE_LEASE = { id: 'l1', agent: 'b1', why: 'laneEnded', lane: 'lane-1', to: new Date().toISOString() } as Parameters<typeof stopLeaseSession>[1]
+const AT = { ws: { lifetime: new AbortController().signal }, pool: { slots: () => [slotWith({ run: 'run-1', lease: 'l1' })] } } as unknown as NonNullable<Parameters<typeof stopLeaseSession>[3]>
 const status = (): void => tellListeners({ type: 'session-status', state: { agentId: 'b1', projectPath: P } as LiveSessionState })
 
 afterEach(() => {
@@ -85,6 +92,37 @@ describe("a lease's end stops the run writing in its slot under it", () => {
     setAgentBusy(() => true)
     stopLeaseSession(P, LEASE, slotWith({ run: 'run-1', lease: 'l1' }))
     expect(stopped).toEqual(['b1:run-1'])
+  })
+
+  it("a lane's lease with the gentle end turned off (HI-1706): stopped at its first idle moment, as before", async () => {
+    await advanced.set(LANES_GENTLE_END, false)
+    try {
+      runs.set('b1', { run: 'run-1', starting: false })
+      stopLeaseSession(P, LANE_LEASE, slotWith({ run: 'run-1', lease: 'l1' }), AT)
+      expect(stopped).toEqual(['b1:run-1'])
+    } finally {
+      await advanced.set(LANES_GENTLE_END, true)
+    }
+  })
+
+  it("a lane's lease with it on is ended gently, never stopped at its first idle moment (HI-1706)", () => {
+    runs.set('b1', { run: 'run-1', starting: false })
+    stopLeaseSession(P, LANE_LEASE, slotWith({ run: 'run-1', lease: 'l1' }), AT)
+    status()
+    expect(stopped).toEqual([])
+  })
+
+  it("a lane's reviewer holds no lease: its end stops only the slot's writer, never the reviewer (HI-1706)", async () => {
+    await advanced.set(LANES_GENTLE_END, false)
+    try {
+      runs.set('b1', { run: 'run-1', starting: false })
+      runs.set('r1', { run: 'run-r', starting: false })
+      stopLeaseSession(P, LANE_LEASE, slotWith({ run: 'run-1', lease: 'l1' }), AT)
+      expect(stopped).toEqual(['b1:run-1'])
+      expect(runs.get('r1')).toEqual({ run: 'run-r', starting: false })
+    } finally {
+      await advanced.set(LANES_GENTLE_END, true)
+    }
   })
 
   it("nothing when the slot has no writer, or a writer of another lease, or the run is over", () => {

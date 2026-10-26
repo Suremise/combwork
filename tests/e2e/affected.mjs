@@ -190,6 +190,7 @@ export const AREAS = [
   // The Progress panel's stages, legend, Solo's lanes, links and old rules marks (#1421).
   { paths: ['tests/e2e/lanesslots.cjs', 'src/renderer/src/components/ProgressLanes.tsx', 'src/renderer/src/laneSource.ts', 'src/shared/laneBar.ts', 'src/shared/lanes.ts', 'src/main/lanes.ts', 'src/main/slotCards.ts', 'src/shared/progressTabs.ts', 'src/renderer/src/components/Progress.tsx'], suites: ['lanesslots'] },
   { paths: ['src/shared/laneStages.ts', 'src/renderer/src/projectStages.ts', 'tests/e2e/lanestages.cjs'], suites: ['lanestages', 'progresslanes'] },
+  { paths: ['tests/e2e/laneend.cjs', 'tests/e2e/cliquit.cjs', 'src/main/slotsApp.ts', 'src/main/sessions.ts', 'src/main/deliveries.ts', 'src/main/providers/claude/adapter.ts', 'src/main/providers/codex/adapter.ts'], suites: ['laneend', 'slotsessions', 'cliquit'] },
   { paths: ['src/main/laneStart.ts', 'src/shared/laneBrief.ts', 'src/renderer/src/components/LaneStartDialog.tsx', 'tests/e2e/lanestart.cjs'], suites: ['agentrole', 'lanestart'] },
   // The shared list's other user: the Assistant's "Done by the Assistant" (#312).
   { paths: ['src/renderer/src/components/ShowAllList.tsx'], suites: ['assistantpanel', 'assistantundo'] },

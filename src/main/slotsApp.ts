@@ -15,9 +15,11 @@ import { basename, join } from 'path'
 import { app } from 'electron'
 import { advanced } from './advanced'
 import { processSupervisor } from './agentProcesses'
-import { boardRead, boardWrite, boardWriteOp } from './boardStore'
+import { boardRead, boardWrite, boardWriteOp, cardKeyOf } from './boardStore'
 import { config } from './config'
+import { agentReadsInbox, cancelFromSource, createDelivery, deliveriesOf, fromSource, offerNow, onDeliveriesChanged, waitingForRun } from './deliveries'
 import { containsPlace } from './fsutil'
+import { getLane } from './lanes'
 import { createLogger, userText } from './logger'
 import { agentLimit } from './projectAgents'
 import { progress, progressGate } from './progressService'
@@ -25,7 +27,7 @@ import { childEnv } from './ptyHost'
 import { sessions } from './sessions'
 import { removeCopiesIn } from './skillCopies'
 import { settleSlotJob } from './slotJobs'
-import { builderCountOf, SlotPool, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner } from './slots'
+import { builderCountOf, SlotPool, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
 import { onHiveEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
@@ -37,7 +39,7 @@ import { defaultProbe } from './workflow/queueProcs'
 import { workflowFor } from './workflow/service'
 import { projectAgents } from '../shared/defaults'
 import { openEntry } from '../shared/workflow/facts'
-import { SLOTS_REMOVE_IDLE, SLOTS_SETUP_MINUTES } from '../shared/advanced'
+import { LANES_END_WAIT_MINUTES, LANES_GENTLE_END, SLOTS_REMOVE_IDLE, SLOTS_SETUP_MINUTES } from '../shared/advanced'
 import type { SlotTestOp, SlotView } from '../shared/types'
 
 const log = createLogger('slots')
@@ -208,7 +210,7 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
     const cfg = await ws.projectConfig(projectPath)
     const root = join(ws.worktreesRoot, basename(projectPath))
     const store = new SlotStore(boardConn(ws), cfg.id ?? basename(projectPath))
-    return new SlotPool({
+    const made: SlotPool = new SlotPool({
       store,
       project: projectPath,
       root,
@@ -229,7 +231,7 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       },
       removeIdle: () => advanced.get(SLOTS_REMOVE_IDLE) !== false,
       ended: (lease, slot) => {
-        stopLeaseSession(projectPath, lease, slot)
+        stopLeaseSession(projectPath, lease, slot, { ws, pool: made })
         // Where its agent works changes (#1442: an idle builder's "in slot-b" goes): the window reads it again.
         if (!ws.lifetime.aborted) ws.scheduleRefresh()
       },
@@ -237,6 +239,7 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       removeSkillCopies: (folder) => removeCopiesIn(projectPath, folder, { always: true, why: 'slot removed' }), // i18n-ignore: the log's reason (English)
       renamer: renamerFor(ws, projectPath)
     })
+    return made
   })()
   pools.set(key, { life: ws.lifetime, pool })
   pool.catch(() => pools.delete(key))
@@ -250,14 +253,21 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
  * lease or anywhere else, isn't this lease's to stop. Looked at again at each change of the agent's status or of the
  * Progress panel's runs, until that run is stopped or over. Its conversation stays resumable by hand while the slot
  * isn't lent again, and the slot isn't lent, taken or removed until the run has exited and released it.
+ *
+ * A lane's lease (`laneEnded`, `laneAbandoned`; `at`: its workspace and pool) is ended gently instead (HI-1706,
+ * LANES_GENTLE_END on): laneEnd.
  */
-export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Slot): void {
+export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Slot, at?: { ws: WorkspaceService; pool: SlotPool }): void {
   const w = slot.writer
   if (!w || w.lease !== lease.id) return
   // This Hive's run of it, still (another Hive's run, or one already over, isn't this Hive's to stop).
   const mine = (): { run: string; starting: boolean } | null => {
     const r = sessions.runNow(projectPath, w.agent)
     return r && r.run === w.run ? r : null
+  }
+  if (at && lease.lane && (lease.why === 'laneEnded' || lease.why === 'laneAbandoned') && advanced.get<boolean>(LANES_GENTLE_END) !== false && !mine()?.starting) {
+    laneEnd(projectPath, lease, slot.name, w, at)
+    return
   }
   let off: (() => void) | null = null
   const done = (): void => {
@@ -276,6 +286,217 @@ export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Sl
     if ((e.type === 'session-status' && e.state.agentId === w.agent && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
   })
   look()
+}
+
+/** The lane-finished notes' source (HI-1706): one per lane lease's end, its ref the lease's id. */
+export const LANE_END_SOURCE = 'lane-end'
+/** At most this many of a lane's cards are named in its note (then "and N more"), and the note at most this long. */
+const NOTE_CARDS = 20
+const NOTE_MAX_CHARS = 2000
+/** How often a lane's end looks again with no event (a typing pause or a line's wait ending tells nothing). */
+const LANE_END_RECHECK_MS = 5000
+
+/**
+ * The note a lane's builder is given as its lane ends (HI-1706): the lane, each card's merge commit (or that it wasn't
+ * merged), and that its session ends once its turn does. Agent-facing: English. At most NOTE_CARDS cards named.
+ */
+export function laneEndNote(lane: string, abandoned: boolean, cards: readonly { key: string; merged: string | null }[]): string {
+  const named = cards.slice(0, NOTE_CARDS).map((c) => `${c.key} ${c.merged ? `merged at ${c.merged.slice(0, 12)}` : 'not merged'}`)
+  const more = cards.length > NOTE_CARDS ? [`and ${cards.length - NOTE_CARDS} more`] : []
+  const list = [...named, ...more].join('; ')
+  const head = abandoned ? `Lane ${lane} was abandoned` : `Lane ${lane} is finished`
+  const text = `${head}${list ? `: ${list}` : ''}. Your session ends once this turn does; Hive resumes it for your next lane. Close the lane's work in your reply, then end your turn.`
+  return text.length > NOTE_MAX_CHARS ? `${text.slice(0, NOTE_MAX_CHARS - 1)}…` : text
+}
+
+/**
+ * Why a lane's builder's run isn't done with its turn yet (HI-1706), or null when it is: in a turn as its status or its
+ * hooks say (a Stop the drain carried on is still one), a line of Hive's or the user's not taken, its runs or background
+ * tasks going, or a delivery still to reach it (the lane's note among them until it is read), whether or not the gate
+ * gives it yet. No settle time: each is a state, looked at again when it changes.
+ */
+export async function laneEndWaitsFor(projectPath: string, agent: string, run: string): Promise<string | null> {
+  if (agentBusy(projectPath, agent)) return 'it is in a turn'
+  if (sessions.turnOpen(projectPath, agent, run)) return 'its turn is still open'
+  const going = agentRunsGoing(projectPath, agent)
+  if (going.length) return `its runs are going (${going.join(', ')})`
+  if (sessions.lineWaiting(projectPath, agent)) return "a line typed into it isn't taken yet"
+  const waiting = await waitingForRun(projectPath, agent, run, sessions.liveFor(projectPath, agent)?.sessionId || null)
+  if (waiting.length) return `deliveries still to reach it (${waiting.map((r) => r.id).join(', ')})`
+  return null
+}
+
+/** What laneEnd works with (HI-1706): the real ones in Hive, a test's own in unit tests. */
+export interface LaneEndDeps {
+  /** Whether the end still owns that run: its workspace open, the run the agent's now, the slot's writer under the lease. */
+  fenced: () => boolean
+  /** laneEndWaitsFor's answer for the run. */
+  waitsFor: () => Promise<string | null>
+  /** Makes the lane's note once (its id, or null when there is none to give: no inbox, refused). */
+  note: () => Promise<string | null>
+  /** Cancels the note if it hasn't been read (the end lost its run, or is over). */
+  retire: (why: string) => Promise<void>
+  /** sessions.quit for the run, fenced. */
+  quit: (why: string, force: boolean) => Promise<'sent' | 'held' | 'gone'>
+  /** Calls the function at each change that may matter; returns the unsubscribe. */
+  watch: (look: () => void) => () => void
+  now: () => number
+  /** When the end stops waiting for the turn (absolute, ms): set once from the lease's end, never moved. */
+  deadline: number
+  log: (line: string) => void
+}
+
+/**
+ * Waits for a lane's builder's turn to be over, then ends its run with its CLI's exit (HI-1706). Looked at again on
+ * each change and every few seconds, one look at a time; the note is made at the first look. Ends when the quit is sent,
+ * the fence is lost (nothing is typed or killed then, and the unread note is retired), or the run is gone. Past the
+ * deadline it quits whatever it waits for (forced: killed where its prompt can't be typed into).
+ */
+export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
+  let over = false
+  let looking = false
+  let again = false
+  let noted = false
+  let lastWhy: string | null = null
+  let resolve!: (why: string) => void
+  const done = new Promise<string>((r) => (resolve = r))
+  const timers: NodeJS.Timeout[] = []
+  let unwatch: (() => void) | null = null
+  const finish = (why: string): void => {
+    if (over) return
+    over = true
+    unwatch?.()
+    for (const t of timers) clearTimeout(t)
+    d.log(why)
+    resolve(why)
+  }
+  const step = async (): Promise<void> => {
+    if (!d.fenced()) {
+      await d.retire('its lane end lost its run').catch(() => undefined) // i18n-ignore: for the log
+      return finish('the run or its lease is gone: nothing ended')
+    }
+    if (!noted) {
+      noted = true
+      await d.note().catch((e) => void d.log(`its lane's note wasn't made: ${(e as Error).message}`))
+      if (!d.fenced()) return step()
+    }
+    const past = d.now() >= d.deadline
+    if (!past) {
+      const why = await d.waitsFor()
+      if (!d.fenced()) return step()
+      if (why) {
+        if (why !== lastWhy) d.log(`waiting: ${why}`)
+        lastWhy = why
+        return
+      }
+    }
+    const r = await d.quit(past ? `its lane ended and it didn't finish its turn in time (${lastWhy ?? 'unknown'})` : 'its lane ended and its turn is over', past)
+    if (r === 'held') return
+    if (r === 'gone') return step()
+    if (past) await d.retire('its run ended').catch(() => undefined) // i18n-ignore: for the log
+    finish(past ? 'ended past the deadline' : 'ended once its turn was over')
+  }
+  const look = (): void => {
+    if (over) return
+    if (looking) {
+      again = true
+      return
+    }
+    looking = true
+    void (async () => {
+      try {
+        do {
+          again = false
+          await step()
+        } while (again && !over)
+      } catch (e) {
+        d.log(`a look failed: ${(e as Error).message}`)
+      } finally {
+        looking = false
+      }
+    })()
+  }
+  unwatch = d.watch(look)
+  const tick = (): void => {
+    if (over) return
+    look()
+    timers.push(setTimeout(tick, LANE_END_RECHECK_MS))
+  }
+  timers.push(setTimeout(tick, LANE_END_RECHECK_MS))
+  timers.push(setTimeout(look, Math.max(0, d.deadline - d.now()) + 50))
+  look()
+  return { done }
+}
+
+/** The lane leases being ended now (by id): a second end of the same lease joins the first, never makes another note. */
+const laneEnds = new Map<string, { done: Promise<string> }>()
+
+/**
+ * A lane's lease ended with its builder still running in the slot (HI-1706): its run is ended gently. The builder is
+ * told the lane is finished (or abandoned), with each card's merge commit, in a note for that run alone; once its turn is
+ * over (laneEndWaitsFor) its CLI is ended with its own exit command (sessions.quit), killed only if that doesn't end it.
+ * Fenced throughout to that run, that lease and the workspace's lifetime. The slot stays the writer's until it exits.
+ */
+function laneEnd(projectPath: string, lease: SlotLease, slotName: string, w: SlotWriter, at: { ws: WorkspaceService; pool: SlotPool }): void {
+  if (laneEnds.has(lease.id)) return
+  const { ws, pool } = at
+  const life = ws.lifetime
+  const label = `${userText(w.agent)} in ${userText(slotName)}`
+  const ended = Date.parse(lease.to ?? '') || Date.now()
+  const fenced = (): boolean => {
+    if (life.aborted) return false
+    const r = sessions.runNow(projectPath, w.agent)
+    if (!r || r.run !== w.run || r.starting) return false
+    const writer = pool.slots().find((s) => s.name === slotName)?.writer
+    return !!writer && writer.run === w.run && writer.lease === lease.id
+  }
+  const note = async (): Promise<string | null> => {
+    if (!agentReadsInbox(projectPath, w.agent)) return null
+    // Once per lease end, whatever became of one made before (read, cancelled): durable in the deliveries, and joined
+    // in memory meanwhile (laneEnds).
+    await deliveriesOf(projectPath, w.agent)
+    const made = fromSource(projectPath, LANE_END_SOURCE).find((r) => r.ref === lease.id)
+    if (made) return made.id
+    const lane = lease.lane ? await getLane(ws, lease.lane).catch(() => null) : null
+    const wf = await workflowFor(ws, projectPath).catch(() => null)
+    const cards = (lane?.cards ?? []).map((c) => {
+      let merged: string | null = null
+      try {
+        merged = wf ? (wf.state(wf.store.card(c.number)).integrated?.result ?? null) : null
+      } catch {
+        // A card gone from the board: named, not merged.
+      }
+      return { key: cardKeyOf(ws, c.number)?.key ?? `#${c.number}`, merged }
+    })
+    const st = sessions.liveFor(projectPath, w.agent)
+    const r = await createDelivery(projectPath, { agentId: w.agent, agentName: st?.agentName, conversation: st?.sessionId || null, kind: 'control', from: { kind: 'hive', name: 'Hive' }, body: laneEndNote(lane?.name ?? lease.lane ?? '', lease.why === 'laneAbandoned', cards), source: LANE_END_SOURCE, ref: lease.id, forRun: w.run }) // i18n-ignore: the product's name, as a delivery's sender
+    await offerNow(projectPath, w.agent)
+    return r.id
+  }
+  const waiter = waitForLaneEnd({
+    fenced,
+    waitsFor: () => laneEndWaitsFor(projectPath, w.agent, w.run),
+    note,
+    retire: async (why) => void (await cancelFromSource(projectPath, LANE_END_SOURCE, lease.id, why)),
+    quit: (why, force) => sessions.quit(projectPath, w.agent, w.run, fenced, why, force),
+    watch: (look) => {
+      const offEvents = onHiveEvent((e) => {
+        if ((e.type === 'session-status' && e.state.agentId === w.agent && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
+      })
+      const offDeliveries = onDeliveriesChanged((host, agents) => {
+        if (host.toLowerCase() === projectPath.toLowerCase() && agents.has(w.agent)) look()
+      })
+      return () => {
+        offEvents()
+        offDeliveries()
+      }
+    },
+    now: () => Date.now(),
+    deadline: ended + advanced.number(LANES_END_WAIT_MINUTES) * 60_000,
+    log: (line) => log.info(`Lane ${userText(lease.lane ?? '')}'s end, ${label} (lease ${lease.id}): ${line}`)
+  })
+  laneEnds.set(lease.id, waiter)
+  void waiter.done.finally(() => laneEnds.delete(lease.id))
 }
 
 let timer: NodeJS.Timeout | null = null
@@ -388,6 +609,11 @@ export async function slotTest(pool: SlotPool, op: SlotTestOp): Promise<unknown>
     case 'writer':
       // A run of another Hive's writing in a lent slot (#1561's scenario): its Hive gone when that process has ended.
       return pool.deps.store.conn.write((db) => Number(db.prepare("UPDATE slots SET writer_run = ?, writer_lease = (SELECT l.id FROM slot_leases l WHERE l.project = slots.project AND l.slot = slots.name AND l.ended_at IS NULL), writer_agent = ?, writer_pid = ?, writer_started = ? WHERE project = ? AND name = ? AND writer_run IS NULL").run(op.run, op.agent, op.pid, op.started, pool.deps.store.project, op.slot).changes) === 1) // i18n-ignore: SQL
+    case 'quit': {
+      // A lane's end's quit of a running CLI (HI-1706's cliquit, the real Claude Code and Codex): its run now, unfenced.
+      const r = sessions.runNow(pool.deps.project, op.agent)
+      return r ? sessions.quit(pool.deps.project, op.agent, r.run, () => true, 'a test asked') : 'gone' // i18n-ignore: for the log
+    }
     default:
       throw new Error('unknown slot test op') // i18n-ignore: a test channel, never shown
   }

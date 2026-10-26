@@ -161,6 +161,10 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   get startupQuestion(): RegExp {
     return advanced.pattern('claude-code.trust.prompt')
   }
+  // Ended as a person ends it at a lane's end (HI-1706): /exit, which 2.1.310 took and exited 0 on in 1.9 s.
+  get quitLine(): { line: string; graceMs: number } {
+    return { line: advanced.get<string>('claude-code.exit.command'), graceMs: advanced.number('claude-code.exit.graceSeconds') * 1000 }
+  }
 
   private async candidates(): Promise<{ path: string; source: string }[]> {
     const out: { path: string; source: string }[] = []

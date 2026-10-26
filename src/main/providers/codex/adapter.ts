@@ -482,6 +482,10 @@ export class CodexAdapter implements ProviderAdapter {
   get startupQuestion(): RegExp {
     return advanced.pattern('codex.trust.prompt')
   }
+  // Ended as a person ends it at a lane's end (HI-1706): /quit, which 0.164.0 took and exited 0 on in 1.4 s.
+  get quitLine(): { line: string; graceMs: number } {
+    return { line: advanced.get<string>('codex.exit.command'), graceMs: advanced.number('codex.exit.graceSeconds') * 1000 }
+  }
   readonly planToggleKey = '\x1b[Z'
   busyScreen(screen: string): boolean {
     return codexHoldsInput(screen)

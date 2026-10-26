@@ -3238,6 +3238,33 @@ Whether a conversation may resume there is its **hold** (none: it may):
   included) and the slot looked at.
   A run of another Hive is that Hive's to stop; the slot stays its until it exits. No off switch: one writer needs it
   (with workflow rules off, leases aren't ended by rules, so nothing is stopped).
+- **A lane's end lets its builder finish** (HI-1706, Darren 26 Oct: "Who the heck wants cut off like that."; design
+  HI-1706/s10, agreed with HR1). A lane's lease ending (`laneEnded`, `laneAbandoned`) never cuts its builder off
+  mid-turn, and ends it cleanly (`slotsApp.ts`'s `laneEnd`). Other lease ends, Stop and restarts are as above.
+  - **Told first:** a note for that run alone (a `control` delivery, `source: 'lane-end'`, `ref` the lease id,
+    `forRun` the writer's run, its conversation): *Lane X is finished: HI-1 merged at <sha>; HI-2 not merged. Your
+    session ends once this turn does; Hive resumes it for your next lane…* (*was abandoned* for an abandoned lane), at
+    most 20 cards named and 2,000 characters. It is made once per lease end, whatever became of one made before. None
+    is made for an agent without an inbox.
+  - **Its turn over, as states say, no settle time** (`laneEndWaitsFor`): not in a turn as its status or its hooks say
+    (a Stop the inbox drain carried on keeps the turn ledger's turn running), no line of Hive's or the user's waiting to
+    be taken, no Progress run or background task, and nothing still to reach that run (queued, offered or uncertain,
+    given by the gate yet or not: the note among them until it is read). Looked at again at each status, Progress and
+    saved delivery change (`onDeliveriesChanged`, after the save) and every 5 s.
+  - **Ended by the CLI's own exit** (`sessions.quit`, only here): its `quitLine` typed, then Enter (Claude Code
+    `/exit`, Codex `/quit`, recorded exiting by themselves with code 0 on 2.1.310 and 0.164.0:
+    `tests/fixtures/advanced/exit-*.json`, and the real-tier suite `cliquit`), Copilot its Ctrl+C keys; killed only
+    if that run still runs after the exit grace. Never typed while the user types, over their draft, over a line of
+    Hive's not taken, or while Hive types.
+  - **Fenced** to that run, that lease and the workspace's lifetime, checked at each look, after each await and before
+    each key and the kill: a restart, a closed workspace, a newer run or the slot's writer changing ends the wait with
+    nothing typed or killed, and retires the note if unread.
+  - **Bounded:** at `hive.lanes.endWaitMinutes` (10) after the lease's end, set once and never moved, it is ended
+    whatever it waits for: its exit command once its input is free, killed instead where its prompt can't be typed
+    into; logged with why. The slot stays the writer's until the run exits, as above.
+  - **Off switch:** Settings → Advanced → **Lanes: let the builder finish when its lane ends** (`hive.lanes.gentleEnd`):
+    off, it is stopped at its first idle moment, as before. A reviewer holds no lease, so a lane's end never stops it:
+    it goes idle.
 - **The Agent API:** an agent's row and detail give its running session's `folder` (when not the project folder) and
   `slot`, and a session's usage its `folder` and `slot`.
 
