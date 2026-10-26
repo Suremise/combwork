@@ -4,7 +4,8 @@
 // and the agents recorded as Hive closes even when reading their cards and lanes hangs.
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { dropLoggerListenersAfterEach, loggerListenerCounts } from './loggerListeners'
 import { tempDir } from './tempDir'
 
 const HUNG_MS = 10_000
@@ -134,6 +135,12 @@ beforeEach(() => {
 })
 afterEach(() => {
   m?.stopRestartRecovery()
+})
+// Each start and relaunch loads the logger again (vi.resetModules): what it listens to is taken off after each test (HI-1728).
+dropLoggerListenersAfterEach()
+const listenersAtStart = loggerListenerCounts()
+afterAll(() => {
+  expect(loggerListenerCounts()).toEqual(listenersAtStart)
 })
 
 describe('the restart queue (HI-1707)', () => {
