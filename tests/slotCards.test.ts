@@ -161,6 +161,8 @@ vi.mock('../src/main/deliveries', async (orig) => {
   }
 })
 
+const { withWriteFence } = await import('../src/main/workflow/factStore')
+const { LeaseLost } = await import('../src/main/workflow/queueRunner')
 const { cycleIn, deleteMergedLine, laneSlotIn, place, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
 
 let env: Env | null = null
@@ -331,6 +333,17 @@ describe("a begun deletion settled by the project's pass, whatever the switches 
     await settleSlotCards(ws, e.project)
     expect(sh(e.project, 'rev-parse', line)).toBe(head)
     await settleSlotCards(ws, e.project)
+    expect(e.kinds(n).filter((k) => k === 'LineDeleteUndone')).toHaveLength(1)
+  })
+
+  it("asked for inside the merge queue's fenced write (a merge freeing a slot, HI-1685), runs outside that fence: its writes never check the queue's lease", async () => {
+    const { e, n, line, head, ws } = await cutShort('Asked inside a fence')
+    // The queue's lease, gone by the time the pass writes (the runner let it go after its drain): every fenced write throws.
+    const lost = (): void => {
+      throw new LeaseLost('integration')
+    }
+    await withWriteFence(lost, () => settleSlotCards(ws, e.project))
+    expect(sh(e.project, 'rev-parse', line)).toBe(head)
     expect(e.kinds(n).filter((k) => k === 'LineDeleteUndone')).toHaveLength(1)
   })
 })
