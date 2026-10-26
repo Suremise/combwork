@@ -90,6 +90,7 @@ export const SUITES = [
   { name: 'codexoverrides', needs: ['codex'] },
   { name: 'codexownhooks', needs: ['codex'], noHive: "asks codex app-server's hooks/list itself, in a throwaway CODEX_HOME (#1285)" },
   { name: 'codexqueued' },
+  { name: 'commitburst' },
   { name: 'compact', needs: ['claude'], claudeHome: 'own' },
   { name: 'consoletext' },
   { name: 'consolewindow' },
