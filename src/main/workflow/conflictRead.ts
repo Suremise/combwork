@@ -23,7 +23,7 @@ const notRead = (file: string, why: ConflictNotRead): ConflictFile => ({ file, n
  */
 async function placeOf(folder: string, file: string): Promise<{ path: string; size: number } | { why: ConflictNotRead }> {
   const rel = normalize(file)
-  if (!file || isAbsolute(file) || /^[a-zA-Z]:/.test(file) || rel === '..' || rel.startsWith(`..${sep}`) || rel.split(/[\\/]/).includes('..')) return { why: 'outside' }
+  if (!file || isAbsolute(file) || /^[a-zA-Z]:/.test(file) || rel === '..' || rel.startsWith(`..${sep}`) || rel.split(/[\\/]/).includes('..')) return { why: 'outside' } // i18n-ignore: a reason's code (ConflictNotRead), worded by the window
   const parts = rel.split(/[\\/]/).filter(Boolean)
   let at = folder
   for (const [i, part] of parts.entries()) {
@@ -32,19 +32,19 @@ async function placeOf(folder: string, file: string): Promise<{ path: string; si
     try {
       st = await lstat(at)
     } catch {
-      return { why: 'missing' }
+      return { why: 'missing' } // i18n-ignore: a reason's code (ConflictNotRead), worded by the window
     }
     // A symlink or a junction, the file itself or a folder on the way: its target may be anywhere.
-    if (st.isSymbolicLink()) return { why: 'link' }
+    if (st.isSymbolicLink()) return { why: 'link' } // i18n-ignore: a reason's code (ConflictNotRead), worded by the window
     if (i === parts.length - 1) {
-      if (!st.isFile()) return { why: 'missing' }
+      if (!st.isFile()) return { why: 'missing' } // i18n-ignore: a reason's code (ConflictNotRead), worded by the window
       // The folder's own real place holds it (a link above the folder is the folder's, not the path's).
-      if (!containsPlace(folder, at)) return { why: 'outside' }
+      if (!containsPlace(folder, at)) return { why: 'outside' } // i18n-ignore: a reason's code (ConflictNotRead), worded by the window
       return { path: at, size: st.size }
     }
-    if (!st.isDirectory()) return { why: 'missing' }
+    if (!st.isDirectory()) return { why: 'missing' } // i18n-ignore: a reason's code (ConflictNotRead), worded by the window
   }
-  return { why: 'missing' }
+  return { why: 'missing' } // i18n-ignore: a reason's code (ConflictNotRead), worded by the window
 }
 
 /**
@@ -57,7 +57,7 @@ export async function readConflicts(folder: string, files: readonly string[], ou
   const room = { chars: CONFLICT_LIMITS.chars }
   let left = budget.totalBytes
   for (const file of files.slice(0, budget.files)) {
-    const place = await placeOf(folder, file).catch((): { why: ConflictNotRead } => ({ why: 'error' }))
+    const place = await placeOf(folder, file).catch((): { why: ConflictNotRead } => ({ why: 'error' })) // i18n-ignore: a reason's code (ConflictNotRead), worded by the window
     if ('why' in place) {
       out.push(notRead(file, place.why))
       continue
