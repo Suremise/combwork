@@ -191,6 +191,8 @@
   "board.details.tookTotal": "{took}{expected, select, none {} other { · expected about {expected}}}",
   "board.details.transient": "{cause, select, spawn {It couldn't start} notFound {Its program wasn't found} timeout {It ran out of time} killed {It was ended from outside} exit75 {It exited with code 75, the project's “temporary failure, try again”} other {A network error in its last lines ({code})}}: the card was returned to its builder, who may submit the same revision again (at most twice in a row) instead of a new one.",
   "board.details.waitingSince": "Waiting since {since}: {waiting}",
+  "board.dialog.activity": "Activity",
+  "board.dialog.activityTip": "Show this card's agents, sessions, turns and processes in its project's Activity tab.",
   "board.dialog.addCard": "Add Card",
   "board.dialog.added": "{who, select, you {Added by you} assistant {Added by the Assistant} repair {Added by Repair} other {Added by {by}}} {added} · changed {changed}",
   "board.dialog.addedUnknown": "Added by unknown {added} · changed {changed}",

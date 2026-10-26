@@ -1,4 +1,4 @@
-import type { AgentInstallInfo, AutoCompactSetting, CatalogModel, EffortLevel, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
+import type { AgentInstallInfo, AutoCompactSetting, BackgroundTaskType, CatalogModel, EffortLevel, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
 import type { ProviderDescriptor } from '../../shared/providers'
 import type { StartHint } from '../../shared/startFailure'
 import type { SafeguardEvent } from '../../shared/safeguards'
@@ -275,8 +275,7 @@ export interface LiveDetails {
   stopsAnswered?: string[]
 }
 
-/** What a background task is (#1584): a command left running, a Monitor, a subagent run in the background, a workflow. */
-export type BackgroundTaskType = 'command' | 'monitor' | 'subagent' | 'workflow'
+export type { BackgroundTaskType } from '../../shared/types'
 
 /**
  * A background task an agent started (a command left running, a Monitor, a subagent) or that ended, from its transcript.

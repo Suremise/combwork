@@ -84,6 +84,7 @@
   "panes.locks.item": "{n, plural, one {Editando # arquivo} other {Editando # arquivos}}",
   "panes.locks.title": "Arquivos que ele está editando neste turno:",
   "panes.locks.titleShared": "Arquivos que ele está editando neste turno. Os outros agentes desta pasta esperam até ele terminar de usá-los:",
+  "panes.menu.activity": "Atividade",
   "panes.menu.archiveStartNew": "Arquivar e começar de novo…",
   "panes.menu.cancelWatch": "Cancelar observação de cartão",
   "panes.menu.compact": "Compactar…",

@@ -22,7 +22,7 @@ import { formatDateTime, formatWhen } from '@shared/dates'
 import * as actions from '../actions'
 import { HAND_OVER_TEXT, handOverNow, onRunningLane } from '@shared/handOver'
 import { call, errorMessage } from '../api'
-import { NO_IDS, NO_PROJECTS, agentPage, get, agentProviderOf, clearStartFailure, closeTile, focusAgent, focusedAgentId, isAssistantPath, notify, openInSessionsTab, paneAssignment, paneCells, projectKey, prompt, revealAgent, seenAgents, set, setProjectTab, showAgent, openVersionControl, showInOverview, showPage, shownLayout, startingKey, startingLabel, useLanguage, useStarting, useStore } from '../store'
+import { NO_IDS, NO_PROJECTS, agentPage, get, agentProviderOf, clearStartFailure, closeTile, focusAgent, focusedAgentId, isAssistantPath, notify, openActivity, openInSessionsTab, paneAssignment, paneCells, projectKey, prompt, revealAgent, seenAgents, set, setProjectTab, showAgent, openVersionControl, showInOverview, showPage, shownLayout, startingKey, startingLabel, useLanguage, useStarting, useStore } from '../store'
 import { useLiveUsage, useLiveUsageState } from '../usage'
 import { commandKeybinding } from '../commands'
 import { cx, formatKeybinding, formatTokens, sessionLabel, timeAgo } from '../util'
@@ -465,6 +465,8 @@ function agentMenu(project: ProjectInfo, a: AgentInfo, pick: () => void, usage?:
       ? [{ label: tr(msg({ id: 'panes.menu.cancelWatch', defaultMessage: 'Cancel Card Watch', description: "Menu item (a watching agent's menu): ends its watch, so nothing wakes it." })), icon: 'eye-closed', onClick: () => void call('watch:cancel', project.path, a.id).catch((e) => notify('error', tr(CANCEL_WATCH_FAILED), String((e as Error).message ?? e))) }]
       : []),
     ...sessionItems(project, a.live, usage?.session),
+    // Its work in the project's Activity tab (#1254); the Assistant has none.
+    ...(isAssistantPath(project.path) ? [] : [{ label: tr(msg({ id: 'panes.menu.activity', defaultMessage: 'Activity', description: "Menu item (an agent's menu): opens the project's Activity tab showing this agent's work: its sessions, turns, tool calls and processes." })), icon: 'type-hierarchy', onClick: () => openActivity(project.path, { agentId: a.id }) }]),
     { label: tr(msg({ id: 'panes.menu.handOver', defaultMessage: 'Hand Over to…', description: "Menu item (an agent's menu): hands its work over to another agent or a new conversation." })), icon: 'arrow-swap', onClick: () => set({ handOverFor: { project: project.path, agentId: a.id } }) },
     ...moveItems(project, a),
     // A slot its ended run still holds (#1506): the same item, for the user's explicit recovery; a carried slot's after it.

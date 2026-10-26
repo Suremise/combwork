@@ -84,6 +84,7 @@
   "panes.locks.item": "{n, plural, one {Bearbeitet # Datei} other {Bearbeitet # Dateien}}",
   "panes.locks.title": "Dateien, die der Agent in diesem Durchgang bearbeitet:",
   "panes.locks.titleShared": "Dateien, die der Agent in diesem Durchgang bearbeitet. Andere Agenten in diesem Ordner warten, bis er damit fertig ist:",
+  "panes.menu.activity": "Aktivität",
   "panes.menu.archiveStartNew": "Archivieren und neu beginnen…",
   "panes.menu.cancelWatch": "Kartenbeobachtung abbrechen",
   "panes.menu.compact": "Komprimieren…",

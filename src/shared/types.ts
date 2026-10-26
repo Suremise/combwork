@@ -1666,6 +1666,9 @@ export interface SubSession {
   kind: string
 }
 
+/** What a background task is (#1584): a command left running, a Monitor, a subagent run in the background, a workflow. */
+export type BackgroundTaskType = 'command' | 'monitor' | 'subagent' | 'workflow'
+
 /** What a bulk action on the Sessions tab does to each session (session:bulk). */
 export type SessionBulkAction = 'archive' | 'unarchive' | 'delete'
 

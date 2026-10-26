@@ -1263,6 +1263,10 @@
     "defaultMessage": "User",
     "description": "A group of a provider's skills: in your user profile."
   },
+  "project.tab.activity": {
+    "defaultMessage": "Activity",
+    "description": "A project's tab: its live work as a tree, card → agent → session → turn → tool call, with subagents and processes."
+  },
   "project.tab.attachments": {
     "defaultMessage": "Attachments",
     "description": "A project's tab: what was pasted or dropped into its sessions."

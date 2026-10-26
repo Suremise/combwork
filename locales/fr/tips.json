@@ -1,4 +1,6 @@
 {
+  "tips.activityTab.text": "L’onglet Activité montre le travail du projet sous forme d’arbre : les cartes, leurs agents, sessions, tours, appels d’outils et les processus qu’ils exécutent. Clique sur un nœud pour voir son entrée exacte et sa dernière action ; le menu ⋯ d’un agent ouvre l’onglet sur cet agent.",
+  "tips.activityTab.title": "Voir en direct ce que fait chaque agent",
   "tips.advancedSettings.text": "Après une mise à jour d’un agent de code, Hive ne voit plus sa question de confiance ou ses erreurs de connexion ? Paramètres → Avancé contient les textes et les champs que Hive recherche, et ses délais : modifie-en un, avec la valeur par défaut à côté, ou édite advanced.json.",
   "tips.advancedSettings.title": "Corriger toi-même un changement de CLI",
   "tips.agentConsole.text": "Paramètres → Agent API → Permettre aux agents de lire la console de développement donne aux agents un outil en lecture seule qui montre les hooks et la ligne d’état de leur CLI à côté de ce que Hive en a compris, expurgés, pour qu’ils puissent déboguer ce que voit Hive.",

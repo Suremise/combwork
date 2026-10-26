@@ -1,3 +1,4 @@
+import { activityTurns, type ActivityTurns } from '../shared/activity'
 import { open, stat } from 'original-fs/promises'
 import type { ProviderId, Transcript, TranscriptItem, TranscriptSearchResult, TranscriptTool } from '../shared/types'
 import { TRANSCRIPT_WINDOW, assertSessionId } from '../shared/defaults'
@@ -151,6 +152,14 @@ export const transcripts = {
     const total = e.parser.items.length
     const from = Math.max(0, Math.min(total, opts.from ?? total - TRANSCRIPT_WINDOW))
     return { sessionId, size: e.size, version, total, from, items: e.parser.items.slice(from).map(forDisplay) }
+  },
+
+  /** A session's latest turns for the Activity tab (#1254), from the same parse; null when the file hasn't changed since knownVersion. */
+  async turns(projectPath: string, sessionId: string, knownVersion?: string): Promise<ActivityTurns | null> {
+    const e = await parsed(projectPath, sessionId)
+    const version = versionOf(e)
+    if (knownVersion !== undefined && knownVersion === version) return null
+    return { sessionId, version, ...activityTurns(e.parser.items) }
   },
 
   async tool(projectPath: string, sessionId: string, itemId: number): Promise<TranscriptTool> {

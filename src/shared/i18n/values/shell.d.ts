@@ -83,6 +83,7 @@ interface HiveMessageValues {
   'shell.command.project.previous': undefined
   'shell.command.project.remove': undefined
   'shell.command.project.storage': undefined
+  'shell.command.project.tab.activity': undefined
   'shell.command.project.tab.changes': undefined
   'shell.command.project.tab.files': undefined
   'shell.command.project.tab.images': undefined

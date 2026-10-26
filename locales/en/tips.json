@@ -1,4 +1,12 @@
 {
+  "tips.activityTab.text": {
+    "defaultMessage": "The Activity tab shows the project's work as a tree: cards, their agents, sessions, turns, tool calls and the processes they run. Click a node for its exact input and what it did last; an agent's ⋯ menu opens it on that agent.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.activityTab.title": {
+    "defaultMessage": "See what every agent is doing, live",
+    "description": "A tip's title."
+  },
   "tips.advancedSettings.text": {
     "defaultMessage": "After a coding agent's update, Hive no longer sees its trust question or its sign-in errors? Settings → Advanced has the text and fields Hive looks for, and its timeouts: change one, with the default beside it, or edit advanced.json.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

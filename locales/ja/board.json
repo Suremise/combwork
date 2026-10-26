@@ -191,6 +191,8 @@
   "board.details.tookTotal": "{took}{expected, select, none {} other { · 目安は約{expected}}}",
   "board.details.transient": "{cause, select, spawn {開始できませんでした} notFound {プログラムが見つかりませんでした} timeout {制限時間を超えました} killed {外部から終了されました} exit75 {コード75（プロジェクトの「一時的な失敗。再試行してください」）で終了しました} other {最後の行にネットワークエラーがありました（{code}）}}。カードはビルダーに差し戻されました。ビルダーは新しいリビジョンの代わりに同じリビジョンを再提出できます（連続して最大2回）。",
   "board.details.waitingSince": "{since}から待機中：{waiting}",
+  "board.dialog.activity": "アクティビティ",
+  "board.dialog.activityTip": "このカードのエージェント、セッション、ターン、プロセスをプロジェクトの「アクティビティ」タブに表示します。",
   "board.dialog.addCard": "カードを追加",
   "board.dialog.added": "{who, select, you {自分が{added}に追加} assistant {アシスタントが{added}に追加} repair {修復で{added}に追加} other {{by}が{added}に追加}} · {changed}に変更",
   "board.dialog.addedUnknown": "{added}に追加（追加者不明） · {changed}に変更",

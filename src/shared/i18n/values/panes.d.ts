@@ -86,6 +86,7 @@ interface HiveMessageValues {
   'panes.locks.item': { n: number }
   'panes.locks.title': undefined
   'panes.locks.titleShared': undefined
+  'panes.menu.activity': undefined
   'panes.menu.archiveStartNew': undefined
   'panes.menu.cancelWatch': undefined
   'panes.menu.compact': undefined

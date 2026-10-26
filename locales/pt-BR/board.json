@@ -191,6 +191,8 @@
   "board.details.tookTotal": "{took}{expected, select, none {} other { · previsto cerca de {expected}}}",
   "board.details.transient": "{cause, select, spawn {Não conseguiu iniciar} notFound {O programa dela não foi encontrado} timeout {O tempo dela acabou} killed {Foi encerrada de fora} exit75 {Terminou com o código 75, o “falha temporária, tente de novo” do projeto} other {Um erro de rede nas últimas linhas ({code})}}: o cartão foi devolvido ao executor, que pode enviar a mesma versão de novo (no máximo duas vezes seguidas) em vez de uma nova.",
   "board.details.waitingSince": "Aguardando desde {since}: {waiting}",
+  "board.dialog.activity": "Atividade",
+  "board.dialog.activityTip": "Mostrar os agentes, sessões, turnos e processos deste cartão na aba Atividade do projeto.",
   "board.dialog.addCard": "Adicionar cartão",
   "board.dialog.added": "{who, select, you {Adicionado por você} assistant {Adicionado pelo Assistente} repair {Adicionado pelo Reparar} other {Adicionado por {by}}} {added} · alterado {changed}",
   "board.dialog.addedUnknown": "Adicionado {added} (autor desconhecido) · alterado {changed}",

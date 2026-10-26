@@ -327,6 +327,10 @@
     "defaultMessage": "Project Storage and Clean Up…",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category. The … says it opens a dialog first: keep it."
   },
+  "shell.command.project.tab.activity": {
+    "defaultMessage": "Go to Activity",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Activity tab, the project's live work as a tree."
+  },
   "shell.command.project.tab.changes": {
     "defaultMessage": "Go to Version Control",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Version Control tab (glossary 2.1)."

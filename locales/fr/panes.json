@@ -84,6 +84,7 @@
   "panes.locks.item": "{n, plural, one {Modifie # fichier} many {Modifie # fichiers} other {Modifie # fichiers}}",
   "panes.locks.title": "Fichiers modifiés pendant ce tour :",
   "panes.locks.titleShared": "Fichiers modifiés pendant ce tour. Les autres agents de ce dossier attendent qu’il en ait fini avec eux :",
+  "panes.menu.activity": "Activité",
   "panes.menu.archiveStartNew": "Archiver et repartir…",
   "panes.menu.cancelWatch": "Annuler la surveillance de cartes",
   "panes.menu.compact": "Compacter…",

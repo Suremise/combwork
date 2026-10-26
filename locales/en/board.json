@@ -767,6 +767,14 @@
     "defaultMessage": "Waiting since {since}: {waiting}",
     "description": "A run's state in its details (Progress panel): waiting since a date and time ({since}) for what its reporter says ({waiting}, in its own words: \"a test slot\")."
   },
+  "board.dialog.activity": {
+    "defaultMessage": "Activity",
+    "description": "Button in the card dialog: opens its project's Activity tab showing this card's work."
+  },
+  "board.dialog.activityTip": {
+    "defaultMessage": "Show this card's agents, sessions, turns and processes in its project's Activity tab.",
+    "description": "Tooltip on the card dialog's Activity button."
+  },
   "board.dialog.addCard": {
     "defaultMessage": "Add Card",
     "description": "The New Card dialog's main button: adds the card."
