@@ -170,6 +170,61 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
     await close(w)
   })
 
+  it('New Project… made while its workspace gives way to another (one with a project of the same name) is refused, never answered with that one (HI-1760, HR5 round 1)', async () => {
+    type Svc = { projectIds: (o?: { fresh?: boolean }) => Promise<unknown>; refreshesSettled: () => Promise<void>; projectInfo: (...a: unknown[]) => Promise<{ path: string }> }
+    /** Holds the next call of `method` until released; `reached` resolves once it is held. */
+    const hold = (w: WS, method: 'projectIds' | 'refreshesSettled', when: (a: unknown[]) => boolean = () => true) => {
+      const svc = w as unknown as Svc
+      const real = (svc[method] as (...a: unknown[]) => Promise<unknown>).bind(w)
+      let release!: () => void
+      let reached!: () => void
+      const gate = new Promise<void>((r) => (release = r))
+      const at = new Promise<void>((r) => (reached = r))
+      let held = false
+      ;(svc as unknown as Record<string, unknown>)[method] = async (...a: unknown[]) => {
+        if (!held && when(a)) {
+          held = true
+          reached()
+          await gate
+        }
+        return real(...a)
+      }
+      return { reached: at, release: () => release() }
+    }
+    // Held at its id; meanwhile the window opens B, which has a "fresh" of its own.
+    const a = workspace(['hive'])
+    const b = workspace(['hive', 'fresh'])
+    const w = await open(a)
+    const atIds = hold(w, 'projectIds', (args) => !!(args[0] as { fresh?: boolean } | undefined)?.fresh)
+    const creating = w.createProject('fresh')
+    await atIds.reached
+    await w.open(b)
+    atIds.release()
+    await expect(creating).rejects.toThrow(/closed/)
+    // Held where it waits for the refresh a write meanwhile scheduled (its reply was the list from before).
+    const c = workspace(['hive'])
+    await w.open(c)
+    const svc = w as unknown as Svc
+    const read = svc.projectInfo.bind(w)
+    let wrote = false
+    svc.projectInfo = async (...args) => {
+      const p = await read(...args)
+      if (!wrote && p.path.toLowerCase() === join(c, 'fresh').toLowerCase()) {
+        wrote = true
+        await w.mutateProjectConfig(p.path, () => ({}))
+      }
+      return p
+    }
+    const atSettled = hold(w, 'refreshesSettled')
+    const creating2 = w.createProject('fresh')
+    await atSettled.reached
+    await w.open(b)
+    atSettled.release()
+    await expect(creating2).rejects.toThrow(/closed/)
+    expect(wrote).toBe(true)
+    await close(w)
+  })
+
   it('a key chosen for a project being made is reserved: a key change or another new project meanwhile is refused it (round 1, finding 2)', async () => {
     const ws = workspace(['hive'])
     const w = await open(ws)

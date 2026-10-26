@@ -1455,16 +1455,31 @@ export class WorkspaceService {
     }
     const p = join(this.path, clean)
     if (existsSync(p)) throw hiveError(msg({ id: 'service.workspace.folderExists', defaultMessage: 'A folder named "{name}" already exists', description: 'An error making a project: the workspace already has a folder called {name}.' }), { name: clean })
+    // The workspace it is made in: after each wait, still the one open (HR5, HI-1760 round 1). These calls act on what
+    // the service has open then, so a close, or another workspace opened meanwhile (the same one again too), would have
+    // them read and answer with that one's projects: refused as closed instead.
+    const gen = this.generation
+    const life = this.life.signal
+    const still = (): void => {
+      if (gen !== this.generation || life.aborted) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+    }
     await mkdir(p)
     await this.ensureProject(p)
+    still()
     // Its id given before the refresh reads it (HI-1760): given during that read (the refresh's sessions place asks for
     // ids), its project.json counts as saved after the read, and the refresh returns the list from before, without it.
     await this.projectIds({ fresh: true })
+    still()
     const info = await this.refresh()
+    still()
     if (this.hasProject(info, p)) return info
     // Another write meanwhile made it hand back the list from before: the refresh that write scheduled reads it afresh.
     await this.refreshesSettled()
-    return this.cached && this.hasProject(this.cached, p) ? this.cached : this.refresh()
+    still()
+    if (this.cached && this.hasProject(this.cached, p)) return this.cached
+    const again = await this.refresh()
+    still()
+    return again
   }
 
   private hasProject(info: WorkspaceInfo, projectPath: string): boolean {
