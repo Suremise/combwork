@@ -366,8 +366,8 @@ async function writeOptions(ws: WorkspaceService, project: { path: string; name:
 
 /** The answer's change: the project's own options and preset as they are now, its merge style and commit message set. */
 function answerChange(cfg: { workflow?: ProjectWorkflow }, platform: PlatformId, a: MergeAnswer): WorkflowChange {
-  const preset = cfg.workflow?.platform === platform ? cfg.workflow.preset : null
-  return { preset, options: { ...ownOf(cfg, platform), style: a.style, commitMessage: a.commitMessage } }
+  const from = cfg.workflow?.platform === platform ? cfg.workflow.preset : null
+  return { preset: from, options: { ...ownOf(cfg, platform), style: a.style, commitMessage: a.commitMessage } }
 }
 
 /**
