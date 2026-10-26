@@ -38,6 +38,7 @@
   "service.cardAttach.moved": "W międzyczasie karta przeszła do innego projektu: dołącz ponownie.",
   "service.cardAttach.noAttachment": "Karta nie ma takiego załącznika.",
   "service.cardAttach.noCard": "Nie ma takiej karty.",
+  "service.cardAttach.noProject": "{project} nie jest projektem obszaru roboczego. Nic nie dołączono.",
   "service.cardAttach.refused": "{path} nie jest plikiem, który można tu dołączyć: podaj ścieżkę pliku z własnego projektu (jego folderu, jego slotów) lub folderu tymczasowego. Nic nie dołączono.",
   "service.cardAttach.tooLarge": "{name} przekracza {max}, najwięcej, ile karta przechowuje w jednym pliku (Ustawienia → Zaawansowane → Załączniki kart: największy plik). Nic nie dołączono.",
   "service.cardAttach.tooMuch": "Naraz można dołączyć najwyżej {files, number} plików i {total}. Nic nie dołączono.",

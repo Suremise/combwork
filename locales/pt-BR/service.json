@@ -38,6 +38,7 @@
   "service.cardAttach.moved": "Enquanto isso o cartão foi para outro projeto: anexe de novo.",
   "service.cardAttach.noAttachment": "O cartão não tem esse anexo.",
   "service.cardAttach.noCard": "Esse cartão não existe.",
+  "service.cardAttach.noProject": "{project} não é um projeto do espaço de trabalho. Nada foi anexado.",
   "service.cardAttach.refused": "{path} não é um arquivo que possa ser anexado aqui: informe o caminho de um arquivo do seu próprio projeto (a pasta dele, os slots dele) ou da pasta temporária. Nada foi anexado.",
   "service.cardAttach.tooLarge": "{name} passa de {max}, o máximo que um cartão mantém em um arquivo (Configurações → Avançado → Anexos de cartões: maior arquivo). Nada foi anexado.",
   "service.cardAttach.tooMuch": "No máximo {files, number} arquivos e {total} podem ser anexados de uma vez. Nada foi anexado.",

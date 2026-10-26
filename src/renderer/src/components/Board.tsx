@@ -1742,6 +1742,9 @@ export function TaskDialog() {
   // drawn or answered: a render with the last card's fields (or none) would show them, and take them for edits (#288).
   const { setError: setActionError } = action
   useLayoutEffect(() => {
+    // Files pasted or dropped and not saved (HI-1700) never outlive the card they were for: dropped, previews revoked,
+    // whenever the dialog closes (Cancel, Discard) or opens on another card. A Save has read them before it closes it.
+    attach.clear('description', 'comment')
     if (open === null || !ready) return
     setActionError(null)
     setAnswerDrafts({})

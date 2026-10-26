@@ -2245,23 +2245,40 @@ function callerScope(): string | null {
   return a ? basename(a.projectPath) : null
 }
 
-/**
- * Files a card's change keeps with it (HI-1700): `attachments`, local paths, each checked against what its caller may
- * attach from (a project's agent: its own project's folders and the temp folder; the Assistant and scripts: the
- * workspace's) and copied into the card's host's staging, all before anything is written. Null without any.
- */
-async function attachmentsIn(body: any, project: string | null): Promise<tasks.ChangeAttachments | null> {
+/** A change's `attachments` (HI-1700): local paths, checked as a list (shape and count) before anything; null without any. */
+function attachmentList(body: any): string[] | null {
   const raw = body?.attachments
   if (raw === undefined || (Array.isArray(raw) && !raw.length)) return null
   if (!Array.isArray(raw) || raw.some((x) => typeof x !== 'string' || !x)) throw new HttpError(400, 'attachments is a list of file paths (strings).')
-  const ws = requireWorkspace()
   checkBatch(raw.map(() => ({})))
+  return raw as string[]
+}
+
+/**
+ * Runs a card's change (`fn`) with its files (HI-1700), inside the operation that makes it (the Assistant's: once admitted):
+ * the card's project checked first (a project of the workspace; a project agent's own), then each path against what its
+ * caller may attach from (a project agent: its own project's folders and the temp folder; the Assistant and scripts: the
+ * workspace's), then copied into the card's host's staging; nothing is copied before the destination is known to be
+ * allowed, and the staging is removed whatever happens. Without files, `fn(null)`.
+ */
+async function withAttachments<T>(paths: string[] | null, project: string | null, fn: (files: tasks.ChangeAttachments | null) => Promise<T>): Promise<T> {
+  if (!paths) return fn(null)
+  const ws = requireWorkspace()
   const agent = agentCaller()
+  if (project !== null) {
+    const known = [...(await ws.listProjectPaths()), ...(await ws.listProjectPaths({ hidden: true }))].some((p) => basename(p).toLowerCase() === project.toLowerCase())
+    if (!known) throw new HttpError(404, `Unknown project "${project}"`)
+    if (agent && basename(agent.projectPath).toLowerCase() !== project.toLowerCase()) throw new HttpError(403, `Cards stay in your project (${basename(agent.projectPath)}).`)
+  } else if (agent) throw new HttpError(403, `Cards stay in your project (${basename(agent.projectPath)}).`)
   const caller: AttachCaller = agent ? { kind: 'agent', project: basename(agent.projectPath) } : { kind: 'workspace' }
   const real: string[] = []
-  for (const p of raw as string[]) real.push(await attachableSource(ws, caller, p))
-  const staging = await stageFiles(cardHost(ws, project), null, real.map((path, i) => ({ path, name: basename(raw[i] as string) })))
-  return { staging, drafts: real.map(() => null) }
+  for (const p of paths) real.push(await attachableSource(ws, caller, p))
+  const staging = await stageFiles(cardHost(ws, project), null, real.map((path, i) => ({ path, name: basename(paths[i]) })))
+  try {
+    return await fn({ staging, drafts: real.map(() => null) })
+  } finally {
+    await staging.dispose()
+  }
 }
 
 /** A change's lines for the files it attached (HI-1700): stored, or already kept with the card (the same bytes). */
@@ -2407,9 +2424,10 @@ route('POST', '/v1/tasks', async ({ body }) => {
   if (!title) throw new HttpError(400, 'title is required')
   const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}), ...(body?.skipReview !== undefined ? { skipReview: body.skipReview as string } : {}) }
   const actor = await taskActor()
-  // Files to keep with it (HI-1700): checked and copied before anything is written, published with the card.
-  const files = await attachmentsIn(body, typeof input.project === 'string' && input.project ? input.project : callerScope())
-  const create = () => tasks.changeWithAttachments(actor, files, 'description', () => tasks.createTask(input, actor))
+  // Files to keep with it (HI-1700): the list checked now; copied inside the operation that makes the card, once its
+  // project is known to be allowed, and published with it.
+  const paths = attachmentList(body)
+  const create = () => withAttachments(paths, typeof input.project === 'string' && input.project ? input.project : callerScope(), (files) => tasks.changeWithAttachments(actor, files, 'description', () => tasks.createTask(input, actor)))
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, attachedLines(c)) : taskView(c))
   if (actor.kind !== 'assistant') return reply(await create())
   const project = typeof input.project === 'string' && input.project ? input.project : null
@@ -2457,11 +2475,12 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   }
   // Files to keep with it (HI-1700), with its comment if it has one: checked and copied first, published in its change.
   if (body?.attachments !== undefined && patch.project !== undefined) throw new HttpError(400, 'Move the card to the other project first, then attach files to it.')
-  const files = await attachmentsIn(body, body?.attachments === undefined ? null : (await tasks.readTask(n, actor)).project ?? null)
+  const paths = attachmentList(body)
   // A change of its kind with anything else is one board change (HR3's #1277 round 1): refused part way, none of it.
   const once = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
   const apply = async (commit?: () => void): Promise<TaskCard> => {
-    const c = await tasks.changeWithAttachments(actor, files, comment ? 'comment' : 'description', () => once(commit))
+    // Its files copied here, inside the operation (the Assistant's: once admitted), to the card's own project.
+    const c = await withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, comment ? 'comment' : 'description', () => once(commit)))
     changes.push(...attachedLines(c))
     return c
   }
@@ -2615,8 +2634,8 @@ route('POST', '/v1/tasks/:n/comments', async ({ params, body }) => {
   const n = taskNumber(params[0])
   const text = typeof body?.text === 'string' ? body.text : ''
   const actor = await taskActor()
-  const files = await attachmentsIn(body, body?.attachments === undefined ? null : (await tasks.readTask(n, actor)).project ?? null)
-  const comment = () => tasks.changeWithAttachments(actor, files, 'comment', () => tasks.commentTask(n, text, actor))
+  const paths = attachmentList(body)
+  const comment = async () => withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, 'comment', () => tasks.commentTask(n, text, actor)))
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, ['Commented', ...attachedLines(c)]) : taskView(c))
   if (actor.kind !== 'assistant') return reply(await comment())
   return assistantChange('agents', `comment on ${cardRef(n)}`, { kind: 'comment-task', card: n }, async () => ({ done: `Commented on ${cardRef(n)}`, result: await reply(await comment()) }))

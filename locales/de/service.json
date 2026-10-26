@@ -38,6 +38,7 @@
   "service.cardAttach.moved": "Die Karte wurde inzwischen in ein anderes Projekt verschoben: Hänge erneut an.",
   "service.cardAttach.noAttachment": "Die Karte hat diesen Anhang nicht.",
   "service.cardAttach.noCard": "Diese Karte gibt es nicht.",
+  "service.cardAttach.noProject": "{project} ist kein Projekt des Arbeitsbereichs. Nichts wurde angehängt.",
   "service.cardAttach.refused": "{path} ist keine Datei, die hier angehängt werden kann: Gib den Pfad einer Datei deines eigenen Projekts (seines Ordners, seiner Slots) oder des Temp-Ordners an. Nichts wurde angehängt.",
   "service.cardAttach.tooLarge": "{name} ist größer als {max}, das Höchste, was eine Karte in einer Datei behält (Einstellungen → Erweitert → Karten-Anhänge: größte Datei). Nichts wurde angehängt.",
   "service.cardAttach.tooMuch": "Höchstens {files, number} Dateien und {total} können auf einmal angehängt werden. Nichts wurde angehängt.",

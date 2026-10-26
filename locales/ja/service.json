@@ -38,6 +38,7 @@
   "service.cardAttach.moved": "その間にカードが別のプロジェクトに移動しました。もう一度添付してください。",
   "service.cardAttach.noAttachment": "カードにその添付ファイルはありません。",
   "service.cardAttach.noCard": "そのカードはありません。",
+  "service.cardAttach.noProject": "{project} はワークスペースのプロジェクトではありません。何も添付していません。",
   "service.cardAttach.refused": "{path} はここに添付できるファイルではありません。自分のプロジェクト（そのフォルダーやスロット）か一時フォルダーにあるファイルのパスを指定してください。何も添付していません。",
   "service.cardAttach.tooLarge": "{name} は {max} を超えています。カードが 1 ファイルで保持できる上限です（「設定」→「詳細」→「カードの添付ファイル：最大ファイル」）。何も添付していません。",
   "service.cardAttach.tooMuch": "一度に添付できるのは最大 {files, number} ファイル、{total} までです。何も添付していません。",

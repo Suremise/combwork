@@ -155,6 +155,10 @@
     "defaultMessage": "No such card.",
     "description": "An error attaching a file to a card (HI-1700): the card is gone."
   },
+  "service.cardAttach.noProject": {
+    "defaultMessage": "{project} is not a project of the workspace. Nothing was attached.",
+    "description": "An error attaching files to a card (HI-1700): the project named for it is not one of the workspace’s (a path, or a name no project has); nothing was copied."
+  },
   "service.cardAttach.refused": {
     "defaultMessage": "{path} is not a file that can be attached here: give the path of a file of your own project (its folder, its slots) or of the temp folder. Nothing was attached.",
     "description": "An error attaching a file to a card by its path (HI-1700): it is missing, a folder or a link, or in a place the caller may not attach from (another project, Hive’s own folders). Nothing was attached."

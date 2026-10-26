@@ -41,6 +41,7 @@ const M = {
   tooMuch: msg({ id: 'service.cardAttach.tooMuch', defaultMessage: 'At most {files, number} files and {total} can be attached at once. Nothing was attached.', description: 'An error attaching files to a card (HI-1700): more files, or more bytes in all ({total}: a size such as 100 MB), than one change takes; none was attached.' }),
   refused: msg({ id: 'service.cardAttach.refused', defaultMessage: '{path} is not a file that can be attached here: give the path of a file of your own project (its folder, its slots) or of the temp folder. Nothing was attached.', description: 'An error attaching a file to a card by its path (HI-1700): it is missing, a folder or a link, or in a place the caller may not attach from (another project, Hive’s own folders). Nothing was attached.' }),
   noCard: msg({ id: 'service.cardAttach.noCard', defaultMessage: 'No such card.', description: 'An error attaching a file to a card (HI-1700): the card is gone.' }),
+  noProject: msg({ id: 'service.cardAttach.noProject', defaultMessage: '{project} is not a project of the workspace. Nothing was attached.', description: 'An error attaching files to a card (HI-1700): the project named for it is not one of the workspace’s (a path, or a name no project has); nothing was copied.' }),
   noAttachment: msg({ id: 'service.cardAttach.noAttachment', defaultMessage: 'The card has no such attachment.', description: 'An error removing a card attachment (HI-1700) that is gone.' }),
   moved: msg({ id: 'service.cardAttach.moved', defaultMessage: "The card moved to another project meanwhile: attach again.", description: "An error attaching files to a card (HI-1700): the card moved to another project while they were copied; nothing was attached." }),
   notOwn: msg({ id: 'service.attachments.notOwn', defaultMessage: "{folder} is a link or not a folder of the project's own, so Hive keeps no attachments in it.", description: "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .hive) is a link or leads elsewhere, so Hive writes nothing through it." }),
@@ -51,8 +52,18 @@ const M = {
 // Where a card's files are.
 // ---------------------------------------------------------------------------
 
-/** The folder a card's attachments are kept under: its project's, or the workspace's for a card with no project. */
-export const cardHost = (ws: WorkspaceService, project: string | null | undefined): string => (project ? join(ws.path!, project) : ws.path!)
+/** A name that is one folder's (no separator, drive, `.` or `..`, nor a character Windows refuses). */
+const plainName = (n: string): boolean => !!n && n !== '.' && n !== '..' && !/[\\/:*?"<>|\x00-\x1f]/.test(n)
+
+/**
+ * The folder a card's attachments are kept under: its project's, or the workspace's for a card with no project. A
+ * project is a folder of the workspace by its plain name: anything else (a path, `..`) is refused, never joined.
+ */
+export function cardHost(ws: WorkspaceService, project: string | null | undefined): string {
+  if (!project) return ws.path!
+  if (!plainName(project)) throw hiveError(M.noProject, { project }, { kind: 'invalid' })
+  return join(ws.path!, project)
+}
 /** A host's cards folder, `<host>\.hive\attachments\cards`. */
 export const cardsRoot = (host: string): string => join(host, HIVE_DIR, ATTACHMENTS_DIR, CARD_ATTACHMENTS_DIR)
 /** A card's folder, made or not. */
@@ -214,6 +225,20 @@ export interface Staging {
   dispose(): Promise<void>
 }
 
+/** Staging folders of operations running in this Hive (lower-cased paths), from before they are made until disposed of. */
+const liveStaging = new Set<string>()
+
+/** Whether another process (another Hive on the workspace) is running: its staging may be in use. */
+const otherAlive = (pid: unknown): boolean => {
+  if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
 const limits = (): { file: number; total: number } => ({ file: advanced.get<number>(CARD_ATTACHMENT_MAX_ID), total: ATTACH_MAX_TOTAL })
 
 /** Checks a call's count and, where known up front, sizes (a paste's bytes), before anything is read or copied. */
@@ -238,14 +263,24 @@ export async function stage(host: string, card: number | null, sources: AttachSo
   checkBatch(sources.map((s) => ('data' in s ? { size: s.data.byteLength, name: s.name } : { name: s.name ?? basename(s.path) })))
   const { file, total } = limits()
   const op = randomBytes(6).toString('hex')
-  const dir = await ownCardsFolder(host, STAGING, op)
+  // Live from before its folder is made until it is disposed of: recovery leaves it alone meanwhile (HR4's HI-1700 round 1).
+  const key = join(cardsRoot(host), STAGING, op).toLowerCase()
+  liveStaging.add(key)
   const dispose = async (): Promise<void> => {
-    await rm(dir, { recursive: true, force: true }).catch((e) => log.warn(`Could not remove the staging folder ${userText(dir)}`, e))
+    await rm(join(cardsRoot(host), STAGING, op), { recursive: true, force: true }).catch((e) => log.warn(`Could not remove the staging folder ${userText(op)}`, e))
+    liveStaging.delete(key)
+  }
+  let dir: string
+  try {
+    dir = await ownCardsFolder(host, STAGING, op)
+  } catch (e) {
+    await dispose()
+    throw e
   }
   const files: StagedFile[] = []
   let sum = 0
   try {
-    await writeFile(join(dir, OP_FILE), JSON.stringify({ kind: 'stage', card, at: new Date().toISOString() }))
+    await writeFile(join(dir, OP_FILE), JSON.stringify({ kind: 'stage', card, pid: process.pid, at: new Date().toISOString() }))
     for (const [i, s] of sources.entries()) {
       const name = ('data' in s ? s.name : (s.name ?? basename(s.path))) || ''
       const tmp = join(dir, `${i}.part`)
@@ -287,6 +322,8 @@ export async function stageDrafts(ws: WorkspaceService, drafts: CardDrafts | und
   if (!drafts?.files?.length) return null
   if (!Array.isArray(drafts.keys) || drafts.keys.length !== drafts.files.length || drafts.keys.some((k) => !/^draft-\d{1,4}$/.test(k))) throw hiveError(M.refused, { path: '' }, { kind: 'invalid' })
   checkBatch(drafts.files.map((f) => ('data' in f ? { size: f.data?.byteLength ?? 0, name: f.name } : { name: basename(String(f.path)) })))
+  // A project of the workspace, before anything is copied (a new card's names one the window was given).
+  if (project && !(await allProjects(ws)).some((p) => basename(p).toLowerCase() === project.toLowerCase())) throw hiveError(M.noProject, { project }, { kind: 'invalid' })
   const sources: AttachSource[] = []
   for (const f of drafts.files) {
     if ('data' in f) {
@@ -513,72 +550,156 @@ export async function recoverCardAttachments(ws: WorkspaceService): Promise<Card
   return out
 }
 
+/** A real folder of the host's own (no link, really inside it), there now; no folder is made. */
+async function ownFolderNow(host: string, p: string): Promise<boolean> {
+  const st = await lstat(p).catch(() => null)
+  return !!st && !st.isSymbolicLink() && st.isDirectory() && insideReal(p, [host])
+}
+
+/** A plain file directly in `dir` (no link, really inside it). */
+async function ownFileIn(dir: string, name: string): Promise<boolean> {
+  if (!plainName(name)) return false
+  const p = join(dir, name)
+  const st = await lstat(p).catch(() => null)
+  return !!st && !st.isSymbolicLink() && st.isFile() && insideReal(p, [dir])
+}
+
+/** An attachment's id, as Hive makes them (12 hex digits). */
+const ATTACHMENT_ID = /^[0-9a-f]{12}$/
+
+/** A trash operation's record, checked: its kind, a card's number, and for a removal each file's id and plain name. Null when it isn't one. */
+function trashRecord(v: unknown): { kind: 'remove'; card: number; files: { id: string; file: string }[] } | { kind: 'delete'; card: number } | null {
+  if (!v || typeof v !== 'object') return null
+  const r = v as { kind?: unknown; card?: unknown; files?: unknown }
+  if (typeof r.card !== 'number' || !Number.isInteger(r.card) || r.card < 1) return null
+  if (r.kind === 'delete') return { kind: 'delete', card: r.card }
+  if (r.kind !== 'remove' || !Array.isArray(r.files) || !r.files.length) return null
+  const files: { id: string; file: string }[] = []
+  for (const f of r.files as unknown[]) {
+    const x = f as { id?: unknown; file?: unknown }
+    if (!x || typeof x.id !== 'string' || !ATTACHMENT_ID.test(x.id) || typeof x.file !== 'string' || !plainName(x.file)) return null
+    files.push({ id: x.id, file: x.file })
+  }
+  return { kind: 'remove', card: r.card, files }
+}
+
+/**
+ * Settles one host's cards folder (recoverCardAttachments), its whole chain checked first (`.hive`, `attachments`,
+ * `cards`: real folders of the host's own, never through a link) and each step again before it is used. A record that
+ * isn't one Hive writes (a path in a name, an id or number it never makes) is left as it is, and logged: nothing it
+ * names is touched. A file it names must be a plain file in its own operation's folder, and, put back, the one its row
+ * names.
+ */
 async function recoverHost(ws: WorkspaceService, host: string, root: string, out: CardAttachmentRecovery): Promise<void> {
+  for (const p of [join(host, HIVE_DIR), join(host, HIVE_DIR, ATTACHMENTS_DIR), root]) {
+    if (!(await ownFolderNow(host, p))) {
+      out.left++
+      return log.warn(`${userText(p)} is a link or not a folder: its card attachments are left as they are`)
+    }
+  }
   const cardOf = (n: number): { project: string | null } | undefined => boardWriteOp(ws, (db) => db.prepare('SELECT project FROM cards WHERE number = ?').get(n) as { project: string | null } | undefined) // i18n-ignore: SQL
   const rowsOf = (n: number): Row[] => boardWriteOp(ws, (db) => db.prepare(`SELECT ${COLUMNS} FROM card_attachments WHERE card = ?`).all(n) as Row[]) // i18n-ignore: SQL
-  // Interrupted removals and deletions.
-  for (const op of await readdir(join(root, TRASH)).catch(() => [] as string[])) {
-    const dir = join(root, TRASH, op)
-    let rec: { kind?: string; card?: number; files?: { id: string; file: string }[] }
+  const homeOf = (card: { project: string | null }): string | null => {
     try {
-      rec = JSON.parse(await readFile(join(dir, OP_FILE), 'utf8'))
+      return cardHost(ws, card.project)
     } catch {
-      out.left++
-      log.warn(`${userText(dir)} has no readable record: left as it is`)
-      continue
+      return null
     }
-    const n = Number(rec.card)
-    if (rec.kind === 'remove' && Array.isArray(rec.files)) {
-      for (const f of rec.files) {
-        const row = rowsOf(n).find((r) => r.id === f.id)
-        const card = cardOf(n)
-        const at = join(dir, f.file)
-        if (!(await exists(at))) continue
-        if (row && card && cardHost(ws, card.project).toLowerCase() === host.toLowerCase()) {
-          await rename(at, join(await ownCardsFolder(host, String(n)), f.file))
-          out.restored++
-        } else {
-          await trash(at)
-          out.binned++
+  }
+  const here = (card: { project: string | null } | undefined): boolean => !!card && homeOf(card)?.toLowerCase() === host.toLowerCase()
+  // Interrupted removals and deletions, each by its own record.
+  const trashRoot = join(root, TRASH)
+  if (await ownFolderNow(host, trashRoot)) {
+    for (const op of await readdir(trashRoot).catch(() => [] as string[])) {
+      const dir = join(trashRoot, op)
+      if (!plainName(op) || !(await ownFolderNow(host, dir))) {
+        out.left++
+        log.warn(`${userText(dir)} is a link or not a folder: left as it is`)
+        continue
+      }
+      let rec: ReturnType<typeof trashRecord> = null
+      try {
+        rec = trashRecord(JSON.parse(await readFile(join(dir, OP_FILE), 'utf8')))
+      } catch {
+        rec = null
+      }
+      if (!rec) {
+        out.left++
+        log.warn(`${userText(dir)} has no record Hive wrote: left as it is`)
+        continue
+      }
+      if (rec.kind === 'remove') {
+        const card = cardOf(rec.card)
+        const rows = rowsOf(rec.card)
+        for (const f of rec.files) {
+          if (!(await ownFileIn(dir, f.file))) continue
+          const row = rows.find((r) => r.id === f.id)
+          if (row && row.file.toLowerCase() === f.file.toLowerCase() && here(card)) {
+            const dest = await ownCardsFolder(host, String(rec.card))
+            if (await lstat(join(dest, f.file)).catch(() => null)) {
+              out.left++
+              log.warn(`${userText(f.file)} is in its card's folder again: the one removed is left in ${userText(dir)}`)
+              continue
+            }
+            await rename(join(dir, f.file), join(dest, f.file))
+            out.restored++
+          } else {
+            await trash(join(dir, f.file))
+            out.binned++
+          }
+        }
+      } else {
+        const files = join(dir, 'files')
+        if (await ownFolderNow(host, files)) {
+          if (here(cardOf(rec.card)) && !(await lstat(cardFolder(host, rec.card)).catch(() => null))) {
+            await rename(files, cardFolder(host, rec.card))
+            out.restored++
+          } else {
+            await trash(files)
+            out.binned++
+          }
         }
       }
       await finishTrash(dir)
-    } else if (rec.kind === 'delete') {
-      const card = cardOf(n)
-      const files = join(dir, 'files')
-      if (card && (await exists(files)) && !(await exists(cardFolder(host, n)))) {
-        await rename(files, cardFolder(host, n))
-        out.restored++
-      } else if (await exists(files)) {
-        await trash(files)
-        out.binned++
-      }
-      await finishTrash(dir)
-    } else out.left++
+    }
   }
-  // Staging: no operation is mid-way under the lock.
-  for (const op of await readdir(join(root, STAGING)).catch(() => [] as string[])) {
-    await rm(join(root, STAGING, op), { recursive: true, force: true }).catch(() => undefined)
-    out.staged++
+  // Staging no operation of this Hive's is using (it registers its own from before it is made), nor another Hive's
+  // still running.
+  const stagingRoot = join(root, STAGING)
+  if (await ownFolderNow(host, stagingRoot)) {
+    for (const op of await readdir(stagingRoot).catch(() => [] as string[])) {
+      const dir = join(stagingRoot, op)
+      if (liveStaging.has(dir.toLowerCase())) continue
+      if (!plainName(op) || !(await ownFolderNow(host, dir))) {
+        out.left++
+        continue
+      }
+      const pid = await readFile(join(dir, OP_FILE), 'utf8').then((t) => (JSON.parse(t) as { pid?: unknown }).pid, () => undefined)
+      if (otherAlive(pid)) continue
+      await rm(dir, { recursive: true, force: true }).catch(() => undefined)
+      out.staged++
+    }
   }
   // Cards' folders.
   for (const e of await readdir(root, { withFileTypes: true }).catch(() => [])) {
-    if (!e.isDirectory() || !/^\d+$/.test(e.name)) continue
+    if (!e.isDirectory() || e.isSymbolicLink() || !/^[1-9]\d{0,15}$/.test(e.name)) continue
     const n = Number(e.name)
     const dir = join(root, e.name)
+    if (!(await ownFolderNow(host, dir))) continue
     const card = cardOf(n)
     if (!card) {
       await trash(dir)
       out.binned++
       continue
     }
-    const rows = rowsOf(n)
-    const home = cardHost(ws, card.project)
+    const rows = rowsOf(n).filter((r) => plainName(r.file))
+    const home = homeOf(card)
+    if (!home) continue
     if (home.toLowerCase() !== host.toLowerCase()) {
       // A folder left by a move: every row's file copied to the card's own folder first where it is missing there.
       const own = cardFolder(home, n)
       for (const r of rows) {
-        if ((await exists(join(own, r.file))) || !(await exists(join(dir, r.file)))) continue
+        if ((await lstat(join(own, r.file)).catch(() => null)) || !(await ownFileIn(dir, r.file))) continue
         await copyFile(join(dir, r.file), join(await ownCardsFolder(home, String(n)), r.file))
         out.restored++
       }

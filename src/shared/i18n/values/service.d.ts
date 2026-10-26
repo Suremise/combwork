@@ -40,6 +40,7 @@ interface HiveMessageValues {
   'service.cardAttach.moved': undefined
   'service.cardAttach.noAttachment': undefined
   'service.cardAttach.noCard': undefined
+  'service.cardAttach.noProject': { project: string | number }
   'service.cardAttach.refused': { path: string | number }
   'service.cardAttach.tooLarge': { name: string | number; max: string | number }
   'service.cardAttach.tooMuch': { files: number; total: string | number }

@@ -172,6 +172,63 @@ describe('recovering what an interrupted operation left (HI-1700, s13)', () => {
     expect(trashed().some((t) => t.endsWith(a.file))).toBe(true)
   })
 
+  it("a record naming a path outside its folder, or an id Hive never makes, is left as it is: nothing it names is touched (HR4's round 1)", async () => {
+    const { w, root } = await workspace()
+    const c = await card(w)
+    const host = join(root, 'p')
+    const victim = file(host, 'keep.txt', 'user file outside attachments')
+    for (const [name, files] of [['bad-path', [{ id: 'aaaaaaaaaaaa', file: '../../../../../keep.txt' }]], ['bad-id', [{ id: 'not-a-row', file: 'keep.txt' }]], ['bad-sep', [{ id: 'aaaaaaaaaaaa', file: 'x\\..\\..\\keep.txt' }]]] as const) {
+      const op = join(att.cardsRoot(host), TRASH, name)
+      mkdirSync(op, { recursive: true })
+      writeFileSync(join(op, OP_FILE), JSON.stringify({ kind: 'remove', card: c, files }))
+    }
+    const r = await inWorkspace(w, () => att.recoverCardAttachments(w))
+    expect(r.left).toBe(3)
+    expect(readFileSync(victim, 'utf8')).toBe('user file outside attachments')
+    expect(trashed().some((t) => t.endsWith('keep.txt'))).toBe(false)
+  })
+
+  it('a .trash or cards folder that is a junction is never followed: what it leads to stays', async () => {
+    const { w, root } = await workspace()
+    const c = await card(w)
+    const elsewhere = join(base, `elsewhere-${++n}`)
+    const kept = file(join(elsewhere, 'files'), 'precious.txt', 'not Hive’s')
+    writeFileSync(join(elsewhere, OP_FILE), JSON.stringify({ kind: 'delete', card: 999999 }))
+    mkdirSync(join(att.cardsRoot(join(root, 'p')), TRASH), { recursive: true })
+    junction(elsewhere, join(att.cardsRoot(join(root, 'p')), TRASH, 'op-link'))
+    await inWorkspace(w, () => att.recoverCardAttachments(w))
+    expect(readFileSync(kept, 'utf8')).toBe('not Hive’s')
+    // A whole cards folder that is a junction: left as it is.
+    const other = join(base, `elsewhere-${++n}`)
+    const theirs = file(join(other, String(c)), 'theirs.txt', 'theirs')
+    mkdirSync(join(root, 'q', '.hive', 'attachments'), { recursive: true })
+    junction(other, join(root, 'q', '.hive', 'attachments', 'cards'))
+    const r = await inWorkspace(w, () => att.recoverCardAttachments(w))
+    expect(r.left).toBeGreaterThan(0)
+    expect(readFileSync(theirs, 'utf8')).toBe('theirs')
+  })
+
+  it("staging still in use is left alone: a stage, then the open's recovery, then its publish (HR4's round 1)", async () => {
+    const { w, root } = await workspace()
+    const c = await card(w)
+    const staging = await att.stage(join(root, 'p'), c, [{ data: new TextEncoder().encode('in flight'), name: 'flight.txt' }])
+    await inWorkspace(w, () => att.recoverCardAttachments(w))
+    const out = await inWorkspace(w, () => store.boardWrite(w, () => att.publish(w, c, staging, 'You', null)))
+    await staging.dispose()
+    expect(readFileSync(out.attachments[0].path, 'utf8')).toBe('in flight')
+    // Disposed of, a staging left behind is recovery's again.
+    file(join(att.cardsRoot(join(root, 'p')), STAGING, 'old-op'), OP_FILE, JSON.stringify({ kind: 'stage', card: c, pid: process.pid }))
+    expect((await inWorkspace(w, () => att.recoverCardAttachments(w))).staged).toBe(1)
+  })
+
+  it('a project that is a path, or not the workspace’s, gets no folder: refused before anything is copied', async () => {
+    const { w, root } = await workspace()
+    expect(() => att.cardHost(w, '../outside')).toThrow(/not a project/)
+    expect(() => att.cardHost(w, 'p\\..\\..')).toThrow(/not a project/)
+    await expect(inWorkspace(w, () => att.stageDrafts(w, { files: [{ data: new TextEncoder().encode('x'), name: 'x.txt' }], keys: ['draft-1'] }, 'nope'))).rejects.toThrow(/not a project/)
+    expect(existsSync(join(root, 'nope'))).toBe(false)
+  })
+
   it("a card's deletion that crashed before its commit gives the live card its folder back; one whose card is gone, to the Recycle Bin", async () => {
     const { w, root } = await workspace()
     const c = await card(w)

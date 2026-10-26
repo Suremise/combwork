@@ -8,6 +8,7 @@
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
+const { createHash } = require('crypto')
 const { showBoard, openByTitle } = require('./queueFixture.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 20000
@@ -16,6 +17,7 @@ const PORT = Number(lib.port(47883))
 const userData = path.join(lib.WORK, 'cardattach-profile')
 const ws = path.join(lib.WORK, 'cardattach-ws')
 const shots = path.join(lib.WORK, 'cardattach-shots')
+const claudeHome = path.join(lib.WORK, 'cardattach-claude-home')
 const alpha = path.join(ws, 'alpha')
 const beta = path.join(ws, 'beta')
 let failed = 0
@@ -33,7 +35,9 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   const sessionFile = path.join(alpha, '.hive', 'attachments', 'run-1', '2026-10-26_12-00-00_session-shot.png')
   fs.mkdirSync(path.dirname(sessionFile), { recursive: true })
   fs.writeFileSync(sessionFile, lib.samplePng(48, 32))
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 900 } })
+  // The fake Claude Code, for the Assistant's session (its token, for a refused change).
+  const cenv = lib.fakeClaude(userData, claudeHome, [alpha, beta, ws])
+  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', ...cenv }, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await inv('settings:update', { agentApi: { enabled: true } })
@@ -88,6 +92,44 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     await inv('settings:update', { appearance: { theme: 'dark' } })
     await page.keyboard.press('Escape')
 
+    // --- Drafts never outlive their card (HR4's round 1): pasted into A's box, Cancel and Discard, then B and a new card.
+    const pasteInto = (loc) => loc.evaluate((el, b64) => {
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+      const dt = new DataTransfer()
+      dt.items.add(new File([bytes], 'left-behind.png', { type: 'image/png' }))
+      el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+    }, png)
+    const cancelAndDiscard = async (d) => {
+      await d.getByRole('button', { name: 'Cancel' }).click()
+      await page.getByRole('button', { name: 'Discard' }).click()
+      await until(async () => (await d.count()) === 0)
+    }
+    const b = await inv('tasks:create', { title: 'Another card', project: 'alpha' })
+    await openByTitle(page, n)
+    const dialogA = lib.cardDialog(page, label)
+    await dialogA.waitFor({ timeout: HUNG_MS })
+    await pasteInto(dialogA.locator('.task-comment-new textarea'))
+    check("a draft in A's comment box", !!(await until(async () => (await dialogA.locator('.attach-draft').count()) === 1)))
+    await cancelAndDiscard(dialogA)
+    await openByTitle(page, b.number)
+    const dialogB = lib.cardDialog(page, await lib.cardLabel(inv, b.number))
+    await dialogB.waitFor({ timeout: HUNG_MS })
+    check("…Cancel and Discard drop it: B shows none of A's drafts", (await dialogB.locator('.attach-draft').count()) === 0 && (await dialogB.locator('.task-comment-new textarea').inputValue()) === '')
+    await page.keyboard.press('Escape')
+    await until(async () => (await dialogB.count()) === 0)
+    await page.getByRole('button', { name: 'New Card' }).first().click()
+    const fresh = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
+    await fresh.waitFor({ timeout: HUNG_MS })
+    await fresh.locator('.task-title-input').fill('Never made')
+    await pasteInto(fresh.locator('.task-description-input'))
+    check("a draft in a new card's description", !!(await until(async () => (await fresh.locator('.attach-draft').count()) === 1)))
+    await cancelAndDiscard(fresh)
+    await page.getByRole('button', { name: 'New Card' }).first().click()
+    await fresh.waitFor({ timeout: HUNG_MS })
+    check('…cancelled, the next new card starts with none', (await fresh.locator('.attach-draft').count()) === 0)
+    await page.keyboard.press('Escape')
+    await until(async () => (await fresh.count()) === 0)
+
     // --- The card's JSON lists it by path, as hive_read_task reads it, and its comment's link reads as that path.
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const get = async () => (await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${n}`, { headers: { Authorization: `Bearer ${token}` } })).json()
@@ -131,6 +173,31 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
       await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
       await page.locator('.images-page').screenshot({ path: path.join(shots, `cardattach-tab-${theme}.png`) })
     }
+    // --- The Agent API: nothing is copied before the destination is allowed (HR4's HI-1700 round 1, finding 3).
+    const post = async (body, bearer = token) => {
+      const r = await fetch(`http://127.0.0.1:${PORT}/v1/tasks`, { method: 'POST', headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      return { status: r.status, body: await r.json().catch(() => null) }
+    }
+    const shot = path.join(alpha, 'docs', 'shot.png')
+    fs.mkdirSync(path.dirname(shot), { recursive: true })
+    fs.writeFileSync(shot, lib.samplePng(32, 32))
+    const staged = () => [alpha, beta, ws].flatMap((h) => { const d = path.join(h, '.hive', 'attachments', 'cards', '.staging'); return fs.existsSync(d) ? fs.readdirSync(d) : [] })
+    const outside = path.join(ws, '..', 'cardattach-outside')
+    const traversal = await post({ title: 'Outside', project: '../cardattach-outside', attachments: [shot] })
+    check('a card for a path, not a project, is refused before anything is copied', traversal.status >= 400 && !fs.existsSync(outside) && staged().length === 0, JSON.stringify({ status: traversal.status, outside: fs.existsSync(outside), staged: staged() }))
+    const unknown = await post({ title: 'Nowhere', project: 'nope', attachments: [shot] })
+    check('…and for a project the workspace has not', unknown.status === 404 && !fs.existsSync(path.join(ws, 'nope')) && staged().length === 0, JSON.stringify({ status: unknown.status, made: fs.existsSync(path.join(ws, 'nope')), staged: staged() }))
+    // The Assistant at Look: its change is refused before it is admitted, and copies nothing.
+    const assistantHome = (await inv('workspace:refresh')).assistant.path
+    await inv('session:start', assistantHome, { agentId: 'assistant' })
+    const asTokenFile = path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
+    const asToken = await until(async () => (fs.existsSync(asTokenFile) ? JSON.parse(fs.readFileSync(asTokenFile, 'utf8')).token : null))
+    check('the Assistant starts, with its token', !!asToken)
+    await inv('settings:update', { assistant: { control: 'look' } })
+    const before = (await inv('tasks:list')).length
+    const denied = await post({ title: 'Not allowed', project: 'alpha', attachments: [shot] }, asToken)
+    check("the Assistant's change refused at Look copies nothing and leaves nothing", denied.status === 403 && staged().length === 0 && (await inv('tasks:list')).length === before, JSON.stringify({ status: denied.status, staged: staged() }))
+    await inv('session:stop', assistantHome, 'assistant').catch(() => undefined)
     // Storage: a row of their own.
     const storage = await inv('storage:project', alpha, true).catch(() => null)
     check('Storage counts card attachments on their own row', !storage || storage.cardAttachments > 0, JSON.stringify(storage && { attachments: storage.attachments, cards: storage.cardAttachments }))
