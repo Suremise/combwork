@@ -349,3 +349,17 @@ describe("a card's change with files (HI-1700, s11 §3–4)", () => {
     expect(inside(join(root, 'p', '.hive', 'attachments', 'cards', '.staging'))).toEqual([])
   })
 })
+
+describe("a card's start prompt names its attachments (HI-1700)", () => {
+  it('lists their paths (up to ten) and gives its description the paths for its links', async () => {
+    const { taskPrompt } = await import('../src/shared/tasks')
+    const card = { number: 7, key: 'AL-7', title: 'Fix the button', description: 'See ![shot](attachment:aaaaaaaaaaaa).', blockedBy: [], comments: [], context: [] } as never
+    const files = Array.from({ length: 12 }, (_, i) => ({ id: i === 0 ? 'aaaaaaaaaaaa' : `b${String(i).padStart(11, '0')}`, path: `C:/w/p/.hive/attachments/cards/7/f${i}.png` }))
+    const prompt = taskPrompt(card, true, { attachments: files })
+    expect(prompt).toContain('See ![shot](C:/w/p/.hive/attachments/cards/7/f0.png).')
+    expect(prompt).toContain('Its attachments (open them by path): C:/w/p/.hive/attachments/cards/7/f0.png, ')
+    expect(prompt).toContain('f9.png, and 2 more (hive_read_task lists them).')
+    expect(prompt).not.toContain('f10.png')
+    expect(taskPrompt(card, true)).not.toContain('Its attachments')
+  })
+})
