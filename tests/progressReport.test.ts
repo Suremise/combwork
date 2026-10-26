@@ -9,7 +9,7 @@ import { createRequire } from 'module'
 import { pathToFileURL } from 'url'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { estimateFor, evictionOrder, KEEP_KEYS, ProgressRun, progressTarget, recordTiming, wrappedLines } from '../src/main/progressReporters/report.mts'
-import { cmdEscapeArgument, commandEnv, commandLabel, parseArgs, parseProcessList, runWrapped, spawnSpec, StepFilter, stepLine, timingKey, treeToEnd, wasInterrupted } from '../src/main/progressReporters/wrapper'
+import { cmdEscapeArgument, commandEnv, commandLabel, parseArgs, parseProcessList, runWrapped, spawnSpec, StepFilter, stepLine, timingKey, treeToEnd, uncountedLine, wasInterrupted } from '../src/main/progressReporters/wrapper'
 import { installShims, shimFiles, withBinOnPath } from '../src/main/progressReporters/shims'
 import { hiveInstructions, progressRule, wrapsLongCommands } from '../src/shared/hiveGuidance'
 import { launchParts } from '../src/main/guidance'
@@ -44,6 +44,8 @@ const calls: { method: string; path: string; auth: string; body: Record<string, 
  */
 const resolves: Record<string, unknown>[] = []
 let resolveReply: { status: number; body: Record<string, unknown> } | 'hang' = { status: 404, body: { error: 'No such route' } }
+/** What the stand-in answers a run's finish (#1654: how a check's run counted). */
+let finishReply: Record<string, unknown> = {}
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 10000
 const seenFile = join(dir, 'seen.json')
@@ -66,6 +68,7 @@ beforeAll(async () => {
       writeFileSync(seenFile, JSON.stringify(calls))
       res.setHeader('Content-Type', 'application/json')
       if (refuse) return res.writeHead(401).end('{"error":"no"}')
+      if (req.method === 'POST' && req.url?.endsWith('/finish')) return res.end(JSON.stringify(finishReply))
       res.end(req.method === 'POST' && req.url === '/v1/progress' ? JSON.stringify({ id: `run-${calls.length}` }) : '{}')
     })
   })
@@ -77,6 +80,7 @@ beforeEach(() => {
   calls.length = 0
   resolves.length = 0
   resolveReply = { status: 404, body: { error: 'No such route' } }
+  finishReply = {}
   refuse = false
   rmSync(seenFile, { force: true })
 })
@@ -336,6 +340,35 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
       expect({ way, code: (await wrap(['--revision', head.slice(0, 7), ...ran], e(), 0, repoDir)).code }).toEqual({ way, code: 0 })
       expect(existsSync(marker)).toBe(true)
     }
+  })
+
+  it("a check's run that didn't count says why, in one line with what to do; its exit code is the command's (#1654)", async () => {
+    resolveReply = { status: 200, body: { card: 'HI-12', revision: id, testedCheckout: id, check: { name: 'typecheck', command: `"${node}" -e "0"` }, folder: dir } }
+    finishReply = { ok: true, check: { name: 'typecheck', counted: false, whyNot: 'changed', changes: ['src/a.ts', ':reflog'], platform: 'git' } }
+    expect(await wrap(['--check', 'typecheck'], env(), 0)).toEqual({ code: 0, out: '', err: 'hive-progress: not counted as check typecheck: files changed in the folder while it ran (src/a.ts, a commit or checkout). Run it again with nothing else writing in the folder, or with --isolated (a check copy of its own).\n' })
+    // Counted, or a Hive that doesn't say: nothing more is printed.
+    finishReply = { ok: true, check: { name: 'typecheck', counted: true, platform: 'git' } }
+    expect((await wrap(['--check', 'typecheck'], env(), 0)).err).toBe('')
+    finishReply = { ok: true }
+    expect((await wrap(['--check', 'typecheck'], env(), 0)).err).toBe('')
+    // A run that wasn't started as a check says nothing either, whatever Hive answers.
+    resolveReply = { status: 200, body: { card: 'HI-12', revision: id, testedCheckout: id, check: null, folder: dir } }
+    finishReply = { ok: true, check: { name: 'node', counted: false, whyNot: 'notCheck', platform: 'git' } }
+    expect(await wrap(['--', node, '-e', 'process.exit(3)'], env(), 0)).toEqual({ code: 3, out: '', err: '' })
+  })
+
+  it('says why for each reason a check run is not counted (#1654)', () => {
+    const line = (whyNot: string, more: Record<string, unknown> = {}, isolated = false) => uncountedLine({ check: { name: 'lint', counted: false, whyNot, platform: 'git', ...more } }, isolated)
+    expect(line('notCheck')).toBe("not counted as check lint: Hive didn't see the check's configured command run. Run it again with hive-progress --check lint.")
+    expect(line('notContained')).toBe("not counted as check lint: what is checked out here doesn't contain the card's revision. Run it in the card's own folder, at its revision.")
+    expect(line('dirty', { changes: ['new.txt'] })).toBe('not counted as check lint: the folder had uncommitted changes (new.txt). Commit or remove them, then run it again.')
+    expect(line('moved')).toBe('not counted as check lint: something else was checked out by the time it ended. Run it again.')
+    expect(line('changed', { changes: [':edit'] })).toBe("not counted as check lint: files changed in the folder while it ran (an agent's edit). Run it again with nothing else writing in the folder, or with --isolated (a check copy of its own).")
+    expect(line('revisionChanged', { platform: 'none' })).toBe("not counted as check lint: the card's declared files changed while it ran. Run it again.")
+    // --isolated is offered only where it is a remedy: on Git, for a run that wasn't isolated already.
+    expect(line('changed', { platform: 'none' })).toBe('not counted as check lint: files changed in the folder while it ran. Run it again with nothing else writing in the folder.')
+    expect(line('changed', {}, true)).toBe('not counted as check lint: files changed in the folder while it ran. Run it again with nothing else writing in the folder.')
+    for (const answer of [null, {}, { check: { name: 'lint', counted: true } }, { check: { name: 'lint', counted: false, whyNot: 'someday' } }]) expect(uncountedLine(answer, false)).toBeNull()
   })
 
   it('a Hive from before (no resolve call) still gets the run, as before, unlinked', async () => {

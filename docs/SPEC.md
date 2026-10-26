@@ -3809,7 +3809,12 @@ and count under the rules above. In a shared folder, another agent's edit during
 the honest answer, so a refusal always offers a remedy that can be met: **`hive-progress --check <name> --isolated`**
 runs the check in a **check copy**, a detached worktree at the card's revision from the same warm pool as review
 copies (§16.10.5), leased to that run and written by nothing else, so it counts whatever happens in the folder. The
-refusal's next step names it ("another agent changed files during your run: run it isolated"). A reviewer's runs in a
+refusal's next step names it ("another agent changed files during your run: run it isolated"). **Said where it
+happens [#1654]:** a run that didn't count keeps what stopped it (`changes`: up to 5 paths, `:reflog` or `:edit`, for
+`changed` and `dirty`), the finish's answer says how it counted, and `hive-progress --check` prints one line with the
+reason and the remedy. `submit.checksPassed`'s refusal names the reason of the check's newest run on the revision when
+that run passed and didn't count, and its next step is that reason's remedy (commit or remove changes; run it again
+with nothing else writing, or `--isolated` on Git; run it in the card's own folder). A reviewer's runs in a
 review copy count for the revision it holds (§16.10.5). None has no check copies (no isolation, OP-16): its remedy is
 running again when the deliverables are quiet, which the refusal says.
 **Built [#1435]:** `--isolated` (with `--check` only, by an agent, on Git) asks resolve for a check copy. It is leased at

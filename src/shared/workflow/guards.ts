@@ -5,7 +5,7 @@
 // In the app (#1263): the runtime (main/workflow/service.ts) runs them; #1265 on route the board's moves through it.
 
 import { awaitsAgentMerge, type Ruleset } from './compile'
-import { approvedByUser, passingReviewers, transientRequeues, type CardKind, type CardState } from './facts'
+import { approvedByUser, passingReviewers, transientRequeues, type CardKind, type CardState, type CheckRanData } from './facts'
 import { reviewByYou, reviewerAgent } from './options'
 import type { GuardId } from './pieces'
 import type { RefusalValues, RuleId } from './refusals'
@@ -39,6 +39,11 @@ export interface GuardInputs {
   badIdentity?: Ans<string | null>
   /** Configured checks with no passing, counted run on the revision. */
   checksMissing?: string[]
+  /**
+   * The first missing check's newest run on the revision, when it didn't count (#1654): why, what it saw change, and
+   * whether a check copy (`--isolated`) is a remedy on the platform.
+   */
+  checkUncounted?: { whyNot: NonNullable<CheckRanData['whyNot']>; changes?: string[]; isolatable: boolean }
   runsGoing?: string[]
   /** The verdict's submission. */
   submission?: number
@@ -131,7 +136,11 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
   },
   'submit.checksPassed': (i) => {
     const missing = i.checksMissing ?? []
-    return missing.length ? { rule: 'submit.checksPassed', values: { card: i.card.key, check: missing[0], revision: short(i.revision), command: `hive-progress --check ${missing[0]} --card ${i.card.key}` } } : null // i18n-ignore: a command, as typed
+    if (!missing.length) return null
+    // Its last run's reason when it ran and didn't count (#1654): `none` when it didn't run or failed.
+    const u = i.checkUncounted
+    const why = { why: u?.whyNot ?? 'none', files: u?.changes?.length ? u.changes.join(', ') : 'none', copy: u?.isolatable ? 'yes' : 'no' } // i18n-ignore: select keys and paths, never shown as they are
+    return { rule: 'submit.checksPassed', values: { card: i.card.key, check: missing[0], revision: short(i.revision), command: `hive-progress --check ${missing[0]} --card ${i.card.key}`, ...why } } // i18n-ignore: a command, as typed
   },
   'submit.identity': (i) => {
     const b = i.badIdentity
