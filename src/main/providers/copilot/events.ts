@@ -671,7 +671,7 @@ export async function readWorkspace(home: string, sessionId: string): Promise<Co
  * The sessions the CLI keeps for a folder (its workspace.yaml's cwd), newest change first: those with a conversation
  * (an events.jsonl with something in it; the CLI makes a folder for every launch, also one that ends before a prompt).
  */
-export async function listCopilotSessions(home: string, folder: string): Promise<ExternalSession[]> {
+export async function listCopilotSessions(home: string, folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]> {
   // Copilot records the cwd as it was given; Hive may spell the folder another way now (a junction, an 8.3 name, #493).
   const here = placeMatcher(folder)
   let ids: string[]
@@ -682,11 +682,12 @@ export async function listCopilotSessions(home: string, folder: string): Promise
   }
   const out: ExternalSession[] = []
   for (const id of ids) {
+    if (skip?.(id)) continue
     const ws = await readWorkspace(home, id)
     if (!ws || !here(ws.cwd)) continue
     const path = copilotEventsPath(home, id)
     const s = await stat(path).catch(() => null)
-    if (s && s.size > 0) out.push({ id, transcriptPath: path, modified: s.mtime.toISOString() })
+    if (s && s.size > 0) out.push({ id, transcriptPath: path, modified: s.mtime.toISOString(), bytes: s.size, mtimeMs: s.mtimeMs })
   }
   return out.sort((a, b) => b.modified.localeCompare(a.modified))
 }

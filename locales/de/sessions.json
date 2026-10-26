@@ -96,6 +96,7 @@
   "sessions.list.info": "Alle Sitzungen dieses Projekts, nach Anbieter und Agent, jeweils mit den Sitzungen darunter, die sie gestartet haben (etwa die guardian reviews von Codex). Wähle eine aus, um ihr Transkript zu lesen, auch was vor jeder Komprimierung kam; klicke mit der rechten Maustaste auf einen Zweig, um alles darin zu archivieren oder zu löschen. Transkripte, die eine CLI gelöscht hat, liest Hive aus dem eigenen Sicherung.",
   "sessions.list.infoAssistant": "Alle Unterhaltungen des Hive Assistant in diesem Arbeitsbereich, nach Anbieter. Wähle eine aus, um sie vollständig zu lesen, auch was vor jeder Komprimierung kam.",
   "sessions.list.new": "{kind, select, conversation {Neue Unterhaltung} other {Neue Sitzung}}",
+  "sessions.list.othersLoading": "Sitzungen, die außerhalb von Hive gestartet wurden, werden gesucht…",
   "sessions.list.noneHere": "{kind, select, conversation {Hier gibt es keine Unterhaltungen: Aktiviere „Archiviert“, um archivierte zu sehen.} other {Hier gibt es keine Sitzungen: Aktiviere „Archiviert“, um archivierte zu sehen.}}",
   "sessions.list.refresh": "Aktualisieren",
   "sessions.list.what": "{kind, select, conversation {die Unterhaltungen} other {die Sitzungen}}",

@@ -471,8 +471,8 @@ export class CopilotAdapter implements ProviderAdapter {
   }
 
   /** The sessions Copilot keeps for this folder (their workspace.yaml's cwd), with a conversation in them (events.ts). */
-  listSessions(folder: string): Promise<ExternalSession[]> {
-    return listCopilotSessions(copilotHome(), folder)
+  listSessions(folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]> {
+    return listCopilotSessions(copilotHome(), folder, skip)
   }
 
   async subSessionOf(): Promise<SubSession | null> {

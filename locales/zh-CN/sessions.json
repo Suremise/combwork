@@ -96,6 +96,7 @@
   "sessions.list.info": "此项目的所有会话，按提供方和智能体分组，每个会话启动的会话（例如 Codex 的 guardian reviews）列在它下面。选择一个即可查看其会话记录，包括每次压缩之前的内容；右键单击某个分支可归档或删除其中的全部内容。CLI 已删除的会话记录会从 Hive 的备份中读取。",
   "sessions.list.infoAssistant": "此工作区的 Hive Assistant 的所有对话，按提供方分组。选择一个即可查看完整内容，包括每次压缩之前的内容。",
   "sessions.list.new": "{kind, select, conversation {新建对话} other {新建会话}}",
+  "sessions.list.othersLoading": "正在查找在 Hive 外启动的会话…",
   "sessions.list.noneHere": "{kind, select, conversation {这里没有对话：勾选“已归档”可查看已归档的对话。} other {这里没有会话：勾选“已归档”可查看已归档的会话。}}",
   "sessions.list.refresh": "刷新",
   "sessions.list.what": "{kind, select, conversation {对话} other {会话}}",

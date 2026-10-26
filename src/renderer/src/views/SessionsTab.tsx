@@ -61,7 +61,7 @@ function cleanupSkipText(reason: CleanupSkip): string {
 type Kind = 'session' | 'conversation'
 
 export function SessionsTab({ project, assistant = false }: { project: ProjectInfo; assistant?: boolean }) {
-  const { items, reload, error: listError, loadedAt } = useSessions(project)
+  const { items, othersLoading, reload, error: listError, loadedAt } = useSessions(project)
   const limit = useAgentLimit()
   const listWidth = usePaneSize('sessions', 320)
   const [showArchived, setShowArchived] = useState(false)
@@ -479,6 +479,11 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
           <label className="flex muted">
             <input type="checkbox" className="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> {tr(msg({ id: 'sessions.filter.archived', defaultMessage: 'Archived', description: 'A checkbox above the Sessions list: shows archived sessions too.' }))}
           </label>
+          {othersLoading && !assistant && (
+            <span className="sessions-scope faint" data-loading="others">
+              <Icon name="loading" spin /> {tr(msg({ id: 'sessions.list.othersLoading', defaultMessage: 'Looking for sessions started outside Hive…', description: "Above the Sessions list while it shows Hive's own sessions and is still reading the sessions the CLIs keep for the project's folders (started in a terminal or an editor)." }))}
+            </span>
+          )}
           {q && (
             <span className="sessions-scope faint">
               {searchError ? null : !results ? (
@@ -497,7 +502,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
         {listError && <StaleNote what={theList} error={listError} at={loadedAt} onRetry={reload} />}
         {q && searchError && <LoadFailed inline what={tr(msg({ id: 'sessions.search.what', defaultMessage: 'the search results', description: "What could not be loaded, in \"Could not load …\": the Sessions tab's search. Lower case." }))} error={searchError} onRetry={() => setSearchTry((n) => n + 1)} />}
         <div className="pane-body file-tree sessions-tree" tabIndex={0} ref={treeRef} onKeyDown={onKeyDown}>
-          {items.length === 0 && <div className="pane-empty">{tr(NONE_YET, { kind })}</div>}
+          {items.length === 0 && !othersLoading && <div className="pane-empty">{tr(NONE_YET, { kind })}</div>}
           {items.length > 0 && rows.length === 0 && !q && <div className="pane-empty">{tr(msg({ id: 'sessions.list.noneHere', defaultMessage: '{kind, select, conversation {No conversations here: tick Archived to see archived ones.} other {No sessions here: tick Archived to see archived ones.}}', description: "The Sessions list when every session is archived (the Hive Assistant's: conversations). Archived is the checkbox above it: use its translation." }), { kind })}</div>}
           {rows.map((r) => {
             if (r.kind === 'hit') {

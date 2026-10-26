@@ -1,7 +1,7 @@
 // The window's repeated reads, never two of the same at once (#1629): queue:list's coalesced calls and the work badges'
 // one read at a time, driven with promises the test settles itself, in the orders that went wrong (HR6's round 1).
 import { describe, expect, it, vi } from 'vitest'
-import { boundedQueue, coalesced, latestOnly } from '../src/shared/coalesce'
+import { boundedQueue, coalesced, joined, latestOnly } from '../src/shared/coalesce'
 import { makeBadgeSource } from '../src/shared/workflow/badgeSource'
 import type { WorkBadge } from '../src/shared/workflow/workView'
 
@@ -53,6 +53,46 @@ describe('coalesced calls (queue:list)', () => {
     h.calls[1].resolve('target')
     expect(await again).toBe('back')
     expect(await b).toBe('target')
+  })
+})
+
+describe('joined calls (HI-1681: the other sessions of a session list)', () => {
+  it('shares the call in flight with those asked meanwhile, and starts a new one once it has settled', async () => {
+    const call = joined<string>()
+    const h = held<string>()
+    const first = call('p', () => h.fetch('p'))
+    const second = call('p', () => h.fetch('p'))
+    // Another key is its own call.
+    const other = call('q', () => h.fetch('q'))
+    expect(h.calls.map((c) => c.for)).toEqual(['p', 'q'])
+    expect(second).toBe(first)
+    h.calls[0].resolve('one')
+    h.calls[1].resolve('other')
+    expect(await second).toBe('one')
+    expect(await other).toBe('other')
+    const third = call('p', () => h.fetch('p'))
+    expect(h.calls).toHaveLength(3)
+    h.calls[2].resolve('two')
+    expect(await third).toBe('two')
+  })
+
+  it('a failed call fails those that joined it, and the next ask starts afresh', async () => {
+    const call = joined<string>()
+    const h = held<string>()
+    const first = call('p', () => h.fetch('p'))
+    const second = call('p', () => h.fetch('p'))
+    h.calls[0].reject(new Error('busy'))
+    await expect(first).rejects.toThrow('busy')
+    await expect(second).rejects.toThrow('busy')
+    const again = call('p', () => h.fetch('p'))
+    expect(h.calls).toHaveLength(2)
+    h.calls[1].resolve('ok')
+    expect(await again).toBe('ok')
+    // A load that throws as it starts fails its caller, and holds nothing up.
+    await expect(call('p', () => { throw new Error('at once') })).rejects.toThrow('at once')
+    const after = call('p', () => h.fetch('p'))
+    h.calls[2].resolve('after')
+    expect(await after).toBe('after')
   })
 })
 
