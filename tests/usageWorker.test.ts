@@ -4,9 +4,11 @@
 import { appendFileSync, readFileSync, writeFileSync } from 'fs'
 import { spawn, type ChildProcess } from 'child_process'
 import { join } from 'path'
+import { Worker } from 'worker_threads'
+import { build } from 'esbuild'
 import { describe, expect, it } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { handleRequest, type IngestJob, type IngestResult } from '../src/main/usageWorker'
+import { handleRequest, type IngestJob, type IngestResult, type WorkerReply, type WorkerRequest } from '../src/main/usageWorker'
 import { cursorOf, writeSession, type StoredSession } from '../src/main/usageDb'
 import { rowsPart, summaryOf, usageFromRows } from '../src/shared/usageLedger'
 import { priceUsage } from '../src/shared/usageDays'
@@ -403,5 +405,30 @@ describe('the usage worker reading a transcript for main', () => {
       expect(got.contextTokens, provider).toBeGreaterThan(0)
     }
     await t.close()
+  })
+})
+
+describe('the usage worker as main starts it (HI-1729)', () => {
+  it('loads in a worker thread, where Electron has no `app`, and answers a job (since HI-1684 its logger threw there and ended it on every start)', async () => {
+    const base = tempDir('hive-usage-worker-thread-')
+    // What `electron` is in a worker of Electron's main process: the npm package's export, a path, with no `app`.
+    const stub = join(base, 'electron-in-worker.cjs')
+    writeFileSync(stub, "module.exports = 'C:\\\\electron\\\\electron.exe'\n")
+    const script = join(base, 'usage-worker.cjs')
+    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'usageWorker.ts')], outfile: script, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs', electron: stub }, logLevel: 'silent' })
+    const w = new Worker(script)
+    try {
+      const reply = await new Promise<WorkerReply>((resolve, reject) => {
+        w.on('message', (m: WorkerReply) => {
+          if ('id' in m) resolve(m)
+        })
+        w.once('error', reject)
+        w.once('exit', (code) => reject(new Error(`the usage worker ended (${code})`)))
+        w.postMessage({ id: 1, type: 'sessions', file: join(base, 'usage.db'), scopes: null } satisfies WorkerRequest)
+      })
+      expect(reply).toEqual({ id: 1, ok: true, value: [] })
+    } finally {
+      await w.terminate()
+    }
   })
 })
