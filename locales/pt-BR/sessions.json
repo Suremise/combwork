@@ -96,6 +96,7 @@
   "sessions.list.info": "Todas as sessões deste projeto, por provedor e agente, com as sessões que cada uma iniciou (como as guardian reviews do Codex) abaixo dela. Selecione uma para ler a transcrição, incluindo o que veio antes de cada compactação; clique com o botão direito em um ramo para arquivar ou excluir tudo o que há nele. Transcrições que uma CLI excluiu são lidas do backup do Hive.",
   "sessions.list.infoAssistant": "Todas as conversas do Hive Assistant deste espaço de trabalho, por provedor. Selecione uma para lê-la por completo, incluindo o que veio antes de cada compactação.",
   "sessions.list.new": "{kind, select, conversation {Nova conversa} other {Nova sessão}}",
+  "sessions.list.othersLoading": "Procurando sessões iniciadas fora do Hive…",
   "sessions.list.noneHere": "{kind, select, conversation {Nenhuma conversa aqui: marque Arquivados para ver as arquivadas.} other {Nenhuma sessão aqui: marque Arquivados para ver as arquivadas.}}",
   "sessions.list.refresh": "Atualizar",
   "sessions.list.what": "{kind, select, conversation {as conversas} other {as sessões}}",

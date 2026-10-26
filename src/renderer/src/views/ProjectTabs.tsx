@@ -335,6 +335,8 @@ const LIST_LIMIT_MS = 60_000
  * only on reload(). Only while a view using it is shown.
  */
 const NO_SESSIONS: SessionListItem[] = []
+/** A listing as shown: `othersLoading` while it is Hive's own sessions alone, the others still being read (HI-1681). */
+type SessionsData = { list: SessionListItem[]; kept: SessionListItem[]; othersLoading?: boolean }
 
 export function useSessions(project: ProjectInfo) {
   const mode = useStore((s) => s.settings?.sessions.overviewRefresh ?? 'live')
@@ -343,7 +345,9 @@ export function useSessions(project: ProjectInfo) {
   const shown = useStore((s) => s.activity === 'projects' || s.workspace?.assistant?.path === project.path)
   // This project's sessions, and deleted sessions' usage (totals count it, lists don't show it). A failed load: views
   // say so (with this project's sessions from before, if any), not "no sessions".
-  const sessions = useScopedLoad<{ list: SessionListItem[]; kept: SessionListItem[] }>(project.path)
+  const sessions = useScopedLoad<SessionsData>(project.path)
+  const haveList = useRef(false)
+  haveList.current = !!sessions.data
   const last = useRef(0)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // One listing at a time (#1646): with listings slower than the updates asking for them (a busy disk, hundreds of
@@ -360,9 +364,18 @@ export function useSessions(project: ProjectInfo) {
       path,
       () => {
         // Deleted sessions' usage only adds to the totals: without it they are a little low, which beats no list.
-        const list = Promise.all([call('session:list', path), call('session:keptUsage', path).catch(() => [])]).then(([items, kept]) => ({ list: items, kept }))
+        const kept = call('session:keptUsage', path).catch(() => [] as SessionListItem[])
+        const list = Promise.all([call('session:list', path), kept]).then(([items, k]): SessionsData => ({ list: items, kept: k }))
         const bounded = withinTime(list, LIST_LIMIT_MS, () => tr(M.noAnswer, { seconds: LIST_LIMIT_MS / 1000 }))
-        loadScoped(path, () => bounded)
+        if (haveList.current) {
+          loadScoped(path, () => bounded)
+          return bounded
+        }
+        // Nothing shown yet (HI-1681): Hive's own sessions first, from its records, while the sessions its CLIs keep for
+        // the project's folders are read (seconds on a busy disk with hundreds of them); the whole list follows.
+        const own = Promise.all([call('session:list', path, { own: true }), kept]).then(([items, k]): SessionsData => ({ list: items, kept: k, othersLoading: true }))
+        loadScoped(path, () => own.catch(() => bounded))
+        void own.catch(() => undefined).then(() => loadScoped(path, () => bounded))
         return bounded
       },
       () => latest.current()
@@ -400,7 +413,7 @@ export function useSessions(project: ProjectInfo) {
     const t = setInterval(load, 60_000)
     return () => clearInterval(t)
   }, [mode, load, shown])
-  return { items: sessions.data?.list ?? null, kept: sessions.data?.kept ?? NO_SESSIONS, reload: load, loadedAt: sessions.at, error: sessions.error }
+  return { items: sessions.data?.list ?? null, kept: sessions.data?.kept ?? NO_SESSIONS, othersLoading: sessions.data?.othersLoading ?? false, reload: load, loadedAt: sessions.at, error: sessions.error }
 }
 
 

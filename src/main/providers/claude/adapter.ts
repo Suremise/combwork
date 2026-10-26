@@ -25,12 +25,16 @@ import type { SafeguardEvent } from '../../../shared/safeguards'
 import { ConversationParser, claudeImageData } from './conversation'
 import { readClaudeModels } from './models'
 import { ClaudeUsageParser, encodeProjectPath, parseTranscript, transcriptSubSession } from './usage'
+import { atMost } from '../../../shared/atMost'
+import { joined } from '../../../shared/coalesce'
 import { advanced } from '../../advanced'
 import { launchOverrides } from '../../advancedValues'
 
 const log = createLogger('claude-code')
 /** Transcripts whose sub-agent check is remembered (by path and mtime). */
 const SUB_CACHE = 2000
+/** Transcripts looked at at once while listing a folder's sessions (HI-1681): each waits on the disk, one after another was slow under load. */
+const LIST_AT_ONCE = 8
 /**
  * How many of the screen's last written lines a safeguard prompt is looked for in: its dialog is drawn last, at the
  * bottom, its choices within about a dozen lines of the end (more when a narrow pane wraps their descriptions).
@@ -631,25 +635,42 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
    * names the folder by Node's realpath of its cwd (`claudeSpelling`), so a session started through a junction is under
    * the real path's name; then Hive's spelling and the real, long path (one started by another name, or an older CLI's).
    * Last, those named by an 8.3 short spelling of the folder, which no other spelling of it gives: found by the cwd
-   * their transcripts record (`shortNamed`).
+   * their transcripts record (`shortNamed`). Kept per folder while the projects folder is unchanged and no folder that
+   * may be its 8.3 name is waiting for a cwd (HI-1681): a list looks up hundreds of sessions in a dozen folders, and each
+   * lookup took the folder's real path three times on main's thread and went through every name.
    */
+  private dirsOf = new Map<string, { names: string[]; dirs: string[] }>()
   private async transcriptDirs(folder: string): Promise<string[]> {
     const root = join(claudeHome(), 'projects')
     const names = await this.projectFolders(root)
     if (!names) return []
+    const key = `${root}|${folder}`.toLowerCase()
+    const kept = this.dirsOf.get(key)
+    if (kept?.names === names) return kept.dirs
     const byName = new Map(names.map((d) => [d.toLowerCase(), d]))
     const wanted = new Set([claudeSpelling(folder), folder, realPath(folder)].map((p) => encodeProjectPath(p).toLowerCase()))
     const exact = [...wanted].flatMap((w) => (byName.has(w) ? [join(root, byName.get(w)!)] : []))
-    return [...exact, ...(await this.shortNamed(root, names.filter((n) => !wanted.has(n.toLowerCase())), folder))]
+    const short = await this.shortNamed(root, names.filter((n) => !wanted.has(n.toLowerCase())), folder)
+    const dirs = [...exact, ...short.dirs]
+    this.dirsOf.delete(key)
+    if (short.settled) this.dirsOf.set(key, { names, dirs })
+    if (this.dirsOf.size > SUB_CACHE) this.dirsOf.delete(this.dirsOf.keys().next().value!)
+    return dirs
   }
 
   /**
    * The folders of ~/.claude/projects, read again only when it changed (#1649): a session list looks up each session's
    * transcript, and reading 500 folders' names for each of 400 sessions took most of a second. A folder's time changes
-   * when one is added, removed or renamed in it. Null when it can't be read.
+   * when one is added, removed or renamed in it. Null when it can't be read. Lookups made while one checks share its
+   * check (HI-1681): a list looks a few sessions up at once.
    */
   private projectNames: { root: string; mtime: number; names: string[] } | null = null
-  private async projectFolders(root: string): Promise<string[] | null> {
+  private projectsCheck = joined<string[] | null>()
+  private projectFolders(root: string): Promise<string[] | null> {
+    return this.projectsCheck(root, () => this.readProjectFolders(root))
+  }
+
+  private async readProjectFolders(root: string): Promise<string[] | null> {
     try {
       const mtime = (await stat(root)).mtimeMs
       if (this.projectNames?.root === root && this.projectNames.mtime === mtime) return this.projectNames.names
@@ -664,18 +685,20 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   /**
    * Of `names` (folders of ~/.claude/projects), those whose transcripts record an 8.3 short spelling of `folder` as their
    * cwd. Only names that may hold one (on the folder's drive, with an encoded `~n`) are looked in, and each one's cwd is
-   * read once while the folder is unchanged.
+   * read once while the folder is unchanged. `settled`: none of them is still without a cwd (one may record it later).
    */
-  private async shortNamed(root: string, names: string[], folder: string): Promise<string[]> {
+  private async shortNamed(root: string, names: string[], folder: string): Promise<{ dirs: string[]; settled: boolean }> {
     const drive = encodeProjectPath(realPath(folder)).slice(0, 3).toLowerCase()
     const here = placeMatcher(folder)
-    const out: string[] = []
+    const dirs: string[] = []
+    let settled = true
     for (const n of names) {
       if (!n.toLowerCase().startsWith(drive) || !MAY_BE_SHORT.test(n)) continue
       const cwd = await this.recordedCwd(join(root, n))
-      if (cwd?.includes('~') && here(cwd)) out.push(join(root, n))
+      if (!cwd) settled = false
+      else if (cwd.includes('~') && here(cwd)) dirs.push(join(root, n))
     }
-    return out
+    return { dirs, settled }
   }
 
   /**
@@ -731,29 +754,52 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return out
   }
 
-  async listSessions(folder: string): Promise<ExternalSession[]> {
-    const out: ExternalSession[] = []
-    const seen = new Set<string>()
-    for (const dir of await this.transcriptDirs(folder)) for (const f of await readdir(dir).catch(() => [])) {
-      if (!f.endsWith('.jsonl') || !isSessionId(basename(f, '.jsonl'))) continue
-      const p = join(dir, f)
+  async listSessions(folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]> {
+    const files: { id: string; path: string }[] = []
+    for (const dir of await this.transcriptDirs(folder)) for (const f of await this.transcriptNames(dir)) {
+      const id = basename(f, '.jsonl')
+      if (f.endsWith('.jsonl') && isSessionId(id) && !skip?.(id)) files.push({ id, path: join(dir, f) })
+    }
+    const found = await atMost(LIST_AT_ONCE, files, async ({ id, path }): Promise<ExternalSession | null> => {
       try {
-        const s = await stat(p)
-        const id = basename(f, '.jsonl')
-        if (!s.isFile() || s.size === 0 || seen.has(id.toLowerCase())) continue
-        seen.add(id.toLowerCase())
-        const sub = await this.subSession(p, id, s.mtimeMs)
-        out.push({ id, transcriptPath: p, modified: s.mtime.toISOString(), ...(sub ? { sub } : {}) })
+        const s = await stat(path)
+        if (!s.isFile() || s.size === 0) return null
+        const sub = await this.subSession(path, id, s.mtimeMs)
+        return { id, transcriptPath: path, modified: s.mtime.toISOString(), bytes: s.size, mtimeMs: s.mtimeMs, ...(sub ? { sub } : {}) }
       } catch {
         // Removed between readdir and stat.
+        return null
       }
-    }
-    return out
+    })
+    // A session in two of the folders (#493): the first folder's, as they are listed.
+    const seen = new Set<string>()
+    return found.filter((x): x is ExternalSession => !!x && !seen.has(x.id.toLowerCase()) && !!seen.add(x.id.toLowerCase()))
   }
 
-  async subSessionOf(path: string, sessionId: string): Promise<SubSession | null> {
-    const s = await stat(path).catch(() => null)
-    return s ? this.subSession(path, sessionId, s.mtimeMs) : null
+  /**
+   * A transcript folder's names, read again only when the folder's time changed (HI-1681): it changes as a transcript
+   * is added, removed or renamed in it, not as one grows, so a session list reads each folder's names once per change.
+   */
+  private names = new Map<string, { mtime: number; names: string[] }>()
+  private async transcriptNames(dir: string): Promise<string[]> {
+    try {
+      const mtime = (await stat(dir)).mtimeMs
+      const c = this.names.get(dir)
+      if (c && c.mtime === mtime) return c.names
+      const names = await readdir(dir)
+      this.names.delete(dir)
+      this.names.set(dir, { mtime, names })
+      if (this.names.size > SUB_CACHE) this.names.delete(this.names.keys().next().value!)
+      return names
+    } catch {
+      this.names.delete(dir)
+      return []
+    }
+  }
+
+  async subSessionOf(path: string, sessionId: string, mtimeMs?: number): Promise<SubSession | null> {
+    const mtime = mtimeMs ?? (await stat(path).catch(() => null))?.mtimeMs
+    return mtime === undefined ? null : this.subSession(path, sessionId, mtime)
   }
 
   /** Each transcript's sub-agent check (its first line), by file and mtime; the oldest go past SUB_CACHE entries. */

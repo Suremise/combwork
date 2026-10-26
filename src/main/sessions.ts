@@ -22,7 +22,8 @@ import { assistantTools } from '../shared/assistantTools'
 import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
-import { coalesced } from '../shared/coalesce'
+import { coalesced, joined } from '../shared/coalesce'
+import { atMost } from '../shared/atMost'
 import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter } from './agentFolders'
 import { slotEnv } from './slots'
 import { copiesDirOf, grantsCopies } from './copies'
@@ -65,7 +66,7 @@ import { recacheEstimate } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage } from '../shared/usageDays'
-import type { Ask, BackgroundTaskType, HookEvent, LaunchContext, LaunchSkill, ProviderAdapter, SkillDelivery } from './providers/types'
+import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchSkill, ProviderAdapter, SkillDelivery } from './providers/types'
 import { providerService } from './providerService'
 import { config } from './config'
 import { emit, emitTo, tellListeners, toast } from './events'
@@ -540,6 +541,8 @@ const MAX_USAGE_SEEN = 200
 const SLOW_LIST_MS = 1000
 /** How many of Hive's sessions a listing looks at at once (#1649): enough to overlap their file checks, not to flood the disk's threads. */
 const LIST_AT_ONCE = 8
+/** Folders (each CLI's) whose other sessions a listing reads at once (HI-1681). */
+const OTHER_FOLDERS_AT_ONCE = 4
 
 /** One session of a bulk action: no reason when it was done, else why it was left alone. */
 type BulkOutcome = { id: string; reason?: SessionSkipReason; message?: string }
@@ -577,33 +580,6 @@ function bulkProgress(projectPath: string, action: SessionBulkAction, total: num
       if (!runs.size) bulkRuns.delete(key)
       send()
     }
-  }
-}
-
-/** `fn` on each of `items`, at most `n` at once; the results in the items' order. */
-async function atMost<T, R>(n: number, items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = Array.from({ length: items.length })
-  let next = 0
-  const worker = async (): Promise<void> => {
-    while (next < items.length) {
-      const i = next++
-      out[i] = await fn(items[i])
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker))
-  return out
-}
-
-/**
- * A transcript's size for the Sessions list (#671): a stat, never a read, taken each time the list is (the window keeps
- * the list, and reloads it when it opens or a session changes). Null when it is missing or can't be read.
- */
-async function transcriptSize(path: string | null | undefined): Promise<number | null> {
-  if (!path) return null
-  try {
-    return (await stat(path)).size
-  } catch {
-    return null
   }
 }
 
@@ -5452,30 +5428,68 @@ class SessionManager {
     return title ? { ...usage, title, customTitle: usage.customTitle ?? title } : usage
   }
 
-  /** Listings under way, per host (#1646): see list(). */
+  /** Listings of Hive's own sessions under way, per host (#1646): see list(). */
   private listings = coalesced<SessionListItem[]>()
+  /** The listing of Hive's own sessions running now, per host, which `own` joins (HI-1681). */
+  private ownRunning = new Map<string, Promise<SessionListItem[]>>()
+  /** Listings of the other sessions under way, per host (HI-1681): see list(). */
+  private others = joined<{ items: SessionListItem[]; folders: number }>()
 
   /**
-   * A host's sessions, for its Overview, its Sessions tab and the Agent API. One listing per host at a time (#1646): a
+   * A host's sessions, for its Overview, its Sessions tab and the Agent API: Hive's own, from its records, and the other
+   * sessions its CLIs keep for its folders, read at the same time. One listing of each per host at a time (#1646): a
    * listing stats each session's files and the CLIs' session folders, and the window asks again as sessions change, so
-   * overlapping ones (61 at once, seen on a 400-session project) shared the disk's threads and each took minutes. Asked
-   * while one runs, callers share one more listing, started once it ends, so each gets a list read after it asked.
+   * overlapping ones (61 at once, seen on a 400-session project) shared the disk's threads and each took minutes.
+   * Asked while one runs, callers share one more listing of Hive's sessions, started once it ends, so each gets its
+   * records as they were after it asked; and the other sessions' listing under way (HI-1681): nothing tells Hive when
+   * those change, and one more after it only doubled the wait (19 s and then 10 s, seen while agents started).
+   * `own`: Hive's sessions alone, joining their listing under way, for a view that shows them before the rest.
    */
-  list(projectPath: string): Promise<SessionListItem[]> {
+  list(projectPath: string, opts: { own?: boolean } = {}): Promise<SessionListItem[]> {
     projectPath = workspace.assertSessionHost(projectPath)
-    return this.listings(resolve(projectPath).toLowerCase(), () => this.listNow(projectPath))
+    const key = resolve(projectPath).toLowerCase()
+    if (opts.own) return this.ownRunning.get(key) ?? this.ownListing(key, projectPath)
+    return this.listNow(key, projectPath)
   }
 
-  private async listNow(projectPath: string): Promise<SessionListItem[]> {
+  private ownListing(key: string, projectPath: string): Promise<SessionListItem[]> {
+    return this.listings(key, () => {
+      const p = this.listOwn(projectPath)
+      this.ownRunning.set(key, p)
+      const end = (): void => {
+        if (this.ownRunning.get(key) === p) this.ownRunning.delete(key)
+      }
+      p.then(end, end)
+      return p
+    })
+  }
+
+  private async listNow(key: string, projectPath: string): Promise<SessionListItem[]> {
     const started = performance.now()
+    let ownMs = 0
+    let othersMs = 0
+    const [own, others] = await Promise.all([
+      this.ownListing(key, projectPath).finally(() => (ownMs = performance.now() - started)),
+      this.others(key, () => this.listOthers(projectPath)).finally(() => (othersMs = performance.now() - started))
+    ])
+    const ids = new Set(own.map((i) => i.id))
+    // A session Hive took on while the other sessions were read is listed once, as Hive's.
+    const items = [...own, ...others.items.filter((i) => !ids.has(i.id))]
+    const ms = performance.now() - started
+    if (ms > SLOW_LIST_MS) {
+      const s = (x: number): string => `${(x / 1000).toFixed(1)} s`
+      log.info(`listing the sessions of ${userText(projectPath)} took ${s(ms)}: Hive's ${own.length} session(s) ${s(ownMs)}, the other sessions in ${others.folders} folder(s) ${s(othersMs)}, read at the same time`)
+    }
+    return items.sort((a, b) => (b.lastActivity ?? '').localeCompare(a.lastActivity ?? ''))
+  }
+
+  /** Hive's own sessions, from its records. */
+  private async listOwn(projectPath: string): Promise<SessionListItem[]> {
     const file = await workspace.sessionsFile(projectPath)
     // Read once for the whole list, not once per session.
     const ctx: ListContext = { records: file.sessions, cfg: await workspace.projectConfig(projectPath), stored: await usageHistory.storedUsage(projectPath).catch(() => new Map()) }
-    const read = performance.now()
     const ttl = config.settings.sessions.cacheTtl
     const items: SessionListItem[] = []
-    // Deleted sessions stay hidden, though the CLI still has their transcripts.
-    const known = new Set([...file.sessions.map((s) => s.id), ...(file.deleted ?? [])])
     // Records from before sub-sessions were told apart (a guardian review adopted then): found now, and kept on them.
     const found = new Map<string, SubSession>()
     // Hive's backups, from its two folders' names (#1649): not four checks per session on main's thread.
@@ -5490,10 +5504,13 @@ class SessionManager {
         // A provider this version doesn't know.
       }
       const hasTranscript = !!transcript
+      // Its size for the list (#671): a stat, never a read, taken each time the list is; the same stat for its
+      // sub-session check (HI-1681). Null when it is missing or can't be read.
+      const st = transcript ? await stat(transcript).catch(() => null) : null
       const hasBackup = backups.has(`${rec.id}.jsonl`.toLowerCase()) || backups.has(`${rec.id}.jsonl${GZ}`.toLowerCase())
       const usage = await this.usage(projectPath, rec.id, ctx)
       const { keptUsage: _kept, ...fields } = rec
-      const sub = rec.sub ?? (await this.recordSub(projectPath, rec, transcript))
+      const sub = rec.sub ?? (await this.recordSub(projectPath, rec, transcript, st?.mtimeMs))
       if (sub && !rec.sub) found.set(rec.id, sub)
       return {
         ...fields,
@@ -5504,7 +5521,7 @@ class SessionManager {
         lastActivity: usage?.lastActivity ?? rec.lastActiveAt,
         hasTranscript,
         hasBackup,
-        transcriptBytes: await transcriptSize(transcript),
+        transcriptBytes: st?.size ?? null,
         ...(!ctx.stored?.has(rec.id) && (hasTranscript || hasBackup) ? { pending: true } : {}),
         usage,
         recache: usage && providerDescriptor(provider).capabilities.promptCacheTtl ? recacheEstimate(usage, ttl) : null
@@ -5512,7 +5529,6 @@ class SessionManager {
     })
     items.push(...listed)
     if (found.size) await this.keepSubs(projectPath, found)
-    const own = performance.now()
     // Each in a slot (#1434): which, and whether it may resume there now, by its agent (gone: no agent may).
     const facts = workspace.isAssistantHome(projectPath) ? null : await folderFacts(projectPath).catch(() => null)
     if (facts?.slots.length) {
@@ -5526,46 +5542,61 @@ class SessionManager {
         if (hold) it.hold = hold
       }
     }
-    // Sessions started outside Hive in the project folder; and from the other folders its sessions ran in (agents'
-    // worktrees, the Assistant's workspace folder), only the sub-sessions of sessions listed here.
-    const folders = this.sessionFolders(projectPath, file.sessions, ctx.cfg)
-    for (const adapter of allProviders()) {
-      for (const [i, folder] of folders.entries()) {
-        for (const ext of await adapter.listSessions(folder).catch(() => [])) {
-          if (known.has(ext.id) || (i > 0 && !(ext.sub?.parentId && items.some((x) => x.id === ext.sub!.parentId)))) continue
-          known.add(ext.id)
-          // From the usage history only (#1106): one it doesn't have, or has from before its file changed, is queued for the
-          // worker (the window is told when it has it), and shows as the history has it meanwhile, or not yet.
-          const st = await stat(ext.transcriptPath).catch(() => null)
-          const kept = ctx.stored?.get(ext.id)
-          const same = !!st && !!kept?.read.path && samePlace(kept.read.path, ext.transcriptPath) && kept.read.size === st.size && kept.read.mtime === st.mtimeMs
-          const usage = kept ? this.titled(kept.usage) : null
-          if (!same) void usageHistory.ingestExternal(projectPath, { id: ext.id, provider: adapter.id, transcriptPath: ext.transcriptPath }).catch(() => undefined)
-          // Known to be empty: not listed. Not known yet: listed without figures until the worker has it.
-          if (usage && usage.requests === 0) continue
-          items.push({
-            id: ext.id,
-            provider: adapter.id,
-            source: 'external',
-            title: usage?.title ?? null,
-            lastActivity: usage?.lastActivity ?? ext.modified,
-            hasTranscript: true,
-            hasBackup: false,
-            transcriptBytes: st?.size ?? null,
-            ...(same ? {} : { pending: true }),
-            usage,
-            recache: usage && adapter.descriptor.capabilities.promptCacheTtl ? recacheEstimate(usage, ttl) : null,
-            ...(ext.sub ? { sub: ext.sub } : {})
-          })
-        }
+    return items
+  }
+
+  /**
+   * Sessions started outside Hive in the project folder; and from the other folders its sessions ran in (agents'
+   * worktrees, the Assistant's workspace folder), only the sub-sessions of sessions listed here. Hive's own sessions'
+   * files, the bulk of those folders, aren't looked at (HI-1681): each CLI leaves them out by id, and reads a folder's
+   * names again only when the folder changed, so a listing opens only new transcripts and stats only the others.
+   */
+  private async listOthers(projectPath: string): Promise<{ items: SessionListItem[]; folders: number }> {
+    const file = await workspace.sessionsFile(projectPath)
+    const cfg = await workspace.projectConfig(projectPath)
+    const stored: Map<string, StoredUsage> = await usageHistory.storedUsage(projectPath).catch(() => new Map())
+    const ttl = config.settings.sessions.cacheTtl
+    // Deleted sessions stay hidden, though the CLI still has their transcripts.
+    const known = new Set([...file.sessions.map((s) => s.id), ...(file.deleted ?? [])])
+    const skip = (id: string): boolean => known.has(id)
+    // Whose sub-sessions are listed from the other folders: Hive's sessions, and the other sessions listed before them.
+    const listed = new Set(file.sessions.map((s) => s.id))
+    const folders = this.sessionFolders(projectPath, file.sessions, cfg)
+    const asks = allProviders().flatMap((adapter) => folders.map((folder, i) => ({ adapter, folder, i })))
+    // A few folders at once: each waits on the disk.
+    const found = await atMost(OTHER_FOLDERS_AT_ONCE, asks, (a) => a.adapter.listSessions(a.folder, skip).catch(() => [] as ExternalSession[]))
+    const items: SessionListItem[] = []
+    for (const [n, { adapter, i }] of asks.entries()) {
+      for (const ext of found[n]) {
+        if (known.has(ext.id) || (i > 0 && !(ext.sub?.parentId && listed.has(ext.sub.parentId)))) continue
+        known.add(ext.id)
+        listed.add(ext.id)
+        // From the usage history only (#1106): one it doesn't have, or has from before its file changed, is queued for the
+        // worker (the window is told when it has it), and shows as the history has it meanwhile, or not yet.
+        const st = ext.bytes !== undefined && ext.mtimeMs !== undefined ? { size: ext.bytes, mtimeMs: ext.mtimeMs } : await stat(ext.transcriptPath).catch(() => null)
+        const kept = stored.get(ext.id)
+        const same = !!st && !!kept?.read.path && samePlace(kept.read.path, ext.transcriptPath) && kept.read.size === st.size && kept.read.mtime === st.mtimeMs
+        const usage = kept ? this.titled(kept.usage) : null
+        if (!same) void usageHistory.ingestExternal(projectPath, { id: ext.id, provider: adapter.id, transcriptPath: ext.transcriptPath }).catch(() => undefined)
+        // Known to be empty: not listed. Not known yet: listed without figures until the worker has it.
+        if (usage && usage.requests === 0) continue
+        items.push({
+          id: ext.id,
+          provider: adapter.id,
+          source: 'external',
+          title: usage?.title ?? null,
+          lastActivity: usage?.lastActivity ?? ext.modified,
+          hasTranscript: true,
+          hasBackup: false,
+          transcriptBytes: st?.size ?? null,
+          ...(same ? {} : { pending: true }),
+          usage,
+          recache: usage && adapter.descriptor.capabilities.promptCacheTtl ? recacheEstimate(usage, ttl) : null,
+          ...(ext.sub ? { sub: ext.sub } : {})
+        })
       }
     }
-    const ms = performance.now() - started
-    if (ms > SLOW_LIST_MS) {
-      const s = (a: number, b: number): string => `${((b - a) / 1000).toFixed(1)} s`
-      log.info(`listing the sessions of ${userText(projectPath)} took ${s(0, ms)}: the usage history ${s(started, read)}, Hive's ${file.sessions.length} session(s) ${s(read, own)}, the other sessions in ${folders.length} folder(s) ${s(own, started + ms)}`)
-    }
-    return items.sort((a, b) => (b.lastActivity ?? '').localeCompare(a.lastActivity ?? ''))
+    return { items, folders: folders.length }
   }
 
   /**
@@ -5585,15 +5616,16 @@ class SessionManager {
 
   /**
    * Whether one of Hive's records is a sub-session, from its transcript's first line (the CLI's, else Hive's copy).
-   * `transcript`: the CLI's, when the caller has looked it up already (null: it has none).
+   * `transcript`: the CLI's, when the caller has looked it up already (null: it has none), and `mtimeMs` its time, when
+   * the caller has stat'd it.
    */
-  private async recordSub(projectPath: string, rec: SessionRecord, transcript?: string | null): Promise<SubSession | null> {
+  private async recordSub(projectPath: string, rec: SessionRecord, transcript?: string | null, mtimeMs?: number): Promise<SubSession | null> {
     if (rec.sub) return rec.sub
     try {
       const adapter = providerAdapter(recordProvider(rec))
       const cli = transcript !== undefined ? transcript : await adapter.transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath).catch(() => null)
       const path = cli ?? this.backupCopy(projectPath, rec.id) ?? this.backupCopy(projectPath, rec.id, true)
-      return path ? await adapter.subSessionOf(path, rec.id) : null
+      return path ? await adapter.subSessionOf(path, rec.id, path === cli ? mtimeMs : undefined) : null
     } catch {
       return null
     }

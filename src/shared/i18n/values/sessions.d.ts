@@ -100,6 +100,7 @@ interface HiveMessageValues {
   'sessions.list.infoAssistant': undefined
   'sessions.list.new': { kind: string }
   'sessions.list.noneHere': { kind: string }
+  'sessions.list.othersLoading': undefined
   'sessions.list.refresh': undefined
   'sessions.list.what': { kind: string }
   'sessions.marker.cantResume': undefined

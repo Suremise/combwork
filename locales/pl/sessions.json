@@ -96,6 +96,7 @@
   "sessions.list.info": "Wszystkie sesje tego projektu według dostawcy i agenta, a pod każdą sesje, które uruchomiła (np. recenzje guardian w Codex). Wybierz sesję, aby przeczytać jej transkrypcję, także to, co było przed każdym kompaktowaniem; kliknij gałąź prawym przyciskiem, aby zarchiwizować lub usunąć wszystko, co w niej jest. Transkrypcje usunięte przez CLI są odczytywane z kopii zapasowej Hive.",
   "sessions.list.infoAssistant": "Wszystkie rozmowy Hive Assistant w tym obszarze roboczym, według dostawcy. Wybierz rozmowę, aby przeczytać ją w całości, także to, co było przed każdym kompaktowaniem.",
   "sessions.list.new": "{kind, select, conversation {Nowa rozmowa} other {Nowa sesja}}",
+  "sessions.list.othersLoading": "Szukanie sesji uruchomionych poza Hive…",
   "sessions.list.noneHere": "{kind, select, conversation {Nie ma tu rozmów: zaznacz Zarchiwizowane, aby zobaczyć zarchiwizowane.} other {Nie ma tu sesji: zaznacz Zarchiwizowane, aby zobaczyć zarchiwizowane.}}",
   "sessions.list.refresh": "Odśwież",
   "sessions.list.what": "{kind, select, conversation {rozmowy} other {sesje}}",

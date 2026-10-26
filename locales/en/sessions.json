@@ -395,6 +395,10 @@
     "defaultMessage": "{kind, select, conversation {No conversations here: tick Archived to see archived ones.} other {No sessions here: tick Archived to see archived ones.}}",
     "description": "The Sessions list when every session is archived (the Hive Assistant's: conversations). Archived is the checkbox above it: use its translation."
   },
+  "sessions.list.othersLoading": {
+    "defaultMessage": "Looking for sessions started outside Hive…",
+    "description": "Above the Sessions list while it shows Hive's own sessions and is still reading the sessions the CLIs keep for the project's folders (started in a terminal or an editor)."
+  },
   "sessions.list.refresh": {
     "defaultMessage": "Refresh",
     "description": "Tooltip of the Sessions tab's refresh button: reads the list again."

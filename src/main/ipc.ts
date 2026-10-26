@@ -864,7 +864,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       openExternalTerminal(dir)
     },
 
-    'session:list': (p) => sessions.list(p),
+    'session:list': (p, opts) => sessions.list(p, { own: opts?.own === true }),
     'session:start': (p, opts) => sessions.start(p, opts),
     'session:stop': (p, agentId) => sessions.stop(workspace.assertSessionHost(p), agentId),
     'session:carryOn': (p, agentId) => sessions.carryOn(workspace.assertProject(p), agentId),
