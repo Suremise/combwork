@@ -104,8 +104,16 @@ export interface CheckRanData {
   by: string
   counted: boolean
   whyNot?: 'notCheck' | 'notContained' | 'dirty' | 'changed' | 'moved' | 'revisionChanged'
+  /**
+   * What made it `changed` (what the watcher saw written: folder-relative paths, ':reflog', ':edit') or `dirty` (the
+   * uncommitted files), at most CHANGES_KEPT (#1654); left out where it isn't known (a stat snapshot's fallback).
+   */
+  changes?: string[]
   isolated?: boolean
 }
+
+/** The paths a `CheckRan` keeps of what stopped it counting (#1654). */
+export const CHANGES_KEPT = 5
 
 export type ForYouKind = 'approve' | 'decide' | 'test' | 'signIn' | 'other'
 

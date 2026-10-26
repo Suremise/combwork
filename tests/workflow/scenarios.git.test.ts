@@ -501,6 +501,37 @@ describe('workflow scenarios, Git', () => {
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
   })
 
+  it("#1654: a refusal for a check whose last run passed but didn't count says why, and what to do, for each reason", async () => {
+    const e = pair({}, { preChecks: ['lint'], commands: { lint: 'npm run lint' } })
+    const { card, folder } = await started(e)
+    const revision = sh(folder, 'rev-parse', 'HEAD')
+    const command = `hive-progress --check lint --card ${card.key}`
+    const ran = async (data: Partial<FactData['CheckRan']>) => {
+      const s = e.wf.state(card)
+      await e.wf.write(card, e.wf.rulesetOf(card, s), 'agent:B1', (w) => w.fact('CheckRan', { name: 'lint', command: 'npm run lint', revision, tested: revision, result: 'passed', run: `run-${Math.random()}`, durationMs: 800, by: 'B1', counted: false, ...data }))
+      return refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'submit.checksPassed')
+    }
+    const head = `Review refused: lint hasn't passed on ${revision.slice(0, 7)}. Its last run passed but didn't count: `
+    const cases: [Partial<FactData['CheckRan']>, string, string][] = [
+      [{ whyNot: 'notCheck' }, "it wasn't the check's configured command.", `Run ${command}, then submit again.`],
+      [{ whyNot: 'notContained' }, "what it ran on doesn't contain the revision.", `Run ${command} in the card's own folder, at its revision, then submit again.`],
+      [{ whyNot: 'dirty', changes: ['notes.txt'] }, 'the folder had uncommitted changes (notes.txt).', `Commit or remove the uncommitted changes, run ${command} again, then submit again.`],
+      [{ whyNot: 'moved' }, 'something else was checked out by its end.', `Run ${command}, then submit again.`],
+      [{ whyNot: 'changed', changes: ['src/a.ts', ':reflog'] }, 'files changed in the folder while it ran (src/a.ts, :reflog).', `Run ${command} again with nothing else writing in the folder, or add --isolated to run it in a check copy of its own, then submit again.`],
+      [{ whyNot: 'changed' }, 'files changed in the folder while it ran.', `Run ${command} again with nothing else writing in the folder, or add --isolated to run it in a check copy of its own, then submit again.`],
+      // A check copy's own run that didn't count: --isolated isn't offered again.
+      [{ whyNot: 'changed', isolated: true }, 'files changed in the folder while it ran.', `Run ${command} again with nothing else writing in the folder, then submit again.`],
+      [{ whyNot: 'revisionChanged' }, "the card's files changed while it ran.", `Run ${command}, then submit again.`]
+    ]
+    for (const [data, why, next] of cases) {
+      const r = await ran(data)
+      expect({ data, message: r.message, next: r.next }).toEqual({ data, message: head + why, next })
+    }
+    // Its newest run on the revision decides: a failed one says nothing more than before.
+    const failed = await ran({ result: 'failed', counted: true })
+    expect([failed.message, failed.next]).toEqual([`Review refused: lint hasn't passed on ${revision.slice(0, 7)}.`, `Run ${command}, then submit again.`])
+  })
+
   it('#1651: a passed check whose record is still being written when submit comes is waited for: accepted the first time', async () => {
     // The check's command ends only once the submit waits for the project's check records (as hive-progress exits
     // before its run's CheckRan is written): without the wait the submit reads no passed lint and is refused.

@@ -63,8 +63,8 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.submit.trailer.change', defaultMessage: 'Each card in its own folder needs no trailers: Version Control → Where cards are built.', description: 'Where the setting that needs commit trailers is changed.' })
   ),
   'submit.checksPassed': r(
-    msg({ id: 'workflow.refused.submit.checksPassed.message', defaultMessage: "Review refused: {check} hasn't passed on {revision}.", description: 'A refused submit: a configured check has no passing counted run on the revision. {check} is the check name, {revision} a short revision id.' }),
-    msg({ id: 'workflow.refused.submit.checksPassed.next', defaultMessage: 'Run {command}, then submit again.', description: 'The next step after a refused submit for a missing check: {command} is the command to run.' }),
+    msg({ id: 'workflow.refused.submit.checksPassed.message', defaultMessage: "Review refused: {check} hasn't passed on {revision}.{why, select, notCheck { Its last run passed but didn't count: it wasn't the check's configured command.} notContained { Its last run passed but didn't count: what it ran on doesn't contain the revision.} dirty { Its last run passed but didn't count: the folder had uncommitted changes{files, select, none {} other { ({files})}}.} moved { Its last run passed but didn't count: something else was checked out by its end.} changed { Its last run passed but didn't count: files changed in the folder while it ran{files, select, none {} other { ({files})}}.} revisionChanged { Its last run passed but didn't count: the card's files changed while it ran.} other {}}", description: "A refused submit: a configured check has no passing counted run on the revision. {check} is the check name, {revision} a short revision id. {why} picks why its last run there didn't count (#1654; keep each branch's key as it is; 'other': it didn't run there, or failed, and nothing is added); {files} lists the paths that changed, or is 'none' (keep the key)." }),
+    msg({ id: 'workflow.refused.submit.checksPassed.next', defaultMessage: "{why, select, dirty {Commit or remove the uncommitted changes, run {command} again, then submit again.} changed {{copy, select, yes {Run {command} again with nothing else writing in the folder, or add --isolated to run it in a check copy of its own, then submit again.} other {Run {command} again with nothing else writing in the folder, then submit again.}}} notContained {Run {command} in the card's own folder, at its revision, then submit again.} other {Run {command}, then submit again.}}", description: "The next step after a refused submit for a missing check: {command} is the command to run. {why} picks the remedy for why its last run didn't count (#1654; keep each branch's key as it is); {copy} is 'yes' where a check copy (--isolated, kept as typed) can be used." }),
     msg({ id: 'workflow.refused.submit.checksPassed.change', defaultMessage: 'This rule is set in Version Control → Checks pass before review.', description: 'Where the rule that refused a submit for a missing check is changed.' })
   ),
   'submit.identity': r(
@@ -312,10 +312,19 @@ export interface RefusalFormat {
 
 const IN_ENGLISH: RefusalFormat = { one: (m, values) => englishText(values ? { m, values } : m), list: (items) => items.join(', '), names: false }
 
+/**
+ * Values a rule's text takes that refusals recorded earlier don't have (their facts keep the values of their time), and
+ * what each was then: `submit.checksPassed`'s last run's reason (#1654), none before.
+ */
+const VALUES_BEFORE: Partial<Record<RuleId, Record<string, string>>> = {
+  'submit.checksPassed': { why: 'none', files: 'none', copy: 'no' } // i18n-ignore: select keys, never shown
+}
+
 /** The three sentences of a refusal, formatted by `f`: `change` null when the rule has none. */
 export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalFormat): { message: string; next: string; change: string | null } {
   const t = REFUSALS[rule]
-  const vals: Record<string, string | number> = {}
+  // A refusal recorded before its rule's text took a value has none of it: the value its text had before (#1654).
+  const vals: Record<string, string | number> = { ...VALUES_BEFORE[rule] }
   for (const [k, v] of Object.entries(values)) vals[k] = typeof v === 'object' ? (workflowLine(v, f.one) ?? '') : v
   // A stage by its name (stages.ts), as the board shows it, to agents too (#1604: "Active", never the id "active"): the
   // project's own, else its message; an id this Hive doesn't know as it is.

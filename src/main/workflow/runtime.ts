@@ -1199,7 +1199,12 @@ export class Workflow {
       }
     }
     inputs.revision = revision
-    if (r.guards.submit.includes('submit.checksPassed') && card.kind === 'code') inputs.checksMissing = o.preChecks.filter((name) => !s.checks.some((c) => c.name === name && c.revision === revision && c.result === 'passed' && c.counted))
+    if (r.guards.submit.includes('submit.checksPassed') && card.kind === 'code') {
+      inputs.checksMissing = o.preChecks.filter((name) => !s.checks.some((c) => c.name === name && c.revision === revision && c.result === 'passed' && c.counted))
+      // The first missing check's newest run on the revision, if it passed and didn't count: the refusal says why (#1654).
+      const last = inputs.checksMissing.length ? s.checks.findLast((c) => c.name === inputs.checksMissing![0] && c.revision === revision) : undefined
+      if (last && last.result === 'passed' && !last.counted && last.whyNot) inputs.checkUncounted = { whyNot: last.whyNot, ...(last.changes?.length ? { changes: last.changes } : {}), isolatable: o.platform === 'git' && !last.isolated }
+    }
     // G13: the builder's own running work, whoever submits (an agent itself; the user's or the Assistant's move: the
     // card's builder). Read again in the write (`runsNow`): work started meanwhile counts.
     const runner = agent ?? (s.started?.builder && s.started.builder !== 'user' ? s.started.builder : null)

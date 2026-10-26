@@ -32,7 +32,7 @@ import { workflowFor } from './service'
 import type { RunRevision } from '../platform/adapter'
 import type { ProgressRun, ProjectConfig } from '../../shared/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
-import { agentActor, foldCard, type Actor, type CheckRanData, type Fact } from '../../shared/workflow/facts'
+import { agentActor, CHANGES_KEPT, foldCard, type Actor, type CheckRanData, type Fact } from '../../shared/workflow/facts'
 import { allOff } from '../../shared/workflow/options'
 
 /** What a run is for, as Hive knows it when the run starts. */
@@ -92,6 +92,9 @@ async function tracked(folder: string): Promise<{ files: string[]; gitDir: strin
 
 /** A list read, or none where it couldn't be. */
 const known = (l: Maybe<string[]>): string[] => (isUnknown(l) ? [] : l)
+const listed = (l: Maybe<string[]> | null): string[] => (l === null ? [] : known(l))
+/** The paths a CheckRan keeps of what stopped it counting: each once, at most CHANGES_KEPT. */
+const kept = (paths: string[]): string[] => [...new Set(paths)].slice(0, CHANGES_KEPT)
 
 /** None's hasher of the project, its configured exclusions left out of the deliverables. */
 function noneOf(r: CheckRunFor): NoneAdapter {
@@ -160,7 +163,8 @@ export async function checkEnd(r: CheckRunFor, start: CheckStart, end: { at: num
     if (!check.ran) whyNot = 'notCheck'
     else if (start.revision === null || isUnknown(after) || !samePaths || start.revision !== after.revision) whyNot = 'revisionChanged'
     else if (isUnknown(seen) ? start.snapshot !== snapB : seen.changed) whyNot = 'changed'
-    return { ...base, revision: start.revision ?? '', tested, counted: !whyNot, ...(whyNot ? { whyNot } : {}) }
+    const changes = whyNot === 'changed' && !isUnknown(seen) ? kept(seen.paths) : []
+    return { ...base, revision: start.revision ?? '', tested, counted: !whyNot, ...(whyNot ? { whyNot } : {}), ...(changes.length ? { changes } : {}) }
   }
   const tested = r.tested ?? ''
   const revision = start.revision
@@ -179,7 +183,9 @@ export async function checkEnd(r: CheckRunFor, start: CheckStart, end: { at: num
   else if (isDirty(start.dirty) || isDirty(dirtyB)) whyNot = 'dirty'
   else if (headB !== tested) whyNot = 'moved'
   else if (isUnknown(seen) ? start.snapshot !== snapB : seen.changed) whyNot = 'changed'
-  return { ...base, revision: revision ?? '', tested, counted: !whyNot, ...(whyNot ? { whyNot } : {}) }
+  // What stopped it counting, where it is known (#1654): what the watcher saw written, or the uncommitted files.
+  const changes = whyNot === 'changed' && !isUnknown(seen) ? kept(seen.paths) : whyNot === 'dirty' ? kept([...listed(start.dirty), ...listed(dirtyB)]) : []
+  return { ...base, revision: revision ?? '', tested, counted: !whyNot, ...(whyNot ? { whyNot } : {}), ...(changes.length ? { changes } : {}) }
 }
 
 // --- In the app: the runs being bracketed, from their start (servers.ts' POST /v1/progress) to their finish.
@@ -256,6 +262,9 @@ export function bracketStarted(runId: string, b: Bracket): void {
   open.set(runId, b)
 }
 
+/** A run's record as a check: its `CheckRan`, its platform, and whether it blocks review (#1279). */
+export type Recorded = CheckRanData & { platform: PlatformId; blocks?: 'review' }
+
 /**
  * Each project's check records still being written, by workspace and project folder (#1651): a submit right after
  * hive-progress exits waits for them (`checksSettled`), since a run's end reads the folder (the watcher settling, git)
@@ -275,7 +284,7 @@ export async function checksSettled(ws: WorkspaceService, projectPath: string): 
  * A run finished: its `CheckRan`, written in its card's facts inside a board change, or null when it wasn't bracketed,
  * didn't end with a result, or its workspace or card has gone meanwhile. Its project's submits wait for it meanwhile.
  */
-export function bracketFinished(run: ProgressRun): Promise<(CheckRanData & { blocks?: 'review' }) | null> {
+export function bracketFinished(run: ProgressRun): Promise<Recorded | null> {
   const b = open.get(run.id)
   open.delete(run.id)
   if (!b) return Promise.resolve(null)
@@ -293,7 +302,7 @@ export function bracketFinished(run: ProgressRun): Promise<(CheckRanData & { blo
   return work
 }
 
-async function record(run: ProgressRun, b: Bracket): Promise<(CheckRanData & { blocks?: 'review' }) | null> {
+async function record(run: ProgressRun, b: Bracket): Promise<Recorded | null> {
   if (run.finishedAt === null || (run.state !== 'passed' && run.state !== 'failed' && run.state !== 'stopped')) return null
   if (b.ws.path !== b.workspacePath || !cardOf(b)) return null
   // Its command as its reporter said (hive-progress: the check's command, or its command line); None's declared paths
@@ -314,7 +323,7 @@ async function record(run: ProgressRun, b: Bracket): Promise<(CheckRanData & { b
   // A failed check its card's rules require before Review (#1279): its row says it blocks review, until seen.
   const wf = data.result !== 'passed' && b.ws.path ? await workflowFor(b.ws, join(b.ws.path, b.project)).catch(() => null) : null
   const gate = wf ? await boardWrite(b.ws, async () => (cardOf(b) ? blocks(wf, facts.card(b.for.card), data) : null)).catch(() => null) : null
-  return gate ? { ...data, blocks: gate } : data
+  return { ...data, platform: b.for.platform, ...(gate ? { blocks: gate } : {}) }
 }
 
 /** Brackets read at resolve (before hive-progress starts the command), by the link it gave out, until their start. */
