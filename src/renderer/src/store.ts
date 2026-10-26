@@ -232,6 +232,13 @@ interface State {
    */
   sidebarFolded: boolean
   sidebarUnfolded: boolean
+  /**
+   * The Progress panel folded to its strip for now (HI-1737, the Assistant's rule): the work short of its least width
+   * even with the sidebar given way. Never saved (the panel stays open in what is kept); `progressUnfolded`: the user
+   * opened it meanwhile, until there's room.
+   */
+  progressFolded: boolean
+  progressUnfolded: boolean
   /** Set to select a session in its project's Sessions tab. */
   /** Open the Sessions tab on a session, and in it at its nth compaction (from 0, oldest first) when given. */
   sessionsJump: { project: string; id: string; nonce: number; compaction?: number } | null
@@ -507,6 +514,8 @@ export const useStore = create<State>(() => ({
   sidebarCompact: false,
   sidebarFolded: false,
   sidebarUnfolded: false,
+  progressFolded: false,
+  progressUnfolded: false,
   sessionsJump: null,
   activityFilters: {},
   filesJump: null,
@@ -917,9 +926,15 @@ export async function setAssistantSide(side: AssistantPanelSide): Promise<void> 
 
 const progressOpenKey = (ws: string): string => `progress-open:${ws.toLowerCase()}`
 
-/** Whether this window's workspace's Progress panel is open (else it is folded to its strip). */
+/** Whether this window's workspace's Progress panel shows open (else it is folded to its strip, by the user or for the room). */
 export function useProgressOpen(): boolean {
-  return useStore((s) => !!s.workspace && s.panes[progressOpenKey(s.workspace.path)] === 1)
+  return useStore((s) => !!s.workspace && s.panes[progressOpenKey(s.workspace.path)] === 1 && !(s.progressFolded && !s.progressUnfolded))
+}
+
+/** Whether the user left the Progress panel open (what is kept), folded for the room or not (HI-1737's layoutRoom). */
+export function progressWanted(): boolean {
+  const ws = get().workspace?.path
+  return !!ws && get().panes[progressOpenKey(ws)] === 1
 }
 
 /** The Progress panel's filter as chosen for this window's workspace (#251), if any. */
@@ -943,14 +958,15 @@ export function setProgressFilter(f: ProgressFilter): void {
 export function setProgressOpen(open: boolean): void {
   const ws = get().workspace?.path
   if (!ws) return
-  set((s) => ({ panes: { ...s.panes, [progressOpenKey(ws)]: open ? 1 : 0 } }))
+  // Folded for the room (HI-1737): opening it shows it anyway, until there's room; folding it is the user's again.
+  set((s) => ({ panes: { ...s.panes, [progressOpenKey(ws)]: open ? 1 : 0 }, progressUnfolded: open && s.progressFolded }))
   void window.hive.invoke('ui:setPane', progressOpenKey(ws), open ? 1 : 0)
 }
 
 /** Whether the Progress panel is open now (for commands). */
 export function progressIsOpen(): boolean {
-  const ws = get().workspace?.path
-  return !!ws && get().panes[progressOpenKey(ws)] === 1
+  const s = get()
+  return progressWanted() && !(s.progressFolded && !s.progressUnfolded)
 }
 
 /** Whether a workspace's Assistant panel was left open. */

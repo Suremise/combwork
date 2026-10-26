@@ -8058,9 +8058,10 @@ button.mode-badge.badge:hover {
   position: relative;
   display: flex;
   flex-direction: column;
-  /* Gives way first when the window is short of room for the work (HI-1737), down to its least width. */
+  /* Gives way first when the window is short of room for the work (HI-1737), down to its least width: 240 px, or less
+     (to 190) once everything else has given way (layoutRoom.ts sets it). */
   flex-shrink: 1000;
-  min-width: 240px;
+  min-width: var(--assistant-min, 240px);
   max-width: 70vw;
   background: var(--bg-sidebar);
   border-left: 1px solid var(--border-subtle);
@@ -8125,6 +8126,9 @@ button.mode-badge.badge:hover {
   font: inherit;
   font-size: 11px;
   cursor: pointer;
+  /* Squeezed past its icon and caret (the panel narrowed for the work, HI-1737): cut inside the pill, never drawn over
+     Start beside it. */
+  overflow: hidden;
 }
 .assistant-mode:hover {
   color: var(--fg);
