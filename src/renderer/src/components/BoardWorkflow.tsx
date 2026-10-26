@@ -1,17 +1,17 @@
-import { useEffect, useState } from 'react'
-import type { ProjectInfo, ProjectStages, WorkflowForm } from '@shared/types'
+import { useEffect, useRef, useState } from 'react'
+import type { ProjectInfo, WorkflowForm } from '@shared/types'
 import { msg, tr } from '@shared/i18n'
 import { PRESET_TEXT } from '@shared/workflow/optionTexts'
 import { call } from '../api'
-import { NO_PROJECTS, showVersionControl, useLanguage, useStore } from '../store'
+import { boardStagesFor, loadTasks, NO_PROJECTS, showVersionControl, useLanguage, useStore } from '../store'
 import type { BoardProject } from '../boardStages'
 import { M as VC_TEXT, PLATFORM_TEXT, presetState } from '../views/VersionControlHeader'
 import { Icon, Tooltip, useContextMenu } from './ui'
 
 /**
  * The board's link to each shown project's workflow (#1420): "Workflow: Git · Team" for the project shown, a line per
- * project in a menu with several; each opens its Version Control tab at Workflow. And the shown projects' stages
- * (`workflow:stages`), read again when a project's workflow is written (`workflow-changed`).
+ * project in a menu with several; each opens its Version Control tab at Workflow. And the shown projects' stages, for
+ * the board's columns (`board:stages`, read with the board's cards).
  */
 
 /** The projects the board shows: one, or every project of the workspace. */
@@ -39,11 +39,24 @@ function usePerProject<T>(project: string | null, read: (path: string) => Promis
   return read_?.values ?? new Map()
 }
 
-/** The shown projects with their stages, for the board's columns. */
-export function useBoardProjects(project: string | null): BoardProject[] {
+/**
+ * The shown projects with their stages, for the board's columns: from the board's own read (`board:stages`, read with
+ * its cards), so its columns are right in its first paint, never added after it (HI-1682). Null until that read is
+ * there, and when the board opens on stages read for an older workflow or projects (read again meanwhile): it never
+ * draws a set of columns the workflow then changes. Once drawn, a change of the workflow changes them once, when read.
+ */
+export function useBoardProjects(project: string | null): BoardProject[] | null {
   const shown = useShown(project)
-  const stages = usePerProject<ProjectStages | null>(project, (path) => call('workflow:stages', path))
-  return shown.map((p) => ({ name: p.name, stages: stages.get(p.path.toLowerCase()) ?? null }))
+  const stages = useStore((s) => s.boardStages)
+  const current = useStore(boardStagesFor)
+  const drawn = useRef(false)
+  const fresh = stages?.for === current
+  useEffect(() => {
+    if (!fresh) void loadTasks()
+  }, [fresh, current])
+  if (!stages || (!fresh && !drawn.current)) return null
+  drawn.current = true
+  return shown.map((p) => ({ name: p.name, stages: stages.byPath[p.path.toLowerCase()] ?? null }))
 }
 
 /** "Workflow: Git · Team" for a project, as its Version Control tab says it. */

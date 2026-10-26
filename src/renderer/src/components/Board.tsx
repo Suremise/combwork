@@ -39,7 +39,7 @@ import { ProviderIcon } from './ProviderIcon'
 import { CardCostLine } from './CardCost'
 import { useLaneOf, useLanes } from '../laneSource'
 import { DocRefViewer, problemLines } from './DocRefViewer'
-import { boardLayout, cardColumn, cardStage, ownStageName, type BoardStageColumn } from '../boardStages'
+import { boardLayout, cardColumn, cardStage, ownStageName, type BoardProject, type BoardStageColumn } from '../boardStages'
 import { BoardWorkflowLink, useBoardProjects } from './BoardWorkflow'
 import { useAdvancedValue } from '../advanced'
 import type { StageId } from '@shared/workflow/facts'
@@ -48,6 +48,7 @@ import { gist } from '@shared/gist'
 
 const NO_TASKS: TaskCard[] = []
 const NO_FOLD: BoardFold = {}
+const NO_BOARD_PROJECTS: BoardProject[] = []
 
 /** This workspace's board as the user left it (#170): its collapsed columns and folded cards. */
 function useBoardFold(): BoardFold {
@@ -685,8 +686,10 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
   const colors = useStore((s) => s.settings?.board.colors)
   const fold = useBoardFold()
   const headerMenu = useContextMenu()
-  // Its columns from the shown projects' stages (#1420): their options' stages and any a card of theirs is in.
-  const shownProjects = useBoardProjects(project)
+  // Its columns from the shown projects' stages (#1420): their options' stages and any a card of theirs is in. Null
+  // until those are known: the board's frame shows without columns meanwhile, never a set the workflow then changes (HI-1682).
+  const known = useBoardProjects(project)
+  const shownProjects = known ?? NO_BOARD_PROJECTS
   const live = useMemo(() => all.filter((c) => !c.archived && (project === null || c.project.toLowerCase() === project.toLowerCase())), [all, project])
   const stageOf = (c: TaskCard) => cardStage(c.column, workBadges.get(c.number)?.stage)
   const enforced = useAdvancedValue<boolean>('hive.workflow.enforce')
@@ -822,6 +825,7 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
   }, [dragging])
 
   if (archived) return <ArchivedTable cards={cards} project={project} query={query} />
+  if (!known) return <div ref={boardRef} className={cx('board', colored && 'colored')} data-loading="" />
 
   const drop = async (into: BoardColumnId): Promise<void> => {
     const d = dragNow.current
@@ -969,7 +973,9 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
         const open = g.columns.filter((c) => !fold.columns?.includes(c.id)).length
         return (
           <div key={g.category} className={cx('board-category', !open && 'collapsed')} data-category={g.category} style={{ flexGrow: open, ...({ '--stages': g.columns.length, '--folded': g.columns.length - open } as React.CSSProperties), ...(colored ? ({ '--col': columnColor(colors, g.category) } as React.CSSProperties) : {}) }}>
-            <div className="board-category-head">{tr(COLUMN_TEXT[g.category].label)}</div>
+            <div className="board-category-head">
+              <span>{tr(COLUMN_TEXT[g.category].label)}</span>
+            </div>
             <div className="board-category-columns">{g.columns.map(column)}</div>
           </div>
         )

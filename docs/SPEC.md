@@ -1580,12 +1580,15 @@ English ("Moved to Doing", which agents, Hive's code and the scenarios read) and
 shows as "Moved to Active"; Archive All's reasons and Start's refusals say Active and Approved. Refusals only agents get
 (an agent's placement, ordering or review of a card) keep Doing and Passed.
 
-**Built [#1420]:** the board's columns are stages (`src/renderer/src/boardStages.ts`, laid out from `workflow:stages`
-and each card's stage from its facts). Each category in its fixed order shows its stages as columns: those the shown
+**Built [#1420]:** the board's columns are stages (`src/renderer/src/boardStages.ts`, laid out from each project's
+stages and each card's stage from its facts). The stages come with the board's cards (`board:stages`, read with them
+when a workflow was written or the projects changed since), so every column is there in the board's first paint and
+none is added after it (HI-1682); a board opened before that read shows its frame without columns. Each category in its fixed order shows its stages as columns: those the shown
 projects' current options produce, and any a card of theirs is in (a card under old rules keeps its stage shown).
 On Hold, Todo, Active and Done always show; Review and Approved only with a stage, or all six while Settings →
 Advanced → *Workflow rules are enforced* is off (cards move freely then). Approved with Merging is two columns
-under one Approved heading, in the category's colour. With several projects shown the columns are the union of their
+under one Approved heading, in the category's colour: a line over them in the gap above the columns with the name on
+it, as a fieldset's legend, taking no row of its own (every column starts at the same height with a group or without). With several projects shown the columns are the union of their
 stages; a column takes a project's rename when one project is shown or every shown project names it alike, else its
 default name, and a card's project chip then says its own project's name for the stage. A drop into a stage is its
 category's move; **Merging is no drop target** (its hover says cards come through the merge queue), and a card in

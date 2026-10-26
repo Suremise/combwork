@@ -809,6 +809,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'workflow:check': (p, change) => checkWorkflowChange(workspace, workspace.assertProject(p), change),
     'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [] }),
     'workflow:stages': (p) => projectStages(workspace, workspace.assertProject(p)),
+    'board:stages': async () => Object.fromEntries(await Promise.all((workspace.info()?.projects ?? []).map(async (p) => [p.path.toLowerCase(), await projectStages(workspace, p.path).catch(() => null)] as const))),
     'workflow:checkPlatform': (p, to) => checkPlatformSwitch(workspace, workspace.assertProject(p), to),
     'workflow:setPlatform': (p, to, opts) => setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected }),
     'workflow:presetNotNow': (p, platform) => presetNotNow(workspace, workspace.assertProject(p), platform),
