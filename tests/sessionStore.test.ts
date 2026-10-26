@@ -27,7 +27,8 @@ const { storeValue, storeTestHooks } = await import('../src/main/storeRows')
 const { sessions } = await import('../src/main/sessions')
 const removal = await import('../src/main/projectRemoval')
 const { workspaceDb } = await import('../src/main/boardStore')
-const { sessionRows, sessionsOf } = await import('../src/main/sessionStore')
+const { readSessions, sessionRows, sessionsOf } = await import('../src/main/sessionStore')
+type SessionsPlace = import('../src/main/sessionStore').SessionsPlace
 
 const at = '2026-10-19T10:00:00.000Z'
 const rec = (id: string, over: Partial<SessionRecord> = {}): SessionRecord => ({ id, agent: 'claude-code', name: `Session ${id}`, createdAt: at, lastActiveAt: at, archived: false, ...over })
@@ -289,6 +290,43 @@ describe('following the project', () => {
     await run(() => removal.restoreProject('travels'))
     expect((await run(() => workspace.sessionsFile(p))).sessions.map((x) => x.id).sort()).toEqual(['late', 't1', 't2'])
     expect(existsSync(file)).toBe(false)
+  })
+
+  it('a read or change that found its place while the project was being removed, and gets its turn once it is removed, leaves the file in the folder (#1161)', async () => {
+    const p = project('stale-place')
+    await run(() => workspace.ensureProject(p))
+    await run(() => workspace.projectIds({ fresh: true }))
+    await run(() => workspace.upsertSession(p, { id: 'k1' }))
+    // Worked out before the project was hidden as removed (a change waiting for its database lease meanwhile).
+    const place = await run(() => (w as unknown as { sessionsPlace: (pp: string) => Promise<SessionsPlace> }).sessionsPlace(p))
+    await run(() => removal.removeProject(p, 'remove'))
+    const file = join(p, '.hive', 'sessions.json')
+    expect((await readSessions(place)).sessions).toEqual([])
+    expect(existsSync(file)).toBe(true)
+    await run(() => removal.restoreProject('stale-place'))
+    expect((await run(() => workspace.sessionsFile(p))).sessions.map((x) => x.id)).toEqual(['k1'])
+  })
+
+  it("a removed project read under its folder's scope (its id unreadable for a moment) leaves the file in the folder (#1161)", async () => {
+    const p = project('unread-id')
+    await run(() => workspace.ensureProject(p))
+    await run(() => workspace.projectIds({ fresh: true }))
+    await run(() => workspace.upsertSession(p, { id: 'u1' }))
+    await run(() => removal.removeProject(p, 'remove'))
+    const file = join(p, '.hive', 'sessions.json')
+    const cfg = join(p, '.hive', 'project.json')
+    // Its id can't be read: the read is under `folder:unread-id`, where no export is marked.
+    renameSync(cfg, `${cfg}.aside`)
+    try {
+      await run(() => workspace.projectIds({ fresh: true }))
+      expect((await run(() => workspace.sessionsFile(p))).sessions).toEqual([])
+      expect(existsSync(file)).toBe(true)
+    } finally {
+      renameSync(`${cfg}.aside`, cfg)
+      await run(() => workspace.projectIds({ fresh: true }))
+    }
+    await run(() => removal.restoreProject('unread-id'))
+    expect((await run(() => workspace.sessionsFile(p))).sessions.map((x) => x.id)).toEqual(['u1'])
   })
 
   it('a project renamed keeps its records (they are under its id)', async () => {
