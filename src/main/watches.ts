@@ -28,7 +28,8 @@ import { isUnread, type DeliveryRecord } from '../shared/deliveries'
 import { cancelFromSource, createDelivery, deliveryNow, followAgent, inFlightNow as deliveriesInFlight, load as loadDeliveries, offerNow, registerSource, settled as deliveriesSettled } from './deliveries'
 import { inFlightNow as writerInFlight, onLineComing, settled as writerSettled } from './lineWriter'
 import { readyFor } from './readiness'
-import { withCardNames } from './projectKeys'
+import { cardNamesOf, withCardNames } from './projectKeys'
+import { namedBy } from '../shared/projectKeys'
 
 /**
  * Wake-on-change watches (#128): an agent registers what it waits for on the board (hive_wait_for_tasks with wake), ends
@@ -677,12 +678,23 @@ const saveQuietly = (store: Store): Promise<void> =>
     log.warn('saving watches', e)
   })
 
-const infoOf = (r: WatchRecord): TaskWatchInfo =>
-  r.agents
-    ? { cards: [], changes: [], agents: r.agents.agents.map((a) => a.name), label: agentWatchLabel(r.agents), since: r.since, limitAt: r.limitAt }
-    : r.lanes
-      ? { cards: r.cond.cards, changes: r.cond.changes, lanes: r.lanes.ids === 'all' ? ['all'] : [...r.lanes.ids], label: laneWatchLabel(r.lanes, r.cond.cards), since: r.since, limitAt: r.limitAt }
-      : { cards: r.cond.cards, changes: r.cond.changes, ...(r.cond.column ? { column: r.cond.column } : {}), label: watchLabel(r.cond), since: r.since, limitAt: r.limitAt }
+/**
+ * A watch as Hive reports it (its English `label`: the Agent API's statusMessage and watching, the inbox's offer line).
+ * Its cards are named as its watcher's workspace names them (HI-1688: by key, "Waiting for HI-12 → Review"), whatever
+ * work asks: a status read outside any request has no names of its own, and gave `#12`. A project agent's watch names
+ * another project's card by its number, as everything that agent reads does (#1219).
+ */
+function infoOf(r: WatchRecord): TaskWatchInfo {
+  const ws = workspaceFor(r.projectPath)
+  const names = ws?.path ? cardNamesOf(ws, ws.isAssistantHome(r.projectPath) ? null : basename(r.projectPath)) : null
+  return namedBy(names, () =>
+    r.agents
+      ? { cards: [], changes: [], agents: r.agents.agents.map((a) => a.name), label: agentWatchLabel(r.agents), since: r.since, limitAt: r.limitAt }
+      : r.lanes
+        ? { cards: r.cond.cards, changes: r.cond.changes, lanes: r.lanes.ids === 'all' ? ['all'] : [...r.lanes.ids], label: laneWatchLabel(r.lanes, r.cond.cards), since: r.since, limitAt: r.limitAt }
+        : { cards: r.cond.cards, changes: r.cond.changes, ...(r.cond.column ? { column: r.cond.column } : {}), label: watchLabel(r.cond), since: r.since, limitAt: r.limitAt }
+  )
+}
 /** A watcher's project's id (#508), as the workspace last read the ids (it reads them when it opens). */
 const projectIdOf = (ws: WorkspaceService, projectPath: string): { projectId?: string } => {
   const id = ws.isAssistantHome(projectPath) ? undefined : ws.projectIdsNow().byPath.get(resolve(projectPath).toLowerCase())
