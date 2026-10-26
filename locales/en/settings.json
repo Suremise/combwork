@@ -1,4 +1,240 @@
 {
+  "settings.accounts.add": {
+    "defaultMessage": "Add Account…",
+    "description": "Button in Settings → Accounts: adds an account (asks its name), then opens its sign-in."
+  },
+  "settings.accounts.addConfirm": {
+    "defaultMessage": "Add and Sign In",
+    "description": "The confirm button of the dialog adding an account (Settings → Accounts)."
+  },
+  "settings.accounts.addFailed": {
+    "defaultMessage": "Couldn't add the account",
+    "description": "An error's title: adding an account failed (Settings → Accounts)."
+  },
+  "settings.accounts.addMessage": {
+    "defaultMessage": "A name for it, such as Personal or Work. Hive makes its folder, then opens {cli}'s sign-in in your browser.",
+    "description": "The message of the dialog asking a new account's name (Settings → Accounts). {cli} is a coding agent CLI."
+  },
+  "settings.accounts.addTitle": {
+    "defaultMessage": "Add a {cli} account",
+    "description": "Title of the dialog asking a new account's name (Settings → Accounts). {cli} is a coding agent CLI (\"Claude Code\")."
+  },
+  "settings.accounts.changeFailed": {
+    "defaultMessage": "Couldn't change the account",
+    "description": "An error's title: renaming an account, turning it on or off, or making it the default failed."
+  },
+  "settings.accounts.changedTo": {
+    "defaultMessage": "Now signed in as {now}, was {was}",
+    "description": "A warning on an account (Settings → Accounts): its login changed (a /login typed in a pane). {now} and {was} are emails."
+  },
+  "settings.accounts.checkedAt": {
+    "defaultMessage": "Checked {when}",
+    "description": "The tooltip of an account's state (Settings → Accounts): when it was last checked. {when} is how long ago (\"5 min ago\")."
+  },
+  "settings.accounts.closeTerminal": {
+    "defaultMessage": "Close",
+    "description": "Button under an account's ended sign-in terminal (Settings → Accounts): hides it."
+  },
+  "settings.accounts.default": {
+    "defaultMessage": "Default",
+    "description": "The choice on an account (Settings → Accounts): the open workspace's default account for its CLI."
+  },
+  "settings.accounts.isDefault": {
+    "defaultMessage": "This workspace's default",
+    "description": "Shown on the account that is the open workspace's default (Settings → Accounts)."
+  },
+  "settings.accounts.keep": {
+    "defaultMessage": "Keep the New Login",
+    "description": "Button on an account whose login changed (Settings → Accounts): takes on the login it is now signed in as."
+  },
+  "settings.accounts.keepFailed": {
+    "defaultMessage": "Couldn't keep the new login",
+    "description": "An error's title: Keep the New Login failed."
+  },
+  "settings.accounts.keepRename": {
+    "defaultMessage": "Kept. Rename {name} to match?",
+    "description": "After Keep the New Login on an account ({name}): offers to rename it, since it is now another login."
+  },
+  "settings.accounts.leftover": {
+    "defaultMessage": "Not all removed: {what}. Remove tries again; nothing outside its folder was touched.",
+    "description": "A warning on an account (Settings → Accounts) whose removal stopped partway. {what} is what's left, in English."
+  },
+  "settings.accounts.list.desc": {
+    "defaultMessage": "Add an account, sign it in, and choose which are on in this workspace and which is its default.",
+    "description": "What the list \"Accounts\" does, under its title (Settings → Accounts)."
+  },
+  "settings.accounts.list.tip": {
+    "defaultMessage": "Each account is a folder of its own that Hive made, signed in with Claude Code's own sign-in in your browser: Hive never sees or keeps its login. Its conversations and memory are shared with your other accounts through a link to Claude Code's projects folder. Its settings, trusted folders and MCP servers are its own. Removing an account deletes its folder and its login on this PC, never your conversations.",
+    "description": "The info tip of the list \"Accounts\" (Settings → Accounts): more on what it does and when it applies."
+  },
+  "settings.accounts.list.title": {
+    "defaultMessage": "Accounts",
+    "description": "A setting's title (Settings → Accounts): the list of accounts."
+  },
+  "settings.accounts.loading": {
+    "defaultMessage": "Loading…",
+    "description": "Settings → Accounts while its list loads."
+  },
+  "settings.accounts.makeDefault": {
+    "defaultMessage": "Make Default",
+    "description": "Button on an account (Settings → Accounts): makes it the open workspace's default account for its CLI (turning it on)."
+  },
+  "settings.accounts.name": {
+    "defaultMessage": "Name",
+    "description": "The label of the box for an account's name (Settings → Accounts)."
+  },
+  "settings.accounts.needName": {
+    "defaultMessage": "Give it a name.",
+    "description": "Under the name box of an account (Settings → Accounts) while it's empty."
+  },
+  "settings.accounts.noWorkspace": {
+    "defaultMessage": "Open a workspace to choose which accounts are on in it.",
+    "description": "Settings → Accounts with no workspace open: the On and Default choices are per workspace."
+  },
+  "settings.accounts.none": {
+    "defaultMessage": "No accounts yet. Add one, then sign it in.",
+    "description": "Settings → Accounts when there are no accounts."
+  },
+  "settings.accounts.onHere": {
+    "defaultMessage": "On in this workspace",
+    "description": "The switch on an account (Settings → Accounts): whether it is on in the open workspace."
+  },
+  "settings.accounts.plan": {
+    "defaultMessage": "{email} · {plan}",
+    "description": "An account's identity in Settings → Accounts: the email it is signed in as, and its plan as the CLI names it (\"max\")."
+  },
+  "settings.accounts.remove": {
+    "defaultMessage": "Remove…",
+    "description": "Button on an account (Settings → Accounts): removes it and deletes its folder (asks first)."
+  },
+  "settings.accounts.removeConfirm": {
+    "defaultMessage": "Remove",
+    "description": "The confirm button of the dialog removing an account."
+  },
+  "settings.accounts.removeFailed": {
+    "defaultMessage": "Couldn't remove the account",
+    "description": "An error's title: removing an account failed."
+  },
+  "settings.accounts.removeMessage": {
+    "defaultMessage": "Its folder is deleted for good, with its login on this PC (it doesn't go to the Recycle Bin). Your conversations and Claude Code's memory are kept: they are shared with your other accounts. The account itself stays yours at Anthropic.",
+    "description": "The message of the dialog confirming an account's removal (Settings → Accounts)."
+  },
+  "settings.accounts.removeTitle": {
+    "defaultMessage": "Remove {name}?",
+    "description": "Title of the dialog confirming an account's removal ({name}, its name)."
+  },
+  "settings.accounts.removing": {
+    "defaultMessage": "Removing…",
+    "description": "The confirm button of the dialog removing an account, while it removes it."
+  },
+  "settings.accounts.rename": {
+    "defaultMessage": "Rename…",
+    "description": "Button on an account (Settings → Accounts): changes its name only."
+  },
+  "settings.accounts.renameConfirm": {
+    "defaultMessage": "Rename",
+    "description": "The confirm button of the dialog renaming an account."
+  },
+  "settings.accounts.renameTitle": {
+    "defaultMessage": "Rename {name}",
+    "description": "Title of the dialog renaming an account ({name}, its name)."
+  },
+  "settings.accounts.sameLogin": {
+    "defaultMessage": "Signed in to the same login as another account: {names}",
+    "description": "A warning on an account (Settings → Accounts): other accounts are signed in as the same login. {names} is their names, listed."
+  },
+  "settings.accounts.signIn": {
+    "defaultMessage": "Sign In",
+    "description": "Button on an account (Settings → Accounts): opens the CLI's own sign-in for it, in a terminal of Hive's."
+  },
+  "settings.accounts.signInAgain": {
+    "defaultMessage": "Sign In Again",
+    "description": "Button on an account (Settings → Accounts) that is signed out, or whose login changed: opens the CLI's own sign-in for it again."
+  },
+  "settings.accounts.signInFailed": {
+    "defaultMessage": "Couldn't open the sign-in",
+    "description": "An error's title: an account's sign-in terminal couldn't be opened."
+  },
+  "settings.accounts.signingIn": {
+    "defaultMessage": "Signing in: finish in your browser, or in the terminal below. Hive doesn't type into it.",
+    "description": "Settings → Accounts while an account's sign-in terminal is open: the user signs in through the CLI's own flow."
+  },
+  "settings.accounts.signingInElsewhere": {
+    "defaultMessage": "Signing in, in another window",
+    "description": "An account's line in Settings → Accounts while its sign-in is open in another of Hive's windows."
+  },
+  "settings.accounts.state.changed": {
+    "defaultMessage": "Login changed",
+    "description": "An account's state (Settings → Accounts): signed in as another login than the one it was added with."
+  },
+  "settings.accounts.state.failed": {
+    "defaultMessage": "Couldn't check",
+    "description": "An account's state (Settings → Accounts): Hive couldn't ask the CLI who it's signed in as (not the same as signed out)."
+  },
+  "settings.accounts.state.missing": {
+    "defaultMessage": "Folder missing",
+    "description": "An account's state (Settings → Accounts): its folder isn't there, or isn't the one Hive made."
+  },
+  "settings.accounts.state.signedIn": {
+    "defaultMessage": "Signed in",
+    "description": "An account's state (Settings → Accounts)."
+  },
+  "settings.accounts.state.signedOut": {
+    "defaultMessage": "Signed out",
+    "description": "An account's state (Settings → Accounts): the CLI says its folder isn't signed in."
+  },
+  "settings.accounts.state.unchecked": {
+    "defaultMessage": "Not checked yet",
+    "description": "An account's state (Settings → Accounts): Hive hasn't asked the CLI yet."
+  },
+  "settings.advanced.claude-code.accounts.emailField.desc": {
+    "defaultMessage": "The field of `claude auth status --json` with the email an account's folder is signed in as. Wrong, Hive can't tell who an account is, and can't warn when its login changes.",
+    "description": "What the advanced setting \"Accounts: email field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command)."
+  },
+  "settings.advanced.claude-code.accounts.emailField.title": {
+    "defaultMessage": "Accounts: email field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.accounts.loggedInField.desc": {
+    "defaultMessage": "The field of `claude auth status --json` that says whether an account's folder is signed in. Wrong, Hive can't tell, and its accounts show \"Couldn't check\".",
+    "description": "What the advanced setting \"Accounts: signed-in field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command)."
+  },
+  "settings.advanced.claude-code.accounts.loggedInField.title": {
+    "defaultMessage": "Accounts: signed-in field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.accounts.loginFiles.desc": {
+    "defaultMessage": "The names of the files in an account's folder that change when Claude Code signs in or out there, as a regular expression. Hive watches them (it never reads them) and checks the account again when one changes. Wrong, a /login or /logout typed in an agent's pane is only found at the account's next check.",
+    "description": "What the advanced setting \"Accounts: login files\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep /login and /logout as they are (commands)."
+  },
+  "settings.advanced.claude-code.accounts.loginFiles.title": {
+    "defaultMessage": "Accounts: login files",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.accounts.orgField.desc": {
+    "defaultMessage": "The field of `claude auth status --json` with the organisation's id an account's folder is signed in to. With the email, it tells two logins apart. Wrong, Hive can't tell who an account is.",
+    "description": "What the advanced setting \"Accounts: organisation field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command)."
+  },
+  "settings.advanced.claude-code.accounts.orgField.title": {
+    "defaultMessage": "Accounts: organisation field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.accounts.planField.desc": {
+    "defaultMessage": "The field of `claude auth status --json` with an account's plan (\"max\"), shown beside its email in Settings → Accounts. Wrong, no plan is shown.",
+    "description": "What the advanced setting \"Accounts: plan field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` and \"max\" as they are."
+  },
+  "settings.advanced.claude-code.accounts.planField.title": {
+    "defaultMessage": "Accounts: plan field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.accounts.statusSeconds.desc": {
+    "defaultMessage": "How long Hive gives `claude auth status` to say who an account's folder is signed in as. Past it, the account shows \"Couldn't check\", never signed out.",
+    "description": "What the advanced setting \"Accounts: sign-in check timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status` as it is (a command)."
+  },
+  "settings.advanced.claude-code.accounts.statusSeconds.title": {
+    "defaultMessage": "Accounts: sign-in check timeout",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.claude-code.exit.command.desc": {
     "defaultMessage": "What Hive types into Claude Code, then Enter, to end it once its lane has ended and its turn is over, so it exits by itself rather than being killed. Wrong, Claude Code isn't ended by it and is killed after the exit grace.",
     "description": "What the advanced setting \"Lane's end: exit command\" is for, and what goes wrong when it is wrong (Settings → Advanced). A lane is a card loop."
@@ -674,6 +910,14 @@
   "settings.advanced.error.text": {
     "defaultMessage": "{title} takes text.",
     "description": "Why an advanced setting's new value isn't taken. {title} is the setting's title."
+  },
+  "settings.advanced.hive.accounts.preview.desc": {
+    "defaultMessage": "Shows Settings → Accounts, where you keep a Claude Code login per account, each signed in through Claude Code's own sign-in. A preview: agents don't run on these accounts yet, and still use your usual Claude Code login.",
+    "description": "What the advanced setting \"Accounts (preview)\" does (Settings → Advanced, under Hive). Settings → Accounts names a section: use its name as Hive shows it."
+  },
+  "settings.advanced.hive.accounts.preview.title": {
+    "defaultMessage": "Accounts (preview)",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: a switch that shows Settings → Accounts before the feature is finished."
   },
   "settings.advanced.hive.agents.perProject.desc": {
     "defaultMessage": "How many agents a project can have (#562): {usual} unless you need more, up to {most}. Each agent runs its own copy of its CLI, so more agents take more memory, and they all share your plans' usage limits. Lowering it removes no agents: a project with more just can't add another. Templates and the Agent API keep to it too.",
@@ -3630,6 +3874,14 @@
   "settings.search": {
     "defaultMessage": "Search settings",
     "description": "Placeholder of Settings' search box."
+  },
+  "settings.section.accounts.desc": {
+    "defaultMessage": "The Claude Code logins Hive keeps, one folder each, signed in through Claude Code's own sign-in. Every account shares your conversations and Claude Code's memory. A preview: agents still run on your usual login.",
+    "description": "Under the heading of the section \"Accounts\" of Settings: what it holds."
+  },
+  "settings.section.accounts.label": {
+    "defaultMessage": "Accounts",
+    "description": "A section of Settings, in its list on the left: the coding agent CLIs' logins Hive keeps (Claude Code accounts)."
   },
   "settings.section.advanced.desc": {
     "defaultMessage": "Developer features, the details Hive relies on that a CLI update can break (advanced.json), logs, data and resetting Hive.",

@@ -1,6 +1,17 @@
 // Generated from locales/en/main.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
+  'main.accounts.badTarget': { target: string | number; cli: string | number }
+  'main.accounts.inUse': { name: string | number }
+  'main.accounts.leftover': { name: string | number }
+  'main.accounts.makeFailed': { error: string | number }
+  'main.accounts.noHome': { cli: string | number; folder: string | number }
+  'main.accounts.noName': undefined
+  'main.accounts.noProvider': { cli: string | number }
+  'main.accounts.notFound': undefined
+  'main.accounts.nothingToKeep': { name: string | number }
+  'main.accounts.previewOff': undefined
+  'main.accounts.removeFailed': { name: string | number; error: string | number }
   'main.antivirus.allExcluded': undefined
   'main.antivirus.changed': undefined
   'main.antivirus.closed': undefined

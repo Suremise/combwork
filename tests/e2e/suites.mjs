@@ -13,6 +13,7 @@
 // branches land in different places (tests/e2esuites.test.ts checks).
 export const SUITES = [
   { name: 'about' },
+  { name: 'accounts' },
   { name: 'activitytab' },
   { name: 'advanced' },
   { name: 'agentapislots' },

@@ -143,6 +143,12 @@ export interface ProviderCapabilities {
    * how a reviewer reaches the project's review copies. Without it, its reviewers review the builder's folder read-only.
    */
   extraDirs: boolean
+  /**
+   * The CLI keeps its login in a home folder given at launch (HI-980: Claude Code's CLAUDE_CONFIG_DIR), so Hive can keep
+   * an account per folder: `homeEnv` names the variable, `shared` the home's folders each account's folder links to by a
+   * junction (the adapter's accountSharedTarget says where). Absent: the CLI has no accounts in Hive.
+   */
+  accounts?: { homeEnv: string; shared: readonly string[] }
 }
 
 /** What the CLI said about a model, for modeCaveat. */

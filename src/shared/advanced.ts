@@ -206,6 +206,12 @@ export const LANES_GENTLE_END = 'hive.lanes.gentleEnd'
 /** The longest a lane's end waits for its builder's turn to end, in minutes (HI-1706): read by main's slotsApp. */
 export const LANES_END_WAIT_MINUTES = 'hive.lanes.endWaitMinutes'
 
+/**
+ * Whether Settings → Accounts is shown (HI-980, staged): its accounts aren't used by launches until HI-1755, which
+ * removes this switch. Read by main's accounts and the window.
+ */
+export const ACCOUNTS_PREVIEW = 'hive.accounts.preview'
+
 /** Whether reviewers review in review copies (#1435, SPEC §16.10.5): read by main's copiesApp. */
 export const COPIES_REVIEW = 'hive.copies.review'
 
@@ -763,6 +769,19 @@ const SOURCES: readonly AdvancedSource[] = [
     unit: 'min',
     applies: 'now'
   },
+  {
+    id: ACCOUNTS_PREVIEW,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.accounts.preview.title', defaultMessage: 'Accounts (preview)', description: "An advanced setting's title (Settings → Advanced), listed under Hive: a switch that shows Settings → Accounts before the feature is finished." }),
+    desc: msg({
+      id: 'settings.advanced.hive.accounts.preview.desc',
+      defaultMessage: "Shows Settings → Accounts, where you keep a Claude Code login per account, each signed in through Claude Code's own sign-in. A preview: agents don't run on these accounts yet, and still use your usual Claude Code login.",
+      description: 'What the advanced setting "Accounts (preview)" does (Settings → Advanced, under Hive). Settings → Accounts names a section: use its name as Hive shows it.'
+    }),
+    kind: 'boolean',
+    default: false,
+    applies: 'now'
+  },
   // Review and check copies (#1435, SPEC §16.10.5, §16.13): reviewers read and run commands in a copy at the exact revision.
   {
     id: COPIES_REVIEW,
@@ -1089,6 +1108,77 @@ const SOURCES: readonly AdvancedSource[] = [
     unit: 's',
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/exit-claude-2.1.310.json`, version: '2.1.310', text: '"exitCode": 0', shows: 'Claude Code exiting by itself 1.9 s after /exit and Enter' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  // Accounts (HI-980): what Hive reads from `claude auth status --json` in an account's folder, never a token.
+  {
+    id: 'claude-code.accounts.statusSeconds',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.accounts.statusSeconds.title', defaultMessage: 'Accounts: sign-in check timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.statusSeconds.desc', defaultMessage: "How long Hive gives `claude auth status` to say who an account's folder is signed in as. Past it, the account shows \"Couldn't check\", never signed out.", description: 'What the advanced setting "Accounts: sign-in check timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status` as it is (a command).' }),
+    kind: 'number',
+    default: 10,
+    min: 3,
+    max: 60,
+    unit: 's',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/auth-status-claude-2.1.310.jsonl`, version: '2.1.310', text: '"loggedIn": true', shows: "Claude Code's sign-in status, as `claude auth status --json` gives it in an account's folder" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'claude-code.accounts.loggedInField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.accounts.loggedInField.title', defaultMessage: 'Accounts: signed-in field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.loggedInField.desc', defaultMessage: "The field of `claude auth status --json` that says whether an account's folder is signed in. Wrong, Hive can't tell, and its accounts show \"Couldn't check\".", description: 'What the advanced setting "Accounts: signed-in field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command).' }),
+    kind: 'field',
+    default: 'loggedIn',
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/advanced/auth-status-claude-2.1.310.jsonl`, version: '2.1.310', fields: ['loggedIn', 'authMethod', 'apiProvider', 'analyticsDisabled', 'projectsDirectory', 'configDirectory', 'email', 'orgId', 'orgName', 'subscriptionType'] },
+      { from: `${FIX}/advanced/auth-status-claude-2.1.310.jsonl`, version: '2.1.310', fields: ['loggedIn', 'authMethod', 'apiProvider', 'analyticsDisabled', 'projectsDirectory', 'configDirectory'] }
+    ]
+  },
+  {
+    id: 'claude-code.accounts.emailField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.accounts.emailField.title', defaultMessage: 'Accounts: email field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.emailField.desc', defaultMessage: "The field of `claude auth status --json` with the email an account's folder is signed in as. Wrong, Hive can't tell who an account is, and can't warn when its login changes.", description: 'What the advanced setting "Accounts: email field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command).' }),
+    kind: 'field',
+    default: 'email',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/auth-status-claude-2.1.310.jsonl`, version: '2.1.310', fields: ['loggedIn', 'authMethod', 'apiProvider', 'analyticsDisabled', 'projectsDirectory', 'configDirectory', 'email', 'orgId', 'orgName', 'subscriptionType'] }]
+  },
+  {
+    id: 'claude-code.accounts.orgField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.accounts.orgField.title', defaultMessage: 'Accounts: organisation field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.orgField.desc', defaultMessage: "The field of `claude auth status --json` with the organisation's id an account's folder is signed in to. With the email, it tells two logins apart. Wrong, Hive can't tell who an account is.", description: 'What the advanced setting "Accounts: organisation field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command).' }),
+    kind: 'field',
+    default: 'orgId',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/auth-status-claude-2.1.310.jsonl`, version: '2.1.310', fields: ['loggedIn', 'authMethod', 'apiProvider', 'analyticsDisabled', 'projectsDirectory', 'configDirectory', 'email', 'orgId', 'orgName', 'subscriptionType'] }]
+  },
+  {
+    id: 'claude-code.accounts.planField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.accounts.planField.title', defaultMessage: 'Accounts: plan field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.planField.desc', defaultMessage: "The field of `claude auth status --json` with an account's plan (\"max\"), shown beside its email in Settings → Accounts. Wrong, no plan is shown.", description: 'What the advanced setting "Accounts: plan field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` and "max" as they are.' }),
+    kind: 'field',
+    default: 'subscriptionType',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/auth-status-claude-2.1.310.jsonl`, version: '2.1.310', fields: ['loggedIn', 'authMethod', 'apiProvider', 'analyticsDisabled', 'projectsDirectory', 'configDirectory', 'email', 'orgId', 'orgName', 'subscriptionType'] }]
+  },
+  {
+    id: 'claude-code.accounts.loginFiles',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.accounts.loginFiles.title', defaultMessage: 'Accounts: login files', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.loginFiles.desc', defaultMessage: "The names of the files in an account's folder that change when Claude Code signs in or out there, as a regular expression. Hive watches them (it never reads them) and checks the account again when one changes. Wrong, a /login or /logout typed in an agent's pane is only found at the account's next check.", description: 'What the advanced setting "Accounts: login files" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep /login and /logout as they are (commands).' }),
+    kind: 'pattern',
+    default: String.raw`^\.(claude|credentials)\.json(\.tmp\.|$)`,
+    flags: 'i',
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/advanced/home-claude-2.1.310.txt`, version: '2.1.310', text: '.claude.json', shows: "The account's identity file at the top of a signed-in Claude Code home" }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/home-claude-2.1.310.txt`, version: '2.1.310', text: '.credentials.json', shows: "The login file at the top of a signed-in Claude Code home (its contents never read)" } // i18n-ignore: a CLI's recorded text (#367)
+    ]
   },
   {
     id: 'claude-code.statusLine.rateLimits',

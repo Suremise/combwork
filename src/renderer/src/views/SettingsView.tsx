@@ -23,8 +23,9 @@ import { KeybindingsEditor } from '../components/Keybindings'
 import { HiddenProjectsList } from '../components/ProjectRemoval'
 import { WorkspaceStorageList } from '../components/Storage'
 import { AntivirusPanel } from '../components/Antivirus'
+import { AccountsSettings } from '../components/AccountsSettings'
 import { AdvancedSettings } from '../components/AdvancedSettings'
-import { ADVANCED_DEFS, groupName, shownText, type AdvancedState } from '@shared/advanced'
+import { ACCOUNTS_PREVIEW, ADVANCED_DEFS, groupName, shownText, type AdvancedState } from '@shared/advanced'
 import { choose, confirm, get, notify, set, useLanguage, useStore } from '../store'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { LANGUAGES, SOURCE_LANGUAGE, languageOf } from '@shared/i18n/languages'
@@ -39,7 +40,7 @@ interface SettingDef extends SettingEntry {
   render?: () => React.ReactNode
 }
 
-const SECTION_ICONS: Record<string, string> = { general: 'settings-gear', updates: 'cloud-download', appearance: 'symbol-color', providers: 'hubot', notifications: 'bell', sessions: 'history', assistant: 'person', workspace: 'root-folder', board: 'project', workflow: 'git-pull-request', agents: 'organization', keybindings: 'keyboard', agentApi: 'broadcast', advanced: 'tools' }
+const SECTION_ICONS: Record<string, string> = { general: 'settings-gear', updates: 'cloud-download', appearance: 'symbol-color', providers: 'hubot', accounts: 'account', notifications: 'bell', sessions: 'history', assistant: 'person', workspace: 'root-folder', board: 'project', workflow: 'git-pull-request', agents: 'organization', keybindings: 'keyboard', agentApi: 'broadcast', advanced: 'tools' }
 
 const SECTIONS: (SettingsSectionInfo<Section> & { icon: string })[] = SETTINGS_SECTIONS.map((s) => ({ ...s, icon: SECTION_ICONS[s.id] ?? 'blank' }))
 
@@ -53,6 +54,7 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'notifications.chimeSound': () => <ChimePicker />,
   'sessions.usageCacheClear': () => <ClearUsageCacheButton />,
   'sessions.resetPerformance': () => <ResetMetricsButton />,
+  'accounts.list': () => <AccountsSettings />,
   'workspace.hiddenProjects': () => <HiddenProjectsList />,
   'workspace.storage': () => <WorkspaceStorageList />,
   'workspace.antivirus': () => <AntivirusPanel />,
@@ -1009,10 +1011,13 @@ export function SettingsView() {
   const advanced = useStore((s) => s.advanced)
   // Searching matches the text as shown, in the language shown.
   const shownLanguage = useLanguage()
+  const accountsShown = advanced?.values[ACCOUNTS_PREVIEW] === true
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
     return SETTINGS.filter((d) => {
+      // Settings → Accounts only with its preview on (HI-980, staged until HI-1755).
+      if (d.section === 'accounts' && !accountsShown) return false
       if (d.id === 'advanced.values' && (q || modifiedOnly)) return advancedMatches(q, modifiedOnly, advanced)
       // Its English matches as well as what it shows: Settings can be searched in either.
       if (q && !`${d.title} ${d.desc} ${d.tip} ${d.key}${shownLanguage !== SOURCE_LANGUAGE ? ` ${Object.values(rowText(d)).join(' ')}` : ''}`.toLowerCase().includes(q)) return false
@@ -1020,7 +1025,7 @@ export function SettingsView() {
       if (!q && !modifiedOnly && d.section !== section) return false
       return true
     })
-  }, [query, section, settings, modifiedOnly, loops, advanced, shownLanguage])
+  }, [query, section, settings, modifiedOnly, loops, advanced, shownLanguage, accountsShown])
 
   if (!settings) return null
   const grouped = SECTIONS.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
@@ -1039,7 +1044,7 @@ export function SettingsView() {
       </div>
       <div className="settings-body">
         <div className="settings-nav">
-          {SECTIONS.map((s) => (
+          {SECTIONS.filter((s) => s.id !== 'accounts' || accountsShown).map((s) => (
             <div key={s.id} className={cx('row', !query && !modifiedOnly && section === s.id && 'selected')} data-section={s.id} onClick={() => {
                 set({ settingsSection: s.id, settingsQuery: '' })
                 setModifiedOnly(false)

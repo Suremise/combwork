@@ -194,6 +194,8 @@ interface State {
   settings: AppSettings | null
   /** Settings → Advanced (#367): advanced.json's overrides, this window's workspace's own values and the installed CLIs. */
   advanced: AdvancedState | null
+  /** Moves on each time main says Hive's accounts changed (HI-980): Settings → Accounts reads them again. */
+  accountsChanged: number
   workspace: WorkspaceInfo | null
   /** The recent workspaces as this window sees them (#144). */
   recent: RecentWorkspace[]
@@ -478,6 +480,7 @@ interface State {
 export const useStore = create<State>(() => ({
   settings: null,
   advanced: null,
+  accountsChanged: 0,
   workspace: null,
   recent: [],
   openProgress: null,
