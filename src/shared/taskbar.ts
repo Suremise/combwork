@@ -1,5 +1,6 @@
 /**
- * The taskbar button when agents need you (the attention inbox's count): a badge over Hive's icon, the count in
+ * The taskbar button when something needs you (For you's count, #1632: the cards' requests and the agents stopped in
+ * their panes; never an agent that only finished): a badge over Hive's icon, the count in
  * the window title (Alt+Tab, hover), and a flash when an agent comes to ask you something while the window
  * isn't focused. Each window shows its own workspace's count.
  */
@@ -17,7 +18,7 @@ export function windowTitle(title: string, count: number): string {
   return count > 0 ? `(${count}) ${title}` : title
 }
 
-const NEED_YOU = msg({ id: 'workspace.taskbar.needYou', defaultMessage: '{count, plural, one {# agent needs you} other {# agents need you}}', description: "What the taskbar badge over Hive's icon says to screen readers: how many agents wait for you." })
+const NEED_YOU = msg({ id: 'workspace.taskbar.needYou', defaultMessage: '{count, plural, one {# needs you} other {# need you}}', description: "What the taskbar badge over Hive's icon says to screen readers: how many things wait for you (requests on cards and agents stopped at a prompt, a sign-in, a question or an error). Keep it short." })
 
 /** What the badge says to screen readers. */
 export function badgeDescription(count: number): string {

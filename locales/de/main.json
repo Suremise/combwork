@@ -224,6 +224,7 @@
   "main.tray.active": "Aktive Projekte",
   "main.tray.cancelQuit": "Geplantes Beenden abbrechen",
   "main.tray.counts": "{working} aktiv, {needYou, plural, one {# braucht dich} other {# brauchen dich}}",
+  "main.tray.finished": "Fertig",
   "main.tray.more": "{n, plural, one {und # weitere} other {und # weitere}}",
   "main.tray.needYou": "Warten auf dich",
   "main.tray.noProjects": "Keine aktiven Projekte",

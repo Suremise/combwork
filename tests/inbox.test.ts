@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { asksYou, branchSummary, inbox, inboxStateText, needsYou } from '../src/shared/inbox'
+import { asksYou, branchSummary, finishedUnseen, inbox, inboxStateText } from '../src/shared/inbox'
 import type { AgentBranchStatus, AgentInfo, LiveSessionState, ProjectInfo, SessionStatus } from '../src/shared/types'
 
 const live = (status: SessionStatus, statusSince: string, unseen = false, extra: Partial<LiveSessionState> = {}): LiveSessionState =>
@@ -13,19 +13,36 @@ const project = (name: string, agents: AgentInfo[]): ProjectInfo => ({ name, pat
 const work = (ahead: number, dirty: number): AgentBranchStatus => ({ branch: 'hive/x', base: 'main', into: 'main', ahead, dirty, diff: { files: 3, insertions: 120, deletions: 40 } })
 
 describe('attention inbox', () => {
-  it('needs you: waiting (seen or not) and finished unseen, not finished seen or working', () => {
-    expect(needsYou(live('waiting', 't', false))).toBe(true)
-    expect(needsYou(live('finished', 't', true))).toBe(true)
-    expect(needsYou(live('finished', 't', false))).toBe(false)
-    expect(needsYou(live('working', 't', true))).toBe(false)
-    expect(needsYou(null)).toBe(false)
+  it('asks you: waiting (seen or not) or signing in; finished unseen is told apart, never as a need (#1632)', () => {
+    expect(asksYou(live('waiting', 't', false))).toBe(true)
+    expect(asksYou(live('signin', 't', false))).toBe(true)
+    expect(asksYou(live('finished', 't', true))).toBe(false)
+    expect(finishedUnseen(live('finished', 't', true))).toBe(true)
+    expect(finishedUnseen(live('finished', 't', false))).toBe(false)
+    expect(finishedUnseen(live('working', 't', true))).toBe(false)
+    expect(finishedUnseen(null)).toBe(false)
+  })
+
+  it('needs you: an agent at a prompt, signing in, asking or stopped by an error; one that only finished is apart (#1632)', () => {
+    const p = project('alpha', [
+      agent('prompt', live('waiting', '2026-10-25T22:00:00Z', false, { statusMessage: 'Allow Bash?' })),
+      agent('signin', live('signin', '2026-10-25T22:01:00Z')),
+      agent('error', live('error', '2026-10-25T22:02:00Z', false, { statusMessage: 'API Error: Connection error.' })),
+      agent('done', live('finished', '2026-10-25T22:03:00Z', true)),
+      agent('seen', live('finished', '2026-10-25T22:04:00Z', false)),
+      agent('busy', live('working', '2026-10-25T22:05:00Z'))
+    ])
+    const box = inbox([p], null, () => null)
+    expect(box.needYou.map((i) => `${i.agentId}/${i.kind}`)).toEqual(['prompt/waiting', 'signin/signin', 'error/error'])
+    expect(box.needYou.map(inboxStateText)).toEqual(['Needs input: Allow Bash?', 'Needs sign-in', 'Stopped by an error: API Error: Connection error.'])
+    expect(box.finished.map((i) => `${i.agentId}/${i.kind}`)).toEqual(['done/finished'])
+    expect(inboxStateText(box.finished[0])).toBe('Finished')
   })
 
   it('a question the agent works on beside: it needs you, though it is working, until answered', () => {
     const q = { text: 'Which colour?', since: '2026-10-02T09:30:00Z' }
     expect(asksYou(live('working', 't', false, { question: q }))).toBe(true)
     expect(asksYou(live('finished', 't', true))).toBe(false)
-    expect(needsYou(live('working', 't', false, { question: q }))).toBe(true)
     // Waiting comes first: what it waits on is what it needs now.
     const p = project('alpha', [
       agent('asks', live('working', '2026-10-02T10:00:00Z', false, { question: q })),
@@ -49,7 +66,7 @@ describe('attention inbox', () => {
     const box = inbox([p], null, () => null)
     expect(box.needYou.map((i) => `${i.agentId}/${i.kind}/${i.since}`)).toEqual(['fell/safeguard/2026-10-11T14:20:00.000Z', 'asks/waiting/2026-10-11T14:30:00Z'])
     expect(inboxStateText(box.needYou[0])).toBe('After a safeguard stop: Now runs on Opus 4.8 instead of Opus 5.5')
-    expect(needsYou(p.agents[0].live)).toBe(false)
+    expect(asksYou(p.agents[0].live)).toBe(false)
   })
 
   it('lists them across projects and the Assistant, oldest first', () => {
@@ -57,9 +74,10 @@ describe('attention inbox', () => {
     const b = project('beta', [agent('three', live('waiting', '2026-10-02T10:01:00Z', false, { statusMessage: 'Allow Bash?' }))])
     const assistant = project('assistant', [agent('assistant', live('finished', '2026-10-02T10:03:00Z', true))])
     const box = inbox([a, b], assistant, () => null)
-    expect(box.needYou.map((i) => `${i.projectName}/${i.agentId}/${i.kind}`)).toEqual(['beta/three/waiting', 'Hive Assistant/assistant/finished', 'alpha/one/finished'])
+    expect(box.needYou.map((i) => `${i.projectName}/${i.agentId}/${i.kind}`)).toEqual(['beta/three/waiting'])
     expect(box.needYou[0].message).toBe('Allow Bash?')
-    expect(box.needYou[1].assistant).toBe(true)
+    expect(box.finished.map((i) => `${i.projectName}/${i.agentId}/${i.kind}`)).toEqual(['Hive Assistant/assistant/finished', 'alpha/one/finished'])
+    expect(box.finished[0].assistant).toBe(true)
   })
 
   it('needs you: an agent whose start failed, with the first line of why, until it runs again', () => {
@@ -82,9 +100,10 @@ describe('attention inbox', () => {
     const branches: Record<string, AgentBranchStatus> = { done: work(2, 0), stopped: work(0, 1), busy: work(1, 0), clean: work(0, 0), unseen: work(1, 0), folder: work(1, 0) }
     const box = inbox([p], null, (_path, id) => branches[id])
     expect(box.toReview.map((i) => i.agentId)).toEqual(['done', 'stopped'])
-    // An unseen finish is listed once, with those that need you, and still carries its work.
-    expect(box.needYou.map((i) => i.agentId)).toEqual(['unseen'])
-    expect(box.needYou[0].branch?.ahead).toBe(1)
+    // An unseen finish is listed once, with the finished, and still carries its work.
+    expect(box.needYou).toEqual([])
+    expect(box.finished.map((i) => i.agentId)).toEqual(['unseen'])
+    expect(box.finished[0].branch?.ahead).toBe(1)
   })
 
   it('sums up a branch', () => {

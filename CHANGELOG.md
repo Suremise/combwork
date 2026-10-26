@@ -114,6 +114,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **"Need you" counts only what needs you.** The status bar's count is exactly what its list shows: the requests on cards waiting for you (For you) and the agents stopped in their panes at a prompt, a sign-in, a question or, newly, an error such as a lost API connection. Agents that only finished are no longer counted: a quieter **✓ 3 finished** beside it says so, and the list, the tray and the taskbar badge keep them apart. Each says what it counts on hover (#1632).
 - **Fewer pauses while the disk is busy:** the board's and the Assistant's journal's databases are tidied up (their write-ahead log copied into the file) once they have been idle for a moment, not in the middle of a save, where it could pause typing in every terminal while a slot was being prepared. A save or a merge lock slow enough to be felt is named in Hive's log (#1633).
 - **A lane's notice names the right lane:** a card's failed review could be told under a lane that once listed the card and was abandoned (one started on it by mistake), rather than the lane it is in now (#1645).
 - **A lane's notice is shown once:** once a lane ended, Hive told its card's failed review again on every look at the lanes, stacking identical notices and filling the card's history with them (#1631).

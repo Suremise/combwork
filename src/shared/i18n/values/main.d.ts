@@ -226,6 +226,7 @@ interface HiveMessageValues {
   'main.tray.active': undefined
   'main.tray.cancelQuit': undefined
   'main.tray.counts': { working: string | number; needYou: number }
+  'main.tray.finished': undefined
   'main.tray.more': { n: number }
   'main.tray.needYou': undefined
   'main.tray.noProjects': undefined

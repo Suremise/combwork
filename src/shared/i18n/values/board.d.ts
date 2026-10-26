@@ -328,9 +328,14 @@ interface HiveMessageValues {
   'board.inbox.changes': undefined
   'board.inbox.commits': { n: number }
   'board.inbox.diff': { files: number; insertions: string | number; deletions: string | number }
+  'board.inbox.error': undefined
+  'board.inbox.errorWhat': { message: string | number }
   'board.inbox.failed': undefined
   'board.inbox.failedWhy': { message: string | number }
   'board.inbox.finished': undefined
+  'board.inbox.finishedCount': { n: number }
+  'board.inbox.finishedHeading': { n: string | number }
+  'board.inbox.finishedTip': undefined
   'board.inbox.merge': undefined
   'board.inbox.needYouCount': { n: number }
   'board.inbox.needYouEmptyHeading': undefined
@@ -342,6 +347,7 @@ interface HiveMessageValues {
   'board.inbox.panel': undefined
   'board.inbox.safeguard': undefined
   'board.inbox.safeguardSwitched': { to: string | number; from: string | number }
+  'board.inbox.signin': undefined
   'board.inbox.toReview': undefined
   'board.inbox.toReviewCount': { n: number }
   'board.inbox.toReviewHeading': { n: string | number }

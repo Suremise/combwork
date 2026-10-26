@@ -1992,8 +1992,8 @@
     "description": "Storage: an agent's worktree."
   },
   "workspace.taskbar.needYou": {
-    "defaultMessage": "{count, plural, one {# agent needs you} other {# agents need you}}",
-    "description": "What the taskbar badge over Hive's icon says to screen readers: how many agents wait for you."
+    "defaultMessage": "{count, plural, one {# needs you} other {# need you}}",
+    "description": "What the taskbar badge over Hive's icon says to screen readers: how many things wait for you (requests on cards and agents stopped at a prompt, a sign-in, a question or an error). Keep it short."
   },
   "workspace.unused.changedFiles": {
     "defaultMessage": "{count, plural, one {# changed file} other {# changed files}}",

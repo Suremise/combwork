@@ -899,6 +899,10 @@
     "defaultMessage": "{working} working, {needYou, plural, one {# needs you} other {# need you}}",
     "description": "A line of the tray icon's tooltip: how many agents are working and how many need you."
   },
+  "main.tray.finished": {
+    "defaultMessage": "Finished",
+    "description": "A section of the tray menu: agents that finished their turn since you last looked (nothing waits for you there)."
+  },
   "main.tray.more": {
     "defaultMessage": "{n, plural, one {and # more} other {and # more}}",
     "description": "The tray menu, under a section's first ten items: how many more there are (the section's items: agents waiting, messages and the like)."

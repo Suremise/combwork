@@ -224,6 +224,7 @@
   "main.tray.active": "活动项目",
   "main.tray.cancelQuit": "取消待定的退出",
   "main.tray.counts": "{working} 个工作中，{needYou, plural, other {# 个需要你处理}}",
+  "main.tray.finished": "已结束",
   "main.tray.more": "{n, plural, other {还有 # 个}}",
   "main.tray.needYou": "需要你处理",
   "main.tray.noProjects": "没有活动项目",
