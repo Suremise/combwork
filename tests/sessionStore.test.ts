@@ -342,9 +342,9 @@ describe('following the project', () => {
       await in2(() => workspace.ensureProject(p2))
       await in2(() => workspace.projectIds({ fresh: true }))
       await in2(() => workspace.upsertSession(p2, { id: 'kept' }))
-      await in2(() => removal.removeProject(p2, 'remove'))
+      // Worked out while the project was present (a change that then waits), and not asked again before the close.
       place = await in2(() => (s2 as unknown as { sessionsPlace: (pp: string) => Promise<SessionsPlace> }).sessionsPlace(p2))
-      expect(await place.removed!()).toBe(true)
+      await in2(() => removal.removeProject(p2, 'remove'))
       // The service opens another workspace: a late change still finds the project removed.
       const ws3 = join(base, 'next-ws')
       mkdirSync(ws3, { recursive: true })
@@ -357,6 +357,31 @@ describe('following the project', () => {
     // Closed: a save landing late, through a lease of its own.
     expect(await changeSessions(place, (f) => f.sessions.map((x) => x.id))).toEqual([])
     expect(existsSync(file)).toBe(true)
+    // Closed, and its workspace.json can't be read either: still nothing moved in.
+    const cfg = join(ws2, '.hive', 'workspace.json')
+    renameSync(cfg, `${cfg}.aside`)
+    try {
+      expect(await changeSessions(place, (f) => f.sessions.map((x) => x.id))).toEqual([])
+      expect(existsSync(file)).toBe(true)
+    } finally {
+      renameSync(`${cfg}.aside`, cfg)
+    }
+  })
+
+  it('a late change while its workspace is open and the project present still lands, moving the folder file back in (#1161)', async () => {
+    const p = project('late-open')
+    await run(() => workspace.ensureProject(p))
+    await run(() => workspace.projectIds({ fresh: true }))
+    await run(() => workspace.upsertSession(p, { id: 'before' }))
+    const place = await run(() => (w as unknown as { sessionsPlace: (pp: string) => Promise<SessionsPlace> }).sessionsPlace(p))
+    // Written into its folder, then the removal didn't end with it hidden: it is present.
+    await run(() => w.exportSessions(p))
+    await run(() => w.releaseSessions(p))
+    await changeSessions(place, (f) => {
+      f.sessions.push(rec('late'))
+    })
+    expect((await run(() => workspace.sessionsFile(p))).sessions.map((x) => x.id)).toEqual(['before', 'late'])
+    expect(existsSync(join(p, '.hive', 'sessions.json'))).toBe(false)
   })
 
   it('a project renamed keeps its records (they are under its id)', async () => {
