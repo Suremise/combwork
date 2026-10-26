@@ -60,6 +60,7 @@ import type { SlotForStart, Workflow } from './workflow/runtime'
 import { agentRunsGoing, setSlotStarts, workflowEnforced, workflowFor, ENFORCE } from './workflow/service'
 import { listWorktreesOrNull } from './worktrees'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
+import { cardAttachments } from './cardAttachments'
 
 const log = createLogger('slots')
 
@@ -644,7 +645,7 @@ export async function place(ws: WorkspaceService, projectPath: string, first: Wo
       how = 'started'
     }
   } else {
-    const prompt = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? taskPrompt(card, !!sessions.hiveMcp(projectPath), { from: 'todo' })
+    const prompt = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? taskPrompt(card, !!sessions.hiveMcp(projectPath), { from: 'todo', attachments: await cardAttachments(ws, n) })
     const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: n, body: prompt, source: PLACEMENT, ref } // i18n-ignore: who a delivery is from, as agents read it
     log.info(`Giving ${userText(agent.name)} #${n} in ${userText(cycle.started.slot)} (${how})`)
     // A refusal (NotGiven: its agent got busy) or a launch that couldn't start throws: nothing recorded, tried again.

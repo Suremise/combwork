@@ -9,7 +9,7 @@ import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
 import { overridesNow } from './advancedValues'
 import { folderChanging, folderSteady, inFolder } from './folderFence'
-import { basename, dirname, extname, isAbsolute, join, resolve } from 'path'
+import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, writeFile } from 'original-fs/promises'
 import { constants as fsConstants, existsSync, realpathSync } from 'original-fs'
 import { typedText } from '../shared/terminalInput'
@@ -124,7 +124,7 @@ import { lookAtTurns, type TurnsReading } from './turnsReader'
 import { hookSeen, hookTurn, hooksMissing, newHooksWatch, noteHooksMissing, promptSent, SeenOnce, transcriptReset, transcriptTurns, turnHeard, type HooksWatch } from './hooksHealth'
 import { beingRead, viewingWindows } from './transcriptReads'
 import { trash } from './trash'
-import { attachmentsDir, freeName, ownAttachmentsFolder } from './attachmentsFolder'
+import { attachmentName, attachmentsDir, freeName, ownAttachmentsFolder } from './attachmentsFolder'
 import { attachmentKind } from '../shared/attachments'
 import { replyStart } from '../shared/tiles'
 import { observer } from './platform/observe'
@@ -5306,14 +5306,7 @@ class SessionManager {
   private async attachmentFile(projectPath: string, l: LiveSession, name: string | null): Promise<string> {
     // A folder of the host's own all the way down, or it throws: an attachment is never written through a link.
     const dir = await ownAttachmentsFolder(projectPath, l.state.sessionId || `run-${l.state.runId}`)
-    const d = new Date()
-    const pad = (n: number): string => String(n).padStart(2, '0')
-    const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`
-    // Characters Windows refuses in a name, and control characters, become "_"; a long name keeps its end (the extension).
-    const own = name ? name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/, '').slice(-100) : ''
-    const ext = own ? extname(own) : '.png'
-    const base = own ? `${stamp}_${own.slice(0, own.length - ext.length)}` : stamp
-    return freeName(dir, `${base}${ext}`, (i) => `-${i + 1}`)
+    return freeName(dir, attachmentName(name), (i) => `-${i + 1}`)
   }
 
   /** Moves a launch's early attachments folder into its session's, when both are folders of the host's own. */

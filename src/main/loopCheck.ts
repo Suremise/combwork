@@ -9,7 +9,7 @@ import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
 import { loopReviewerOf } from './loopReviewer'
 import { sessions } from './sessions'
-import { allTasks } from './tasks'
+import { allTasks, liveCardHeads } from './tasks'
 import { workspaceOf } from './workspace'
 
 const log = createLogger('loops')
@@ -149,18 +149,23 @@ function requestOpen(card: Pick<TaskCard, 'history' | 'comments' | 'agentName' |
   return !card.history.slice(asked + 1).some((h) => names.has(h.by.toLowerCase())) && !(card.comments ?? []).some((m) => m.at >= at && names.has(m.by.toLowerCase()))
 }
 
-/** The cards an agent in a loop owes now (owedCards), read from the board, its project's settings and its reviewers. */
+/**
+ * The cards an agent in a loop owes now (owedCards), read from the board, its project's settings and its reviewers: its
+ * cards in play from the live cards' heads (HI-1690: no card's document for that), then only those cards in full (their
+ * history and comments say whose move it is).
+ */
 async function owedNow(loop: Loop): Promise<number[]> {
   const ws = workspaceOf(loop.projectPath)
   const project = basename(loop.projectPath)
-  const cards = await allTasks(ws, { archived: false })
-  const inPlay = cardsInPlay(cards, project, loop.agentId, loop.cards)
+  const inPlay = cardsInPlay(await liveCardHeads(ws), project, loop.agentId, loop.cards)
   if (!inPlay.length) return []
   // The project's loop wakes (Project Settings → Card loops: loopWakes.ts' wakesOn, read as it reads it), and an inbox
   // to receive them (deliveries are refused without one).
   const wakes = agentReadsInbox(loop.projectPath, loop.agentId) && (await ws.projectConfig(loop.projectPath).catch(() => null))?.loopWakes !== false
+  if (!wakes) return inPlay
+  const cards = await allTasks(ws, { numbers: inPlay })
   const reviewers = new Map<number, string | null>()
-  if (wakes) for (const n of inPlay) reviewers.set(n, (await loopReviewerOf(ws, cards.find((c) => c.number === n)!).catch(() => null))?.id ?? null)
+  for (const c of cards) reviewers.set(c.number, (await loopReviewerOf(ws, c).catch(() => null))?.id ?? null)
   return owedCards(cards, project, loop.agentId, loop.cards, { wakes, reviewerOf: (n) => reviewers.get(n) ?? null })
 }
 

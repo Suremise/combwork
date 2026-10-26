@@ -31,6 +31,11 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
   merge?: string
   /** For a project agent: the cards in blockedBy and links that are another project's (it sees only their numbers). */
   elsewhere?: number[]
+  /**
+   * Files kept with the card (HI-1700), newest first: full path (open it with your tools), name, size, who added it and
+   * when, and where it came (a comment's author and time, the description, a session). `missing`: its file is gone.
+   */
+  attachments?: { path: string; name: string; size: number; by: string; at: string; from: string; missing?: true }[]
   /** Its 1.0 stage (#1223): `column` is the stage's category. Last, after the card's own fields. */
   stage: StageId
 }
@@ -117,7 +122,8 @@ const place = (c: Pick<TaskChange, 'column' | 'position' | 'of'>): string => `${
 
 /** "HI-61 (#61) created in Todo (51st of 51) for alpha, given to Coder: Lean replies" (#61 for a card with no key). */
 export function createdText(c: TaskChange): string {
-  return `${cardName(c)} created in ${place(c)}${c.project ? ` for ${c.project}` : ''}${c.agent ? `, given to ${c.agent}` : ''}: ${c.title}`
+  // The files it was made with (HI-1700), each stored or already kept.
+  return `${cardName(c)} created in ${place(c)}${c.project ? ` for ${c.project}` : ''}${c.agent ? `, given to ${c.agent}` : ''}: ${c.title}${c.changes.length ? `. ${c.changes.join('; ')}` : ''}`
 }
 
 /** "HI-60 (#60) Lean replies: Commented; Moved to Review. Now in Review (1st of 4), alpha, Coder." */

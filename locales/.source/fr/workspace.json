@@ -446,6 +446,7 @@
   "workspace.storage.backups": "Transcript backups",
   "workspace.storage.beforeCompression": "{size} before compression",
   "workspace.storage.cancel": "Cancel",
+  "workspace.storage.cardAttachments": "Card attachments",
   "workspace.storage.cleanUp": "Clean Up…",
   "workspace.storage.copies": "Review and check copies",
   "workspace.storage.deletedSession": "Deleted session {id}",

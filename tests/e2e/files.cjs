@@ -220,7 +220,7 @@ const check = (name, ok, extra = '') => {
   check('attachments: 8, the log, Markdown, CSV and PDF too', (await page.locator('.thumb').count()) === 8)
   check('attachments: the old images folder moved to .hive/attachments', !fs.existsSync(path.join(proj, '.hive', 'images')) && fs.readdirSync(path.join(proj, '.hive', 'attachments', ids[0])).length === 6, String(fs.existsSync(path.join(proj, '.hive', 'images'))))
   const desc = await page.locator('.images-desc').innerText().catch(() => '')
-  check('attachments: a line says what the tab holds', desc === "Files pasted or dropped into this project's agents' sessions, by session.", desc)
+  check('attachments: a line says what the tab holds', desc === "Files kept with this project's cards, and files pasted or dropped into its agents' sessions.", desc)
   check('attachments: thumbnails load', await page.locator('.thumb img').first().evaluate((i) => i.complete && i.naturalWidth > 0))
   check('attachments: archived heading', (await page.locator('.images-archived').count()) === 1)
   const filters = await page.locator('.attachment-filter').allInnerTexts()

@@ -366,15 +366,23 @@ function helpers(h) {
     check(`the lane's row reads "${key}-B1 / ${key}-R1 · slot-a"`, !!(await until(async () => (await x.text(row1)).replace(/\s*·\s*/g, ' · ').includes(`${key}-B1 / ${key}-R1 · slot-a`), HUNG_MS)), await x.text(row1))
     await x.shoot('lanes', x.panel)
     await x.showTab('runs')
-    const runRow = x.panel.locator(`[data-run="${copyRun?.id}"] .progress-run-for`).first()
-    // Its group (the reviewer's runs of the card's check) opened.
+    const runRow = x.panel.locator(`.progress-recent-item[data-run="${copyRun?.id}"] .progress-recent > .tip-wrap`).first()
+    // Its card's runs (HI-1701) and its group (the reviewer's runs of the card's check) opened.
     await until(async () => {
-      const shut = x.panel.locator('.progress-group-head[aria-expanded="false"]')
+      const shut = x.panel.locator('.progress-card-toggle[aria-expanded="false"], .progress-group-head[aria-expanded="false"]')
       if ((await shut.count()) === 0) return (await runRow.count()) > 0
       await shut.first().click()
       return false
     }, HUNG_MS)
-    check(`the copy's run reads "<key> · ${rev1.slice(0, 7)} · in ${path.basename(copy)}"`, !!(await until(async () => (await x.text(runRow)) === `${(await x.card(a1)).key} · ${rev1.slice(0, 7)} · in ${path.basename(copy)}`, HUNG_MS)), await x.text(runRow))
+    // What it ran for and where is in its hover (HI-1701: a line per run).
+    const forLine = `${(await x.card(a1)).key} · ${rev1.slice(0, 7)} · in ${path.basename(copy)}`
+    const tip = () => h.page.locator('body > .tip').last().innerText().catch(() => '')
+    check(`the copy's run's hover reads "<key> · ${rev1.slice(0, 7)} · in ${path.basename(copy)}"`, !!(await until(async () => {
+      if ((await tip()).includes(forLine)) return true
+      await runRow.hover()
+      return false
+    }, HUNG_MS)), await tip())
+    await h.page.mouse.move(5, 5)
     const agentChoices = () => x.panel.locator('select[aria-label="Agent"] option').allInnerTexts().catch(() => [])
     const hives = ['Hive (slot slot-a)', 'Hive (slot slot-b)', `Hive (copy ${path.basename(copy)})`]
     const hivesNamed = async () => {

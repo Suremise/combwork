@@ -442,6 +442,115 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
       await disposeWorkspaceService(w)
     }
   })
+
+  // HI-1668: the root watcher's read (250 ms after a folder changes) listed p4 before it went, and settled after the read
+  // that no longer listed it: the older listing became the projects' ids and what is remembered (4 kept, not 3).
+  it('a read that listed the folders before a later one settles after it: the later listing stands', async () => {
+    const wsPath = join(base, 'ws-overlap')
+    project(wsPath, 'keep')
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    try {
+      await w.refreshesSettled()
+      const gone = join(wsPath, 'gone')
+      // The older read, the first to list `gone`, is held where it reads it, until the newer one has settled.
+      let release!: () => void
+      const held = new Promise<void>((r) => (release = r))
+      const read = w.projectConfig.bind(w)
+      let holding = true
+      let reached = false
+      w.projectConfig = (async (p: string, o?: never) => {
+        if (holding && p.toLowerCase() === gone.toLowerCase()) {
+          reached = true
+          await held
+        }
+        return read(p, o)
+      }) as typeof w.projectConfig
+      project(wsPath, 'gone')
+      const older = w.projectIds({ fresh: true })
+      await vi.waitFor(() => expect(reached).toBe(true), { timeout: HUNG_MS })
+      await moveFolder(gone, join(base, 'ws-overlap-out'))
+      const newer = await w.projectIds({ fresh: true })
+      expect(newer.byPath.has(gone.toLowerCase())).toBe(false)
+      holding = false
+      release()
+      await older
+      expect(w.projectIdsNow().byPath.has(gone.toLowerCase())).toBe(false)
+      expect(w.projectIdsNow().byPath.size).toBe(1)
+    } finally {
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  /**
+   * A workspace whose folder listings the test sets (`folders`), with every read of `gone`'s project.json held until
+   * `release` (HR3's probe for HI-1668 round 1): the order reads list and settle in is the test's.
+   */
+  async function heldReads(name: string) {
+    const wsPath = join(base, name)
+    const keep = project(wsPath, 'keep', { id: 'p-111111111111' })
+    const gone = project(wsPath, 'gone', { id: 'p-222222222222' })
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    await w.refreshesSettled()
+    const state = { folders: [keep] }
+    w.listProjectPaths = async (o: { hidden?: boolean } = {}) => (o.hidden ? [] : [...state.folders])
+    await w.projectIds({ fresh: true })
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    let reached = false
+    const read = w.projectConfig.bind(w)
+    w.projectConfig = (async (p: string, o?: never) => {
+      if (p.toLowerCase() === gone.toLowerCase()) {
+        reached = true
+        await held
+      }
+      return read(p, o)
+    }) as typeof w.projectConfig
+    const has = () => w.projectIdsNow().byPath.has(gone.toLowerCase())
+    return { w, keep, gone, state, release, reached: () => reached, has }
+  }
+
+  it('a later listing that finds the folders as already read settles at once: an older read held meanwhile is dropped', async () => {
+    const h = await heldReads('ws-cached')
+    try {
+      const cached = h.w.projectIdsNow()
+      h.state.folders = [h.keep, h.gone]
+      const older = h.w.projectIds({ fresh: true })
+      await vi.waitFor(() => expect(h.reached()).toBe(true), { timeout: HUNG_MS })
+      h.state.folders = [h.keep]
+      const newer = await h.w.projectIds({ fresh: true })
+      // The folders as already read: the standing index itself.
+      expect(newer).toBe(cached)
+      h.release()
+      await older
+      expect(h.has()).toBe(false)
+    } finally {
+      h.release()
+      await disposeWorkspaceService(h.w)
+    }
+  })
+
+  it('a later listing that finds a read of the same folders under way makes it its own: it stands over one settled between', async () => {
+    const h = await heldReads('ws-reuse')
+    try {
+      h.state.folders = [h.keep, h.gone]
+      const first = h.w.projectIds({ fresh: true })
+      await vi.waitFor(() => expect(h.reached()).toBe(true), { timeout: HUNG_MS })
+      // Between: the folders as already read, settled at once.
+      h.state.folders = [h.keep]
+      await h.w.projectIds({ fresh: true })
+      // Latest: `gone` back, the same folders the held read is reading: it shares that read.
+      h.state.folders = [h.keep, h.gone]
+      const latest = h.w.projectIds({ fresh: true })
+      h.release()
+      await Promise.all([first, latest])
+      expect(h.has()).toBe(true)
+    } finally {
+      h.release()
+      await disposeWorkspaceService(h.w)
+    }
+  })
 })
 
 describe('merge holds Hive closed under are told in their project now (#508 round 3)', () => {

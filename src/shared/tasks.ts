@@ -1,4 +1,5 @@
 import { msg, type Msg } from './i18n/msg'
+import { withAttachmentPaths, type CardAttachment } from './cardAttachments'
 import type { BoardColumnId, BoardFold, ContextProblem, TaskCard, TaskColumn } from './types'
 import { cardLabel, cardName, cardRef } from './projectKeys'
 
@@ -654,18 +655,25 @@ export function rawTaskPrompt(card: Pick<TaskCard, 'title' | 'description'>, not
   return [card.title.trim(), note?.trim() ?? '', card.description.trim()].filter(Boolean).join('\n\n')
 }
 
-export function taskPrompt(card: TaskCard, withTools: boolean, opts: { from?: TaskColumn; note?: string; context?: ContextLine[] } = {}): string {
+/** At most this many of a card's attachments named in its start prompt (HI-1700); hive_read_task lists them all. */
+const PROMPT_ATTACHMENTS_MAX = 10
+
+export function taskPrompt(card: TaskCard, withTools: boolean, opts: { from?: TaskColumn; note?: string; context?: ContextLine[]; attachments?: Pick<CardAttachment, 'id' | 'path'>[] } = {}): string {
+  // Its attachments (HI-1700): the text's links to them as their paths, and their paths listed.
+  const files = opts.attachments ?? []
+  const paths = (t: string): string => (files.length ? withAttachmentPaths(t, files) : t)
   const parts = [`Work on task ${cardName(card)} from the Hive task board: ${card.title}`] // i18n-ignore: agent-facing: the prompt an agent starts a card with
   const again = opts.from === 'review' || opts.from === 'passed' || opts.from === 'done'
   if (again) parts.push(`It was in ${columnLabel(opts.from!)} and is back in Doing for more work.`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
   if (opts.note?.trim()) parts.push(opts.note.trim())
-  if (card.description.trim()) parts.push(card.description.trim())
+  if (card.description.trim()) parts.push(paths(card.description.trim()))
   if (card.blockedBy.length) parts.push(`It depends on ${card.blockedBy.map((n) => `${cardRef(n)}`).join(', ')}.`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
   const context = opts.context ?? (card.context ?? []).map((ref) => ({ ref }))
   if (context.length) parts.push(contextText(context, withTools))
+  if (files.length) parts.push(`Its attachments (open them by path): ${files.slice(0, PROMPT_ATTACHMENTS_MAX).map((a) => a.path).join(', ')}${files.length > PROMPT_ATTACHMENTS_MAX ? `, and ${files.length - PROMPT_ATTACHMENTS_MAX} more (hive_read_task lists them)` : ''}.`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
   const latest = card.comments[card.comments.length - 1]
   if (again && latest?.text.trim()) {
-    const text = latest.text.trim()
+    const text = paths(latest.text.trim())
     parts.push(`Its latest comment (${latest.by}, ${latest.at.slice(0, 10)}):\n\n${text.length > PROMPT_COMMENT_MAX ? `${text.slice(0, PROMPT_COMMENT_MAX)}… (cut short: hive_read_task has it all)` : text}`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
   }
   if (withTools) parts.push(`Use the work-on-card skill.${card.comments.length ? ` The card has ${card.comments.length} comment${card.comments.length === 1 ? '' : 's'}: read ${again ? 'the rest' : 'them'} with hive_read_task.` : ''}`) // i18n-ignore: agent-facing: the prompt an agent starts a card with

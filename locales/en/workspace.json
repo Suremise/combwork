@@ -1791,6 +1791,10 @@
     "defaultMessage": "Cancel",
     "description": "The Clean Up dialog's button that closes it."
   },
+  "workspace.storage.cardAttachments": {
+    "defaultMessage": "Card attachments",
+    "description": "Storage (HI-1700): files kept with cards (.hive/attachments/cards). Clean Up and Purge never remove them."
+  },
   "workspace.storage.cleanUp": {
     "defaultMessage": "Clean Up…",
     "description": "Storage: opens the Clean Up dialog."

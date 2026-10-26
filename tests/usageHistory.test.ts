@@ -12,6 +12,11 @@ import type { SessionListItem, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-usage-history-')
+// The CLIs' homes are the test's own (HI-1666): a list looks in each for sessions started outside Hive, and the user's
+// ~/.codex (a thousand rollouts) took 17 s of it under a full unit run's load.
+process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
+process.env.CODEX_HOME = join(base, 'codex-home')
+process.env.COPILOT_HOME = join(base, 'copilot-home')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')

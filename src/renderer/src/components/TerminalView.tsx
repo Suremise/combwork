@@ -764,7 +764,7 @@ export function TerminalView({
       ref={host}
     >
       <div className="terminal-mount" ref={mount} />
-      {projectPath && <AttachmentChips ptyKey={ptyKey} provider={provider} />}
+      {projectPath && <AttachmentChips ptyKey={ptyKey} provider={provider} projectPath={projectPath} agentId={agentId ?? null} />}
     </div>
   )
 }
