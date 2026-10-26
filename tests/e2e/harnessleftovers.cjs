@@ -33,7 +33,8 @@ const gone = (list) => lib.until(() => list.every((id) => !running(id)), HUNG_MS
 /**
  * A suite (a node of its own, with its runner's environment: `work` its folder) that starts a test copy of Hive through
  * lib.launch, waits for lib.cjs's record of it, and is then killed mid-run (its node only, as a runner's TaskStop or a
- * crash ends it). { shell: Playwright's pid, copy: the main process's identity, out }.
+ * crash ends it). { shell: the identity of Playwright's process (the shell), copy: the main process's identity, out },
+ * both taken while the suite still runs, so its handle to the shell keeps that pid the shell's.
  */
 async function killedSuite(work, profile) {
   fs.mkdirSync(work, { recursive: true })
@@ -51,8 +52,10 @@ async function killedSuite(work, profile) {
   child.stdout.on('data', (d) => (out += d))
   child.stderr.on('data', (d) => (out += d))
   const pids = await lib.until(() => /COPY (\d+) (\d+)/.exec(out)?.slice(1).map(Number) ?? (/ERR/.test(out) ? [] : null), HUNG_MS, 250)
-  const [shell, main] = pids ?? []
-  const copy = lib.identify(main ? [main] : [])[0] ?? null
+  const [shellPid, main] = pids ?? []
+  const known = lib.identify([shellPid, main].filter(Boolean))
+  const shell = known.find((p) => p.pid === shellPid) ?? null
+  const copy = known.find((p) => p.pid === main) ?? null
   if (copy) ids.push(copy)
   const exited = new Promise((r) => child.once('exit', r))
   child.kill()
@@ -77,9 +80,11 @@ async function detachedCopy(profile) {
     const suite = path.join(lib.WORK, 'killed-suite')
     const one = await killedSuite(suite, path.join(lib.WORK, 'killed-suite-profile'))
     check('a suite starts its test copy of Hive', !!one.copy, one.out.slice(-2000))
-    check("…Playwright's pid is a shell's, Hive's main process its child", !!one.copy && one.shell !== one.copy.pid)
+    check("…Playwright's pid is a shell's, Hive's main process its child", !!one.copy && !!one.shell && one.shell.pid !== one.copy.pid)
     check("…lib.cjs records the main process, by pid and start time, in the suite's folder", !!one.copy && fs.readFileSync(path.join(suite, '.hive-copies.jsonl'), 'utf8').includes(`"started":${one.copy.started}`))
-    check('…the copy outlives its killed suite', !!one.copy && !lib.processRunning(one.shell) && running(one.copy), JSON.stringify(one))
+    // The shell ends with the suite's job, after the suite's node: waited for, by its identity.
+    const shellGone = !!one.shell && !!(await gone([one.shell]))
+    check('…the copy outlives its killed suite', !!one.copy && shellGone && running(one.copy), JSON.stringify({ ...one, shellGone }))
     const atEnd = endCopies([suite])
     check("the runner's step once a suite has ended (endCopies) ends the copy, by its record", atEnd.ended > 0 && !!one.copy && !!(await gone([one.copy])), JSON.stringify(atEnd))
 
