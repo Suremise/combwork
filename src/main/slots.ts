@@ -676,6 +676,16 @@ export class SlotStore {
   }
 
   /**
+   * Whether a carried lease is one the agent's Resume took (#1434: a free slot of the pool, on a card's or lane's line), not
+   * an adopted worktree's (#1441: on the agent's 0.9 branch). Its slot had a card's or lane's lease before it; an adopted
+   * worktree's carried lease is the first its slot had (the adoption makes the slot).
+   */
+  resumedCarry(lease: SlotLease): boolean {
+    if (lease.kind !== 'carried') return false
+    return this.conn.read((db) => !!db.prepare("SELECT 1 FROM slot_leases WHERE project = ? AND slot = ? AND kind IN ('card', 'lane') AND from_at <= ? AND id <> ? LIMIT 1").get(this.project, lease.slot, lease.from, lease.id))
+  }
+
+  /**
    * Starts a removal on a slot in one write: only while it is free (no operation, job or open lease) and still in the
    * state it was read in. Whether it started.
    */
@@ -1183,6 +1193,11 @@ export class SlotPool {
 
   lastLease(name: string): SlotLease | null {
     return this.store.lastLease(name)
+  }
+
+  /** Whether a carried lease is one the agent's Resume took, not an adopted worktree's (SlotStore.resumedCarry). */
+  resumedCarry(lease: SlotLease): boolean {
+    return this.store.resumedCarry(lease)
   }
 
   /** The renames under way (#1441), and intents no operation owns cleared (SlotStore's). */

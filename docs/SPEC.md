@@ -3735,7 +3735,11 @@ decided again in it):
   ends (`handedOff`), the card's or lane's lease begins on the same slot and its conversations are rebound to it, so the
   conversation goes on there and resumes there after a restart. Otherwise the card gets another slot and the carried one
   stays protected; its conversation resumes once that card ends. The same handover applies to a slot the agent's own
-  Resume took (§16.10.3). **Release Slot…** in the agent's ⋯ menu (asks first) ends a carried lease; Hive never deletes
+  Resume took (§16.10.3: one whose slot had a card's or lane's lease before), when it is clean, its head merged or not:
+  it is on a card's or lane's line, which stays when the slot moves to the new one (HI-1741: HB3's Resume took a slot
+  on a line still in review, its lane was lent a second, and with the pool sized to the builders another builder found
+  none free). Changes not committed keep it carried; a handover not possible just then (the slot busy or changed) ends
+  it (`superseded`) once the start holds its own lease, decided again in the pool's write as above. **Release Slot…** in the agent's ⋯ menu (asks first) ends a carried lease; Hive never deletes
   the agent's branch.
 - **The rename.** A free adopted slot (no lease, operation, job or writer, ready, no session running there, nothing
   holding the folder: the rename probe) is renamed to the next generic name (`slot-c`) in the pool's folder, so a slot

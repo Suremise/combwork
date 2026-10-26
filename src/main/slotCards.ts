@@ -229,16 +229,22 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
  * one) with the same checkout, read again from its ref files (HR4: anything changed keeps it). A refusal changes
  * nothing. The card's work is on its line, which stays; back in Active, its start lends it a slot on that line as for any
  * card. The slot isn't reused or removed while the builder's run still writes there (a slot with a writer isn't free);
- * it drains once that run has moved, then retires as any free slot does.
+ * it drains once that run has moved, then retires as any free slot does. A slot its Resume took, kept for nothing, that
+ * the start couldn't take over just then (HI-1741) ends the same way, with every check but the card's.
  */
 async function endLeftCarried(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, starting: { card: number } | { lane: string }, holding: string): Promise<void> {
   const carried = pool.leasesOf(builder).find((l) => l.kind === 'carried')
-  const kept = carried ? keptFor(ws, carried.id) : null
-  if (!carried || !kept || !('card' in kept) || ('card' in starting && kept.card === starting.card)) return
+  if (!carried) return
+  const kept = keptFor(ws, carried.id)
+  // A slot its Resume took, kept for nothing, that the start couldn't take over (HI-1741: busy, or changed, just then):
+  // ended the same way, its line staying. An adopted worktree kept for nothing stays (its branch is on no card's line).
+  const resumed = !kept && pool.resumedCarry(carried)
+  if (!resumed && (!kept || !('card' in kept) || ('card' in starting && kept.card === starting.card))) return
   const wf = await workflowFor(ws, projectPath).catch(() => null)
   const slot = pool.slotOf(carried)
   if (!wf || !slot) return
   const left = (): boolean => {
+    if (!kept || !('card' in kept)) return true
     const c = cardOf(wf, kept.card)
     return !c || wf.state(c).stage !== 'active'
   }
@@ -250,23 +256,33 @@ async function endLeftCarried(ws: WorkspaceService, projectPath: string, pool: S
   const still = (): boolean => {
     const k = keptFor(ws, carried.id)
     const now = pool.slotOf(carried)
-    if (!k || !('card' in k) || k.card !== kept.card || !left() || !pool.leasesOf(builder).some((l) => l.id === holding)) return false
+    const same = resumed ? !k : !!k && 'card' in k && !!kept && 'card' in kept && k.card === kept.card
+    if (!same || !left() || !pool.leasesOf(builder).some((l) => l.id === holding)) return false
     if (!now || now.name !== slot.name || !samePlace(now.folder, slot.folder) || now.createdAt !== slot.createdAt || now.op || now.job) return false
     const at = G.headSync(now.folder)
     return !!at && at.line === checkout.line && at.head === checkout.head
   }
-  if (await pool.release(carried.id, 'superseded', still)) log.info(`The adopted ${userText(slot.name)}'s carried lease ${carried.id} ended: its builder left #${kept.card} for ${'card' in starting ? `#${starting.card}` : `lane ${starting.lane}`} (lease ${holding})`)
+  const why = kept && 'card' in kept ? `its builder left #${kept.card}` : 'its builder, who resumed there,' // i18n-ignore: a log line
+  if (await pool.release(carried.id, 'superseded', still)) log.info(`${userText(slot.name)}'s carried lease ${carried.id} ended: ${why} moved on to ${'card' in starting ? `#${starting.card}` : `lane ${starting.lane}`} (lease ${holding})`)
 }
 
 /**
  * A builder's own slot a start or a lane can take over (#1441): its carried lease (its adopted worktree, or a slot its
- * Resume took) kept for nothing now, the slot clean and its head in the target (merged). Null: none, or not now.
+ * Resume took) kept for nothing now and the slot clean. An adopted worktree's head must be in the target too (merged):
+ * its branch is the agent's own from 0.9, on no card's line. A slot its Resume took is on a card's or lane's line, which
+ * stays when the slot moves to the new one (HI-1741: HB3's, on a line still in review, was left carried and unused while
+ * its lane was lent a second slot, and another builder found none free).
  */
 async function carriedToHand(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, target: string | null): Promise<{ carried: SlotLease; slot: Slot } | null> {
   const carried = pool.leasesOf(builder).find((l) => l.kind === 'carried')
   if (!carried || keptFor(ws, carried.id)) return null
   const slot = pool.slotOf(carried)
-  return slot && (await cleanAndContained(projectPath, slot.folder, target)) ? { carried, slot } : null
+  if (!slot) return null
+  if (pool.resumedCarry(carried)) {
+    const d = await G.dirty(slot.folder)
+    return isUnknown(d) || d.length ? null : { carried, slot }
+  }
+  return (await cleanAndContained(projectPath, slot.folder, target)) ? { carried, slot } : null
 }
 
 /**
