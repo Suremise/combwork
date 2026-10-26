@@ -265,8 +265,8 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
     // As they resolve (an option left out inherits), before and after.
     if (workflow.mergeAsk) {
       const was = resolvedOf(ws, project.path, project.platform, cfg).options
-      const now = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow }).options
-      chosen = was.style !== now.style || was.commitMessage !== now.commitMessage
+      const saved = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow }).options
+      chosen = was.style !== saved.style || was.commitMessage !== saved.commitMessage
     }
     return { workflow: chosen ? withoutMergeAsk(workflow) : workflow }
   })
