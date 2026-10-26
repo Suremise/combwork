@@ -25,6 +25,10 @@ export const EVERYTHING = [
   'src/main/openingFence.ts',
   'src/main/paths.ts',
   'src/main/logger.ts',
+  // Its thread writes every line hive.log and hooks.log get (HI-1730).
+  'src/main/logWriter.ts',
+  // Every IPC call, database step and slow log write is marked through it (HI-1692).
+  'src/main/stallWork.ts',
   'src/main/ptyHost.ts',
   'src/main/testQuiet.ts',
   // Every IPC call's errors and the Agent API's go through it (#845).
@@ -263,7 +267,7 @@ export const AREAS = [
   { paths: ['src/main/lastRun.ts', 'src/shared/unexpectedClose.ts', 'src/main/mergeSlotHost.ts', 'src/main/mergeSlots.ts', 'tests/e2e/unexpectedclose.cjs', 'tests/e2e/unexpectedclose-leftovers.cjs'], suites: ['unexpectedclose', 'unexpectedclose-leftovers', 'restartresume'] },
   { paths: ['src/main/restartResume.ts', 'src/shared/restartResume.ts', 'tests/e2e/restartresume.cjs'], suites: ['restartresume', 'unexpectedclose'] },
   // "The main process was busy" (#1109): sleep isn't a stall, and a stall names what was running.
-  { paths: ['src/main/mainStalls.ts', 'tests/e2e/stalls.cjs'], suites: ['stalls'] },
+  { paths: ['src/main/mainStalls.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/stalls.cjs'], suites: ['stalls'] },
   { paths: ['src/main/exitLog.ts', 'src/main/memory.ts', 'src/main/diagnostics.ts', 'src/main/updater.ts', 'src/main/installDir.ts'], suites: ['crashdumps'] },
   // .hive kept out of version control, and its notice (#345).
   { paths: ['src/main/hiveVcs.ts', 'src/shared/hiveVcsText.ts', 'src/renderer/src/components/HiveVcsNotice.tsx'], suites: ['hivevcs', 'gitinit'] },
