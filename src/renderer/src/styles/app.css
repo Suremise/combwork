@@ -4168,6 +4168,65 @@ h2.section#unused-worktrees {
   margin: 0 0 6px;
   line-height: 1.45;
 }
+/* Settings → Accounts (HI-980) */
+.accounts-provider {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.account-row {
+  align-self: stretch;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.account-main {
+  flex: 1 1 360px;
+  min-width: 220px;
+}
+.account-name {
+  font-weight: 600;
+}
+.account-state {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 2px;
+}
+.account-state.state-signedIn .codicon {
+  color: var(--success);
+}
+.account-state.state-changed .codicon,
+.account-state.state-missing .codicon,
+.account-warning .codicon {
+  color: var(--warning);
+}
+.account-warning {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 4px;
+}
+.account-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.account-default {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+.account-signin {
+  align-self: stretch;
+  margin-top: 10px;
+}
 .task-terminal {
   height: 280px;
   background: #1a1a1a;

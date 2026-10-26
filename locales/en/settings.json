@@ -1,4 +1,240 @@
 {
+  "settings.accounts.add": {
+    "defaultMessage": "Add Connection…",
+    "description": "Button in Settings → Connections: adds a connection (asks its name), then opens its sign-in."
+  },
+  "settings.accounts.addConfirm": {
+    "defaultMessage": "Add and Sign In",
+    "description": "The confirm button of the dialog adding a connection (Settings → Connections)."
+  },
+  "settings.accounts.addFailed": {
+    "defaultMessage": "Couldn't add the connection",
+    "description": "An error's title: adding a connection failed (Settings → Connections)."
+  },
+  "settings.accounts.addMessage": {
+    "defaultMessage": "A name for it, such as Anthropic · Max 1 or Work. Hive makes its folder, then opens {cli}'s sign-in in your browser.",
+    "description": "The message of the dialog asking a new connection's name (Settings → Connections). {cli} is a coding agent CLI."
+  },
+  "settings.accounts.addTitle": {
+    "defaultMessage": "Add a {cli} sign-in connection",
+    "description": "Title of the dialog asking a new connection's name (Settings → Connections). {cli} is a coding agent CLI (\"Claude Code\")."
+  },
+  "settings.accounts.changeFailed": {
+    "defaultMessage": "Couldn't change the connection",
+    "description": "An error's title: renaming a connection, turning it on or off, or making it the default failed."
+  },
+  "settings.accounts.changedTo": {
+    "defaultMessage": "Now signed in as {now}, was {was}",
+    "description": "A warning on a connection (Settings → Connections): its login changed (a /login typed in a pane). {now} and {was} are emails."
+  },
+  "settings.accounts.checkedAt": {
+    "defaultMessage": "Checked {when}",
+    "description": "The tooltip of a connection's state (Settings → Connections): when it was last checked. {when} is how long ago (\"5 min ago\")."
+  },
+  "settings.accounts.closeTerminal": {
+    "defaultMessage": "Close",
+    "description": "Button under a connection's ended sign-in terminal (Settings → Connections): hides it."
+  },
+  "settings.accounts.default": {
+    "defaultMessage": "Default",
+    "description": "The choice on a connection (Settings → Connections): the open workspace's default connection for its CLI."
+  },
+  "settings.accounts.isDefault": {
+    "defaultMessage": "This workspace's default",
+    "description": "Shown on the connection that is the open workspace's default (Settings → Connections)."
+  },
+  "settings.accounts.keep": {
+    "defaultMessage": "Keep the New Login",
+    "description": "Button on a connection whose login changed (Settings → Connections): takes on the login it is now signed in as."
+  },
+  "settings.accounts.keepFailed": {
+    "defaultMessage": "Couldn't keep the new login",
+    "description": "An error's title: Keep the New Login failed."
+  },
+  "settings.accounts.keepRename": {
+    "defaultMessage": "Kept. Rename {name} to match?",
+    "description": "After Keep the New Login on a connection ({name}): offers to rename it, since it is now another login."
+  },
+  "settings.accounts.leftover": {
+    "defaultMessage": "Not all removed: {what}. Remove tries again; nothing outside its folder was touched.",
+    "description": "A warning on a connection (Settings → Connections) whose removal stopped partway. {what} is what's left, in English."
+  },
+  "settings.accounts.list.desc": {
+    "defaultMessage": "Add a connection, sign it in, and choose which are on in this workspace and which is its default.",
+    "description": "What the list \"Connections\" does, under its title (Settings → Connections)."
+  },
+  "settings.accounts.list.tip": {
+    "defaultMessage": "A sign-in connection is a folder of its own that Hive made, signed in with Claude Code's own sign-in in your browser: Hive never sees or keeps its login. Its conversations and memory are shared with your other connections through a link to Claude Code's projects folder. Its settings, trusted folders and MCP servers are its own. Removing a connection deletes its folder and its login on this PC, never your conversations.",
+    "description": "The info tip of the list \"Connections\" (Settings → Connections): more on what it does and when it applies."
+  },
+  "settings.accounts.list.title": {
+    "defaultMessage": "Connections",
+    "description": "A setting's title (Settings → Connections): the list of connections."
+  },
+  "settings.accounts.loading": {
+    "defaultMessage": "Loading…",
+    "description": "Settings → Connections while its list loads."
+  },
+  "settings.accounts.makeDefault": {
+    "defaultMessage": "Make Default",
+    "description": "Button on a connection (Settings → Connections): makes it the open workspace's default connection for its CLI (turning it on)."
+  },
+  "settings.accounts.name": {
+    "defaultMessage": "Name",
+    "description": "The label of the box for a connection's name (Settings → Connections)."
+  },
+  "settings.accounts.needName": {
+    "defaultMessage": "Give it a name.",
+    "description": "Under the name box of a connection (Settings → Connections) while it's empty."
+  },
+  "settings.accounts.noWorkspace": {
+    "defaultMessage": "Open a workspace to choose which connections are on in it.",
+    "description": "Settings → Connections with no workspace open: the On and Default choices are per workspace."
+  },
+  "settings.accounts.none": {
+    "defaultMessage": "No connections yet. Add one, then sign it in.",
+    "description": "Settings → Connections when there are no connections."
+  },
+  "settings.accounts.onHere": {
+    "defaultMessage": "On in this workspace",
+    "description": "The switch on a connection (Settings → Connections): whether it is on in the open workspace."
+  },
+  "settings.accounts.plan": {
+    "defaultMessage": "{email} · {plan}",
+    "description": "A connection's identity in Settings → Connections: the email it is signed in as, and its plan as the CLI names it (\"max\")."
+  },
+  "settings.accounts.remove": {
+    "defaultMessage": "Remove…",
+    "description": "Button on a connection (Settings → Connections): removes it and deletes its folder (asks first)."
+  },
+  "settings.accounts.removeConfirm": {
+    "defaultMessage": "Remove",
+    "description": "The confirm button of the dialog removing a connection."
+  },
+  "settings.accounts.removeFailed": {
+    "defaultMessage": "Couldn't remove the connection",
+    "description": "An error's title: removing a connection failed."
+  },
+  "settings.accounts.removeMessage": {
+    "defaultMessage": "Its folder is deleted for good, with its login on this PC (it doesn't go to the Recycle Bin). Your conversations and Claude Code's memory are kept: they are shared with your other connections. The account itself stays yours at Anthropic.",
+    "description": "The message of the dialog confirming a connection's removal (Settings → Connections)."
+  },
+  "settings.accounts.removeTitle": {
+    "defaultMessage": "Remove {name}?",
+    "description": "Title of the dialog confirming a connection's removal ({name}, its name)."
+  },
+  "settings.accounts.removing": {
+    "defaultMessage": "Removing…",
+    "description": "The confirm button of the dialog removing a connection, while it removes it."
+  },
+  "settings.accounts.rename": {
+    "defaultMessage": "Rename…",
+    "description": "Button on a connection (Settings → Connections): changes its name only."
+  },
+  "settings.accounts.renameConfirm": {
+    "defaultMessage": "Rename",
+    "description": "The confirm button of the dialog renaming a connection."
+  },
+  "settings.accounts.renameTitle": {
+    "defaultMessage": "Rename {name}",
+    "description": "Title of the dialog renaming a connection ({name}, its name)."
+  },
+  "settings.accounts.sameLogin": {
+    "defaultMessage": "Signed in to the same login as another connection: {names}",
+    "description": "A warning on a connection (Settings → Connections): other connections are signed in as the same login. {names} is their names, listed."
+  },
+  "settings.accounts.signIn": {
+    "defaultMessage": "Sign In",
+    "description": "Button on a connection (Settings → Connections): opens the CLI's own sign-in for it, in a terminal of Hive's."
+  },
+  "settings.accounts.signInAgain": {
+    "defaultMessage": "Sign In Again",
+    "description": "Button on a connection (Settings → Connections) that is signed out, or whose login changed: opens the CLI's own sign-in for it again."
+  },
+  "settings.accounts.signInFailed": {
+    "defaultMessage": "Couldn't open the sign-in",
+    "description": "An error's title: a connection's sign-in terminal couldn't be opened."
+  },
+  "settings.accounts.signingIn": {
+    "defaultMessage": "Signing in: finish in your browser, or in the terminal below. Hive doesn't type into it.",
+    "description": "Settings → Connections while a connection's sign-in terminal is open: the user signs in through the CLI's own flow."
+  },
+  "settings.accounts.signingInElsewhere": {
+    "defaultMessage": "Signing in, in another window",
+    "description": "A connection's line in Settings → Connections while its sign-in is open in another of Hive's windows."
+  },
+  "settings.accounts.state.changed": {
+    "defaultMessage": "Login changed",
+    "description": "A connection's state (Settings → Connections): signed in as another login than the one it was added with."
+  },
+  "settings.accounts.state.failed": {
+    "defaultMessage": "Couldn't check",
+    "description": "A connection's state (Settings → Connections): Hive couldn't ask the CLI who it's signed in as (not the same as signed out)."
+  },
+  "settings.accounts.state.missing": {
+    "defaultMessage": "Folder missing",
+    "description": "A connection's state (Settings → Connections): its folder isn't there, or isn't the one Hive made."
+  },
+  "settings.accounts.state.signedIn": {
+    "defaultMessage": "Signed in",
+    "description": "A connection's state (Settings → Connections)."
+  },
+  "settings.accounts.state.signedOut": {
+    "defaultMessage": "Signed out",
+    "description": "A connection's state (Settings → Connections): the CLI says its folder isn't signed in."
+  },
+  "settings.accounts.state.unchecked": {
+    "defaultMessage": "Not checked yet",
+    "description": "A connection's state (Settings → Connections): Hive hasn't asked the CLI yet."
+  },
+  "settings.advanced.claude-code.accounts.emailField.desc": {
+    "defaultMessage": "The field of `claude auth status --json` with the email a connection's folder is signed in as. Wrong, Hive can't tell who a connection is signed in as, and can't warn when its login changes.",
+    "description": "What the advanced setting \"Connections: email field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command)."
+  },
+  "settings.advanced.claude-code.accounts.emailField.title": {
+    "defaultMessage": "Connections: email field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.accounts.loggedInField.desc": {
+    "defaultMessage": "The field of `claude auth status --json` that says whether a connection's folder is signed in. Wrong, Hive can't tell, and its sign-in connections show \"Couldn't check\".",
+    "description": "What the advanced setting \"Connections: signed-in field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command)."
+  },
+  "settings.advanced.claude-code.accounts.loggedInField.title": {
+    "defaultMessage": "Connections: signed-in field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.accounts.loginFiles.desc": {
+    "defaultMessage": "The names of the files in a connection's folder that change when Claude Code signs in or out there, as a regular expression. Hive watches them (it never reads them) and checks the connection again when one changes. Wrong, a /login or /logout typed in an agent's pane is only found at the connection's next check.",
+    "description": "What the advanced setting \"Connections: login files\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep /login and /logout as they are (commands)."
+  },
+  "settings.advanced.claude-code.accounts.loginFiles.title": {
+    "defaultMessage": "Connections: login files",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.accounts.orgField.desc": {
+    "defaultMessage": "The field of `claude auth status --json` with the organisation's id a connection's folder is signed in to. With the email, it tells two logins apart. Wrong, Hive can't tell who a connection is signed in as.",
+    "description": "What the advanced setting \"Connections: organisation field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command)."
+  },
+  "settings.advanced.claude-code.accounts.orgField.title": {
+    "defaultMessage": "Connections: organisation field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.accounts.planField.desc": {
+    "defaultMessage": "The field of `claude auth status --json` with a connection's plan (\"max\"), shown beside its email in Settings → Connections. Wrong, no plan is shown.",
+    "description": "What the advanced setting \"Connections: plan field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` and \"max\" as they are."
+  },
+  "settings.advanced.claude-code.accounts.planField.title": {
+    "defaultMessage": "Connections: plan field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.accounts.statusSeconds.desc": {
+    "defaultMessage": "How long Hive gives `claude auth status` to say who a connection's folder is signed in as. Past it, the connection shows \"Couldn't check\", never signed out.",
+    "description": "What the advanced setting \"Connections: sign-in check timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status` as it is (a command)."
+  },
+  "settings.advanced.claude-code.accounts.statusSeconds.title": {
+    "defaultMessage": "Connections: sign-in check timeout",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.claude-code.exit.command.desc": {
     "defaultMessage": "What Hive types into Claude Code, then Enter, to end it once its lane has ended and its turn is over, so it exits by itself rather than being killed. Wrong, Claude Code isn't ended by it and is killed after the exit grace.",
     "description": "What the advanced setting \"Lane's end: exit command\" is for, and what goes wrong when it is wrong (Settings → Advanced). A lane is a card loop."
@@ -674,6 +910,14 @@
   "settings.advanced.error.text": {
     "defaultMessage": "{title} takes text.",
     "description": "Why an advanced setting's new value isn't taken. {title} is the setting's title."
+  },
+  "settings.advanced.hive.accounts.preview.desc": {
+    "defaultMessage": "Shows Settings → Connections, where you keep the ways your agents reach their models: for now, Claude Code sign-ins, each a folder of its own signed in through Claude Code's own sign-in. A preview: agents don't run on these connections yet, and still use your usual Claude Code login.",
+    "description": "What the advanced setting \"Connections (preview)\" does (Settings → Advanced, under Hive). Settings → Connections names a section: use its name as Hive shows it."
+  },
+  "settings.advanced.hive.accounts.preview.title": {
+    "defaultMessage": "Connections (preview)",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: a switch that shows Settings → Connections before the feature is finished."
   },
   "settings.advanced.hive.agents.perProject.desc": {
     "defaultMessage": "How many agents a project can have (#562): {usual} unless you need more, up to {most}. Each agent runs its own copy of its CLI, so more agents take more memory, and they all share your plans' usage limits. Lowering it removes no agents: a project with more just can't add another. Templates and the Agent API keep to it too.",
@@ -3630,6 +3874,14 @@
   "settings.search": {
     "defaultMessage": "Search settings",
     "description": "Placeholder of Settings' search box."
+  },
+  "settings.section.accounts.desc": {
+    "defaultMessage": "How your agents reach their models: for now, Claude Code sign-ins Hive keeps, one folder each, signed in through Claude Code's own sign-in. Every connection shares your conversations and Claude Code's memory. A preview: agents still run on your usual login.",
+    "description": "Under the heading of the section \"Connections\" of Settings: what it holds."
+  },
+  "settings.section.accounts.label": {
+    "defaultMessage": "Connections",
+    "description": "A section of Settings, in its list on the left: connections, the ways Hive's agents reach their models (a CLI signed in, or later a base URL and key)."
   },
   "settings.section.advanced.desc": {
     "defaultMessage": "Developer features, the details Hive relies on that a CLI update can break (advanced.json), logs, data and resetting Hive.",

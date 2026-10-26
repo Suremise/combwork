@@ -15,7 +15,7 @@ import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
-import type { Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
+import type { ConnectionStatus, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
 import { autoCompactOf, settingsScopes } from './autoCompact'
 import { hiveStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
 import { claudeBackgroundTasks } from './background'
@@ -86,6 +86,47 @@ export function claudeTurnScreen(screen: string): 'idle' | 'working' | null {
 
 export function claudeHome(): string {
   return process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
+}
+
+/** The fields Hive reads from `claude auth status --json` (HI-980), as Settings → Advanced names them. */
+export interface AuthStatusFields {
+  loggedIn: string
+  email: string
+  orgId: string
+  plan: string
+}
+
+/**
+ * Who `claude auth status --json` says a folder is signed in as (HI-980), from its output (it exits 1 when signed out,
+ * with the same JSON): only the fields named, never anything else it prints. Not told (no JSON, no boolean signed-in
+ * field) is `ok: false`, never signed out.
+ */
+/**
+ * An account's status from `claude auth status --json`'s run (HI-980): only a check that ended by itself counts. Exit
+ * 0 with its answer, or exit 1 with signed-out JSON (how it says signed out); anything else (a timeout, another exit,
+ * exit 1 claiming signed in) is a failed check, whatever it printed.
+ */
+export function claudeAccountStatus(r: { stdout: string; code: number; ended?: true }, f: AuthStatusFields): ConnectionStatus {
+  if (r.ended) return { ok: false, error: `it didn't finish (exit ${r.code})` } // i18n-ignore: for the log
+  const s = parseClaudeAuthStatus(r.stdout, f)
+  if (r.code === 0) return s
+  if (r.code === 1 && s.ok && !s.loggedIn) return s
+  return { ok: false, error: s.ok ? `it exited ${r.code} saying ${s.loggedIn ? 'signed in' : 'signed out'}` : `${s.error} (exit ${r.code})` } // i18n-ignore: for the log
+}
+
+export function parseClaudeAuthStatus(stdout: string, f: AuthStatusFields): ConnectionStatus {
+  let j: unknown
+  try {
+    j = JSON.parse(stdout.trim())
+  } catch {
+    return { ok: false, error: 'its status was not JSON' } // i18n-ignore: for the log
+  }
+  if (!j || typeof j !== 'object') return { ok: false, error: 'its status was not an object' } // i18n-ignore: for the log
+  const o = j as Record<string, unknown>
+  const signedIn = o[f.loggedIn]
+  if (typeof signedIn !== 'boolean') return { ok: false, error: `its status had no "${f.loggedIn}"` } // i18n-ignore: for the log
+  const str = (k: string): string | undefined => (typeof o[k] === 'string' && o[k] ? (o[k] as string) : undefined)
+  return { ok: true, loggedIn: signedIn, email: str(f.email), orgId: str(f.orgId), plan: str(f.plan) ?? null }
 }
 
 /**
@@ -282,6 +323,25 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
 
   loginCommand(executable: string): CommandSpec {
     return { file: executable, args: ['auth', 'login'] }
+  }
+
+  async accountStatus(executable: string, env: NodeJS.ProcessEnv): Promise<ConnectionStatus> {
+    const r = await run(executable, ['auth', 'status', '--json'], advanced.number('claude-code.accounts.statusSeconds') * 1000, env)
+    const fields: AuthStatusFields = {
+      loggedIn: advanced.get<string>('claude-code.accounts.loggedInField'),
+      email: advanced.get<string>('claude-code.accounts.emailField'),
+      orgId: advanced.get<string>('claude-code.accounts.orgField'),
+      plan: advanced.get<string>('claude-code.accounts.planField')
+    }
+    return claudeAccountStatus(r, fields)
+  }
+
+  accountSharedTarget(name: string): string {
+    return join(claudeHome(), name)
+  }
+
+  accountLoginFile(name: string): boolean {
+    return advanced.pattern('claude-code.accounts.loginFiles').test(name)
   }
 
   /** Claude Code's own default: "model" in ~/.claude/settings.json. */

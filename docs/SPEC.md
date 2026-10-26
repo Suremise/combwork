@@ -772,6 +772,70 @@ The same rules apply to every provider's CLI; the details below are Claude Code'
 - **The name** (#443): the app is displayed as **Hive Desktop** (`productName`; `shared/appName.ts`): the window title and title bar ("Hive Desktop Dev" for dev builds, also their Windows app ID's name), About, the status bar's version and the update items and notifications that name a version, the tray tooltip, native dialog titles, the installer, the Start menu and desktop shortcuts (`shortcutName`), Installed apps (`Hive Desktop <version>`) and the GitHub release title. Sentences and labels where the short name reads naturally say **Hive** ("Hive couldn't…", Quit Hive, Hive Assistant, Hive skills), and so does everything agents and data see: the `hive` MCP server and tools, the Agent API's `app`, `TERM_PROGRAM`, card history's author, metrics exports. Nothing stored moves: the app ID `com.hive.desktop` (taskbar pins, notification settings, the uninstall entry), the profile `%APPDATA%\Hive` (set by main, since Electron would take `productName`), the install folder `%LOCALAPPDATA%\Programs\Hive` and `Hive.exe` (from `executableName`), the installer's file name `Hive-Setup-<version>.exe` and the update feed. An update renames the old shortcuts (electron-builder's installer keeps them under the new name). `tests/appName.test.ts` pins the folders.
 - Releasing: `npm run release` uploads a draft release (installer, `latest.yml`, blockmap) with the `gh` login; it is published by hand on GitHub. See `RELEASING.md`.
 
+### 11.2 Connections (HI-980)
+
+**A connection** is a configured CLI plus where it gets its model (Darren, 26 Oct ~22:20). For example "Anthropic · Max 1" is Claude Code, signed in; "DeepSeek" is Claude Code with a base URL and key; "ChatGPT · Work" is Codex, signed in; "Ollama (local)" is a local model.
+- An agent runs on a connection, and switching accounts means picking another connection.
+- Profiles (Work, Personal; HI-1202) sit above, per workspace: which connections are available, plus the Git identity, GitHub host and MCP credentials.
+- "Provider" keeps meaning the CLI.
+- Each connection has a `kind`: `signIn` is built here; base URL + key (DeepSeek) and local come with their own cards.
+
+Below, an **account** is a **sign-in connection**: a login folder of Hive's, signed in through the CLI's own sign-in. Settings shows it as Settings → **Connections**. The code's names follow: the types (`Connection`, `ConnectionIdentity`, `ConnectionObserved`, `WorkspaceConnections`, `ConnectionsView`, `ConnectionStatus`), `config.json`'s `connections` and `lastUsedConnection`, `workspace.json`'s `connections`, the descriptor's `capabilities.connections`, the IPC (`connections:*`) and the event (`connections-changed`). Only private and on-disk names keep `account` (nothing has shipped, so nothing stored is renamed): the modules (`main/accounts.ts`, `shared/accounts.ts`, `AccountsSettings.tsx`) and their function names, the message and advanced-setting ids (`settings.accounts.*`, `hive.accounts.preview`, `claude-code.accounts.*`), Settings' section id, and the folder `<profile>\accounts`.
+
+**Staged:** shown only with Settings → Advanced → **Connections (preview)** on (`hive.accounts.preview`, off by default). Until HI-1755, agents and the Assistant still launch on the CLI's usual home. HI-1755 removes the switch and launches every Claude Code session on a Hive account. From then on Hive runs nothing from `~/.claude`, which stays the user's own for their terminal (Darren, 26 Oct). HI-1756 adds plan usage per account and the account in the pane header and status bar. HI-1757 and HI-1758 do Codex and Copilot, each once its logins are proven separate per home. The decisions are on HI-980.
+
+- **An account is a CLI login in a folder of its own**, `<accounts>\<id>\`. `<accounts>` is `%LOCALAPPDATA%\Hive\accounts` for the installed Hive, `Hive-Dev`'s for a dev build, and `<HIVE_USER_DATA>\accounts` for a test profile.
+  - The id is random and stable (`a-3f9c2e1b`). The name is the user's ("Personal", "Hive overnight"), and a rename changes only the name.
+  - The list is in `config.json` (`connections`), in Settings' order. All accounts are equal: there's no primary.
+  - A provider has accounts when its descriptor has `capabilities.connections`: `homeEnv` (`CLAUDE_CONFIG_DIR`) and `shared` (`['projects']`). The adapter supplies `accountStatus`, `accountSharedTarget` and `accountLoginFile`. Shared code never tests a provider's id.
+- **Shared through a junction, nothing else.** The account's `projects\` is a directory junction to the CLI home's `projects\` (`accountSharedTarget`: `claudeHome()\projects`), so every account finds every transcript, its memory and resume.
+  - The target is checked first: an absolute path, directly in the adapter's `configHome()`, and not in the accounts folder.
+  - A missing `projects\` is made as an empty folder. That is the only thing Hive ever writes in the CLI's home (Darren, 26 Oct). A missing home is refused ("run Claude Code once").
+  - Settings, trusted folders and user MCP servers stay per account (its own `.claude.json`). Nothing is copied or mirrored.
+- **Signing in** is the CLI's own: **Sign In** (also **Sign In Again**) runs `loginCommand()` (`claude auth login`) in one of Hive's terminals, with `homeEnv` set to the folder (`providerService.runAccountLogin`, one per account).
+  - Hive types nothing into it: the user signs in through Anthropic's browser flow.
+  - Add Account… makes the folder and its junction, each checked, then opens it.
+  - Hive never reads, stores or passes a token. The login stays in the folder's `.credentials.json`, which Hive never opens.
+  - **It starts under the account's lock**, so never while the account is being removed. The account must still be there, and its folder still the one Hive made (a real folder that resolves to itself). A folder replaced by a link would send the CLI's login writes elsewhere, so it is refused and nothing starts. A launch's claim (HI-1755) is taken the same way.
+- **Who it is signed in as** comes from the CLI's own status, `claude auth status --json` in the folder: `loggedIn`, `email`, `orgId` and `subscriptionType`. These field names, the check's timeout and the login files' names are advanced settings (`claude-code.accounts.*`), checked against `tests/fixtures/advanced/auth-status-claude-2.1.310.jsonl`.
+  - **Two records, never merged:** `accepted` is who the user took the account on as (its first good sign-in, or **Keep the New Login**). `observed` is the latest check. A check writes only `observed`, so it can't clear a change the user hasn't answered.
+  - **The states:**
+    - **Signed in.**
+    - **Signed out:** only when the CLI says `loggedIn: false`.
+    - **Login changed:** signed in, but not as `accepted`, e.g. after a `/login` in a pane. It shows "Now signed in as y, was x", with Keep the New Login (then a rename offered) and Sign In Again.
+    - **Couldn't check:** a timeout or unreadable output. It is never shown as signed out, and keeps the last identity.
+      Only a check that ended by itself counts: exit 0 with its answer, or exit 1 saying `loggedIn: false` (how the CLI says signed out). A timeout, any other exit, or exit 1 claiming signed in is a failed check, whatever it printed (`claudeAccountStatus`).
+    - **Folder missing.**
+    - **Not checked yet.**
+  - Only a check that succeeds, says signed in, and has both an email and an organisation can set `accepted`.
+  - Two accounts on the same login (email, any case, and organisation) are flagged on both rows.
+  - Hive never blocks `/login` or `/logout` in a pane.
+- **When accounts are checked**, at most two checks at once, and one at a time per account:
+  - **At every launch:** HI-1755 calls `confirmAccount()`, a fresh check, run again while the login changes under it, at most 3 rounds. It says `fresh: false` if the login kept changing.
+  - **When its login files change, Settings open or not:** a watch on each account that's on in an open workspace (or that has sessions) picks up the change. The check follows after 1 s.
+    - A watch on the accounts folder catches an account's folder deleted, renamed or made again: that account's watch is made again and the account checked.
+    - A watch that fails is tried again after 1, 2, 4, 8 and 16 s, then every minute while it is wanted.
+    - Watches close when nothing wants them.
+  - After its sign-in ends, and when Settings → Accounts is shown.
+  - A check asked for while one runs gets the one started after it. A check that ends after its account was removed is dropped (the account's generation).
+- **A workspace's choice**, in `workspace.json`: `connections: { [provider]: { on: [ids], default: id|null } }`.
+  - No entry means not set up, and nothing is turned on by itself. `{ on: [], default: null }` is the user's own "none on", and is kept.
+  - The first account turned on becomes the default. A default turned off or removed is replaced by the first account of the same provider that's on, in the list's order, else none. Never another provider's.
+  - Ids no longer in the list are dropped when read.
+  - Choosing a default records `lastUsedConnection[provider]`. A new workspace, made only (never one opened), starts with that account on, as its default.
+  - Each window lists its own workspace's choice.
+- **Removing an account** deletes its folder for good, with its login on this PC, not to the Recycle Bin (Darren, 26 Oct). The confirmation says so.
+  - **Refused while it is in use:** its sessions (HI-1755 registers them), a launch's claim, or its sign-in open (from its start to its end). The check is made again under the account's lock, which sign-ins and claims take too.
+  - **The steps:**
+    1. The accounts folder and the account's folder must be real folders, not links, and the account's must resolve to itself.
+    2. Each shared folder's junction is removed as the link alone, and checked gone. One already gone is a removal tried again. A real folder there, or a link elsewhere, refuses.
+    3. The whole folder is searched for any other link, without following any, and one found refuses.
+    4. The folder is renamed aside, to `<accounts>\.removing-<id>`: one rename, which follows nothing. A folder left aside by a crash or a quit is finished at the next start, or by Remove tried again.
+    5. The folder aside is deleted by Hive's own walk: each folder's identity is read before and after listing it, and checked again before every delete in it. A link met, or a folder replaced, stops the walk at once.
+  - **The threat model** (the Assistant's call on HI-980, 26 Oct): removal protects against Hive's own mistakes, the CLI's normal writes (it makes no junctions), and anything the user changed before removal began. It doesn't try to defeat another process racing the walk within milliseconds: such a process runs as the same user, with the same rights, and no userland walk on Windows can close that race.
+  - **If it stops partway,** the account stays listed with what's left (`leftover`), and Remove tries again. Nothing outside its folder is ever touched.
+  - Tested with junctions swapped in partway through (`tests/accounts.test.ts`).
+
 ---
 
 ## 12. Agent API
