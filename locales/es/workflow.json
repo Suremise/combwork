@@ -454,6 +454,7 @@
   "workflow.value.sameness.change": "El mismo cambio",
   "workflow.value.sameness.exact": "Solo la versión exacta",
   "workflow.value.style.merge": "Commit de fusión",
+  "workflow.value.style.rebase": "Rebase y avance rápido",
   "workflow.value.style.squash": "Squash",
   "workflow.why.dependenciesDone": "Es barato, y ninguna tarjeta se construye sobre trabajo que aún no está incorporado.",
   "workflow.why.excluded": "Las dependencias y la salida de compilación no forman parte de lo que entrega una tarjeta.",

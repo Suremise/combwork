@@ -1713,7 +1713,7 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G3 | **Checks pass before review** | Named commands | `submit.checksPassed` |
 | G4 | **A pass survives a clean rebase** | Same change (default) · Exact revision only | Sameness [#1112 B]. "Pass" for a reviewer's verdict, "approval" only for your OK [HB3's round 1 finding 18]; a user's approval carries over the same way. |
 | G5 | **Who merges** | Hive merges (queue) · The agent merges, Hive checks · Committed is done (no merge) · Not checked | `done.contained`, the queue (§16.9). "Committed is done": the target is the branch the folder works on, so the card is Done once its rules pass (review, approval). "Not checked": Done isn't checked against the target. Hive merges and the agent merges need G11 = slots; Committed is done needs G11 = project folder (§16.7.2). |
-| G6 | **Merge style** | Merge commit · Squash | Owned here, not by the Merge dialog (OP-13). |
+| G6 | **Merge style** | Merge commit · Squash · Rebase and fast-forward | Owned here, not by the Merge dialog (OP-13). The merge queue's: where the agent merges, G6 isn't read. Rebase and fast-forward (#1184) lands a linear history (§16.9.1 step 4). |
 | G7 | **Work merges into** (target) | A branch, default the repository's default branch (`main`) | Per-card target allowed (OP-12). |
 | G8 | **Work is up to date with <target> before it merges** (strict) | On / Off | `integrate.upToDate` |
 | G9 | **Checks pass on the merged result** | Named commands | `integrate.checksPassed` (Hive merges only) |
@@ -2446,7 +2446,25 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
 4. **Test merge** in the queue's own worktree (a merge slot, kept warm like other slots): `git worktree add --detach`
    at the target's head (the **expected** revision); `git merge --no-ff <rev>` (or `merge --squash` + commit) with the
    message `AM-12: <title>` and trailers `Hive-Card: AM-12`, `Hive-Revision: <rev>`, `Hive-Reviewed-By: <reviewer>`;
-   the result on a temporary ref `refs/hive/queue/<entry>` [P1]. **Hive's commits** [HB3's round 1 finding 11]:
+   the result on a temporary ref `refs/hive/queue/<entry>` [P1].
+   **Rebase and fast-forward (G6, built [#1184]):** the test merge is a rebase, under the **linear landing** policy:
+   every commit the advance adds to the target (`expected..result`) has exactly one parent, and `expected` is an
+   ancestor of `result`. In the queue's worktree, detached at the reviewed revision, `git rebase --onto <expected>
+   <base>` with Hive's identity and `commitEnv` (no prompt, signing bounded), merge preservation always off
+   (`-c rebase.rebaseMerges=false --no-rebase-merges`, overriding the repository's setting for this command only;
+   `--force-rebase` whenever the reviewed suffix `base..revision` holds a merge, which git would otherwise take as up to
+   date and keep) and no other ref moved (`-c rebase.updateRefs=false --no-update-refs`, as strict's update). A linear
+   suffix already on top of the target lands as it is, with no rewrite. Before the merge checks the result is checked:
+   on top of the target, no commit with two parents in `expected..result`, and `sameChange` with the reviewed change;
+   failing one, the card is returned (`notUpToDate`, its log saying which: a merge resolution that changed the work
+   can't survive flattening); a conflict returns it with its files; a read git couldn't answer pauses (never taken for a
+   pass or a mismatch). The checks then run on exactly that result, and the advance (§16.9.2, unchanged) moves the
+   target from `expected` to it: a fast-forward, recorded as `Integrated` with method `fastForward`. G8 (strict) needs
+   no separate update with it. The rebased commits keep their own messages, authors and dates, with Hive as committer:
+   there is no merge commit, so no `Hive-Card`, `Hive-Revision` or `Hive-Reviewed-By` trailers, the price of a linear
+   history; the reviewed revision stays pinned (§16.9.3), and containment finds the change spread over several commits.
+   No preset sets it.
+   **Hive's commits** [HB3's round 1 finding 11]:
    - authored and committed with the project's identity (G12's, else git's configured identity for the repository);
      with no identity the entry pauses ("set a commit identity for this repository");
    - the repository's hooks run (no `--no-verify`, AGENTS.md); a hook that fails returns the card with the hook's
@@ -4632,6 +4650,6 @@ test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of 
 | Conflict help on a returned card (the conflicting files and hunks from the test merge) | On Hold, git-support: #1181 |
 | Submodules and Git LFS in slots and review copies | On Hold, git-support: #1182 |
 | Remote targets: fetch before testing, push after (Team with a shared remote) | On Hold, git-support: #1183 |
-| Rebase and fast-forward as a merge style | On Hold, git-support: #1184 |
+| Rebase and fast-forward as a merge style | **Built [#1184]:** G6's third value (§16.9.1 step 4, linear landing) |
 | Signed queue commits without a prompt | On Hold, git-support: #1185 |
 | Pin refs for submitted revisions; hooks and signing pauses in the queue; Hive's commit identity | P5 (in scope, §16.9) |

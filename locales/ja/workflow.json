@@ -454,6 +454,7 @@
   "workflow.value.sameness.change": "同じ変更",
   "workflow.value.sameness.exact": "完全に同じリビジョンのみ",
   "workflow.value.style.merge": "マージコミット",
+  "workflow.value.style.rebase": "リベースして早送り",
   "workflow.value.style.squash": "スカッシュ",
   "workflow.why.dependenciesDone": "コストが低く、まだ取り込まれていない作業の上にカードが作られることはありません。",
   "workflow.why.excluded": "依存関係やビルド出力は、カードの成果物には含まれません。",

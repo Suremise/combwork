@@ -488,7 +488,7 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
       case 'mergeInstall':
         return select('mergeInstall', [['onManifestChange', tr(V.mergeInstall.onManifestChange)], ['always', tr(V.mergeInstall.always)]])
       case 'style':
-        return select('style', [['merge', tr(V.style.merge)], ['squash', tr(V.style.squash)]])
+        return select('style', [['merge', tr(V.style.merge)], ['squash', tr(V.style.squash)], ['rebase', tr(V.style.rebase)]])
       case 'folder':
         return select('folder', [['slots', tr(V.folder.slots)], ['project', tr(V.folder.project)]])
       case 'reviewerMode':

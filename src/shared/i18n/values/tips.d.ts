@@ -246,6 +246,8 @@ interface HiveMessageValues {
   'tips.mergeQueueFolder.title': undefined
   'tips.mergeQueuePanel.text': undefined
   'tips.mergeQueuePanel.title': undefined
+  'tips.mergeRebase.text': undefined
+  'tips.mergeRebase.title': undefined
   'tips.mergeSlot.text': undefined
   'tips.mergeSlot.title': undefined
   'tips.mergeStrict.text': undefined

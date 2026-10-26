@@ -39,7 +39,7 @@ export interface WorkflowOptions {
   /** G5 (Git); None is always `accept`. */
   finish: Finisher
   /** G6. */
-  style: 'merge' | 'squash'
+  style: 'merge' | 'squash' | 'rebase'
   /** G7: the target line; empty means the repository's default branch. */
   target: string
   /**
@@ -334,7 +334,7 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   preChecks: strings,
   sameness: oneOf<WorkflowOptions['sameness']>(['change', 'exact']),
   finish: oneOf<Finisher>(['hiveMerges', 'agentMerges', 'committed', 'notChecked', 'accept']),
-  style: oneOf<WorkflowOptions['style']>(['merge', 'squash']),
+  style: oneOf<WorkflowOptions['style']>(['merge', 'squash', 'rebase']),
   target: (v) => typeof v === 'string',
   targetOwn: (v) => v === true,
   strict: bool,

@@ -233,7 +233,7 @@ export interface FactData {
   ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number; for?: 'user'; asker?: string; checklist?: string[]; entry?: string; result?: string; actions?: AskAction[] }
   /** An answer (§16.8.5): `note` the user's reply; at the round limit, their `choice` and the rounds a carry on adds; `action`, an action the question offered, done (#1630; `note` its reason). */
   Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number; action?: AskActionKind }
-  IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash'; requeue?: 'transient' | 'retry' }
+  IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash' | 'rebase'; requeue?: 'transient' | 'retry' }
   /** `followUp`: a follow-up posted on the queued card (#1623), so the queue can't merge the revision while its line changes. */
   IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' | 'followUp' }
   IntegrationStarted: { entry: string; expected: string; result: string; files?: string[]; checkedOut?: string | null }

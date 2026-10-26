@@ -463,6 +463,7 @@
   "workflow.value.sameness.change": "Same change",
   "workflow.value.sameness.exact": "Exact revision only",
   "workflow.value.style.merge": "Merge commit",
+  "workflow.value.style.rebase": "Rebase and fast-forward",
   "workflow.value.style.squash": "Squash",
   "workflow.why.dependenciesDone": "It’s cheap, and no card is built on work that isn’t in yet.",
   "workflow.why.excluded": "Dependencies and build output aren’t part of what a card delivers.",

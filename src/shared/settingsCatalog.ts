@@ -756,7 +756,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('commands', 'custom'),
     option('sameness', 'select', [['change', V.sameness.change], ['exact', V.sameness.exact]]),
     option('finish', 'select', [['hiveMerges', V.finish.hiveMerges], ['agentMerges', V.finish.agentMerges], ['committed', V.finish.committed], ['notChecked', V.finish.notChecked]]),
-    option('style', 'select', [['merge', V.style.merge], ['squash', V.style.squash]]),
+    option('style', 'select', [['merge', V.style.merge], ['squash', V.style.squash], ['rebase', V.style.rebase]]),
     option('target', 'text'),
     option('mergeChecks', 'custom'),
     option('mergeInstall', 'select', [['onManifestChange', V.mergeInstall.onManifestChange], ['always', V.mergeInstall.always]]),
