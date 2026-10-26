@@ -8650,12 +8650,16 @@ body.pane-resizing-v .monaco-editor {
   font-weight: 600;
   color: var(--fg-strong);
 }
+/* In a narrow window the row wraps (HI-1725): the search box gives way to its least width first, then whatever doesn't
+   fit goes whole to a second line, New Card and ⋯ still at its end. */
 .board-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
 }
-/* The checkboxes keep their one line; the workflow link (#1420) gives way first, cut with "…" (its hover has it whole). */
+/* The checkboxes keep their one line; the workflow link (#1420) is cut with "…" (its hover has it whole) only where even
+   a line of its own is too narrow for it. */
 .board-toolbar > label {
   white-space: nowrap;
 }
@@ -8673,7 +8677,8 @@ body.pane-resizing-v .monaco-editor {
   display: flex;
   align-items: center;
   gap: 6px;
-  width: 300px;
+  flex: 0 1 300px;
+  min-width: 160px;
   max-width: 40%;
 }
 .board-search .search-box {
