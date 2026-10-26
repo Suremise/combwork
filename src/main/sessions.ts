@@ -1,3 +1,5 @@
+import type { ActivityTask } from '../shared/activity'
+import { maskText } from '../shared/redact'
 import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
@@ -1222,6 +1224,37 @@ class SessionManager {
 
   liveStates(): LiveSessionState[] {
     return [...this.live.values()].map((l) => l.state)
+  }
+
+  /** The background tasks running in a project's agents' launches (#1254, the Activity tab), as their CLIs described them. */
+  backgroundTasks(projectPath: string): ActivityTask[] {
+    return this.projectStates(projectPath).flatMap((state) => {
+      const l = this.live.get(`${projectPath.toLowerCase()}#${state.agentId}`)
+      return [...(l?.tasks ?? new Map()).entries()].map(([id, t]) => ({ agentId: state.agentId, sessionId: state.sessionId, id, ...(t.type ? { type: t.type } : {}), ...(t.description ? { description: maskText(t.description) } : {}), at: t.at }))
+    })
+  }
+
+  /**
+   * A project's sessions for the Activity tab (#1254): from its records and the usage history's titles alone, those
+   * running or active within `hours`; no transcript is looked for or stat'ed (a session's turns are read when it opens),
+   * so it answers in milliseconds where the full listing (list()) takes most of a second with hundreds.
+   */
+  async activitySessions(projectPath: string, hours: number): Promise<SessionListItem[]> {
+    projectPath = workspace.assertSessionHost(projectPath)
+    const file = await workspace.sessionsFile(projectPath)
+    const stored = await usageHistory.storedUsage(projectPath).catch(() => new Map<string, StoredUsage>())
+    const live = new Set(this.projectStates(projectPath).map((s) => s.sessionId))
+    const since = Date.now() - hours * 3600_000
+    const out: SessionListItem[] = []
+    for (const rec of file.sessions) {
+      const kept = stored.get(rec.id)
+      const usage = kept ? this.titled(kept.usage) : null
+      const last = usage?.lastActivity ?? rec.lastActiveAt
+      if (!live.has(rec.id) && (rec.archived || !(Date.parse(last) >= since))) continue
+      const { keptUsage: _kept, ...fields } = rec
+      out.push({ ...fields, provider: recordProvider(rec), source: 'hive', title: usage?.title ?? null, lastActivity: last, hasTranscript: true, hasBackup: false, usage: null, recache: null })
+    }
+    return out
   }
 
   /** Whether a session of Hive's runs, or is starting, in a folder (#1431: its skill copies stay while one does). */

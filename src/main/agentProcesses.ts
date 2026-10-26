@@ -6,6 +6,8 @@ import { createLogger, userText } from './logger'
 import { JobHost, MAX_LISTED, type HostFailure, type JobList } from './processSupervisor'
 import { hiveError } from './hiveError'
 import { processLabel, progressRunTitle, type AgentLeftovers, type AgentProcess } from '../shared/agentProcesses'
+import type { ActivityProcess } from '../shared/activity'
+import { maskText } from '../shared/redact'
 import { englishText, shownText, withValues, type TextPart } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { MAX_MARKER_LAUNCHES, MAX_MARKER_PROCESSES, type LaunchProcesses } from '../shared/unexpectedClose'
@@ -115,6 +117,8 @@ interface Launch {
   projectPath: string
   agentId: string
   agentName: string
+  /** Its terminal's process (the gate), once tracked: it and what it started first are the agent's CLI (#1254). */
+  gate?: number
 }
 
 /** Launches whose CLI is still running (or exited and being looked at). */
@@ -184,7 +188,7 @@ export type TrackResult = { tracked: true } | { tracked: false; reason: string; 
  */
 export async function trackLaunch(launch: Launch, pid: number, cancelled?: AbortSignal): Promise<TrackResult> {
   if (process.platform !== 'win32') return { tracked: false, reason: englishText(TRACKER.windowsOnly), text: TRACKER.windowsOnly }
-  running.set(launch.runId, launch)
+  running.set(launch.runId, { ...launch, gate: pid })
   const r = await host.request('add', launch.runId, pid)
   if (r === 'ok' && !cancelled?.aborted) {
     if (host.usable) problem = null
@@ -263,6 +267,57 @@ export async function inAgentLaunch(projectPath: string, agentId: string, pid: n
   return false
 }
 
+/** A running launch's processes now, for the Activity tab (#1254): its agent, run and job's processes (at most MAX_LISTED). */
+export interface LaunchNow {
+  agentId: string
+  runId: string
+  /** The agent's CLI and its terminal: listed, never ended from here (Stop does). */
+  cli: number[]
+  processes: ActivityProcess[]
+  more: number
+}
+
+/**
+ * What a project's running agents' launches run now (#1254): each launch's job, as Stop's tracking has it. Empty when
+ * none is tracked; never starts the host.
+ */
+export async function projectLaunches(projectPath: string): Promise<LaunchNow[]> {
+  if (process.platform !== 'win32' || !host.pid) return []
+  const out: LaunchNow[] = []
+  for (const l of running.values()) {
+    if (l.projectPath.toLowerCase() !== projectPath.toLowerCase()) continue
+    const list = await listJob(l.runId, true)
+    if (!list) continue
+    out.push({ agentId: l.agentId, runId: l.runId, cli: cliOf(l, list.processes), processes: list.processes, more: list.more })
+  }
+  return out
+}
+
+/** A launch's own CLI among its processes: its gate and what the gate started. */
+function cliOf(l: Launch, processes: readonly AgentProcess[]): number[] {
+  return l.gate ? [l.gate, ...processes.filter((p) => p.parent === l.gate).map((p) => p.pid)] : []
+}
+
+/**
+ * Ends one of an agent's own processes (#1254, the Activity tab): only while it is in that agent's running launch's
+ * job as the process the user saw (its id and start time), never its CLI (Stop ends that), never by name. `notOwn`:
+ * none of its running launches has it now (ended already, or another's); `cli`: the agent's CLI.
+ */
+export async function endAgentProcess(projectPath: string, agentId: string, pid: number, created: string): Promise<'ended' | 'notOwn' | 'cli' | 'failed'> {
+  if (process.platform !== 'win32' || !host.pid) return 'notOwn'
+  for (const l of running.values()) {
+    if (agentKey(l.projectPath, l.agentId) !== agentKey(projectPath, agentId)) continue
+    const processes = (await listJob(l.runId))?.processes ?? []
+    const p = processes.find((x) => x.pid === pid && x.created === created)
+    if (!p) continue
+    if (cliOf(l, processes).includes(pid)) return 'cli'
+    const ended = await endProcessesExactly([p])
+    log.info(`ended ${userText(p.label)} (pid ${pid}) of ${userText(l.agentName)} from the Activity tab${ended ? '' : ': it still runs'}`)
+    return ended ? 'ended' : 'failed'
+  }
+  return 'notOwn'
+}
+
 /** Once every launch that has exited has been looked at (Hive quitting asks about all their leftovers at once). */
 export async function leftoversSettled(): Promise<void> {
   while (settling.size) await Promise.allSettled([...settling])
@@ -294,15 +349,17 @@ async function findLeftovers(runId: string): Promise<AgentLeftovers | null> {
   return now
 }
 
-async function listJob(runId: string): Promise<{ processes: AgentProcess[]; more: number; adopted: number } | null> {
+async function listJob(runId: string, withCommands = false): Promise<{ processes: ActivityProcess[]; more: number; adopted: number } | null> {
   const r = (await host.request('list', runId)) as JobList | string | null
   if (!r || typeof r !== 'object' || !Array.isArray(r.processes)) return null
   const processes = r.processes
     // A console window's host belongs to a process of the job and ends with it: not one to list.
     .filter((p) => !/^(conhost|openconsole)\.exe$/i.test(p.name))
     .map((p) => {
-      const run = progressRunTitle(p.cmd ?? '')
-      return { pid: p.pid, name: p.name, label: processLabel(p.name, p.cmd), ...(p.created && p.created !== '0' ? { created: p.created } : {}), ...(p.parent ? { parent: p.parent } : {}), ...(run ? { run } : {}) }
+      // Masked before it is shortened (#1254): a secret on a command line (a token argument) is never shown or kept.
+      const cmd = p.cmd ? maskText(p.cmd) : p.cmd
+      const run = progressRunTitle(cmd ?? '')
+      return { pid: p.pid, name: p.name, label: processLabel(p.name, cmd), ...(p.created && p.created !== '0' ? { created: p.created } : {}), ...(p.parent ? { parent: p.parent } : {}), ...(run ? { run } : {}), ...(withCommands && cmd ? { command: cmd } : {}) }
     })
     .sort((a, b) => a.pid - b.pid)
     .slice(0, MAX_LISTED)

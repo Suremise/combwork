@@ -324,6 +324,7 @@
   "project.skills.target": "the skills",
   "project.skills.turnOn": "Turn on a coding agent in Settings → Providers to see its skills.",
   "project.skills.user": "User",
+  "project.tab.activity": "Activity",
   "project.tab.attachments": "Attachments",
   "project.tab.files": "Files",
   "project.tab.git": "Git",

@@ -6,6 +6,8 @@
 //   ask's scope and no newer read of that scope has been taken.
 // - oneAtATime(): one load at a time per scope for a view that keeps its own results (#1646); asked meanwhile, once
 //   more after it. withinTime(): a load that fails once its time is up, so a view never waits on it without end.
+// - latestOnly() and boundedQueue() (#1254): reads that belong to a view's lifetime: only the newest read's result is
+//   taken, a few reads at once, and none after the view is hidden or gone (cancel()).
 
 /** A function that calls `load` for a key, one call in flight per key, as above. */
 export function coalesced<T>(): (key: string, load: () => Promise<T>) => Promise<T> {
@@ -121,6 +123,71 @@ export function oneAtATime(): { run: (scope: string, start: () => Promise<unknow
         p = Promise.reject(e)
       }
       p.then(ended, ended)
+    }
+  }
+}
+
+/**
+ * A read repeated for one view: only the newest one started applies its result, and none once cancel() was called
+ * (the view hidden, gone, or showing something else). An older read that finishes after a newer one changes nothing.
+ */
+export function latestOnly(): { run: <T>(read: Promise<T>, apply: (value: T) => void, failed?: (e: unknown) => void) => void; cancel: () => void } {
+  let n = 0
+  return {
+    run(read, apply, failed) {
+      const mine = ++n
+      read.then(
+        (v) => mine === n && apply(v),
+        (e) => mine === n && failed?.(e)
+      )
+    },
+    cancel() {
+      n++
+    }
+  }
+}
+
+/**
+ * Reads for a view, at most `limit` at once, each key once while it is queued or running. cancel() (the view hidden,
+ * gone, or showing something else) drops those waiting; those running finish but apply nothing and start no more.
+ */
+export function boundedQueue(limit: number): { add: <T>(key: string, read: () => Promise<T>, apply: (value: T) => void) => void; cancel: () => void } {
+  let gen = 0
+  let waiting: { key: string; start: () => void }[] = []
+  let running = new Set<string>()
+  const next = (): void => {
+    while (running.size < limit && waiting.length) waiting.shift()!.start()
+  }
+  return {
+    add(key, read, apply) {
+      if (running.has(key) || waiting.some((w) => w.key === key)) return
+      const mine = gen
+      waiting.push({
+        key,
+        start: () => {
+          const now = running
+          now.add(key)
+          const ended = (): void => {
+            now.delete(key)
+            if (mine === gen) next()
+          }
+          let p: Promise<unknown>
+          try {
+            p = read().then((v) => {
+              if (mine === gen) apply(v)
+            })
+          } catch (e) {
+            p = Promise.reject(e)
+          }
+          p.then(ended, ended)
+        }
+      })
+      next()
+    },
+    cancel() {
+      gen++
+      waiting = []
+      running = new Set()
     }
   }
 }

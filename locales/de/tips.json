@@ -1,4 +1,6 @@
 {
+  "tips.activityTab.text": "Der Tab „Aktivität“ zeigt die Arbeit des Projekts als Baum: Karten, ihre Agenten, Sitzungen, Durchgänge, Tool-Aufrufe und die Prozesse, die sie ausführen. Klicke auf einen Knoten, um seine genaue Eingabe und seine letzte Aktion zu sehen; das Menü ⋯ eines Agenten öffnet den Tab für diesen Agenten.",
+  "tips.activityTab.title": "Live sehen, was jeder Agent tut",
   "tips.advancedSettings.text": "Nach dem Update eines Coding-Agenten erkennt Hive dessen Vertrauensfrage oder Anmeldefehler nicht mehr? Unter Einstellungen → Erweitert stehen die Texte und Felder, nach denen Hive sucht, und seine Timeouts: Ändere einen Wert (der Standard steht daneben) oder bearbeite advanced.json.",
   "tips.advancedSettings.title": "Eine CLI-Änderung selbst beheben",
   "tips.agentConsole.text": "Einstellungen → Agent API → „Agenten die Entwicklerkonsole lesen lassen“ gibt Agenten ein Werkzeug mit Lesezugriff: Es zeigt die Hooks und die Statuszeile ihrer CLI neben dem, was Hive daraus gemacht hat, geschwärzt. So können sie untersuchen, was Hive sieht.",

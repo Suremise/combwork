@@ -81,6 +81,7 @@
   "shell.command.project.previous": "Poprzedni projekt",
   "shell.command.project.remove": "Usuń projekt…",
   "shell.command.project.storage": "Miejsce na dysku i porządki w projekcie…",
+  "shell.command.project.tab.activity": "Przejdź do zakładki Aktywność",
   "shell.command.project.tab.changes": "Przejdź do zakładki Kontrola wersji",
   "shell.command.project.tab.files": "Przejdź do zakładki Pliki",
   "shell.command.project.tab.images": "Przejdź do zakładki Załączniki",

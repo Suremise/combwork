@@ -18,6 +18,8 @@ export const PROJECT_TABS = [
   // Version Control (#1416; the Git view of #607): Workflow, then Changes, History, Branches & remotes and Merge queue. Its
   // id stays `changes` (saved tabs, `project.tab.changes`).
   { id: 'changes', label: msg({ id: 'project.tab.versionControl', defaultMessage: 'Version Control', description: "A project's tab (renamed from Git): its version control, workflow options, changes, history and branches. Glossary 2.1: Version Control (the tab)." }), icon: 'source-control' },
+  // Activity (#1254): last of the main tabs, so the others keep their Alt keys.
+  { id: 'activity', label: msg({ id: 'project.tab.activity', defaultMessage: 'Activity', description: "A project's tab: its live work as a tree, card → agent → session → turn → tool call, with subagents and processes." }), icon: 'type-hierarchy' },
   { id: 'memory', label: msg({ id: 'project.tab.memory', defaultMessage: 'Memory', description: "A project's tab: the instructions and memory files its agents read." }), icon: 'book', more: true },
   { id: 'skills', label: msg({ id: 'project.tab.skills', defaultMessage: 'Skills', description: "A project's tab: the skills its agents get." }), icon: 'sparkle', more: true },
   { id: 'templates', label: msg({ id: 'project.tab.templates', defaultMessage: 'Templates', description: "A project's tab: templates of agents and cards." }), icon: 'library', more: true },
@@ -33,7 +35,7 @@ export type ProjectTab = (typeof PROJECT_TABS)[number]['id']
  */
 export const STRIP_TABS = PROJECT_TABS.filter((t) => t.id !== 'settings')
 
-/** The strip's own tabs, Alt+1…8 in this order (#1043), and the ones in its More ▾ menu after them. */
+/** The strip's own tabs, Alt+1…9 in this order (#1043), and the ones in its More ▾ menu after them. */
 export const MAIN_TABS = STRIP_TABS.filter((t) => !('more' in t))
 export const MORE_TABS = STRIP_TABS.filter((t) => 'more' in t)
 

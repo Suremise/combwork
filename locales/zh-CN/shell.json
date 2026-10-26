@@ -81,6 +81,7 @@
   "shell.command.project.previous": "上一个项目",
   "shell.command.project.remove": "移除项目…",
   "shell.command.project.storage": "项目存储与清理…",
+  "shell.command.project.tab.activity": "转到“活动”标签页",
   "shell.command.project.tab.changes": "转到“版本控制”标签页",
   "shell.command.project.tab.files": "转到“文件”标签页",
   "shell.command.project.tab.images": "转到“附件”标签页",

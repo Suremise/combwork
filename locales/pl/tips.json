@@ -1,4 +1,6 @@
 {
+  "tips.activityTab.text": "Zakładka Aktywność pokazuje pracę projektu jako drzewo: karty, ich agentów, sesje, tury, wywołania narzędzi i uruchomione przez nie procesy. Kliknij węzeł, aby zobaczyć jego dokładne wejście i ostatnią czynność; menu ⋯ agenta otwiera ją dla tego agenta.",
+  "tips.activityTab.title": "Zobacz na żywo, co robi każdy agent",
   "tips.advancedSettings.text": "Po aktualizacji agenta Hive nie widzi już jego pytania o zaufanie albo błędów logowania? Ustawienia → Zaawansowane zawierają teksty i pola, których szuka Hive, oraz jego limity czasu: zmień jeden z nich (domyślna wartość jest obok) albo edytuj advanced.json.",
   "tips.advancedSettings.title": "Sam napraw zmianę w CLI",
   "tips.agentConsole.text": "Ustawienia → Agent API → Pozwól agentom czytać konsolę deweloperską daje agentom narzędzie tylko do odczytu: pokazuje hooki i linię statusu ich CLI obok tego, co Hive z nich odczytał (z ukrytymi danymi), żeby mogli sprawdzić, co widzi Hive.",

@@ -204,6 +204,8 @@ interface HiveMessageValues {
   'board.details.tookTotal': { took: string | number; expected: string }
   'board.details.transient': { cause: string; code: string | number }
   'board.details.waitingSince': { since: string | number; waiting: string | number }
+  'board.dialog.activity': undefined
+  'board.dialog.activityTip': undefined
   'board.dialog.addCard': undefined
   'board.dialog.added': { who: string; by: string | number; added: string | number; changed: string | number }
   'board.dialog.addedUnknown': { added: string | number; changed: string | number }

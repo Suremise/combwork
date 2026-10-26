@@ -1,7 +1,7 @@
 // The window's repeated reads, never two of the same at once (#1629): queue:list's coalesced calls and the work badges'
 // one read at a time, driven with promises the test settles itself, in the orders that went wrong (HR6's round 1).
-import { describe, expect, it } from 'vitest'
-import { coalesced } from '../src/shared/coalesce'
+import { describe, expect, it, vi } from 'vitest'
+import { boundedQueue, coalesced, latestOnly } from '../src/shared/coalesce'
 import { makeBadgeSource } from '../src/shared/workflow/badgeSource'
 import type { WorkBadge } from '../src/shared/workflow/workView'
 
@@ -137,5 +137,88 @@ describe("the work badges' one source", () => {
     await settled()
     expect(s.get()).not.toBe(first)
     expect(s.get().badges.get(1)).toBe(first.badges.get(1))
+  })
+})
+
+/**
+ * Waits until these reads have settled and what the helpers chained on them has run: their own callbacks, then what
+ * those started (a queue's next read). Promise callbacks run in order, so this waits for nothing else, and no timer.
+ */
+const drained = async (reads: Promise<unknown>[]): Promise<void> => {
+  await Promise.allSettled(reads)
+  await Promise.resolve()
+  await Promise.resolve()
+}
+
+describe("a view's reads (#1254 round 3)", () => {
+  it('latestOnly: only the newest read applies, an older one finishing after it changes nothing (A delayed, B current)', async () => {
+    const reads = latestOnly()
+    const h = held<string>()
+    const applied: string[] = []
+    const a = h.fetch('alpha')
+    reads.run(a, (v) => applied.push(v))
+    const b = h.fetch('beta')
+    reads.run(b, (v) => applied.push(v))
+    h.calls[1].resolve('beta list')
+    await drained([b])
+    expect(applied).toEqual(['beta list'])
+    h.calls[0].resolve('alpha list')
+    await drained([a])
+    expect(applied).toEqual(['beta list'])
+  })
+
+  it('latestOnly: nothing applies once cancelled (the view hidden or gone)', async () => {
+    const reads = latestOnly()
+    const h = held<string>()
+    const seen: string[] = []
+    const a = h.fetch('a')
+    reads.run(a, (v) => seen.push(v), () => seen.push('failed'))
+    reads.cancel()
+    h.calls[0].reject(new Error('late'))
+    await drained([a])
+    expect(seen).toEqual([])
+  })
+
+  it('boundedQueue: at most n at once, each key once; cancelled, what waits never starts and what runs applies nothing', async () => {
+    const q = boundedQueue(2)
+    const h = held<string>()
+    const applied: string[] = []
+    const started: string[] = []
+    const reads: Promise<string>[] = []
+    for (const id of ['s1', 's2', 's3', 's4', 's1']) {
+      q.add(
+        id,
+        () => {
+          started.push(id)
+          const p = h.fetch(id)
+          reads.push(p)
+          return p
+        },
+        (v) => applied.push(v)
+      )
+    }
+    expect(started).toEqual(['s1', 's2'])
+    // The tab hidden before the first reads come back.
+    q.cancel()
+    h.calls[0].resolve('one')
+    h.calls[1].resolve('two')
+    await drained(reads)
+    expect(started).toEqual(['s1', 's2'])
+    expect(applied).toEqual([])
+    // Shown again: the queue takes new reads.
+    q.add('s3', () => (started.push('s3'), Promise.resolve('three')), (v) => applied.push(v))
+    await vi.waitFor(() => expect(applied).toEqual(['three']))
+  })
+
+  it('boundedQueue: a read that finishes starts the next waiting one, and applies its result', async () => {
+    const q = boundedQueue(1)
+    const h = held<string>()
+    const applied: string[] = []
+    for (const id of ['a', 'b']) q.add(id, () => h.fetch(id), (v) => applied.push(v))
+    expect(h.calls.map((c) => c.for)).toEqual(['a'])
+    h.calls[0].resolve('A')
+    await vi.waitFor(() => expect(h.calls.map((c) => c.for)).toEqual(['a', 'b']))
+    h.calls[1].resolve('B')
+    await vi.waitFor(() => expect(applied).toEqual(['A', 'B']))
   })
 })

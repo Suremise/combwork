@@ -202,6 +202,8 @@
   "board.details.tookTotal": "{took}{expected, select, none {} other { · se esperan unos {expected}}}",
   "board.details.transient": "{cause, select, spawn {No pudo iniciarse} notFound {No se encontró su programa} timeout {Se le acabó el tiempo} killed {Se terminó desde fuera} exit75 {Salió con el código 75, el “fallo temporal, vuelve a intentarlo” del proyecto} other {Un error de red en sus últimas líneas ({code})}}: la tarjeta se devolvió a su autor, que puede volver a enviar la misma versión (como mucho dos veces seguidas) en lugar de una nueva.",
   "board.details.waitingSince": "Esperando desde {since}: {waiting}",
+  "board.dialog.activity": "Actividad",
+  "board.dialog.activityTip": "Mostrar los agentes, sesiones, turnos y procesos de esta tarjeta en la pestaña Actividad de su proyecto.",
   "board.dialog.addCard": "Agregar tarjeta",
   "board.dialog.added": "{who, select, you {Agregada por ti} assistant {Agregada por el Asistente} repair {Agregada por Reparar} other {Agregada por {by}}} {added} · cambiada {changed}",
   "board.dialog.addedUnknown": "Agregada por: desconocido, {added} · cambiada {changed}",

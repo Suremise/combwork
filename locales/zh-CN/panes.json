@@ -84,6 +84,7 @@
   "panes.locks.item": "{n, plural, other {正在编辑 # 个文件}}",
   "panes.locks.title": "本轮正在编辑的文件：",
   "panes.locks.titleShared": "本轮正在编辑的文件。此文件夹中的其他智能体会等它用完这些文件：",
+  "panes.menu.activity": "活动",
   "panes.menu.archiveStartNew": "归档并新建会话…",
   "panes.menu.cancelWatch": "取消卡片监视",
   "panes.menu.compact": "压缩…",

@@ -1,0 +1,178 @@
+{
+  "activity.cardsLabel": {
+    "defaultMessage": "Cards",
+    "description": "A label in the Activity tab's details: the cards a session worked on."
+  },
+  "activity.clearFilter": {
+    "defaultMessage": "Show everything",
+    "description": "Tooltip of the filter chip above the Activity tree: removes the filter."
+  },
+  "activity.cliProcess": {
+    "defaultMessage": "The agent's CLI · process {pid}",
+    "description": "A process node in the Activity tree that is the agent's own CLI (or its terminal). {pid} is its process id."
+  },
+  "activity.closeDetails": {
+    "defaultMessage": "Close details",
+    "description": "Tooltip of the button closing the Activity tab's details panel."
+  },
+  "activity.collapse": {
+    "defaultMessage": "Collapse",
+    "description": "A node's close button in the Activity tree (screen readers)."
+  },
+  "activity.collapseAll": {
+    "defaultMessage": "Collapse All",
+    "description": "Tooltip of the Activity tab's button that closes every node."
+  },
+  "activity.column": {
+    "defaultMessage": "{column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
+    "description": "A card node's second line in the Activity tree: its board column. Use the board's column names."
+  },
+  "activity.columnLabel": {
+    "defaultMessage": "Column",
+    "description": "A label in the Activity tab's details: a card's board column."
+  },
+  "activity.details": {
+    "defaultMessage": "Details",
+    "description": "The Activity tab's details panel, for screen readers."
+  },
+  "activity.empty": {
+    "defaultMessage": "Nothing ran in the last 24 hours. Start an agent to see its work here.",
+    "description": "The Activity tab when no agent runs and no session was active in the last 24 hours."
+  },
+  "activity.emptyFiltered": {
+    "defaultMessage": "Nothing for this filter in the last 24 hours.",
+    "description": "The Activity tab, filtered to an agent or a card, when it has nothing to show."
+  },
+  "activity.endButton": {
+    "defaultMessage": "End Process…",
+    "description": "A button in the Activity tab's details: ends this one process of the agent's, after a confirmation (…)."
+  },
+  "activity.endDetail": {
+    "defaultMessage": "Only this process ends, and only while it is still the one listed here. What it started keeps running, and the agent may see its command fail.",
+    "description": "Detail of the confirmation before ending one of an agent's processes from the Activity tab."
+  },
+  "activity.endFailed": {
+    "defaultMessage": "Could not end the process",
+    "description": "An error's title: ending a process from the Activity tab failed."
+  },
+  "activity.endMessage": {
+    "defaultMessage": "End {label} (process {pid})?",
+    "description": "The confirmation before ending one of an agent's processes. {label} is what it runs, {pid} its id."
+  },
+  "activity.endTitle": {
+    "defaultMessage": "End this process?",
+    "description": "Title of the confirmation before ending one of an agent's processes from the Activity tab."
+  },
+  "activity.ended": {
+    "defaultMessage": "Ended {label}",
+    "description": "A notification: the process ({label}: what it ran) was ended from the Activity tab."
+  },
+  "activity.expand": {
+    "defaultMessage": "Expand",
+    "description": "A node's open button in the Activity tree (screen readers)."
+  },
+  "activity.expandAll": {
+    "defaultMessage": "Expand All",
+    "description": "Tooltip of the Activity tab's button that opens every node."
+  },
+  "activity.filterAgent": {
+    "defaultMessage": "Agent: {name}",
+    "description": "A chip above the Activity tree when it shows one agent's work ({name}); clicking it shows everything."
+  },
+  "activity.filterCard": {
+    "defaultMessage": "Card: {name}",
+    "description": "A chip above the Activity tree when it shows one card's work ({name}: its key, such as HI-12); clicking it shows everything."
+  },
+  "activity.heading": {
+    "defaultMessage": "Activity",
+    "description": "The Activity tab's heading: the project's live work as a tree."
+  },
+  "activity.input": {
+    "defaultMessage": "Input",
+    "description": "A heading in the Activity tab's details: the node's input exactly (a prompt, a tool call's input, a command line), with secrets masked."
+  },
+  "activity.lastAction": {
+    "defaultMessage": "Last action",
+    "description": "A heading in the Activity tab's details: what the node did last (a reply, a tool call's result, an agent's status)."
+  },
+  "activity.lastActive": {
+    "defaultMessage": "Last active",
+    "description": "A label in the Activity tab's details: when a session was last active."
+  },
+  "activity.loadFailed": {
+    "defaultMessage": "Could not load the activity: {error}",
+    "description": "The Activity tab when the project's sessions couldn't be read. {error} is the reason."
+  },
+  "activity.loading": {
+    "defaultMessage": "Loading…",
+    "description": "The Activity tab, or a detail in it, while it loads."
+  },
+  "activity.more": {
+    "defaultMessage": "{n, plural, one {# more session} other {# more sessions}}",
+    "description": "A node in the Activity tree standing for older sessions not shown; clicking it shows them."
+  },
+  "activity.noPrompt": {
+    "defaultMessage": "(no prompt text)",
+    "description": "A turn node in the Activity tree whose prompt has no text (only images, say)."
+  },
+  "activity.notEnded": {
+    "defaultMessage": "{why, select, notOwn {{label} is no longer one of this agent's processes: nothing was ended.} cli {{label} is the agent's CLI: use Stop to end it.} other {{label} could not be ended: it may still run.}}",
+    "description": "A notification after End Process in the Activity tab when it didn't end it: it had ended or isn't the agent's (notOwn), it is the agent's CLI (cli), or ending it failed. {label} is what it runs."
+  },
+  "activity.openCard": {
+    "defaultMessage": "Open Card",
+    "description": "A button in the Activity tab's details: opens the card."
+  },
+  "activity.openSession": {
+    "defaultMessage": "Open in Sessions Tab",
+    "description": "A button in the Activity tab's details: opens the session's transcript in the Sessions tab."
+  },
+  "activity.parentLabel": {
+    "defaultMessage": "Started by process",
+    "description": "A label in the Activity tab's details: the id of the process that started this one."
+  },
+  "activity.pidLabel": {
+    "defaultMessage": "Process id",
+    "description": "A label in the Activity tab's details: a process's id."
+  },
+  "activity.process": {
+    "defaultMessage": "Process {pid}",
+    "description": "A process node's second line in the Activity tree. {pid} is its process id."
+  },
+  "activity.reading": {
+    "defaultMessage": "Reading the sessions…",
+    "description": "Beside the Activity tab's heading while the project's sessions are read (the tree shows running agents meanwhile)."
+  },
+  "activity.showAgent": {
+    "defaultMessage": "Show Agent",
+    "description": "A button in the Activity tab's details: shows the agent's terminal."
+  },
+  "activity.started": {
+    "defaultMessage": "Started",
+    "description": "A label in the Activity tab's details: when a turn, tool call, task or process started."
+  },
+  "activity.state": {
+    "defaultMessage": "{state, select, working {Working} waiting {Waiting for you} failed {Failed or stalled} done {Done} other {Idle}}",
+    "description": "A node's state in the Activity tree: working, waiting for you, failed (or stalled), done, idle."
+  },
+  "activity.statusLabel": {
+    "defaultMessage": "Status",
+    "description": "A label in the Activity tab's details: the node's state."
+  },
+  "activity.task": {
+    "defaultMessage": "{type, select, subagent {Background subagent} command {Background command} monitor {Monitor} workflow {Workflow} other {Background task}}",
+    "description": "A background task node in the Activity tree: what kind it is."
+  },
+  "activity.tools": {
+    "defaultMessage": "{n, plural, =0 {No tool calls} one {# tool call} other {# tool calls}}",
+    "description": "A turn node's second line in the Activity tree: how many tool calls it made."
+  },
+  "activity.turns": {
+    "defaultMessage": "{n, plural, one {# turn} other {# turns}}",
+    "description": "A session node's second line in the Activity tree: how many turns (a prompt and what followed) it has."
+  },
+  "activity.window": {
+    "defaultMessage": "Running now and the last 24 hours",
+    "description": "Beside the Activity tab's heading: what it shows. Older work is in the Sessions tab."
+  }
+}

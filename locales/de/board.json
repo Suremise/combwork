@@ -202,6 +202,8 @@
   "board.details.tookTotal": "{took}{expected, select, none {} other { · erwartet etwa {expected}}}",
   "board.details.transient": "{cause, select, spawn {Er konnte nicht starten} notFound {Sein Programm wurde nicht gefunden} timeout {Seine Zeit ist abgelaufen} killed {Er wurde von außen beendet} exit75 {Er endete mit Code 75, beim Projekt „vorübergehender Fehler, erneut versuchen“} other {Ein Netzwerkfehler in seinen letzten Zeilen ({code})}}: Die Karte wurde an ihren Bearbeiter zurückgegeben, der dieselbe Revision erneut einreichen darf (höchstens zweimal hintereinander) statt einer neuen.",
   "board.details.waitingSince": "Wartet seit {since}: {waiting}",
+  "board.dialog.activity": "Aktivität",
+  "board.dialog.activityTip": "Agenten, Sitzungen, Durchgänge und Prozesse dieser Karte im Tab „Aktivität“ ihres Projekts anzeigen.",
   "board.dialog.addCard": "Karte hinzufügen",
   "board.dialog.added": "{who, select, you {Hinzugefügt von dir} assistant {Hinzugefügt vom Assistenten} repair {Hinzugefügt von „Reparieren“} other {Hinzugefügt von {by}}} {added} · geändert {changed}",
   "board.dialog.addedUnknown": "Hinzugefügt von unbekannt {added} · geändert {changed}",

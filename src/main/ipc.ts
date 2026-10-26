@@ -80,7 +80,7 @@ import { transcripts } from './transcripts'
 import * as skills from './skills'
 import * as storage from './storage'
 import { antivirusStatus, antivirusSuggestion, applyAntivirus, dismissAntivirus, moveDefenderPlan, prepareAntivirus } from './antivirus'
-import { agentsMemory, allLeftovers, leftoversSettled, settleLeftovers } from './agentProcesses'
+import { agentsMemory, allLeftovers, endAgentProcess, leftoversSettled, projectLaunches, settleLeftovers } from './agentProcesses'
 import { cardWork, forYou, workBadges } from './workflow/cardWork'
 import { contextWorkspace, currentWorkspace, inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
 import { ensureHiveExcluded, trackedHiveFiles, untrackHive, vcsOf } from './hiveVcs'
@@ -1030,6 +1030,14 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'attachments:trashGroup': (p, id) => files.trashAttachmentGroup(p, id),
     'transcript:read': (p, id, opts) => transcripts.read(p, id, opts ?? {}),
     'transcript:tool': (p, id, itemId) => transcripts.tool(p, id, itemId),
+    'activity:now': async (p) => {
+      p = workspace.assertProject(p)
+      return { launches: await projectLaunches(p), tasks: sessions.backgroundTasks(p) }
+    },
+    'activity:turns': (p, id, known) => transcripts.turns(p, id, known),
+    'activity:sessions': (p, hours) => sessions.activitySessions(workspace.assertProject(p), Math.max(1, Math.min(24 * 7, Number(hours) || 24))),
+    'activity:detail': (p, id, itemId) => transcripts.detail(p, id, Number(itemId)),
+    'activity:endProcess': (p, agentId, pid, created) => endAgentProcess(workspace.assertProject(p), String(agentId), Number(pid), String(created)),
     'transcript:image': (p, id, imageId) => transcripts.image(p, id, imageId),
     'transcript:search': (p, query, id) => transcripts.search(p, query, id),
     'transcript:compactions': (p, id) => transcripts.compactions(p, id),
