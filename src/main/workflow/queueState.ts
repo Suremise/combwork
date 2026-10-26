@@ -318,7 +318,7 @@ const shortRev = (r: string | null | undefined): string => (r ? r.slice(0, 7) : 
  * once: HI-1737 sat in Approved, nobody told).
  */
 export const staleWake = (key: string, approved: string | null | undefined, current: string | null | undefined): string =>
-  `${key}: its pass is for ${shortRev(approved)}, but its line is at ${shortRev(current)} (changed since): submit ${shortRev(current)} for review (hive_submit).` // i18n-ignore: a wake, agent-facing
+  `${key}: its pass is stale: it is for ${shortRev(approved)}, but its line is at ${shortRev(current)} (changed since). Submit ${shortRev(current)} for review (hive_submit).` // i18n-ignore: a wake, agent-facing
 
 /** A returned card's wake (#1354): its key, what came back, and what to do next. */
 export const returnedWake = (key: string, f: FactData['IntegrationFailed']): string => returnedText(key, f)

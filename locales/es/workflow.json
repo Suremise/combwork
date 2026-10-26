@@ -278,6 +278,8 @@
   "workflow.refused.requeue.allowed.next": "Corrige el fallo, haz commit y envía la nueva versión.",
   "workflow.refused.review.decisionsReceived.message": "La tarjeta {card} tiene una decisión que no has leído.",
   "workflow.refused.review.decisionsReceived.next": "Léela, juzga si el trabajo la cumple y después da tu veredicto.",
+  "workflow.refused.review.headMoved.message": "La rama de {card} ha cambiado desde que se envió: se envió en {submitted} y su cabeza está ahora en {head}, un cambio distinto. Una aprobación cubre solo la revisión enviada.",
+  "workflow.refused.review.headMoved.next": "Da un veredicto negativo explicándolo (hive_verdict, pass: false): su autor envía entonces {head}, que se revisa como cualquier envío.",
   "workflow.refused.review.noSubmission.message": "La tarjeta {card} no tiene nada enviado a revisión.",
   "workflow.refused.review.noSubmission.next": "Espera a que su autor la envíe.",
   "workflow.refused.review.notAuthor.change": "Solo Mover de todos modos, en la tarjeta, se salta esta regla.",

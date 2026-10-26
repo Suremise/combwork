@@ -1115,6 +1115,14 @@
     "defaultMessage": "Read it, judge whether the work meets it, then give your verdict.",
     "description": "The next step after a refused verdict for an unread decision."
   },
+  "workflow.refused.review.headMoved.message": {
+    "defaultMessage": "{card}'s line has moved since it was submitted: it was submitted at {submitted}, and its head is now {head}, a different change. A pass covers only the revision submitted.",
+    "description": "A refused passing verdict (HI-1763): the card's branch has new commits since the revision under review (a follow-up, say). {card} is the card's key; {submitted} and {head} are commits' short hashes."
+  },
+  "workflow.refused.review.headMoved.next": {
+    "defaultMessage": "Give a failing verdict saying so (hive_verdict, pass: false): its builder then submits {head}, which is reviewed as any submission.",
+    "description": "The next step after a pass refused because the branch moved on (HI-1763): fail the review so the builder submits the new commit. {head} is a commit's short hash; keep the tool name and its argument as they are."
+  },
   "workflow.refused.review.noSubmission.message": {
     "defaultMessage": "{card} has nothing submitted to review.",
     "description": "A refused review: the card has no submission."

@@ -196,7 +196,7 @@ function aboutOf(ws: WorkspaceService, a: ActionRow): { kind: LoopWakeKind; text
   const data = (f?.data ?? {}) as Record<string, unknown>
   if (f?.kind === 'ReviewerRequest') return { kind: 'request', text: String(data.text ?? '') }
   // A design or a follow-up asks its reviewer for a check; going ahead only tells it; an answer is its builder's.
-  if (f?.kind === 'LoopStep') return { kind: data.step === 'ok' || data.step === 'gaps' ? 'stepAnswer' : data.step === 'proceed' ? 'stepNotice' : 'step', text: loopStepWords(String(data.step ?? ''), String(data.text ?? ''), typeof data.design === 'string' ? data.design : undefined, typeof data.of === 'string' ? data.of : undefined, typeof data.revision === 'string' ? data.revision : undefined) }
+  if (f?.kind === 'LoopStep') return { kind: data.step === 'ok' || data.step === 'gaps' ? 'stepAnswer' : data.step === 'proceed' ? 'stepNotice' : 'step', text: loopStepWords(String(data.step ?? ''), String(data.text ?? ''), typeof data.design === 'string' ? data.design : undefined, typeof data.of === 'string' ? data.of : undefined) }
   if (f?.kind === 'Verdict') return { kind: 'verdict' }
   if (f?.kind === 'Submitted' || (f?.kind === 'Moved' && data.to === 'review')) return { kind: 'review' }
   if (f?.kind === 'Moved' && (data.to === 'approved' || data.to === 'done')) return { kind: data.to }

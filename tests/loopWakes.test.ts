@@ -605,8 +605,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     const id = String((await intent(b1, { kind: 'loopStep', step: 'followUp', text: 'Fixes ready: the dark theme.' })).done.data?.design)
     await typedUntil(st, k + 1)
     expect(st.typed[k].agent).toBe('r1')
-    // HI-1763: it names the revision it pinned, the one the reviewer checks.
-    expect(st.typed[k].text).toMatch(new RegExp(`The builder: "follow-up ${id} ready for your check at [0-9a-f]{7} \\(answer with its id\\): Fixes ready: the dark theme\\."`))
+    expect(st.typed[k].text).toContain(`The builder: "follow-up ${id} ready for your check (answer with its id): Fixes ready: the dark theme."`)
     expect(st.typed[k].text).toContain("check it and answer with hive_loop_step (ok, or gaps saying what's missing, and its id)")
     st.status.set('b1', 'ready')
     await intent(r1, { kind: 'loopStep', step: 'ok', text: 'Both themes fine.', design: id })

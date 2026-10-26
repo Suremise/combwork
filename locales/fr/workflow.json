@@ -278,6 +278,8 @@
   "workflow.refused.requeue.allowed.next": "Corrige l’échec, fais un commit et soumets la nouvelle révision.",
   "workflow.refused.review.decisionsReceived.message": "La carte {card} a une décision que tu n’as pas lue.",
   "workflow.refused.review.decisionsReceived.next": "Lis-la, juge si le travail la respecte, puis donne ton verdict.",
+  "workflow.refused.review.headMoved.message": "La branche de {card} a avancé depuis sa soumission : soumise à {submitted}, sa tête est maintenant {head}, un autre changement. Une approbation ne couvre que la révision soumise.",
+  "workflow.refused.review.headMoved.next": "Donne un verdict négatif qui le dit (hive_verdict, pass: false) : son auteur soumet alors {head}, relu comme toute soumission.",
   "workflow.refused.review.noSubmission.message": "Rien n’a été soumis à la relecture pour la carte {card}.",
   "workflow.refused.review.noSubmission.next": "Attends que son auteur la soumette.",
   "workflow.refused.review.notAuthor.change": "Seul Déplacer quand même, sur la carte, passe outre cette règle.",

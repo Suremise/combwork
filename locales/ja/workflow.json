@@ -278,6 +278,8 @@
   "workflow.refused.requeue.allowed.next": "失敗を修正してコミットし、新しいリビジョンを提出してください。",
   "workflow.refused.review.decisionsReceived.message": "{card}にまだ読んでいない決定事項があります。",
   "workflow.refused.review.decisionsReceived.next": "決定事項を読み、作業がそれを満たしているか判断してから判定してください。",
+  "workflow.refused.review.headMoved.message": "{card}のブランチは提出後に進んでいます。提出時は{submitted}で、現在のヘッドは別の変更である{head}です。承認は提出されたリビジョンだけを対象とします。",
+  "workflow.refused.review.headMoved.next": "その旨を書いて不合格の判定を出してください（hive_verdict、pass: false）。ビルダーが{head}を提出し、通常の提出と同じくレビューされます。",
   "workflow.refused.review.noSubmission.message": "{card}には、レビューに提出されたものがありません。",
   "workflow.refused.review.noSubmission.next": "ビルダーが提出するのを待ってください。",
   "workflow.refused.review.notAuthor.change": "このルールをスキップできるのは、カードの「それでも移動」だけです。",

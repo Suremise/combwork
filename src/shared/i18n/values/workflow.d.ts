@@ -280,6 +280,8 @@ interface HiveMessageValues {
   'workflow.refused.requeue.allowed.next': undefined
   'workflow.refused.review.decisionsReceived.message': { card: string | number }
   'workflow.refused.review.decisionsReceived.next': undefined
+  'workflow.refused.review.headMoved.message': { card: string | number; submitted: string | number; head: string | number }
+  'workflow.refused.review.headMoved.next': { head: string | number }
   'workflow.refused.review.noSubmission.message': { card: string | number }
   'workflow.refused.review.noSubmission.next': undefined
   'workflow.refused.review.notAuthor.change': undefined

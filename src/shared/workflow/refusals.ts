@@ -10,7 +10,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.hiveMerges' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'review.headMoved' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.hiveMerges' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -212,6 +212,10 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'review.noSubmission': r(
     msg({ id: 'workflow.refused.review.noSubmission.message', defaultMessage: '{card} has nothing submitted to review.', description: 'A refused review: the card has no submission.' }),
     msg({ id: 'workflow.refused.review.noSubmission.next', defaultMessage: 'Wait for its builder to submit it.', description: 'The next step when there is nothing to review.' })
+  ),
+  'review.headMoved': r(
+    msg({ id: 'workflow.refused.review.headMoved.message', defaultMessage: "{card}'s line has moved since it was submitted: it was submitted at {submitted}, and its head is now {head}, a different change. A pass covers only the revision submitted.", description: "A refused passing verdict (HI-1763): the card's branch has new commits since the revision under review (a follow-up, say). {card} is the card's key; {submitted} and {head} are commits' short hashes." }),
+    msg({ id: 'workflow.refused.review.headMoved.next', defaultMessage: 'Give a failing verdict saying so (hive_verdict, pass: false): its builder then submits {head}, which is reviewed as any submission.', description: "The next step after a pass refused because the branch moved on (HI-1763): fail the review so the builder submits the new commit. {head} is a commit's short hash; keep the tool name and its argument as they are." })
   ),
   'submit.empty': r(
     msg({ id: 'workflow.refused.submit.empty.message', defaultMessage: '{card} has no change to review.', description: 'A refused submit: the change from the base is empty.' }),

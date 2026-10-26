@@ -286,6 +286,8 @@
   "workflow.refused.requeue.allowed.next": "Fix the failure, commit and submit the new revision.",
   "workflow.refused.review.decisionsReceived.message": "{card} has a decision you haven't read.",
   "workflow.refused.review.decisionsReceived.next": "Read it, judge whether the work meets it, then give your verdict.",
+  "workflow.refused.review.headMoved.message": "{card}'s line has moved since it was submitted: it was submitted at {submitted}, and its head is now {head}, a different change. A pass covers only the revision submitted.",
+  "workflow.refused.review.headMoved.next": "Give a failing verdict saying so (hive_verdict, pass: false): its builder then submits {head}, which is reviewed as any submission.",
   "workflow.refused.review.noSubmission.message": "{card} has nothing submitted to review.",
   "workflow.refused.review.noSubmission.next": "Wait for its builder to submit it.",
   "workflow.refused.review.notAuthor.change": "Only Move anyway, on the card, skips this rule.",

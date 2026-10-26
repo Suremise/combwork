@@ -278,6 +278,8 @@
   "workflow.refused.requeue.allowed.next": "修复失败项，提交后将新的修订版本提交评审。",
   "workflow.refused.review.decisionsReceived.message": "{card} 有一个你尚未阅读的决定。",
   "workflow.refused.review.decisionsReceived.next": "阅读它，判断工作是否符合它，然后给出结论。",
+  "workflow.refused.review.headMoved.message": "{card} 的分支在提交后已前进：提交时为 {submitted}，现在的头是 {head}，是另一处更改。通过只适用于所提交的修订。",
+  "workflow.refused.review.headMoved.next": "请给出不通过的判定并说明原因（hive_verdict，pass: false）：构建者随后提交 {head}，它会像任何提交一样被评审。",
   "workflow.refused.review.noSubmission.message": "{card} 没有已提交待评审的内容。",
   "workflow.refused.review.noSubmission.next": "等待它的构建者提交评审。",
   "workflow.refused.review.notAuthor.change": "只有卡片上的“仍然移动”可以跳过此规则。",

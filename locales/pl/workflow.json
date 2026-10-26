@@ -278,6 +278,8 @@
   "workflow.refused.requeue.allowed.next": "Napraw błąd, zrób commit i przekaż nową rewizję.",
   "workflow.refused.review.decisionsReceived.message": "Na karcie {card} jest decyzja, której jeszcze nie znasz.",
   "workflow.refused.review.decisionsReceived.next": "Przeczytaj ją, oceń, czy praca jej odpowiada, a potem wydaj werdykt.",
+  "workflow.refused.review.headMoved.message": "Gałąź {card} przesunęła się od przesłania: przesłano ją na {submitted}, a jej głowa jest teraz na {head}, innej zmianie. Zatwierdzenie obejmuje tylko przesłaną rewizję.",
+  "workflow.refused.review.headMoved.next": "Wydaj negatywny werdykt z tym uzasadnieniem (hive_verdict, pass: false): wykonawca prześle wtedy {head}, recenzowane jak każde przesłanie.",
   "workflow.refused.review.noSubmission.message": "Karta {card} nie ma nic przekazanego do recenzji.",
   "workflow.refused.review.noSubmission.next": "Poczekaj, aż jej wykonawca przekaże ją do recenzji.",
   "workflow.refused.review.notAuthor.change": "Tę regułę pomija tylko Przenieś mimo to na karcie.",

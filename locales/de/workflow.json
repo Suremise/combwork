@@ -278,6 +278,8 @@
   "workflow.refused.requeue.allowed.next": "Behebe den Fehler, committe und reiche die neue Revision ein.",
   "workflow.refused.review.decisionsReceived.message": "{card} hat eine Entscheidung, die du noch nicht gelesen hast.",
   "workflow.refused.review.decisionsReceived.next": "Lies sie, beurteile, ob die Arbeit ihr entspricht, und gib dann dein Urteil ab.",
+  "workflow.refused.review.headMoved.message": "Der Branch von {card} hat sich seit dem Einreichen bewegt: eingereicht wurde {submitted}, sein Head ist jetzt {head}, eine andere Änderung. Eine Freigabe gilt nur für die eingereichte Revision.",
+  "workflow.refused.review.headMoved.next": "Gib ein ablehnendes Urteil mit diesem Grund (hive_verdict, pass: false): Der Bearbeiter reicht dann {head} ein, das wie jede Einreichung geprüft wird.",
   "workflow.refused.review.noSubmission.message": "Für {card} wurde nichts zum Review eingereicht.",
   "workflow.refused.review.noSubmission.next": "Warte, bis der Bearbeiter die Karte einreicht.",
   "workflow.refused.review.notAuthor.change": "Nur „Trotzdem verschieben“ auf der Karte überspringt diese Regel.",
