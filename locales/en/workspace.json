@@ -2303,6 +2303,10 @@
     "defaultMessage": "{app} {version} is the latest version.",
     "description": "The update dialog: no newer Hive."
   },
+  "workspace.updates.localBuild": {
+    "defaultMessage": "Local build {version}{hasCommit, select, yes { ({commit})} other {}}",
+    "description": "Settings → Updates and About: the running Hive is a local build (one built on this computer with npm run dist, not a published release), with the commit it was built from."
+  },
   "workspace.updates.mb": {
     "defaultMessage": "{mb, number, ::.0} MB",
     "description": "A size in megabytes (an update's download). Keep MB unless your language writes it otherwise."
@@ -2314,6 +2318,14 @@
   "workspace.updates.notChecked": {
     "defaultMessage": "Not checked yet.",
     "description": "Hive's updates: no check since Hive started."
+  },
+  "workspace.updates.notInstalledNotNewer": {
+    "defaultMessage": "Version {version} is downloaded, but the copy installed on this computer is the same version or newer, so Hive won't install it.",
+    "description": "Hive's updates: a downloaded update isn't installed, since what is installed (a local build, say) isn't older."
+  },
+  "workspace.updates.notInstalledUnreadable": {
+    "defaultMessage": "Version {version} is downloaded, but Hive couldn't read the copy installed on this computer, so it won't replace it.",
+    "description": "Hive's updates: a downloaded update isn't installed, since the installed copy couldn't be read (another installer may be replacing it)."
   },
   "workspace.updates.off": {
     "defaultMessage": "Updates are off in this build.",
@@ -2327,6 +2339,10 @@
     "defaultMessage": "On GitHub",
     "description": "The update dialog's button: the release on GitHub."
   },
+  "workspace.updates.openReleasePage": {
+    "defaultMessage": "Open Release Page",
+    "description": "The update dialog's button: opens that release's page on GitHub in the browser (it doesn't install anything)."
+  },
   "workspace.updates.perSecond": {
     "defaultMessage": "{size}/s",
     "description": "The update dialog: the download's speed ({size}: \"1.2 MB\")."
@@ -2334,6 +2350,10 @@
   "workspace.updates.progress": {
     "defaultMessage": "{percent, number, ::percent} · {done} of {total}",
     "description": "The update dialog: the download's progress ({done}, {total}: sizes in MB)."
+  },
+  "workspace.updates.published": {
+    "defaultMessage": "A published {version} is available. Hive doesn’t install a release of the same version over your local build.",
+    "description": "Hive's updates: the user runs a local build, and a published release of the same version exists; it is offered (its page), never installed by itself."
   },
   "workspace.updates.ready": {
     "defaultMessage": "Version {version} is ready to install.",

@@ -52,6 +52,8 @@ An agent takes the OK in its own pane: the release-hive skill says how.
 
 Each build `npm run dist` makes is recorded in `dist/build-info.json`, beside its installer: the code, commit and branch it was built from (Notes). Each successful build, by `npm run dist` or `npm run release`, also goes into the Hive Assistant's journal as Hive's entry: its kind (`--kind beta|baseline|rc|release`, else from the version: a `-beta.n` is a beta, an `-rc.n` an RC, and a release version is `npm run release`'s release or `npm run dist`'s candidate for it), version, commit and installer. It's sent to Hive while it's running; otherwise it's recorded when the workspace next opens. **Settings → Advanced → Record builds in the journal** turns it off.
 
+A build also says inside itself whether it is local (#1647, SPEC §11.1): `npm run dist` packages `build-identity.json` with `local: true`, and its installer waits for another Hive installer to finish before installing; `npm run release` packages `local: false`, and its installer doesn't wait. An installed local build is never replaced by a release of its own version (it's offered instead), so a candidate built with `npm run dist` and then released as the same version isn't updated to the published build: install the published one by hand.
+
 ## What a release checks
 
 Before any release that is uploaded, an RC or the release itself, everything runs on its commit, unlike the baseline's lighter checks (The 1.0 path):

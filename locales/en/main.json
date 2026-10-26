@@ -1287,9 +1287,25 @@
     "defaultMessage": "No release of Hive has been published yet.",
     "description": "Why checking for updates found none."
   },
+  "main.update.notInstalled": {
+    "defaultMessage": "{app} {version} wasn't installed",
+    "description": "A notice: the user chose Restart and Update, and Hive didn't install the downloaded update. {app} is Hive's name."
+  },
+  "main.update.notInstalledNotNewer": {
+    "defaultMessage": "The copy installed on this computer is the same version or newer (a local build, say).",
+    "description": "Why Hive did not install a downloaded update: what is installed is not older than it."
+  },
+  "main.update.notInstalledUnreadable": {
+    "defaultMessage": "Hive couldn't read the copy installed on this computer, so it didn't replace it. Try again once any other Hive installer has finished.",
+    "description": "Why Hive did not install a downloaded update: it could not read the installed copy (another installer may be replacing it)."
+  },
   "main.update.offline": {
     "defaultMessage": "Couldn't reach GitHub to check for updates. Check your internet connection.",
     "description": "Why checking for updates failed. GitHub is a name."
+  },
+  "main.update.openReleasePage": {
+    "defaultMessage": "Open Release Page",
+    "description": "The notice's button: opens that release's page on GitHub in the browser (it doesn't install anything)."
   },
   "main.update.ready": {
     "defaultMessage": "{app} {version} is ready",
@@ -1306,6 +1322,14 @@
   "main.update.restart": {
     "defaultMessage": "Restart and Update",
     "description": "The notice's button: restarts Hive and installs the update."
+  },
+  "main.update.sameVersion": {
+    "defaultMessage": "A published {app} {version} is available",
+    "description": "A notice: the user runs a local build (one they built themselves) of a version, and a published release of the same version exists. {app} is Hive's name."
+  },
+  "main.update.sameVersionBody": {
+    "defaultMessage": "You're running a local build of {version}{hasCommit, select, yes { ({commit})} other {}}. Hive doesn't install a release of the same version over it.",
+    "description": "The notice that a published release has the same version as the user's local build. {commit} is the commit it was built from."
   },
   "main.update.testCopy": {
     "defaultMessage": "A test copy of Hive doesn't check for updates.",

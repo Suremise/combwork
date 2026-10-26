@@ -1,9 +1,13 @@
 // Hive's updater against a local fake release feed (generic provider): automatic check + download,
 // status bar states, update dialog, manual download, skip, auto-check off, errors, dev-build
-// disabled state, Restart and Update through the quit flow (test mode never installs anything).
+// disabled state, Restart and Update through the quit flow (test mode never installs anything). #1647: what an install
+// would replace is a stand-in installed copy (HIVE_TEST_RESOURCES, fakeInstall.cjs): an older one is replaced, a local
+// build of the same version never (Restart and Update says so), a local build is offered a release of its own version
+// (Open Release Page) and Settings → Updates names it, and the install on quit comes only from a quit that goes ahead.
 // Throwaway profiles; the download cache is %LOCALAPPDATA%\hive-test-updater (deleted before/after), or
 // hive-test-updater-<k> for a runner in e2e lane k (lanes.mjs), so runners at once don't share it.
 const lib = require('./lib.cjs')
+const { fakeInstall } = require('./fakeInstall.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs'), path = require('path'), http = require('http'), crypto = require('crypto')
 const scratch = lib.WORK
@@ -64,10 +68,18 @@ async function launch(profile, extraEnv = {}) {
 }
 const waitFor = async (fn, ms = 20000) => { const t = Date.now(); while (Date.now() - t < ms) { if (await fn()) return true; await sleep(250) } return false }
 const statusText = (page) => page.locator('.statusbar .status-item').last().innerText()
+/** Whether the app's process has exited, waited for (#1647): set up before what makes it quit. */
+const exits = (a) => {
+  let gone = false
+  a.process().once('exit', () => (gone = true))
+  return () => lib.until(async () => gone, HUNG_MS)
+}
 const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profile, 'logs', 'hive.log'), 'utf8') } catch { return '' } }
 
 ;(async () => {
-  for (const d of ['upd-a', 'upd-b', 'upd-c', 'upd-d']) fs.rmSync(path.join(scratch, d), { recursive: true, force: true })
+  for (const d of ['upd-a', 'upd-b', 'upd-c', 'upd-d', 'upd-e', 'upd-f', 'upd-g', 'upd-g-ws', 'upd-g-claude', 'res-older', 'res-local', 'res-same']) fs.rmSync(path.join(scratch, d), { recursive: true, force: true })
+  // The installed copy an install would replace (#1647): an older release, unless a case says otherwise.
+  const older = fakeInstall(path.join(scratch, 'res-older'), { version: '9.1.0' })
   fs.rmSync(cache, { recursive: true, force: true })
   await new Promise((r) => server.listen(0, '127.0.0.1', r))
   const feed = `http://127.0.0.1:${server.address().port}/`
@@ -75,7 +87,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
 
   // 1. Defaults: automatic check finds 9.1.1 and downloads it, held half way until its progress has been seen.
   holdDownload = deferred()
-  let { app, page, inv } = await launch('upd-a', { HIVE_UPDATE_FEED: feed, HIVE_UPDATE_DELAY: '1500' })
+  let { app, page, inv } = await launch('upd-a', { HIVE_UPDATE_FEED: feed, HIVE_UPDATE_DELAY: '1500', HIVE_TEST_RESOURCES: older })
   const sawDownloading = await waitFor(async () => /Downloading Hive Desktop 9.1.1/.test(await statusText(page)), HUNG_MS)
   check('status bar shows the download', sawDownloading)
   await page.screenshot({ path: path.join(scratch, 'upd-1-downloading.png') })
@@ -174,6 +186,63 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   check('About shows the update status', /installed app/.test(await page.locator('.about-update').innerText()))
   await page.screenshot({ path: path.join(scratch, 'upd-6-about.png') })
   await app.close()
+
+  // 6. #1647: the installed copy a local build of 9.1.1: the downloaded 9.1.1 is never installed over it.
+  release = { version: '9.1.1', file: crypto.randomBytes(2 * 1024 * 1024), notes: 'Same version' }
+  const sameLocal = fakeInstall(path.join(scratch, 'res-local'), { version: '9.1.1', identity: { version: '9.1.1', commit: 'abc1234def', local: true } })
+  ;({ app, page, inv } = await launch('upd-e', { HIVE_UPDATE_FEED: feed, HIVE_UPDATE_DELAY: '1000', HIVE_TEST_RESOURCES: sameLocal }))
+  check('#1647: the release is downloaded', await waitFor(async () => (await inv('update:state')).status === 'ready', HUNG_MS))
+  await inv('update:install')
+  check('#1647: Restart and Update over a local build of its version: not installed, and said so', await waitFor(async () => (await page.locator('.toast', { hasText: "Hive Desktop 9.1.1 wasn't installed" }).count()) === 1, HUNG_MS) && (await inv('update:state')).notInstalled === 'notNewer')
+  check('#1647: …and Hive is still running', (await inv('update:state')).status === 'ready' && !/would install/.test(log('upd-e')))
+  await page.screenshot({ path: path.join(scratch, 'upd-7-not-installed.png') })
+  const exitedE = exits(app)
+  await inv('app:quit')
+  await exitedE()
+  check('#1647: its quit (install automatic) installs nothing', /Not installing 9.1.1/.test(log('upd-e')) && !/would install/.test(log('upd-e')))
+
+  // 7. #1647: running a local build, a release of its own version is offered (its page), and Settings names the build.
+  const own = JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'package.json'), 'utf8')).version
+  release = { version: own, file: crypto.randomBytes(1024 * 1024), notes: 'Same as the local build' }
+  const sameRunning = fakeInstall(path.join(scratch, 'res-same'), { version: own, identity: { version: own, commit: 'abc1234def', local: true } })
+  const downloadsBefore = downloads
+  ;({ app, page, inv } = await launch('upd-f', { HIVE_UPDATE_FEED: feed, HIVE_UPDATE_DELAY: '1000', HIVE_TEST_RESOURCES: sameRunning }))
+  check(`#1647: a published ${own} offered to the local ${own}, never downloaded`, await waitFor(async () => (await inv('update:state')).published === own, HUNG_MS) && downloads === downloadsBefore)
+  const offer = page.locator('.toast', { hasText: `A published Hive Desktop ${own} is available` })
+  check('#1647: …by a notice whose button opens its release page', await waitFor(async () => (await offer.count()) === 1, HUNG_MS) && (await offer.locator('button', { hasText: 'Open Release Page' }).count()) === 1)
+  await page.keyboard.press('Control+,')
+  // The click waits for Settings' navigation to be there (Playwright's own wait, bounded).
+  await page.locator('.settings-nav .row', { hasText: 'Updates' }).click({ timeout: HUNG_MS })
+  check('#1647: Settings → Updates says it is a local build, with its commit', await waitFor(async () => (await page.locator('.settings').innerText()).includes(`Local build ${own} (abc1234)`), HUNG_MS))
+  await page.screenshot({ path: path.join(scratch, 'upd-8-local-build.png') })
+  await app.close()
+
+  // 8. #1647: install on quit comes from a quit that goes ahead: cancelled (an agent running, Confirm on quit: always),
+  // nothing; then quit, and it would install (test mode).
+  release = { version: '9.1.1', file: crypto.randomBytes(2 * 1024 * 1024), notes: 'On quit' }
+  const gProfile = path.join(scratch, 'upd-g')
+  const gWs = path.join(scratch, 'upd-g-ws')
+  fs.mkdirSync(path.join(gWs, 'alpha'), { recursive: true })
+  fs.mkdirSync(gProfile, { recursive: true })
+  fs.writeFileSync(path.join(gProfile, 'config.json'), JSON.stringify({ version: 1, settings: { general: { confirmOnQuit: 'always' } } }))
+  const claude = lib.fakeClaude(gProfile, path.join(scratch, 'upd-g-claude'), [path.join(gWs, 'alpha')])
+  ;({ app, page, inv } = await launch('upd-g', { HIVE_UPDATE_FEED: feed, HIVE_UPDATE_DELAY: '1000', HIVE_TEST_RESOURCES: older, ...claude }))
+  await lib.openWorkspace(inv, page, gWs)
+  await lib.waitForProvider(inv)
+  const agent = await lib.addAgent(inv, path.join(gWs, 'alpha'))
+  await inv('session:start', path.join(gWs, 'alpha'), { agentId: agent.id })
+  await lib.acceptClaudeTrust(inv, path.join(gWs, 'alpha'), agent.id)
+  check('#1647: downloaded, an agent running', await waitFor(async () => (await inv('update:state')).status === 'ready' && (await inv('session:live')).length === 1, HUNG_MS))
+  await inv('app:quit')
+  check('#1647: quitting asks first (an agent is running)', await waitFor(async () => (await page.locator('.dialog', { hasText: 'Quit Hive?' }).count()) === 1, HUNG_MS))
+  await page.locator('.dialog button', { hasText: 'Cancel' }).click()
+  check('#1647: a cancelled quit installs nothing, and Hive goes on', await waitFor(async () => (await inv('app:quitState')).request === null, HUNG_MS) && !/would install/.test(log('upd-g')) && (await inv('session:live')).length === 1)
+  const exitedG = exits(app)
+  await inv('app:quit')
+  await waitFor(async () => (await page.locator('.dialog', { hasText: 'Quit Hive?' }).count()) === 1, HUNG_MS)
+  await inv('app:quitDecision', 'now', false).catch(() => undefined)
+  await exitedG()
+  check('#1647: the quit that goes ahead installs it over the older copy (test mode: no install)', /Test mode: would install 9.1.1 \(on quit\)/.test(log('upd-g')), log('upd-g').split('\n').filter((l) => /updates\]|exit\]/.test(l)).slice(-5).join(' | '))
 
   server.close()
   // The download cache is outside hive-test (no housekeeping there), so it goes, but never at the cost of a suite whose

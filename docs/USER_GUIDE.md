@@ -1582,6 +1582,8 @@ Hive keeps itself up to date from its GitHub releases. By default it checks shor
 - **Hive is now Hive Desktop** (0.5.0). The update renames the Start menu and desktop shortcuts and the entry in **Installed apps** to **Hive Desktop**. Nothing else moves: Hive stays installed in `%LOCALAPPDATA%\Programs\Hive` as `Hive.exe`, and your settings and conversations stay in `%APPDATA%\Hive`. A taskbar pin keeps working.
 - **Help → Check for Updates…** checks straight away and tells you the result.
 - **Settings → Updates** turns automatic checks and downloads off, chooses whether updates install **automatically when Hive quits** or **only when you choose Restart and Update**, and can include pre-release (beta) versions.
+- **Hive never installs an update over a copy that isn't older.** Before it installs, Hive reads the copy installed on this computer. A downloaded update is installed only when it is a newer version (1.0.0-rc.2 is older than 1.0.0). If that copy is the same version or newer (a build you made yourself, say), or Hive can't read it, Hive doesn't install the update and says why (*Hive Desktop X wasn't installed*).
+- **A build you made yourself** (`npm run dist`) is shown in Settings → Updates as **Local build X (its commit)**. A published release of the same version is offered, never installed by itself: Hive tells you and **Open Release Page** opens it on GitHub. A newer release updates it as usual. Its installer also waits for another Hive installer to finish (one an update started as Hive quit) before it installs, so yours is the last one installed.
 
 Updates are checked against their published checksum before they install.
 

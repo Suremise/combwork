@@ -323,11 +323,17 @@ interface HiveMessageValues {
   'main.update.checksum': undefined
   'main.update.devBuild': undefined
   'main.update.noRelease': undefined
+  'main.update.notInstalled': { app: string | number; version: string | number }
+  'main.update.notInstalledNotNewer': undefined
+  'main.update.notInstalledUnreadable': undefined
   'main.update.offline': undefined
+  'main.update.openReleasePage': undefined
   'main.update.ready': { app: string | number; version: string | number }
   'main.update.readyAuto': undefined
   'main.update.readyManual': undefined
   'main.update.restart': undefined
+  'main.update.sameVersion': { app: string | number; version: string | number }
+  'main.update.sameVersionBody': { version: string | number; hasCommit: string; commit: string | number }
   'main.update.testCopy': undefined
   'main.update.updated': { app: string | number; version: string | number }
   'main.update.updatedBody': undefined
