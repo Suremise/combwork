@@ -223,9 +223,11 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
  * old folder while it worked other lanes), ended (`superseded`) once a start of its holds a lease of its own (`holding`,
  * just lent): never before, so a start refused or failed ends nothing, and the builder's run in the old folder is never
  * left without a lease (stopLeaseSession: it now holds that one). That card no longer Active, the folder with no changes
- * not committed (unknown or dirty keeps it); then, in the pool's write, all of it again: the carried lease still open
- * and still kept for that card, the card still not Active, the slot still at the folder found clean, and `holding` still
- * open. The card's work is on its line, which stays; back in Active, its start lends it a slot on that line as for any
+ * not committed (unknown or dirty keeps it), its checkout (line and commit) read then; then, in the pool's write, all of it
+ * again: the carried lease still open and still kept for that card, the card still not Active, `holding` still open, and
+ * the slot still the same one (its name, folder and making, no operation or job on it: Hive's own line changes run as
+ * one) with the same checkout, read again from its ref files (HR4: anything changed keeps it). A refusal changes
+ * nothing. The card's work is on its line, which stays; back in Active, its start lends it a slot on that line as for any
  * card. The slot isn't reused or removed while the builder's run still writes there (a slot with a writer isn't free);
  * it drains once that run has moved, then retires as any free slot does.
  */
@@ -243,10 +245,15 @@ async function endLeftCarried(ws: WorkspaceService, projectPath: string, pool: S
   if (!left()) return
   const d = await G.dirty(slot.folder)
   if (isUnknown(d) || d.length) return
+  const checkout = G.headSync(slot.folder)
+  if (!checkout) return
   const still = (): boolean => {
     const k = keptFor(ws, carried.id)
     const now = pool.slotOf(carried)
-    return !!k && 'card' in k && k.card === kept.card && left() && !!now && samePlace(now.folder, slot.folder) && pool.leasesOf(builder).some((l) => l.id === holding)
+    if (!k || !('card' in k) || k.card !== kept.card || !left() || !pool.leasesOf(builder).some((l) => l.id === holding)) return false
+    if (!now || now.name !== slot.name || !samePlace(now.folder, slot.folder) || now.createdAt !== slot.createdAt || now.op || now.job) return false
+    const at = G.headSync(now.folder)
+    return !!at && at.line === checkout.line && at.head === checkout.head
   }
   if (await pool.release(carried.id, 'superseded', still)) log.info(`The adopted ${userText(slot.name)}'s carried lease ${carried.id} ended: its builder left #${kept.card} for ${'card' in starting ? `#${starting.card}` : `lane ${starting.lane}`} (lease ${holding})`)
 }

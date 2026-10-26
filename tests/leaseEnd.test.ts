@@ -25,19 +25,28 @@ vi.mock('../src/main/sessions', () => ({
 /** The project's lanes as kept, and each agent's watch, as lanes.ts and watches.ts give them. */
 let lanesNow: { id: string; project: string; state: string; builder: { id: string }; reviewer?: { id: string } | null }[] = []
 const watching = new Map<string, { label: string } | 'unknown'>()
-vi.mock('../src/main/lanes', async (orig) => ({ ...(await orig<object>()), rawLanes: async () => lanesNow }))
 vi.mock('../src/main/watches', async (orig) => ({ ...(await orig<object>()), watchKnown: (_p: string, agent: string) => watching.get(agent) ?? null }))
 /** The project's cards in flight its agent builds or reviews, as the board's query finds them (none: undefined). */
 let inFlight: { number: number } | undefined
 let boardFails = false
 let reads = 0
+/** The board's reads so far: each look reads the lanes' and the cards' tables. */
 const asked = (): number => reads
 vi.mock('../src/main/boardStore', async (orig) => ({
   ...(await orig<object>()),
   boardRead: (_ws: unknown, fn: (db: unknown) => unknown) => {
     if (boardFails) throw new Error('the board is closing')
     reads++
-    return fn({ prepare: () => ({ get: () => inFlight }) })
+    // The lanes' table (a running lane of the project the agent builds or reviews), else the cards' (one in flight).
+    return fn({
+      prepare: (sql: string) => ({
+        get: (project: string, builder: string, reviewer: string) => {
+          if (!/FROM lanes/.test(sql)) return inFlight
+          const l = lanesNow.find((x) => x.state === 'active' && x.project.toLowerCase() === project.toLowerCase() && (x.builder.id === builder || x.reviewer?.id === reviewer))
+          return l ? { id: l.id, builder: l.builder.id } : undefined
+        }
+      })
+    })
   }
 }))
 
@@ -209,11 +218,22 @@ describe("a carried lease's end never stops an agent with work elsewhere (HI-173
     let busy = true
     setAgentBusy(() => busy)
     await stopLeaseSession(P, CARRIED, slotWith({ run: 'run-1', lease: 'l1' }), at())
-    // Its turn starts a card meanwhile (no lease yet, so the first look found nothing).
+    // Its turn starts a card meanwhile (no lease yet, so the first look found nothing); at the idle moment the look, made
+    // then with nothing awaited, sees it.
     inFlight = { number: 13 }
     busy = false
     status()
-    await vi.waitFor(() => expect(asked()).toBeGreaterThan(1))
+    expect(asked()).toBe(4)
+    expect(stopped).toEqual([])
+  })
+
+  it("work arriving during its one await (before the first look) is seen too: B's lease made then", async () => {
+    runs.set('b1', { run: 'run-1', starting: false })
+    const open: { id: string; kind: string; card?: number | null }[] = []
+    const ended = stopLeaseSession(P, CARRIED, slotWith({ run: 'run-1', lease: 'l1' }), at(open))
+    // While the look waits for its one import, B's start lends B's lease.
+    open.push({ id: 'l2', kind: 'card', card: 21 })
+    await ended
     status()
     expect(stopped).toEqual([])
   })

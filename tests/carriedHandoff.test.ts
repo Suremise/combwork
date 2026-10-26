@@ -242,6 +242,18 @@ describe("a carried lease kept for a card its builder has left (HI-1731)", () =>
     expect(store.openLease('hb2')?.id).toBe(carried.id)
     sh(wt('hb2'), 'checkout', '--', 'a.txt')
     await drop()
+    // Its checkout changed after it was found clean, before the guarded end (B2's run committed meanwhile): kept, the
+    // commit with it (HR4: the slot's line as the guard decided on it).
+    const release = pool.release.bind(pool)
+    const late = vi.spyOn(pool, 'release').mockImplementationOnce(async (...args) => {
+      commit(wt('hb2'), { 'late.txt': 'late\n' }, 'late work')
+      return release(...args)
+    })
+    await start(await card("B2's after a commit"), 'b2', false)
+    late.mockRestore()
+    expect(store.openLease('hb2')?.id).toBe(carried.id)
+    expect(sh(wt('hb2'), 'log', '-1', '--format=%s').trim()).toBe('late work')
+    await drop()
     expect(store.openLeases().filter((l) => l.agent === 'b2').map((l) => l.kind)).toEqual(['carried'])
     expect(stops).toEqual([])
   })

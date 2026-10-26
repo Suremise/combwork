@@ -141,6 +141,28 @@ export function refSync(common: string, ref: string, depth = 0): string | null {
   return null
 }
 
+/**
+ * A folder's checkout read from its ref files with no git process (as refSync): the branch it has checked out (null:
+ * detached) and its commit, or null when that can't be read. Cheap enough to read again inside a transaction (HI-1731:
+ * a slot's line as a guard decided on it).
+ */
+export function headSync(folder: string): { line: string | null; head: string } | null {
+  const own = gitDirSync(folder)
+  const common = commonDirSync(folder)
+  if (!own || !common) return null
+  try {
+    const v = readFileSync(join(own, 'HEAD'), 'utf8').trim()
+    if (v.startsWith('ref: ')) {
+      const ref = v.slice(5)
+      const sha = refSync(common, ref)
+      return sha ? { line: ref.replace(/^refs\/heads\//, ''), head: sha } : null
+    }
+    return /^[0-9a-f]{40,64}$/.test(v) ? { line: null, head: v } : null
+  } catch {
+    return null
+  }
+}
+
 /** The commit HEAD names in a folder. */
 export async function head(folder: string): Promise<Maybe<string>> {
   const r = await git(folder, ['rev-parse', '--verify', '-q', 'HEAD'])
