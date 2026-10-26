@@ -34,7 +34,7 @@ import { hiveError } from './hiveError'
 import { listLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
-import { allTasks } from './tasks'
+import { liveCardHeads } from './tasks'
 import { openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
 import { leasesOf, type FolderSlot } from '../shared/agentFolders'
 import { projectAgents } from '../shared/defaults'
@@ -224,8 +224,8 @@ const doneSeen = new Map<string, Set<number>>()
 async function lookAtDone(ws: WorkspaceService): Promise<void> {
   if (!ws.path) return
   const k = ws.path.toLowerCase()
-  const cards = await allTasks(ws)
-  const done = cards.filter((c) => c.column === 'done' && !c.archived && c.project)
+  // The live Done cards alone, their heads (HI-1690): never the whole board, whose archived cards are most of it.
+  const done = (await liveCardHeads(ws, { done: true })).filter((c) => c.project)
   const seen = doneSeen.get(k)
   doneSeen.set(k, new Set(done.map((c) => c.number)))
   if (!seen) return

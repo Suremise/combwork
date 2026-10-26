@@ -29,7 +29,7 @@ import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, STAGE_CATEGORY, type AskAction
 import { askActionAvailable, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
-import { afterBoardWrite, archiveBatchDocs, boardSavepoint, movedNames, boardRead, boardReadOnly, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
+import { afterBoardWrite, archiveBatchDocs, boardSavepoint, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
@@ -284,6 +284,19 @@ export async function costCards(ws: WorkspaceService, numbers: number[]): Promis
   const ids = await ws.projectIds()
   if (!ws.path) return []
   return costDocs(ws, numbers).map(({ number, doc }) => clean(doc as Partial<TaskCard> & { projectId?: unknown }, number, ids))
+}
+
+/**
+ * The live cards (with `done`, the live Done ones alone) with what readers run on each board change need (HI-1690:
+ * number, title, project, column, agent and reviewer; the rest as a card without them has it): no archived card, and no
+ * card's description, comments, decisions or history read. In board order, as allTasks gives them (a reader taking the
+ * first card that fits takes the one highest in its column: HR6's round 1).
+ */
+export async function liveCardHeads(ws: WorkspaceService, o: { done?: boolean } = {}): Promise<TaskCard[]> {
+  if (!ws.path) return []
+  const ids = await ws.projectIds()
+  if (!ws.path) return []
+  return sortCards(cardHeadDocs(ws, o).map(({ number, doc }) => clean(doc as Partial<TaskCard> & { projectId?: unknown }, number, ids)))
 }
 
 /** A card's place on the board: all that placing another card needs of it (#458). */

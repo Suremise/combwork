@@ -21,7 +21,7 @@ import { LANE_CARD_CHANGES, laneCardMark, laneHits, laneLimitLine, laneWakeLine,
 import { cardStallIn, laneOrderView } from './cardStall'
 import { noteLoopWatch } from './loopCheck'
 import { sessions } from './sessions'
-import { allTasks, getTask, inScope, noteOnCard, unknownTask } from './tasks'
+import { allTasks, getTask, inScope, liveCardHeads, noteOnCard, unknownTask } from './tasks'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
 import { isUnread, type DeliveryRecord } from '../shared/deliveries'
@@ -1367,7 +1367,8 @@ function laneBoard(ws: WorkspaceService): LaneBoard {
       }
       return out
     },
-    live: () => (live ??= allTasks(ws, { archived: false }))
+    // Their heads (HI-1690): whose card an agent waits on is all a wait's line needs.
+    live: () => (live ??= liveCardHeads(ws))
   }
 }
 
