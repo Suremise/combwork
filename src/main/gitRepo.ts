@@ -37,7 +37,8 @@ import { localUse, remoteKept } from '../shared/branchCleanup'
 import { samePath } from '../shared/movePaths'
 import * as G from './platform/git'
 import { resolvedOf } from './workflow/rulesets'
-import { workBadges } from './workflow/cardWork'
+import { workBadges } from './workflow/cardWork'
+import { workflowWrite } from './workflow/writes'
 import { checkProject } from './branchWatch'
 import { samePlace } from './fsutil'
 import type { AgentDef } from '../shared/types'
@@ -860,22 +861,25 @@ function cardLines(projectPath: string): Set<string> {
 
 const kept = (why: string, branch: string, target = ''): Text => withValues(B.kept, { why, branch, target })
 
+/** git's refusal to delete a branch checked out in a worktree ("used by worktree at", older "checked out at"). */
+const CHECKED_OUT = /used by worktree|checked out at/i
+
 const branchNameOk = async (projectPath: string, name: string): Promise<boolean> => !!name && !name.startsWith('-') && (await refFormatOk(projectPath, ['--branch', name]))
 
 /**
  * Deletes local branches (#1642): each only at the commit the user was shown (`sha`), merged into the project's target
  * (unless `unmerged`, one branch the user confirmed with the commits it drops), and never one in use (the target, the
- * default branch, the folder's, a worktree's or slot's, an open card's). Checked again for each under the repository's
- * lock, where slots are made, so none is deleted as it is checked out; the ref removed at that commit (`update-ref -d`,
- * not `git branch -d`, which asks about HEAD, not the target), its config section with it. What is kept is said, why.
+ * default branch, the folder's, a worktree's or slot's, an open card's). Each branch's check and its deletion happen in
+ * one hold of the repository's lock, which slot preparation, merges, branch switches and a target change take too
+ * (round 3), so none of them lands between the two; git refusing a branch checked out in any worktree is the last line
+ * (`git branch -D`, after the commit is checked: measured against the target, never `-d`'s HEAD). What is kept is said,
+ * why.
  */
 export async function deleteBranches(projectPath: string, items: BranchAt[], unmerged = false): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
   if (!Array.isArray(items) || !items.length || (unmerged && items.length !== 1)) throw new HiveError({ lines: ['git:deleteBranches takes branches, and one when unmerged'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   return oneAtATime(projectPath, () =>
-    withRepoLock(
-      projectPath,
-      async () => {
+    guarded(projectPath, async () => {
         await summaryOf(projectPath)
         await targetOrRefuse(projectPath)
         const deleted: string[] = []
@@ -910,21 +914,20 @@ export async function deleteBranches(projectPath: string, items: BranchAt[], unm
             notes.push(kept('unmerged', branch, now.target))
             continue
           }
-          const r = await git(projectPath, ['update-ref', '-d', `refs/heads/${branch}`, sha])
+          // git as the last line (round 3): it refuses a branch checked out in any worktree, whoever took it. Under the
+          // lock nothing else moves the branch, so the commit checked above is the one deleted (and its config with it).
+          const r = await git(projectPath, ['branch', '-D', branch])
           if (!r.ok) {
-            notes.push(withValues(B.deleteFailed, { branch, why: gitSaid(r) }))
+            notes.push(CHECKED_OUT.test(r.err) ? kept('worktree', branch) : withValues(B.deleteFailed, { branch, why: gitSaid(r) }))
             continue
           }
-          await git(projectPath, ['config', '--remove-section', `branch.${branch}`])
           deleted.push(branch)
         }
         if (deleted.length) log.info(`Deleted ${deleted.length} branch(es) of ${userText(projectPath)}: ${userText(deleted.join(', '))}${unmerged ? ' (unmerged, confirmed)' : ''}`)
         if (!deleted.length) throw new HiveError(linesOf(notes))
         void checkProject(projectPath)
         return shownText(linesOf([withValues(B.deleted, { n: deleted.length, branches: listOf(deleted, 'unit') }), ...notes]))
-      },
-      { project: projectPath }
-    )
+    })
   )
 }
 
@@ -932,17 +935,14 @@ export async function deleteBranches(projectPath: string, items: BranchAt[], unm
  * Deletes branches on a remote (#1642, `git push --delete`, outward-facing: the window asks for each with its own tick):
  * each named as the window has it (nas/hive/hb1), only merged into the project's target, never the remote's default
  * branch, the target or the default branch, nor one whose local branch is in use, and only at the commit the user was
- * shown (`--force-with-lease`: a branch that moved on the remote is refused there). Each is checked under the
- * repository's lock, its use read then (round 2); the push itself runs after it, as every push does: it may wait minutes
- * on the remote or a sign-in, and slots are made under that lock.
+ * shown (`--force-with-lease`: a branch that moved on the remote is refused there). The checks and the push are one hold
+ * of the repository's lock (round 3), bounded by the network timeout: a slot, worktree or target change waits for it.
  */
 export async function deleteRemoteBranches(projectPath: string, remote: string, items: BranchAt[]): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
   if (!Array.isArray(items) || !items.length) throw new HiveError({ lines: ['git:deleteRemoteBranches takes branches'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   return oneAtATime(projectPath, async () => {
-    const { go, notes } = await withRepoLock(
-      projectPath,
-      async () => {
+    return guarded(projectPath, async () => {
         const s = await summaryOf(projectPath)
         if (!s.remotes.includes(remote)) throw refusal(M.noRemote, { remote })
         await targetOrRefuse(projectPath)
@@ -986,22 +986,31 @@ export async function deleteRemoteBranches(projectPath: string, remote: string, 
           }
           ready.push({ name: full, branch, sha })
         }
-        return { go: ready, notes: said }
-      },
-      { project: projectPath }
-    )
-    if (!go.length) throw new HiveError(linesOf(notes))
-    const r = await net(projectPath, ['push', '--porcelain', ...go.map((g) => `--force-with-lease=refs/heads/${g.branch}:${g.sha}`), '--', remote, ...go.map((g) => `:refs/heads/${g.branch}`)])
-    const got = parsePushPorcelain(r.out)
-    const done = go.filter((g) => got.some((x) => x.kind === 'branch' && x.name === g.branch && x.result === 'pushed'))
-    const refused = go.filter((g) => !done.includes(g))
-    if (!done.length && !got.length && !r.ok) throw failed(M.pushFailed, { to: remote }, r)
-    if (done.length) log.info(`Deleted ${done.length} branch(es) on ${userText(remote)} of ${userText(projectPath)}: ${userText(done.map((g) => g.branch).join(', '))}`)
-    void checkProject(projectPath)
-    const lines = [...(done.length ? [withValues(B.remoteDeleted, { n: done.length, remote, branches: listOf(done.map((g) => g.branch), 'unit') })] : []), ...(refused.length ? [withValues(B.remoteRefused, { remote, branches: listOf(refused.map((g) => g.branch), 'unit') })] : []), ...notes]
-    if (!done.length) throw new HiveError(linesOf(lines))
-    return shownText(linesOf(lines))
+        if (!ready.length) throw new HiveError(linesOf(said))
+        // The push under the lock too (round 3): no slot, worktree or target change lands between the checks and it.
+        const r = await net(projectPath, ['push', '--porcelain', ...ready.map((g) => `--force-with-lease=refs/heads/${g.branch}:${g.sha}`), '--', remote, ...ready.map((g) => `:refs/heads/${g.branch}`)])
+        const got = parsePushPorcelain(r.out)
+        const done = ready.filter((g) => got.some((x) => x.kind === 'branch' && x.name === g.branch && x.result === 'pushed'))
+        const refused = ready.filter((g) => !done.includes(g))
+        if (!done.length && !got.length && !r.ok) throw failed(M.pushFailed, { to: remote }, r)
+        if (done.length) log.info(`Deleted ${done.length} branch(es) on ${userText(remote)} of ${userText(projectPath)}: ${userText(done.map((g) => g.branch).join(', '))}`)
+        void checkProject(projectPath)
+        const lines = [...(done.length ? [withValues(B.remoteDeleted, { n: done.length, remote, branches: listOf(done.map((g) => g.branch), 'unit') })] : []), ...(refused.length ? [withValues(B.remoteRefused, { remote, branches: listOf(refused.map((g) => g.branch), 'unit') })] : []), ...said]
+        if (!done.length) throw new HiveError(linesOf(lines))
+        return shownText(linesOf(lines))
+    })
   })
+}
+
+/**
+ * A clean-up's one hold (#1642 round 3), from each branch's last check through its deletion (a remote's push included):
+ * the turn of workflow writes, so no options change (the project's, the workspace's or Hive's, from the window, a
+ * setting's tool, a preset) moves the target meanwhile, then the repository's lock, which slot preparation, merges and
+ * branch switches take, so no slot or worktree takes a branch meanwhile. Nothing holding the repository's lock waits
+ * for a workflow write, so the order can't deadlock.
+ */
+function guarded<T>(projectPath: string, fn: () => Promise<T>): Promise<T> {
+  return workflowWrite(() => withRepoLock(projectPath, fn, { project: projectPath }))
 }
 
 /** The project's target read now, refusing when that branch isn't here (nothing can be measured against it). */
@@ -1015,8 +1024,8 @@ async function targetOrRefuse(projectPath: string): Promise<string> {
 /**
  * A local branch's use as it is now (#1642 round 2), read for each branch right before it is deleted: the project's
  * target (its options read again) and default branch, the folder's branch, the worktrees and slots, the board's open
- * cards. Under the repository's lock worktrees and slots can't change meanwhile; cards and options can only race the
- * few git calls left before the deletion.
+ * cards. Read under the repository's lock, which the worktrees, slots and the target change only under (round 3); an
+ * open card's line is in use only where a slot or worktree has it checked out, which git refuses to delete.
  */
 async function branchUseNow(projectPath: string, branch: string): Promise<{ why: ReturnType<typeof localUse>; target: string | null; defaultBranch: string | null }> {
   const targets = await branchTargets(projectPath, await workTargetOf(projectPath))

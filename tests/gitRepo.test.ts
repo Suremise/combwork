@@ -67,7 +67,7 @@ vi.mock('../src/main/fsutil', async (importOriginal) => {
 
 /** While set, a `git checkout` or `git merge` (a switch, a create, a pull) stops before git starts: `entered`, then `open` (#646). */
 let gitDoor: { entered: () => void; open: Promise<void> } | null = null
-/** While set, the next `git update-ref` (a branch deleted, #1642) stops before git starts, likewise. */
+/** While set, the next deletion of a branch (#1642: `git branch -D`, or a push deleting one) stops before git starts, likewise. */
 let refDoor: { entered: () => void; open: Promise<void> } | null = null
 vi.mock('../src/main/git', async (importOriginal) => {
   const real = await importOriginal<typeof import('../src/main/git')>()
@@ -81,7 +81,7 @@ vi.mock('../src/main/git', async (importOriginal) => {
         await door.open
       }
       const atRef = refDoor
-      if (atRef && args[1][0] === 'update-ref') {
+      if (atRef && ((args[1][0] === 'branch' && args[1][1] === '-D') || args[1][0] === 'push')) {
         refDoor = null
         atRef.entered()
         await atRef.open
@@ -698,6 +698,76 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(said).toContain('An open card works on hive/hb2')
     expect(branchNames(proj)).toEqual(expect.arrayContaining(['hive/hb2']))
     expect(branchNames(proj)).not.toContain('hive/hb1')
+  }, 120_000)
+
+  /** A slot taking `branch` as slot preparation does: under the repository's lock. Says whether it got it. */
+  const slotTakes = async (branch: string, folder: string): Promise<string> => {
+    const { withRepoLock } = await import('../src/main/repoLock')
+    return withRepoLock(proj, async () => {
+      // The local branch only: `worktree add` alone would make it again from origin's of the same name.
+      try {
+        git(proj, 'show-ref', '--verify', '-q', `refs/heads/${branch}`)
+      } catch {
+        return 'no such branch'
+      }
+      git(proj, 'worktree', 'add', '-q', folder, branch)
+      return 'took it'
+    })
+  }
+
+  it('holds one lock from a branch’s check to its deletion: a slot, or a target change, waits for it (round 3)', async () => {
+    const at = setUp()
+    const { workflowWrite } = await import('../src/main/workflow/writes')
+    const d = door()
+    refDoor = d.door
+    const deleting = repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }])
+    await d.at
+    // Checked and about to go: a slot claims it, and the target moves to it, each as Hive does (lock, workflow write).
+    let claim = ''
+    const claimed = slotTakes('hive/hb1', join(proj, '..', 'slot-b')).then((r) => (claim = r))
+    let retargeted = false
+    const retarget = workflowWrite(async () => {
+      workTarget = 'hive/hb1'
+      retargeted = true
+    })
+    expect([claim, retargeted]).toEqual(['', false])
+    d.open()
+    expect(await deleting).toMatch(/Deleted hive\/hb1\./)
+    // Each went after it: the slot found no branch to take; the target changed once nothing could be deleted against it.
+    expect(await claimed).toBe('no such branch')
+    await retarget
+    expect(retargeted).toBe(true)
+  }, 120_000)
+
+  it('leaves git the last word: a branch checked out at the last moment is kept, said in use (round 3)', async () => {
+    const at = setUp()
+    const d = door()
+    refDoor = d.door
+    const deleting = repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }, { name: 'hive/hb2', sha: at['hive/hb2'] }])
+    await d.at
+    // Something outside Hive's discipline checks hive/hb1 out after the check: git refuses to delete it.
+    git(proj, 'worktree', 'add', '-q', join(proj, '..', 'outside'), 'hive/hb1')
+    d.open()
+    const said = await deleting
+    expect(said).toContain('hive/hb1 is checked out in a worktree or slot: kept.')
+    expect(said).toMatch(/Deleted hive\/hb2\./)
+    expect(branchNames(proj)).toContain('hive/hb1')
+  }, 120_000)
+
+  it('holds the lock through a remote’s push: a slot taking the branch waits until it is deleted there (round 3)', async () => {
+    const at = setUp()
+    const d = door()
+    refDoor = d.door
+    const deleting = repo.deleteRemoteBranches(proj, 'origin', [{ name: 'origin/hive/hb1', sha: at['hive/hb1'] }])
+    await d.at
+    let claim = ''
+    const claimed = slotTakes('hive/hb1', join(proj, '..', 'slot-c')).then((r) => (claim = r))
+    expect(claim).toBe('')
+    d.open()
+    expect(await deleting).toMatch(/Deleted hive\/hb1 on origin\./)
+    expect(branchNames(remote)).not.toContain('hive/hb1')
+    // The local branch was never the remote's to delete: the slot takes it once the push is done.
+    expect(await claimed).toBe('took it')
   }, 120_000)
 
   it('checks a remote branch under the repository lock with its use read then (round 2)', async () => {
