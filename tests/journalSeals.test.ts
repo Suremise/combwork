@@ -13,7 +13,13 @@ import { junction } from './pathAliases'
 import { clearJournal, journalPath, LeaseJob, leaseJobGone, queueHost, retireSeal, sealJournal, sweepSeals } from '../src/main/workflow/queueJobs'
 import type { JobHost } from '../src/main/processSupervisor'
 
-const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
+const req = createRequire(import.meta.url)
+const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
+// Processes ended by identity, never by a remembered pid (#603): taken while they are known to be the test's own.
+const { identify, endExactly } = req('./e2e/folderProcesses.cjs') as {
+  identify: (pids: number[]) => { pid: number; started: number }[]
+  endExactly: (targets: { pid: number; started: number }[]) => number
+}
 
 const ends: (() => void)[] = []
 afterAll(() => {
@@ -46,13 +52,8 @@ describe.runIf(process.platform === 'win32')("a seal goes once its job is gone (
     const k = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true, windowsHide: true, env: baseEnv() })
     k.unref()
     const pid = k.pid!
-    ends.push(() => {
-      try {
-        process.kill(pid)
-      } catch {
-        // gone
-      }
-    })
+    // Ended through its handle, which the test holds.
+    ends.push(() => void k.kill())
     expect(await job.assign(pid, after, Date.now() + 1)).toBe(true)
     const runs = (): boolean => {
       try {
@@ -84,20 +85,16 @@ describe.runIf(process.platform === 'win32')("a seal goes once its job is gone (
     const other = queueHost({ linger: true })
     const lease = `slot-seal-${Date.now()}`
     expect(await LeaseJob.open(other, lease, await journalPath(root, lease, dir))).toBeInstanceOf(LeaseJob)
-    const relay = other.pid!
-    ends.push(() => {
-      try {
-        process.kill(relay)
-      } catch {
-        // gone
-      }
-    })
+    // That supervisor by its identity, taken now while it is known to be the test's own.
+    const relay = identify([other.pid!])
+    expect(relay).toHaveLength(1)
+    ends.push(() => void endExactly(relay))
     const seal = await settled(root, dir, lease)
     const gone = (l: string) => leaseJobGone(host, l)
     expect(await sweepSeals(root, dir, gone)).toBe(0)
     expect(existsSync(seal)).toBe(true)
     // That supervisor ends (its relay gone, its input closes): the job closes with it, and the next sweep takes the seal.
-    process.kill(relay)
+    expect(endExactly(relay)).toBe(1)
     await vi.waitFor(async () => expect(await sweepSeals(root, dir, gone)).toBe(1), { timeout: 30_000, interval: 250 })
     expect(existsSync(seal)).toBe(false)
   })
