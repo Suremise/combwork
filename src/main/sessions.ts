@@ -234,6 +234,9 @@ const MODE_SWITCHES_AT_ONCE = 6
 /** After a kill, how long a CLI's console takes to be gone (its processes listed and ended, then its exit). */
 const KILL_EXIT_MS = 1000
 
+/** The most a start waits for its agent's ended runs' slot writers to be released (HI-1867): a bound for a hung one. */
+const WRITER_SETTLE_MS = 15_000
+
 /**
  * How long stopping sessions waits for them to end: its own timeout, or longer where a CLI is given time to exit by
  * itself before it is killed (an adapter's exitKeys graceMs: Copilot's 10 s, #716), so its kill and exit still come
@@ -1195,7 +1198,7 @@ class SessionManager {
    * Each run holding a slot's writer (#1434), from its claim until its release is handed on: whether it has spawned a
    * process (setup or its CLI), and its claim's tracked work, ended once it has (or once its start is given up).
    */
-  private writers = new Map<string, { projectPath: string; spawned: boolean; done: () => void }>()
+  private writers = new Map<string, { projectPath: string; agentId: string; spawned: boolean; done: () => void }>()
   /** Hive is quitting: no new agent starts. */
   private shuttingDown = false
   /** The window showing a project (several windows each show one workspace). */
@@ -1606,11 +1609,13 @@ class SessionManager {
    */
   private async placeFor(projectPath: string, agent: AgentDef, existing: SessionRecord | undefined, opts: StartOptions, run: string): Promise<Place> {
     const fa = folderAgent(agent)
+    // The agent's own runs that have ended, their writers' releases still being written: its slot is theirs until then.
+    await this.earlierWritersSettled(projectPath, agent.id, WRITER_SETTLE_MS)
     try {
       const c = await claimPlace(projectPath, fa, existing ?? null, { purpose: fa.role === 'reviewer' ? 'review' : (opts.purpose ?? defaultPurpose(fa.role)), auto: !!opts.auto, run })
       // Its slot's writer is this run's from now: released once its processes are known to have ended, or its start is
       // given up before any ran.
-      if (c.lease && c.slot) this.writers.set(run, { projectPath, spawned: false, done: c.done })
+      if (c.lease && c.slot) this.writers.set(run, { projectPath, agentId: agent.id, spawned: false, done: c.done })
       else c.done()
       return c
     } catch (e) {
@@ -1636,28 +1641,32 @@ class SessionManager {
     const settled = w.spawned ? settleWriter(w.projectPath, run) : releaseWriter(w.projectPath, run).finally(() => w.done())
     // Kept until written: a quit waits for them before its workspaces close (HI-1801).
     this.writersSettling.add(settled)
-    this.writerSettlingOf.set(run, settled)
+    const entry = { projectPath: w.projectPath, agentId: w.agentId, settled }
+    this.writerSettlingOf.set(run, entry)
     void settled.finally(() => {
       this.writersSettling.delete(settled)
-      this.writerSettlingOf.delete(run)
+      if (this.writerSettlingOf.get(run) === entry) this.writerSettlingOf.delete(run)
     })
   }
 
   /** Writer releases under way (settleWriterOf): each its write of the release, once its run's outcome is known. */
   private readonly writersSettling = new Set<Promise<void>>()
-  /** The same, by run: a start after a stop waits for the stopped run's (writerSettled). */
-  private readonly writerSettlingOf = new Map<string, Promise<void>>()
+  /** The same, by run, with whose run it was: the agent's next start waits for them (earlierWritersSettled). */
+  private readonly writerSettlingOf = new Map<string, { projectPath: string; agentId: string; settled: Promise<void> }>()
 
   /**
-   * Once a run that has ended has its slot writer released (or found held), at most `timeoutMs` (HI-1867): a new
-   * conversation's start just after its stop found the slot still written by the run it stopped, its release waiting for
-   * its processes to be known to have ended, and was refused. None under way (released, or never a writer): at once.
+   * Once the agent's runs that have ended have their slot writers released (or found held), at most `timeoutMs`
+   * (HI-1867): a lane's start of its builder just after its last run ended (stopped by the start, or exited by itself
+   * moments before) found the slot still written by that run, its release waiting for its processes to be known to have
+   * ended, and was refused. None under way: at once. Another agent's or Hive's writer, or one held (its processes kept
+   * running, or not known to have ended), isn't waited for: the claim refuses it as before.
    */
-  private async writerSettled(run: string, timeoutMs: number): Promise<void> {
-    const settling = this.writerSettlingOf.get(run)
-    if (!settling) return
+  private async earlierWritersSettled(projectPath: string, agentId: string, timeoutMs: number): Promise<void> {
+    const key = projectPath.toLowerCase()
+    const mine = [...this.writerSettlingOf.values()].filter((e) => e.agentId === agentId && e.projectPath.toLowerCase() === key).map((e) => e.settled.catch(() => undefined))
+    if (!mine.length) return
     let timer: NodeJS.Timeout | undefined
-    await Promise.race([settling.catch(() => undefined), new Promise<void>((r) => (timer = setTimeout(r, timeoutMs)))])
+    await Promise.race([Promise.all(mine), new Promise<void>((r) => (timer = setTimeout(r, timeoutMs)))])
     clearTimeout(timer)
   }
 
@@ -3512,16 +3521,10 @@ class SessionManager {
     return null
   }
 
-  /**
-   * Stops a running agent to end its conversation (kept in the Sessions tab): whether it has stopped. Stopped, its slot's
-   * writer released too (HI-1867), so the new conversation's start in that slot isn't refused as still written by it.
-   */
+  /** Stops a running agent to end its conversation (kept in the Sessions tab): whether it has stopped. */
   private async endConversation(projectPath: string, agentId: string): Promise<boolean> {
-    const run = this.live.get(liveId(projectPath, agentId))?.state.runId
     await this.stopWhereAndWait((s) => s.projectPath.toLowerCase() === projectPath.toLowerCase() && (s as { agentId?: string }).agentId === agentId, 15_000)
-    if (this.live.has(liveId(projectPath, agentId))) return false
-    if (run) await this.writerSettled(run, 15_000)
-    return true
+    return !this.live.has(liveId(projectPath, agentId))
   }
 
   /** Turns a running agent's Plan mode on or off (providers where it is a toggle, e.g. Codex's Shift+Tab). */
