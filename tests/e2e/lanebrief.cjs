@@ -70,10 +70,15 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
   const facts = async (n) => inv('tasks:facts', n)
   const placed = async (n) => (await facts(n)).find((f) => f.kind === 'BuilderPlaced')?.data ?? null
   const slotOf = async (n) => (await facts(n)).findLast((f) => f.kind === 'Started')?.data
-  /** A conversation's transcript (its user turns among them), as the fake CLI writes it, or ''. */
+  /** A conversation's transcript (its user turns among them), as the fake CLI writes it in its home's projects, or ''. */
   const transcript = async (sessionId) => {
-    const rec = (await inv('session:list', alpha)).find((s) => s.id === sessionId)
-    return rec?.transcriptPath && fs.existsSync(rec.transcriptPath) ? fs.readFileSync(rec.transcriptPath, 'utf8') : ''
+    const projects = path.join(home, 'projects')
+    if (!sessionId || !fs.existsSync(projects)) return ''
+    for (const d of fs.readdirSync(projects)) {
+      const f = path.join(projects, d, `${sessionId}.jsonl`)
+      if (fs.existsSync(f)) return fs.readFileSync(f, 'utf8')
+    }
+    return ''
   }
 
   try {
