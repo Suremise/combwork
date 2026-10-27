@@ -465,7 +465,7 @@ const nothingToArchive = (dialog) => {
     }
     const merges = 'hold todo doing review passed merging done'
     // The board opened by open() with main's reads held: its frame without columns until its read comes, then every
-    // column at once; the workflow link once its own read is applied. Nothing moves, comes or goes, and the toolbar
+    // column at once, and the workflow link with them (read with the stages, HI-1852). Nothing moves, comes or goes, and the toolbar
     // keeps its height.
     const heldOpen = async (what, open, expected, shot) => {
       await hold(true)
@@ -496,11 +496,11 @@ const nothingToArchive = (dialog) => {
     await record()
     await showBoard('alpha')
     check('alpha, opened again: every column from the first paint', !!(await until(async () => (await columns()) === merges, HUNG_MS)) && (await layouts()).filter((l) => l.columns).every((l) => l.columns.replace(/\*/g, '') === merges), JSON.stringify(await layouts()))
-    check('…the workflow link waits for its read', !!(await until(async () => (await heldReads()) > 0, HUNG_MS)) && (await link.count()) === 0)
+    // The workflow link came with the stages too (HI-1852): there from the first paint, with no read of its own.
+    check('…the workflow link too, with no read of its own', (await link.count()) === 1 && (await layouts()).filter((l) => l.columns).every((l) => l.chip) && (await heldReads()) === 0, JSON.stringify({ layouts: await layouts(), held: await heldReads() }))
     await topShot('noshift-again')
-    await release()
     await hold(false)
-    check('…then shows, the columns where they were and the toolbar its height', !!(await until(async () => (await link.count()) === 1, HUNG_MS)) && steady(await layouts()), JSON.stringify(await layouts()))
+    check('…the columns where they were and the toolbar its height', steady(await layouts()), JSON.stringify(await layouts()))
     // The workflow changed while the board is closed (HR5's round 1): opened again, never the columns of the old one.
     // To No review (no Merging): Merging never shows; and back: Merging comes with the rest, never after them.
     const changedWhileClosed = (options, answered, expected) =>
