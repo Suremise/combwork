@@ -158,16 +158,18 @@ const check = (name, ok, extra = '') => {
   const release = () => app.evaluate(() => global.__hiveTestGate.release())
   // A change queued for the project's lock (#423): withFileLock (fsutil.ts) queues a call behind the one holding a file's
   // lock by setting the file's key (its path in lower case) in its map of locks, in the same step as the call. While the
-  // user's write holds project.json, a set of that key is a change queued behind it: past all its checks before the lock.
-  // Counted from Map.prototype.set in Hive's main process only while a race waits for it, then put back. Were the lock
-  // kept some other way, no set would come and the check fails, rather than passing without the race.
+  // user's write holds project.json, a set of that key to the queue's promise is a change queued behind it: past all its
+  // checks before the lock. Only a promise counts: other maps use the same key (HI-1850: project.json's kept reads,
+  // HI-1814, set it on every read, and the lock's call count beside it). Counted from Map.prototype.set in Hive's main
+  // process only while a race waits for it, then put back. Were the lock kept some other way, no set would come and the
+  // check fails, rather than passing without the race.
   const watchLockQueue = () =>
     app.evaluate((_, lockKey) => {
       const set = (global.__hiveTestMapSet ??= Map.prototype.set)
       global.__hiveTestQueued = 0
       // eslint-disable-next-line eslint/no-extend-native -- in the test copy only, and put back once the race is queued
       Map.prototype.set = function (k, v) {
-        if (k === lockKey) global.__hiveTestQueued++
+        if (k === lockKey && typeof v?.then === 'function') global.__hiveTestQueued++
         return set.call(this, k, v)
       }
     }, projectFile.toLowerCase())
