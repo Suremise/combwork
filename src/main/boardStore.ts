@@ -1181,6 +1181,8 @@ export function cardOwnersNow(ws: WorkspaceService, numbers: readonly number[]):
     const at = numbers.map(() => '?').join(', ')
     const out = new Map<number, { agent: string | null; lane: string | null }>()
     for (const r of db.prepare(`SELECT number, agent FROM cards WHERE number IN (${at})`).all(...numbers) as { number: number; agent: string | null }[]) out.set(r.number, { agent: r.agent, lane: null }) // i18n-ignore: SQL
+    // A 0.9 board waiting for its upgrade to 1.0 has no lane tables yet: no card has an owner lane (HI-1846).
+    if (boardReadOnly(ws)) return out
     const rows = db
       .prepare(`SELECT x.card, l.id FROM (SELECT lane, card FROM lane_cards UNION SELECT lane, card FROM lane_pending) x JOIN lanes l ON l.id = x.lane JOIN cards c ON c.number = x.card WHERE x.card IN (${at}) AND l.state = 'active' AND l.project = c.project COLLATE NOCASE ORDER BY (c.agent IS NOT NULL AND c.agent = l.builder_id), l.started_at, l.id`) // i18n-ignore: SQL
       .all(...numbers) as { card: number; id: string }[]

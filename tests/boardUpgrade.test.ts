@@ -499,6 +499,21 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     await close(w)
   })
 
+  it("lanes' card owners, which the Lanes view reads as it opens, read as none while it waits (no \"no such table: lane_pending\"); read once upgraded (HI-1846)", async () => {
+    const ws = await board09()
+    const w = await open(ws)
+    expect(store.boardReadOnly(w)).toBe(true)
+    const numbers = (inWorkspace(w, () => store.boardRead(w, (db) => db.prepare('SELECT number FROM cards').all())) as { number: number }[]).map((r) => r.number)
+    expect(numbers.length).toBeGreaterThan(0)
+    const owners = inWorkspace(w, () => store.cardOwnersNow(w, numbers))
+    expect([...owners.values()].every((o) => o.lane === null)).toBe(true)
+    expect(owners.size).toBe(numbers.length)
+    await inWorkspace(w, () => store.upgradeBoard(w))
+    expect(store.boardReadOnly(w)).toBe(false)
+    expect(inWorkspace(w, () => store.cardOwnersNow(w, numbers)).size).toBe(numbers.length)
+    await close(w)
+  })
+
   it("a store's file isn't moved in meanwhile (no write): read from the database, left in place, moved in once upgraded", async () => {
     const ws = await board09()
     const p = join(ws, 'p')
