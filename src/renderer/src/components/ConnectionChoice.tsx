@@ -41,7 +41,7 @@ export function useConnections(): ConnectionsView | null {
 /** `value`: the connection's id, '' for the workspace's default. */
 export function ConnectionChoice({ provider, value, onChange, id }: { provider: ProviderId; value: string; onChange: (v: string) => void; id?: string }) {
   const view = useConnections()
-  if (!providerDescriptor(provider).capabilities.connections || !view) return null
+  if (!providerDescriptor(provider).capabilities.connections || !view?.preview) return null
   const ws = view.workspace[provider]
   const on = view.connections.filter((c) => c.provider === provider && ws?.on.includes(c.id))
   const def = ws?.default ? view.connections.find((c) => c.id === ws.default) : undefined

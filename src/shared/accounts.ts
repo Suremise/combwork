@@ -7,6 +7,8 @@ import type { Connection, ProviderId, WorkspaceConnections, WorkspaceConfig } fr
 
 /** What Settings → Accounts shows (accounts:list): the connections, and the asking window's workspace's choice of them. */
 export interface ConnectionsView {
+  /** Settings → Advanced → Connections (preview) (until S8): off, nothing about connections is shown, and nothing listed. */
+  preview: boolean
   /** The providers that can have connections (capabilities.connections) and are on in Settings. */
   providers: ProviderId[]
   connections: (Connection & { signingIn: boolean; folder: string })[]
@@ -103,10 +105,10 @@ export function resolveConnection(cfg: Pick<WorkspaceConfig, 'connections'> | nu
   const ws = workspaceAccounts(cfg, provider, connections)
   if (wanted) {
     const c = connections.find((x) => x.id === wanted)
-    if (!c) return { ok: false, why: 'deleted', wanted }
-    if (c.provider !== provider) return { ok: false, why: 'otherProvider', wanted }
+    if (!c) return { ok: false, why: 'deleted', wanted } // i18n-ignore: a reason's code, not text
+    if (c.provider !== provider) return { ok: false, why: 'otherProvider', wanted } // i18n-ignore: a reason's code, not text
     if (ws?.on.includes(wanted)) return { ok: true, id: wanted }
-    return ws?.default ? { ok: true, id: ws.default, note: 'offFallback' } : { ok: false, why: 'offNoDefault', wanted }
+    return ws?.default ? { ok: true, id: ws.default, note: 'offFallback' } : { ok: false, why: 'offNoDefault', wanted } // i18n-ignore: a reason's code, not text
   }
-  return ws?.default ? { ok: true, id: ws.default } : { ok: false, why: 'none' }
+  return ws?.default ? { ok: true, id: ws.default } : { ok: false, why: 'none' } // i18n-ignore: a reason's code, not text
 }

@@ -179,6 +179,30 @@
     "defaultMessage": "{n, plural, one {# compaction so far} other {# compactions so far}}{over, select, yes { — consider compacting} other {}}",
     "description": "A line of the hover of a pane footer's context: how many times the conversation was compacted, and (over the user's threshold) a suggestion to compact."
   },
+  "panes.footer.connectionChanged": {
+    "defaultMessage": "Its login changed since it was added: see Settings → Connections.",
+    "description": "Added to the hover of a pane footer's connection: the connection is signed in as another login than the one it was added with. Settings → Connections names a section."
+  },
+  "panes.footer.connectionOff": {
+    "defaultMessage": "The connection chosen for it is off in this workspace, so it runs on the workspace's default.",
+    "description": "Added to the hover of a pane footer's connection: the agent's own connection is off in this workspace, so the default runs it."
+  },
+  "panes.footer.connectionSwitching": {
+    "defaultMessage": "switches once its turn is over",
+    "description": "After the connection in a pane's footer (lower case): the agent moves to another connection once its turn is over, then carries on."
+  },
+  "panes.footer.connectionSwitchingTip": {
+    "defaultMessage": "Once its turn is over, it ends and carries on, on the connection chosen for it now.",
+    "description": "Added to the hover of a pane footer's connection while a switch waits for the agent's turn to be over."
+  },
+  "panes.footer.connectionTip": {
+    "defaultMessage": "Runs on the connection {name}.",
+    "description": "Hover of the connection in a pane's footer (HI-1755): the connection this session launched on ({name})."
+  },
+  "panes.footer.connectionUnknown": {
+    "defaultMessage": "Hive couldn't check who this connection is signed in as when it started.",
+    "description": "Added to the hover of a pane footer's connection: the connection's sign-in couldn't be checked at launch (not the same as signed out)."
+  },
   "panes.footer.costClick": {
     "defaultMessage": "Click to see this session's details in the Overview",
     "description": "The last line of the hover of a pane footer's cost: what clicking does (the project's Overview tab)."

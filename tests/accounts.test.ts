@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as electron from 'electron'
 import { accountState, duplicateLogins, switchedOn, workspaceAccounts } from '../src/shared/accounts'
 import type { Connection } from '../src/shared/types'
+import { ACCOUNTS_PREVIEW } from '../src/shared/advanced'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-accounts-')
@@ -44,6 +45,7 @@ const logins = new Map<string, (code: number) => void>()
 
 beforeAll(async () => {
   advanced.load(join(base, 'profile'))
+  await advanced.set(ACCOUNTS_PREVIEW, true)
   mkdirSync(home, { recursive: true })
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never

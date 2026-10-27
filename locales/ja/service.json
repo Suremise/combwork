@@ -187,6 +187,7 @@
   "service.providers.notInstalled": "{cli}がインストールされていません。",
   "service.providers.pickNotFound": "{task}：Hiveは{item}を見つけられませんでした。ターミナルで操作するか、Hiveを更新してください。",
   "service.providers.retryUnavailable": "この更新の再試行は利用できなくなりました。「再確認」を選んでから、「更新」を試してください。",
+  "service.providers.signInConnections": "{cli}は接続ごとにサインインします。「設定」→「接続」からサインインしてください。",
   "service.providers.stillLooking": "Hiveはまだ{cli}を探しています。少し待ってから、もう一度お試しください。",
   "service.providers.stillLookingAll": "Hiveはまだコーディングエージェントの各CLIを探しています。少し待ってから、もう一度お試しください。",
   "service.providers.stopFirst": "{cli}を更新する前に、実行中の{cli}のエージェントをすべて停止してください。",

@@ -187,6 +187,7 @@
   "service.providers.notInstalled": "{cli} no está instalado.",
   "service.providers.pickNotFound": "{task}: Hive no encontró {item}. Hazlo en la terminal o actualiza Hive.",
   "service.providers.retryUnavailable": "Este reintento de actualización ya no está disponible. Elige Volver a comprobar y luego Actualizar.",
+  "service.providers.signInConnections": "{cli} inicia sesión por conexión: inicia sesión desde Configuración → Conexiones.",
   "service.providers.stillLooking": "Hive todavía está buscando {cli}. Vuelve a intentarlo en un momento.",
   "service.providers.stillLookingAll": "Hive todavía está buscando las CLI de los agentes de programación. Vuelve a intentarlo en un momento.",
   "service.providers.stopFirst": "Detén todos los agentes de {cli} en ejecución antes de actualizarlo.",

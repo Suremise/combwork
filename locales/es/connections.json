@@ -1,0 +1,8 @@
+{
+  "connections.choice.default": "Predeterminada del espacio de trabajo ({name})",
+  "connections.choice.defaultNone": "Predeterminada del espacio de trabajo (ninguna activada)",
+  "connections.choice.gone": "Una conexión quitada (el agente no puede iniciarse)",
+  "connections.choice.label": "Conexión",
+  "connections.choice.none": "No hay ninguna conexión de {cli} activada en este espacio de trabajo. Agrega una en Configuración → Conexiones.",
+  "connections.choice.off": "{name} (desactivada en este espacio de trabajo: el agente usa la predeterminada)"
+}

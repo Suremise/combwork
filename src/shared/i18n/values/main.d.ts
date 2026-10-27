@@ -11,7 +11,6 @@ interface HiveMessageValues {
   'main.accounts.noProvider': { cli: string | number }
   'main.accounts.notFound': undefined
   'main.accounts.nothingToKeep': { name: string | number }
-  'main.accounts.previewOff': undefined
   'main.accounts.removeFailed': { name: string | number; error: string | number }
   'main.antivirus.allExcluded': undefined
   'main.antivirus.changed': undefined
@@ -34,6 +33,12 @@ interface HiveMessageValues {
   'main.branchMerge.cardWork': { branch: string | number; card: string | number }
   'main.branchMerge.notBranch': { branch: string | number }
   'main.branchMerge.same': { branch: string | number }
+  'main.connections.launch.changing': { name: string | number; agent: string | number }
+  'main.connections.launch.deleted': { agent: string | number }
+  'main.connections.launch.none': { cli: string | number; agent: string | number }
+  'main.connections.launch.offNoDefault': { agent: string | number; name: string | number; cli: string | number }
+  'main.connections.launch.otherProvider': { agent: string | number; cli: string | number }
+  'main.connections.launch.signedOut': { name: string | number; agent: string | number }
   'main.console.noWorkspace': undefined
   'main.console.title': { workspace: string | number }
   'main.corrupt.damaged': { file: string | number }

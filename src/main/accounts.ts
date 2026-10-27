@@ -13,7 +13,7 @@ import { emit, onHiveEvent } from './events'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { childEnv, hasPty } from './ptyHost'
-import { connectionsManaged, testHomeSeam } from './connectionSeam'
+import { connectionsManaged, connectionsOn, testHomeSeam } from './connectionSeam'
 import { provider } from './providers'
 import { providerService } from './providerService'
 import { openWorkspaces, setNewWorkspaceExtras, workspace, workspaceOf } from './workspace'
@@ -744,7 +744,9 @@ export function accountsView(check = false): ConnectionsView {
     if (w) ws[p] = w
   }
   const testHome = providers.filter((p) => !connectionsManaged(p))
-  return { providers, connections: all.map((a) => ({ ...a, signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id) })), workspace: ws, testHome }
+  // Off (the preview switch, until S8): nothing about connections is shown.
+  if (!connectionsOn()) return { preview: false, providers: [], connections: [], workspace: {}, testHome: [] }
+  return { preview: true, providers, connections: all.map((a) => ({ ...a, signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id) })), workspace: ws, testHome }
 }
 
 /** Saves the asking window's workspace's accounts for a provider, worked out from how they are when it is written. */
@@ -845,7 +847,8 @@ const LAUNCH = {
  */
 export async function connectionForLaunch(o: { provider: ProviderId; workspaceConfig: WorkspaceConfig | null; wanted: string | null | undefined; agentName: string }): Promise<LaunchConnection | null> {
   const caps = providerDescriptor(o.provider).capabilities.connections
-  if (!caps) return null
+  // Connections off (the preview switch, until S8): everything launches as before.
+  if (!caps || !connectionsOn()) return null
   const cli = providerDescriptor(o.provider).name
   const choose = (): ReturnType<typeof resolveConnection> => resolveConnection(o.workspaceConfig, o.provider, o.wanted, list())
   const choice = choose()
@@ -905,9 +908,9 @@ export function connectionHomes(id: ProviderId, cfg?: WorkspaceConfig | null): C
 }
 
 /** Whether a connection is one of the provider's on in the workspace a project (or host) belongs to (HI-1755). */
-export function connectionOnHere(id: string, provider: ProviderId, projectPath: string): boolean {
+export function connectionOnHere(id: string, cli: ProviderId, projectPath: string): boolean {
   const ws = workspaceOf(projectPath)
-  return !!ws.path && !!workspaceAccounts(ws.config, provider, list())?.on.includes(id)
+  return !!ws.path && !!workspaceAccounts(ws.config, cli, list())?.on.includes(id)
 }
 
 /**

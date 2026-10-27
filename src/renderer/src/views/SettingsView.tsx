@@ -26,7 +26,7 @@ import { AntivirusPanel } from '../components/Antivirus'
 import { AccountsSettings } from '../components/AccountsSettings'
 import { ConnectionChoice } from '../components/ConnectionChoice'
 import { AdvancedSettings } from '../components/AdvancedSettings'
-import { ADVANCED_DEFS, groupName, shownText, type AdvancedState } from '@shared/advanced'
+import { ACCOUNTS_PREVIEW, ADVANCED_DEFS, groupName, shownText, type AdvancedState } from '@shared/advanced'
 import { choose, confirm, get, notify, set, useLanguage, useStore } from '../store'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { LANGUAGES, SOURCE_LANGUAGE, languageOf } from '@shared/i18n/languages'
@@ -1028,10 +1028,13 @@ export function SettingsView() {
   const advanced = useStore((s) => s.advanced)
   // Searching matches the text as shown, in the language shown.
   const shownLanguage = useLanguage()
+  // Connections only with their preview on (HI-980, HI-1755; the switch goes in S8).
+  const accountsShown = advanced?.values[ACCOUNTS_PREVIEW] === true
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
     return SETTINGS.filter((d) => {
+      if ((d.section === 'accounts' || d.id === 'assistant.connection') && !accountsShown) return false
       if (d.id === 'advanced.values' && (q || modifiedOnly)) return advancedMatches(q, modifiedOnly, advanced)
       // Its English matches as well as what it shows: Settings can be searched in either.
       if (q && !`${d.title} ${d.desc} ${d.tip} ${d.key}${shownLanguage !== SOURCE_LANGUAGE ? ` ${Object.values(rowText(d)).join(' ')}` : ''}`.toLowerCase().includes(q)) return false
@@ -1039,7 +1042,7 @@ export function SettingsView() {
       if (!q && !modifiedOnly && d.section !== section) return false
       return true
     })
-  }, [query, section, settings, modifiedOnly, loops, advanced, shownLanguage])
+  }, [query, section, settings, modifiedOnly, loops, advanced, shownLanguage, accountsShown])
 
   if (!settings) return null
   const grouped = SECTIONS.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
@@ -1058,7 +1061,7 @@ export function SettingsView() {
       </div>
       <div className="settings-body">
         <div className="settings-nav">
-          {SECTIONS.map((s) => (
+          {SECTIONS.filter((s) => s.id !== 'accounts' || accountsShown).map((s) => (
             <div key={s.id} className={cx('row', !query && !modifiedOnly && section === s.id && 'selected')} data-section={s.id} onClick={() => {
                 set({ settingsSection: s.id, settingsQuery: '' })
                 setModifiedOnly(false)

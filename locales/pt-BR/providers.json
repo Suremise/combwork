@@ -75,6 +75,7 @@
   "providers.export.summary": "Resumo",
   "providers.export.thinking": "Raciocínio",
   "providers.export.you": "Você",
+  "providers.memory.connection": "{file} da conexão {name} (os agentes dela, todos os projetos)",
   "providers.memory.user": "Seu {file} (global)",
   "providers.readiness.notInstalled": "{provider} não está instalado.",
   "providers.readiness.signedOut": "O {provider} não está conectado.",

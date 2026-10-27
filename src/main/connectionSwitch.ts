@@ -48,12 +48,12 @@ export function runSwitch(d: SwitchDeps): SwitchOp {
   }
   const step = async (): Promise<void> => {
     if (!typed) {
-      if (!d.running()) return finish('gone', 'its run ended before it was switched')
+      if (!d.running()) return finish('gone', 'its run ended before it was switched') // i18n-ignore: for the log
       const held = d.heldNow()
       if (held) return
       const r = await d.quit()
       if (over) return
-      if (r === 'gone') return finish('gone', 'its run ended before it was switched')
+      if (r === 'gone') return finish('gone', 'its run ended before it was switched') // i18n-ignore: for the log
       // Held: nothing was typed; the next change looks again. Sent: typed once, never again.
       if (r === 'sent') typed = true
       else return
@@ -80,10 +80,12 @@ export function runSwitch(d: SwitchDeps): SwitchOp {
     looking = true
     void (async () => {
       try {
-        do {
+        // Once more for each change that came while it looked (finish ends it: over).
+        for (;;) {
           again = false
           await step()
-        } while (again && !over)
+          if (!again || over) break
+        }
       } finally {
         looking = false
       }

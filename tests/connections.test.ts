@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as electron from 'electron'
 import { resolveConnection } from '../src/shared/accounts'
 import type { Connection, LiveSessionState } from '../src/shared/types'
+import { ACCOUNTS_PREVIEW } from '../src/shared/advanced'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-connections-')
@@ -31,6 +32,8 @@ const { authScope } = await import('../src/main/sessions')
 
 const status = new Map<string, () => Promise<{ ok: true; loggedIn: boolean; email?: string; orgId?: string } | { ok: false; error: string }>>()
 const signedIn = (email: string) => async () => ({ ok: true as const, loggedIn: true, email, orgId: 'org-1' })
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
+const HUNG_MS = 10_000
 const outcome = (p: Promise<unknown>): Promise<string> => p.then(() => 'ok', (e: Error) => e.message)
 
 const wsPath = join(base, 'ws')
@@ -39,6 +42,7 @@ const here = <T>(fn: () => T): T => inWorkspace(w, fn)
 
 beforeAll(async () => {
   advanced.load(join(base, 'profile'))
+  await advanced.set(ACCOUNTS_PREVIEW, true)
   mkdirSync(join(home, 'projects'), { recursive: true })
   mkdirSync(join(userHome, '.claude'), { recursive: true })
   mkdirSync(wsPath, { recursive: true })
@@ -279,7 +283,7 @@ describe('a switch at the next safe point (runSwitch)', () => {
     expect(a.quits).toEqual([])
     a.held = null
     a.change()
-    await vi.waitFor(() => expect(a.quits).toEqual(['sent']))
+    await vi.waitFor(() => expect(a.quits).toEqual(['sent']), { timeout: HUNG_MS })
     a.change()
     a.change()
     expect(a.quits).toEqual(['sent'])
@@ -296,11 +300,11 @@ describe('a switch at the next safe point (runSwitch)', () => {
     a.held = null
     a.quitAnswer = 'held'
     a.change()
-    await vi.waitFor(() => expect(a.quits).toEqual(['held']))
+    await vi.waitFor(() => expect(a.quits).toEqual(['held']), { timeout: HUNG_MS })
     expect(op.typed).toBe(false)
     a.quitAnswer = 'sent'
     a.change()
-    await vi.waitFor(() => expect(a.quits).toEqual(['held', 'sent']))
+    await vi.waitFor(() => expect(a.quits).toEqual(['held', 'sent']), { timeout: HUNG_MS })
     expect(op.typed).toBe(true)
     a.running = false
     a.change()
@@ -317,7 +321,7 @@ describe('a switch at the next safe point (runSwitch)', () => {
     const second = agent()
     second.a.held = null
     second.a.change()
-    await vi.waitFor(() => expect(second.op.typed).toBe(true))
+    await vi.waitFor(() => expect(second.op.typed).toBe(true), { timeout: HUNG_MS })
     second.op.cancel('its workspace closed')
     second.a.running = false
     second.a.change()

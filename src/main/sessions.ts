@@ -63,7 +63,7 @@ import type {
 } from '../shared/types'
 import { provider as providerAdapter, allProviders } from './providers'
 import { runSwitch, type SwitchOp } from './connectionSwitch'
-import { laneEndHeldNow } from './slotsApp'
+import { connectionsOn } from './connectionSeam'
 import { checkAccount, connectionForLaunch, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
 import { resolveConnection } from '../shared/accounts'
 import { recacheEstimate } from './providers/common'
@@ -1338,7 +1338,7 @@ class SessionManager {
     const chime = pc.chime === 'inherit' ? s.notifications.chimeEnabled : pc.chime === 'on'
     // The connection it would launch on (HI-1755): a change of choice asks for a restart.
     const wanted = assistant ? workspace.config.assistantConnection?.[l.provider] : forAgent?.connection
-    const choice = providerDescriptor(l.provider).capabilities.connections ? resolveConnection(workspace.config, l.provider, wanted, config.get().connections ?? []) : null
+    const choice = providerDescriptor(l.provider).capabilities.connections && connectionsOn() ? resolveConnection(workspace.config, l.provider, wanted, config.get().connections ?? []) : null
     const connection = choice ? (choice.ok ? choice.id : `!${choice.why}`) : null
     return { provider: l.provider, skills, skillHashes, skillProblems, mcpServers, model: l.model, effort: l.effort, permissionMode: l.permissionMode, extraArgs, use200kContext: l.use200kContext, chime, connection }
   }
@@ -1474,7 +1474,7 @@ class SessionManager {
     this.assertStartsAllowed(projectPath)
     projectPath = workspace.assertSessionHost(projectPath)
     // A start of the user's (not a switch's own resume) replaces a switch of connection waiting for that agent (HI-1755).
-    if (opts.agentId && !this.switchResuming.has(liveId(projectPath, opts.agentId))) this.switches.get(liveId(projectPath, opts.agentId))?.cancel('started by hand')
+    if (opts.agentId && !this.switchResuming.has(liveId(projectPath, opts.agentId))) this.switches.get(liveId(projectPath, opts.agentId))?.cancel('started by hand') // i18n-ignore: for the log
     if (opts.resumeId !== undefined) assertSessionId(opts.resumeId)
     const agentId = opts.agentId || (await this.soleAgent(projectPath))
     // Again after the await, with nothing awaited before the start is reserved: a fence raised meanwhile holds.
@@ -1845,6 +1845,12 @@ class SessionManager {
     }
   }
 
+  /**
+   * Why an agent's turn isn't over yet (HI-1706's laneEndHeldNow: slotsApp.ts sets it as it loads, as deliveries.ts sets
+   * `deliveries`, so sessions.ts doesn't import it): a connection switch waits on it. Until set, nothing holds it.
+   */
+  safePointHeld: (projectPath: string, agentId: string, runId: string) => string | null = () => null
+
   /** Switches of connection waiting for their agent's safe point (HI-1755), by liveId: at most one per agent. */
   private switches = new Map<string, SwitchOp>()
   /** Agents whose switch is resuming them now: that start is the switch's, not the user's. */
@@ -1863,17 +1869,16 @@ class SessionManager {
     if (!l || l.state.status === 'stopped') return 'notRunning'
     const { runId, sessionId } = l.state
     const label = userText(this.label(l.state))
-    const open = (): boolean => !this.shuttingDown && !!workspaceFor(projectPath) && !workspaceFor(projectPath)?.closing
-    const running = (): boolean => {
-      const cur = this.live.get(id)
-      return !!cur && cur.state.runId === runId && cur.state.status !== 'stopped'
-    }
+    const hostOpen = (): boolean => !this.shuttingDown && !!workspaceFor(projectPath) && !workspaceFor(projectPath)?.closing
+    // Its run counts until it has left the live sessions (start refuses while it is there, whatever its status): its
+    // session-exit, emitted once it has, is the change that resumes it.
+    const running = (): boolean => this.live.get(id)?.state.runId === runId
     const op = runSwitch({
       running,
-      heldNow: () => laneEndHeldNow(projectPath, agentId, runId),
-      quit: () => this.quit(projectPath, agentId, runId, { fenced: open, why: 'a switch of connection', ready: () => laneEndHeldNow(projectPath, agentId, runId) }), // i18n-ignore: for the log
+      heldNow: () => this.safePointHeld(projectPath, agentId, runId),
+      quit: () => this.quit(projectPath, agentId, runId, { fenced: hostOpen, why: 'a switch of connection', ready: () => this.safePointHeld(projectPath, agentId, runId) }), // i18n-ignore: for the log
       resume: async () => {
-        if (!open()) throw new Error('its workspace closed') // i18n-ignore: for the log
+        if (!hostOpen()) throw new Error('its workspace closed') // i18n-ignore: for the log
         this.switchResuming.add(id)
         try {
           await inWorkspace(workspaceOf(projectPath), () => this.start(projectPath, { agentId, ...(sessionId ? { resumeId: sessionId } : {}) }))

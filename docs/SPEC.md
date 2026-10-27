@@ -782,7 +782,49 @@ The same rules apply to every provider's CLI; the details below are Claude Code'
 
 Below, an **account** is a **sign-in connection**: a login folder of Hive's, signed in through the CLI's own sign-in. Settings shows it as Settings → **Connections**. The code's names follow: the types (`Connection`, `ConnectionIdentity`, `ConnectionObserved`, `WorkspaceConnections`, `ConnectionsView`, `ConnectionStatus`), `config.json`'s `connections` and `lastUsedConnection`, `workspace.json`'s `connections`, the descriptor's `capabilities.connections`, the IPC (`connections:*`) and the event (`connections-changed`). Only private and on-disk names keep `account` (nothing has shipped, so nothing stored is renamed): the modules (`main/accounts.ts`, `shared/accounts.ts`, `AccountsSettings.tsx`) and their function names, the message and advanced-setting ids (`settings.accounts.*`, `hive.accounts.preview`, `claude-code.accounts.*`), Settings' section id, and the folder `<profile>\accounts`.
 
-**Staged:** shown only with Settings → Advanced → **Connections (preview)** on (`hive.accounts.preview`, off by default). Until HI-1755, agents and the Assistant still launch on the CLI's usual home. HI-1755 removes the switch and launches every Claude Code session on a Hive account. From then on Hive runs nothing from `~/.claude`, which stays the user's own for their terminal (Darren, 26 Oct). HI-1756 adds plan usage per account and the account in the pane header and status bar. HI-1757 and HI-1758 do Codex and Copilot, each once its logins are proven separate per home. The decisions are on HI-980.
+**Staged, in slices** (Darren, 26 Oct ~23:25): everything about connections is behind Settings → Advanced → **Connections (preview)** (`hive.accounts.preview`, off by default). Off, agents and the Assistant launch on the CLI's usual home, as before. Each slice merges on its own behind it:
+- **S1 (HI-1755):** launching on a connection.
+- **S2 (HI-1769):** agent rows, and the template load dialog.
+- **S3 (HI-1770):** model, effort and context belong to the connection, with the migration.
+- **S4 (HI-1771):** the Agent API.
+- **S5 (HI-1756):** usage per connection.
+- **S6 (HI-1772):** base URL + key connections.
+- **S7 (HI-1757, HI-1758, HI-1773):** Codex, Copilot and Ollama.
+- **S8 (HI-1774):** removes the switch and the old plumbing. From then on Hive runs nothing from `~/.claude`, which stays the user's own for their terminal (Darren, 26 Oct).
+
+The design across every surface is HI-1755's design note and addendum. The decisions are on HI-980 and HI-1755.
+
+**Launching on a connection** (S1):
+- **Which connection** (`resolveConnection`):
+  - an agent's own choice (`AgentDef.connection`, Agent Settings, Add Agent, templates) when it is on in its workspace;
+  - **off there:** the same CLI's workspace default, noted on the agent ("off here: the default runs it");
+  - with no default, or a choice removed or for another CLI: **refused**, saying why.
+  - No choice: the workspace's default for the CLI.
+  - The Assistant: its own choice per workspace (`workspace.json` `assistantConnection`, Settings → Assistant), else the default.
+  - **None on:** refused ("No Claude Code connection is on in this workspace"), with a banner in the project offering **Add a Connection**. Never the CLI's own home.
+  - Each window's workspace resolves its own, so two run on different connections at once.
+- **The launch** (`connectionForLaunch`):
+  - **The claim:** a claim under the connection's lock, with its folder checked (removal is refused while it's held, and it's released however the launch ends).
+  - **The check:** a fresh identity check.
+    - **Refused:** signed out, its login changing throughout the check (`fresh: false`), or its folder missing or replaced.
+    - **Goes ahead, noted:** a check that couldn't tell, or a changed login.
+  - **Its home:** the connection's folder, set in the launch's environment under the descriptor's `homeEnv`.
+  - **Just before spawning:** checked again that the choice still resolves to it and it still exists.
+  - **On the run:** `launchedConnection` (id, name, note), fixed until the run ends. The session record keeps it, and the footer names it.
+  - **The choice** is part of the launch signature ("restart needed").
+- **The CLI's own home, never read for a connection's agents:** its default model (`configuredDefaultModel(home)`), user memory (`memorySources(project, homes)`), skills and plugins (`skillRoots(home)`), file access (`fileAllowed(path, write, homes)`, the same narrow policy).
+  - Agent Setup runs no `auth status` or sign-in on `~/.claude` for a CLI with connections (`connectionsManaged`).
+  - Transcripts stay shared through the junction.
+- **Sign-out recovery** is per auth scope (`authScope`: the CLI, or the CLI and the connection), rechecked through the connection's own check. One connection signing out never stops, relabels or clears another's agents, in any workspace.
+- **Switching at a safe point** (`connectionSwitch.ts`, `sessions.switchAtSafePoint`): offered on the restart banner and in Settings → Connections ("N running agents run on another connection than the one chosen now").
+  - **One per agent:** asked again while one waits, nothing changes.
+  - **The exit:** once its turn is over (HI-1706's predicate), its CLI's exit is typed once (a quit `held` typed nothing, so it's asked again at the next change).
+  - **The resume:** only after that run has exited, its last session is resumed once, on the connection chosen then.
+  - **Cancelled by:** a manual stop or start, its workspace closing, or Hive quitting (no resume). It's never kept across a restart.
+- **The test seam** (`HIVE_TEST_CLI_HOME_CONNECTION=1`, DEV_SEAMS; `lib.hiveEnv` sets it):
+  - **When it applies:** only an unpackaged build with a test profile and an explicit CLI test home, never the user's own (compared by real path, so a junction or 8.3 alias is the user's too).
+  - **What it does:** launches as before connections where the workspace has none on, with the CLI's own sign-in handling.
+  - **Where it's off:** the `connections` suite sets it to `0`.
 
 - **An account is a CLI login in a folder of its own**, `<accounts>\<id>\`. `<accounts>` is `%LOCALAPPDATA%\Hive\accounts` for the installed Hive, `Hive-Dev`'s for a dev build, and `<HIVE_USER_DATA>\accounts` for a test profile.
   - The id is random and stable (`a-3f9c2e1b`). The name is the user's ("Personal", "Hive overnight"), and a rename changes only the name.

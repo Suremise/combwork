@@ -75,6 +75,7 @@
   "providers.export.summary": "Zusammenfassung",
   "providers.export.thinking": "Denkprozess",
   "providers.export.you": "Du",
+  "providers.memory.connection": "{file} der Verbindung {name} (ihre Agenten, alle Projekte)",
   "providers.memory.user": "{file} für alle Projekte",
   "providers.readiness.notInstalled": "{provider} ist nicht installiert.",
   "providers.readiness.signedOut": "{provider} ist nicht angemeldet.",

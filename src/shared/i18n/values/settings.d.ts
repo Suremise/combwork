@@ -6,6 +6,7 @@ interface HiveMessageValues {
   'settings.accounts.addFailed': undefined
   'settings.accounts.addMessage': { cli: string | number }
   'settings.accounts.addTitle': { cli: string | number }
+  'settings.accounts.affected': { n: number }
   'settings.accounts.changeFailed': undefined
   'settings.accounts.changedTo': { now: string | number; was: string | number }
   'settings.accounts.checkedAt': { when: string | number }
@@ -48,6 +49,7 @@ interface HiveMessageValues {
   'settings.accounts.state.signedIn': undefined
   'settings.accounts.state.signedOut': undefined
   'settings.accounts.state.unchecked': undefined
+  'settings.accounts.switchAffected': undefined
   'settings.advanced.claude-code.accounts.emailField.desc': undefined
   'settings.advanced.claude-code.accounts.emailField.title': undefined
   'settings.advanced.claude-code.accounts.loggedInField.desc': undefined
@@ -486,6 +488,10 @@ interface HiveMessageValues {
   'settings.assistant.compactSuggestTokens.off': undefined
   'settings.assistant.compactSuggestTokens.tip': undefined
   'settings.assistant.compactSuggestTokens.title': undefined
+  'settings.assistant.connection.desc': undefined
+  'settings.assistant.connection.failed': undefined
+  'settings.assistant.connection.noWorkspace': undefined
+  'settings.assistant.connection.title': undefined
   'settings.assistant.control.desc': undefined
   'settings.assistant.control.option.agents': undefined
   'settings.assistant.control.option.look': undefined

@@ -437,6 +437,9 @@ export function laneEndHeldNow(projectPath: string, agent: string, run: string):
   return null
 }
 
+// A connection switch at an agent's safe point waits on the same (HI-1755): given to sessions as this loads.
+sessions.safePointHeld = laneEndHeldNow
+
 /** laneEndHeldNow once the project's deliveries are read (the only await, before every state is read). */
 export async function laneEndWaitsFor(projectPath: string, agent: string, run: string): Promise<string | null> {
   await deliveriesOf(projectPath, agent)

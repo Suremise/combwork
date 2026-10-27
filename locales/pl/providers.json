@@ -75,6 +75,7 @@
   "providers.export.summary": "Podsumowanie",
   "providers.export.thinking": "Myślenie",
   "providers.export.you": "Ty",
+  "providers.memory.connection": "{file} połączenia {name} (jego agenci, wszystkie projekty)",
   "providers.memory.user": "Twój {file} (globalny)",
   "providers.readiness.notInstalled": "{provider} nie jest zainstalowany.",
   "providers.readiness.signedOut": "{provider} nie jest zalogowany.",

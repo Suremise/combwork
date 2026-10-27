@@ -189,6 +189,7 @@ interface HiveMessageValues {
   'service.providers.notInstalled': { cli: string | number }
   'service.providers.pickNotFound': { task: string | number; item: string | number }
   'service.providers.retryUnavailable': undefined
+  'service.providers.signInConnections': { cli: string | number }
   'service.providers.stillLooking': { cli: string | number }
   'service.providers.stillLookingAll': undefined
   'service.providers.stopFirst': { cli: string | number }

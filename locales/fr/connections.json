@@ -1,0 +1,8 @@
+{
+  "connections.choice.default": "Par défaut de l’espace de travail ({name})",
+  "connections.choice.defaultNone": "Par défaut de l’espace de travail (aucune activée)",
+  "connections.choice.gone": "Une connexion retirée (l’agent ne peut pas démarrer)",
+  "connections.choice.label": "Connexion",
+  "connections.choice.none": "Aucune connexion {cli} n’est activée dans cet espace de travail. Ajoutes-en une dans Paramètres → Connexions.",
+  "connections.choice.off": "{name} (désactivée dans cet espace de travail : l’agent tourne sur la connexion par défaut)"
+}

@@ -1,0 +1,8 @@
+{
+  "connections.choice.default": "ワークスペースの既定（{name}）",
+  "connections.choice.defaultNone": "ワークスペースの既定（有効な接続なし）",
+  "connections.choice.gone": "削除された接続（エージェントは起動できません）",
+  "connections.choice.label": "接続",
+  "connections.choice.none": "このワークスペースで有効な{cli}の接続がありません。「設定」→「接続」で追加してください。",
+  "connections.choice.off": "{name}（このワークスペースでは無効：既定の接続で動きます）"
+}

@@ -19,6 +19,10 @@
     "defaultMessage": "Add a {cli} sign-in connection",
     "description": "Title of the dialog asking a new connection's name (Settings → Connections). {cli} is a coding agent CLI (\"Claude Code\")."
   },
+  "settings.accounts.affected": {
+    "defaultMessage": "{n, plural, one {# running agent runs on another connection than the one chosen for it now.} other {# running agents run on another connection than the one chosen for them now.}}",
+    "description": "Banner in Settings → Connections after a connection was turned off or the default changed (HI-1755): how many running agents are on a connection other than the one chosen now."
+  },
   "settings.accounts.changeFailed": {
     "defaultMessage": "Couldn't change the connection",
     "description": "An error's title: renaming a connection, turning it on or off, or making it the default failed."
@@ -186,6 +190,10 @@
   "settings.accounts.state.unchecked": {
     "defaultMessage": "Not checked yet",
     "description": "A connection's state (Settings → Connections): Hive hasn't asked the CLI yet."
+  },
+  "settings.accounts.switchAffected": {
+    "defaultMessage": "Switch Them When Their Turn Is Over",
+    "description": "Button on that banner: each of those agents ends once its turn is over and carries on, on the connection chosen now."
   },
   "settings.advanced.claude-code.accounts.emailField.desc": {
     "defaultMessage": "The field of `claude auth status --json` with the email a connection's folder is signed in as. Wrong, Hive can't tell who a connection is signed in as, and can't warn when its login changes.",
@@ -912,7 +920,7 @@
     "description": "Why an advanced setting's new value isn't taken. {title} is the setting's title."
   },
   "settings.advanced.hive.accounts.preview.desc": {
-    "defaultMessage": "Shows Settings → Connections, where you keep the ways your agents reach their models: for now, Claude Code sign-ins, each a folder of its own signed in through Claude Code's own sign-in. A preview: agents don't run on these connections yet, and still use your usual Claude Code login.",
+    "defaultMessage": "Turns on Connections: Settings → Connections, where you keep Claude Code sign-ins, each a folder of its own signed in through Claude Code's own sign-in, and a connection for each agent and the Assistant to run on. A preview: off, agents run on your usual Claude Code login, as before.",
     "description": "What the advanced setting \"Connections (preview)\" does (Settings → Advanced, under Hive). Settings → Connections names a section: use its name as Hive shows it."
   },
   "settings.advanced.hive.accounts.preview.title": {
@@ -1938,6 +1946,22 @@
   "settings.assistant.compactSuggestTokens.title": {
     "defaultMessage": "Highlight Compact over",
     "description": "A setting's title (Settings → Assistant)."
+  },
+  "settings.assistant.connection.desc": {
+    "defaultMessage": "Which connection the Assistant of the open workspace runs on. The workspace's default unless you choose one.",
+    "description": "What the setting \"Connection (this workspace)\" does, under its title (Settings → Assistant)."
+  },
+  "settings.assistant.connection.failed": {
+    "defaultMessage": "Couldn't change the Assistant's connection",
+    "description": "An error's title: saving the Assistant's connection (Settings → Assistant) failed."
+  },
+  "settings.assistant.connection.noWorkspace": {
+    "defaultMessage": "Open a workspace to choose its Assistant's connection.",
+    "description": "Settings → Assistant → Connection with no workspace open."
+  },
+  "settings.assistant.connection.title": {
+    "defaultMessage": "Connection (this workspace)",
+    "description": "A setting's title (Settings → Assistant): which connection the open workspace's Assistant runs on."
   },
   "settings.assistant.control.desc": {
     "defaultMessage": "What the Assistant may do beyond looking and advising, in every workspace.",
@@ -3876,7 +3900,7 @@
     "description": "Placeholder of Settings' search box."
   },
   "settings.section.accounts.desc": {
-    "defaultMessage": "How your agents reach their models: for now, Claude Code sign-ins Hive keeps, one folder each, signed in through Claude Code's own sign-in. Every connection shares your conversations and Claude Code's memory. A preview: agents still run on your usual login.",
+    "defaultMessage": "How your agents reach their models: for now, Claude Code sign-ins Hive keeps, one folder each, signed in through Claude Code's own sign-in. Every connection shares your conversations and Claude Code's memory. Each agent and the Assistant runs on its own connection, or the workspace's default.",
     "description": "Under the heading of the section \"Connections\" of Settings: what it holds."
   },
   "settings.section.accounts.label": {

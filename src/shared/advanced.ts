@@ -206,6 +206,12 @@ export const LANES_GENTLE_END = 'hive.lanes.gentleEnd'
 /** The longest a lane's end waits for its builder's turn to end, in minutes (HI-1706): read by main's slotsApp. */
 export const LANES_END_WAIT_MINUTES = 'hive.lanes.endWaitMinutes'
 
+/**
+ * Whether connections are on (HI-980, HI-1755, staged): Settings → Connections, the pickers and launching on a
+ * connection; off, everything launches as before. Removed by the cleanup slice, S8 (Darren, 26 Oct ~23:20).
+ */
+export const ACCOUNTS_PREVIEW = 'hive.accounts.preview'
+
 /** Whether reviewers review in review copies (#1435, SPEC §16.10.5): read by main's copiesApp. */
 export const COPIES_REVIEW = 'hive.copies.review'
 
@@ -761,6 +767,19 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 120,
     unit: 'min',
+    applies: 'now'
+  },
+  {
+    id: ACCOUNTS_PREVIEW,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.accounts.preview.title', defaultMessage: 'Connections (preview)', description: "An advanced setting's title (Settings → Advanced), listed under Hive: a switch that shows Settings → Connections before the feature is finished." }),
+    desc: msg({
+      id: 'settings.advanced.hive.accounts.preview.desc',
+      defaultMessage: "Turns on Connections: Settings → Connections, where you keep Claude Code sign-ins, each a folder of its own signed in through Claude Code's own sign-in, and a connection for each agent and the Assistant to run on. A preview: off, agents run on your usual Claude Code login, as before.",
+      description: 'What the advanced setting "Connections (preview)" does (Settings → Advanced, under Hive). Settings → Connections names a section: use its name as Hive shows it.'
+    }),
+    kind: 'boolean',
+    default: false,
     applies: 'now'
   },
   // Review and check copies (#1435, SPEC §16.10.5, §16.13): reviewers read and run commands in a copy at the exact revision.
