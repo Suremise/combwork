@@ -114,6 +114,8 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'proj
     await lib.until(async () => !(await live('a-one')) && !(await live('a-two')), HUNG_MS)
     await page.locator('.project-row', { hasText: 'alpha' }).first().click()
     await lib.openProjectSettings(page)
+    // The list of agents is Project Settings → Agents' (HI-1765: it opens on General).
+    await page.locator('.tab-body .settings-nav .row').filter({ has: page.locator('.label', { hasText: /^Agents$/ }) }).click()
     const agentRow = page.locator(`.agent-list-row[data-agent="${three.id}"]`)
     check("the Agents list: Three runs its connection's defaults", !!(await lib.until(async () => /Its connection's defaults \(Sonnet/.test(await agentRow.innerText().catch(() => '')), HUNG_MS)), await agentRow.innerText().catch(() => ''))
     await agentRow.getByRole('button', { name: 'Agent Settings' }).click()
