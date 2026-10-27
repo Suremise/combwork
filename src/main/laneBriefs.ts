@@ -5,7 +5,8 @@
 // records the rev whose delivery has been made (`out`), so one owed (a crash between the lane's save and its delivery)
 // is made by the next look. A replaced or cleared brief's delivery not received yet is cancelled, and refreshed just
 // before it is offered, so it can never arrive as the current one; and it is never offered into the builder's conversation
-// running as it was given (`notIn`, the one a new lane's start replaces). Agent-facing: English.
+// running as its lane began (`notIn`, the one a new lane's start replaces; an edit keeps it and takes no other).
+// Agent-facing: English.
 
 import { join } from 'path'
 import type { LaneRecord } from '../shared/lanes'

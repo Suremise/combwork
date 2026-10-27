@@ -77,16 +77,18 @@ export const LANE_BRIEF_MAX = 4000
 /**
  * A lane's brief after a start that gives `brief` (HI-1795): undefined keeps it as it is (a list change, a reviewer's
  * join); '' (or only spaces) clears it; a text replaces it. A change of text, or a clear, takes the next rev (never one
- * used before, a clear's included); the same text changes nothing, so nothing is given again. `notIn`: the builder's
- * conversation running as it was given (outside slots, never offered into it: its next conversation gets it).
+ * used before, a clear's included); the same text changes nothing, so nothing is given again. `notIn` (a new lane's
+ * only): the builder's conversation running as its lane began, which outside slots its brief is never offered into (the
+ * next one gets it); an edit keeps the one its lane began with and never takes another, so an edited brief reaches the
+ * lane's working conversation.
  */
 export function nextBrief(was: LaneRecord['brief'], brief: string | undefined, notIn?: string | null): LaneRecord['brief'] {
   if (brief === undefined) return was
   const text = brief.trim() ? brief.trim().slice(0, LANE_BRIEF_MAX) : null
-  const from = notIn ? { notIn } : {}
-  if (!was) return text === null ? undefined : { text, rev: 1, out: null, ...from }
+  if (!was) return text === null ? undefined : { text, rev: 1, out: null, ...(notIn ? { notIn } : {}) }
   if (was.text === text) return was
-  return { text, rev: was.rev + 1, out: was.out, ...from }
+  // An edit keeps the exclusion its lane began with (HR4's HI-1795 round 2): never one of the lane's working conversation.
+  return { text, rev: was.rev + 1, out: was.out, ...(was.notIn ? { notIn: was.notIn } : {}) }
 }
 /** A lane's name, at most. */
 export const LANE_NAME_MAX = 80

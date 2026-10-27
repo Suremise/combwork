@@ -174,9 +174,35 @@ describe("a lane's brief kept with the lane, and delivered outside slots (HI-179
     } finally {
       running.mockRestore()
     }
-    // A brief given with no conversation running holds nowhere.
-    await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a], by: 'the Assistant', brief: 'Changed.', briefNotIn: null })
-    expect((await lanes.rawLanes(w)).find((x) => x.id === l.id)?.brief).not.toHaveProperty('notIn')
+  })
+
+  it("a lane's edits (HR4's round 2): before its first new conversation they keep its exclusion; after, they reach its working conversation", async () => {
+    const a = await make('Edited a')
+    // As the API does, each start passes the builder's conversation running then.
+    const edit = (brief: string, running: string) => lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a], by: 'the Assistant', brief, briefNotIn: running })
+    const l = (await edit('First.', 'conv-old')).lane
+    const offered = async (rev: number, running: string): Promise<boolean> => {
+      await settleLaneBriefs(w)
+      const d = (await deliveriesOf(project, 'b1')).find((x) => x.source === LANE_BRIEF_SOURCE && x.ref === `${l.id}:${rev}`)!
+      const live = vi.spyOn(sessions, 'liveFor').mockReturnValue({ sessionId: running } as never)
+      try {
+        return laneBriefHoldsForTests(d, project, 'offer' as never)
+      } finally {
+        live.mockRestore()
+      }
+    }
+    // The new lane: never into the conversation it began beside.
+    expect(await offered(1, 'conv-old')).toBe(false)
+    // Edited before the builder's first new conversation: still not into that one, and the lane keeps that exclusion.
+    await edit('Edited before.', 'conv-old')
+    expect(await briefOf(l.id)).toMatchObject({ rev: 2, notIn: 'conv-old' })
+    expect(await offered(2, 'conv-old')).toBe(false)
+    expect(await offered(2, 'conv-lane')).toBe(true)
+    // The builder works in its lane conversation (it got the brief there); edited again from there: that conversation
+    // gets it, with no restart (it is never excluded, whatever conversation the edit was given beside).
+    await edit('Edited after.', 'conv-lane')
+    expect(await briefOf(l.id)).toMatchObject({ rev: 3, notIn: 'conv-old' })
+    expect(await offered(3, 'conv-lane')).toBe(true)
   })
 
   it("one owed (saved, its delivery not yet made or not yet recorded) is made by the next look, once", async () => {
