@@ -80,6 +80,9 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'advanced.reset': () => <ResetAll />
 }
 
+/** A CLI's rows that are each connection's with Connections on (HI-1770). */
+const MOVED_KEYS = new Set(['defaultModel', 'defaultEffort', 'use200kContext'])
+
 /** A provider page's custom controls, by key. */
 function providerControl(provider: ProviderId, key: string): (() => React.ReactNode) | undefined {
   switch (key) {
@@ -87,6 +90,8 @@ function providerControl(provider: ProviderId, key: string): (() => React.ReactN
       return () => <ProviderToggle provider={provider} />
     case 'status':
       return () => <ProviderStatus provider={provider} />
+    case 'movedToConnections':
+      return () => null
     case 'defaultModel':
       return () => <GlobalModelPicker provider={provider} />
     case 'defaultEffort':
@@ -1034,7 +1039,9 @@ export function SettingsView() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
     return SETTINGS.filter((d) => {
-      if ((d.section === 'accounts' || d.id === 'assistant.connection') && !accountsShown) return false
+      if ((d.section === 'accounts' || d.id === 'assistant.connection' || d.key === 'movedToConnections') && !accountsShown) return false
+      // With Connections on, a CLI with them has its model, effort and context on each connection (HI-1770).
+      if (accountsShown && d.provider && d.section === `provider:${d.provider}` && MOVED_KEYS.has(d.key) && providerDescriptor(d.provider).capabilities.connections) return false
       if (d.id === 'advanced.values' && (q || modifiedOnly)) return advancedMatches(q, modifiedOnly, advanced)
       // Its English matches as well as what it shows: Settings can be searched in either.
       if (q && !`${d.title} ${d.desc} ${d.tip} ${d.key}${shownLanguage !== SOURCE_LANGUAGE ? ` ${Object.values(rowText(d)).join(' ')}` : ''}`.toLowerCase().includes(q)) return false

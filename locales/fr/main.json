@@ -42,6 +42,7 @@
   "main.connections.launch.offNoDefault": "La connexion de {agent}, {name}, est désactivée dans cet espace de travail, et aucune autre connexion {cli} n’est activée. Actives-en une dans Paramètres → Connexions.",
   "main.connections.launch.otherProvider": "La connexion choisie pour {agent} est celle d’une autre CLI. Choisis une connexion {cli} dans les Paramètres de l’agent.",
   "main.connections.launch.signedOut": "{name} est déconnectée. Reconnecte-toi dans Paramètres → Connexions, puis démarre {agent}.",
+  "main.connections.moveFailed": "Hive n’a pas pu déplacer les paramètres de modèle de {project} vers ses agents",
   "main.console.noWorkspace": "Ouvre d’abord un espace de travail : la console de développement montre les agents d’un espace de travail et ce que Hive y fait.",
   "main.console.title": "Console de développement — {workspace}",
   "main.corrupt.damaged": "Le fichier {file} était endommagé",

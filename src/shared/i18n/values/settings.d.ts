@@ -12,6 +12,12 @@ interface HiveMessageValues {
   'settings.accounts.checkedAt': { when: string | number }
   'settings.accounts.closeTerminal': undefined
   'settings.accounts.default': undefined
+  'settings.accounts.defaults': undefined
+  'settings.accounts.defaults.context': undefined
+  'settings.accounts.defaults.copied': { cli: string | number }
+  'settings.accounts.defaults.effort': undefined
+  'settings.accounts.defaults.failed': undefined
+  'settings.accounts.defaults.model': undefined
   'settings.accounts.isDefault': undefined
   'settings.accounts.keep': undefined
   'settings.accounts.keepFailed': undefined
@@ -26,6 +32,13 @@ interface HiveMessageValues {
   'settings.accounts.needName': undefined
   'settings.accounts.noWorkspace': undefined
   'settings.accounts.none': undefined
+  'settings.accounts.notice.context': { value: string | number }
+  'settings.accounts.notice.dismiss': undefined
+  'settings.accounts.notice.effort': { value: string | number }
+  'settings.accounts.notice.hint': undefined
+  'settings.accounts.notice.line': { project: string | number; agent: string | number; setting: string | number }
+  'settings.accounts.notice.model': { value: string | number }
+  'settings.accounts.notice.title': undefined
   'settings.accounts.onHere': undefined
   'settings.accounts.plan': { email: string | number; plan: string | number }
   'settings.accounts.remove': undefined
@@ -939,6 +952,8 @@ interface HiveMessageValues {
   'settings.provider.modelFallback.desc': { provider: string | number }
   'settings.provider.modelFallback.tip': undefined
   'settings.provider.modelFallback.title': undefined
+  'settings.provider.movedToConnections.desc': undefined
+  'settings.provider.movedToConnections.title': undefined
   'settings.provider.notInstalled': undefined
   'settings.provider.notInstalledShort': undefined
   'settings.provider.off': { provider: string | number }

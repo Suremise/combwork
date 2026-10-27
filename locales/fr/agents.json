@@ -246,6 +246,7 @@
   "agents.name.empty": "Saisis un nom.",
   "agents.name.taken": "Il y a déjà un agent nommé « {agent} » dans le projet {project}. Les noms d’agents sont uniques dans tout l’espace de travail : essaie « {suggestion} ».",
   "agents.name.tooLong": "Un nom fait au plus {max} caractères.",
+  "agents.overrides.connectionDefault": "Par défaut de la connexion",
   "agents.overrides.context": "Utiliser un contexte de 200K (au lieu de 1M)",
   "agents.overrides.effort": "Effort",
   "agents.overrides.inherited": "{whose} ({value})",

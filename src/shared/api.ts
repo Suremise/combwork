@@ -4,6 +4,7 @@ import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
 import type { ConnectionsView } from './accounts'
+import type { MovedNotice } from './connectionDefaults'
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
   ArchiveBatch,
@@ -929,6 +930,12 @@ export interface HiveRequests {
   'connections:setDefault': (id: string) => void
   /** The Assistant's own connection for a CLI in this window's workspace (HI-1755); null: the workspace's default. */
   'connections:setAssistant': (provider: ProviderId, id: string | null) => void
+  /** A connection's defaults for the agents on it (HI-1770): model, effort and context; '' or null leaves one to the CLI. */
+  'connections:setDefaults': (id: string, patch: { model?: string | null; effort?: string | null; use200kContext?: boolean | null }) => void
+  /** Values moved from this window's workspace's projects onto their agents that their connection can't use (HI-1770), not dismissed. */
+  'connections:notice': () => MovedNotice[]
+  /** Dismisses those of the notice's entries (by key) that it lists now. */
+  'connections:dismissNotice': (keys: string[]) => void
   /** Switches this window's workspace's running agents whose connection isn't the one chosen now, each at its next safe point. */
   'connections:switchAffected': () => { projectPath: string; agentId: string; result: 'queued' | 'waiting' | 'notRunning' }[]
   /** Switches one agent to the connection chosen for it now, at its next safe point (HI-1755). */

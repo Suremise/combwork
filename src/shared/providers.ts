@@ -1,4 +1,4 @@
-import type { AgentDef, AppSettings, AutoCompactSetting, EffortLevel, PermissionMode, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings } from './types'
+import type { AgentDef, AppSettings, AutoCompactSetting, Connection, EffortLevel, PermissionMode, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings } from './types'
 import type { AttachmentKind } from './attachments'
 import { msg, type Msg } from './i18n/msg'
 import type { Tr } from './tasks'
@@ -621,8 +621,16 @@ export function extraArgsProblem(input: string | string[], tr?: Tr): string | nu
   return 'Hive passes the task after "--"; remove it from extra arguments. For an option whose value is "--", write --option=--.' // i18n-ignore: English without tr (main's errors: their area converts them)
 }
 
-/** What an agent launches with: its own overrides, else the project's (for its provider), else the global defaults. */
-export function agentLaunchSettings(agent: Pick<AgentDef, 'provider' | 'model' | 'effort' | 'permissionMode' | 'use200kContext'> | null | undefined, cfg: Pick<ProjectConfig, 'providers' | 'defaultProvider'>, settings: Pick<AppSettings, 'providers' | 'defaultProvider'>): AgentLaunchSettings {
+/**
+ * Where model, effort and context come from after an agent's own (HI-1770): `legacy`, the project's for its CLI, then
+ * the per-CLI defaults (as before connections, and with them off); `connection`, the connection it runs on (Connections
+ * on, a CLI with them): its defaults, never the project's or the CLI's; `conn` null when none can be used (then the
+ * agent's own alone). Permission mode and extra arguments are the CLI's and the project's either way.
+ */
+export type LaunchLayer = { kind: 'legacy' } | { kind: 'connection'; conn: Pick<Connection, 'defaults'> | null }
+
+/** What an agent launches with: its own overrides, else the project's (for its provider), else the global defaults; with a connection (`layer`), else the connection's defaults. */
+export function agentLaunchSettings(agent: Pick<AgentDef, 'provider' | 'model' | 'effort' | 'permissionMode' | 'use200kContext'> | null | undefined, cfg: Pick<ProjectConfig, 'providers' | 'defaultProvider'>, settings: Pick<AppSettings, 'providers' | 'defaultProvider'>, layer: LaunchLayer = { kind: 'legacy' }): AgentLaunchSettings {
   const provider = agentProvider(agent, cfg, settings)
   const g = providerSettings(settings, provider)
   const pc = projectProviderConfig(cfg, provider)
@@ -630,10 +638,17 @@ export function agentLaunchSettings(agent: Pick<AgentDef, 'provider' | 'model' |
   const projectMode = pc.permissionMode === 'inherit' ? fallbackMode : pc.permissionMode
   let permissionMode = agent?.permissionMode ?? projectMode
   if (!modeAllowed(provider, permissionMode, settings)) permissionMode = modeAllowed(provider, projectMode, settings) ? projectMode : fallbackMode
+  const extraArgs = [g.extraArgs, pc.extraArgs].filter((a) => a && a.trim())
+  const contextLimit = providerDescriptor(provider).capabilities.contextLimit
+  if (layer.kind === 'connection') {
+    // An agent's own, else its connection's default, else the CLI decides (its own default model and effort; context off).
+    const d = layer.conn?.defaults
+    return { provider, model: agent?.model || d?.model || null, effort: agent?.effort || d?.effort || null, permissionMode, extraArgs, use200kContext: contextLimit && (agent?.use200kContext ?? d?.use200kContext ?? false) }
+  }
   const model = agent?.model || (pc.model && pc.model !== 'inherit' ? pc.model : g.defaultModel || null)
   const effort = agent?.effort || (pc.effort !== 'inherit' ? pc.effort : g.defaultEffort || null)
-  const use200kContext = providerDescriptor(provider).capabilities.contextLimit && (agent?.use200kContext ?? projectUse200k(pc, g))
-  return { provider, model, effort, permissionMode, extraArgs: [g.extraArgs, pc.extraArgs].filter((a) => a && a.trim()), use200kContext }
+  const use200kContext = contextLimit && (agent?.use200kContext ?? projectUse200k(pc, g))
+  return { provider, model, effort, permissionMode, extraArgs, use200kContext }
 }
 
 /** Whether a project's agents (without their own choice) use a 200K context: the project's choice, else the global one. */

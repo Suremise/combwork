@@ -246,6 +246,7 @@
   "agents.name.empty": "Wpisz nazwę.",
   "agents.name.taken": "W projekcie {project} jest już agent o nazwie „{agent}”. Nazwy agentów są unikalne w całym obszarze roboczym: spróbuj „{suggestion}”.",
   "agents.name.tooLong": "Nazwa może mieć najwyżej {max} zn.",
+  "agents.overrides.connectionDefault": "Domyślne z połączenia",
   "agents.overrides.context": "Użyj kontekstu 200K (zamiast 1M)",
   "agents.overrides.effort": "Wysiłek",
   "agents.overrides.inherited": "{whose} ({value})",

@@ -592,6 +592,8 @@ export interface AppConfig {
     sessionsTree?: Record<string, Record<string, boolean>>
     /** The .hive version control notice each project's Overview no longer shows (#345): the situation dismissed (`hiveVcsKey`), by project path in lower case. */
     hiveVcsNotice?: Record<string, string>
+    /** The connections notice's entries dismissed (HI-1770): `<project path in lower case>|<moved entry's id>`. */
+    connectionsNoticeDismissed?: string[]
     /** The active projects folded in the Assistant panel's Workspace list (#399), by `assistantFoldKey` (workspace and project path); unfolded ones aren't kept. */
     assistantFold?: Record<string, boolean>
     /** Each workspace's board as the user left it, by workspace path in lower case (#170): collapsed columns, folded cards. */
@@ -696,6 +698,32 @@ export interface Connection {
   observed?: ConnectionObserved
   /** A removal that stopped partway, in English: what is left, for Remove to try again. */
   leftover?: string
+  /**
+   * Its defaults for the agents on it (HI-1770): what an agent with no model, effort or context of its own runs with.
+   * Absent: not set yet (copied from the CLI's once, `defaultsFrom`); an empty object is the user's (the CLI decides).
+   */
+  defaults?: ConnectionDefaults
+  /** 'cli': `defaults` are still the CLI's per-CLI defaults as copied; cleared once they are edited. */
+  defaultsFrom?: 'cli'
+}
+
+/** A connection's defaults (HI-1770); each absent: the CLI decides (its own default model, effort; context off). */
+export interface ConnectionDefaults {
+  model?: string
+  effort?: EffortLevel
+  use200kContext?: boolean
+}
+
+/** The field moved from a project onto its agents by the connections migration (HI-1770). */
+export type MovedField = 'model' | 'effort' | 'use200kContext'
+
+/**
+ * A CLI's project overrides moved onto the project's agents (HI-1770, Darren's 26 Oct ~23:25 (2)): when, and each value
+ * an agent was given (`id`: `<cli>:<agentId>:<field>`, stable, for the notice and its dismissal).
+ */
+export interface ConnectionsMoved {
+  at: string
+  moved: { id: string; agent: string; field: MovedField; value: string | boolean }[]
 }
 
 /** A workspace's accounts for one provider (HI-980): those on in it, and its default among them (null: none). */
@@ -1250,6 +1278,11 @@ export interface ProjectConfig {
   transcriptWarnMB: number | null
   /** The project's agents, in the order they were added. All are equal; a new project has none. */
   agents: AgentDef[]
+  /**
+   * One-time changes made to the project, recorded with what they did: `connections1`, per CLI, its model, effort and
+   * context overrides moved onto its agents (HI-1770), written with them in one write.
+   */
+  migrations?: { connections1?: Partial<Record<ProviderId, ConnectionsMoved>> }
   /** The Session tab's layout (one for the project, #134); its pages hold as many agents as it has panes. */
   layout: PageLayout
   /**

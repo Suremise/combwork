@@ -827,6 +827,17 @@ The design across every surface is HI-1755's design note and addendum. The decis
   - **What it does:** launches as before connections where the workspace has none on, with the CLI's own sign-in handling.
   - **Where it's off:** the `connections` suite sets it to `0`.
 
+**Model, effort and context belong to the connection** (S3, HI-1770; Darren, 26 Oct ~23:10 and ~23:25 (2)):
+- **Each connection's defaults** (`Connection.defaults`: model, effort, context; Settings → Connections → Defaults for agents on it). A new connection gets the CLI's per-CLI defaults copied (`defaultsFrom: 'cli'`), as do connections from before, once, only where `defaults` is absent; edited, they are the user's. The pickers use the connection's own models (`connectionModels`, by its kind: a sign-in connection's are its CLI's catalogue).
+- **Resolution** (`agentLaunchSettings` with a `connection` layer, whenever Connections are on and the CLI has them): the agent's own, else its connection's default, else the CLI decides in the connection's home. Never the per-CLI defaults or the project's model, effort and context. With no connection usable, the agent's own alone. An explicit context off is kept. Permission mode and extra arguments stay the CLI's and the project's. The Assistant's own are its agent's, else Settings → Assistant's, then its connection's defaults.
+- **An effort the model that runs doesn't take** (the agent's or the connection's default model, else the connection home's configured default, else the catalogue's) is kept but not passed at launch.
+- **Screens:** the CLI page's default model, effort and context rows and Project Settings' model, effort and context rows are hidden (a note points to Settings → Connections). Agent Settings and Add Agent name **Connection default (…)**, and the Agents list says "Its connection's defaults (…)".
+- **The move** (once per project and CLI): each of the CLI's agents without its own model, effort or context gets the project's (an explicit value is never overwritten, and nothing is given where the project set nothing).
+  - It runs in one write under the project's lock, with its record `project.json migrations.connections1[cli] = { at, moved }`, so an interrupted run repeats and a second changes nothing; a CLI given connections later moves its own.
+  - **A launch awaits it** before reading the project, so none starts with the project's values unread and not yet its agents'. A failure refuses the launch, saying so, and the next start retries. It also runs at a workspace's open and when Connections are turned on.
+  - The project's own values stay in project.json, unread with Connections on, so turning them off behaves as before; S8 removes them. The Assistant's home is never moved.
+- **The notice** of moved values the agent's connection can't use is worked out from the moves' records when shown (`connections:notice`, the asking window's workspace only), so a stop between the move and anything else loses nothing. Dismissed entries are kept app-wide (`ui.connectionsNoticeDismissed`, by project and entry id), so they stay dismissed; a later CLI's entries are new.
+
 **The rows and templates name connections** (S2, HI-1769):
 - **One rule for every row** (`connectionOf`, `src/shared/connectionLabel.ts`), the launch's own (`resolveConnection`), so the window and a start never disagree:
   - its own choice on here: its name;

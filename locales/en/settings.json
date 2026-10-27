@@ -43,6 +43,30 @@
     "defaultMessage": "Default",
     "description": "The choice on a connection (Settings → Connections): the open workspace's default connection for its CLI."
   },
+  "settings.accounts.defaults": {
+    "defaultMessage": "Defaults for agents on it",
+    "description": "A button opening a connection's defaults (Settings → Connections; HI-1770): the model, effort and context an agent on it runs with when it has none of its own."
+  },
+  "settings.accounts.defaults.context": {
+    "defaultMessage": "Use 200K context (instead of 1M)",
+    "description": "Label of a connection's default context choice (Settings → Connections → Defaults for agents on it): hold sessions to a 200K-token window instead of the model's 1M one."
+  },
+  "settings.accounts.defaults.copied": {
+    "defaultMessage": "Copied from Settings → {cli} when it was added. Change them here.",
+    "description": "Under a connection's defaults (Settings → Connections; HI-1770) while they are still the CLI's as copied ({cli}: \"Claude Code\"). Settings → {cli} names a section."
+  },
+  "settings.accounts.defaults.effort": {
+    "defaultMessage": "Effort",
+    "description": "Label of a connection's default effort (reasoning) (Settings → Connections → Defaults for agents on it)."
+  },
+  "settings.accounts.defaults.failed": {
+    "defaultMessage": "Couldn't change the connection's defaults",
+    "description": "An error's title (Settings → Connections; HI-1770): saving a connection's default model, effort or context failed."
+  },
+  "settings.accounts.defaults.model": {
+    "defaultMessage": "Model",
+    "description": "Label of a connection's default model (Settings → Connections → Defaults for agents on it)."
+  },
   "settings.accounts.isDefault": {
     "defaultMessage": "This workspace's default",
     "description": "Shown on the connection that is the open workspace's default (Settings → Connections)."
@@ -98,6 +122,34 @@
   "settings.accounts.none": {
     "defaultMessage": "No connections yet. Add one, then sign it in.",
     "description": "Settings → Connections when there are no connections."
+  },
+  "settings.accounts.notice.context": {
+    "defaultMessage": "Use 200K context: {value} (its CLI has no such choice)",
+    "description": "A moved setting in the notice (Settings → Connections; HI-1770): a context choice the agent's CLI doesn't have, kept on the agent but not used. {value} is On or Off."
+  },
+  "settings.accounts.notice.dismiss": {
+    "defaultMessage": "Dismiss",
+    "description": "Button (Settings → Connections; HI-1770): hides the notice of moved settings for good."
+  },
+  "settings.accounts.notice.effort": {
+    "defaultMessage": "Effort {value} (its model doesn't take it)",
+    "description": "A moved setting in the notice (Settings → Connections; HI-1770): an effort level ({value}) the agent's model doesn't offer, kept on the agent but not used."
+  },
+  "settings.accounts.notice.hint": {
+    "defaultMessage": "They stay on the agents, unused. Change them in each agent's Agent Settings.",
+    "description": "Under the notice of moved settings a connection can't use (Settings → Connections; HI-1770). Agent Settings names a dialog."
+  },
+  "settings.accounts.notice.line": {
+    "defaultMessage": "{project} · {agent}: {setting}",
+    "description": "A line of the notice of moved settings a connection can't use (Settings → Connections; HI-1770): the project, the agent and the setting with its value (\"Effort: high\")."
+  },
+  "settings.accounts.notice.model": {
+    "defaultMessage": "Model {value}",
+    "description": "A moved setting in the notice (Settings → Connections; HI-1770): a model, kept on the agent."
+  },
+  "settings.accounts.notice.title": {
+    "defaultMessage": "Some settings moved onto agents can't be used by their connection",
+    "description": "A notice's title (Settings → Connections; HI-1770): a project's own model, effort or context settings were moved onto its agents (connections hold the defaults now), and some of them the agent's connection can't use: they are kept on the agent but not used."
   },
   "settings.accounts.onHere": {
     "defaultMessage": "On in this workspace",
@@ -3750,6 +3802,14 @@
   "settings.provider.modelFallback.title": {
     "defaultMessage": "Models (fallback)",
     "description": "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)."
+  },
+  "settings.provider.movedToConnections.desc": {
+    "defaultMessage": "Each connection has its own now: Settings → Connections. An agent's own choice still comes first.",
+    "description": "Under the title \"Model, effort and context\" (Settings → a provider page, with Connections on; HI-1770): each connection has its own defaults for them. Settings → Connections names a section."
+  },
+  "settings.provider.movedToConnections.title": {
+    "defaultMessage": "Model, effort and context",
+    "description": "A setting's title (Settings → a provider page, with Connections on; HI-1770): where the default model, effort and context went."
   },
   "settings.provider.notInstalled": {
     "defaultMessage": "CLI not installed",
