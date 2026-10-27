@@ -5,10 +5,10 @@
 // their own answer. The observer's read of a repository's refs (HI-1814) is the same through it as in this thread.
 import { execFileSync } from 'child_process'
 import { createRequire } from 'module'
-import { writeFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { build } from 'esbuild'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { git, readRefsOffMain, useGitWorker, type GitResult } from '../src/main/git'
 import { runGit } from '../src/main/gitWorker'
 import { readRepoRefs } from '../src/main/platform/repoRefs'
@@ -33,6 +33,58 @@ beforeAll(async () => {
   writeFileSync(join(repo, 'big.txt'), 'x'.repeat(1024 * 1024))
 }, 60_000)
 afterAll(() => useGitWorker(null))
+
+/**
+ * A git command that leaves a process of the test's own holding its output open after git exits, as a process main
+ * starts meanwhile can (an agent's terminal, HI-1854): an alias whose shell starts it in the background and says
+ * `started`. It writes its pid, and ends when the test asks (a stop file) or, should the test run die, after its own
+ * bound. Ended when the test finishes, passed, failed or timed out, and waited for until it has gone.
+ */
+function holding(): { args: string[]; running: () => boolean } {
+  const dir = tempDir('hive-git-holder-')
+  const fwd = (p: string): string => p.replace(/\\/g, '/')
+  const script = join(dir, 'holder.cjs')
+  writeFileSync(script, `const fs = require('fs'), path = require('path'), dir = process.argv[2]
+fs.writeFileSync(path.join(dir, 'pid'), String(process.pid))
+const bound = Date.now() + ${HUNG_MS * 4}
+setInterval(() => { if (fs.existsSync(path.join(dir, 'stop')) || Date.now() > bound) process.exit(0) }, 50)
+`)
+  const pid = (): number | null => (existsSync(join(dir, 'pid')) ? Number(readFileSync(join(dir, 'pid'), 'utf8')) : null)
+  const alive = (p: number): boolean => {
+    try {
+      process.kill(p, 0)
+      return true
+    } catch {
+      return false
+    }
+  }
+  const args = ['-c', `alias.hold=!"${fwd(process.execPath)}" "${fwd(script)}" "${fwd(dir)}" & echo started`, 'hold']
+  let asked = false
+  onTestFinished(async () => {
+    writeFileSync(join(dir, 'stop'), '')
+    // Once its command was given out, its holder starts (it writes its pid first) and is gone before the next test.
+    if (!asked) return
+    const p = await vi.waitFor(
+      () => {
+        const n = pid()
+        if (n === null) throw new Error('its holder has not started')
+        return n
+      },
+      { timeout: HUNG_MS }
+    )
+    await vi.waitFor(() => expect(alive(p)).toBe(false), { timeout: HUNG_MS })
+  })
+  return {
+    get args() {
+      asked = true
+      return args
+    },
+    running: () => {
+      const p = pid()
+      return p !== null && alive(p)
+    }
+  }
+}
 
 /** What a result says, its bytes included. */
 const said = (r: GitResult): unknown => ({ ...r, buf: r.buf.toString('base64') })
@@ -76,14 +128,17 @@ describe("git's worker (HI-1783)", () => {
   })
 
   it('answers a command that has exited though another process holds its output open (HI-1854)', async () => {
-    // An alias whose shell leaves a process behind that inherited git's output, as a process main starts meanwhile can
-    // (an agent's terminal): git exits, its pipes stay open while that one runs (it ends by itself, long after the test).
-    const hold = ['-c', 'alias.hold=!sleep 60 & echo started', 'hold']
-    const r = await runGit({ cwd: repo, args: hold, maxBuffer: 1024 * 1024, env: gitEnv() }, 100)
+    // Git exited, its output's pipes still open: held by the test's own process, which inherited them.
+    const first = holding()
+    const r = await runGit({ cwd: repo, args: first.args, maxBuffer: 1024 * 1024, env: gitEnv() }, 100)
     expect({ out: Buffer.from(r.stdout).toString().trim(), error: r.error, held: r.held }).toEqual({ out: 'started', error: null, held: true })
+    // Answered while the holder still runs: not by its ending.
+    await vi.waitFor(() => expect(first.running()).toBe(true), { timeout: HUNG_MS })
     // And through the worker, at its own quiet time.
     useGitWorker(bundle)
-    expect(await git(repo, hold, undefined, undefined, { env: gitEnv() })).toMatchObject({ ok: true, out: 'started\n' })
+    const second = holding()
+    expect(await git(repo, second.args, undefined, undefined, { env: gitEnv() })).toMatchObject({ ok: true, out: 'started\n' })
+    await vi.waitFor(() => expect(second.running()).toBe(true), { timeout: HUNG_MS })
   }, HUNG_MS)
 
   it("reads a repository's lines, folders, HEADs and reflogs as this thread does (HI-1814)", async () => {
