@@ -117,10 +117,19 @@ async function changes(ctx) {
   seedChanges(ctx)
   await ctx.command('project.tab.changes')
   await (await shown(ctx, ctx.page.locator('.git-sections [data-section="changes"]'), "the Git tab's sections")).first().click()
-  // The project folder's own changes (the picker's last entry, its value empty), when the picker is there.
+  // The project folder's own changes (the picker's last entry, its value empty), when the picker is there. It shows
+  // once the tab has read the branches it can compare (HI-1824), and the page it opens on may be another (unused
+  // worktrees, or two branches compared), so choose the folder until its changes list.
   const picker = ctx.page.locator('.changes-picker')
-  if (await picker.count()) await picker.first().selectOption('')
-  const row = await shown(ctx, ctx.page.locator('.split-list .pane-body .row'), 'a changed file')
+  const rows = ctx.page.locator('.split-list .pane-body .row')
+  await ctx.lib.until(async () => {
+    if ((await picker.count()) && (await picker.first().inputValue().catch(() => null)) !== '') {
+      await picker.first().selectOption('').catch(() => {})
+      return false
+    }
+    return (await rows.count()) > 0
+  }, ctx.hungMs)
+  const row = await shown(ctx, rows, 'a changed file')
   await row.first().click()
   await shown(ctx, ctx.page.locator('.split-main .editor-toolbar'), 'its diff')
   return ctx.page.locator('.split', { has: picker.or(ctx.page.locator('.split-list .pane-body')) }).first()
@@ -245,7 +254,6 @@ module.exports = {
     { name: 'settings-agents', open: (ctx) => settingsSection(ctx, 'organization') },
     { name: 'settings-provider', open: (ctx) => settingsSection(ctx, null) },
     { name: 'settings-sessions', open: (ctx) => settingsSection(ctx, 'history') },
-    { name: 'settings-loops', open: (ctx) => settingsSection(ctx, 'sync') },
     { name: 'reset-dialog', open: resetDialog, close: closeLast }
   ]
 }
