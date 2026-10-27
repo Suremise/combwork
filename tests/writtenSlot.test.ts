@@ -185,7 +185,11 @@ describe("B1's next start takes over the slot its own run still writes in (HI-17
     await u.setWriter(a.slot, l.id, 'b1', { pid: 1, started: 1 })
     running.delete('lane-old')
     await u.pool.release(l.id, 'laneEnded')
-    expect(await u.lane('lane-next')).toMatchObject({ waiting: expect.stringMatching(/changed while it was taken over/) })
+    // The window's dry start says what the real one does (HI-1787): both wait, neither advertises nor lends a slot.
+    const slotsBefore = u.pool.slots().length
+    expect(await u.start(await u.card('B1 next', 'b1'), 'b1', true)).toMatchObject({ wait: expect.stringMatching(/own slot .* is held by another Hive's run: this start waits for it/) })
+    expect(await u.lane('lane-next')).toMatchObject({ waiting: expect.stringMatching(/own slot .* is held by another Hive's run/) })
     expect(u.leases('b1')).toEqual([])
+    expect(u.pool.slots().length).toBe(slotsBefore)
   })
 })
