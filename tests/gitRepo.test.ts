@@ -671,7 +671,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     const to = Object.fromEntries(info.branches.map((b) => [b.name, b.toTarget]))
     expect(to).toEqual({ '1.0.0': 0, main: 0, 'hive/hb1': 0, 'hive/hb2': 0, 'hive/slot': 0, 'hive/card': 0, 'spike/x': 1 })
     expect(info.remoteRows?.find((r) => r.name === 'origin/spike/x')).toMatchObject({ remote: 'origin', branch: 'spike/x', toTarget: 1 })
-    const { busyLines, cleanupOffer, localGroup } = await import('../src/shared/branchCleanup')
+    const { busyLines, cleanupOffer, leftoverBranches, localGroup } = await import('../src/shared/branchCleanup')
     const busy = busyLines(new Map([['hive/card', [{ stage: 'review' as const }]]]))
     const groups = Object.fromEntries(info.branches.map((b) => [b.name, localGroup(b, info, busy)]))
     expect(groups).toEqual({ '1.0.0': 'inUse', main: 'inUse', 'hive/slot': 'inUse', 'hive/card': 'inUse', 'hive/hb1': 'merged', 'hive/hb2': 'merged', 'spike/x': 'unmerged' })
@@ -682,8 +682,34 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
       ['origin/hive/hb1', true],
       ['origin/hive/hb2', true]
     ])
+    // The Changes tab's leftover branches (HI-1823): the same free branches, merged and not, never one in use.
+    const left = leftoverBranches(info, busy)
+    expect([left.merged.map((b) => b.name), left.unmerged.map((b) => [b.name, b.toTarget])]).toEqual([['hive/hb1', 'hive/hb2'], [['spike/x', 1]]])
+    // With the card Done, its branch is a leftover too; with no target, none is.
+    expect(leftoverBranches(info, busyLines(new Map([['hive/card', [{ stage: 'done' as const }]]]))).merged.map((b) => b.name)).toEqual(['hive/card', 'hive/hb1', 'hive/hb2'])
+    expect(leftoverBranches({ ...info, target: null }, busy)).toEqual({ merged: [], unmerged: [] })
     // Without a target asked for (an action reading the branches), nothing is counted.
     expect((await repo.repoInfo(proj)).branches.every((b) => b.toTarget === undefined)).toBe(true)
+  })
+
+  it("the Changes tab's leftover read has every local branch, past the 200 Branches & remotes shows (HI-1823)", async () => {
+    setUp()
+    // 205 branches at one commit (git sorts a tie by name), then zz/leftover: past the first 200 by date.
+    const at = git(proj, 'rev-parse', '1.0.0')
+    const lines = Array.from({ length: 205 }, (_, i) => `create refs/heads/aa/${String(i).padStart(3, '0')} ${at}`).join('\n')
+    execFileSync('git', ['update-ref', '--stdin'], { cwd: proj, input: `${lines}\ncreate refs/heads/zz/leftover ${at}\n` })
+    const shown = await repo.repoInfo(proj, workTarget)
+    expect(shown.branches.some((b) => b.name === 'zz/leftover')).toBe(false)
+    const all = await repo.leftoverInfo(proj, workTarget)
+    expect(all.branches).toHaveLength(7 + 205 + 1)
+    expect(all.branches.find((b) => b.name === 'zz/leftover')).toMatchObject({ toTarget: 0, worktree: null })
+    expect(all.branches.find((b) => b.name === 'hive/slot')?.worktree).toBeTruthy()
+    // Counted: merged by git's word, spike/x's one commit; nothing unknown here.
+    expect([all.branches.find((b) => b.name === 'spike/x')?.toTarget, all.uncounted]).toEqual([1, 0])
+    const { busyLines, leftoverBranches } = await import('../src/shared/branchCleanup')
+    const left = leftoverBranches(all, busyLines(new Map([['hive/card', [{ stage: 'review' as const }]]])))
+    expect(left.merged.map((b) => b.name)).toContain('zz/leftover')
+    expect([left.merged.length, left.unmerged.map((b) => b.name)]).toEqual([2 + 205 + 1, ['spike/x']])
   })
 
   it('deletes only what it was shown, merged and unused, and says why each other one is kept', async () => {

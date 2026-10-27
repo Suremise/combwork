@@ -71,3 +71,15 @@ export function cleanupOffer(info: Pick<GitRepoInfo, 'branches' | 'remoteRows' |
   const remote = (info.remoteRows ?? []).filter((r) => r.toTarget === 0 && !remoteKept(r, info) && !used.has(r.branch)).map((r) => ({ name: r.name, sha: r.sha, remote: r.remote, branch: r.branch, withLocal: names.has(r.branch) }))
   return { local: local.sort(byName), remote: remote.sort(byName) }
 }
+
+/**
+ * The Changes tab's leftover branches (HI-1823): the local branches nothing uses (localUse: not the target, the default
+ * or the folder's branch, none checked out in a worktree or slot, no open card's), so a Done or archived card's, an
+ * agent's from before slots, one of no card: merged into the target, or not (with the commits it has that the target
+ * hasn't, when counted). Empty with no target to measure against. By name.
+ */
+export function leftoverBranches(info: Pick<GitRepoInfo, 'branches' | 'target' | 'defaultBranch'>, busy: ReadonlySet<string>): { merged: GitBranchRow[]; unmerged: GitBranchRow[] } {
+  if (!info.target) return { merged: [], unmerged: [] }
+  const free = info.branches.filter((b) => b.sha && !localUse(b, info, busy)).sort((a, b) => a.name.localeCompare(b.name, 'en'))
+  return { merged: free.filter((b) => b.toTarget === 0), unmerged: free.filter((b) => b.toTarget !== 0) }
+}

@@ -322,38 +322,6 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
     if (ok) act(`track:${branch}`, tr(M.untrackFailed, { branch, upstream }), () => call('git:setUpstream', project.path, branch, null))
   }
 
-  /** Deletes one branch nothing uses (#1642), after a confirm: a merged one loses nothing; an unmerged one lists the commits it drops. */
-  const deleteOne = async (b: GitBranchRow, target: string): Promise<void> => {
-    if (!b.sha) return
-    const one = { name: b.name, sha: b.sha }
-    const remove = async (unmerged: boolean): Promise<void> => {
-      try {
-        notify('success', await call('git:deleteBranches', project.path, [one], unmerged))
-      } finally {
-        bumpGit(project.path)
-      }
-    }
-    if (b.toTarget === 0) {
-      await confirm({ title: tr(C.deleteMergedTitle, { branch: b.name }), message: tr(C.deleteMergedMessage, { target }), confirmLabel: tr(C.deleteButton), busyLabel: tr(C.deleting), danger: true, run: () => remove(false) })
-      return
-    }
-    const drops = await attempt(tr(C.dropsFailed, { branch: b.name }), () => call('git:branchDrops', project.path, b.name))
-    if (!drops) return
-    const lines = drops.commits.map((c) => `${c.short} ${c.subject}`)
-    if (drops.total > drops.commits.length) lines.push(tr(C.deleteMore, { n: drops.total - drops.commits.length }))
-    await confirm({
-      title: tr(C.deleteUnmergedTitle, { branch: b.name, n: drops.total }),
-      message: tr(C.deleteUnmergedMessage, { branch: b.name, n: drops.total, target: drops.target }),
-      list: lines,
-      listOnly: true,
-      listMono: true,
-      confirmLabel: tr(C.deleteButton),
-      busyLabel: tr(C.deleting),
-      danger: true,
-      run: () => remove(true)
-    })
-  }
-
   /**
    * Clean Up Merged Branches (#1642): the offer ticked as the user leaves it, local branches first, then each remote's
    * (outward-facing, none ticked to start with), each deleted at the commit shown.
@@ -595,7 +563,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                     )}
                     {updatable(b) && <IconButton icon="repo-pull" title={tr(U.tip, { branch: b.name, target: target! })} action="update-branch" disabled={!!ro} onClick={() => void updateFrom(b)} />}
                     {!b.current && <IconButton icon="git-merge" title={tr(M.mergeBranch, { branch: b.name })} action="merge-branch" disabled={!!ro} onClick={() => set({ branchMergeFor: { project: project.path, branch: b.name } })} />}
-                    {free && <IconButton icon="trash" title={tr(C.deleteTip, { branch: b.name })} action="delete-branch" disabled={off} onClick={() => void deleteOne(b, target!)} />}
+                    {free && <IconButton icon="trash" title={tr(C.deleteTip, { branch: b.name })} action="delete-branch" disabled={off} onClick={() => void deleteBranch(project, b, target!)} />}
                     {!b.current && (
                       <Tooltip content={why ?? tr(M.switchTip, { branch: b.name })}>
                         <span>
@@ -1006,7 +974,7 @@ const CARDS = {
  * review (with a copy button) or, Done, that it was merged and as what; and how many earlier cards worked on the same
  * branch. A worktree's: its agent's card, the same way.
  */
-function BranchCards({ cards, project, names }: { cards: BranchCard[]; project: ProjectInfo; names: Partial<Record<BranchCard['stage'], string>> | undefined }) {
+export function BranchCards({ cards, project, names }: { cards: BranchCard[]; project: ProjectInfo; names: Partial<Record<BranchCard['stage'], string>> | undefined }) {
   const tasks = useStore((st) => st.tasks)
   const [copied, setCopied] = useState(false)
   useEffect(() => {
@@ -1057,4 +1025,40 @@ function BranchCards({ cards, project, names }: { cards: BranchCard[]; project: 
       )}
     </span>
   )
+}
+
+/**
+ * Deletes one branch nothing uses (#1642), after a confirm: a merged one loses nothing; an unmerged one lists the commits
+ * it drops (git's -D). Branches & remotes and the Changes tab's leftover branches (HI-1823) ask the same way; main checks
+ * each deletion again (the branch's use now, at the commit shown).
+ */
+export async function deleteBranch(project: Pick<ProjectInfo, 'path'>, b: Pick<GitBranchRow, 'name' | 'sha' | 'toTarget'>, target: string): Promise<void> {
+  if (!b.sha) return
+  const one = { name: b.name, sha: b.sha }
+  const remove = async (unmerged: boolean): Promise<void> => {
+    try {
+      notify('success', await call('git:deleteBranches', project.path, [one], unmerged))
+    } finally {
+      bumpGit(project.path)
+    }
+  }
+  if (b.toTarget === 0) {
+    await confirm({ title: tr(C.deleteMergedTitle, { branch: b.name }), message: tr(C.deleteMergedMessage, { target }), confirmLabel: tr(C.deleteButton), busyLabel: tr(C.deleting), danger: true, run: () => remove(false) })
+    return
+  }
+  const drops = await attempt(tr(C.dropsFailed, { branch: b.name }), () => call('git:branchDrops', project.path, b.name))
+  if (!drops) return
+  const lines = drops.commits.map((c) => `${c.short} ${c.subject}`)
+  if (drops.total > drops.commits.length) lines.push(tr(C.deleteMore, { n: drops.total - drops.commits.length }))
+  await confirm({
+    title: tr(C.deleteUnmergedTitle, { branch: b.name, n: drops.total }),
+    message: tr(C.deleteUnmergedMessage, { branch: b.name, n: drops.total, target: drops.target }),
+    list: lines,
+    listOnly: true,
+    listMono: true,
+    confirmLabel: tr(C.deleteButton),
+    busyLabel: tr(C.deleting),
+    danger: true,
+    run: () => remove(true)
+  })
 }

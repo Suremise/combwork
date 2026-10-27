@@ -228,6 +228,8 @@ interface HiveMessageValues {
   'tips.lanesLegend.title': undefined
   'tips.language.text': undefined
   'tips.language.title': undefined
+  'tips.leftoverBranches.text': undefined
+  'tips.leftoverBranches.title': undefined
   'tips.leftoverProcesses.text': undefined
   'tips.leftoverProcesses.title': undefined
   'tips.licenceAudit.text': undefined

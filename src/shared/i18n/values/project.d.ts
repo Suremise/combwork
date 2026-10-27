@@ -217,6 +217,19 @@ interface HiveMessageValues {
   'project.key.prefix': { key: string | number; other: string | number }
   'project.key.taken': { key: string | number }
   'project.key.willAlias': { key: string | number; old: string | number }
+  'project.leftovers.about': { target: string | number }
+  'project.leftovers.ahead': { n: number; target: string | number }
+  'project.leftovers.compare': undefined
+  'project.leftovers.compareTip': { branch: string | number; target: string | number }
+  'project.leftovers.delete': undefined
+  'project.leftovers.entry': { n: number }
+  'project.leftovers.heading': undefined
+  'project.leftovers.load': undefined
+  'project.leftovers.loading': undefined
+  'project.leftovers.merged': { target: string | number }
+  'project.leftovers.none': undefined
+  'project.leftovers.notCounted': { target: string | number }
+  'project.leftovers.unmerged': { target: string | number }
   'project.limit.heading': { plan: string; when: string | number }
   'project.limit.noConnections': { provider: string | number }
   'project.limit.none': { provider: string | number }

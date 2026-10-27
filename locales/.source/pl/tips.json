@@ -226,6 +226,8 @@
   "tips.lanesLegend.title": "What a lane’s colours mean",
   "tips.language.text": "Hive follows Windows' display language when it has it. Settings → General → Language picks another; languages translated by AI are marked, and improvements are welcome. Agents are still spoken to in English.",
   "tips.language.title": "Hive in your language",
+  "tips.leftoverBranches.text": "Version Control → Changes lists leftover branches: a superseded or archived card’s, an agent’s from before slots. Compare one with your target first, then Delete… it; one with commits of its own lists them before it goes.",
+  "tips.leftoverBranches.title": "Clean up branches nothing uses",
   "tips.leftoverProcesses.text": "A preview server or a tail -f an agent started can keep running after it stops, holding the project's folder or a port. Hive lists them in the ⋯ menu on the agent's pane and offers to end them; Settings → Agents can end them every time.",
   "tips.leftoverProcesses.title": "End what a stopped agent left running",
   "tips.licenceAudit.text": "Before a release, ask an agent to audit the licences of what your project ships. It reads them from the files, vendored material and installer parts included, and flags anything unclear for you.",

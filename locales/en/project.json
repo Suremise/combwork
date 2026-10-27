@@ -863,6 +863,58 @@
     "defaultMessage": "Its cards will be named {key}-12; {old}-12 will still find them.",
     "description": "Under the project key box while a new key is typed (Project Settings). {key} is the key typed, {old} the key it has: AM-12 style card names."
   },
+  "project.leftovers.about": {
+    "defaultMessage": "Branches nothing uses now: not {target} or the default branch, not checked out in a worktree or slot, and no open card’s. A Done or archived card’s branch, an agent’s from before slots, or one of no card. Delete removes only the branch, and Hive checks again first that nothing uses it.",
+    "description": "The sentence at the top of the Changes tab's leftover branches. {target} is the branch the project's work merges into."
+  },
+  "project.leftovers.ahead": {
+    "defaultMessage": "{n, plural, one {# commit not in {target}} other {# commits not in {target}}}",
+    "description": "On a leftover branch in the Changes tab: how many of its commits {target} hasn't."
+  },
+  "project.leftovers.compare": {
+    "defaultMessage": "Compare",
+    "description": "A button on a leftover branch in the Changes tab: compares it with the target before deciding."
+  },
+  "project.leftovers.compareTip": {
+    "defaultMessage": "Compare {branch} with {target}",
+    "description": "Tooltip of a leftover branch's Compare button in the Changes tab."
+  },
+  "project.leftovers.delete": {
+    "defaultMessage": "Delete…",
+    "description": "A button on a leftover branch in the Changes tab: deletes it, after a confirmation."
+  },
+  "project.leftovers.entry": {
+    "defaultMessage": "Leftover branches ({n, number})",
+    "description": "An entry of the Changes tab's picker: the branches nothing uses now, {n} of them."
+  },
+  "project.leftovers.heading": {
+    "defaultMessage": "Leftover branches",
+    "description": "The heading of the Changes tab's page of branches nothing uses now."
+  },
+  "project.leftovers.load": {
+    "defaultMessage": "the branches",
+    "description": "What couldn't be read, in an error on the Changes tab's leftover branches."
+  },
+  "project.leftovers.loading": {
+    "defaultMessage": "Reading the branches…",
+    "description": "While the Changes tab's leftover branches are read."
+  },
+  "project.leftovers.merged": {
+    "defaultMessage": "Merged into {target}",
+    "description": "A group of the Changes tab's leftover branches: those whose commits are all in {target}, so deleting them loses nothing."
+  },
+  "project.leftovers.none": {
+    "defaultMessage": "None here.",
+    "description": "Under a group of the Changes tab's leftover branches that has none."
+  },
+  "project.leftovers.notCounted": {
+    "defaultMessage": "commits not in {target}: not counted",
+    "description": "On a leftover branch in the Changes tab when Hive didn't count its commits (too many)."
+  },
+  "project.leftovers.unmerged": {
+    "defaultMessage": "Not in {target}",
+    "description": "A group of the Changes tab's leftover branches: those with commits {target} hasn't."
+  },
   "project.limit.heading": {
     "defaultMessage": "{plan, select, none {Plan limits, account-wide, as of {when}} other {Plan limits ({plan}), account-wide, as of {when}}}",
     "description": "Above the plan limits. {plan} is the plan's name (none when unknown); {when} how long ago they were reported."

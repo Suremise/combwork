@@ -81,7 +81,7 @@ export function useCompareLines(project: ProjectInfo): { lines: CompareLines | n
  * blocked), its branch against the slot's target, else its default (the board's records, read without making the pool).
  * A branch is listed once.
  */
-export function CompareGroup({ lines, value }: { lines: CompareLines; value: string }) {
+export function CompareGroup({ lines, value, last }: { lines: CompareLines; value: string; last?: React.ReactNode }) {
   const tasks = useStore((s) => s.tasks)
   const first = lines.integration && lines.main ? compareRoot(lines.main, lines.integration) : null
   const inSlot = new Set(lines.slots.map((s) => s.branch))
@@ -108,6 +108,7 @@ export function CompareGroup({ lines, value }: { lines: CompareLines; value: str
             {tr(M.option, { head: r.head, base: r.base })}
           </option>
         ))}
+        {last}
       </optgroup>
       {slots.length > 0 && (
         <optgroup label={tr(M.slotsGroup)}>

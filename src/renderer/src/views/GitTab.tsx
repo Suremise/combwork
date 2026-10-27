@@ -77,7 +77,7 @@ export const at = (ms: number | null): string | null => (ms ? timeAgo(new Date(m
  * Reads a Git channel for the project: again when the project's git changes here, its agents work, the window gets
  * focus, or on `reload`; the last answer stays while it does.
  */
-export function useGitRead<C extends 'git:summary' | 'git:info' | 'git:history' | 'git:compareLines' | 'git:compare'>(channel: C, project: ProjectInfo, args: readonly (string | number | null)[] = NO_ARGS): { data: Awaited<ReturnType<HiveRequests[C]>> | null; error: string | null; loading: boolean; at: number; reload: () => void } {
+export function useGitRead<C extends 'git:summary' | 'git:info' | 'git:history' | 'git:compareLines' | 'git:compare' | 'git:leftovers'>(channel: C, project: ProjectInfo, args: readonly (string | number | null)[] = NO_ARGS): { data: Awaited<ReturnType<HiveRequests[C]>> | null; error: string | null; loading: boolean; at: number; reload: () => void } {
   type T = Awaited<ReturnType<HiveRequests[C]>>
   const version = useStore((s) => s.gitVersion[project.path] ?? 0)
   const usage = useStore((s) => s.usageVersion[project.path] ?? 0)

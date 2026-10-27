@@ -226,6 +226,8 @@
   "tips.lanesLegend.title": "Ce que veulent dire les couleurs d’un couloir",
   "tips.language.text": "Hive suit la langue d’affichage de Windows quand il l’a. Paramètres → Général → Langue en choisit une autre ; les langues traduites par IA sont signalées, et les améliorations sont les bienvenues. Hive parle toujours aux agents en anglais.",
   "tips.language.title": "Hive dans ta langue",
+  "tips.leftoverBranches.text": "Gestion de versions → Modifications liste les branches restantes : celle d’une carte remplacée ou archivée, celle d’un agent d’avant les emplacements. Comparez-en une d’abord avec votre branche cible, puis Supprimer… ; une branche avec ses propres commits les liste avant de disparaître.",
+  "tips.leftoverBranches.title": "Nettoyer les branches que plus rien n’utilise",
   "tips.leftoverProcesses.text": "Un serveur d’aperçu ou un tail -f lancé par un agent peut continuer à tourner après son arrêt, en bloquant le dossier du projet ou un port. Hive les liste dans le menu ⋯ du volet de l’agent et propose de les arrêter ; Paramètres → Agents peut les arrêter à chaque fois.",
   "tips.leftoverProcesses.title": "Arrêter ce qu’un agent arrêté a laissé tourner",
   "tips.licenceAudit.text": "Avant une version, demande à un agent d’auditer les licences de ce que ton projet livre. Il les lit dans les fichiers eux-mêmes, fichiers tiers embarqués et éléments de l’installateur compris, et te signale tout ce qui n’est pas clair.",

@@ -29,6 +29,8 @@ import { call, errorMessage } from '../api'
 import { DocEditor } from '../components/DocEditor'
 import { DiffView } from '../components/Editors'
 import { COMPARE_ROOT, CompareGroup, ComparePage, compareRoot, parseCompareRoot, useCompareLines } from '../components/ChangesCompare'
+import { LEFTOVERS_ROOT, LeftoversOption, LeftoversPage, useLeftovers } from '../components/ChangesLeftovers'
+import { useGitRead } from './GitTab'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
 import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Switch, Tooltip } from '../components/ui'
@@ -970,7 +972,7 @@ function ChangesSplit({ listWidth, children }: { listWidth: number; children: Re
  * Whose changes the Changes tab shows (#476): the unused worktrees first (all, or one, each with who made it), then the
  * worktrees agents work in, then the project folder, last (agents working in the folder itself, and you).
  */
-function ChangesPicker({ project, value, onChange, unused, looking, listed, compare }: { project: ProjectInfo; value: string; onChange: (id: string) => void; unused: UnusedWorktree[]; looking: boolean; listed: boolean; compare: ReturnType<typeof useCompareLines> }) {
+function ChangesPicker({ project, value, onChange, unused, looking, listed, compare, leftovers }: { project: ProjectInfo; value: string; onChange: (id: string) => void; unused: UnusedWorktree[]; looking: boolean; listed: boolean; compare: ReturnType<typeof useCompareLines>; leftovers: number }) {
   // The folders agents work in (#1569): a slot, the slot kept for one, or a 0.9 worktree, each once; a free slot's
   // changes are under the unused worktrees.
   const inUse = project.agents.flatMap((a) => { const own = workFolderOf(a); return own ? [{ a, own }] : [] }).filter((x, i, all) => all.findIndex((y) => samePath(y.own.path, x.own.path)) === i)
@@ -978,7 +980,7 @@ function ChangesPicker({ project, value, onChange, unused, looking, listed, comp
     <div className="root-row">
       <Tooltip content={tr(C.pickerTip)}>
         <select className="select root-select changes-picker" value={value} onChange={(e) => onChange(e.target.value)}>
-          {compare.lines && compare.lines.branches.length > 1 && <CompareGroup lines={compare.lines} value={value} />}
+          {compare.lines && compare.lines.branches.length > 1 && <CompareGroup lines={compare.lines} value={value} last={leftovers > 0 || value === LEFTOVERS_ROOT ? <LeftoversOption count={leftovers} /> : null} />}
           <optgroup label={tr(C.unusedGroup)}>
             <option value={UNUSED_ROOT}>{looking ? tr(C.unusedLooking) : listed ? tr(C.unusedCount, { count: unused.length }) : tr(C.unusedFailed)}</option>
             {unused
@@ -1034,6 +1036,9 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   const integration = compare.lines?.integration && compare.lines.main ? compareRoot(compare.lines.main, compare.lines.integration) : null
   const shownId = rootId ?? integration ?? (!compare.known ? COMPARE_ROOT : hasWorktrees || resolving ? UNUSED_ROOT : '')
   const compared = parseCompareRoot(shownId)
+  // The branches nothing uses now (HI-1823), as Branches & remotes reads them.
+  const infoRead = useGitRead('git:leftovers', owner)
+  const leftovers = useLeftovers(owner, infoRead.data)
   const listingUnused = shownId === UNUSED_ROOT
   const spare = shownId.startsWith(`${UNUSED_ROOT}:`) ? (unusedList.find((w) => unusedRoot(w.path) === shownId && (w.branch || w.slot)) ?? null) : null
   // An agent's folder's changes (its slot, the slot kept for it or its 0.9 worktree, #1569) are everything on its branch
@@ -1097,8 +1102,9 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
     }
   }, [file, root, base, status, key, diffTry])
   const choose = (id: string): void => set((s) => ({ changesRoot: { ...s.changesRoot, [owner.path]: id } }))
-  const selector = hasWorktrees || shownId || (compare.lines?.branches.length ?? 0) > 1 ? <ChangesPicker project={owner} value={shownId} onChange={choose} unused={unusedList} looking={unusedLoading && !unusedData} listed={!!unusedData} compare={compare} /> : null
+  const selector = hasWorktrees || shownId || (compare.lines?.branches.length ?? 0) > 1 ? <ChangesPicker project={owner} value={shownId} onChange={choose} unused={unusedList} looking={unusedLoading && !unusedData} listed={!!unusedData} compare={compare} leftovers={leftovers.count} /> : null
   if (shownId === COMPARE_ROOT) return <div className="empty-state"><Icon name="loading" spin />{tr(M.loading)}</div>
+  if (shownId === LEFTOVERS_ROOT) return <LeftoversPage project={owner} read={infoRead} selector={selector} listWidth={listWidth} onCompare={(b, h) => choose(compareRoot(b, h))} />
   if (compared) return <ComparePage project={owner} base={compared.base} head={compared.head} lines={compare.lines} selector={selector} listWidth={listWidth} onPick={(b, h) => choose(compareRoot(b, h))} />
 
   // Not "not a git repository": git can't run, so Hive can't tell (#346). Whichever page is shown.

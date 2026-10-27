@@ -30,7 +30,7 @@ import { insideArchive, insideReal, isFile, samePlace, writeTextAtomic, writeTex
 import { gitDiff, gitStatus } from './git'
 import { compareBranches, compareDiff, compareLines } from './gitCompare'
 import { initCheck, initRepo } from './gitInit'
-import { addRemote, branchDrops, branchUpdatePlan, createBranch, createTag, deleteBranches, deleteRemoteBranches, fetchAll, pull, push, pushToRemote, remoteTracking, removeRemote, renameRemote, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, setUpstream, switchBranch, updateBranch, workTargetOf } from './gitRepo'
+import { addRemote, branchDrops, branchUpdatePlan, createBranch, createTag, deleteBranches, deleteRemoteBranches, fetchAll, pull, push, pushToRemote, remoteTracking, removeRemote, renameRemote, leftoverInfo, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, setUpstream, switchBranch, updateBranch, workTargetOf } from './gitRepo'
 import { checkGit, gitTool } from './gitTool'
 import { refreshPath, refreshPathBeforeStart } from './freshPath'
 import { openExternalTerminal } from './externalTerminal'
@@ -1471,6 +1471,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       // The slots as the board records them: a plain read, never the slot pool or the 0.9 migration (it runs as the project opens).
       const slots = (await boardSlots(p)).map((s) => ({ name: s.name, folder: s.folder, card: s.open?.card ?? null, agent: s.open?.agent ?? null, target: s.target ?? null }))
       return compareLines(p, await workTargetOf(p), slots)
+    },
+    'git:leftovers': async (p) => {
+      p = workspace.assertProject(p)
+      return leftoverInfo(p, await workTargetOf(p))
     },
     'git:compare': (p, base, head, page, pinBase, pinHead) => compareBranches(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), Number(page) || 1, { base: pinBase, head: pinHead }),
     'git:compareDiff': (p, base, head, f, pinned) => compareDiff(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), String(f ?? ''), pinned && typeof pinned === 'object' ? pinned : null),
