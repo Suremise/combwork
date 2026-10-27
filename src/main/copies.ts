@@ -32,7 +32,7 @@ import { basename, join } from 'path'
 import { samePlace } from './fsutil'
 import { git } from './git'
 import { createLogger, userText } from './logger'
-import { deletingIn, IDLE_MS, lockHash, OpLost, quiet, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRunner, type SlotRunEnd } from './slots'
+import { deletingIn, folderThere, IDLE_MS, lockHash, OpLost, quiet, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRunner, type SlotRunEnd } from './slots'
 import { copyIgnored, listWorktrees } from './worktrees'
 
 const log = createLogger('copies')
@@ -538,7 +538,7 @@ export class CopyPool {
         return { why: 'noCopy', size: 0 }
       }
       const opts = await this.deps.options()
-      let made = fresh || copy.state === 'gone' || !existsSync(copy.folder)
+      let made = fresh || copy.state === 'gone' || !(await folderThere(copy.folder))
       if (!made && !(await this.listed(copy.folder))) {
         await this.store.fenced(name, token, (db) => {
           this.store.dropIn(db, lease.id, 'gone')
@@ -679,7 +679,7 @@ export class CopyPool {
       const busy = this.deps.holderBusy(l.agent)
       if (busy) return hold({ why: 'holder', by: busy })
     }
-    if (existsSync(c.folder) && !(await quiet(c.folder))) return hold({ why: 'process', by: 'a process with a file or folder open in it' })
+    if ((await folderThere(c.folder)) && !(await quiet(c.folder))) return hold({ why: 'process', by: 'a process with a file or folder open in it' })
     if (await this.store.free(l.id, name)) this.held.delete(l.id)
     return null
   }
@@ -708,7 +708,7 @@ export class CopyPool {
     }
     for (const c of this.store.copies()) {
       if (c.state === 'returning') await this.tryFree(c.name)
-      else if (c.state === 'free' && !existsSync(c.folder)) await this.store.markGone(c.name)
+      else if (c.state === 'free' && !(await folderThere(c.folder))) await this.store.markGone(c.name)
     }
   }
 
@@ -745,7 +745,7 @@ export class CopyPool {
           })
           return
         }
-        const to: CopyState = existsSync(c.folder) ? 'free' : 'gone'
+        const to: CopyState = (await folderThere(c.folder)) ? 'free' : 'gone'
         await this.store.fenced(c.name, token, (db) => this.store.setIn(db, c.name, to, {}, { op: null, ...job }))
       } catch (e) {
         if (!(e instanceof OpLost)) throw e
@@ -771,7 +771,7 @@ export class CopyPool {
       try {
         const run = this.deps.runIn(c.folder)
         if (run) return await keep({ why: 'run' as const, by: run })
-        if (existsSync(c.folder)) {
+        if (await folderThere(c.folder)) {
           if (!(await quiet(c.folder))) return await keep({ why: 'process' as const, by: 'a process with a file or folder open in it' })
           await this.store.fenced(name, token, () => undefined)
           // A copy holds nobody's work (detached at a revision): its build outputs go with it.

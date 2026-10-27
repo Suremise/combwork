@@ -18,6 +18,7 @@ import { workflowFor } from './workflow/service'
 import { legacyWorktree, slotsMigrated } from './agentFolders'
 import type { StoredAgent } from '../shared/agentFolders'
 import { projectFolders, recreateSlot, releaseSlotLease, type ProjectFolder } from './projectFolders'
+import { folderThere } from './slots'
 
 /**
  * An agent's worktree whose folder is gone (#146): deleted after its work was merged, or a workspace copied to another
@@ -58,7 +59,8 @@ export async function missingWorktree(projectPath: string, agentId: string): Pro
 async function goneSlotOf(projectPath: string, agentId: string): Promise<ProjectFolder | null> {
   const mine = (await projectFolders(workspaceOf(projectPath), projectPath)).filter((f) => f.of.kind === 'slot' && f.lease?.agent === agentId)
   const f = mine.find((x) => x.lease?.kind !== 'carried') ?? mine[0]
-  return f && !existsSync(f.folder) ? f : null
+  // A quiet check has it aside for a moment (HI-1753): read once none is under way.
+  return f && !(await folderThere(f.folder)) ? f : null
 }
 
 /**

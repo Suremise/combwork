@@ -14,10 +14,27 @@ import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { ABANDON_MS, COPIES_DIR, CopyPool, copyPoolSize, CopyStore, IsolatedRequests, type CopyLease } from '../src/main/copies'
-import { fileSlotConn, quiet, type OpHolder, type SlotRun, type SlotRunEnd } from '../src/main/slots'
+import { fileSlotConn, folderWaiting, quiet, type OpHolder, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { BoundedLog, execCommand, FILE_IO } from '../src/main/workflow/queueChecks'
 import { resolveRunLink, type RunLinkDeps } from '../src/main/workflow/runLink'
 import { commit, gitRepo, sh } from './workflow/harness'
+
+// A quiet check held with its folder renamed aside (HI-1753): `go` set, the next rename aside waits for it after moving
+// the folder, `entered` called then. Every other rename passes straight through.
+const aside = vi.hoisted(() => ({ go: null as Promise<void> | null, entered: null as (() => void) | null }))
+vi.mock('fs/promises', async (original) => {
+  const real = await original<typeof import('fs/promises')>()
+  const rename = async (from: string, to: string): Promise<void> => {
+    await real.rename(from, to)
+    const go = aside.go
+    if (go && /\.hive-quiet-/.test(to)) {
+      aside.go = null
+      aside.entered?.()
+      await go
+    }
+  }
+  return { ...real, default: { ...real, rename }, rename }
+})
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -646,6 +663,48 @@ describe('copies: check copies freed while their builder works (HI-1764)', { tim
     const got = await w.pool.leaseCopy({ kind: 'review', card: 9, revision: head(w.project), agent: 'R1', ref: '1' })
     expect(got.ok).toBe(true)
     expect(w.store.unfreed().map((l) => l.kind)).toEqual(['review'])
+  })
+
+  it("a copy whose quiet check has its folder aside isn't freed by another look meanwhile: that look waits for the check (HI-1753)", async () => {
+    const w = world({ size: 1 })
+    const l = await leased(w)
+    const job = await w.pool.setLeaseJob(l.lease.id)
+    w.set.jobs.set(job!, false)
+    await w.pool.returnCopy(l.lease.id, 'runEnded')
+    w.set.jobs.set(job!, true)
+    // Whether its folder was there each time the copy was freed.
+    const freedWith: boolean[] = []
+    const free = w.store.free.bind(w.store)
+    w.store.free = (id, name) => (freedWith.push(existsSync(l.folder)), free(id, name))
+    let entered!: () => void
+    let open!: () => void
+    const held = new Promise<void>((r) => (entered = r))
+    aside.entered = entered
+    aside.go = new Promise<void>((r) => (open = r))
+    const first = w.pool.tryFree(l.name)
+    try {
+      await held
+      expect(existsSync(l.folder)).toBe(false)
+      // Another look while it is aside: it waits for that check (before HI-1753's round 2 it read the folder as gone and freed it).
+      let done = false
+      const second = w.pool.tryFree(l.name).finally(() => (done = true))
+      await vi.waitFor(() => expect(done || folderWaiting() === 1).toBe(true), { timeout: HUNG_MS })
+      expect(freedWith).toEqual([])
+      expect(w.store.lease(l.lease.id)?.freed).toBeNull()
+      open()
+      expect(await first).toBeNull()
+      expect(await second).toBeNull()
+    } finally {
+      open()
+      aside.go = null
+      await first.catch(() => undefined)
+    }
+    // Each try at freeing it (the second finds it freed already) came with its folder back in place.
+    expect(freedWith.length).toBeGreaterThan(0)
+    expect(freedWith.every((there) => there)).toBe(true)
+    expect(w.store.copy(l.name)?.state).toBe('free')
+    expect(existsSync(l.folder)).toBe(true)
+    expect(folderWaiting()).toBe(0)
   })
 
   it('a wait says what holds each copy: lent since when, or returned and held back by what', async () => {
