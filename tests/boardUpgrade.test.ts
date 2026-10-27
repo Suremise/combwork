@@ -34,6 +34,7 @@ const storeRows = await import('../src/main/storeRows')
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { keyProjects } = await import('../src/main/projectKeys')
+const { changeGroups } = await import('../src/main/assistantChanges')
 const { BACKUPS_KEPT, DbInUseError, fileSchemaVersion, openDb, schemaVersion } = await import('../src/main/db')
 const { PRESENCE_DIR, STALE_MS } = await import('../src/main/presence')
 
@@ -484,6 +485,17 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     await inWorkspace(w, () => store.upgradeBoard(w))
     expect(store.upgradeWaiting(ws)).toBe(false)
     expect(() => store.assertUpgraded(ws)).not.toThrow()
+    await close(w)
+  })
+
+  it("the Assistant's changes, which the window lists as it opens, read as none while it waits (no \"no such table\"); kept once upgraded (HI-1820)", async () => {
+    const ws = await board09()
+    const w = await open(ws)
+    expect(store.boardReadOnly(w)).toBe(true)
+    expect(inWorkspace(w, () => changeGroups(w))).toEqual([])
+    await inWorkspace(w, () => store.upgradeBoard(w))
+    expect(store.boardReadOnly(w)).toBe(false)
+    expect(inWorkspace(w, () => changeGroups(w))).toEqual([])
     await close(w)
   })
 
