@@ -142,6 +142,9 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     await lib.sendPrompt(inv, lib.ptyKey(alpha, 'a-two'), 'hello', { submitted: async () => !!(await live('a-two'))?.costFree })
     const twoPane = page.locator('.agent-pane', { has: page.locator('.pane-header-bar', { hasText: 'Two' }) })
     check('its footer says free (local)', !!(await lib.until(async () => (await twoPane.locator('.foot-cost[data-cost="free"]').innerText().catch(() => '')) === 'free (local)', HUNG_MS)))
+    // Its turn over before going on (the footer says free as soon as its record does, before the turn ends): a quit with
+    // an agent at work would ask about it.
+    check('…its turn over, still free', !!(await lib.until(async () => ['idle', 'ready', 'finished'].includes((await live('a-two'))?.status) && (await live('a-two'))?.costFree === true, HUNG_MS)))
     await shots('free')
     await page.keyboard.press('Control+,')
     await page.locator('.settings-nav .row[data-section="accounts"]').click()
