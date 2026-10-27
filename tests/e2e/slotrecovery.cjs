@@ -5,7 +5,9 @@
 // 2. `inPrepare`: the line checked out, its `SlotPrepared` not written: the restart records it (nothing switched twice);
 // 3. `inPlacement`: the placement claimed, nothing delivered: the restart takes the claim over and gives the card once;
 // 4. a lane started from the window with no slot free waits through a restart ("waiting for a slot", kept with the lane),
-//    starts nothing while the rules are off, and starts once a slot is free with them back on: its builder's brief once.
+//    starts nothing while the rules are off, and starts once a slot is free with them back on: its builder's brief once;
+// 5. `inPlacement` with the builder's conversation bound to the card's lease (HI-1746: its slot taken over by its next
+//    card): the restart resumes that conversation there with the card, never a new one.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -150,6 +152,32 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
     check('4. …R1 starts too', !!(await until(async () => !!(await live(r1.id)), HUNG_MS)))
     const sessionsOf = async (id) => (await inv('session:list', alpha)).filter((s) => s.agentId === id)
     check("4. …started once: one conversation of B4's, the lane waiting no more", (await sessionsOf(b4.id)).length === 1 && !!(await until(async () => (await lane(lane4.lane.id))?.status?.reason !== 'slot', HUNG_MS)), JSON.stringify((await sessionsOf(b4.id)).length))
+
+    // --- 5. inPlacement with the builder's conversation bound to the card's lease (HI-1746): B2, in its turn, puts card 2
+    // back and starts card 5, which takes its slot over (HI-1762: the conversation rebound to card 5's lease); Hive ends
+    // as it places B2; the restart resumes that conversation there with card 5, once, never a new one.
+    await restartToCrashAt('inPlacement')
+    const c5 = await create('Recover five')
+    const b2Conv = (await sessionsOf(b2.id)).filter((s) => same(s.cwd, st2.folder)).sort((x, y) => (y.lastActiveAt ?? '').localeCompare(x.lastActiveAt ?? ''))[0]
+    await inv('session:start', alpha, { agentId: b2.id, resumeId: b2Conv.id })
+    check('5. B2 resumed in its slot, in its conversation', !!(await until(async () => same((await live(b2.id))?.cwd, st2.folder) && (await live(b2.id))?.sessionId === b2Conv.id && ['ready', 'finished'].includes((await live(b2.id))?.status), HUNG_MS)), JSON.stringify(await live(b2.id)))
+    const tb2 = await tokenOf(b2.id)
+    // In a turn until the test makes its file: card 2's end doesn't stop it, and card 5's start takes its slot over.
+    await lib.typeLine(inv, lib.ptyKey(alpha, b2.id), home, null, 'holduntil slotrecovery-5-go', { live: () => live(b2.id) })
+    check('5. …in its turn', !!(await until(async () => (await live(b2.id))?.status === 'working', HUNG_MS)))
+    const pb2 = await intent(tb2, c2, 'put-back', { why: 'starting another' })
+    check('5. card 2 put back', pb2.status === 200, JSON.stringify(pb2.body))
+    const s5 = await intent(tb2, c5, 'start')
+    check("5. B2 starts card 5: its own slot taken over", s5.status === 200 && same(s5.body?.data?.folder, st2.folder), JSON.stringify(s5.body))
+    check('5. …its conversation bound to card 5', !!(await until(async () => (await inv('slots:list', alpha)).some((s) => s.lease?.card === c5 && same(s.folder, st2.folder)) && !!(await sessionsOf(b2.id)).find((s) => s.id === b2Conv.id && s.lease === (s5.body?.data?.lease ?? s.lease)), HUNG_MS)))
+    fs.writeFileSync(path.join(home, 'slotrecovery-5-go'), '')
+    await crashedThenRestart('5. inPlacement')
+    check('5. …the claim was made before the end, nothing delivered', (await count(c5, 'PlacementClaimed')) >= 1 && (await count(c5, 'BuilderPlaced')) === 0, JSON.stringify(await kinds(c5)))
+    const placed5 = await until(async () => (await facts(c5)).find((f) => f.kind === 'BuilderPlaced'), HUNG_MS)
+    check('5. …restarted: B2 placed by resuming its conversation, not a new one', placed5?.data?.how === 'resumed', JSON.stringify(placed5?.data))
+    check('5. …running there in that same conversation', !!(await until(async () => same((await live(b2.id))?.cwd, st2.folder) && (await live(b2.id))?.sessionId === b2Conv.id, HUNG_MS)), JSON.stringify(await live(b2.id)))
+    const last = launches().filter((l) => l.sessionId === b2Conv.id).at(-1)
+    check('5. …its launch resumed it (--resume), and placed it once', last?.opts?.['--resume'] === b2Conv.id && (await count(c5, 'BuilderPlaced')) === 1, JSON.stringify(last?.opts))
   } catch (e) {
     check('no exception', false, e?.stack ?? String(e))
   } finally {

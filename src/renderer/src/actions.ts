@@ -764,6 +764,15 @@ async function resumeAll_(path: string): Promise<void> {
     try {
       await whileStarting(path, a.id, { kind: 'resume', sessionId: a.resume!.id }, () => call('session:start', path, { resumeId: a.resume!.id, name: a.resume!.name, agentId: a.id, auto: true }))
     } catch (e) {
+      // Hive resuming that same conversation meanwhile (a card's placement, HI-1746): resumed once that start is, its
+      // failure reported as Resume All's. Anything else it runs or starts: the refusal, as before.
+      let joined: 'running' | 'other'
+      try {
+        joined = await call('session:joinResume', path, a.id, a.resume!.id)
+      } catch (j) {
+        throw new Error(errorMessage(j), { cause: j })
+      }
+      if (joined === 'running') return
       throw new Error(errorMessage(e), { cause: e })
     }
   })

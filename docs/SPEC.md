@@ -3506,6 +3506,19 @@ Whether a conversation may resume there is its **hold** (none: it may):
     without being given (cancelled, refused, expired, stale), or a launch that couldn't start, is made again by a later
     pass [HR1's round 2]; then `BuilderPlaced`. A window Start hands its prompt (note, Read first)
     to that instead of typing it where the agent is.
+    **Its builder stopped** (HI-1746: Hive quit between the card's start and its placement), the placement resumes the
+    builder's newest conversation of its provider bound to the card's lease (a handover or a takeover binds it there),
+    the card's prompt that launch's own line (`BuilderPlaced` `how: 'resumed'`); a new conversation only when there is
+    no such record or its transcript is gone. It never starts the builder meanwhile: while this run's restart resume will
+    bring it back (queued, starting, or pending to resume by itself) it waits, woken as that resume settles, then types
+    the card in (a failed or cancelled resume leaves it to resume the conversation itself); while that conversation is
+    held (its slot's hold) it waits, the card told once, never an older or a new conversation instead; after three failed
+    resumes it stops, the card told, and types the card in once its builder runs there (the user's Resume, a start by
+    hand; a Hive started again tries again). A start of the builder by another wins over its own: the restart queue
+    counts a start under way as running (skipped, never failed), the window's Resume All counts the same conversation
+    live, or a start of it under way once it has started, as resumed (its failure or cancellation is Resume All's; a
+    different conversation is refused as before), and the placement's refused launch gives its delivery to nobody, so the
+    next try types the card in: one launch, the card's prompt once.
   - **Release:** a card's own lease its current cycle doesn't use (Todo, Done, or a later start's), ended in the write
     that reads the card, so a release can never end a later start's lease; a lease lent for a start not written yet is
     left two minutes. A lane's when the lane has ended or been abandoned. Releases run with the rules off too.

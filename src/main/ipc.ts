@@ -953,6 +953,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'session:start': (p, opts) => sessions.start(p, opts),
     'session:stop': (p, agentId) => sessions.stop(workspace.assertSessionHost(p), agentId),
     'session:carryOn': (p, agentId) => sessions.carryOn(workspace.assertProject(p), agentId),
+    'session:joinResume': (p, agentId, sessionId) => sessions.joinResume(p, agentId, sessionId),
     'session:markIdle': (p, agentId) => sessions.markIdle(workspace.assertSessionHost(p), agentId),
     'session:archive': (p, id, archived) => sessions.archive(p, id, archived),
     'session:rename': (p, id, name) => sessions.rename(p, id, name),

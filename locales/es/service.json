@@ -197,6 +197,8 @@
   "service.providers.taskDone": "{task}: terminó correctamente",
   "service.providers.taskFailed": "{task}: terminó con el código {code}",
   "service.slots.notPrepared": "Hive no pudo preparar {slot} para {card}: {why}",
+  "service.slots.resumeFailed": "Hive no pudo reanudar la conversación de {agent} en {slot} para {card} (tres intentos): {why}. Reanuda {agent} desde Sesiones, o empieza de nuevo, y Hive le dará {card}.",
+  "service.slots.resumeHeld": "Hive aún no puede darle {card} a {agent}: la conversación de {agent} en {slot} no se puede reanudar ahora ({why}). Hive le dará {card} en cuanto pueda.",
   "service.templates.v09": "Las plantillas de 1.0 no atan los agentes a worktrees, así que las plantillas de Hive ocupan su lugar. Se guarda una copia {n, plural, one {de la plantilla} many {de las # plantillas} other {de las # plantillas}} con la copia de seguridad del tablero de 0.9.",
   "service.templates.v09Title": "Tus plantillas de agentes de 0.9 no se usan en 1.0",
   "service.transcripts.busy": "Esta sesión se está archivando o eliminando. Vuelve a intentarlo en un momento.",

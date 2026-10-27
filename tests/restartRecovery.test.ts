@@ -17,6 +17,8 @@ const h = vi.hoisted(() => ({
   hold: null as Promise<void> | null,
   holdAsked: 0,
   starts: [] as string[],
+  /** Agents another start (a card's placement) is starting now. */
+  pending: [] as string[],
   tasks: null as Promise<unknown[]> | null,
   stopEnds: true,
   advanced: { 'hive.restart.resumeAfterUpdate': true, 'hive.restart.resumeReadySeconds': 90 } as Record<string, unknown>,
@@ -27,6 +29,8 @@ vi.mock('../src/main/sessions', () => ({
   sessions: {
     liveStates: () => h.lives,
     liveFor: (p: string, a: string) => h.lives.find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === a) ?? null,
+    // A start of the agent under way by another (a card's placement resuming it, HI-1746).
+    pendingStart: (_p: string, a: string) => (h.pending.includes(a) ? { resumeId: null, outcome: new Promise(() => undefined) } : null),
     resumeHoldFor: async () => {
       h.holdAsked++
       if (h.hold) await h.hold
@@ -131,7 +135,7 @@ function takesNote(agentId: string): void {
 
 beforeEach(() => {
   dir = tempDir('hive-restart-recovery-')
-  Object.assign(h, { lives: [], workspaces: [], hold: null, holdAsked: 0, starts: [], tasks: null, stopEnds: true, run: 0 })
+  Object.assign(h, { lives: [], workspaces: [], hold: null, holdAsked: 0, starts: [], pending: [], tasks: null, stopEnds: true, run: 0 })
 })
 afterEach(() => {
   m?.stopRestartRecovery()
@@ -236,6 +240,17 @@ describe('the restart queue (HI-1707)', () => {
     expect(saved()).toMatchObject({ reason: 'update', entries: [expect.objectContaining({ agentId: 'a1', state: 'pending', card: { label: 'HI-1', round: 3 } })] })
     await relaunch(ws, { readyMs: HUNG_MS })
     await vi.waitFor(() => expect(h.starts).toEqual(['a1']), { timeout: HUNG_MS })
+  })
+
+  it("an agent another start is starting (a card's placement resuming it, HI-1746): skipped as running, never started twice or failed", async () => {
+    const ws = workspace(join(dir, 'ws'), ['a1'])
+    h.workspaces = [ws]
+    h.pending = ['a1']
+    await startWith([entry(ws.path, 'a1')], { readyMs: HUNG_MS })
+    m.workspaceRecovering(ws.path, Promise.resolve())
+    await m.startRestartRecovery()
+    await vi.waitFor(() => expect(m.restartRecord()?.entries[0]).toMatchObject({ state: 'skipped', why: 'running' }), { timeout: HUNG_MS })
+    expect(h.starts).toEqual([])
   })
 
   it('an agent that was ready before the close: its entry is gone', async () => {

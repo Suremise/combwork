@@ -197,6 +197,8 @@
   "service.providers.taskDone": "{task} terminée",
   "service.providers.taskFailed": "{task} terminée avec le code {code}",
   "service.slots.notPrepared": "Hive n’a pas pu préparer l’emplacement {slot} pour la carte {card} : {why}",
+  "service.slots.resumeFailed": "Hive n’a pas pu reprendre la conversation de {agent} dans l’emplacement {slot} pour la carte {card} (trois essais) : {why}. Reprends {agent} depuis Sessions, ou repars de zéro, et Hive lui donnera {card}.",
+  "service.slots.resumeHeld": "Hive ne peut pas encore donner la carte {card} à {agent} : la conversation de {agent} dans l’emplacement {slot} ne peut pas reprendre pour l’instant ({why}). Hive lui donnera {card} dès que possible.",
   "service.templates.v09": "Les modèles de la 1.0 n’attachent pas les agents à des worktrees : les modèles de Hive prennent leur place. Une copie {n, plural, one {du modèle} many {des # modèles} other {des # modèles}} est gardée avec la sauvegarde du tableau 0.9.",
   "service.templates.v09Title": "Tes modèles d’agents de la 0.9 ne sont pas utilisés dans la 1.0",
   "service.transcripts.busy": "Cette session est en cours d’archivage ou de suppression. Réessaie dans un instant.",

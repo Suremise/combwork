@@ -197,6 +197,8 @@
   "service.providers.taskDone": "{task}が完了しました",
   "service.providers.taskFailed": "{task}が終了コード{code}で終了しました",
   "service.slots.notPrepared": "Hiveは{card}のために{slot}を準備できませんでした：{why}",
+  "service.slots.resumeFailed": "Hiveは{card}のために{slot}にある{agent}の会話を再開できませんでした（3回試行）：{why}。セッション履歴から{agent}を再開するか、新しく開始すると、Hiveが{card}を渡します。",
+  "service.slots.resumeHeld": "Hiveはまだ{agent}に{card}を渡せません：{slot}にある{agent}の会話を今は再開できません（{why}）。再開できるようになり次第、Hiveが{card}を渡します。",
   "service.templates.v09": "1.0のテンプレートはエージェントをワークツリーに固定しないため、代わりにHiveのテンプレートを使います。{n, plural, other {#個のテンプレート}}のコピーは0.9のボードのバックアップと一緒に保管されています。",
   "service.templates.v09Title": "0.9のエージェントテンプレートは1.0では使われません",
   "service.transcripts.busy": "このセッションはアーカイブ中または削除中です。少し待ってから、もう一度お試しください。",
