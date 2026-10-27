@@ -2114,7 +2114,7 @@ class SessionManager {
     // Checked after the last await, just before spawning: stopped, its workspace closed or switched, or the
     // provider turned off while this launch was being prepared, it must not start a process.
     if (l.stopRequested || this.live.get(id) !== l || this.starting.get(id)?.cancelled || !workspaceFor(projectPath) || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
-    state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}) } : undefined
+    state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}) } : undefined
     if (!isProviderEnabled(config.settings, adapter.id)) throw hiveError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name })
     l.startAllowed?.()
     const cmd = adapter.buildCommand(info.path, ctx)
@@ -4476,7 +4476,8 @@ class SessionManager {
     const answered = (d.stopsAnswered ?? []).map(Date.parse).filter((t) => t >= started)
     if (answered.length) l.stopsAnswered = [...(l.stopsAnswered ?? []), ...answered].slice(-STOPS_KEPT)
     if (d.turnEnded || answered.length) this.reconcileTurn(l)
-    if (d.planUsage) reportPlanUsage(l.state.provider, d.planUsage, l.state.agentName ?? l.state.agentId)
+    // The connection it launched on (HI-1756): its usage is that login's.
+    if (d.planUsage) reportPlanUsage(l.state.provider, d.planUsage, l.state.agentName ?? l.state.agentId, l.state.launchedConnection)
     const learn = l.defaultEffort
     const learnModel = d.modelId ?? learn?.model
     if (learn && d.effort && learnModel) {

@@ -194,6 +194,7 @@
   "main.plan.resetsAt": "Se restablece a las {time}.",
   "main.plan.resetsOn": "Se restablece el {when}.",
   "main.plan.used": "Has usado el {share, number, ::percent} de tu {window, select, hours {{hours, plural, one {límite de # hora} many {límite de # horas} other {límite de # horas}}} weekly {límite semanal} other {límite {label}}} de {provider}",
+  "main.plan.usedOn": "Se ha usado el {share, number, ::percent} del {window, select, hours {{hours, plural, one {límite de # hora} many {límite de # horas} other {límite de # horas}}} weekly {límite semanal} other {límite {label}}} en {connection}",
   "main.quit.closed": "Hive se cerró",
   "main.quit.closedBody": "{n, plural, one {Se detuvo # sesión. Reanúdala desde Hive la próxima vez; no se perdió nada.} many {Se detuvieron # sesiones. Reanúdalas desde Hive la próxima vez; no se perdió nada.} other {Se detuvieron # sesiones. Reanúdalas desde Hive la próxima vez; no se perdió nada.}}",
   "main.quit.dialogTitle": "Salir de Hive",

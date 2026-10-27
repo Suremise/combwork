@@ -194,6 +194,7 @@
   "main.plan.resetsAt": "Odnawia się o {time}.",
   "main.plan.resetsOn": "Termin odnowienia: {when}.",
   "main.plan.used": "Wykorzystano {share, number, ::percent} Twojego {window, select, hours {{hours, plural, one {#-godzinnego limitu} few {#-godzinnego limitu} many {#-godzinnego limitu} other {#-godzinnego limitu}}} weekly {tygodniowego limitu} other {limitu {label}}} w {provider}",
+  "main.plan.usedOn": "Wykorzystano {share, number, ::percent} {window, select, hours {{hours, plural, one {#-godzinnego limitu} few {#-godzinnego limitu} many {#-godzinnego limitu} other {#-godzinnego limitu}}} weekly {tygodniowego limitu} other {limitu {label}}} na połączeniu {connection}",
   "main.quit.closed": "Zamknięto Hive",
   "main.quit.closedBody": "{n, plural, one {Zatrzymano # sesję. Wznowisz ją w Hive następnym razem; nic nie przepadło.} few {Zatrzymano # sesje. Wznowisz je w Hive następnym razem; nic nie przepadło.} many {Zatrzymano # sesji. Wznowisz je w Hive następnym razem; nic nie przepadło.} other {Zatrzymano # sesji. Wznowisz je w Hive następnym razem; nic nie przepadło.}}",
   "main.quit.dialogTitle": "Zamknij Hive",

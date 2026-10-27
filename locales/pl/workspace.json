@@ -429,6 +429,7 @@
   "workspace.statusBar.apiOn": "Agent API nasłuchuje pod adresem {url}",
   "workspace.statusBar.asOf": "Zgłoszono {when}. Aktualizuje się, gdy działa sesja.",
   "workspace.statusBar.awakeTip": "Windows nie przejdzie w stan uśpienia, dopóki agenci nie skończą (ekran może się wyłączyć). Ustawienia → Ogólne → Nie usypiaj komputera, gdy agenci pracują.",
+  "workspace.statusBar.connectionLine": "{name} ({provider}{hasPlan, select, yes {, plan {plan}} other {}})",
   "workspace.statusBar.git": "{hasVersion, select, yes {Git {version}} other {Git}}",
   "workspace.statusBar.gitOld": "Git {version} jest starszy niż {min}: niektóre funkcje gita nie działają.",
   "workspace.statusBar.gitProblem": "{problem}. {fix}",

@@ -45,6 +45,7 @@
   "panes.footer.compactionHistory": "点击查看压缩历史",
   "panes.footer.compactions": "{n, plural, other {目前已压缩 # 次}}{over, select, yes {，建议压缩} other {}}",
   "panes.footer.connectionChanged": "自添加以来它的登录身份已变更：请查看“设置”→“连接”。",
+  "panes.footer.connectionEmail": "已登录为 {email}。",
   "panes.footer.connectionOff": "为它选择的连接在此工作区中已停用，因此它由工作区的默认连接运行。",
   "panes.footer.connectionSwitching": "本轮结束后切换",
   "panes.footer.connectionSwitchingTip": "本轮结束后，它会结束并在现在为它选择的连接上继续。",

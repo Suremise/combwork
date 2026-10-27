@@ -1,4 +1,4 @@
-import type { PlanLimit, TaskCard, WorkspaceInfo } from '@shared/types'
+import type { PlanLimit, PlanUsage, ProviderId, TaskCard, WorkspaceInfo } from '@shared/types'
 import { useNow } from '../usage'
 import { runCommand } from '../commands'
 import { setActivity, set, useProviderWarnings, useStore, type Activity } from '../store'
@@ -19,6 +19,8 @@ import { GitStatusBarItem } from '../views/GitTab'
 import { AGENT_LIMIT_MAX } from '@shared/defaults'
 import { AgentRowsTable, CARD_COLUMN, PROJECT_COLUMN, STATE_COLUMN, WAITING_COLUMN, agentRow, tableText, type AgentTableData, type AgentTableRow } from './AgentsTable'
 import { limitWindow } from '../views/ProjectTabs'
+import { useConnections } from './ConnectionChoice'
+import { useConnectionsInUse } from '../connectionUsage'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 
 const M = {
@@ -48,6 +50,7 @@ const M = {
   api: msg({ id: 'workspace.statusBar.api', defaultMessage: 'API', description: "The status bar's item for Hive's Agent API. Keep it short." }),
   awakeTip: msg({ id: 'workspace.statusBar.awakeTip', defaultMessage: "Windows won't sleep until the agents finish (the screen may still turn off). Settings → General → Keep the PC awake while agents work.", description: "Tooltip on the status bar's keep-awake note. Keep the setting's path as Settings shows it." }),
   shortLimit: msg({ id: 'workspace.statusBar.shortLimit', defaultMessage: '{window, select, fiveHour {5h} weekly {Week} other {{label}}}', description: "The status bar's plan limits, before each one's percent: the 5-hour window, the weekly one, or the provider's own name for another. Keep it very short." }),
+  connectionLine: msg({ id: 'workspace.statusBar.connectionLine', defaultMessage: '{name} ({provider}{hasPlan, select, yes {, {plan} plan} other {}})', description: "The first line of a connection's plan limits tooltip in the status bar (HI-1756): the connection's name the user gave it ({name}: \"Max 1\"), its coding agent ({provider}: Claude Code) and its plan's name ({plan}: max, pro…)." }),
   planLine: msg({ id: 'workspace.statusBar.planLine', defaultMessage: '{provider}{hasPlan, select, yes { ({plan} plan)} other {}}', description: "The first line of the status bar's plan limits tooltip (GitHub issue #1): the coding agent ({provider}: Claude Code) and its plan's name ({plan}: max, pro…)." }),
   limitLine: msg({ id: 'workspace.statusBar.limitLine', defaultMessage: '{window, select, fiveHour {5-hour limit} weekly {Weekly limit} other {{label} limit}}: {used, number, ::percent} used{hasReset, select, yes {, resets {when}} other {}}', description: 'A line of the status bar\'s plan limits tooltip (GitHub issue #1): a rolling usage window, how much of it is used, and when it resets ({when}: "in 2 h 5 min", or a weekday and time).' }),
   reportedBy: msg({ id: 'workspace.statusBar.reportedBy', defaultMessage: 'Reported by {agent}, {when}', description: 'Under a line of the status bar\'s plan limits tooltip (#383): which agent\'s session reported the figure of the limit above ({agent}: its name) and when ({when}: "4 minutes ago").' }),
@@ -238,40 +241,58 @@ function shortLimit(l: PlanLimit): string {
 /**
  * Each enabled provider's plan limits, as Hive keeps them from its sessions' reports (the highest in each reset period,
  * #383): one item per provider. A limit whose reset has passed with no new report is left out, not shown as it was.
+ * With connections (HI-1756, the preview on), a CLI that has them shows one item per connection a session of this
+ * window's workspace runs on, named, each that login's own limits; its CLI-wide item (sessions not on one) goes.
  */
 function PlanUsageStatus() {
   const all = useStore((s) => s.planUsage)
+  const byConnection = useStore((s) => s.connectionPlanUsage)
   const settings = useStore((s) => s.settings)
+  const view = useConnections()
+  const inUse = useConnectionsInUse()
   const now = useNow(60000)
+  const byConnections = new Set(view?.preview ? view.providers : [])
   return (
     <>
-      {enabledProviders(settings).map((p) => {
-        const kept = all[p.id]
-        const limits = (kept?.limits ?? []).filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now)
-        if (!kept || !limits.length) return null
-        const usage = { ...kept, limits }
-        const worst = Math.max(...usage.limits.map((l) => l.usedPercent))
-        // GitHub issue #1: every part in the window's language (the window's name, the percent, when it resets, how long ago).
-        const lines = usage.limits.flatMap((l) => [
-          tr(M.limitLine, { window: limitWindow(l), label: l.label, used: Math.round(l.usedPercent) / 100, hasReset: l.resetsAt ? 'yes' : 'no', when: l.resetsAt ? resetsIn(l.resetsAt) : '' }),
-          ...(l.reportedBy && l.reportedAt ? [tr(M.reportedBy, { agent: l.reportedBy, when: timeAgo(l.reportedAt) })] : [])
-        ])
-        const tip = [tr(M.planLine, { provider: p.name, hasPlan: usage.plan ? 'yes' : 'no', plan: usage.plan ?? '' }), ...lines, tr(M.asOf, { when: timeAgo(usage.updatedAt) })].join('\n')
-        return (
-          <Tooltip key={p.id} content={<span style={{ whiteSpace: 'pre-line' }}>{tip}</span>}>
-            <div className={cx('status-item', worst >= 95 ? 'warn' : worst >= 80 && 'caution')} data-plan={p.id} onClick={() => runCommand('project.tab.overview')}>
-              <ProviderIcon provider={p.id} mono />
-              {usage.limits.map((l, i) => (
-                <span key={l.id}>
-                  {i > 0 && <span className="status-sep">·</span>}
-                  {shortLimit(l)} {fmt.percent(l.usedPercent / 100)}
-                </span>
-              ))}
-            </div>
-          </Tooltip>
-        )
-      })}
+      {enabledProviders(settings).map((p) =>
+        byConnections.has(p.id)
+          ? inUse.filter((c) => c.provider === p.id).map((c) => <PlanItem key={c.id} provider={p.id} kept={byConnection[c.id]} now={now} label={c.name} first={tr(M.connectionLine, { name: c.name, provider: p.name, hasPlan: byConnection[c.id]?.plan ? 'yes' : 'no', plan: byConnection[c.id]?.plan ?? '' })} data={{ 'data-plan': p.id, 'data-plan-connection': c.id }} />)
+          : <PlanItem key={p.id} provider={p.id} kept={all[p.id]} now={now} first={tr(M.planLine, { provider: p.name, hasPlan: all[p.id]?.plan ? 'yes' : 'no', plan: all[p.id]?.plan ?? '' })} data={{ 'data-plan': p.id }} />
+      )}
     </>
+  )
+}
+
+/** One item of the status bar's plan limits: a CLI's, or (`label`, its name) a connection's. Nothing while none is current. */
+function PlanItem({ provider, kept, now, label, first, data }: { provider: ProviderId; kept: PlanUsage | undefined; now: number; label?: string; first: string; data: Record<string, string> }) {
+  const limits = (kept?.limits ?? []).filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now)
+  if (!kept || !limits.length) return null
+  const usage = { ...kept, limits }
+  const worst = Math.max(...usage.limits.map((l) => l.usedPercent))
+  // GitHub issue #1: every part in the window's language (the window's name, the percent, when it resets, how long ago).
+  const lines = usage.limits.flatMap((l) => [
+    tr(M.limitLine, { window: limitWindow(l), label: l.label, used: Math.round(l.usedPercent) / 100, hasReset: l.resetsAt ? 'yes' : 'no', when: l.resetsAt ? resetsIn(l.resetsAt) : '' }),
+    ...(l.reportedBy && l.reportedAt ? [tr(M.reportedBy, { agent: l.reportedBy, when: timeAgo(l.reportedAt) })] : [])
+  ])
+  const tip = [first, ...lines, tr(M.asOf, { when: timeAgo(usage.updatedAt) })].join('\n')
+  return (
+    <Tooltip content={<span style={{ whiteSpace: 'pre-line' }}>{tip}</span>}>
+      <div className={cx('status-item', worst >= 95 ? 'warn' : worst >= 80 && 'caution')} {...data} onClick={() => runCommand('project.tab.overview')}>
+        <ProviderIcon provider={provider} mono />
+        {label !== undefined && (
+          <span className="plan-connection">
+            {label}
+            <span className="status-sep">·</span>
+          </span>
+        )}
+        {usage.limits.map((l, i) => (
+          <span key={l.id}>
+            {i > 0 && <span className="status-sep">·</span>}
+            {shortLimit(l)} {fmt.percent(l.usedPercent / 100)}
+          </span>
+        ))}
+      </div>
+    </Tooltip>
   )
 }
 

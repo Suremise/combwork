@@ -194,6 +194,7 @@
   "main.plan.resetsAt": "{time}にリセットされます。",
   "main.plan.resetsOn": "{when}にリセットされます。",
   "main.plan.used": "{provider}の{window, select, hours {{hours, plural, other {#時間の上限}}} weekly {週間の上限} other {{label}の上限}}の{share, number, ::percent}を使用済み",
+  "main.plan.usedOn": "{connection}の{window, select, hours {{hours, plural, other {#時間の上限}}} weekly {週間の上限} other {{label}の上限}}の{share, number, ::percent}を使用済み",
   "main.quit.closed": "Hiveを終了しました",
   "main.quit.closedBody": "{n, plural, other {#件のセッションを停止しました。次回Hiveから再開できます。失われたものはありません。}}",
   "main.quit.dialogTitle": "Hiveを終了",

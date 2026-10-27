@@ -186,9 +186,12 @@ interface HiveMessageValues {
   'project.key.taken': { key: string | number }
   'project.key.willAlias': { key: string | number; old: string | number }
   'project.limit.heading': { plan: string; when: string | number }
+  'project.limit.noConnections': { provider: string | number }
   'project.limit.none': { provider: string | number }
+  'project.limit.noneConnection': { name: string | number }
   'project.limit.resets': { when: string | number }
   'project.limit.tip': { window: string; label: string | number; provider: string | number }
+  'project.limit.tipConnection': { window: string; label: string | number; name: string | number }
   'project.limit.title': { window: string; label: string | number }
   'project.limit.used': undefined
   'project.loading': undefined

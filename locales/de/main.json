@@ -194,6 +194,7 @@
   "main.plan.resetsAt": "Es wird um {time} zurückgesetzt.",
   "main.plan.resetsOn": "Es wird am {when} zurückgesetzt.",
   "main.plan.used": "{share, number, ::percent} deines {window, select, hours {{hours, plural, one {#-Stunden-Limits} other {#-Stunden-Limits}}} weekly {Wochenlimits} other {Limits {label}}} von {provider} verbraucht",
+  "main.plan.usedOn": "{share, number, ::percent} des {window, select, hours {{hours, plural, one {#-Stunden-Limits} other {#-Stunden-Limits}}} weekly {Wochenlimits} other {Limits {label}}} auf {connection} verbraucht",
   "main.quit.closed": "Hive wurde beendet",
   "main.quit.closedBody": "{n, plural, one {# Sitzung wurde gestoppt. Setze sie beim nächsten Mal in Hive fort; nichts ging verloren.} other {# Sitzungen wurden gestoppt. Setze sie beim nächsten Mal in Hive fort; nichts ging verloren.}}",
   "main.quit.dialogTitle": "Hive beenden",

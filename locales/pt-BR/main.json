@@ -194,6 +194,7 @@
   "main.plan.resetsAt": "Ele é renovado às {time}.",
   "main.plan.resetsOn": "Ele é renovado em {when}.",
   "main.plan.used": "Usado: {share, number, ::percent} do seu limite {window, select, hours {de {hours, plural, one {# hora} other {# horas}}} weekly {semanal} other {{label}}} do {provider}",
+  "main.plan.usedOn": "Usado: {share, number, ::percent} do limite {window, select, hours {de {hours, plural, one {# hora} other {# horas}}} weekly {semanal} other {{label}}} em {connection}",
   "main.quit.closed": "O Hive foi fechado",
   "main.quit.closedBody": "{n, plural, one {# sessão foi parada. Retome-a no Hive na próxima vez; nada se perdeu.} other {# sessões foram paradas. Retome-as no Hive na próxima vez; nada se perdeu.}}",
   "main.quit.dialogTitle": "Sair do Hive",

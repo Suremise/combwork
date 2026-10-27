@@ -335,5 +335,8 @@
   "project.tab.versionControl": "バージョン管理",
   "project.tabs.more": "その他",
   "project.tabs.moreTip": "プロジェクトの{tabs}",
-  "project.tabs.tip": "{tab}（{key}）"
+  "project.tabs.tip": "{tab}（{key}）",
+  "project.limit.tipConnection": "{name}のすべてのセッション（Hive以外も含む）で使った、プランの{window, select, fiveHour {5時間} weekly {週間} other {{label}}}枠の割合です。",
+  "project.limit.noneConnection": "{name}のセッションで次のメッセージを送ると、上限がここに表示されます。",
+  "project.limit.noConnections": "このワークスペースで有効な{provider}の接続がありません。プランの上限をここに表示するには、「設定」→「接続」で有効にしてください。"
 }

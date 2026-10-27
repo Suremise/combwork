@@ -429,6 +429,7 @@
   "workspace.statusBar.apiOn": "L’Agent API écoute sur {url}",
   "workspace.statusBar.asOf": "Signalé {when}. Mis à jour pendant qu’une session tourne.",
   "workspace.statusBar.awakeTip": "Windows ne se mettra pas en veille avant que les agents aient fini (l’écran peut quand même s’éteindre). Paramètres → Général → Garder le PC éveillé pendant que les agents travaillent.",
+  "workspace.statusBar.connectionLine": "{name} ({provider}{hasPlan, select, yes {, forfait {plan}} other {}})",
   "workspace.statusBar.git": "{hasVersion, select, yes {Git {version}} other {Git}}",
   "workspace.statusBar.gitOld": "Git {version} est plus ancien que {min} : certaines fonctions git ne marchent pas.",
   "workspace.statusBar.gitProblem": "{problem}. {fix}",

@@ -97,6 +97,7 @@ export const SUITES = [
   { name: 'connectiondefaults' },
   { name: 'connectionrows' },
   { name: 'connections' },
+  { name: 'connectionusage' },
   { name: 'consoletext' },
   { name: 'consolewindow' },
   { name: 'context' },

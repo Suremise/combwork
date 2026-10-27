@@ -1,7 +1,8 @@
 import { englishText } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { Notification } from 'electron'
-import type { PlanLimit, PlanUsage, ProviderId } from '../shared/types'
+import { createHash } from 'crypto'
+import type { ConnectionPlanUsage, PlanLimit, PlanUsage, ProviderId } from '../shared/types'
 import { providerName } from '../shared/providers'
 import { formatTime, formatWeekdayTime } from '../shared/dates'
 import { config } from './config'
@@ -97,14 +98,17 @@ const USED = msg({ id: 'main.plan.used', defaultMessage: '{share, number, ::perc
 const usedWindow = (l: Pick<PlanLimit, 'windowMinutes'>): { window: 'hours' | 'weekly' | 'other'; hours: number } =>
   l.windowMinutes === 7 * 24 * 60 ? { window: 'weekly', hours: 0 } : l.windowMinutes && l.windowMinutes % 60 === 0 ? { window: 'hours', hours: l.windowMinutes / 60 } : { window: 'other', hours: 0 }
 
+const USED_ON = msg({ id: 'main.plan.usedOn', defaultMessage: '{share, number, ::percent} of the {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used on {connection}', description: "A notice (HI-1756): how much of a plan's usage limit is used ({share}: \"85%\") on one connection, a sign-in the user named ({connection}: \"Max 1\"). The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it)." })
+
 /**
- * The notice that a limit is `level`% used: in the language shown, its title in English for the Agent API too.
- * Exported for tests.
+ * The notice that a limit is `level`% used: in the language shown, its title in English for the Agent API too. On a
+ * connection (HI-1756), it names the connection, whose own limit it is. Exported for tests.
  */
-export function planNotice(provider: ProviderId, l: Pick<PlanLimit, 'usedPercent' | 'resetsAt' | 'label' | 'windowMinutes'>, level: number): { title: string; body: string; apiTitle: string } {
-  const values = { share: Math.round(l.usedPercent) / 100, provider: providerName(provider), ...usedWindow(l), label: l.label }
+export function planNotice(provider: ProviderId, l: Pick<PlanLimit, 'usedPercent' | 'resetsAt' | 'label' | 'windowMinutes'>, level: number, connection?: string): { title: string; body: string; apiTitle: string } {
+  const values = { share: Math.round(l.usedPercent) / 100, provider: providerName(provider), ...usedWindow(l), label: l.label, connection: connection ?? '' }
+  const m = connection ? USED_ON : USED
   const body = `${level >= 95 ? tr(msg({ id: 'main.plan.pause', defaultMessage: 'Sessions will pause when it runs out.', description: 'A plan-usage notice, at 95% used or more.' })) : tr(msg({ id: 'main.plan.close', defaultMessage: 'You are getting close to the limit.', description: 'A plan-usage notice, below 95% used.' }))}${resetText(l.resetsAt)}`
-  return { title: tr(USED, values), body, apiTitle: englishText({ m: USED, values }) }
+  return { title: tr(m, values), body, apiTitle: englishText({ m, values }) }
 }
 
 /**
@@ -118,24 +122,37 @@ const shownValues = (u: PlanUsage | null | undefined): string => JSON.stringify(
  * agents work). What mergePlanUsage keeps is in memory (saved with the config on quit and with any other
  * change); it is only written to disk when a shown value changes, and then at most once a minute. `reportedBy` is the
  * reporting session's agent, for the status bar's tooltip.
+ *
+ * A session launched on a connection (HI-1756) reports that connection's own limits: kept by its id
+ * (`connectionPlanUsage`), never mixed into its CLI's, and warned of per connection (`connection:<id>:<limit>`), the
+ * notice naming it. One whose session isn't on a connection (the preview off) is its CLI's, as before.
+ * They are a login's (HR2's round 1): kept with the login they came from (`login`, usageLogin), and taken only from a
+ * session launched as the login the connection is signed in as now. One still running as another (a login kept since,
+ * or changed in a pane) or whose login its launch couldn't tell is left out: it never fills another login's figures.
  */
-export function reportPlanUsage(provider: ProviderId, report: PlanUsage, reportedBy?: string): void {
-  const all = config.get().planUsage
-  const prev = all[provider]
+export function reportPlanUsage(provider: ProviderId, report: PlanUsage, reportedBy?: string, connection?: { id: string; name: string; login?: string }): void {
+  if (connection && (!connection.login || connection.login !== connectionLoginNow(connection.id))) return
+  const c = config.get()
+  const kept = connection ? c.connectionPlanUsage?.[connection.id] : c.planUsage[provider]
+  // Another login's figures (its connection signed in as someone else since): this login's start afresh, warnings too.
+  const stale = !!connection && !!kept && (kept as ConnectionPlanUsage).login !== connection.login
+  if (stale) forgetConnectionUsage(connection.id)
+  const prev = stale ? undefined : kept
   const usage = mergePlanUsage(prev, report, Date.now(), reportedBy)
   const changed = shownValues(prev) !== shownValues(usage)
-  config.get().planUsage = { ...all, [provider]: usage }
+  if (connection) c.connectionPlanUsage = { ...c.connectionPlanUsage, [connection.id]: { ...usage, login: connection.login } }
+  else c.planUsage = { ...c.planUsage, [provider]: usage }
   if (changed) {
-    emit({ type: 'plan-usage', provider, usage })
+    emit({ type: 'plan-usage', provider, usage, ...(connection ? { connection: connection.id } : {}) })
     saveSoon()
   }
 
   for (const l of usage.limits) {
-    const key = `${provider}:${l.id}`
+    const key = warningKey(provider, l.id, connection?.id)
     const level = nextWarning(l, config.get().planWarnings[key])
     if (level === null) continue
-    config.update((c) => (c.planWarnings[key] = { resetsAt: l.resetsAt, level }))
-    const { title, body, apiTitle } = planNotice(provider, l, level)
+    config.update((cfg) => (cfg.planWarnings[key] = { resetsAt: l.resetsAt, level }))
+    const { title, body, apiTitle } = planNotice(provider, l, level, connection?.name)
     // Kept in the Notifications panel, and told as agent notices are (routeAppNotice): a banner in the window you are
     // using, a Windows notification with Hive in the background, or nothing (notifications off, or Show nothing).
     logNotice(level >= 95 ? 'error' : 'warning', title, body)
@@ -152,4 +169,47 @@ export function reportPlanUsage(provider: ProviderId, report: PlanUsage, reporte
       apiTitle
     )
   }
+}
+
+/** Where a limit's last warning is kept: per CLI, or per connection (HI-1756). Exported for tests. */
+export const warningKey = (provider: ProviderId, limit: string, connection?: string): string => (connection ? `connection:${connection}:${limit}` : `${provider}:${limit}`)
+
+/**
+ * A connection removed, or now signed in as another login than its figures are from (HI-1756): its usage and warnings
+ * go, here and in the windows, so they never show under another login.
+ */
+export function forgetConnectionUsage(id: string): void {
+  const c = config.get()
+  if (!c.connectionPlanUsage?.[id] && !Object.keys(c.planWarnings).some((k) => k.startsWith(`connection:${id}:`))) return
+  config.update((cfg) => {
+    if (cfg.connectionPlanUsage) delete cfg.connectionPlanUsage[id]
+    for (const k of Object.keys(cfg.planWarnings)) if (k.startsWith(`connection:${id}:`)) delete cfg.planWarnings[k]
+  })
+  emit({ type: 'plan-usage-cleared', connection: id })
+}
+
+/**
+ * A login, as plan usage keeps it (HR2's round 1): its email (any case) and organisation, hashed, so a session's state
+ * and the saved figures say whose they are without carrying the email. Null with no identity.
+ */
+export function usageLogin(identity: { email?: string; orgId?: string } | null | undefined): string | null {
+  if (!identity?.email || !identity.orgId) return null
+  return createHash('sha256').update(`${identity.email.toLowerCase()}\n${identity.orgId}`).digest('hex').slice(0, 16)
+}
+
+/**
+ * The login a connection is signed in as now: its latest check's when that found it signed in (a login changed in a
+ * pane included: its new sessions launch as it), else the one accepted. What a session launched on it now runs as.
+ */
+export function connectionLoginNow(id: string): string | null {
+  const a = config.get().connections?.find((x) => x.id === id)
+  if (!a) return null
+  return (a.observed?.loggedIn === true ? usageLogin(a.observed) : null) ?? usageLogin(a.accepted)
+}
+
+/** After a connection's record changed (accounts.ts): figures from another login than it is signed in as now go. */
+export function connectionLoginChanged(id: string): void {
+  const kept = config.get().connectionPlanUsage?.[id]
+  const now = connectionLoginNow(id)
+  if (kept && now && kept.login !== now) forgetConnectionUsage(id)
 }

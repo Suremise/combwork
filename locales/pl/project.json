@@ -335,5 +335,8 @@
   "project.tab.versionControl": "Kontrola wersji",
   "project.tabs.more": "Więcej",
   "project.tabs.moreTip": "{tabs} projektu",
-  "project.tabs.tip": "{tab} ({key})"
+  "project.tabs.tip": "{tab} ({key})",
+  "project.limit.tipConnection": "Jaka część {window, select, fiveHour {5-godzinnego limitu} weekly {tygodniowego limitu} other {limitu {label}}} planu jest zużyta na połączeniu {name}, we wszystkich jego sesjach (nie tylko w Hive).",
+  "project.limit.noneConnection": "Jego limity pojawią się po następnej wiadomości w sesji na połączeniu {name}.",
+  "project.limit.noConnections": "W tym obszarze roboczym nie jest włączone żadne połączenie {provider}. Włącz je w Ustawienia → Połączenia, aby zobaczyć tutaj jego limity planu."
 }

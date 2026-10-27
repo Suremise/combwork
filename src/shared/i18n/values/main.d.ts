@@ -196,6 +196,7 @@ interface HiveMessageValues {
   'main.plan.resetsAt': { time: string | number }
   'main.plan.resetsOn': { when: string | number }
   'main.plan.used': { share: number; provider: string | number; window: string; hours: number; label: string | number }
+  'main.plan.usedOn': { share: number; window: string; hours: number; label: string | number; connection: string | number }
   'main.quit.closed': undefined
   'main.quit.closedBody': { n: number }
   'main.quit.dialogTitle': undefined
