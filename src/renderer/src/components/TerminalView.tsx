@@ -59,6 +59,24 @@ function disposeWebgl(webgl: WebglAddon, canvases: HTMLCanvasElement[]): void {
   for (const c of canvases) c.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext()
 }
 
+/**
+ * Gives a hidden terminal's WebGL renderer back with the terminal taken out of the page, until it is shown again
+ * (HI-1828: putBack). xterm draws with a new DOM renderer then: every row at once, and again later (its idle-time
+ * resize, its selection's next frame), measuring each character's width as it goes. In the page each measure laid the
+ * whole window out again: a page switch's four released terminals took 0.5–1 s, and in a view hidden by display: none
+ * (every width 0, never kept) seconds. Out of the page nothing is laid out; the widths it measures there are 0, which
+ * xterm never keeps, so they are measured again in the page when it is shown (without WebGL).
+ */
+function disposeWebglOffPage(term: Terminal, webgl: WebglAddon, canvases: HTMLCanvasElement[]): void {
+  term.element?.remove()
+  disposeWebgl(webgl, canvases)
+}
+
+/** Puts a terminal taken out of the page (disposeWebglOffPage) back in its mount. */
+function putBack(term: Terminal, mount: HTMLElement | null): void {
+  if (term.element && mount && !term.element.isConnected) mount.appendChild(term.element)
+}
+
 /** How many terminals hold a WebGL context (for tests). */
 ;(window as unknown as { __hiveWebglCount?: () => number }).__hiveWebglCount = () => webglHolders.size
 
@@ -685,7 +703,7 @@ export function TerminalView({
 
   // WebGL renderer (as in VS Code): faster, and needed for rescaleOverlappingGlyphs. Only visible
   // terminals take a context, within WEBGL_BUDGET (see above); hidden ones keep it for 30 seconds so
-  // switching back is instant, then fall back to the DOM renderer.
+  // switching back is instant, then fall back to the DOM renderer, out of the page (disposeWebglOffPage).
   useEffect(() => {
     const term = termRef.current
     if (!term) return
@@ -693,12 +711,14 @@ export function TerminalView({
       if (dropWebgl.current) clearTimeout(dropWebgl.current)
       dropWebgl.current = null
       webglHolders.delete(ptyKey)
-      if (webglRef.current) disposeWebgl(webglRef.current, webglCanvases.current)
+      if (webglRef.current && visibleRef.current) disposeWebgl(webglRef.current, webglCanvases.current)
+      else if (webglRef.current) disposeWebglOffPage(term, webglRef.current, webglCanvases.current)
       webglRef.current = null
     }
     if (visible) {
       if (dropWebgl.current) clearTimeout(dropWebgl.current)
       dropWebgl.current = null
+      putBack(term, mount.current)
       if (!webglRef.current && !noWebgl) {
         makeRoomForWebgl(ptyKey)
         try {
@@ -722,7 +742,9 @@ export function TerminalView({
             })
           })
           webgl.onContextLoss(() => {
-            webgl.dispose()
+            // Lost while hidden (Chromium dropped it), it is given back as a release is (disposeWebglOffPage).
+            if (visibleRef.current) webgl.dispose()
+            else disposeWebglOffPage(term, webgl, [])
             if (webglRef.current === webgl) {
               webglRef.current = null
               webglHolders.delete(ptyKey)
