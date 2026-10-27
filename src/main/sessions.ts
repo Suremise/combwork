@@ -925,6 +925,8 @@ const CARRY_ON_PROMPT = 'Your last turn stopped because your sign-in had expired
 
 class SessionManager {
   private live = new Map<string, LiveSession>()
+  /** Server markers of runs that have ended, held until their record says so or they are kept (HI-1829: serverRunEnding). */
+  private readonly serverEnding = new Map<string, number>()
   /**
    * CLIs whose sign-in was refused, until signed in again (#309): the user is told once per CLI and expiry (agents
    * stopping later only show it), and the CLI's own check runs again meanwhile, to notice the sign-in.
@@ -2306,8 +2308,10 @@ class SessionManager {
       onExit: (code, output) => {
         screen?.dispose()
         // A server connection's key stays masked until what its exit left (its last output) is handled (HI-1772).
-        // Its server markers go with the run (HI-1829): those its record has, at once; any it couldn't save are kept.
-        void Promise.resolve(this.onExit(projectPath, agent.id, state.runId, code, output)).finally(() => this.serverRunEnded(projectPath, l))
+        // Its server markers go with the run (HI-1829): those its record has, at once; the rest are held from now (before
+        // onExit takes it out of live) until their record says so, or kept if it can't.
+        const ending = this.serverRunEnding(l)
+        void Promise.resolve(this.onExit(projectPath, agent.id, state.runId, code, output)).finally(() => this.serverRunEnded(projectPath, ending))
       }
     })
     // Its process runs now (spawnPty returned, not thrown): its slot's writer is the run's processes' to settle (#1434).
@@ -5610,19 +5614,38 @@ class SessionManager {
    */
   private serverMarked(projectPath: string, sessionId: string): boolean {
     for (const l of this.live.values()) if (l.serverSids?.has(sessionId)) return true
-    return serverMarks.ignoresReports(projectPath, sessionId)
+    return !!this.serverEnding.get(sessionId) || serverMarks.ignoresReports(projectPath, sessionId)
   }
 
   /**
-   * A run ended (HI-1829): what it marked goes with it. One its record doesn't say yet is saved now: one the CLI started
-   * gets a record if its own write failed; one it never started (marked before the spawn) only if it has a record from
-   * an earlier run. If that fails it is kept, bounded (serverMarks.ts).
+   * A run ending (HI-1829), at once as its process exits, before anything awaits or takes it out of live: its markers
+   * that its record doesn't say yet are held (`serverEnding`, by id: a count, for two runs of one conversation ending
+   * together) until serverRunEnded has saved or kept each, so no read between sees one without them. Those its record
+   * says go now.
    */
-  private async serverRunEnded(projectPath: string, l: LiveSession): Promise<void> {
+  private serverRunEnding(l: LiveSession): { unsaved: string[]; started: Set<string> } {
     const unsaved = [...(l.serverSids ?? [])].filter((sid) => !l.serverSaved?.has(sid))
     const started = l.serverRecorded ?? new Set<string>()
+    for (const sid of unsaved) this.serverEnding.set(sid, (this.serverEnding.get(sid) ?? 0) + 1)
     l.serverSids = l.serverSaved = l.serverRecorded = undefined
-    for (const sid of unsaved) if ((await this.saveServerRan(projectPath, sid, started.has(sid))) === 'failed') serverMarks.add(projectPath, sid)
+    return { unsaved, started }
+  }
+
+  /**
+   * A run ended (HI-1829): each marker held for it is saved now: one the CLI started gets a record if its own write
+   * failed; one it never started (marked before the spawn) only if it has a record from an earlier run. One that can't be
+   * saved is kept (serverMarks.ts) before its hold goes, so it is never read without one.
+   */
+  private async serverRunEnded(projectPath: string, ending: { unsaved: string[]; started: Set<string> }): Promise<void> {
+    for (const sid of ending.unsaved) {
+      try {
+        if ((await this.saveServerRan(projectPath, sid, ending.started.has(sid))) === 'failed') serverMarks.add(projectPath, sid)
+      } finally {
+        const n = (this.serverEnding.get(sid) ?? 1) - 1
+        if (n > 0) this.serverEnding.set(sid, n)
+        else this.serverEnding.delete(sid)
+      }
+    }
   }
 
   /** A host's sessions whose server record couldn't be saved, tried again a few at a time; each saved is let go. */

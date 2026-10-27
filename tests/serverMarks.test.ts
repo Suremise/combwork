@@ -80,7 +80,8 @@ describe("a run's server markers (sessions.ts)", async () => {
   type Manager = {
     live: Map<string, Live>
     serverMarked: (p: string, id: string) => boolean
-    serverRunEnded: (p: string, l: Live) => Promise<void>
+    serverRunEnding: (l: Live) => { unsaved: string[]; started: Set<string> }
+    serverRunEnded: (p: string, ending: { unsaved: string[]; started: Set<string> }) => Promise<void>
     saveServerMarks: (p: string) => Promise<void>
     usageFor: (p: string, path: string, id: string, provider: string, o?: { reportsIgnored?: boolean }) => Promise<{ costUsd: number | null } | null>
   }
@@ -119,9 +120,11 @@ describe("a run's server markers (sessions.ts)", async () => {
     manager.live.set(`${alpha.toLowerCase()}#${agent}`, l)
     return l
   }
+  /** As its process exits: its markers handed over first, then out of live (onExit), then saved or kept. */
   const end = async (l: Live) => {
+    const ending = manager.serverRunEnding(l)
     manager.live.delete(`${alpha.toLowerCase()}#${String(l.state.agentId)}`)
-    await manager.serverRunEnded(alpha, l)
+    await manager.serverRunEnded(alpha, ending)
   }
   /** As the Sessions tab reads a conversation that isn't running: by its record. */
   const readAfter = async (sid: string) => {
@@ -208,7 +211,7 @@ describe("a run's server markers (sessions.ts)", async () => {
     await other.open(ws2)
     vi.spyOn(WorkspaceService.prototype, 'mutateSessions').mockRejectedValue(new Error('disk full'))
     const l: Live = { state: { projectPath: beta, agentId: 'b1', provider: 'claude-code', sessionId: 'b-unsaved', status: 'idle', runId: 'run-beta' }, adapter: providerAdapter('claude-code'), serverSids: new Set(['b-unsaved']), serverRecorded: new Set(['b-unsaved']) }
-    await manager.serverRunEnded(beta, l)
+    await manager.serverRunEnded(beta, manager.serverRunEnding(l))
     vi.restoreAllMocks()
     expect(serverMarksForTests().pending(beta)).toEqual(['b-unsaved'])
     await disposeWorkspaceService(other)
@@ -217,6 +220,47 @@ describe("a run's server markers (sessions.ts)", async () => {
     expect(manager.serverMarked(beta, 'another')).toBe(true)
     // The first workspace's host isn't touched.
     expect(manager.serverMarked(alpha, 'another')).toBe(false)
+  })
+
+  // HR2's round 1: while the exit's record write was pending, the run was out of live and nothing marked it ($9 read).
+  it('while its exit saves its record (out of live already): still marked and read without the report, saved or not', async () => {
+    const real = WorkspaceService.prototype.mutateSessions
+    for (const outcome of ['saved', 'failed'] as const) {
+      const sid = `pending-${outcome}`
+      await record(sid)
+      let release!: () => void
+      const held = new Promise<void>((r) => (release = r))
+      let entered!: () => void
+      const writing = new Promise<void>((r) => (entered = r))
+      vi.spyOn(WorkspaceService.prototype, 'mutateSessions').mockImplementation(async function (this: InstanceType<typeof WorkspaceService>, ...args: Parameters<typeof real>) {
+        entered()
+        await held
+        if (outcome === 'failed') throw new Error('disk full')
+        return real.apply(this, args) as never
+      })
+      const l = run(sid)
+      const ending = manager.serverRunEnding(l)
+      manager.live.delete(`${alpha.toLowerCase()}#a1`)
+      // Out of live, its write not begun: held.
+      expect(manager.serverMarked(alpha, sid)).toBe(true)
+      const done = manager.serverRunEnded(alpha, ending)
+      await writing
+      // Its write under way: still held, and a read takes no report.
+      expect(manager.serverMarked(alpha, sid)).toBe(true)
+      expect((await manager.usageFor(alpha, transcript, sid, 'claude-code'))?.costUsd).toBeNull()
+      release()
+      await done
+      vi.restoreAllMocks()
+      if (outcome === 'saved') {
+        expect((await w.sessionRecord(alpha, sid))?.serverRan).toBe(true)
+        expect(manager.serverMarked(alpha, sid)).toBe(false)
+        expect(await readAfter(sid)).toBeNull()
+      } else {
+        expect(serverMarksForTests().pending(alpha)).toContain(sid)
+        expect(manager.serverMarked(alpha, sid)).toBe(true)
+        serverMarksForTests().deleted(alpha, sid)
+      }
+    }
   })
 
   it('a deleted session: its kept marker goes', async () => {
