@@ -284,6 +284,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.assistant.startView.title': undefined
   'settings.advanced.hive.cards.attachmentMax.desc': undefined
   'settings.advanced.hive.cards.attachmentMax.title': undefined
+  'settings.advanced.hive.cards.titleNudgeChars.desc': undefined
+  'settings.advanced.hive.cards.titleNudgeChars.title': undefined
   'settings.advanced.hive.console.showText.desc': undefined
   'settings.advanced.hive.console.showText.title': undefined
   'settings.advanced.hive.copies.quietWaitMinutes.desc': undefined
@@ -413,12 +415,14 @@ interface HiveMessageValues {
   'settings.advanced.takes.text': undefined
   'settings.advanced.unit.agents': { n: number }
   'settings.advanced.unit.captures': { n: number }
+  'settings.advanced.unit.characters': { n: number }
   'settings.advanced.unit.lanes': { n: number }
   'settings.advanced.unit.minutes': { n: number }
   'settings.advanced.unit.seconds': { n: number }
   'settings.advanced.unitLabel.agents': undefined
   'settings.advanced.unitLabel.bytes': undefined
   'settings.advanced.unitLabel.captures': undefined
+  'settings.advanced.unitLabel.characters': undefined
   'settings.advanced.unitLabel.lanes': undefined
   'settings.advanced.unitLabel.minutes': undefined
   'settings.advanced.unitLabel.seconds': undefined

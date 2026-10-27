@@ -472,6 +472,33 @@ const prose = (seed, n) => {
   measure('hive_list_tasks (as Assistant, all)', tool('hive_list_tasks', {}, 'assistant'), 80 * 200)
   measure('hive_create_task (as Assistant)', tool('hive_create_task', { title: 'Assistant card', project: 'alpha', description: prose(600, 1800) }, 'assistant'), 400)
   measure('hive_update_task (as Assistant)', tool('hive_update_task', { number: todo[30], comment: 'Noted.' }, 'assistant'), 400)
+  // A long title (HI-1872): kept, never refused, the reply's last line suggesting a shorter one; none for a title within
+  // the limit, a change without a title, the user's own title (the window's), or with the setting at 0.
+  const LONG = 'Tray: the restart notice stays after Hive restarts, because the update check runs before the window opens'
+  const NUDGE = 'Titles over 80 characters are cut in git and on the board: consider a shorter one (the detail belongs in the description).'
+  const nudged = (text) => text.split('\n').at(-1) === NUDGE
+  const longMade = measure('hive_create_task (a long title)', tool('hive_create_task', { title: LONG, description: prose(700, 600) }), 500)
+  const longKey = /^([A-Z]{2,4}-\d+) /.exec(longMade)?.[1]
+  check('a long title from an agent: created with it, the nudge on a last line of its own', longMade.split('\n').length === 2 && longMade.split('\n')[0].endsWith(`: ${LONG}`) && nudged(longMade), longMade)
+  check('…and the card keeps it whole', !!longKey && JSON.parse(tool('hive_read_task', { number: longKey }).text).title === LONG, longKey)
+  const retitled = measure('hive_update_task (a long title)', tool('hive_update_task', { number: longKey, title: `${LONG}, again` }), 500)
+  check('a long retitle: changed, the nudge on a last line', retitled.split('\n').length === 2 && retitled.startsWith(`${longKey} ${LONG}, again: `) && nudged(retitled), retitled)
+  const commentOnly = tool('hive_update_task', { number: longKey, comment: 'Noted.' }).text
+  check('…a change without a title: no nudge', !commentOnly.includes('\n') && /: Commented\./.test(commentOnly), commentOnly)
+  const shortened = tool('hive_update_task', { number: longKey, title: 'Restart notice stays after a restart' }).text
+  check('…a title within the limit: no nudge', !shortened.includes('\n') && shortened.startsWith(`${longKey} Restart notice stays after a restart: `), shortened)
+  const asLong = measure('hive_create_task (as Assistant, a long title)', tool('hive_create_task', { title: LONG, project: 'alpha', description: prose(701, 600) }, 'assistant'), 600)
+  check("the Assistant's long title: created with it, the nudge on a last line", asLong.includes(`: ${LONG}`) && nudged(asLong), asLong)
+  const viaApi = await api('POST', '/v1/tasks', { title: LONG, project: 'alpha' })
+  check("the Agent API's card JSON: the title kept, nudge beside it", viaApi.status === 200 && viaApi.body?.title === LONG && viaApi.body?.nudge === NUDGE, viaApi.text.slice(0, 300))
+  const mine = await inv('tasks:create', { title: LONG, project: 'alpha' })
+  check("the user's own long title, from the window: kept, no nudge", mine?.title === LONG && mine?.nudge === undefined, JSON.stringify(mine).slice(0, 300))
+  await inv('advanced:set', 'hive.cards.titleNudgeChars', 0)
+  const unNudged = tool('hive_create_task', { title: LONG, description: 'Off.' }).text
+  check('with Suggest a shorter title past at 0: kept, no nudge', !unNudged.includes('\n') && unNudged.endsWith(`: ${LONG}`), unNudged)
+  await inv('advanced:set', 'hive.cards.titleNudgeChars', 80)
+  // Out of Todo again, as the user would park them: the checks below count Todo's 50.
+  for (const made of (await api('GET', '/v1/tasks?column=todo')).body.filter((x) => x.title.startsWith(LONG) || x.title === 'Restart notice stays after a restart')) await inv('tasks:update', made.number, { column: 'hold' })
   measure('hive_reorder_tasks (as Assistant)', tool('hive_reorder_tasks', { column: 'todo', cards: [todo[31], todo[32]] }, 'assistant'), 300)
   // Undo (#1282): its messages' changes, a line each; one message's changes with their ids; what an undo did.
   tool('hive_update_tasks', { numbers: [todo[33], todo[34]], addLabels: ['undo-me'] }, 'assistant')

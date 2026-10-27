@@ -230,6 +230,9 @@ export const CTRL_CV_TO_CLI = 'hive.terminal.ctrlCVToCli'
 /** Successful builds of Hive itself (npm run dist, npm run release) go into the journal as Hive's facts (#1534): read by main's buildFacts. */
 export const JOURNAL_BUILDS = 'hive.journal.builds'
 
+/** Past this many characters, an agent's card title gets a nudge to shorten it (HI-1872; 0: none): read by main's titleNudge. */
+export const CARD_TITLE_NUDGE = 'hive.cards.titleNudgeChars'
+
 /** The Assistant gets Hive's start view at each start and compaction (#1286, #966 row 28): read by main's startContext. */
 export const ASSISTANT_START_VIEW = 'hive.assistant.startView'
 
@@ -842,6 +845,22 @@ const SOURCES: readonly AdvancedSource[] = [
     }),
     kind: 'boolean',
     default: true,
+    applies: 'now'
+  },
+  {
+    id: CARD_TITLE_NUDGE,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.cards.titleNudgeChars.title', defaultMessage: "Suggest a shorter title past", description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in characters (\"80 characters\"): the length of a card title an agent writes past which Hive suggests a shorter one." }),
+    desc: msg({
+      id: 'settings.advanced.hive.cards.titleNudgeChars.desc',
+      defaultMessage: "When an agent or the Hive Assistant gives a card a title longer than this, Hive keeps it and tells the agent a shorter one would be better: a long title is cut in git's history, where it becomes the merge commit's subject, and on the board. The titles you write yourself are never questioned. 0 turns the suggestion off.",
+      description: 'What the advanced setting "Suggest a shorter title past" does (Settings → Advanced, under Hive). A card title is the one-line name of a card on the task board.'
+    }),
+    kind: 'number',
+    default: 80,
+    min: 0,
+    max: 200,
+    unit: 'characters',
     applies: 'now'
   },
   {
@@ -2478,7 +2497,8 @@ const UNITS: Record<string, Msg> = {
   lanes: msg({ id: 'settings.advanced.unit.lanes', defaultMessage: '{n, plural, one {# lane} other {# lanes}}', description: "An advanced setting's value: a number of card-loop lanes the Progress panel shows." }),
   agents: msg({ id: 'settings.advanced.unit.agents', defaultMessage: '{n, plural, one {# agent} other {# agents}}', description: "An advanced setting's value: a number of agents." }),
   min: msg({ id: 'settings.advanced.unit.minutes', defaultMessage: '{n, number} min', description: 'An advanced setting\'s value in minutes, short: "10 min". {n} is the number.' }),
-  captures: msg({ id: 'settings.advanced.unit.captures', defaultMessage: '{n, plural, one {# capture} other {# captures}}', description: "An advanced setting's value: a number of the flight recorder's captures (saved recordings of the developer console)." })
+  captures: msg({ id: 'settings.advanced.unit.captures', defaultMessage: '{n, plural, one {# capture} other {# captures}}', description: "An advanced setting's value: a number of the flight recorder's captures (saved recordings of the developer console)." }),
+  characters: msg({ id: 'settings.advanced.unit.characters', defaultMessage: '{n, plural, one {# character} other {# characters}}', description: "An advanced setting's value: a number of characters (letters, spaces and the like) in a piece of text." })
 }
 
 /** A number's unit on its own, beside its box in Settings → Advanced ("s"): the unit of the values UNITS writes. */
@@ -2488,7 +2508,8 @@ const UNIT_LABELS: Record<string, Msg> = {
   agents: msg({ id: 'settings.advanced.unitLabel.agents', defaultMessage: 'agents', description: 'Beside the box of an advanced setting that is a number of agents (Settings → Advanced).' }),
   min: msg({ id: 'settings.advanced.unitLabel.minutes', defaultMessage: 'min', description: 'Beside the box of an advanced setting given in minutes (Settings → Advanced): the unit, short, as in "10 min".' }),
   bytes: msg({ id: 'settings.advanced.unitLabel.bytes', defaultMessage: 'bytes', description: 'Beside the box of an advanced setting that is a size in bytes (Settings → Advanced), as in "4096 bytes".' }),
-  captures: msg({ id: 'settings.advanced.unitLabel.captures', defaultMessage: 'captures', description: "Beside the box of an advanced setting that is a number of the flight recorder's captures (saved recordings of the developer console; Settings → Advanced)." })
+  captures: msg({ id: 'settings.advanced.unitLabel.captures', defaultMessage: 'captures', description: "Beside the box of an advanced setting that is a number of the flight recorder's captures (saved recordings of the developer console; Settings → Advanced)." }),
+  characters: msg({ id: 'settings.advanced.unitLabel.characters', defaultMessage: 'characters', description: 'Beside the box of an advanced setting that is a number of characters in a piece of text (Settings → Advanced), as in "80 characters".' })
 }
 
 /** A number's unit as its box shows it beside it (#1281), in the user's language; null without one. */

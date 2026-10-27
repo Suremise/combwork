@@ -111,6 +111,8 @@ export interface TaskChange {
   project: string
   agent: string | null
   changes: string[]
+  /** A line suggesting a shorter title (HI-1872, main/titleNudge.ts): the agent's long title was kept. */
+  nudge?: string
 }
 
 export const ordinal = (n: number): string => {
@@ -123,13 +125,13 @@ const place = (c: Pick<TaskChange, 'column' | 'position' | 'of'>): string => `${
 /** "HI-61 (#61) created in Todo (51st of 51) for alpha, given to Coder: Lean replies" (#61 for a card with no key). */
 export function createdText(c: TaskChange): string {
   // The files it was made with (HI-1700), each stored or already kept.
-  return `${cardName(c)} created in ${place(c)}${c.project ? ` for ${c.project}` : ''}${c.agent ? `, given to ${c.agent}` : ''}: ${c.title}${c.changes.length ? `. ${c.changes.join('; ')}` : ''}`
+  return `${cardName(c)} created in ${place(c)}${c.project ? ` for ${c.project}` : ''}${c.agent ? `, given to ${c.agent}` : ''}: ${c.title}${c.changes.length ? `. ${c.changes.join('; ')}` : ''}${c.nudge ? `\n${c.nudge}` : ''}`
 }
 
 /** "HI-60 (#60) Lean replies: Commented; Moved to Review. Now in Review (1st of 4), alpha, Coder." */
 export function changedText(c: TaskChange): string {
   const what = c.changes.length ? c.changes.join('; ') : 'No change'
-  return `${cardName(c)} ${c.title}: ${what}. Now in ${place(c)}${c.project ? `, ${c.project}` : ''}${c.agent ? `, ${c.agent}` : ''}.`
+  return `${cardName(c)} ${c.title}: ${what}. Now in ${place(c)}${c.project ? `, ${c.project}` : ''}${c.agent ? `, ${c.agent}` : ''}.${c.nudge ? `\n${c.nudge}` : ''}`
 }
 
 /** What a card's intent did (#1267, SPEC §16.8.1): the card, the stage it left and the one it is in, what the intent says of it (start: folder, line, base, target; start review: revision, base, files), warnings. */

@@ -3862,6 +3862,25 @@ module.exports.SCENARIOS.push(
       ]
     }
   },
+  ...['agent', 'assistant'].map((role) => ({
+    id: role === 'agent' ? 'follow-up-title' : 'assistant-follow-up-title',
+    title: `${role === 'agent' ? 'An agent' : 'The Assistant'} cards a follow-up found with detailed evidence (HI-1872): a short title naming the outcome or the problem, the evidence in the description`,
+    ...(role === 'assistant' ? { role: 'assistant', control: 'agents' } : {}),
+    prompt: `${role === 'agent' ? "While working you found this, and it isn't your card's work" : 'A builder found this while working on another card'}: put it on the board as a follow-up card${role === 'assistant' ? ' for alpha' : ''}, and don't fix it. Priya reported on 26 Oct that after Hive restarts for an update, the tray's "Restart to update" notice stays for about 38 seconds. In src/main/updater.ts, checkForUpdate() (line 212) runs before the window opens and its answer arrives 4.2 s after the tray is built, so the notice is never cleared; hive.log says "update: already current, notice kept". Fix direction: clear the notice when the check says Hive is current. Done when the notice is gone once the restart has finished, with a unit test.`,
+    fake: () =>
+      `hive hive_create_task ${JSON.stringify({ ...(role === 'assistant' ? { project: 'alpha' } : {}), title: "Tray's update notice clears after an update restart", description: "Priya reported (26 Oct) that after an update restart the tray's \"Restart to update\" notice stays about 38 s. src/main/updater.ts: checkForUpdate() (line 212) runs before the window opens; its answer comes 4.2 s after the tray is built, so the notice is never cleared (hive.log: \"update: already current, notice kept\"). Fix: clear it when the check says current. Done when the notice is gone after the restart, with a unit test." })}`,
+    expect: (o) => {
+      const card = o.allCards.find((x) => x.project === 'alpha')
+      const title = card?.title ?? ''
+      const text = `${card?.description ?? ''} ${(card?.comments ?? []).map((x) => x.text).join(' ')}`
+      return [
+        ['wrote one card for it', ran(o, 'hive_create_task').length === 1 && o.allCards.length === 1, o.allCards.map((x) => x.title).join(' | ')],
+        ['its title is short: at most 80 characters (about 70 asked)', !!card && [...title].length <= 80, `${[...title].length}: ${title}`],
+        ["its title leaves out the evidence: no file name or path, measurement, line number or person's name", !!card && !/\.(ts|js|log)\b|[\\/]|\d|Priya/i.test(title), title],
+        ['the evidence is in the description: the file, the timing and who reported it', /updater\.ts/.test(text) && /4\.2/.test(text) && /Priya/.test(text), text.slice(0, 300)]
+      ]
+    }
+  })),
   {
     id: 'coordinator-lanes-to-end',
     title: "Coordinator mode following two running lanes to their end (#402): Hive's real wakes as each lane finishes; it sweeps, watches what is left, and says when both are done",

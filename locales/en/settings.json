@@ -1131,6 +1131,14 @@
     "defaultMessage": "Card attachments: largest file",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in bytes: the largest file Hive keeps with a card (pasted, dropped or attached to it)."
   },
+  "settings.advanced.hive.cards.titleNudgeChars.desc": {
+    "defaultMessage": "When an agent or the Hive Assistant gives a card a title longer than this, Hive keeps it and tells the agent a shorter one would be better: a long title is cut in git's history, where it becomes the merge commit's subject, and on the board. The titles you write yourself are never questioned. 0 turns the suggestion off.",
+    "description": "What the advanced setting \"Suggest a shorter title past\" does (Settings → Advanced, under Hive). A card title is the one-line name of a card on the task board."
+  },
+  "settings.advanced.hive.cards.titleNudgeChars.title": {
+    "defaultMessage": "Suggest a shorter title past",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in characters (\"80 characters\"): the length of a card title an agent writes past which Hive suggests a shorter one."
+  },
   "settings.advanced.hive.console.showText.desc": {
     "defaultMessage": "Show the text in the developer console: prompts, replies, commands and tools' arguments, under a banner saying it is unredacted, and start each recording with its text box ticked. Tokens, API keys and sign-in details stay masked whatever this says; agents' hive_console stays redacted, and a recording with text is never attached to Copy Diagnostics.",
     "description": "What the advanced setting \"Developer console: show prompt, reply and command text\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -1647,6 +1655,10 @@
     "defaultMessage": "{n, plural, one {# capture} other {# captures}}",
     "description": "An advanced setting's value: a number of the flight recorder's captures (saved recordings of the developer console)."
   },
+  "settings.advanced.unit.characters": {
+    "defaultMessage": "{n, plural, one {# character} other {# characters}}",
+    "description": "An advanced setting's value: a number of characters (letters, spaces and the like) in a piece of text."
+  },
   "settings.advanced.unit.lanes": {
     "defaultMessage": "{n, plural, one {# lane} other {# lanes}}",
     "description": "An advanced setting's value: a number of card-loop lanes the Progress panel shows."
@@ -1670,6 +1682,10 @@
   "settings.advanced.unitLabel.captures": {
     "defaultMessage": "captures",
     "description": "Beside the box of an advanced setting that is a number of the flight recorder's captures (saved recordings of the developer console; Settings → Advanced)."
+  },
+  "settings.advanced.unitLabel.characters": {
+    "defaultMessage": "characters",
+    "description": "Beside the box of an advanced setting that is a number of characters in a piece of text (Settings → Advanced), as in \"80 characters\"."
   },
   "settings.advanced.unitLabel.lanes": {
     "defaultMessage": "lanes",
