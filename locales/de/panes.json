@@ -40,7 +40,7 @@
   "panes.empty.onPage": "Seite {page}",
   "panes.failed.dismiss": "Ausblenden (das Terminal behält die Ausgabe)",
   "panes.failed.retry": "Wiederholen",
-  "panes.failed.setup": "Agent-Einrichtung…",
+  "panes.failed.setup": "Anbieter-Einrichtung…",
   "panes.failed.title": "Start fehlgeschlagen:",
   "panes.footer.compactionHistory": "Klicken, um den Komprimierungsverlauf anzuzeigen",
   "panes.footer.compactions": "{n, plural, one {# Komprimierung bisher} other {# Komprimierungen bisher}}{over, select, yes { – Komprimieren empfohlen} other {}}",

@@ -121,7 +121,7 @@ export function check(projectPath: string, agentId: string): Promise<void> {
     .then(
       (st) => record(found.project.path, agentId, st),
       async (e) => {
-        // Git that can't run fails every check, every minute: Agent Setup and the status bar say so once (#346). A branch
+        // Git that can't run fails every check, every minute: Provider Setup and the status bar say so once (#346). A branch
         // deleted while it was checked (a card's line, just merged) isn't worth a warning either (HI-1698).
         if (!gitProblem() && (await G.lineHead(found.project.path, found.worktree.branch).catch(() => null)) !== null) log.warn(`Couldn't check ${userText(found.worktree.branch)}`, e)
         record(found.project.path, agentId, null)

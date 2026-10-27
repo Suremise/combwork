@@ -17,7 +17,7 @@ Hive Desktop (Hive for short) looks and feels like a streamlined VS Code, but it
 
 ## Features
 
-- **Claude Code and Codex** — each agent chooses its provider, so a project can mix them, with Claude Code builders and Codex reviewers; each CLI's own terminal is shown. Turn providers on in Settings → Providers; Help → Agent Setup installs and signs them in, and says which versions this Hive was tested with. **Hand Over to…** passes work from one agent to another, across providers, through a handover.
+- **Claude Code and Codex** — each agent chooses its provider, so a project can mix them, with Claude Code builders and Codex reviewers; each CLI's own terminal is shown. Turn providers on in Settings → Providers; Help → Provider Setup installs and signs them in, and says which versions this Hive was tested with. **Hand Over to…** passes work from one agent to another, across providers, through a handover.
 - **Parallel sessions** — sessions across your projects, as many as your machine can run, with live status (ready / working / needs input / waiting on background tasks / finished), Compact, and screenshots pasted straight into the session.
 - **A team per project** — up to twelve agents (24 for power users), all equal, six to a page, each with its own name, role, provider, model, effort and permission mode. Each agent works in the project folder (with file locks so agents don't edit the same file) or in its own git worktree; roles such as builder and reviewer are optional. Save a team as a **template** and load it into any project, reusing clean worktrees instead of piling up new ones.
 - **Hive Assistant** — one per workspace, in a side panel beside your agents: ask it what they are doing, or let it run the work: it plans cards, briefs and starts agents, follows each lane to the end and asks you only for real decisions. Four working modes — Coordinator, Planner, QA triager and Release manager, or write your own; Settings → Assistant sets what it may do.
@@ -79,7 +79,7 @@ The seven languages besides English were translated by AI, and Hive says so besi
 ## Requirements
 
 - Windows 10 or 11 (x64)
-- At least one coding agent CLI: [Claude Code](https://code.claude.com/docs/en/setup) and/or [Codex](https://developers.openai.com/codex). Hive's Agent Setup offers to install them. Copies built into editor extensions are not used. Hive 0.4.0 was tested with Claude Code 2.1.293 and Codex 0.161.0.
+- At least one coding agent CLI: [Claude Code](https://code.claude.com/docs/en/setup) and/or [Codex](https://developers.openai.com/codex). Hive's Provider Setup offers to install them. Copies built into editor extensions are not used. Hive 0.4.0 was tested with Claude Code 2.1.293 and Codex 0.161.0.
 - Git (for the Changes tab, worktrees and merging)
 
 ## Install

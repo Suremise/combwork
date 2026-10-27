@@ -93,8 +93,8 @@ describe('git missing or too old', () => {
   it('reads as before in English, and how to fix it', () => {
     expect(gitProblemText({ state: 'missing' })).toBe("Git isn't installed (or isn't on Hive's PATH)")
     expect(gitProblemText({ state: 'old', version: '2.16.0' })).toBe('Git 2.16.0 is too old for Hive (it needs 2.38 or later)')
-    expect(gitFixText({ state: 'old', version: '2.30.0' })).toBe('Update Git for Windows to 2.38 or later, then Check again in Agent Setup.')
-    expect(gitFixText({ state: 'missing' })).toBe('Install Git for Windows (2.38 or later), or add the folder holding git.exe to your PATH, then Check again in Agent Setup (no need to restart Hive).')
+    expect(gitFixText({ state: 'old', version: '2.30.0' })).toBe('Update Git for Windows to 2.38 or later, then Check again in Provider Setup.')
+    expect(gitFixText({ state: 'missing' })).toBe('Install Git for Windows (2.38 or later), or add the folder holding git.exe to your PATH, then Check again in Provider Setup (no need to restart Hive).')
   })
 
   it("lists what an older git loses, by how old it is", () => {

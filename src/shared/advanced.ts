@@ -2019,8 +2019,8 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.codex.override.terminalTitle.title', defaultMessage: "Set Codex's terminal title", description: "An advanced setting's title (Settings → Advanced, under Codex): one of Hive's overrides of the CLI, on by default." }),
     desc: msg({
       id: 'settings.advanced.codex.override.terminalTitle.desc',
-      defaultMessage: "Hive gives Codex's sessions their terminal title items (Terminal title items, as tui.terminal_title), whatever your own Codex config says, and tells from the title when Codex needs you (\"Action Required\"). Turned off, your Codex config decides the title, and Hive tells when Codex needs you from its hooks instead, as it does for Codex versions before 0.160. Codex's setup in Agent Setup keeps Hive's title, which it waits on.",
-      description: 'What the advanced setting "Set Codex\'s terminal title" does (Settings → Advanced, under Codex). Terminal title items is another setting\'s title: use it as Settings shows it. tui.terminal_title is a config key and "Action Required" is Codex\'s own text: keep them. Agent Setup is a dialog\'s name.'
+      defaultMessage: "Hive gives Codex's sessions their terminal title items (Terminal title items, as tui.terminal_title), whatever your own Codex config says, and tells from the title when Codex needs you (\"Action Required\"). Turned off, your Codex config decides the title, and Hive tells when Codex needs you from its hooks instead, as it does for Codex versions before 0.160. Codex's setup in Provider Setup keeps Hive's title, which it waits on.",
+      description: 'What the advanced setting "Set Codex\'s terminal title" does (Settings → Advanced, under Codex). Terminal title items is another setting\'s title: use it as Settings shows it. tui.terminal_title is a config key and "Action Required" is Codex\'s own text: keep them. Provider Setup is a dialog\'s name.'
     }),
     kind: 'boolean',
     default: true,
@@ -2034,8 +2034,8 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.copilot.override.noAutoUpdate.title', defaultMessage: "Don't let Copilot update itself", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default." }),
     desc: msg({
       id: 'settings.advanced.copilot.override.noAutoUpdate.desc',
-      defaultMessage: "Hive starts Copilot with --no-auto-update and COPILOT_AUTO_UPDATE=false (its sessions, and checking its sign-in and models), so it runs the version installed and a download never changes it between a session's restarts; Update in Agent Setup updates it when you choose. Turned off, Hive sets neither and Copilot updates itself as it would outside Hive (your own COPILOT_AUTO_UPDATE still applies).",
-      description: 'What the advanced setting "Don\'t let Copilot update itself" does (Settings → Advanced, under GitHub Copilot). --no-auto-update is a command-line option and COPILOT_AUTO_UPDATE=false an environment variable: keep them. Update is a button\'s name and Agent Setup a dialog\'s.'
+      defaultMessage: "Hive starts Copilot with --no-auto-update and COPILOT_AUTO_UPDATE=false (its sessions, and checking its sign-in and models), so it runs the version installed and a download never changes it between a session's restarts; Update in Provider Setup updates it when you choose. Turned off, Hive sets neither and Copilot updates itself as it would outside Hive (your own COPILOT_AUTO_UPDATE still applies).",
+      description: 'What the advanced setting "Don\'t let Copilot update itself" does (Settings → Advanced, under GitHub Copilot). --no-auto-update is a command-line option and COPILOT_AUTO_UPDATE=false an environment variable: keep them. Update is a button\'s name and Provider Setup a dialog\'s.'
     }),
     kind: 'boolean',
     default: true,
@@ -2181,8 +2181,8 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.copilot.override.stripGitHubTokens.title', defaultMessage: 'Keep GH_TOKEN and GITHUB_TOKEN from Copilot', description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default. GH_TOKEN and GITHUB_TOKEN are environment variables: keep them." }),
     desc: msg({
       id: 'settings.advanced.copilot.override.stripGitHubTokens.desc',
-      defaultMessage: "Hive leaves GH_TOKEN and GITHUB_TOKEN, which other tools set, out of Copilot's environment, so a token left there never signs Copilot agents in to another account; COPILOT_GITHUB_TOKEN, set for Copilot, is kept. Turned off, Copilot gets them and signs in with them before its own login, as it would outside Hive, and Agent Setup shows that sign-in.",
-      description: 'What the advanced setting "Keep GH_TOKEN and GITHUB_TOKEN from Copilot" does (Settings → Advanced, under GitHub Copilot). GH_TOKEN, GITHUB_TOKEN and COPILOT_GITHUB_TOKEN are environment variables: keep them. Agent Setup is a dialog\'s name.'
+      defaultMessage: "Hive leaves GH_TOKEN and GITHUB_TOKEN, which other tools set, out of Copilot's environment, so a token left there never signs Copilot agents in to another account; COPILOT_GITHUB_TOKEN, set for Copilot, is kept. Turned off, Copilot gets them and signs in with them before its own login, as it would outside Hive, and Provider Setup shows that sign-in.",
+      description: 'What the advanced setting "Keep GH_TOKEN and GITHUB_TOKEN from Copilot" does (Settings → Advanced, under GitHub Copilot). GH_TOKEN, GITHUB_TOKEN and COPILOT_GITHUB_TOKEN are environment variables: keep them. Provider Setup is a dialog\'s name.'
     }),
     kind: 'boolean',
     default: true,

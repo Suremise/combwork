@@ -278,7 +278,7 @@
   "workflow.refused.paths.excluded.message": "{card}：{path} 位于 {folder} 中，没有版本控制的项目不会把它算作工作的一部分。",
   "workflow.refused.paths.excluded.next": "只声明 {folder} 之外属于这项工作的文件：卡片的路径只能缩小项目的工作范围，不能扩大。",
   "workflow.refused.platform.unknown.message": "{card}：Hive 无法读取{what}，因此无法检查规则 {rule}。",
-  "workflow.refused.platform.unknown.next": "请检查“配置智能体”或该文件夹，然后重试。",
+  "workflow.refused.platform.unknown.next": "请检查“配置提供方”或该文件夹，然后重试。",
   "workflow.refused.platform.unknown.nextGone": "项目的 Git 仓库不见了：请让用户恢复它，或在其“版本控制”标签页中将项目切换到“无”（从下一张卡片起生效）。",
   "workflow.refused.queue.advancing.message": "{card} 正在合并到 {target}：已无法再移出合并队列。",
   "workflow.refused.queue.advancing.next": "请等待合并完成。如果不需要这项更改，请在 {target} 中还原它。",

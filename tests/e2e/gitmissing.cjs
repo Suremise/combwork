@@ -1,5 +1,5 @@
 // Git missing (#346): a test copy whose PATH has no git (through the run context's environment, never the machine's)
-// says so wherever git matters, never "not a git repository": Agent Setup's Git row (Git not found, with the fix and
+// says so wherever git matters, never "not a git repository": Provider Setup's Git row (Git not found, with the fix and
 // Git for Windows), the status bar, the Changes tab, the Merge dialog. Remove All's opt-in deletion keeps the worktree, with the reason. A repository with a worktree agent, made
 // with the suite's own git before Hive starts. Throwaway profile and workspace, quiet; no agent is started.
 const lib = require('./lib.cjs')
@@ -60,11 +60,11 @@ function pathWithoutGit() {
   const item = page.locator('.statusbar .status-item.warn', { hasText: 'Git' })
   check('the status bar shows it', !!(await lib.until(async () => (await item.count()) === 1, 10000)))
 
-  // --- Agent Setup: the Git row, both themes.
+  // --- Provider Setup: the Git row, both themes.
   await item.click()
-  const setup = page.locator('.dialog', { hasText: 'Agent Setup' })
+  const setup = page.locator('.dialog', { hasText: 'Provider Setup' })
   const row = setup.locator('.setup-git[data-git="missing"]')
-  check("the status bar item opens Agent Setup, with Git's row", !!(await lib.until(async () => (await row.count()) === 1, 10000)))
+  check("the status bar item opens Provider Setup, with Git's row", !!(await lib.until(async () => (await row.count()) === 1, 10000)))
   const rowText = await row.innerText().catch(() => '')
   check('…"Git not found", the fix and Git for Windows', rowText.includes('Git not found') && rowText.includes('Install Git for Windows') && (await row.locator('button', { hasText: 'Git for Windows' }).count()) === 1, rowText)
   await shot('setup-dark')
@@ -72,7 +72,7 @@ function pathWithoutGit() {
   await shot('setup-light')
   await theme('dark')
   await page.keyboard.press('Escape')
-  check('Escape closes Agent Setup', !!(await lib.until(async () => (await setup.count()) === 0, HUNG_MS)))
+  check('Escape closes Provider Setup', !!(await lib.until(async () => (await setup.count()) === 0, HUNG_MS)))
 
   // --- Add Agent: nothing in it needs git (#1442: no worktree choice), so it opens as usual.
   const info = await inv('agents:gitInfo', repo)

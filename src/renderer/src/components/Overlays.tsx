@@ -729,16 +729,16 @@ export function ShortcutsDialog() {
 }
 
 /**
- * After Agent Setup's install found the CLI (#472). Installers say to restart the terminal; Hive looked again on the
+ * After Provider Setup's install found the CLI (#472). Installers say to restart the terminal; Hive looked again on the
  * PATH a new process gets, so neither it nor new agents need a restart. Running agents keep the PATH they started with.
  */
 function installedText(name: string): string {
-  return tr(msg({ id: 'shell.setup.installed', defaultMessage: "{provider} is installed and Hive has found it: agents you start now can use it, without restarting Hive (the installer's advice to restart your terminal is for terminals already open). Agents already running get the new PATH when they restart.", description: "Agent Setup, after an install found the coding agent's CLI. {provider} is its name; PATH is a Windows setting: keep it." }), { provider: name })
+  return tr(msg({ id: 'shell.setup.installed', defaultMessage: "{provider} is installed and Hive has found it: agents you start now can use it, without restarting Hive (the installer's advice to restart your terminal is for terminals already open). Agents already running get the new PATH when they restart.", description: "Provider Setup, after an install found the coding agent's CLI. {provider} is its name; PATH is a Windows setting: keep it." }), { provider: name })
 }
 
 /** An install that ended without Hive finding the CLI. */
 function installNotFoundText(name: string): string {
-  return tr(msg({ id: 'shell.setup.notFound', defaultMessage: "The install ended, but Hive can't find {provider}. If the installer reported an error, it's shown below; if it says it worked, Check again, or set {provider}'s path in Settings → {provider}.", description: "Agent Setup, after an install ended without Hive finding the CLI. {provider} is its name; Check again is the dialog's button." }), { provider: name })
+  return tr(msg({ id: 'shell.setup.notFound', defaultMessage: "The install ended, but Hive can't find {provider}. If the installer reported an error, it's shown below; if it says it worked, Check again, or set {provider}'s path in Settings → {provider}.", description: "Provider Setup, after an install ended without Hive finding the CLI. {provider} is its name; Check again is the dialog's button." }), { provider: name })
 }
 
 /**
@@ -757,7 +757,7 @@ function GitSetupRow() {
     return (
       <div className="setup-status setup-git">
         <Icon name="loading" spin />
-        <div>{tr(msg({ id: 'shell.setup.lookingForGit', defaultMessage: 'Looking for Git…', description: 'Agent Setup while Hive looks for git.' }))}</div>
+        <div>{tr(msg({ id: 'shell.setup.lookingForGit', defaultMessage: 'Looking for Git…', description: 'Provider Setup while Hive looks for git.' }))}</div>
       </div>
     )
   }
@@ -767,20 +767,20 @@ function GitSetupRow() {
         <Icon name="pass-filled" />
         <div className="grow">
           <div>
-            {tRich(msg({ id: 'shell.setup.gitOk', defaultMessage: '<b>Git {version}</b> <muted>— for worktrees, merging and the Version Control tab</muted>', description: 'Agent Setup: the git Hive found. {version} is its version; <b> is bold, <muted> greyed. Git is a name: keep it.' }), { version: git.version ?? '', b: bold, muted })}
+            {tRich(msg({ id: 'shell.setup.gitOk', defaultMessage: '<b>Git {version}</b> <muted>— for worktrees, merging and the Version Control tab</muted>', description: 'Provider Setup: the git Hive found. {version} is its version; <b> is bold, <muted> greyed. Git is a name: keep it.' }), { version: git.version ?? '', b: bold, muted })}
           </div>
           {git.path && <div className="muted mono" style={{ fontSize: 11 }}>{git.path}</div>}
         </div>
       </div>
     )
   }
-  const title = git.state === 'missing' ? tr(msg({ id: 'shell.setup.gitMissing', defaultMessage: 'Git not found', description: 'Agent Setup when Hive finds no git. Git is a name: keep it.' })) : git.state === 'old' ? tr(msg({ id: 'shell.setup.gitOld', defaultMessage: 'Git {version} is older than {min}', description: 'Agent Setup when the git found is too old. {version} and {min} are version numbers.' }), { version: git.version ?? '', min: GIT_MIN }) : tr(msg({ id: 'shell.setup.gitUnknown', defaultMessage: "Couldn't check Git", description: "Agent Setup when Hive couldn't run git to check it." }))
+  const title = git.state === 'missing' ? tr(msg({ id: 'shell.setup.gitMissing', defaultMessage: 'Git not found', description: 'Provider Setup when Hive finds no git. Git is a name: keep it.' })) : git.state === 'old' ? tr(msg({ id: 'shell.setup.gitOld', defaultMessage: 'Git {version} is older than {min}', description: 'Provider Setup when the git found is too old. {version} and {min} are version numbers.' }), { version: git.version ?? '', min: GIT_MIN }) : tr(msg({ id: 'shell.setup.gitUnknown', defaultMessage: "Couldn't check Git", description: "Provider Setup when Hive couldn't run git to check it." }))
   const detail =
     git.state === 'old' && !problem
-      ? tr(msg({ id: 'shell.setup.gitOldDetail', defaultMessage: '{why} Update Git for Windows to {min} or later, then Check again.', description: "Agent Setup, under a too old git. {why} says why (in English for now); Git for Windows is a product's name; Check again is the dialog's button." }), { why: gitOldText(git.version!), min: GIT_MIN })
+      ? tr(msg({ id: 'shell.setup.gitOldDetail', defaultMessage: '{why} Update Git for Windows to {min} or later, then Check again.', description: "Provider Setup, under a too old git. {why} says why (in English for now); Git for Windows is a product's name; Check again is the dialog's button." }), { why: gitOldText(git.version!), min: GIT_MIN })
       : git.state === 'unknown'
-        ? tr(msg({ id: 'shell.setup.gitUnknownDetail', defaultMessage: '{error}. Hive needs Git {min} or later for worktrees, merging and the Version Control tab.', description: "Agent Setup when git couldn't be checked. {error} is the error, as given." }), { error: git.error ?? '', min: GIT_MIN })
-        : tr(msg({ id: 'shell.setup.gitProblemDetail', defaultMessage: "{problem}: worktree agents, merging, the Version Control tab's Git sections and the unmerged counts don't work. {fix}", description: 'Agent Setup under a git problem. {problem} and {fix} say what is wrong and what to do (in English for now).' }), { problem: problem ?? '', fix: gitFixText(git) })
+        ? tr(msg({ id: 'shell.setup.gitUnknownDetail', defaultMessage: '{error}. Hive needs Git {min} or later for worktrees, merging and the Version Control tab.', description: "Provider Setup when git couldn't be checked. {error} is the error, as given." }), { error: git.error ?? '', min: GIT_MIN })
+        : tr(msg({ id: 'shell.setup.gitProblemDetail', defaultMessage: "{problem}: worktree agents, merging, the Version Control tab's Git sections and the unmerged counts don't work. {fix}", description: 'Provider Setup under a git problem. {problem} and {fix} say what is wrong and what to do (in English for now).' }), { problem: problem ?? '', fix: gitFixText(git) })
   return (
     <div className="setup-status setup-git" data-git={git.state}>
       <Icon name="warning" />
@@ -801,7 +801,7 @@ function GitSetupRow() {
 function TestedLine({ tested, installed }: { tested: TestedCli; installed: string | null }) {
   const note = testedNote(tested)
   return (
-    <div className="setup-tested" data-tested={tested.installed} title={tested.testedAt ? tr(msg({ id: 'shell.setup.testedAt', defaultMessage: "Hive's tests ran against {version} on {date}", description: "Tooltip of Agent Setup's tested-version line. {version} is the CLI's version; {date} when Hive's tests ran." }), { version: tested.version, date: tested.testedAt }) : undefined}>
+    <div className="setup-tested" data-tested={tested.installed} title={tested.testedAt ? tr(msg({ id: 'shell.setup.testedAt', defaultMessage: "Hive's tests ran against {version} on {date}", description: "Tooltip of Provider Setup's tested-version line. {version} is the CLI's version; {date} when Hive's tests ran." }), { version: tested.version, date: tested.testedAt }) : undefined}>
       <span className="muted">{testedSummary(tested, installed)}</span>
       {tested.installed === 'same' && <Icon name="check" className="setup-tested-ok" />}
       {note && <div className="hint">{note}</div>}
@@ -836,7 +836,7 @@ export function AgentSetupDialog() {
       setFinished(null)
       setRunning(true)
     } catch (e) {
-      notify('error', tr(msg({ id: 'shell.setup.startFailed', defaultMessage: 'Could not start', description: "An error's title: Agent Setup couldn't start an install, an update or a sign-in." })), errorMessage(e))
+      notify('error', tr(msg({ id: 'shell.setup.startFailed', defaultMessage: 'Could not start', description: "An error's title: Provider Setup couldn't start an install, an update or a sign-in." })), errorMessage(e))
     }
   }
   const recheck = async (): Promise<typeof providers | null> => {
@@ -867,11 +867,11 @@ export function AgentSetupDialog() {
     // Installers say to restart the terminal (#472): Hive looked again on the PATH a new process gets, so it needn't.
     const what: Record<ProviderTask, string> = {
       install: installedText(p.name),
-      update: tr(msg({ id: 'shell.setup.updated', defaultMessage: '{provider} is up to date.', description: "Agent Setup after an update. {provider} is the coding agent's name." }), { provider: p.name }),
-      login: tr(msg({ id: 'shell.setup.signedIn', defaultMessage: '{provider} is signed in.', description: "Agent Setup after signing in. {provider} is the coding agent's name." }), { provider: p.name }),
-      setup: tr(msg({ id: 'shell.setup.setUp', defaultMessage: '{provider} is set up.', description: "Agent Setup after a setup step. {provider} is the coding agent's name." }), { provider: p.name })
+      update: tr(msg({ id: 'shell.setup.updated', defaultMessage: '{provider} is up to date.', description: "Provider Setup after an update. {provider} is the coding agent's name." }), { provider: p.name }),
+      login: tr(msg({ id: 'shell.setup.signedIn', defaultMessage: '{provider} is signed in.', description: "Provider Setup after signing in. {provider} is the coding agent's name." }), { provider: p.name }),
+      setup: tr(msg({ id: 'shell.setup.setUp', defaultMessage: '{provider} is set up.', description: "Provider Setup after a setup step. {provider} is the coding agent's name." }), { provider: p.name })
     }
-    setFinished({ ok: true, text: tr(msg({ id: 'shell.setup.done', defaultMessage: '{what} You can close this window.', description: 'Agent Setup after a task did its job. {what} says what happened.' }), { what: what[kind] }) })
+    setFinished({ ok: true, text: tr(msg({ id: 'shell.setup.done', defaultMessage: '{what} You can close this window.', description: 'Provider Setup after a task did its job. {what} says what happened.' }), { what: what[kind] }) })
     setTask(null)
   }
   const close = (): void => {
@@ -884,18 +884,18 @@ export function AgentSetupDialog() {
 
   return (
     <Modal
-      title={tr(msg({ id: 'shell.setup.title', defaultMessage: 'Agent Setup', description: 'The title of Help → Agent Setup.' }))}
+      title={tr(msg({ id: 'shell.setup.title', defaultMessage: 'Provider Setup', description: 'The title of Help → Provider Setup.' }))}
       icon="hubot"
       wide
       onClose={close}
       footer={
         <>
           <button className="btn subtle" onClick={() => void call('app:openExternal', p.setupUrl)}>
-            <Icon name="link-external" /> {tr(msg({ id: 'shell.setup.docs', defaultMessage: '{provider} docs', description: "Agent Setup's button: opens the coding agent's own documentation. {provider} is its name." }), { provider: p.name })}
+            <Icon name="link-external" /> {tr(msg({ id: 'shell.setup.docs', defaultMessage: '{provider} docs', description: "Provider Setup's button: opens the coding agent's own documentation. {provider} is its name." }), { provider: p.name })}
           </button>
           <div className="grow" />
           <button className="btn subtle" onClick={() => void recheck()} disabled={busy || running}>
-            <Icon name={busy ? 'loading' : 'refresh'} spin={busy} /> {tr(msg({ id: 'shell.setup.checkAgain', defaultMessage: 'Check again', description: "Agent Setup's button: looks for the CLI, git and updates again." }))}
+            <Icon name={busy ? 'loading' : 'refresh'} spin={busy} /> {tr(msg({ id: 'shell.setup.checkAgain', defaultMessage: 'Check again', description: "Provider Setup's button: looks for the CLI, git and updates again." }))}
           </button>
           <button className="btn primary" onClick={close}>
             {running ? tr(msg({ id: 'shell.dialog.cancel', defaultMessage: 'Cancel', description: "A dialog's button that closes it without doing anything." })) : tr(msg({ id: 'shell.close', defaultMessage: 'Close', description: 'Closes a panel or a dialog.' }))}
@@ -907,7 +907,7 @@ export function AgentSetupDialog() {
         <div className="setup-tabs">
           {PROVIDERS.map((x) => (
             <button key={x.id} className={cx('setup-tab', tab === x.id && 'selected')} disabled={running} onClick={() => { setTab(x.id); setFinished(null) }}>
-              <ProviderIcon provider={x.id} /> {isProviderEnabled(settings, x.id) ? x.name : <span>{tRich(msg({ id: 'shell.setup.tabOff', defaultMessage: '{provider}<faint> (off)</faint>', description: 'A tab of Agent Setup for a provider that is turned off. {provider} is its name; <faint> is greyed.' }), { provider: x.name, faint })}</span>}
+              <ProviderIcon provider={x.id} /> {isProviderEnabled(settings, x.id) ? x.name : <span>{tRich(msg({ id: 'shell.setup.tabOff', defaultMessage: '{provider}<faint> (off)</faint>', description: 'A tab of Provider Setup for a provider that is turned off. {provider} is its name; <faint> is greyed.' }), { provider: x.name, faint })}</span>}
             </button>
           ))}
         </div>
@@ -916,7 +916,7 @@ export function AgentSetupDialog() {
         <div className="banner info" style={{ borderRadius: 6, marginBottom: 10 }}>
           <Icon name="info" />
           <span>
-            {tRich(msg({ id: 'shell.setup.off', defaultMessage: "{provider} is turned off, so Hive doesn't run it. <on>Turn it on</on>", description: 'Agent Setup for a provider that is turned off. {provider} is its name; <on> is a link that turns it on.' }), {
+            {tRich(msg({ id: 'shell.setup.off', defaultMessage: "{provider} is turned off, so Hive doesn't run it. <on>Turn it on</on>", description: 'Provider Setup for a provider that is turned off. {provider} is its name; <on> is a link that turns it on.' }), {
               provider: p.name,
               on: linkTo('on', () => void call('settings:update', { providers: { [tab]: { enabled: true } } }).then((ns) => set({ settings: ns })))
             })}
@@ -927,7 +927,7 @@ export function AgentSetupDialog() {
       {!info || info.checking ? (
         <div className="setup-status">
           <Icon name="loading" spin />
-          <div>{tr(msg({ id: 'shell.setup.looking', defaultMessage: 'Looking for {provider}…', description: 'Agent Setup while Hive looks for a CLI. {provider} is its name.' }), { provider: p.name })}</div>
+          <div>{tr(msg({ id: 'shell.setup.looking', defaultMessage: 'Looking for {provider}…', description: 'Provider Setup while Hive looks for a CLI. {provider} is its name.' }), { provider: p.name })}</div>
         </div>
       ) : info.found ? (
         <>
@@ -935,7 +935,7 @@ export function AgentSetupDialog() {
           <Icon name="pass-filled" className="" />
           <div className="grow">
             <div>
-              {tRich(msg({ id: 'shell.setup.found', defaultMessage: '<b>{provider} {version}</b> <muted>— found via {source}</muted>', description: 'Agent Setup: the CLI Hive found. {provider} is its name, {version} its version, {source} where it was found (PATH, an install folder); <b> is bold, <muted> greyed.' }), { provider: p.name, version: info.version ?? '', source: installSourceText(info.source, tr), b: bold, muted })}
+              {tRich(msg({ id: 'shell.setup.found', defaultMessage: '<b>{provider} {version}</b> <muted>— found via {source}</muted>', description: 'Provider Setup: the CLI Hive found. {provider} is its name, {version} its version, {source} where it was found (PATH, an install folder); <b> is bold, <muted> greyed.' }), { provider: p.name, version: info.version ?? '', source: installSourceText(info.source, tr), b: bold, muted })}
             </div>
             <div className="setup-path muted mono" title={info.path ?? undefined}>
               {info.path}
@@ -944,7 +944,7 @@ export function AgentSetupDialog() {
             <div className="setup-badges">
               {info.loggedIn === true && (
                 <span className="badge success" data-signin={info.authMethod ?? ''}>
-                  <Icon name="account" /> {tr(msg({ id: 'shell.setup.signedInAs', defaultMessage: '{account, select, none {Signed in} other {Signed in as {account}}}{method, select, none {} other { ({method})}}', description: 'A badge in Agent Setup: the CLI is signed in. {account} is the account, {method} how it signed in (none: not known).' }), { account: info.account || 'none', method: info.authMethod || 'none' })}
+                  <Icon name="account" /> {tr(msg({ id: 'shell.setup.signedInAs', defaultMessage: '{account, select, none {Signed in} other {Signed in as {account}}}{method, select, none {} other { ({method})}}', description: 'A badge in Provider Setup: the CLI is signed in. {account} is the account, {method} how it signed in (none: not known).' }), { account: info.account || 'none', method: info.authMethod || 'none' })}
                 </span>
               )}
               {issues.map((r) => (
@@ -952,7 +952,7 @@ export function AgentSetupDialog() {
                   {r.message}
                 </span>
               ))}
-              {!info.updateAvailable && info.latestVersion && <span className="badge">{tr(msg({ id: 'shell.setup.upToDate', defaultMessage: 'Up to date', description: 'A badge in Agent Setup: the CLI is the newest version.' }))}</span>}
+              {!info.updateAvailable && info.latestVersion && <span className="badge">{tr(msg({ id: 'shell.setup.upToDate', defaultMessage: 'Up to date', description: 'A badge in Provider Setup: the CLI is the newest version.' }))}</span>}
             </div>
             {!!info.notes?.length && (
               <div className="setup-notes">
@@ -991,11 +991,11 @@ export function AgentSetupDialog() {
           <div className="setup-status">
             <Icon name="warning" />
             <div className="grow">
-              <strong>{tr(msg({ id: 'shell.setup.notInstalled', defaultMessage: '{provider} is not installed', description: "Agent Setup when a CLI isn't installed. {provider} is its name." }), { provider: p.name })}</strong>
-              <div className="muted">{tr(msg({ id: 'shell.setup.notInstalledDetail', defaultMessage: "Hive runs the standalone {provider} command-line tool in each project. It isn't bundled with Hive — install it with {company}'s official installer.", description: 'Agent Setup, under "<provider> is not installed". {provider} is the coding agent\'s name, {company} its maker\'s.' }), { provider: p.name, company: p.company })}</div>
+              <strong>{tr(msg({ id: 'shell.setup.notInstalled', defaultMessage: '{provider} is not installed', description: "Provider Setup when a CLI isn't installed. {provider} is its name." }), { provider: p.name })}</strong>
+              <div className="muted">{tr(msg({ id: 'shell.setup.notInstalledDetail', defaultMessage: "Hive runs the standalone {provider} command-line tool in each project. It isn't bundled with Hive — install it with {company}'s official installer.", description: 'Provider Setup, under "<provider> is not installed". {provider} is the coding agent\'s name, {company} its maker\'s.' }), { provider: p.name, company: p.company })}</div>
             </div>
             <button className="btn primary" disabled={running} onClick={() => void start('install')}>
-              <Icon name="cloud-download" /> {tr(msg({ id: 'shell.setup.install', defaultMessage: 'Install {provider}', description: "Agent Setup's button: installs the CLI. {provider} is its name." }), { provider: p.name })}
+              <Icon name="cloud-download" /> {tr(msg({ id: 'shell.setup.install', defaultMessage: 'Install {provider}', description: "Provider Setup's button: installs the CLI. {provider} is its name." }), { provider: p.name })}
             </button>
           </div>
           {info.editorExtensionOnly && p.extensionNote && (
@@ -1013,7 +1013,7 @@ export function AgentSetupDialog() {
       )}
       {!!info?.rejected?.length && (
         <p className="hint setup-wrap">
-          <Icon name="info" /> {tRich(msg({ id: 'shell.setup.rejected', defaultMessage: '{n, plural, one {Ignored a copy} other {Ignored copies}} bundled with an editor extension ({path}). Hive only uses the standalone CLI.', description: "Agent Setup when it found a CLI only inside an editor's extension. {n} is how many; {path} is where (one of them)." }), { n: info.rejected.length, path: <CopyableCode key="path" code={info.rejected[0]} /> })}
+          <Icon name="info" /> {tRich(msg({ id: 'shell.setup.rejected', defaultMessage: '{n, plural, one {Ignored a copy} other {Ignored copies}} bundled with an editor extension ({path}). Hive only uses the standalone CLI.', description: "Provider Setup when it found a CLI only inside an editor's extension. {n} is how many; {path} is where (one of them)." }), { n: info.rejected.length, path: <CopyableCode key="path" code={info.rejected[0]} /> })}
         </p>
       )}
       <GitSetupRow />
@@ -1264,7 +1264,7 @@ export function ProvidersBanner() {
         </span>
         <span className="wrap-banner-actions">
           <button className="btn small primary" onClick={() => set({ setupOpen: on[0].id })}>
-            {tr(msg({ id: 'shell.providers.setup', defaultMessage: 'Agent Setup', description: "The banner's button: opens Agent Setup." }))}
+            {tr(msg({ id: 'shell.providers.setup', defaultMessage: 'Provider Setup', description: "The banner's button: opens Provider Setup." }))}
           </button>
         </span>
       </div>
@@ -1286,7 +1286,7 @@ export function ProvidersBanner() {
           </span>
           <span className="wrap-banner-actions">
             <button className="btn small primary" onClick={() => set({ setupOpen: p.id })}>
-              {r.action?.label ?? tr(msg({ id: 'shell.providers.setUp', defaultMessage: 'Set up', description: "A provider's banner's button when Hive names no other action: opens Agent Setup." }))}
+              {r.action?.label ?? tr(msg({ id: 'shell.providers.setUp', defaultMessage: 'Set up', description: "A provider's banner's button when Hive names no other action: opens Provider Setup." }))}
             </button>
           </span>
         </div>

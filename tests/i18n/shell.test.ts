@@ -6,7 +6,7 @@ import { PSEUDO_LANGUAGE } from '../../src/shared/i18n/languages'
 import { otherUsers, shortcutUsers } from '../../src/renderer/src/keyConflicts'
 
 // #795: the `shell` area: commands (their names, categories and hover tips), the title bar's menus, the command palette,
-// dialog chrome, the quit, Compact and Agent Setup dialogs, About, Diagnostics and shortcuts. The renderer's modules
+// dialog chrome, the quit, Compact and Provider Setup dialogs, About, Diagnostics and shortcuts. The renderer's modules
 // load React views, so this checks commands.ts's source and the area's messages as extracted.
 
 const ROOT = resolve(__dirname, '../..')

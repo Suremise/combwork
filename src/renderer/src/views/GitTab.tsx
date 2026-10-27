@@ -28,7 +28,7 @@ export const GIT_TEXT = {
   howTo: msg({ id: 'git.setup.howTo', defaultMessage: 'To use them, make it a repository: Initialise makes it one on a branch called main, keeps its .hive out of git, and commits its files, so agents can work in worktrees at once. Then add a remote under Branches & remotes to push it.', description: "The Git tab of a project that isn't a git repository. Initialise and Branches & remotes are a button and a section: keep them as they are named there. Keep main (the branch name)." }),
   cantRead: msg({ id: 'git.problem.cantRead', defaultMessage: "{problem}, so Hive can't read this repository.", description: 'The Git tab when git cannot run. {problem} says why, such as "Git isn\'t installed (or isn\'t on Hive\'s PATH)".' }),
   learnMore: msg({ id: 'git.setup.learnMore', defaultMessage: 'Learn more', description: "Link on the Git tab of a project that isn't a git repository: opens the user guide's Git view section." }),
-  agentSetup: msg({ id: 'git.problem.agentSetup', defaultMessage: 'Agent Setup', description: 'Button: opens Agent Setup, which checks git and says how to fix it.' }),
+  agentSetup: msg({ id: 'git.problem.agentSetup', defaultMessage: 'Provider Setup', description: 'Button: opens Provider Setup, which checks git and says how to fix it.' }),
   retry: msg({ id: 'git.retry', defaultMessage: 'Retry', description: 'Button: reads git again.' }),
   reading: msg({ id: 'git.reading', defaultMessage: 'Reading git…', description: "A Git tab section while it reads git for the first time." }),
   historyLoad: msg({ id: 'git.history.loadTarget', defaultMessage: 'the history', description: 'What could not be read in Git → History: shown in "Could not load {what}: {error}" and "Could not refresh {what}; last updated …".' }),

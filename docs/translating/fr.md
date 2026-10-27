@@ -43,7 +43,7 @@ Translate the meaning, not the words, and keep the result as short and plain.
   inside Validé), *Terminé*. In running text name the column (*dans la colonne Relecture*, *passe en Terminé*,
   *revient en Validé*), never an agreed participle (*jusqu’à ce qu’elle passe en Terminé*, not *soit Terminée*).
 - **Where things are:** paths through menus and settings keep Hive's arrows, with each name as Hive shows it in
-  French: *Paramètres → Fournisseurs*, *Aide → Configuration des agents*.
+  French: *Paramètres → Fournisseurs*, *Aide → Configuration des fournisseurs*.
 
 ## Grammar
 

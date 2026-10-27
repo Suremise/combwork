@@ -144,7 +144,7 @@ English, it is as German developers say it.
 | backup | Sicherung | |
 | staged | bereitgestellt | As VS Code says. Never *vorgemerkt*. |
 | watch (a card watch) | Beobachtung, Kartenbeobachtung | |
-| Agent Setup | Agent-Einrichtung | |
+| Provider Setup | Anbieter-Einrichtung | |
 | the shipped modes (Coordinator, Planner, QA triager, Release manager) | Koordinator, Planer, QA-Triage, Release-Manager | As `assistant.modes.shipped.*` shows them. |
 
 Common UI words, for consistency:

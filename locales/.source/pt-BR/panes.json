@@ -42,7 +42,7 @@
   "panes.empty.onPage": "Page {page}",
   "panes.failed.dismiss": "Dismiss (the terminal keeps the output)",
   "panes.failed.retry": "Retry",
-  "panes.failed.setup": "Agent Setup…",
+  "panes.failed.setup": "Provider Setup…",
   "panes.failed.title": "Couldn't start:",
   "panes.footer.compactionHistory": "Click to view compaction history",
   "panes.footer.compactions": "{n, plural, one {# compaction so far} other {# compactions so far}}{over, select, yes { — consider compacting} other {}}",

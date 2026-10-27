@@ -1,4 +1,4 @@
-// A Copy button beside every command Agent Setup shows (#1204, Darren's Store PowerShell fix): Codex found, with the
+// A Copy button beside every command Provider Setup shows (#1204, Darren's Store PowerShell fix): Codex found, with the
 // warning about the Microsoft Store's PowerShell 7 and its detail (the symptom's error text, and the uninstall command
 // before the winget one, #1512: each as code); Claude Code not installed, with its install note (the installer's command and folder). Each code span has
 // its own Copy button; it copies exactly that command (a fake clipboard in the page: the real one is never touched) and
@@ -76,7 +76,7 @@ async function openSetup(app, page, lang = 'en') {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     try {
       const setup = await openSetup(app, page)
-      check('Agent Setup opens', (await setup.count()) === 1)
+      check('Provider Setup opens', (await setup.count()) === 1)
       await setup.locator('.setup-tab', { hasText: 'Codex' }).click()
       const winget = setup.locator(`.copy-code-btn[data-copy-code="${WINGET}"]`)
       check('the winget command has a Copy button beside it', !!(await lib.until(async () => (await winget.count()) === 1, HUNG_MS)))

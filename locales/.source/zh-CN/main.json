@@ -79,7 +79,7 @@
   "main.gitInit.fix.staged": "check the .gitignore for a rule that brings .hive back",
   "main.gitInit.nested": "This folder is inside the git repository in {root}. Confirm that you want a repository of its own inside it.",
   "main.gitInit.noEmail": "Git has no email to make the first commit as: enter one.",
-  "main.gitInit.noGit": "{problem}: Agent Setup says how to fix it.",
+  "main.gitInit.noGit": "{problem}: Provider Setup says how to fix it.",
   "main.gitInit.noName": "Git has no name to make the first commit as: enter one.",
   "main.gitInit.otherVcs": "{vcs} keeps this folder (in {root}): Hive makes a git repository only where no other version control system is.",
   "main.gitInit.step.commit": "{n, plural, one {committed # file} other {committed # files}}",

@@ -278,7 +278,7 @@
   "workflow.refused.paths.excluded.message": "{card}: {path} está en {folder}, que un proyecto sin control de versiones deja fuera de su trabajo.",
   "workflow.refused.paths.excluded.next": "Declara solo los archivos del trabajo, fuera de {folder}: las rutas de una tarjeta acotan el trabajo del proyecto, nunca lo amplían.",
   "workflow.refused.platform.unknown.message": "{card}: Hive no pudo leer {what}, así que no se puede comprobar la regla {rule}.",
-  "workflow.refused.platform.unknown.next": "Revisa Configuración de agentes o la carpeta y vuelve a intentarlo.",
+  "workflow.refused.platform.unknown.next": "Revisa Configuración de proveedores o la carpeta y vuelve a intentarlo.",
   "workflow.refused.platform.unknown.nextGone": "El repositorio Git del proyecto ya no está: pide al usuario que lo restaure o que cambie el proyecto a Ninguno en su pestaña Control de versiones (a partir de la próxima tarjeta).",
   "workflow.refused.queue.advancing.message": "La tarjeta {card} se está fusionando ahora en {target}: ya no se puede quitar de la cola de fusión.",
   "workflow.refused.queue.advancing.next": "Espera a que termine la fusión. Si el cambio no se quiere, reviértelo en {target}.",

@@ -17,7 +17,7 @@ This document explains how Hive is put together, for anyone changing the code. P
 | `src/shared/providers.ts`, `claude.ts`, `codex.ts`, `copilot.ts` | Provider descriptors (names, modes, models, capabilities) and settings resolution helpers |
 | `src/shared/models.ts`, `src/main/providers/*/models.ts` | Models and capabilities from the CLIs (Claude Code's initialize, codex debug models, Copilot's ACP session), with the editable fallbacks: what the pickers, the footer and the Agent API offer |
 | `src/main/providers/` | `ProviderAdapter` interface, registry, `claude/`, `codex/` and `copilot/` adapters (launch, hooks, transcripts, usage, conversation parsers) |
-| `src/main/providerService.ts` | Each provider's install info, readiness and setup tasks (Agent Setup) |
+| `src/main/providerService.ts` | Each provider's install info, readiness and setup tasks (Provider Setup) |
 | `src/shared/advanced.ts`, `src/main/advanced.ts`, `src/renderer/src/components/AdvancedSettings.tsx` | Advanced settings (#367): the overridable defaults with their recorded samples, advanced.json and the CLI versions overrides were made for, Settings → Advanced's list |
 | `src/shared/prices.ts`, `instructions.ts` | Price tables and cost estimates; shared AGENTS.md logic |
 | `src/main/servers.ts` | Hook server (random port) and Agent API |

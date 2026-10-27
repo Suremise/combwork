@@ -1542,7 +1542,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
 
     'provider:info': () => providerService.shown(),
     'provider:refresh': async (id) => {
-      // Agent Setup's Check again looks at git too (#346), on the PATH a new process would get (#472).
+      // Provider Setup's Check again looks at git too (#346), on the PATH a new process would get (#472).
       await refreshPath()
       await Promise.all([providerService.refresh(id, true), checkGit()])
       return providerService.shown()

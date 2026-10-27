@@ -40,7 +40,7 @@
   "panes.empty.onPage": "Página {page}",
   "panes.failed.dismiss": "Descartar (la terminal conserva la salida)",
   "panes.failed.retry": "Reintentar",
-  "panes.failed.setup": "Configuración de agentes…",
+  "panes.failed.setup": "Configuración de proveedores…",
   "panes.failed.title": "No se pudo iniciar:",
   "panes.footer.compactionHistory": "Haz clic para ver el historial de compactaciones",
   "panes.footer.compactions": "{n, plural, one {# compactación hasta ahora} many {# compactaciones hasta ahora} other {# compactaciones hasta ahora}}{over, select, yes { — considera compactar} other {}}",

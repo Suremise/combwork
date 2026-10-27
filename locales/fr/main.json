@@ -79,7 +79,7 @@
   "main.gitInit.fix.staged": "cherche dans le .gitignore une règle qui réintègre .hive",
   "main.gitInit.nested": "Ce dossier se trouve dans le dépôt git situé dans {root}. Confirme que tu veux un dépôt distinct à l’intérieur.",
   "main.gitInit.noEmail": "Git n’a pas d’adresse e-mail pour faire le premier commit : saisis-en une.",
-  "main.gitInit.noGit": "{problem} : Configuration des agents explique comment corriger cela.",
+  "main.gitInit.noGit": "{problem} : Configuration des fournisseurs explique comment corriger cela.",
   "main.gitInit.noName": "Git n’a pas de nom pour faire le premier commit : saisis-en un.",
   "main.gitInit.otherVcs": "{vcs} gère ce dossier (dans {root}) : Hive ne crée un dépôt git que là où aucun autre système de gestion de versions n’est présent.",
   "main.gitInit.step.commit": "{n, plural, one {premier commit de # fichier} many {premier commit de # fichiers} other {premier commit de # fichiers}}",

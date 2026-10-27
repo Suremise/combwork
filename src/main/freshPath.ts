@@ -143,7 +143,7 @@ const cliFolders = new Map<string, string>()
 /**
  * Notes where Hive found a provider's CLI (null: not found), for the PATH of what Hive starts (#1103): a standalone CLI
  * found where its installer puts it (Claude Code's `~\.local\bin`) needn't be on any PATH, and Claude Code's native
- * installer can leave it off, so Agent Setup found it while the sessions and terminals Hive starts couldn't run it by
+ * installer can leave it off, so Provider Setup found it while the sessions and terminals Hive starts couldn't run it by
  * name. Hive's own PATH, which it finds the CLIs on, stays as it is (a folder found by a fixed place mustn't come before
  * one an installer adds later), and the user's PATH in the registry is never changed.
  */
@@ -158,7 +158,7 @@ export function noteCliFolder(id: string, executable: string | null): void {
 
 /**
  * The PATH for a process Hive starts (`childEnv`): `path` with the found CLIs' folders it lacks at its end, so the
- * session or terminal runs by name the CLI Agent Setup found (#1103), and nothing already on PATH resolves differently.
+ * session or terminal runs by name the CLI Provider Setup found (#1103), and nothing already on PATH resolves differently.
  */
 export function withCliFolders(path: string): string {
   return mergePath(path, [...cliFolders.values()]).value

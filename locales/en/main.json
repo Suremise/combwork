@@ -320,8 +320,8 @@
     "description": "Why a folder was not made a git repository: no email address to commit as is set, and the user entered none."
   },
   "main.gitInit.noGit": {
-    "defaultMessage": "{problem}: Agent Setup says how to fix it.",
-    "description": "Why a folder can't be made a git repository (the Initialise Git Repository dialog): git is missing or broken. {problem} says what's wrong. Agent Setup is a view's name."
+    "defaultMessage": "{problem}: Provider Setup says how to fix it.",
+    "description": "Why a folder can't be made a git repository (the Initialise Git Repository dialog): git is missing or broken. {problem} says what's wrong. Provider Setup is a view's name."
   },
   "main.gitInit.noName": {
     "defaultMessage": "Git has no name to make the first commit as: enter one.",

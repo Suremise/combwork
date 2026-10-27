@@ -84,7 +84,7 @@ export function resumeBlock(s: Resumable, ctx: ResumeContext): string | null {
   if (ctx.live) return tr(msg({ id: 'agents.resume.running', defaultMessage: 'It is running now.', description: "Why a session in the Sessions tab can't be resumed: it is running." }))
   if (!s.hasTranscript && !s.hasBackup) return tr(msg({ id: 'agents.resume.noTranscript', defaultMessage: 'Neither {cli} nor Hive has its transcript any more, so there is nothing to resume.', description: "Why a session can't be resumed: its conversation's file is gone from the CLI ({cli}) and from Hive's backup." }), { cli: who })
   if (!ctx.providerEnabled) return tr(msg({ id: 'agents.resume.providerOff', defaultMessage: '{cli} is turned off. Turn it on in Settings → Providers to resume it.', description: "Why a session can't be resumed: its CLI ({cli}) is turned off. Settings → Providers is where: use its translated names." }), { cli: who })
-  if (ctx.providerInstalled === false) return tr(msg({ id: 'agents.resume.notInstalled', defaultMessage: "{cli} isn't installed. Set it up in Agent Setup to resume it.", description: "Why a session can't be resumed: its CLI ({cli}) isn't installed. Agent Setup is a Help window: use its translated name." }), { cli: who })
+  if (ctx.providerInstalled === false) return tr(msg({ id: 'agents.resume.notInstalled', defaultMessage: "{cli} isn't installed. Set it up in Provider Setup to resume it.", description: "Why a session can't be resumed: its CLI ({cli}) isn't installed. Provider Setup is a Help window: use its translated name." }), { cli: who })
   if (ctx.assistant) return null
   if (!ctx.runners.length && !ctx.canAddAgent) {
     return s.cwd && !(ctx.projectPath && samePath(s.cwd, ctx.projectPath))

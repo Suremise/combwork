@@ -156,7 +156,7 @@
   "session.start.openIn": "Diese Unterhaltung ist bereits in {agent} geöffnet. Ein Agent kann nur eine Sitzung fortsetzen, die kein anderer Agent ausführt.",
   "session.start.otherFolder": "Diese Sitzung lief in {folder}. Setze sie mit dem Agenten fort, der in diesem Ordner arbeitet.",
   "session.start.projectRunning": "Für dieses Projekt läuft bereits eine Sitzung. Stoppe sie zuerst.",
-  "session.start.providerMissing": "{resuming, select, yes {Zum Fortsetzen dieser Unterhaltung wird {provider} benötigt. Installation über Hilfe → Agent-Einrichtung.} other {Für Agent {agent} wird {provider} benötigt. Installation über Hilfe → Agent-Einrichtung.}}",
+  "session.start.providerMissing": "{resuming, select, yes {Zum Fortsetzen dieser Unterhaltung wird {provider} benötigt. Installation über Hilfe → Anbieter-Einrichtung.} other {Für Agent {agent} wird {provider} benötigt. Installation über Hilfe → Anbieter-Einrichtung.}}",
   "session.start.providerOff": "{provider} ist ausgeschaltet. {resuming, select, yes {Schalte den Anbieter unter Einstellungen → Anbieter ein, um diese Unterhaltung fortzusetzen.} other {Schalte den Anbieter unter Einstellungen → Anbieter ein, um Agent {agent} auszuführen.}}",
   "session.start.removing": "Dieses Projekt wird entfernt",
   "session.start.repairing": "Hive repariert diesen verschobenen Arbeitsbereich: Starte den Agenten, wenn „Reparieren“ fertig ist.",

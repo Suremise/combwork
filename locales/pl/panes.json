@@ -40,7 +40,7 @@
   "panes.empty.onPage": "Strona {page}",
   "panes.failed.dismiss": "Odrzuć (terminal zachowa wyjście)",
   "panes.failed.retry": "Ponów",
-  "panes.failed.setup": "Konfiguracja agentów…",
+  "panes.failed.setup": "Konfiguracja dostawców…",
   "panes.failed.title": "Nie udało się uruchomić:",
   "panes.footer.compactionHistory": "Kliknij, aby zobaczyć historię kompaktowania",
   "panes.footer.compactions": "{n, plural, one {Dotąd # kompaktowanie} few {Dotąd # kompaktowania} many {Dotąd # kompaktowań} other {Dotąd # kompaktowania}}{over, select, yes { – rozważ kompaktowanie} other {}}",

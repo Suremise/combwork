@@ -356,11 +356,11 @@
     "description": "An error loading a template: the names chosen for its agents in the Load template dialog no longer fit it (it was edited meanwhile)."
   },
   "content.templates.neededBy": {
-    "defaultMessage": "{problem, select, unknown {This Hive doesn't know the coding agent \"{provider}\" (update Hive), needed by {agents}.} off {{provider} is turned off (Settings → Providers), needed by {agents}.} other {{provider} isn't installed (Agent Setup), needed by {agents}.}}",
+    "defaultMessage": "{problem, select, unknown {This Hive doesn't know the coding agent \"{provider}\" (update Hive), needed by {agents}.} off {{provider} is turned off (Settings → Providers), needed by {agents}.} other {{provider} isn't installed (Provider Setup), needed by {agents}.}}",
     "description": "Why a template can't be loaded: a coding agent CLI its agents {agents} (their names, listed in the language's way: \"Builder and Reviewer\") need. {problem} and {provider} as in the reason without the agents."
   },
   "content.templates.needsIt": {
-    "defaultMessage": "{problem, select, unknown {This Hive doesn't know the coding agent \"{provider}\" (update Hive): {agent} needs it.} off {{provider} is turned off (Settings → Providers): {agent} needs it.} other {{provider} isn't installed (Agent Setup): {agent} needs it.}}",
+    "defaultMessage": "{problem, select, unknown {This Hive doesn't know the coding agent \"{provider}\" (update Hive): {agent} needs it.} off {{provider} is turned off (Settings → Providers): {agent} needs it.} other {{provider} isn't installed (Provider Setup): {agent} needs it.}}",
     "description": "An error adding one agent from a template: the coding agent CLI it needs. {agent} is its name; {problem} and {provider} as in the reason a template can't be loaded."
   },
   "content.templates.noAgents": {
@@ -388,8 +388,8 @@
     "description": "An error loading a template, nothing changed: {problem} is why, a sentence of its own (how many agents a project can have)."
   },
   "content.templates.provider": {
-    "defaultMessage": "{problem, select, unknown {This Hive doesn't know the coding agent \"{provider}\" (update Hive)} off {{provider} is turned off (Settings → Providers)} other {{provider} isn't installed (Agent Setup)}}",
-    "description": "Why a template can't be loaded: a coding agent CLI it needs. {problem} is why: unknown ({provider} is the id the template gives, which this version of Hive doesn't know), off (turned off in Settings → Providers), or not installed (Agent Setup is a Help window). {provider} is otherwise its name (\"Codex\")."
+    "defaultMessage": "{problem, select, unknown {This Hive doesn't know the coding agent \"{provider}\" (update Hive)} off {{provider} is turned off (Settings → Providers)} other {{provider} isn't installed (Provider Setup)}}",
+    "description": "Why a template can't be loaded: a coding agent CLI it needs. {problem} is why: unknown ({provider} is the id the template gives, which this version of Hive doesn't know), off (turned off in Settings → Providers), or not installed (Provider Setup is a Help window). {provider} is otherwise its name (\"Codex\")."
   },
   "content.templates.running": {
     "defaultMessage": "{agent} is running or starting: stop it first.",

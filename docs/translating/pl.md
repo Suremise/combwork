@@ -153,7 +153,7 @@ The words Polish uses for Hive's terms ([glossary.md](glossary.md)). Use them ev
 | Storage (a project's) | Miejsce na dysku | Clean Up…: Wyczyść…. |
 | Repair (a moved workspace) | Naprawa (button: Napraw…) | |
 | Recycle Bin / File Explorer | Kosz / Eksplorator plików | |
-| Agent Setup | Konfiguracja agentów | |
+| Provider Setup | Konfiguracja dostawców | |
 | Mark idle | Oznacz jako bezczynny | |
 | layouts | Pojedynczo, Dwie kolumny, Trzy kolumny, Siatka 2×2, Siatka 3×2 | |
 | the Assistant's modes | Koordynator, Planista, Triażysta QA, Menedżer wydań | |

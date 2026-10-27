@@ -79,7 +79,7 @@
   "main.gitInit.fix.staged": "sprawdź, czy w pliku .gitignore nie ma reguły, która przywraca .hive",
   "main.gitInit.nested": "Ten folder leży w repozytorium git w folderze {root}. Potwierdź, że chcesz w nim osobnego repozytorium.",
   "main.gitInit.noEmail": "Git nie ma adresu e-mail do pierwszego commita: wpisz go.",
-  "main.gitInit.noGit": "{problem}: Konfiguracja agentów podpowie, jak to naprawić.",
+  "main.gitInit.noGit": "{problem}: Konfiguracja dostawców podpowie, jak to naprawić.",
   "main.gitInit.noName": "Git nie ma nazwy użytkownika do pierwszego commita: wpisz ją.",
   "main.gitInit.otherVcs": "Ten folder (w {root}) obsługuje {vcs}: Hive tworzy repozytorium git tylko tam, gdzie nie ma innego systemu kontroli wersji.",
   "main.gitInit.step.commit": "{n, plural, one {utworzono commit z # plikiem} few {utworzono commit z # plikami} many {utworzono commit z # plikami} other {utworzono commit z # pliku}}",

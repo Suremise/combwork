@@ -357,7 +357,7 @@ interface State {
   /** Hive's own update state, and whether its dialog is open. */
   update: UpdateState | null
   updateOpen: boolean
-  /** The Agent Setup dialog, open at a provider (or at the first one). */
+  /** The Provider Setup dialog, open at a provider (or at the first one). */
   setupOpen: ProviderId | true | false
   /** Repair… for a moved workspace (#146), and the move whose banner was hidden (until Hive restarts). */
   moveRepairOpen: boolean

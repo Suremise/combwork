@@ -1,6 +1,6 @@
 // The CLI versions a Hive release was tested with (#365): read from the real tier's run record (never typed by hand),
 // written into resources/tested-clis.json by `npm run tested-clis`, checked by `npm run release`, and compared with the
-// installed version for Agent Setup, Copy Diagnostics and the Agent API.
+// installed version for Provider Setup, Copy Diagnostics and the Agent API.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join, win32 } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'

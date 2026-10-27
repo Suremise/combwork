@@ -5,7 +5,7 @@
 //    (Claude Code, turned off; Settings' or the project's) is named in the empty project, and Add Agent keeps it chosen,
 //    says why it can't add, and adds nothing until another provider is chosen.
 // 2. Claude Code turned on but not installed (hidden: a PATH without it, and a home and AppData of the suite's own, as
-//    the Copilot stand-in does), Codex installed: nothing warns about Claude Code (no banner, no Agent Setup opening, a
+//    the Copilot stand-in does), Codex installed: nothing warns about Claude Code (no banner, no Provider Setup opening, a
 //    plain status bar item) until an agent uses it.
 // Throwaway profiles, workspace and CODEX_HOME; quiet. No real CLI is installed or signed in.
 const lib = require('./lib.cjs')
@@ -142,11 +142,11 @@ const check = (name, ok, extra = '') => {
   await lib.openWorkspace(two.inv, two.page, ws)
   await two.page.getByText('alpha', { exact: true }).first().click()
   await lib.until(async () => (await two.page.locator('.session-empty-card').count()) === 1, 10000)
-  // Hive has looked for the CLIs (launch waited for it): Agent Setup would open at once if it were going to.
+  // Hive has looked for the CLIs (launch waited for it): Provider Setup would open at once if it were going to.
   await lib.sleep(1000) // on purpose: nothing should appear
   const banners = await two.page.locator('.providers-banner').allInnerTexts()
   check('no banner about Claude Code', !banners.some((b) => b.includes('Claude Code')), JSON.stringify(banners))
-  check('Agent Setup did not open by itself', (await two.page.locator('.dialog', { hasText: 'Agent Setup' }).count()) === 0)
+  check('Provider Setup did not open by itself', (await two.page.locator('.dialog', { hasText: 'Provider Setup' }).count()) === 0)
   check('the status bar shows Claude Code plainly, not as a warning', (await two.page.locator('[data-unused-provider="claude-code"]').count()) === 1 && (await two.page.locator('.statusbar .status-item.warn', { hasText: 'Claude Code' }).count()) === 0)
   check('the empty project names Codex, with no warning', (await two.page.locator('.session-empty-card').innerText()).includes('adds a Codex agent') && (await two.page.locator('[data-provider-warning]').count()) === 0)
   await two.page.screenshot({ path: path.join(lib.WORK, 'defprov-claude-unused.png') })

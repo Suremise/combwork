@@ -127,7 +127,7 @@ function forEvent(e: HiveEvent): BrowserWindow[] {
 }
 
 function forPty(key: string): BrowserWindow[] {
-  // session:<project path>#<agent id>: the window showing that project. Other terminals (Agent Setup's
+  // session:<project path>#<agent id>: the window showing that project. Other terminals (Provider Setup's
   // tasks) go to every window; only the one that started the task shows it.
   const m = /^session:(.+)#[^#]+$/.exec(key)
   return m ? wins([windowForPath(m[1])]) : wins(hiveWindows())

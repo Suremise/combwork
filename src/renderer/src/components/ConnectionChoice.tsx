@@ -181,8 +181,8 @@ const SETUP = {
   text: msg({ id: 'project.banner.connectionSetup', defaultMessage: "No {cli} connection is on in this workspace, so its agents can't start. Add one and sign it in.", description: 'Banner in a project whose agents\' CLI ({cli}: "Claude Code") has no connection on in the workspace (HI-1755).' }),
   assistant: msg({ id: 'assistant.banner.connectionSetup', defaultMessage: "No {cli} connection is on in this workspace, so the Assistant can't start. Add one and sign it in.", description: 'Banner in the Assistant panel when its coding agent CLI ({cli}: "Claude Code") has no connection on in the workspace (HI-1774): it can\'t start until one is.' }),
   add: msg({ id: 'project.banner.connectionSetupAdd', defaultMessage: 'Add a Connection', description: 'Button on the banner asking for a connection: opens Settings → Connections.' }),
-  setupLine: msg({ id: 'shell.setup.connections', defaultMessage: '{n, plural, =0 {{cli} signs in per connection, and none is on in this workspace yet: add one and sign it in.} one {{cli} signs in per connection: # is on in this workspace.} other {{cli} signs in per connection: # are on in this workspace.}}', description: 'Agent Setup, for a coding agent CLI ({cli}: "Claude Code") that signs in per connection (Settings → Connections) rather than here (HI-1774). {n} is how many of its connections are on in the open workspace.' }),
-  open: msg({ id: 'shell.setup.openConnections', defaultMessage: 'Open Connections', description: "Agent Setup's button: opens Settings → Connections, where a coding agent CLI's connections are added and signed in." })
+  setupLine: msg({ id: 'shell.setup.connections', defaultMessage: '{n, plural, =0 {{cli} signs in per connection, and none is on in this workspace yet: add one and sign it in.} one {{cli} signs in per connection: # is on in this workspace.} other {{cli} signs in per connection: # are on in this workspace.}}', description: 'Provider Setup, for a coding agent CLI ({cli}: "Claude Code") that signs in per connection (Settings → Connections) rather than here (HI-1774). {n} is how many of its connections are on in the open workspace.' }),
+  open: msg({ id: 'shell.setup.openConnections', defaultMessage: 'Open Connections', description: "Provider Setup's button: opens Settings → Connections, where a coding agent CLI's connections are added and signed in." })
 }
 
 /**
@@ -233,7 +233,7 @@ export function ConnectionsIntroBanner() {
 }
 
 /**
- * Agent Setup's line for a CLI that signs in per connection (HI-1774), in place of a sign-in of its own: how many are on
+ * Provider Setup's line for a CLI that signs in per connection (HI-1774), in place of a sign-in of its own: how many are on
  * in this workspace, and Open Connections. Nothing for a CLI without connections, or a test copy on its CLI test home.
  */
 export function ConnectionSetupLine({ cli, onOpen }: { cli: ProviderId; onOpen: () => void }) {

@@ -160,7 +160,7 @@
   "session.start.openIn": "This conversation is already open in {agent}. An agent can only resume a session no other agent is running.",
   "session.start.otherFolder": "This session ran in {folder}. Resume it with the agent that works in that folder.",
   "session.start.projectRunning": "A session is already running for this project. Stop it first.",
-  "session.start.providerMissing": "{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Agent Setup.} other {{provider} is required to run {agent}. Install it from Help → Agent Setup.}}",
+  "session.start.providerMissing": "{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Provider Setup.} other {{provider} is required to run {agent}. Install it from Help → Provider Setup.}}",
   "session.start.providerOff": "{provider} is turned off. {resuming, select, yes {Turn it on in Settings → Providers to resume this conversation.} other {Turn it on in Settings → Providers to run {agent}.}}",
   "session.start.removing": "This project is being removed",
   "session.start.repairing": "Hive is repairing this moved workspace: start the agent when Repair has finished.",

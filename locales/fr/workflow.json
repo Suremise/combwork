@@ -278,7 +278,7 @@
   "workflow.refused.paths.excluded.message": "{card} : {path} est dans {folder}, qu’un projet sans gestion de versions laisse hors de son travail.",
   "workflow.refused.paths.excluded.next": "Déclare seulement les fichiers du travail, hors de {folder} : les chemins d’une carte restreignent le travail du projet, sans jamais l’élargir.",
   "workflow.refused.platform.unknown.message": "Carte {card} : Hive n’a pas pu lire {what}, donc la règle {rule} ne peut pas être vérifiée.",
-  "workflow.refused.platform.unknown.next": "Vérifie la configuration des agents ou le dossier, puis réessaie.",
+  "workflow.refused.platform.unknown.next": "Vérifie la configuration des fournisseurs ou le dossier, puis réessaie.",
   "workflow.refused.platform.unknown.nextGone": "Le dépôt Git du projet a disparu : demande à l’utilisateur de le restaurer, ou de passer le projet à Aucune dans son onglet Gestion de versions (à partir de la prochaine carte).",
   "workflow.refused.queue.advancing.message": "La carte {card} est en cours de fusion dans {target} : elle ne peut plus être retirée de la file de fusion.",
   "workflow.refused.queue.advancing.next": "Attends la fin de la fusion. Si la modification n’est pas voulue, annule-la dans {target}.",

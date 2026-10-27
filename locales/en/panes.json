@@ -164,8 +164,8 @@
     "description": "Button on the bar of an agent that failed to start: tries the launch again. Keep it short."
   },
   "panes.failed.setup": {
-    "defaultMessage": "Agent Setup…",
-    "description": "Button on the bar of an agent that failed to start: opens Agent Setup (installing or signing in to its CLI)."
+    "defaultMessage": "Provider Setup…",
+    "description": "Button on the bar of an agent that failed to start: opens Provider Setup (installing or signing in to its CLI)."
   },
   "panes.failed.title": {
     "defaultMessage": "Couldn't start:",

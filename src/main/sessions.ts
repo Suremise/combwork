@@ -1815,7 +1815,7 @@ class SessionManager {
     const resuming = opts.resumeId ? 'yes' : 'no'
     if (!isProviderEnabled(config.settings, providerId)) throw hiveError(msg({ id: 'session.start.providerOff', defaultMessage: '{provider} is turned off. {resuming, select, yes {Turn it on in Settings → Providers to resume this conversation.} other {Turn it on in Settings → Providers to run {agent}.}}', description: "Starting an agent is refused: its coding agent is turned off in Settings → Providers. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation." }), { provider: name, resuming, agent: agent.name }, { kind: 'conflict' })
     const info = providerService.info(providerId)
-    if (!info.found || !info.path) throw hiveError(msg({ id: 'session.start.providerMissing', defaultMessage: '{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Agent Setup.} other {{provider} is required to run {agent}. Install it from Help → Agent Setup.}}', description: "Starting an agent is refused: its coding agent's CLI isn't installed. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation. Help → Agent Setup is a menu command." }), { provider: name, resuming, agent: agent.name })
+    if (!info.found || !info.path) throw hiveError(msg({ id: 'session.start.providerMissing', defaultMessage: '{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Provider Setup.} other {{provider} is required to run {agent}. Install it from Help → Provider Setup.}}', description: "Starting an agent is refused: its coding agent's CLI isn't installed. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation. Help → Provider Setup is a menu command." }), { provider: name, resuming, agent: agent.name })
     await workspace.ensureProject(projectPath)
     times.mark('ensureProject')
     // Where it runs (#1434, agentFolders.ts): the Assistant in the workspace folder, where it can read every project; a
@@ -4466,7 +4466,7 @@ class SessionManager {
     const out: { gather?: ReturnType<typeof setTimeout>; recheck?: ReturnType<typeof setInterval> } = {}
     this.signedOut.set(scope, out)
     out.gather = setTimeout(() => this.tellSignedOut(scope), SIGNED_OUT_GATHER_MS)
-    // Agent Setup (or the connection's row) shows it signed out, and the next check that finds it signed in again ends
+    // Provider Setup (or the connection's row) shows it signed out, and the next check that finds it signed in again ends
     // this (providerService's, or the connection's: onConnectionSignedIn).
     recheck()
     out.recheck = setInterval(() => {
@@ -4514,7 +4514,7 @@ class SessionManager {
   signedInAgain(scope: string, checked = false): void {
     if (!this.endSignedOut(scope)) return
     const provider = scope.split(':')[0] as ProviderId
-    // Agent Setup (and its banner) learn it too, unless its own check is what said so; a connection's is its own.
+    // Provider Setup (and its banner) learn it too, unless its own check is what said so; a connection's is its own.
     if (!checked && !scope.includes(':')) void providerService.refresh(provider, false).catch(() => undefined)
     const stopped = this.liveStates().filter((s) => authScope(s) === scope && s.status === 'signin')
     for (const st of stopped) {

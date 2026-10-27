@@ -145,7 +145,7 @@ export const AREAS = [
   { paths: ['src/main/branchWatch.ts', 'src/main/git.ts', 'src/main/worktrees.ts'], suites: ['unmerged', 'agents', 'changes', 'paneheader', 'claude-real', 'wsmove', 'wtrecreate', 'removeall', 'gitmissing', 'unusedwt', 'changespicker', 'gitview'] },
   // git.ts's processes, started off main's thread (HI-1783): git.ts's suites.
   { paths: ['src/main/gitWorker.ts'], suites: ['unmerged', 'agents', 'changes', 'paneheader', 'claude-real', 'wsmove', 'wtrecreate', 'removeall', 'gitmissing', 'unusedwt', 'changespicker', 'gitview'] },
-  // Git missing or too old (#346): Agent Setup's Git row, the status bar and every git-dependent screen.
+  // Git missing or too old (#346): Provider Setup's Git row, the status bar and every git-dependent screen.
   { paths: ['src/main/gitTool.ts', 'src/shared/gitTool.ts'], suites: ['gitmissing', 'providers'] },
   // The Git view (#607): the Git tab's sections and the status bar's item.
   { paths: ['src/main/gitRepo.ts', 'src/shared/gitRepo.ts', 'src/shared/branchCleanup.ts', 'src/renderer/src/views/GitTab.tsx', 'src/renderer/src/views/GitBranches.tsx', 'src/renderer/src/gitReads.ts'], suites: ['gitbranchcards', 'gitcleanup', 'gitupdate', 'gitview', 'gitremotes', 'changes', 'changespicker', 'gitmissing', 'unusedwt', 'inbox', 'gitinit', 'versioncontrol', 'mergedialogslots'] },

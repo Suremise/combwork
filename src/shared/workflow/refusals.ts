@@ -166,7 +166,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   ),
   'platform.unknown': r(
     msg({ id: 'workflow.refused.platform.unknown.message', defaultMessage: "{card}: Hive couldn't read {what}, so the rule {rule} can't be checked.", description: 'A refused move: a fact a rule needs could not be read (git missing, folder gone). {what} says what, {rule} the rule id.' }),
-    msg({ id: 'workflow.refused.platform.unknown.next', defaultMessage: 'Check Agent Setup or the folder, then try again.', description: 'The next step when Hive could not read what a rule needs.' })
+    msg({ id: 'workflow.refused.platform.unknown.next', defaultMessage: 'Check Provider Setup or the folder, then try again.', description: 'The next step when Hive could not read what a rule needs.' })
   ),
   'loop.roundLimit': r(
     msg({ id: 'workflow.refused.loop.roundLimit.message', defaultMessage: '{card} reached its round limit: it goes on once its round-limit question is answered.', description: "A refused submission or move: the card failed as many reviews as its card loop allows (Settings → Card loops), and Hive asked how to go on (For you); until that question is answered, its loop is paused. Read by agents and shown in the window alike: it names no one (never \"the user\"). {card} is a card key." }),

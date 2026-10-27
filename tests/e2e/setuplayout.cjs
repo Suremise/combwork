@@ -1,4 +1,4 @@
-// Agent Setup with a very long CLI path (#821): a user's WinGet path (…\WinGet\Packages\GitHub.Copilot_Microsoft.Winget.
+// Provider Setup with a very long CLI path (#821): a user's WinGet path (…\WinGet\Packages\GitHub.Copilot_Microsoft.Winget.
 // Source_8wekyb3d8bbwe\…) has no place to break, so it widened the status row and pushed Sign in off the dialog. Each
 // provider's tab gets a found CLI at such a path that isn't signed in (sent to the window as main sends it: no CLI is
 // run or signed in), at the window's smallest size, where the wide dialog is narrowest. On every tab, in both themes:
@@ -60,11 +60,11 @@ function stubInfo(p) {
 
     await page.keyboard.press('Control+Shift+P')
     check('the command palette opens', !!(await lib.until(async () => (await page.locator('.palette input').count()) === 1, HUNG_MS)))
-    await page.locator('.palette input').fill('Agent Setup')
-    await lib.until(async () => (await page.locator('.palette-list', { hasText: 'Agent Setup' }).count()) === 1, HUNG_MS)
+    await page.locator('.palette input').fill('Provider Setup')
+    await lib.until(async () => (await page.locator('.palette-list', { hasText: 'Provider Setup' }).count()) === 1, HUNG_MS)
     await page.keyboard.press('Enter')
-    const setup = page.locator('.dialog', { hasText: 'Agent Setup' })
-    check('Agent Setup opens', !!(await lib.until(async () => (await setup.count()) === 1, HUNG_MS)))
+    const setup = page.locator('.dialog', { hasText: 'Provider Setup' })
+    check('Provider Setup opens', !!(await lib.until(async () => (await setup.count()) === 1, HUNG_MS)))
 
     const theme = async (t) => {
       await inv('settings:update', { appearance: { theme: t } })

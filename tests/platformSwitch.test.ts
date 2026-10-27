@@ -342,6 +342,6 @@ describe('S20: the repository gone (#1419)', () => {
   it("the refusal's next step in the window's words", () => {
     const english = { one: (m: Parameters<typeof englishText>[0] & object, v?: Record<string, string | number>) => englishText(v ? { m: m as never, values: v } : m), list: (x: string[]) => x.join(', '), names: false }
     expect(refusalLines('platform.unknown', { card: 'AM-1', what: 'the line', rule: 'start', offer: 'repositoryGone' }, english as never).next).toBe(englishText(REPOSITORY_GONE_NEXT))
-    expect(refusalLines('platform.unknown', { card: 'AM-1', what: 'the line', rule: 'start' }, english as never).next).toBe('Check Agent Setup or the folder, then try again.')
+    expect(refusalLines('platform.unknown', { card: 'AM-1', what: 'the line', rule: 'start' }, english as never).next).toBe('Check Provider Setup or the folder, then try again.')
   })
 })

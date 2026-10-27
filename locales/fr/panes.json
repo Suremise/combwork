@@ -40,7 +40,7 @@
   "panes.empty.onPage": "Page {page}",
   "panes.failed.dismiss": "Fermer (le terminal garde la sortie)",
   "panes.failed.retry": "Réessayer",
-  "panes.failed.setup": "Configuration des agents…",
+  "panes.failed.setup": "Configuration des fournisseurs…",
   "panes.failed.title": "Impossible de démarrer :",
   "panes.footer.compactionHistory": "Clique pour voir l’historique des compactages",
   "panes.footer.compactions": "{n, plural, one {# compactage jusqu’ici} many {# compactages jusqu’ici} other {# compactages jusqu’ici}}{over, select, yes { – pense à compacter} other {}}",

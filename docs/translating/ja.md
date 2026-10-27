@@ -131,7 +131,7 @@ The words Japanese uses for Hive's terms ([glossary.md](glossary.md)). Use them 
 | Storage (a project's) / Clean Up… | ストレージ / クリーンアップ… | |
 | Repair (a moved workspace) | 修復 | |
 | Recycle Bin / File Explorer | ごみ箱 / エクスプローラー | |
-| Agent Setup | エージェントのセットアップ | |
+| Provider Setup | プロバイダーのセットアップ | |
 | Mark idle | アイドルにする | |
 | layouts | 1つずつ、2列、3列、2×2グリッド、3×2グリッド | |
 | the Assistant's modes | コーディネーター、プランナー、QAトリアージ担当、リリースマネージャー | |
@@ -142,7 +142,7 @@ The words Japanese uses for Hive's terms ([glossary.md](glossary.md)). Use them 
 | menus | ファイル、編集、表示、プロジェクト、セッション、ヘルプ | |
 | Finished (an agent's status) | 作業終了 | Never 完了, which is the Done column. |
 | Working on (the sidebar's marking) | 作業対象 | 作業中 is the Working status. |
-| Copy Diagnostics / Developer Console / Agent Setup | 診断情報をコピー / 開発者コンソール / エージェントのセットアップ | |
+| Copy Diagnostics / Developer Console / Provider Setup | 診断情報をコピー / 開発者コンソール / プロバイダーのセットアップ | |
 | run states (Progress panel) | 実行中、失敗、成功、停止、待機中 | A run that passed is 成功, not 承認済み. |
 
 ## Examples
