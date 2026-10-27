@@ -125,7 +125,7 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'proj
     }, HUNG_MS)
     check('Agent Settings: an empty model reads "Connection default (Sonnet…)"', !!base && /Connection default \(Sonnet/.test(base), String(base))
     const mode = await dialog.locator('.agent-form select').evaluateAll((all) => all.map((s) => s.options[0]?.textContent ?? '').find((x) => x.startsWith("Project's")) ?? '').catch(() => '')
-    check("…its permission mode still follows the project's (never \"Connection default\")", /^Project's \(/.test(mode), mode)
+    check("…its permission mode still follows the project's (never \"Connection default\")", mode.startsWith("Project's ("), mode)
     await shots('agentsettings')
     await page.keyboard.press('Escape')
 
@@ -140,7 +140,7 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'proj
       const f = await firsts()
       return f.some((x) => x.startsWith('Connection default')) ? f : null
     }, HUNG_MS)
-    check("Settings → Assistant: Connection default (Sonnet…), (Low) and context (Off), never the CLI's Haiku, High, On", !!shown && shown.some((x) => /^Connection default \(Sonnet/.test(x)) && shown.includes('Connection default (Low)') && shown.includes('Connection default (Off)') && !shown.some((x) => /Haiku|High|\(On\)/.test(x)), JSON.stringify(shown ?? (await firsts())))
+    check("Settings → Assistant: Connection default (Sonnet…), (Low) and context (Off), never the CLI's Haiku, High, On", !!shown && shown.some((x) => x.startsWith('Connection default (Sonnet')) && shown.includes('Connection default (Low)') && shown.includes('Connection default (Off)') && !shown.some((x) => /Haiku|High|\(On\)/.test(x)), JSON.stringify(shown ?? (await firsts())))
     await shots('assistant')
     await page.keyboard.press('Escape')
   } catch (e) {
