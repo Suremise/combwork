@@ -418,6 +418,7 @@ interface HiveMessageValues {
   'settings.advancedList.alsoSetting': { key: string | number }
   'settings.advancedList.appliesAtRestart': undefined
   'settings.advancedList.appliesToSessions': undefined
+  'settings.advancedList.cliOff': { cli: string | number }
   'settings.advancedList.cliVersion': { cli: string | number }
   'settings.advancedList.default': { value: string | number }
   'settings.advancedList.fileError': { problem: string | number }
@@ -431,6 +432,7 @@ interface HiveMessageValues {
   'settings.advancedList.modified': undefined
   'settings.advancedList.modifiedOnly': undefined
   'settings.advancedList.noMatch': undefined
+  'settings.advancedList.noMatchHere': { group: string | number }
   'settings.advancedList.notValid': { problem: string | number }
   'settings.advancedList.open': undefined
   'settings.advancedList.openFailed': undefined
@@ -438,6 +440,7 @@ interface HiveMessageValues {
   'settings.advancedList.restart': undefined
   'settings.advancedList.restartDue': undefined
   'settings.advancedList.restartFailed': undefined
+  'settings.advancedList.tabs': undefined
   'settings.advancedList.unknown': { ids: string | number }
   'settings.advancedList.workspace': undefined
   'settings.advancedList.workspaceLabel': { label: string | number }

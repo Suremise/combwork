@@ -3,4 +3,5 @@
 interface HiveMessageValues {
   'tabs.unsaved': undefined
   'tabs.unsavedNamed': { tab: string | number }
+  'tabs.withNote': { tab: string | number; note: string | number }
 }

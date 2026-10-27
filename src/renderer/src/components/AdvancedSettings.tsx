@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ADVANCED_DEFS, AGENTS_PER_PROJECT, advancedRow, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
+import { useEffect, useId, useMemo, useState } from 'react'
+import { ADVANCED_DEFS, AGENTS_PER_PROJECT, advancedRow, type AdvancedGroup, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
 import { AGENT_LIMIT_DEFAULT, manyAgentsNote } from '@shared/defaults'
 import { msg, tr, tRich } from '@shared/i18n'
 import { INBOX_SWITCH_ID } from '@shared/inboxSwitches'
 import type { ProviderId } from '@shared/types'
+import { PROVIDERS, isProviderEnabled } from '@shared/providers'
 import { call, errorMessage } from '../api'
-import { notify, set, useStore } from '../store'
+import { chooseTab, notify, set, useRememberedTab, useStore } from '../store'
 import { NumberField } from './NumberField'
 import { DottedId, Icon, IconButton, InfoTip, SearchInput, Switch, Tooltip } from './ui'
 import { cx } from '../util'
+import { ProviderIcon } from './ProviderIcon'
+import { HiveMark } from './Updates'
+import { TabPanel, Tabs } from './Tabs'
 
 /**
  * Settings → Advanced's list (#367), in the manner of about:config: every overridable default, grouped by Hive and each
@@ -19,6 +23,28 @@ import { cx } from '../util'
  * follows the file. `query` and `modifiedOnly` are Settings' own search and Modified only, on top of the list's. A
  * value that applies when Hive restarts, changed since this Hive started, offers Restart Hive (#676).
  */
+const T = {
+  tabs: msg({ id: 'settings.advancedList.tabs', defaultMessage: 'Hive and the CLIs', description: "Accessible name of Settings → Advanced's tabs: Hive, then one per CLI (Claude Code, Codex, GitHub Copilot)." }),
+  cliOff: msg({ id: 'settings.advancedList.cliOff', defaultMessage: '{cli} is turned off: these settings apply once you turn it on', description: "Tooltip of a dimmed tab of Settings → Advanced, and part of its name for screen readers: the CLI is turned off in Settings → Providers. {cli} is its name." }),
+  noMatchHere: msg({ id: 'settings.advancedList.noMatchHere', defaultMessage: 'No settings of {group} match.', description: "A tab of Settings → Advanced with none of the filtered values: {group} is Hive or the CLI's name." })
+}
+
+/** The tab the list remembers (HI-1839). */
+const TABS_KEY = 'settings.advanced'
+
+/**
+ * Its tabs (HI-1839): Hive, then each CLI with advanced values, in the providers' order, as the descriptors name them;
+ * a group of a CLI Hive no longer offers keeps a tab after them.
+ */
+const GROUPS: AdvancedGroup[] = (() => {
+  const used = new Set(ADVANCED_DEFS.map((d) => d.group))
+  const ordered: AdvancedGroup[] = ['hive', ...PROVIDERS.map((p) => p.id).filter((id) => used.has(id))]
+  return [...ordered, ...[...used].filter((g) => !ordered.includes(g))].filter((g) => used.has(g))
+})()
+
+/** Whether a group is a CLI's (its tab has the CLI's icon, and is dimmed while it is off). */
+const isCli = (g: AdvancedGroup): g is ProviderId => PROVIDERS.some((p) => p.id === g)
+
 export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query: string; modifiedOnly: boolean }) {
   const state = useStore((s) => s.advanced)
   const hasWorkspace = useStore((s) => !!s.workspace)
@@ -30,7 +56,21 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
   const matches = (text: string): boolean => words.every((w) => text.toLowerCase().includes(w))
   // Its English matches as well as what it shows, as Settings' own rows do.
   const shown = rows.filter((r) => (!modifiedOnly || r.override !== undefined || r.workspaceValue !== undefined) && matches(`${r.def.id} ${r.def.setting ?? ''} ${groupName(r.def.group)} ${r.def.title} ${r.def.desc} ${shownText(r.def.text.title)} ${shownText(r.def.text.desc)}`))
-  const groups = [...new Set(ADVANCED_DEFS.map((d) => d.group))]
+  const settings = useStore((s) => s.settings)
+  const idBase = useId()
+  // Filtering (Settings' search, this list's filter, either Modified only): each tab counts its matches; the tab shown is
+  // the remembered one while it has some, else the first that has; a tab clicked meanwhile narrows to it, unremembered.
+  const filtering = words.length > 0 || modifiedOnly
+  const [filterTab, setFilterTab] = useState<AdvancedGroup | null>(null)
+  useEffect(() => {
+    if (!filtering) setFilterTab(null)
+  }, [filtering])
+  const remembered = useRememberedTab<AdvancedGroup>(TABS_KEY, GROUPS, 'hive')
+  const count = (g: AdvancedGroup): number => shown.filter((r) => r.def.group === g).length
+  // A value's own id searched for opens its group's tab, whatever is remembered.
+  const exact = ADVANCED_DEFS.find((d) => words.length === 1 && d.id.toLowerCase() === words[0])?.group
+  const tab: AdvancedGroup = !filtering ? remembered : (filterTab ?? exact ?? (count(remembered) ? remembered : (GROUPS.find((g) => count(g) > 0) ?? remembered)))
+  const choose = (g: AdvancedGroup): void => (filtering ? setFilterTab(g) : chooseTab(TABS_KEY, g))
   if (!state) return null
   return (
     <div className="advanced-list">
@@ -53,19 +93,26 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
           <Icon name="info" /> {tr(msg({ id: 'settings.advancedList.unknown', defaultMessage: "advanced.json also names {ids}, which this Hive doesn't know (a typo, or a newer Hive's): kept in the file, not used.", description: "Above Settings → Advanced's list. {ids} lists values' ids, as advanced.json writes them; advanced.json is a file name: keep it." }), { ids: state.unknown.join(', ') })}
         </div>
       )}
-      {groups.map((g) => {
+      <Tabs<AdvancedGroup>
+        idBase={idBase}
+        className="advanced-tabs"
+        label={tr(T.tabs)}
+        value={tab}
+        onChange={choose}
+        items={GROUPS.map((g) => ({ id: g, label: groupName(g), icon: isCli(g) ? <ProviderIcon provider={g} /> : <HiveMark className="tab-hex" />, ...(filtering ? { count: count(g) } : {}), ...(isCli(g) && !isProviderEnabled(settings, g) ? { muted: tr(T.cliOff, { cli: groupName(g) }) } : {}) }))}
+      />
+      {/* Every group's rows stay mounted, the tab shown alone visible: a value being typed is never lost to a switch. */}
+      {GROUPS.map((g) => {
         const list = shown.filter((r) => r.def.group === g)
-        if (!list.length) return null
         return (
-          <div key={g} className="advanced-group" role="group" aria-label={groupName(g)}>
-            <h3>{groupName(g)}</h3>
+          <TabPanel key={g} idBase={idBase} id={g} selected={g === tab} className="advanced-group" data-group={g}>
             {list.map((r) => (
               <AdvancedItem key={r.def.id} row={r} cli={cliFacing(r.def) ? (state.cli[r.def.group as ProviderId] ?? null) : null} workspace={hasWorkspace} restartDue={r.def.applies === 'restart' && !!state.atStart && r.def.id in state.atStart && state.atStart[r.def.id] !== r.value} />
             ))}
-          </div>
+            {!list.length && <div className="empty-state">{shown.length ? tr(T.noMatchHere, { group: groupName(g) }) : tr(msg({ id: 'settings.advancedList.noMatch', defaultMessage: 'No advanced settings match.', description: "Settings → Advanced's list when its filter finds nothing." }))}</div>}
+          </TabPanel>
         )
       })}
-      {!shown.length && <div className="empty-state">{tr(msg({ id: 'settings.advancedList.noMatch', defaultMessage: 'No advanced settings match.', description: "Settings → Advanced's list when its filter finds nothing." }))}</div>}
     </div>
   )
 }
