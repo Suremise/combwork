@@ -1202,7 +1202,7 @@ export class WorkspaceService {
     const publish = (): Promise<ProjectConfig | null> =>
       retryWhileSaving(() => withFileLock(file, async () => {
         const cfg = await this.projectConfig(projectPath, { unsettled: 'throw' })
-        if (opts.existing && !existsSync(file)) throw Object.assign(new Error('the project is gone'), { code: 'ENOENT' })
+        if (opts.existing && !existsSync(file)) throw Object.assign(new Error('the project is gone'), { code: 'ENOENT' }) // i18n-ignore: internal, its caller drops ENOENT unshown
         const had = projectAgents(cfg).map((a) => a.id)
         const patch = fn(cfg)
         let updated = { ...cfg, ...patch }
