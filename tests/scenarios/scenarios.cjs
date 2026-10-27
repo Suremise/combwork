@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 93
+const FIXTURES_VERSION = 94
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -43,20 +43,38 @@ const asksTheUser = (text) =>
   /\?|\bplease (?:choose|decide|confirm|pick|select)\b|\b(?:let me know|tell me) (?:which|whether|how you(?:'d| would) like)\b|\b(?:need|needs|waiting for|awaiting|awaits?) your (?:decision|choice|call|answer|go-ahead|approval|confirmation)\b/i.test(
     String(text ?? '').replace(/\b(?:nothing|no one|nobody)\s+(?:needs|is waiting for|awaits)\s+your\s+\w+/gi, '')
   )
+/** An offer that waits for the user's yes ("If you want, I'll commit it", "Want me to…"): a request, as a question is. */
+const OFFER = /^(?:if you(?:'d)? (?:want|like|prefer)|(?:do you )?want me to|would you like me to)\b/i
+/** A question that names nothing itself ("Should I go ahead?", "OK?"): it asks about the sentence before it. */
+const BARE = /^(?:(?:should|shall|can|may) I (?:go ahead|proceed|do (?:it|that|so))|(?:is that |that )?(?:ok|okay|alright|fine)|go ahead|proceed)\s*\?$/i
 /**
- * The questions the agent put to the user (HI-1618): a hive_ask_user that worked, a notification that worked and reads
- * as a question (one that only says how things stand isn't), its CLI's own question tool (Claude Code's
- * AskUserQuestion, Codex's request_user_input), and its last reply when it asks. Each as its text.
+ * The sentences (and lines) of a text that ask the user something (asksTheUser, or an offer), not those around them
+ * saying how things stand; a bare "Should I go ahead?" together with the sentence it asks about.
+ */
+const askingSentences = (text) => {
+  const all = String(text ?? '')
+    .split(/(?<=[.?!])\s+|\r?\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  return all.flatMap((s, i) => (BARE.test(s) ? [`${all[i - 1] ?? ''} ${s}`.trim()] : asksTheUser(s) || OFFER.test(s) ? [s] : []))
+}
+/**
+ * The questions the agent put to the user (HI-1618), each the sentence that asks, never the text around it: a
+ * hive_ask_user that worked (its whole text when no one sentence reads as a question: the tool asks by itself), a
+ * notification that worked, its CLI's own question tool (Claude Code's AskUserQuestion, Codex's request_user_input)
+ * that didn't fail, and its last reply.
  */
 const questionsToUser = (o) => [
-  ...ran(o, 'hive_ask_user').map((x) => String(argsOf(x).text ?? '')),
-  ...ran(o, 'hive_notify')
-    .map((x) => `${argsOf(x).title ?? ''} ${argsOf(x).message ?? ''}`)
-    .filter(asksTheUser),
-  ...(o.tools ?? []).filter((t) => /AskUserQuestion|request_user_input/i.test(String(t.name ?? ''))).map((t) => String(t.input ?? '')),
-  ...(asksTheUser(o.finalReply) ? [String(o.finalReply)] : [])
+  ...ran(o, 'hive_ask_user').flatMap((x) => {
+    const text = String(argsOf(x).text ?? '')
+    const asking = askingSentences(text)
+    return asking.length ? asking : text.trim() ? [text.trim()] : []
+  }),
+  ...ran(o, 'hive_notify').flatMap((x) => [...askingSentences(argsOf(x).title), ...askingSentences(argsOf(x).message)]),
+  ...(o.tools ?? []).filter((t) => /AskUserQuestion|request_user_input/i.test(String(t.name ?? '')) && !t.isError).flatMap((t) => askingSentences(t.input)),
+  ...askingSentences(o.finalReply)
 ]
-/** Whether it asked the user whether to commit: one of its questions is about committing. */
+/** Whether it asked the user whether to commit: one of its questions, itself, is about committing. */
 const askedToCommit = (o) => questionsToUser(o).some((q) => /\bcommit/i.test(q))
 /**
  * Starts Coder on a long task without a card before the subject's prompt (#416): ready (a trust question answered), then
