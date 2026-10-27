@@ -28,6 +28,12 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
     for (const gone of ['workspace.loopRounds', 'workspace.loopWaitHours', 'project.loopRounds', 'project.loopWakes', 'project.loopStepWaitMinutes', 'project.fileLocks', 'agents.fileLocks', 'project.workflow']) expect(settingEntry(gone)).toBeUndefined()
     // The hidden workflow rows are the project's Version Control tab's, not a section of Project Settings.
     expect(settingPath(own)).toBe('Version Control → Workflow → Rounds')
+    // The levels' rows are Settings → Version Control's two parts (HI-1768), their ids as before.
+    expect(settingPath(rounds)).toBe('Settings → Version Control → Workspace defaults → Rounds')
+    expect(settingPath(settingEntry('workflow.git.loopRounds')!)).toBe('Settings → Version Control → Hive defaults → Rounds')
+    expect(settingPath(settingEntry('workflow.git.slotCopy')!)).toBe('Settings → Version Control → Hive defaults → Files copied into new slots')
+    expect(settingPath(settingEntry('workspace.workflow.git.slotCopy')!)).toBe('Settings → Version Control → Workspace defaults → Files copied into new slots')
+    expect([settingEntry('workflow.workspaceDefaults')?.section, settingEntry('workspace.workflowDefaults')]).toEqual(['workflow', undefined])
   })
 
   it('the settings tools read and change the open workspace’s, saved in its workspace.json; an old loops is moved in, an override of the new kind kept', async () => {
@@ -51,7 +57,7 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
       expect([changed.old, changed.new]).toEqual([4, 7])
       await applySetting(entryOf('workspace.workflow.none.loopWaitHours'), '3', null)
       // Its user guide heading by its id (#1535), given as the heading's text.
-      expect(settingDetail(entryOf('workspace.workflow.none.loopWaitHours'), null)).toMatchObject({ value: '3', default: 'inherit', docs: 'Workflow defaults' })
+      expect(settingDetail(entryOf('workspace.workflow.none.loopWaitHours'), null)).toMatchObject({ value: '3', default: 'inherit', docs: 'Hive and workspace defaults' })
       await expect(applySetting(entryOf('workspace.workflow.none.loopRounds'), 99, null)).rejects.toThrow(/1 to 50/)
       const inherit = await applySetting(entryOf('workspace.workflow.git.loopWaitHours'), null, null)
       expect([inherit.old, inherit.new]).toEqual([5, 'inherit'])

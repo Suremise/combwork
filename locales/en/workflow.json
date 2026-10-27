@@ -176,7 +176,7 @@
     "description": "The placeholder of the field “What the work is” (folders and files left out)."
   },
   "workflow.form.from.global": {
-    "defaultMessage": "From Hive’s settings",
+    "defaultMessage": "From Hive defaults",
     "description": "Where a workflow option’s value comes from: Hive’s own default."
   },
   "workflow.form.from.here": {

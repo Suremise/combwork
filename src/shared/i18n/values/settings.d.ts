@@ -770,6 +770,7 @@ interface HiveMessageValues {
   'settings.option.off': undefined
   'settings.option.on': undefined
   'settings.path.assistant': { assistant: string | number; provider: string | number; title: string | number }
+  'settings.path.level': { section: string | number; part: string | number; title: string | number }
   'settings.path.project': { section: string | number; title: string | number }
   'settings.path.settings': { section: string | number; title: string | number }
   'settings.path.versionControl': { title: string | number }
@@ -1092,8 +1093,13 @@ interface HiveMessageValues {
   'settings.viewers.revokeTitle': { name: string | number }
   'settings.viewers.token': undefined
   'settings.viewers.tokenOf': { name: string | number }
-  'settings.workflow.defaults.desc': undefined
-  'settings.workflow.defaults.title': undefined
+  'settings.workflow.hiveDefaults.desc': undefined
+  'settings.workflow.hiveDefaults.tip': undefined
+  'settings.workflow.hiveDefaults.title': undefined
+  'settings.workflow.workspaceDefaults.desc': undefined
+  'settings.workflow.workspaceDefaults.tip': undefined
+  'settings.workflow.workspaceDefaults.title': undefined
+  'settings.workflow.workspaceDefaultsNamed': { workspace: string | number }
   'settings.workspace.antivirus.desc': undefined
   'settings.workspace.antivirus.tip': undefined
   'settings.workspace.antivirus.title': undefined
@@ -1103,6 +1109,4 @@ interface HiveMessageValues {
   'settings.workspace.storage.desc': undefined
   'settings.workspace.storage.tip': undefined
   'settings.workspace.storage.title': undefined
-  'settings.workspace.workflowDefaults.desc': undefined
-  'settings.workspace.workflowDefaults.title': undefined
 }

@@ -43,7 +43,7 @@
   "workflow.form.discard": "Descartar alterações",
   "workflow.form.fileLocksNote": "Vale para agentes que trabalham na mesma pasta, fora de um slot.",
   "workflow.form.folders": "Pastas e arquivos, separados por vírgulas",
-  "workflow.form.from.global": "Das configurações do Hive",
+  "workflow.form.from.global": "Dos padrões do Hive",
   "workflow.form.from.here": "Definido aqui",
   "workflow.form.from.platform": "Padrão",
   "workflow.form.from.preset": "Da predefinição",

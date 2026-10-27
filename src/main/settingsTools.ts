@@ -145,7 +145,7 @@ export function settingRows(opts: { query?: string; scope?: SettingScope; projec
   const levelsAtDefault = rows.filter((r) => r.level && !r.changed).length
   return [
     ...rows.filter((r) => !(r.advanced || r.level) || r.changed).map((r) => r.row),
-    ...(levelsAtDefault ? [{ id: 'workflow.*', title: 'query "workflow" lists them', value: `${levelsAtDefault} more`, desc: "Hive's and the workspace's workflow defaults, per version control (inherit)." }] : []), // i18n-ignore: the Assistant's tools (English)
+    ...(levelsAtDefault ? [{ id: 'workflow.*', title: 'query "workflow" lists them', value: `${levelsAtDefault} more`, desc: "Hive defaults and the workspace's (Settings → Version Control), per version control (inherit)." }] : []), // i18n-ignore: the Assistant's tools (English)
     ...(atDefault ? [{ id: 'advanced.*', title: 'query "advanced" lists them', value: `${atDefault} more`, desc: 'Advanced settings.' }] : [])
   ]
 }

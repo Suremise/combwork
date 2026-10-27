@@ -43,7 +43,7 @@
   "workflow.form.discard": "Änderungen verwerfen",
   "workflow.form.fileLocksNote": "Gilt für Agenten, die im selben Ordner arbeiten, außerhalb eines Slots.",
   "workflow.form.folders": "Ordner und Dateien, durch Kommas getrennt",
-  "workflow.form.from.global": "Aus den Einstellungen von Hive",
+  "workflow.form.from.global": "Aus den Hive-Standards",
   "workflow.form.from.here": "Hier festgelegt",
   "workflow.form.from.platform": "Standard",
   "workflow.form.from.preset": "Aus der Voreinstellung",

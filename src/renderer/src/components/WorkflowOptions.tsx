@@ -608,13 +608,15 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
           {problems.flatMap((p, i) => problemLines(p).map((line, j) => <div key={`${i}:${j}`}>{line}</div>))}
         </div>
       )}
+      {/* Discard Changes reads the form again too: a change elsewhere it skipped while the draft was unsaved (another level
+          saved meanwhile, HI-1768) shows at once. */}
       <div className="workflow-actions">
         <Tooltip content={blocked ? tr(T.saveBlocked) : null}>
           <button className="btn primary" data-action="save" disabled={!dirty || !settings || blocked} onClick={() => void save().catch((e) => notify('error', errorMessage(e)))}>
             {tr(T.save)}
           </button>
         </Tooltip>
-        <button className="btn" disabled={!dirty} onClick={() => (setDraft({ preset: form.preset, options: { ...form.own } }), setProblems([]))}>
+        <button className="btn" disabled={!dirty} onClick={() => (setDraft({ preset: form.preset, options: { ...form.own } }), setProblems([]), void load(true))}>
           {tr(T.discard)}
         </button>
         <span className="workflow-spacer" />

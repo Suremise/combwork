@@ -43,7 +43,7 @@
   "workflow.form.discard": "Odrzuć zmiany",
   "workflow.form.fileLocksNote": "Dotyczy agentów pracujących w tym samym folderze, poza slotem.",
   "workflow.form.folders": "Foldery i pliki, oddzielone przecinkami",
-  "workflow.form.from.global": "Z ustawień Hive",
+  "workflow.form.from.global": "Z ustawień domyślnych Hive",
   "workflow.form.from.here": "Ustawione tutaj",
   "workflow.form.from.platform": "Domyślne",
   "workflow.form.from.preset": "Z ustawienia wstępnego",

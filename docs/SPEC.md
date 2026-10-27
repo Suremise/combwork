@@ -2002,8 +2002,10 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
 - The resolved options and their origins are readable by agents (`hive_project_status`) and settable by the user, and
   by the Assistant within Control (as settings are, `hive_update_setting`), never by project agents [note §3].
 - **Export**: a project's options can be copied as JSON from the tab and pasted into another project (OP-5).
-- **Built [#1422], the defaults at each level**: Hive's in **Settings → Workflow defaults** (`workflow.defaults`), the
-  workspace's in **Settings → Workspace → Workflow defaults**, each with a None · Git choice of which platform's it shows,
+- **Built [#1422], the defaults at each level**: since HI-1768 both in **Settings → Version Control** (section id
+  `workflow`, after Board): **Hive defaults** (`workflow.defaults`, "for every workspace") and **Workspace defaults
+  (<name>)** (`workflow.workspaceDefaults`, shown while a workspace is open; before HI-1768 Settings → Workflow defaults
+  and Settings → Workspace → Workflow defaults; the values stay where they were, config.json and workspace.json), each with a None · Git choice of which platform's it shows,
   in #1418's editor in a level mode (`WorkflowLevelForm`): the same groups, labels, presets, All off and live
   contradictions; a value set at the level says *Set here*, and Inherit goes back to the level below (the workspace's
   to Hive's, Hive's to the platform's all-off). G12 (the project's identity) and the rows shown elsewhere aren't at a
@@ -2088,8 +2090,8 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
     shown) with how many there are and are leased (`copies:list`), and **Reviewers review in review copies**
     (#1435's switch, read-only here, with a link to Advanced).
   - **Project Settings:** no slot rows (HI-1765 removed its Slots and copies link): the setup command's catalog row stays,
-    hidden, for `hive_update_setting`, and the copied files are `project.slotCopy`. Settings → Workflow defaults (Git:
-    Hive's) and Settings → Workspace's workflow defaults set **Files copied into new slots** for the projects under them
+    hidden, for `hive_update_setting`, and the copied files are `project.slotCopy`. Settings → Version Control's Hive defaults (Git)
+    and Workspace defaults set **Files copied into new slots** for the projects under them
     (`slotDefaults.copy` in config.json and workspace.json; set, none, or inherit; hidden rows `workflow.git.slotCopy` and
     `workspace.workflow.git.slotCopy`), resolved project, workspace, Hive, `.env*` by one resolver (slotDefaults.ts) for
     slots, review copies and 0.9's worktrees. The copy's Inherit also clears a project's old `worktreeCopy`.
@@ -2143,7 +2145,7 @@ Project Settings loses its **Card loops** and **Workflow** sections (the second 
   in hours, 6, 1–24), `loopStepWaitMinutes` (Design check wait in minutes, 30, 1–240) under a group of their own, **Card
   loops**, and `fileLocks` (File locks: Block, Ask me, Warn or Off) under Where cards are built (Git) or The work
   (None), always shown, with "Applies to agents working in the same folder, outside a slot." Inherited Hive (Settings →
-  Workflow defaults) → workspace (Settings → Workspace) → project (Version Control → Workflow), each row saying where its
+  Version Control → Hive defaults) → workspace (its Workspace defaults) → project (Version Control → Workflow), each row saying where its
   value comes from, and saved with the form's Save at every level (`shared/workflow/options.ts`).
 - **Preferences, not rules** (`PREFERENCE_OPTIONS`): left out of every ruleset (`ruleOptions`), so a change applies at
   once and makes nothing "old rules", and no ruleset id changes; no preset or All off sets them; they never make the

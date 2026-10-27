@@ -44,7 +44,7 @@
   "workflow.form.discard": "Discard Changes",
   "workflow.form.fileLocksNote": "Applies to agents working in the same folder, outside a slot.",
   "workflow.form.folders": "Folders and files, separated by commas",
-  "workflow.form.from.global": "From Hive’s settings",
+  "workflow.form.from.global": "From Hive defaults",
   "workflow.form.from.here": "Set here",
   "workflow.form.from.platform": "Default",
   "workflow.form.from.preset": "From the preset",

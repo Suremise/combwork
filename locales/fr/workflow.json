@@ -43,7 +43,7 @@
   "workflow.form.discard": "Abandonner les modifications",
   "workflow.form.fileLocksNote": "S’applique aux agents qui travaillent dans le même dossier, hors d’un emplacement.",
   "workflow.form.folders": "Dossiers et fichiers, séparés par des virgules",
-  "workflow.form.from.global": "Depuis les paramètres de Hive",
+  "workflow.form.from.global": "Depuis les valeurs par défaut de Hive",
   "workflow.form.from.here": "Défini ici",
   "workflow.form.from.platform": "Par défaut",
   "workflow.form.from.preset": "Depuis le préréglage",
