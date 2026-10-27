@@ -446,6 +446,21 @@ describe('who an account is signed in as', () => {
     expect((await accounts.confirmAccount(a.id)).fresh).toBe(false)
   })
 
+  it('at a launch, a login rewritten during the check counts with no event seen for it yet (HI-1873)', async () => {
+    // Not on in any workspace, so not watched: no event reaches Hive, as when one is still on its way or queued.
+    const a = await accounts.addAccount('claude-code', 'Unseen')
+    writeFileSync(join(folderOf(a), '.credentials.json'), '{"token":"old"}')
+    let n = 0
+    status.set(folderOf(a), async () => {
+      n++
+      // The CLI answered from the old login; the new one is written before its answer reaches Hive.
+      if (n === 1) writeFileSync(join(folderOf(a), '.credentials.json'), '{"token":"new, and longer"}')
+      return { ok: true, loggedIn: true, email: n === 1 ? 'old@example.com' : 'new@example.com', orgId: 'org-1' }
+    })
+    expect(await accounts.confirmAccount(a.id)).toMatchObject({ fresh: true, observed: { email: 'new@example.com' } })
+    expect(n).toBe(2)
+  })
+
   it('a check that ends after its account was removed is dropped', async () => {
     const a = await accounts.addAccount('claude-code', 'Late')
     let release!: () => void
@@ -564,14 +579,18 @@ describe("a workspace's accounts", () => {
         return { ok: true, loggedIn: true, email: 'busy@example.com', orgId: 'org-1' }
       })
       for (let i = 0; i < 3; i++) expect(await accounts.confirmAccount(a.id)).toMatchObject({ fresh: true, observed: { email: 'busy@example.com' } })
-      // The login itself rewritten during a check, reported with no name: checked again, the answer after it taken.
+      // The login itself rewritten during a check, among the busy folder's other writes and events, its own reported
+      // with no name: checked again, the answer after it taken.
       let n = 0
       status.set(folderOf(a), async () => {
         n++
+        writeFileSync(join(folderOf(a), 'logs_2.sqlite-wal'), String(Math.random()))
+        for (let i = 0; i < 5; i++) accounts.accountFolderEvent(a.id, null)
         if (n === 1) {
           writeFileSync(join(folderOf(a), '.credentials.json'), '{"token":"someone else, longer"}')
           accounts.accountFolderEvent(a.id, null)
         }
+        for (let i = 0; i < 5; i++) accounts.accountFolderEvent(a.id, 'logs_2.sqlite-wal')
         return { ok: true, loggedIn: true, email: `v${n}@example.com`, orgId: 'org-1' }
       })
       expect(await accounts.confirmAccount(a.id)).toMatchObject({ fresh: true, observed: { email: 'v2@example.com' } })

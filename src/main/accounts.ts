@@ -629,16 +629,17 @@ function startCheck(id: string): Promise<ConnectionObserved | null> {
 /**
  * Who an account is signed in as for a launch (HI-1755): a fresh check, run again while its login keeps changing
  * under it (at most CONFIRM_ROUNDS), so a launch never goes ahead on an answer older than the folder. `fresh: false`
- * when it kept changing.
+ * when it kept changing. The login is stamped before and after each check itself (HI-1873): a change whose event the
+ * watch hasn't delivered or compared yet still counts, and a busy folder's other writes never do.
  */
 export async function confirmAccount(id: string): Promise<{ observed: ConnectionObserved | null; fresh: boolean }> {
   let observed: ConnectionObserved | null = null
   for (let i = 0; i < CONFIRM_ROUNDS; i++) {
     const seen = changes.get(id) ?? 0
+    const before = await loginStamp(id)
     observed = await checkAccount(id)
-    // What the watch saw before the answer came is compared with the login first (HI-1873), so it counts here.
-    await watched.get(id)?.comparing
-    if ((changes.get(id) ?? 0) === seen) return { observed, fresh: true }
+    const after = await loginStamp(id)
+    if (before === after && (changes.get(id) ?? 0) === seen) return { observed, fresh: true }
   }
   return { observed, fresh: false }
 }
@@ -723,8 +724,8 @@ interface Watched {
   retry: NodeJS.Timeout | null
   tries: number
   /** The login as last seen (loginStamp): an event counts as a change only when it moved (HI-1873). Unset: not seen yet. */
-  stamp?: string
-  /** The comparisons, one at a time: the last one queued (confirm waits for it). */
+  stamp?: string | null
+  /** The comparisons, one at a time: the last one queued. */
   comparing: Promise<void> | null
   /** A comparison is queued and not started yet: it covers events until it starts. */
   queued: boolean
@@ -760,13 +761,13 @@ function changed(id: string): void {
 /**
  * What a change to an account's login moves, never reading a file: its folder's identity (made again or replaced) and
  * each login file's id, size and write time. Not its access or change times: a CLI reading the login, or Codex's sandbox
- * setting ACLs over the folder, moves those (HI-1873). A provider naming no login files: every event counts, as before.
+ * setting ACLs over the folder, moves those (HI-1873). Null for a provider naming no login files: every event counts,
+ * as before, and only events count at a launch.
  */
-let unnamed = 0
-async function loginStamp(id: string): Promise<string> {
+async function loginStamp(id: string): Promise<string | null> {
   const a = getAccount(id)
   const isLogin = a && provider(a.provider).accountLoginFile?.bind(provider(a.provider))
-  if (!isLogin) return `any:${++unnamed}`
+  if (!isLogin) return null
   const dir = accountFolder(id)
   try {
     const d = await lstat(dir, { bigint: true })
@@ -782,7 +783,7 @@ async function loginStamp(id: string): Promise<string> {
 }
 
 /** The folder's identity, from a stamp: when it moves, the folder was made again or replaced, and is watched again. */
-const folderOf = (stamp: string | undefined): string | undefined => stamp?.split('|')[0]
+const folderOf = (stamp: string | null | undefined): string | undefined => stamp?.split('|')[0]
 
 /**
  * Something happened in or to an account's folder (its watch, or the accounts folder's): counted as a change only when
@@ -798,7 +799,7 @@ function noticed(id: string): void {
     w.queued = false
     if (watched.get(id) !== w) return
     const stamp = await loginStamp(id)
-    if (watched.get(id) !== w || stamp === w.stamp) return
+    if (watched.get(id) !== w || (stamp !== null && stamp === w.stamp)) return
     const moved = folderOf(stamp) !== folderOf(w.stamp)
     w.stamp = stamp
     if (moved) attach(id)
