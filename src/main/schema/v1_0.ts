@@ -1062,6 +1062,9 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'board.history': { sql: 'SELECT * FROM card_history WHERE card = ? ORDER BY ord', args: [1], index: 'PRIMARY KEY' },
   'board.historySince': { sql: 'SELECT card, what FROM card_history WHERE at > ?', args: ['2026-10-01'], index: 'card_history_at' },
   'board.decisions': { sql: 'SELECT * FROM card_decisions WHERE card = ? ORDER BY ord', args: [1], index: 'PRIMARY KEY' },
+  // The live cards changed since a mark (HI-1789, decisionChanges), and which of them have decisions.
+  'board.liveChanged': { sql: 'SELECT number, archived FROM cards WHERE rev >= ?', args: [1], index: 'cards_rev' },
+  'board.decided': { sql: 'SELECT DISTINCT card FROM card_decisions WHERE card IN (SELECT value FROM json_each(?))', args: ['[1]'], index: 'PRIMARY KEY' },
   'board.holds': { sql: 'SELECT * FROM card_holds WHERE card = ? ORDER BY ord', args: [1], index: 'PRIMARY KEY' },
   'board.context': { sql: 'SELECT ref FROM card_context WHERE card = ? ORDER BY ord', args: [1], index: 'PRIMARY KEY' },
   // sessionStore.ts: a host's sessions, one by id, an agent's, a card's.

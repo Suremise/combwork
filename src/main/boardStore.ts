@@ -1479,12 +1479,13 @@ export function decisionChanges(ws: WorkspaceService, since: number | null): { g
   return readSnapshot(ws, (b, db) => {
     if (b.legacy) return null
     const mark = (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g // i18n-ignore: SQL
-    const where = `archived = 0${since === null ? '' : ' AND rev >= ?'}` // i18n-ignore: SQL
-    const args = since === null ? [] : [since]
-    const changed = (db.prepare(`SELECT number FROM cards WHERE ${where}`).all(...args) as { number: number }[]).map((r) => r.number) // i18n-ignore: SQL
-    const decided = `${where} AND EXISTS (SELECT 1 FROM card_decisions d WHERE d.card = cards.number)` // i18n-ignore: SQL
-    const docs = cardFields(db, DECISION_FIELDS, { where: decided, args, parts: ['history', 'decisions'] }).map(({ r, fields }) => ({ number: r.card.number, doc: fields }))
-    return { generation: b.generation, mark, changed, docs }
+    // By the revision's index alone (archived picked here: a condition on it, or an ORDER BY, can make SQLite take
+    // another index or scan every card), then the decided ones by number.
+    const changed = (since === null ? db.prepare('SELECT number, archived FROM cards WHERE archived = 0').all() : db.prepare('SELECT number, archived FROM cards WHERE rev >= ?').all(since)) as { number: number; archived: number }[] // i18n-ignore: SQL
+    const numbers = changed.filter((r) => r.archived === 0).map((r) => r.number)
+    const decided = numbers.length ? (db.prepare('SELECT DISTINCT card FROM card_decisions WHERE card IN (SELECT value FROM json_each(?))').all(JSON.stringify(numbers)) as { card: number }[]).map((r) => r.card) : [] // i18n-ignore: SQL
+    const docs = decided.length ? cardFields(db, DECISION_FIELDS, { numbers: decided, parts: ['history', 'decisions'] }).map(({ r, fields }) => ({ number: r.card.number, doc: fields })) : []
+    return { generation: b.generation, mark, changed: numbers, docs }
   })
 }
 
