@@ -978,7 +978,7 @@ function ChangesPicker({ project, value, onChange, unused, looking, listed, comp
     <div className="root-row">
       <Tooltip content={tr(C.pickerTip)}>
         <select className="select root-select changes-picker" value={value} onChange={(e) => onChange(e.target.value)}>
-          {compare.lines && compare.lines.branches.length > 1 && <CompareGroup project={project} lines={compare.lines} value={value} />}
+          {compare.lines && compare.lines.branches.length > 1 && <CompareGroup lines={compare.lines} value={value} />}
           <optgroup label={tr(C.unusedGroup)}>
             <option value={UNUSED_ROOT}>{looking ? tr(C.unusedLooking) : listed ? tr(C.unusedCount, { count: unused.length }) : tr(C.unusedFailed)}</option>
             {unused

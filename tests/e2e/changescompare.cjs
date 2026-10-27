@@ -3,8 +3,10 @@
 // other way; the 254 files 1.0.0 changes since it left main, 200 listed until Show more; a text file's diff, opened
 // when it is clicked, and a binary one's notice; each side's commits, 50 a page; Swap compares the other way round.
 // Nothing in the repository changes (refs, index, working tree, worktrees), and a name that isn't a branch is refused.
-// Screenshots in both themes. The repository is made with the suite's own git; throwaway profile and workspace; quiet;
-// no agent is started.
+// Slots: one lent to a card with no agent working in it (slot-c's case) and a free one, each with a branch, listed
+// under Slots and opening its branch's comparison. Screenshots in both themes. The repository is made with the suite's
+// own git; throwaway profile and workspace; quiet; no agent is started.
+// Dev build only (#1578): its slots are lent through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -59,7 +61,7 @@ function state() {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
   await inv('workflow:setOptions', proj, { preset: null, options: { target: '1.0.0' } })
-  const before = state()
+  let before = state()
   const text = (loc) => loc.innerText().catch(() => '')
   const theme = async (t) => {
     await inv('settings:update', { appearance: { theme: t } })
@@ -110,16 +112,56 @@ function state() {
   await shots('commits')
   await commits.locator('[aria-label="Next page"]').click()
   check('…the next page, the next 50 of 1.0.0’s', !!(await lib.until(async () => /Page 2 of 3/.test(await text(commits.locator('.table-paging'))) && /1\.0\.0 work 70/.test(await text(commits.locator('.git-commit').first())), HUNG_MS)), await text(commits.locator('.git-commit').first()))
+  // 1.0.0 moves on (a commit made as a terminal would): the pages stay of the comparison read, until Refresh.
+  git(proj, 'update-ref', 'refs/heads/1.0.0', git(proj, 'commit-tree', '1.0.0^{tree}', '-p', '1.0.0', '-m', '1.0.0 moved on'))
+  await commits.locator('[aria-label="Previous page"]').click()
+  check('…a page turned after 1.0.0 moved is of the same comparison (its commits pinned)', !!(await lib.until(async () => /Page 1 of 3/.test(await text(commits.locator('.table-paging'))) && /1\.0\.0 work 120/.test(await text(commits.locator('.git-commit').first())), HUNG_MS)) && (await counts.getAttribute('data-compare-ahead')) === '120', await text(commits.locator('.git-commit').first()))
+  await page.locator('.split-list .pane-header [aria-label="Compare again"]').click()
+  check('…and Refresh reads 1.0.0 as it is now', !!(await lib.until(async () => (await counts.getAttribute('data-compare-ahead').catch(() => null)) === '121' && /1\.0\.0 moved on/.test(await text(commits.locator('.git-commit').first())), HUNG_MS)), await text(counts))
+  // What the rest must leave as it is: the repository with 1.0.0 moved.
+  before = state()
 
   // --- Swap: main against 1.0.0.
   await page.locator('[data-action="compare-swap"]').click()
-  check('Swap compares the other way: main’s 1 commit, its 1 file', !!(await lib.until(async () => (await on('1.0.0', 'main')) && (await counts.getAttribute('data-compare-ahead').catch(() => null)) === '1' && (await counts.getAttribute('data-compare-behind')) === '120' && (await files.count()) === 1 && (await page.locator('[data-compare-file="main-only.txt"]').count()) === 1, HUNG_MS)), `${await text(counts)} / ${await files.allInnerTexts()}`)
+  check('Swap compares the other way: main’s 1 commit, its 1 file', !!(await lib.until(async () => (await on('1.0.0', 'main')) && (await counts.getAttribute('data-compare-ahead').catch(() => null)) === '1' && (await counts.getAttribute('data-compare-behind')) === '121' && (await files.count()) === 1 && (await page.locator('[data-compare-file="main-only.txt"]').count()) === 1, HUNG_MS)), `${await text(counts)} / ${await files.allInnerTexts()}`)
   check('…the picker shows that pair', (await picker.inputValue()) === 'compare:1.0.0:main')
 
   // --- Refused, and nothing changed.
   const refused = await inv('git:compare', proj, 'main', '--output=x').then(() => 'answered', (e) => String(e?.message ?? e))
   check('a name that isn’t a branch is refused, never taken as an option', /no branch --output=x/.test(refused), refused)
   check('nothing in the repository changed: refs, index, working tree, worktrees', state() === before)
+
+  // --- Slots (HR1's round 0, HI-1823's slot-c): slot-a lent to card 1758 with no agent working there (slot-c's case:
+  // its card blocked), and slot-b free, each with a branch, the pool's records read without making the pool from the
+  // picker. Lent through slots:test (dev build only, #1578).
+  const op = (o) => inv('slots:test', proj, o)
+  const b1 = await lib.addAgent(inv, proj, { name: 'B1' })
+  const b2 = await lib.addAgent(inv, proj, { name: 'B2' })
+  const onBranch = (folder, branch, file) => {
+    git(folder, 'checkout', '-q', '-b', branch)
+    fs.writeFileSync(path.join(folder, file), `${branch}\n`)
+    git(folder, 'add', '-A')
+    git(folder, 'commit', '-qm', `work on ${branch}`)
+  }
+  const a = await op({ op: 'lend', agent: b1.id, card: 1758 })
+  check('slot-a is lent to card 1758', a?.ok && a.slot.name === 'slot-a', JSON.stringify(a))
+  onBranch(a.slot.folder, 'hive/HI-1758-blocked', 'blocked.txt')
+  const b = await op({ op: 'lend', agent: b2.id, card: 7 })
+  onBranch(b.slot.folder, 'hive/left-free', 'free.txt')
+  await op({ op: 'release', lease: b.lease.id, why: 'done' })
+  // The picker reads the branches again as the tab opens.
+  await page.locator('.tab', { hasText: 'Overview' }).click()
+  await page.locator('.tab', { hasText: 'Version Control' }).click()
+  const slotGroup = picker.locator('optgroup[label^="Slots"]')
+  const slotLabels = async () => (await slotGroup.locator('option').allInnerTexts().catch(() => [])).join('|')
+  check('Slots lists each slot with a branch: its name, its card (free when it has none) and its branch', !!(await lib.until(async () => (await slotLabels()) === 'slot-a · #1758 · hive/HI-1758-blocked|slot-b · free · hive/left-free', HUNG_MS)), await slotLabels())
+  const branchValues = await picker.locator('optgroup[label^="Branches"] option').evaluateAll((os) => os.map((o) => o.value))
+  check('…each branch once: not under Branches too', !branchValues.some((v) => v.endsWith(':hive/HI-1758-blocked') || v.endsWith(':hive/left-free')), JSON.stringify(branchValues))
+  await picker.selectOption({ label: 'slot-a · #1758 · hive/HI-1758-blocked' })
+  // Its target as the pool recorded it: main here (slots:test lends with none, so the repository's default branch).
+  check('a slot opens its branch against where it merges (its target, main): its one commit and file', !!(await lib.until(async () => (await on('main', 'hive/HI-1758-blocked')) && (await counts.getAttribute('data-compare-ahead').catch(() => null)) === '1' && (await files.count()) === 1 && (await page.locator('[data-compare-file="blocked.txt"]').count()) === 1, HUNG_MS)), await text(page.locator('.split-main')))
+  check('…saying the files are its own since it left main', /The files hive\/HI-1758-blocked changes since it left main\./.test(await text(page.locator('[data-compare-files-hint]'))), await text(page.locator('[data-compare-files-hint]')))
+  await shots('slot')
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

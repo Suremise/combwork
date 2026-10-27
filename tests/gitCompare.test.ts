@@ -50,6 +50,26 @@ describe('compareLines: what the Changes tab can compare', () => {
     expect((await compareLines(repo, 'gone')).integration).toBeNull()
   })
 
+  it("each slot whose folder has a branch, with its lease's card (a blocked card's slot, a free one), never one without", async () => {
+    const repo = fixture(3)
+    const slot = (name: string) => join(repo, '..', name)
+    sh(repo, 'worktree', 'add', '-q', slot('slot-a'), '-b', 'hive/HI/HI-1-a')
+    sh(repo, 'worktree', 'add', '-q', slot('slot-c'), '-b', 'hive/HI/HI-1758-blocked')
+    sh(repo, 'worktree', 'add', '-q', '--detach', slot('slot-d'))
+    const records = [
+      { name: 'slot-a', folder: slot('slot-a'), card: null, agent: null, target: null },
+      // slot-c's case (HI-1823): lent to a card that is blocked, its agent elsewhere.
+      { name: 'slot-c', folder: slot('slot-c'), card: 1758, agent: 'a-hb3', target: '1.0.0' },
+      { name: 'slot-d', folder: slot('slot-d'), card: null, agent: null, target: null },
+      { name: 'slot-e', folder: slot('slot-e'), card: null, agent: null, target: null }
+    ]
+    const lines = await compareLines(repo, '1.0.0', records)
+    expect(lines.slots).toEqual([
+      { name: 'slot-a', folder: slot('slot-a'), branch: 'hive/HI/HI-1-a', card: null, agent: null, target: null },
+      { name: 'slot-c', folder: slot('slot-c'), branch: 'hive/HI/HI-1758-blocked', card: 1758, agent: 'a-hb3', target: '1.0.0' }
+    ])
+  })
+
   it('a folder that is no repository says so', async () => {
     const lines = await compareLines(tempDir('gitcompare-none-'), '1.0.0')
     expect(lines).toMatchObject({ isRepo: false, branches: [], main: null, integration: null })
@@ -95,6 +115,31 @@ describe('compareBranches and compareDiff: 1.0.0 against main', () => {
     expect(second.aheadCommits.map((x) => x.subject)).toEqual(['commit 9', 'commit 8', 'commit 7', 'commit 6', 'commit 5', 'commit 4', 'commit 3', 'commit 2', 'drop readme', 'change a, add new'])
     // Past the last page: the last.
     expect((await compareBranches(repo, 'main', '1.0.0', 99)).page).toBe(2)
+    // 1.0.0 moves on: the next page of the first comparison (its commits pinned) is still of that state.
+    const other = join(repo, '..', 'other')
+    sh(repo, 'worktree', 'add', '-q', other, '1.0.0')
+    commit(other, { 'later.txt': 'later\n' }, 'later')
+    const pinned = await compareBranches(repo, 'main', '1.0.0', 2, { base: first.baseCommit, head: first.headCommit })
+    expect(pinned).toMatchObject({ ahead: COMPARE_COMMITS + 10, headCommit: first.headCommit, filesTotal: first.filesTotal })
+    expect(pinned.aheadCommits.map((x) => x.subject)).toEqual(second.aheadCommits.map((x) => x.subject))
+    // Unpinned (a refresh): the branch as it is now.
+    expect((await compareBranches(repo, 'main', '1.0.0', 2)).ahead).toBe(COMPARE_COMMITS + 11)
+  })
+
+  it("a file's diff is of the comparison's own commits, though the branch has moved since", async () => {
+    const repo = fixture(3)
+    const c = await compareBranches(repo, 'main', '1.0.0')
+    expect(c.headCommit).toBe(sh(repo, 'rev-parse', '1.0.0'))
+    expect(c.baseCommit).toBe(sh(repo, 'rev-parse', 'main'))
+    // 1.0.0 moves on in a folder of its own: new.txt changes there.
+    const other = join(repo, '..', 'other')
+    sh(repo, 'worktree', 'add', '-q', other, '1.0.0')
+    commit(other, { 'new.txt': 'moved on\n' }, 'later')
+    const pinned = { base: c.baseCommit, head: c.headCommit }
+    expect(await compareDiff(repo, 'main', '1.0.0', 'new.txt', pinned)).toMatchObject({ original: '', modified: 'new\n' })
+    // Without its commits (or with ids that aren't commits here): the branches as they are now.
+    expect(await compareDiff(repo, 'main', '1.0.0', 'new.txt')).toMatchObject({ modified: 'moved on\n' })
+    expect(await compareDiff(repo, 'main', '1.0.0', 'new.txt', { base: '0'.repeat(40), head: 'HEAD' })).toMatchObject({ modified: 'moved on\n' })
   })
 
   it("refuses a branch that isn't one, and never takes a name as an option", async () => {

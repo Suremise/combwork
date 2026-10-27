@@ -6746,6 +6746,10 @@ button.agent-place:hover {
 .compare-view {
   margin: 0 10px 8px 14px;
 }
+.compare-files-hint {
+  padding: 0 10px 6px 14px;
+  font-size: 11px;
+}
 .compare-more {
   margin: 6px 14px;
 }

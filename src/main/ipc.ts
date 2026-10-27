@@ -116,7 +116,7 @@ import { repairStages } from './workflow/stageRepair'
 import { attachableSource, attachToCard, cardAttachmentGroups, cardAttachments, recoverCardAttachments, removeCardAttachment, stageDrafts } from './cardAttachments'
 import { settleSlotsUpToDate } from './workflow/slotsUpToDateStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
-import { heldWriter, releaseHeldWriter } from './agentFolders'
+import { boardSlots, heldWriter, releaseHeldWriter } from './agentFolders'
 import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
 import { checkWorkflowChange, chooseMerge, presetsNotice, settleMergeChoices, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
@@ -1468,10 +1468,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'git:diff': (root, f, base) => gitDiff(workspace.assertChangesRoot(root), f, base),
     'git:compareLines': async (p) => {
       p = workspace.assertProject(p)
-      return compareLines(p, await workTargetOf(p))
+      // The slots as the board records them: a plain read, never the slot pool or the 0.9 migration (it runs as the project opens).
+      const slots = (await boardSlots(p)).map((s) => ({ name: s.name, folder: s.folder, card: s.open?.card ?? null, agent: s.open?.agent ?? null, target: s.target ?? null }))
+      return compareLines(p, await workTargetOf(p), slots)
     },
-    'git:compare': (p, base, head, page) => compareBranches(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), Number(page) || 1),
-    'git:compareDiff': (p, base, head, f) => compareDiff(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), String(f ?? '')),
+    'git:compare': (p, base, head, page, pinBase, pinHead) => compareBranches(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), Number(page) || 1, { base: pinBase, head: pinHead }),
+    'git:compareDiff': (p, base, head, f, pinned) => compareDiff(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), String(f ?? ''), pinned && typeof pinned === 'object' ? pinned : null),
     // The file of the diff shown (#495): in the folder the Changes tab shows, which may be an unused worktree outside the
     // workspace that file IPC (guardFile) doesn't reach; inside it by its real location too, so a link can't lead out.
     'changes:openFile': (root, f) => {

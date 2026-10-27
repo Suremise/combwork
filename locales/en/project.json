@@ -587,6 +587,10 @@
     "defaultMessage": "Files",
     "description": "A switch in the Changes tab's comparison: the changed files."
   },
+  "project.compare.filesHint": {
+    "defaultMessage": "The files {head} changes since it left {base}. Swap to see {base}’s.",
+    "description": "Above the files in the Changes tab's comparison: they are only the branch's own changes, since the commit where it left the other."
+  },
   "project.compare.group": {
     "defaultMessage": "Branches (compared, nothing checked out)",
     "description": "A group of the Changes tab's picker: comparisons of two branches, read without checking anything out."
@@ -628,8 +632,8 @@
     "description": "A heading in the Changes tab's comparison: the commits the branch {head} has that {base} hasn't."
   },
   "project.compare.option": {
-    "defaultMessage": "{head} ↔ {base}{slot, select, none {} other { · {slot}}}{card, select, none {} other { · {card}}}",
-    "description": "A comparison in the Changes tab's picker: the branch {head} against {base}. {slot} is the slot it is checked out in and {card} the card working there (each none when there is none)."
+    "defaultMessage": "{head} ↔ {base}",
+    "description": "A comparison in the Changes tab's picker: the branch {head} against {base}."
   },
   "project.compare.parted": {
     "defaultMessage": "They parted at {commit}.",
@@ -650,6 +654,14 @@
   "project.compare.sideBySide": {
     "defaultMessage": "Side by side",
     "description": "A button in the Changes tab's comparison: shows a diff as two columns."
+  },
+  "project.compare.slotOption": {
+    "defaultMessage": "{slot} · {card, select, none {free} other {{card}}} · {branch}",
+    "description": "A slot in the Changes tab's picker: its name {slot}, the card it is lent to ({card}; none: free, no card) and its branch {branch}."
+  },
+  "project.compare.slotsGroup": {
+    "defaultMessage": "Slots (each one’s branch, compared)",
+    "description": "A group of the Changes tab's picker: the project's slots (working folders lent to cards), each opening its branch compared with where it merges."
   },
   "project.compare.status": {
     "defaultMessage": "{status, select, M {Modified} A {Added} D {Deleted} T {Type changed} other {{status}}}: {path}",

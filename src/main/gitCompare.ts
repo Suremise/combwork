@@ -1,5 +1,6 @@
 import { COMPARE_COMMITS, COMPARE_FILES, type CompareFile, type CompareLines, type GitCommitRow, type GitComparison } from '../shared/gitRepo'
 import type { GitDiff } from '../shared/types'
+import { resolve as resolvePath } from 'path'
 import { msg } from '../shared/i18n'
 import { failure as commandFailed, git, isBinary, MAX_DIFF_BYTES, tooLargeDiff } from './git'
 import { gitProblem } from './gitTool'
@@ -32,9 +33,23 @@ async function localBranches(root: string): Promise<{ name: string; folder: stri
     .sort((a, b) => a.name.localeCompare(b.name, 'en'))
 }
 
-/** What can be compared: the local branches, main, and the project's integration line (`workTarget`, its G7). */
-export async function compareLines(root: string, workTarget: string | null): Promise<CompareLines> {
-  const none: CompareLines = { isRepo: false, branches: [], main: null, integration: null }
+/** A slot as the board records it: its folder, and its open lease's card and agent (null when it is free). */
+export interface SlotRecord {
+  name: string
+  folder: string
+  card: number | null
+  agent: string | null
+  target: string | null
+}
+
+const folderKey = (p: string): string => resolvePath(p).toLowerCase()
+
+/**
+ * What can be compared: the local branches, main, the project's integration line (`workTarget`, its G7), and each of
+ * `slots` (the board's records, read by the caller without making the slot pool) whose folder has a branch checked out.
+ */
+export async function compareLines(root: string, workTarget: string | null, slots: readonly SlotRecord[] = []): Promise<CompareLines> {
+  const none: CompareLines = { isRepo: false, branches: [], main: null, integration: null, slots: [] }
   const inside = await git(root, ['rev-parse', '--is-inside-work-tree'])
   if (!inside.ok) {
     const problem = gitProblem()
@@ -47,14 +62,31 @@ export async function compareLines(root: string, workTarget: string | null): Pro
   const d = await G.defaultBranch(root)
   const main = !isUnknown(d) && has(d) ? d : null
   const integration = has(workTarget) && workTarget !== main ? workTarget : null
-  return { isRepo: true, branches, main, integration }
+  const byFolder = new Map(branches.filter((b) => b.folder).map((b) => [folderKey(b.folder!), b.name]))
+  const listed = slots.flatMap((s) => {
+    const branch = byFolder.get(folderKey(s.folder))
+    return branch ? [{ ...s, branch }] : []
+  })
+  return { isRepo: true, branches, main, integration, slots: listed }
 }
 
-/** A listed branch, named whole; refused when there's no such branch (deleted or renamed since the list). */
-async function branchRef(root: string, name: string): Promise<string> {
+/** A listed branch's tip, read through its whole name; refused when there's no such branch (deleted or renamed since the list). */
+async function branchTip(root: string, name: string): Promise<string> {
   const listed = (await localBranches(root)).some((b) => b.name === name)
   if (!listed) throw hiveError(M.noBranch, { branch: name })
-  return `refs/heads/${name}`
+  const r = await git(root, ['rev-parse', '--verify', '-q', `refs/heads/${name}^{commit}`])
+  if (r.ok) return r.out.trim()
+  if (r.code === 1) throw hiveError(M.noBranch, { branch: name })
+  throw commandFailed('git rev-parse', r) // i18n-ignore: a git command, as it is
+}
+
+const SHA = /^[0-9a-f]{40}([0-9a-f]{24})?$/
+
+/** A commit id the window was given by a comparison, checked to be one here; null when it isn't (a stale or made-up id). */
+async function pinnedCommit(root: string, id: unknown): Promise<string | null> {
+  if (typeof id !== 'string' || !SHA.test(id)) return null
+  const r = await git(root, ['rev-parse', '--verify', '-q', `${id}^{commit}`])
+  return r.ok ? r.out.trim() : null
 }
 
 const FORMAT = '--format=%H%x00%h%x00%an%x00%ae%x00%at%x00%D%x00%s%x1e'
@@ -83,8 +115,11 @@ async function mergeBaseOf(root: string, base: string, head: string): Promise<st
  * the files head changes since it left base (three dots, as a card's changes are shown), names only: a file's diff is
  * read when it is opened (compareDiff).
  */
-export async function compareBranches(root: string, baseName: string, headName: string, page = 1): Promise<GitComparison> {
-  const [base, head] = await Promise.all([branchRef(root, baseName), branchRef(root, headName)])
+export async function compareBranches(root: string, baseName: string, headName: string, page = 1, pinned?: { base?: unknown; head?: unknown } | null): Promise<GitComparison> {
+  // Each branch read once, as a commit: everything below is of those two commits, even if a branch moves meanwhile.
+  // Another page of the same comparison names its commits (`pinned`), so its pages never mix two states of a branch.
+  const [pb, ph] = await Promise.all([pinnedCommit(root, pinned?.base), pinnedCommit(root, pinned?.head)])
+  const [base, head] = pb && ph ? [pb, ph] : await Promise.all([branchTip(root, baseName), branchTip(root, headName)])
   const counts = await git(root, ['rev-list', '--left-right', '--count', `${base}...${head}`, '--'])
   if (!counts.ok) throw commandFailed('git rev-list', counts) // i18n-ignore: a git command, as it is
   const [behind, ahead] = counts.out.trim().split(/\s+/).map((n) => Number(n) || 0)
@@ -106,7 +141,7 @@ export async function compareBranches(root: string, baseName: string, headName: 
   const files: CompareFile[] = []
   const parts = names.out.split('\0').filter(Boolean)
   for (let i = 0; i + 1 < parts.length; i += 2) files.push({ path: parts[i + 1], status: parts[i][0] })
-  return { base: baseName, head: headName, mergeBase: mb, ahead, behind, aheadCommits, behindCommits, page: p, pages, files: files.slice(0, COMPARE_FILES), filesTotal: files.length }
+  return { base: baseName, head: headName, baseCommit: base, headCommit: head, mergeBase: mb, ahead, behind, aheadCommits, behindCommits, page: p, pages, files: files.slice(0, COMPARE_FILES), filesTotal: files.length }
 }
 
 /** A file at a commit, or empty when it isn't there (added or deleted); its size first, so a large one is never read. */
@@ -121,10 +156,15 @@ async function fileAt(root: string, rev: string, file: string): Promise<{ buf: B
   return { buf: r.buf }
 }
 
-/** One file of a comparison: as it was where head left base, against head's. */
-export async function compareDiff(root: string, baseName: string, headName: string, file: string): Promise<GitDiff> {
+/**
+ * One file of a comparison: as it was where head left base, against head's. `pinned` is the comparison's own commits
+ * (GitComparison's baseCommit and headCommit), so the diff is of what the comparison listed; without them (or when one
+ * isn't a commit here), the branches' tips now.
+ */
+export async function compareDiff(root: string, baseName: string, headName: string, file: string, pinned?: { base?: unknown; head?: unknown } | null): Promise<GitDiff> {
   const path = String(file ?? '').replace(/\\/g, '/')
-  const [base, head] = await Promise.all([branchRef(root, baseName), branchRef(root, headName)])
+  const [pb, ph] = await Promise.all([pinnedCommit(root, pinned?.base), pinnedCommit(root, pinned?.head)])
+  const [base, head] = pb && ph ? [pb, ph] : await Promise.all([branchTip(root, baseName), branchTip(root, headName)])
   const from = (await mergeBaseOf(root, base, head)) ?? base
   const [original, modified] = await Promise.all([fileAt(root, from, path), fileAt(root, head, path)])
   if ('size' in original) return tooLargeDiff(path, original.size)

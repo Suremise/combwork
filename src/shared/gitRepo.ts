@@ -258,6 +258,19 @@ export interface CompareLines {
   main: string | null
   /** The project's target (G7) when it is a local branch other than main: the comparison shown by default. */
   integration: string | null
+  /** The project's slots whose folder has a branch checked out, by name (free ones and blocked cards' included). */
+  slots: CompareSlot[]
+}
+
+/** A slot as the Changes tab's picker lists it (HI-1824): its branch, and its lease's card and agent when it is lent. */
+export interface CompareSlot {
+  name: string
+  folder: string
+  branch: string
+  card: number | null
+  agent: string | null
+  /** The branch its lines merge into, when the pool knows it. */
+  target: string | null
 }
 
 /** A file `head` changes since it left `base`, as git's name-status letter. */
@@ -270,6 +283,12 @@ export interface CompareFile {
 export interface GitComparison {
   base: string
   head: string
+  /**
+   * The commits compared: each branch's tip as this comparison read it. A file's diff is asked for these (never the
+   * branches' tips then), so it belongs to the counts and files shown even if a branch has moved since.
+   */
+  baseCommit: string
+  headCommit: string
   /** Where head left base; null when they share no history (the files are then base's tip against head's). */
   mergeBase: string | null
   /** Head's commits base hasn't, and base's head hasn't. */

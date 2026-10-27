@@ -3,7 +3,6 @@ import type { ProjectInfo, GitDiff } from '@shared/types'
 import type { CompareLines, GitCommitRow, GitComparison } from '@shared/gitRepo'
 import { COMPARE_COMMITS } from '@shared/gitRepo'
 import { fmt, msg, tr } from '@shared/i18n'
-import { samePath } from '@shared/movePaths'
 import { call, errorMessage } from '../api'
 import { cardLabelOf, useStore } from '../store'
 import { at, useGitRead } from '../views/GitTab'
@@ -23,7 +22,10 @@ import { Icon, IconButton, LoadFailed, Tooltip } from './ui'
 
 const M = {
   group: msg({ id: 'project.compare.group', defaultMessage: 'Branches (compared, nothing checked out)', description: "A group of the Changes tab's picker: comparisons of two branches, read without checking anything out." }),
-  option: msg({ id: 'project.compare.option', defaultMessage: '{head} ↔ {base}{slot, select, none {} other { · {slot}}}{card, select, none {} other { · {card}}}', description: "A comparison in the Changes tab's picker: the branch {head} against {base}. {slot} is the slot it is checked out in and {card} the card working there (each none when there is none)." }),
+  option: msg({ id: 'project.compare.option', defaultMessage: '{head} ↔ {base}', description: "A comparison in the Changes tab's picker: the branch {head} against {base}." }),
+  slotsGroup: msg({ id: 'project.compare.slotsGroup', defaultMessage: 'Slots (each one’s branch, compared)', description: "A group of the Changes tab's picker: the project's slots (working folders lent to cards), each opening its branch compared with where it merges." }),
+  slotOption: msg({ id: 'project.compare.slotOption', defaultMessage: '{slot} · {card, select, none {free} other {{card}}} · {branch}', description: "A slot in the Changes tab's picker: its name {slot}, the card it is lent to ({card}; none: free, no card) and its branch {branch}." }),
+  filesHint: msg({ id: 'project.compare.filesHint', defaultMessage: 'The files {head} changes since it left {base}. Swap to see {base}’s.', description: "Above the files in the Changes tab's comparison: they are only the branch's own changes, since the commit where it left the other." }),
   about: msg({ id: 'project.compare.about', defaultMessage: 'What {head} changes since it left {base}: its commits that {base} hasn’t, and the files they change. Read from git, nothing checked out.', description: "The sentence at the top of the Changes tab's comparison of two branches." }),
   head: msg({ id: 'project.compare.head', defaultMessage: 'Branch', description: "A label in the Changes tab's comparison: the branch whose changes are shown." }),
   base: msg({ id: 'project.compare.base', defaultMessage: 'Against', description: "A label in the Changes tab's comparison: the branch it is compared with." }),
@@ -73,37 +75,49 @@ export function useCompareLines(project: ProjectInfo): { lines: CompareLines | n
 }
 
 /**
- * The picker's group of comparisons: the integration line against main first, then each local branch against its
- * default. A branch checked out in a slot names it and the card its agent has in hand, from the agents' places (never
- * the slot pool: reading it here would make the pool as the project opens).
+ * The picker's comparisons. **Branches:** the integration line against main first, then each local branch no slot has
+ * checked out, against its default. **Slots:** each slot whose folder has a branch (a free one, one whose card is
+ * blocked), its branch against the slot's target, else its default (the board's records, read without making the pool).
+ * A branch is listed once.
  */
-export function CompareGroup({ project, lines, value }: { project: ProjectInfo; lines: CompareLines; value: string }) {
+export function CompareGroup({ lines, value }: { lines: CompareLines; value: string }) {
   const tasks = useStore((s) => s.tasks)
   const first = lines.integration && lines.main ? compareRoot(lines.main, lines.integration) : null
+  const inSlot = new Set(lines.slots.map((s) => s.branch))
+  const has = (b: string | null): b is string => !!b && lines.branches.some((x) => x.name === b)
   const rows = lines.branches.flatMap((b) => {
     const base = defaultBase(lines, b.name)
     const id = base ? compareRoot(base, b.name) : null
-    return id && id !== first ? [{ id, head: b.name, base: base!, folder: b.folder }] : []
+    return id && id !== first && !inSlot.has(b.name) ? [{ id, head: b.name, base: base! }] : []
+  })
+  const slots = lines.slots.flatMap((s) => {
+    const base = has(s.target) && s.target !== s.branch ? s.target : defaultBase(lines, s.branch)
+    return base ? [{ ...s, id: compareRoot(base, s.branch) }] : []
   })
   const picked = parseCompareRoot(value)
   // A pair chosen with the page's own pickers, not one of the defaults: listed too, so the picker shows it.
-  const extra = picked && value !== first && !rows.some((r) => r.id === value) ? picked : null
-  const label = (head: string, base: string, folder: string | null): string => {
-    const agent = folder ? project.agents.find((a) => (a.place.is === 'slot' || a.place.is === 'carried') && samePath(a.place.folder, folder)) : undefined
-    const held = agent ? tasks.find((t) => t.agent === agent.id && t.column === 'doing' && t.project.toLowerCase() === (project.path.split(/[\\/]/).pop() ?? '').toLowerCase()) : undefined
-    return tr(M.option, { head, base, slot: agent?.place.name ?? 'none', card: held ? cardLabelOf({ tasks }, held.number) : 'none' })
-  }
-  const folderOf = (name: string): string | null => lines.branches.find((b) => b.name === name)?.folder ?? null
+  const extra = picked && value !== first && !rows.some((r) => r.id === value) && !slots.some((r) => r.id === value) ? picked : null
   return (
-    <optgroup label={tr(M.group)}>
-      {first && <option value={first}>{label(lines.integration!, lines.main!, folderOf(lines.integration!))}</option>}
-      {extra && <option value={value}>{label(extra.head, extra.base, folderOf(extra.head))}</option>}
-      {rows.map((r) => (
-        <option key={r.id} value={r.id}>
-          {label(r.head, r.base, r.folder)}
-        </option>
-      ))}
-    </optgroup>
+    <>
+      <optgroup label={tr(M.group)}>
+        {first && <option value={first}>{tr(M.option, { head: lines.integration!, base: lines.main! })}</option>}
+        {extra && <option value={value}>{tr(M.option, { head: extra.head, base: extra.base })}</option>}
+        {rows.map((r) => (
+          <option key={r.id} value={r.id}>
+            {tr(M.option, { head: r.head, base: r.base })}
+          </option>
+        ))}
+      </optgroup>
+      {slots.length > 0 && (
+        <optgroup label={tr(M.slotsGroup)}>
+          {slots.map((s) => (
+            <option key={s.name} value={s.id} data-slot={s.name}>
+              {tr(M.slotOption, { slot: s.name, card: s.card !== null ? cardLabelOf({ tasks }, s.card) : 'none', branch: s.branch })}
+            </option>
+          ))}
+        </optgroup>
+      )}
+    </>
   )
 }
 
@@ -117,36 +131,55 @@ export function ComparePage({ project, base, head, lines, selector, listWidth, o
   const [file, setFile] = useState<string | null>(null)
   const [inline, setInline] = useState(false)
   const pair = `${base}\n${head}`
+  // From the first page turn until Refresh, the commits the comparison read: each page is of them, never of a branch
+  // that has moved since (and so are the counts, the files and a file's diff).
+  const [pin, setPin] = useState<{ for: string; base: string; head: string } | null>(null)
+  const pinned = pin?.for === pair ? pin : null
   useEffect(() => {
     setPage(1)
     setShown(FILES_STEP)
     setFile(null)
+    setPin(null)
   }, [pair])
-  const raw = useGitRead('git:compare', project, [base, head, page])
+  const raw = useGitRead('git:compare', project, [base, head, page, pinned?.base ?? '', pinned?.head ?? ''])
   // The last answer for this pair stays while another page is read.
   const [last, setLast] = useState<{ for: string; data: GitComparison } | null>(null)
   useEffect(() => {
     if (raw.data) setLast({ for: pair, data: raw.data })
   }, [raw.data, pair])
   const c = raw.data ?? (last?.for === pair ? last.data : null)
+  const turn = (n: number): void => {
+    if (c && !pinned) setPin({ for: pair, base: c.baseCommit, head: c.headCommit })
+    setPage(n)
+  }
+  // Refresh reads the branches as they are now (unpinned): the counts, files and pages of their new tips.
+  const refresh = (): void => (pinned ? setPin(null) : raw.reload())
 
-  // A file's diff, read when it is opened; an answer for another file (or pair) never shows.
-  const wanted = `${pair}\n${file ?? ''}`
+  // A file no longer listed (the branches moved and a refresh read them again) isn't shown.
+  useEffect(() => {
+    if (c && file && !c.files.some((f) => f.path === file)) setFile(null)
+  }, [c, file])
+
+  // A file's diff, read when it is opened, of the commits the comparison listed (pinned: never the branches' tips
+  // then, so it matches the counts and files shown); an answer for another file, pair or pair of commits never shows.
+  const baseCommit = c?.baseCommit ?? ''
+  const headCommit = c?.headCommit ?? ''
+  const wanted = `${pair}\n${baseCommit}:${headCommit}\n${file ?? ''}`
   const [diffOf, setDiffOf] = useState<{ for: string; diff: GitDiff } | null>(null)
   const [diffErrorOf, setDiffErrorOf] = useState<{ for: string; error: string } | null>(null)
   const [diffTry, setDiffTry] = useState(0)
   useEffect(() => {
-    if (!file) return
-    const asked = `${pair}\n${file}`
+    if (!file || !baseCommit) return
+    const asked = `${pair}\n${baseCommit}:${headCommit}\n${file}`
     let current = true
-    void call('git:compareDiff', project.path, base, head, file).then(
+    void call('git:compareDiff', project.path, base, head, file, { base: baseCommit, head: headCommit }).then(
       (d) => current && (setDiffOf({ for: asked, diff: d }), setDiffErrorOf(null)),
       (e) => current && setDiffErrorOf({ for: asked, error: errorMessage(e) })
     )
     return () => {
       current = false
     }
-  }, [project.path, base, head, file, pair, diffTry])
+  }, [project.path, base, head, file, pair, baseCommit, headCommit, diffTry])
   const diff = diffOf?.for === wanted ? diffOf.diff : null
   const diffError = diffErrorOf?.for === wanted ? diffErrorOf.error : null
 
@@ -191,7 +224,7 @@ export function ComparePage({ project, base, head, lines, selector, listWidth, o
           <div className="pane-header" style={{ paddingLeft: 14 }}>
             {tr(M.files)} {c && <span className="badge" style={{ marginLeft: 6 }} data-compare-files={c.filesTotal}>{fmt.number(c.filesTotal)}</span>}
             <div className="actions">
-              <IconButton icon={raw.loading ? 'loading' : 'refresh'} spin={raw.loading} title={tr(M.refresh)} disabled={raw.loading} onClick={raw.reload} />
+              <IconButton icon={raw.loading ? 'loading' : 'refresh'} spin={raw.loading} title={tr(M.refresh)} disabled={raw.loading} onClick={refresh} />
             </div>
           </div>
           {selector}
@@ -208,6 +241,11 @@ export function ComparePage({ project, base, head, lines, selector, listWidth, o
               <button type="button" role="radio" aria-checked={view === 'commits'} className={cx(view === 'commits' && 'active')} data-compare-view="commits" onClick={() => setView('commits')}>
                 {tr(M.commits)} <span className="faint">↑{fmt.number(c.ahead)} ↓{fmt.number(c.behind)}</span>
               </button>
+            </div>
+          )}
+          {c && c.files.length > 0 && (
+            <div className="hint compare-files-hint" data-compare-files-hint="">
+              {tr(M.filesHint, { head, base })}
             </div>
           )}
           <div className="pane-body">
@@ -254,7 +292,7 @@ export function ComparePage({ project, base, head, lines, selector, listWidth, o
                 {tr(M.onlyHead, { head: base, base: head })} <span className="badge">{fmt.number(c.behind)}</span>
               </h2>
               {commitRows(c.behindCommits)}
-              {c.pages > 1 && <Pager page={c.page} pages={c.pages} from={(c.page - 1) * COMPARE_COMMITS + 1} to={Math.min(c.page * COMPARE_COMMITS, Math.max(c.ahead, c.behind))} total={Math.max(c.ahead, c.behind)} onPage={setPage} />}
+              {c.pages > 1 && <Pager page={c.page} pages={c.pages} from={(c.page - 1) * COMPARE_COMMITS + 1} to={Math.min(c.page * COMPARE_COMMITS, Math.max(c.ahead, c.behind))} total={Math.max(c.ahead, c.behind)} onPage={turn} />}
             </div>
           ) : diff ? (
             <>
