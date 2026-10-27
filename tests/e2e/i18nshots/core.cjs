@@ -83,7 +83,9 @@ async function openCards(ctx) {
   await ctx.command('project.tab.session')
   await lib.showAgent(page, 'Four')
   await shown(ctx, lib.paneHeader(page, 'Four').locator(`[data-task="${cards[0].number}"]`).first(), "Four's card on its pane header")
+  // The agents are listed in Project Settings' Agents section (its people icon), not the section it opens on.
   await ctx.command('project.tab.settings')
+  await (await shown(ctx, page.locator('.settings-nav .row', { has: page.locator('.codicon-organization') }), 'the Agents section')).first().click()
   const remove = await shown(ctx, page.locator(`[data-agent="${four.id}"] [data-action="remove-agent"]`).first(), "Four's remove button")
   await remove.click()
   // First "Remove Four?": its action button is the solid (or danger, or primary) one, whatever its words.

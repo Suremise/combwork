@@ -259,6 +259,7 @@ module.exports = {
     { name: 'vc-workflow-checks', open: group('checks') },
     { name: 'vc-workflow-merging', open: group('merging') },
     { name: 'vc-workflow-where', open: group('where') },
+    { name: 'vc-workflow-loops', open: group('loops') },
     { name: 'vc-workflow-stages', open: group('stages') },
     { name: 'vc-queue', open: queue },
     { name: 'progress-queue-paused', open: progressQueue },
