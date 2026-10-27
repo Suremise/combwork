@@ -1466,6 +1466,28 @@ export function cardChanges(ws: WorkspaceService, since: number | null): CardCha
   })
 }
 
+/**
+ * The live cards at revision `since` or above (every live card when null), in full, with the board's mark and its
+ * opening, from one snapshot: nothing of the other cards read (cardChanges reads every card's number and key, HI-1789).
+ * Null on a board with no revisions (a 0.9 board waiting for its upgrade).
+ */
+export function liveCardChanges(ws: WorkspaceService, since: number | null): { generation: number; mark: number; live: { number: number; doc: Record<string, unknown> }[] } | null {
+  return readSnapshot(ws, (b, db) => {
+    if (b.legacy) return null
+    const mark = (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g // i18n-ignore: SQL
+    const sel = since === null ? { where: 'archived = 0' } : { where: 'archived = 0 AND rev >= ?', args: [since] } // i18n-ignore: SQL
+    return { generation: b.generation, mark, live: readCardRows(db, sel).map((r) => ({ number: r.card.number, doc: composeCard(r) })) }
+  })
+}
+
+/** Which of these cards are on the board (with `live`, and not archived). */
+export function cardsOnBoard(ws: WorkspaceService, numbers: readonly number[], o: { live?: boolean } = {}): Set<number> {
+  if (!numbers.length) return new Set()
+  const { db } = readConn(ws)
+  const rows = db.prepare(`SELECT number FROM cards WHERE number IN (SELECT value FROM json_each(?))${o.live ? ' AND archived = 0' : ''}`).all(JSON.stringify([...new Set(numbers)])) as { number: number }[] // i18n-ignore: SQL
+  return new Set(rows.map((r) => r.number))
+}
+
 /** Which opening of the workspace's board is open now (Board.generation), opening it if it isn't. */
 export function boardGeneration(ws: WorkspaceService): number {
   return readConn(ws).b.generation

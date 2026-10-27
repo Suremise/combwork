@@ -354,10 +354,17 @@ describe("decision notices' live cards with decisions, kept and read again for t
     expect((await same()).cards.some((x) => x.number === b)).toBe(true)
     await run(() => tasks.archiveTask(e, true))
     expect((await same()).cards.some((x) => x.number === e)).toBe(false)
+    // A link to a card deleted since is left out once the card is read again, as a whole read leaves it out.
+    const gone = (await run(() => tasks.createTask({ title: 'Linked, then gone', project: 'alpha' }, user))).number
+    await run(() => tasks.updateTask(b, { links: [gone] }, user))
+    expect((await same()).cards.find((x) => x.number === b)!.links).toEqual([gone])
     const db = other()
-    db.exec(`PRAGMA foreign_keys = ON; DELETE FROM cards WHERE number = ${d}`)
+    db.exec(`PRAGMA foreign_keys = ON; DELETE FROM cards WHERE number = ${gone}; DELETE FROM cards WHERE number = ${d}`)
     db.close()
-    expect((await same()).cards.some((x) => x.number === d)).toBe(false)
+    await run(() => tasks.commentTask(b, 'after the delete', user))
+    const left = await same()
+    expect(left.cards.some((x) => x.number === d)).toBe(false)
+    expect(left.cards.find((x) => x.number === b)!.links).toEqual([])
   })
 
   it("are read whole again once a card's key changes, and after the board is opened again", async () => {
