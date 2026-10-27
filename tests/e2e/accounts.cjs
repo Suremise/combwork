@@ -201,6 +201,18 @@ const check = (name, ok, extra = '') => {
     check('…its Set Up opens in the new project’s folder', !!(await lib.until(async () => /gamma's folder/.test(await page.locator('.account-signin [data-set-up-in]').innerText().catch(() => '')), HUNG_MS)))
     await closeRunning(true)
     check('…and, trusted there, it is set up again', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
+    // A project it already trusts, added while the read is held (round 3): Checking…, then, released, the row clears to
+    // Set up by itself (the same answer as before, for the new projects: the window is told), the list never asked here.
+    const delta = path.join(ws1, 'delta')
+    fs.mkdirSync(delta, { recursive: true })
+    const pj = path.join(folder, '.claude.json')
+    const cj = JSON.parse(fs.readFileSync(pj, 'utf8'))
+    fs.writeFileSync(pj, JSON.stringify({ ...cj, projects: { ...cj.projects, [fs.realpathSync.native(delta).replace(/\\/g, '/')]: { hasTrustDialogAccepted: true } } }))
+    fs.rmSync(trustGo)
+    await inv('workspace:refresh')
+    check('a project it already trusts, added: Checking… while read', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="checking"]').count()) === 1, HUNG_MS)))
+    fs.writeFileSync(trustGo, '')
+    check('…then Set up by itself once read, the same answer as before', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
 
     // --- Rename: the name only.
     await row('Personal').getByRole('button', { name: 'Rename…' }).click()

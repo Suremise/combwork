@@ -734,7 +734,8 @@ async function runTrust(key: string, id: string, st: TrustState): Promise<void> 
   if (current && answer) {
     const was = st.result
     st.result = { gen, answer }
-    if (!was || JSON.stringify(was.answer) !== JSON.stringify(answer)) emit({ type: 'connections-changed' })
+    // A new generation's answer is a change to show even when it reads the same (round 3: Checking… must clear).
+    if (!was || was.gen !== gen || JSON.stringify(was.answer) !== JSON.stringify(answer)) emit({ type: 'connections-changed' })
   }
   if (st.dirty || !current) return void runTrust(key, id, st)
   for (const w of st.waiters.splice(0)) w(st.result?.gen === st.gen ? st.result.answer : null)
