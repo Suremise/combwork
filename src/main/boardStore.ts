@@ -1843,8 +1843,12 @@ const copy09 = (path: string): { file: string; version: number; at: string } | u
  */
 /** By the workspace's place (#1395: a store loaded through another spelling of its folder is the same database's). */
 const generations = new Map<string, number>()
-/** The generation of a workspace's database by a path entering now (its place resolved here). */
-export const dbGeneration = (workspacePath: string): number => dbGenerationAt(placeKey(workspacePath))
+/**
+ * The generation of a workspace's database by a path entering now: its open board's place, as `replaced` counts it
+ * (HI-1797: resolving the path on each call cost a realpath on main's thread, read on every lanes refresh), else the
+ * place resolved here.
+ */
+export const dbGeneration = (workspacePath: string): number => dbGenerationAt(boards.get(keyOf(workspacePath))?.place ?? placeKey(workspacePath))
 /** The generation of a workspace's database by the place a caller recorded as it entered. */
 export const dbGenerationAt = (place: string): number => generations.get(place) ?? 0
 const replacedListeners = new Set<(workspacePath: string, place: string) => void>()

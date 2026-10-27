@@ -94,6 +94,32 @@ export interface Db {
  * nothing committed; a power cut may lose the last commit or two, never the file), a wait for a lock held by another
  * process, and caches sized for a board of a few thousand cards.
  */
+/** How many statements a connection keeps (keepStatements): the oldest goes first once there are more. */
+const KEPT_STATEMENTS = 400
+
+/**
+ * A connection keeps its statements (HI-1797): the board's reads prepared each again on every call, about 5 ms of main
+ * a check's resolve. A statement is the same SQL's until the connection closes (SQLite prepares it again itself when
+ * the schema changes); none here is iterated or given its own settings, so one statement serves each call in turn.
+ */
+function keepStatements(db: DatabaseSync): void {
+  const kept = new Map<string, ReturnType<DatabaseSync['prepare']>>()
+  const prepare = db.prepare.bind(db)
+  db.prepare = ((sql: string) => {
+    let s = kept.get(sql)
+    if (s) {
+      // Newest last, so the oldest is the first to go.
+      kept.delete(sql)
+      kept.set(sql, s)
+      return s
+    }
+    s = prepare(sql)
+    kept.set(sql, s)
+    if (kept.size > KEPT_STATEMENTS) kept.delete(kept.keys().next().value!)
+    return s
+  }) as DatabaseSync['prepare']
+}
+
 function configure(db: DatabaseSync): void {
   db.exec('PRAGMA journal_mode = WAL')
   db.exec('PRAGMA synchronous = NORMAL')
@@ -351,6 +377,8 @@ function openDbNow(file: string, opts: OpenOptions): Db {
     const pending = newer === null ? migrate(writer, file, opts) : null
     if (newer !== null || pending) writer.exec('PRAGMA query_only = ON')
     reader = new DatabaseSync(file, { timeout: 5000 })
+    keepStatements(writer)
+    keepStatements(reader)
     fileNames.set(writer, basename(file))
     fileNames.set(reader, basename(file))
     configure(reader)

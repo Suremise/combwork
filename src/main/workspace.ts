@@ -151,6 +151,8 @@ export class WorkspaceService {
   private place: string | null = null
   private wsConfig: WorkspaceConfig = structuredClone(DEFAULT_WORKSPACE_CONFIG)
   private watcher: FSWatcher | null = null
+  /** .hive's own top, watched natively (watchHive). */
+  private hiveTop: RootWatcher | null = null
   private rootWatcher: RootWatcher | null = null
   private refreshTimer: NodeJS.Timeout | null = null
   /** The refresh scheduleRefresh has waiting, told once it has run (or was dropped): refreshesSettled waits for it. */
@@ -507,6 +509,8 @@ export class WorkspaceService {
     while (this.scheduledRuns.size) await Promise.allSettled([...this.scheduledRuns])
     if (closing) closeBoard(closing, place)
     if (closing) closeJournal(join(closing, HIVE_DIR, ASSISTANT_DIR), place)
+    this.hiveTop?.close()
+    this.hiveTop = null
     await this.watcher?.close()
     this.watcher = null
     this.path = null
@@ -601,27 +605,55 @@ export class WorkspaceService {
     const assistantHome = this.assistantHome.toLowerCase()
     const mcpDir = this.mcpDir.toLowerCase() + sep
     const hiveDir = this.hiveDir.toLowerCase() + sep
-    this.watcher = chokidar.watch(this.hiveDir, {
-      depth: 5,
-      ignoreInitial: true,
-      // The Assistant's home changes with every launch; nothing in it is shown from the file system. In .hive/mcp only
-      // the definitions (<name>.json) are: a server's own folder (added from a .zip, #550) isn't watched, since a watched
-      // folder inside it would stop Windows moving the folder (Replace, Delete). The board is in its database (#1017),
-      // told by Hive's own writes: neither the database's files nor the cards' old folders and backups are watched.
-      ignored: (p: string) => {
-        const at = resolve(p).toLowerCase()
-        const top = at.startsWith(hiveDir) ? at.slice(hiveDir.length).split(sep)[0] : ''
-        return at === assistantHome || BOARD_FILES.test(top) || (at.startsWith(mcpDir) && (at.slice(mcpDir.length).includes(sep) || !at.endsWith('.json')))
+    // Only the folders whose files are shown (HI-1797): chokidar read .hive's own listing again, and filtered each entry,
+    // on every change at its top, and the board's database files there change with every board write. .hive itself is
+    // watched natively below, for workspace.json and for one of these folders appearing.
+    const folders = ['shared', 'skills', 'mcp', MODES_DIR, LEGACY_MODES_DIR]
+    const watched = new Set(folders.filter((f) => existsSync(join(this.hiveDir, f))))
+    this.watcher = chokidar.watch(
+      [...watched].map((f) => join(this.hiveDir, f)),
+      {
+        depth: 5,
+        ignoreInitial: true,
+        // The Assistant's home changes with every launch; nothing in it is shown from the file system. In .hive/mcp only
+        // the definitions (<name>.json) are: a server's own folder (added from a .zip, #550) isn't watched, since a watched
+        // folder inside it would stop Windows moving the folder (Replace, Delete). The board is in its database (#1017),
+        // told by Hive's own writes: neither the database's files nor the cards' old folders and backups are watched.
+        ignored: (p: string) => {
+          const at = resolve(p).toLowerCase()
+          const top = at.startsWith(hiveDir) ? at.slice(hiveDir.length).split(sep)[0] : ''
+          return at === assistantHome || BOARD_FILES.test(top) || (at.startsWith(mcpDir) && (at.slice(mcpDir.length).includes(sep) || !at.endsWith('.json')))
+        }
       }
-    })
-    this.watcher.on('all', (evt, p) => {
-      const rel = this.path ? p.slice(this.path.length + 1).replace(/\\/g, '/') : ''
+    )
+    const told = (rel: string): void => {
       if (rel.startsWith(`${HIVE_DIR}/shared`)) this.emit({ type: 'notes-changed' })
       else if (rel.startsWith(`${HIVE_DIR}/skills`) || rel.startsWith(`${HIVE_DIR}/mcp`)) this.emit({ type: 'skills-changed' })
       else if (rel.startsWith(`${HIVE_DIR}/${MODES_DIR}`) || rel.startsWith(`${HIVE_DIR}/${LEGACY_MODES_DIR}`)) this.emit({ type: 'modes-changed' })
       else if (rel === `${HIVE_DIR}/workspace.json`) void this.reloadConfig()
-    })
-    this.watcher.on('error', (e) => log.warn('watcher error', e))
+    }
+    const chokidarWatcher = this.watcher
+    chokidarWatcher.on('all', (evt, p) => told(this.path ? p.slice(this.path.length + 1).replace(/\\/g, '/') : ''))
+    chokidarWatcher.on('error', (e) => log.warn('watcher error', e))
+    // .hive's own top, natively: each event only a name compared (the database's files change at every write).
+    // workspace.json changed reads the config again; one of the folders above appearing is watched from then on, and
+    // tells its change (what is in it is new).
+    try {
+      const top = watch(this.hiveDir, (_evt, name) => {
+        if (this.watcher !== chokidarWatcher || !name) return
+        const n = String(name)
+        if (n === 'workspace.json') return void this.reloadConfig()
+        const f = folders.find((x) => x.toLowerCase() === n.toLowerCase())
+        if (!f || watched.has(f) || !existsSync(join(this.hiveDir, f))) return
+        watched.add(f)
+        chokidarWatcher.add(join(this.hiveDir, f))
+        told(`${HIVE_DIR}/${f}`)
+      })
+      top.on('error', (e) => log.warn('watcher error (.hive)', e))
+      this.hiveTop = top
+    } catch (e) {
+      log.warn('watching .hive', e)
+    }
   }
 
   private rootRetry: NodeJS.Timeout | null = null
