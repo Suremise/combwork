@@ -22,7 +22,7 @@ vi.mock('electron', () => ({
 }))
 
 const { config } = await import('../src/main/config')
-const { mergePlanUsage, nextWarning, reportPlanUsage } = await import('../src/main/planUsage')
+const { forgetConnectionUsage, mergePlanUsage, nextWarning, planNotice, reportPlanUsage, warningKey } = await import('../src/main/planUsage')
 const { parseClaudePlanUsage } = await import('../src/main/providers/claude/adapter')
 const { rolloutPlanUsage } = await import('../src/main/providers/codex/rollout')
 const { onHiveEvent } = await import('../src/main/events')
@@ -120,6 +120,73 @@ describe('a plan usage warning', () => {
   it('notifications off: only kept in the panel, focused or not', () => {
     config.settings.notifications.desktopNotifications = false
     expect(warn()).toEqual({ kept: true, visibleToasts: 0, banners: 0, windows: 0, told: 0 })
+  })
+})
+
+// HI-1756 (Connections S5): a session on a connection reports that login's own limits, kept and warned of per
+// connection, never mixed into its CLI's (two logins, Max 1 near its limit and Max 2 not, are two sets of figures).
+describe('plan usage per connection (HI-1756)', () => {
+  const MAX1 = { id: 'a-11111111', name: 'Max 1' }
+  const MAX2 = { id: 'a-22222222', name: 'Max 2' }
+  const events: { type: string; provider?: string; connection?: string; toast?: { title: string } }[] = []
+  let off: () => void
+  beforeEach(() => {
+    events.length = 0
+    off = onHiveEvent((e) => void events.push(e as never))
+    vi.spyOn(config, 'update').mockImplementation((fn: (c: ReturnType<typeof config.get>) => void) => fn(config.get()))
+    config.get().planWarnings = {}
+    config.get().planUsage = {}
+    config.get().connectionPlanUsage = {}
+  })
+  afterEach(() => {
+    off()
+    vi.restoreAllMocks()
+  })
+  const toasts = (): string[] => events.filter((e) => e.type === 'toast').map((e) => e.toast!.title)
+
+  it("keys a report by its connection's id, apart from its CLI's and the other connection's", () => {
+    reportPlanUsage('claude-code', usage(62), 'HB1', MAX1)
+    reportPlanUsage('claude-code', usage(30), 'HB2', MAX2)
+    reportPlanUsage('claude-code', usage(5), 'Other')
+    const kept = config.get().connectionPlanUsage!
+    expect(kept[MAX1.id].limits[0]).toMatchObject({ usedPercent: 62, reportedBy: 'HB1' })
+    expect(kept[MAX2.id].limits[0]).toMatchObject({ usedPercent: 30, reportedBy: 'HB2' })
+    expect(config.get().planUsage['claude-code']?.limits[0].usedPercent).toBe(5)
+    // The windows are told which connection each is for (none for the CLI's own).
+    expect(events.filter((e) => e.type === 'plan-usage').map((e) => [e.provider, e.connection ?? null])).toEqual([
+      ['claude-code', MAX1.id],
+      ['claude-code', MAX2.id],
+      ['claude-code', null]
+    ])
+  })
+
+  it('warns per connection, naming it: one at 96% is warned of, the other at 30% not, and each only once a period', () => {
+    reportPlanUsage('claude-code', usage(96), 'HB1', MAX1)
+    reportPlanUsage('claude-code', usage(30), 'HB2', MAX2)
+    reportPlanUsage('claude-code', usage(97), 'HB1', MAX1)
+    expect(toasts()).toEqual(['96% of the 5-hour limit used on Max 1'])
+    expect(Object.keys(config.get().planWarnings)).toEqual([warningKey('claude-code', 'five_hour', MAX1.id)])
+    expect(warningKey('claude-code', 'five_hour', MAX1.id)).toBe(`connection:${MAX1.id}:five_hour`)
+    // Max 2 crossing it later is its own warning; the CLI's own key is untouched by either.
+    reportPlanUsage('claude-code', usage(85), 'HB2', MAX2)
+    expect(toasts()).toEqual(['96% of the 5-hour limit used on Max 1', '85% of the 5-hour limit used on Max 2'])
+    expect(config.get().planWarnings['claude-code:five_hour']).toBeUndefined()
+  })
+
+  it("a connection's notice names it; the CLI's names the CLI, as before", () => {
+    const l = usage(96).limits[0]
+    expect(planNotice('claude-code', l, 95, 'Max 1').title).toBe('96% of the 5-hour limit used on Max 1')
+    expect(planNotice('claude-code', l, 95, 'Max 1').apiTitle).toBe('96% of the 5-hour limit used on Max 1')
+    expect(planNotice('claude-code', { ...l, windowMinutes: 10080, label: 'weekly' }, 95, 'Max 2').title).toBe('96% of the weekly limit used on Max 2')
+    expect(planNotice('claude-code', l, 95).title).toBe('96% of your Claude Code 5-hour limit used')
+  })
+
+  it('a connection removed takes its usage and warnings with it, and leaves the others', () => {
+    reportPlanUsage('claude-code', usage(96), 'HB1', MAX1)
+    reportPlanUsage('claude-code', usage(90), 'HB2', MAX2)
+    forgetConnectionUsage(MAX1.id)
+    expect(Object.keys(config.get().connectionPlanUsage!)).toEqual([MAX2.id])
+    expect(Object.keys(config.get().planWarnings)).toEqual([warningKey('claude-code', 'five_hour', MAX2.id)])
   })
 })
 

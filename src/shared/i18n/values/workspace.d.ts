@@ -432,6 +432,7 @@ interface HiveMessageValues {
   'workspace.statusBar.apiOn': { url: string | number }
   'workspace.statusBar.asOf': { when: string | number }
   'workspace.statusBar.awakeTip': undefined
+  'workspace.statusBar.connectionLine': { name: string | number; provider: string | number; hasPlan: string; plan: string | number }
   'workspace.statusBar.git': { hasVersion: string; version: string | number }
   'workspace.statusBar.gitOld': { version: string | number; min: string | number }
   'workspace.statusBar.gitProblem': { problem: string | number; fix: string | number }

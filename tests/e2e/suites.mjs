@@ -96,6 +96,7 @@ export const SUITES = [
   { name: 'compact', needs: ['claude'], claudeHome: 'own' },
   { name: 'connectionrows' },
   { name: 'connections' },
+  { name: 'connectionusage' },
   { name: 'consoletext' },
   { name: 'consolewindow' },
   { name: 'context' },

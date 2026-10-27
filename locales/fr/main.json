@@ -193,6 +193,7 @@
   "main.plan.resetsAt": "Elle se réinitialise à {time}.",
   "main.plan.resetsOn": "Réinitialisation : {when}.",
   "main.plan.used": "Tu as utilisé {share, number, ::percent} de ta limite {provider} {window, select, hours {sur {hours, plural, one {# heure} many {# heures} other {# heures}}} weekly {hebdomadaire} other {{label}}}",
+  "main.plan.usedOn": "{share, number, ::percent} de la limite {window, select, hours {sur {hours, plural, one {# heure} many {# heures} other {# heures}}} weekly {hebdomadaire} other {{label}}} utilisés sur {connection}",
   "main.quit.closed": "Hive a été fermé",
   "main.quit.closedBody": "{n, plural, one {# session a été arrêtée. Reprends-la depuis Hive la prochaine fois ; rien n’a été perdu.} many {# sessions ont été arrêtées. Reprends-les depuis Hive la prochaine fois ; rien n’a été perdu.} other {# sessions ont été arrêtées. Reprends-les depuis Hive la prochaine fois ; rien n’a été perdu.}}",
   "main.quit.dialogTitle": "Quitter Hive",

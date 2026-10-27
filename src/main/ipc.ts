@@ -447,6 +447,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
   const impl: Impl = {
     'app:info': () => getAppInfo(),
     'app:planUsage': () => config.get().planUsage,
+    'app:connectionPlanUsage': () => config.get().connectionPlanUsage ?? {},
     'app:quit': () => quitControl.quit(),
     'app:restart': () => quitControl.restart(),
     'app:quitDecision': (choice, dontAskAgain) => quitControl.decide(win(), choice, dontAskAgain),

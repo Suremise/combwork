@@ -3,7 +3,7 @@ import { AssistantMark } from '../components/AssistantMark'
 import { CardChip, WatchedCardChip, WatchedCardChips } from '../components/CardChip'
 import { cardsWait } from '../components/watchLine'
 import { KeybindingsEditor } from '../components/Keybindings'
-import type { CompactionEvent, GitDiff, GitStatus, McpServerInfo, MemorySource, PlanLimit, ProjectConfig, ProjectInfo, ProviderId, SessionListItem, SessionUsage, SkillInfo, UnusedWorktree } from '@shared/types'
+import type { CompactionEvent, GitDiff, GitStatus, McpServerInfo, MemorySource, PlanLimit, PlanUsage, ProjectConfig, ProjectInfo, ProviderId, SessionListItem, SessionUsage, SkillInfo, UnusedWorktree } from '@shared/types'
 import { unpricedModel, unpricedText, usesOwnPrices } from '@shared/prices'
 import { formatDateTime, formatDayLabel } from '@shared/dates'
 import { agentChoosesMcp, agentGetsMcp, agentMcpText, serverOnIn } from '@shared/agentMcp'
@@ -32,7 +32,8 @@ import { DiffView } from '../components/Editors'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
 import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Switch, Tooltip } from '../components/ui'
-import { ConnectionMark } from '../components/ConnectionChoice'
+import { ConnectionMark, useConnections } from '../components/ConnectionChoice'
+import { useConnectionsInUse } from '../connectionUsage'
 import { languageFor } from '../monacoLang'
 import { useScopedLoad } from '../scopedLoad'
 import { oneAtATime, withinTime } from '@shared/coalesce'
@@ -152,6 +153,9 @@ const M = {
   limitResets: msg({ id: 'project.limit.resets', defaultMessage: 'used · resets {when}', description: 'Under a plan limit\'s percent. {when} is when it resets: "in 2 h 5 min", or a day and time.' }),
   limitTip: msg({ id: 'project.limit.tip', defaultMessage: "How much of your plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used, across all your {provider} sessions (not just Hive).", description: 'The (i) beside a plan limit.' }),
   planLimits: msg({ id: 'project.limit.heading', defaultMessage: '{plan, select, none {Plan limits, account-wide, as of {when}} other {Plan limits ({plan}), account-wide, as of {when}}}', description: "Above the plan limits. {plan} is the plan's name (none when unknown); {when} how long ago they were reported." }),
+  limitTipConnection: msg({ id: 'project.limit.tipConnection', defaultMessage: "How much of the plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used on {name}, across all its sessions (not just Hive's).", description: 'The (i) beside a plan limit of one connection (HI-1756): {name} is the connection, a sign-in the user named ("Max 1").' }),
+  noConnectionLimits: msg({ id: 'project.limit.noneConnection', defaultMessage: 'Its limits appear after the next message in a session on {name}.', description: 'Under a connection ({name}: "Max 1", a sign-in the user named) in the plan limits (HI-1756), before any of its limits were reported.' }),
+  noConnectionsOn: msg({ id: 'project.limit.noConnections', defaultMessage: 'No {provider} connection is on in this workspace. Turn one on in Settings → Connections to see its plan limits here.', description: 'In place of the plan limits (HI-1756) when the workspace has no connection on for the coding agent ({provider}). Settings → Connections names a section.' }),
   noLimits: msg({ id: 'project.limit.none', defaultMessage: "{provider} reports your plan’s limits while a session runs; they appear here after the next message in any {provider} session. Accounts that use an API key have no plan limits.", description: 'In place of the plan limits before any were reported.' })
 }
 
@@ -891,15 +895,49 @@ function SessionDetails({ project, items }: { project: ProjectInfo; items: Sessi
   )
 }
 
-/** One provider's subscription limits (account-wide), as its sessions last reported them. */
+/**
+ * One provider's subscription limits (account-wide), as its sessions last reported them. With connections (HI-1756,
+ * the preview on), a CLI that has them lists each of its connections on in this workspace or in use by its sessions,
+ * named, each that login's own limits.
+ */
 export function PlanLimits({ provider }: { provider: ProviderId }) {
   const kept = useStore((s) => s.planUsage[provider])
+  const byConnection = useStore((s) => s.connectionPlanUsage)
+  const view = useConnections()
+  const inUse = useConnectionsInUse()
   const now = useNow(60000)
+  const p = providerDescriptor(provider)
+  if (view?.preview && view.providers.includes(provider)) {
+    const ids = [...new Set([...(view.workspace[provider]?.on ?? []), ...inUse.filter((c) => c.provider === provider).map((c) => c.id)])]
+    if (!ids.length) return <p className="hint">{tr(M.noConnectionsOn, { provider: p.name })}</p>
+    return (
+      <>
+        {ids.map((id) => {
+          const c = view.connections.find((x) => x.id === id)
+          const name = c?.name ?? inUse.find((x) => x.id === id)?.name ?? id
+          const email = c?.observed?.email ?? c?.accepted?.email
+          return (
+            <div key={id} className="plan-connection-limits" data-plan-connection={id}>
+              <div className="plan-connection-name">
+                <strong>{name}</strong>
+                {email && <span className="faint"> {email}</span>}
+              </div>
+              <LimitCards kept={byConnection[id]} now={now} tip={(l) => tr(M.limitTipConnection, { window: limitWindow(l), label: l.label, name })} none={tr(M.noConnectionLimits, { name })} />
+            </div>
+          )
+        })}
+      </>
+    )
+  }
+  return <LimitCards kept={kept} now={now} tip={(l) => tr(M.limitTip, { window: limitWindow(l), label: l.label, provider: providerName(provider) })} none={tr(M.noLimits, { provider: p.name })} />
+}
+
+/** A CLI's or a connection's limits as cards, or `none` before any is current. */
+function LimitCards({ kept, now, tip, none }: { kept: PlanUsage | undefined; now: number; tip: (l: PlanLimit) => string; none: string }) {
   // A limit whose reset has passed with no new report isn't shown as it was (#383).
   const usage = kept && { ...kept, limits: kept.limits.filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now) }
-  const p = providerDescriptor(provider)
-  const card = (id: ProviderId, l: PlanLimit): React.ReactNode => (
-    <Card key={l.id} title={tr(M.limitTitle, { window: limitWindow(l), label: `${l.label.charAt(0).toUpperCase()}${l.label.slice(1)}` })} value={fmt.percent(l.usedPercent / 100)} sub={l.resetsAt ? tr(M.limitResets, { when: resetsIn(l.resetsAt) }) : tr(M.limitUsed)} tip={tr(M.limitTip, { window: limitWindow(l), label: l.label, provider: providerName(id) })} accent={l.usedPercent >= 80}>
+  const card = (l: PlanLimit): React.ReactNode => (
+    <Card key={l.id} title={tr(M.limitTitle, { window: limitWindow(l), label: `${l.label.charAt(0).toUpperCase()}${l.label.slice(1)}` })} value={fmt.percent(l.usedPercent / 100)} sub={l.resetsAt ? tr(M.limitResets, { when: resetsIn(l.resetsAt) }) : tr(M.limitUsed)} tip={tip(l)} accent={l.usedPercent >= 80}>
       <div className={cx('meter', l.usedPercent >= 95 ? 'danger' : l.usedPercent >= 80 && 'caution')}>
         <div style={{ width: `${Math.min(100, l.usedPercent)}%` }} />
       </div>
@@ -910,10 +948,10 @@ export function PlanLimits({ provider }: { provider: ProviderId }) {
       <div className="faint small overview-plan">
         {tr(M.planLimits, { plan: usage.plan || 'none', when: timeAgo(usage.updatedAt) })}
       </div>
-      <div className="cards">{usage.limits.map((l) => card(provider, l))}</div>
+      <div className="cards">{usage.limits.map(card)}</div>
     </>
   ) : (
-    <p className="hint">{tr(M.noLimits, { provider: p.name })}</p>
+    <p className="hint">{none}</p>
   )
 }
 

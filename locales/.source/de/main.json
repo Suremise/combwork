@@ -193,6 +193,7 @@
   "main.plan.resetsAt": "It resets at {time}.",
   "main.plan.resetsOn": "It resets on {when}.",
   "main.plan.used": "{share, number, ::percent} of your {provider} {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used",
+  "main.plan.usedOn": "{share, number, ::percent} of the {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used on {connection}",
   "main.quit.closed": "Hive has closed",
   "main.quit.closedBody": "{n, plural, one {# session was stopped. Resume it from Hive next time; nothing was lost.} other {# sessions were stopped. Resume them from Hive next time; nothing was lost.}}",
   "main.quit.dialogTitle": "Quit Hive",

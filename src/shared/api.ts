@@ -155,6 +155,7 @@ export interface HiveRequests {
   'app:info': () => AppInfo
   /** The plan usage each provider last reported (e.g. 5-hour and weekly limits), by provider. */
   'app:planUsage': () => Record<ProviderId, PlanUsage>
+  'app:connectionPlanUsage': () => Record<string, PlanUsage>
   'app:quit': () => void
   /** Restarts Hive: quits as app:quit does (asking about running agents), then starts it again (#676). */
   'app:restart': () => void

@@ -193,6 +193,7 @@
   "main.plan.resetsAt": "将于 {time} 重置。",
   "main.plan.resetsOn": "将于 {when} 重置。",
   "main.plan.used": "{provider} {window, select, hours {{hours, plural, other {# 小时限额}}} weekly {每周限额} other {{label} 限额}}已用 {share, number, ::percent}",
+  "main.plan.usedOn": "{connection} 的{window, select, hours {{hours, plural, other {# 小时限额}}} weekly {每周限额} other {{label} 限额}}已用 {share, number, ::percent}",
   "main.quit.closed": "Hive 已关闭",
   "main.quit.closedBody": "{n, plural, other {已停止 # 个会话。下次可在 Hive 中恢复，不会丢失任何内容。}}",
   "main.quit.dialogTitle": "退出 Hive",

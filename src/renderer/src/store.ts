@@ -209,6 +209,8 @@ interface State {
   gitTool: GitTool | null
   /** Subscription limits each provider last reported (account-wide), by provider. */
   planUsage: Record<ProviderId, PlanUsage>
+  /** Subscription limits each connection's sessions last reported (that login's own, HI-1756), by connection id. */
+  connectionPlanUsage: Record<string, PlanUsage>
   /** Worktree agents' unmerged work, by projectKey (null: git couldn't check it). */
   branchStatus: Record<string, AgentBranchStatus | null>
   /** Agents whose CLI exited before its session started, by projectKey: why, until the next launch or ✕. */
@@ -502,6 +504,7 @@ export const useStore = create<State>(() => ({
   providers: {},
   gitTool: null,
   planUsage: {},
+  connectionPlanUsage: {},
   branchStatus: {},
   startFailures: {},
   leftovers: {},

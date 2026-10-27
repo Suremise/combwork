@@ -429,6 +429,7 @@
   "workspace.statusBar.apiOn": "Agent API lauscht auf {url}",
   "workspace.statusBar.asOf": "Stand: {when}. Wird aktualisiert, während eine Sitzung läuft.",
   "workspace.statusBar.awakeTip": "Windows wechselt nicht in den Energiesparmodus, bis die Agenten fertig sind (der Bildschirm kann trotzdem ausgehen). Einstellungen → Allgemein → PC wach halten, während Agenten arbeiten.",
+  "workspace.statusBar.connectionLine": "{name} ({provider}{hasPlan, select, yes {, Plan {plan}} other {}})",
   "workspace.statusBar.git": "{hasVersion, select, yes {Git {version}} other {Git}}",
   "workspace.statusBar.gitOld": "Git {version} ist älter als {min}: Einige Git-Funktionen gehen nicht.",
   "workspace.statusBar.gitProblem": "{problem}. {fix}",

@@ -7531,6 +7531,17 @@ button.agent-place:hover {
 .overview-plan {
   margin: 4px 0 6px;
 }
+/* A connection's plan limits (HI-1756): its name (and sign-in), then its cards. */
+.plan-connection-limits + .plan-connection-limits {
+  margin-top: 12px;
+}
+.plan-connection-name {
+  margin: 8px 0 2px;
+}
+/* The status bar's connection name before its limits. */
+.status-item .plan-connection {
+  font-weight: 600;
+}
 .running-list {
   display: flex;
   flex-direction: column;

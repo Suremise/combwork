@@ -12,6 +12,7 @@ import { config } from './config'
 import { emit, onHiveEvent } from './events'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
+import { forgetConnectionUsage } from './planUsage'
 import { childEnv, hasPty } from './ptyHost'
 import { connectionsManaged, connectionsOn, testHomeSeam } from './connectionSeam'
 import { provider } from './providers'
@@ -439,6 +440,7 @@ export async function removeAccount(id: string): Promise<void> {
     config.update((c) => {
       for (const [p, v] of Object.entries(c.lastUsedConnection ?? {})) if (v === id) delete c.lastUsedConnection![p as ProviderId]
     })
+    forgetConnectionUsage(id)
     log.info(`account ${id} removed`)
     syncWatches()
   })

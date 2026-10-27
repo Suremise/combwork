@@ -429,6 +429,7 @@
   "workspace.statusBar.apiOn": "La Agent API escucha en {url}",
   "workspace.statusBar.asOf": "Datos de {when}. Se actualiza mientras hay una sesión en ejecución.",
   "workspace.statusBar.awakeTip": "Windows no entrará en suspensión hasta que terminen los agentes (la pantalla aún puede apagarse). Configuración → General → Mantener el equipo activo mientras trabajan los agentes.",
+  "workspace.statusBar.connectionLine": "{name} ({provider}{hasPlan, select, yes {, plan {plan}} other {}})",
   "workspace.statusBar.git": "{hasVersion, select, yes {Git {version}} other {Git}}",
   "workspace.statusBar.gitOld": "Git {version} es anterior a {min}: algunas funciones de git no funcionan.",
   "workspace.statusBar.gitProblem": "{problem}. {fix}",

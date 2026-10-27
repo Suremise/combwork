@@ -39,6 +39,7 @@ import { safeguardText } from '@shared/safeguards'
 import { unpricedModel, unpricedText } from '@shared/prices'
 import { hooksMissingNote, hooksMissingText, unknownStateText } from '@shared/runtime'
 import { Icon, IconButton, ReviewMark, SafeguardMark, signInNote, statusText, Tooltip, useContextMenu, useFolds, type MenuEntry } from './ui'
+import { useConnections } from './ConnectionChoice'
 import { startBlockedReason, useStartBlocked } from './BoardUpgrade'
 import { awayFromProject, legacyOf, placeText, placeTip } from '../agentPlace'
 import { legacySetupPending } from '@shared/agentFolders'
@@ -1464,6 +1465,10 @@ export function PaneFooter({
   const pc = projectProviderConfig(project.config, provider)
   const ps = providerSettings(settings, provider)
   const live = a.live
+  // Who the connection it runs on is signed in as (HI-1756), for its hover.
+  const connections = useConnections()
+  const signedInAs = live?.launchedConnection && connections?.connections.find((c) => c.id === live.launchedConnection!.id)
+  const email = signedInAs ? (signedInAs.observed?.email ?? signedInAs.accepted?.email) : undefined
   // What runs (#248): the session's reported model while it runs (status line, else its transcript), else what the choice
   // resolves to; the choice itself in the tooltip when it reads differently (an alias).
   const shown = agentModelShown(provider, a.model || pc.model, ps.defaultModel, providers[provider], live ? live.modelId || usage?.model || null : null)
@@ -1645,7 +1650,7 @@ export function PaneFooter({
       {live?.launchedConnection && (
         <>
           {sep('s0')}
-          <Tooltip content={connectionTip(live.launchedConnection, !!live.switchPending)}>
+          <Tooltip content={connectionTip(live.launchedConnection, !!live.switchPending, email)}>
             <span className="pane-foot-item foot-connection fit-clip" data-connection={live.launchedConnection.id} onClick={() => (onSettings ? onSettings() : set({ agentSettingsFor: { project: project.path, agentId: a.id } }))}>
               {live.launchedConnection.note && <Icon name="warning" />} {live.launchedConnection.name}
               {live.switchPending && <span className="faint"> · {tr(CONNECTION_TEXT.switching)}</span>}
@@ -1663,6 +1668,7 @@ export function PaneFooter({
 }
 
 const CONNECTION_TEXT = {
+  email: msg({ id: 'panes.footer.connectionEmail', defaultMessage: 'Signed in as {email}.', description: "Added to the hover of a pane footer's connection (HI-1756): the login the connection is signed in as ({email}: its email address)." }),
   tip: msg({ id: 'panes.footer.connectionTip', defaultMessage: 'Runs on the connection {name}.', description: "Hover of the connection in a pane's footer (HI-1755): the connection this session launched on ({name})." }),
   offFallback: msg({ id: 'panes.footer.connectionOff', defaultMessage: "The connection chosen for it is off in this workspace, so it runs on the workspace's default.", description: "Added to the hover of a pane footer's connection: the agent's own connection is off in this workspace, so the default runs it." }),
   unknownLogin: msg({ id: 'panes.footer.connectionUnknown', defaultMessage: "Hive couldn't check who this connection is signed in as when it started.", description: "Added to the hover of a pane footer's connection: the connection's sign-in couldn't be checked at launch (not the same as signed out)." }),
@@ -1671,10 +1677,14 @@ const CONNECTION_TEXT = {
   switchingTip: msg({ id: 'panes.footer.connectionSwitchingTip', defaultMessage: 'Once its turn is over, it ends and carries on, on the connection chosen for it now.', description: "Added to the hover of a pane footer's connection while a switch waits for the agent's turn to be over." })
 }
 
-/** The hover of a pane footer's connection: which one it runs on, and why it isn't the one chosen, or what its check said. */
-function connectionTip(c: NonNullable<AgentInfo['live']>['launchedConnection'], switching: boolean): string {
+/**
+ * The hover of a pane footer's connection: which one it runs on and who it is signed in as (HI-1756), and why it isn't
+ * the one chosen, or what its check said.
+ */
+function connectionTip(c: NonNullable<AgentInfo['live']>['launchedConnection'], switching: boolean, email?: string): string {
   if (!c) return ''
   const parts = [tr(CONNECTION_TEXT.tip, { name: c.name })]
+  if (email) parts.push(tr(CONNECTION_TEXT.email, { email }))
   if (c.note) parts.push(tr(CONNECTION_TEXT[c.note]))
   if (switching) parts.push(tr(CONNECTION_TEXT.switchingTip))
   return parts.join(' ')
