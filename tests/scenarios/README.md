@@ -96,8 +96,10 @@ The checks are positive and negative:
     override reason.
   - **prioritise**: an order within Todo, not a move between stages.
 - **A gate's refusal and its next step** (#1536):
-  - **intent-submit-refused**: a submission of uncommitted work is refused with "commit, then submit". The builder
-    commits and submits again, overriding nothing and moving nothing by hand.
+  - **intent-submit-refused**: a submission of uncommitted work is refused, saying in git's words that nothing is
+    committed (HI-1618: submitting for review never commits). Asked only to submit, the builder asks the user before
+    committing, committing nothing, overriding nothing and moving nothing by hand; the card stays in Doing.
+  - **intent-submit-commit**: asked to commit and submit for review, the builder does both with no question.
   - **review-interrupted**: a review started with the intent loses its card to its builder, so the verdict is refused.
     The reviewer doesn't retry it and moves nothing.
 - **Under the presets** (#1536), saved as the Workflow section saves them: a solo user's card goes from start to Done

@@ -167,7 +167,7 @@ function intentTools(): Tool[] {
     intent(
       'hive_submit',
       'submit',
-      'Submit a card in Doing for review: it moves on (to Review, or past it where its project has no review). Writes summary as a comment. A revision already reviewed needs note (what is different). As a lane\'s builder, Hive then watches it for you, for its review. Replies with warnings (files outside its paths, other agents\' changes in a shared folder) and the watch.',
+      'Submit a card in Doing for review: hands its committed work to review (a code card in Git needs its work committed; submitting never commits), and it moves on (to Review, or past it where its project has no review). Writes summary as a comment. A revision already reviewed needs note (what is different). As a lane\'s builder, Hive then watches it for you, for its review. Replies with warnings (files outside its paths, other agents\' changes in a shared folder) and the watch.',
       { summary: { type: 'string', description: 'What was done, a line first.' }, revision, note: { type: 'string', description: 'For a revision already reviewed: what this submission adds (an explanation).' }, paths: { type: 'array', items: { type: 'string' }, description: 'The files the work changed, relative to the project, for a project with no version control.' } },
       ['summary'],
       (a) => ({ summary: a.summary, revision: a.revision, note: a.note, paths: a.paths })

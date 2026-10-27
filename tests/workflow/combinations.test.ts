@@ -76,7 +76,7 @@ describe('S36: every combination', () => {
       // Submitting before the work is committed (Git: written, not committed; None: not written) is refused…
       if (c.platform === 'git') put(folder, `c${i}.txt`, `${i}\n`)
       expect(await tryIt(await e.wf.submit(card.key, B1, { summary: 'too soon' }))).toBe(false)
-      expect(['submit.clean', 'submit.empty']).toContain(refusals.at(-1))
+      expect(['submit.clean', 'submit.empty', 'submit.unchanged']).toContain(refusals.at(-1))
       // …and its next step leads on.
       if (c.platform === 'git') commit(folder, {}, `${card.key}: work`, c.folder === 'project' ? { trailer: card.key } : {})
       else put(e.project, `c${i}.md`, `${i}\n`)

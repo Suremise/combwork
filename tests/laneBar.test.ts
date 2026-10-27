@@ -431,8 +431,8 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
   const refused = { move: 'submit', rule: 'submit.empty', values: { card: 'alpha-7' }, at: '', times: 1 }
 
   it('a refused request (#1279): its reason and next step as the agent got them, the card named as the window names it; repeats counted after', () => {
-    expect(workNotes(badge({ refused }), 'review', null, short, tr, names, 'AL-7')).toEqual(['AL-7 has no change to review. Commit the work, then submit.', 'Under review: a3f2c1d'])
-    expect(workNotes(badge({ refused: { ...refused, times: 3 } }), 'doing', null, short, tr, names, 'AL-7')[0]).toBe('AL-7 has no change to review. Commit the work, then submit. (refused 3 times)')
+    expect(workNotes(badge({ refused }), 'review', null, short, tr, names, 'AL-7')).toEqual(['AL-7: nothing committed to review. Commit the card\'s work, then submit for review. If the user didn\'t ask you to commit, ask them.', 'Under review: a3f2c1d'])
+    expect(workNotes(badge({ refused: { ...refused, times: 3 } }), 'doing', null, short, tr, names, 'AL-7')[0]).toBe('AL-7: nothing committed to review. Commit the card\'s work, then submit for review. If the user didn\'t ask you to commit, ask them. (refused 3 times)')
     // A rule's names in the window's words (move.notFromHere names the stage and the moves).
     expect(workNotes(badge({ revision: null, refused: { move: 'submit', rule: 'move.notFromHere', values: { card: 'alpha-7', stage: 'todo', move: 'submit', moves: 'start' }, at: '', times: 1 } }), 'todo', null, short, tr, names, 'AL-7')[0]).toMatch(/^AL-7 /)
   })
@@ -450,7 +450,7 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     const seg = { kind: 'card', number: 7, name: 'AL-7', state: 'passed', failed: false, round: 1, label: 'AL-7 x · Passed', notes: [] } as CardSegment
     const o = { by: 'user' as const, move: 'active→done', rules: ['done.contained'], reason: '', at: '' }
     const b = badge({ refused, stalePass: { approved: 'a3f2c1d9e8', current: 'b71e09a4cc' }, override: o })
-    expect(segmentMarks({ frozen: null }, b, seg, short, tr, names)).toEqual({ refused: 'AL-7 has no change to review. Commit the work, then submit.', stale: 'Pass was for a3f2c1d; now at b71e09a', override: 'You moved it past its rules: done.contained. No reason given.' })
+    expect(segmentMarks({ frozen: null }, b, seg, short, tr, names)).toEqual({ refused: 'AL-7: nothing committed to review. Commit the card\'s work, then submit for review. If the user didn\'t ask you to commit, ask them.', stale: 'Pass was for a3f2c1d; now at b71e09a', override: 'You moved it past its rules: done.contained. No reason given.' })
     expect(segmentMarks({ frozen: null }, badge(), seg, short, tr, names)).toEqual({})
     // Done, a stale pass no longer matters: no stale mark or line.
     expect(segmentMarks({ frozen: null }, b, { ...seg, state: 'done' }, short, tr, names)).not.toHaveProperty('stale')
@@ -473,7 +473,7 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     ])
     const marks = foldedMarks({ frozen: null }, badges, segs, [1, 2, 27], () => short, tr, names)
     expect(marks).toEqual({
-      refused: ['AL-27: AL-27 has no change to review. Commit the work, then submit.'],
+      refused: ['AL-27: AL-27: nothing committed to review. Commit the card\'s work, then submit for review. If the user didn\'t ask you to commit, ask them.'],
       stale: ['AL-2: Pass was for a3f2c1d; now at b71e09a'],
       override: ['AL-1: You moved it past its rules: done.contained. Reason: Merged by hand'],
       oldRules: []

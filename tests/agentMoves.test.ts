@@ -224,7 +224,7 @@ describe("an agent's old moves as intents (#1268)", () => {
     writeFileSync(join(wt, 'more.txt'), 'uncommitted\n')
     const r = await refused(update(w, card, builder, { column: 'review' }, 'Ready'))
     expect(r?.rule).toBe('submit.clean')
-    expect(r?.next).toBe('Commit your changes (or remove them), then submit again.')
+    expect(r?.next).toBe('Commit your changes (or remove them), then submit for review again. If the user didn\'t ask you to commit, ask them.')
     const c = await inWorkspace(w, () => tasks.getTask(card, w))
     expect(c.column).toBe('doing')
     // Nothing of the change was saved, its comment neither.

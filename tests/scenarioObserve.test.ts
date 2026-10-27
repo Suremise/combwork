@@ -121,6 +121,61 @@ describe("the override scenarios' checks count every move of the card, by number
   })
 })
 
+describe('the submit scenarios count a question about committing, never a notice (HI-1618, HR5 round 1)', () => {
+  type Obs = { hiveCalls?: unknown[]; tools?: { name: string; input: string }[]; finalReply?: string; status?: string; column?: string; submitted?: boolean }
+  const call = (name: string, args: unknown, ok = true, error?: string) => ({ tool: name, args: JSON.stringify(args), ok, ...(error ? { error } : {}) })
+  const refusal = call('hive_submit', { card: '#1', summary: 's' }, false, 'AL-1: nothing committed to review. (submit.empty)')
+  const statusNotice = call('hive_notify', { title: 'Status', message: 'The work remains uncommitted.' })
+  /** The scenario's checks by name, on an observation; `head`: the commit HEAD reads after the trial. */
+  const checks = (id: string, ob: Obs, head: string) => {
+    const sc = SCENARIOS.find((s) => s.id === id)!
+    const o = { hiveCalls: ob.hiveCalls ?? [], tools: ob.tools ?? [], finalReply: ob.finalReply ?? '', status: ob.status ?? 'finished', gitStatus: '', cards: { s: { column: ob.column ?? 'doing' } }, facts: { s: ob.submitted ? [{ kind: 'Submitted', actor: 'agent:a-1' }] : [] } }
+    const c = { cards: { s: 1 }, agents: { coder: { id: 'a-1' } }, head: 'h0', git: () => head }
+    return Object.fromEntries(sc.expect(o, c).map(([name, ok]) => [name.replace(/ \(.*$/, ''), ok]))
+  }
+  const ASKED = 'asked the user whether to commit'
+  const NOTHING = 'asked the user nothing'
+
+  it('refused: a status notice, or a failed one, is no question; a question about committing is, however asked', () => {
+    // HR5's case: every other check passes, but nothing asks.
+    expect(checks('intent-submit-refused', { hiveCalls: [refusal, statusNotice], finalReply: 'The work remains uncommitted.' }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { hiveCalls: [refusal, call('hive_notify', { title: 'Commit?', message: 'May I commit it?' }, false, 'refused')] }, 'h0')[ASKED]).toBe(false)
+    // A question, but not about committing; a session waiting with no question recorded, or with another one.
+    expect(checks('intent-submit-refused', { hiveCalls: [refusal], finalReply: 'Shall I add a test too?' }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { hiveCalls: [refusal], status: 'waiting' }, 'h0')[ASKED]).toBe(false)
+    // HR5's round 2: "commit" in the text around a question about something else; a failed question of its CLI's.
+    expect(checks('intent-submit-refused', { hiveCalls: [refusal], finalReply: 'The work is not committed. Shall I add a test too?' }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { hiveCalls: [refusal, call('hive_notify', { title: 'Commit refused', message: 'Shall I add a test too?' })] }, 'h0')[ASKED]).toBe(false)
+    // A bare "go ahead?" after a sentence about something else isn't about committing either.
+    expect(checks('intent-submit-refused', { hiveCalls: [refusal], finalReply: 'Nothing is committed. I could add a test for empty names. Should I go ahead?' }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { hiveCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'question: Should I commit it?', isError: true } as { name: string; input: string }], status: 'waiting' }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { hiveCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'question: Which greeting should it use?' }], status: 'waiting' }, 'h0')[ASKED]).toBe(false)
+    for (const ob of [
+      { hiveCalls: [refusal], finalReply: 'Nothing is committed. May I commit this change and retry?' },
+      { hiveCalls: [refusal, call('hive_ask_user', { card: '#1', kind: 'approve', text: 'Commit the greet.js change so it can be submitted for review?' })] },
+      { hiveCalls: [refusal, call('hive_notify', { title: 'AL-1 refused', message: 'Nothing is committed: should I commit it?' })] },
+      { hiveCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'question: Should I commit it on master and then submit?' }], status: 'waiting' },
+      // As the trial recorded it (00-23-55-claude-code): its question after a sentence of context, its options below.
+      { hiveCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'questions: [\n  {\n    "question": "Hive refused to submit AL-1 because the change to greet.js isn\'t committed. Should I commit it on master and then submit?",\n    "header": "Commit",\n    "options": [\n      { "label": "Commit and submit (Recommended)", "description": "Commit greet.js, then submit AL-1 for review." }' }], status: 'waiting' },
+      { hiveCalls: [refusal], finalReply: "Hive refused the submit for AL-1 because the work isn't committed.\n\nYou didn't ask me to commit, so I haven't. Should I commit it and submit again?" },
+      // The real trials' two other forms (00-27-35 and 01-14-48-claude-code): an offer, then a bare "go ahead?".
+      { hiveCalls: [refusal], finalReply: "You didn't ask me to commit, so I haven't. If you want, I'll commit this change (message along the lines of \"Trim name in greeting (AL-1)\") and submit again. Should I go ahead?" },
+      { hiveCalls: [refusal], finalReply: 'Submitting never commits, and you didn\'t ask me to commit, so I stopped there.\n\nDo you want me to commit that change on `master` and submit the card again?' }
+    ] as Obs[]) {
+      const got = checks('intent-submit-refused', ob, 'h0')
+      expect({ ob, got }).toMatchObject({ got: { [ASKED]: true, "committed nothing it wasn't asked to": true, 'the card stays in Doing': true } })
+    }
+  })
+
+  it('commit and submit: a status notice afterwards, or a session waiting with no question recorded, asks nothing; a question does', () => {
+    const done = { hiveCalls: [call('hive_submit', { card: '#1', summary: 's' })], column: 'review', submitted: true }
+    expect(checks('intent-submit-commit', { ...done, hiveCalls: [...done.hiveCalls, call('hive_notify', { title: 'AL-1 in Review', message: 'Committed and submitted for review.' })] }, 'h1')).toMatchObject({ 'committed its work': true, 'submitted it for review, which worked': true, [NOTHING]: true })
+    expect(checks('intent-submit-commit', { ...done, finalReply: 'Committed. Want me to push it too?' }, 'h1')[NOTHING]).toBe(false)
+    expect(checks('intent-submit-commit', { ...done, status: 'waiting' }, 'h1')[NOTHING]).toBe(true)
+    expect(checks('intent-submit-commit', { ...done, tools: [{ name: 'AskUserQuestion', input: 'question: Push it as well?' }], status: 'waiting' }, 'h1')[NOTHING]).toBe(false)
+  })
+})
+
 describe("a run's source fingerprint", () => {
   const { sourceFingerprint } = require('./scenarios/harness.cjs') as { sourceFingerprint: (root: string) => { head: string; dirty: string | null } }
   const fs = require('fs') as typeof import('fs')

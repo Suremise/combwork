@@ -415,7 +415,8 @@ describe('drags run the intents they stand for (#1290)', () => {
       const card = await create(w)
       await update(w, card, { agent: 'a1' })
       const r = await move(w, card, 'review', { confirm: true })
-      expect(r).toMatchObject({ moved: { column: 'doing' }, stopped: { rule: 'submit.empty' } })
+      // No version control: its files unchanged, not "nothing committed" (HI-1618).
+      expect(r).toMatchObject({ moved: { column: 'doing' }, stopped: { rule: platform === 'none' ? 'submit.unchanged' : 'submit.empty' } })
       expect(stage(w, card)).toBe('active')
       expect(kinds(w, card)).not.toContain('Submitted')
     }
