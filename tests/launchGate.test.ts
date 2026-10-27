@@ -152,6 +152,37 @@ if (process.argv[4] === '--stay') {
     expect(alive(pid)).toBe(false)
   }, 60000)
 
+  it('ends a CLI started through a .cmd wrapper that outlives its gate, the wrapper and the CLI both (HI-1819)', async () => {
+    const { trackLaunch, launchEnded } = await import('../src/main/agentProcesses')
+    const { spawnPty } = await import('../src/main/ptyHost')
+    // A CLI Hive starts through cmd.exe (toSpawnable: a .cmd launcher it can't start directly): the gate's child is
+    // cmd.exe, and the CLI is cmd.exe's.
+    const cliPid = join(dir, 'wrapped-pid.txt')
+    const wrapper = join(dir, 'wrapper.cmd')
+    writeFileSync(wrapper, `@echo off\r\n"${process.execPath}" "${cli}" "${join(dir, 'wrapped-ran.txt')}" "${cliPid}" --stay\r\n`)
+    let gatePid = 0
+    const exited = new Promise<void>((resolve) => {
+      spawnPty('gate-wrapped', {
+        file: process.env.ComSpec || 'cmd.exe',
+        args: `/d /s /c "${wrapper}"`,
+        cwd: dir,
+        env,
+        track: (pid, cancelled) => {
+          gatePid = pid
+          return trackLaunch({ runId: 'gate6', projectPath: dir, agentId: 'g6', agentName: 'Wrapped', gated: true }, pid, cancelled).then((t): GateWord => (t.tracked ? { go: true } : { go: false, reason: t.reason }))
+        },
+        onExit: () => resolve()
+      })
+    })
+    await vi.waitFor(() => expect(existsSync(cliPid) && Number(readFileSync(cliPid, 'utf8')) > 0).toBe(true), { timeout: 30_000, interval: 50 })
+    const pid = Number(readFileSync(cliPid, 'utf8'))
+    process.kill(gatePid)
+    await exited
+    expect(alive(pid)).toBe(true)
+    expect(await launchEnded('gate6')).toBeNull()
+    expect(alive(pid)).toBe(false)
+  }, 60000)
+
   it('never runs the CLI once its terminal is being killed, whatever word comes after (HI-1819)', async () => {
     const ran = join(dir, 'stopped-ran.txt')
     const gate = launchGate(process.execPath, [cli, ran, join(dir, 'stopped-server.txt')], env)
