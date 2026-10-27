@@ -379,8 +379,9 @@ process.stdin.on('end', () => { if (!${!!o.stubborn}) { child.kill(); process.ex
     const gate = new Promise<void>((res) => (go = res))
     codexCheckSeams.beforeStart = () => gate
     const check = status(s.cmd, homeOf('a-paused'))
+    // The quit sets its guard at once; the check, let go after it, must start nothing.
     const stopping = stopCodexChecks()
-    setTimeout(go, 200)
+    go()
     await stopping
     expect(await check).toMatchObject({ ok: false })
     expect(s.started()).toBe(false)
