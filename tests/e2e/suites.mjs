@@ -210,6 +210,7 @@ export const SUITES = [
   { name: 'packaged-progress', needs: ['packaged'] },
   { name: 'packaged-transcript', needs: ['packaged'] },
   { name: 'pages' },
+  { name: 'pageswitch' },
   { name: 'paneheader' },
   { name: 'panelroom' },
   { name: 'perfcompare' },
