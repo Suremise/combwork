@@ -559,6 +559,9 @@ const CardTile = memo(function CardTile({
   forYou?: ForYouItem[]
 }) {
   const menu = useContextMenu()
+  // Memo, it isn't drawn again with the board (HI-1806): it follows a change of language and of date format itself.
+  useLanguage()
+  useDateStyle()
   // A Doing card whose agent has finished is waiting for someone to look: it shows like a finished agent.
   const finished = c.column === 'doing' && agent?.live?.status === 'finished'
   // Read again each minute: its reviewer line's "5 min ago" (the board works out its stall each minute too, #521).
