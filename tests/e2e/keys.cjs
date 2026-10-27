@@ -49,10 +49,32 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   }
   check('Alt+1…9 open the tabs in the order they show', reached.length === MAIN.length, `reached ${JSON.stringify(reached)}`)
   check('tab shortcuts never hide the sidebar', (await page.locator('.project-row').count()) === 2)
-  await page.locator('.tabs .tab-more').click(); await lib.until(async () => (await page.locator('.menu .menu-item').count()) === 4, HUNG_MS)
-  const moreItems = (await page.locator('.menu .menu-item').allInnerTexts()).map((t) => t.trim())
-  check('More ▾ lists Memory, Skills, Templates and MCP, with no keys', JSON.stringify(moreItems) === JSON.stringify(['Memory', 'Skills', 'Templates', 'MCP']), JSON.stringify(moreItems))
+  // More ▾: its four tabs with no keys, then a separator and Project Settings… (HI-1840) with its command's key.
+  const moreRows = () => page.locator('.menu').last().evaluate((m) => [...m.children].map((c) => (c.classList.contains('menu-sep') ? '-' : `${c.querySelector('.menu-label, :scope > span:not(.menu-key)')?.textContent.trim() ?? c.textContent.trim()}=${c.querySelector('.menu-key')?.textContent.trim() ?? ''}`)))
+  const openMore = async () => {
+    await page.locator('.tabs .tab-more').click()
+    await lib.until(async () => (await page.locator('.menu .menu-item').count()) === 5, HUNG_MS)
+  }
+  await openMore()
+  const moreItems = await moreRows()
+  check('More ▾ lists Memory, Skills, Templates and MCP with no keys, then a separator and Project Settings… with Alt+0', JSON.stringify(moreItems) === JSON.stringify(['Memory=', 'Skills=', 'Templates=', 'MCP=', '-', 'Project Settings…=Alt+0']), JSON.stringify(moreItems))
+  for (const theme of ['dark', 'light']) {
+    await inv('settings:update', { appearance: { theme } })
+    await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+    await page.screenshot({ path: path.join(scratch, `keys-more-settings-${theme}.png`) })
+  }
+  await inv('settings:update', { appearance: { theme: 'dark' } })
+  await lib.menuEntry(page, 'Project Settings…').click()
+  check('…choosing it opens Project Settings, no tab of the strip chosen, More ▾ keeping its own name', !!(await lib.until(async () => (await page.locator('.tab-body .settings-top').count()) > 0 && (await page.locator('.tabs .tab.active').count()) === 0 && (await page.locator('.tabs .tab-more .tab-label').innerText()).trim() === 'More', HUNG_MS)), await page.locator('.tabs .tab-more .tab-label').innerText().catch(() => ''))
+  // Its key follows the user's: changed, the menu shows the new one; reset, Alt+0 again.
+  await inv('settings:setKeybinding', 'project.tab.settings', 'Alt+Shift+0')
+  await lib.until(async () => (await inv('settings:get')).keybindings['project.tab.settings'] === 'Alt+Shift+0', HUNG_MS)
+  await openMore()
+  check('…its key follows a change of the shortcut (Alt+Shift+0)', (await moreRows()).at(-1) === 'Project Settings…=Alt+Shift+0', JSON.stringify(await moreRows()))
   await page.keyboard.press('Escape'); await lib.until(async () => (await page.locator('.menu').count()) === 0, HUNG_MS)
+  await inv('settings:setKeybinding', 'project.tab.settings', undefined)
+  await lib.until(async () => !('project.tab.settings' in (await inv('settings:get')).keybindings), HUNG_MS)
+  await page.keyboard.press('Alt+1'); await lib.until(async () => (await tab().catch(() => '')).trim() === 'Session', HUNG_MS)
   for (const label of ['Memory', 'Skills', 'Templates', 'MCP']) {
     let ok = true
     await lib.openMoreTab(page, label).catch(() => (ok = false))

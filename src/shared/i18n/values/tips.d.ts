@@ -334,6 +334,8 @@ interface HiveMessageValues {
   'tips.projectTabs.title': undefined
   'tips.projectTabsKeys.text': undefined
   'tips.projectTabsKeys.title': undefined
+  'tips.projectTabsSettings.text': undefined
+  'tips.projectTabsSettings.title': undefined
   'tips.quitWhenDone.text': undefined
   'tips.quitWhenDone.title': undefined
   'tips.recentWorkspaces.text': undefined

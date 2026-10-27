@@ -332,6 +332,8 @@
   "tips.projectTabs.title": "Des onglets qui font de la place",
   "tips.projectTabsKeys.text": "Alt+1 à Alt+8 ouvrent les onglets d'un projet dans l'ordre où ils apparaissent, de Session à Git. Mémoire, Compétences, Modèles et MCP sont dans Plus ▾ au bout, et dans le menu Projet de la barre de menus.",
   "tips.projectTabsKeys.title": "Alt et un chiffre pour chaque onglet",
+  "tips.projectTabsSettings.text": "Le dernier élément de Plus ▾, au bout des onglets d’un projet, est Paramètres du projet…, avec son raccourci (Alt+0, sauf si tu le changes).",
+  "tips.projectTabsSettings.title": "Les paramètres du projet depuis Plus ▾",
   "tips.quitWhenDone.text": "Quitter pendant qu’un agent travaille propose Quitter quand les agents ont fini : Hive se masque et quitte tout seul une fois qu’ils ont terminé. Les conversations sont toujours conservées.",
   "tips.quitWhenDone.title": "Quitter quand les agents ont fini",
   "tips.recentWorkspaces.text": "Retire un espace de travail de Fichier → Ouvrir un élément récent ou de la page d’accueil avec son ✕, ou par clic droit. Effacer les éléments récents les oublie tous ; les dossiers disparus s’affichent comme introuvables.",

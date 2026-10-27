@@ -12,7 +12,7 @@ import hexUrl from '../assets/icon.svg'
 import * as actions from '../actions'
 import { call, errorMessage } from '../api'
 import { needsConnection, NoConnectionBanner, useConnections } from '../components/ConnectionChoice'
-import { commandKeybinding } from '../commands'
+import { commandKeybinding, runCommand } from '../commands'
 import { AddAgentButton, PANE_FOOTER, PANE_HEADER, PaneChrome, RESUME_TINT, ResumeButton, SessionToolbar, TerminalLayer, usePanes, useWidth } from '../components/AgentPanes'
 import { terminalMinWidth } from '../components/TerminalView'
 import { AgentTiles, TILE_STRIP, useTileStripWidth } from '../components/AgentTiles'
@@ -40,6 +40,7 @@ const TABS = MAIN_TABS
 
 const M = {
   moreTabs: msg({ id: 'project.tabs.more', defaultMessage: 'More', description: "The last of a project's tabs: opens a menu of its other tabs (Memory, Skills, Templates, MCP). When one of them is open, the button shows its name instead. Keep it short." }),
+  moreSettings: msg({ id: 'project.tabs.moreSettings', defaultMessage: 'Project Settings…', description: "The last item of the project tabs' More ▾ menu, after a separator (HI-1840): opens the project's settings. Keep the …." }),
   moreTip: msg({ id: 'project.tabs.moreTip', defaultMessage: "The project's {tabs}", description: "Tooltip on the project tabs' More ▾ button. {tabs} lists the tabs in its menu, such as Memory, Skills, Templates and MCP." }),
   tabTip: msg({ id: 'project.tabs.tip', defaultMessage: '{tab} ({key})', description: "A project tab's tooltip with its keyboard shortcut. {tab} is the tab's name, {key} the shortcut, such as Alt+4." }),
   providerOff: msg({ id: 'project.empty.providerOff', defaultMessage: '{provider} is turned off — Settings → Providers', description: "Warning on the Session tab when the agent's provider is turned off. Settings → Providers: name it as Settings does." }),
@@ -191,11 +192,18 @@ function ProjectTabStrip({ project, tab, live }: { project: ProjectInfo; tab: Pr
   const moreTab = MORE_TABS.find((t) => t.id === tab)
   const moreLabel = moreTab ? tr(moreTab.label) : tr(M.moreTabs)
   const moreIcon = moreTab?.icon ?? 'ellipsis'
-  const moreItems = (): MenuEntry[] =>
-    MORE_TABS.map((t) => {
-      const kb = commandKeybinding(tabCommand(t.id))
-      return { label: tr(t.label), icon: t.icon, keybinding: kb ? formatKeybinding(kb) : undefined, onClick: () => setProjectTab(project.path, t.id) }
-    })
+  const moreItems = (): MenuEntry[] => {
+    const settingsKb = commandKeybinding('project.tab.settings')
+    return [
+      ...MORE_TABS.map((t) => {
+        const kb = commandKeybinding(tabCommand(t.id))
+        return { label: tr(t.label), icon: t.icon, keybinding: kb ? formatKeybinding(kb) : undefined, onClick: () => setProjectTab(project.path, t.id) }
+      }),
+      // Then Project Settings (HI-1840): an action, its command's, never one of More ▾'s tabs (so never its label).
+      { separator: true },
+      { label: tr(M.moreSettings), icon: 'settings', keybinding: settingsKb ? formatKeybinding(settingsKb) : undefined, onClick: () => runCommand('project.tab.settings') }
+    ]
+  }
   const fitRef = useRef<TabFit>('labels')
   let fit = fitRef.current
   if (widths && width > 0 && widths.labelled.length === MORE_AT + 1) {
