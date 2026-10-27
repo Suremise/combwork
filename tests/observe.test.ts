@@ -3,11 +3,11 @@
 // packed-refs rewrite), a write in an ignored folder doesn't count, a folder gone and back (#964) leaves its record
 // unknown rather than empty, and the watches close when their workspace does.
 import { execFileSync } from 'child_process'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { Observer, observer, type ObserveEvent } from '../src/main/platform/observe'
+import { FILE_TIME_SLACK_MS, Observer, observer, type ObserveEvent } from '../src/main/platform/observe'
 import { isUnknown } from '../src/main/platform/types'
 import { tempDir } from './tempDir'
 
@@ -33,6 +33,12 @@ function repo(): string {
   run(p, 'commit', '-q', '-m', 'one')
   return p
 }
+
+/**
+ * Main's thread busy for a while, as under load (HI-1767): nothing else runs, so a watch's events wait. Not a wait for
+ * a condition: what the test then checks is the write log's answer.
+ */
+const busy = (ms: number): void => void Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 
 /** Once a folder's watch is armed: its record is complete from now on. */
 const armed = (o: Observer, folder: string) => vi.waitFor(async () => expect(isUnknown(await o.changedBetween(folder, Date.now(), Date.now()))).toBe(false), { timeout: HUNG_MS })
@@ -100,6 +106,26 @@ describe('the watcher on a Git repository', () => {
     writeFileSync(join(p, 'a.txt'), 'a\n')
     expect(run(p, 'status', '--porcelain')).toBe('')
     expect(await between(t0)).toEqual({ changed: true, paths: ['a.txt'] })
+  })
+
+  it("a write or a deletion just before the start, its event coming after it, doesn't count (HI-1767)", async () => {
+    mkdirSync(join(p, 'sub'))
+    commit(p, 'sub/c.txt', 'c\n')
+    await seen({ kind: 'lineMoved', line: 'main' })
+    await armed(o, p)
+    // Written (as a check copy's reset or a merge writes), then main's thread busy past the write's times: the watch's
+    // events can only come in after the start is taken.
+    writeFileSync(join(p, 'a.txt'), 'late\n')
+    rmSync(join(p, 'sub', 'c.txt'))
+    busy(FILE_TIME_SLACK_MS + 50)
+    const t0 = Date.now()
+    expect(await between(t0)).toEqual({ changed: false, paths: [] })
+    // Their events did come in, after the start: the write log has them, and the check left them out.
+    await seen({ kind: 'written', folder: p, paths: ['a.txt'] })
+    // A write after it still counts, however soon.
+    const t1 = Date.now()
+    writeFileSync(join(p, 'a.txt'), 'a\n')
+    expect((await between(t1)).paths).toEqual(['a.txt'])
   })
 
   it("a write in an ignored folder (out/, node_modules) does not count, an install's burst included", async () => {

@@ -4132,7 +4132,10 @@ where it ran) and counts for a card's submission only if all of these hold; othe
 - **nothing changed in between**: the watcher (§16.3.2 observe) saw no write to a tracked file in the folder and no
   HEAD reflog entry during the run (a checkout and back, a reset to the same commit, an edit undone all show), and no
   agent's edit hook fired there. A build writing ignored outputs (`out/`, `node_modules`) doesn't count against it.
-  Writes anywhere in the tracked tree count, not just the card's files: its checks can depend on any of them;
+  Writes anywhere in the tracked tree count, not just the card's files: its checks can depend on any of them. A write
+  is the run's by the file's own times, not when its event came in (HI-1767): a check copy's reset or the target merged
+  in just before the start, whose events came in after it under load, isn't (its file last written before the start,
+  100 ms of clock slack aside); a deleted file is timed by its folder's;
 - **None:** `hive-progress --check <name> --card AM-12` computes the card's current revision from its declared paths
   when the run starts and when it ends (§16.3.3); the run counts for a submission whose revision is that same value
   (same paths, same contents), and the watcher saw no write to a deliverable in between. So the builder declares its
