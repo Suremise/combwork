@@ -292,13 +292,13 @@ describe('cards kept until they change, as getTask reads them (HI-1780)', () => 
     await run(() => tasks.commentTask(x, 'first', user))
     const db = other()
     const at = rev(db, x)
-    expect((await now([x])).get(x)!.comments.map((c) => c.text)).toContain('first')
+    expect((await now([x])).get(x)!.comments.map((m) => m.text)).toContain('first')
     await run(() => tasks.commentTask(x, 'second', user))
     // Still at the mark: its revision didn't move, and it is read as it is all the same.
     expect(rev(db, x)).toBe(at)
     db.close()
     expect((await now([x])).get(x)).toEqual(await fresh(x))
-    expect((await now([x])).get(x)!.comments.map((c) => c.text)).toContain('second')
+    expect((await now([x])).get(x)!.comments.map((m) => m.text)).toContain('second')
   })
 
   it("are read again once a card's key changes, and after the board is opened again", async () => {
