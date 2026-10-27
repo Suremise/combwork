@@ -13,6 +13,7 @@ import { useAdvancedValue } from '../advanced'
 import { ATTACHMENT_ANCHOR, type AttachmentLookup } from '../cardAttachLinks'
 import { confirm, notify, set, showAttachments, useStore } from '../store'
 import { imageUrl, timeAgo } from '../util'
+import { useScopedLoad } from '../scopedLoad'
 import { Icon, IconButton, Tooltip, useContextMenu, type MenuEntry } from './ui'
 
 /** A box of the card dialog that takes drafts. */
@@ -236,26 +237,23 @@ const TAB = {
 
 /**
  * A project's cards' attachments (its Attachments tab), read again whenever the board changes; `loaded` once a read for
- * this project has answered (HI-1841: its tabs choose only then), `failed` when the last one failed.
+ * this project has answered (HI-1841: its tabs choose only then), `failed` when the last one failed. Reads go through
+ * useScopedLoad, so an older read (this project's, or one still running for the last project) never replaces a newer
+ * one's answer (HR5's HI-1841 round 1).
  */
 export function useProjectCardAttachments(projectPath: string | null): { groups: CardAttachmentGroup[]; reload: () => Promise<void>; loaded: boolean; failed: boolean } {
   // Each read of the board: an attachment added or removed leaves the cards, so `tasks`, as they were (HI-1853).
   const reads = useStore((s) => s.boardReads)
-  const [state, setState] = useState<{ for: string | null; groups: CardAttachmentGroup[]; failed: boolean } | null>(null)
+  const scope = projectPath ?? ''
+  const read = useScopedLoad<CardAttachmentGroup[]>(scope)
+  const { load } = read
   const reload = useCallback(async () => {
-    if (!projectPath) return setState({ for: null, groups: [], failed: false })
-    try {
-      const groups = await call('cards:projectAttachments', projectPath)
-      setState({ for: projectPath, groups, failed: false })
-    } catch {
-      setState((s) => ({ for: projectPath, groups: s?.for === projectPath ? s.groups : [], failed: true }))
-    }
-  }, [projectPath])
+    load(scope, () => (projectPath ? call('cards:projectAttachments', projectPath) : Promise.resolve([])))
+  }, [load, scope, projectPath])
   useEffect(() => {
     void reload()
   }, [reload, reads])
-  const mine = state?.for === projectPath ? state : null
-  return { groups: mine?.groups ?? NO_GROUPS, reload, loaded: !!mine && !mine.failed, failed: !!mine?.failed }
+  return { groups: read.data ?? NO_GROUPS, reload, loaded: read.data !== null && !read.error, failed: !!read.error }
 }
 
 const NO_GROUPS: CardAttachmentGroup[] = []

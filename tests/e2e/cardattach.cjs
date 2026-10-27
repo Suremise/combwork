@@ -225,6 +225,32 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     check('Show in Attachments opens Card attachments at its card, both its files shown (its filter back to All)', !!(await until(async () => (await selectedAttach()) === 'card' && (await target.isVisible()) && (await target.locator('.thumb').count()) === 2)), JSON.stringify([await selectedAttach(), await target.locator('.thumb').count()]))
     check('…without changing the tab remembered', JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).ui?.tabs?.attachments === 'pane')
     check('…the dialog closed, the card’s files in view', (await page.locator('[data-action="show-in-attachments"]').count()) === 0 && (await target.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.top < window.innerHeight })))
+    // The tab already shown, its filter hiding the target (HR5's HI-1841 round 1): an older card with only an image, below
+    // newer cards with text files, opened with Card attachments on Text. Its jump waits for the filter's reset to show,
+    // then scrolls to it.
+    const api = (method, url, body) => fetch(`http://127.0.0.1:${PORT}${url}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const pic = path.join(alpha, 'docs', 'old-shot.png')
+    fs.writeFileSync(pic, lib.samplePng(48, 48))
+    const older = await inv('tasks:create', { title: 'Older card with a picture', project: 'alpha' })
+    await api('PATCH', `/v1/tasks/${older.number}`, { attachments: [pic] })
+    for (let i = 0; i < 6; i++) {
+      const t = await inv('tasks:create', { title: `Newer card ${i}`, project: 'alpha' })
+      const f = path.join(alpha, 'docs', `newer-${i}.txt`)
+      fs.writeFileSync(f, `newer ${i}
+`)
+      await api('PATCH', `/v1/tasks/${t.number}`, { attachments: [f] })
+    }
+    const olderGroup = section.locator(`[data-card="${older.number}"]`)
+    const cardTotal = () => attachTabs().then((t) => t.find((x) => x.id === 'card')?.count ?? 0)
+    check('the newer cards’ files listed', !!(await until(async () => (await cardTotal()) === 9)), String(await cardTotal()))
+    await page.locator('.attachment-filter[data-kind="text"]').click()
+    check('Card attachments on Text: the older picture card hidden', !!(await until(async () => (await selectedAttach()) === 'card' && (await olderGroup.count()) === 0)))
+    await showBoard(page)
+    await openByTitle(page, older.number)
+    await show.waitFor({ timeout: 15000 })
+    await show.click()
+    const inView = () => olderGroup.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && el.closest('.scroll-page').scrollTop > 0 }).catch(() => false)
+    check('…Show in Attachments: the filter back to All, the older card scrolled into view from below the fold, outlined', !!(await until(async () => (await selectedAttach()) === 'card' && (await page.locator('.attachment-filter', { hasText: 'All' }).getAttribute('aria-pressed')) === 'true' && (await inView()) && (await olderGroup.evaluate((el) => el.classList.contains('jumped')).catch(() => false)))), JSON.stringify([await selectedAttach(), await inView()]))
     // --- The Agent API: nothing is copied before the destination is allowed (HR4's HI-1700 round 1, finding 3).
     const post = async (body, bearer = token) => {
       const r = await fetch(`http://127.0.0.1:${PORT}/v1/tasks`, { method: 'POST', headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

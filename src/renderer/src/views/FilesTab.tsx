@@ -1129,17 +1129,20 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
   ]
 
   // A link's jump (HI-1841), for this project only: its tab shown (and kept), that tab's filter back to All so its target
-  // shows, and once the target is drawn, scrolled to and flashed; then the jump is done. A target that isn't there once
-  // the files are read (no attachments in that session) leaves the tab shown.
+  // shows; then, in a render that has both (never the page as it was: HR5's round 1), the target scrolled to and
+  // flashed once drawn, and the jump done. A target that isn't there once the files are read (no attachments in that
+  // session) leaves the tab shown.
   const jump = useStore((s) => s.attachmentsJump)
   const pageRef = useRef<HTMLDivElement>(null)
+  const [preparedJump, setPreparedJump] = useState<number | null>(null)
   useEffect(() => {
     if (assistant || !jump || jump.project !== project.path) return
     setShownTab({ project: project.path, tab: jump.tab })
     setFilters((f) => (f[jump.tab] ? { ...f, [jump.tab]: null } : f))
+    setPreparedJump(jump.nonce)
   }, [assistant, jump, project.path])
   useEffect(() => {
-    if (assistant || !jump || jump.project !== project.path || tab !== jump.tab) return
+    if (assistant || !jump || jump.project !== project.path || preparedJump !== jump.nonce || tab !== jump.tab || filters[jump.tab]) return
     const sel = jump.tab === 'card' ? `[data-card="${jump.card}"]` : `[data-session="${CSS.escape(jump.session)}"]`
     const target = pageRef.current?.querySelector<HTMLElement>(`[role="tabpanel"][data-tab-panel="${jump.tab}"] ${sel}`)
     const read = jump.tab === 'card' ? cardFiles.loaded || cardFiles.failed : !!all

@@ -246,3 +246,57 @@ describe("a load with an early part (HI-1681: Hive's sessions before the rest)",
     expect(v.get().data).toBeNull()
   })
 })
+
+describe("scopedLoads: answers out of order (HI-1841, HR5's round 1)", () => {
+  /** A view's state, its scope and the loads it starts, each settled by the test. */
+  function view(scope: string) {
+    let state: Scoped<string[]> = { scope, data: null, error: null, at: 0 }
+    let current = scope
+    const pending: { resolve: (v: string[]) => void; reject: (e: Error) => void }[] = []
+    const load = scopedLoads<string[]>((next) => (state = next(state)), () => current, () => 1)
+    const start = (asked: string) => load(asked, () => new Promise<string[]>((resolve, reject) => pending.push({ resolve, reject })))
+    return { start, pending, move: (to: string) => (current = to), state: () => state }
+  }
+
+  it("an older load of the last scope answering after the new scope's is dropped", async () => {
+    const v = view('alpha')
+    v.start('alpha')
+    v.move('beta')
+    v.start('beta')
+    v.pending[1].resolve([])
+    await Promise.resolve()
+    v.pending[0].resolve(['alpha-card'])
+    await Promise.resolve()
+    expect(v.state()).toEqual({ scope: 'beta', data: [], error: null, at: 1 })
+  })
+
+  it("…and so is its failure: the new scope's results stay, with no error", async () => {
+    const v = view('alpha')
+    v.start('alpha')
+    v.move('beta')
+    v.start('beta')
+    v.pending[1].resolve(['beta-card'])
+    await Promise.resolve()
+    v.pending[0].reject(new Error('alpha failed'))
+    await Promise.resolve().then(() => undefined)
+    expect(v.state()).toEqual({ scope: 'beta', data: ['beta-card'], error: null, at: 1 })
+  })
+
+  it('in one scope, an older load answering after a newer one is dropped, success or failure', async () => {
+    const v = view('alpha')
+    v.start('alpha')
+    v.start('alpha')
+    v.pending[1].resolve(['new'])
+    await Promise.resolve()
+    v.pending[0].resolve(['old'])
+    await Promise.resolve()
+    expect(v.state().data).toEqual(['new'])
+    v.start('alpha')
+    v.start('alpha')
+    v.pending[3].resolve(['newer'])
+    await Promise.resolve()
+    v.pending[2].reject(new Error('older failed'))
+    await Promise.resolve().then(() => undefined)
+    expect(v.state()).toEqual({ scope: 'alpha', data: ['newer'], error: null, at: 1 })
+  })
+})
