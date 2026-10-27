@@ -26,6 +26,7 @@ import { writeWorkflow } from './workflow/projectWorkflow'
 import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
 import { AUTO_PROVIDER, DEFAULT_PROJECT_PROVIDER, PROVIDERS, dangerModes, defaultProviderSettings, modeOption, permissionLabel, projectProviderConfig, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
+import { LEGACY_CONSUMED, ownOrLegacy } from './workflow/preferences'
 
 /** Where a setting lives: Hive's own (Settings), a provider's page in Settings, the open workspace, or one project (Project Settings). */
 export type SettingScope = 'app' | 'provider' | 'workspace' | 'project'
@@ -1114,7 +1115,8 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
   if (e.scope === 'project') {
     if (!project) return undefined
     // The project's own value of a workflow option, or inherit (#1278: the workspace's, then Hive's, then all-off).
-    if (e.workflow) return project.workflow?.options?.[e.workflow] ?? 'inherit'
+    // With no options yet, its card loops and file locks from before HI-1766, as the form and the runtime read them.
+    if (e.workflow) return ownOrLegacy(project as ProjectConfig & Record<string, unknown>)[e.workflow] ?? 'inherit'
     if (e.key === PLATFORM_SETTING_KEY) return project.platform ?? project.workflow?.platform ?? null
     if (e.provider) return (projectProviderConfig(project, e.provider) as unknown as Record<string, unknown>)[e.key] ?? 'inherit'
     return (project as unknown as Record<string, unknown>)[e.key]
@@ -1357,10 +1359,11 @@ export function settingPatch(
     const key = e.workflow
     return {
       project: (cfg) => {
-        const options: Record<string, unknown> = { ...cfg.workflow?.options }
+        // From the options as they read (the old keys of a project with none yet among them), which then go.
+        const options: Record<string, unknown> = ownOrLegacy(cfg as ProjectConfig & Record<string, unknown>)
         if (value === null) delete options[key]
         else options[key] = value
-        return { workflow: writeWorkflow(cfg.workflow, { platform: (cfg.workflow?.platform ?? cfg.platform)!, preset: cfg.workflow?.preset ?? null, options }) }
+        return { workflow: writeWorkflow(cfg.workflow, { platform: (cfg.workflow?.platform ?? cfg.platform)!, preset: cfg.workflow?.preset ?? null, options }), ...LEGACY_CONSUMED }
       }
     }
   }

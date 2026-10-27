@@ -67,6 +67,47 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
     await disposeWorkspaceService(again)
   })
 
+  it("a project with no workflow options yet and its card loops from before HI-1766: the settings tool and the form read them as its own, and Inherit from either keeps them inherited after reading again (HR5's round 1)", async () => {
+    const { setWorkflowOptions, workflowForm } = await import('../src/main/workflow/optionsForm')
+    const path = join(base, 'ws-legacy')
+    const old = { version: 2, platform: 'none', agents: [], loopRounds: 4, loopWakes: false, fileLocks: 'warn' }
+    const file = (p: string) => join(path, p, '.hive', 'project.json')
+    for (const p of ['tool', 'form']) {
+      mkdirSync(join(path, p, '.hive'), { recursive: true })
+      writeFileSync(file(p), JSON.stringify(old))
+    }
+    const w = createWorkspaceService()
+    await w.open(path)
+    const legacyKeys = (p: string) => ['loopRounds', 'loopWakes', 'fileLocks', 'loopWaitHours', 'loopStepWaitMinutes'].filter((k) => k in JSON.parse(readFileSync(file(p), 'utf8')))
+    await inWorkspace(w, async () => {
+      // The settings tool: it reads the old value the runtime uses, its change says so, and Inherit sticks.
+      const rounds = entryOf('project.workflow.loopRounds')
+      const tool = { name: 'tool', config: await w.projectConfig(join(path, 'tool')) }
+      expect(settingDetail(rounds, tool)).toMatchObject({ value: '4' })
+      const r = await applySetting(rounds, null, join(path, 'tool'))
+      expect([r.old, r.new]).toEqual([4, 'inherit'])
+      expect(legacyKeys('tool')).toEqual([])
+      expect(JSON.parse(readFileSync(file('tool'), 'utf8')).workflow.options).toEqual({ loopWakes: false, fileLocks: 'warn' })
+      // The form: its own options are the old ones; saved without the rounds, they stay inherited.
+      const form = await workflowForm(w, join(path, 'form'))
+      expect(form.own).toEqual({ loopRounds: 4, loopWakes: false, fileLocks: 'warn' })
+      const { loopRounds: _r, ...rest } = form.own
+      await setWorkflowOptions(w, join(path, 'form'), { preset: null, options: rest, base: { preset: form.preset, options: form.own } }, { applyTo: [] })
+      expect(legacyKeys('form')).toEqual([])
+      expect(JSON.parse(readFileSync(file('form'), 'utf8')).workflow.options).toEqual({ loopWakes: false, fileLocks: 'warn' })
+    })
+    await disposeWorkspaceService(w)
+    // Read again: nothing moves back.
+    const again = createWorkspaceService()
+    await again.open(path)
+    for (const p of ['tool', 'form']) {
+      const cfg = await again.projectConfig(join(path, p))
+      expect(cfg.workflow?.options, p).toEqual({ loopWakes: false, fileLocks: 'warn' })
+      expect('loopRounds' in cfg, p).toBe(false)
+    }
+    await disposeWorkspaceService(again)
+  })
+
   it('advanced settings (#367): set in advanced.json or the workspace’s own, listed only when changed or asked for', async () => {
     const { advanced, updateSettingsChecked } = await import('../src/main/advanced')
     const profile = join(base, 'profile-advanced')

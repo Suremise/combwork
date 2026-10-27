@@ -81,6 +81,16 @@ export function legacyPreferences(raw: unknown): Partial<WorkflowOptions> {
   return out as Partial<WorkflowOptions>
 }
 
+/**
+ * A project.json patch that consumes the old keys (HR5's HI-1766 round 1): for a write whose workflow options already
+ * hold what they had, as the form and the settings tool show them (`legacyPreferences`), so one removed there (Inherit)
+ * stays inherited rather than moving in again.
+ */
+export const LEGACY_CONSUMED: Partial<Pick<ProjectConfig, 'loopWakes' | 'loopRounds' | 'loopWaitHours' | 'loopStepWaitMinutes' | 'fileLocks'>> = { loopWakes: undefined, loopRounds: undefined, loopWaitHours: undefined, loopStepWaitMinutes: undefined, fileLocks: undefined }
+
+/** A project's own options as the form and the settings tool show them: its workflow's, else its old keys (none yet). */
+export const ownOrLegacy = (cfg: Pick<ProjectConfig, 'workflow'> & Record<string, unknown>): Partial<WorkflowOptions> => (cfg.workflow ? { ...cfg.workflow.options } : legacyPreferences(cfg))
+
 /** Options with the old values each lacks (key presence: a value set there, false or not, wins). */
 const withMissing = (options: unknown, old: Partial<WorkflowOptions>): Partial<WorkflowOptions> => {
   const o = options && typeof options === 'object' && !Array.isArray(options) ? (options as Record<string, unknown>) : {}
