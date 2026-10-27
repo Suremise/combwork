@@ -720,12 +720,12 @@ describe("a card's cycle in a slot (#1438)", () => {
     const at = (folder: string, seq: number, lease = 'l-1') => f(seq, 'Started', { folder, line: 'hive/AM/AM-1-x', base: 'b', target: 'main', builder: 'B1', cardKind: 'code', slot: 'slot-a', lease })
     const before = 'C:\\before\\ws.worktrees\\alpha\\slot-a'
     const after = 'C:\\after\\ws.worktrees\\alpha\\slot-a'
-    const moved = [at(before, 1), f(2, 'FolderMoved', { from: before.toUpperCase(), to: after, why: 'repair' }), f(3, 'LineRenamed', { from: 'HIVE/AM/AM-1-x', to: 'hive/AM/AM-1-y', why: 'repair' })]
-    expect(cycleIn(moved)?.started).toMatchObject({ folder: after, line: 'hive/AM/AM-1-y', slot: 'slot-a', lease: 'l-1' })
+    const afterMove = [at(before, 1), f(2, 'FolderMoved', { from: before.toUpperCase(), to: after, why: 'repair' }), f(3, 'LineRenamed', { from: 'HIVE/AM/AM-1-x', to: 'hive/AM/AM-1-y', why: 'repair' })]
+    expect(cycleIn(afterMove)?.started).toMatchObject({ folder: after, line: 'hive/AM/AM-1-y', slot: 'slot-a', lease: 'l-1' })
     // Another folder's move, or another line's rename, isn't its own.
     expect(cycleIn([at(before, 1), f(2, 'FolderMoved', { from: 'C:\\elsewhere', to: after, why: 'repair' }), f(3, 'LineRenamed', { from: 'hive/AM/AM-2-z', to: 'hive/AM/AM-2-w', why: 'repair' })])?.started).toMatchObject({ folder: before, line: 'hive/AM/AM-1-x' })
     // A move before its start was the last cycle's: its start names where it is.
-    expect(cycleIn([...moved, at(after, 4, 'l-2')])?.started).toMatchObject({ folder: after, line: 'hive/AM/AM-1-x', lease: 'l-2' })
+    expect(cycleIn([...afterMove, at(after, 4, 'l-2')])?.started).toMatchObject({ folder: after, line: 'hive/AM/AM-1-x', lease: 'l-2' })
   })
 })
 
