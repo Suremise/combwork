@@ -4,7 +4,7 @@
 // launch's environment (masked while used); a keyless launch only for this PC's server; its models read from the server
 // when asked (bounded, redirects refused, a stale reply dropped). Dummy keys only, in this file's temp folders; the CLI
 // is never run and nothing signs in.
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'fs'
 import { createServer, type Server, type ServerResponse } from 'http'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -111,6 +111,29 @@ describe('a profile that never saved a key (round 2)', () => {
       expect(await outcome(coverage.requireMasking())).toBe('ok')
     } finally {
       safe.available = true
+    }
+  })
+
+  it("before ready, hive.log's first lines aren't masked; a config.json that can't be read keeps them strict (HI-1855)", async () => {
+    const line = "The install folder C:\\Program Files\\Hive has an app package's entry"
+    resetMaskingForTests('pending')
+    coverage.startCoverageEarly()
+    expect(maskingState().state).toBe('none')
+    expect(logLine('warn', 'installDir', line)).toContain(line)
+    // Damaged: nothing can be told of it before ready, so strict, as before.
+    await config.flush()
+    const cfg = join(profile, 'config.json')
+    const kept = existsSync(cfg) ? readFileSync(cfg, 'utf8') : null
+    writeFileSync(cfg, '{ damaged')
+    try {
+      resetMaskingForTests('pending')
+      coverage.startCoverageEarly()
+      expect(maskingState().state).toBe('pending')
+      expect(logLine('warn', 'installDir', line)).toContain('<masked>')
+    } finally {
+      if (kept === null) unlinkSync(cfg)
+      else writeFileSync(cfg, kept)
+      await restart()
     }
   })
 })
@@ -399,6 +422,11 @@ describe('key coverage: every saved key masked for good (round 2)', () => {
     } finally {
       decrypt.mockRestore()
     }
+    // Before ready (HI-1855), a profile that saved a key stays strict until its fingerprints are read.
+    resetMaskingForTests('pending')
+    coverage.startCoverageEarly()
+    expect(maskingState().state).toBe('pending')
+    await restart()
   })
 
   it('missing or damaged or undecryptable fingerprints after a key was saved: unavailable, strict everywhere, exports refused before writing, a new key refused', async () => {

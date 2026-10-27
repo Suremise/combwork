@@ -13,7 +13,9 @@ const path = require('path')
 const PACKAGE = 'S-1-15-2-1430448594-2639229838-973813799-439329657-1197984847-4069167804-1277922394'
 const FOLDER_ENTRY = '*S-1-15-2-1:(OI)(CI)(RX)'
 const FILE_ENTRY = '*S-1-15-2-1:(RX)'
-const system32 = (...p) => path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', ...p)
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
+const HUNG_MS = 30000
+const system32 =(...p) => path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', ...p)
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -94,8 +96,11 @@ function pasted(message) {
   check('it added ALL APPLICATION PACKAGES to the folder, read and inherited', /\(A;OICI;0x1200a9;;;AC\)/.test(sddl(fixable)), sddl(fixable))
   check('and to the file Electron checks, read', /\(A;;0x1200a9;;;AC\)/.test(sddl(icu)), sddl(icu))
   await app.close()
-  const hiveLog = fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
-  check('its log says so', hiveLog.includes("icudtl.dat doesn't inherit") && hiveLog.includes('Added ALL APPLICATION PACKAGES to the install folder'))
+  // Its lines, written by the log's own thread (HI-1730), in words: a profile that never saved a key masks nothing (HI-1855).
+  const logFile = path.join(userData, 'logs', 'hive.log')
+  const readLog = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8') : '')
+  const said = await lib.until(() => readLog().includes("icudtl.dat doesn't inherit") && readLog().includes('Added ALL APPLICATION PACKAGES to the install folder'), HUNG_MS)
+  check('its log says so', !!said, readLog().split('\n').filter((l) => l.includes('[installDir]')).join(' | '))
 
   // A folder the user can't change the permissions of (the owner held to reading by OWNER RIGHTS): Hive can't add it,
   // so it says what to run and quits instead of starting.
