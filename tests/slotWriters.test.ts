@@ -498,7 +498,9 @@ describe('Release Slot through the Agent API and the Assistant (#1561)', () => {
     await plant('r-race')
     const both = await Promise.all([0, 1].map(() => refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a', run: 'r-race' } }))))
     expect(both.filter((r) => r === 'released')).toHaveLength(1)
-    expect(both.filter((r) => r !== 'released')[0]).toMatch(/changed meanwhile|^409$/)
+    // The other is told it changed: a 409 refusal (a number) when it looked after the first was done (HI-1761), or a
+    // "changed meanwhile" message when the two met inside the release.
+    expect(String(both.filter((r) => r !== 'released')[0])).toMatch(/changed meanwhile|^409$/)
     expect(writer()).toBeNull()
     await plant('r-start')
     hostOn(false)
