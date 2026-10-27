@@ -2,7 +2,8 @@
 // applies), on the fake Codex (no browser, no real sign-in): with none on, a Codex agent is refused; two connections
 // signed in with Codex's own login in each one's folder; two agents on them at once, each launch's CODEX_HOME its own
 // folder, its login kept there (the file store) and a token in Hive's environment never passed on; a conversation
-// carried from one connection to the other (its rollout in the shared sessions folder, resumed); a login changed in a
+// carried from one connection to the other (its rollout in the shared sessions folder, resumed), its plan usage then
+// the connection's own, in the status bar (HI-1882); a login changed in a
 // connection's folder warned of; a signed-out connection refused; and a removal that leaves the shared rollouts in the
 // CLI home untouched.
 const lib = require('./lib.cjs')
@@ -110,6 +111,18 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     const resumed = await lib.until(async () => launchedIn(work.id).find((l) => l.agent === 'Two') ?? null, HUNG_MS)
     check('…resumed on Work, the same conversation', !!resumed && resumed.args[0] === 'resume' && resumed.args[1] === first, JSON.stringify(resumed?.args?.slice(0, 2)))
     check('…its rollout found there too, through Work’s link', rollouts(path.join(accountsRoot, work.id, 'sessions')).some((f) => f.includes(first)))
+
+    // --- Its plan usage is Work's (HI-1882: a Codex login has no organisation, and every report was dropped): the
+    // rollout's rate limits kept as Work's, and the status bar's Work item shows them.
+    await lib.until(async () => (await live('a-two'))?.status === 'ready', HUNG_MS)
+    await inv('pty:write', lib.ptyKey(alpha, 'a-two'), 'planusage 12 57')
+    await lib.sleep(300) // on purpose: the fake takes a typed line before its Enter, as Codex does
+    await inv('pty:write', lib.ptyKey(alpha, 'a-two'), '\r')
+    const keptWork = await lib.until(async () => (await inv('app:connectionPlanUsage'))[work.id] ?? null, HUNG_MS)
+    check("Two's rollout's rate limits are kept as Work's", keptWork?.limits?.map((l) => l.usedPercent).join(',') === '12,57' && !(await inv('app:planUsage')).codex, JSON.stringify({ kept: keptWork, cli: (await inv('app:planUsage')).codex ?? null }))
+    const workItem = page.locator(`.statusbar .status-item[data-plan-connection="${work.id}"]`)
+    const workText = async () => ((await workItem.count()) === 1 ? (await workItem.innerText()).replace(/\s+/g, ' ') : '')
+    check('…and the status bar shows Work’s: 5h 12% · Week 57%', !!(await lib.until(async () => /Work.*5h 12%.*Week 57%/.test(await workText()), HUNG_MS)), await workText())
 
     // --- A third agent on a busy connection (HI-1873): One and Two run on Work, writing in its folder all the time as
     // Codex's databases do (and so does each check's app server), its login untouched. Three starts there, every time.

@@ -190,11 +190,12 @@ export function forgetConnectionUsage(id: string): void {
 
 /**
  * A login, as plan usage keeps it (HR2's round 1): its email (any case) and organisation, hashed, so a session's state
- * and the saved figures say whose they are without carrying the email. Null with no identity.
+ * and the saved figures say whose they are without carrying the email. Null with no email. A CLI whose login has no
+ * organisation (Codex: an email and a plan) is its email alone (HI-1882: requiring one dropped every Codex report).
  */
 export function usageLogin(identity: { email?: string; orgId?: string } | null | undefined): string | null {
-  if (!identity?.email || !identity.orgId) return null
-  return createHash('sha256').update(`${identity.email.toLowerCase()}\n${identity.orgId}`).digest('hex').slice(0, 16)
+  if (!identity?.email) return null
+  return createHash('sha256').update(`${identity.email.toLowerCase()}\n${identity.orgId ?? ''}`).digest('hex').slice(0, 16)
 }
 
 /**
