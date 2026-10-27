@@ -173,11 +173,15 @@ export interface ServerCaps {
   presets: readonly ServerPreset[]
 }
 
-/** A server's model listing (HI-1772): `path` absolute (from the origin) or relative (under the base URL), the reply's list, and each entry's id. */
+/**
+ * A server's model listing (HI-1772): `path` absolute (from the origin) or relative (under the base URL), the reply's
+ * list, and each entry's id; `remote`, a field an entry the server runs elsewhere has, not empty (HI-1773).
+ */
 export interface ServerListing {
   path: string
   list: string
   id: string
+  remote?: string
 }
 
 /** A preset for Add Connection (HI-1772): a filled form, all of it editable. */
@@ -192,6 +196,13 @@ export interface ServerPreset {
   keyless?: boolean
   /** Where its setup is documented, shown with the preset. */
   docs?: string
+  /**
+   * The advanced setting (a pattern) for model ids its server runs elsewhere (HI-1773), for models typed rather than
+   * read from it: a model its listing marks remote is remote whatever the pattern says.
+   */
+  remoteModels?: string
+  /** The context length, in tokens, the service recommends for this CLI (HI-1773): shown with the preset, never enforced. */
+  contextAdvice?: number
 }
 
 /** What the CLI said about a model, for modeCaveat. */

@@ -303,6 +303,14 @@
     "defaultMessage": "Connections: sign-in check timeout",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.claude-code.connections.remoteModels.desc": {
+    "defaultMessage": "The model names Ollama runs on ollama.com rather than on this PC (its cloud models, such as gpt-oss:120b-cloud), as a regular expression, for an Ollama connection's models typed in rather than read from Ollama (Read Models asks Ollama, which says). Such a connection's sessions aren't free (local). Wrong, a cloud model typed in is counted as free, or a local one as not free.",
+    "description": "What the advanced setting \"Connections: Ollama cloud models\" is for, and what goes wrong when it is wrong (Settings → Advanced). Ollama, ollama.com and Read Models (a button) are names; \"free (local)\" is how Hive shows the cost of sessions run only on this PC."
+  },
+  "settings.advanced.claude-code.connections.remoteModels.title": {
+    "defaultMessage": "Connections: Ollama cloud models",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Ollama is a product's name; its cloud models run on ollama.com."
+  },
   "settings.advanced.claude-code.exit.command.desc": {
     "defaultMessage": "What Hive types into Claude Code, then Enter, to end it once its lane has ended and its turn is over, so it exits by itself rather than being killed. Wrong, Claude Code isn't ended by it and is killed after the exit grace.",
     "description": "What the advanced setting \"Lane's end: exit command\" is for, and what goes wrong when it is wrong (Settings → Advanced). A lane is a card loop."
@@ -2398,6 +2406,18 @@
   "settings.connections.server.changeFailed": {
     "defaultMessage": "Couldn't change the connection",
     "description": "An error's title: changing a server connection failed (Settings → Connections)."
+  },
+  "settings.connections.server.cloud": {
+    "defaultMessage": "cloud",
+    "description": "Beside a model in a server connection's model list: its server runs it in the cloud (an Ollama cloud model, on ollama.com), not on this PC."
+  },
+  "settings.connections.server.cloudTip": {
+    "defaultMessage": "Runs in the cloud, not on this PC: this connection's sessions aren't free (local).",
+    "description": "Tooltip of \"cloud\" beside a model in a server connection's model list (an Ollama cloud model). \"free (local)\" is how Hive shows the cost of sessions run only on this PC."
+  },
+  "settings.connections.server.contextAdvice": {
+    "defaultMessage": "{name} recommends a context length of {size, number} tokens or more for {cli}, especially in larger repositories. Set it in {name}'s own settings: Hive doesn't change them.",
+    "description": "Under a server connection's preset (Add Connection): the service ({name}: \"Ollama\") recommends a context window of at least {size} tokens (64,000) for the coding agent CLI ({cli}: \"Claude Code\"). Advice, not a requirement Hive enforces."
   },
   "settings.connections.server.custom": {
     "defaultMessage": "Custom",

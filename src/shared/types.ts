@@ -722,6 +722,12 @@ export type ModelAlias = 'opus' | 'sonnet' | 'haiku'
 export interface ServerModel {
   id: string
   as?: ModelAlias[]
+  /**
+   * The server runs it elsewhere (HI-1773: an Ollama cloud model, reached through the server on this PC but run on
+   * ollama.com), so its sessions are never free (local). Kept in config only as its server's listing said; what main
+   * sends a window or a launch also has its preset's pattern applied, as set now (withRemote).
+   */
+  remote?: true
 }
 
 /**
@@ -2034,7 +2040,7 @@ export interface LiveSessionState {
     note?: 'offFallback' | 'unknownLogin' | 'loginChanged'
     /** Who it launched as (HI-1756: its plan usage is that login's), as plan usage keeps a login (a hash); absent: unknown. */
     login?: string
-    /** A server connection's (HI-1772): its models as launched, so the footer shows the real model and what it stands in for, and whether its server is on this PC. */
+    /** A server connection's (HI-1772): its models as launched, so the footer shows the real model and what it stands in for, and whether it runs only on this PC (its server is, and none of its models runs elsewhere: HI-1773). */
     server?: { models: ServerModel[]; local?: boolean }
   }
   /** A switch to the connection it would launch on now waits for its turn to be over (HI-1755). */

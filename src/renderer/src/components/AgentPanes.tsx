@@ -1476,7 +1476,7 @@ export function PaneFooter({
   // On a server connection (HI-1772): the server's real model, with the Claude names it stands in for, and no effort.
   const onServer = live?.launchedConnection?.server
   const serverModel = onServer ? serverModelOf(onServer.models, live?.modelId || usage?.model || a.model || serverDefaultModel(onServer.models) || '') : null
-  const model = serverModel?.id ? serverModelLabel(serverModel.id, serverModel.as, tr) : shown.label
+  const model = serverModel?.id ? serverModelLabel(serverModel.id, serverModel.as, tr, serverModel.remote) : shown.label
   // With no effort set or reported, the model's own default when the CLI said what it is ("Medium (default)", #125).
   const runModel = a.model || (pc.model && pc.model !== 'inherit' ? pc.model : ps.defaultModel) || providers[provider]?.defaultModel || null
   const effort = onServer ? null : effortLabel(provider, live?.effort, a.effort ?? pc.effort, ps.defaultEffort, modelCaps(provider, runModel, providers[provider], settings).defaultEffort, settings)

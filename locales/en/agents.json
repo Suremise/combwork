@@ -975,6 +975,14 @@
     "defaultMessage": "{model} (as {names})",
     "description": "A model of a server connection (Settings → Connections), with the Claude model names it stands in for. {model} is the server's model id (\"deepseek-flash\"); {names} the Claude names, joined (\"Opus, Sonnet\")."
   },
+  "agents.models.serverCloud": {
+    "defaultMessage": "{model} (cloud)",
+    "description": "A model of a server connection that its server runs in the cloud rather than on this PC (an Ollama cloud model). {model} is the model id (\"glm-4.6:cloud\")."
+  },
+  "agents.models.serverCloudAs": {
+    "defaultMessage": "{model} (cloud, as {names})",
+    "description": "A model of a server connection that its server runs in the cloud rather than on this PC (an Ollama cloud model), with the Claude model names it stands in for. {model} is the model id (\"glm-4.6:cloud\"); {names} the Claude names, joined (\"Opus, Sonnet\")."
+  },
   "agents.models.unavailableGroup": {
     "defaultMessage": "Not available to this account",
     "description": "A group of the model picker: models the CLI lists that the user's account can't use (shown, not offered)."

@@ -243,6 +243,8 @@
   "agents.models.olderGroup": "旧版本",
   "agents.models.providerGroup": "{provider} 模型",
   "agents.models.serverAs": "{model}（作为 {names}）",
+  "agents.models.serverCloud": "{model}（云端）",
+  "agents.models.serverCloudAs": "{model}（云端，作为 {names}）",
   "agents.models.unavailableGroup": "此账户不可用",
   "agents.name.empty": "请输入名称。",
   "agents.name.taken": "{project} 中已有名为“{agent}”的智能体。智能体名称在整个工作区内必须唯一：试试“{suggestion}”。",

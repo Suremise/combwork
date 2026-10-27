@@ -1,0 +1,12 @@
+Ollama 0.33.1, 27 Oct 2026 (HI-1773): the names of its cloud models, which run on ollama.com through the server on this PC, and of local ones.
+
+Cloud models, as Ollama's docs name them:
+- docs.ollama.com/cloud: "In the Ollama app or CLI, use `gemma4:cloud`."
+- docs.ollama.com/integrations/claude-code: gemma4:cloud, kimi-k2.7-code:cloud
+- ollama.com/blog/cloud-models (its earlier tags): "ollama run qwen3-coder:480b-cloud", "ollama pull gpt-oss:120b-cloud"; also gpt-oss:20b-cloud, deepseek-v3.1:671b-cloud
+
+Local models: GET http://localhost:11434/api/tags on the maintainer's PC (Ollama 0.33.1), each entry's "name" (no "remote_host"):
+qwen3.8:27b
+qwen3-coder-next:q4_K_M
+qwen3.6:35b-a3b
+devstral-small-2:24b

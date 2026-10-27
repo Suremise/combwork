@@ -3,6 +3,7 @@ import type { Connection, ModelAlias, ProviderId, ServerModel } from '@shared/ty
 import { providerDescriptor, type ServerPreset } from '@shared/providers'
 import { MODEL_ALIASES, parseBaseUrl, type ServerModelsRead } from '@shared/serverConnection'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
+import { serverModelLabel } from '@shared/models'
 import { call, errorMessage } from '../api'
 import { confirm, notify } from '../store'
 import { Icon, Modal } from './ui'
@@ -25,6 +26,9 @@ const M = {
   custom: msg({ id: 'settings.connections.server.custom', defaultMessage: 'Custom', description: "A choice of a server connection's preset: no preset, the user fills in the form." }),
   local: msg({ id: 'settings.connections.server.local', defaultMessage: '{name} (on this PC)', description: 'A preset of a server connection that runs on the user\'s own computer ({name}: "Ollama").' }),
   docs: msg({ id: 'settings.connections.server.docs', defaultMessage: 'Its setup is documented at {url}.', description: "Under a server connection's preset: where the service documents using it with the CLI. {url} is a web address." }),
+  contextAdvice: msg({ id: 'settings.connections.server.contextAdvice', defaultMessage: '{name} recommends a context length of {size, number} tokens or more for {cli}, especially in larger repositories. Set it in {name}\'s own settings: Hive doesn\'t change them.', description: 'Under a server connection\'s preset (Add Connection): the service ({name}: "Ollama") recommends a context window of at least {size} tokens (64,000) for the coding agent CLI ({cli}: "Claude Code"). Advice, not a requirement Hive enforces.' }),
+  cloud: msg({ id: 'settings.connections.server.cloud', defaultMessage: 'cloud', description: "Beside a model in a server connection's model list: its server runs it in the cloud (an Ollama cloud model, on ollama.com), not on this PC." }),
+  cloudTip: msg({ id: 'settings.connections.server.cloudTip', defaultMessage: "Runs in the cloud, not on this PC: this connection's sessions aren't free (local).", description: "Tooltip of \"cloud\" beside a model in a server connection's model list (an Ollama cloud model). \"free (local)\" is how Hive shows the cost of sessions run only on this PC." }),
   baseUrl: msg({ id: 'settings.connections.server.baseUrl', defaultMessage: 'Base URL', description: "Label of a server connection's base URL (Settings → Connections), such as https://api.deepseek.com/anthropic." }),
   key: msg({ id: 'settings.connections.server.key', defaultMessage: 'API key', description: "Label of a server connection's API key box (Settings → Connections)." }),
   keyHint: msg({ id: 'settings.connections.server.keyHint', defaultMessage: "Stored encrypted for your Windows account, never shown again. The agent's commands can read it from their environment.", description: "Under a server connection's API key box: how Hive keeps the key, and that an agent running on it can read it (it is in the agent's environment)." }),
@@ -118,13 +122,14 @@ export function ServerModelsEditor({ models, onChange, disabled }: { models: Ser
   const toggle = (i: number, a: ModelAlias): void => {
     const on = !models[i].as?.includes(a)
     // A name moves to the model ticked: it runs one model only.
-    onChange(models.map((m, j) => ({ id: m.id, as: j === i ? (on ? MODEL_ALIASES.filter((x) => x === a || m.as?.includes(x)) : (m.as ?? []).filter((x) => x !== a)) : (m.as ?? []).filter((x) => !(on && x === a)) })))
+    onChange(models.map((m, j) => ({ ...m, as: j === i ? (on ? MODEL_ALIASES.filter((x) => x === a || m.as?.includes(x)) : (m.as ?? []).filter((x) => x !== a)) : (m.as ?? []).filter((x) => !(on && x === a)) })))
   }
   return (
     <div className="server-models" data-server-models>
       {models.map((m, i) => (
         <div key={i} className="server-model-row flex" data-model={m.id}>
           <input className="input" value={m.id} disabled={disabled} placeholder={tr(M.modelId)} aria-label={tr(M.modelId)} spellCheck={false} onChange={(e) => set(i, { ...m, id: e.target.value })} />
+          {m.remote && <span className="muted" data-cloud title={tr(M.cloudTip)}>{tr(M.cloud)}</span>}
           {MODEL_ALIASES.map((a) => (
             <label key={a} className="flex server-model-alias">
               <input type="checkbox" disabled={disabled} checked={!!m.as?.includes(a)} onChange={() => toggle(i, a)} /> {ALIAS_NAME[a]}
@@ -200,7 +205,8 @@ export function AddConnectionDialog({ cli, onClose, onSignIn }: { cli: ProviderI
     }
   }
   const cliName = providerDescriptor(cli).name
-  const docs = presets.find((x) => x.id === preset)?.docs
+  const chosen = presets.find((x) => x.id === preset)
+  const docs = chosen?.docs
   return (
     <Modal
       title={tr(M.addTitle, { cli: cliName })}
@@ -236,6 +242,7 @@ export function AddConnectionDialog({ cli, onClose, onSignIn }: { cli: ProviderI
               {presets.map((p) => <option key={p.id} value={p.id}>{presetLabel(p)}</option>)}
             </select>
             {docs && <div className="hint span2">{tr(M.docs, { url: docs })}</div>}
+            {chosen?.contextAdvice && <div className="hint span2" data-context-advice>{tr(M.contextAdvice, { name: chosen.name, size: chosen.contextAdvice, cli: cliName })}</div>}
             <label htmlFor="conn-url">{tr(M.baseUrl)}</label>
             <input id="conn-url" className="input" value={baseUrl} disabled={busy} spellCheck={false} placeholder="https://" /* i18n-ignore: a URL's scheme */ onChange={(e) => setBaseUrl(e.target.value)} />
             <label htmlFor="conn-key">{tr(M.key)}</label>
@@ -362,7 +369,7 @@ export function ServerConnectionDetail({ c, keyLast4, onSetUp }: { c: Connection
   return (
     <div className="server-detail" data-server={c.id}>
       <div className="account-ident muted" data-server-line>{line}</div>
-      {models.length > 0 && <div className="muted server-models-line">{models.map((m) => (m.as?.length ? `${m.id} (${m.as.map((a) => ALIAS_NAME[a]).join(', ')})` : m.id)).join(' · ')}</div>}
+      {models.length > 0 && <div className="muted server-models-line" data-server-models-line>{models.map((m) => serverModelLabel(m.id, m.as ?? [], tr, m.remote)).join(' · ')}</div>}
       {!keyLast4 && !local && <div className="account-warning" data-warning="noKey"><Icon name="warning" /> {tr(M.needsKey)}</div>}
       <div className="server-actions flex">
         <button className="btn subtle small" data-key-action onClick={() => setDialog('key')}>{tr(keyLast4 ? M.replaceKey : M.setKey)}</button>

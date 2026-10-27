@@ -9,6 +9,7 @@ import { acceptable, accountState, resolveConnection, workspaceAccounts, switche
 import { profileFolder } from '../shared/appName'
 import { isProviderEnabled, providerDescriptor, PROVIDERS } from '../shared/providers'
 import { msg, type Msg } from '../shared/i18n'
+import { advanced } from './advanced'
 import { config } from './config'
 import { emit, onHiveEvent } from './events'
 import { hiveError } from './hiveError'
@@ -22,7 +23,7 @@ import { providerService } from './providerService'
 import { openWorkspaces, setNewWorkspaceExtras, workspace, workspaceOf } from './workspace'
 import { dropKeysExcept, keyInfo, loadKeys, removeKey, withKey } from './keyStore'
 import { coverageView } from './keyCoverage'
-import { aliasModels, MODEL_ALIASES, originOf, parseBaseUrl, serverDefaultModel } from '../shared/serverConnection'
+import { aliasModels, MODEL_ALIASES, originOf, parseBaseUrl, serverDefaultModel, withRemote } from '../shared/serverConnection'
 import type { ServerCaps } from '../shared/providers'
 
 /**
@@ -853,7 +854,7 @@ export function accountsView(check = false): ConnectionsView {
     const k = isServer(a) ? keyInfo(a.id) : undefined
     return k && k.origin === originOf(a.server?.baseUrl ?? '') ? { key: { last4: k.last4, at: k.at } } : {}
   }
-  return { preview: true, providers, connections: all.map((a) => ({ ...a, signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a) })), workspace: ws, testHome, masking: coverageView() }
+  return { preview: true, providers, connections: all.map((a) => ({ ...shownServer(a), signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a) })), workspace: ws, testHome, masking: coverageView() }
 }
 
 /** Saves the asking window's workspace's accounts for a provider, worked out from how they are when it is written. */
@@ -934,7 +935,8 @@ export interface LaunchConnection {
   /**
    * A server connection's (HI-1772): the variables its launch gets (its server, its models, its key: secret, given to
    * that launch's environment only and never kept), its models for the footer, and its key's use for masking, ended
-   * by whoever holds the launch once its process is gone (or it never started).
+   * by whoever holds the launch once its process is gone (or it never started); `local`, it runs only on this PC
+   * (runsLocally).
    */
   server?: { env: Record<string, string>; models: ServerModel[]; local: boolean }
   /**
@@ -983,6 +985,36 @@ export function serverEnv(caps: ServerCaps, server: ServerConnection, key: strin
 }
 
 /**
+ * Whether a model id is one a server connection's preset says its server runs elsewhere (HI-1773: an Ollama cloud
+ * model), by the preset's advanced pattern; false for a preset with none, or none chosen.
+ */
+export function remoteModelTest(caps: ServerCaps, preset: string | undefined): (id: string) => boolean {
+  const setting = caps.presets.find((p) => p.id === preset)?.remoteModels
+  if (!setting) return () => false
+  const re = advanced.pattern(setting)
+  return (id) => re.test(id)
+}
+
+/** A server connection's models as they run now (HI-1773): its listing's marks, and its preset's pattern as set now. */
+export function effectiveModels(caps: ServerCaps, server: ServerConnection): ServerModel[] {
+  return withRemote(server.models, remoteModelTest(caps, server.preset))
+}
+
+/**
+ * Whether a server connection runs only on this PC (HI-1773): its server is, and none of its models is one the server
+ * runs elsewhere (effectiveModels). Its sessions are then free (local).
+ */
+export function runsLocally(caps: ServerCaps, server: ServerConnection, local: boolean): boolean {
+  return local && !effectiveModels(caps, server).some((m) => m.remote)
+}
+
+/** A connection as a window sees it: a server connection's models as they run now (effectiveModels). */
+function shownServer(a: Connection): Connection {
+  const caps = a.server ? providerDescriptor(a.provider).capabilities.connections?.server : undefined
+  return caps && a.server ? { ...a, server: { ...a.server, models: effectiveModels(caps, a.server) } } : a
+}
+
+/**
  * A server connection's part of a launch (HI-1772): its key decrypted for this launch's environment (refused without
  * one, unless its server is this machine's), and that key masked from now until the launch's process is gone.
  */
@@ -991,7 +1023,7 @@ async function serverPart(a: Connection, caps: ServerCaps, agentName: string): P
   if (!a.server || !b.ok) throw hiveError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
   const got = await withKey(a.id, b.origin)
   if (!got && !b.local) throw hiveError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
-  return { part: { env: serverEnv(caps, a.server, got?.key ?? null), models: a.server.models, local: b.local }, keyV: got?.v ?? null, origin: b.origin }
+  return { part: { env: serverEnv(caps, a.server, got?.key ?? null), models: effectiveModels(caps, a.server), local: runsLocally(caps, a.server, b.local) }, keyV: got?.v ?? null, origin: b.origin }
 }
 
 /**
@@ -1162,5 +1194,14 @@ export function initConnections(): void {
   })
   onHiveEvent((e) => {
     if (e.type === 'workspace-changed') syncWatches()
+  })
+  // The patterns of models a server runs elsewhere (HI-1773): a change re-marks the models windows show.
+  const patterns = (): string => PROVIDERS.flatMap((p) => p.capabilities.connections?.server?.presets ?? []).map((p) => (p.remoteModels ? advanced.pattern(p.remoteModels).source : '')).join('\n')
+  let shown = patterns()
+  advanced.onChange(() => {
+    const now = patterns()
+    if (now === shown) return
+    shown = now
+    emit({ type: 'connections-changed' })
   })
 }

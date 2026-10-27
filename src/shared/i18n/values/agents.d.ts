@@ -245,6 +245,8 @@ interface HiveMessageValues {
   'agents.models.olderGroup': undefined
   'agents.models.providerGroup': { provider: string | number }
   'agents.models.serverAs': { model: string | number; names: string | number }
+  'agents.models.serverCloud': { model: string | number }
+  'agents.models.serverCloudAs': { model: string | number; names: string | number }
   'agents.models.unavailableGroup': undefined
   'agents.name.empty': undefined
   'agents.name.taken': { agent: string | number; project: string | number; suggestion: string | number }

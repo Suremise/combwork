@@ -39,12 +39,14 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
   fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
   fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }] }))
 
-  // A local server standing in for Ollama: its model list (/api/tags), the Authorization header it got recorded.
+  // A local server standing in for Ollama: its model list (/api/tags), the Authorization header it got recorded. A cloud
+  // model (HI-1773) has remote_host, as Ollama's ListModelResponse does.
   const asked = []
+  let tags = [{ name: 'qwen3:8b' }, { name: 'devstral:24b' }]
   const stub = http.createServer((req, res) => {
     asked.push({ url: req.url, auth: req.headers.authorization ?? null })
     res.writeHead(req.url === '/api/tags' ? 200 : 404, { 'content-type': 'application/json' })
-    res.end(req.url === '/api/tags' ? JSON.stringify({ models: [{ name: 'qwen3:8b' }, { name: 'devstral:24b' }] }) : '{}')
+    res.end(req.url === '/api/tags' ? JSON.stringify({ models: tags }) : '{}')
   })
   await new Promise((r) => stub.listen(0, '127.0.0.1', r))
   const port = stub.address().port
@@ -150,7 +152,38 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     await page.locator('.settings-nav .row[data-section="accounts"]').click()
     check('…its row says it is on this PC, with no key', !!(await lib.until(async () => (await row('Ollama').innerText().catch(() => '')).includes(`127.0.0.1:${port} · On this PC, no key`), HUNG_MS)))
     await shots('local')
+
+    // --- Ollama's preset (HI-1773): its Claude Code guide, and its recommended context length as advice.
+    await page.locator('[data-add="claude-code"]').click()
+    await page.locator('[data-from="server"]').check()
+    await page.locator('#conn-preset').selectOption('ollama')
+    check("the Ollama preset recommends Ollama's context length, as advice", !!(await lib.until(async () => (await page.locator('[data-context-advice]').innerText().catch(() => '')).includes('Ollama recommends a context length of 64,000 tokens or more for Claude Code'), HUNG_MS)))
+    check('…and links its Claude Code guide', (await page.locator('.server-form').innerText()).includes('https://docs.ollama.com/integrations/claude-code'))
+    await shots('ollama-preset')
+    await page.keyboard.press('Escape')
+    await lib.until(async () => (await page.locator('#conn-preset').count()) === 0, HUNG_MS)
+
+    // --- A cloud model Ollama lists (HI-1773, Darren 27 Oct): marked cloud, and the connection no longer free (local).
+    tags = [{ name: 'qwen3:8b' }, { name: 'devstral:24b' }, { name: 'mine', model: 'mine', remote_model: 'glm-4.6', remote_host: 'https://ollama.com:443' }]
+    await inv('session:stop', alpha, 'a-two')
+    await row('Ollama').locator('[data-read-models]').click()
+    check("a model Ollama runs in the cloud is marked so in its row, whatever its name", !!(await lib.until(async () => (await row('Ollama').locator('[data-server-models-line]').innerText().catch(() => '')).includes('mine (cloud)'), HUNG_MS)), await row('Ollama').innerText().catch(() => ''))
+    await shots('cloud')
+    // The pattern for typed models, changed in Settings → Advanced: the row follows at once, both ways, with nothing
+    // edited or read again (HI-1773 round 1).
+    const modelsLine = () => row('Ollama').locator('[data-server-models-line]').innerText().catch(() => '')
+    await inv('advanced:set', 'claude-code.connections.remoteModels', '^devstral:')
+    check('…a pattern set in Advanced marks a typed model cloud at once', !!(await lib.until(async () => (await modelsLine()).includes('devstral:24b (cloud)'), HUNG_MS)), await modelsLine())
+    await inv('advanced:set', 'claude-code.connections.remoteModels', null)
+    check('…and set back, unmarks it, the listed mark kept', !!(await lib.until(async () => !(await modelsLine()).includes('devstral:24b (cloud)') && (await modelsLine()).includes('mine (cloud)'), HUNG_MS)), await modelsLine())
     await closeSettings()
+    await inv('session:start', alpha, { agentId: 'a-two' })
+    check('Two launches again on it, as not only on this PC', !!(await lib.until(async () => (await live('a-two'))?.launchedConnection?.server?.local === false, HUNG_MS)), JSON.stringify((await live('a-two'))?.launchedConnection))
+    await lib.until(async () => ['idle', 'ready'].includes((await live('a-two'))?.status), HUNG_MS)
+    await lib.sendPrompt(inv, lib.ptyKey(alpha, 'a-two'), 'statusmodel mine', { submitted: async () => (await live('a-two'))?.modelId === 'mine' })
+    check('…its footer names the model as cloud', !!(await lib.until(async () => (await twoPane.locator('.foot-model').innerText().catch(() => '')).includes('mine (cloud)'), HUNG_MS)), await twoPane.locator('.foot-model').innerText().catch(() => ''))
+    check('…its turn over, not free', !!(await lib.until(async () => ['idle', 'ready', 'finished'].includes((await live('a-two'))?.status), HUNG_MS)) && (await live('a-two'))?.costFree !== true && (await twoPane.locator('.foot-cost[data-cost="free"]').count()) === 0)
+    await shots('cloud-footer')
     await inv('session:stop', alpha, 'a-two')
 
     // --- The key is nowhere else: not in the log, config, diagnostics or the window's console, never in plain text in its store.

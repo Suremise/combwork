@@ -125,6 +125,8 @@ export interface AdvancedSample {
   fields?: string[]
   /** For a value Hive gives the CLI: what the recording shows of it taking the value. */
   shows?: string
+  /** What was recorded, where it isn't the group's CLI (HI-1773: "Ollama", a server a preset reaches); `version` is its. */
+  source?: string
 }
 
 /** A value as written below: its text as messages. */
@@ -1199,6 +1201,22 @@ const SOURCES: readonly AdvancedSource[] = [
       { from: `${FIX}/advanced/ambient-auth-claude-2.1.311.txt`, version: '2.1.311', text: 'ANTHROPIC_API_KEY', shows: 'A key in the environment taken as a login over a connection home that never signed in' }, // i18n-ignore: a CLI's recorded text (#367)
       { from: `${FIX}/advanced/ambient-auth-claude-2.1.311.txt`, version: '2.1.311', text: 'CLAUDE_CODE_USE_BEDROCK', shows: 'A third-party provider switch in the environment taken over a connection home' }, // i18n-ignore: a CLI's recorded text (#367)
       { from: `${FIX}/advanced/ambient-auth-claude-2.1.311.txt`, version: '2.1.311', text: 'ANTHROPIC_CUSTOM_HEADERS', shows: "Request headers from the environment sent with every request to the connection's server" } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  {
+    id: 'claude-code.connections.remoteModels',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.connections.remoteModels.title', defaultMessage: 'Connections: Ollama cloud models', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Ollama is a product's name; its cloud models run on ollama.com." }),
+    desc: msg({ id: 'settings.advanced.claude-code.connections.remoteModels.desc', defaultMessage: "The model names Ollama runs on ollama.com rather than on this PC (its cloud models, such as gpt-oss:120b-cloud), as a regular expression, for an Ollama connection's models typed in rather than read from Ollama (Read Models asks Ollama, which says). Such a connection's sessions aren't free (local). Wrong, a cloud model typed in is counted as free, or a local one as not free.", description: 'What the advanced setting "Connections: Ollama cloud models" is for, and what goes wrong when it is wrong (Settings → Advanced). Ollama, ollama.com and Read Models (a button) are names; "free (local)" is how Hive shows the cost of sessions run only on this PC.' }),
+    kind: 'pattern',
+    // A tag of `cloud`, or one ending in `-cloud` (Ollama's earlier cloud models), never a name's own `-cloud`.
+    default: String.raw`:(?:[\w.]+-)?cloud$`,
+    flags: 'i',
+    applies: 'sessions',
+    samples: [
+      { from: `${FIX}/advanced/ollama-cloud-models-0.33.1.txt`, version: '0.33.1', source: 'Ollama', text: 'gemma4:cloud' }, // i18n-ignore: a server's recorded text (#367)
+      { from: `${FIX}/advanced/ollama-cloud-models-0.33.1.txt`, version: '0.33.1', source: 'Ollama', text: 'kimi-k2.7-code:cloud' }, // i18n-ignore: a server's recorded text (#367)
+      { from: `${FIX}/advanced/ollama-cloud-models-0.33.1.txt`, version: '0.33.1', source: 'Ollama', text: 'gpt-oss:120b-cloud' } // i18n-ignore: a server's recorded text (#367)
     ]
   },
   {
@@ -2341,7 +2359,7 @@ export function sampleMissText(def: AdvancedDef, value: unknown): Text | null {
   const samples = def.samples ?? []
   if (!samples.length || samples.some((s) => reads(def, value, s))) return null
   const s = samples.filter((x) => !x.shows)[0] ?? samples[samples.length - 1]
-  const cli = groupName(def.group)
+  const cli = s.source ?? groupName(def.group)
   if (def.kind === 'list' && Array.isArray(value) && s.fields)
     return withValues(
       msg({ id: 'settings.advanced.miss.list', defaultMessage: '{cli} {version} sent {missing}, which this list doesn\'t have (it sent {fields}). Fine if {cli} has changed since.', description: "Under an advanced setting listing the fields Hive knows a CLI sends, when the CLI was recorded sending one it leaves out (Settings → Advanced). {cli} is the CLI's name, {version} its version; {missing} and {fields} are field names, as the CLI sends them." }),

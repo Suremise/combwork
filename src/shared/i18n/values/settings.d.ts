@@ -77,6 +77,8 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.accounts.planField.title': undefined
   'settings.advanced.claude-code.accounts.statusSeconds.desc': undefined
   'settings.advanced.claude-code.accounts.statusSeconds.title': undefined
+  'settings.advanced.claude-code.connections.remoteModels.desc': undefined
+  'settings.advanced.claude-code.connections.remoteModels.title': undefined
   'settings.advanced.claude-code.exit.command.desc': undefined
   'settings.advanced.claude-code.exit.command.title': undefined
   'settings.advanced.claude-code.exit.graceSeconds.desc': { took: number }
@@ -601,6 +603,9 @@ interface HiveMessageValues {
   'settings.connections.server.addModel': undefined
   'settings.connections.server.baseUrl': undefined
   'settings.connections.server.changeFailed': undefined
+  'settings.connections.server.cloud': undefined
+  'settings.connections.server.cloudTip': undefined
+  'settings.connections.server.contextAdvice': { name: string | number; size: number; cli: string | number }
   'settings.connections.server.custom': undefined
   'settings.connections.server.docs': { url: string | number }
   'settings.connections.server.edit': undefined
