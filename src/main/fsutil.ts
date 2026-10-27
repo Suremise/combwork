@@ -280,8 +280,11 @@ export function realPath(p: string): string {
  */
 export const placeKey = (p: string): string => realPath(p).toLowerCase()
 
-/** Whether two paths are the same place (`placeKey`). */
-export const samePlace = (a: string, b: string): boolean => placeKey(a) === placeKey(b)
+/**
+ * Whether two paths are the same place (`placeKey`). Spelt the same, they are, with no look at the disk (HI-1783: a
+ * check's resolve compared its folders this way, a realpath each on main's thread, a few ms apiece).
+ */
+export const samePlace = (a: string, b: string): boolean => resolve(a).toLowerCase() === resolve(b).toLowerCase() || placeKey(a) === placeKey(b)
 
 /**
  * A test for whether a path is the place `folder` is, for matching the cwd a CLI recorded with Hive's spelling of a

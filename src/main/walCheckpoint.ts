@@ -1,4 +1,5 @@
 import { existsSync, statSync } from 'original-fs'
+import { stat } from 'original-fs/promises'
 import { basename, join } from 'path'
 import { Worker } from 'worker_threads'
 import type { DatabaseSync } from 'node:sqlite'
@@ -318,11 +319,18 @@ export const SLOW_COMMIT_MS = 100
  * in the log whichever it is.
  */
 export function timedCommit(db: DatabaseSync, file: string): void {
-  const before = walStat(file).size
+  // The WAL's size as the commit starts, read on the thread pool (HI-1783: a stat here on main's thread, before every
+  // commit, cost it a few ms each on Windows), taken only for a slow commit's line: the pool reads it at once, while
+  // a commit slow enough to be logged has barely begun.
+  const before = stat(`${file}-wal`).then(
+    (s) => s.size,
+    () => 0
+  )
   const t = performance.now()
   timedStep(`db commit ${basename(file)}`, () => db.exec('COMMIT'))
   const ms = performance.now() - t
   if (ms < SLOW_COMMIT_MS) return
   const mb = (n: number): string => (n / 1048576).toFixed(1)
-  log.warn(`a commit to ${basename(file)} took ${Math.round(ms)} ms on main's thread (WAL ${mb(before)} MB before, ${mb(walStat(file).size)} MB after; ${checkpointsInCommits(db) ? 'SQLite checkpoints it in commits' : 'checkpointed when idle'})`)
+  const auto = checkpointsInCommits(db)
+  void Promise.all([before, stat(`${file}-wal`).then((s) => s.size, () => 0)]).then(([b, a]) => log.warn(`a commit to ${basename(file)} took ${Math.round(ms)} ms on main's thread (WAL ${mb(b)} MB before, ${mb(a)} MB after; ${auto ? 'SQLite checkpoints it in commits' : 'checkpointed when idle'})`))
 }
