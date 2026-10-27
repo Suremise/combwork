@@ -10,7 +10,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.hiveMerges' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.hiveMerges' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -215,7 +215,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   ),
   'review.headMoved': r(
     msg({ id: 'workflow.refused.review.headMoved.message', defaultMessage: "{card}'s line has moved since it was submitted: it was submitted at {submitted}, and its head is now {head}, a different change. A pass covers only the revision submitted.", description: "A refused passing verdict (HI-1763): the card's branch has new commits since the revision under review (a follow-up, say). {card} is the card's key; {submitted} and {head} are commits' short hashes." }),
-    msg({ id: 'workflow.refused.review.headMoved.next', defaultMessage: 'Give a failing verdict saying so (hive_verdict, pass: false): its builder then submits {head}, which is reviewed as any submission.', description: "The next step after a pass refused because the branch moved on (HI-1763): fail the review so the builder submits the new commit. {head} is a commit's short hash; keep the tool name and its argument as they are." })
+    msg({ id: 'workflow.refused.review.headMoved.next', defaultMessage: 'A commit you asked for: ask its builder to submit {head} as a follow-up (hive_request_builder), which keeps it in Review with no round counted, then start your review again. Otherwise give a failing verdict saying so (hive_verdict, pass: false), and its builder submits it as the next round.', description: "The next step after a pass refused because the branch moved on (HI-1763, HI-1832): a commit the reviewer asked for is submitted by the builder as a follow-up (the card stays in Review, no round counted) and reviewed again; any other is failed so the builder submits it as a new round. {head} is a commit's short hash; keep the tool names and the argument as they are." })
   ),
   // Submitting is "submit for review": it hands committed work to review and never commits it (HI-1618, Darren's
   // decision): what is missing is said in git's words, and committing stays the user's call.
@@ -231,6 +231,11 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'submit.sameRevisionNote': r(
     msg({ id: 'workflow.refused.submit.sameRevisionNote.message', defaultMessage: '{revision} was already reviewed.', description: 'A refused submit: the same revision again without a note.' }),
     msg({ id: 'workflow.refused.submit.sameRevisionNote.next', defaultMessage: 'Submit it again with a note saying what changed in your answer, or commit a new revision.', description: 'The next step when submitting a reviewed revision again.' })
+  ),
+  // HI-1832: a follow-up in Review is its builder's (or the user's, the Assistant's): another agent's would move the review.
+  'submit.followUpNotBuilder': r(
+    msg({ id: 'workflow.refused.submit.followUpNotBuilder.message', defaultMessage: "{card}'s follow-up is its builder's to submit: you aren't building it.", description: 'A refused follow-up submission (HI-1832: a commit its reviewer asked for, submitted while the card is in Review): only the agent building the card submits one. {card} is a card key.' }),
+    msg({ id: 'workflow.refused.submit.followUpNotBuilder.next', defaultMessage: 'Leave it to its builder, or say what you found in a comment.', description: "The next step after a follow-up submission refused because the agent is not the card's builder (HI-1832)." })
   ),
   'evidence.changed': r(
     msg({ id: 'workflow.refused.evidence.changed.message', defaultMessage: 'What Hive read for {card} changed while it decided.', description: "A refused intent: a branch head, a file or another card the rule depends on changed between Hive's reading it and recording the move. {card} is a card key." }),
@@ -291,7 +296,8 @@ export const NOTHING_FROM_HERE = msg({ id: 'workflow.refused.move.notFromHere.ne
  */
 export const SIDE_NEXT = {
   reviewer: msg({ id: 'workflow.refused.move.notFromHere.nextReviewer', defaultMessage: '{back, select, yes {Its review is over: it went back for more work. Leave it where it is, with no verdict, and wait for it to come back to Review.} other {Its review is over: it has moved on from Review. Leave it where it is, with no verdict.}}', description: "The next step after a reviewer's review or verdict was refused because the card is no longer in Review (#1604): its review ended. back (select): yes when the card went back to be worked on (Todo or Active), other when it moved on (approved, merged). Review is a stage name: use it as Hive shows it. Read by agents and shown in the window alike: it names no one. Translate each sentence." }),
-  builder: msg({ id: 'workflow.refused.move.notFromHere.nextBuilder', defaultMessage: "It waits for its reviewer's verdict: wait for that, which brings it back if there is more to do.", description: "The next step after a card's builder was refused a move while the card waits in Review for its reviewer (#1604): the review's verdict comes first. Read by agents and shown in the window alike: it names no one." })
+  builder: msg({ id: 'workflow.refused.move.notFromHere.nextBuilder', defaultMessage: "It waits for its reviewer's verdict: wait for that, which brings it back if there is more to do.", description: "The next step after a card's builder was refused a move while the card waits in Review for its reviewer (#1604): the review's verdict comes first. Read by agents and shown in the window alike: it names no one." }),
+  builderSubmit: msg({ id: 'workflow.refused.move.notFromHere.nextBuilderSubmit', defaultMessage: "A change asked for while it is in Review, committed: submit it again with followUp: true, which keeps it in Review for its reviewer to check. Anything else waits for its reviewer's verdict.", description: "The next step after a card's builder submitted it again while it waits in Review (HI-1832): the verdict comes first, but a change the reviewer asked for is submitted as a follow-up. followUp is the tool's option, as agents type it: keep it as it is. Read by agents and shown in the window alike: it names no one." })
 } satisfies Record<string, Msg>
 
 /**

@@ -103,6 +103,7 @@
   "tasks.history.decisionsTold": "已告知 {agent} {count, plural, other {# 个新决定}}",
   "tasks.history.dependsOn": "依赖 {cards}",
   "tasks.history.description": "更改了描述",
+  "tasks.history.followUpSubmitted": "已在 {revision} 提交后续修改供评审",
   "tasks.history.fromOlder": "从旧版 Hive 添加，在那里创建时编号为 #{was}",
   "tasks.history.given": "交给了 {agent}",
   "tasks.history.imported": "随 {project} 一起恢复（原为 #{was}）",

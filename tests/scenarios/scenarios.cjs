@@ -2941,7 +2941,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'card-loop-follow-up',
-    title: "A card loop builder asked for a change its reviewer checks, on a card in Review (#1467): it arms its watch and posts a follow-up with hive_loop_step, not a comment",
+    title: "A card loop builder asked for a commit its reviewer checks, on a card in Review (HI-1832, #1467): it submits it with hive_submit followUp, the card staying in Review and its own, no round counted",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       await pairInProject(c)
@@ -2963,16 +2963,15 @@ module.exports.SCENARIOS = [
     prompt: (c) =>
       `You are the builder of card #${c.cards.f} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). The card is in Review. The user asked for one change for Implementer to check: greet.js trims the name. You have made it and committed it (${c.commit}). Hand it to your reviewer as your loop says.`,
     fake: (c) =>
-      `skill card-loop then hive hive_wait_for_tasks {"cards":[${c.cards.f}],"changes":["comment","column","verdict"],"wake":true,"limitMinutes":360} then hive hive_loop_step ${JSON.stringify({ card: `#${c.cards.f}`, step: 'followUp', text: `Follow-up ready: greet.js trims the name, at ${c.commit}.` })}`,
+      `skill card-loop then hive hive_submit ${JSON.stringify({ card: `#${c.cards.f}`, summary: `Follow-up: greet.js trims the name, at ${c.commit}.`, followUp: true })}`,
     expect: (o) => {
       const tools = o.hiveCalls.map((x) => x.tool)
-      const watchAt = tools.indexOf('hive_wait_for_tasks')
-      const postAt = tools.findIndex((t, i) => t === 'hive_loop_step' && argsOf(o.hiveCalls[i]).step === 'followUp')
+      const subs = factsOf(o, 'f', 'Submitted')
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
-        ['posted a follow-up with hive_loop_step (a LoopStep fact)', postAt >= 0 && factsOf(o, 'f', 'LoopStep').some((f) => f.data.step === 'followUp'), tools.join(',')],
-        ['armed its watch on the card before posting it', watchAt >= 0 && postAt > watchAt, tools.join(',')],
-        ['the card stays in Review, not submitted again', o.cards.f?.column === 'review' && factsOf(o, 'f', 'Submitted').length === 1, `${o.cards.f?.column}, ${factsOf(o, 'f', 'Submitted').length} submissions`]
+        ['submitted it with hive_submit followUp (a second Submitted fact, a follow-up)', tools.some((t, k) => t === 'hive_submit' && argsOf(o.hiveCalls[k]).followUp === true) && subs.length === 2 && subs[1].data.followUp === true, tools.join(',')],
+        ['the card stays in Review, its own, in the same round', o.cards.f?.column === 'review' && o.cards.f?.agentName === 'Coder' && subs.length === 2 && subs[1].data.round === subs[0].data.round, `${o.cards.f?.column}, ${o.cards.f?.agentName}, ${subs.map((x) => x.data.round).join(',')}`],
+        ['posted no loop step for it', !factsOf(o, 'f', 'LoopStep').length, tools.join(',')]
       ]
     }
   },

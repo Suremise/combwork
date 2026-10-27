@@ -103,6 +103,7 @@
   "tasks.history.decisionsTold": "Avisou o agente {agent} de {count, plural, =0 {# novas decisões} one {# nova decisão} other {# novas decisões}}",
   "tasks.history.dependsOn": "Depende de {cards}",
   "tasks.history.description": "Alterou a descrição",
+  "tasks.history.followUpSubmitted": "Ajuste enviado para revisão em {revision}",
   "tasks.history.fromOlder": "Adicionado de um Hive mais antigo, onde foi criado como #{was}",
   "tasks.history.given": "Entregue ao agente {agent}",
   "tasks.history.imported": "Trazido de volta com o projeto {project} (era #{was})",

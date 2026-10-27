@@ -1083,6 +1083,10 @@
     "defaultMessage": "It waits for its reviewer's verdict: wait for that, which brings it back if there is more to do.",
     "description": "The next step after a card's builder was refused a move while the card waits in Review for its reviewer (#1604): the review's verdict comes first. Read by agents and shown in the window alike: it names no one."
   },
+  "workflow.refused.move.notFromHere.nextBuilderSubmit": {
+    "defaultMessage": "A change asked for while it is in Review, committed: submit it again with followUp: true, which keeps it in Review for its reviewer to check. Anything else waits for its reviewer's verdict.",
+    "description": "The next step after a card's builder submitted it again while it waits in Review (HI-1832): the verdict comes first, but a change the reviewer asked for is submitted as a follow-up. followUp is the tool's option, as agents type it: keep it as it is. Read by agents and shown in the window alike: it names no one."
+  },
   "workflow.refused.move.notFromHere.nextNone": {
     "defaultMessage": "Nothing waits to be done there now.",
     "description": "The next step after a refused move when nothing is possible from the card's stage (the request it answered is no longer open)."
@@ -1152,8 +1156,8 @@
     "description": "A refused passing verdict (HI-1763): the card's branch has new commits since the revision under review (a follow-up, say). {card} is the card's key; {submitted} and {head} are commits' short hashes."
   },
   "workflow.refused.review.headMoved.next": {
-    "defaultMessage": "Give a failing verdict saying so (hive_verdict, pass: false): its builder then submits {head}, which is reviewed as any submission.",
-    "description": "The next step after a pass refused because the branch moved on (HI-1763): fail the review so the builder submits the new commit. {head} is a commit's short hash; keep the tool name and its argument as they are."
+    "defaultMessage": "A commit you asked for: ask its builder to submit {head} as a follow-up (hive_request_builder), which keeps it in Review with no round counted, then start your review again. Otherwise give a failing verdict saying so (hive_verdict, pass: false), and its builder submits it as the next round.",
+    "description": "The next step after a pass refused because the branch moved on (HI-1763, HI-1832): a commit the reviewer asked for is submitted by the builder as a follow-up (the card stays in Review, no round counted) and reviewed again; any other is failed so the builder submits it as a new round. {head} is a commit's short hash; keep the tool names and the argument as they are."
   },
   "workflow.refused.review.noSubmission.message": {
     "defaultMessage": "{card} has nothing submitted to review.",
@@ -1250,6 +1254,14 @@
   "workflow.refused.submit.empty.next": {
     "defaultMessage": "Commit the card's work, then submit for review. If the user didn't ask you to commit, ask them.",
     "description": "The next step after a refused submit for review with nothing committed, addressed to the agent: committing is the user's call."
+  },
+  "workflow.refused.submit.followUpNotBuilder.message": {
+    "defaultMessage": "{card}'s follow-up is its builder's to submit: you aren't building it.",
+    "description": "A refused follow-up submission (HI-1832: a commit its reviewer asked for, submitted while the card is in Review): only the agent building the card submits one. {card} is a card key."
+  },
+  "workflow.refused.submit.followUpNotBuilder.next": {
+    "defaultMessage": "Leave it to its builder, or say what you found in a comment.",
+    "description": "The next step after a follow-up submission refused because the agent is not the card's builder (HI-1832)."
   },
   "workflow.refused.submit.identity.change": {
     "defaultMessage": "This rule is set in Version Control → Commits use the project's identity.",

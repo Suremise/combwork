@@ -787,7 +787,7 @@ describe('a pass covers only the revision submitted; a stale pass says so (HI-17
     moved(await e.wf.loopStep(card.key, R1, 'ok', 'Checked', { ...reviewer, design: (posted as { data?: Record<string, unknown> }).data?.design as string }))
     const r = refusedBy(await e.wf.verdict(card.key, R1, { pass: true, comment: 'good' }), 'review.headMoved')
     expect(r.message).toBe(`${card.key}'s line has moved since it was submitted: it was submitted at ${submitted.slice(0, 7)}, and its head is now ${now.slice(0, 7)}, a different change. A pass covers only the revision submitted.`)
-    expect(r.next).toBe(`Give a failing verdict saying so (hive_verdict, pass: false): its builder then submits ${now.slice(0, 7)}, which is reviewed as any submission.`)
+    expect(r.next).toBe(`A commit you asked for: ask its builder to submit ${now.slice(0, 7)} as a follow-up (hive_request_builder), which keeps it in Review with no round counted, then start your review again. Otherwise give a failing verdict saying so (hive_verdict, pass: false), and its builder submits it as the next round.`)
     // Nothing silent: still in Review, no pass, no Stale, nothing queued.
     expect(e.wf.state(card)).toMatchObject({ stage: 'review', stale: null, verdicts: [] })
     expect(await e.queue().runOnce('main')).toBeNull()
@@ -826,5 +826,115 @@ describe('a pass covers only the revision submitted; a stale pass says so (HI-17
     expect(e.wf.queueLineOf(card.key)).toContain(`Its pass is for ${passed.slice(0, 7)}, but its line is at ${now.slice(0, 7)}`)
     expect(refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges').next).toBe(`Its pass is stale: its line changed since it was approved (it is at ${now.slice(0, 7)}). Submit it again for review; it is queued once that is approved.`)
     expect(await e.queue().runOnce('main')).toBeNull()
+  })
+})
+
+describe('a follow-up submitted in Review (HI-1832): the revision under review moves to it, no round counted, no one reassigned', () => {
+  const head = (folder: string): string => sh(folder, 'rev-parse', 'HEAD').trim()
+  /** A Pair card in Review at its first submission, R1 reviewing it, then a follow-up commit R1 asked for. */
+  async function inReview(e: Env, before?: (key: string) => Promise<void>) {
+    const c = await started(e)
+    moved(await e.wf.submit(c.card.key, B1, { summary: 'done' }))
+    const first = e.wf.state(c.card).latest!
+    moved(await e.wf.startReview(c.card.key, R1))
+    await before?.(c.card.key)
+    commit(c.folder, { 'src/asked.txt': 'what the reviewer asked for\n' }, 'follow-up')
+    return { ...c, first }
+  }
+
+  it("its builder submits it with followUp: a new submission at the head, pinned, in the same round, still in Review and its builder's; the reviewer woken to start again", async () => {
+    const e = pair()
+    const { card, folder, first } = await inReview(e)
+    const now = head(folder)
+    e.wakes.length = 0
+    const r = await e.wf.submit(card.key, B1, { summary: 'The change you asked for', followUp: true })
+    moved(r)
+    expect(r).toMatchObject({ from: 'review', to: 'review', data: { followUp: true, revision: now } })
+    const s = e.wf.state(card)
+    expect(s).toMatchObject({ stage: 'review', rounds: 0 })
+    expect(s.latest).toMatchObject({ revision: now, followUp: true, round: first.round })
+    expect(s.submissions).toHaveLength(2)
+    expect(s.started?.builder).toBe('B1')
+    // No move written, and its pin is the card's second.
+    expect(e.store.facts(card.id).filter((f) => f.kind === 'Moved').map((f) => (f.data as FactData['Moved']).to)).toEqual(['active', 'review'])
+    expect(sh(e.project, 'rev-parse', `refs/hive/cards/${card.key.toLowerCase()}/2`).trim()).toBe(now)
+    expect(e.wakes).toEqual([expect.objectContaining({ agent: 'reviewers', why: expect.stringContaining(`follow-up submitted for review at ${now.slice(0, 7)} (submission ${s.latest!.id}). Start your review again (hive_start_review)`) })])
+    // The review of the earlier submission doesn't carry: a verdict on it, or one not started on the follow-up, is refused.
+    // (A pass on the earlier one is refused first because the line moved on from it.)
+    refusedBy(await e.wf.verdict(card.key, R1, { submission: first.id, pass: true, comment: 'good' }), 'review.headMoved')
+    refusedBy(await e.wf.verdict(card.key, R1, { submission: first.id, pass: false, comment: 'old' }), 'verdict.currentSubmission')
+    refusedBy(await e.wf.verdict(card.key, R1, { pass: true, comment: 'good' }), 'verdict.reviewing')
+    expect(e.wf.state(card).verdicts).toEqual([])
+    // Started again, it takes the follow-up, and a pass there isn't refused for a moved head.
+    const again = await e.wf.startReview(card.key, R1)
+    moved(again)
+    expect(again).toMatchObject({ data: { revision: now, submission: s.latest!.id } })
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'good' }))
+    expect(e.wf.state(card)).toMatchObject({ stage: 'merging', rounds: 0 })
+    expect(e.wf.state(card).entries.at(-1)).toMatchObject({ state: 'open', revision: now })
+  })
+
+  it('a pass given on the earlier submission no longer counts once a follow-up is submitted (two reviewers)', async () => {
+    const e = pair({}, { reviewers: 2 })
+    const { card } = await inReview(e, async (key) => moved(await e.wf.verdict(key, R1, { pass: true, comment: 'good' })))
+    expect(e.wf.state(card).stage).toBe('review')
+    moved(await e.wf.submit(card.key, B1, { summary: 'asked for', followUp: true }))
+    moved(await e.wf.startReview(card.key, R2))
+    moved(await e.wf.verdict(card.key, R2, { pass: true, comment: 'good' }))
+    // R1's pass was for the earlier submission: one pass of two on the follow-up, so it waits in Review.
+    expect(e.wf.state(card).stage).toBe('review')
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'good' }))
+    expect(e.wf.state(card).stage).toBe('merging')
+  })
+
+  it('refused: by another agent, at the same revision, and without followUp, nothing written; outside Review it is an ordinary submission', async () => {
+    const e = pair()
+    const { card, folder } = await inReview(e)
+    const written = () => e.store.facts(card.id).filter((f) => f.kind !== 'Refused').length
+    const before = written()
+    refusedBy(await e.wf.submit(card.key, B2, { summary: 'not mine', followUp: true }), 'submit.followUpNotBuilder')
+    refusedBy(await e.wf.submit(card.key, R1, { summary: 'the reviewer', followUp: true }), 'submit.followUpNotBuilder')
+    const plain = refusedBy(await e.wf.submit(card.key, B1, { summary: 'again' }), 'move.notFromHere')
+    expect(plain.next).toBe("A change asked for while it is in Review, committed: submit it again with followUp: true, which keeps it in Review for its reviewer to check. Anything else waits for its reviewer's verdict.")
+    expect(written()).toBe(before)
+    moved(await e.wf.submit(card.key, B1, { summary: 'asked for', followUp: true }))
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'the same again', followUp: true }), 'submit.notDuplicate')
+    // Back in Doing after a fail, followUp is an ordinary submission: the next round.
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: false, comment: 'one more' }))
+    commit(folder, { 'src/round2.txt': 'round 2\n' }, 'round 2')
+    moved(await e.wf.submit(card.key, B1, { summary: 'round 2', followUp: true }))
+    expect(e.wf.state(card).latest).toMatchObject({ round: 2 })
+    expect(e.wf.state(card).latest?.followUp).toBeUndefined()
+  })
+
+  it('a verdict while the follow-up is on its way refuses it where it writes', async () => {
+    const e = pair()
+    const { card } = await inReview(e)
+    e.wf.cfg.hooks = {
+      beforeWrite: async (move) => {
+        if (move !== 'submit') return
+        e.wf.cfg.hooks = {}
+        moved(await e.wf.verdict(card.key, R1, { pass: false, comment: 'failed meanwhile' }))
+      }
+    }
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'asked for', followUp: true }), 'move.notFromHere')
+    expect(e.wf.state(card)).toMatchObject({ stage: 'active', rounds: 1 })
+    expect(e.wf.state(card).submissions).toHaveLength(1)
+  })
+
+  it('another submission while the follow-up is on its way refuses it where it writes', async () => {
+    const e = pair()
+    const { card } = await inReview(e)
+    e.wf.cfg.hooks = {
+      beforeWrite: async (move) => {
+        if (move !== 'submit') return
+        e.wf.cfg.hooks = {}
+        moved(await e.wf.submit(card.key, B1, { summary: 'the first follow-up', followUp: true }))
+      }
+    }
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'the second', followUp: true }), 'move.notFromHere')
+    expect(e.wf.state(card).submissions).toHaveLength(2)
   })
 })

@@ -227,6 +227,19 @@ describe('reviewing a card', () => {
     expect(history(fixing)).toContain('Third (alpha): Given to Third')
   })
 
+  it("its reviewer's own move back to Doing leaves the card its builder's (HI-1832); the review stops", async () => {
+    const c = await done()
+    await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
+    const back = await run(() => tasks.updateTask(c.number, { column: 'doing' }, reviewer))
+    expect([back.column, back.agent, back.agentName, back.review]).toEqual(['doing', 'c1', 'Coder', undefined])
+    expect(history(back)).toContain('Reviewer (alpha): Review by Reviewer stopped')
+    expect(history(back).some((h) => h.includes('Given to'))).toBe(false)
+    // An agent that never reviewed it still takes it, as before.
+    const d = await done('Another')
+    await run(() => tasks.updateTask(d.number, { review: 'start' }, reviewer))
+    expect((await run(() => tasks.updateTask(d.number, { column: 'doing' }, third))).agent).toBe('t1')
+  })
+
   it('moving the card to another project stops the review', async () => {
     const c = await done()
     await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
