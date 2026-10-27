@@ -4,7 +4,7 @@ import { UNDO_FINAL, type ActivityKind } from '../shared/assistantActivity'
 import type { AgentDef, AssistantChangeGroup, AssistantChangeKind, AssistantChangeRow, TaskCard } from '../shared/types'
 import type { LaneRecord } from '../shared/lanes'
 import { currentTurn, type AssistantTurn } from './assistantControl'
-import { boardRead, boardWrite, boardWriteOp } from './boardStore'
+import { boardRead, boardReadOnly, boardWrite, boardWriteOp } from './boardStore'
 import type { Db } from './db'
 import { changeActor } from './workflow/recorder'
 import type { WorkspaceService } from './workspace'
@@ -319,6 +319,8 @@ export type UndoOutcome = NonNullable<AssistantChangeRow['outcome']>
  * their fields' values.
  */
 export function recordedChanges(ws: WorkspaceService, sel: { change?: string; group?: string } = {}, now = Date.now()): RecordedChange[] {
+  // A 0.9 board waiting for its upgrade to 1.0 has no change record yet: nothing is kept (HI-1820).
+  if (boardReadOnly(ws)) return []
   const since = new Date(now - KEEP_MS).toISOString()
   return boardRead(ws, (db) => {
     const rows = (
