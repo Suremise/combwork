@@ -86,7 +86,9 @@ Hive asks each CLI which models it has and what each can do, so a new model, or 
 
 ### Connections (preview) <a id="connections-preview"></a>
 
-With **Settings → Advanced → Connections (preview)** on, each agent runs on a **connection**: for now, a Claude Code sign-in that Hive keeps in a folder of its own, signed in through Claude Code's own sign-in (**Settings → Connections**). Each workspace chooses which connections are on and which is its default; an agent can have its own. With the preview off, everything works as before.
+With **Settings → Advanced → Connections (preview)** on, each agent runs on a **connection**: for now, a Claude Code or Codex sign-in that Hive keeps in a folder of its own, signed in through the CLI's own sign-in (**Settings → Connections**). Each workspace chooses which connections are on and which is its default; an agent can have its own. With the preview off, everything works as before.
+
+- **Codex connections share their conversations, not their memory.** An agent can carry on a Codex conversation on another Codex connection: its transcript is shared. Codex keeps its memories, thread names and prompt history per connection. A key or token for Codex set in your environment is never used on a connection: each runs on its own login.
 
 - **Model, effort and context belong to the connection.** Open a connection's **Defaults for agents on it** in Settings → Connections to choose the model, effort and context an agent on it runs with when it has none of its own. A new connection starts with what **Settings → Claude Code** had; change them there and they are the connection's own.
 - **An agent's own choice comes first.** In Agent Settings and Add Agent, an empty model, effort or context reads **Connection default (…)**, naming what that is now.

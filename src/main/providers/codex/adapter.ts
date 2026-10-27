@@ -18,9 +18,9 @@ import { createLogger, userText } from '../../logger'
 import { hiveError } from '../../hiveError'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { findSecretWarnings } from '../../mcpSecrets'
-import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
+import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import { storePwshFirst, storePwshIssue } from './storePwsh'
-import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, KeySteps, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
+import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, ExternalSession, KeySteps, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
 import { codexBackgroundMemo, codexBackgroundTasks, type CodexBackgroundMemo } from './background'
 import { codexSafeguards } from './safeguards'
 import { codexTranscriptTurns } from './turns'
@@ -59,6 +59,8 @@ function readToml(path: string): Record<string, any> {
 }
 
 const userConfig = (): Record<string, any> => readToml(join(codexHome(), 'config.toml'))
+/** A home's config.toml: a connection's (HI-1757), or Codex's own. */
+const configOf = (home?: string): Record<string, any> => (home ? readToml(join(home, 'config.toml')) : userConfig())
 
 /** Agent Setup's explanation of the two choices Codex's sandbox setup offers, for someone working in Hive. */
 const SANDBOX_CHOICE = [
@@ -219,6 +221,42 @@ async function hooksFromCodex(executable: string, hookArgs: string[], cwd: strin
   return Object.keys(out).length ? out : null
 }
 
+/** Whether a file in a Codex home may be opened in Hive: its AGENTS.md (editable) and its skills' SKILL.md (read-only). */
+function codexFileAllowed(path: string, write: boolean, homeDir: string): boolean {
+  const home = resolve(homeDir).toLowerCase()
+  const abs = resolve(path).toLowerCase()
+  if (!abs.startsWith(home + '\\') && !abs.startsWith(home + '/')) return false
+  const rel = abs.slice(home.length + 1).replace(/\\/g, '/')
+  if (rel === 'agents.md') return true
+  return !write && rel.startsWith('skills/') && basename(rel) === 'skill.md'
+}
+
+/** The fields of Codex's sign-in answer Hive reads (Settings → Advanced, codex.accounts.*). */
+export interface CodexAccountFields {
+  account: string
+  email: string
+  plan: string
+}
+
+/**
+ * Who a CODEX_HOME is signed in as, from its app server's account answer (HI-1757: `account/read`; the type, email and
+ * plan, never a token or the account's id): signed out when its account is null. `ok: false` when there was no answer
+ * or Hive can't read it, which isn't signed out.
+ */
+export function codexAccountStatus(answer: { ok: true; result: any } | { ok: false; error: string }, f: CodexAccountFields): ConnectionStatus {
+  if (!answer.ok) return { ok: false, error: answer.error }
+  const r = answer.result
+  if (!r || typeof r !== 'object' || !(f.account in r)) return { ok: false, error: `its answer had no "${f.account}"` } // i18n-ignore: for the log
+  const a = r[f.account]
+  if (a === null) return { ok: true, loggedIn: false }
+  if (typeof a !== 'object') return { ok: false, error: `its "${f.account}" was not an object` } // i18n-ignore: for the log
+  const str = (k: string): string | undefined => (typeof a[k] === 'string' && a[k] ? (a[k] as string) : undefined)
+  return { ok: true, loggedIn: true, email: str(f.email), plan: str(f.plan) ?? null }
+}
+
+/** The store Codex keeps a connection's login in (HI-1757): its own folder, whatever Codex's default store is. */
+export const CONNECTION_STORE = ['-c', 'cli_auth_credentials_store="file"']
+
 /**
  * The developer_instructions Codex itself would give a session started with `args` (the agent's Extra arguments) in
  * `cwd` (#1285, the Assistant's design on it): Hive parses no profile and ranks no layer, Codex does. Its offline prompt
@@ -283,19 +321,44 @@ export function developerTexts(items: unknown): string[] | null {
 }
 
 /** One request to Codex's app server (started for it, in `cwd`, with `args`): its result, or null on an error or after 20 s. */
-function askAppServer(executable: string, args: string[], cwd: string, method: string, params: unknown, env?: NodeJS.ProcessEnv): Promise<any> {
+function askAppServer(executable: string, args: string[], cwd: string, method: string, params: unknown, env?: NodeJS.ProcessEnv, timeoutMs = 20000): Promise<any> {
+  return appServerAnswer(executable, args, cwd, method, params, env, timeoutMs).then((a) => (a.ok ? a.result : null))
+}
+
+/** How long a closed app server gets to end by itself (0.164.0 ends in about 0.2 s once its stdin closes) before it is ended. */
+const APP_SERVER_CLOSE_MS = 3000
+
+/**
+ * One request's answer from Codex's app server: its result, its error (`ok: false`, `error` its message), or none
+ * (`error` says why: it didn't start, ended, or took past `timeoutMs`). The server is closed on every outcome: its stdin
+ * ended, which ends it with what it started (HI-1757: 0.164.0's git and console host), then ended if it is still there.
+ */
+function appServerAnswer(executable: string, args: string[], cwd: string, method: string, params: unknown, env: NodeJS.ProcessEnv | undefined, timeoutMs: number): Promise<{ ok: true; result: any } | { ok: false; error: string }> {
   return new Promise((resolveP) => {
     const s = toSpawnable(executable, ['app-server', ...args])
     const p = spawn(s.file, s.args, { cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'], ...(env ? { env } : {}) })
     let buf = ''
-    const done = (v: any): void => {
+    let over = false
+    const done = (v: { ok: true; result: any } | { ok: false; error: string }): void => {
+      if (over) return
+      over = true
       clearTimeout(timer)
-      p.kill()
+      try {
+        p.stdin.end()
+      } catch {
+        // Already closed.
+      }
+      if (p.exitCode === null && p.signalCode === null) {
+        const kill = setTimeout(() => p.kill(), APP_SERVER_CLOSE_MS)
+        p.once('close', () => clearTimeout(kill))
+      }
       resolveP(v)
     }
-    const timer = setTimeout(() => done(null), 20000)
+    const timer = setTimeout(() => done({ ok: false, error: `no answer in ${Math.round(timeoutMs / 1000)} s` }), timeoutMs) // i18n-ignore: for the log
+    p.stdin.on('error', () => undefined)
+    p.on('close', (code) => done({ ok: false, error: `it ended (exit ${code})` })) // i18n-ignore: for the log
     const send = (m: unknown): void => void p.stdin.write(JSON.stringify(m) + '\n')
-    p.on('error', () => done(null))
+    p.on('error', (e) => done({ ok: false, error: `it didn't start: ${e.message}` })) // i18n-ignore: for the log
     p.stdout.on('data', (d) => {
       buf += d
       let i
@@ -311,7 +374,7 @@ function askAppServer(executable: string, args: string[], cwd: string, method: s
         if (m.id === 1) {
           send({ method: 'initialized' })
           send({ id: 2, method, params })
-        } else if (m.id === 2) done(m.error ? null : (m.result ?? null))
+        } else if (m.id === 2) done(m.error ? { ok: false, error: String(m.error?.message ?? 'an error') } : { ok: true, result: m.result ?? null }) // i18n-ignore: for the log
       }
     })
     send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'hive', version: '1' } } })
@@ -646,6 +709,30 @@ export class CodexAdapter implements ProviderAdapter {
     return { ...toSpawnable(executable, ['login']) }
   }
 
+  /** A connection's sign-in (HI-1757): Codex's own login, kept in the connection's folder. */
+  accountLoginCommand(executable: string): CommandSpec {
+    return { ...toSpawnable(executable, ['login', ...CONNECTION_STORE]) }
+  }
+
+  /** Who a connection's CODEX_HOME (in `env`) is signed in as: its app server's account answer, never a token. */
+  async accountStatus(executable: string, env: NodeJS.ProcessEnv): Promise<ConnectionStatus> {
+    const answer = await appServerAnswer(executable, CONNECTION_STORE, homedir(), advanced.get<string>('codex.accounts.readMethod'), {}, env, advanced.number('codex.accounts.statusSeconds') * 1000)
+    return codexAccountStatus(answer, { account: advanced.get<string>('codex.accounts.accountField'), email: advanced.get<string>('codex.accounts.emailField'), plan: advanced.get<string>('codex.accounts.planField') })
+  }
+
+  accountSharedTarget(name: string): string {
+    return join(codexHome(), name)
+  }
+
+  accountLoginFile(name: string): boolean {
+    return advanced.pattern('codex.accounts.loginFiles').test(name)
+  }
+
+  /** What Codex reads as a login from its environment (HI-1757: CODEX_ACCESS_TOKEN): left out on a connection. */
+  accountEnvDrop(): readonly string[] {
+    return advanced.get<string[]>('codex.accounts.dropEnv')
+  }
+
   /**
    * The Windows sandbox setup is Codex's own prompt (the admin sandbox, or the non-admin one). Hive opens
    * Codex read-only in a folder of its own, trusted for this run only. With no sandbox yet, choosing "Ask for
@@ -676,8 +763,9 @@ export class CodexAdapter implements ProviderAdapter {
     return r.code === 0 ? parseCodexModels(r.stdout) : null
   }
 
-  configuredDefaultModel(): string | null {
-    const m = userConfig().model
+  /** "model" in Codex's own config.toml (~/.codex's, or a connection's: HI-1757). */
+  configuredDefaultModel(home?: string): string | null {
+    const m = configOf(home).model
     return typeof m === 'string' && m.trim() ? m.trim() : null
   }
 
@@ -806,7 +894,15 @@ export class CodexAdapter implements ProviderAdapter {
     // user's own config; a -c sandbox_workspace_write.writable_roots would replace those (0.163.0: the fixture
     // writable-roots-codex-0.163.0.json in tests/fixtures/advanced).
     for (const d of ctx.extraDirs ?? []) args.push('--add-dir', d)
-    const files = [join(codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
+    // On a connection (HI-1757): its login kept in its own folder, and the Windows sandbox this PC has (set up once, in
+    // ~/.codex's config: its accounts are the machine's), unless the connection's own config names one.
+    if (ctx.connectionHome) {
+      args.push(...CONNECTION_STORE)
+      const own = configOf(ctx.connectionHome).windows?.sandbox
+      const pc = userConfig().windows?.sandbox
+      if (process.platform === 'win32' && !own && typeof pc === 'string' && /^[\w-]{1,24}$/.test(pc)) args.push('-c', `windows.sandbox=${toToml(pc)}`)
+    }
+    const files = [join(ctx.connectionHome ?? codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
     const developer = this.developerOverride(ctx)
     const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveHiveTools'), trusted: ctx.trustedHiveTools }
     for (const [name, def] of Object.entries(ctx.mcpServers)) {
@@ -1174,28 +1270,24 @@ export class CodexAdapter implements ProviderAdapter {
   // Project files
   // -------------------------------------------------------------------------
 
-  async memorySources(projectPath: string): Promise<MemorySource[]> {
+  async memorySources(projectPath: string, homes?: readonly { id: string; name: string; home: string }[]): Promise<MemorySource[]> {
     const p = this.id
-    const sources: MemorySource[] = [
-      { provider: p, id: 'project', label: 'AGENTS.md', path: join(projectPath, 'AGENTS.md'), kind: 'claude-md', exists: false }, // i18n-ignore: a file's name
-      { provider: p, id: 'user', label: userMemoryLabel('AGENTS.md'), path: join(codexHome(), 'AGENTS.md'), kind: 'claude-md', exists: false }
-    ]
+    // The user's own file: each connection's on in the workspace (HI-1757: each is its own home), else ~/.codex's.
+    const users: MemorySource[] = homes
+      ? homes.map((h) => ({ provider: p, id: `user:${h.id}`, label: connectionMemoryLabel('AGENTS.md', h.name), path: join(h.home, 'AGENTS.md'), kind: 'claude-md', exists: false })) // i18n-ignore: a file's name
+      : [{ provider: p, id: 'user', label: userMemoryLabel('AGENTS.md'), path: join(codexHome(), 'AGENTS.md'), kind: 'claude-md', exists: false }] // i18n-ignore: a file's name
+    const sources: MemorySource[] = [{ provider: p, id: 'project', label: 'AGENTS.md', path: join(projectPath, 'AGENTS.md'), kind: 'claude-md', exists: false }, ...users] // i18n-ignore: a file's name
     for (const s of sources) s.exists = existsSync(s.path)
     return sources
   }
 
-  /** In Codex's folder, only the user AGENTS.md (editable) and skills (read-only). Never credentials or config. */
-  fileAllowed(path: string, write: boolean): boolean {
-    const home = resolve(codexHome()).toLowerCase()
-    const abs = resolve(path).toLowerCase()
-    if (!abs.startsWith(home + '\\') && !abs.startsWith(home + '/')) return false
-    const rel = abs.slice(home.length + 1).replace(/\\/g, '/')
-    if (rel === 'agents.md') return true
-    return !write && rel.startsWith('skills/') && basename(rel) === 'skill.md'
+  /** In Codex's folder (or a connection's), only the user AGENTS.md (editable) and skills (read-only). Never credentials or config. */
+  fileAllowed(path: string, write: boolean, homes?: readonly string[]): boolean {
+    return (homes ?? [codexHome()]).some((h) => codexFileAllowed(path, write, h))
   }
 
-  skillRoots(): SkillRoots {
-    return { machine: [join(codexHome(), 'skills')], plugins: null, local: [AGENTS_SKILLS], hiveCopyPrefix: 'hive-' }
+  skillRoots(home = codexHome()): SkillRoots {
+    return { machine: [join(home, 'skills')], plugins: null, local: [AGENTS_SKILLS], hiveCopyPrefix: 'hive-' }
   }
 
   async projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>> {

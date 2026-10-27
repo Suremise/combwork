@@ -2,7 +2,8 @@
 // path = fake-codex.cmd), so who is asked (an approval, a question, the auto-reviewer) is tested without signing
 // in or spending tokens. It sends the hooks, in the order, and sets the terminal title the way Codex 0.160.0 did
 // (tests/hookStatus.test.ts has the sequences):
-// - `--version`, `login status` and the app server (hooks/list) answer as a signed-in Codex.
+// - `--version`, `login status` and the app server (hooks/list, account/read) answer as a signed-in Codex; in a
+//   connection's folder (HI-1757), `login` signs it in and account/read says who, signed out until then.
 // - It titles its terminal "<project>", and "[ ! ] Action Required | <project>" (blinking with "[ . ]") while a
 //   person must act: one title for everything asked. It sends SessionStart with the first prompt, as Codex does.
 // - Prompts, typed and sent with Enter:
@@ -55,12 +56,38 @@ if (args[0] === 'debug' && args[1] === 'models') {
   process.stdout.write(fs.readFileSync(path.join(__dirname, '..', '..', 'fixtures', 'codex-debug-models.json'), 'utf8'))
   process.exit(0)
 }
+// A connection's folder (HI-1757: a CODEX_HOME in an accounts folder): `login` signs it in as fake-login-as.json beside
+// the accounts folder says ({ email, plan }), writing fake-account.json and auth.json (as a sign-in writes it), with no
+// browser; the app server's account/read answers from fake-account.json, signed out (account null) without one.
+const connectionHome = process.env.CODEX_HOME || ''
+const inConnection = !!connectionHome && path.basename(path.dirname(connectionHome)).toLowerCase() === 'accounts'
+const connectionAccount = () => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(connectionHome, 'fake-account.json'), 'utf8'))
+  } catch {
+    return null
+  }
+}
+if (args[0] === 'login' && inConnection && args[1] !== 'status') {
+  let as = { email: 'fake@example.com', plan: 'plus' }
+  try {
+    as = JSON.parse(fs.readFileSync(path.join(connectionHome, '..', 'fake-login-as.json'), 'utf8'))
+  } catch {
+    // The default identity.
+  }
+  console.log('Opening the browser to sign in… (the fake opens none)')
+  fs.writeFileSync(path.join(connectionHome, 'fake-account.json'), JSON.stringify(as))
+  fs.writeFileSync(path.join(connectionHome, 'auth.json'), '{"fake":true}')
+  console.log('Successfully logged in')
+  process.stdout.write('', () => process.exit(0))
+  return
+}
 if (args[0] === 'login') {
   console.log('Logged in using ChatGPT')
   process.exit(0)
 }
 if (args[0] === 'app-server') {
-  // Hive asks how this version names and hashes its hooks: none.
+  // Hive asks how this version names and hashes its hooks (none), or who its connection's folder is signed in as.
   let buf = ''
   process.stdin.on('data', (d) => {
     buf += d
@@ -69,9 +96,14 @@ if (args[0] === 'app-server') {
       const m = JSON.parse(buf.slice(0, i))
       buf = buf.slice(i + 1)
       if (m.id === 1) process.stdout.write(JSON.stringify({ id: 1, result: {} }) + '\n')
-      if (m.id === 2) process.stdout.write(JSON.stringify({ id: 2, result: { data: [] } }) + '\n')
+      else if (m.method === 'account/read') {
+        const a = inConnection ? connectionAccount() : { email: 'fake@example.com', plan: 'plus' }
+        process.stdout.write(JSON.stringify({ id: m.id, result: { account: a ? { type: 'chatgpt', email: a.email, planType: a.plan } : null, requiresOpenaiAuth: true, workspaceRouting: null } }) + '\n')
+      } else if (m.id === 2) process.stdout.write(JSON.stringify({ id: 2, result: { data: [] } }) + '\n')
     }
   })
+  // As Codex does: its stdin closed, it ends.
+  process.stdin.on('end', () => process.exit(0))
   return
 }
 
@@ -101,7 +133,9 @@ if (debugAt >= 0 && args[debugAt + 1] === 'prompt-input') {
 }
 
 // Each launch is recorded in fake-launches.jsonl in CODEX_HOME: its folder and arguments (for what Hive tells it).
-if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), args }) + '\n')
+// With its home, agent, and the names (never the values) of the login variables it was given (HI-1757).
+const loginVars = Object.keys(process.env).filter((k) => /^(CODEX_ACCESS_TOKEN|CODEX_API_KEY|OPENAI_API_KEY)$/i.test(k))
+if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), args, home: process.env.CODEX_HOME, agent: process.env.HIVE_AGENT || null, loginVars }) + '\n')
 
 const hookUrl = /(http:\/\/127\.0\.0\.1:\d+\/hook\?run=[\w-]+)/.exec(args.find((a) => a.startsWith('hooks.Stop=')) ?? '')?.[1]
 // Codex runs Hive's hook command, whose curl reads the Authorization header from the launch's auth file (#345).
