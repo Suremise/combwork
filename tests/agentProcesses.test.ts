@@ -26,6 +26,29 @@ vi.mock('electron', async (importOriginal) => {
 })
 profile.dir = tempDir('hive-agentproc-profile-')
 
+describe('the CLI a lost terminal leaves (HI-1819)', () => {
+  it('is the gate’s child and the command its cmd.exe wrappers run, never what the CLI itself started', async () => {
+    const { orphanedCli } = await import('../src/main/agentProcesses')
+    const p = (pid: number, name: string, parent: number, created: string) => ({ pid, name, label: name, parent, created })
+    const gate = 10
+    const processes = [
+      p(20, 'cmd.exe', gate, '1000'),
+      // A .cmd launcher run from the wrapper: another cmd.exe, then the CLI.
+      p(30, 'cmd.exe', 20, '1001'),
+      p(40, 'node.exe', 30, '1002'),
+      // What the CLI started (a dev server): a leftover, not the CLI.
+      p(50, 'node.exe', 40, '1003'),
+      // A process whose parent id is the wrapper's but which started before it: that id named another process then.
+      p(60, 'node.exe', 20, '999'),
+      // No start time: can't be told from a later process with its id.
+      { pid: 70, name: 'node.exe', label: 'node', parent: gate }
+    ]
+    expect(orphanedCli(processes, gate).map((x) => x.pid)).toEqual([20, 30, 40])
+    // A CLI started directly: only itself.
+    expect(orphanedCli([p(40, 'node.exe', gate, '1'), p(50, 'node.exe', 40, '2')], gate).map((x) => x.pid)).toEqual([40])
+  })
+})
+
 describe('a process as the user recognises it', () => {
   it('drops the executable path and cuts paths in arguments to their last part', () => {
     expect(processLabel('node.exe', '"C:\\Program Files\\nodejs\\node.exe" "C:\\Users\\x\\AppData\\Roaming\\npm\\node_modules\\npm\\bin\\npm-cli.js" run serve')).toBe('node npm-cli.js run serve')

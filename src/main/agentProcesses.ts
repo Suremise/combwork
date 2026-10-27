@@ -119,6 +119,8 @@ interface Launch {
   agentName: string
   /** Its terminal's process (the gate), once tracked: it and what it started first are the agent's CLI (#1254). */
   gate?: number
+  /** That process is a launch gate (launchGate.ts), which starts only the command and waits for it. */
+  gated?: boolean
 }
 
 /** Launches whose CLI is still running (or exited and being looked at). */
@@ -331,7 +333,16 @@ async function findLeftovers(runId: string): Promise<AgentLeftovers | null> {
   }
   await new Promise((r) => setTimeout(r, SETTLE_MS))
   running.delete(runId)
-  const list = await listJob(runId)
+  let list = await listJob(runId)
+  // The gate waits for its CLI, so a CLI still running once the gate has exited lost its terminal (HI-1819): started as
+  // the terminal was killed (Hive quitting just after a launch), after its console had ended what was attached to it.
+  // It has no console and can't be used: ended, never listed as a leftover to keep.
+  const orphans = launch.gated && launch.gate ? orphanedCli(list?.processes ?? [], launch.gate) : []
+  if (orphans.length) {
+    const ended = await endProcessesExactly(orphans)
+    log.info(`ended ${userText(launch.agentName)}'s CLI, which outlived its terminal: ${userText(orphans.map((p) => p.label).join('; '))}${ended ? '' : ' (it still runs)'}`)
+    list = await listJob(runId)
+  }
   // Empty only when its whole membership is: members not described (more) are still members, left as leftovers.
   if (!list || emptyJob(list)) {
     void host.request('forget', runId)
@@ -347,6 +358,27 @@ async function findLeftovers(runId: string): Promise<AgentLeftovers | null> {
   const now = leftoversOf(launch.projectPath, launch.agentId)
   emit({ type: 'agent-leftovers', leftovers: now })
   return now
+}
+
+/** A command interpreter a CLI or setup command is started through (toSpawnable, shellCommand): its children are its foreground command. */
+const WRAPPER = /^cmd\.exe$/i
+
+/**
+ * The CLI a gate started, as a lost terminal leaves it (HI-1819): the gate's child, and through a command interpreter
+ * wrapping it (a .cmd launcher, a setup command) the command it runs, as far down as wrappers go. What the CLI itself
+ * started stays out: its background processes are leftovers like any other. Each process is taken only with its start
+ * time, and a child only if it started after its parent, so a parent's id Windows gave a later process names nothing.
+ */
+export function orphanedCli(processes: readonly AgentProcess[], gate: number): AgentProcess[] {
+  const out: AgentProcess[] = []
+  const queue = processes.filter((p) => p.parent === gate && p.created)
+  for (let p = queue.shift(); p; p = queue.shift()) {
+    out.push(p)
+    if (!WRAPPER.test(p.name)) continue
+    const parent = p
+    queue.push(...processes.filter((c) => c.parent === parent.pid && c.created && BigInt(c.created) >= BigInt(parent.created!) && !out.includes(c)))
+  }
+  return out
 }
 
 async function listJob(runId: string, withCommands = false): Promise<{ processes: ActivityProcess[]; more: number; adopted: number } | null> {

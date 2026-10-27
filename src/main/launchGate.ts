@@ -85,6 +85,8 @@ export interface LaunchGate {
   env: Record<string, string>
   /** The gate's process is known: it is told `word` once that has settled (a rejection refuses, with its message). */
   open(word: Promise<GateWord>): void
+  /** The terminal is being killed: the gate is told to stop, whatever word comes later (none if it had its word). */
+  stop(reason: string): void
   /** The terminal has exited (or never started): the pipe closes. */
   close(): void
 }
@@ -117,9 +119,15 @@ export function launchGate(file: string, args: string[] | string, env: Record<st
       void word
         .catch((e: unknown): GateWord => ({ go: false, reason: e instanceof Error ? e.message : String(e) }))
         .then((w) => {
+          if (said !== null) return
           said = w.go ? 'go' : `stop ${w.reason.replace(/[\r\n]+/g, ' ')}`
           tell()
         })
+    },
+    stop(reason) {
+      if (said !== null) return
+      said = `stop ${reason.replace(/[\r\n]+/g, ' ')}`
+      tell()
     },
     close() {
       server?.close()
