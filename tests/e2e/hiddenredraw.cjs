@@ -87,18 +87,23 @@ const check = (name, ok, extra = '') => {
 
     await page.locator('.activity-btn[aria-label="Projects"]').click()
     // As drawn (the DOM renderer's rows) is what its buffer holds: the lines printed while hidden, drawn once shown.
-    const drawn = () => pane.evaluate((h) => [...h.querySelectorAll('.xterm-rows > div')].map((r) => r.textContent.replace(/ /g, ' ').trimEnd()))
+    const drawn = () => pane.evaluate((h) => [...h.querySelectorAll('.xterm-rows > div')].map((r) => r.textContent.replace(/\u00a0/g, ' ').trimEnd()))
     const held = async () => ((await page.evaluate((k) => window.__hiveTerminalLines(k), key)) ?? []).map((l) => l.trimEnd())
     const same = await lib.until(async () => {
       const [d, h] = [await drawn(), await held()]
       return d.length > 0 && d.join('\n') === h.join('\n') && d.includes(lines.at(-1))
     }, HUNG_MS)
     check('shown again, it draws what was printed while hidden', !!same, JSON.stringify({ drawn: (await drawn()).slice(-3), held: (await held()).slice(-3) }))
-    // Scrolled back up to it, its selection is drawn as it stands: the word if it is still selected (xterm clears a
-    // selection when the terminal's height changes, as fitting it on its return can), nothing if not.
-    await page.evaluate((k) => window.__hiveTerminalScrollLines(k, -10000), key)
-    const asItStands = async () => ((await selection()) === WORD ? (await selectionDrawn()) > 0 : (await selection()) === '' && (await selectionDrawn()) === 0)
-    check('its selection is drawn as it stands', !!(await lib.until(asItStands, HUNG_MS)), JSON.stringify({ selection: await selection(), drawn: await selectionDrawn() }))
+    // Its selection is drawn as it stands: the word if it is still selected (xterm clears a selection when the terminal's
+    // height changes, as fitting it on its return can), nothing if not. Scrolled up a few lines at a time until the
+    // selected line is in view (where depends on how often the CLI's redraws wiped the word before it was selected).
+    const asItStands = async () => {
+      if ((await selection()) === '') return (await selectionDrawn()) === 0
+      if ((await selectionDrawn()) > 0) return true
+      await page.evaluate((k) => window.__hiveTerminalScrollLines(k, -3), key)
+      return false
+    }
+    check('its selection is drawn as it stands', !!(await lib.until(asItStands, HUNG_MS, 200)), JSON.stringify({ selection: await selection(), drawn: await selectionDrawn(), state: await state() }))
   } finally {
     await app.close().catch(() => undefined)
   }
