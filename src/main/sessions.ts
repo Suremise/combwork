@@ -2386,6 +2386,11 @@ class SessionManager {
     }
     // Free as the conversation's record says (this run's flag merged with earlier runs'), never by this run alone.
     l.costFree = !!rec.serverLocal && !rec.notLocal
+    // The footer follows at once (and liveCost keeps it so): a conversation switched to that ran elsewhere isn't free.
+    if (!!state.costFree !== l.costFree) {
+      state.costFree = l.costFree ? true : undefined
+      this.emitState(state)
+    }
     // The conversation it was meant for has it: one the CLI moves to later (/clear, /new) wasn't handed over.
     l.handedOverFrom = undefined
     // Started in a slot: bound to the lease it started under (a conversation the CLI moves to later, too).
@@ -3904,13 +3909,12 @@ class SessionManager {
     // Hive's estimate by the real model's id (unpriced unless the user priced it).
     const onServer = !!l.state.launchedConnection?.server
     // Free (HI-1772): only on servers on this PC, the conversation's record says: a known $0, shown as free (local).
-    if (l.costFree) {
-      if (!l.state.costFree) {
-        l.state.costFree = true
-        this.emitState(l.state)
-      }
-      return this.setLiveCost(l, 0, false)
+    // Shown as its conversation's policy is now, both ways (a /resume into a conversation that ran elsewhere ends it).
+    if (!!l.state.costFree !== !!l.costFree) {
+      l.state.costFree = l.costFree ? true : undefined
+      this.emitState(l.state)
     }
+    if (l.costFree) return this.setLiveCost(l, 0, false)
     const own = onServer || usesOwnPrices(l.state.provider, config.settings)
     if (l.adapter.descriptor.capabilities.reportsCost && !own) return this.setLiveCost(l, l.reportedCost, false)
     if (!force && Date.now() - (l.costAt ?? 0) <= COST_INTERVAL_MS) return
@@ -5460,6 +5464,9 @@ class SessionManager {
       l.lastBackupAt = undefined
       st.costUsd = undefined
       st.costEstimated = undefined
+      // Free is the new conversation's to say (HI-1772): not until its record does (recordSession, below).
+      st.costFree = undefined
+      l.costFree = false
       l.reportedCost = undefined
       l.costAt = undefined
       this.releaseLocks(liveId(st.projectPath, st.agentId))

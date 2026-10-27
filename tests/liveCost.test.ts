@@ -210,4 +210,23 @@ describe('a session that ran on a server connection (HI-1772)', () => {
     expect(l.state.costFree).toBe(true)
     expect(cost(l).costUsd).toBe(0)
   })
+
+  it('a local-only conversation, then a /resume into one that ran elsewhere: free (local) goes, both ways', async () => {
+    choose('reported')
+    const l = idle() as Live & { costFree?: boolean }
+    l.state.launchedConnection = { id: 'a-ollama', name: 'Ollama', server: { models: [], local: true } }
+    l.costFree = true
+    await sessions.repriceLive()
+    expect(l.state.costFree).toBe(true)
+    // Its record for the new conversation says notLocal: not free, and the footer says so at once.
+    l.costFree = false
+    await sessions.repriceLive()
+    expect(l.state.costFree).toBeUndefined()
+    expect(cost(l).costUsd).not.toBe(0)
+    // And back (another local-only conversation).
+    l.costFree = true
+    await sessions.repriceLive()
+    expect(l.state.costFree).toBe(true)
+    expect(cost(l).costUsd).toBe(0)
+  })
 })
