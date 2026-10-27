@@ -1,6 +1,6 @@
 // A card's intents over the Agent API (#1267, SPEC §16.8.1), each caller with its own token: a builder and a reviewer
 // (fake Claude Code agents, their own tokens as their hive tools use them) and the Hive Assistant through Settings →
-// Assistant → Control. An agent's plain number is refused naming the card's key and #N (S48); start, submit, start
+// Assistant → Control. An agent's plain number is refused naming the card's key alone (S48); start, submit, start
 // review, the reviewer's request (which ends the builder's wait for its verdict, #1272) and a failed verdict move the
 // card by its workflow (the card stays its builder's); the builder can't review its own card; ask the user leaves it
 // where it is; missing arguments are 400; the Assistant's intent is refused at Look and advise and runs at Control
@@ -96,9 +96,9 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     check('the card has a key', /^[A-Z]{2,4}-\d+$/.test(key ?? ''), key)
     const ref = encodeURIComponent(key)
 
-    // S48: an agent's plain number is refused, naming the card's own forms.
+    // S48: an agent's plain number is refused, naming the card by its key alone (HI-1661: never the workspace-wide #N).
     const plain = await asBuilder(`/v1/tasks/${n}/start`)
-    check("an agent's plain number is refused (409, card.plainNumber), naming the key and #N", plain.status === 409 && plain.body?.rule === 'card.plainNumber' && plain.body.next.includes(key) && plain.body.next.includes(`#${n}`), JSON.stringify(plain.body))
+    check("an agent's plain number is refused (409, card.plainNumber), naming the key, not #N", plain.status === 409 && plain.body?.rule === 'card.plainNumber' && plain.body.next.includes(key) && !plain.body.next.includes(`#${n}`), JSON.stringify(plain.body))
     check('…and nothing moved', (await card(n)).column === 'todo')
 
     // Start: the builder's own, in Doing.
