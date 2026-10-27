@@ -13,6 +13,7 @@
   "main.accounts.nothingToKeep": "Połączenie {name} nie jest zalogowane na nikogo, kogo Hive mógłby sprawdzić, więc nie ma logowania do zachowania.",
   "main.accounts.removeFailed": "Nie usunięto połączenia {name}: {error}. Nie ruszono niczego poza jego folderem; Usuń spróbuje jeszcze raz.",
   "main.accounts.running": "Na połączeniu {name} pracują agenci: zatrzymaj ich, a potem je usuń.",
+  "main.accounts.setUpCancelled": "Konfiguracja połączenia {name} się nie otworzyła: połączenie usunięto albo zamknięto jego obszar roboczy, gdy Hive sprawdzał jego foldery.",
   "main.antivirus.allExcluded": "Każdy folder, który Hive może zaproponować, jest już wykluczony.",
   "main.antivirus.changed": "Obszar roboczy zmienił się od czasu pytania: niczego nie zmieniono.",
   "main.antivirus.closed": "Obszar roboczy został w międzyczasie zamknięty.",

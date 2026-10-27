@@ -13,6 +13,7 @@
   "main.accounts.nothingToKeep": "Hive konnte für die Verbindung {name} keine Anmeldung feststellen, also gibt es keine zu behalten.",
   "main.accounts.removeFailed": "Die Verbindung {name} wurde nicht entfernt: {error}. Außerhalb ihres Ordners wurde nichts angefasst; „Entfernen“ versucht es erneut.",
   "main.accounts.running": "Auf der Verbindung {name} laufen Agenten: Stoppe sie, dann entferne die Verbindung.",
+  "main.accounts.setUpCancelled": "Einrichten von {name} wurde nicht geöffnet: Die Verbindung wurde entfernt oder ihr Arbeitsbereich geschlossen, während Hive ihre Ordner prüfte.",
   "main.antivirus.allExcluded": "Jeder Ordner, den Hive anbieten kann, ist schon ausgeschlossen.",
   "main.antivirus.changed": "Der Arbeitsbereich hat sich seit der Frage geändert: Es wurde nichts geändert.",
   "main.antivirus.closed": "Der Arbeitsbereich wurde inzwischen geschlossen.",

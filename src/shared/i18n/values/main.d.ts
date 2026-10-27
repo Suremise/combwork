@@ -15,6 +15,7 @@ interface HiveMessageValues {
   'main.accounts.nothingToKeep': { name: string | number }
   'main.accounts.removeFailed': { name: string | number; error: string | number }
   'main.accounts.running': { name: string | number }
+  'main.accounts.setUpCancelled': { name: string | number }
   'main.antivirus.allExcluded': undefined
   'main.antivirus.changed': undefined
   'main.antivirus.closed': undefined

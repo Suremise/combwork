@@ -775,7 +775,7 @@ describe("a workspace's accounts", () => {
       const folders = names.map((n) => join(wsPath, n))
       // Each trust read held until the test answers it: how many projects it was asked about, and its answer.
       let held: { projects: number; answer: (v: (boolean | null)[]) => void }[] = []
-      let spy: { mockRestore: () => void }
+      let spy: ReturnType<typeof vi.spyOn>
       let a: Connection
       const row = () => run(() => accounts.accountsView()).connections.find((c) => c.id === a.id)!
       const projectsNow = async (n: number): Promise<void> => {
@@ -810,7 +810,10 @@ describe("a workspace's accounts", () => {
         expect(row().trust).toEqual({ pending: [], unknown: false })
         expect(connectionReadiness(row())).toBe('done')
         held[1].answer([true])
+        // Settled: a Set Up asked now waits for nothing new to be read... except its own (a terminal's end is a change).
         await vi.waitFor(() => expect(row().trust).toEqual({ pending: [], unknown: false }), { timeout: HUNG_MS })
+        // Passive refreshes (the window reloading the list on connections-changed) start no read: no read/emit/refresh cycle.
+        for (let i = 0; i < 5; i++) run(() => accounts.accountsView())
         expect(held).toHaveLength(2)
       })
 
@@ -825,8 +828,10 @@ describe("a workspace's accounts", () => {
         expect(held[1].projects).toBe(2)
         expect(row().trust?.checking).toBe(true)
         held[1].answer([true, false])
+        // The Set Up asked against the old set gets the current set's folder.
         expect(await folder).toBe(realpathSync.native(folders[1]))
         expect(row().trust).toEqual({ pending: [{ project: 'beta', folder: realpathSync.native(folders[1]) }], unknown: false })
+        for (let i = 0; i < 5; i++) run(() => accounts.accountsView())
         expect(held).toHaveLength(2)
       })
 
@@ -842,19 +847,56 @@ describe("a workspace's accounts", () => {
         await vi.waitFor(() => expect(held).toHaveLength(3), { timeout: HUNG_MS })
         expect(held[2].projects).toBe(2)
         held[2].answer([true, true])
+        // A current answer with nothing pending: no folder (its own then), which isn't a cancellation.
         expect(await folder).toBeUndefined()
         expect(row().trust).toEqual({ pending: [], unknown: false })
+        for (let i = 0; i < 5; i++) run(() => accounts.accountsView())
         expect(held).toHaveLength(3)
       })
 
-      it('removed while a read is held: its Set Up waiter is told there is no folder, and nothing is written', async () => {
+      it('removed while a read is held: its Set Up is cancelled (it opens nowhere), and the read stores nothing and reads no more', async () => {
         const folder = run(() => accounts.setUpFolder(a.id))
         await run(() => accounts.setAccountOn(a.id, false))
         await accounts.removeAccount(a.id)
-        expect(await folder).toBeUndefined()
+        expect(await outcome(folder)).toMatch(/Set Up didn't open: the connection was removed or its workspace closed/)
         held[0].answer([false])
-        await vi.waitFor(() => expect(accounts.getAccount(a.id)).toBeUndefined(), { timeout: HUNG_MS })
+        // Its read ends retired: once it has, nothing more was asked of the CLI.
+        await vi.waitFor(() => expect(spy.mock.settledResults).toHaveLength(1), { timeout: HUNG_MS })
         expect(held).toHaveLength(1)
+      })
+
+      it("its workspace closed while Set Up waits: cancelled; reopened, the old read's answer can't reach the new state", async () => {
+        // A second workspace, the connection on there too, its own read held.
+        const ws2 = join(base, 'ws-trust-2')
+        mkdirSync(join(ws2, 'delta'), { recursive: true })
+        let w2 = createWorkspaceService()
+        await w2.open(ws2)
+        const in2 = <T>(fn: () => T): T => inWorkspace(w2, fn)
+        await in2(() => accounts.setAccountOn(a.id, true))
+        in2(() => accounts.accountsView())
+        await vi.waitFor(() => expect(held).toHaveLength(2), { timeout: HUNG_MS })
+        const folder = in2(() => accounts.setUpFolder(a.id))
+        await disposeWorkspaceService(w2)
+        // The next list read prunes it (as the close's own event does in the app).
+        row()
+        expect(await outcome(folder)).toMatch(/Set Up didn't open/)
+        // Opened again: a new state, a new read; the old read answered late changes nothing of it.
+        w2 = createWorkspaceService()
+        await w2.open(ws2)
+        try {
+          const row2 = () => inWorkspace(w2, () => accounts.accountsView()).connections.find((c) => c.id === a.id)!
+          row2()
+          await vi.waitFor(() => expect(held).toHaveLength(3), { timeout: HUNG_MS })
+          held[1].answer([false])
+          held[2].answer([true])
+          await vi.waitFor(() => expect(row2().trust).toEqual({ pending: [], unknown: false }), { timeout: HUNG_MS })
+          await vi.waitFor(() => expect(spy.mock.settledResults.filter((r: { type: string }) => r.type === 'fulfilled')).toHaveLength(2), { timeout: HUNG_MS })
+          expect(row2().trust).toEqual({ pending: [], unknown: false })
+          expect(held).toHaveLength(3)
+          await inWorkspace(w2, () => accounts.setAccountOn(a.id, false))
+        } finally {
+          await disposeWorkspaceService(w2)
+        }
       })
     })
   })

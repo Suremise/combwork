@@ -688,8 +688,13 @@ interface TrustState {
   running: boolean
   dirty: boolean
   result?: { gen: number; answer: TrustAnswer }
-  /** Callers waiting for a current answer (Set Up's folder): resolved once idle with one, or with null when it goes. */
-  waiters: ((a: TrustAnswer | null) => void)[]
+  /**
+   * Callers waiting for a current answer (Set Up's folder): resolved once idle with one (null: none could be read), or
+   * `cancelled` when the state goes (its connection removed, its workspace closed).
+   */
+  waiters: ((a: TrustAnswer | null | 'cancelled') => void)[]
+  /** Gone from the map (dropTrust): a read of it still under way stores nothing, reads no more and tells no one. */
+  retired: boolean
 }
 const trustState = new Map<string, TrustState>()
 
@@ -700,7 +705,7 @@ function requestTrust(id: string, ws: string, projects: Projects, mayHaveChanged
   const conn = generation(id)
   let st = trustState.get(key)
   if (!st) {
-    st = { gen: 0, sig, projects, conn, running: false, dirty: false, waiters: [] }
+    st = { gen: 0, sig, projects, conn, running: false, dirty: false, waiters: [], retired: false }
     trustState.set(key, st)
   }
   if (st.sig !== sig || st.conn !== conn || mayHaveChanged) {
@@ -721,8 +726,9 @@ async function runTrust(key: string, id: string, st: TrustState): Promise<void> 
   const gen = st.gen
   const answer = await readTrustOnce(id, st.projects).catch(() => null)
   st.running = false
-  // Removed meanwhile, or the workspace closed: its state is gone, and its waiters were told.
-  if (trustState.get(key) !== st) return
+  // Removed meanwhile, or the workspace closed (and maybe opened again, with a new state for the key): this read's state
+  // is retired, and its waiters were told. Nothing of it goes on.
+  if (st.retired || trustState.get(key) !== st) return
   if (!getAccount(id) || st.conn !== generation(id)) return dropTrust(key)
   const current = gen === st.gen
   if (current && answer) {
@@ -734,8 +740,19 @@ async function runTrust(key: string, id: string, st: TrustState): Promise<void> 
   for (const w of st.waiters.splice(0)) w(st.result?.gen === st.gen ? st.result.answer : null)
 }
 
+/**
+ * Tests only (unpackaged builds): HIVE_TEST_HOLD_TRUST=<file> holds each trust read until that file exists, so a suite
+ * can show Checking… (HI-1870 round 3).
+ */
+async function trustTestHold(): Promise<void> {
+  const file = !app.isPackaged ? process.env.HIVE_TEST_HOLD_TRUST : undefined
+  if (!file) return
+  while (!(await lstat(file).then(() => true, () => false))) await new Promise((r) => setTimeout(r, 100))
+}
+
 /** One reading of a connection's trust of these projects, through its adapter. */
 async function readTrustOnce(id: string, projects: Projects): Promise<TrustAnswer | null> {
+  await trustTestHold()
   const a = getAccount(id)
   const read = a && provider(a.provider).connectionTrusts
   if (!a || !read) return null
@@ -749,7 +766,8 @@ function dropTrust(key: string): void {
   const st = trustState.get(key)
   if (!st) return
   trustState.delete(key)
-  for (const w of st.waiters.splice(0)) w(null)
+  st.retired = true
+  for (const w of st.waiters.splice(0)) w('cancelled')
 }
 
 /** Every workspace a connection's trust was read for, read again: one of its terminals ended (it may have changed). */
@@ -785,7 +803,9 @@ export async function setUpFolder(id: string): Promise<string | undefined> {
   const a = getAccount(id)
   if (!a || !workspace.path || !onHere(a)) return undefined
   const st = requestTrust(id, workspace.path, projectsHere(), true)
-  const answer = await new Promise<TrustAnswer | null>((r) => st.waiters.push(r))
+  const answer = await new Promise<TrustAnswer | null | 'cancelled'>((r) => st.waiters.push(r))
+  // Removed, or its workspace closed, while Hive checked: Set Up opens nowhere (never its own folder instead).
+  if (answer === 'cancelled') throw hiveError(msg({ id: 'main.accounts.setUpCancelled', defaultMessage: "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Hive checked its folders.", description: "An error opening a connection's Set Up (Settings → Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started." }), { name: a.name }, { kind: 'conflict' })
   return answer?.pending[0]?.folder
 }
 
@@ -1482,7 +1502,10 @@ export function initConnections(): void {
     return connections ? { connections } : {}
   })
   onHiveEvent((e) => {
-    if (e.type === 'workspace-changed') syncWatches()
+    if (e.type !== 'workspace-changed') return
+    syncWatches()
+    // A workspace closed: its connections' trust reads are dropped, and a Set Up waiting on one is cancelled (HI-1870).
+    pruneTrust()
   })
   // The patterns of models a server runs elsewhere (HI-1773): a change re-marks the models windows show.
   const patterns = (): string => PROVIDERS.flatMap((p) => p.capabilities.connections?.server?.presets ?? []).map((p) => (p.remoteModels ? advanced.pattern(p.remoteModels).source : '')).join('\n')

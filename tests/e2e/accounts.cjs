@@ -39,6 +39,10 @@ const check = (name, ok, extra = '') => {
   cfg.settings.providers.codex.executablePath = path.join(__dirname, 'fake-codex', 'fake-codex.cmd')
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   env.CODEX_HOME = codexHome
+  // Trust reads go ahead while this file is there; taken away, they wait (HI-1870: Checking… shown, for its screenshot).
+  const trustGo = path.join(userData, 'trust-go')
+  fs.writeFileSync(trustGo, '')
+  env.HIVE_TEST_HOLD_TRUST = trustGo
   fs.mkdirSync(path.dirname(conversation), { recursive: true })
   fs.writeFileSync(conversation, '{"kept":true}\n')
   for (const w of [ws1, ws2]) fs.mkdirSync(path.join(w, 'alpha'), { recursive: true })
@@ -183,13 +187,20 @@ const check = (name, ok, extra = '') => {
     check('…the CLI run there, on the connection', !!trustRun && path.resolve(trustRun.cwd).toLowerCase() === alpha1.toLowerCase(), JSON.stringify(trustRun))
     await closeRunning(true)
     check('…its trust answered (the fake records it), the row says it is set up', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)) && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }))
-    // A project added afterwards: needed again, for it alone.
+    // A project added afterwards, its trust read held: Checking…, never Set up, until it is in (HI-1870 round 3).
+    fs.rmSync(trustGo)
     fs.mkdirSync(path.join(ws1, 'gamma'), { recursive: true })
     await inv('workspace:refresh')
+    check('while its trust of a new project is read, the row says Checking…, not Set up', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="checking"]').count()) === 1, HUNG_MS)) && (await row('Personal').locator('[data-set-up-state="done"]').count()) === 0)
+    await shots('checking')
+    fs.writeFileSync(trustGo, '')
+    // Then needed again, for it alone.
     check('a project added later brings Needs set up back, for it alone', !!(await lib.until(async () => JSON.stringify((await trustOf(inv, personal.id))?.pending.map((p) => p.project)) === '["gamma"]' && (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1, HUNG_MS)))
-    fs.rmSync(path.join(ws1, 'gamma'), { recursive: true, force: true })
-    await inv('workspace:refresh')
-    check('…and set up again once it is gone', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
+    // Its Set Up opens in the new project's folder, where its trust is answered (the fake records it): set up again.
+    await row('Personal').locator('[data-set-up]').click()
+    check('…its Set Up opens in the new project’s folder', !!(await lib.until(async () => /gamma's folder/.test(await page.locator('.account-signin [data-set-up-in]').innerText().catch(() => '')), HUNG_MS)))
+    await closeRunning(true)
+    check('…and, trusted there, it is set up again', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
 
     // --- Rename: the name only.
     await row('Personal').getByRole('button', { name: 'Rename…' }).click()

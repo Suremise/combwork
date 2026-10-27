@@ -55,6 +55,10 @@
     "defaultMessage": "{name} has agents running on it: stop them, then remove it.",
     "description": "An error removing a connection ({name}, its name in Settings → Connections): agents run on it, or one is starting."
   },
+  "main.accounts.setUpCancelled": {
+    "defaultMessage": "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Hive checked its folders.",
+    "description": "An error opening a connection's Set Up (Settings → Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started."
+  },
   "main.antivirus.allExcluded": {
     "defaultMessage": "Every folder Hive may offer is already excluded.",
     "description": "An error in Settings → Workspace → Antivirus scanning: nothing to add."
