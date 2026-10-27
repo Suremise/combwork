@@ -13,7 +13,7 @@ import { resolvedValues } from './advancedValues'
 import { config } from './config'
 import { emit, onHiveEvent } from './events'
 import { createLogger, userText } from './logger'
-import { recordProvider, sessions } from './sessions'
+import { recordProvider, sessions, type ListContext } from './sessions'
 import { boardHolds, cardHolds, type CardHolds } from './tasks'
 import { usageFile, type SessionId, type SessionMeta, type StoredSession } from './usageDb'
 import type { IngestJob, IngestResult, KeptJob, ReadResult, ReadSeed, WorkerReply, WorkerRequest } from './usageWorker'
@@ -411,7 +411,7 @@ class UsageHistory {
    * `keepState` keeps the parser's state ('running': at most every few minutes). `path`: where it was read last, when
    * the caller has it (a sweep), else found as the session list finds it.
    */
-  ingest(projectPath: string, sessionId: string, o: { priority: Priority; keepState: IngestJob['keepState']; path?: string }): Promise<IngestResult | null> {
+  ingest(projectPath: string, sessionId: string, o: { priority: Priority; keepState: IngestJob['keepState']; path?: string; context?: () => Promise<ListContext> }): Promise<IngestResult | null> {
     return this.told(projectPath, sessionId, this.ingestJob(projectPath, sessionId, o))
   }
 
@@ -423,15 +423,17 @@ class UsageHistory {
     })
   }
 
-  private ingestJob(projectPath: string, sessionId: string, o: { priority: Priority; keepState: IngestJob['keepState']; path?: string }): Promise<IngestResult | null> {
+  private ingestJob(projectPath: string, sessionId: string, o: { priority: Priority; keepState: IngestJob['keepState']; path?: string; context?: () => Promise<ListContext> }): Promise<IngestResult | null> {
     return this.enqueue<IngestResult>(`ingest|${projectPath.toLowerCase()}|${sessionId}`, o.priority, async () => {
       const ws = workspaceFor(projectPath)
       const run = ws && runOf(ws)
       if (!ws || !run) return null
       const { workspace, scope } = await ws.sessionScope(projectPath)
-      const rec = (await ws.sessionsFile(projectPath, run.signal)).sessions.find((s) => s.id === sessionId)
+      // The host's records, the job's own read or those its freshen shares between its jobs (HI-1790).
+      const ctx = o.context ? await o.context() : undefined
+      const rec = (ctx?.records ?? (await ws.sessionsFile(projectPath, run.signal)).sessions).find((s) => s.id === sessionId)
       if (!rec) return null
-      const path = o.path && existsSync(o.path) ? o.path : await sessions.anyTranscript(projectPath, sessionId).catch(() => null)
+      const path = o.path && existsSync(o.path) ? o.path : await sessions.anyTranscript(projectPath, sessionId, ctx).catch(() => null)
       const { holds, holdsKey } = await this.holdsFor(ws, run, projectPath, rec)
       const job: IngestJob = { ...metaOf(scope, rec), path, holds, holdsKey, keepState: o.keepState }
       return { type: 'ingest', file: usageFile(workspace), job }
@@ -578,8 +580,21 @@ class UsageHistory {
    */
   async freshen(ws: WorkspaceService): Promise<void> {
     const waits: Promise<unknown>[] = [this.attribute(ws)]
+    // Each host's records and settings read once for its running sessions' jobs (HI-1790: a dozen agents' jobs each read
+    // every record twice, for a card's cost line), by the first of them to run: as current as its own read would be.
+    const contexts = new Map<string, () => Promise<ListContext>>()
+    const contextOf = (host: string): (() => Promise<ListContext>) => {
+      const key = host.toLowerCase()
+      let c = contexts.get(key)
+      if (!c) {
+        let read: Promise<ListContext> | undefined
+        c = () => (read ??= Promise.all([ws.sessionsFile(host, runOf(ws)?.signal), ws.projectConfig(host)]).then(([f, cfg]) => ({ records: f.sessions, cfg })))
+        contexts.set(key, c)
+      }
+      return c
+    }
     for (const st of sessions.liveStates()) {
-      if (st.sessionId && !st.settingUp && workspaceFor(st.projectPath) === ws) waits.push(this.ingest(st.projectPath, st.sessionId, { priority: 1, keepState: 'running' }))
+      if (st.sessionId && !st.settingUp && workspaceFor(st.projectPath) === ws) waits.push(this.ingest(st.projectPath, st.sessionId, { priority: 1, keepState: 'running', context: contextOf(st.projectPath) }))
     }
     for (const q of [...this.queue, ...(this.current ? [this.current] : [])]) {
       if (q.priority <= 1) waits.push(new Promise((resolve) => q.waiters.push({ resolve, reject: resolve })))
