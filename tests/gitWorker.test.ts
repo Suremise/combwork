@@ -4,6 +4,7 @@
 // environment, a time limit, a folder that isn't there and output over its bound; and many commands at once each get
 // their own answer.
 import { execFileSync } from 'child_process'
+import { createRequire } from 'module'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
 import { build } from 'esbuild'
@@ -11,14 +12,18 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { git, useGitWorker, type GitResult } from '../src/main/git'
 import { tempDir } from './tempDir'
 
+// The run's allowlisted environment and test git config for every git child, as the suites' git has (never this
+// process's environment).
+const { gitEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { gitEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }
+
 const tmp = tempDir('hive-git-worker-')
 const bundle = join(tmp, 'git-worker.cjs')
 const repo = join(tmp, 'repo')
 
 beforeAll(async () => {
   await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'gitWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
-  execFileSync('git', ['init', '-q', repo], { windowsHide: true })
-  execFileSync('git', ['-C', repo, '-c', 'user.name=T', '-c', 'user.email=t@example.com', 'commit', '-q', '--allow-empty', '-m', 'first'], { windowsHide: true })
+  execFileSync('git', ['init', '-q', repo], { windowsHide: true, env: gitEnv() })
+  execFileSync('git', ['-C', repo, '-c', 'user.name=T', '-c', 'user.email=t@example.com', 'commit', '-q', '--allow-empty', '-m', 'first'], { windowsHide: true, env: gitEnv() })
   // A file of a megabyte, for output far over Node's pool (moved, not copied).
   writeFileSync(join(repo, 'big.txt'), 'x'.repeat(1024 * 1024))
 }, 60_000)
@@ -33,7 +38,7 @@ const commands: [string, Parameters<typeof git>][] = [
   ["git's own failure (its exit code and message)", [repo, ['rev-parse', '--verify', 'no-such-ref']]],
   ['input on stdin', [repo, ['hash-object', '--stdin'], undefined, 'some content\n']],
   ['a megabyte of output', [repo, ['hash-object', '--no-filters', '-w', 'big.txt']]],
-  ['an environment', [repo, ['var', 'GIT_AUTHOR_IDENT'], undefined, undefined, { env: { ...process.env, GIT_AUTHOR_NAME: 'Worker Test', GIT_AUTHOR_EMAIL: 'w@example.com', GIT_AUTHOR_DATE: '2026-10-27T00:00:00Z' } }]],
+  ['an environment', [repo, ['var', 'GIT_AUTHOR_IDENT'], undefined, undefined, { env: gitEnv({ GIT_AUTHOR_NAME: 'Worker Test', GIT_AUTHOR_EMAIL: 'w@example.com', GIT_AUTHOR_DATE: '2026-10-27T00:00:00Z' }) }]],
   ['a folder that is not there', [join(tmp, 'not-there'), ['status']]],
   ['output over its bound', [repo, ['cat-file', '-p', 'HEAD'], 8]]
 ]
@@ -60,7 +65,7 @@ describe("git's worker (HI-1783)", () => {
   it('answers many commands at once, each with its own', async () => {
     useGitWorker(bundle)
     const inputs = Array.from({ length: 30 }, (_, i) => `content ${i}\n`)
-    const want = inputs.map((t) => execFileSync('git', ['-C', repo, 'hash-object', '--stdin'], { input: t, windowsHide: true }).toString().trim())
+    const want = inputs.map((t) => execFileSync('git', ['-C', repo, 'hash-object', '--stdin'], { input: t, windowsHide: true, env: gitEnv() }).toString().trim())
     const got = await Promise.all(inputs.map((t) => git(repo, ['hash-object', '--stdin'], undefined, t)))
     expect(got.map((r) => r.out.trim())).toEqual(want)
   })
