@@ -30,6 +30,29 @@ export function returnIn(wf: Workflow, n: number): QueueReturn | null {
   }
 }
 
+/** A card approved with a stale pass (HI-1763): since when (its `Stale` fact), what was passed and where its line is. */
+export interface StaleApproval {
+  since: string
+  approved: string | null
+  current: string | null
+}
+
+/** A card in Approved whose pass is stale, as its facts say; null when it isn't one, or unreadable. */
+export function staleIn(wf: Workflow, n: number): StaleApproval | null {
+  try {
+    const s = wf.state(wf.store.card(n))
+    return s.stage === 'approved' && s.stale && s.staleSince ? { since: s.staleSince, approved: s.stale.approved, current: s.stale.current } : null
+  } catch {
+    return null
+  }
+}
+
+/** staleIn for a card of a project in a workspace. */
+export async function staleApprovalOf(ws: WorkspaceService, projectPath: string, n: number): Promise<StaleApproval | null> {
+  const wf = await workflowFor(ws, projectPath).catch(() => null)
+  return wf ? staleIn(wf, n) : null
+}
+
 /** returnIn for a card of a project in a workspace (its workflow, null when it has none). */
 export async function queueReturnOf(ws: WorkspaceService, projectPath: string, n: number): Promise<QueueReturn | null> {
   const wf = await workflowFor(ws, projectPath).catch(() => null)

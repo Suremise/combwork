@@ -2316,7 +2316,17 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   on a card in Review or Approved, queued included (`loop.stepNotHere` elsewhere; on a queued card it first takes its
   entry out of the queue, `IntegrationCancelled` with reason follow-up, so the queue can't merge the approved revision
   while the follow-up changes its line, and the reviewer's `ok` queues it again while its pass holds; refused once the
-  queue has begun merging it, `loop.followUpMerging`, #1623), named as a design is (`<key>/s<seq>`, its comment
+  queue has begun merging it, `loop.followUpMerging`, #1623). **A follow-up's `ok` is only the reviewer's check of it:
+  it approves nothing (HI-1763, the Assistant's design call, 26 Oct).** A pass covers only the revision submitted, while
+  it is the card's head or the same change: a line moved on to another change since the submission (a follow-up commit,
+  OK'd or not) refuses a pass (`review.headMoved`, naming both revisions; next: a failing verdict, so its builder submits
+  the head, which runs its checks, the user's gates and a review copy as any submission). On 26 Oct HR4 OK'd HB4's
+  follow-up commit and passed the submitted one: the pass went stale at once and HI-1737 sat in Approved, nobody told.
+  **A pass that goes stale afterwards is never silent:** its builder's wake names what was passed, where the line is and
+  what to submit (`staleWake`), the card's merge line and a refused merge or move say so (queue state `stale`,
+  `merge.hiveMerges` next `nextStale`), and a lane watch is told `stalled` once it has stood 10 minutes from its `Stale`
+  fact (`staleSince`, never moved by later notices), its builder idle or only watching (`staleWaitReason`). Named as a
+  design is (`<key>/s<seq>`, its comment
   headed "Follow-up HI-12/s41, for the reviewer's check (an answer names HI-12/s41):"), with the same reviewer rule
   (`loop.noReviewer` with none), the same `step` loop wake to the reviewer whatever its watch counts, and the same
   answers (`ok`, `gaps`, naming it; history "Checked the follow-up: OK: …"). It has no due time and no going ahead:
