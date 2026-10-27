@@ -149,6 +149,8 @@ export interface AppSettings {
   keybindings: KeybindingOverrides
   /** The global default workflow options (SPEC §16.6.6), under each workspace's and project's own; absent: all off. */
   workflow?: WorkflowDefaults
+  /** Hive's default slot options for Git projects (HI-1765), under each workspace's and project's own (`slots`). */
+  slotDefaults?: SlotDefaults
   updates: {
     checkAutomatically: boolean
     downloadAutomatically: boolean
@@ -260,10 +262,6 @@ export interface AppSettings {
   agents: {
     /** Per-file locks between agents working in the same folder. */
     fileLocks: FileLockMode
-    /** Git-ignored files copied into new worktrees: glob patterns, one per line or comma separated. */
-    worktreeCopy: string
-    /** Default for merging a worktree agent's branch. */
-    mergeStyle: MergeStyle
     /** How long a background task an agent started counts as running if it never reports its end, in minutes. */
     backgroundTaskMinutes: number
     /** What to do with processes an agent leaves running when it stops: offer to end them, or end them (#507). */
@@ -770,6 +768,17 @@ export interface WorkspaceConfig {
   journalSuggested?: boolean
   /** The workspace's default workflow options (SPEC §16.6.6), between the global ones and each project's own. */
   workflow?: WorkflowDefaults
+  /** The workspace's default slot options (HI-1765), between Hive's and each project's own. */
+  slotDefaults?: SlotDefaults
+}
+
+/**
+ * Slot options a level (Hive's, a workspace's) gives the Git projects under it (HI-1765). `copy`: the git-ignored files
+ * copied into each new slot and review copy, glob patterns, comma separated or one per line; left out, the level
+ * inherits; an empty string is none.
+ */
+export interface SlotDefaults {
+  copy?: string
 }
 
 /** A project folder Hive leaves out of the workspace, until it's restored in Settings → Workspace. */

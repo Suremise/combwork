@@ -18,7 +18,8 @@ import { workflowFor } from './workflow/service'
 import { legacyWorktree, slotsMigrated } from './agentFolders'
 import type { StoredAgent } from '../shared/agentFolders'
 import { projectFolders, recreateSlot, releaseSlotLease, type ProjectFolder } from './projectFolders'
-import { folderThere } from './slots'
+import { folderThere, slotLevelsOf } from './slots'
+import { slotCopyOf } from '../shared/slotDefaults'
 
 /**
  * An agent's worktree whose folder is gone (#146): deleted after its work was merged, or a workspace copied to another
@@ -169,7 +170,7 @@ export async function recreateWorktree(projectPath: string, agentId: string, opt
     await createWorktree(projectPath, dest, old.branch, from)
     base = from
   }
-  const copied = await copyIgnored(projectPath, dest, cfg.worktreeCopy ?? config.settings.agents.worktreeCopy).catch(() => [] as string[])
+  const copied = await copyIgnored(projectPath, dest, slotCopyOf(cfg, slotLevelsOf(config.settings, workspaceOf(projectPath))).value).catch(() => [] as string[])
   log.info(`${onBranch ? 'Recreated' : 'Created a new'} worktree for ${userText(a.name)} at ${userText(dest)} on ${userText(old.branch)}${copied.length ? `; copied ${userText(copied.join(', '))}` : ''}`)
   // At a new place, its sessions and the CLIs' data for the old folder are to follow it (workspaceMove.ts finishes
   // that): the move is recorded in the same locked change as the new path, so a failure or exit after it can't lose it.

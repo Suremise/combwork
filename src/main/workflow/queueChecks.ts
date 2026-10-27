@@ -90,7 +90,7 @@ export interface QueueChecksDeps {
   logDir: string
   /** The longest a check or install runs (ms). */
   timeoutMs: () => number
-  /** The project's worktree setup command (Project Settings → Agents & Worktrees), as it is now. */
+  /** The project's worktree setup command (Project Settings → Agents), as it is now. */
   setupCommand: () => string | Promise<string>
   /** The network error codes that make a failed check transient in its last lines (Settings → Advanced, #1362); none: only the sure causes. */
   networkCodes?: () => RegExp | null

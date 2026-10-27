@@ -1655,9 +1655,9 @@ function SettingRow({ title, desc, tip, children, modified }: { title: string; d
   )
 }
 
-type ProjectSection = 'agents' | 'sessions' | 'loops' | 'workflow' | 'storage' | 'keys' | 'advanced' | `provider:${string}`
+type ProjectSection = 'general' | 'agents' | 'sessions' | 'loops' | 'workflow' | 'storage' | 'keys' | 'advanced' | `provider:${string}`
 
-const PROJECT_SECTION_ICONS: Record<string, string> = { agents: 'organization', sessions: 'history', loops: 'sync', workflow: 'git-pull-request', storage: 'database', keys: 'keyboard', advanced: 'tools' }
+const PROJECT_SECTION_ICONS: Record<string, string> = { general: 'settings-gear', agents: 'organization', sessions: 'history', loops: 'sync', workflow: 'git-pull-request', storage: 'database', keys: 'keyboard', advanced: 'tools' }
 
 // Each section's label and description are shown from its messages (text), in the window's language when it renders;
 // label and desc stay the catalogue's English, for the Assistant's tools.
@@ -1816,7 +1816,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
   // With Connections on, a CLI with them has no project model, effort or context (HI-1770: each connection's, and the agents' own).
   const connectionsShown = useStore((s) => s.advanced?.values[ACCOUNTS_PREVIEW] === true)
   const installs = useStore((s) => s.providers)
-  const [section, setSection] = useState<ProjectSection>('agents')
+  const [section, setSection] = useState<ProjectSection>('general')
   const [query, setQuery] = useState('')
   // Opened on a section from elsewhere (Settings → Workspace's Storage links).
   const jump = useStore((s) => s.projectSettingsJump)
@@ -1937,7 +1937,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
 
   const defs: ProjectSettingDef[] = [
     {
-      section: 'agents',
+      section: 'general',
       key: 'key',
       ...rowText('project.key'),
       // Its example in this project's own key.
@@ -1945,7 +1945,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       render: () => <ProjectKeyField project={project} />
     },
     {
-      section: 'agents',
+      section: 'general',
       key: 'defaultProvider',
       ...rowText('project.defaultProvider'),
       modified: cfg.defaultProvider !== 'inherit',
@@ -2115,18 +2115,6 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
             </option>
           ))}
         </select>
-      )
-    },
-    {
-      // The setup command and copied files are the Version Control tab's Slots and copies since #1445 (their rows stay
-      // for the Assistant's settings tool).
-      section: 'agents',
-      key: 'slotOptions',
-      ...rowText('project.slotOptions'),
-      render: () => (
-        <button className="btn" data-action="open-slot-options" onClick={() => openVersionControl(project.path, 'workflow')}>
-          <Icon name="source-control" /> {tr(S.openVersionControl)}
-        </button>
       )
     },
     {

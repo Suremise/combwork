@@ -372,8 +372,8 @@
     "description": "An error importing a template: the file chosen is gone."
   },
   "content.templates.noKey": {
-    "defaultMessage": "Hive couldn't read {project}'s key, and this template's agent names are made from it. Try again, or check the key in Project Settings → Agents & Worktrees.",
-    "description": "An error loading a template, or adding one of its agents, whose names hold the project's key (HI-B1 in a project whose key is HI): the key of the project ({project}, its name) couldn't be read. Project Settings → Agents & Worktrees is where the key is changed: use its translation."
+    "defaultMessage": "Hive couldn't read {project}'s key, and this template's agent names are made from it. Try again, or check the key in Project Settings → General.",
+    "description": "An error loading a template, or adding one of its agents, whose names hold the project's key (HI-B1 in a project whose key is HI): the key of the project ({project}, its name) couldn't be read. Project Settings → Agents is where the key is changed: use its translation."
   },
   "content.templates.noKeySave": {
     "defaultMessage": "Hive couldn't read {project}'s key, so the names can't be saved with it. Try again, or save without Use the project key in names.",

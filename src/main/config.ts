@@ -3,7 +3,7 @@ import { join } from 'path'
 import { copyFileSync, existsSync, readFileSync } from 'original-fs'
 import { DEFAULT_APP_CONFIG, mergeDefaults, migrateConfig, withLegacySettings } from '../shared/defaults'
 import { extraArgsProblem } from '../shared/providers'
-import type { AppConfig, AppSettings, EffortOption, FallbackModel, ModelPrice, ProviderSettings } from '../shared/types'
+import type { AppConfig, AppSettings, EffortOption, FallbackModel, ModelPrice, ProviderSettings, SlotDefaults } from '../shared/types'
 import type { SettingsPatch } from '../shared/api'
 import type { PlatformId } from '../shared/platform/descriptors'
 import type { WorkflowOptions } from '../shared/workflow/options'
@@ -146,6 +146,15 @@ class ConfigStore {
   setWorkflowDefaults(platform: PlatformId, options: Partial<WorkflowOptions>): AppSettings {
     const prev = structuredClone(this.data.settings)
     this.data.settings = { ...this.data.settings, workflow: { ...this.data.settings.workflow, [platform]: options } }
+    this.scheduleSave()
+    for (const l of this.listeners) l(this.data.settings, prev)
+    return this.data.settings
+  }
+
+  /** Replaces Hive's slot defaults (HI-1765: Settings → Workflow defaults, Git): the deep merge can't take one back to inherit. */
+  setSlotDefaults(defaults: SlotDefaults): AppSettings {
+    const prev = structuredClone(this.data.settings)
+    this.data.settings = { ...this.data.settings, slotDefaults: defaults }
     this.scheduleSave()
     for (const l of this.listeners) l(this.data.settings, prev)
     return this.data.settings
