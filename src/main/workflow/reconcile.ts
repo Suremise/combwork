@@ -21,6 +21,7 @@ import { isUnknown, type Maybe } from '../platform/types'
 import { samePath } from '../../shared/movePaths'
 import type { CardRecord } from './factStore'
 import type { Workflow, Write } from './runtime'
+import { staleWake } from './queueState'
 
 export interface ReconcileHooks {
   /** Called after the platform was read and before the write: where a test lets another observer act first. */
@@ -314,7 +315,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     }
     // A stale pass whose effects weren't applied (recorded while the rules weren't enforced): applied now, once.
     if (s.stale && wf.cfg.reconcileActs && !staleApplied(wf, card, s)) {
-      await wf.write(card, r, 'outside', (w) => sameCycle(w, s) && staleEffects(w, back, `${card.key}: stale, submit again (or put its branch back at ${approved.revision.slice(0, 7)})`)) // i18n-ignore: a wake, agent-facing
+      await wf.write(card, r, 'outside', (w) => sameCycle(w, s) && staleEffects(w, back, `${staleWake(card.key, approved.revision, s.stale?.current)} Or put its branch back at ${approved.revision.slice(0, 7)}.`)) // i18n-ignore: a wake, agent-facing
       return
     }
     // A new revision after a pass: the same change carries over, another goes stale (§16.4.4).
@@ -334,7 +335,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
         }
         observed(w, 'Stale', `stale:${s.cycle}:${s.lastHeadFact}`, { approved: approved.revision, current: head, why: o.sameness === 'exact' ? 'exact' : 'change' }) // i18n-ignore: a fact's kind and codes, not text
         // What follows from it, once, with the rules enforced (P3 records only).
-        if (wf.cfg.reconcileActs) staleEffects(w, back, `${card.key}: stale, submit again (or put its branch back at ${approved.revision.slice(0, 7)})`) // i18n-ignore: a wake, agent-facing
+        if (wf.cfg.reconcileActs) staleEffects(w, back, `${staleWake(card.key, approved.revision, head)} Or put its branch back at ${approved.revision.slice(0, 7)}.`) // i18n-ignore: a wake, agent-facing
       })
     }
     return
