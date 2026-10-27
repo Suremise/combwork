@@ -1251,9 +1251,17 @@
     "defaultMessage": "{card}: nothing committed to review.",
     "description": "A refused submit for review: the card's line has no commit since it started (git's words: nothing committed). {card} is a card key."
   },
+  "workflow.refused.submit.empty.messageForUser": {
+    "defaultMessage": "Nothing is committed to review yet.",
+    "description": "A refused move of a card to Review by the user (a drag on the board): the card's line has no commit since it started. Shown under a title that names the card and the column, so it doesn't name them."
+  },
   "workflow.refused.submit.empty.next": {
     "defaultMessage": "Commit the card's work, then submit for review. If the user didn't ask you to commit, ask them.",
     "description": "The next step after a refused submit for review with nothing committed, addressed to the agent: committing is the user's call."
+  },
+  "workflow.refused.submit.empty.nextForUser": {
+    "defaultMessage": "Commit the card's work, then move it again.",
+    "description": "The next step after the user's move of a card to Review was refused with nothing committed: commit the work, then move the card again."
   },
   "workflow.refused.submit.followUpNotBuilder.message": {
     "defaultMessage": "{card}'s follow-up is its builder's to submit: you aren't building it.",

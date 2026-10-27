@@ -154,7 +154,9 @@ const check = (name, ok, extra = '') => {
     const refusal = page.locator('.toast', { hasText: "can't move to Review" })
     check('a drag to Review with nothing to submit is refused, saying why', !!(await lib.until(async () => (await refusal.count()) > 0, HUNG_MS)))
     const said = (await refusal.first().innerText().catch(() => '')).replace(/\s+/g, ' ')
-    check('…in its sentences: what, and what to do, the card named by its key', said.includes(`${(await card(b)).key} has no change to review`) && said.includes('Commit the work, then submit.'), said)
+    // Worded for the user (HI-1851): the title names the card, once; the sentences say what and what to do.
+    const bKey = (await card(b)).key
+    check('…in its sentences: what, and what to do, the card named by its key', said.includes(`${bKey} can't move to Review`) && said.split(bKey).length === 2 && said.includes('Nothing is committed to review yet.') && said.includes("Commit the card's work, then move it again."), said)
     check('…and the card stays in Active', (await card(b))?.column === 'doing' && (await column('Active').locator(`.task-card[data-task="${b}"]`).count()) === 1)
     await refusal.first().screenshot({ path: path.join(lib.WORK, 'boardgates-refused-dark.png') })
 

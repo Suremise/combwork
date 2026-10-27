@@ -326,6 +326,19 @@ export interface RefusalFormat {
   names: boolean
   /** The project's own stage names (N5), where the window knows them: a renamed stage is named so. */
   stageNames?: StageNames | null
+  /** The user's own move refused (the board's drag, the card dialog): a rule with words of its own for them (`FOR_USER`). */
+  forUser?: boolean
+}
+
+/**
+ * A refusal's sentences where the user's own move is refused, for rules whose words are the agent's (HI-1851): the board's
+ * toast names the card in its title ("AL-2 can't move to Review"), so the message doesn't again.
+ */
+const FOR_USER: Partial<Record<RuleId, Partial<Omit<RefusalText, 'change'>>>> = {
+  'submit.empty': {
+    message: msg({ id: 'workflow.refused.submit.empty.messageForUser', defaultMessage: 'Nothing is committed to review yet.', description: "A refused move of a card to Review by the user (a drag on the board): the card's line has no commit since it started. Shown under a title that names the card and the column, so it doesn't name them." }),
+    next: msg({ id: 'workflow.refused.submit.empty.nextForUser', defaultMessage: "Commit the card's work, then move it again.", description: 'The next step after the user\'s move of a card to Review was refused with nothing committed: commit the work, then move the card again.' })
+  }
 }
 
 const IN_ENGLISH: RefusalFormat = { one: (m, values) => englishText(values ? { m, values } : m), list: (items) => items.join(', '), names: false }
@@ -365,8 +378,9 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
   const paused = values.queue === 'paused' && typeof values.waits === 'string' && Object.hasOwn(PAUSED_NEXT, values.waits) ? PAUSED_NEXT[values.waits as keyof typeof PAUSED_NEXT] : null
   const queued = rule === 'merge.hiveMerges' && typeof values.queue === 'string' && Object.hasOwn(QUEUE_NEXT, values.queue) ? (paused ?? QUEUE_NEXT[values.queue as keyof typeof QUEUE_NEXT]) : null
   const side = rule === 'move.notFromHere' && typeof values.whose === 'string' && Object.hasOwn(SIDE_NEXT, values.whose) ? SIDE_NEXT[values.whose as keyof typeof SIDE_NEXT] : null
-  const next = side ?? (rule === 'move.notFromHere' && !values.moves ? NOTHING_FROM_HERE : rule === 'platform.unknown' && values.offer === 'repositoryGone' ? REPOSITORY_GONE_NEXT : (queued ?? t.next))
-  return { message: f.one(t.message, vals), next: f.one(next, vals), change: t.change ? f.one(t.change, vals) : null }
+  const user = f.forUser ? FOR_USER[rule] : undefined
+  const next = user?.next ?? side ?? (rule === 'move.notFromHere' && !values.moves ? NOTHING_FROM_HERE : rule === 'platform.unknown' && values.offer === 'repositoryGone' ? REPOSITORY_GONE_NEXT : (queued ?? t.next))
+  return { message: f.one(user?.message ?? t.message, vals), next: f.one(next, vals), change: t.change ? f.one(t.change, vals) : null }
 }
 
 /** Builds a refusal from its rule and values: three English sentences, each from its own message. */
