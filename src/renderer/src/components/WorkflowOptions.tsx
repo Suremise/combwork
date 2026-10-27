@@ -16,6 +16,7 @@ import { agentProviderOf, cardLabelOf, confirm, notify, openVersionControl, set 
 import { cx } from '../util'
 import { SlotCopyLevel, SlotsAndCopies } from './SlotsAndCopies'
 import { ORIGIN_TEXT } from '../workflowOrigins'
+import { OriginText } from './OriginText'
 import { providerDescriptor } from '@shared/providers'
 import { agentWorkflowRole, reviewsWork } from '@shared/workflow/roles'
 import { Icon, Switch, Tooltip } from './ui'
@@ -190,7 +191,7 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
  * for None or for Git, in the project form's editor: the same groups and checks, each option inheriting from the level
  * below (the workspace's from Hive's, Hive's from every rule off).
  */
-export function WorkflowLevelForm({ level }: { level: WorkflowLevel }) {
+export function WorkflowLevelForm({ level, onDirty }: { level: WorkflowLevel; onDirty?: (dirty: boolean) => void }) {
   const [platform, setPlatform] = useState<PlatformId>('git')
   const workspacePath = useStore((s) => s.workspace?.path ?? '')
   const source = useMemo(
@@ -215,13 +216,16 @@ export function WorkflowLevelForm({ level }: { level: WorkflowLevel }) {
         </div>
         <span className="s-desc">{tr(platform === 'git' ? T.levelForGit : T.levelForNone)}</span>
       </div>
-      <WorkflowEditor source={source} project={null} />
+      <WorkflowEditor source={source} project={null} onDirty={onDirty} />
     </div>
   )
 }
 
-/** The editor: a project's options or a level's defaults (`source`), with `project` for a project's own rows. */
-function WorkflowEditor({ source, project }: { source: FormSource; project: ProjectInfo | null }) {
+/**
+ * The editor: a project's options or a level's defaults (`source`), with `project` for a project's own rows; `onDirty`
+ * hears whether its draft is unsaved (Settings → Version Control marks its tab, HI-1837).
+ */
+function WorkflowEditor({ source, project, onDirty }: { source: FormSource; project: ProjectInfo | null; onDirty?: (dirty: boolean) => void }) {
   // The form as read and its draft, kept with the project they are for: another project's never shows (HR5's round 1).
   const [loaded, setLoaded] = useState<{ for: string; form: WorkflowForm; draft: WorkflowChange } | null>(null)
   const [failed, setFailed] = useState<{ for: string; error: string } | null>(null)
@@ -303,6 +307,7 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
   const effective = useMemo((): WorkflowOptions | null => (form && draft ? ({ ...form.inherited, ...draft.options, platform: form.platform } as WorkflowOptions) : null), [form, draft])
   const dirty = !!form && !!draft && (draft.preset !== form.preset || !same(draft.options, form.own))
   dirtyRef.current = dirty
+  useEffect(() => onDirty?.(dirty), [onDirty, dirty])
   if (error) return <div className="s-desc error">{tr(T.loadFailed, { error })}</div>
   if (!form || !draft || !effective) return null
   const platform = form.platform
@@ -419,7 +424,7 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
           <div className="s-desc">{tr(text.desc)}</div>
           {controlNote(key)}
           <div className="s-desc workflow-origin">
-            {tr(T.from[origin])}
+            <OriginText origin={origin} />
             {key in draft.options && (
               <Tooltip content={tr(T.inheritTip, { value: valueText(key, form.inherited[key]) })}>
                 <button className="btn subtle small workflow-inherit" onClick={() => inheritKey(key)}>

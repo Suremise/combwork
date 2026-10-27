@@ -673,6 +673,21 @@ describe('who an account is signed in as', () => {
     expect((await accounts.confirmAccount(a.id)).fresh).toBe(false)
   })
 
+  it('at a launch, a login rewritten during the check counts with no event seen for it yet (HI-1873)', async () => {
+    // Not on in any workspace, so not watched: no event reaches Hive, as when one is still on its way or queued.
+    const a = await accounts.addAccount('claude-code', 'Unseen')
+    writeFileSync(join(folderOf(a), '.credentials.json'), '{"token":"old"}')
+    let n = 0
+    status.set(folderOf(a), async () => {
+      n++
+      // The CLI answered from the old login; the new one is written before its answer reaches Hive.
+      if (n === 1) writeFileSync(join(folderOf(a), '.credentials.json'), '{"token":"new, and longer"}')
+      return { ok: true, loggedIn: true, email: n === 1 ? 'old@example.com' : 'new@example.com', orgId: 'org-1' }
+    })
+    expect(await accounts.confirmAccount(a.id)).toMatchObject({ fresh: true, observed: { email: 'new@example.com' } })
+    expect(n).toBe(2)
+  })
+
   it('a check that ends after its account was removed is dropped', async () => {
     const a = await accounts.addAccount('claude-code', 'Late')
     let release!: () => void
@@ -920,6 +935,52 @@ describe("a workspace's accounts", () => {
           await disposeWorkspaceService(w2)
         }
       })
+    })
+
+    it('a busy folder whose login stays put is fresh at a launch: nameless events and other files written (HI-1873)', async () => {
+      const a = await accounts.addAccount('claude-code', 'Busy')
+      status.set(folderOf(a), signedIn('busy@example.com'))
+      writeFileSync(join(folderOf(a), '.credentials.json'), '{"token":1}')
+      await run(() => accounts.setAccountOn(a.id, true))
+      await vi.waitFor(() => expect(accounts.getAccount(a.id)?.observed?.email).toBe('busy@example.com'), { timeout: HUNG_MS })
+      await vi.waitFor(() => expect(accounts.accountWatched(a.id)).toBe(true), { timeout: HUNG_MS })
+      // Agents on it write their logs and databases while each check runs, made and deleted at the top of its folder (the
+      // accounts folder's watch sees that too), and Windows reports some of it with no file name.
+      status.set(folderOf(a), async () => {
+        writeFileSync(join(folderOf(a), 'logs_2.sqlite-wal'), String(Math.random()))
+        writeFileSync(join(folderOf(a), 'state_5.sqlite-journal'), 'x')
+        rmSync(join(folderOf(a), 'state_5.sqlite-journal'))
+        accounts.accountFolderEvent(a.id, null)
+        accounts.accountFolderEvent(a.id, 'logs_2.sqlite-wal')
+        // Its login file read (an access, not a write): reported by name on Windows.
+        readFileSync(join(folderOf(a), '.credentials.json'))
+        accounts.accountFolderEvent(a.id, '.credentials.json')
+        return { ok: true, loggedIn: true, email: 'busy@example.com', orgId: 'org-1' }
+      })
+      for (let i = 0; i < 3; i++) expect(await accounts.confirmAccount(a.id)).toMatchObject({ fresh: true, observed: { email: 'busy@example.com' } })
+      // The login itself rewritten during a check, among the busy folder's other writes and events, its own reported
+      // with no name: checked again, the answer after it taken.
+      let n = 0
+      status.set(folderOf(a), async () => {
+        n++
+        writeFileSync(join(folderOf(a), 'logs_2.sqlite-wal'), String(Math.random()))
+        for (let i = 0; i < 5; i++) accounts.accountFolderEvent(a.id, null)
+        if (n === 1) {
+          writeFileSync(join(folderOf(a), '.credentials.json'), '{"token":"someone else, longer"}')
+          accounts.accountFolderEvent(a.id, null)
+        }
+        for (let i = 0; i < 5; i++) accounts.accountFolderEvent(a.id, 'logs_2.sqlite-wal')
+        return { ok: true, loggedIn: true, email: `v${n}@example.com`, orgId: 'org-1' }
+      })
+      expect(await accounts.confirmAccount(a.id)).toMatchObject({ fresh: true, observed: { email: 'v2@example.com' } })
+      // Rewritten during every check: never fresh.
+      status.set(folderOf(a), async () => {
+        writeFileSync(join(folderOf(a), '.credentials.json'), `{"token":"${Math.random()}${Date.now()}"}`)
+        accounts.accountFolderEvent(a.id, null)
+        return { ok: true, loggedIn: true, email: 'moving@example.com', orgId: 'org-1' }
+      })
+      expect((await accounts.confirmAccount(a.id)).fresh).toBe(false)
+      await run(() => accounts.setAccountOn(a.id, false))
     })
   })
 })

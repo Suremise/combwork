@@ -606,6 +606,8 @@ export interface AppConfig {
     progressFilter?: Record<string, { project: string; agent?: string }>
     /** Each workspace's running lanes in the order the user put them in the Progress panel (#568), by workspace path in lower case: lane ids. */
     laneOrder?: Record<string, string[]>
+    /** The tab each remembered row of tabs last showed (HI-1837: Settings → Version Control's Hive or workspace defaults…), by the row's key. */
+    tabs?: Record<string, string>
   }
   /** Per provider: the model last seen in a session started without a model choice (the CLI's own default). */
   observedDefaultModel: Record<ProviderId, string>

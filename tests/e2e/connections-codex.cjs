@@ -35,7 +35,7 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
   fs.writeFileSync(path.join(codexHome, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
   lib.gitProject(alpha)
   fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'codex' }, { id: 'a-two', name: 'Two', provider: 'codex' }] }))
+  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'codex' }, { id: 'a-two', name: 'Two', provider: 'codex' }, { id: 'a-three', name: 'Three', provider: 'codex' }] }))
   lib.enableProviders(userData, ['claude-code', 'codex'])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -123,6 +123,23 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     const resumed = await lib.until(async () => launchedIn(work.id).find((l) => l.agent === 'Two') ?? null, HUNG_MS)
     check('…resumed on Work, the same conversation', !!resumed && resumed.args[0] === 'resume' && resumed.args[1] === first, JSON.stringify(resumed?.args?.slice(0, 2)))
     check('…its rollout found there too, through Work’s link', rollouts(path.join(accountsRoot, work.id, 'sessions')).some((f) => f.includes(first)))
+
+    // --- A third agent on a busy connection (HI-1873): One and Two run on Work, writing in its folder all the time as
+    // Codex's databases do (and so does each check's app server), its login untouched. Three starts there, every time.
+    fs.writeFileSync(path.join(accountsRoot, work.id, 'fake-busy'), '')
+    const threes = () => launchedIn(work.id).filter((l) => l.agent === 'Three').length
+    const refusedBusy = []
+    for (let i = 0; i < 3; i++) {
+      const before = threes()
+      const out = await failure(inv('session:start', alpha, { agentId: 'a-three' }))
+      if (out) refusedBusy.push(out)
+      else {
+        await lib.until(async () => threes() > before, HUNG_MS)
+        await stop('a-three')
+      }
+    }
+    check('a third agent starts on a connection two others are busy on, every time (3 of 3)', refusedBusy.length === 0, JSON.stringify(refusedBusy))
+    fs.rmSync(path.join(accountsRoot, work.id, 'fake-busy'))
     await stop('a-two')
 
     // --- A login changed in Home's folder (signed in as someone else there): warned of, not taken on.

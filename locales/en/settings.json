@@ -1711,6 +1711,10 @@
     "defaultMessage": "Applies to sessions started afterwards.",
     "description": "A line of an advanced value's info tip."
   },
+  "settings.advancedList.cliOff": {
+    "defaultMessage": "{cli} is turned off: these settings apply once you turn it on",
+    "description": "Tooltip of a dimmed tab of Settings → Advanced, and part of its name for screen readers: the CLI is turned off in Settings → Providers. {cli} is its name."
+  },
   "settings.advancedList.cliVersion": {
     "defaultMessage": "It is {cli}'s: a change records the version it was made for.",
     "description": "A line of an advanced value's info tip, for a CLI's value. {cli} is the CLI's name."
@@ -1763,9 +1767,17 @@
     "defaultMessage": "No advanced settings match.",
     "description": "Settings → Advanced's list when its filter finds nothing."
   },
+  "settings.advancedList.noMatchHere": {
+    "defaultMessage": "No settings of {group} match.",
+    "description": "A tab of Settings → Advanced with none of the filtered values: {group} is Hive or the CLI's name."
+  },
   "settings.advancedList.notValid": {
     "defaultMessage": "Not valid, so Hive uses the default: {problem}",
     "description": "Under an advanced value that isn't valid. {problem} says why."
+  },
+  "settings.advancedList.off": {
+    "defaultMessage": "off",
+    "description": "A short mark on the tab of a CLI turned off in Settings → Advanced (beside its name, such as Codex). Lower case, one short word."
   },
   "settings.advancedList.open": {
     "defaultMessage": "Open advanced.json",
@@ -1790,6 +1802,10 @@
   "settings.advancedList.restartFailed": {
     "defaultMessage": "Could not restart Hive",
     "description": "An error's title: restarting Hive from Settings → Advanced failed."
+  },
+  "settings.advancedList.tabs": {
+    "defaultMessage": "Hive and the CLIs",
+    "description": "Accessible name of Settings → Advanced's tabs: Hive, then one per CLI (Claude Code, Codex, GitHub Copilot)."
   },
   "settings.advancedList.unknown": {
     "defaultMessage": "advanced.json also names {ids}, which this Hive doesn't know (a typo, or a newer Hive's): kept in the file, not used.",
@@ -3071,6 +3087,10 @@
     "defaultMessage": "Shortcuts",
     "description": "A setting's title (Settings → Keyboard Shortcuts)."
   },
+  "settings.keys.all": {
+    "defaultMessage": "All",
+    "description": "The keyboard shortcuts editor's first tab: every command, of every category. Short."
+  },
   "settings.keys.alsoUsed": {
     "defaultMessage": "Also used by {commands}",
     "description": "Tooltip of the warning beside a shortcut other commands use too. {commands} lists them."
@@ -3102,6 +3122,10 @@
   "settings.keys.column.shortcut": {
     "defaultMessage": "Shortcut",
     "description": "A column of the keyboard shortcuts editor: the keys."
+  },
+  "settings.keys.commandIn": {
+    "defaultMessage": "{category}: {command}",
+    "description": "A command named with its category, where it may be on another tab of the shortcuts editor (Also used by…, Shortcut already in use): \"Session: Compact Conversation\". Keep the order natural for the language."
   },
   "settings.keys.inUseDetail": {
     "defaultMessage": "When two commands share a shortcut, the first one listed that is available runs. Change the other one to avoid surprises.",
@@ -3190,6 +3214,10 @@
   "settings.keys.source.removed": {
     "defaultMessage": "Removed",
     "description": "The Set column of the shortcuts editor: the user removed this command's shortcut."
+  },
+  "settings.keys.tabs": {
+    "defaultMessage": "Command categories",
+    "description": "Accessible name of the keyboard shortcuts editor's tabs: All, then one per command category (Project, Session…)."
   },
   "settings.keys.terminalKey": {
     "defaultMessage": "While an agent's terminal has focus this key goes to the agent, so the shortcut only works elsewhere.",
@@ -4786,6 +4814,10 @@
   "settings.workflow.hiveDefaults.title": {
     "defaultMessage": "Hive defaults",
     "description": "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)."
+  },
+  "settings.workflow.tabs": {
+    "defaultMessage": "Workflow defaults",
+    "description": "Accessible name of Settings → Version Control's tabs: Hive defaults and the open workspace's (HI-1837)."
   },
   "settings.workflow.workspaceDefaults.desc": {
     "defaultMessage": "For this workspace’s projects, over Hive defaults; a project sets its own in its Version Control tab.",

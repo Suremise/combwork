@@ -93,9 +93,9 @@ export function updateSummary(u: UpdateState | null): string {
 }
 
 /** Hive's mark as a line drawing in the text colour (hexagon, prompt and cursor), like the status bar's other icons. */
-function HiveMark() {
+export function HiveMark({ className = 'status-hex' }: { className?: string }) {
   return (
-    <svg className="status-hex" viewBox="0 0 512 512" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="44" strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} viewBox="0 0 512 512" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="44" strokeLinecap="round" strokeLinejoin="round">
       <polygon points="478,256 367,448 145,448 34,256 145,64 367,64" />
       <polyline points="170,190 246,256 170,322" />
       <line x1="280" y1="322" x2="348" y2="322" />

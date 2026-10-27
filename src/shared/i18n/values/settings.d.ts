@@ -429,6 +429,7 @@ interface HiveMessageValues {
   'settings.advancedList.alsoSetting': { key: string | number }
   'settings.advancedList.appliesAtRestart': undefined
   'settings.advancedList.appliesToSessions': undefined
+  'settings.advancedList.cliOff': { cli: string | number }
   'settings.advancedList.cliVersion': { cli: string | number }
   'settings.advancedList.default': { value: string | number }
   'settings.advancedList.fileError': { problem: string | number }
@@ -442,13 +443,16 @@ interface HiveMessageValues {
   'settings.advancedList.modified': undefined
   'settings.advancedList.modifiedOnly': undefined
   'settings.advancedList.noMatch': undefined
+  'settings.advancedList.noMatchHere': { group: string | number }
   'settings.advancedList.notValid': { problem: string | number }
+  'settings.advancedList.off': undefined
   'settings.advancedList.open': undefined
   'settings.advancedList.openFailed': undefined
   'settings.advancedList.reset': { value: string | number }
   'settings.advancedList.restart': undefined
   'settings.advancedList.restartDue': undefined
   'settings.advancedList.restartFailed': undefined
+  'settings.advancedList.tabs': undefined
   'settings.advancedList.unknown': { ids: string | number }
   'settings.advancedList.workspace': undefined
   'settings.advancedList.workspaceLabel': { label: string | number }
@@ -769,6 +773,7 @@ interface HiveMessageValues {
   'settings.keybindings.editor.desc': undefined
   'settings.keybindings.editor.tip': undefined
   'settings.keybindings.editor.title': undefined
+  'settings.keys.all': undefined
   'settings.keys.alsoUsed': { commands: string | number }
   'settings.keys.cantUse': { keys: string | number }
   'settings.keys.change': undefined
@@ -777,6 +782,7 @@ interface HiveMessageValues {
   'settings.keys.column.command': undefined
   'settings.keys.column.set': undefined
   'settings.keys.column.shortcut': undefined
+  'settings.keys.commandIn': { category: string | number; command: string | number }
   'settings.keys.inUseDetail': undefined
   'settings.keys.inUseMessage': { keys: string | number; commands: string | number }
   'settings.keys.inUseTitle': undefined
@@ -799,6 +805,7 @@ interface HiveMessageValues {
   'settings.keys.source.global': undefined
   'settings.keys.source.project': undefined
   'settings.keys.source.removed': undefined
+  'settings.keys.tabs': undefined
   'settings.keys.terminalKey': undefined
   'settings.keys.useGlobal': undefined
   'settings.keys.useIt': undefined
@@ -1198,6 +1205,7 @@ interface HiveMessageValues {
   'settings.workflow.hiveDefaults.desc': undefined
   'settings.workflow.hiveDefaults.tip': undefined
   'settings.workflow.hiveDefaults.title': undefined
+  'settings.workflow.tabs': undefined
   'settings.workflow.workspaceDefaults.desc': undefined
   'settings.workflow.workspaceDefaults.tip': undefined
   'settings.workflow.workspaceDefaults.title': undefined
