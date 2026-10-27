@@ -1,5 +1,5 @@
 import type { LiveSessionState, ProviderId } from './types'
-import { resolveConnection, type ConnectionChoice, type ConnectionsView } from './accounts'
+import { connectionsApply, resolveConnection, type ConnectionChoice, type ConnectionsView } from './accounts'
 
 /**
  * Which connection an agent's rows name (HI-1769), by the launch's own rule (resolveConnection), so the window and a start
@@ -20,7 +20,7 @@ export interface ConnectionShown {
 }
 
 export function connectionOf(own: string | undefined, provider: ProviderId, launched: LiveSessionState['launchedConnection'] | undefined, view: ConnectionsView | null): ConnectionShown | null {
-  if (!view?.providers.includes(provider)) return null
+  if (!view || !connectionsApply(view, provider)) return null
   const name = (id: string): string | undefined => view.connections.find((c) => c.id === id)?.name
   const r = resolveConnection({ connections: view.workspace }, provider, own, view.connections)
   const desired: ConnectionShown['desired'] = r.ok ? { ...r, name: name(r.id) ?? r.id } : { ...r, ...(r.wanted && name(r.wanted) ? { wantedName: name(r.wanted) } : {}) }

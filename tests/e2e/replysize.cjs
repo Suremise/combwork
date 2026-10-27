@@ -154,7 +154,8 @@ const prose = (seed, n) => {
   console.log('\n--- hive tools (as an agent)')
   const projects = measure('hive_list_projects', tool('hive_list_projects', {}), 1000)
   check('projects: a line each, with their agents and their roles in the workflow (#1430)', /^alpha \(on, \w+\): Coder \[claude-code, builder\] idle; Tester \[claude-code, builder\] stopped$/m.test(projects), projects)
-  measure('hive_project_status', tool('hive_project_status', {}), 3000)
+  // About 3,030 characters: each Claude Code agent's connection fields (HI-1771), there for everyone since HI-1774.
+  measure('hive_project_status', tool('hive_project_status', {}), 3200)
   const usage = measure('hive_session_usage', tool('hive_session_usage', {}), 1500)
   check('usage leaves out its days unless asked', !usage.includes('"days"') && tool('hive_session_usage', { days: true }).text.includes('"days"'))
   const notes = measure('hive_list_shared_notes', tool('hive_list_shared_notes', {}), 1500)
@@ -376,8 +377,9 @@ const prose = (seed, n) => {
   const recolour = measure('hive_update_setting (a table)', tool('hive_update_setting', { id: 'board.colors', value: { doing: '#ff0000' } }, 'assistant+settings'), 400)
   check('a table change says which entry changed, old → new', /^Changed Settings → Board → Column colours \(board\.colors\): doing: #[0-9a-f]{6} → doing: #ff0000\./.test(recolour), recolour)
   await inv('settings:update', { board: { colors: { doing: '#3b82f6' } } })
-  const badEffort = tool('hive_update_setting', { id: 'claude-code.defaultEffort', value: 'bananas' }, 'assistant+settings')
-  check("an effort level the picker doesn't offer is refused, naming those it does", badEffort.isError && /takes one of: /.test(badEffort.text) && (await inv('settings:get')).providers['claude-code'].defaultEffort === '', badEffort.text)
+  // Copilot's: a CLI with connections has no default effort of its own (HI-1774).
+  const badEffort = tool('hive_update_setting', { id: 'copilot.defaultEffort', value: 'bananas' }, 'assistant+settings')
+  check("an effort level the picker doesn't offer is refused, naming those it does", badEffort.isError && /takes one of: /.test(badEffort.text) && (await inv('settings:get')).providers.copilot.defaultEffort === '', badEffort.text)
   await inv('settings:update', { assistant: { providers: { 'claude-code': { model: 'opus' } } } })
   const ownModel = tool('hive_read_setting', { id: 'assistant.claude-code.model' }, 'assistant').text
   check("the Assistant's own model reads as it is, and is the user's", /\(assistant\.claude-code\.model\): opus \(default \(empty\)\)/.test(ownModel) && /Read-only to you: /.test(ownModel), ownModel)

@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { Connection, LiveSessionState, ProviderId } from '@shared/types'
-import { resolveConnection, type ConnectionsView } from '@shared/accounts'
+import { connectionsApply, resolveConnection, type ConnectionsView } from '@shared/accounts'
 import { enabledProviders, providerDescriptor } from '@shared/providers'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call } from '../api'
@@ -64,6 +64,7 @@ export function useConnections(): ConnectionsView | null {
  */
 export function useLaunchConnection(own: string | undefined, provider: ProviderId): Connection | null | undefined {
   const view = useConnections()
+  // The layer is the connection's for every CLI with connections, a test copy on its CLI test home too (none: null).
   if (!view?.providers.includes(provider)) return undefined
   const r = resolveConnection({ connections: view.workspace }, provider, own || undefined, view.connections)
   return r.ok ? (view.connections.find((c) => c.id === r.id) ?? null) : null
@@ -76,7 +77,7 @@ export function useLaunchConnection(own: string | undefined, provider: ProviderI
  */
 export function ConnectionChoice({ provider, value, onChange, onOtherCli, id }: { provider: ProviderId; value: string; onChange: (v: string) => void; onOtherCli?: (provider: ProviderId, connection: string) => void; id?: string }) {
   const view = useConnections()
-  if (!providerDescriptor(provider).capabilities.connections || !view) return null
+  if (!providerDescriptor(provider).capabilities.connections || !view || !connectionsApply(view, provider)) return null
   const onFor = (p: ProviderId) => view.connections.filter((c) => c.provider === p && view.workspace[p]?.on.includes(c.id))
   const ws = view.workspace[provider]
   const on = onFor(provider)

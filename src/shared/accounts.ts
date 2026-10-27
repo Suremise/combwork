@@ -28,6 +28,15 @@ export interface ConnectionsView {
 }
 
 /**
+ * Whether a CLI's agents run on connections here, for what the window shows (HI-1774): it has them and is on (the view
+ * lists it), unless this is a test copy on its CLI test home with none on in the workspace, which launches as before
+ * connections (the seam, HI-1755) and so shows none of them (no Connection column, the CLI's own plan limits).
+ */
+export function connectionsApply<V extends Pick<ConnectionsView, 'providers' | 'testHome' | 'workspace'>>(view: V | null | undefined, cli: ProviderId): view is V {
+  return !!view && view.providers.includes(cli) && !(view.testHome.includes(cli) && !view.workspace[cli]?.default)
+}
+
+/**
  * An account's state, from `accepted` (who the user took it on as) and `observed` (the latest check), never merged: a
  * check can't clear a change the user hasn't answered.
  * - `missing`: its folder isn't there (or was replaced by something Hive didn't make).

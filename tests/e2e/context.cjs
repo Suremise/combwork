@@ -1,5 +1,5 @@
-// Use 200K context (instead of 1M): the global setting (off by default), the project's and the agent's choices
-// in the UI, and what a launch gets (CLAUDE_CODE_DISABLE_1M_CONTEXT, and the model without "[1m]"). The model
+// Use 200K context (instead of 1M): the agent's own choice and the Assistant's in the UI (Claude Code has no global or
+// project choice since connections hold the defaults, HI-1774: a project's old value isn't read), and what a launch gets (CLAUDE_CODE_DISABLE_1M_CONTEXT, and the model without "[1m]"). The model
 // pickers have no 1M checkbox. Agents run the fake Claude Code (fake-claude/), which records each launch.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -57,16 +57,12 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `contex
     }
   }
 
-  // Global setting: off by default, on the Claude Code page.
-  check('off by default', (await inv('settings:get')).providers['claude-code'].use200kContext === false)
+  // No global setting: each connection's (HI-1774).
   await page.keyboard.press('Control+,')
-  await lib.sleep(800)
   await page.locator('.settings-nav .row', { hasText: 'Claude Code' }).click()
-  await lib.sleep(500)
-  const setting = page.locator('.setting', { hasText: 'Use 200K context (instead of 1M)' })
-  check('Settings → Claude Code has the setting', (await setting.count()) === 1)
+  await lib.until(async () => (await page.getByText('CLI path', { exact: true }).count()) === 1, HUNG_MS)
+  check('Settings → Claude Code has no such setting (each connection has its own)', (await page.locator('.setting', { hasText: 'Use 200K context (instead of 1M)' }).count()) === 0)
   check('no 1M checkbox in the model picker', (await page.getByText('1M context', { exact: true }).count()) === 0)
-  await setting.scrollIntoViewIfNeeded()
   await shot(page, '1-settings')
   await page.locator('.settings-nav .row', { hasText: 'Codex' }).click()
   await lib.sleep(400)
@@ -84,7 +80,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `contex
   const ctxLabel = dialog.locator('.agent-form > label', { hasText: 'Use 200K context (instead of 1M)' })
   check('Add Agent has the choice for Claude Code', (await ctxLabel.count()) === 1)
   const ctxSelect = ctxLabel.locator('xpath=following-sibling::select[1]')
-  check('…following the project (Off)', (await ctxSelect.locator('option').first().innerText()) === "Project's (Off)")
+  check('…following its connection, none of the project', !/Project's/.test(await ctxSelect.locator('option').first().innerText()), await ctxSelect.locator('option').first().innerText())
   await ctxSelect.selectOption('on')
   await dialog.locator('input.input').first().fill('Small')
   await shot(page, '2-add-agent')
@@ -118,25 +114,22 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `contex
   await inv('session:stop', proj, small.id)
   await until(async () => !(await live(small.id)), HUNG_MS)
 
-  // null clears the agent's choice: it follows the project, whose On wins over the global Off.
+  // null clears the agent's choice; a project's old On (from before connections) isn't read: its connection decides.
   await inv('agents:update', proj, small.id, { use200kContext: null })
   small = (await project()).agents.find((a) => a.id === small.id)
   check('null clears the choice', small.use200kContext === undefined, JSON.stringify(small))
   await inv('project:updateProvider', proj, 'claude-code', { use200kContext: 'on' })
   await inv('session:start', proj, { agentId: small.id })
   await until(async () => (await live(small.id))?.status === 'ready', HUNG_MS)
-  check("the project's On applies", launches().at(-1)?.env?.CLAUDE_CODE_DISABLE_1M_CONTEXT === '1')
+  check("a project's old On isn't read (HI-1774)", launches().at(-1)?.env?.CLAUDE_CODE_DISABLE_1M_CONTEXT === undefined, JSON.stringify(launches().at(-1)?.env))
   await inv('session:stop', proj, small.id)
   await until(async () => !(await live(small.id)), HUNG_MS)
 
-  // Project settings show the project's choice; Agent Settings shows the agent's.
+  // Project Settings has no such row for Claude Code; Agent Settings shows the agent's own.
   await lib.openProjectSettings(page)
-  await lib.sleep(600)
   await page.locator('.settings-nav .row', { hasText: 'Claude Code' }).click()
-  await lib.sleep(500)
-  const projSetting = page.locator('.setting', { hasText: 'Use 200K context (instead of 1M)' })
-  check('Project Settings → Claude Code has the setting', (await projSetting.count()) === 1)
-  check('…showing On', (await projSetting.locator('select').inputValue()) === 'on')
+  await lib.until(async () => (await page.locator('.setting', { hasText: 'Extra arguments' }).count()) >= 1, HUNG_MS)
+  check('Project Settings → Claude Code has no such setting', (await page.locator('.setting', { hasText: 'Use 200K context (instead of 1M)' }).count()) === 0)
   await shot(page, '3-project')
   await inv('agents:update', proj, small.id, { use200kContext: false })
   await page.locator('.settings-nav .row', { hasText: 'Agents' }).first().click()
@@ -147,12 +140,12 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `contex
   const sd = page.locator('.dialog', { hasText: 'Small settings' })
   const sdSelect = sd.locator('.agent-form > label', { hasText: 'Use 200K context' }).locator('xpath=following-sibling::select[1]')
   check('Agent Settings shows the agent’s Off', (await sdSelect.inputValue()) === 'off')
-  check('…with the project’s On as the default', (await sdSelect.locator('option').first().innerText()) === "Project's (On)")
+  check('…with its connection’s as the default, never the project’s', !/Project's/.test(await sdSelect.locator('option').first().innerText()), await sdSelect.locator('option').first().innerText())
   await shot(page, '4-agent-settings')
   await sdSelect.selectOption('')
   await sd.locator('.btn.primary', { hasText: 'Save' }).click()
   await lib.until(async () => (await project()).agents.find((a) => a.id === small.id)?.use200kContext === undefined, 10000)
-  check('Save with the project’s choice clears it', (await project()).agents.find((a) => a.id === small.id)?.use200kContext === undefined)
+  check('Save with the default clears it', (await project()).agents.find((a) => a.id === small.id)?.use200kContext === undefined)
 
   // The Assistant: Settings → Assistant's choice reaches its launch.
   await inv('settings:update', { assistant: { providers: { 'claude-code': { use200kContext: 'on' } } } })

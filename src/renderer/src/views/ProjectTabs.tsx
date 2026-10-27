@@ -36,7 +36,7 @@ import { DataTable, useDateColumns, type DataColumn } from '../components/DataTa
 import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Switch, Tooltip } from '../components/ui'
 import { ConnectionMark, useConnections } from '../components/ConnectionChoice'
 import { useConnectionsInUse } from '../connectionUsage'
-import { resolveConnection } from '@shared/accounts'
+import { connectionsApply, resolveConnection } from '@shared/accounts'
 import { languageFor } from '../monacoLang'
 import { useScopedLoad } from '../scopedLoad'
 import { oneAtATime, withinTime } from '@shared/coalesce'
@@ -904,7 +904,7 @@ export function PlanLimits({ provider }: { provider: ProviderId }) {
   const inUse = useConnectionsInUse()
   const now = useNow(60000)
   const p = providerDescriptor(provider)
-  if (view?.providers.includes(provider)) {
+  if (connectionsApply(view, provider)) {
     const ids = [...new Set([...(view.workspace[provider]?.on ?? []), ...inUse.filter((c) => c.provider === provider).map((c) => c.id)])]
     if (!ids.length) return <p className="hint">{tr(M.noConnectionsOn, { provider: p.name })}</p>
     return (

@@ -20,6 +20,7 @@ import { AGENT_LIMIT_MAX } from '@shared/defaults'
 import { AgentRowsTable, CARD_COLUMN, PROJECT_COLUMN, STATE_COLUMN, WAITING_COLUMN, agentRow, tableText, type AgentTableData, type AgentTableRow } from './AgentsTable'
 import { limitWindow } from '../views/ProjectTabs'
 import { useConnections } from './ConnectionChoice'
+import { connectionsApply } from '@shared/accounts'
 import { useConnectionsInUse } from '../connectionUsage'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 
@@ -251,7 +252,7 @@ function PlanUsageStatus() {
   const view = useConnections()
   const inUse = useConnectionsInUse()
   const now = useNow(60000)
-  const byConnections = new Set(view?.providers ?? [])
+  const byConnections = new Set((view?.providers ?? []).filter((p) => connectionsApply(view, p)))
   return (
     <>
       {enabledProviders(settings).map((p) =>

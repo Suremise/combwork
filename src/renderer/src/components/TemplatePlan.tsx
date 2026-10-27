@@ -1,6 +1,6 @@
 import { pairedShown, type SettingShown, type TemplateLoadView } from '@shared/templateLoad'
 import { isKnownProvider } from '@shared/providers'
-import type { ConnectionsView } from '@shared/accounts'
+import { connectionsApply, type ConnectionsView } from '@shared/accounts'
 import type { ConnectionProblem, ProviderId, TemplateLoadPlan } from '@shared/types'
 import { WORKFLOW_ROLE_TEXT } from '@shared/workflow/roles'
 import { ProviderIcon } from './ProviderIcon'
@@ -74,7 +74,7 @@ const oldNote = (note: string): ReactNode => <span className="faint template-pla
 export function TemplatePlan({ view, edit, connections }: { view: TemplateLoadView; edit?: NameEdit; connections?: ConnectionEdit }) {
   const goes = new Map(view.removed.map((a) => [a.name.toLowerCase(), a]))
   // The Connection column only where one of its agents' CLIs has connections shown (HI-1769).
-  const conn = connections && view.created.some((a) => isKnownProvider(a.provider) && connections.view.providers.includes(a.provider)) ? connections : undefined
+  const conn = connections && view.created.some((a) => isKnownProvider(a.provider) && connectionsApply(connections.view, a.provider)) ? connections : undefined
   const columns = conn ? 7 : 6
   return (
     <div className="template-plan">
@@ -134,7 +134,7 @@ export function TemplatePlan({ view, edit, connections }: { view: TemplateLoadVi
                   </td>
                   <td>{a.effort ? <Setting s={a.effort} /> : <span className="faint">—</span>}</td>
                   <td>{a.mode ? <Setting s={a.mode} /> : <span className="faint">—</span>}</td>
-                  {conn && (isKnownProvider(a.provider) && conn.view.providers.includes(a.provider) ? <ConnectionCell edit={conn} index={i} provider={a.provider} agent={edit?.names[i] ?? a.name} /> : <td><span className="faint">—</span></td>)}
+                  {conn && (isKnownProvider(a.provider) && connectionsApply(conn.view, a.provider) ? <ConnectionCell edit={conn} index={i} provider={a.provider} agent={edit?.names[i] ?? a.name} /> : <td><span className="faint">—</span></td>)}
                 </tr>
                 {old && (
                   <tr data-old-of={a.name} className="template-plan-old-row">
