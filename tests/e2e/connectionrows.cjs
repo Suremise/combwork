@@ -68,6 +68,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await inv('connections:setDefault', max2.id)
     await page.locator('.project-row', { hasText: 'alpha' }).first().click()
     await lib.openProjectSettings(page)
+    // The list of agents is Project Settings → Agents' (HI-1765: it opens on General).
+    await page.locator('.tab-body .settings-nav .row').filter({ has: page.locator('.label', { hasText: /^Agents$/ }) }).click()
     const mark = (id) => page.locator(`.agent-list-row[data-agent="${id}"] .agent-connection`)
     const attrs = async (id) => mark(id).evaluate((el) => ({ id: el.dataset.connection, state: el.dataset.connectionState, other: el.hasAttribute('data-connection-other'), text: el.textContent.trim() })).catch(() => null)
     const one = await lib.until(async () => {
