@@ -724,7 +724,8 @@ export interface ServerModel {
   as?: ModelAlias[]
   /**
    * The server runs it elsewhere (HI-1773: an Ollama cloud model, reached through the server on this PC but run on
-   * ollama.com): as its server's listing said, else by its preset's pattern. Its sessions are never free (local).
+   * ollama.com), so its sessions are never free (local). Kept in config only as its server's listing said; what main
+   * sends a window or a launch also has its preset's pattern applied, as set now (withRemote).
    */
   remote?: true
 }

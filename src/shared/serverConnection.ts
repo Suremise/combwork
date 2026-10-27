@@ -99,16 +99,24 @@ export function cleanModels(models: readonly ServerModel[]): ServerModel[] {
 }
 
 /**
- * Models as saved from a form (HI-1773): a model is remote when it was (its server's listing said so: an edit of its
- * names keeps that, whatever the window sent) or its id is one its preset's pattern takes; the window never makes one
- * remote, nor local again.
+ * Models as saved from a form (HI-1773): `remote` kept only where its server's listing said so (an edit of its names
+ * keeps that, whatever the window sent); the window never marks a model, nor takes a mark off. A preset's pattern is
+ * never saved: withRemote applies it as the models are used.
  */
-export function markRemote(models: readonly ServerModel[], before: readonly ServerModel[], isRemoteId: (id: string) => boolean): ServerModel[] {
+export function keepListedRemote(models: readonly ServerModel[], before: readonly ServerModel[]): ServerModel[] {
   const was = new Set(before.filter((m) => m.remote).map((m) => m.id))
   return cleanModels(models.map(({ remote: _sent, ...m }) => {
     const id = typeof m.id === 'string' ? m.id.trim() : ''
-    return was.has(id) || isRemoteId(id) ? { ...m, remote: true as const } : m
+    return was.has(id) ? { ...m, remote: true as const } : m
   }))
+}
+
+/**
+ * A server's models as they run now (HI-1773): remote where its listing said so, or where its preset's pattern takes
+ * the id as it is set now. What a launch, the connection's row, the pickers and the footer all use.
+ */
+export function withRemote(models: readonly ServerModel[], isRemoteId: (id: string) => boolean): ServerModel[] {
+  return models.map((m) => (m.remote || !isRemoteId(m.id) ? m : { ...m, remote: true as const }))
 }
 
 /** Each alias's model, where one stands in for it. */

@@ -597,22 +597,30 @@ describe('Ollama cloud models: on this PC, but not local (HI-1773, Darren 27 Oct
   })
   afterAll(() => new Promise<void>((r) => srv.close(() => r())))
   const ollama = (models: { id: string; as?: ('opus' | 'sonnet' | 'haiku')[]; remote?: true }[], preset: string | undefined = 'ollama') => serverOn({ name: 'Ollama', preset, baseUrl: `http://127.0.0.1:${port}`, models })
-  const local = async (id: string): Promise<boolean> => {
+  /** A new launch on it: whether it runs only on this PC, and its models as the footer gets them. */
+  const launched = async (id: string): Promise<{ local: boolean; cloud: string[] }> => {
     const conn = (await launch(id))!
     try {
-      return conn.server!.local
+      return { local: conn.server!.local, cloud: conn.server!.models.filter((m) => m.remote).map((m) => m.id) }
     } finally {
       conn.release()
     }
   }
+  const local = async (id: string): Promise<boolean> => (await launched(id)).local
+  /** Its models marked cloud as Settings → Connections and the pickers get them, and as config keeps them. */
+  const shownCloud = (id: string): string[] => view().connections.find((c) => c.id === id)!.server!.models.filter((m) => m.remote).map((m) => m.id)
+  const savedCloud = (id: string): string[] => accounts.getAccount(id)!.server!.models.filter((m) => m.remote).map((m) => m.id)
+  const pattern = async (value: string | null): Promise<void> => advanced.set('claude-code.connections.remoteModels', value)
   const tag = (name: string, remote?: string) => ({ name, model: name, size: 1, digest: 'x', ...(remote ? { remote_model: name, remote_host: remote } : {}) })
 
   it("read from Ollama: a model it marks remote (an alias of a cloud model too) is cloud, the rest local; each reading says it afresh", async () => {
     const a = await ollama([{ id: 'qwen3:8b', as: ['opus'] }])
     expect(await local(a.id)).toBe(true)
-    // The server's own mark, whatever the name; a cloud tag it doesn't mark (an older Ollama), by the preset's pattern.
+    // The server's own mark, whatever the name, kept; a cloud tag it doesn't mark (an older Ollama), by the preset's
+    // pattern as it runs, never kept.
     tags = { models: [tag('qwen3:8b'), tag('mine', 'https://ollama.com:443'), tag('glm-4.6:cloud')] }
     expect(await servers.readServerModels(a.id, 'r1')).toMatchObject({ ok: true, models: [{ id: 'qwen3:8b', as: ['opus'] }, { id: 'mine', remote: true }, { id: 'glm-4.6:cloud', remote: true }] })
+    expect(savedCloud(a.id)).toEqual(['mine'])
     expect(await local(a.id)).toBe(false)
     // Read again: what this reading says, not what the last one did.
     tags = { models: [tag('qwen3:8b'), tag('mine')] }
@@ -636,27 +644,66 @@ describe('Ollama cloud models: on this PC, but not local (HI-1773, Darren 27 Oct
 
   it('typed: by the preset\'s pattern (a tag of cloud or …-cloud, never a name\'s own -cloud), and only for the Ollama preset', async () => {
     const a = await ollama([{ id: 'qwen3:8b', as: ['opus'] }, { id: 'gpt-oss:120b-cloud' }, { id: 'my-cloud' }])
-    expect(accounts.getAccount(a.id)!.server!.models.map((m) => [m.id, !!m.remote])).toEqual([['qwen3:8b', false], ['gpt-oss:120b-cloud', true], ['my-cloud', false]])
-    expect(await local(a.id)).toBe(false)
+    // Marked as it runs and as it's shown, never in config (round 1).
+    expect(savedCloud(a.id)).toEqual([])
+    expect(shownCloud(a.id)).toEqual(['gpt-oss:120b-cloud'])
+    expect(await launched(a.id)).toEqual({ local: false, cloud: ['gpt-oss:120b-cloud'] })
     // A custom server on this PC: no pattern of Ollama's applies.
     const custom = await ollama([{ id: 'gemma4:cloud', as: ['opus'] }], '')
-    expect(accounts.getAccount(custom.id)!.server!.models[0].remote).toBeUndefined()
-    expect(await local(custom.id)).toBe(true)
+    expect(shownCloud(custom.id)).toEqual([])
+    expect(await launched(custom.id)).toEqual({ local: true, cloud: [] })
     // The real names Ollama gives (tests/fixtures/advanced): its cloud models taken, its local ones not.
     const test = accounts.remoteModelTest(providerDescriptor('claude-code').capabilities.connections!.server!, 'ollama')
     expect(['gemma4:cloud', 'kimi-k2.7-code:cloud', 'qwen3-coder:480b-cloud', 'deepseek-v3.1:671b-cloud'].every(test)).toBe(true)
     expect(['qwen3.8:27b', 'qwen3-coder-next:q4_K_M', 'qwen3.6:35b-a3b', 'devstral-small-2:24b', 'my-cloud', 'cloud'].some(test)).toBe(false)
   })
 
-  it('the pattern as set in Settings → Advanced applies at the next launch to models already typed', async () => {
+  it('the pattern as set in Settings → Advanced applies at the next launch and in what windows show, both ways (round 1)', async () => {
     const a = await ollama([{ id: 'qwen3:8b', as: ['opus'] }])
-    expect(await local(a.id)).toBe(true)
-    await advanced.set('claude-code.connections.remoteModels', '^qwen3:')
+    expect(await launched(a.id)).toEqual({ local: true, cloud: [] })
+    await pattern('^qwen3:')
     try {
-      expect(await local(a.id)).toBe(false)
+      expect(await launched(a.id)).toEqual({ local: false, cloud: ['qwen3:8b'] })
+      expect(shownCloud(a.id)).toEqual(['qwen3:8b'])
     } finally {
-      await advanced.set('claude-code.connections.remoteModels', null)
+      await pattern(null)
     }
-    expect(await local(a.id)).toBe(true)
+    // Set back: local again, with no edit or reading.
+    expect(await launched(a.id)).toEqual({ local: true, cloud: [] })
+    expect(shownCloud(a.id)).toEqual([])
+  })
+
+  it('added while the pattern was wrong, then the pattern put right: a new launch is local (round 1, HR3\'s repro)', async () => {
+    await pattern('^qwen3:')
+    let a: Awaited<ReturnType<typeof ollama>>
+    try {
+      a = await ollama([{ id: 'qwen3:8b', as: ['opus'] }])
+    } finally {
+      await pattern(null)
+    }
+    expect(savedCloud(a.id)).toEqual([])
+    expect(await launched(a.id)).toEqual({ local: true, cloud: [] })
+  })
+
+  it("a connection saved before S7 (a cloud model typed, no mark): marked cloud as it runs and as it's shown (round 1)", async () => {
+    const a = await ollama([{ id: 'qwen3:8b', as: ['opus'] }])
+    // As S6 saved it: a typed cloud model, never marked.
+    config.update((c) => {
+      const s = c.connections!.find((x) => x.id === a.id)!.server!
+      s.models = [{ id: 'gemma4:cloud', as: ['opus'] }]
+    })
+    expect(savedCloud(a.id)).toEqual([])
+    expect(await launched(a.id)).toEqual({ local: false, cloud: ['gemma4:cloud'] })
+    expect(shownCloud(a.id)).toEqual(['gemma4:cloud'])
+  })
+
+  it('moved off the Ollama preset: its pattern no longer applies; a mark Ollama gave stays until read again', async () => {
+    const a = await ollama([{ id: 'gemma4:cloud', as: ['opus'] }])
+    tags = { models: [tag('gemma4:cloud'), tag('mine', 'https://ollama.com:443')] }
+    await servers.readServerModels(a.id, 'r')
+    expect(shownCloud(a.id)).toEqual(['gemma4:cloud', 'mine'])
+    await servers.editServerConnection(a.id, { preset: null })
+    expect(shownCloud(a.id)).toEqual(['mine'])
+    expect(await local(a.id)).toBe(false)
   })
 })

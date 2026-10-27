@@ -1,7 +1,7 @@
 // A server connection's rules (HI-1772, shared/serverConnection.ts): which base URLs are taken and which are this PC's,
 // what a key and a model id may be, how models stand in for the CLI's aliases, and a model listing's reply.
 import { describe, expect, it } from 'vitest'
-import { aliasModels, cleanModels, isLoopbackHost, keyProblem, listedIds, listedRemote, listingUrl, LISTED_MAX, markRemote, mergeListed, parseBaseUrl, serverDefaultModel, serverModelOf } from '../src/shared/serverConnection'
+import { aliasModels, cleanModels, isLoopbackHost, keyProblem, keepListedRemote, listedIds, listedRemote, listingUrl, LISTED_MAX, mergeListed, parseBaseUrl, serverDefaultModel, serverModelOf, withRemote } from '../src/shared/serverConnection'
 import { providerDescriptor } from '../src/shared/providers'
 import { serverModelLabel } from '../src/shared/models'
 
@@ -116,10 +116,15 @@ describe('models a server runs elsewhere (HI-1773: Ollama cloud models)', () => 
     const before = [{ id: 'a', as: ['opus' as const], remote: true as const }, { id: 'b' }]
     expect(mergeListed(before, ['a', 'b'], (id) => id === 'b').models).toEqual([{ id: 'a', as: ['opus'] }, { id: 'b', remote: true }])
   })
-  it("saved from a form: a mark it had stays, the pattern's added, the window's own ignored", () => {
+  it("saved from a form: the listing's mark it had stays, the window's own ignored, no pattern saved", () => {
     const before = [{ id: 'mine', remote: true as const }, { id: 'qwen3:8b' }]
     const sent = [{ id: 'mine', as: ['opus' as const] }, { id: 'qwen3:8b', remote: true as const }, { id: ' x:cloud ' }]
-    expect(markRemote(sent, before, (id) => id.endsWith(':cloud'))).toEqual([{ id: 'mine', as: ['opus'], remote: true }, { id: 'qwen3:8b' }, { id: 'x:cloud', remote: true }])
+    expect(keepListedRemote(sent, before)).toEqual([{ id: 'mine', as: ['opus'], remote: true }, { id: 'qwen3:8b' }, { id: 'x:cloud' }])
+  })
+  it('as they run: the listing\'s marks, and the pattern as it is now (round 1)', () => {
+    const saved = [{ id: 'mine', remote: true as const }, { id: 'qwen3:8b', as: ['opus' as const] }, { id: 'x:cloud' }]
+    expect(withRemote(saved, (id: string) => id.endsWith(':cloud'))).toEqual([{ id: 'mine', remote: true }, { id: 'qwen3:8b', as: ['opus'] }, { id: 'x:cloud', remote: true }])
+    expect(withRemote(saved, () => false)).toEqual(saved)
   })
   it('the footer and the pickers say cloud', () => {
     expect(serverModelOf([{ id: 'glm-4.6:cloud', as: ['opus'], remote: true }], 'claude-opus-5-5')).toEqual({ id: 'glm-4.6:cloud', as: ['opus'], remote: true })

@@ -169,6 +169,13 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     await row('Ollama').locator('[data-read-models]').click()
     check("a model Ollama runs in the cloud is marked so in its row, whatever its name", !!(await lib.until(async () => (await row('Ollama').locator('[data-server-models-line]').innerText().catch(() => '')).includes('mine (cloud)'), HUNG_MS)), await row('Ollama').innerText().catch(() => ''))
     await shots('cloud')
+    // The pattern for typed models, changed in Settings → Advanced: the row follows at once, both ways, with nothing
+    // edited or read again (HI-1773 round 1).
+    const modelsLine = () => row('Ollama').locator('[data-server-models-line]').innerText().catch(() => '')
+    await inv('advanced:set', 'claude-code.connections.remoteModels', '^devstral:')
+    check('…a pattern set in Advanced marks a typed model cloud at once', !!(await lib.until(async () => (await modelsLine()).includes('devstral:24b (cloud)'), HUNG_MS)), await modelsLine())
+    await inv('advanced:set', 'claude-code.connections.remoteModels', null)
+    check('…and set back, unmarks it, the listed mark kept', !!(await lib.until(async () => !(await modelsLine()).includes('devstral:24b (cloud)') && (await modelsLine()).includes('mine (cloud)'), HUNG_MS)), await modelsLine())
     await closeSettings()
     await inv('session:start', alpha, { agentId: 'a-two' })
     check('Two launches again on it, as not only on this PC', !!(await lib.until(async () => (await live('a-two'))?.launchedConnection?.server?.local === false, HUNG_MS)), JSON.stringify((await live('a-two'))?.launchedConnection))
