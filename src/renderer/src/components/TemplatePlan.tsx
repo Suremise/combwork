@@ -1,5 +1,7 @@
 import { pairedShown, type SettingShown, type TemplateLoadView } from '@shared/templateLoad'
 import { isKnownProvider } from '@shared/providers'
+import type { ConnectionsView } from '@shared/accounts'
+import type { ConnectionProblem, ProviderId, TemplateLoadPlan } from '@shared/types'
 import { WORKFLOW_ROLE_TEXT } from '@shared/workflow/roles'
 import { ProviderIcon } from './ProviderIcon'
 import { Icon } from './ui'
@@ -26,6 +28,14 @@ const M = {
   fromTip: msg({ id: 'assistant.templatePlan.fromTip', defaultMessage: 'Its name in the template', description: "Load template's table: tooltip on an agent's name as the template has it, beside the box for its new name." }),
   nameLabel: msg({ id: 'assistant.templatePlan.nameLabel', defaultMessage: 'Name of agent {n}', description: "Load template's table: the accessible name of the box for agent number {n}'s name." }),
   withNote: msg({ id: 'assistant.templatePlan.withNote', defaultMessage: '{thing} <faint>{note}</faint>', description: "Load template: a name or a setting ({thing}), then a note about it in brackets ({note}, which brings its brackets: \"(default)\"), greyed. Keep the <faint> tags around {note}. Japanese and Chinese: no space before full-width brackets." }),
+  connection: msg({ id: 'assistant.templatePlan.connection', defaultMessage: 'Connection', description: "Load template's table (HI-1769, with Connections on): the column of the connection each agent runs on (a login or service its coding agent CLI uses)." }),
+  connectionDefault: msg({ id: 'assistant.templatePlan.connectionDefault', defaultMessage: "Workspace's default ({name})", description: "Load template's table, the Connection column (HI-1769): the agent follows the workspace's default connection for its CLI ({name}); also the first choice of the box for an agent whose own connection can't be used here." }),
+  connectionNone: msg({ id: 'assistant.templatePlan.connectionNone', defaultMessage: "Workspace's default (none on: it can't start)", description: "Load template's table, the Connection column (HI-1769): the agent follows the workspace's default connection for its CLI, but none is on, so it can't start until one is." }),
+  connectionLabel: msg({ id: 'assistant.templatePlan.connectionLabel', defaultMessage: 'Connection of {agent}', description: "Load template's table (HI-1769): the accessible name of the box choosing the connection of the agent {agent}." }),
+  missing: msg({ id: 'assistant.templatePlan.connectionMissing', defaultMessage: '{name}: no connection with that id here', description: "Load template's table, the Connection column (HI-1769): the template's agent ran on a connection ({name}, its name when saved) that this machine doesn't have (never matched by name). The box under it chooses another." }),
+  off: msg({ id: 'assistant.templatePlan.connectionOff', defaultMessage: '{name}: off in this workspace', description: "Load template's table, the Connection column (HI-1769): the template's agent ran on a connection ({name}) that is off in this workspace. The box under it chooses another." }),
+  otherCli: msg({ id: 'assistant.templatePlan.connectionOtherCli', defaultMessage: "{name}: another CLI's connection", description: "Load template's table, the Connection column (HI-1769): the template's agent names a connection ({name}) of another coding agent CLI than its own. The box under it chooses one of its own CLI's." }),
+  unnamed: msg({ id: 'assistant.templatePlan.connectionUnnamed', defaultMessage: 'Its connection', description: "Load template's table, the Connection column (HI-1769): stands for the name of a template agent's connection when the template doesn't say it, before \": no connection with that id here\"." }),
   isDefault: msg({ id: 'assistant.templatePlan.default', defaultMessage: '(default)', description: "Load template's table, after a model, effort or mode: the template leaves it to the project's or Hive's defaults." })
 }
 
@@ -61,8 +71,11 @@ const oldNote = (note: string): ReactNode => <span className="faint template-pla
  * agent's worktree is said across its row's settings (it has none), a replaced one's on a line under its row. What the
  * template leaves to the defaults is shown as what it is here with a muted "(default)"; then the notes, said once.
  */
-export function TemplatePlan({ view, edit }: { view: TemplateLoadView; edit?: NameEdit }) {
+export function TemplatePlan({ view, edit, connections }: { view: TemplateLoadView; edit?: NameEdit; connections?: ConnectionEdit }) {
   const goes = new Map(view.removed.map((a) => [a.name.toLowerCase(), a]))
+  // The Connection column only where one of its agents' CLIs has connections shown (HI-1769).
+  const conn = connections && connections.view.preview && view.created.some((a) => isKnownProvider(a.provider) && connections.view.providers.includes(a.provider)) ? connections : undefined
+  const columns = conn ? 7 : 6
   return (
     <div className="template-plan">
       <table className="table template-plan-table">
@@ -75,6 +88,7 @@ export function TemplatePlan({ view, edit }: { view: TemplateLoadView; edit?: Na
             <th>{tr(M.model)}</th>
             <th>{tr(M.effort)}</th>
             <th>{tr(M.mode)}</th>
+            {conn && <th>{tr(M.connection)}</th>}
           </tr>
         </thead>
         <tbody>
@@ -120,11 +134,12 @@ export function TemplatePlan({ view, edit }: { view: TemplateLoadView; edit?: Na
                   </td>
                   <td>{a.effort ? <Setting s={a.effort} /> : <span className="faint">—</span>}</td>
                   <td>{a.mode ? <Setting s={a.mode} /> : <span className="faint">—</span>}</td>
+                  {conn && (isKnownProvider(a.provider) && conn.view.providers.includes(a.provider) ? <ConnectionCell edit={conn} index={i} provider={a.provider} agent={edit?.names[i] ?? a.name} /> : <td><span className="faint">—</span></td>)}
                 </tr>
                 {old && (
                   <tr data-old-of={a.name} className="template-plan-old-row">
                     <td />
-                    <td colSpan={6}>{oldNote(old)}</td>
+                    <td colSpan={columns}>{oldNote(old)}</td>
                   </tr>
                 )}
               </Fragment>
@@ -138,7 +153,7 @@ export function TemplatePlan({ view, edit }: { view: TemplateLoadView; edit?: Na
                   <span className="template-plan-name">{a.name}</span>
                 </td>
                 <Change state="removed" />
-                <td colSpan={5}>{a.note && oldNote(a.note)}</td>
+                <td colSpan={columns - 1}>{a.note && oldNote(a.note)}</td>
               </tr>
             ))}
         </tbody>
@@ -149,6 +164,61 @@ export function TemplatePlan({ view, edit }: { view: TemplateLoadView; edit?: Na
         </p>
       ))}
     </div>
+  )
+}
+
+/**
+ * The Connection column (HI-1769, with Connections on): each agent's connection, and for each one `flagged` (its own can't
+ * be used here: by `create`'s index) the box choosing another: the workspace's default first (null: it follows it), then
+ * its CLI's connections on here, each pinned by id. Never matched by name, never another CLI's.
+ */
+export interface ConnectionEdit {
+  view: ConnectionsView
+  own: (string | undefined)[]
+  flagged: TemplateLoadPlan['connections']
+  choices: Record<number, string | null>
+  onChoice: (index: number, id: string | null) => void
+}
+
+const PROBLEM: Record<ConnectionProblem, Msg> = { missing: M.missing, off: M.off, otherCli: M.otherCli }
+
+function ConnectionCell({ edit, index, provider, agent }: { edit: ConnectionEdit; index: number; provider: ProviderId; agent: string }) {
+  const { view } = edit
+  const ws = view.workspace[provider]
+  const on = view.connections.filter((c) => c.provider === provider && ws?.on.includes(c.id))
+  const def = ws?.default ? view.connections.find((c) => c.id === ws.default) : undefined
+  const followsDefault = def ? tr(M.connectionDefault, { name: def.name }) : tr(M.connectionNone)
+  const flag = edit.flagged.find((f) => f.index === index)
+  const own = edit.own[index]
+  if (!flag) {
+    const name = own ? view.connections.find((c) => c.id === own)?.name : undefined
+    return (
+      <td className="template-plan-connection" data-connection={own ?? ''}>
+        {name ? (
+          <>
+            <Icon name="check" /> {name}
+          </>
+        ) : (
+          <span className="faint">{followsDefault}</span>
+        )}
+      </td>
+    )
+  }
+  const choice = edit.choices[index] ?? null
+  return (
+    <td className="template-plan-connection" data-connection={flag.id} data-connection-problem={flag.problem}>
+      <div className="template-plan-connection-problem">
+        <Icon name="warning" /> {tr(PROBLEM[flag.problem], { name: flag.name ?? tr(M.unnamed) })}
+      </div>
+      <select className="input" aria-label={tr(M.connectionLabel, { agent })} value={choice ?? ''} onChange={(e) => edit.onChoice(index, e.target.value || null)}>
+        <option value="">{followsDefault}</option>
+        {on.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+    </td>
   )
 }
 

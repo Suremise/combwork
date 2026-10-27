@@ -4,5 +4,19 @@
   "connections.choice.gone": "A removed connection (the agent is refused a start)",
   "connections.choice.label": "Connection",
   "connections.choice.none": "No {cli} connection is on in this workspace. Add one in Settings → Connections.",
-  "connections.choice.off": "{name} (off in this workspace: the default runs it)"
+  "connections.choice.off": "{name} (off in this workspace: the default runs it)",
+  "connections.choice.otherCli": "{cli} connections",
+  "connections.mark.anotherMark": "Running on another connection than the one chosen",
+  "connections.mark.deleted": "Connection removed",
+  "connections.mark.deletedTip": "The connection chosen for it was removed: it can't start until you choose another in its Agent Settings, or the workspace's default.",
+  "connections.mark.inherited": "{name}: the workspace's default for {cli}, which it follows",
+  "connections.mark.none": "No connection",
+  "connections.mark.noneTip": "No {cli} connection is on in this workspace: it can't start until one is (Settings → Connections).",
+  "connections.mark.offFallback": "{wanted} is off in this workspace: the default, {name}, runs it",
+  "connections.mark.offNoDefault": "{wanted} is off here",
+  "connections.mark.offNoDefaultTip": "{wanted} is off in this workspace, and no other {cli} connection is on: it can't start until one is (Settings → Connections).",
+  "connections.mark.other": "Runs on {running} until it restarts. Chosen now: {chosen}",
+  "connections.mark.otherProvider": "Another CLI's connection",
+  "connections.mark.otherProviderTip": "{wanted} is for another CLI than {cli}: it can't start until you choose one of its own in its Agent Settings.",
+  "connections.mark.own": "{name}: its own choice"
 }

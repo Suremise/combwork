@@ -180,6 +180,8 @@ interface HiveMessageValues {
   'panes.table.background': { n: number }
   'panes.table.card': undefined
   'panes.table.cardPrefix': { value: string | number }
+  'panes.table.connection': undefined
+  'panes.table.connectionPrefix': { value: string | number }
   'panes.table.happens': undefined
   'panes.table.notRunning': undefined
   'panes.table.project': undefined

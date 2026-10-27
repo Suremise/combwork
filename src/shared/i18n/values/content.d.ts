@@ -75,6 +75,7 @@ interface HiveMessageValues {
   'content.templates.changedSince': undefined
   'content.templates.changedWhile': undefined
   'content.templates.checkFailed': { agent: string | number; folder: string | number; error: string | number }
+  'content.templates.connectionsChanged': undefined
   'content.templates.editedMeanwhile': { name: string | number }
   'content.templates.enterName': undefined
   'content.templates.failed': { error: string | number }

@@ -73,6 +73,7 @@
   "content.templates.changedSince": "Los agentes del proyecto cambiaron desde que los viste: vuelve a abrir la plantilla.",
   "content.templates.changedWhile": "Los agentes del proyecto cambiaron mientras se cargaba la plantilla: no se cambió nada. Vuelve a abrir la plantilla.",
   "content.templates.checkFailed": "Hive no pudo comprobar el worktree del agente {agent} ({folder}): {error}",
+  "content.templates.connectionsChanged": "Las conexiones de la plantilla cambiaron desde que las viste: vuelve a abrirla.",
   "content.templates.editedMeanwhile": "“{name}” cambió desde que empezaste a editarla (se volvió a guardar mientras tanto): no se guardó nada. Cierra el editor para verla como está ahora.",
   "content.templates.enterName": "Escribe un nombre para la plantilla.",
   "content.templates.failed": "No se cambió nada: {error}",

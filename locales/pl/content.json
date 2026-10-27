@@ -73,6 +73,7 @@
   "content.templates.changedSince": "Agenci projektu zmienili się od Twojego ostatniego spojrzenia: otwórz szablon ponownie.",
   "content.templates.changedWhile": "Agenci projektu zmienili się podczas wczytywania szablonu: nic nie zmieniono. Otwórz szablon ponownie.",
   "content.templates.checkFailed": "Nie udało się sprawdzić worktree agenta {agent} ({folder}): {error}",
+  "content.templates.connectionsChanged": "Połączenia szablonu zmieniły się od Twojego ostatniego spojrzenia: otwórz szablon ponownie.",
   "content.templates.editedMeanwhile": "Szablon „{name}” zmienił się, odkąd zaczęto go edytować (w międzyczasie zapisano go ponownie): nic nie zapisano. Zamknij edytor, aby zobaczyć jego obecną wersję.",
   "content.templates.enterName": "Wpisz nazwę szablonu.",
   "content.templates.failed": "Nic nie zmieniono: {error}",

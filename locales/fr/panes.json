@@ -178,6 +178,8 @@
   "panes.table.background": "En attente de {n, plural, one {# tâche en arrière-plan} many {# tâches en arrière-plan} other {# tâches en arrière-plan}}",
   "panes.table.card": "Carte",
   "panes.table.cardPrefix": "carte {value}",
+  "panes.table.connection": "Connexion",
+  "panes.table.connectionPrefix": "sur {value}",
   "panes.table.happens": "Ce qui se passe",
   "panes.table.notRunning": "Arrêté",
   "panes.table.project": "Projet",

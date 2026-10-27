@@ -10,8 +10,10 @@ import { statusText } from './ui'
 import { ItemTable, type ItemGroup, type ItemRow } from './ItemTable'
 import { cx } from '../util'
 import { useLanes } from '../laneSource'
-import { useLanguage, useStore } from '../store'
+import { agentProviderOf, useLanguage, useStore } from '../store'
 import { legacyOf, placeText } from '../agentPlace'
+import { connectionCellText, useConnections } from './ConnectionChoice'
+import type { ConnectionsView } from '@shared/accounts'
 
 type Agent = ProjectInfo['agents'][number]
 
@@ -146,6 +148,12 @@ export const SLOT_COLUMN: AgentColumn = {
   kind: 'short',
   cell: msg({ id: 'panes.table.slotPrefix', defaultMessage: 'works {value}', description: "Where the agent works in a line of text (screen readers): {value} is agents.place.short (\"in slot-b\", \"carried: hb2\"). Lower case." })
 }
+/** The connection the agent runs on, or would start on (HI-1769, with Connections on): "Max 1", "Max 2 ⟳". */
+export const CONNECTION_COLUMN: AgentColumn = {
+  label: msg({ id: 'panes.table.connection', defaultMessage: 'Connection', description: "An agents table's column heading (HI-1769): the connection the agent runs on, or would start on (a login or service its coding agent CLI uses: \"Max 1\")." }),
+  kind: 'short',
+  cell: msg({ id: 'panes.table.connectionPrefix', defaultMessage: 'on {value}', description: "The agent's connection in a line of text (screen readers): {value} is its name (\"on Max 1\"). Lower case." })
+}
 export const PROJECT_COLUMN: AgentColumn = {
   label: msg({ id: 'panes.table.project', defaultMessage: 'Project', description: "An agents table's column heading: the agent's project." }),
   kind: 'short',
@@ -157,22 +165,26 @@ export const PROJECT_COLUMN: AgentColumn = {
  * outside the project folder, #1442) · State · Card · Waiting for (only when one waits), in lane order (a builder, then
  * its reviewer). `only`: just these agents (ids), as Stop All lists the running ones (#572).
  */
-export function projectAgentsData(p: ProjectInfo, tasks: readonly TaskCard[], lanes: readonly TableLane[], only?: readonly string[], opts: { role?: boolean; place?: boolean } = {}): AgentTableData {
+export function projectAgentsData(p: ProjectInfo, tasks: readonly TaskCard[], lanes: readonly TableLane[], only?: readonly string[], opts: { role?: boolean; place?: boolean; connections?: ConnectionsView | null } = {}): AgentTableData {
   const rows = laneOrder(p.agents, lanes)
     .filter((a) => !only || only.includes(a.id))
     .map((a) => ({ a, ...agentRow(p, a, tasks) }))
   const waits = rows.some((r) => r.waits)
   const role = !!opts.role
   const place = !!opts.place && rows.some(({ a }) => placeText(a.place))
+  // Each one's connection (HI-1769), where any agent here has one shown (Connections on, a CLI with them).
+  const connection = (a: ProjectInfo['agents'][number]): string | null => connectionCellText(a.connection, agentProviderOf(p, a), a.live?.launchedConnection, opts.connections ?? null)
+  const conn = !!opts.connections && rows.some(({ a }) => connection(a) !== null)
   return {
-    columns: [...(role ? [ROLE_COLUMN] : []), ...(place ? [SLOT_COLUMN] : []), STATE_COLUMN, CARD_COLUMN, ...(waits ? [WAITING_COLUMN] : [])],
-    rows: rows.map(({ a, state, card, waits: w }) => ({ key: a.id, name: a.name, dot: a.live?.status ?? 'stopped', off: !a.live, cells: [...(role ? [{ text: tr(WORKFLOW_ROLE_TEXT[agentWorkflowRole(a)].name) }] : []), ...(place ? [{ text: placeText(a.place) ?? '' }] : []), { text: state }, { text: card }, ...(waits ? [{ text: w }] : [])] }))
+    columns: [...(role ? [ROLE_COLUMN] : []), ...(conn ? [CONNECTION_COLUMN] : []), ...(place ? [SLOT_COLUMN] : []), STATE_COLUMN, CARD_COLUMN, ...(waits ? [WAITING_COLUMN] : [])],
+    rows: rows.map(({ a, state, card, waits: w }) => ({ key: a.id, name: a.name, dot: a.live?.status ?? 'stopped', off: !a.live, cells: [...(role ? [{ text: tr(WORKFLOW_ROLE_TEXT[agentWorkflowRole(a)].name) }] : []), ...(conn ? [{ text: connection(a) ?? '' }] : []), ...(place ? [{ text: placeText(a.place) ?? '' }] : []), { text: state }, { text: card }, ...(waits ? [{ text: w }] : [])] }))
   }
 }
 
 /** A project's agents as a table (#529), for a tooltip (`projectAgentsData`), with their roles in the workflow (#1430). */
 export function AgentsTable({ project, tasks, lanes }: { project: ProjectInfo; tasks: readonly TaskCard[]; lanes: readonly TableLane[] }) {
-  return <AgentRowsTable {...projectAgentsData(project, tasks, lanes, undefined, { role: true, place: true })} />
+  const connections = useConnections()
+  return <AgentRowsTable {...projectAgentsData(project, tasks, lanes, undefined, { role: true, place: true, connections })} />
 }
 
 /**

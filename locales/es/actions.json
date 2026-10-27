@@ -246,6 +246,8 @@
   "actions.template.addTitle": "Agregar un agente desde una plantilla",
   "actions.template.blockedMessage": "Todavía no se puede cargar en {project, select, none {este proyecto} other {el proyecto {project}}}:",
   "actions.template.blockedTitle": "Todavía no se puede cargar “{name}”",
+  "actions.template.connectionFallback": "{agent} usa la conexión predeterminada del espacio de trabajo",
+  "actions.template.connectionFallbackWhy": "{name} {problem, select, missing {no está en este equipo} otherCli {es de otra CLI} other {está desactivada en este espacio de trabajo}}: elige otra en su Configuración del agente si quieres.",
   "actions.template.everyProject": "Para todo el espacio de trabajo (si no, solo para este proyecto)",
   "actions.template.load": "Cargar plantilla",
   "actions.template.loadAdds": "Agrega sus agentes al proyecto {project}.",

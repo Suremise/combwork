@@ -246,6 +246,8 @@
   "actions.template.addTitle": "テンプレートからエージェントを追加",
   "actions.template.blockedMessage": "{project, select, none {このプロジェクト} other {{project}}}にはまだ読み込めません：",
   "actions.template.blockedTitle": "「{name}」はまだ読み込めません",
+  "actions.template.connectionFallback": "{agent}はワークスペースの既定の接続を使います",
+  "actions.template.connectionFallbackWhy": "{name}{problem, select, missing {はこのマシンにありません} otherCli {は別のCLIの接続です} other {はこのワークスペースでは無効です}}。必要なら「エージェント設定」で別の接続を選んでください。",
   "actions.template.everyProject": "ワークスペースのすべてのプロジェクト用（オフならこのプロジェクト専用）",
   "actions.template.load": "テンプレートを読み込む",
   "actions.template.loadAdds": "{project}にテンプレートのエージェントを追加します。",

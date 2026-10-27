@@ -1,12 +1,15 @@
 // Launching on a connection (HI-1755): which connection a launch uses (resolveConnection), the test seam's bounds, the
 // launch's outcomes (refused, noted, claimed and released), the safe-point switch's steps, and what is read from a
-// connection's home instead of the CLI's own (memory, files). In this file's temp folders only: the CLI is never run
-// (its status is faked) and nothing signs in.
-import { mkdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs'
+// connection's home instead of the CLI's own (memory, files). HI-1769: what an agent's rows name (connectionOf), an
+// agent's own choice checked with the write that saves it (Add Agent, Agent Settings), and templates' connections (the
+// load dialog's flagged agents, inherited versus pinned, a stale choice, one agent added). In this file's temp folders
+// only: the CLI is never run (its status is faked) and nothing signs in.
+import { mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { resolveConnection } from '../src/shared/accounts'
+import { resolveConnection, type ConnectionsView } from '../src/shared/accounts'
+import { connectionOf } from '../src/shared/connectionLabel'
 import type { Connection, LiveSessionState } from '../src/shared/types'
 import { ACCOUNTS_PREVIEW } from '../src/shared/advanced'
 import { tempDir } from './tempDir'
@@ -29,7 +32,9 @@ const { providerService } = await import('../src/main/providerService')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { runSwitch } = await import('../src/main/connectionSwitch')
 const { authScope } = await import('../src/main/sessions')
-const { updateAgent } = await import('../src/main/projectAgents')
+const { addAgent, updateAgent } = await import('../src/main/projectAgents')
+const templates = await import('../src/main/templates')
+const { TEMPLATE_VERSION } = await import('../src/shared/templates')
 const { fileLockDepth, withFileLock } = await import('../src/main/fsutil')
 const { listSkills, invalidateSkillCache } = await import('../src/main/skills')
 
@@ -50,6 +55,9 @@ beforeAll(async () => {
   mkdirSync(join(userHome, '.claude'), { recursive: true })
   mkdirSync(join(wsPath, 'alpha', '.hive'), { recursive: true })
   writeFileSync(join(wsPath, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }] }))
+  // A project templates are loaded into (HI-1769), its agents replaced each time.
+  mkdirSync(join(wsPath, 'gamma', '.hive'), { recursive: true })
+  writeFileSync(join(wsPath, 'gamma', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never
   vi.spyOn(provider('claude-code'), 'accountStatus').mockImplementation(async (_exe, env) => {
@@ -513,6 +521,197 @@ describe('a choice saved while starting: the last look at its own choice, skills
       expect((provider('claude-code').accountStatus as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(before)
       // And a launch takes the way before connections.
       expect(await launch()).toBeNull()
+    } finally {
+      await advanced.set(ACCOUNTS_PREVIEW, true)
+    }
+  })
+})
+
+describe('what an agent row names (connectionOf, HI-1769)', () => {
+  const c = (id: string, cli: Connection['provider'] = 'claude-code'): ConnectionsView['connections'][number] => ({ id, provider: cli, name: `Name ${id}`, createdAt: '', signingIn: false, folder: '' })
+  const view = (over: Partial<ConnectionsView> = {}): ConnectionsView => ({ preview: true, providers: ['claude-code'], connections: [c('a'), c('b'), c('x', 'codex')], workspace: { 'claude-code': { on: ['a'], default: 'a' } }, testHome: [], ...over })
+  const ran = (id: string) => ({ id, name: `Name ${id}` })
+  it('its own on here; none of its own: the default, inherited', () => {
+    expect(connectionOf('a', 'claude-code', undefined, view())).toMatchObject({ shown: { id: 'a' }, inherited: false, other: false, desired: { ok: true, id: 'a' } })
+    expect(connectionOf(undefined, 'claude-code', undefined, view())).toMatchObject({ shown: { id: 'a', name: 'Name a' }, inherited: true, other: false })
+  })
+  it('its own off here: the default runs it, noted; off with no default: none shown, never made up', () => {
+    expect(connectionOf('b', 'claude-code', undefined, view())).toMatchObject({ shown: { id: 'a' }, desired: { ok: true, id: 'a', note: 'offFallback' } })
+    const none = view({ workspace: { 'claude-code': { on: [], default: null } } })
+    expect(connectionOf('b', 'claude-code', undefined, none)).toMatchObject({ shown: null, desired: { ok: false, why: 'offNoDefault', wantedName: 'Name b' } })
+    expect(connectionOf(undefined, 'claude-code', undefined, none)).toMatchObject({ shown: null, desired: { ok: false, why: 'none' } })
+  })
+  it('removed, or another CLI’s: unusable, shown as such', () => {
+    expect(connectionOf('gone', 'claude-code', undefined, view())).toMatchObject({ shown: null, desired: { ok: false, why: 'deleted' } })
+    expect(connectionOf('x', 'claude-code', undefined, view())).toMatchObject({ shown: null, desired: { ok: false, why: 'otherProvider', wantedName: 'Name x' } })
+  })
+  it('running: always the one it runs on; ⟳ when another is chosen now, or the choice is now unusable', () => {
+    expect(connectionOf('a', 'claude-code', ran('a'), view())).toMatchObject({ shown: { id: 'a' }, other: false })
+    expect(connectionOf(undefined, 'claude-code', ran('b'), view())).toMatchObject({ shown: { id: 'b', name: 'Name b' }, other: true, desired: { ok: true, id: 'a' } })
+    expect(connectionOf('gone', 'claude-code', ran('a'), view())).toMatchObject({ shown: { id: 'a' }, other: true, desired: { ok: false, why: 'deleted' } })
+    expect(connectionOf('x', 'claude-code', ran('a'), view())).toMatchObject({ shown: { id: 'a' }, other: true, desired: { ok: false, why: 'otherProvider' } })
+  })
+  it('nothing where connections aren’t shown: the preview off, a CLI without them, no view yet', () => {
+    expect(connectionOf('a', 'claude-code', undefined, view({ preview: false }))).toBeNull()
+    expect(connectionOf('x', 'codex', undefined, view())).toBeNull()
+    expect(connectionOf('a', 'claude-code', undefined, null)).toBeNull()
+  })
+})
+
+describe('an agent’s own connection, checked with the write that saves it (HI-1769)', () => {
+  const alpha = join(wsPath, 'alpha')
+  const projectJson = join(alpha, '.hive', 'project.json')
+  const agentsOf = async (p: string) => (await w.projectConfig(p)).agents
+  const deferred = () => {
+    let done!: () => void
+    const p = new Promise<void>((r) => (done = r))
+    return { p, done }
+  }
+
+  it('Add Agent: one on here is kept; off, removed or another CLI’s is refused, saying why, and nothing is added', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const b = await accounts.addAccount('claude-code', 'Work')
+    const added = await here(() => addAgent(alpha, { name: 'On Personal', connection: a.id }))
+    expect(added.connection).toBe(a.id)
+    expect(await outcome(here(() => addAgent(alpha, { name: 'On Work', connection: b.id })))).toMatch(/Work isn't on in this workspace/)
+    expect(await outcome(here(() => addAgent(alpha, { name: 'On Gone', connection: 'a-gone' })))).toMatch(/no longer exists/)
+    config.update((c) => void (c.connections = (c.connections ?? []).map((x) => (x.id === b.id ? { ...x, provider: 'codex' } : x))))
+    expect(await outcome(here(() => addAgent(alpha, { name: 'On Codex', connection: b.id })))).toMatch(/for another CLI/)
+    expect((await agentsOf(alpha)).map((x) => x.name)).not.toEqual(expect.arrayContaining(['On Work', 'On Gone', 'On Codex']))
+    await here(() => import('../src/main/projectAgents').then((m) => m.removeAgent(alpha, added.id, { deleteWorktree: false })))
+  })
+
+  it('Add Agent: a connection turned off while it waits on its write is refused then, nothing added', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    await signedInConnection('Work', 'work@example.com')
+    const lock = deferred()
+    const holding = withFileLock(projectJson, () => lock.p)
+    const adding = here(() => addAgent(alpha, { name: 'Stale', connection: a.id }))
+    await vi.waitFor(() => expect(fileLockDepth(projectJson)).toBe(2), { timeout: HUNG_MS })
+    await here(() => accounts.setAccountOn(a.id, false))
+    lock.done()
+    await holding
+    expect(await outcome(adding)).toMatch(/Personal isn't on in this workspace/)
+    expect((await agentsOf(alpha)).some((x) => x.name === 'Stale')).toBe(false)
+  })
+
+  it('Agent Settings: a new choice off, removed or another CLI’s is refused; the one already saved may stay (off here); checked under the lock', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const b = await signedInConnection('Work', 'work@example.com')
+    await here(() => updateAgent(alpha, 'a-one', { connection: b.id }))
+    await here(() => accounts.setAccountOn(b.id, false))
+    // Saved before it went off: saving the agent again keeps it (the default runs it meanwhile).
+    expect((await here(() => updateAgent(alpha, 'a-one', { connection: b.id, role: 'kept' }))).connection).toBe(b.id)
+    await here(() => updateAgent(alpha, 'a-one', { connection: null }))
+    expect(await outcome(here(() => updateAgent(alpha, 'a-one', { connection: b.id })))).toMatch(/Work isn't on in this workspace/)
+    expect(await outcome(here(() => updateAgent(alpha, 'a-one', { connection: 'a-gone' })))).toMatch(/no longer exists/)
+    // On when asked, off by the time its write runs: refused then.
+    const lock = deferred()
+    const holding = withFileLock(projectJson, () => lock.p)
+    const saving = here(() => updateAgent(alpha, 'a-one', { connection: a.id }))
+    await vi.waitFor(() => expect(fileLockDepth(projectJson)).toBe(2), { timeout: HUNG_MS })
+    await here(() => accounts.setAccountOn(a.id, false))
+    lock.done()
+    await holding
+    expect(await outcome(saving)).toMatch(/Personal isn't on in this workspace/)
+    expect((await agentsOf(alpha)).find((x) => x.id === 'a-one')?.connection).toBeUndefined()
+    await here(() => updateAgent(alpha, 'a-one', { role: null as unknown as string }))
+  })
+})
+
+describe('templates’ connections (HI-1769)', () => {
+  const gamma = join(wsPath, 'gamma')
+  const tplDir = join(wsPath, '.hive', 'templates')
+  /** A template: T1 on Personal (its id), T2 on a connection this machine never had, T3 on none of its own. */
+  function writeTemplate(file: string, personal: string) {
+    mkdirSync(tplDir, { recursive: true })
+    writeFileSync(join(tplDir, file), JSON.stringify({ version: TEMPLATE_VERSION, name: file, savedAt: '', layout: 'auto', agents: [
+      { name: 'T1', role: 'builder', provider: 'claude-code', connection: personal, connectionName: 'Personal' },
+      { name: 'T2', role: 'reviewer', provider: 'claude-code', connection: 'a-elsewhere', connectionName: 'Max 2' },
+      { name: 'T3', role: 'builder', provider: 'claude-code' }
+    ] }))
+  }
+  const ids = async () => (await w.projectConfig(gamma)).agents.map((a) => a.id)
+  const byName = async (n: string) => (await w.projectConfig(gamma)).agents.find((a) => a.name === n)
+  const resolved = async (n: string) => resolveConnection(w.config, 'claude-code', (await byName(n))?.connection, config.get().connections ?? [])
+
+  it("the plan flags only an explicit id that can't be used here (never one inherited), by its index, with its name for display", async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    writeTemplate('flags.json', a.id)
+    const plan = await here(() => templates.templatePlan(gamma, 'workspace', 'flags.json'))
+    expect(plan.connections).toEqual([{ index: 1, id: 'a-elsewhere', name: 'Max 2', problem: 'missing' }])
+    // Off here: flagged as off.
+    await here(() => accounts.setAccountOn(a.id, false))
+    await signedInConnection('Work', 'work@example.com')
+    expect((await here(() => templates.templatePlan(gamma, 'workspace', 'flags.json'))).connections.map((c) => [c.index, c.problem])).toEqual([[0, 'off'], [1, 'missing']])
+  })
+
+  it('loaded with the default chosen: it inherits, and follows a later change of default; one pinned stays pinned', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const b = await signedInConnection('Work', 'work@example.com')
+    writeTemplate('inherit.json', a.id)
+    const first = await ids()
+    await here(() => templates.loadTemplate(gamma, 'workspace', 'inherit.json', first, undefined, undefined, { 1: null }))
+    expect((await byName('T1'))?.connection).toBe(a.id)
+    expect((await byName('T2'))?.connection).toBeUndefined()
+    expect((await byName('T3'))?.connection).toBeUndefined()
+    expect(await resolved('T2')).toEqual({ ok: true, id: a.id })
+    await here(() => accounts.setAccountDefault(b.id))
+    expect(await resolved('T2')).toEqual({ ok: true, id: b.id })
+    expect(await resolved('T1')).toEqual({ ok: true, id: a.id })
+    // Loaded again with Personal chosen for T2 itself: pinned, it stays on Personal whatever the default.
+    const second = await ids()
+    await here(() => templates.loadTemplate(gamma, 'workspace', 'inherit.json', second, undefined, undefined, { 1: a.id }))
+    expect((await byName('T2'))?.connection).toBe(a.id)
+    expect(await resolved('T2')).toEqual({ ok: true, id: a.id })
+  })
+
+  it("an answer for an index the plan didn't flag, or a choice that can't be used: refused, nothing changed", async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const b = await accounts.addAccount('claude-code', 'Work')
+    writeTemplate('stale.json', a.id)
+    const before = await ids()
+    expect(await outcome(here(async () => templates.loadTemplate(gamma, 'workspace', 'stale.json', before, undefined, undefined, { 0: a.id, 1: null })))).toMatch(/connections changed since you looked/)
+    expect(await outcome(here(async () => templates.loadTemplate(gamma, 'workspace', 'stale.json', before, undefined, undefined, { 1: b.id })))).toMatch(/Work isn't on in this workspace/)
+    expect(await ids()).toEqual(before)
+  })
+
+  it('a connection turned off after the dialog showed the plan: the load is refused, the project as it was', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    await signedInConnection('Work', 'work@example.com')
+    writeTemplate('later.json', a.id)
+    const plan = await here(() => templates.templatePlan(gamma, 'workspace', 'later.json'))
+    expect(plan.connections.map((c) => c.index)).toEqual([1])
+    const before = await ids()
+    await here(() => accounts.setAccountOn(a.id, false))
+    // The dialog's answers are for its plan (index 1); T1's Personal went off since: flagged now, so refused.
+    expect(await outcome(here(async () => templates.loadTemplate(gamma, 'workspace', 'later.json', before, undefined, undefined, { 1: null })))).toMatch(/connections changed since you looked/)
+    expect(await ids()).toEqual(before)
+  })
+
+  it("one agent added from a template: its own where it can be used; else the default, and the reply says why", async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    writeTemplate('one.json', a.id)
+    const t1 = await here(() => templates.addAgentFromTemplate(gamma, 'workspace', 'one.json', 0, undefined, 'One T1'))
+    expect(t1.connection).toBe(a.id)
+    expect(t1.connectionFallback).toBeUndefined()
+    const t2 = await here(() => templates.addAgentFromTemplate(gamma, 'workspace', 'one.json', 1, undefined, 'One T2'))
+    expect(t2.connection).toBeUndefined()
+    expect(t2.connectionFallback).toEqual({ name: 'Max 2', problem: 'missing' })
+  })
+
+  it("saved: each agent's connection named beside its id; with Connections off nothing is flagged and only one on here is kept", async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    await here(() => updateAgent(join(wsPath, 'alpha'), 'a-one', { connection: a.id }))
+    await here(() => templates.saveTemplate(join(wsPath, 'alpha'), 'workspace', 'Saved'))
+    const saved = JSON.parse(readFileSync(join(tplDir, 'saved.json'), 'utf8'))
+    expect(saved.agents[0]).toMatchObject({ connection: a.id, connectionName: 'Personal' })
+    await here(() => updateAgent(join(wsPath, 'alpha'), 'a-one', { connection: null }))
+    writeTemplate('off.json', a.id)
+    await advanced.set(ACCOUNTS_PREVIEW, false)
+    try {
+      const plan = await here(() => templates.templatePlan(gamma, 'workspace', 'off.json'))
+      expect(plan.connections).toEqual([])
     } finally {
       await advanced.set(ACCOUNTS_PREVIEW, true)
     }

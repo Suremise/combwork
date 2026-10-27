@@ -73,6 +73,7 @@
   "content.templates.changedSince": "Os agentes do projeto mudaram desde que você olhou: abra o modelo de novo.",
   "content.templates.changedWhile": "Os agentes do projeto mudaram enquanto o modelo era carregado: nada foi alterado. Abra o modelo de novo.",
   "content.templates.checkFailed": "O Hive não conseguiu verificar o worktree ({folder}) do agente {agent}: {error}",
+  "content.templates.connectionsChanged": "As conexões do modelo mudaram desde que você olhou: abra o modelo de novo.",
   "content.templates.editedMeanwhile": "“{name}” mudou desde que você começou a editá-lo (foi salvo de novo nesse meio-tempo): nada foi salvo. Feche o editor para vê-lo como está agora.",
   "content.templates.enterName": "Digite um nome para o modelo.",
   "content.templates.failed": "Nada foi alterado: {error}",

@@ -248,6 +248,8 @@ interface HiveMessageValues {
   'actions.template.addTitle': undefined
   'actions.template.blockedMessage': { project: string }
   'actions.template.blockedTitle': { name: string | number }
+  'actions.template.connectionFallback': { agent: string | number }
+  'actions.template.connectionFallbackWhy': { name: string | number; problem: string }
   'actions.template.everyProject': undefined
   'actions.template.load': undefined
   'actions.template.loadAdds': { project: string | number }

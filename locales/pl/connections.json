@@ -4,5 +4,19 @@
   "connections.choice.gone": "Usunięte połączenie (agent nie zostanie uruchomiony)",
   "connections.choice.label": "Połączenie",
   "connections.choice.none": "W tym obszarze roboczym nie jest włączone żadne połączenie {cli}. Dodaj je w Ustawienia → Połączenia.",
-  "connections.choice.off": "{name} (wyłączone w tym obszarze roboczym: agenta uruchamia domyślne)"
+  "connections.choice.off": "{name} (wyłączone w tym obszarze roboczym: agenta uruchamia domyślne)",
+  "connections.choice.otherCli": "Połączenia {cli}",
+  "connections.mark.anotherMark": "Działa na innym połączeniu niż wybrane",
+  "connections.mark.deleted": "Połączenie usunięte",
+  "connections.mark.deletedTip": "Połączenie wybrane dla agenta zostało usunięte: nie uruchomi się, dopóki nie wybierzesz innego w jego oknie Ustawienia agenta albo domyślnego połączenia obszaru roboczego.",
+  "connections.mark.inherited": "{name}: domyślne połączenie {cli} w obszarze roboczym, za którym agent podąża",
+  "connections.mark.none": "Brak połączenia",
+  "connections.mark.noneTip": "W tym obszarze roboczym nie jest włączone żadne połączenie {cli}: agent nie uruchomi się, dopóki jakieś nie zostanie włączone (Ustawienia → Połączenia).",
+  "connections.mark.offFallback": "{wanted} jest wyłączone w tym obszarze roboczym: agenta uruchamia domyślne, {name}",
+  "connections.mark.offNoDefault": "{wanted} jest tu wyłączone",
+  "connections.mark.offNoDefaultTip": "{wanted} jest wyłączone w tym obszarze roboczym, a żadne inne połączenie {cli} nie jest włączone: agent nie uruchomi się, dopóki jakieś nie zostanie włączone (Ustawienia → Połączenia).",
+  "connections.mark.other": "Działa na {running} do ponownego uruchomienia. Wybrane teraz: {chosen}",
+  "connections.mark.otherProvider": "Połączenie innego CLI",
+  "connections.mark.otherProviderTip": "{wanted} jest dla innego CLI niż {cli}: agent nie uruchomi się, dopóki nie wybierzesz połączenia {cli} w jego oknie Ustawienia agenta.",
+  "connections.mark.own": "{name}: wybrane dla niego"
 }

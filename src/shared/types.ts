@@ -1428,6 +1428,9 @@ export interface AgentDef {
 /** A change to an agent's settings: empty values (null for use200kContext and mcpServers) clear an override so it follows the project. */
 export type AgentPatch = Partial<Pick<AgentDef, 'name' | 'provider' | 'model' | 'effort' | 'permissionMode' | 'mode' | 'role'>> & { use200kContext?: boolean | null; mcpServers?: string[] | null; workflowRole?: WorkflowRole | null; connection?: string | null }
 
+/** Why a connection can't be an agent's own choice here (HI-1769): removed, another CLI's, or off in its workspace. */
+export type ConnectionProblem = 'missing' | 'otherCli' | 'off'
+
 /** What loading a template into a project would do (#126), and what stops it now. */
 export interface TemplateLoadPlan {
   scope: TemplateScope
@@ -1459,6 +1462,12 @@ export interface TemplateLoadPlan {
   reviewerMode: ReviewerMode | null
   /** Providers the template needs that are off or not installed, and which of its agents need each. */
   missing: { provider: ProviderId; reason: string; agents: string[]; problem?: 'unknown' | 'off' | 'notInstalled' }[]
+  /**
+   * Agents whose own connection can't be used here (HI-1769, with Connections on), by `create`'s index: removed or never
+   * on this machine (`missing`), another CLI's, or off in this workspace. The dialog asks for each (the same CLI's
+   * default preselected, which inherits) and the load takes its answers by these indexes. `name` is for display.
+   */
+  connections: { index: number; id: string; name?: string; problem: ConnectionProblem }[]
   /** Why it can't be loaded now (empty: it can). */
   blocked: string[]
 }

@@ -7,6 +7,7 @@ import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { set, useStore } from '../store'
 import { TemplatePlan } from './TemplatePlan'
+import { useConnections } from './ConnectionChoice'
 
 /**
  * The Load template dialog's plan with its agents' names to choose (#702, Darren's decision of 12 Oct; #1440): beside
@@ -25,7 +26,7 @@ const M = {
   takenNote: msg({ id: 'assistant.loadNames.filledNote', defaultMessage: 'Agent names are unique across the workspace, and {projects} already {count, plural, one {has an agent} other {has agents}} called {names}: {count, plural, one {a free name is} other {free names are}} filled in below. Change any name you like.', description: "Load template, above the plan: some of the template's names are taken by other projects' agents ({projects} lists the projects, {names} the names; {count} how many), so free names were filled in for them." })
 }
 
-export function TemplateLoadNames({ path, scope, file, from, initial, onChange }: { path: string; scope: TemplateScope; file: string; from?: string; initial: TemplateLoadPlan; onChange: (names: string[]) => void }) {
+export function TemplateLoadNames({ path, scope, file, from, initial, onChange, onConnections }: { path: string; scope: TemplateScope; file: string; from?: string; initial: TemplateLoadPlan; onChange: (names: string[]) => void; onConnections?: (choices: Record<number, string | null>) => void }) {
   const project = useStore((s) => s.workspace?.projects.find((p) => p.path === path) ?? null)
   const projects = useStore((s) => s.workspace?.projects)
   const settings = useStore((s) => s.settings)
@@ -45,6 +46,10 @@ export function TemplateLoadNames({ path, scope, file, from, initial, onChange }
     return chosen
   })
   const [planError, setPlanError] = useState<string | null>(null)
+  // The connection chosen for each agent the plan flags (HI-1769), by its index: the workspace's default to start with.
+  const connections = useConnections()
+  const [choices, setChoices] = useState<Record<number, string | null>>(() => Object.fromEntries(initial.connections.map((c) => [c.index, null])))
+  useEffect(() => onConnections?.(choices), [choices, onConnections])
   // This project's agents don't count: the load replaces them.
   const others = useMemo(() => workspaceAgentList(projects).filter((a) => a.project.toLowerCase() !== (project?.name ?? '').toLowerCase()), [projects, project])
   const problems = names.map((n, i) => {
@@ -93,7 +98,11 @@ export function TemplateLoadNames({ path, scope, file, from, initial, onChange }
           {tr(M.takenNote, { projects: fmt.list([...new Set(initial.taken.map((t) => t.project))], 'unit'), count: initial.taken.length, names: fmt.list(initial.taken.map((t) => t.name), 'unit') })}
         </p>
       )}
-      <TemplatePlan view={view} edit={{ from: initial.templateNames, names, problems, onName: (i, v) => setNames((x) => x.map((n, j) => (j === i ? v : n))) }} />
+      <TemplatePlan
+        view={view}
+        edit={{ from: initial.templateNames, names, problems, onName: (i, v) => setNames((x) => x.map((n, j) => (j === i ? v : n))) }}
+        connections={connections ? { view: connections, own: plan.create.map((a) => a.connection), flagged: plan.connections, choices, onChoice: (i, id) => setChoices((x) => ({ ...x, [i]: id })) } : undefined}
+      />
       {planError && <div className="field-error">{planError}</div>}
     </>
   )

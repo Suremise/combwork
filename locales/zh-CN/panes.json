@@ -178,6 +178,8 @@
   "panes.table.background": "{n, plural, other {正在等待 # 个后台任务}}",
   "panes.table.card": "卡片",
   "panes.table.cardPrefix": "卡片：{value}",
+  "panes.table.connection": "连接",
+  "panes.table.connectionPrefix": "连接：{value}",
   "panes.table.happens": "影响",
   "panes.table.notRunning": "未运行",
   "panes.table.project": "项目",

@@ -32,11 +32,13 @@ import {
   type TemplateScope
 } from '../shared/templates'
 import { HIVE_TEMPLATES, hiveTemplate, type HiveTemplate } from '../shared/templateDefaults'
-import type { AgentBranchStatus, AgentDef, ProjectConfig, ProviderId, TemplateLoadPlan } from '../shared/types'
+import type { AgentBranchStatus, AgentDef, ConnectionProblem, ProjectConfig, ProviderId, TemplateLoadPlan } from '../shared/types'
 import { config } from './config'
 import { placeKey, readKeptJson, withFileLock, writeKeptJson, writeTextAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { addAgent, agentLimit, prepareAgent } from './projectAgents'
+import { assertConnectionHere, connectionProblem, getAccount } from './accounts'
+import { connectionsOn } from './connectionSeam'
 import { projectKeyOf } from './projectKeys'
 import { providerService } from './providerService'
 import { sessions } from './sessions'
@@ -229,7 +231,9 @@ function withTemplatesLock<T>(dir: string, fn: () => Promise<T>): Promise<T> {
 /** Writes a template into a place (its file there: a new one, or the one it replaces). */
 async function write(d: TemplateDest, file: string, t: AgentTemplate): Promise<TemplateEntry> {
   await mkdir(folder(d), { recursive: true })
-  await writeKeptJson(join(folder(d), file), exportable(t))
+  // Each agent's connection named as it is now (HI-1769), for where its id isn't known: shown, never used to find one.
+  const named = { ...t, agents: t.agents.map((a) => (a.connection ? { ...a, connectionName: getAccount(a.connection)?.name ?? a.connectionName } : a)) }
+  await writeKeptJson(join(folder(d), file), exportable(named))
   return (await readOne(d, file))!
 }
 
@@ -501,8 +505,8 @@ async function planFor(projectPath: string, scope: TemplateScope, file: string, 
     const why = sub && a.provider !== sub ? providerProblem(a.provider) : null
     if (!why || why.problem === 'unknown') return a
     swaps.push({ index, from: a.provider, to: sub!, problem: why.problem })
-    // Its effort and mode are the other provider's to name: the stand-in's defaults instead.
-    const { model: _m, effort: _e, permissionMode: _p, ...rest } = a
+    // Its effort and mode are the other provider's to name, and its connection too (HI-1769): the stand-in's defaults instead.
+    const { model: _m, effort: _e, permissionMode: _p, connection: _c, connectionName: _n, ...rest } = a
     return { ...rest, provider: sub! }
   })
   const missing: TemplateLoadPlan['missing'] = []
@@ -528,7 +532,16 @@ async function planFor(projectPath: string, scope: TemplateScope, file: string, 
   const pairs = (original.pairs ?? []).map((p) => ({ builder: at(p.builder), reviewer: at(p.reviewer) })).filter((p) => p.builder >= 0 && p.reviewer >= 0)
   // A suggestion the project's options already follow isn't one.
   const suggestedPreset = original.suggestedPreset && original.suggestedPreset !== presetOf(cfg) ? original.suggestedPreset : null
-  const plan: TemplateLoadPlan = { scope: t.scope, file: t.file, name: t.name, layout: t.layout, remove, create, templateNames: expanded, taken: takenNames, pairs, swaps, suggestedPreset, reviewerMode: original.reviewerMode ?? null, missing, blocked: blocked.map(shownText) }
+  // Its agents' own connections that can't be used here (HI-1769): the dialog asks for each. With Connections off (the
+  // preview), none is asked: the load keeps one that is on, as before.
+  const connections: TemplateLoadPlan['connections'] = connectionsOn()
+    ? create.flatMap((a, index) => {
+        const problem = a.connection ? connectionProblem(a.connection, a.provider, projectPath) : null
+        const name = a.connection ? (getAccount(a.connection)?.name ?? a.connectionName) : undefined
+        return a.connection && problem ? [{ index, id: a.connection, ...(name ? { name } : {}), problem }] : []
+      })
+    : []
+  const plan: TemplateLoadPlan = { scope: t.scope, file: t.file, name: t.name, layout: t.layout, remove, create, templateNames: expanded, taken: takenNames, pairs, swaps, suggestedPreset, reviewerMode: original.reviewerMode ?? null, missing, connections, blocked: blocked.map(shownText) }
   return { plan, why: blocked }
 }
 
@@ -580,7 +593,7 @@ const loading = new Set<string>()
  *   and their open cards go back (nobody has them; Doing ones to Todo).
  * - The template's suggested preset is only offered (the window opens the Workflow section with it), never applied here.
  */
-export async function loadTemplate(projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[]): Promise<{ created: string[]; removed: string[] }> {
+export async function loadTemplate(projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[], connections?: Record<number, string | null>): Promise<{ created: string[]; removed: string[] }> {
   projectPath = workspace.assertProject(projectPath)
   const key = projectPath.toLowerCase()
   if (loading.has(key)) throw refusal(msg({ id: 'content.templates.loading', defaultMessage: 'A template is already being loaded into this project.', description: 'An error loading a template while another load into the same project is under way.' }), undefined, 'conflict')
@@ -594,12 +607,13 @@ export async function loadTemplate(projectPath: string, scope: TemplateScope, fi
     const changed = (ids: string[]): boolean => !Array.isArray(expected) || ids.length !== expected.length || ids.some((id, i) => id !== expected[i])
     if (changed(plan.remove.map((a) => a.id))) throw refusal(msg({ id: 'content.templates.changedSince', defaultMessage: "The project's agents changed since you looked: open the template again.", description: "An error loading a template: the project's agents changed after the Load template dialog showed them." }), undefined, 'conflict')
     if (plan.taken.length) throw new TemplateError(takenText(plan.taken), { kind: 'conflict' })
+    const connectionAt = connectionsFor(projectPath, plan, connections)
     const cfg = await workspace.projectConfig(projectPath)
     const staged: { def: AgentDef; discard: () => Promise<void> }[] = []
     let old: AgentDef[] = []
     try {
-      for (const a of plan.create) {
-        const opts = { name: a.name, role: a.note, workflowRole: a.role, provider: a.provider, model: a.model, effort: a.effort, permissionMode: a.permissionMode, use200kContext: a.use200kContext, mcpServers: a.mcpServers, connection: a.connection, location: 'project' as const }
+      for (const [i, a] of plan.create.entries()) {
+        const opts = { name: a.name, role: a.note, workflowRole: a.role, provider: a.provider, model: a.model, effort: a.effort, permissionMode: a.permissionMode, use200kContext: a.use200kContext, mcpServers: a.mcpServers, connection: connectionAt(i), location: 'project' as const }
         staged.push(await prepareAgent(projectPath, cfg, opts, a.name, staged.map((s) => s.def), reads))
         await testHooks.staged?.(a.name)
       }
@@ -627,6 +641,8 @@ export async function loadTemplate(projectPath: string, scope: TemplateScope, fi
           // The limit as it is now: Settings may have lowered it since the plan.
           const limit = agentLimit(projectPath)
           if (staged.length > limit) throw refusal(M.nothing, { problem: templateLimitText(staged.length, limit) })
+          // Each one's connection as it is now (HI-1769): one turned off or removed while they were prepared stops the load.
+          for (const { def } of staged) if (def.connection) assertConnectionHere(def.connection, def.provider!, projectPath, def.name)
           old = list
           // A removed agent's worktree whose setup never ran is remembered for the next agent given it (#289).
           const pending = [...(Array.isArray(now.setupPending) ? now.setupPending.filter((p) => typeof p === 'string') : []), ...list.filter((a) => legacySetupPending(a)).map((a) => legacyWorktree(a)!.path)]
@@ -651,6 +667,24 @@ export async function loadTemplate(projectPath: string, scope: TemplateScope, fi
   }
 }
 
+/**
+ * The connection each agent to create gets (HI-1769), by `create`'s index. With Connections on: the template's own where
+ * it can be used here; for one the plan flagged (`plan.connections`), the dialog's answer by that index (null: the
+ * workspace's default, which it then follows). Answers for other indexes than those flagged now (one went off or was
+ * removed since the dialog showed its plan, or came back) mean the dialog showed another plan: refused. With them off,
+ * as before: the template's own only where it is on here. Each id is checked again as the agent is prepared and with
+ * the write.
+ */
+function connectionsFor(projectPath: string, plan: TemplateLoadPlan, answers: Record<number, string | null> | undefined): (index: number) => string | undefined {
+  const flagged = new Set(plan.connections.map((c) => c.index))
+  const answered = Object.keys(answers ?? {}).map(Number)
+  if (connectionsOn() && (answered.length !== flagged.size || answered.some((k) => !flagged.has(k)))) throw refusal(msg({ id: 'content.templates.connectionsChanged', defaultMessage: "The template's connections changed since you looked: open it again.", description: 'An error loading a template: the connections the Load template dialog asked about are no longer the ones it would ask about (the template or the connections changed).' }), undefined, 'conflict')
+  return (index) => {
+    const a = plan.create[index]
+    if (!connectionsOn()) return a.connection && !connectionProblem(a.connection, a.provider, projectPath) ? a.connection : undefined
+    return flagged.has(index) ? answers?.[index] || undefined : a.connection
+  }
+}
 
 /**
  * Adds one agent of a template to the project, the others left alone, in the project folder with its role in the
@@ -658,7 +692,7 @@ export async function loadTemplate(projectPath: string, scope: TemplateScope, fi
  * agent of the workspace has it), else its pattern made with the project's key, a name already taken numbered
  * ("Builder 2").
  */
-export async function addAgentFromTemplate(projectPath: string, scope: TemplateScope, file: string, index: number, from?: string, chosen?: string): Promise<AgentDef> {
+export async function addAgentFromTemplate(projectPath: string, scope: TemplateScope, file: string, index: number, from?: string, chosen?: string): Promise<AgentDef & { connectionFallback?: { name: string; problem: ConnectionProblem } }> {
   projectPath = workspace.assertProject(projectPath)
   const t = await usable(refFor(projectPath, scope, file, from))
   const a = Number.isInteger(index) ? t.agents[index] : undefined
@@ -668,5 +702,8 @@ export async function addAgentFromTemplate(projectPath: string, scope: TemplateS
   // Unique across the workspace (#702): a name any agent of it has gets a number ("Builder 2"), never a prefix.
   const own = (await namesIn(projectPath, t.agents))[index]
   const name = typeof chosen === 'string' && chosen.trim() ? withNames([{ ...a, name: own }], [chosen])[0].name : uniqueName(own, (await workspaceAgents(projectPath)).map((x) => x.name))
-  return addAgent(projectPath, { name, role: a.note, workflowRole: a.role, provider: a.provider, model: a.model, effort: a.effort, permissionMode: a.permissionMode, use200kContext: a.use200kContext, mcpServers: a.mcpServers, connection: a.connection, location: 'project' })
+  // Its connection where it can be used here (HI-1769); else the workspace's default, which the reply says.
+  const problem = a.connection ? connectionProblem(a.connection, a.provider, projectPath) : null
+  const def = await addAgent(projectPath, { name, role: a.note, workflowRole: a.role, provider: a.provider, model: a.model, effort: a.effort, permissionMode: a.permissionMode, use200kContext: a.use200kContext, mcpServers: a.mcpServers, connection: problem ? undefined : a.connection, location: 'project' })
+  return problem && connectionsOn() ? { ...def, connectionFallback: { name: getAccount(a.connection!)?.name ?? a.connectionName ?? a.connection!, problem } } : def
 }

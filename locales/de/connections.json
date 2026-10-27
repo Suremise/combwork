@@ -4,5 +4,19 @@
   "connections.choice.gone": "Eine entfernte Verbindung (der Agent wird nicht gestartet)",
   "connections.choice.label": "Verbindung",
   "connections.choice.none": "In diesem Arbeitsbereich ist keine Verbindung für {cli} eingeschaltet. Füge eine unter Einstellungen → Verbindungen hinzu.",
-  "connections.choice.off": "{name} (in diesem Arbeitsbereich ausgeschaltet: Der Agent läuft mit dem Standard)"
+  "connections.choice.off": "{name} (in diesem Arbeitsbereich ausgeschaltet: Der Agent läuft mit dem Standard)",
+  "connections.choice.otherCli": "Verbindungen für {cli}",
+  "connections.mark.anotherMark": "Läuft mit einer anderen als der gewählten Verbindung",
+  "connections.mark.deleted": "Verbindung entfernt",
+  "connections.mark.deletedTip": "Die für den Agenten gewählte Verbindung wurde entfernt: Er kann erst starten, wenn du in seinen Agent-Einstellungen eine andere oder den Standard des Arbeitsbereichs wählst.",
+  "connections.mark.inherited": "{name}: der Standard des Arbeitsbereichs für {cli}, dem der Agent folgt",
+  "connections.mark.none": "Keine Verbindung",
+  "connections.mark.noneTip": "In diesem Arbeitsbereich ist keine Verbindung für {cli} eingeschaltet: Der Agent kann erst starten, wenn eine eingeschaltet ist (Einstellungen → Verbindungen).",
+  "connections.mark.offFallback": "{wanted} ist in diesem Arbeitsbereich ausgeschaltet: Der Standard, {name}, führt den Agenten aus",
+  "connections.mark.offNoDefault": "{wanted} ist hier ausgeschaltet",
+  "connections.mark.offNoDefaultTip": "{wanted} ist in diesem Arbeitsbereich ausgeschaltet, und keine andere Verbindung für {cli} ist eingeschaltet: Der Agent kann erst starten, wenn eine eingeschaltet ist (Einstellungen → Verbindungen).",
+  "connections.mark.other": "Läuft bis zum Neustart mit {running}. Jetzt gewählt: {chosen}",
+  "connections.mark.otherProvider": "Verbindung einer anderen CLI",
+  "connections.mark.otherProviderTip": "{wanted} ist für eine andere CLI als {cli}: Der Agent kann erst starten, wenn du in seinen Agent-Einstellungen eine Verbindung für {cli} wählst.",
+  "connections.mark.own": "{name}: eigens für den Agenten gewählt"
 }

@@ -73,6 +73,7 @@
   "content.templates.changedSince": "The project's agents changed since you looked: open the template again.",
   "content.templates.changedWhile": "The project's agents changed while the template was loading: nothing was changed. Open the template again.",
   "content.templates.checkFailed": "Hive couldn't check {agent}'s worktree ({folder}): {error}",
+  "content.templates.connectionsChanged": "The template's connections changed since you looked: open it again.",
   "content.templates.editedMeanwhile": "\"{name}\" changed since you started editing it (saved again meanwhile): nothing was saved. Close the editor to see it as it is now.",
   "content.templates.enterName": "Enter a name for the template.",
   "content.templates.failed": "Nothing was changed: {error}",

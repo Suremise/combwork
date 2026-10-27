@@ -178,6 +178,8 @@
   "panes.table.background": "Esperando {n, plural, one {# tarea en segundo plano} many {# tareas en segundo plano} other {# tareas en segundo plano}}",
   "panes.table.card": "Tarjeta",
   "panes.table.cardPrefix": "tarjeta {value}",
+  "panes.table.connection": "Conexión",
+  "panes.table.connectionPrefix": "en {value}",
   "panes.table.happens": "Qué ocurre",
   "panes.table.notRunning": "No está en ejecución",
   "panes.table.project": "Proyecto",

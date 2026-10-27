@@ -73,6 +73,7 @@
   "content.templates.changedSince": "表示した後にプロジェクトのエージェントが変わりました。テンプレートを開き直してください。",
   "content.templates.changedWhile": "テンプレートの読み込み中にプロジェクトのエージェントが変わったため、何も変更していません。テンプレートを開き直してください。",
   "content.templates.checkFailed": "{agent}のワークツリー（{folder}）を確認できませんでした：{error}",
+  "content.templates.connectionsChanged": "表示した後にテンプレートの接続が変わりました。テンプレートを開き直してください。",
   "content.templates.editedMeanwhile": "「{name}」は編集を始めた後に別の場所で保存されたため、何も保存していません。エディターを閉じると現在の内容を確認できます。",
   "content.templates.enterName": "テンプレートの名前を入力してください。",
   "content.templates.failed": "何も変更していません：{error}",

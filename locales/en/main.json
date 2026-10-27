@@ -131,6 +131,18 @@
     "defaultMessage": "{branch} can't be merged into itself.",
     "description": "An error merging from the Merge dialog: the branch picked and the target are the same ({branch})."
   },
+  "main.connections.choice.missing": {
+    "defaultMessage": "The connection chosen for {agent} no longer exists. Choose another, or the workspace's default.",
+    "description": "An error saving an agent's settings (or adding one): the connection chosen for it ({agent}, its name) was removed. A connection is how a coding agent CLI signs in or reaches its model (Settings → Connections)."
+  },
+  "main.connections.choice.off": {
+    "defaultMessage": "{name} isn't on in this workspace. Turn it on in Settings → Connections, or choose another for {agent}.",
+    "description": "An error saving an agent's settings (or adding one): the connection chosen ({name}) is off in this workspace, so it can't be the agent's ({agent}, its name). Settings → Connections names a section."
+  },
+  "main.connections.choice.otherCli": {
+    "defaultMessage": "{name} is for another CLI than {agent}'s. Choose one of its own.",
+    "description": "An error saving an agent's settings (or adding one): the connection chosen ({name}) belongs to another coding agent CLI than the agent's ({agent}, its name)."
+  },
   "main.connections.launch.changedAgain": {
     "defaultMessage": "{agent}'s connection was changed again while it was starting. Start it again.",
     "description": "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Hive started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Connections)."
