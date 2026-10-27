@@ -705,6 +705,8 @@ export class CodexAdapter implements ProviderAdapter {
    * It asks only in a Git repository, so a folder without Git needs none. Its own file only: launches pass no trust.
    */
   async connectionTrusts(home: string, targets: readonly TrustTarget[]): Promise<(boolean | null)[]> {
+    // Each launch trusts its own folder (HI-1871: the Advanced switch, on by default): none of Hive's folders asks.
+    if (advanced.get<boolean>('codex.trust.perLaunch')) return targets.map(() => true)
     let projects: Record<string, unknown>
     try {
       const t = parseToml(await readFile(join(home, 'config.toml'), 'utf8')) as Record<string, unknown>
@@ -901,6 +903,10 @@ export class CodexAdapter implements ProviderAdapter {
     // On a connection (HI-1757): its login kept in its own folder, and the Windows sandbox this PC has (set up once, in
     // ~/.codex's config: its accounts are the machine's), unless the connection's own config names one.
     args.push(...launchConnectionArgs(ctx))
+    // Its own folder trusted for this launch (HI-1871, Darren 27 Oct: on by default, an Advanced off switch): Codex
+    // looks its cwd up first, so it never asks in Hive's folders. The table merges into the home's own for this launch
+    // (config overrides.rs, merge.rs at 6aaac69) and nothing is written.
+    if (advanced.get<boolean>('codex.trust.perLaunch')) args.push('-c', `projects=${toToml({ [ctx.cwd]: { trust_level: 'trusted' } })}`)
     const files = [join(ctx.connectionHome ?? codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
     const developer = this.developerOverride(ctx)
     const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveHiveTools'), trusted: ctx.trustedHiveTools }

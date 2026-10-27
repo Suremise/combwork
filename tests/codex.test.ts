@@ -1,6 +1,6 @@
 import { readFileSync as readText } from 'fs'
 import { join as joinPath } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { codexMcpServer, hookHash, toToml } from '../src/main/providers/codex/adapter'
 import { CodexConversationParser, parseRollout, patchPaths, presetFromSettings, rolloutDetails, rolloutPlanUsage } from '../src/main/providers/codex/rollout'
 import { codexModelLabel } from '../src/shared/codex'
@@ -133,9 +133,12 @@ describe('Codex: when a person must act', () => {
     }
   })
 
-  it("reads a connection's trust of a workspace's folders as Codex 0.164.0 looked it up (HI-1870): the main root, any letter case", async () => {
+  it("reads a connection's trust of a workspace's folders as Codex 0.164.0 looked it up (HI-1870), with Hive's per-launch trust off", async () => {
     const { mkdirSync, rmSync, writeFileSync } = await import('fs')
     const { codex } = await import('../src/main/providers/codex/adapter')
+    const { advanced } = await import('../src/main/advanced')
+    const real = advanced.get.bind(advanced)
+    const off = vi.spyOn(advanced, 'get').mockImplementation(((id: string) => (id === 'codex.trust.perLaunch' ? false : real(id))) as typeof advanced.get)
     const home = tempDir('hive-codex-trust-')
     try {
       const t = (root: string | null, git = true) => ({ root, git, short: false })
@@ -149,6 +152,42 @@ describe('Codex: when a person must act', () => {
       writeFileSync(joinPath(home, 'config.toml'), "[projects.'C:\\work\\alpha'\ntrust_level = \n")
       expect(await codex.connectionTrusts(home, targets)).toEqual([null, null, null, null, null])
     } finally {
+      off.mockRestore()
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
+  it("trusts each launch's own folder when Hive's per-launch trust is on (HI-1871, Darren: on by default): its -c, and nothing pending", async () => {
+    const { rmSync } = await import('fs')
+    const { codex } = await import('../src/main/providers/codex/adapter')
+    const { advanced } = await import('../src/main/advanced')
+    const home = tempDir('hive-codex-perlaunch-')
+    const before = process.env.CODEX_HOME
+    process.env.CODEX_HOME = home
+    try {
+      const ctx = {
+        projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: 'C:\\work\\HIVE.worktrees\\alpha\\slot-a', workspacePath: home, runId: 'r', sessionId: '',
+        resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
+      }
+      expect(advanced.get<boolean>('codex.trust.perLaunch')).toBe(true)
+      const { args } = codex.buildCommand(ctx.executable, ctx)
+      const i = args.findIndex((a) => a.startsWith('projects='))
+      // The inline table (a dotted -c key would split the path at "HIVE.worktrees"), its folder alone.
+      expect(args[i - 1]).toBe('-c')
+      expect(args[i]).toBe('projects={"C:\\\\work\\\\HIVE.worktrees\\\\alpha\\\\slot-a"={trust_level="trusted"}}')
+      expect(await codex.connectionTrusts(home, [{ root: 'C:\\work\\alpha', git: true, short: false }, { root: null, git: true, short: false }])).toEqual([true, true])
+      // Off: no -c of it, and trust read from the connection's own file.
+      const real = advanced.get.bind(advanced)
+      const off = vi.spyOn(advanced, 'get').mockImplementation(((id: string) => (id === 'codex.trust.perLaunch' ? false : real(id))) as typeof advanced.get)
+      try {
+        expect(codex.buildCommand(ctx.executable, ctx).args.some((a) => a.startsWith('projects='))).toBe(false)
+        expect(await codex.connectionTrusts(home, [{ root: 'C:\\work\\alpha', git: true, short: false }])).toEqual([false])
+      } finally {
+        off.mockRestore()
+      }
+    } finally {
+      if (before === undefined) delete process.env.CODEX_HOME
+      else process.env.CODEX_HOME = before
       rmSync(home, { recursive: true, force: true })
     }
   })

@@ -217,6 +217,8 @@
   "settings.advanced.codex.subagent.threadField.title": "Sitzungsdatei: Feld für den Thread des Subagenten",
   "settings.advanced.codex.title.items.desc": "Was Hive Codex in den Terminaltitel schreiben lässt (tui.terminal_title): seine Aktivität, die den Spinner und „Action Required“ zeigt, und den Namen des Projekts. Ohne Aktivität erkennt Hive am Titel nicht, dass Codex arbeitet oder dich braucht.",
   "settings.advanced.codex.title.items.title": "Elemente des Terminaltitels",
+  "settings.advanced.codex.trust.perLaunch.desc": "Jeder Codex-Agent wird mit seinem eigenen Ordner (seinem Projekt, Slot oder seiner Prüfkopie) als vertraut für diesen Start gestartet, sodass Codex nicht fragt, ob es ihm vertrauen soll. In die Dateien von Codex wird nichts geschrieben. Aus, fragt Codex auf jeder Verbindung einmal pro Projekt, und Einrichten führt dich durch sie.",
+  "settings.advanced.codex.trust.perLaunch.title": "Ordner von Hive bei jedem Start vertrauen",
   "settings.advanced.codex.trust.prompt.desc": "Die Frage von Codex vor der ersten Sitzung in einem Ordner (in einem Git-Repository). Solange sie zu sehen ist, zeigt Hive, dass der Agent auf dich wartet.",
   "settings.advanced.codex.trust.prompt.title": "Vertrauensfrage",
   "settings.advanced.codex.turnScreen.working.desc": "Die Working-Zeile von Codex, die nur gezeichnet wird, während ein Durchgang läuft. Hat Hive Beginn oder Ende eines Durchgangs verpasst, versteht es diese Zeile auf dem Bildschirm als Arbeit des Agenten; ist sie falsch, kann es einen arbeitenden Agenten für untätig halten.",

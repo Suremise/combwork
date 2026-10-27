@@ -871,6 +871,14 @@
     "defaultMessage": "Terminal title items",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.codex.trust.perLaunch.desc": {
+    "defaultMessage": "Each Codex agent is started with its own folder (its project, slot or review copy) trusted for that launch, so Codex doesn't ask whether to trust it. Nothing is written to Codex's files. Off, Codex asks once per project on each connection, and Set Up walks you through them.",
+    "description": "What the advanced setting \"Trust Hive's folders on each launch\" is for, and what happens when it is off (Settings → Advanced, HI-1871). A slot and a review copy are folders Hive lends to agents."
+  },
+  "settings.advanced.codex.trust.perLaunch.title": {
+    "defaultMessage": "Trust Hive's folders on each launch",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.codex.trust.prompt.desc": {
     "defaultMessage": "Codex's question before a folder's first session (in a Git repository). Hive shows the agent as waiting for you while it is on screen.",
     "description": "What the advanced setting \"Trust question\" is for, and what goes wrong when it is wrong (Settings → Advanced)."

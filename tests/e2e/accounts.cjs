@@ -186,6 +186,7 @@ const check = (name, ok, extra = '') => {
     const launchesBefore = fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).length
     await row('Personal').locator('[data-set-up]').click()
     check('…its Set Up opens once, in the workspace’s folder, saying it covers every project in it', !!(await lib.until(async () => /this workspace's folder.*every project in it/.test(await page.locator('.account-signin [data-set-up-in]').innerText().catch(() => '')), HUNG_MS)))
+    await shots('set-up-workspace')
     const trustRun = await lib.until(async () => {
       const all = fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
       return all.length > launchesBefore ? all.at(-1) : null

@@ -223,6 +223,8 @@
   "settings.advanced.codex.subagent.threadField.title": "Session file: subagent's thread field",
   "settings.advanced.codex.title.items.desc": "What Hive asks Codex to put in its terminal title (tui.terminal_title): its activity, which shows the busy spinner and \"Action Required\", and the project's name. Without activity, Hive can't tell from the title that Codex is working or needs you.",
   "settings.advanced.codex.title.items.title": "Terminal title items",
+  "settings.advanced.codex.trust.perLaunch.desc": "Each Codex agent is started with its own folder (its project, slot or review copy) trusted for that launch, so Codex doesn't ask whether to trust it. Nothing is written to Codex's files. Off, Codex asks once per project on each connection, and Set Up walks you through them.",
+  "settings.advanced.codex.trust.perLaunch.title": "Trust Hive's folders on each launch",
   "settings.advanced.codex.trust.prompt.desc": "Codex's question before a folder's first session (in a Git repository). Hive shows the agent as waiting for you while it is on screen.",
   "settings.advanced.codex.trust.prompt.title": "Trust question",
   "settings.advanced.codex.turnScreen.working.desc": "Codex's Working line, drawn only while a turn runs. When Hive missed a turn's start or end, it takes this on screen to mean the agent is working; wrong, it can take a working agent for idle.",

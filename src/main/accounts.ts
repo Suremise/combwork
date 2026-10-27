@@ -1687,6 +1687,8 @@ export function initConnections(): Promise<void> {
   const patterns = (): string => PROVIDERS.flatMap((p) => p.capabilities.connections?.server?.presets ?? []).map((p) => (p.remoteModels ? advanced.pattern(p.remoteModels).source : '')).join('\n')
   let shown = patterns()
   advanced.onChange(() => {
+    // A CLI's trust reading may follow an advanced setting (HI-1871: Codex's per-launch trust): read again, fresh.
+    for (const [k, st] of trustState) requestTrust(k.slice(0, k.indexOf('|')), k.slice(k.indexOf('|') + 1), st.projects, true)
     const now = patterns()
     if (now === shown) return
     shown = now

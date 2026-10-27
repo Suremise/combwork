@@ -219,6 +219,8 @@ interface HiveMessageValues {
   'settings.advanced.codex.subagent.threadField.title': undefined
   'settings.advanced.codex.title.items.desc': undefined
   'settings.advanced.codex.title.items.title': undefined
+  'settings.advanced.codex.trust.perLaunch.desc': undefined
+  'settings.advanced.codex.trust.perLaunch.title': undefined
   'settings.advanced.codex.trust.prompt.desc': undefined
   'settings.advanced.codex.trust.prompt.title': undefined
   'settings.advanced.codex.turnScreen.working.desc': undefined
