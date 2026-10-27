@@ -624,10 +624,16 @@ async function pool(h) {
   const second = others.find((r) => r.id !== e1.id) ?? others[0]
   const v3 = await review(second, p2, two.rev)
   check(`…its second reviewer passes it: Done`, v3.ok && (await x.done(p2)), v3.why)
-  // A pool lane left running, for the gallery's lane rows.
+  // A pool lane left running, for the gallery's lane rows. B2's card Done wakes it (its inbox) and a busy builder is
+  // refused: started as the window's Wait and Start does, once it isn't busy (HI-1858); refused again only if a wake
+  // came in between.
   const p5 = await x.create(beta, 'Pool: fifth')
-  const l5 = (await inv('lanes:start', beta, { builder: b2.id, reviewer: null, pool: true, cards: [p5] })).lane
-  check('another lane on the pool, left running', !!(await until(() => x.slotOfLane(beta, l5.id), HUNG_MS)))
+  const BUSY = ['working', 'starting', 'waiting', 'background', 'watching', 'signin']
+  const l5 = await until(async () => {
+    if (BUSY.includes((await x.live(beta, b2.id))?.status)) return null
+    return (await inv('lanes:start', beta, { builder: b2.id, reviewer: null, pool: true, cards: [p5] }).catch((e) => (/ is working| is starting| is waiting/.test(String(e)) ? null : Promise.reject(e))))?.lane ?? null
+  }, HUNG_MS)
+  check('another lane on the pool, left running', !!l5 && !!(await until(() => x.slotOfLane(beta, l5.id), HUNG_MS)), JSON.stringify(await x.live(beta, b2.id)))
 }
 
 /**
