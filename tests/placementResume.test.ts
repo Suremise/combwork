@@ -14,11 +14,19 @@ const state = vi.hoisted(() => ({
   /** Conversations whose transcript is on disk. */
   transcripts: new Set<string>(),
   /** The slots' hold on a conversation (resumeHold), by its id. */
-  holds: new Map<string, { is: string; slot: string }>()
+  holds: new Map<string, { is: string; slot: string }>(),
+  /** The transcript lookup fails (a read that can't be made now). */
+  lookupFails: false
 }))
 vi.mock('../src/main/providers', async (orig) => {
   const actual = await orig<typeof import('../src/main/providers')>()
-  return { ...actual, provider: (id: string) => ({ ...actual.provider(id as never), transcriptPath: async (_cwd: string, sessionId: string) => (state.transcripts.has(sessionId) ? `${sessionId}.jsonl` : null) }) }
+  const transcriptPath = async (_cwd: string, sessionId: string): Promise<string | null> => {
+    if (state.lookupFails) throw new Error('EBUSY: the transcript folder is busy (test)')
+    return state.transcripts.has(sessionId) ? `${sessionId}.jsonl` : null
+  }
+  // The adapter with only its transcript lookup replaced (its methods are its class's: kept through its prototype).
+  const withLookup = <T extends object>(a: T): T => Object.assign(Object.create(a) as T, { transcriptPath })
+  return { ...actual, allProviders: () => actual.allProviders().map(withLookup), provider: (id: string) => withLookup(actual.provider(id as never)) }
 })
 vi.mock('../src/shared/agentFolders', async (orig) => ({ ...(await orig<object>()), resumeHold: (_f: unknown, _a: unknown, s: { id: string }) => state.holds.get(s.id) ?? null }))
 
@@ -83,6 +91,16 @@ describe("the conversation a placement resumes for its stopped builder (HI-1746)
     expect(await chosen()).toEqual({ is: 'none' })
   })
 
+  it("its transcript lookup failing (unknown, HR4's round 1): thrown, never none (so no new conversation is started)", async () => {
+    state.transcripts = new Set(['c-old', 'c-new'])
+    state.lookupFails = true
+    try {
+      await expect(chosen()).rejects.toThrow(/EBUSY/)
+    } finally {
+      state.lookupFails = false
+    }
+  })
+
   it('no record bound to the lease: none', async () => {
     state.transcripts = new Set(['c-old', 'c-new'])
     expect(await run(() => sessions.leaseConversation(project, 'b1', 'l-none'))).toEqual({ is: 'none' })
@@ -91,24 +109,31 @@ describe("the conversation a placement resumes for its stopped builder (HI-1746)
 
 describe("Resume All joining a start of that same conversation (HI-1746)", () => {
   // Sessions' own maps, as a start or a running session leaves them.
-  const internals = sessions as unknown as { live: Map<string, { state: { sessionId: string } }>; starting: Map<string, { resumeId?: string; outcome: Promise<unknown> }> }
+  const internals = sessions as unknown as { live: Map<string, { state: { sessionId: string; runId: string } }>; starting: Map<string, { resumeId?: string; outcome: Promise<unknown> }> }
   const key = `${project.toLowerCase()}#b1`
   const join_ = () => run(() => sessions.joinResume(project, 'b1', 'c-new'))
+  let runs = 0
+  /**
+   * A start of the conversation under way, as startReserved leaves it: in `starting`, and its live state already there
+   * (put in before its launch runs, HR4's round 1), taken out again if the launch fails or is cancelled.
+   */
   const pending = (resumeId: string): { settle: () => void; fail: (e: Error) => void } => {
+    const runId = `run-${++runs}`
     let settle!: () => void
     let fail!: (e: Error) => void
     const outcome = new Promise<unknown>((res, rej) => {
       settle = () => {
         internals.starting.delete(key)
-        internals.live.set(key, { state: { sessionId: resumeId } })
-        res({})
+        res({ sessionId: resumeId, runId })
       }
       fail = (e) => {
         internals.starting.delete(key)
+        internals.live.delete(key)
         rej(e)
       }
     })
     internals.starting.set(key, { resumeId, outcome })
+    internals.live.set(key, { state: { sessionId: resumeId, runId } })
     return { settle, fail }
   }
   const clear = (): void => {
@@ -117,7 +142,7 @@ describe("Resume All joining a start of that same conversation (HI-1746)", () =>
   }
 
   it('running that conversation now: running', async () => {
-    internals.live.set(key, { state: { sessionId: 'c-new' } })
+    internals.live.set(key, { state: { sessionId: 'c-new', runId: 'run-live' } })
     try {
       expect(await join_()).toBe('running')
     } finally {
@@ -125,7 +150,7 @@ describe("Resume All joining a start of that same conversation (HI-1746)", () =>
     }
   })
 
-  it("a start of it under way: running once it has started; its failure, or its cancellation, is Resume All's", async () => {
+  it("a start of it under way (its live state already there): running once it has started; its failure, or its cancellation, is Resume All's", async () => {
     try {
       const ok = pending('c-new')
       const joined = join_()
@@ -148,7 +173,7 @@ describe("Resume All joining a start of that same conversation (HI-1746)", () =>
   it('another conversation running or starting, or nothing: other (the refusal stands)', async () => {
     try {
       expect(await join_()).toBe('other')
-      internals.live.set(key, { state: { sessionId: 'c-old' } })
+      internals.live.set(key, { state: { sessionId: 'c-old', runId: 'run-old' } })
       expect(await join_()).toBe('other')
       internals.live.delete(key)
       const other = pending('c-old')

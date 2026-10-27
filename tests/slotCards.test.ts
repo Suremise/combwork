@@ -57,7 +57,9 @@ const state = vi.hoisted(() => ({
   /** The next starts: fail (its resume couldn't start), or lose to another start (that start then runs the builder there). */
   starts: [] as ('fails' | 'lost' | 'busy')[],
   /** This run's restart record will resume the builder (restartResume.isResuming). */
-  resuming: false
+  resuming: false,
+  /** The conversation's lookup fails (its transcript can't be read now: unknown). */
+  convFails: false
 }))
 vi.mock('../src/main/restartResume', async (orig) => ({ ...(await orig<object>()), isResuming: () => state.resuming }))
 
@@ -152,7 +154,10 @@ vi.mock('../src/main/sessions', async (orig) => {
       return {}
     },
     newConversation: async () => (state.calls.push('newConversation'), {}),
-    leaseConversation: async () => state.conv,
+    leaseConversation: async () => {
+      if (state.convFails) throw new Error('EBUSY: the transcript folder is busy (test)')
+      return state.conv
+    },
     pendingStart: () => null
   }
   return { ...actual, sessions: stub }
@@ -202,7 +207,7 @@ let env: Env | null = null
 afterEach(() => {
   env?.close()
   env = null
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false })
 })
 
 /** A card started in a slot (a worktree on its line, under lease l-1), its change merged into main and reported: Done. */
@@ -462,6 +467,19 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     expect(state.calls).toEqual(['resume c1 with the card'])
     expect(placedHow(e, n)).toEqual(['resumed'])
     expect(state.deliveries.map((d) => d.state)).toEqual(['offered'])
+  })
+
+  it("its conversation's lookup failing (unknown): nothing launched, tried again; resumed once it can be read", async () => {
+    const { e, n, cycle, ws } = await owed()
+    state.conv = resume
+    state.convFails = true
+    await expect(place(ws, e.project, e.wf, n, cycle, lease)).rejects.toThrow(/EBUSY/)
+    expect(state.calls).toEqual([])
+    expect(placedHow(e, n)).toEqual([])
+    state.convFails = false
+    await place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)
+    expect(state.calls).toEqual(['resume c1 with the card'])
+    expect(placedHow(e, n)).toEqual(['resumed'])
   })
 
   it('no conversation it can resume there (none bound, or its transcript gone): a new one in the slot, as before', async () => {

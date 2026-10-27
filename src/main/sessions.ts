@@ -1665,12 +1665,16 @@ class SessionManager {
    */
   async joinResume(projectPath: string, agentId: string, sessionId: string): Promise<'running' | 'other'> {
     projectPath = workspace.assertSessionHost(projectPath)
-    const live = (): boolean => this.live.get(liveId(projectPath, agentId))?.state.sessionId === sessionId
-    if (live()) return 'running'
+    // A start under way first (HR4's round 1): its live state is there before its launch has run, so it is joined by its
+    // outcome, never by that state; then the run it started, still the agent's, in that conversation.
     const p = this.pendingStart(projectPath, agentId)
-    if (!p || p.resumeId !== sessionId) return 'other'
-    await p.outcome
-    return live() ? 'running' : 'other'
+    if (p) {
+      if (p.resumeId !== sessionId) return 'other'
+      const started = await p.outcome
+      const now = this.live.get(liveId(projectPath, agentId))?.state
+      return now?.runId === started.runId && now.sessionId === sessionId ? 'running' : 'other'
+    }
+    return this.live.get(liveId(projectPath, agentId))?.state.sessionId === sessionId ? 'running' : 'other'
   }
 
   /**
@@ -1688,12 +1692,10 @@ class SessionManager {
       .filter((r) => r.agentId === agentId && r.lease === lease && !r.archived && !r.sub && recordProvider(r) === provider)
       .sort((x, y) => (y.lastActiveAt ?? '').localeCompare(x.lastActiveAt ?? ''))[0]
     if (!rec) return { is: 'none' }
-    let transcript: string | null = null
-    try {
-      transcript = await providerAdapter(provider).transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath)
-    } catch {
-      // A provider this version doesn't know: nothing it could resume.
-    }
+    // A provider this version doesn't know: nothing it could resume. A lookup that fails throws (unknown: tried again).
+    const adapter = allProviders().find((p) => p.id === provider)
+    if (!adapter) return { is: 'none' }
+    const transcript = await adapter.transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath)
     if (!transcript) return { is: 'none' }
     const hold = resumeHold(await folderFacts(projectPath), folderAgent(agent), rec)
     return hold ? { is: 'held', hold } : { is: 'resume', id: rec.id, name: rec.name }
