@@ -201,7 +201,7 @@ vi.mock('../src/main/deliveries', async (orig) => {
 const { tellListeners } = await import('../src/main/events')
 const { withWriteFence } = await import('../src/main/workflow/factStore')
 const { LeaseLost } = await import('../src/main/workflow/queueRunner')
-const { cycleIn, deleteMergedLine, laneSlotIn, place, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
+const { cycleIn, deleteMergedLine, laneSlotIn, place, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
 
 let env: Env | null = null
 afterEach(() => {
@@ -468,7 +468,7 @@ describe("a slot that couldn't be prepared (HI-1796)", { timeout: 60_000 }, () =
 })
 
 describe("a placement owed at a restart resumes its builder's conversation (HI-1746)", { timeout: 60_000 }, () => {
-  async function owed(): Promise<{ e: Env; n: number; slot: string; cycle: NonNullable<ReturnType<typeof cycleIn>>; ws: never }> {
+  async function owed(): Promise<{ e: Env; n: number; key: string; slot: string; cycle: NonNullable<ReturnType<typeof cycleIn>>; ws: never }> {
     const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
     state.wf = e.wf
     const card = e.wf.createCard({ title: 'Placed' })
@@ -478,7 +478,7 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     moved(await e.wf.start(card.key, B1))
     await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'hive/AM/x', revision: 'r' }))
     const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
-    return { e, n: card.id, slot, cycle: cycleIn(e.store.facts(card.id))!, ws }
+    return { e, n: card.id, key: card.key, slot, cycle: cycleIn(e.store.facts(card.id))!, ws }
   }
   const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'card', card: 0, lane: null, project: 'p', from: '', to: null, why: null, endRev: null } as never
   const placedHow = (e: Env, n: number): string[] => e.store.facts(n).filter((f) => f.kind === 'BuilderPlaced').map((f) => (f.data as { how: string }).how)
@@ -618,6 +618,74 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     await placing
     expect(state.calls.slice(3)).toEqual(['typed (given)'])
     expect(placedHow(e, n)).toEqual(['typed'])
+  })
+
+  describe('what a placement keeps between its looks and tries (HI-1804)', () => {
+    const kept = (ws: never, n: number) => placementTracksForTests(ws).get(`${env!.project.toLowerCase()}#${n}`) ?? null
+
+    it('kept while it waits or is tried again (its tries, its cutoff, the holds it told), let go once it is placed', async () => {
+      const { e, n, slot, cycle, ws } = await owed()
+      state.conv = resume
+      // Two failed tries: kept across ensure's tries again (each a new call).
+      state.starts = ['fails', 'fails']
+      await expect(place(ws, e.project, e.wf, n, cycle, lease)).rejects.toThrow(/couldn't resume/)
+      await expect(place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)).rejects.toThrow(/couldn't resume/)
+      expect(kept(ws, n)).toMatchObject({ ref: `${n}:${cycle.seq}:l-1`, failures: 2, gaveUp: false })
+      // Held now: it waits, told once, and keeps that while it waits.
+      state.conv = { is: 'held', hold: { is: 'draining', slot: 'slot-a' } }
+      const placing = place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)
+      await vi.waitFor(() => expect(notices(e)).toHaveLength(1), { timeout: HUNG_MS })
+      expect(kept(ws, n)).toMatchObject({ failures: 2, told: new Set(['draining']) })
+      // Resumed by hand meanwhile: typed in, and what it kept let go.
+      state.live = { cwd: slot, sessionId: 'c1' }
+      status()
+      await placing
+      expect(placedHow(e, n)).toEqual(['typed'])
+      expect(kept(ws, n)).toBeNull()
+    })
+
+    it('let go once its placement is obsolete (the card moved on, the rules off) or its workspace ends', async () => {
+      const { e, n, cycle, ws } = await owed()
+      state.conv = resume
+      state.starts = ['fails']
+      await expect(place(ws, e.project, e.wf, n, cycle, lease)).rejects.toThrow(/couldn't resume/)
+      expect(kept(ws, n)).toMatchObject({ failures: 1 })
+      // The rules off before its next try: nothing to place, and nothing kept.
+      state.enforced = false
+      await place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)
+      expect(kept(ws, n)).toBeNull()
+      // Waiting on a hold when its workspace ends: the wait ends, and nothing is kept.
+      state.enforced = true
+      state.conv = { is: 'held', hold: { is: 'draining', slot: 'slot-a' } }
+      const placing = place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)
+      await vi.waitFor(() => expect(kept(ws, n)?.told.has('draining')).toBe(true), { timeout: HUNG_MS })
+      ;(ws as unknown as { lifetime: { aborted: boolean } }).lifetime.aborted = true
+      status()
+      await placing
+      expect(kept(ws, n)).toBeNull()
+      expect(placedHow(e, n)).toEqual([])
+    })
+
+    it("a new cycle of the card starts afresh: the last cycle's tries and notices aren't its own", async () => {
+      const { e, n, key, cycle, ws } = await owed()
+      state.conv = resume
+      state.starts = ['fails', 'fails']
+      await expect(place(ws, e.project, e.wf, n, cycle, lease)).rejects.toThrow(/couldn't resume/)
+      await expect(place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)).rejects.toThrow(/couldn't resume/)
+      expect(kept(ws, n)).toMatchObject({ failures: 2 })
+      // Started again (put back, started: a new cycle under a new lease, prepared).
+      moved(await e.wf.putBack(key, B1, { why: 'again' }))
+      e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: state.slot, lease: 'l-2', fresh: true })
+      moved(await e.wf.start(key, B1))
+      await e.wf.write(e.store.card(n)!, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-2', line: 'hive/AM/x', revision: 'r' }))
+      const again = cycleIn(e.store.facts(n))!
+      const lease2 = { ...(lease as object), id: 'l-2' } as never
+      // One failure on the new cycle is its first, not the old one's third: no cutoff, no notice.
+      state.starts = ['fails']
+      await expect(place(ws, e.project, e.wf, n, again, lease2)).rejects.toThrow(/couldn't resume/)
+      expect(kept(ws, n)).toMatchObject({ ref: `${n}:${again.seq}:l-2`, failures: 1, gaveUp: false })
+      expect(notices(e)).toEqual([])
+    })
   })
 })
 
