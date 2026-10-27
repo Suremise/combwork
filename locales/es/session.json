@@ -150,6 +150,7 @@
   "session.start.closing": "Hive está deteniendo los agentes de este espacio de trabajo, así que ahora no puede iniciarse ninguno.",
   "session.start.couldNot": "No se pudo iniciar el agente {agent}",
   "session.start.fenced": "{why}, así que sus agentes no pueden iniciarse ahora.",
+  "session.start.moveFailed": "Hive no pudo mover la configuración de modelo de {project} a sus agentes: {error}. Vuelve a iniciarlo.",
   "session.start.openIn": "Esta conversación ya está abierta en {agent}. Un agente solo puede reanudar una sesión que no esté ejecutando ningún otro agente.",
   "session.start.otherFolder": "Esta sesión se ejecutó en {folder}. Reanúdala con el agente que trabaja en esa carpeta.",
   "session.start.projectRunning": "Ya hay una sesión en ejecución para este proyecto. Detenla primero.",

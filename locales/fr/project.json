@@ -1,5 +1,6 @@
 {
   "project.agents.add": "Ajouter un agent",
+  "project.agents.connectionSettings": "Valeurs par défaut de sa connexion ({model})",
   "project.agents.merge": "Fusionner…",
   "project.agents.off": "{provider} (désactivé)",
   "project.agents.own200k": "{on, select, yes {contexte 200K activé} other {contexte 200K désactivé}}",

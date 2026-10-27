@@ -6,7 +6,7 @@ import { createHash } from 'crypto'
 import { basename, join } from 'path'
 import type { KeptUsage, ProviderId, SessionRecord, UsageHistoryProgress } from '../shared/types'
 import { projectAgents } from '../shared/defaults'
-import { sessionHolds, usageFromRows, type SessionHold } from '../shared/usageLedger'
+import { heldAt, holdIndex, sessionHolds, usageFromRows, type HoldIndex, type SessionHold, type SessionWho } from '../shared/usageLedger'
 import type { UsageSummary } from '../shared/usageLedger'
 import { advanced } from './advanced'
 import { resolvedValues } from './advancedValues'
@@ -14,7 +14,7 @@ import { config } from './config'
 import { emit, onHiveEvent } from './events'
 import { createLogger, userText } from './logger'
 import { recordProvider, sessions } from './sessions'
-import { cardHolds, type CardHolds } from './tasks'
+import { boardHolds, cardHolds, type CardHolds } from './tasks'
 import { usageFile, type SessionId, type SessionMeta, type StoredSession } from './usageDb'
 import type { IngestJob, IngestResult, KeptJob, ReadResult, ReadSeed, WorkerReply, WorkerRequest } from './usageWorker'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
@@ -43,6 +43,36 @@ const SWEEP_TICKS = 10
 const STATE_DAYS = 14
 /** How long the board read for holds is used again. */
 const CARDS_MS = 30_000
+
+/** A project's holds for sharing its sessions' use out: see UsageHistory.projectHolds. */
+interface ProjectHolds {
+  index: HoldIndex
+  named: (name: string) => string[]
+  /** Each agent's holds key, by whoKey. */
+  keys: Map<string, string>
+}
+
+/** A workspace's cards' holds as read at `at`, and each project's worked out from them (UsageHistory.projectHolds). */
+interface BoardCards {
+  at: number
+  cards: Promise<CardHolds[]>
+  projects: Map<string, ProjectEntry>
+  /** The read before this one's projects: a project whose holds are as they were keeps its agents' keys. */
+  prior: Map<string, ProjectEntry> | null
+}
+
+/** A project's holds worked out once, their fingerprint, and its agents' keys while its agents are `agents`. */
+interface ProjectEntry {
+  index: HoldIndex | null
+  fp: string
+  agents: string | null
+  keys: Map<string, string>
+}
+
+/** A project's holds as they are (each card's: whose, which role, from when to when): equal, its agents' keys are too. */
+const holdsFingerprint = (index: HoldIndex): string => createHash('sha1').update(JSON.stringify(index.cards.map((c) => [c.number, c.holds.map(({ hold: h }) => [h.agent ?? null, h.name, h.role, h.from, h.to ?? null])]))).digest('hex')
+
+const whoKey = (who: SessionWho): string => `${who.agentId ?? ''}\0${who.agentName ?? ''}`
 
 type Priority = 0 | 1 | 2
 type Body = WorkerRequest extends infer R ? (R extends { id: number } ? Omit<R, 'id'> : never) : never
@@ -90,7 +120,8 @@ class UsageHistory {
   private stopped = false
   private progress = new Map<string, UsageHistoryProgress>()
   private backfills = new Map<string, Promise<void>>()
-  private cards = new Map<string, { at: number; cards: Promise<CardHolds[]> }>()
+  /** Each workspace's cards' holds, read again after a board change or half a minute, and each project's worked out from them once (holdIndex, HI-1748). */
+  private cards = new Map<string, BoardCards>()
 
   /** Starts the tick (Hive is ready). */
   start(): void {
@@ -102,7 +133,8 @@ class UsageHistory {
     onHiveEvent((e) => {
       // The board changed: its holds are read again, and running sessions' cards shared out again if they changed.
       if (e.type === 'tasks-changed') {
-        this.cards.delete(wsKey(e.workspacePath))
+        const c = this.cards.get(wsKey(e.workspacePath))
+        if (c) c.at = Number.NEGATIVE_INFINITY
         this.cardsChanged(e.workspacePath)
       }
       // A turn ended: what it used is recorded now, not at the next tick, so views that read the history have it.
@@ -149,18 +181,20 @@ class UsageHistory {
         this.enqueue(`attribute|${wsKey(run.path)}|${scope}`, 1, async () => {
           if (!this.live(ws, run)) return null
           const ids = await this.call<SessionId[]>({ type: 'ids', file, scope })
-          const byWho = new Map<string, { holds: SessionHold[]; holdsKey: string | null }>()
+          if (!this.live(ws, run)) return null
+          const p = await this.projectHolds(ws, run, host)
+          if (!this.live(ws, run)) return null
+          const now = Date.now()
+          // Each agent's key (kept until the board changes); its holds worked out only for a session whose key changed.
+          const byWho = new Map<string, { holds: SessionHold[] | null; holdsKey: string | null }>()
           const list: { session: string; holds: SessionHold[]; holdsKey: string | null }[] = []
           for (const id of ids) {
             if (id.source === 'external') continue
             const who = { ...(id.agentId ? { agentId: id.agentId } : {}), ...(id.agentName ? { agentName: id.agentName } : {}) }
-            const k = `${who.agentId ?? ''}\0${who.agentName ?? ''}`
+            const k = whoKey(who)
             let h = byWho.get(k)
-            if (!h) {
-              if (!this.live(ws, run)) return null
-              byWho.set(k, (h = await this.holdsFor(ws, run, host, who)))
-            }
-            if (h.holdsKey !== id.holdsKey) list.push({ session: id.session, ...h })
+            if (!h) byWho.set(k, (h = { holds: null, holdsKey: p ? this.holdsKeyOf(p, who, now) : null }))
+            if (h.holdsKey !== id.holdsKey) list.push({ session: id.session, holdsKey: h.holdsKey, holds: (h.holds ??= p ? sessionHolds(p.index, who, p.named, now) : []) })
           }
           return list.length ? { type: 'attribute', file, scope, sessions: list } : null
         })
@@ -440,28 +474,77 @@ class UsageHistory {
    * only when they changed. Of `run`'s workspace only: none once it closed (the service may have the next one by then).
    */
   private async holdsFor(ws: WorkspaceService, run: WorkspaceRun, projectPath: string, who: Pick<SessionRecord, 'agentId' | 'agentName'>): Promise<{ holds: SessionHold[]; holdsKey: string | null }> {
-    if (!this.live(ws, run) || ws.isAssistantHome(projectPath)) return { holds: [], holdsKey: null }
+    const p = await this.projectHolds(ws, run, projectPath)
+    if (!p) return { holds: [], holdsKey: null }
+    const now = Date.now()
+    const holds = sessionHolds(p.index, who, p.named, now)
+    return { holds, holdsKey: holds.length ? this.holdsKeyOf(p, who, now) : null }
+  }
+
+  /**
+   * A project's cards' holds as the board has them (read again after a change, or half a minute), worked out once
+   * (holdIndex), how a hold with only a name finds its agent, and each agent's holds key, kept while the board and the
+   * project's agents are as they were (HI-1748). Null: none (no cards; the Assistant's; `run`'s workspace closed).
+   */
+  private async projectHolds(ws: WorkspaceService, run: WorkspaceRun, projectPath: string): Promise<ProjectHolds | null> {
+    if (!this.live(ws, run) || ws.isAssistantHome(projectPath)) return null
+    const c = this.boardCards(ws, run)
+    const project = basename(projectPath).toLowerCase()
+    const all = await c.cards
+    if (!this.live(ws, run)) return null
+    let kept = c.projects.get(project)
+    if (!kept) {
+      const own = all.filter((card) => card.project.toLowerCase() === project)
+      const index = own.length ? holdIndex(own) : null
+      const fp = index ? holdsFingerprint(index) : ''
+      const was = c.prior?.get(project)
+      c.projects.set(project, (kept = was && was.fp === fp ? was : { index, fp, agents: null, keys: new Map() }))
+    }
+    const index = kept.index
+    if (!index) return null
+    const cfg = await ws.projectConfig(projectPath).catch(() => null)
+    if (!this.live(ws, run)) return null
+    const agents = cfg ? projectAgents(cfg) : []
+    // A hold with only a name is its agent's by the agents named so now: their keys are kept while those are the same.
+    const names = agents.map((a) => `${a.id}\0${a.name}`).join('\n')
+    if (kept.agents !== names) Object.assign(kept, { agents: names, keys: new Map() })
+    const named = (name: string): string[] => agents.filter((a) => a.name.toLowerCase() === name.toLowerCase()).map((a) => a.id)
+    return { index, named, keys: kept.keys }
+  }
+
+  /** The workspace's cards' holds kept (read again after a board change, which is told as it commits, or half a minute). */
+  private boardCards(ws: WorkspaceService, run: WorkspaceRun): BoardCards {
     const key = wsKey(run.path)
     let c = this.cards.get(key)
     if (!c || Date.now() - c.at > CARDS_MS) {
       // Only the cards' holds (#1107: never their comments).
-      c = { at: Date.now(), cards: cardHolds(ws).catch(() => []) }
+      // What the last read worked out, for the projects whose holds a change left as they were (most: a comment, a move of another project's card).
+      const prior = c ? new Map([...(c.prior ?? []), ...c.projects]) : null
+      c = { at: Date.now(), cards: boardHolds(ws).catch(() => []), projects: new Map(), prior }
       this.cards.set(key, c)
     }
-    const project = basename(projectPath).toLowerCase()
-    const all = await c.cards
-    if (!this.live(ws, run)) return { holds: [], holdsKey: null }
-    const cards = all.filter((card) => card.project.toLowerCase() === project)
-    if (!cards.length) return { holds: [], holdsKey: null }
-    const cfg = await ws.projectConfig(projectPath).catch(() => null)
-    if (!this.live(ws, run)) return { holds: [], holdsKey: null }
-    const agents = cfg ? projectAgents(cfg) : []
-    const named = (name: string): string[] => agents.filter((a) => a.name.toLowerCase() === name.toLowerCase()).map((a) => a.id)
-    const holds = sessionHolds(cards, who, named, Date.now())
-    if (!holds.length) return { holds, holdsKey: null }
-    // Open holds end "never" in the key: one going on doesn't change it, one ending does.
-    const open = sessionHolds(cards, who, named, Number.MAX_SAFE_INTEGER)
-    return { holds, holdsKey: createHash('sha1').update(JSON.stringify(open)).digest('hex') }
+    return c
+  }
+
+  /**
+   * Every card's holds, archived cards too, as sharing sessions' use out reads them: cost per card and per lane take
+   * these rather than reading every card's holds again (HI-1748). Kept until the board changes.
+   */
+  boardHolds(ws: WorkspaceService): Promise<CardHolds[]> {
+    const run = runOf(ws)
+    return run && this.live(ws, run) ? this.boardCards(ws, run).cards : cardHolds(ws)
+  }
+
+  /**
+   * An agent's holds key: its holds with open ones ending "never", so one going on doesn't change it and one ending
+   * does; null while it holds no card. The worker shares a session's cards out again only when its key changed.
+   */
+  private holdsKeyOf(p: ProjectHolds, who: SessionWho, now: number): string | null {
+    if (!heldAt(p.index, who, p.named, now)) return null
+    const k = whoKey(who)
+    let key = p.keys.get(k)
+    if (key === undefined) p.keys.set(k, (key = createHash('sha1').update(JSON.stringify(sessionHolds(p.index, who, p.named, Number.MAX_SAFE_INTEGER))).digest('hex')))
+    return key
   }
 
   /**
@@ -766,6 +849,14 @@ class UsageHistory {
   /** The rows on some cards, with whose session each is. */
   cardRows(workspacePath: string, cards: number[]): Promise<(SessionMeta & { row: StoredSession['rows'][number] })[]> {
     return this.call({ type: 'cards', file: usageFile(workspacePath), cards })
+  }
+
+  /** Whose a host's sessions in the history are, without their usage (cost per card: whether a hold's agent has any, HI-1748). */
+  async sessionsWho(projectPath: string): Promise<SessionWho[]> {
+    const ws = workspaceFor(projectPath)
+    if (!ws?.path) return []
+    const { workspace, scope } = await ws.sessionScope(projectPath)
+    return (await this.call<SessionId[]>({ type: 'ids', file: usageFile(workspace), scope })).map((s) => ({ ...(s.agentId ? { agentId: s.agentId } : {}), ...(s.agentName ? { agentName: s.agentName } : {}) }))
   }
 
   /** A host's sessions with their timelines (a lane's cost). */

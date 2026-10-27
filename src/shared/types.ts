@@ -149,6 +149,8 @@ export interface AppSettings {
   keybindings: KeybindingOverrides
   /** The global default workflow options (SPEC §16.6.6), under each workspace's and project's own; absent: all off. */
   workflow?: WorkflowDefaults
+  /** Hive's default slot options for Git projects (HI-1765), under each workspace's and project's own (`slots`). */
+  slotDefaults?: SlotDefaults
   updates: {
     checkAutomatically: boolean
     downloadAutomatically: boolean
@@ -260,10 +262,6 @@ export interface AppSettings {
   agents: {
     /** Per-file locks between agents working in the same folder. */
     fileLocks: FileLockMode
-    /** Git-ignored files copied into new worktrees: glob patterns, one per line or comma separated. */
-    worktreeCopy: string
-    /** Default for merging a worktree agent's branch. */
-    mergeStyle: MergeStyle
     /** How long a background task an agent started counts as running if it never reports its end, in minutes. */
     backgroundTaskMinutes: number
     /** What to do with processes an agent leaves running when it stops: offer to end them, or end them (#507). */
@@ -592,6 +590,8 @@ export interface AppConfig {
     sessionsTree?: Record<string, Record<string, boolean>>
     /** The .hive version control notice each project's Overview no longer shows (#345): the situation dismissed (`hiveVcsKey`), by project path in lower case. */
     hiveVcsNotice?: Record<string, string>
+    /** The connections notice's entries dismissed (HI-1770): `<project path in lower case>|<moved entry's id>`. */
+    connectionsNoticeDismissed?: string[]
     /** The active projects folded in the Assistant panel's Workspace list (#399), by `assistantFoldKey` (workspace and project path); unfolded ones aren't kept. */
     assistantFold?: Record<string, boolean>
     /** Each workspace's board as the user left it, by workspace path in lower case (#170): collapsed columns, folded cards. */
@@ -701,6 +701,32 @@ export interface Connection {
   observed?: ConnectionObserved
   /** A removal that stopped partway, in English: what is left, for Remove to try again. */
   leftover?: string
+  /**
+   * Its defaults for the agents on it (HI-1770): what an agent with no model, effort or context of its own runs with.
+   * Absent: not set yet (copied from the CLI's once, `defaultsFrom`); an empty object is the user's (the CLI decides).
+   */
+  defaults?: ConnectionDefaults
+  /** 'cli': `defaults` are still the CLI's per-CLI defaults as copied; cleared once they are edited. */
+  defaultsFrom?: 'cli'
+}
+
+/** A connection's defaults (HI-1770); each absent: the CLI decides (its own default model, effort; context off). */
+export interface ConnectionDefaults {
+  model?: string
+  effort?: EffortLevel
+  use200kContext?: boolean
+}
+
+/** The field moved from a project onto its agents by the connections migration (HI-1770). */
+export type MovedField = 'model' | 'effort' | 'use200kContext'
+
+/**
+ * A CLI's project overrides moved onto the project's agents (HI-1770, Darren's 26 Oct ~23:25 (2)): when, and each value
+ * an agent was given (`id`: `<cli>:<agentId>:<field>`, stable, for the notice and its dismissal).
+ */
+export interface ConnectionsMoved {
+  at: string
+  moved: { id: string; agent: string; field: MovedField; value: string | boolean }[]
 }
 
 /** A workspace's accounts for one provider (HI-980): those on in it, and its default among them (null: none). */
@@ -747,6 +773,17 @@ export interface WorkspaceConfig {
   journalSuggested?: boolean
   /** The workspace's default workflow options (SPEC §16.6.6), between the global ones and each project's own. */
   workflow?: WorkflowDefaults
+  /** The workspace's default slot options (HI-1765), between Hive's and each project's own. */
+  slotDefaults?: SlotDefaults
+}
+
+/**
+ * Slot options a level (Hive's, a workspace's) gives the Git projects under it (HI-1765). `copy`: the git-ignored files
+ * copied into each new slot and review copy, glob patterns, comma separated or one per line; left out, the level
+ * inherits; an empty string is none.
+ */
+export interface SlotDefaults {
+  copy?: string
 }
 
 /** A project folder Hive leaves out of the workspace, until it's restored in Settings → Workspace. */
@@ -1255,6 +1292,11 @@ export interface ProjectConfig {
   transcriptWarnMB: number | null
   /** The project's agents, in the order they were added. All are equal; a new project has none. */
   agents: AgentDef[]
+  /**
+   * One-time changes made to the project, recorded with what they did: `connections1`, per CLI, its model, effort and
+   * context overrides moved onto its agents (HI-1770), written with them in one write.
+   */
+  migrations?: { connections1?: Partial<Record<ProviderId, ConnectionsMoved>> }
   /** The Session tab's layout (one for the project, #134); its pages hold as many agents as it has panes. */
   layout: PageLayout
   /**

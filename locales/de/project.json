@@ -1,5 +1,6 @@
 {
   "project.agents.add": "Agent hinzufügen",
+  "project.agents.connectionSettings": "Standards der Verbindung ({model})",
   "project.agents.merge": "Mergen…",
   "project.agents.off": "{provider} (aus)",
   "project.agents.own200k": "{on, select, yes {200K-Kontext an} other {200K-Kontext aus}}",

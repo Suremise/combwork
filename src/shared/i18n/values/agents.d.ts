@@ -248,6 +248,7 @@ interface HiveMessageValues {
   'agents.name.empty': undefined
   'agents.name.taken': { agent: string | number; project: string | number; suggestion: string | number }
   'agents.name.tooLong': { max: string | number }
+  'agents.overrides.connectionDefault': undefined
   'agents.overrides.context': undefined
   'agents.overrides.effort': undefined
   'agents.overrides.inherited': { whose: string | number; value: string | number }

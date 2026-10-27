@@ -6,7 +6,10 @@
 
 import { hiveError } from './hiveError'
 import { msg } from '../shared/i18n/msg'
-import type { ProjectConfig, SlotOptions } from '../shared/types'
+import type { ProjectConfig, SlotDefaults, SlotOptions, WorkflowLevel } from '../shared/types'
+import { config } from './config'
+import { slotLevelsOf } from './slots'
+import { slotCopyOf, type SlotLevelForm, type SlotOptionOrigin } from '../shared/slotDefaults'
 import type { WorkspaceService } from './workspace'
 
 export type SlotSettingKey = keyof SlotOptions | 'copiesSize'
@@ -43,7 +46,60 @@ export async function setSlotSetting(ws: WorkspaceService, projectPath: string, 
     const slots = { ...c.slots }
     if (value === null) delete slots[key]
     else slots[key] = key === 'copy' ? (value as string) : (value as string).trim()
+    // The copy's Inherit takes the project's own value from before 1.0 too (HI-1765: its `worktreeCopy` is its own, read
+    // after `slots.copy`), so it then inherits the workspace's or Hive's.
+    if (key === 'copy' && value === null && c.worktreeCopy != null) return { slots, worktreeCopy: null }
     return { slots }
   })
   return { slots: cfg.slots ?? {}, copies: cfg.copies ?? {} }
+}
+
+/** Hive's or the workspace's slot defaults, with what each inherits (Hive's: the built-in default). */
+export function slotLevelForm(ws: WorkspaceService, level: WorkflowLevel): SlotLevelForm {
+  if (level !== 'global' && level !== 'workspace') throw hiveError(M.bad, undefined, { kind: 'invalid' })
+  const levels = slotLevelsOf(config.settings, ws)
+  return level === 'global' ? { own: { ...levels.global }, inherited: { copy: slotCopyOf(null, {}) } } : { own: { ...levels.workspace }, inherited: { copy: slotCopyOf(null, { global: levels.global }) } }
+}
+
+/** A project's copied files as they inherit, and where they come from (the window's Slots and copies). */
+export async function projectSlotCopy(ws: WorkspaceService, projectPath: string): Promise<{ value: string; origin: SlotOptionOrigin }> {
+  return slotCopyOf(await ws.projectConfig(projectPath), slotLevelsOf(config.settings, ws))
+}
+
+/** The slot defaults a level can set for the Git projects under it (HI-1765). */
+export type SlotDefaultKey = keyof SlotDefaults
+const DEFAULT_KEYS: readonly SlotDefaultKey[] = ['copy']
+
+/**
+ * Sets (or, with null, removes, so it inherits) one of a level's slot defaults (HI-1765): Hive's (config.json) or the
+ * workspace's (workspace.json, under its lock, against it as it is then). An empty string is that level's "none".
+ * `check` sees the level's defaults as the change replaces them, in the change's own turn (the workspace's in its save
+ * queue, HR5's HI-1765 round 1): throwing refuses it, nothing written.
+ */
+export async function setSlotDefault(ws: WorkspaceService, level: WorkflowLevel, key: SlotDefaultKey, value: string | null, check?: (now: SlotDefaults | undefined) => void): Promise<SlotDefaults> {
+  if (level !== 'global' && level !== 'workspace') throw hiveError(M.bad, undefined, { kind: 'invalid' })
+  if (!DEFAULT_KEYS.includes(key)) throw hiveError(M.bad, undefined, { kind: 'invalid' })
+  if (value !== null && (typeof value !== 'string' || value.length > MAX_TEXT)) throw hiveError(M.badText, undefined, { kind: 'invalid' })
+  const next = (now: SlotDefaults | undefined): SlotDefaults => {
+    const d = { ...now }
+    if (value === null) delete d[key]
+    else d[key] = value
+    return d
+  }
+  if (level === 'global') {
+    check?.(config.settings.slotDefaults)
+    return config.setSlotDefaults(next(config.settings.slotDefaults)).slotDefaults ?? {}
+  }
+  let saved: SlotDefaults = {}
+  let checked = false
+  await ws.saveWorkspaceConfigWith((c) => {
+    // The save works the change out again once written: checked only the first time, before anything is written.
+    if (!checked) check?.(c.slotDefaults)
+    checked = true
+    saved = next(c.slotDefaults)
+    return { slotDefaults: saved }
+  })
+  // The windows read it again, whoever changed it (the settings tool, another window): their open rows follow.
+  ws.scheduleRefresh()
+  return saved
 }

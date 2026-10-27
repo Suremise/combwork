@@ -152,6 +152,7 @@ interface HiveMessageValues {
   'session.start.closing': undefined
   'session.start.couldNot': { agent: string | number }
   'session.start.fenced': { why: string | number }
+  'session.start.moveFailed': { project: string | number; error: string | number }
   'session.start.openIn': { agent: string | number }
   'session.start.otherFolder': { folder: string | number }
   'session.start.projectRunning': undefined

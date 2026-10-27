@@ -21,7 +21,7 @@ import { createLogger, userText } from './logger'
 import { progress } from './progressService'
 import { sessions } from './sessions'
 import { appRunner, appSettle, boardConn, holder, journalsOf, retireSealOf, sweepSealsOf } from './slotsApp'
-import { slotOptionsOf } from './slots'
+import { slotLevelsOf, slotOptionsOf } from './slots'
 import { openWorkspaces, WorkspaceService } from './workspace'
 import { CopyPool, CopyStore, copiesDirOf, copyPoolSize, IsolatedRequests, type CopyLease } from './copies'
 import { journalPath, LeaseJob } from './workflow/queueJobs'
@@ -56,7 +56,7 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
       store: new CopyStore(boardConn(ws), cfg.id ?? basename(projectPath)),
       project: projectPath,
       dir: copiesDirOf(ws.worktreesRoot, projectPath),
-      options: async () => slotOptionsOf(await ws.projectConfig(projectPath), config.settings.agents.worktreeCopy),
+      options: async () => slotOptionsOf(await ws.projectConfig(projectPath), slotLevelsOf(config.settings, ws)),
       size: async () => {
         const c = await ws.projectConfig(projectPath)
         return copyPoolSize(projectAgents(c).filter((a) => reviewsWork(agentWorkflowRole(a))).length, c.copies?.size)

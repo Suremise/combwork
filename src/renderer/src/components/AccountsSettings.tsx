@@ -1,3 +1,4 @@
+import { ConnectionDefaultsEditor, MovedNoticeBanner } from './ConnectionDefaults'
 import { useCallback, useEffect, useState } from 'react'
 import type { ProviderId } from '@shared/types'
 import { accountState, duplicateLogins, type ConnectionsView, type ConnectionState } from '@shared/accounts'
@@ -134,6 +135,7 @@ export function AccountsSettings() {
   return (
     <div className="accounts-settings">
       {!wsPath && <p className="hint">{tr(M.noWorkspace)}</p>}
+      <MovedNoticeBanner />
       {affected > 0 && (
         <div className="banner warn" data-switch-affected>
           <Icon name="refresh" /> {tr(M.affected, { n: affected })}
@@ -167,6 +169,7 @@ export function AccountsSettings() {
                     {state === 'changed' && a.accepted && o?.email && <div className="account-warning" data-warning="changed"><Icon name="warning" /> {tr(M.changedTo, { now: o.email, was: a.accepted.email })}</div>}
                     {same && <div className="account-warning" data-warning="duplicate"><Icon name="warning" /> {tr(M.sameLogin, { names: fmt.list(same.map(nameOf)) })}</div>}
                     {a.leftover && <div className="account-warning" data-warning="leftover"><Icon name="warning" /> {tr(M.leftover, { what: a.leftover })}</div>}
+                    <ConnectionDefaultsEditor connection={a} />
                   </div>
                   <div className="account-actions">
                     <Switch checked={on} disabled={!wsPath || !!a.leftover} label={tr(M.onHere)} onChange={(v) => void act(M.changeFailed, () => call('connections:setOn', a.id, v))} />

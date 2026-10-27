@@ -44,6 +44,7 @@ interface HiveMessageValues {
   'main.connections.launch.offNoDefault': { agent: string | number; name: string | number; cli: string | number }
   'main.connections.launch.otherProvider': { agent: string | number; cli: string | number }
   'main.connections.launch.signedOut': { name: string | number; agent: string | number }
+  'main.connections.moveFailed': { project: string | number }
   'main.console.noWorkspace': undefined
   'main.console.title': { workspace: string | number }
   'main.corrupt.damaged': { file: string | number }

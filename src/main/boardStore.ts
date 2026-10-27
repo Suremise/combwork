@@ -1479,14 +1479,32 @@ export function boardGeneration(ws: WorkspaceService): number {
 export function holdDocs(ws: WorkspaceService, o: { live?: boolean } = {}): { number: number; doc: Record<string, unknown> }[] {
   // One snapshot for both reads: the history read for the cards without holds sees the cards the first read saw.
   return readSnapshot(ws, (b, db) => {
-    if (!b.legacy) {
-      const cards = cardFields(db, ['project', 'projectId', 'agent', 'agentName', 'review', 'held'], { parts: ['holds'], ...(o.live ? { where: 'archived = 0' } : {}) })
-      const need = cards.filter((c) => !Array.isArray(c.fields.held)).map((c) => c.r.card.number)
-      const history = new Map(need.length ? readCardRows(db, { numbers: need, parts: ['history'], columns: [] }).map((r) => [r.card.number, cardField(r, 'history') ?? null]) : [])
-      return cards.map(({ r, fields }) => ({ number: r.card.number, doc: { ...fields, history: Array.isArray(fields.held) ? null : (history.get(r.card.number) ?? null) } }))
-    }
+    if (!b.legacy) return holdRows(db, o.live ? { where: 'archived = 0' } : {})
     const rows = db.prepare(`SELECT number, json_object('project', doc -> '$.project', 'projectId', doc -> '$.projectId', 'agent', doc -> '$.agent', 'agentName', doc -> '$.agentName', 'review', doc -> '$.review', 'held', doc -> '$.held', 'history', CASE WHEN json_type(doc, '$.held') = 'array' THEN NULL ELSE doc -> '$.history' END) AS doc FROM cards${o.live ? " WHERE coalesce(json_extract(doc, '$.archived'), 0) = 0" : ''} ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
     return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+  })
+}
+
+/** holdDocs' rows of the cards `sel` picks, on a board with revisions. */
+function holdRows(db: Db['reader'], sel: { where?: string; args?: number[] }): { number: number; doc: Record<string, unknown> }[] {
+  const cards = cardFields(db, ['project', 'projectId', 'agent', 'agentName', 'review', 'held'], { parts: ['holds'], ...sel })
+  const need = cards.filter((c) => !Array.isArray(c.fields.held)).map((c) => c.r.card.number)
+  const history = new Map(need.length ? readCardRows(db, { numbers: need, parts: ['history'], columns: [] }).map((r) => [r.card.number, cardField(r, 'history') ?? null]) : [])
+  return cards.map(({ r, fields }) => ({ number: r.card.number, doc: { ...fields, history: Array.isArray(fields.held) ? null : (history.get(r.card.number) ?? null) } }))
+}
+
+/**
+ * The holds (holdDocs) of the cards at revision `since` or above (every card's when null), with the board's mark, its
+ * opening (Board.generation) and every card's number, from one snapshot (HI-1748: what the usage history keeps of the
+ * board, read again only for the cards a change touched, as cardChanges does for a window). Null on a board with no
+ * revisions (a 0.9 board waiting for its upgrade): holdDocs reads it whole.
+ */
+export function holdChanges(ws: WorkspaceService, since: number | null): { generation: number; mark: number; numbers: number[]; docs: { number: number; doc: Record<string, unknown> }[] } | null {
+  return readSnapshot(ws, (b, db) => {
+    if (b.legacy) return null
+    const mark = (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g // i18n-ignore: SQL
+    const numbers = (db.prepare('SELECT number FROM cards ORDER BY number').all() as { number: number }[]).map((r) => r.number) // i18n-ignore: SQL
+    return { generation: b.generation, mark, numbers, docs: holdRows(db, since === null ? {} : { where: 'rev >= ?', args: [since] }) }
   })
 }
 

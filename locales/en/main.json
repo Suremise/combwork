@@ -171,6 +171,10 @@
     "defaultMessage": "{name} is signed out. Sign it in again in Settings → Connections, then start {agent}.",
     "description": "Starting an agent ({agent}) is refused: its connection ({name}) isn't signed in."
   },
+  "main.connections.moveFailed": {
+    "defaultMessage": "Hive couldn't move {project}'s model settings to its agents",
+    "description": "A notice's title (HI-1770): moving a project's own model, effort and context settings onto its agents (connections now hold the defaults) failed; it is tried again at the next start. {project} is the project's name."
+  },
   "main.console.noWorkspace": {
     "defaultMessage": "Open a workspace first: the developer console shows a workspace's agents and Hive's work there.",
     "description": "An error when the developer console is opened with no workspace open."

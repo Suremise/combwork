@@ -3,7 +3,8 @@ import { join, resolve } from 'path'
 import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
 import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
-import type { Connection, ConnectionObserved, ConnectionProblem, ProviderId, WorkspaceConfig } from '../shared/types'
+import type { Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, ProviderId, WorkspaceConfig } from '../shared/types'
+import { cliDefaults } from '../shared/connectionDefaults'
 import { acceptable, accountState, resolveConnection, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { profileFolder } from '../shared/appName'
 import { isProviderEnabled, providerDescriptor, PROVIDERS } from '../shared/providers'
@@ -388,7 +389,8 @@ export async function addAccount(id: ProviderId, name: string): Promise<Connecti
   support(id)
   const n = name.trim()
   if (!n) throw hiveError(NO_NAME, undefined, { kind: 'invalid' })
-  const a: Connection = { id: `a-${randomBytes(4).toString('hex')}`, provider: id, kind: 'signIn', name: n, createdAt: new Date().toISOString() }
+  // Its defaults the CLI's as they are now (HI-1770), until edited.
+  const a: Connection = { id: `a-${randomBytes(4).toString('hex')}`, provider: id, kind: 'signIn', name: n, createdAt: new Date().toISOString(), defaults: cliDefaults(config.settings, id), defaultsFrom: 'cli' }
   return locked(a.id, async () => {
     try {
       await makeFolder(a)
@@ -402,6 +404,35 @@ export async function addAccount(id: ProviderId, name: string): Promise<Connecti
     log.info(`account ${a.id} added (${a.provider})`)
     syncWatches()
     return a
+  })
+}
+
+/**
+ * A connection's defaults for the agents on it (HI-1770): model, effort and context, each '' or null to leave it to the
+ * CLI. Edited, they are the user's (no longer the CLI's as copied).
+ */
+export function setConnectionDefaults(id: string, patch: { model?: string | null; effort?: string | null; use200kContext?: boolean | null }): void {
+  assertOn()
+  const a = mustGet(id)
+  const next: ConnectionDefaults = { ...a.defaults }
+  if (patch.model !== undefined) next.model = patch.model?.trim() || undefined
+  if (patch.effort !== undefined) next.effort = patch.effort?.trim() || undefined
+  if (patch.use200kContext !== undefined) next.use200kContext = providerDescriptor(a.provider).capabilities.contextLimit && typeof patch.use200kContext === 'boolean' ? patch.use200kContext : undefined
+  for (const k of Object.keys(next) as (keyof ConnectionDefaults)[]) if (next[k] === undefined) delete next[k]
+  changeAccount(id, (c) => {
+    c.defaults = next
+    delete c.defaultsFrom
+  })
+}
+
+/**
+ * Connections made before they had defaults (HI-1755's) get the CLI's, once (HI-1770): only where `defaults` is absent,
+ * so one the user emptied or edited is never filled in again.
+ */
+export function seedConnectionDefaults(): void {
+  if (!list().some((a) => a.defaults === undefined)) return
+  changeAccounts((all) => {
+    for (const [i, a] of all.entries()) if (a.defaults === undefined) all[i] = { ...a, defaults: cliDefaults(config.settings, a.provider), defaultsFrom: 'cli' }
   })
 }
 

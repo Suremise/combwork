@@ -3,6 +3,10 @@
     "defaultMessage": "Add Agent",
     "description": "Button: adds an agent to the project."
   },
+  "project.agents.connectionSettings": {
+    "defaultMessage": "Its connection's defaults ({model})",
+    "description": "Under an agent with no model, effort or context of its own, with Connections on (HI-1770): it runs with its connection's defaults. {model} is the model it runs."
+  },
   "project.agents.merge": {
     "defaultMessage": "Merge…",
     "description": "Tooltip on a worktree agent's merge button."

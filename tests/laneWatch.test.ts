@@ -271,7 +271,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
   const base = tempDir('hive-lanewatch-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
-  const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
+  const { contextWorkspace, createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
   const tasks = await import('../src/main/tasks')
   const watches = await import('../src/main/watches')
   watches.testHooks.settleMs = 0
@@ -386,6 +386,25 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await watches.evaluateWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(4), { timeout: HUNG_MS })
     expect(st.told[3]).toMatch(/^\[Hive\] Lane B1 \/ R1 \(greetings\): ended \(merged\)\./)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a lane hit names its card by key, with no workspace the context as the watch is looked at (HI-1777)", async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const { changeProjectKey } = await import('../src/main/projectKeys')
+    await changeProjectKey(w, alpha, 'AL')
+    const [a] = await newCards(w, 'b1', 1)
+    const key = (await inWorkspace(w, () => tasks.getTask(a, w))).key
+    expect(key).toMatch(/^AL-\d+$/)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    await watchAll(w, home, st)
+    await inWorkspace(w, () => tasks.updateTask(a, { blocked: 'Screenshots for your OK' }, agent('b1')))
+    expect(contextWorkspace()).toBeUndefined()
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toContain(`${key} is blocked: "Screenshots for your OK"`)
+    expect(st.told[0]).not.toContain(`#${a}`)
     await disposeWorkspaceService(w)
   })
 

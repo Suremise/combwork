@@ -987,6 +987,10 @@
     "defaultMessage": "A name is at most {max} characters.",
     "description": "Why an agent name can't be used: it is longer than {max} characters."
   },
+  "agents.overrides.connectionDefault": {
+    "defaultMessage": "Connection default",
+    "description": "An agent's model, effort or context choice that follows its connection's default (HI-1770): the first choice of each, before that default in brackets (\"Connection default (Opus 5.5)\"). Keep it short."
+  },
   "agents.overrides.context": {
     "defaultMessage": "Use 200K context (instead of 1M)",
     "description": "Label of an agent's choice to hold its sessions to a 200K-token context window instead of the model's 1M one."

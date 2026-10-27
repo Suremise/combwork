@@ -2991,6 +2991,21 @@ p.hint {
   color: var(--warning);
   margin-bottom: 2px;
 }
+/* A connection's defaults for the agents on it (HI-1770), opened under its row; the notice of moved settings above the list. */
+.connection-defaults {
+  margin-top: 4px;
+}
+.connection-defaults-form {
+  margin-top: 6px;
+  max-width: 520px;
+}
+.connections-notice {
+  align-items: flex-start;
+}
+.connections-notice ul {
+  margin: 4px 0;
+  padding-left: 20px;
+}
 /* An agent's connection in its rows (HI-1769): one line, its ⟳ kept with it. */
 .agent-connection {
   white-space: nowrap;

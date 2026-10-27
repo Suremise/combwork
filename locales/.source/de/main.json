@@ -42,6 +42,7 @@
   "main.connections.launch.offNoDefault": "{agent}'s connection, {name}, is off in this workspace, and no other {cli} connection is on. Turn one on in Settings → Connections.",
   "main.connections.launch.otherProvider": "The connection chosen for {agent} is for another CLI. Pick a {cli} connection in its Agent Settings.",
   "main.connections.launch.signedOut": "{name} is signed out. Sign it in again in Settings → Connections, then start {agent}.",
+  "main.connections.moveFailed": "Hive couldn't move {project}'s model settings to its agents",
   "main.console.noWorkspace": "Open a workspace first: the developer console shows a workspace's agents and Hive's work there.",
   "main.console.title": "Developer Console — {workspace}",
   "main.corrupt.damaged": "{file} was damaged",

@@ -150,6 +150,7 @@
   "session.start.closing": "Hive stoppt gerade die Agenten dieses Arbeitsbereichs, daher kann jetzt keiner starten.",
   "session.start.couldNot": "{agent} konnte nicht gestartet werden",
   "session.start.fenced": "{why}, daher können die Agenten des Projekts jetzt nicht starten.",
+  "session.start.moveFailed": "Hive konnte die Modelleinstellungen von {project} nicht auf seine Agenten übertragen: {error}. Starte den Agenten erneut.",
   "session.start.openIn": "Diese Unterhaltung ist bereits in {agent} geöffnet. Ein Agent kann nur eine Sitzung fortsetzen, die kein anderer Agent ausführt.",
   "session.start.otherFolder": "Diese Sitzung lief in {folder}. Setze sie mit dem Agenten fort, der in diesem Ordner arbeitet.",
   "session.start.projectRunning": "Für dieses Projekt läuft bereits eine Sitzung. Stoppe sie zuerst.",

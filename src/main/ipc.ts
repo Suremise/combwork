@@ -19,7 +19,8 @@ import { keptLaneOrder } from '../shared/laneBar'
 import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../shared/tips'
 import { allProviders } from './providers'
 import { providerService } from './providerService'
-import { accountsView, addAccount, connectionHomes, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, signInAccount } from './accounts'
+import { accountsView, addAccount, connectionHomes, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, setConnectionDefaults, signInAccount } from './accounts'
+import { dismissMovedNotice, movedNotice } from './connectionMoves'
 import { config } from './config'
 import { clearRecent, recentChanged, recentFor, removeRecent } from './recentWorkspaces'
 import { emit, emitTo, onHiveEvent } from './events'
@@ -120,7 +121,7 @@ import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesetsNow } from './workflow/rulesets'
 import { poolFor, slotTest, slotViews } from './slotsApp'
-import { setSlotSetting } from './slotSettings'
+import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { copyViews, stopIsolated } from './copiesApp'
 import { branchQueueCard, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
@@ -902,6 +903,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined, true),
     'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p))),
     'slots:setSetting': (p, key, value) => setSlotSetting(workspace, workspace.assertProject(p), key, value),
+    'slots:copyOf': (p) => projectSlotCopy(workspace, workspace.assertProject(p)),
+    'slots:levelForm': (level) => slotLevelForm(workspace, level),
+    'slots:setLevelDefault': async (level, key, value) => {
+      await setSlotDefault(workspace, level, key, value)
+      return slotLevelForm(workspace, level)
+    },
     'slots:releaseCarried': (p, agentId) => releaseCarried(workspace, workspace.assertProject(p), String(agentId)),
     'slots:heldWriter': (p, slot) => heldWriter(workspace.assertProject(p), String(slot)),
     'slots:releaseWriter': (p, slot, run, end) => releaseHeldWriter(workspace.assertProject(p), String(slot), String(run), { end: end === true }),
@@ -1525,6 +1532,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'connections:setDefault': (id) => setAccountDefault(id),
     'connections:setAssistant': (provider, id) => setAssistantConnection(provider, id),
     'connections:switchAffected': () => sessions.switchAffected(workspace.path!),
+    'connections:setDefaults': (id, patch) => setConnectionDefaults(id, patch),
+    'connections:notice': () => movedNotice(workspace),
+    'connections:dismissNotice': (keys) => dismissMovedNotice(workspace, Array.isArray(keys) ? keys.filter((k) => typeof k === 'string') : []),
     'session:switchConnection': (p, agentId) => sessions.switchAtSafePoint(p, agentId),
 
     'api:info': () => apiInfo(),

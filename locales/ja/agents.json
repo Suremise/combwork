@@ -246,6 +246,7 @@
   "agents.name.empty": "名前を入力してください。",
   "agents.name.taken": "{project}に「{agent}」という名前のエージェントがすでにあります。エージェント名はワークスペース全体で重複できません。「{suggestion}」はいかがですか。",
   "agents.name.tooLong": "名前は{max}文字以内にしてください。",
+  "agents.overrides.connectionDefault": "接続の既定",
   "agents.overrides.context": "200Kコンテキストを使う（1Mの代わりに）",
   "agents.overrides.effort": "エフォート",
   "agents.overrides.inherited": "{whose}（{value}）",

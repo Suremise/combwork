@@ -24,7 +24,7 @@ import { HiddenProjectsList } from '../components/ProjectRemoval'
 import { WorkspaceStorageList } from '../components/Storage'
 import { AntivirusPanel } from '../components/Antivirus'
 import { AccountsSettings } from '../components/AccountsSettings'
-import { ConnectionChoice } from '../components/ConnectionChoice'
+import { ConnectionChoice, useLaunchConnection } from '../components/ConnectionChoice'
 import { AdvancedSettings } from '../components/AdvancedSettings'
 import { ACCOUNTS_PREVIEW, ADVANCED_DEFS, groupName, shownText, type AdvancedState } from '@shared/advanced'
 import { choose, confirm, get, notify, set, useLanguage, useStore } from '../store'
@@ -80,6 +80,9 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'advanced.reset': () => <ResetAll />
 }
 
+/** A CLI's rows that are each connection's with Connections on (HI-1770). */
+const MOVED_KEYS = new Set(['defaultModel', 'defaultEffort', 'use200kContext'])
+
 /** A provider page's custom controls, by key. */
 function providerControl(provider: ProviderId, key: string): (() => React.ReactNode) | undefined {
   switch (key) {
@@ -87,6 +90,8 @@ function providerControl(provider: ProviderId, key: string): (() => React.ReactN
       return () => <ProviderToggle provider={provider} />
     case 'status':
       return () => <ProviderStatus provider={provider} />
+    case 'movedToConnections':
+      return () => null
     case 'defaultModel':
       return () => <GlobalModelPicker provider={provider} />
     case 'defaultEffort':
@@ -616,12 +621,21 @@ function AssistantModePicker() {
   )
 }
 
+const CONNECTION_DEFAULT = msg({ id: 'agents.overrides.connectionDefault', defaultMessage: 'Connection default', description: "An agent's model, effort or context choice that follows its connection's default (HI-1770): the first choice of each, before that default in brackets (\"Connection default (Opus 5.5)\"). Keep it short." })
+const ON_TEXT = msg({ id: 'settings.option.on', defaultMessage: 'On', description: 'A choice of a setting that is on or off, beside Inherit or Default.' })
+const OFF_TEXT = msg({ id: 'settings.option.off', defaultMessage: 'Off', description: 'A choice of a setting that is on or off, beside Inherit or Default.' })
+
 /** The Assistant's model, effort, mode and arguments with one provider. */
 function AssistantProviderDefaults({ provider }: { provider: ProviderId }) {
   const settings = useStore((s) => s.settings)
   const p = providerDescriptor(provider)
   const a = settings?.assistant.providers[provider] ?? { model: '', effort: '', permissionMode: '', extraArgs: '', use200kContext: '' as const }
-  const g = providerSettings(settings, provider)
+  // With connections (HI-1770), what an empty choice runs is the Assistant's connection's default, not the CLI's.
+  const assistantChoice = useStore((s) => s.workspace?.config.assistantConnection?.[provider])
+  const conn = useLaunchConnection(assistantChoice || undefined, provider)
+  const legacy = providerSettings(settings, provider)
+  const g = conn === undefined ? legacy : { ...legacy, defaultModel: conn?.defaults?.model ?? '', defaultEffort: conn?.defaults?.effort ?? '', use200kContext: !!conn?.defaults?.use200kContext }
+  const connectionDefault = (value: string | null): string => (value ? tr(msg({ id: 'agents.overrides.inherited', defaultMessage: '{whose} ({value})', description: "The first choice of an agent's model, effort, mode or context: whose setting it follows ({whose}: \"Project's\") and what that is now ({value}: \"Opus 5.5\")." }), { whose: tr(CONNECTION_DEFAULT), value }) : tr(CONNECTION_DEFAULT))
   const [args, setArgs] = useState(a.extraArgs)
   useEffect(() => setArgs(a.extraArgs), [a.extraArgs])
   const save = (patch: Partial<typeof a>): void => void saveSettings({ assistant: { providers: { [provider]: patch } } } as SettingsPatch)
@@ -630,11 +644,11 @@ function AssistantProviderDefaults({ provider }: { provider: ProviderId }) {
   const runModel = a.model || g.defaultModel || cliDefault
   // The level itself, "Default (Medium)": effortText's "Medium, default" would say default twice (#911). Not known: "Claude Code's default", no outer "Default (…)" (#916).
   const effortLevel = g.defaultEffort && g.defaultEffort !== 'inherit' ? g.defaultEffort : modelCaps(provider, runModel, info, settings).defaultEffort
-  const effortLabel = !effortLevel ? cliDefaultEffort(provider, tr) : tr(msg({ id: 'settings.assistant.defaultIs', defaultMessage: 'Default ({value})', description: 'The first choice of a list in Settings → Assistant → With <provider>: what applies when nothing is chosen. {value} says what that is.' }), { value: effortName(provider, effortLevel, settings, tr) })
+  const effortLabel = conn !== undefined ? connectionDefault(effortLevel ? effortName(provider, effortLevel, settings, tr) : null) : !effortLevel ? cliDefaultEffort(provider, tr) : tr(msg({ id: 'settings.assistant.defaultIs', defaultMessage: 'Default ({value})', description: 'The first choice of a list in Settings → Assistant → With <provider>: what applies when nothing is chosen. {value} says what that is.' }), { value: effortName(provider, effortLevel, settings, tr) })
   return (
     <div className="agent-form assistant-defaults">
       <label>{tr(msg({ id: 'settings.assistantProvider.model.title', defaultMessage: 'Model', description: "A field's title in Settings → Assistant → With <provider>: the Assistant's model." }))}</label>
-      <ModelPicker provider={provider} value={a.model} base={{ value: '', label: g.defaultModel ? tr(msg({ id: 'settings.provider.cliDefaultIs', defaultMessage: '{provider} default ({which})', description: "The first choice of a model or effort list: the CLI's own default, and which model or level that is. {provider} is its name." }), { provider: p.name, which: runsAsName(provider, g.defaultModel, info) }) : tr(msg({ id: 'settings.provider.cliDefault', defaultMessage: '{provider} default', description: "The first choice of a model or effort list: the CLI's own default. {provider} is its name." }), { provider: p.name }) }} onChange={(v) => save({ model: v })} />
+      <ModelPicker provider={provider} value={a.model} base={{ value: '', label: conn !== undefined ? connectionDefault(g.defaultModel || cliDefault ? runsAsName(provider, (g.defaultModel || cliDefault)!, info) : null) : g.defaultModel ? tr(msg({ id: 'settings.provider.cliDefaultIs', defaultMessage: '{provider} default ({which})', description: "The first choice of a model or effort list: the CLI's own default, and which model or level that is. {provider} is its name." }), { provider: p.name, which: runsAsName(provider, g.defaultModel, info) }) : tr(msg({ id: 'settings.provider.cliDefault', defaultMessage: '{provider} default', description: "The first choice of a model or effort list: the CLI's own default. {provider} is its name." }), { provider: p.name }) }} onChange={(v) => save({ model: v })} />
       <label>{tr(msg({ id: 'settings.assistantProvider.effort.title', defaultMessage: 'Effort', description: "A field's title in Settings → Assistant → With <provider>: the Assistant's reasoning effort." }))}</label>
       <EffortPicker provider={provider} model={runModel} value={a.effort} base={{ value: '', label: effortLabel }} onChange={(v) => save({ effort: v as EffortLevel | '' })} />
       <label>{tr(msg({ id: 'settings.assistantProvider.permissionMode.title', defaultMessage: 'Permission mode', description: "A field's title in Settings → Assistant → With <provider>: the Assistant's permission mode." }))}</label>
@@ -653,7 +667,7 @@ function AssistantProviderDefaults({ provider }: { provider: ProviderId }) {
         <>
           <label>{tr(msg({ id: 'settings.assistantProvider.use200kContext.title', defaultMessage: 'Use 200K context (instead of 1M)', description: "A field's title in Settings → Assistant → With <provider>. 200K and 1M are numbers of tokens." }))}</label>
           <select className="select" value={a.use200kContext ?? ''} onChange={(e) => save({ use200kContext: e.target.value as '' | 'on' | 'off' })}>
-            <option value="">{tr(msg({ id: 'settings.assistant.defaultIs', defaultMessage: 'Default ({value})', description: 'The first choice of a list in Settings → Assistant → With <provider>: what applies when nothing is chosen. {value} says what that is.' }), { value: g.use200kContext ? tr(msg({ id: 'settings.option.on', defaultMessage: 'On', description: 'A choice of a setting that is on or off, beside Inherit or Default.' })) : tr(msg({ id: 'settings.option.off', defaultMessage: 'Off', description: 'A choice of a setting that is on or off, beside Inherit or Default.' })) })}</option>
+            <option value="">{conn !== undefined ? connectionDefault(tr(g.use200kContext ? ON_TEXT : OFF_TEXT)) : tr(msg({ id: 'settings.assistant.defaultIs', defaultMessage: 'Default ({value})', description: 'The first choice of a list in Settings → Assistant → With <provider>: what applies when nothing is chosen. {value} says what that is.' }), { value: g.use200kContext ? tr(msg({ id: 'settings.option.on', defaultMessage: 'On', description: 'A choice of a setting that is on or off, beside Inherit or Default.' })) : tr(msg({ id: 'settings.option.off', defaultMessage: 'Off', description: 'A choice of a setting that is on or off, beside Inherit or Default.' })) })}</option>
             <option value="on">{tr(msg({ id: 'settings.option.on', defaultMessage: 'On', description: 'A choice of a setting that is on or off, beside Inherit or Default.' }))}</option>
             <option value="off">{tr(msg({ id: 'settings.option.off', defaultMessage: 'Off', description: 'A choice of a setting that is on or off, beside Inherit or Default.' }))}</option>
           </select>
@@ -1034,7 +1048,9 @@ export function SettingsView() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
     return SETTINGS.filter((d) => {
-      if ((d.section === 'accounts' || d.id === 'assistant.connection') && !accountsShown) return false
+      if ((d.section === 'accounts' || d.id === 'assistant.connection' || d.key === 'movedToConnections') && !accountsShown) return false
+      // With Connections on, a CLI with them has its model, effort and context on each connection (HI-1770).
+      if (accountsShown && d.provider && d.section === `provider:${d.provider}` && MOVED_KEYS.has(d.key) && providerDescriptor(d.provider).capabilities.connections) return false
       if (d.id === 'advanced.values' && (q || modifiedOnly)) return advancedMatches(q, modifiedOnly, advanced)
       // Its English matches as well as what it shows: Settings can be searched in either.
       if (q && !`${d.title} ${d.desc} ${d.tip} ${d.key}${shownLanguage !== SOURCE_LANGUAGE ? ` ${Object.values(rowText(d)).join(' ')}` : ''}`.toLowerCase().includes(q)) return false

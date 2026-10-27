@@ -1,4 +1,4 @@
-import type { AgentInstallInfo, AppSettings, CatalogModel, EffortLevel, EffortOption, FallbackModel, ProviderId } from './types'
+import type { AgentInstallInfo, AppSettings, CatalogModel, Connection, EffortLevel, EffortOption, FallbackModel, ProviderId } from './types'
 import { OLDER_VERSIONS } from './claude'
 import { msg } from './i18n/msg'
 import { providerDescriptor, type ModelGroup } from './providers'
@@ -17,6 +17,17 @@ export type ModelInfo = Pick<AgentInstallInfo, 'catalog' | 'configuredEffort' | 
 type Info = ModelInfo
 
 const text = (v: unknown): v is string => typeof v === 'string' && v.trim() !== ''
+
+/**
+ * What Hive knows of a connection's models (HI-1770), by its kind, never its CLI: a sign-in connection's are its CLI's
+ * (its catalogue, as without connections). The kinds to come (an endpoint's, Ollama's) list their own here.
+ */
+export function connectionModels(conn: Pick<Connection, 'kind'>, info: Info): Info {
+  switch (conn.kind ?? 'signIn') {
+    case 'signIn':
+      return info
+  }
+}
 
 /** The descriptor's effort levels: the starting fallback. */
 export const shippedEfforts = (provider: ProviderId): EffortOption[] => providerDescriptor(provider).effortLevels

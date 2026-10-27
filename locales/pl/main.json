@@ -42,6 +42,7 @@
   "main.connections.launch.offNoDefault": "Połączenie agenta {agent}, {name}, jest wyłączone w tym obszarze roboczym, a żadne inne połączenie {cli} nie jest włączone. Włącz jedno w Ustawienia → Połączenia.",
   "main.connections.launch.otherProvider": "Połączenie wybrane dla agenta {agent} jest przeznaczone dla innego CLI. Wybierz połączenie {cli} w jego oknie Ustawienia agenta.",
   "main.connections.launch.signedOut": "Połączenie {name} jest wylogowane. Zaloguj je ponownie w Ustawienia → Połączenia, a potem uruchom agenta {agent}.",
+  "main.connections.moveFailed": "Nie udało się przenieść ustawień modelu projektu {project} do jego agentów",
   "main.console.noWorkspace": "Najpierw otwórz obszar roboczy: konsola deweloperska pokazuje jego agentów i pracę, którą Hive w nim wykonuje.",
   "main.console.title": "Konsola deweloperska – {workspace}",
   "main.corrupt.damaged": "Plik {file} był uszkodzony",

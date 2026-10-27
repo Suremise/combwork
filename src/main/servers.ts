@@ -678,12 +678,23 @@ async function callerInfo(): Promise<Record<string, unknown>> {
   return { role: 'api', scope: 'workspace' }
 }
 
+/**
+ * The request's workspace's Hive skills (null without one), read once its open has brought them up to date, as a launch
+ * reads them (HI-1781: during the update after an open, a list half copied).
+ */
+async function hiveSkillsNow(): Promise<Awaited<ReturnType<typeof skillRevisions>> | null> {
+  const ws = contextWorkspace()
+  if (!ws) return null
+  await ws.itemsUpToDate()
+  return inWorkspace(ws, () => skillRevisions())
+}
+
 route('GET', '/v1/status', async () => ({
   app: { name: 'Hive', version: app.getVersion() },
   api: { version: API_VERSION },
   caller: await callerInfo(),
   // The guidance this Hive gives sessions, and the request's workspace's Hive skills (null without one).
-  guidance: { revision: GUIDANCE_REVISION, skills: contextWorkspace() ? await inWorkspace(contextWorkspace()!, () => skillRevisions()) : null },
+  guidance: { revision: GUIDANCE_REVISION, skills: await hiveSkillsNow() },
   providers: providerService.all(),
   /** The request's workspace (or the only open one); `workspaces` lists every window's. */
   workspace: contextWorkspace()?.path ? { name: basename(contextWorkspace()!.path!), path: contextWorkspace()!.path } : null,

@@ -5,7 +5,7 @@ import { useAgentLimit } from '../advanced'
 import { PROVIDERS, agentProvider, chosenDefaultProvider, defaultProviderPending, isProviderEnabled, modeCaveat, modeOption, offeredModes, projectDefaultProvider, projectProviderConfig, projectUse200k, providerDescriptor, providerName, providerSettings, shownText } from '@shared/providers'
 import type { BranchQueueCard } from '@shared/workflow/queue'
 import type { MergeBranch } from '@shared/types'
-import type { AgentBranchStatus, EffortLevel, MergeResult, PermissionMode, ProjectConfig, ProjectInfo, ProviderId } from '@shared/types'
+import type { AgentBranchStatus, Connection, EffortLevel, MergeResult, PermissionMode, ProjectConfig, ProjectInfo, ProviderId } from '@shared/types'
 import { serverOnIn } from '@shared/agentMcp'
 import { agentNameProblem, nameTaken, nameTakenMessage, sameAgentName, suggestAgentName, workspaceAgentList } from '@shared/agentNames'
 import type { TemplateAgent } from '@shared/templates'
@@ -14,11 +14,12 @@ import { gitFixText, gitProblemText } from '@shared/gitTool'
 import * as actions from '../actions'
 import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
 import { call, errorMessage } from '../api'
+import { projectMergeChoice } from '../mergeChoice'
 import { agentProviderOf, bumpUnused, confirm, focusAfterRemoving, notify, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
 import { msg, tr, tRich } from '@shared/i18n'
 import { confirmDangerousMode } from './PermissionMode'
 import { ProviderIcon } from './ProviderIcon'
-import { ConnectionChoice } from './ConnectionChoice'
+import { ConnectionChoice, useLaunchConnection } from './ConnectionChoice'
 import { cx } from '../util'
 import { formatSize } from '@shared/units'
 import { MergeSlotNote, projectSlots, useMergeSlots } from './MergeSlots'
@@ -37,6 +38,7 @@ const CANCEL = msg({ id: 'agents.dialog.cancel', defaultMessage: 'Cancel', descr
 const NAME = msg({ id: 'agents.dialog.name', defaultMessage: 'Name', description: "Label of an agent's name (Add Agent, Agent Settings)." })
 const CODING_AGENT = msg({ id: 'agents.dialog.codingAgent', defaultMessage: 'Coding agent', description: 'A heading in Add Agent and Agent Settings, above the choice of provider (Claude Code, Codex, GitHub Copilot).' })
 const SETTINGS = msg({ id: 'agents.dialog.settings', defaultMessage: 'Settings', description: "A heading in Add Agent and Agent Settings, above the agent's model, effort, mode and context." })
+const CONNECTION_DEFAULT = msg({ id: 'agents.overrides.connectionDefault', defaultMessage: 'Connection default', description: "An agent's model, effort or context choice that follows its connection's default (HI-1770): the first choice of each, before that default in brackets (\"Connection default (Opus 5.5)\"). Keep it short." })
 const PROJECTS = msg({ id: 'agents.overrides.projects', defaultMessage: "Project's", description: "An agent's model, effort, mode or context choice that follows the project's: the first choice of each, before the project's value in brackets (\"Project's (Opus 5.5)\"). Keep it short." })
 const MCP_SERVERS = msg({ id: 'agents.dialog.mcpServers', defaultMessage: 'MCP servers', description: "A heading in Agent Settings, above the agent's MCP servers." })
 const WORKS_IN = msg({ id: 'agents.dialog.worksIn', defaultMessage: 'Works in', description: 'Label of where an agent works (Agent Settings): its slot, its worktree from before 1.0, or the project folder.' })
@@ -111,10 +113,16 @@ export function Overrides({
   onContext,
   inherit,
   inheritIsDefault,
-  assistant
+  assistant,
+  connection
 }: {
   /** The Hive Assistant's: never the CLI's own setting (#1284). */
   assistant?: boolean
+  /**
+   * The connection it would start on (HI-1770, useLaunchConnection): given (null: none usable), an empty choice follows
+   * its defaults ("Connection default (…)"), not the project's or the CLI's; undefined, as before connections.
+   */
+  connection?: Pick<Connection, 'defaults'> | null
   /** What an empty choice is called (the project's, by default): the caller's own words. */
   inherit?: string
   /** That name says it is the default ("Default"): the effort then names the level alone, not "High, default" (#916). */
@@ -136,7 +144,11 @@ export function Overrides({
   const info = useStore((s) => s.providers[provider])
   const cliDefault = info?.defaultModel ?? null
   if (!settings) return null
-  const whose = inherit ?? tr(PROJECTS)
+  const fromConnection = connection !== undefined
+  const d = connection?.defaults
+  const whose = inherit ?? (fromConnection ? tr(CONNECTION_DEFAULT) : tr(PROJECTS))
+  // The permission mode stays the CLI's and the project's with connections too.
+  const whoseMode = inherit ?? tr(PROJECTS)
   /** The first choice of each: whose it is, and what that is now. */
   const inherited = (value: string): string => tr(msg({ id: 'agents.overrides.inherited', defaultMessage: '{whose} ({value})', description: "The first choice of an agent's model, effort, mode or context: whose setting it follows ({whose}: \"Project's\") and what that is now ({value}: \"Opus 5.5\")." }), { whose, value })
   const onOff = (on: boolean): string => (on ? tr(msg({ id: 'agents.overrides.on', defaultMessage: 'On', description: "A choice of an agent's Use 200K context setting. Keep it short." })) : tr(msg({ id: 'agents.overrides.off', defaultMessage: 'Off', description: "A choice of an agent's Use 200K context setting. Keep it short." })))
@@ -145,14 +157,14 @@ export function Overrides({
   const g = providerSettings(settings, provider)
   // The model's name alone: inherited() already says it is the project's (or the default), so "Default (Opus 5.5)",
   // not "Default (Opus 5.5 (default))" (#892).
-  const projectModel = effectiveModelLabel(provider, (pc.model && pc.model !== 'inherit' ? pc.model : '') || g.defaultModel || cliDefault || undefined, '', info)
+  const projectModel = effectiveModelLabel(provider, (fromConnection ? d?.model : (pc.model && pc.model !== 'inherit' ? pc.model : '') || g.defaultModel) || cliDefault || undefined, '', info)
   const projectPermission = modeName(provider, pc.permissionMode === 'inherit' ? g.defaultPermissionMode : pc.permissionMode)
   // Never the CLI's own setting for the Assistant (#1284).
   const modes = offeredModes(provider, settings, assistant)
   // What would run: the choice here, else what it inherits.
-  const runModel = model || (pc.model && pc.model !== 'inherit' ? pc.model : g.defaultModel) || cliDefault
+  const runModel = model || (fromConnection ? d?.model : pc.model && pc.model !== 'inherit' ? pc.model : g.defaultModel) || cliDefault
   const runMode = permission || (pc.permissionMode !== 'inherit' ? pc.permissionMode : g.defaultPermissionMode)
-  const chosenEffort = pc.effort !== 'inherit' ? pc.effort : g.defaultEffort
+  const chosenEffort = fromConnection ? (d?.effort ?? '') : pc.effort !== 'inherit' ? pc.effort : g.defaultEffort
   // Default once (#916): the CLI's own default, when it hasn't said which level that is, alone ("Claude Code's default", not
   // "Default (Claude Code default)"); else the level, bare after "Default" ("Default (High)"), "Project's (High, default)" for an agent.
   const defaultLevel = chosenEffort && chosenEffort !== 'inherit' ? chosenEffort : modelCaps(provider, runModel, info, settings).defaultEffort
@@ -167,7 +179,7 @@ export function Overrides({
       <EffortPicker provider={provider} model={runModel} value={effort} base={{ value: '', label: effortBase }} onChange={onEffort} />
       <label>{tr(msg({ id: 'agents.overrides.permission', defaultMessage: 'Permission mode', description: "Label of an agent's permission mode choice (Add Agent, Agent Settings)." }))}</label>
       <select className="select" value={permission} onChange={(e) => onPermission(e.target.value)}>
-        <option value="">{inherited(projectPermission)}</option>
+        <option value="">{tr(msg({ id: 'agents.overrides.inherited', defaultMessage: '{whose} ({value})', description: "The first choice of an agent's model, effort, mode or context: whose setting it follows ({whose}: \"Project's\") and what that is now ({value}: \"Opus 5.5\")." }), { whose: whoseMode, value: projectPermission })}</option>
         {modes.map((m) => (
           <option key={m.value} value={m.value}>
             {shownText(m.label, m.text?.label, tr)}
@@ -179,7 +191,7 @@ export function Overrides({
         <>
           <label>{tr(msg({ id: 'agents.overrides.context', defaultMessage: 'Use 200K context (instead of 1M)', description: "Label of an agent's choice to hold its sessions to a 200K-token context window instead of the model's 1M one." }))}</label>
           <select className="select" value={context} onChange={(e) => onContext(e.target.value as ContextChoice)}>
-            <option value="">{inherited(onOff(projectUse200k(pc, g)))}</option>
+            <option value="">{inherited(onOff(fromConnection ? !!d?.use200kContext : projectUse200k(pc, g)))}</option>
             <option value="on">{onOff(true)}</option>
             <option value="off">{onOff(false)}</option>
           </select>
@@ -247,6 +259,8 @@ export function AddAgentDialog() {
   // Its connection (HI-1755): '' for the workspace's default.
   const [connection, setConnection] = useState('')
   const [provider, setProvider] = useState<ProviderId>('')
+  // The connection a new agent would start on (HI-1770): an empty model, effort or context follows its defaults.
+  const launchConnection = useLaunchConnection(connection || undefined, provider)
   // The provider is still the project's default (not one the user picked), and whether that waits on detection (#506).
   const [followDefault, setFollowDefault] = useState(true)
   const defaultPending = useStore((s) => !!s.addAgentFor && defaultProviderPending(s.workspace?.projects.find((p) => p.path === s.addAgentFor)?.config, s.settings))
@@ -410,7 +424,7 @@ export function AddAgentDialog() {
         {tr(msg({ id: 'agents.add.whereNote', defaultMessage: "In the project folder. A builder takes one of the project's slots for each card it builds and works there until the card is done; Version Control → Branches & remotes lists them.", description: "The Add Agent dialog, under Where it works: agents have no worktree of their own (1.0); a builder works in a slot (a working folder Hive lends to a card) while it builds a card. Version Control → Branches & remotes: use their translated names. Glossary: slot." }))}
       </div>
       <h3 className="agent-dialog-h">{tr(SETTINGS)}</h3>
-      <Overrides project={project} provider={provider} model={model} effort={effort} permission={permission} context={context} onModel={setModel} onEffort={setEffort} onPermission={setPermission} onContext={setContext} />
+      <Overrides project={project} provider={provider} model={model} effort={effort} permission={permission} context={context} onModel={setModel} onEffort={setEffort} onPermission={setPermission} onContext={setContext} connection={launchConnection} />
     </Modal>
   )
 }
@@ -556,6 +570,8 @@ function AgentSettingsModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey])
   const put = (patch: Partial<AgentFields>): void => setF((x) => ({ ...x, ...patch }))
+  // The connection it would start on (HI-1770): an empty model, effort or context follows its defaults.
+  const launchConnection = useLaunchConnection(f.connection || undefined, f.provider)
   const chooseProvider = (v: ProviderId): void => put(v !== f.provider ? { provider: v, model: '', effort: '', permission: '', context: '', connection: '' } : { provider: v })
   const problem = agentNameProblem(f.name, tr) ?? (nameProblem?.(f.name.trim()) ?? null)
   const submit = async (): Promise<void> => {
@@ -620,6 +636,7 @@ function AgentSettingsModal({
         onEffort={(effort) => put({ effort })}
         onPermission={(permission) => put({ permission })}
         onContext={(context) => put({ context })}
+        connection={launchConnection}
       />
       <h3 className="agent-dialog-h">{tr(MCP_SERVERS)}</h3>
       <McpChoice value={f.mcp} offered={mcpOffered} where={mcpWhere} onChange={(mcp) => put({ mcp })} />
@@ -912,14 +929,21 @@ const QUEUE_LOOKUP_FAILED = msg({ id: 'agents.mergeDialog.queueLookupFailed', de
 export function MergeDialog() {
   useLanguage()
   const target = useStore((s) => s.mergeFor)
-  const settings = useStore((s) => s.settings)
   const project = useStore((s) => s.workspace?.projects.find((p) => p.path === s.mergeFor?.project) ?? null)
   const found = project?.agents.find((a) => a.id === target?.agentId) ?? null
   const [status, setStatus] = useState<AgentBranchStatus | null>(null)
   /** Why the branch couldn't be read (git missing, say, #346): shown instead of a merge that can't be checked. */
   const [readError, setReadError] = useState<string | null>(null)
   const gitTool = useStore((s) => s.gitTool)
-  const [squash, setSquash] = useState(true)
+  const [squash, setSquash] = useState(false)
+  // Whether the user has picked a merge style in this opening (a click on the one shown too, which changes nothing): the
+  // project's, read after, never overrides it.
+  const chosenStyle = useRef(false)
+  const [styleRead, setStyleRead] = useState(false)
+  const chooseSquash = (v: boolean): void => {
+    chosenStyle.current = true
+    setSquash(v)
+  }
   const [message, setMessage] = useState('')
   const [cleanup, setCleanup] = useState(false)
   const [moveBranch, setMoveBranch] = useState(true)
@@ -945,13 +969,25 @@ export function MergeDialog() {
     setResult(null)
     setBusy(false)
     if (!target || !agent?.tree) return
-    setSquash((settings?.agents.mergeStyle ?? 'merge') === 'squash')
+    // The project's own merge style (HI-1765), once read: a merge commit until then, and never over the user's choice.
+    chosenStyle.current = false
+    setSquash(false)
+    setStyleRead(false)
+    let live = true
+    void projectMergeChoice(target.project).then((style) => {
+      if (!live) return
+      setStyleRead(true)
+      if (!chosenStyle.current) setSquash(style === 'squash')
+    })
     setMessage(unused ? `Work from ${unused.branch}` : `${agent.name}: work from ${agent.tree.branch}`) // i18n-ignore: a commit message, kept in git's history (English, as agents read it)
     setCleanup(false)
     setMoveBranch(true)
     void (unused ? call('worktrees:unusedBranchStatus', target.project, unused.path) : call('agents:branchStatus', target.project, target.agentId))
       .then(setStatus)
       .catch((e) => setReadError(errorMessage(e)))
+    return () => {
+      live = false
+    }
     // Reset when the dialog opens for another agent or worktree.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target?.project, target?.agentId, target?.worktree?.path])
@@ -1163,16 +1199,16 @@ export function MergeDialog() {
               <Icon name="warning" /> {tr(msg({ id: 'agents.mergeDialog.uncommitted', defaultMessage: "{files, plural, one {# file in the worktree isn't committed} other {# files in the worktree aren't committed}}, and Hive merges only committed work. Commit or stash {files, plural, one {it} other {them}} in the worktree, then merge.", description: "The Merge dialog when the worktree has uncommitted files ({files}: how many): Merge is off until they are committed or stashed (git stash) in the worktree." }), { files: status.dirty })}
             </div>
           )}
-          <div className="choice-list">
+          <div className="choice-list" data-merge-style={styleRead ? 'read' : 'reading'}>
             <label className={cx('choice', !squash && 'selected')}>
-              <input type="radio" checked={!squash} onChange={() => setSquash(false)} />
+              <input type="radio" checked={!squash} onClick={() => chooseSquash(false)} onChange={() => chooseSquash(false)} />
               <div>
                 <strong>{tr(MERGE)}</strong>
                 <div className="faint">{unused ? tr(msg({ id: 'agents.mergeDialog.mergeNoteUnused', defaultMessage: 'Keeps its commits and their messages, plus a merge commit.', description: "Under the Merge choice (a git merge) for an unused worktree's branch." })) : tr(msg({ id: 'agents.mergeDialog.mergeNote', defaultMessage: "Keeps the agent's commits and their messages, plus a merge commit. Its next merge brings only what is new.", description: "Under the Merge choice (a git merge) for an agent's work." }))}</div>
               </div>
             </label>
             <label className={cx('choice', squash && 'selected')}>
-              <input type="radio" checked={squash} onChange={() => setSquash(true)} />
+              <input type="radio" checked={squash} onClick={() => chooseSquash(true)} onChange={() => chooseSquash(true)} />
               <div>
                 <strong>{tr(msg({ id: 'agents.mergeDialog.squash', defaultMessage: 'Squash', description: 'A choice in the Merge dialog: one commit with all the work (a git squash merge). Keep it short.' }))}</strong>
                 <div className="faint">{unused ? tr(msg({ id: 'agents.mergeDialog.squashNoteUnused', defaultMessage: 'One commit with everything on it, with the message below.', description: "Under the Squash choice for an unused worktree's branch." })) : tr(msg({ id: 'agents.mergeDialog.squashNote', defaultMessage: 'One commit with everything the agent did, with the message below.', description: "Under the Squash choice for an agent's work." }))}</div>
