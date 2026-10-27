@@ -3023,6 +3023,10 @@
     "defaultMessage": "Shortcuts",
     "description": "A setting's title (Settings → Keyboard Shortcuts)."
   },
+  "settings.keys.all": {
+    "defaultMessage": "All",
+    "description": "The keyboard shortcuts editor's first tab: every command, of every category. Short."
+  },
   "settings.keys.alsoUsed": {
     "defaultMessage": "Also used by {commands}",
     "description": "Tooltip of the warning beside a shortcut other commands use too. {commands} lists them."
@@ -3054,6 +3058,10 @@
   "settings.keys.column.shortcut": {
     "defaultMessage": "Shortcut",
     "description": "A column of the keyboard shortcuts editor: the keys."
+  },
+  "settings.keys.commandIn": {
+    "defaultMessage": "{category}: {command}",
+    "description": "A command named with its category, where it may be on another tab of the shortcuts editor (Also used by…, Shortcut already in use): \"Session: Compact Conversation\". Keep the order natural for the language."
   },
   "settings.keys.inUseDetail": {
     "defaultMessage": "When two commands share a shortcut, the first one listed that is available runs. Change the other one to avoid surprises.",
@@ -3142,6 +3150,10 @@
   "settings.keys.source.removed": {
     "defaultMessage": "Removed",
     "description": "The Set column of the shortcuts editor: the user removed this command's shortcut."
+  },
+  "settings.keys.tabs": {
+    "defaultMessage": "Command categories",
+    "description": "Accessible name of the keyboard shortcuts editor's tabs: All, then one per command category (Project, Session…)."
   },
   "settings.keys.terminalKey": {
     "defaultMessage": "While an agent's terminal has focus this key goes to the agent, so the shortcut only works elsewhere.",

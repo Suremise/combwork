@@ -757,6 +757,7 @@ interface HiveMessageValues {
   'settings.keybindings.editor.desc': undefined
   'settings.keybindings.editor.tip': undefined
   'settings.keybindings.editor.title': undefined
+  'settings.keys.all': undefined
   'settings.keys.alsoUsed': { commands: string | number }
   'settings.keys.cantUse': { keys: string | number }
   'settings.keys.change': undefined
@@ -765,6 +766,7 @@ interface HiveMessageValues {
   'settings.keys.column.command': undefined
   'settings.keys.column.set': undefined
   'settings.keys.column.shortcut': undefined
+  'settings.keys.commandIn': { category: string | number; command: string | number }
   'settings.keys.inUseDetail': undefined
   'settings.keys.inUseMessage': { keys: string | number; commands: string | number }
   'settings.keys.inUseTitle': undefined
@@ -787,6 +789,7 @@ interface HiveMessageValues {
   'settings.keys.source.global': undefined
   'settings.keys.source.project': undefined
   'settings.keys.source.removed': undefined
+  'settings.keys.tabs': undefined
   'settings.keys.terminalKey': undefined
   'settings.keys.useGlobal': undefined
   'settings.keys.useIt': undefined

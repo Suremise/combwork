@@ -1,4 +1,6 @@
-// Keyboard shortcuts: Settings editor (record, chord, conflict, refused keys, remove, reset), project
+// Keyboard shortcuts: Settings editor (record, chord, conflict, refused keys, remove, reset), its tabs by category
+// (HI-1838: All and each category with counts, the keyboard, remembered, a search showing All with its matches counted,
+// a Category filter that doesn't reach a category's tab, a clash across categories named with its category), project
 // overrides, and some new defaults (Go to Project, layouts, next tab); Alt+1…9 for the tabs in the strip's order, More ▾'s
 // tabs, and the Project menu matching them (#1043). Throwaway profile and workspace;
 // no sessions started.
@@ -80,6 +82,112 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await page.keyboard.press('Control+,'); await lib.until(async () => (await page.locator('.settings-nav .row', { hasText: 'Keyboard Shortcuts' }).count()) > 0, HUNG_MS)
   await page.locator('.settings-nav .row', { hasText: 'Keyboard Shortcuts' }).click(); await lib.until(async () => (await page.locator('.kb-table tr:not(.kb-cat)').count()) > 60, HUNG_MS)
   check('editor lists commands', (await page.locator('.kb-table tr:not(.kb-cat)').count()) > 60, String(await page.locator('.kb-table tr:not(.kb-cat)').count()))
+
+  // --- Tabs by category (HI-1838): All, then each category in the commands' order, each with its count.
+  const kbTabs = () => page.locator('.kb-tabs [role="tab"]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-tab'), label: e.querySelector('.hive-tab-label').textContent.trim(), count: Number((e.querySelector('.hive-tab-count')?.textContent ?? '').replace(/\D/g, '') || -1), selected: e.getAttribute('aria-selected') === 'true' })))
+  const kbTab = (id) => page.locator(`.kb-tabs [role="tab"][data-tab="${id}"]`)
+  const selectedKb = async () => (await kbTabs()).find((t) => t.selected)?.id ?? null
+  const bodyRows = () => page.locator('.kb-table tbody td.kb-label').count()
+  // The column headers' names, as written (their CSS shows them in capitals); the filter row under them left out.
+  const headers = () => page.locator('.kb-table thead tr:first-child th').evaluateAll((ths) => ths.map((th) => th.textContent.trim()).filter(Boolean))
+  const configKb = (key) => JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).ui?.tabs?.[key]
+  const t0 = await kbTabs()
+  // The categories in the order All lists them (its default order is the commands').
+  const shownOrder = [...new Set((await page.locator('.kb-table tbody td.kb-category').allInnerTexts()).map((c) => c.trim()))]
+  check('tabs: All first and chosen, then each category in the commands’ order', t0[0]?.id === 'all' && t0[0].selected && JSON.stringify(t0.slice(1).map((t) => t.label)) === JSON.stringify(shownOrder) && t0.length > 6, JSON.stringify([t0.map((t) => t.label), shownOrder]))
+  check('…each with its count, All’s every command, the categories’ adding up to it', t0[0].count === (await bodyRows()) && t0.slice(1).reduce((n, t) => n + t.count, 0) === t0[0].count, JSON.stringify(t0.map((t) => t.count)))
+  check('All has the Category column', (await headers()).includes('Category'), JSON.stringify(await headers()))
+  const session = t0.find((t) => t.id === 'session')
+  await kbTab('session').click()
+  check('the Session tab: its commands alone, without the Category column', !!(await lib.until(async () => (await selectedKb()) === 'session' && (await bodyRows()) === session.count && !(await headers()).includes('Category'), HUNG_MS)), JSON.stringify([await selectedKb(), await bodyRows(), await headers()]))
+  check('…remembered in the settings', !!(await lib.until(() => configKb('shortcuts') === 'session', HUNG_MS)), String(configKb('shortcuts')))
+  await page.screenshot({ path: path.join(scratch, 'keys-tabs-session-dark.png') })
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
+  await page.screenshot({ path: path.join(scratch, 'keys-tabs-session-light.png') })
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+  // The keyboard: the arrows move along the tabs, the focus with them.
+  await kbTab('session').focus()
+  await page.keyboard.press('ArrowRight')
+  const next = t0[t0.findIndex((t) => t.id === 'session') + 1]
+  const focusedKb = () => page.evaluate(() => document.activeElement?.closest('.kb-tabs') ? document.activeElement.getAttribute('data-tab') : null)
+  check('ArrowRight: the next category, focused', !!(await lib.until(async () => (await selectedKb()) === next.id && (await focusedKb()) === next.id && (await bodyRows()) === next.count, HUNG_MS)), JSON.stringify([await selectedKb(), await focusedKb()]))
+  await page.keyboard.press('Home')
+  check('Home: All', !!(await lib.until(async () => (await selectedKb()) === 'all' && (await focusedKb()) === 'all', HUNG_MS)))
+  // A Category filter set in All doesn't reach a category's tab, and shows in All again when back.
+  await page.locator('.kb-table select[aria-label="Filter Category"]').selectOption('Project')
+  const projectCount = t0.find((t) => t.id === 'project').count
+  check('All filtered to Project', !!(await lib.until(async () => (await bodyRows()) === projectCount, HUNG_MS)), String(await bodyRows()))
+  await kbTab('session').click()
+  check('…the Session tab still shows all its commands, saying nothing of a filter', !!(await lib.until(async () => (await selectedKb()) === 'session' && (await bodyRows()) === session.count, HUNG_MS)) && (await page.locator('.kb-table', { hasText: 'No rows match the filters' }).count()) === 0, String(await bodyRows()))
+  // Sorting works as the columns change: Command A to Z inside the tab.
+  await page.locator('.kb-table th button', { hasText: 'Command' }).click()
+  const sessionLabels = () => page.locator('.kb-table tbody td.kb-label').evaluateAll((tds) => tds.map((td) => td.firstChild.textContent.trim()))
+  check('…and Command sorts them A to Z', !!(await lib.until(async () => { const l = await sessionLabels(); return l.length === session.count && l.every((x, i) => !i || l[i - 1].localeCompare(x, undefined, { sensitivity: 'base' }) <= 0) }, HUNG_MS)), (await sessionLabels()).join(' | '))
+  await page.locator('.kb-table th button', { hasText: 'Command' }).click(); await page.locator('.kb-table th button', { hasText: 'Command' }).click()
+  // The Set filter inside a tab: Changed, none yet.
+  await page.locator('.kb-table select[aria-label="Filter Set"]').selectOption('Default')
+  check('…its Set filter works there too', !!(await lib.until(async () => (await bodyRows()) === session.count, HUNG_MS)))
+  await page.locator('.kb-table select[aria-label="Filter Set"]').selectOption('')
+  await kbTab('all').click()
+  check('back in All, the Category filter is still set and shown', !!(await lib.until(async () => (await selectedKb()) === 'all' && (await page.locator('.kb-table select[aria-label="Filter Category"]').inputValue()) === 'Project' && (await bodyRows()) === projectCount, HUNG_MS)), String(await bodyRows()))
+  await page.locator('.kb-table select[aria-label="Filter Category"]').selectOption('')
+  await kbTab('session').click()
+  await lib.until(async () => (await selectedKb()) === 'session' && configKb('shortcuts') === 'session', HUNG_MS)
+  // A search shows All, each tab's count its matches; a tab clicked meanwhile narrows it, not remembered; cleared, the
+  // tab remembered before is back.
+  const kbSearch = page.locator('.kb-toolbar input')
+  await kbSearch.fill('notifications')
+  check('a search shows All, its count the matches, a category’s count its own', !!(await lib.until(async () => { const t = await kbTabs(); return (await selectedKb()) === 'all' && t[0].count === (await bodyRows()) && t[0].count > 1 && t[0].count < t0[0].count && t.slice(1).reduce((n, x) => n + x.count, 0) === t[0].count && t.find((x) => x.id === 'session').count === 0 }, HUNG_MS)), JSON.stringify(await kbTabs()))
+  await page.screenshot({ path: path.join(scratch, 'keys-tabs-search-dark.png') })
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
+  await page.screenshot({ path: path.join(scratch, 'keys-tabs-search-light.png') })
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+  const withMatches = (await kbTabs()).find((t) => t.id !== 'all' && t.count > 0)
+  await kbTab(withMatches.id).click()
+  check('…a category clicked meanwhile shows its matches alone', !!(await lib.until(async () => (await selectedKb()) === withMatches.id && (await bodyRows()) === withMatches.count, HUNG_MS)), String(await bodyRows()))
+  check('…and isn’t remembered', configKb('shortcuts') === 'session', String(configKb('shortcuts')))
+  await kbSearch.fill('')
+  check('cleared: the tab remembered before, Session, is back with its commands', !!(await lib.until(async () => (await selectedKb()) === 'session' && (await bodyRows()) === session.count && (await kbTabs())[0].count === t0[0].count, HUNG_MS)), JSON.stringify([await selectedKb(), await bodyRows()]))
+  // A clash with a command in another tab: recording it asks, naming the command with its category; the warning says so.
+  const firstSession = page.locator('.kb-table tbody tr').first()
+  await firstSession.locator('.icon-btn[aria-label^="Change shortcut"]').click()
+  await lib.until(async () => /Press the keys/.test(await firstSession.innerText()), HUNG_MS)
+  await page.keyboard.press('Control+Shift+P')
+  const inUse = page.locator('.dialog', { hasText: 'Shortcut already in use' })
+  check('a clash with View’s Show All Commands asks, naming it with its category', !!(await lib.until(async () => (await inUse.innerText().catch(() => '')).includes('View: Show All Commands'), HUNG_MS)), await inUse.innerText().catch(() => ''))
+  const before = (await inv('settings:get')).keybindings
+  await inUse.getByRole('button', { name: 'Use it' }).click()
+  const clashed = await lib.until(async () => Object.entries((await inv('settings:get')).keybindings).find(([k, v]) => v === 'Mod+Shift+P' && !(k in before))?.[0] ?? null, HUNG_MS)
+  check('…Use it saves it', !!clashed, JSON.stringify((await inv('settings:get')).keybindings))
+  const warn = firstSession.locator('.kb-warn')
+  const tip = await lib.hoverTip(page, warn, (t) => t.includes('View: Show All Commands')).catch(() => '')
+  check('…and its warning names the other tab’s command with its category', !!tip, String(tip))
+  await firstSession.locator('.icon-btn[aria-label^="Reset to default"]').click()
+  check('…reset', !!(await lib.until(async () => !(clashed in (await inv('settings:get')).keybindings), HUNG_MS)))
+  await kbTab('all').click()
+  await lib.until(async () => (await selectedKb()) === 'all' && (await bodyRows()) === t0[0].count, HUNG_MS)
+  // German in a narrow window: the tabs' longer names and counts wrap onto another line, every tab whole, none scrolled
+  // out of sight (HR5's design check).
+  const base = (await inv('app:info')).language
+  const deDir = path.join(lib.ROOT, 'locales', 'de')
+  const deMessages = Object.assign({}, ...fs.readdirSync(deDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(deDir, f), 'utf8'))))
+  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+  await lib.fitWindow(app, page, { width: 1000, height: 900 })
+  await speak({ ...base, code: 'de', locale: 'de', messages: deMessages })
+  const tabsFit = () => page.locator('.kb-tabs').evaluate((list) => {
+    const l = list.getBoundingClientRect()
+    const tabs = [...list.querySelectorAll('[role="tab"]')].map((t) => t.getBoundingClientRect())
+    return { inside: tabs.every((t) => t.left >= l.left - 0.5 && t.right <= l.right + 0.5), scrolls: list.scrollWidth > list.clientWidth + 1, lines: new Set(tabs.map((t) => Math.round(t.top))).size, first: list.querySelector('.hive-tab-label')?.textContent }
+  })
+  check('German, narrow: the tabs wrap, each whole, none scrolled away', !!(await lib.until(async () => { const f = await tabsFit(); return f.first === 'Alle' && f.inside && !f.scrolls && f.lines > 1 }, HUNG_MS)), JSON.stringify(await tabsFit()))
+  await page.locator('.kb-tabs').scrollIntoViewIfNeeded()
+  await page.screenshot({ path: path.join(scratch, 'keys-tabs-narrow-de-dark.png') })
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
+  await page.screenshot({ path: path.join(scratch, 'keys-tabs-narrow-de-light.png') })
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+  await speak(base)
+  await lib.fitWindow(app, page, { width: 1400, height: 900 })
+  await lib.until(async () => (await tabsFit()).first === 'All', HUNG_MS)
   // A DataTable (#250): a Category filter and sorting by a header, with the edit controls kept.
   await page.locator('.kb-table select[aria-label="Filter Category"]').selectOption('Session'); await sleep(200)
   const cats = await page.locator('.kb-table tbody td.kb-category').allInnerTexts()
@@ -132,6 +240,8 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await lib.openProjectSettings(page)
   await page.locator('.settings-nav .row, .psettings-nav .row, .row', { hasText: 'Keyboard Shortcuts' }).first().click(); await lib.until(async () => (await page.locator('.kb-table').innerText().catch(() => '')).includes('Go to Files'), HUNG_MS)
   check('project editor lists only project/session commands', !(await page.locator('.kb-table').innerText()).includes('Toggle Sidebar') && (await page.locator('.kb-table').innerText()).includes('Go to Files'))
+  const projectTabs = await kbTabs()
+  check('…its tabs: All, Project and Session, All chosen (its own remembered tab)', JSON.stringify(projectTabs.map((t) => [t.id, t.selected])) === JSON.stringify([['all', true], ['project', false], ['session', false]]), JSON.stringify(projectTabs))
   console.log('rows after kb nav', await page.locator('.project-row').count())
   const frow = page.locator('.kb-table tr', { hasText: 'Go to Files' }).first()
   await frow.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await sleep(200)

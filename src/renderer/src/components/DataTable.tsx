@@ -114,7 +114,9 @@ export function DataTable<T>({
   useEffect(() => {
     if (view.page !== page) setPage(view.page)
   }, [view.page, page])
-  const filtered = Object.values(filters).some((v) => v.trim())
+  // Only the shown columns' filters count: one kept for a column the table no longer has (Keyboard Shortcuts' Category,
+  // inside a category's tab, HI-1838) neither narrows the rows nor says they are filtered.
+  const filtered = columns.some((c) => c.filter && filters[c.key]?.trim())
   const hasFilters = columns.some((c) => c.filter) && (rows.length > filterFrom || filtered)
   // Selecting every row the filters let through, not only this page's.
   const matchingKeys = useMemo(() => (selection ? tableView(rows, columns, { sort: null, filters, page: 1, pageSize: Math.max(1, rows.length) }).rows.map((r, i) => rowKey(r, i)) : []), [selection, rows, columns, filters, rowKey])

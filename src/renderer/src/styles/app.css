@@ -1765,9 +1765,15 @@ textarea.input {
   display: none !important;
 }
 /* The tabs' line runs under the whole row, the selected tab's underline on it. */
-.workflow-defaults-tabs > .hive-tabs-row {
+.workflow-defaults-tabs > .hive-tabs-row,
+.kb-editor > .hive-tabs-row {
   border-block-end: 1px solid var(--border-subtle);
   margin-block-end: 4px;
+}
+/* Keyboard Shortcuts' many categories (HI-1838) wrap onto another line rather than scroll with the last cut off. */
+.hive-tabs.kb-tabs {
+  flex-wrap: wrap;
+  overflow-x: visible;
 }
 /* "From Hive defaults", "From the workspace": a link to that tab of Settings → Version Control (HI-1837). */
 .workflow-origin-link {
