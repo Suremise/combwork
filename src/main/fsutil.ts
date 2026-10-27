@@ -215,6 +215,35 @@ export async function readKeptJson<T>(path: string, fallback: T, opts: KeptReadO
   }
 }
 
+/** Kept files read by their stat (readKeptJsonByStat): path (lower-cased) → the stat it was read at and what it parsed to. */
+const keptByStat = new Map<string, { mtimeMs: number; size: number; ino: number; value: unknown }>()
+
+/**
+ * readKeptJson for a file read often and changed seldom (HI-1814: project.json, read several times by each check's
+ * resolve): read again only when its modified time, size or identity changed, else a copy of what it parsed to (a
+ * caller may change what it is given). Stated before the read, so a change during it is a different stat next time:
+ * never kept as current. Only a read that parsed is kept; anything else goes through readKeptJson, its recovery
+ * included, each time, as before.
+ */
+export async function readKeptJsonByStat<T>(path: string, fallback: T, opts: KeptReadOptions = {}): Promise<T> {
+  const key = path.toLowerCase()
+  const st = await stat(path).catch(() => null)
+  const kept = keptByStat.get(key)
+  if (st && kept && kept.mtimeMs === st.mtimeMs && kept.size === st.size && kept.ino === st.ino) return structuredClone(kept.value) as T
+  keptByStat.delete(key)
+  if (!st) return readKeptJson(path, fallback, opts)
+  const text = await readFile(path, 'utf8').catch(() => null)
+  let value: unknown
+  try {
+    if (text === null) throw new Error('unreadable')
+    value = JSON.parse(text)
+  } catch {
+    return readKeptJson(path, fallback, opts)
+  }
+  keptByStat.set(key, { mtimeMs: st.mtimeMs, size: st.size, ino: st.ino, value })
+  return structuredClone(value) as T
+}
+
 /** The same, for reads at startup that must be synchronous (config.json). */
 export function readKeptJsonSync<T>(path: string, fallback: T): T {
   // Marked (HI-1692): read at start, and settled with pauses when it doesn't parse.

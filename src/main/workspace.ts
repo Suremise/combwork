@@ -20,7 +20,7 @@ import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSess
 import { config } from './config'
 import { changesConfig, viewOf, withoutView } from '../shared/projectView'
 import { emit, emitTo } from './events'
-import { containsPlace, insideReal, isDir, placeKey, readJson, readKeptJson, removePath, retryWhileSaving, samePlace, withFileLock, writeKeptJson, type KeptReadOptions } from './fsutil'
+import { containsPlace, insideReal, isDir, placeKey, readJson, readKeptJson, readKeptJsonByStat, removePath, retryWhileSaving, samePlace, withFileLock, writeKeptJson, type KeptReadOptions } from './fsutil'
 import { admit, dismiss, setFenceReason } from './openingFence'
 import { AfterOpen } from './openProgress'
 import { whenAll } from '../shared/atMost'
@@ -1117,7 +1117,8 @@ export class WorkspaceService {
 
   /** A project's config; `opts` for a read that is written back (mutateProjectConfig, #1600). */
   async projectConfig(projectPath: string, opts?: KeptReadOptions): Promise<ProjectConfig> {
-    const raw = await readKeptJson<Record<string, unknown>>(join(projectPath, HIVE_DIR, 'project.json'), {}, opts)
+    // By its stat (HI-1814): read and parsed again only once it changed.
+    const raw = await readKeptJsonByStat<Record<string, unknown>>(join(projectPath, HIVE_DIR, 'project.json'), {}, opts)
     const cfg = this.withView(projectPath, mergeDefaults(structuredClone(DEFAULT_PROJECT_CONFIG), migrateProjectConfig(raw)), raw)
     // The Assistant's "project" settings are Settings → Assistant; its file keeps the workspace's own choices.
     return this.isAssistantHome(projectPath) ? assistantProjectConfig(cfg, config.settings) : cfg

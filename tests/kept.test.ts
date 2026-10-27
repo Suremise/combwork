@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { Worker } from 'worker_threads'
 import { describe, expect, it, vi } from 'vitest'
-import { DAMAGED_AGE_MS, KeptFileBusy, keptSettleSteps, onCorruptFile, readKeptJson, readKeptJsonSync, writeKeptJson, type KeptSample, type KeptSettled } from '../src/main/fsutil'
+import { DAMAGED_AGE_MS, KeptFileBusy, keptSettleSteps, onCorruptFile, readKeptJson, readKeptJsonByStat, readKeptJsonSync, writeKeptJson, type KeptSample, type KeptSettled } from '../src/main/fsutil'
 import { tempDir } from './tempDir'
 
 describe('kept files', () => {
@@ -46,6 +46,26 @@ describe('kept files', () => {
     const before = reports.length
     expect(await readKeptJson(join(dir, 'missing.json'), 7)).toBe(7)
     expect(reports.length).toBe(before)
+  })
+
+  it('read by its stat (HI-1814): kept until the file changes, a copy each time, and a damaged one recovered as before', async () => {
+    const f = join(dir, 'stat.json')
+    await writeKeptJson(f, { n: 1, list: ['a'] })
+    const first = await readKeptJsonByStat<{ n: number; list: string[] }>(f, { n: 0, list: [] })
+    expect(first).toEqual({ n: 1, list: ['a'] })
+    // A caller changing what it was given changes nothing kept.
+    first.list.push('changed')
+    expect(await readKeptJsonByStat(f, null)).toEqual({ n: 1, list: ['a'] })
+    // Written again (Hive's write or anyone's), with the same size: its time and identity say so.
+    await writeKeptJson(f, { n: 2, list: ['b'] })
+    expect(await readKeptJsonByStat(f, null)).toEqual({ n: 2, list: ['b'] })
+    writeFileSync(f, '{ "n": 3, "list": ["c"] }')
+    expect(await readKeptJsonByStat(f, null)).toEqual({ n: 3, list: ['c'] })
+    // Damaged: never kept, readKeptJson's recovery (the .bak) each time.
+    writeFileSync(f, '{ "n": ')
+    age(f)
+    expect(await readKeptJsonByStat(f, null)).toEqual({ n: 2, list: ['b'] })
+    expect(await readKeptJsonByStat(join(dir, 'stat-missing.json'), 7)).toBe(7)
   })
 
   it('sets aside an empty file that was emptied a while ago', async () => {

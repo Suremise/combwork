@@ -1,6 +1,7 @@
 import { execFile } from 'child_process'
 import { existsSync } from 'original-fs'
 import { parentPort } from 'worker_threads'
+import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
 
 /**
  * Git's worker (HI-1783): a thread of its own that starts Hive's git processes, so their starts (CreateProcess blocks the
@@ -8,7 +9,8 @@ import { parentPort } from 'worker_threads'
  * Hive's main process and the keystrokes typed into a pane. Each command is run as git.ts always ran it (execFile, its
  * output as bytes, its bound and environment, its input); what it gives back is execFile's own outcome, which git.ts
  * reads as it always did. Its environment is main's, shared (SHARE_ENV), so a change main makes to it applies here too.
- * No Electron here (a worker can't load it).
+ * It also reads a repository's refs and working folders for the observer (HI-1814: a reset's read walked every ref file
+ * on main). No Electron here (a worker can't load it).
  */
 
 export interface GitRequest {
@@ -31,7 +33,15 @@ export interface GitOutcome {
   cwdExists: boolean
 }
 
-export type GitReply = { id: number; outcome: GitOutcome }
+/** The observer's read of a repository (repoRefs.ts): its lines, its first `max` working folders and their HEADs. */
+export interface RefsRequest {
+  id: number
+  kind: 'refs'
+  common: string
+  max: number
+}
+
+export type GitReply = { id: number; outcome: GitOutcome } | { id: number; refs: RepoRefs }
 
 /** Runs one command as git.ts runs it. */
 export function runGit(m: Omit<GitRequest, 'id'>): Promise<GitOutcome> {
@@ -53,7 +63,11 @@ export function runGit(m: Omit<GitRequest, 'id'>): Promise<GitOutcome> {
 
 const port = parentPort
 if (port) {
-  port.on('message', (m: GitRequest) => {
+  port.on('message', (m: GitRequest | RefsRequest) => {
+    if ('kind' in m) {
+      port.postMessage({ id: m.id, refs: readRepoRefs(m.common, m.max) } satisfies GitReply)
+      return
+    }
     void runGit(m).then((outcome) => {
       // The output moves to main rather than being copied (a diff can be megabytes), when it has its memory to itself: a
       // small one can be a slice of Node's shared pool, which moving would take from every other buffer in it, so that

@@ -276,7 +276,7 @@ export async function branchStatus(projectPath: string, wt: WorktreeRef, reads?:
       throw hiveError(M.cantCheck, { branch: wt.branch, why: errorText(e) }, { cause: e })
     }))
   const count = await git(projectPath, ['rev-list', '--count', `${into ?? wt.base}..${wt.branch}`])
-  const dirty = existsSync(wt.path) ? await (reads ? reads.dirty(wt.path) : dirtyCount(wt.path)) : 0
+  const dirty = (await isDir(wt.path)) ? await (reads ? reads.dirty(wt.path) : dirtyCount(wt.path)) : 0
   if (!count.ok || dirty === null) {
     throw hiveError(M.cantCheck, { branch: wt.branch, why: gitProblemData(gitTool()) ?? (count.ok ? M.statusFailed : count.err.trim() || M.unknownError) })
   }
@@ -411,7 +411,7 @@ export async function removeCheckedWorktree(projectPath: string, wt: WorktreeRef
  * tracked uncommitted changes), or with its own last commit when `into` is null. Null when git can't say.
  */
 async function diffSummary(cwd: string, into: string | null): Promise<AgentBranchStatus['diff'] | null> {
-  if (!existsSync(cwd)) return null
+  if (!(await isDir(cwd))) return null
   let from = 'HEAD'
   if (into) {
     const base = await git(cwd, ['merge-base', into, 'HEAD'])

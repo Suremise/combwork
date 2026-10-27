@@ -15,13 +15,13 @@
 // events and no error; such a watch ends at once, and is tried again every few seconds until the folder is back (its
 // record starting again then). A watch's error does the same.
 
-import { watch, readdirSync, readFileSync, existsSync, statSync, type FSWatcher } from 'original-fs'
+import { watch, readFileSync, existsSync, statSync, type FSWatcher } from 'original-fs'
 import { lstat, stat } from 'original-fs/promises'
 import { dirname, isAbsolute, join, resolve, sep } from 'path'
-import { git } from '../git'
+import { git, readRefsOffMain } from '../git'
 import { createLogger, userText } from '../logger'
 import type { PlatformId } from '../../shared/platform/descriptors'
-import { refSync } from './git'
+import { isMainGitDir, readRepoRefs, type Heads, type RepoRefs } from './repoRefs'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { unknown, type Maybe } from './types'
 
@@ -231,9 +231,6 @@ class FolderLog {
   }
 }
 
-/** A line or folder name → the commit it is at, read from the ref files. */
-type Heads = Map<string, string | null>
-
 /** The common git dir of the repository holding a folder, read from the files (no git process), or null. */
 export function commonDirOf(root: string): string | null {
   const dotGit = join(root, '.git')
@@ -250,63 +247,6 @@ export function commonDirOf(root: string): string | null {
   } catch {
     return null
   }
-}
-
-/** Every branch with its commit: loose refs under refs/heads, over packed-refs. */
-function linesOf(common: string): Heads {
-  const out: Heads = new Map()
-  try {
-    for (const l of readFileSync(join(common, 'packed-refs'), 'utf8').split(/\r?\n/)) {
-      const [sha, name] = l.split(' ')
-      if (name?.startsWith('refs/heads/') && /^[0-9a-f]{40,64}$/.test(sha)) out.set(name.slice('refs/heads/'.length), sha)
-    }
-  } catch {
-    // No packed refs.
-  }
-  const walk = (dir: string, prefix: string): void => {
-    let list
-    try {
-      list = readdirSync(dir, { withFileTypes: true })
-    } catch {
-      return
-    }
-    for (const e of list) {
-      if (e.isDirectory()) walk(join(dir, e.name), `${prefix}${e.name}/`)
-      else if (e.isFile() && !e.name.endsWith('.lock')) {
-        try {
-          const v = readFileSync(join(dir, e.name), 'utf8').trim()
-          if (/^[0-9a-f]{40,64}$/.test(v)) out.set(`${prefix}${e.name}`, v)
-        } catch {
-          // Being rewritten: the next read has it.
-        }
-      }
-    }
-  }
-  walk(join(common, 'refs', 'heads'), '')
-  return out
-}
-
-/** The working folders of a repository (its main folder, then each worktree), each with its git dir. */
-function foldersOf(common: string): { folder: string; gitDir: string }[] {
-  const out: { folder: string; gitDir: string }[] = []
-  // A repository's main folder holds its common dir as `.git`; a bare one has none.
-  if (isMainGitDir(common)) out.push({ folder: dirname(common), gitDir: common })
-  let names: string[] = []
-  try {
-    names = readdirSync(join(common, 'worktrees'))
-  } catch {
-    // No worktrees.
-  }
-  for (const n of names) {
-    const gitDir = join(common, 'worktrees', n)
-    try {
-      const target = readFileSync(join(gitDir, 'gitdir'), 'utf8').trim()
-      out.push({ folder: dirname(resolve(target)), gitDir })
-    } catch {
-      // Being made or removed.
-    }
-  }
-  return out
 }
 
 /**
@@ -329,6 +269,10 @@ class RepoWatch {
   private reflogFolder = new Map<string, string>()
   /** git dir (lower-cased) → its HEAD reflog's size at the last read: an entry whose event was lost still counts. */
   private reflogSize = new Map<string, number>()
+  /** The read under way in git's worker (HI-1814), and whether another was asked for meanwhile. */
+  private reading: Promise<void> | null = null
+  private again = false
+  private closed = false
 
   constructor(
     readonly common: string,
@@ -337,7 +281,8 @@ class RepoWatch {
     private held: (folder: string) => boolean = () => false
   ) {
     if (!isMainGitDir(common)) this.bare = new DirWatch(common, true, (n) => this.event(n === null ? null : n.split(sep).join('/')))
-    this.read()
+    // The first read here and now: the repository's folders have their write logs as soon as it is followed.
+    this.apply(readRepoRefs(common, MAX_FOLDERS))
   }
 
   /** An event in the git dir (its path relative to it, with `/`), or null: events were lost, so the refs are read. */
@@ -373,27 +318,56 @@ class RepoWatch {
   /**
    * Reads the lines and folders' HEADs, says what moved since the last read, and keeps the folders' write logs in step.
    * Only the first read (the repository just attached) takes what it finds without saying it: every later one, whoever
-   * asks (its own events, a rescan, a refresh's `follow`), says every move, so none is taken in silently.
+   * asks (its own events, a rescan, a refresh's `follow`), says every move, so none is taken in silently. Those later
+   * reads walk the ref files in git's worker (HI-1814: a check copy's reset read them on main), one at a time, a read
+   * asked for meanwhile running once that one is in; folders being deleted or removed let go of their logs at once.
    */
   read(): void {
-    const lines = linesOf(this.common)
-    const folders = foldersOf(this.common).slice(0, MAX_FOLDERS)
-    const heads: Heads = new Map()
+    this.release()
+    if (this.reading) {
+      this.again = true
+      return
+    }
+    this.reading = (async () => {
+      try {
+        for (;;) {
+          this.again = false
+          const refs = await readRefsOffMain(this.common, MAX_FOLDERS)
+          if (this.closed) break
+          this.apply(refs)
+          if (!this.again) break
+        }
+      } catch (e) {
+        log.warn(`reading ${userText(this.common)}'s refs failed`, e)
+      } finally {
+        // Here, with nothing awaited since the last check: a read asked for from now on starts a new one.
+        this.reading = null
+      }
+    })()
+  }
+
+  /** Once the reads asked for so far are in. */
+  async current(): Promise<void> {
+    while (this.reading) await this.reading
+  }
+
+  /** Lets go of the write logs of folders being deleted or removed (Windows can't delete a folder a watch holds). */
+  private release(): void {
+    for (const [k, l] of this.logs) {
+      if (!this.held(l.folder)) continue
+      l.close()
+      this.logs.delete(k)
+    }
+  }
+
+  /** Takes in what a read found: the moves since the last are said (but for the first), the write logs kept in step. */
+  private apply({ lines, folders, heads, sizes }: RepoRefs): void {
     this.reflogFolder.clear()
-    const sizes = new Map<string, number>()
     for (const f of folders) {
-      heads.set(f.folder, refSync(f.gitDir, 'HEAD') ?? refSync(this.common, readHeadRef(f.gitDir) ?? 'HEAD'))
       const g = f.gitDir.toLowerCase()
       this.reflogFolder.set(g, f.folder)
-      let size = 0
-      try {
-        size = statSync(join(f.gitDir, 'logs', 'HEAD')).size
-      } catch {
-        // No reflog yet.
-      }
-      sizes.set(g, size)
       const was = this.reflogSize.get(g)
-      if (was !== undefined && was !== size) this.reflog(f.gitDir)
+      if (was !== undefined && was !== sizes.get(g)) this.reflog(f.gitDir)
     }
     this.reflogSize = sizes
     if (this.primed) {
@@ -411,11 +385,7 @@ class RepoWatch {
       l.close()
       this.logs.delete(k)
     }
-    for (const [k, l] of this.logs) {
-      if (!this.held(l.folder)) continue
-      l.close()
-      this.logs.delete(k)
-    }
+    this.release()
     for (const f of folders) {
       const k = f.folder.toLowerCase()
       if (this.logs.has(k) || this.held(f.folder)) continue
@@ -425,6 +395,7 @@ class RepoWatch {
   }
 
   close(): void {
+    this.closed = true
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
     this.bare?.close()
@@ -433,22 +404,6 @@ class RepoWatch {
   }
 }
 
-/** Whether a common git dir is a main folder's `.git` (not a bare repository). */
-function isMainGitDir(common: string): boolean {
-  return /[\\/]\.git$/i.test(common)
-}
-
-/** What a git dir's HEAD names (`refs/heads/x`), when it is a symbolic ref. */
-function readHeadRef(gitDir: string): string | null {
-  try {
-    const v = readFileSync(join(gitDir, 'HEAD'), 'utf8').trim()
-    return v.startsWith('ref: ') ? v.slice(5) : null
-  } catch {
-    return null
-  }
-}
-
-/** A project as the watcher follows it: Git (its repository) or None (its folder). */
 export interface ObservedProject {
   path: string
   platform: PlatformId
@@ -590,6 +545,11 @@ export class Observer {
     for (const l of [...this.folders.values(), ...[...this.repos.values()].flatMap((r) => [...r.logs.values()])]) l.verify()
   }
 
+  /** Once every repository's reads asked for so far are in: a worktree a refresh just followed has its write log. */
+  private async current(): Promise<void> {
+    for (const r of [...this.repos.values()]) await r.current()
+  }
+
   private logOf(folder: string): FolderLog | null {
     const k = resolve(folder).toLowerCase()
     const own = this.folders.get(k)
@@ -607,6 +567,7 @@ export class Observer {
    * it would count as a change during it (#1222).
    */
   async settled(folder: string): Promise<void> {
+    await this.current()
     const l = this.logOf(folder)
     if (l) await settle(l)
   }
@@ -633,6 +594,7 @@ export class Observer {
    * the caller then falls back to its stat snapshot.
    */
   async changedBetween(folder: string, t0: number, t1: number, counts?: (paths: string[]) => string[]): Promise<Maybe<FolderChanges>> {
+    await this.current()
     const l = this.logOf(folder)
     if (!l) return unknown(UNREADABLE.writes, { folder })
     // An event is timed when it arrives, after its write: those arriving until the folder settles count too (a write by
