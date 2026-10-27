@@ -227,10 +227,10 @@ describe("the usage history's card holds, kept and read again for the cards a ch
     const first = await same()
     // A comment changes no holds: every card the same object, read again for that card alone.
     await run(() => tasks.commentTask(a, 'no holds change', user))
-    const mark = store.holdChanges(w, null)!.mark
+    const at = store.holdChanges(w, null)!.mark
     await run(() => tasks.commentTask(b, 'one card', user))
     // B, and A at the mark (the read is inclusive: a write committed after it is in the next).
-    expect(store.holdChanges(w, mark)!.docs.map((d) => d.number)).toEqual([a, b])
+    expect(store.holdChanges(w, at)!.docs.map((d) => d.number)).toEqual([a, b])
     const after = await same()
     for (const x of after) if (x.number !== a && x.number !== b) expect(x).toBe(first.find((y) => y.number === x.number))
     // A move into Doing for an agent: a hold begins; out of it, it ends.
