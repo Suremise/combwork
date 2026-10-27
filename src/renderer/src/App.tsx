@@ -210,6 +210,12 @@ function handleEvent(e: HiveEvent): void {
     case 'connections-changed':
       set((st) => ({ connectionsChanged: st.connectionsChanged + 1 }))
       break
+    case 'plan-usage-cleared':
+      set((st) => {
+        const { [e.connection]: _gone, ...rest } = st.connectionPlanUsage
+        return { connectionPlanUsage: rest }
+      })
+      break
     case 'plan-usage':
       if (e.connection) set((st) => ({ connectionPlanUsage: { ...st.connectionPlanUsage, [e.connection!]: e.usage } }))
       else set((st) => ({ planUsage: { ...st.planUsage, [e.provider]: e.usage } }))

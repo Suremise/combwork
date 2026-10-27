@@ -619,7 +619,7 @@ export interface AppConfig {
   /** Per provider: the plan usage it last reported (account-wide), from sessions not on a connection. */
   planUsage: Record<ProviderId, PlanUsage>
   /** Per connection (its id, HI-1756): the plan usage its sessions last reported, that login's own limits. */
-  connectionPlanUsage?: Record<string, PlanUsage>
+  connectionPlanUsage?: Record<string, ConnectionPlanUsage>
   /** Highest warning shown per "provider:limit", and for which reset period. */
   planWarnings: Record<string, { resetsAt: string | null; level: number }>
   /** The CLI accounts Hive keeps (HI-980: Settings → Accounts), each a folder of its own, in the order Settings lists them. */
@@ -646,6 +646,9 @@ export interface PlanLimit {
 }
 
 /** Subscription limits a provider reported (e.g. a rolling 5-hour window and a weekly limit). */
+/** A connection's plan usage (HI-1756): the login it came from (planUsage.ts usageLogin), so another's never shows as its. */
+export type ConnectionPlanUsage = PlanUsage & { login?: string }
+
 export interface PlanUsage {
   provider: ProviderId
   /** The plan's name when the provider says (e.g. "plus"). */
@@ -1950,7 +1953,13 @@ export interface LiveSessionState {
    * The connection this run launched on (HI-1755), kept for the run whatever is chosen meanwhile; absent: a provider
    * without connections (or a test copy on its CLI test home). `note`: why it isn't the one chosen (its choice was off).
    */
-  launchedConnection?: { id: string; name: string; note?: 'offFallback' | 'unknownLogin' | 'loginChanged' }
+  launchedConnection?: {
+    id: string
+    name: string
+    note?: 'offFallback' | 'unknownLogin' | 'loginChanged'
+    /** Who it launched as (HI-1756: its plan usage is that login's), as plan usage keeps a login (a hash); absent: unknown. */
+    login?: string
+  }
   /** A switch to the connection it would launch on now waits for its turn to be over (HI-1755). */
   switchPending?: boolean
   /**
@@ -3064,6 +3073,7 @@ export type HiveEvent =
   /** A worktree agent's unmerged work changed (null: git couldn't check it). */
   | { type: 'branch-status'; projectPath: string; agentId: string; status: AgentBranchStatus | null }
   | { type: 'plan-usage'; provider: ProviderId; usage: PlanUsage; connection?: string }
+  | { type: 'plan-usage-cleared'; connection: string }
   /** Hive's accounts changed (HI-980: one added, renamed, removed, checked, or a workspace's choice of them): read them again. */
   | { type: 'connections-changed' }
   | { type: 'window-state'; maximized: boolean; focused: boolean; alwaysOnTop: boolean }

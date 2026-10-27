@@ -110,6 +110,21 @@ const check = (name, ok, extra = '') => {
     await foot(max2.id).first().hover()
     check('…its hover says who it is signed in as', !!(await lib.until(async () => (await page.locator('.tip', { hasText: 'Signed in as two@example.com.' }).count()) >= 1, HUNG_MS)))
 
+    // --- Max 2 signed in again as another login, and that kept (HR2's round 1): its old figures and warning go, and a
+    // session on the new login fills them from nothing.
+    await inv('session:stop', alpha, 'a-two')
+    await lib.until(async () => !(await live('a-two')), HUNG_MS)
+    fs.writeFileSync(path.join(accountsRoot, 'fake-login-as.json'), JSON.stringify({ email: 'three@example.com', orgId: 'org-3' }))
+    await inv('connections:signIn', max2.id)
+    check('Max 2 is signed in as three@example.com now', !!(await lib.until(async () => (await inv('connections:list')).connections.find((c) => c.id === max2.id && c.observed?.email === 'three@example.com') ?? null, HUNG_MS)))
+    await inv('connections:keepLogin', max2.id)
+    check('…its old login’s figures go: no Max 2 item, none kept', !!(await lib.until(async () => (await item(max2.id).count()) === 0 && !(await inv('app:connectionPlanUsage'))[max2.id], HUNG_MS)), JSON.stringify((await inv('app:connectionPlanUsage'))[max2.id] ?? null))
+    await inv('session:start', alpha, { agentId: 'a-two' })
+    check('Two starts again on Max 2', !!(await lib.until(async () => (await live('a-two'))?.status === 'ready' && (await live('a-two')).launchedConnection?.id === max2.id, HUNG_MS)))
+    check('…and reports the new login’s limits', await send('a-two', 'planusage 1 1'))
+    check('the status bar shows Max 2 at the new login’s 5h 1% · Week 1%, not warned', !!(await lib.until(async () => /Max 2.*5h 1%.*Week 1%/.test(await text(max2.id)), HUNG_MS)) && !/\b(warn|caution)\b/.test((await item(max2.id).getAttribute('class')) ?? ''), await text(max2.id))
+    check('…and Max 1’s own figures are as they were', /Max 1.*5h 62%.*Week 10%/.test(await text(max1.id)), await text(max1.id))
+
     // --- The preview off: the connections' items go.
     await inv('advanced:set', 'hive.accounts.preview', false)
     check('with the preview off, no connection’s item is shown', !!(await lib.until(async () => (await page.locator('.statusbar [data-plan-connection]').count()) === 0, HUNG_MS)))

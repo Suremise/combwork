@@ -12,7 +12,7 @@ import { config } from './config'
 import { emit, onHiveEvent } from './events'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
-import { forgetConnectionUsage } from './planUsage'
+import { connectionLoginChanged, forgetConnectionUsage, usageLogin } from './planUsage'
 import { childEnv, hasPty } from './ptyHost'
 import { connectionsManaged, connectionsOn, testHomeSeam } from './connectionSeam'
 import { provider } from './providers'
@@ -90,6 +90,8 @@ function changeAccount(id: string, fn: (a: Connection) => void): void {
       all[i] = next
     }
   })
+  // Its plan usage is a login's (HI-1756): another login's figures go once it is signed in as someone else.
+  connectionLoginChanged(id)
 }
 
 // ---------------------------------------------------------------------------
@@ -834,6 +836,8 @@ export interface LaunchConnection {
   homeEnv: string
   /** Why it isn't exactly what was chosen, or what its check couldn't say: shown on the agent. */
   note?: 'offFallback' | 'unknownLogin' | 'loginChanged'
+  /** Who it launches as, from its fresh check (planUsage.ts usageLogin; a check that failed keeps the last one): its usage's. */
+  login?: string
   /** Ends the launch's claim: once its session runs (its live state then keeps it from removal) or it failed. */
   release: () => void
   /**
@@ -896,6 +900,7 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
       folder: accountFolder(id),
       homeEnv: caps.homeEnv,
       ...(note ? { note } : {}),
+      ...(usageLogin(observed) ? { login: usageLogin(observed)! } : {}),
       release,
       stillValid: (wanted) => generation(id) === gen && !!getAccount(id) && (() => {
         const now = choose(wanted)

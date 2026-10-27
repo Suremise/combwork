@@ -22,7 +22,7 @@ vi.mock('electron', () => ({
 }))
 
 const { config } = await import('../src/main/config')
-const { forgetConnectionUsage, mergePlanUsage, nextWarning, planNotice, reportPlanUsage, warningKey } = await import('../src/main/planUsage')
+const { connectionLoginChanged, forgetConnectionUsage, mergePlanUsage, nextWarning, planNotice, reportPlanUsage, usageLogin, warningKey } = await import('../src/main/planUsage')
 const { parseClaudePlanUsage } = await import('../src/main/providers/claude/adapter')
 const { rolloutPlanUsage } = await import('../src/main/providers/codex/rollout')
 const { onHiveEvent } = await import('../src/main/events')
@@ -126,10 +126,19 @@ describe('a plan usage warning', () => {
 // HI-1756 (Connections S5): a session on a connection reports that login's own limits, kept and warned of per
 // connection, never mixed into its CLI's (two logins, Max 1 near its limit and Max 2 not, are two sets of figures).
 describe('plan usage per connection (HI-1756)', () => {
-  const MAX1 = { id: 'a-11111111', name: 'Max 1' }
-  const MAX2 = { id: 'a-22222222', name: 'Max 2' }
+  const ONE = { email: 'one@example.com', orgId: 'org-1' }
+  const TWO = { email: 'two@example.com', orgId: 'org-1' }
+  const THREE = { email: 'three@example.com', orgId: 'org-3' }
+  // A session's launchedConnection: its connection, and who it launched as.
+  const MAX1 = { id: 'a-11111111', name: 'Max 1', login: usageLogin(ONE)! }
+  const MAX2 = { id: 'a-22222222', name: 'Max 2', login: usageLogin(TWO)! }
   const events: { type: string; provider?: string; connection?: string; toast?: { title: string } }[] = []
   let off: () => void
+  /** The connections Hive keeps, each accepted as (and now signed in as) its login. */
+  const signedIn = (id: string, who: { email: string; orgId: string }, observed: { email: string; orgId: string } = who) => {
+    const all = (config.get().connections ?? []).filter((c) => c.id !== id)
+    config.get().connections = [...all, { id, provider: 'claude-code', name: id, createdAt: '2026-10-27T00:00:00Z', accepted: who, observed: { at: '2026-10-27T00:00:00Z', loggedIn: true, ...observed } }]
+  }
   beforeEach(() => {
     events.length = 0
     off = onHiveEvent((e) => void events.push(e as never))
@@ -137,6 +146,9 @@ describe('plan usage per connection (HI-1756)', () => {
     config.get().planWarnings = {}
     config.get().planUsage = {}
     config.get().connectionPlanUsage = {}
+    config.get().connections = []
+    signedIn(MAX1.id, ONE)
+    signedIn(MAX2.id, TWO)
   })
   afterEach(() => {
     off()
@@ -179,6 +191,54 @@ describe('plan usage per connection (HI-1756)', () => {
     expect(planNotice('claude-code', l, 95, 'Max 1').apiTitle).toBe('96% of the 5-hour limit used on Max 1')
     expect(planNotice('claude-code', { ...l, windowMinutes: 10080, label: 'weekly' }, 95, 'Max 2').title).toBe('96% of the weekly limit used on Max 2')
     expect(planNotice('claude-code', l, 95).title).toBe('96% of your Claude Code 5-hour limit used')
+  })
+
+  it("is a login's (HR2's round 1): another login kept on the connection clears its figures and warnings, here and in the windows", () => {
+    reportPlanUsage('claude-code', usage(96), 'HB2', MAX2)
+    expect(config.get().connectionPlanUsage![MAX2.id].login).toBe(MAX2.login)
+    // Max 2 signed in again as another login, and that kept (accounts.ts: observed, then accepted, each a record change).
+    signedIn(MAX2.id, TWO, THREE)
+    connectionLoginChanged(MAX2.id)
+    expect(config.get().connectionPlanUsage![MAX2.id]).toBeUndefined()
+    expect(Object.keys(config.get().planWarnings)).toEqual([])
+    expect(events.filter((e) => e.type === 'plan-usage-cleared').map((e) => e.connection)).toEqual([MAX2.id])
+    signedIn(MAX2.id, THREE)
+    connectionLoginChanged(MAX2.id)
+    // The old login's session, still running, can't fill the new login's figures...
+    reportPlanUsage('claude-code', usage(97), 'HB2', MAX2)
+    expect(config.get().connectionPlanUsage![MAX2.id]).toBeUndefined()
+    // ...a session launched as the new one does, from nothing: 1%, and warned of afresh when it crosses 80%.
+    const asThree = { ...MAX2, login: usageLogin(THREE)! }
+    reportPlanUsage('claude-code', usage(1, 1), 'HB2', asThree)
+    expect(config.get().connectionPlanUsage![MAX2.id]).toMatchObject({ login: asThree.login, limits: [{ usedPercent: 1 }, { usedPercent: 1 }] })
+    reportPlanUsage('claude-code', usage(85), 'HB2', asThree)
+    expect(toasts()).toEqual(['96% of the 5-hour limit used on Max 2', '85% of the 5-hour limit used on Max 2'])
+    // Max 1's own figures are untouched throughout.
+    reportPlanUsage('claude-code', usage(62), 'HB1', MAX1)
+    expect(config.get().connectionPlanUsage![MAX1.id].limits[0].usedPercent).toBe(62)
+  })
+
+  it('a sign-in again as the same login keeps its figures and warnings; a launch whose login is unknown reports nothing', () => {
+    reportPlanUsage('claude-code', usage(96), 'HB2', MAX2)
+    signedIn(MAX2.id, { email: 'TWO@example.com', orgId: 'org-1' })
+    connectionLoginChanged(MAX2.id)
+    expect(config.get().connectionPlanUsage![MAX2.id].limits[0].usedPercent).toBe(96)
+    expect(Object.keys(config.get().planWarnings)).toEqual([warningKey('claude-code', 'five_hour', MAX2.id)])
+    expect(events.some((e) => e.type === 'plan-usage-cleared')).toBe(false)
+    reportPlanUsage('claude-code', usage(20), 'HB3', { id: MAX1.id, name: MAX1.name })
+    expect(config.get().connectionPlanUsage![MAX1.id]).toBeUndefined()
+  })
+
+  it("a login changed in a pane, not yet answered: its new sessions' figures count, the old login's sessions' no longer", () => {
+    reportPlanUsage('claude-code', usage(70), 'HB1', MAX1)
+    // Max 1 now signed in as three@ (a /login in a pane): accepted is still one@, but new sessions launch as three@.
+    signedIn(MAX1.id, ONE, THREE)
+    connectionLoginChanged(MAX1.id)
+    expect(config.get().connectionPlanUsage![MAX1.id]).toBeUndefined()
+    reportPlanUsage('claude-code', usage(75), 'HB1', MAX1)
+    expect(config.get().connectionPlanUsage![MAX1.id]).toBeUndefined()
+    reportPlanUsage('claude-code', usage(10), 'HB4', { ...MAX1, login: usageLogin(THREE)! })
+    expect(config.get().connectionPlanUsage![MAX1.id].limits[0].usedPercent).toBe(10)
   })
 
   it('a connection removed takes its usage and warnings with it, and leaves the others', () => {
