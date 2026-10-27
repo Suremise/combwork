@@ -55,7 +55,7 @@ const state = vi.hoisted(() => ({
   /** The builder's conversation bound to the card's lease, as sessions.leaseConversation gives it (HI-1746). */
   conv: { is: 'none' } as { is: 'none' } | { is: 'resume'; id: string; name: string } | { is: 'held'; hold: { is: string; slot: string } },
   /** The next starts: fail (its resume couldn't start), or lose to another start (that start then runs the builder there). */
-  starts: [] as ('fails' | 'lost')[],
+  starts: [] as ('fails' | 'lost' | 'busy')[],
   /** This run's restart record will resume the builder (restartResume.isResuming). */
   resuming: false
 }))
@@ -139,6 +139,11 @@ vi.mock('../src/main/sessions', async (orig) => {
       const how = state.starts.shift()
       state.calls.push(how ? `${name} (${how})` : name)
       if (how === 'fails') throw new Error("its conversation couldn't resume (test)")
+      if (how === 'busy') {
+        const { HiveError } = await vi.importActual<typeof import('../src/main/hiveError')>('../src/main/hiveError')
+        const text = 'slot-a still has another session in it (test)'
+        throw new HiveError({ shown: text, english: text }, { kind: 'conflict' })
+      }
       if (how === 'lost') {
         // Another start of it (the restart queue, Resume All) won: it runs there now, and this one is refused.
         state.live = { cwd: state.slot, sessionId: o.resumeId ?? 'other' }
@@ -525,6 +530,27 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     expect(state.deliveries.map((d) => d.state)).toEqual(['cancelled', 'offered'])
     expect(placedHow(e, n)).toEqual(['typed'])
     expect(notices(e)).toEqual([])
+  })
+
+  it("its resume refused for now (a crashed run's processes still in its slot): a wait, told once, never a counted try; resumed once the slot is ready", async () => {
+    const { e, n, cycle, ws } = await owed()
+    state.conv = resume
+    state.starts = ['busy', 'busy', 'busy']
+    const placing = place(ws, e.project, e.wf, n, cycle, lease)
+    await vi.waitFor(() => expect(notices(e)).toHaveLength(1), { timeout: HUNG_MS })
+    expect(notices(e)[0]).toMatch(/can't give AM-\d+ to B1 yet: its conversation in slot-a can't resume now \(slot-a still has another session in it \(test\)\)/)
+    // Each look refused again: still a wait, not told again, never given up on.
+    for (const tries of [2, 3]) {
+      status()
+      await vi.waitFor(() => expect(state.calls).toHaveLength(tries), { timeout: HUNG_MS })
+    }
+    expect(notices(e)).toHaveLength(1)
+    // The slot ready: the next look resumes it.
+    status()
+    await placing
+    expect(state.calls).toEqual(['resume c1 with the card (busy)', 'resume c1 with the card (busy)', 'resume c1 with the card (busy)', 'resume c1 with the card'])
+    expect(placedHow(e, n)).toEqual(['resumed'])
+    expect(state.logged.some((l) => /didn't resume/.test(l))).toBe(false)
   })
 
   it('three failed resumes: the card told, never a new conversation; once its builder runs there (resumed by hand), the card typed in once', async () => {

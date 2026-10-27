@@ -26,7 +26,7 @@ import { projectAgents } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import { taskPrompt } from '../shared/tasks'
 import { agentWorkflowRole, buildsWork } from '../shared/workflow/roles'
-import { workflowText } from '../shared/workflow/texts'
+import { SLOT_NOTICES, workflowText } from '../shared/workflow/texts'
 import type { Fact, FactData, StartedData, StageId } from '../shared/workflow/facts'
 import { SLOTS_DELETE_MERGED, SLOTS_RENAME_ADOPTED } from '../shared/advanced'
 import { basename } from 'path'
@@ -55,6 +55,7 @@ import { holder, poolFor, setSlotFreed } from './slotsApp'
 import { quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool } from './slots'
 import { carriedOf, keptFor, keptGoing } from './slotMigration'
 import { getTask } from './tasks'
+import { HiveError } from './hiveError'
 import { onAction } from './workflow/actionWorker'
 import { agentBusy } from './workflow/lineUpdates'
 import { withoutWriteFence, type CardRecord } from './workflow/factStore'
@@ -67,9 +68,7 @@ import { cardAttachments } from './cardAttachments'
 const log = createLogger('slots')
 
 const M = {
-  notPrepared: msg({ id: 'service.slots.notPrepared', defaultMessage: "Hive couldn't get {slot} ready for {card}: {why}", description: "A notice: a card was started in a slot (a worktree Hive lends to a card or a lane), and Hive couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English." }),
-  resumeHeld: msg({ id: 'service.slots.resumeHeld', defaultMessage: "Hive can't give {card} to {agent} yet: {agent}'s conversation in {slot} can't resume now ({why}). Hive gives it {card} once it can.", description: "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Hive hasn't handed the card to it yet; the agent's last conversation, in that slot, can't be resumed now, and Hive never starts a new conversation instead. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the reason, in English." }),
-  resumeFailed: msg({ id: 'service.slots.resumeFailed', defaultMessage: "Hive couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Hive gives it {card}.", description: "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Hive's resumes of the agent's last conversation there failed three times, so it stopped trying. Once the user resumes the agent, or starts it, Hive hands it the card. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the last failure's reason, in English." })
+  notPrepared: msg({ id: 'service.slots.notPrepared', defaultMessage: "Hive couldn't get {slot} ready for {card}: {why}", description: "A notice: a card was started in a slot (a worktree Hive lends to a card or a lane), and Hive couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English." })
 }
 
 /** What a placement's delivery is made from: its identity is the card's cycle and lease, so it is made once. */
@@ -877,13 +876,24 @@ const resumeGaveUp = new Set<string>()
 /** The holds a placement told its card about (ref and hold), so it tells each once. */
 const holdsTold = new Set<string>()
 
-/** Resolves at the next change that may matter to a waiting placement (or within 30 s); false once `over`. */
+/** Told each slot freed (a run's writer released), by its project's folder: a waiting placement looks again. */
+const slotFreed = new Set<(projectPath: string) => void>()
+
+/**
+ * Resolves at the next change that may matter to a waiting placement: its builder's status, a run, its restart resume, a
+ * slot of its project freed, or within 30 s; false once `over`.
+ */
 function nextLook(projectPath: string, agentId: string, over: () => boolean): Promise<boolean> {
   return new Promise((resolve) => {
     const same = (p: string, a: string): boolean => a === agentId && p.toLowerCase() === projectPath.toLowerCase()
+    const freed = (p: string): void => {
+      if (p.toLowerCase() === projectPath.toLowerCase()) finish()
+    }
+    slotFreed.add(freed)
     const finish = (): void => {
       off()
       offEntry()
+      slotFreed.delete(freed)
       clearTimeout(timer)
       resolve(!over())
     }
@@ -937,7 +947,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
     log.info(`#${n} waits for ${userText(agent.name)}'s conversation in ${userText(cycle.started.slot)}: held (${conv.hold.is})`)
     if (!holdsTold.has(told)) {
       holdsTold.add(told)
-      await tellCard(wf, now.card, cycle.started.builder, workflowText(M.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: holdWords(conv.hold) }), `Hive can't give ${card.key ?? `#${n}`} to ${agent.name} yet: its conversation in ${cycle.started.slot} can't resume now (${holdWords(conv.hold)}).`) // i18n-ignore: agent-facing, and the notice's English
+      await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: holdWords(conv.hold) }), `Hive can't give ${card.key ?? `#${n}`} to ${agent.name} yet: its conversation in ${cycle.started.slot} can't resume now (${holdWords(conv.hold)}).`) // i18n-ignore: agent-facing, and the notice's English
     }
     return 'wait'
   }
@@ -955,6 +965,16 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
     } catch (e) {
       // Another start of it won (the restart queue, Resume All): not this resume's failure; the next look finds it running.
       if (sessions.liveFor(projectPath, agentId) || sessions.pendingStart(projectPath, agentId)) throw e
+      // Its slot not ready for it yet (a crashed run's processes not known ended, a setup under way): a wait, not a try.
+      if (e instanceof HiveError && e.kind === 'conflict') {
+        log.info(`#${n} waits to resume ${userText(agent.name)}'s conversation in ${userText(cycle.started.slot)}: ${userText(e.message)}`)
+        const told = `${ref}\nrefused`
+        if (!holdsTold.has(told)) {
+          holdsTold.add(told)
+          await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: e.message }), `Hive can't give ${card.key ?? `#${n}`} to ${agent.name} yet: its conversation in ${cycle.started.slot} can't resume now (${e.message}).`) // i18n-ignore: agent-facing, and the notice's English
+        }
+        throw new Waits()
+      }
       const tries = (resumeFailures.get(ref) ?? 0) + 1
       resumeFailures.set(ref, tries)
       if (tries >= RESUME_TRIES) {
@@ -962,7 +982,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
         resumeFailures.delete(ref)
         const why = e instanceof Error ? e.message : String(e)
         log.warn(`#${n}: ${userText(agent.name)}'s conversation in ${userText(cycle.started.slot)} didn't resume (${tries} tries): ${userText(why)}`)
-        await tellCard(wf, now.card, cycle.started.builder, workflowText(M.resumeFailed, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why }), `Hive couldn't resume ${agent.name}'s conversation in ${cycle.started.slot} for ${card.key ?? `#${n}`} (three tries): ${why}. Resume ${agent.name} from Sessions, or start it fresh, and Hive gives it ${card.key ?? `#${n}`}.`) // i18n-ignore: agent-facing, and the notice's English
+        await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeFailed, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why }), `Hive couldn't resume ${agent.name}'s conversation in ${cycle.started.slot} for ${card.key ?? `#${n}`} (three tries): ${why}. Resume ${agent.name} from Sessions, or start it fresh, and Hive gives it ${card.key ?? `#${n}`}.`) // i18n-ignore: agent-facing, and the notice's English
         throw new GaveUp()
       }
       throw e
@@ -991,7 +1011,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
       offered.delete(offerKey(projectPath, n))
     }
   } catch (e) {
-    if (e instanceof GaveUp) return 'wait'
+    if (e instanceof GaveUp || e instanceof Waits) return 'wait'
     throw e
   }
   resumeGaveUp.delete(ref)
@@ -1004,6 +1024,8 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
 
 /** A placement's resumes reached RESUME_TRIES: told, and it waits for its builder to run. */
 class GaveUp extends Error {}
+/** A placement's resume refused for now (its slot not ready for it): it waits, the try not counted. */
+class Waits extends Error {}
 
 /** A placement's notice on its card, and its builder woken with the English (as a preparation's failure is). */
 async function tellCard(wf: Workflow, card: Parameters<Workflow['write']>[0], builder: string, shown: ReturnType<typeof workflowText>, english: string): Promise<void> {
@@ -1319,7 +1341,10 @@ export function startSlotCards(): void {
     return ws ? projectAgents(await ws.projectConfig(projectPath)).filter(builds).length : 0
   })
   setLaneSlots(laneSlot)
-  setSlotFreed((ws, project) => void settleSlotCards(ws, project))
+  setSlotFreed((ws, project) => {
+    for (const l of slotFreed) l(project)
+    void settleSlotCards(ws, project)
+  })
   const offLanes = onLanesWritten(() => void settleAll().catch((e) => log.warn("settling the lanes' slots", e)))
   // A workspace opening (Hive's start, a restart after a crash): what its cards are owed is done.
   const seen = new WeakSet<AbortSignal>()

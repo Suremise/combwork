@@ -3512,7 +3512,9 @@ Whether a conversation may resume there is its **hold** (none: it may):
     no such record or its transcript is gone. It never starts the builder meanwhile: while this run's restart resume will
     bring it back (queued, starting, or pending to resume by itself) it waits, woken as that resume settles, then types
     the card in (a failed or cancelled resume leaves it to resume the conversation itself); while that conversation is
-    held (its slot's hold) it waits, the card told once, never an older or a new conversation instead; after three failed
+    held (its slot's hold), or its resume refused for now (the slot's last run's processes not known ended, a setup under
+    way: a conflict, never a counted try), it waits, the card told once, never an older or a new conversation instead,
+    looking again at its builder's status, a run, its restart resume or a slot freed (else every 30 s); after three failed
     resumes it stops, the card told, and types the card in once its builder runs there (the user's Resume, a start by
     hand; a Hive started again tries again). A start of the builder by another wins over its own: the restart queue
     counts a start under way as running (skipped, never failed), the window's Resume All counts the same conversation
