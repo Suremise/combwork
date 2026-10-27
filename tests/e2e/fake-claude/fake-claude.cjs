@@ -25,7 +25,7 @@
 //   "askwhen NAME": the permission prompt once the test makes a file NAME in its home (#667), not after a set time.
 //   "waitfile NAME" as a step ("waitfile go then hive hive_inbox {}"): the steps after it wait for that file.
 //   "shell: <command line>" runs a command in cmd with the session's environment (fake-shell.jsonl records it; its
-//   standard error so far is in fake-shell-stderr-<agent>.txt while it runs, HI-1816).
+//   standard error so far is in its agent's file while it runs, shellStderr.cjs, HI-1816).
 //   "planusage F W": its status line reports the plan's limits as Claude Code's does (rate_limits: the 5-hour at F%,
 //   the weekly at W%), with reset times every session of the machine agrees on (#383).
 //   "linger N" leaves N processes running after it ends, as an agent's preview server or tail -f does (#507): each a
@@ -124,6 +124,7 @@ const path = require('path')
 const { randomUUID } = require('crypto')
 const { spawn } = require('child_process')
 const { callHiveTool, connectHive, parseHiveStep, isDoorbell, doorbellIsWork, inboxRows } = require('../fake-bridge.cjs')
+const { shellStderrFile } = require('./shellStderr.cjs')
 
 const args = process.argv.slice(2)
 if (args[0] === '--version') {
@@ -470,7 +471,7 @@ function shell(cmd) {
     let stdout = ''
     let stderr = ''
     // Its standard error so far, for a test waiting on what a command says before it ends (HI-1816).
-    const live = home ? path.join(home, `fake-shell-stderr-${process.env.HIVE_AGENT || 'agent'}.txt`) : null
+    const live = home ? shellStderrFile(home, process.env.HIVE_AGENT) : null
     if (live) fs.writeFileSync(live, '')
     p.stdout.on('data', (d) => (stdout += d))
     p.stderr.on('data', (d) => {
