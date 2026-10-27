@@ -71,7 +71,7 @@ const wsPath = join(base, 'ws')
 const project = join(wsPath, 'alpha')
 const folder = join(base, 'slot-a')
 const ws = createWorkspaceService()
-const manager = sessions as unknown as Record<string, unknown> & { live: Map<string, { state: { runId: string } }>; runs: Map<string, string>; writers: Map<string, unknown> }
+const manager = sessions as unknown as Record<string, unknown> & { live: Map<string, { state: { runId: string } }>; runs: Map<string, string>; writers: Map<string, unknown>; writerSettlingOf: Map<string, unknown> }
 const saved = new Map<string, unknown>()
 const live = new Set<string>()
 const me = { pid: process.pid, started: 1 }
@@ -121,6 +121,7 @@ afterEach(async () => {
   for (const [k] of [...manager.live]) manager.live.delete(k)
   manager.runs.clear()
   manager.writers.clear()
+  manager.writerSettlingOf.clear()
   live.clear()
   spawned.length = 0
   launched = 0
@@ -277,6 +278,60 @@ describe("a slot's writer through sessions.start (#1434 round 3)", () => {
     settleRunForTests(state.runId, 'ended')
     await vi.waitFor(() => expect(writer()).toBeNull(), { timeout: 15000 })
     expect(live.size).toBe(0)
+  })
+
+  it("the agent's next start just after its run ended waits for that run's release, then claims the slot (HI-1867)", async () => {
+    hostOn()
+    const settle = manager.settleWriterOf as (run: string) => void
+    const old = (await start()).runId
+    // Its CLI has exited (its live entry gone, as a lane's start finds it): its release waits for the tracker.
+    settle.call(manager, old)
+    manager.live.clear()
+    manager.runs.clear()
+    const waiting = vi.spyOn(manager as unknown as { earlierWritersSettled: (...a: unknown[]) => Promise<void> }, 'earlierWritersSettled')
+    let claims = 0
+    const off = onBoardCommitted(() => {
+      if (writer()?.run && writer()?.run !== old) claims++
+    })
+    try {
+      const next = start()
+      // At the wait, with the old run's writer still on the slot: nothing claimed, nothing launched, not refused.
+      await vi.waitFor(() => expect(waiting).toHaveBeenCalled(), { timeout: 15000 })
+      expect(writer()?.run).toBe(old)
+      expect(launched).toBe(1)
+      settleRunForTests(old, 'ended')
+      const state = await next
+      expect(state.runId).not.toBe(old)
+      expect(writer()).toMatchObject({ run: state.runId, agent: 'b1' })
+      expect(launched).toBe(2)
+      expect(live.has(state.runId)).toBe(true)
+      expect(live.has(old)).toBe(false)
+      expect(claims).toBeGreaterThan(0)
+    } finally {
+      off()
+      waiting.mockRestore()
+    }
+  })
+
+  it("…but a run held (its processes kept running) is still refused once its outcome is known (HI-1867)", async () => {
+    hostOn()
+    const settle = manager.settleWriterOf as (run: string) => void
+    const old = (await start()).runId
+    settle.call(manager, old)
+    manager.live.clear()
+    manager.runs.clear()
+    const waiting = vi.spyOn(manager as unknown as { earlierWritersSettled: (...a: unknown[]) => Promise<void> }, 'earlierWritersSettled')
+    try {
+      const next = start()
+      await vi.waitFor(() => expect(waiting).toHaveBeenCalled(), { timeout: 15000 })
+      settleRunForTests(old, 'kept')
+      await expect(next).rejects.toThrow(/still has another session/)
+      expect(writer()?.run).toBe(old)
+      expect(launched).toBe(1)
+    } finally {
+      waiting.mockRestore()
+      await store.clearWriterRun(old)
+    }
   })
 
   it("a slot the pool set up never runs the agent's worktree setup (its 0.9 worktree elsewhere)", async () => {
