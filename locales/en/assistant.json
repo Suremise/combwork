@@ -847,6 +847,10 @@
     "defaultMessage": "Coding agent: {provider}",
     "description": "A line of an agent's tooltip in the Assistant's workspace section ({provider}: \"Claude Code\")."
   },
+  "assistant.panel.providerOn": {
+    "defaultMessage": "Coding agent: {provider} · {connection}",
+    "description": "A line of an agent's tooltip in the Assistant's workspace section, with Connections on (HI-1769): its CLI ({provider}: \"Claude Code\") and the connection it runs on or would start on ({connection}: \"Max 1\", with ⟳ when it runs on another than the one chosen, or why none can run it)."
+  },
   "assistant.panel.railLabel": {
     "defaultMessage": "Hive Assistant",
     "description": "The hidden Assistant panel's strip, written down it. Hive's name stays as it is."
@@ -1938,6 +1942,38 @@
   "assistant.templatePlan.codingAgent": {
     "defaultMessage": "Coding agent",
     "description": "Load template's table: the column of each agent's CLI (Claude Code, Codex…)."
+  },
+  "assistant.templatePlan.connection": {
+    "defaultMessage": "Connection",
+    "description": "Load template's table (HI-1769, with Connections on): the column of the connection each agent runs on (a login or service its coding agent CLI uses)."
+  },
+  "assistant.templatePlan.connectionDefault": {
+    "defaultMessage": "Workspace's default ({name})",
+    "description": "Load template's table, the Connection column (HI-1769): the agent follows the workspace's default connection for its CLI ({name}); also the first choice of the box for an agent whose own connection can't be used here."
+  },
+  "assistant.templatePlan.connectionLabel": {
+    "defaultMessage": "Connection of {agent}",
+    "description": "Load template's table (HI-1769): the accessible name of the box choosing the connection of the agent {agent}."
+  },
+  "assistant.templatePlan.connectionMissing": {
+    "defaultMessage": "{name}: no connection with that id here",
+    "description": "Load template's table, the Connection column (HI-1769): the template's agent ran on a connection ({name}, its name when saved) that this machine doesn't have (never matched by name). The box under it chooses another."
+  },
+  "assistant.templatePlan.connectionNone": {
+    "defaultMessage": "Workspace's default (none on: it can't start)",
+    "description": "Load template's table, the Connection column (HI-1769): the agent follows the workspace's default connection for its CLI, but none is on, so it can't start until one is."
+  },
+  "assistant.templatePlan.connectionOff": {
+    "defaultMessage": "{name}: off in this workspace",
+    "description": "Load template's table, the Connection column (HI-1769): the template's agent ran on a connection ({name}) that is off in this workspace. The box under it chooses another."
+  },
+  "assistant.templatePlan.connectionOtherCli": {
+    "defaultMessage": "{name}: another CLI's connection",
+    "description": "Load template's table, the Connection column (HI-1769): the template's agent names a connection ({name}) of another coding agent CLI than its own. The box under it chooses one of its own CLI's."
+  },
+  "assistant.templatePlan.connectionUnnamed": {
+    "defaultMessage": "Its connection",
+    "description": "Load template's table, the Connection column (HI-1769): stands for the name of a template agent's connection when the template doesn't say it, before \": no connection with that id here\"."
   },
   "assistant.templatePlan.default": {
     "defaultMessage": "(default)",

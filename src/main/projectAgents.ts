@@ -25,7 +25,7 @@ import { listOf, shownText, withValues, type Text } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { capturedText, HiveError, hiveError, shownError } from './hiveError'
 import { providerService } from './providerService'
-import { connectionOnHere } from './accounts'
+import { assertConnectionHere, connectionProblem } from './accounts'
 import { assertNameFree, withAgentNames, workspaceAgents } from './agentNames'
 import { sameAgentName } from '../shared/agentNames'
 import { chooseSpace, hiveBranch, reusableBranches, type BranchHome } from '../shared/hiveBranches'
@@ -155,6 +155,8 @@ export async function addAgent(projectPath: string, opts: AddAgentOptions): Prom
         const max = agentLimit(projectPath)
         if (list.length >= max) throw helperError((t) => agentLimitText(max, t))
         if (list.some((a) => sameAgentName(a.name, name))) throw hiveError(msg({ id: 'worktrees.agent.nameTaken', defaultMessage: 'There is already an agent called "{name}".', description: 'An error: the project already has an agent with the name {name}.' }), { name })
+        // Its connection as it is now (HI-1769): turned off or removed while it was being prepared, it isn't added.
+        if (def.connection) assertConnectionHere(def.connection, def.provider!, projectPath, name)
         // An automatic layout follows the agents, so the new one shows; with one chosen by hand, a full page sends it to the next (#134).
         return { agents: [...list, def] }
       })
@@ -325,8 +327,12 @@ export async function prepareAgent(projectPath: string, cfg: ProjectConfig, opts
   if (opts.workflowRole !== undefined) def.workflowRole = cleanWorkflowRole(opts.workflowRole)
   const mcpServers = cleanMcpServers(opts.mcpServers)
   if (mcpServers) def.mcpServers = mcpServers
-  // Its connection (HI-1755), when it is one of its provider's on in this workspace; else it uses the default.
-  if (opts.connection && connectionOnHere(opts.connection, provider, projectPath)) def.connection = opts.connection
+  // Its connection (HI-1755): one of its provider's on in this workspace, else refused, saying why (HI-1769: never
+  // dropped quietly); checked again with the write that adds it.
+  if (opts.connection) {
+    assertConnectionHere(opts.connection, provider, projectPath, name)
+    def.connection = opts.connection
+  }
 
   return { def, discard: async () => undefined }
 }
@@ -386,14 +392,23 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   // an agent sharing its name from before names were unique keeps it while its other settings change, but only while it
   // still has that name. The Assistant's agent is never renamed.
   const name = patch.name
+  // Its connection (HI-1769), checked under the lock with the write: one that exists, is the CLI's it will run and is on
+  // here. Only the one already saved, for the same CLI, may stay while it is off here (the default runs it meanwhile).
+  const check = (current: AgentDef): void => {
+    opts.check?.(current)
+    const was = agentProvider(current, cfg, config.settings)
+    const cli = clean.provider ?? was
+    const kept = clean.connection === current.connection && cli === was
+    if (clean.connection && !(kept && connectionProblem(clean.connection, cli, projectPath) === 'off')) assertConnectionHere(clean.connection, cli, projectPath, current.name)
+  }
   const def =
     name !== undefined
       ? await withAgentNames(projectPath, async () => {
           const now = projectAgents(await workspace.projectConfig(projectPath)).find((a) => a.id === agentId)
           if (!now || !sameAgentName(now.name, name)) await assertNameFree(projectPath, name, { self: agentId })
-          return workspace.updateAgent(projectPath, agentId, clean, opts.check)
+          return workspace.updateAgent(projectPath, agentId, clean, check)
         })
-      : await workspace.updateAgent(projectPath, agentId, clean, opts.check)
+      : await workspace.updateAgent(projectPath, agentId, clean, check)
   const live = sessions.liveFor(projectPath, agentId)
   if (live && patch.name) live.agentName = patch.name
   await workspaceOf(projectPath).refresh()

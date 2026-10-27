@@ -246,6 +246,8 @@
   "actions.template.addTitle": "Add an agent from a template",
   "actions.template.blockedMessage": "It can't be loaded into {project, select, none {this project} other {{project}}} yet:",
   "actions.template.blockedTitle": "Can't load \"{name}\" yet",
+  "actions.template.connectionFallback": "{agent} uses the workspace's default connection",
+  "actions.template.connectionFallbackWhy": "{name} {problem, select, missing {isn't on this machine} otherCli {is another CLI's} other {is off in this workspace}}: choose another in its Agent Settings if you like.",
   "actions.template.everyProject": "For every project in the workspace (else for this project only)",
   "actions.template.load": "Load template",
   "actions.template.loadAdds": "It adds its agents to {project}.",

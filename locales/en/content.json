@@ -295,6 +295,10 @@
     "defaultMessage": "Hive couldn't check {agent}'s worktree ({folder}): {error}",
     "description": "Why a template can't be loaded: git couldn't tell whether the worktree {folder} of the agent {agent} it would remove has uncommitted work; {error} is why (often git's own words)."
   },
+  "content.templates.connectionsChanged": {
+    "defaultMessage": "The template's connections changed since you looked: open it again.",
+    "description": "An error loading a template: the connections the Load template dialog asked about are no longer the ones it would ask about (the template or the connections changed)."
+  },
   "content.templates.editedMeanwhile": {
     "defaultMessage": "\"{name}\" changed since you started editing it (saved again meanwhile): nothing was saved. Close the editor to see it as it is now.",
     "description": "An error saving an edited template: it was saved again elsewhere after the editor opened it."

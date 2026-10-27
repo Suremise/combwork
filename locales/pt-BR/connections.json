@@ -4,5 +4,19 @@
   "connections.choice.gone": "Uma conexão removida (o agente não pode ser iniciado)",
   "connections.choice.label": "Conexão",
   "connections.choice.none": "Nenhuma conexão do {cli} está ativada neste espaço de trabalho. Adicione uma em Configurações → Conexões.",
-  "connections.choice.off": "{name} (desativada neste espaço de trabalho: a padrão roda o agente)"
+  "connections.choice.off": "{name} (desativada neste espaço de trabalho: a padrão roda o agente)",
+  "connections.choice.otherCli": "Conexões do {cli}",
+  "connections.mark.anotherMark": "Rodando em uma conexão diferente da escolhida",
+  "connections.mark.deleted": "Conexão removida",
+  "connections.mark.deletedTip": "A conexão escolhida para o agente foi removida: ele não pode ser iniciado até você escolher outra nas Configurações do agente dele, ou a padrão do espaço de trabalho.",
+  "connections.mark.inherited": "{name}: a padrão do espaço de trabalho para o {cli}, que o agente segue",
+  "connections.mark.none": "Nenhuma conexão",
+  "connections.mark.noneTip": "Nenhuma conexão do {cli} está ativada neste espaço de trabalho: o agente não pode ser iniciado até que uma esteja (Configurações → Conexões).",
+  "connections.mark.offFallback": "{wanted} está desativada neste espaço de trabalho: a padrão, {name}, roda o agente",
+  "connections.mark.offNoDefault": "{wanted} está desativada aqui",
+  "connections.mark.offNoDefaultTip": "{wanted} está desativada neste espaço de trabalho, e nenhuma outra conexão do {cli} está ativada: o agente não pode ser iniciado até que uma esteja (Configurações → Conexões).",
+  "connections.mark.other": "Roda em {running} até reiniciar. Escolhida agora: {chosen}",
+  "connections.mark.otherProvider": "Conexão de outra CLI",
+  "connections.mark.otherProviderTip": "{wanted} é de outra CLI, não do {cli}: o agente não pode ser iniciado até você escolher uma conexão do {cli} nas Configurações do agente dele.",
+  "connections.mark.own": "{name}: escolhida para ele"
 }

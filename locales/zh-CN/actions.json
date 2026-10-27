@@ -246,6 +246,8 @@
   "actions.template.addTitle": "从模板添加智能体",
   "actions.template.blockedMessage": "暂时无法加载到{project, select, none {此项目} other { {project} }}中：",
   "actions.template.blockedTitle": "暂时无法加载“{name}”",
+  "actions.template.connectionFallback": "{agent} 使用工作区的默认连接",
+  "actions.template.connectionFallbackWhy": "{name} {problem, select, missing {不在此计算机上} otherCli {属于另一个 CLI} other {在此工作区中已停用}}：如有需要，可在它的“智能体设置”中另选一个。",
   "actions.template.everyProject": "用于工作区中的所有项目（否则仅用于此项目）",
   "actions.template.load": "加载模板",
   "actions.template.loadAdds": "它会将其中的智能体添加到 {project}。",

@@ -246,6 +246,8 @@
   "actions.template.addTitle": "Dodaj agenta z szablonu",
   "actions.template.blockedMessage": "Nie można go jeszcze wczytać do {project, select, none {tego projektu} other {projektu {project}}}:",
   "actions.template.blockedTitle": "Nie można jeszcze wczytać „{name}”",
+  "actions.template.connectionFallback": "Agent {agent} używa domyślnego połączenia obszaru roboczego",
+  "actions.template.connectionFallbackWhy": "{name} {problem, select, missing {nie istnieje na tym komputerze} otherCli {należy do innego CLI} other {jest wyłączone w tym obszarze roboczym}}: jeśli chcesz, wybierz inne w jego oknie Ustawienia agenta.",
   "actions.template.everyProject": "Dla wszystkich projektów w obszarze roboczym (bez zaznaczenia: tylko dla tego projektu)",
   "actions.template.load": "Wczytaj szablon",
   "actions.template.loadAdds": "Szablon doda swoich agentów do projektu {project}.",

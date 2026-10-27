@@ -194,6 +194,8 @@
   "panes.table.background": "Waiting on {n, plural, one {# background task} other {# background tasks}}",
   "panes.table.card": "Card",
   "panes.table.cardPrefix": "card {value}",
+  "panes.table.connection": "Connection",
+  "panes.table.connectionPrefix": "on {value}",
   "panes.table.happens": "What happens",
   "panes.table.notRunning": "Not running",
   "panes.table.project": "Project",

@@ -178,6 +178,8 @@
   "panes.table.background": "{n, plural, other {バックグラウンドのタスク#件を待機中}}",
   "panes.table.card": "カード",
   "panes.table.cardPrefix": "カード：{value}",
+  "panes.table.connection": "接続",
+  "panes.table.connectionPrefix": "接続：{value}",
   "panes.table.happens": "どうなるか",
   "panes.table.notRunning": "停止中",
   "panes.table.project": "プロジェクト",

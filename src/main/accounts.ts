@@ -3,11 +3,11 @@ import { join, resolve } from 'path'
 import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
 import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
-import type { Connection, ConnectionObserved, ProviderId, WorkspaceConfig } from '../shared/types'
+import type { Connection, ConnectionObserved, ConnectionProblem, ProviderId, WorkspaceConfig } from '../shared/types'
 import { acceptable, accountState, resolveConnection, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { profileFolder } from '../shared/appName'
 import { isProviderEnabled, providerDescriptor, PROVIDERS } from '../shared/providers'
-import { msg } from '../shared/i18n'
+import { msg, type Msg } from '../shared/i18n'
 import { config } from './config'
 import { emit, onHiveEvent } from './events'
 import { hiveError } from './hiveError'
@@ -954,6 +954,29 @@ export function connectionHomes(id: ProviderId, cfg?: WorkspaceConfig | null): C
   const ids = new Set<string>()
   for (const c of cfg !== undefined ? (cfg ? [cfg] : []) : openWorkspaces().map((w) => w.config)) for (const x of workspaceAccounts(c, id, all)?.on ?? []) ids.add(x)
   return all.filter((a) => ids.has(a.id)).map((a) => ({ id: a.id, name: a.name, home: accountFolder(a.id) }))
+}
+
+const CHOICE: Record<ConnectionProblem, Msg> = {
+  missing: msg({ id: 'main.connections.choice.missing', defaultMessage: "The connection chosen for {agent} no longer exists. Choose another, or the workspace's default.", description: "An error saving an agent's settings (or adding one): the connection chosen for it ({agent}, its name) was removed. A connection is how a coding agent CLI signs in or reaches its model (Settings → Connections)." }),
+  otherCli: msg({ id: 'main.connections.choice.otherCli', defaultMessage: "{name} is for another CLI than {agent}'s. Choose one of its own.", description: "An error saving an agent's settings (or adding one): the connection chosen ({name}) belongs to another coding agent CLI than the agent's ({agent}, its name)." }),
+  off: msg({ id: 'main.connections.choice.off', defaultMessage: "{name} isn't on in this workspace. Turn it on in Settings → Connections, or choose another for {agent}.", description: "An error saving an agent's settings (or adding one): the connection chosen ({name}) is off in this workspace, so it can't be the agent's ({agent}, its name). Settings → Connections names a section." })
+}
+
+/**
+ * Why a connection can't be saved as an agent's own choice in a project now (HI-1769): removed, another CLI's, or not on
+ * in its workspace; null when it can. Read from memory, so it is checked again with the write that saves it.
+ */
+export function connectionProblem(id: string, cli: ProviderId, projectPath: string): ConnectionProblem | null {
+  const a = getAccount(id)
+  if (!a) return 'missing'
+  if (a.provider !== cli) return 'otherCli'
+  return connectionOnHere(id, cli, projectPath) ? null : 'off'
+}
+
+/** Refuses a connection that can't be an agent's own choice here (connectionProblem), saying why. */
+export function assertConnectionHere(id: string, cli: ProviderId, projectPath: string, agent: string): void {
+  const why = connectionProblem(id, cli, projectPath)
+  if (why) throw hiveError(CHOICE[why], { agent, name: getAccount(id)?.name ?? id }, { kind: 'conflict' })
 }
 
 /** Whether a connection is one of the provider's on in the workspace a project (or host) belongs to (HI-1755). */

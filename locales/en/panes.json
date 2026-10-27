@@ -715,6 +715,14 @@
     "defaultMessage": "card {value}",
     "description": "The agent's card in a line of text (screen readers, a dialog's copy): {value} is the card (\"#12 Title\", \"reviewing #12 Title\"). Lower case."
   },
+  "panes.table.connection": {
+    "defaultMessage": "Connection",
+    "description": "An agents table's column heading (HI-1769): the connection the agent runs on, or would start on (a login or service its coding agent CLI uses: \"Max 1\")."
+  },
+  "panes.table.connectionPrefix": {
+    "defaultMessage": "on {value}",
+    "description": "The agent's connection in a line of text (screen readers): {value} is its name (\"on Max 1\"). Lower case."
+  },
   "panes.table.happens": {
     "defaultMessage": "What happens",
     "description": "An agents table's column heading (Start New All, Remove All…): what the action does to each agent."

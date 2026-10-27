@@ -246,6 +246,8 @@
   "actions.template.addTitle": "Adicionar um agente de um modelo",
   "actions.template.blockedMessage": "Ainda não é possível carregá-lo {project, select, none {neste projeto} other {no projeto {project}}}:",
   "actions.template.blockedTitle": "Ainda não é possível carregar “{name}”",
+  "actions.template.connectionFallback": "O agente {agent} usa a conexão padrão do espaço de trabalho",
+  "actions.template.connectionFallbackWhy": "{name} {problem, select, missing {não está nesta máquina} otherCli {é de outra CLI} other {está desativada neste espaço de trabalho}}: escolha outra nas Configurações do agente dele, se quiser.",
   "actions.template.everyProject": "Para todos os projetos do espaço de trabalho (senão, só para este projeto)",
   "actions.template.load": "Carregar modelo",
   "actions.template.loadAdds": "Ele adiciona os agentes dele ao projeto {project}.",

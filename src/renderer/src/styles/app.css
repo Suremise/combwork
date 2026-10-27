@@ -2982,6 +2982,22 @@ p.hint {
   color: var(--fg-strong);
   margin-right: 6px;
 }
+/* An agent's connection (HI-1769): its own one that can't be used here says why above the box choosing another. */
+.template-plan-connection select {
+  max-width: 16em;
+}
+.template-plan-connection-problem {
+  font-size: 11.5px;
+  color: var(--warning);
+  margin-bottom: 2px;
+}
+/* An agent's connection in its rows (HI-1769): one line, its ⟳ kept with it. */
+.agent-connection {
+  white-space: nowrap;
+}
+.running-line .running-connection {
+  flex: none;
+}
 .template-plan-provider {
   display: inline-flex;
   align-items: center;

@@ -32,6 +32,7 @@ import { DiffView } from '../components/Editors'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
 import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Switch, Tooltip } from '../components/ui'
+import { ConnectionMark } from '../components/ConnectionChoice'
 import { languageFor } from '../monacoLang'
 import { useScopedLoad } from '../scopedLoad'
 import { oneAtATime, withinTime } from '@shared/coalesce'
@@ -648,6 +649,7 @@ export function RunningAgent({ project, a, label, onOpen, assistant }: { project
         {/* One line (HI-1679): the status gives way with "…", the chip after it never wraps and keeps its key whole. */}
         <div className="running-line">
           <strong>{label ?? a.name}</strong>
+          <ConnectionMark own={a.connection} provider={live.provider} launched={live.launchedConnection} className="faint running-connection" />
           <Tooltip content={status}>
             <span className="faint running-status">{wait ? wait.line : status}</span>
           </Tooltip>
@@ -1718,7 +1720,8 @@ function AgentList({ project }: { project: ProjectInfo }) {
             </Tooltip>
             <div className="grow">
               <div>
-                <strong>{a.name}</strong> <span className="faint">{off ? tr(S.off, { provider: providerName(provider) }) : providerName(provider)}</span>{' '}
+                <strong>{a.name}</strong>{' '}
+                <span className="faint">{off ? tr(S.off, { provider: providerName(provider) }) : <ConnectionMark own={a.connection} provider={provider} launched={a.live?.launchedConnection} fallback={providerName(provider)} />}</span>{' '}
                 {own ? (
                   <span className="agent-branch">
                     <Icon name="git-branch" /> {own.branch}

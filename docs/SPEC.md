@@ -827,6 +827,26 @@ The design across every surface is HI-1755's design note and addendum. The decis
   - **What it does:** launches as before connections where the workspace has none on, with the CLI's own sign-in handling.
   - **Where it's off:** the `connections` suite sets it to `0`.
 
+**The rows and templates name connections** (S2, HI-1769):
+- **One rule for every row** (`connectionOf`, `src/shared/connectionLabel.ts`), the launch's own (`resolveConnection`), so the window and a start never disagree:
+  - its own choice on here: its name;
+  - its own off here, same CLI, with a default: the default's name, its hover saying so;
+  - removed, another CLI's, off with no default, or none on: shown as unusable, saying why. No connection is made up for it;
+  - none of its own: the workspace's default for its CLI, which it follows (the hover says so).
+  - **While it runs,** a row names the connection its run is on, until it restarts, marked ⟳ when that isn't the one it would start on now (or that one is now unusable).
+- **Where:** Project Settings → Agents (the connection's name in place of the CLI's, the CLI's icon kept), the Overview's running agents, the sidebar's agents hover table (a Connection column), and the Assistant panel's agent hover.
+- **Templates:**
+  - **Saving:** an agent's connection is kept by id, with its name beside it (`connectionName`), which is for display only.
+  - **The load dialog** has a Connection column, and asks only about an agent whose **own** connection can't be used here: removed or never on this machine, another CLI's, or off. An agent with none of its own follows the default and isn't asked about.
+    - For each one asked about, the box's first choice, preselected, is **the workspace's default** (it then follows it). The CLI's connections on here follow, each pinning that one.
+    - Never matched by name, never another CLI's.
+  - **Loading:** the answers go by the plan's indexes and must be for exactly the agents asked about now, else the load is refused ("connections changed since you looked"). Each connection is checked again as the agent is prepared and with the write. One turned off or removed meanwhile refuses the whole load, nothing changed (the load is all or nothing).
+  - **Add Agent from Template:** its own connection where it can be used; else the default, and a notice says why.
+  - Hive's own templates' agents moved to another CLI drop their connection.
+- **An agent's own connection is checked with the write that saves it** (Add Agent, Agent Settings, the template load): on here for its CLI, else refused, saying why; never dropped quietly. Agent Settings may keep the one already saved when it's off here (the default runs it).
+- **Another CLI's connection:** Add Agent's and Agent Settings' choice of connection also lists the other CLIs' connections on here. Picking one changes the agent's CLI, which Agent Settings asks about first, as a change of CLI does (its model and the rest start again, and its conversations stay with the old CLI). Never while it runs.
+- **Off** (the preview switch): nothing changes. Rows show the CLI, the load dialog has no Connection column, and a template's connection is kept only where it is on here, as before.
+
 - **An account is a CLI login in a folder of its own**, `<accounts>\<id>\`. `<accounts>` is `%LOCALAPPDATA%\Hive\accounts` for the installed Hive, `Hive-Dev`'s for a dev build, and `<HIVE_USER_DATA>\accounts` for a test profile.
   - The id is random and stable (`a-3f9c2e1b`). The name is the user's ("Personal", "Hive overnight"), and a rename changes only the name.
   - The list is in `config.json` (`connections`), in Settings' order. All accounts are equal: there's no primary.

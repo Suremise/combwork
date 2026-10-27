@@ -4,5 +4,19 @@
   "connections.choice.gone": "削除された接続（エージェントは起動できません）",
   "connections.choice.label": "接続",
   "connections.choice.none": "このワークスペースで有効な{cli}の接続がありません。「設定」→「接続」で追加してください。",
-  "connections.choice.off": "{name}（このワークスペースでは無効：既定の接続で動きます）"
+  "connections.choice.off": "{name}（このワークスペースでは無効：既定の接続で動きます）",
+  "connections.choice.otherCli": "{cli}の接続",
+  "connections.mark.anotherMark": "選んだ接続とは別の接続で実行中",
+  "connections.mark.deleted": "接続が削除されました",
+  "connections.mark.deletedTip": "選ばれた接続が削除されました。「エージェント設定」で別の接続かワークスペースの既定を選ぶまで起動できません。",
+  "connections.mark.inherited": "{name}：{cli}のワークスペースの既定（既定が変わると追従します）",
+  "connections.mark.none": "接続なし",
+  "connections.mark.noneTip": "このワークスペースで有効な{cli}の接続がありません。どれかが有効になるまで起動できません（「設定」→「接続」）。",
+  "connections.mark.offFallback": "{wanted}はこのワークスペースでは無効です。既定の{name}で動きます",
+  "connections.mark.offNoDefault": "{wanted}はここでは無効",
+  "connections.mark.offNoDefaultTip": "{wanted}はこのワークスペースでは無効で、ほかに有効な{cli}の接続もありません。どれかが有効になるまで起動できません（「設定」→「接続」）。",
+  "connections.mark.other": "再起動するまで{running}で実行します。現在の選択：{chosen}",
+  "connections.mark.otherProvider": "別のCLIの接続",
+  "connections.mark.otherProviderTip": "{wanted}は{cli}とは別のCLI用です。「エージェント設定」で{cli}の接続を選ぶまで起動できません。",
+  "connections.mark.own": "{name}：このエージェント用に選んだ接続"
 }

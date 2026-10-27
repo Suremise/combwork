@@ -69,9 +69,11 @@ export interface TemplateAgent {
   mcpServers?: string[]
   /**
    * The connection it ran on (HI-1755), with `model`: what runs it. A connection's id is this machine's: where it isn't
-   * on, an agent added from the template uses the workspace's default.
+   * on, the load dialog asks (HI-1769), the same CLI's default preselected; absent, it uses the workspace's default.
    */
   connection?: string
+  /** That connection's name when saved (HI-1769): shown where its id isn't here, never used to find one. */
+  connectionName?: string
 }
 
 export interface AgentTemplate {
@@ -247,7 +249,8 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
       ...(a.permissionMode ? { permissionMode: a.permissionMode as string } : {}),
       ...(typeof a.use200kContext === 'boolean' ? { use200kContext: a.use200kContext } : {}),
       ...(mcpServers ? { mcpServers } : {}),
-      ...(typeof a.connection === 'string' && a.connection ? { connection: a.connection } : {})
+      ...(typeof a.connection === 'string' && a.connection ? { connection: a.connection } : {}),
+      ...(typeof a.connection === 'string' && a.connection && typeof a.connectionName === 'string' && a.connectionName ? { connectionName: a.connectionName } : {})
     })
   }
   // Two agents named alike once their patterns are made (`{key}-B{n}` twice is HI-B1 and HI-B2: different).

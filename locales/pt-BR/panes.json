@@ -178,6 +178,8 @@
   "panes.table.background": "Aguardando {n, plural, =0 {# tarefas em segundo plano} one {# tarefa em segundo plano} other {# tarefas em segundo plano}}",
   "panes.table.card": "Cartão",
   "panes.table.cardPrefix": "cartão {value}",
+  "panes.table.connection": "Conexão",
+  "panes.table.connectionPrefix": "na conexão {value}",
   "panes.table.happens": "O que acontece",
   "panes.table.notRunning": "Parado",
   "panes.table.project": "Projeto",

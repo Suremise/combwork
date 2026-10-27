@@ -4,5 +4,19 @@
   "connections.choice.gone": "Une connexion retirée (l’agent ne peut pas démarrer)",
   "connections.choice.label": "Connexion",
   "connections.choice.none": "Aucune connexion {cli} n’est activée dans cet espace de travail. Ajoutes-en une dans Paramètres → Connexions.",
-  "connections.choice.off": "{name} (désactivée dans cet espace de travail : l’agent tourne sur la connexion par défaut)"
+  "connections.choice.off": "{name} (désactivée dans cet espace de travail : l’agent tourne sur la connexion par défaut)",
+  "connections.choice.otherCli": "Connexions {cli}",
+  "connections.mark.anotherMark": "Tourne sur une autre connexion que celle choisie",
+  "connections.mark.deleted": "Connexion retirée",
+  "connections.mark.deletedTip": "La connexion choisie pour l’agent a été retirée : il ne peut pas démarrer tant que tu n’en choisis pas une autre dans ses Paramètres de l’agent, ou celle par défaut de l’espace de travail.",
+  "connections.mark.inherited": "{name} : la connexion par défaut de l’espace de travail pour {cli}, que l’agent suit",
+  "connections.mark.none": "Aucune connexion",
+  "connections.mark.noneTip": "Aucune connexion {cli} n’est activée dans cet espace de travail : l’agent ne peut pas démarrer tant qu’aucune ne l’est (Paramètres → Connexions).",
+  "connections.mark.offFallback": "{wanted} est désactivée dans cet espace de travail : la connexion par défaut, {name}, fait tourner l’agent",
+  "connections.mark.offNoDefault": "{wanted} est désactivée ici",
+  "connections.mark.offNoDefaultTip": "{wanted} est désactivée dans cet espace de travail, et aucune autre connexion {cli} n’est activée : l’agent ne peut pas démarrer tant qu’aucune ne l’est (Paramètres → Connexions).",
+  "connections.mark.other": "Tourne sur {running} jusqu’à son redémarrage. Choix actuel : {chosen}",
+  "connections.mark.otherProvider": "Connexion d’une autre CLI",
+  "connections.mark.otherProviderTip": "{wanted} est pour une autre CLI que {cli} : l’agent ne peut pas démarrer tant que tu ne choisis pas une connexion {cli} dans ses Paramètres de l’agent.",
+  "connections.mark.own": "{name} : son propre choix"
 }

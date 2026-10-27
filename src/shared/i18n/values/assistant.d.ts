@@ -213,6 +213,7 @@ interface HiveMessageValues {
   'assistant.panel.openNow': undefined
   'assistant.panel.progress': { hasStep: string; run: string | number; step: string | number }
   'assistant.panel.provider': { provider: string | number }
+  'assistant.panel.providerOn': { provider: string | number; connection: string | number }
   'assistant.panel.railLabel': undefined
   'assistant.panel.restart': undefined
   'assistant.panel.restartButton': undefined
@@ -486,6 +487,14 @@ interface HiveMessageValues {
   'assistant.templateLoad.swapped': { problem: string; from: string | number; to: string | number }
   'assistant.templatePlan.agent': undefined
   'assistant.templatePlan.codingAgent': undefined
+  'assistant.templatePlan.connection': undefined
+  'assistant.templatePlan.connectionDefault': { name: string | number }
+  'assistant.templatePlan.connectionLabel': { agent: string | number }
+  'assistant.templatePlan.connectionMissing': { name: string | number }
+  'assistant.templatePlan.connectionNone': undefined
+  'assistant.templatePlan.connectionOff': { name: string | number }
+  'assistant.templatePlan.connectionOtherCli': { name: string | number }
+  'assistant.templatePlan.connectionUnnamed': undefined
   'assistant.templatePlan.default': undefined
   'assistant.templatePlan.effort': undefined
   'assistant.templatePlan.fromTip': undefined

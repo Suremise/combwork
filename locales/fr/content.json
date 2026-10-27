@@ -73,6 +73,7 @@
   "content.templates.changedSince": "Les agents du projet ont changé depuis que tu as regardé : rouvre le modèle.",
   "content.templates.changedWhile": "Les agents du projet ont changé pendant le chargement du modèle : rien n’a été modifié. Rouvre le modèle.",
   "content.templates.checkFailed": "Hive n’a pas pu vérifier le worktree de l’agent {agent} ({folder}) : {error}",
+  "content.templates.connectionsChanged": "Les connexions du modèle ont changé depuis que tu as regardé : rouvre le modèle.",
   "content.templates.editedMeanwhile": "Le modèle « {name} » a changé depuis que tu as commencé à le modifier (il a été réenregistré entre-temps) : rien n’a été enregistré. Ferme l’éditeur pour le voir tel qu’il est maintenant.",
   "content.templates.enterName": "Saisis un nom pour le modèle.",
   "content.templates.failed": "Rien n’a été modifié : {error}",

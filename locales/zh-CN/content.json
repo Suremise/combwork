@@ -73,6 +73,7 @@
   "content.templates.changedSince": "项目的智能体在你查看后已更改：请重新打开模板。",
   "content.templates.changedWhile": "加载模板期间项目的智能体发生了更改：未做任何更改。请重新打开模板。",
   "content.templates.checkFailed": "Hive 无法检查 {agent} 的工作树（{folder}）：{error}",
+  "content.templates.connectionsChanged": "模板的连接在你查看后已更改：请重新打开模板。",
   "content.templates.editedMeanwhile": "你开始编辑后，“{name}”已更改（期间又被保存过）：未保存任何内容。关闭编辑器即可查看它现在的样子。",
   "content.templates.enterName": "请输入模板名称。",
   "content.templates.failed": "未做任何更改：{error}",

@@ -246,6 +246,8 @@
   "actions.template.addTitle": "Einen Agenten aus einer Vorlage hinzufügen",
   "actions.template.blockedMessage": "Die Vorlage lässt sich noch nicht in {project, select, none {dieses Projekt} other {{project}}} laden:",
   "actions.template.blockedTitle": "„{name}“ lässt sich noch nicht laden",
+  "actions.template.connectionFallback": "{agent} verwendet die Standardverbindung des Arbeitsbereichs",
+  "actions.template.connectionFallbackWhy": "{name} {problem, select, missing {gibt es auf diesem Rechner nicht} otherCli {gehört zu einer anderen CLI} other {ist in diesem Arbeitsbereich ausgeschaltet}}: Wähle in den Agent-Einstellungen eine andere, wenn du möchtest.",
   "actions.template.everyProject": "Für jedes Projekt im Arbeitsbereich (sonst nur für dieses Projekt)",
   "actions.template.load": "Vorlage laden",
   "actions.template.loadAdds": "Die Vorlage fügt ihre Agenten zu {project} hinzu.",

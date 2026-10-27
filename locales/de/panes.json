@@ -178,6 +178,8 @@
   "panes.table.background": "Wartet auf {n, plural, one {# Hintergrundaufgabe} other {# Hintergrundaufgaben}}",
   "panes.table.card": "Karte",
   "panes.table.cardPrefix": "Karte {value}",
+  "panes.table.connection": "Verbindung",
+  "panes.table.connectionPrefix": "mit {value}",
   "panes.table.happens": "Was passiert",
   "panes.table.notRunning": "Läuft nicht",
   "panes.table.project": "Projekt",

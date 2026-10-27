@@ -379,7 +379,17 @@ export function AddAgentDialog() {
       <h3 className="agent-dialog-h">{tr(CODING_AGENT)}</h3>
       <ProviderChoice value={provider} onChange={chooseProvider} />
       <div className="agent-form">
-        <ConnectionChoice id="add-agent-connection" provider={provider} value={connection} onChange={setConnection} />
+        {/* Another CLI's connection is a choice of that CLI too (HI-1769), as picking the CLI is. */}
+        <ConnectionChoice
+          id="add-agent-connection"
+          provider={provider}
+          value={connection}
+          onChange={setConnection}
+          onOtherCli={(p, c) => {
+            chooseProvider(p)
+            setConnection(c)
+          }}
+        />
       </div>
       {checking && (
         <div className="banner info" data-provider-checking>
@@ -595,7 +605,8 @@ function AgentSettingsModal({
       <h3 className="agent-dialog-h">{tr(CODING_AGENT)}</h3>
       {providerLocked ?? <ProviderChoice value={f.provider} current={initial.provider} onChange={chooseProvider} />}
       <div className="agent-form">
-        <ConnectionChoice id="agent-connection" provider={f.provider} value={f.connection} onChange={(connection) => put({ connection })} />
+        {/* Another CLI's connection changes its CLI (HI-1769): its model and the rest start again, and saving asks first, as a change of CLI does; not while it runs. */}
+        <ConnectionChoice id="agent-connection" provider={f.provider} value={f.connection} onChange={(connection) => put({ connection })} onOtherCli={providerLocked ? undefined : (provider, connection) => put({ provider, model: '', effort: '', permission: '', context: '', connection })} />
       </div>
       <h3 className="agent-dialog-h">{tr(SETTINGS)}</h3>
       <Overrides

@@ -34,6 +34,9 @@ interface HiveMessageValues {
   'main.branchMerge.cardWork': { branch: string | number; card: string | number }
   'main.branchMerge.notBranch': { branch: string | number }
   'main.branchMerge.same': { branch: string | number }
+  'main.connections.choice.missing': { agent: string | number }
+  'main.connections.choice.off': { name: string | number; agent: string | number }
+  'main.connections.choice.otherCli': { name: string | number; agent: string | number }
   'main.connections.launch.changedAgain': { agent: string | number }
   'main.connections.launch.changing': { name: string | number; agent: string | number }
   'main.connections.launch.deleted': { agent: string | number }

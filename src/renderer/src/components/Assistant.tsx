@@ -13,6 +13,7 @@ import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
 import { legacyOf, placeText, placeTip } from '../agentPlace'
+import { connectionCellText, useConnections } from './ConnectionChoice'
 import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
 import { cardLabel } from '@shared/projectKeys'
 import { loadAssistantChanges } from '../assistantUndo'
@@ -108,6 +109,7 @@ const M = {
   foldTip: msg({ id: 'assistant.panel.foldTip', defaultMessage: '{hasKey, select, yes {Fold the Assistant panel ({key})} other {Fold the Assistant panel}}', description: 'Tooltip of the button in the Assistant panel\'s header that folds it to a strip at the window\'s edge, with its shortcut ({key}: "Ctrl+Alt+I").' }),
   nameTip: msg({ id: 'assistant.panel.nameTip', defaultMessage: 'Assistant · {provider}', description: "Tooltip of the Assistant's name on its panel's header: its coding agent ({provider}: \"Claude Code\"). Assistant as the panel's title says it." }),
   provider: msg({ id: 'assistant.panel.provider', defaultMessage: 'Coding agent: {provider}', description: "A line of an agent's tooltip in the Assistant's workspace section ({provider}: \"Claude Code\")." }),
+  providerOn: msg({ id: 'assistant.panel.providerOn', defaultMessage: 'Coding agent: {provider} · {connection}', description: "A line of an agent's tooltip in the Assistant's workspace section, with Connections on (HI-1769): its CLI ({provider}: \"Claude Code\") and the connection it runs on or would start on ({connection}: \"Max 1\", with ⟳ when it runs on another than the one chosen, or why none can run it)." }),
   noneRunning: msg({ id: 'assistant.panel.noneRunning', defaultMessage: 'no agents running', description: "The Assistant's workspace section: a project none of whose agents run. Lower case." }),
   names: msg({ id: 'assistant.panel.names', defaultMessage: 'Show agent names', description: "The Assistant's workspace section: a toggle button that shows each agent's name beside its state mark, for screen readers." }),
   namesTip: msg({ id: 'assistant.panel.namesTip', defaultMessage: "{shown, select, yes {Show only the agents' state marks (names on hover)} other {Show the agents' names beside their state marks}}", description: "Tooltip of the toggle in the Assistant's workspace section: what clicking it does." }),
@@ -737,13 +739,17 @@ function OverviewAgent({ project: p, a, state, names, onGo }: { project: Project
   const doing = useAgentCards(p, a.id)
   const reviewing = useAgentReviews(p, a.id)
   const run = useStore((s) => agentOpenRun(s.progressRuns, p.path, a.id))
+  const connections = useConnections()
   const activity = activityOf(a.live, run)
   // The state its mark draws first (the board's too: a stalled or blocked card), then what it is doing when that says more.
   const stateText = tr(AGENT_STATE_LABEL[state])
   const detail = activity && !activity.toLowerCase().startsWith(stateText.toLowerCase()) ? activity : ''
+  // Its CLI, and the connection it runs on or would start on (HI-1769, with Connections on).
+  const cli = providerDescriptor(agentProviderOf(p, a)).name
+  const connection = connectionCellText(a.connection, agentProviderOf(p, a), a.live?.launchedConnection, connections)
   const first = tr(M.markLabel, { name: a.name, state: stateText, running: a.live ? 'yes' : 'no', hasDetail: detail ? 'yes' : 'no', detail })
   const rest = [
-    tr(M.provider, { provider: providerDescriptor(agentProviderOf(p, a)).name }),
+    connection ? tr(M.providerOn, { provider: cli, connection }) : tr(M.provider, { provider: cli }),
     ...doing.map((c) => tr(M.workingOn, { number: cardLabel(c), title: c.title })),
     ...reviewing.map((c) => tr(M.reviewing, { number: cardLabel(c), title: c.title })),
     ...(run ? [tr(M.progress, { run: runWords(run), hasStep: run.stepName ? 'yes' : 'no', step: run.stepName ?? '' })] : []),

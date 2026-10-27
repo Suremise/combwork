@@ -94,6 +94,7 @@ export const SUITES = [
   { name: 'codexqueued' },
   { name: 'commitburst' },
   { name: 'compact', needs: ['claude'], claudeHome: 'own' },
+  { name: 'connectionrows' },
   { name: 'connections' },
   { name: 'consoletext' },
   { name: 'consolewindow' },

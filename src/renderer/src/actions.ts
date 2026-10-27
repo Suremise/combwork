@@ -1324,6 +1324,8 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
   const expected = p.agents.map((a) => a.id)
   // The names its agents get (#702): chosen in the dialog, which greys out its button while one clashes.
   let names = plan.create.map((a) => a.name)
+  // The connection chosen for each agent whose own can't be used here (HI-1769), by its index in the plan.
+  let connections: Record<number, string | null> = Object.fromEntries(plan.connections.map((c) => [c.index, null]))
   const suggested = plan.suggestedPreset
   let switchPreset = false
   const ok = await confirm({
@@ -1334,7 +1336,7 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
     // Who goes and who comes: each new agent's settings, and its new worktree's branch and folder in this project (#268),
     // as a table (#511), with their names to choose (#702).
     detail: templateLoadDetail(plan, p.config, get().settings, (id) => get().providers[id]),
-    content: createElement(TemplateLoadNames, { path, scope: entry.scope, file: entry.file, from, initial: plan, onChange: (now: string[]) => void (names = now) }),
+    content: createElement(TemplateLoadNames, { path, scope: entry.scope, file: entry.file, from, initial: plan, onChange: (now: string[]) => void (names = now), onConnections: (now: Record<number, string | null>) => void (connections = now) }),
     wide: true,
     scrollDetail: true,
     confirmLabel: tr(msg({ id: 'actions.template.load', defaultMessage: 'Load template', description: 'Button: loads the template into the project.' })),
@@ -1343,7 +1345,7 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
     // The preset it suggests (#1436): off by default, and only ever chosen in the form, never saved from here.
     check: suggested ? { label: tr(msg({ id: 'actions.template.switchPreset', defaultMessage: 'Also switch this project to {preset}… (opens Version Control → Workflow with it chosen, to save there)', description: "A tick box when loading a template that suggests a preset ({preset}: Solo, Pair or Team, as the presets are named): after loading, the project's Version Control tab opens at Workflow with that preset chosen but not saved. Glossary: preset." }), { preset: tr(PRESET_TEXT[suggested]) }), initial: false, set: (v) => (switchPreset = v) } : undefined,
     run: async () => {
-      await call('templates:load', path, entry.scope, entry.file, expected, from, names)
+      await call('templates:load', path, entry.scope, entry.file, expected, from, names, connections)
     }
   })
   if (!ok) return
@@ -1392,6 +1394,8 @@ export async function addAgentFromTemplate(path: string, entry: Pick<TemplateEnt
   const def = await attempt(failed, () => call('templates:addAgent', path, entry.scope, entry.file, index, undefined, name.trim()))
   if (!def) return
   await refreshWorkspace()
+  // Its own connection can't be used here (HI-1769): it follows the workspace's default, and is told so.
+  if (def.connectionFallback) notify('info', tr(msg({ id: 'actions.template.connectionFallback', defaultMessage: "{agent} uses the workspace's default connection", description: "A notice's title after adding an agent from a template (HI-1769): its own connection can't be used here, so it follows the workspace's default connection for its CLI." }), { agent: def.name }), tr(msg({ id: 'actions.template.connectionFallbackWhy', defaultMessage: "{name} {problem, select, missing {isn't on this machine} otherCli {is another CLI's} other {is off in this workspace}}: choose another in its Agent Settings if you like.", description: "Under the notice that an agent added from a template uses the workspace's default connection (HI-1769): why its own ({name}) can't be used. Agent Settings names a dialog." }), { name: def.connectionFallback.name, problem: def.connectionFallback.problem }))
   const now = project(path)
   if (now) showAgent(now, def.id, 'select')
 }

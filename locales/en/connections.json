@@ -22,5 +22,61 @@
   "connections.choice.off": {
     "defaultMessage": "{name} (off in this workspace: the default runs it)",
     "description": "A choice of connection that is chosen but off in this workspace ({name}): the workspace's default runs the agent instead."
+  },
+  "connections.choice.otherCli": {
+    "defaultMessage": "{cli} connections",
+    "description": "A group in the choice of connection: the connections of another coding agent CLI ({cli}: \"Codex\"). Picking one switches the agent to that CLI (it is asked first)."
+  },
+  "connections.mark.anotherMark": {
+    "defaultMessage": "Running on another connection than the one chosen",
+    "description": "Accessible label of the ⟳ mark beside a running agent's connection in its row (HI-1769)."
+  },
+  "connections.mark.deleted": {
+    "defaultMessage": "Connection removed",
+    "description": "An agent's row, in place of its connection (HI-1769): the connection chosen for it was removed, so it can't start until another is chosen. Short."
+  },
+  "connections.mark.deletedTip": {
+    "defaultMessage": "The connection chosen for it was removed: it can't start until you choose another in its Agent Settings, or the workspace's default.",
+    "description": "The hover of an agent's row whose chosen connection was removed (HI-1769). Agent Settings names a dialog."
+  },
+  "connections.mark.inherited": {
+    "defaultMessage": "{name}: the workspace's default for {cli}, which it follows",
+    "description": "The hover of an agent's connection in its row (HI-1769): it has no connection of its own, so it runs on the workspace's default ({name}) for its CLI ({cli}: \"Claude Code\"), and follows it if the default changes."
+  },
+  "connections.mark.none": {
+    "defaultMessage": "No connection",
+    "description": "An agent's row, in place of its connection (HI-1769): the workspace has no connection on for its CLI, so it can't start. Short."
+  },
+  "connections.mark.noneTip": {
+    "defaultMessage": "No {cli} connection is on in this workspace: it can't start until one is (Settings → Connections).",
+    "description": "The hover of an agent's row (HI-1769): no connection is on in this workspace for its CLI ({cli}: \"Claude Code\"). Settings → Connections names a section."
+  },
+  "connections.mark.offFallback": {
+    "defaultMessage": "{wanted} is off in this workspace: the default, {name}, runs it",
+    "description": "The hover of an agent's connection in its row (HI-1769): its own connection ({wanted}) is off in this workspace, so the workspace's default ({name}) runs it."
+  },
+  "connections.mark.offNoDefault": {
+    "defaultMessage": "{wanted} is off here",
+    "description": "An agent's row, in place of its connection (HI-1769): its own connection ({wanted}) is off in this workspace and no other is on to run it. Short."
+  },
+  "connections.mark.offNoDefaultTip": {
+    "defaultMessage": "{wanted} is off in this workspace, and no other {cli} connection is on: it can't start until one is (Settings → Connections).",
+    "description": "The hover of an agent's row (HI-1769): its own connection ({wanted}) is off here and the workspace has no other connection on for its CLI ({cli}). Settings → Connections names a section."
+  },
+  "connections.mark.other": {
+    "defaultMessage": "Runs on {running} until it restarts. Chosen now: {chosen}",
+    "description": "The hover of a running agent's connection in its row (HI-1769, shown with a ⟳ mark): its run is on one connection ({running}) and the one it would start on now is another ({chosen}: a connection's name, or why none can run it). It keeps the one it runs on until it restarts."
+  },
+  "connections.mark.otherProvider": {
+    "defaultMessage": "Another CLI's connection",
+    "description": "An agent's row, in place of its connection (HI-1769): the connection chosen for it belongs to another coding agent CLI, so it can't start on it. Short."
+  },
+  "connections.mark.otherProviderTip": {
+    "defaultMessage": "{wanted} is for another CLI than {cli}: it can't start until you choose one of its own in its Agent Settings.",
+    "description": "The hover of an agent's row whose chosen connection ({wanted}) belongs to another CLI than its own ({cli}) (HI-1769). Agent Settings names a dialog."
+  },
+  "connections.mark.own": {
+    "defaultMessage": "{name}: its own choice",
+    "description": "The hover of an agent's connection in its row (HI-1769): the connection ({name}) was chosen for it in its Agent Settings."
   }
 }

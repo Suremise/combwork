@@ -178,6 +178,8 @@
   "panes.table.background": "Czeka na {n, plural, one {# zadanie w tle} few {# zadania w tle} many {# zadań w tle} other {# zadania w tle}}",
   "panes.table.card": "Karta",
   "panes.table.cardPrefix": "karta {value}",
+  "panes.table.connection": "Połączenie",
+  "panes.table.connectionPrefix": "połączenie {value}",
   "panes.table.happens": "Co się stanie",
   "panes.table.notRunning": "Nie działa",
   "panes.table.project": "Projekt",

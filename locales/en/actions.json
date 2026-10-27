@@ -987,6 +987,14 @@
     "defaultMessage": "Can't load \"{name}\" yet",
     "description": "Title of the message when a template ({name}) can't be loaded now (an agent runs, a provider is off…)."
   },
+  "actions.template.connectionFallback": {
+    "defaultMessage": "{agent} uses the workspace's default connection",
+    "description": "A notice's title after adding an agent from a template (HI-1769): its own connection can't be used here, so it follows the workspace's default connection for its CLI."
+  },
+  "actions.template.connectionFallbackWhy": {
+    "defaultMessage": "{name} {problem, select, missing {isn't on this machine} otherCli {is another CLI's} other {is off in this workspace}}: choose another in its Agent Settings if you like.",
+    "description": "Under the notice that an agent added from a template uses the workspace's default connection (HI-1769): why its own ({name}) can't be used. Agent Settings names a dialog."
+  },
   "actions.template.everyProject": {
     "defaultMessage": "For every project in the workspace (else for this project only)",
     "description": "A tick box in the Save as Template dialog: the template is the workspace's (ticked) or this project's."

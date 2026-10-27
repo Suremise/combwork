@@ -1026,7 +1026,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'templates:list': (p) => templates.listTemplates(p),
     'templates:save': (p, scope, name, overwrite, usePatterns) => templates.saveTemplate(p, scope, name, overwrite, usePatterns === true),
     'templates:plan': (p, scope, file, from, names) => templates.templatePlan(p, scope, file, from, names),
-    'templates:load': (p, scope, file, expected, from, names) => templates.loadTemplate(p, scope, file, expected, from, names),
+    'templates:load': (p, scope, file, expected, from, names, connections) => templates.loadTemplate(p, scope, file, expected, from, names, connections),
     'templates:addAgent': (p, scope, file, index, from, name) => templates.addAgentFromTemplate(p, scope, file, index, from, name),
     'templates:all': () => templates.listAllTemplates(),
     'templates:rename': (ref, name) => templates.renameTemplate(ref, name),
