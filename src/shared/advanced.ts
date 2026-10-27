@@ -1188,13 +1188,17 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'claude-code.accounts.dropEnv',
     group: 'claude-code',
     title: msg({ id: 'settings.advanced.claude-code.accounts.dropEnv.title', defaultMessage: 'Connections: sign-in variables left out', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
-    desc: msg({ id: 'settings.advanced.claude-code.accounts.dropEnv.desc', defaultMessage: "The environment variables Hive leaves out when it runs Claude Code on a connection (its sign-in, its checks and its agents), so a key, token, server or model set on this PC can't stand in for the connection's own. A server connection's own (its server, key and models) are set after. Wrong, a variable Claude Code reads as a login or a server could make a connection run as someone else, or elsewhere.", description: 'What the advanced setting "Connections: sign-in variables left out" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
-    kind: 'list',
-    default: ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL'],
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.dropEnv.desc', defaultMessage: "The environment variables Hive leaves out when it runs Claude Code on a connection (its sign-in, its checks, Set Up and its agents), by name: a key, token, request header, server, provider switch or model set on this PC can't stand in for the connection's own. A server connection's own (its server, key and models) are set after. Wrong, a variable Claude Code reads as a login, a header or a server could make a connection run as someone else, or send a key elsewhere.", description: 'What the advanced setting "Connections: sign-in variables left out" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'pattern',
+    // Every ANTHROPIC_* (keys, tokens, ANTHROPIC_CUSTOM_HEADERS, base URLs, models and their names), the provider
+    // switches and their auth skips, the OAuth token, the subagents' model, the Bedrock bearer token and Vertex's region.
+    default: String.raw`^(?:ANTHROPIC_\w+|CLAUDE_CODE_(?:USE_\w+|SKIP_\w+_AUTH|OAUTH_\w+|SUBAGENT_MODEL|API_KEY_HELPER_TTL_MS)|AWS_BEARER_TOKEN_BEDROCK|CLOUD_ML_REGION)$`,
+    flags: 'i',
     applies: 'sessions',
     samples: [
-      { from: `${FIX}/advanced/ambient-auth-claude-2.1.311.txt`, version: '2.1.311', text: 'ANTHROPIC_API_KEY: exit 0, "loggedIn": true', shows: 'A key in the environment taken as a login over a connection home that never signed in' }, // i18n-ignore: a CLI's recorded text (#367)
-      { from: `${FIX}/advanced/ambient-auth-claude-2.1.311.txt`, version: '2.1.311', text: 'CLAUDE_CODE_USE_BEDROCK=1: exit 0, "loggedIn": true', shows: 'A third-party provider switch in the environment taken over a connection home' } // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/ambient-auth-claude-2.1.311.txt`, version: '2.1.311', text: 'ANTHROPIC_API_KEY', shows: 'A key in the environment taken as a login over a connection home that never signed in' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/ambient-auth-claude-2.1.311.txt`, version: '2.1.311', text: 'CLAUDE_CODE_USE_BEDROCK', shows: 'A third-party provider switch in the environment taken over a connection home' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/ambient-auth-claude-2.1.311.txt`, version: '2.1.311', text: 'ANTHROPIC_CUSTOM_HEADERS', shows: "Request headers from the environment sent with every request to the connection's server" } // i18n-ignore: a CLI's recorded text (#367)
     ]
   },
   {

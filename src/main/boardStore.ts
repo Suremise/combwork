@@ -2037,13 +2037,14 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
  * Exports the board to plain files (Export Board to JSON): a folder with `<n>.json` for each card, exactly as the cards'
  * files were before 0.9 (so an older Hive can read them), with board.json and archive-batches.json. Returns how many cards.
  */
-export async function exportBoard(ws: WorkspaceService, dir: string): Promise<number> {
+export async function exportBoard(ws: WorkspaceService, dir: string, mask: <T>(v: T) => T = (v) => v): Promise<number> {
   // Its cards, next number and batches as one snapshot of the board.
   const { docs, next, batches } = readSnapshot(ws, (_b, db) => ({ docs: cardDocs(ws), next: nextOf(db), batches: archiveBatchDocs(ws) }))
   await mkdir(dir, { recursive: true })
-  for (const { number, doc } of docs) await writeFile(join(dir, `${number}.json`), JSON.stringify(doc, null, 2) + '\n', 'utf8')
+  // `mask`: each value masked before it is written (HI-1772: no server connection's key in an export).
+  for (const { number, doc } of docs) await writeFile(join(dir, `${number}.json`), JSON.stringify(mask(doc), null, 2) + '\n', 'utf8')
   await writeFile(join(dir, 'board.json'), JSON.stringify({ version: 1, next }, null, 2) + '\n', 'utf8')
-  if (batches.length) await writeFile(join(dir, 'archive-batches.json'), JSON.stringify({ version: 1, batches }, null, 2) + '\n', 'utf8')
+  if (batches.length) await writeFile(join(dir, 'archive-batches.json'), JSON.stringify({ version: 1, batches: mask(batches) }, null, 2) + '\n', 'utf8')
   log.info(`exported ${docs.length} card(s) to ${userText(dir)}`)
   return docs.length
 }

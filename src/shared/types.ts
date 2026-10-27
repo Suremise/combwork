@@ -1773,6 +1773,11 @@ export interface MergeResult {
 export interface SessionRecord {
   /** The connection its latest run launched on (HI-1755), id and name as then; absent: none (a provider without connections). */
   connection?: { id: string; name: string }
+  /**
+   * A run of it was on a server connection (HI-1772), kept once set: its CLI's own cost reports price the server's model
+   * as a Claude model, so they are never counted (`withoutCostReports`): Hive's estimate by the real model id only.
+   */
+  serverRan?: true
   id: string
   /** The provider that ran it ("claude-code", "codex"). The field name predates providers. */
   agent: ProviderId

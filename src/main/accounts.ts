@@ -986,7 +986,7 @@ export function serverEnv(caps: ServerCaps, server: ServerConnection, key: strin
  * A server connection's part of a launch (HI-1772): its key decrypted for this launch's environment (refused without
  * one, unless its server is this machine's), and that key masked from now until the launch's process is gone.
  */
-async function serverPart(a: Connection, caps: ServerCaps, agentName: string): Promise<{ part: NonNullable<LaunchConnection['server']>; keyV: number | null; origin: string }> {
+async function serverPart(a: Connection, caps: ServerCaps, agentName: string): Promise<{ part: NonNullable<LaunchConnection['server']>; keyV: string | null; origin: string }> {
   const b = parseBaseUrl(a.server?.baseUrl ?? '')
   if (!a.server || !b.ok) throw hiveError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
   const got = await withKey(a.id, b.origin)

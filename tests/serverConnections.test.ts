@@ -21,11 +21,17 @@ process.env.CLAUDE_CONFIG_DIR = home
 delete process.env.HIVE_TEST_CLI_HOME_CONNECTION
 ;(electron.app as unknown as { getPath: (n: string) => string }).getPath = (n: string) => (n === 'home' ? userHome : profile)
 const safe = (electron as unknown as { safeStorage: { available: boolean } }).safeStorage
+// Set Up's terminal recorded, not started: its key and environment, and its end (HI-1772 round 1).
+const spawned = vi.hoisted(() => [] as { key: string; env: Record<string, string | undefined>; onExit?: (code: number) => void }[])
+vi.mock('../src/main/ptyHost', async (original) => ({
+  ...(await original<object>()),
+  spawnPty: (key: string, o: { env: Record<string, string | undefined>; onExit?: (code: number) => void }) => void spawned.push({ key, env: o.env, onExit: o.onExit })
+}))
 
 const accounts = await import('../src/main/accounts')
 const servers = await import('../src/main/serverConnections')
 const keys = await import('../src/main/keyStore')
-const { maskKeys, keysInUse } = await import('../src/main/keyMatcher')
+const { maskDeep, maskKeys, keysInUse } = await import('../src/main/keyMatcher')
 const { config } = await import('../src/main/config')
 const { advanced } = await import('../src/main/advanced')
 const { provider } = await import('../src/main/providers')
@@ -89,7 +95,7 @@ describe('a server connection and its key', () => {
     expect(JSON.stringify(config.get())).not.toContain(KEY)
     for (const f of ['config.json', 'config.json.bak']) if (existsSync(join(profile, f))) expect(readFileSync(join(profile, f), 'utf8')).not.toContain(KEY)
     expect(readFileSync(keyFile, 'utf8')).not.toContain(KEY)
-    expect(store()[a.id]).toMatchObject({ v: 1, origin: 'https://api.deepseek.com', last4: KEY.slice(-4) })
+    expect(store()[a.id]).toMatchObject({ v: expect.stringMatching(/^[0-9a-f]{24}$/), origin: 'https://api.deepseek.com', last4: KEY.slice(-4) })
     // What a window sees: its last 4 characters, never the key.
     const shown = view().connections.find((c) => c.id === a.id)!
     expect(shown.key).toEqual({ last4: KEY.slice(-4), at: expect.any(String) })
@@ -101,9 +107,10 @@ describe('a server connection and its key', () => {
 
   it("Replace: the reply has its last 4 characters only, its version moves on; Remove Key: none", async () => {
     const a = await serverOn({ key: KEY })
+    const v1 = store()[a.id].v
     const r = await servers.setServerKey(a.id, KEY2)
     expect(r).toEqual({ last4: KEY2.slice(-4) })
-    expect(store()[a.id].v).toBe(2)
+    expect(store()[a.id].v).not.toBe(v1)
     await servers.removeServerKey(a.id)
     expect(store()[a.id]).toBeUndefined()
     expect(view().connections.find((c) => c.id === a.id)!.key).toBeUndefined()
@@ -187,7 +194,7 @@ describe('the key store: one write per change, one lock, no backup', () => {
     await Promise.all([saving, cleaning])
     expect(store()[a.id]).toBeDefined()
     // A key whose connection is gone (a config restored from before it): dropped.
-    writeFileSync(keyFile, JSON.stringify({ ...store(), 'a-gone0000': { v: 1, origin: 'https://x.example', last4: 'abcd', at: '', blob: 'x' } }))
+    writeFileSync(keyFile, JSON.stringify({ ...store(), 'a-gone0000': { v: '0', origin: 'https://x.example', last4: 'abcd', at: '', blob: 'x' } }))
     expect(await keys.dropKeysExcept(() => new Set([a.id]))).toEqual(['a-gone0000'])
     expect(Object.keys(store())).toEqual([a.id])
   })
@@ -262,6 +269,38 @@ describe('launching on a server connection', () => {
     }
   })
 
+  it("this PC's credential, header, route and model variables never reach a launch or Set Up, any spelling (round 1)", async () => {
+    const inherited = { ANTHROPIC_CUSTOM_HEADERS: 'X-Api-Key: ambient-dummy-secret', anthropic_default_sonnet_model: 'claude-x', ANTHROPIC_SMALL_FAST_MODEL: 'claude-y', CLAUDE_CODE_SUBAGENT_MODEL: 'claude-z', CLAUDE_CODE_SKIP_BEDROCK_AUTH: '1', AWS_BEARER_TOKEN_BEDROCK: 'aws-dummy-0000000', ANTHROPIC_VERTEX_PROJECT_ID: 'p', CLOUD_ML_REGION: 'r' }
+    const local = await serverOn({ name: 'Ollama', preset: 'ollama', baseUrl: 'http://localhost:11434', models: [{ id: 'qwen3:8b', as: ['opus'] }] })
+    const conn = (await launch(local.id))!
+    try {
+      const env = withServerEnv(conn.server!.env, withoutAccountEnv(provider('claude-code'), { PATH: 'x', ...inherited }))
+      expect(env).toEqual({ PATH: 'x', ...conn.server!.env })
+    } finally {
+      conn.release()
+      conn.server!.endKeyUse()
+    }
+    // Set Up's terminal: the same, from this process's own environment.
+    const was = { ...process.env }
+    Object.assign(process.env, inherited)
+    try {
+      spawned.length = 0
+      const remote = await serverOn({ key: KEY })
+      await servers.setUpServerConnection(remote.id)
+      const env = spawned.at(-1)!.env
+      // None of this PC's values: gone, or the connection's own (its subagents' model) in place.
+      for (const [k, v] of Object.entries(inherited)) expect(env[k] === undefined || env[k] !== v, k).toBe(true)
+      expect(env.CLAUDE_CODE_SUBAGENT_MODEL).toBe('deepseek-flash')
+      expect(env).toMatchObject({ ANTHROPIC_BASE_URL: 'https://api.deepseek.com/anthropic', ANTHROPIC_AUTH_TOKEN: KEY, CLAUDE_CONFIG_DIR: accounts.accountFolder(remote.id) })
+      // Its key masked while the terminal is open, and let go once it ends.
+      expect(maskKeys(KEY)).toBe('<key>')
+      spawned.at(-1)!.onExit?.(0)
+      expect(keysInUse()).toBe(0)
+    } finally {
+      for (const k of Object.keys(inherited)) if (!(k in was)) delete process.env[k]
+    }
+  })
+
   it('no effort or context on a server connection', () => {
     const l = agentLaunchSettings({ provider: 'claude-code', model: 'deepseek-flash', effort: 'high', use200kContext: true }, { providers: {} as never, defaultProvider: 'claude-code' } as never, config.settings, { kind: 'connection', conn: { kind: 'server', defaults: {} } })
     expect(l).toMatchObject({ model: 'deepseek-flash', effort: null, use200kContext: false })
@@ -284,6 +323,38 @@ describe('launching on a server connection', () => {
     expect(await servers.editServerConnection(a.id, { baseUrl: 'https://gw.example.com' })).toEqual({ keyCleared: true })
     expect(store()[a.id]).toBeUndefined()
     expect(await outcome(launch(a.id))).toMatch(/has no key/)
+  })
+
+  it('a key removed and saved again is another key: a launch prepared on the first is out of date (round 1)', async () => {
+    const a = await serverOn({ key: KEY })
+    const conn = (await launch(a.id))!
+    try {
+      await servers.removeServerKey(a.id)
+      await servers.setServerKey(a.id, KEY2)
+      expect(conn.stillValid(a.id)).toBe(false)
+    } finally {
+      conn.release()
+      conn.server!.endKeyUse()
+    }
+    // Even with the store emptied (damaged) between: never the same save id twice.
+    const before = store()[a.id].v
+    writeFileSync(keyFile, '{}')
+    await servers.setServerKey(a.id, KEY2)
+    expect(store()[a.id].v).not.toBe(before)
+  })
+})
+
+describe('exports (round 1)', () => {
+  it('every saved key masked in what an export writes, though no use of it is held; let go after', async () => {
+    await serverOn({ key: KEY })
+    expect(keysInUse()).toBe(0)
+    const out = await keys.withSavedKeysMasked(async () => ({ text: maskKeys(`## Tool\n\`env\` printed ANTHROPIC_AUTH_TOKEN=${KEY}\n`), json: JSON.stringify(maskDeep({ comments: [{ text: `key ${KEY}` }] })) }))
+    expect(out.text).not.toContain(KEY.slice(0, 8))
+    expect(JSON.parse(out.json)).toEqual({ comments: [{ text: 'key <key>' }] })
+    expect(keysInUse()).toBe(0)
+    // A failing export lets them go too.
+    expect(await outcome(keys.withSavedKeysMasked(async () => Promise.reject(new Error('disk full'))))).toBe('disk full')
+    expect(keysInUse()).toBe(0)
   })
 })
 
@@ -375,5 +446,23 @@ describe("reading a server's models (when asked)", () => {
     expect(second).toMatchObject({ ok: true })
     expect(await first).toEqual({ ok: false, why: 'stale' })
     expect(accounts.getAccount(a.id)!.server!.models.map((m) => m.id)).toEqual(['second'])
+  }, HUNG_MS * 2)
+
+  it('stale too when only its path changed meanwhile, the same server (round 1)', async () => {
+    const a = await serverOn({ name: 'Paths', preset: undefined, baseUrl: `http://127.0.0.1:${port}/old`, models: [{ id: 'kept', as: ['opus'] }] })
+    let answer!: () => void
+    let asked!: () => void
+    const isAsked = new Promise<void>((r) => (asked = r))
+    reply = (res, url) => {
+      expect(url).toBe('/old/v1/models')
+      asked()
+      answer = () => json({ data: [{ id: 'from-old-path' }] })(res)
+    }
+    const reading = servers.readServerModels(a.id, 'old-path')
+    await isAsked
+    expect(await servers.editServerConnection(a.id, { baseUrl: `http://127.0.0.1:${port}/new` })).toEqual({ keyCleared: false })
+    answer()
+    expect(await reading).toEqual({ ok: false, why: 'stale' })
+    expect(accounts.getAccount(a.id)!.server!.models.map((m) => m.id)).toEqual(['kept'])
   }, HUNG_MS * 2)
 })

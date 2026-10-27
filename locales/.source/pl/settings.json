@@ -61,7 +61,7 @@
   "settings.accounts.state.signedOut": "Signed out",
   "settings.accounts.state.unchecked": "Not checked yet",
   "settings.accounts.switchAffected": "Switch Them When Their Turn Is Over",
-  "settings.advanced.claude-code.accounts.dropEnv.desc": "The environment variables Hive leaves out when it runs Claude Code on a connection (its sign-in, its checks and its agents), so a key, token, server or model set on this PC can't stand in for the connection's own. A server connection's own (its server, key and models) are set after. Wrong, a variable Claude Code reads as a login or a server could make a connection run as someone else, or elsewhere.",
+  "settings.advanced.claude-code.accounts.dropEnv.desc": "The environment variables Hive leaves out when it runs Claude Code on a connection (its sign-in, its checks, Set Up and its agents), by name: a key, token, request header, server, provider switch or model set on this PC can't stand in for the connection's own. A server connection's own (its server, key and models) are set after. Wrong, a variable Claude Code reads as a login, a header or a server could make a connection run as someone else, or send a key elsewhere.",
   "settings.advanced.claude-code.accounts.dropEnv.title": "Connections: sign-in variables left out",
   "settings.advanced.claude-code.accounts.emailField.desc": "The field of `claude auth status --json` with the email a connection's folder is signed in as. Wrong, Hive can't tell who a connection is signed in as, and can't warn when its login changes.",
   "settings.advanced.claude-code.accounts.emailField.title": "Connections: email field",

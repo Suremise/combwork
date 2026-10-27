@@ -406,6 +406,33 @@ describe('the usage worker reading a transcript for main', () => {
     }
     await t.close()
   })
+
+  it("a session that ran on a server connection (HI-1772): its CLI's Claude-priced cost report never counted, in the history or a read", async () => {
+    const t = await setup()
+    // A server's model (no price of Hive's), with the cost Claude Code reported for it priced as a Claude model.
+    const server = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'deepseek-flash', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
+    const report = JSON.stringify({ type: 'cost-state', timestamp: new Date(T0 + 3000).toISOString(), totalCostUSD: 4.2 }) + '\n'
+    writeFileSync(t.transcript, prompt(0) + server(1) + server(2) + report)
+    const settings = { providers: DEFAULT_SETTINGS.providers }
+    const cost = async () => { const st = (await t.stored())!; return usageFromRows(st.summary, st.rows, settings).costUsd }
+    // As a sign-in session: the report is its cost.
+    expect((await t.ingest()).status).toBe('written')
+    expect(await cost()).toBeCloseTo(4.2)
+    // As a server session (its record's serverRan): recorded again without it, unpriced (Hive has no price for its model).
+    const s = await setup()
+    writeFileSync(s.transcript, readFileSync(t.transcript, 'utf8'))
+    expect((await s.ingest({ reportsIgnored: true })).status).toBe('written')
+    const st = (await s.stored())!
+    const rows = st.rows
+    expect(usageFromRows(st.summary, rows, settings).costUsd).toBeNull()
+    expect(rows.reduce((n, r) => n + r.outputTokens, 0)).toBe(200)
+    // A read for its footer the same way; without the flag, the report.
+    const readFor = (reportsIgnored?: boolean) => call({ type: 'read', path: s.transcript, session: 'abc', provider: 'claude-code', seed: null, ...(reportsIgnored ? { reportsIgnored } : {}) }) as Promise<{ usage: SessionUsage }>
+    expect(priceUsage((await readFor(true)).usage, settings).costUsd).toBeNull()
+    expect(priceUsage((await readFor()).usage, settings).costUsd).toBeCloseTo(4.2)
+    await t.close()
+    await s.close()
+  })
 })
 
 describe('the usage worker as main starts it (HI-1729)', () => {

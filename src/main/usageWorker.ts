@@ -9,6 +9,7 @@ import { readAdvancedFrom, valuesReader } from './advancedValues'
 import type { DatabaseSync } from 'node:sqlite'
 import { baselineOf, cardRows, cursorOf, getMeta, replaceRows, sessionIds, setMeta, storedSession, storedSessions, storedTimelines, updateMeta, USAGE_MIGRATIONS, writeSession, type SessionMeta, type SessionWrite } from './usageDb'
 import { isGz, readTranscript } from './transcriptFiles'
+import { withoutCostReports } from '../shared/usageDays'
 import { newUsageParser, parserShape, restoreParser, saveParser, type RawUsageParser } from './usageParsers'
 
 /**
@@ -35,6 +36,8 @@ export interface IngestJob extends SessionMeta {
   external?: boolean
   /** The holds `holds` were made from, as a key (open ones as open): a change re-shares the session's cards. */
   holdsKey: string | null
+  /** A run of it was on a server connection (HI-1772: SessionRecord.serverRan): its CLI's cost reports aren't counted. */
+  reportsIgnored?: boolean
 }
 
 export interface KeptJob extends SessionMeta {
@@ -59,7 +62,7 @@ export type WorkerRequest = { id: number } & (
   | { type: 'forgetStates'; file: string; before: string }
   | { type: 'attribute'; file: string; scope: string; sessions: { session: string; holds: SessionHold[]; holdsKey: string | null }[] }
   | { type: 'close'; file: string }
-  | { type: 'read'; path: string; session: string; provider: ProviderId; seed: ReadSeed | null; noWait?: boolean }
+  | { type: 'read'; path: string; session: string; provider: ProviderId; seed: ReadSeed | null; noWait?: boolean; reportsIgnored?: boolean }
   | { type: 'forgetReads' }
 )
 
@@ -241,9 +244,12 @@ async function takeUp(cur: ReturnType<typeof cursorOf>, path: string, size: numb
   return parser ? { parser, from: cur.stateOffset } : null
 }
 
-/** A result as main gets it: without its timeline (cost per card reads the history's). */
-const readResult = (c: ReadEntry): ReadResult => {
-  const { timeline: _timeline, ...usage } = c.raw!
+/**
+ * A result as main gets it: without its timeline (cost per card reads the history's); without the CLI's cost reports
+ * for a session that ran on a server connection (HI-1772, `reportsIgnored`).
+ */
+const readResult = (c: ReadEntry, reportsIgnored = false): ReadResult => {
+  const { timeline: _timeline, ...usage } = reportsIgnored ? withoutCostReports(c.raw!) : c.raw!
   return { usage, size: c.size, mtime: c.mtime }
 }
 
@@ -253,7 +259,7 @@ const readResult = (c: ReadEntry): ReadResult => {
  * history (`seed`), so only what was added since is read; without one, it is read from the start, here, never in main.
  * Null when it can't be read, or for a provider this Hive can't read.
  */
-async function readUsage(path: string, session: string, provider: ProviderId, seed: ReadSeed | null, noWait = false): Promise<ReadResult | null> {
+async function readUsage(path: string, session: string, provider: ProviderId, seed: ReadSeed | null, noWait = false, reportsIgnored = false): Promise<ReadResult | null> {
   // A start's read (#1177) never queues behind the file's turn (the import ingesting it): it gets nothing instead.
   if (noWait && turns.has(readKey(path))) return null
   return inTurn(path, async () => {
@@ -264,7 +270,7 @@ async function readUsage(path: string, session: string, provider: ProviderId, se
       return null
     }
     const had = touch(path)
-    if (had?.raw && had.size === st.size && had.mtime === st.mtimeMs && had.session === session && had.provider === provider) return readResult(had)
+    if (had?.raw && had.size === st.size && had.mtime === st.mtimeMs && had.session === session && had.provider === provider) return readResult(had, reportsIgnored)
     let c = goOn(path, session, provider, st.size, st.mtimeMs)
     if (!c) {
       let taken: Awaited<ReturnType<typeof takeUp>> = null
@@ -291,7 +297,7 @@ async function readUsage(path: string, session: string, provider: ProviderId, se
     c.mtime = st.mtimeMs
     c.raw = c.parser!.result()
     keep(path, c)
-    return readResult(c)
+    return readResult(c, reportsIgnored)
   })
 }
 
@@ -349,11 +355,13 @@ async function ingest(file: string, job: IngestJob): Promise<IngestResult> {
     log('warn', `usage history: couldn't read a transcript (${(e as Error).message})`, job.path)
     return { status: 'failed' }
   }
-  const raw = parser.result()
+  // A session that ran on a server connection (HI-1772): its CLI's cost reports aren't counted.
+  const read0 = parser.result()
+  const raw = job.reportsIgnored ? withoutCostReports(read0) : read0
   // What it read is kept for the next read of a running session (the footer's, the next tick's); a session that ended
   // has its state saved below, and its parser is let go.
   if (job.keepState === 'now') reads.delete(readKey(job.path))
-  else if (live?.parser === parser || job.keepState === 'running') keep(job.path, { parser, session: job.session, provider: job.provider, offset, size: st.size, mtime: st.mtimeMs, raw })
+  else if (live?.parser === parser || job.keepState === 'running') keep(job.path, { parser, session: job.session, provider: job.provider, offset, size: st.size, mtime: st.mtimeMs, raw: read0 })
   // Read again after the awaits: what another writer recorded meanwhile is checked in the write.
   const now = cursorOf(db, job.scope, job.session)
   const settings = providers ? { providers } : null
@@ -476,7 +484,7 @@ export async function handleRequest(m: WorkerRequest): Promise<unknown> {
     }
     case 'read':
       // At once, not after the jobs: a running session's footer never waits for an import.
-      return readUsage(m.path, m.session, m.provider, m.seed, m.noWait)
+      return readUsage(m.path, m.session, m.provider, m.seed, m.noWait, m.reportsIgnored)
     case 'forgetReads':
       reads.clear()
       return true

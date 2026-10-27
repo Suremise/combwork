@@ -129,6 +129,8 @@ export async function editServerConnection(id: string, patch: { baseUrl?: string
   return locked(id, async () => {
     const { server, caps } = serverOf(id)
     const b = patch.baseUrl !== undefined ? checkedUrl(patch.baseUrl) : null
+    // A reading of its models under way was for the server as it was: ended (and its reply stale anyway).
+    if (b || patch.preset !== undefined) cancelServerModels(id)
     const before = parseBaseUrl(server.baseUrl)
     const moved = !!b && (!before.ok || before.origin !== b.origin)
     let keyCleared = false
@@ -161,6 +163,8 @@ export async function setServerKey(id: string, key: string): Promise<{ last4: st
       const { a, server } = serverOf(id)
       const b = checkedUrl(server.baseUrl)
       assertKeyNotIn(key, { name: a.name, url: b.url, models: server.models })
+      // A reading of its models under way used the key before: ended.
+      cancelServerModels(id)
       const info = await saveKey(id, b.origin, key)
       emit({ type: 'connections-changed' })
       // Agents a refused key stopped can carry on (Resume), as after signing in again.
@@ -176,6 +180,7 @@ export async function setServerKey(id: string, key: string): Promise<{ last4: st
 export async function removeServerKey(id: string): Promise<void> {
   assertOn()
   serverOf(id)
+  cancelServerModels(id)
   await locked(id, () => removeKey(id))
   emit({ type: 'connections-changed' })
 }
@@ -220,33 +225,40 @@ export async function readServerModels(id: string, request: string): Promise<Lis
   const timer = setTimeout(() => abort.abort(), LIST_TIMEOUT_MS)
   const got = await withKey(id, b.origin)
   const endUse = got ? holdKey(got.key) : () => undefined
+  // What this reading was made for: the base URL in full (its path too), the preset and the key's own save id. Any of
+  // them changed since (or a newer reading, or the connection gone), and whatever came back is stale.
+  const asked = { baseUrl: server.baseUrl, preset: server.preset ?? null, key: got?.v ?? null }
+  const current = (): boolean => {
+    const now = getAccount(id)
+    const k = keyInfo(id)
+    return listings.get(id)?.request === request && !!now?.server && now.server.baseUrl === asked.baseUrl && (now.server.preset ?? null) === asked.preset && (k && k.origin === b.origin ? k.v : null) === asked.key
+  }
+  const said = (r: Exclude<ListResult, { ok: true }>): ListResult => (current() ? r : { ok: false, why: 'stale' }) // i18n-ignore: a reason's code, not text
   try {
     let res: Response
     try {
       res = await fetch(url, { method: 'GET', redirect: 'manual', signal: abort.signal, headers: { accept: 'application/json', ...(got ? { authorization: `Bearer ${got.key}` } : {}) } }) // i18n-ignore: an HTTP header
     } catch {
-      return listings.get(id)?.request === request ? { ok: false, why: 'unreachable' } : { ok: false, why: 'stale' } // i18n-ignore: a reason's code, not text
+      return said({ ok: false, why: 'unreachable' }) // i18n-ignore: a reason's code, not text
     }
-    if (res.status >= 300 && res.status < 400) return { ok: false, why: 'redirect', status: res.status } // i18n-ignore: a reason's code, not text
-    if (res.status === 401) return { ok: false, why: 'refused', status: 401 } // i18n-ignore: a reason's code, not text
-    if (res.status === 403) return { ok: false, why: 'forbidden', status: 403 } // i18n-ignore: a reason's code, not text
-    if (!res.ok) return { ok: false, why: 'failed', status: res.status } // i18n-ignore: a reason's code, not text
+    if (res.status >= 300 && res.status < 400) return said({ ok: false, why: 'redirect', status: res.status }) // i18n-ignore: a reason's code, not text
+    if (res.status === 401) return said({ ok: false, why: 'refused', status: 401 }) // i18n-ignore: a reason's code, not text
+    if (res.status === 403) return said({ ok: false, why: 'forbidden', status: 403 }) // i18n-ignore: a reason's code, not text
+    if (!res.ok) return said({ ok: false, why: 'failed', status: res.status }) // i18n-ignore: a reason's code, not text
     const body = await readBounded(res, abort)
-    if (body === null) return listings.get(id)?.request === request ? { ok: false, why: 'tooBig' } : { ok: false, why: 'stale' } // i18n-ignore: a reason's code, not text
+    if (body === null) return said({ ok: false, why: 'tooBig' }) // i18n-ignore: a reason's code, not text
     let parsed: unknown
     try {
       parsed = JSON.parse(body)
     } catch {
-      return { ok: false, why: 'shape' } // i18n-ignore: a reason's code, not text
+      return said({ ok: false, why: 'shape' }) // i18n-ignore: a reason's code, not text
     }
     const ids = listedIds(parsed, listingOf(server, caps))
-    if (!ids) return { ok: false, why: 'shape' } // i18n-ignore: a reason's code, not text
-    // Kept only if this is still the listing asked for, on the same server with the same key.
+    if (!ids) return said({ ok: false, why: 'shape' }) // i18n-ignore: a reason's code, not text
+    // Kept only if this is still the reading asked for, on the same server (its whole base URL) with the same key.
     return await locked(id, async () => {
       const now = getAccount(id)
-      const nowUrl = now?.server ? parseBaseUrl(now.server.baseUrl) : null
-      const keyNow = keyInfo(id)
-      if (listings.get(id)?.request !== request || !now || !nowUrl?.ok || nowUrl.origin !== b.origin || (keyNow?.origin === b.origin ? keyNow.v : null) !== (got?.v ?? null)) return { ok: false, why: 'stale' } as const // i18n-ignore: a reason's code, not text
+      if (!now || !current()) return { ok: false, why: 'stale' } as const // i18n-ignore: a reason's code, not text
       const merged = mergeListed(now.server!.models, ids)
       change(id, (a) => (a.server = { ...a.server!, models: merged.models, modelsFrom: 'listed' }))
       log.info(`connection ${id}: ${ids.length} model(s) read from its server`)

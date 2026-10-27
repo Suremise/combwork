@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto'
 import { join } from 'path'
 import { readFile } from 'original-fs/promises'
 import { app, safeStorage } from 'electron'
@@ -5,6 +6,7 @@ import { msg } from '../shared/i18n'
 import { emit } from './events'
 import { writeJsonAtomic } from './fsutil'
 import { hiveError } from './hiveError'
+import { holdKey } from './keyMatcher'
 import { createLogger } from './logger'
 
 /**
@@ -22,7 +24,8 @@ import { createLogger } from './logger'
 const log = createLogger('keys')
 
 export interface KeyInfo {
-  v: number
+  /** Its save's own id, random, never reused (HI-1772 round 1: a counter restarted after a removal, so a key saved again looked unchanged). */
+  v: string
   origin: string
   last4: string
   at: string
@@ -62,7 +65,7 @@ async function read(): Promise<Store> {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('not an object') // i18n-ignore: hive.log, in English
     const out: Store = {}
     for (const [id, e] of Object.entries(parsed as Record<string, Partial<Entry>>)) {
-      if (e && typeof e.blob === 'string' && typeof e.origin === 'string' && typeof e.v === 'number' && typeof e.last4 === 'string') out[id] = { v: e.v, origin: e.origin, last4: e.last4, at: String(e.at ?? ''), blob: e.blob }
+      if (e && typeof e.blob === 'string' && typeof e.origin === 'string' && typeof e.v === 'string' && typeof e.last4 === 'string') out[id] = { v: e.v, origin: e.origin, last4: e.last4, at: String(e.at ?? ''), blob: e.blob }
     }
     return out
   } catch (e) {
@@ -108,11 +111,11 @@ export function saveKey(id: string, origin: string, key: string): Promise<KeyInf
   return serial(async () => {
     const store = await read()
     const blob = safeStorage.encryptString(key).toString('base64')
-    const entry: Entry = { v: (store[id]?.v ?? 0) + 1, origin, last4: key.slice(-4), at: new Date().toISOString(), blob }
+    const entry: Entry = { v: randomBytes(12).toString('hex'), origin, last4: key.slice(-4), at: new Date().toISOString(), blob }
     const next = { ...store, [id]: entry }
     await write(next)
     remember(next)
-    log.info(`connection ${id}: key saved (v${entry.v})`)
+    log.info(`connection ${id}: key saved`)
     return { v: entry.v, origin, last4: entry.last4, at: entry.at }
   })
 }
@@ -155,11 +158,39 @@ export function dropKeysExcept(keep: () => ReadonlySet<string>): Promise<string[
 }
 
 /**
+ * Runs an export with every saved key masked (HI-1772 round 1): a transcript, the board or a report written to a file
+ * may hold a key a session printed, even one whose run ended long ago, when no use of it is held. Each saved key is
+ * decrypted for the export alone (the user asked for it; never at start-up), held for masking while it runs, and let go
+ * after, however it ends. What the export writes goes through maskKeys.
+ */
+export async function withSavedKeysMasked<T>(fn: () => Promise<T>): Promise<T> {
+  const keys = await serial(async () => {
+    const store = await read()
+    const out: string[] = []
+    for (const [id, e] of Object.entries(store)) {
+      try {
+        out.push(safeStorage.decryptString(Buffer.from(e.blob, 'base64')))
+      } catch (err) {
+        log.warn(`connection ${id}'s key couldn't be decrypted for an export: ${(err as Error).message}`)
+      }
+    }
+    return out
+  })
+  const releases = keys.map((k) => holdKey(k))
+  keys.length = 0
+  try {
+    return await fn()
+  } finally {
+    for (const r of releases) r()
+  }
+}
+
+/**
  * A connection's key, decrypted for one use (a launch's environment, a model listing's request), with its version:
  * only when it is still saved for `origin`. Null: none, or saved for another origin. The caller keeps it no longer
  * than that use.
  */
-export function withKey(id: string, origin: string): Promise<{ key: string; v: number } | null> {
+export function withKey(id: string, origin: string): Promise<{ key: string; v: string } | null> {
   return serial(async () => {
     const store = await read()
     remember(store)

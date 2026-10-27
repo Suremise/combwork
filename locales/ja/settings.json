@@ -61,7 +61,7 @@
   "settings.accounts.state.signedOut": "サインアウト",
   "settings.accounts.state.unchecked": "未確認",
   "settings.accounts.switchAffected": "ターンが終わったら切り替える",
-  "settings.advanced.claude-code.accounts.dropEnv.desc": "HiveがClaude Codeを接続で実行するとき（そのサインイン、チェック、エージェント）に除外する環境変数です。このPCで設定されたキー、トークン、サーバー、モデルが接続自身のものの代わりに使われないようにします。サーバー接続自身のもの（サーバー、キー、モデル）はその後で設定されます。誤っていると、Claude Codeがログインやサーバーとして読み取る変数によって、接続が別の人として、または別の場所で動く可能性があります。",
+  "settings.advanced.claude-code.accounts.dropEnv.desc": "Hive が Claude Code を接続で実行するとき（そのサインイン、確認、セットアップ、エージェント）に名前で除外する環境変数です。この PC に設定されたキー、トークン、リクエストヘッダー、サーバー、プロバイダーの切り替え、モデルが接続自身のものの代わりになることはありません。サーバー接続自身のもの（サーバー、キー、モデル）はその後に設定されます。誤っていると、Claude Code がサインイン、ヘッダー、サーバーとして読む変数によって、接続が別の人として動いたり、キーが別の場所に送られたりするおそれがあります。",
   "settings.advanced.claude-code.accounts.dropEnv.title": "接続：除外するサインイン用の変数",
   "settings.advanced.claude-code.accounts.emailField.desc": "`claude auth status --json`のうち、接続のフォルダーがサインインしているメールアドレスを持つフィールドです。誤っていると、Hiveは接続が誰としてサインインしているのかわからず、ログインが変わっても警告できません。",
   "settings.advanced.claude-code.accounts.emailField.title": "接続：メールアドレスのフィールド",

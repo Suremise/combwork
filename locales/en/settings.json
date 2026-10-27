@@ -248,7 +248,7 @@
     "description": "Button on that banner: each of those agents ends once its turn is over and carries on, on the connection chosen now."
   },
   "settings.advanced.claude-code.accounts.dropEnv.desc": {
-    "defaultMessage": "The environment variables Hive leaves out when it runs Claude Code on a connection (its sign-in, its checks and its agents), so a key, token, server or model set on this PC can't stand in for the connection's own. A server connection's own (its server, key and models) are set after. Wrong, a variable Claude Code reads as a login or a server could make a connection run as someone else, or elsewhere.",
+    "defaultMessage": "The environment variables Hive leaves out when it runs Claude Code on a connection (its sign-in, its checks, Set Up and its agents), by name: a key, token, request header, server, provider switch or model set on this PC can't stand in for the connection's own. A server connection's own (its server, key and models) are set after. Wrong, a variable Claude Code reads as a login, a header or a server could make a connection run as someone else, or send a key elsewhere.",
     "description": "What the advanced setting \"Connections: sign-in variables left out\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
   },
   "settings.advanced.claude-code.accounts.dropEnv.title": {

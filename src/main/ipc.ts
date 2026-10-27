@@ -21,6 +21,8 @@ import { allProviders } from './providers'
 import { providerService } from './providerService'
 import { accountsView, addAccount, connectionHomes, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, setConnectionDefaults, signInAccount } from './accounts'
 import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setUpServerConnection } from './serverConnections'
+import { withSavedKeysMasked } from './keyStore'
+import { maskDeep, maskKeys } from './keyMatcher'
 import { dismissMovedNotice, movedNotice } from './connectionMoves'
 import { config } from './config'
 import { clearRecent, recentChanged, recentFor, removeRecent } from './recentWorkspaces'
@@ -692,7 +694,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
         filters: [{ name: 'JSON', extensions: ['json'] }]
       })
       if (r.canceled || !r.filePath) return null
-      await writeTextAtomic(r.filePath, JSON.stringify(metricsExport(report, app.getVersion(), sanitize), null, 2) + '\n')
+      await withSavedKeysMasked(async () => writeTextAtomic(r.filePath!, JSON.stringify(maskDeep(metricsExport(report, app.getVersion(), sanitize)), null, 2) + '\n'))
       return r.filePath
     },
     // Each takes the workspace's folder and lifetime before awaiting anything (benchContext): work whose workspace closes
@@ -782,7 +784,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const r = await dialog.showOpenDialog(win(), { title: tr(M.exportBoard), buttonLabel: tr(M.exportBoardButton), defaultPath: app.getPath('documents'), properties: ['openDirectory', 'createDirectory'] })
       if (r.canceled || !r.filePaths[0]) return null
       const dir = join(r.filePaths[0], `hive-board-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`)
-      return { dir, cards: await exportBoard(ws, dir) }
+      return { dir, cards: await withSavedKeysMasked(() => exportBoard(ws, dir, maskDeep)) }
     },
     'tasks:create': async (input, drafts) => tasks.changeWithAttachments({ kind: 'user' }, await stageDrafts(currentWorkspace(), drafts, input.project ?? null), 'description', () => tasks.createTask(input, { kind: 'user' })),
     'tasks:setKind': (n, kind, opts) => tasks.setKind(n, kind, { kind: 'user' }, opts ?? {}),
@@ -1057,7 +1059,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const name = await templates.exportName(ref)
       const r = await dialog.showSaveDialog(win(), { title: tr(M.exportTemplate), defaultPath: join(app.getPath('downloads'), name), filters: [{ name: tr(M.templateFiles), extensions: ['json'] }] })
       if (r.canceled || !r.filePath) return null
-      await templates.exportTemplate(ref, r.filePath)
+      await withSavedKeysMasked(() => templates.exportTemplate(ref, r.filePath!, maskDeep))
       return r.filePath
     },
     'templates:pickImport': async () => {
@@ -1153,7 +1155,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
         filters: [{ name: 'Markdown', extensions: ['md'] }] // i18n-ignore: a file format's name
       })
       if (r.canceled || !r.filePath) return null
-      await writeTextAtomic(r.filePath, await transcripts.markdown(p, id, title))
+      // No server connection's key in it (HI-1772), whatever the session printed: every saved key masked for the export.
+      await withSavedKeysMasked(async () => writeTextAtomic(r.filePath!, maskKeys(await transcripts.markdown(p, id, title))))
       return r.filePath
     },
     'attachments:copyImage': async (path) => {

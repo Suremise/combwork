@@ -61,7 +61,7 @@
   "settings.accounts.state.signedOut": "已退出登录",
   "settings.accounts.state.unchecked": "尚未检查",
   "settings.accounts.switchAffected": "本轮结束后切换它们",
-  "settings.advanced.claude-code.accounts.dropEnv.desc": "Hive 在某个连接上运行 Claude Code（其登录、检查和智能体）时排除的环境变量，以免此电脑上设置的密钥、令牌、服务器或模型取代该连接自己的设置。服务器连接自己的设置（其服务器、密钥和模型）在此之后设置。若设置有误，Claude Code 读作登录或服务器的变量可能让连接以其他人的身份或在其他地方运行。",
+  "settings.advanced.claude-code.accounts.dropEnv.desc": "Hive 在连接上运行 Claude Code 时（其登录、检查、设置和代理）按名称排除的环境变量：此电脑上设置的密钥、令牌、请求头、服务器、提供商开关或模型都不能代替连接自己的。服务器连接自己的变量（其服务器、密钥和模型）随后设置。若设置有误，Claude Code 读作登录、请求头或服务器的变量可能让连接以他人身份运行，或把密钥发送到别处。",
   "settings.advanced.claude-code.accounts.dropEnv.title": "连接：排除的登录变量",
   "settings.advanced.claude-code.accounts.emailField.desc": "`claude auth status --json` 中包含连接文件夹所登录电子邮件的字段。若设置有误，Hive 无法识别连接以谁的身份登录，也无法在其登录身份变更时发出警告。",
   "settings.advanced.claude-code.accounts.emailField.title": "连接：电子邮件字段",

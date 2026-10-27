@@ -549,6 +549,11 @@ interface UsageSeen {
   usage: SessionUsage | null
 }
 const usageSeen = new Map<string, UsageSeen>()
+/**
+ * Sessions launched on a server connection in this run (HI-1772), so every read of their usage leaves the CLI's cost
+ * reports out; their records keep it (`serverRan`) for later runs and the history's ingest.
+ */
+const serverSessions = new Set<string>()
 /** Transcripts main keeps the latest usage of (the worker keeps more: Settings → Sessions → Usage cache size). */
 const MAX_USAGE_SEEN = 200
 /** A session listing this slow is logged with where its time went (#1646). */
@@ -2190,6 +2195,7 @@ class SessionManager {
     // provider turned off while this launch was being prepared, it must not start a process.
     if (l.stopRequested || this.live.get(id) !== l || this.starting.get(id)?.cancelled || !workspaceFor(projectPath) || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
     state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}), ...(conn.server ? { server: { models: conn.server.models } } : {}) } : undefined
+    if (conn?.server && state.sessionId) serverSessions.add(state.sessionId)
     if (!isProviderEnabled(config.settings, adapter.id)) throw hiveError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name })
     l.startAllowed?.()
     const cmd = adapter.buildCommand(info.path, ctx)
@@ -2326,6 +2332,8 @@ class SessionManager {
   private async recordSession(projectPath: string, agent: Pick<AgentDef, 'id' | 'name'>, l: LiveSession): Promise<void> {
     const { state } = l
     const sessionId = state.sessionId
+    // On a server connection (HI-1772), this conversation's usage leaves the CLI's cost reports out from now on.
+    if (state.launchedConnection?.server && sessionId) serverSessions.add(sessionId)
     // A new conversation began with this launch, or (one the CLI switched to) now: its record says so, and the footer
     // names it by the record's time, as the Sessions tab does (#630: a minute apart when recorded after a minute's turn).
     state.sessionCreatedAt ??= state.startedAt
@@ -2352,7 +2360,9 @@ class SessionManager {
       ...(legacyWorktree(agent) ? { branch: legacyWorktree(agent)!.branch } : {}),
       ...(l.handedOverFrom ? { handedOverFrom: l.handedOverFrom } : {}),
       // The connection its latest run launched on (HI-1755), id and name as then: what it actually ran on.
-      ...(state.launchedConnection ? { connection: { id: state.launchedConnection.id, name: state.launchedConnection.name } } : {})
+      ...(state.launchedConnection ? { connection: { id: state.launchedConnection.id, name: state.launchedConnection.name } } : {}),
+      // On a server connection (HI-1772), kept once set: its CLI's cost reports are never counted for it.
+      ...(state.launchedConnection?.server ? { serverRan: true as const } : {})
     }, { createdAt: state.sessionCreatedAt })
     // The conversation it was meant for has it: one the CLI moves to later (/clear, /new) wasn't handed over.
     l.handedOverFrom = undefined
@@ -5543,7 +5553,9 @@ class SessionManager {
    * its last read stopped, or (not read in this run: a session resumed after a restart) from its session's saved state in
    * the history of `projectPath`, its host. Unchanged since main last had it, answered here without asking the worker.
    */
-  private async usageFor(projectPath: string, path: string, sessionId: string, provider: ProviderId, o: { noWait?: boolean } = {}): Promise<SessionUsage | null> {
+  private async usageFor(projectPath: string, path: string, sessionId: string, provider: ProviderId, o: { noWait?: boolean; reportsIgnored?: boolean } = {}): Promise<SessionUsage | null> {
+    // A session that ran on a server connection (HI-1772): read without its CLI's cost reports.
+    const reportsIgnored = !!o.reportsIgnored || serverSessions.has(sessionId)
     try {
       const s = await stat(path)
       const seen = usageSeen.get(path)
@@ -5554,7 +5566,7 @@ class SessionManager {
         // Unchanged since it was read: priced again after a price change, not read.
         return (seen.usage ??= this.priced(seen.raw))
       }
-      const r = await usageHistory.read(projectPath, path, sessionId, provider, o)
+      const r = await usageHistory.read(projectPath, path, sessionId, provider, { ...o, reportsIgnored })
       if (!r) return null
       this.checkUnderstood(provider, r.usage, r.size)
       // The title the CLI's own index gives it (Codex's, Copilot's), which the worker's parsers can't read.
@@ -5768,7 +5780,7 @@ class SessionManager {
     if (running && ctx?.stored) {
       // As its pane has it; unchanged since the last read, the worker isn't asked at all (usageFor).
       const p = await this.anyTranscript(projectPath, sessionId, ctx)
-      if (p) usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx))
+      if (p) usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx), { reportsIgnored: !!rec?.serverRan })
     }
     if (!usage && (!running || ctx?.stored)) {
       const stored = (ctx?.stored ?? (await usageHistory.storedUsage(projectPath).catch(() => null)))?.get(sessionId)
@@ -5783,7 +5795,7 @@ class SessionManager {
     if (!usage) {
       const p = await this.anyTranscript(projectPath, sessionId, ctx)
       if (!p) return rec?.keptUsage ?? null
-      usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx), o)
+      usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx), { ...o, reportsIgnored: !!rec?.serverRan })
       if (usage && rec && !running) void usageHistory.ingest(projectPath, sessionId, { priority: 2, keepState: 'no' }).catch(() => undefined)
     }
     if (usage) usage = withScreenStopsIn(usage, rec?.screenStops)
