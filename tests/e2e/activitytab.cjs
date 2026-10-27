@@ -81,7 +81,7 @@ function transcript(sid, startMin) {
     const shoot = (name) => page.screenshot({ path: path.join(shots, `${name}.png`) })
 
     // --- HB1's card in Doing; a finished card of HB1's, with its session an hour ago (history: never shown here).
-    await inv('tasks:create', { title: 'Card one', project: 'alpha', agent: 'hb1', column: 'doing' })
+    const one = await inv('tasks:create', { title: 'Card one', project: 'alpha', agent: 'hb1', column: 'doing' })
     const old = await inv('tasks:create', { title: 'An earlier card', project: 'alpha', agent: 'hb1', column: 'done' })
     const S = { old: randomUUID() }
     fs.writeFileSync(path.join(transcripts, `${S.old}.jsonl`), transcript(S.old, 60))
@@ -256,6 +256,32 @@ function transcript(sid, startMin) {
     await lib.menuEntry(page, 'All').click()
     await page.keyboard.press('Escape')
 
+    // --- A long title (HI-1884): the row stays one line, the key and the column whole, only the title cut with "…" and
+    // whole in its tooltip; at the normal width and a narrow one, in both themes.
+    const LONG = 'Card one: the tray keeps its restart notice after an update restart because the check answers late, and more'
+    await inv('tasks:update', one.number, { title: LONG })
+    const oneLine = async (theme) => {
+      for (const [width, name] of [[1500, 'normal'], [760, 'narrow']]) {
+        await lib.fitWindow(app, page, { width, height: 900 })
+        const shown = await lib.until(async () => {
+          if ((await cardHead.locator('.activity-card-title').getAttribute('title').catch(() => null)) === LONG) return true
+          await refresh()
+          return false
+        }, HUNG_MS, 500)
+        const g = await cardHead.evaluate((row) => {
+          const box = (sel) => row.querySelector(sel)?.getBoundingClientRect() ?? null
+          const title = row.querySelector('.activity-card-title')
+          const lineH = parseFloat(getComputedStyle(row).lineHeight) || 18
+          return { line: lineH, head: row.getBoundingClientRect().height, key: box('.activity-card-key'), title: box('.activity-card-title'), column: box('.activity-card-column'), keyText: row.querySelector('.activity-card-key')?.textContent ?? '', cut: !!title && title.scrollWidth > title.clientWidth }
+        })
+        const single = (b) => !!b && b.height < g.line * 1.5
+        check(`${theme}, ${name}: the card row is one line, its key and column whole, only the title cut`, !!shown && single(g.key) && single(g.column) && single(g.title) && g.head < g.line * 1.5 + 2 && /^\w+-\d+$/.test(g.keyText.trim()) && g.key.right <= g.title.left && g.title.right <= g.column.left && (name === 'normal' || g.cut), JSON.stringify(g))
+        await shoot(`7-one-line-${theme}-${name}`)
+      }
+      await lib.fitWindow(app, page, { width: 1500, height: 900 })
+    }
+    await oneLine('dark')
+
     // --- Light theme.
     await inv('settings:update', { appearance: { theme: 'light' } })
     await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === 'light', HUNG_MS)
@@ -263,6 +289,7 @@ function transcript(sid, startMin) {
     await page.mouse.move(5, 5)
     await lib.until(async () => /Card one/.test(await cardHead.innerText().catch(() => '')) && (await node('process').count()) > 0, HUNG_MS, 250)
     await shoot('5-light')
+    await oneLine('light')
     await inv('session:stop', alpha, 'hb1').catch(() => undefined)
     await inv('session:stop', alpha, 'hb2').catch(() => undefined)
   } finally {
