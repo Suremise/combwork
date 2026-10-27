@@ -254,9 +254,9 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
     const betaCopy = await until(() => starts().find((x) => /beta[\\/]copies[\\/]copy-1$/i.test(x.cwd))?.cwd, HUNG_MS)
     check("C1's check holds beta's copy-1", !!betaCopy, JSON.stringify(starts()))
     const peek = await call(t1, '/v1/progress/resolve', { folder: betaCopy })
-    check("B1 resolving in beta's copy gets its own card, nothing of beta's lease", peek.status === 200 && peek.body?.card === `#${a}` && !JSON.stringify(peek.body).includes(`#${cardC}`) && !JSON.stringify(peek.body).includes(keyC) && !('copy' in (peek.body ?? {})), JSON.stringify(peek))
+    check("B1 resolving in beta's copy gets its own card, nothing of beta's lease", peek.status === 200 && peek.body?.card === keyA && !JSON.stringify(peek.body).includes(`#${cardC}`) && !JSON.stringify(peek.body).includes(keyC) && !('copy' in (peek.body ?? {})), JSON.stringify(peek))
     const peekNamed = await call(t1, '/v1/progress/resolve', { folder: betaCopy, card: keyA })
-    check('…naming its own card there either', peekNamed.status === 200 && peekNamed.body?.card === `#${a}` && !JSON.stringify(peekNamed.body).includes(`#${cardC}`), JSON.stringify(peekNamed))
+    check('…naming its own card there either', peekNamed.status === 200 && peekNamed.body?.card === keyA && !JSON.stringify(peekNamed.body).includes(`#${cardC}`) && !JSON.stringify(peekNamed.body).includes(keyC), JSON.stringify(peekNamed))
     fs.writeFileSync(go, 'go')
     check("C1's check passes", (await betaRun)?.code === 0)
 
