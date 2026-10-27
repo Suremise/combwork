@@ -11,11 +11,10 @@ import type { ProjectFolderOf } from '../shared/types'
 import { folderWhat } from '../shared/projectFolders'
 import { containsPlace, samePlace } from './fsutil'
 import { legacyWorktree } from './agentFolders'
-import { existsSync } from 'original-fs'
 import { boardRead, boardWrite, boardWriteOp, cardKeys } from './boardStore'
 import { createLogger, userText } from './logger'
 import { replaceHome, retiredHomes } from './slotMigration'
-import { deleteKey, deletingIn, releaseDeleteIn, type DeleteReservation, type Holder } from './slots'
+import { deleteKey, deletingIn, folderThere, releaseDeleteIn, type DeleteReservation, type Holder } from './slots'
 import { workflowFor } from './workflow/service'
 import type { WorkspaceService } from './workspace'
 
@@ -305,7 +304,7 @@ export async function trashFolders(ws: WorkspaceService, projectPath: string, id
   const root = join(ws.worktreesRoot, basename(projectPath))
   const warnings: string[] = []
   for (const f of folders) {
-    if (!containsPlace(root, f.folder) || !existsSync(f.folder)) continue
+    if (!containsPlace(root, f.folder) || !(await folderThere(f.folder))) continue
     await trash(f.folder).catch((e: Error) => warnings.push(tr(K.notTrashed, { path: f.folder, why: e.message })))
   }
   const gone = await boardWrite(ws, async () =>

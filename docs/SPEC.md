@@ -3580,7 +3580,8 @@ is settled (#1429's `slotJobs.ts`: ended, journal sealed and read, seen gone), a
 running background tasks (a check's isn't waited for, HI-1764: every process of its run is in its job, and a builder in
 a card loop is nearly always busy, so its check copies stayed held and reviewers got none), and a rename of its folder
 aside and back succeeds (`slots.ts` `quiet`, slots' too: one per folder at a time, a caller meanwhile sharing its answer,
-HI-1753, as two at once moved the folder on from one aside name to the next); otherwise it stays returning, tried again within seconds of its return (0.5, 1, 2, 4 and 8 s)
+HI-1753, as two at once moved the folder on from one aside name to the next; and the pools' "is its folder there?"
+reads, `folderThere`, wait for a check under way, so a folder aside for one is never read as gone); otherwise it stays returning, tried again within seconds of its return (0.5, 1, 2, 4 and 8 s)
 and then looked at again every 30 s and on each lease. A review waiting for a copy is told how many are in use and the
 one likely to come free first (one returned, since when and what holds it back; else the one lent longest, what for);
 one that has waited 5 minutes stalls its card for lane watches (`cardStall.ts`). Past Settings → Advanced, **Copies: wait for one to be free**

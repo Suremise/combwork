@@ -1247,7 +1247,7 @@ export class SlotPool {
     const s = this.store.slot(name)
     if (!s || s.writer) return
     const last = this.store.lastLease(name)
-    if (last?.to && !last.endRev && existsSync(s.folder)) {
+    if (last?.to && !last.endRev && (await folderThere(s.folder))) {
       const rev = await G.head(s.folder)
       if (!isUnknown(rev)) await this.store.finalizeEndRev(last.id, rev)
     }
@@ -1271,7 +1271,7 @@ export class SlotPool {
   }
 
   private async present(s: Slot): Promise<boolean> {
-    if (!existsSync(s.folder)) return false
+    if (!(await folderThere(s.folder))) return false
     const listed = await listWorktrees(this.deps.project).catch(() => null)
     return !listed || listed.some((l) => samePlace(l.path, s.folder))
   }
@@ -1439,7 +1439,7 @@ export class SlotPool {
       if (!made) {
         if (!(await this.present(slot))) {
           // Gone from disk while free: made again where it was (git's stale entry pruned first).
-          if (existsSync(slot.folder)) return await fail('its folder is there but git does not list it as a worktree')
+          if (await folderThere(slot.folder)) return await fail('its folder is there but git does not list it as a worktree')
           await this.store.fenced(name, token, () => undefined)
           await git(this.deps.project, ['worktree', 'prune'])
           made = true
@@ -1618,7 +1618,7 @@ export class SlotPool {
       let added = false
       try {
         const giveUp = async (why: string): Promise<string> => (await this.store.endRecreate(name, token, intent, false), why)
-        if (existsSync(intent.from) && !samePlace(intent.from, intent.to)) return await giveUp('its folder is there again') // i18n-ignore: the log's reason
+        if ((await folderThere(intent.from)) && !samePlace(intent.from, intent.to)) return await giveUp('its folder is there again') // i18n-ignore: the log's reason
         if (existsSync(intent.to)) return await giveUp(`${intent.to} is already there`) // i18n-ignore: the log's reason
         const others = (await prunable()).filter((p) => !samePlace(p, intent.from))
         if (others.length) return await giveUp(`git's prune would also forget ${others.join(', ')}`) // i18n-ignore: the log's reason
@@ -1751,7 +1751,7 @@ export class SlotPool {
       try {
         let kept = await this.guard(slot)
         if (kept) return await keep(kept)
-        if (existsSync(slot.folder)) {
+        if (await folderThere(slot.folder)) {
           const opts = await this.deps.options()
           if (opts.archive.trim()) {
             const end = await this.run(name, token, { slot: name, what: 'archive', command: opts.archive.trim(), folder: slot.folder, env: slotEnv(slot) })
@@ -1811,7 +1811,7 @@ export class SlotPool {
     const session = this.deps.sessionIn?.(s.folder)
     if (session) return { why: 'session', detail: session }
     for (const card of this.store.cardsOf(s.name)) if (await this.deps.inFlight?.(card)) return { why: 'inFlight', card }
-    if (!existsSync(s.folder)) return null
+    if (!(await folderThere(s.folder))) return null
     if (probe && !(await quiet(s.folder))) return { why: 'process' }
     const d = await G.dirty(s.folder)
     if (isUnknown(d)) return { why: 'cantCheck', detail: d.what }
@@ -1876,6 +1876,27 @@ export function quiet(folder: string): Promise<boolean> {
 
 /** The quiet checks under way, by folder (lower-cased). */
 const quieting = new Map<string, Promise<boolean>>()
+
+/**
+ * Whether a slot's or copy's folder is there, read once no quiet check of it is under way (HI-1753, HR2's round 1): a
+ * check has it renamed aside for a moment, so a plain existsSync then reads a folder in use as gone (a returning copy
+ * freed, a free one marked gone or made again) while the check still has it. A check only renames while it is in
+ * `quieting`, and the look is in the same tick as finding none, so it never sees one mid-check.
+ */
+export async function folderThere(folder: string): Promise<boolean> {
+  const key = folder.toLowerCase()
+  for (let going = quieting.get(key); going; going = quieting.get(key)) {
+    waiting++
+    await going.catch(() => false).finally(() => waiting--)
+  }
+  return existsSync(folder)
+}
+
+// Callers of folderThere waiting for a quiet check now.
+let waiting = 0
+
+/** How many callers of folderThere wait for a quiet check now (tests). */
+export const folderWaiting = (): number => waiting
 
 async function quietOnce(folder: string): Promise<boolean> {
   const aside = `${folder}.hive-quiet-${randomBytes(3).toString('hex')}`
