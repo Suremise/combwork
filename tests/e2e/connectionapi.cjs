@@ -1,10 +1,9 @@
-// The Agent API and connections (HI-1771, S4; behind Settings → Advanced → Connections (preview), the test seam off so
+// The Agent API and connections (HI-1771, S4; the test seam off so
 // the real rule applies): GET /v1/connections as each caller may see it (the workspace token and the Assistant every
 // connection, a project agent only those on in its workspace, four fields; details=true widens nothing; never a folder
 // or defaults; another one asked after by id or name is 404 to an agent); the Assistant adds and changes agents by
 // connection name or id (two sharing a name: 409; unknown: 404; one off here: 409; another CLI than the provider: 409),
-// an unrelated change keeping it and null clearing it; the status shows the chosen and the running connection; with the
-// preview off, the routes and the field are refused. The fake Claude Code signs in, no browser.
+// an unrelated change keeping it and null clearing it; the status shows the chosen and the running connection. The fake Claude Code signs in, no browser.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -42,7 +41,6 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
-    await inv('advanced:set', 'hive.accounts.preview', true)
     await lib.openWorkspace(inv, page, ws)
     const userToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const api = async (method, route, body, token = userToken) => {
@@ -131,11 +129,6 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const projectAgent = await api('POST', '/v1/projects/alpha/agents', { name: 'Sneaky', connection: 'Max 1' }, agentToken)
     check('a project agent may not add agents (403), connection or not', projectAgent.status === 403, JSON.stringify(projectAgent))
 
-    // --- Connections off: the routes and the field are refused.
-    await inv('advanced:set', 'hive.accounts.preview', false)
-    const off = [await api('GET', '/v1/connections'), await asAssistant('POST', '/v1/projects/alpha/agents', { name: 'Late', connection: 'Max 1' })]
-    check('with the preview off, GET /v1/connections and a connection field are refused (409)', off.every((r) => r.status === 409 && /Connections are a preview/.test(r.body?.error ?? '')), JSON.stringify(off))
-    await inv('advanced:set', 'hive.accounts.preview', true)
     await inv('session:stop', alpha, 'a-one')
     await inv('session:stop', assistantHome, 'assistant')
   } catch (e) {

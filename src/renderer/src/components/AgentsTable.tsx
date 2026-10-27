@@ -148,7 +148,7 @@ export const SLOT_COLUMN: AgentColumn = {
   kind: 'short',
   cell: msg({ id: 'panes.table.slotPrefix', defaultMessage: 'works {value}', description: "Where the agent works in a line of text (screen readers): {value} is agents.place.short (\"in slot-b\", \"carried: hb2\"). Lower case." })
 }
-/** The connection the agent runs on, or would start on (HI-1769, with Connections on): "Max 1", "Max 2 ⟳". */
+/** The connection the agent runs on, or would start on (HI-1769): "Max 1", "Max 2 ⟳". */
 export const CONNECTION_COLUMN: AgentColumn = {
   label: msg({ id: 'panes.table.connection', defaultMessage: 'Connection', description: "An agents table's column heading (HI-1769): the connection the agent runs on, or would start on (a login or service its coding agent CLI uses: \"Max 1\")." }),
   kind: 'short',

@@ -40,6 +40,7 @@ interface HiveMessageValues {
   'settings.accounts.notice.model': { value: string | number }
   'settings.accounts.notice.title': undefined
   'settings.accounts.onHere': undefined
+  'settings.accounts.ownLogin': { cli: string | number }
   'settings.accounts.plan': { email: string | number; plan: string | number }
   'settings.accounts.remove': undefined
   'settings.accounts.removeConfirm': undefined
@@ -264,8 +265,6 @@ interface HiveMessageValues {
   'settings.advanced.error.oneLine': { title: string | number; most: string | number }
   'settings.advanced.error.pattern': { title: string | number }
   'settings.advanced.error.text': { title: string | number }
-  'settings.advanced.hive.accounts.preview.desc': undefined
-  'settings.advanced.hive.accounts.preview.title': undefined
   'settings.advanced.hive.agents.perProject.desc': { usual: string | number; most: string | number }
   'settings.advanced.hive.agents.perProject.title': undefined
   'settings.advanced.hive.assistant.otherMcpServers.desc': undefined
@@ -1011,8 +1010,6 @@ interface HiveMessageValues {
   'settings.provider.modelFallback.desc': { provider: string | number }
   'settings.provider.modelFallback.tip': undefined
   'settings.provider.modelFallback.title': undefined
-  'settings.provider.movedToConnections.desc': undefined
-  'settings.provider.movedToConnections.title': undefined
   'settings.provider.notInstalled': undefined
   'settings.provider.notInstalledShort': undefined
   'settings.provider.off': { provider: string | number }

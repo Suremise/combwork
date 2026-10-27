@@ -1,4 +1,4 @@
-// Model, effort and context belong to the connection (HI-1770, S3; behind Settings → Advanced → Connections (preview),
+// Model, effort and context belong to the connection (HI-1770, S3;
 // the test seam off so the real rule applies): with Connections on, a project's own model, effort and context move onto
 // its agents once (an agent's own kept), recorded in project.json; a connection's defaults are edited in Settings →
 // Connections and a launch with none of its own runs them (the fake's launch log), an agent's own winning; Agent Settings
@@ -41,7 +41,6 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'proj
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
-    await inv('advanced:set', 'hive.accounts.preview', true)
     await lib.openWorkspace(inv, page, ws)
     const live = async (agentId) => (await inv('session:live')).find((s) => s.agentId === agentId && s.status !== 'stopped') ?? null
     const shots = async (name) => {
@@ -104,9 +103,9 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'proj
     check('…dismissed, it is gone', !!(await lib.until(async () => (await notice.count()) === 0, HUNG_MS)))
     check('…and stays gone when asked again', (await inv('connections:notice')).length === 0)
 
-    // --- Settings → Claude Code: its model rows give way to a note; Project Settings has none either.
+    // --- Settings → Claude Code: no model, effort or context rows, nor a note where they went (HI-1774); Project Settings has none either.
     await page.locator('.settings-nav .row[data-section="provider:claude-code"]').click()
-    check('Settings → Claude Code: "Model, effort and context" points to Connections, its default model row gone', !!(await lib.until(async () => /Each connection has its own now/.test(await page.locator('body').innerText().catch(() => '')), HUNG_MS)) && (await page.getByText('Default model', { exact: true }).count()) === 0)
+    check('Settings → Claude Code: no default model, effort or context rows, and no "moved" note', !!(await lib.until(async () => (await page.getByText('CLI path', { exact: true }).count()) === 1, HUNG_MS)) && (await page.getByText('Default model', { exact: true }).count()) === 0 && (await page.getByText('Default effort', { exact: true }).count()) === 0 && !/Each connection has its own now/.test(await page.locator('body').innerText()))
     await shots('cli')
     await page.keyboard.press('Escape')
 

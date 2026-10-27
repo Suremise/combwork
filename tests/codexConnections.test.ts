@@ -11,7 +11,6 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import { CODEX_DESCRIPTOR } from '../src/shared/codex'
 import { acceptable } from '../src/shared/accounts'
-import { ACCOUNTS_PREVIEW } from '../src/shared/advanced'
 import type { Connection } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
@@ -53,7 +52,6 @@ let statusSpy: { mockRestore(): void }
 
 beforeAll(async () => {
   advanced.load(join(base, 'profile'))
-  await advanced.set(ACCOUNTS_PREVIEW, true)
   mkdirSync(join(kept, '..'), { recursive: true })
   writeFileSync(kept, '{"kept":true}\n')
   config.settings.providers.codex.enabled = true

@@ -1,4 +1,4 @@
-// Launching on a connection (HI-1755, S1; behind Settings → Advanced → Connections (preview), the test seam off so the
+// Launching on a connection (HI-1755, S1; the test seam off so the
 // real rule applies): with no connection on, an agent is refused and the project asks for one; two connections signed in
 // (the fake Claude Code signs in, no browser); agents of one workspace on different connections at once (each launch
 // logged in its own connection's folder); a second window's workspace on its own connection; a connection turned off
@@ -45,7 +45,6 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     const invOn = (p) => (ch, ...a) => p.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     const inv = invOn(page)
     const failure = (p) => p.then(() => null, (e) => String(e?.message ?? e))
-    await inv('advanced:set', 'hive.accounts.preview', true)
     await lib.openWorkspace(inv, page, ws1)
     const live = async (agentId) => (await inv('session:live')).find((s) => s.agentId === agentId && s.status !== 'stopped') ?? null
     const shots = async (name) => {
@@ -63,8 +62,28 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     check('with no connection on, an agent is refused, saying why', /No Claude Code connection is on in this workspace/.test(refused ?? ''), refused ?? 'started')
     check('…nothing launched on the CLI home', lines(path.join(home, 'fake-launches.jsonl')).length === 0)
     await page.locator('.sidebar .tree-item', { hasText: 'alpha' }).first().click().catch(() => undefined)
-    check('…and the project asks for a connection', !!(await lib.until(async () => (await page.locator('[data-connection-setup]').count()) >= 1, HUNG_MS)))
+    check('…and the project asks for a connection', !!(await lib.until(async () => (await page.locator('[data-connection-setup="project"]').count()) >= 1, HUNG_MS)))
+    // On for everyone (HI-1774): the one-time notice, the Assistant's banner and Agent Setup's line, none of which falls
+    // back to the CLI's own sign-in.
+    check('the one-time notice says agents run on connections, naming Claude Code', !!(await lib.until(async () => /Agents now run on connections: add one for Claude Code/.test(await page.locator('[data-connections-intro]').innerText().catch(() => '')), HUNG_MS)))
+    if ((await page.locator('.assistant-panel').count()) === 0) await page.keyboard.press('Control+Alt+I')
+    check("the Assistant asks for a connection too: it can't start without one", !!(await lib.until(async () => /so the Assistant can't start/.test(await page.locator('[data-connection-setup="assistant"]').innerText().catch(() => '')), HUNG_MS)))
     await shots('setup')
+    await page.keyboard.press('Control+Alt+I')
+    await page.keyboard.press('Control+Shift+P')
+    await page.locator('.palette input').waitFor({ timeout: HUNG_MS })
+    await page.keyboard.type('Agent Setup')
+    await page.locator('.palette-item[data-command="help.agentSetup"]').waitFor({ timeout: HUNG_MS })
+    await page.keyboard.press('Enter')
+    const setupDialog = page.locator('.dialog', { hasText: 'Agent Setup' })
+    check("Agent Setup's Claude Code tab: signed in per connection, none on yet, no sign-in of its own", !!(await lib.until(async () => /signs in per connection, and none is on in this workspace yet/.test(await setupDialog.locator('[data-connection-setup-line]').innerText().catch(() => '')), HUNG_MS)) && (await setupDialog.locator('button', { hasText: /^Sign in/ }).count()) === 0)
+    await shots('agent-setup')
+    await setupDialog.locator('[data-open-connections]').click()
+    check('…Open Connections closes it and shows Settings → Connections', !!(await lib.until(async () => (await setupDialog.count()) === 0 && (await page.locator('.settings-nav .row.selected[data-section="accounts"]').count()) === 1, HUNG_MS)))
+    // Copilot has no connections (HI-1758): said, if it is on.
+    const copilotOn = (await inv('settings:get')).providers?.copilot?.enabled === true
+    if (copilotOn) check("Settings → Connections says why Copilot has none", (await page.locator('[data-no-connections="copilot"]').count()) === 1)
+    await page.locator('.activity-btn[aria-label="Projects"]').click()
 
     // --- Two connections, each signed in with the fake (no browser), the workspace's folders trusted in each.
     const connect = async (name, email) => {
@@ -78,6 +97,7 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
       return a
     }
     const max1 = await connect('Max 1', 'one@example.com')
+    check('…the one-time notice goes once a connection is added, for good', !!(await lib.until(async () => (await page.locator('[data-connections-intro]').count()) === 0, HUNG_MS)) && (await inv('connections:list')).intro === undefined)
     const max2 = await connect('Max 2', 'two@example.com')
     await inv('connections:setOn', max1.id, true)
     await inv('connections:setOn', max2.id, true)

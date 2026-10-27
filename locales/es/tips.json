@@ -136,6 +136,8 @@
   "tips.compareBranches.title": "Comparar dos ramas, como 1.0.0 con main",
   "tips.conflictHunks.text": "Cuando la cola de fusión devuelve una tarjeta por un conflicto, su sección Trabajo lista los archivos: haz clic en uno para ver sus conflictos, el lado del destino y el de la tarjeta bajo sus nombres, tal como los dejó la fusión de prueba de la cola.",
   "tips.conflictHunks.title": "Ver los conflictos de una tarjeta devuelta",
+  "tips.connections.text": "Configuración → Conexiones guarda varios inicios de sesión de Claude Code y Codex, o un servidor como Ollama en este equipo. Cada espacio de trabajo elige cuáles están activadas y su predeterminada, y cualquier agente puede usar la suya: elígela en la configuración del agente.",
+  "tips.connections.title": "Ejecuta agentes con distintos inicios de sesión",
   "tips.consoleRecording.text": "En la consola de desarrollador, Grabar escribe en un archivo lo que la CLI de un agente envía a Hive, con los datos sensibles ocultos salvo que marques el texto para esa grabación, y Copiar diagnóstico puede adjuntarlo a un informe de error.",
   "tips.consoleRecording.title": "Graba lo que envía una CLI",
   "tips.consoleText.text": "Configuración → Avanzado → Consola de desarrollador: mostrar el texto de prompts, respuestas y comandos los muestra en la consola de desarrollador, bajo un banner que lo indica, y marca el texto para las grabaciones nuevas. Los tokens y los inicios de sesión siguen ocultos, y hive_console de los agentes sigue ocultando los datos sensibles.",

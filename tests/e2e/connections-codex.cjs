@@ -1,4 +1,4 @@
-// Codex connections (HI-1757; behind Settings → Advanced → Connections (preview), the test seam off so the real rule
+// Codex connections (HI-1757; the test seam off so the real rule
 // applies), on the fake Codex (no browser, no real sign-in): with none on, a Codex agent is refused; two connections
 // signed in with Codex's own login in each one's folder; two agents on them at once, each launch's CODEX_HOME its own
 // folder, its login kept there (the file store) and a token in Hive's environment never passed on; a conversation
@@ -54,7 +54,6 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     const failure = (p) => p.then(() => null, (e) => String(e?.message ?? e))
     await lib.waitForProvider(inv, 'codex')
-    await inv('advanced:set', 'hive.accounts.preview', true)
     await lib.openWorkspace(inv, page, ws)
     const live = async (agentId) => (await inv('session:live')).find((s) => s.agentId === agentId && s.status !== 'stopped') ?? null
     const view = async (id) => (await inv('connections:list')).connections.find((c) => c.id === id)

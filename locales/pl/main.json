@@ -11,7 +11,6 @@
   "main.accounts.noProvider": "Hive nie obsługuje jeszcze połączeń przez logowanie dla {cli}.",
   "main.accounts.notFound": "Nie ma takiego połączenia.",
   "main.accounts.nothingToKeep": "Połączenie {name} nie jest zalogowane na nikogo, kogo Hive mógłby sprawdzić, więc nie ma logowania do zachowania.",
-  "main.accounts.previewOff": "Połączenia są w wersji zapoznawczej: najpierw włącz Ustawienia → Zaawansowane → Połączenia (wersja zapoznawcza).",
   "main.accounts.removeFailed": "Nie usunięto połączenia {name}: {error}. Nie ruszono niczego poza jego folderem; Usuń spróbuje jeszcze raz.",
   "main.antivirus.allExcluded": "Każdy folder, który Hive może zaproponować, jest już wykluczony.",
   "main.antivirus.changed": "Obszar roboczy zmienił się od czasu pytania: niczego nie zmieniono.",

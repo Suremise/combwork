@@ -136,6 +136,8 @@
   "tips.compareBranches.title": "Compare two branches, such as 1.0.0 with main",
   "tips.conflictHunks.text": "When the merge queue sends a card back for a conflict, its Work section lists the files: click one to see its conflicts, the target's side and the card's under their names, as the queue's test merge had them.",
   "tips.conflictHunks.title": "See a returned card's conflicts",
+  "tips.connections.text": "Settings → Connections keeps several Claude Code and Codex sign-ins, or a server such as Ollama on this PC. Each workspace chooses which are on and its default, and any agent can run on its own: pick it in Agent Settings.",
+  "tips.connections.title": "Run agents on different sign-ins",
   "tips.consoleRecording.text": "In the developer console, Record writes what an agent's CLI sends Hive to a file, redacted unless you tick text for that recording, and Copy Diagnostics can attach it to a bug report.",
   "tips.consoleRecording.title": "Record what a CLI sends",
   "tips.consoleText.text": "Settings → Advanced → Developer console: show prompt, reply and command text shows them in the developer console, under a banner saying so, and ticks text for new recordings. Tokens and sign-ins stay masked, and agents' hive_console stays redacted.",

@@ -11,7 +11,6 @@
   "main.accounts.noProvider": "O {cli} ainda não pode ter conexões por login no Hive.",
   "main.accounts.notFound": "Essa conexão não existe.",
   "main.accounts.nothingToKeep": "A conexão {name} não está conectada com ninguém que o Hive consiga verificar, então não há login para manter.",
-  "main.accounts.previewOff": "As conexões são uma prévia: ative Configurações → Avançado → Conexões (prévia) primeiro.",
   "main.accounts.removeFailed": "A conexão {name} não foi removida: {error}. Nada fora da pasta dela foi alterado; Remover tenta de novo.",
   "main.antivirus.allExcluded": "Todas as pastas que o Hive pode sugerir já estão excluídas.",
   "main.antivirus.changed": "O espaço de trabalho mudou desde a pergunta: nada foi alterado.",

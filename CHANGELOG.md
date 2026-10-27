@@ -14,6 +14,7 @@ Hive 1.0 adds a workflow layer: your project's options decide how a card goes fr
 - **Hive asks how to merge.** The first time a card of an upgraded Git project reaches the merge queue, the queue waits and asks under For you how to merge the project's cards: the merge style (a merge commit, as 0.9 did, Squash or Rebase) and the commit message (Hive's, with the card's key, or the branch's own). Nothing about how your history looks is set without asking (HI-1697).
 - **Projects get keys** (HI, AM…), suggested from their folders and listed in a quiet notice: cards are named `HI-12`, cards you have keep their number in their project (#1061 is HI-1061), and `#N` keeps working everywhere.
 - **Your 0.9 templates aren't used in 1.0.** They stay where they were, but aren't listed or loaded; the upgrade keeps a copy of each with the 0.9 board backup. Save your agents as a template again, or start from one of Hive's (below).
+- **Add a connection, and sign it in once.** Claude Code and Codex agents (and the Assistant) now run on connections Hive keeps, never on your terminal's own sign-in (`~/.claude`, `~/.codex`), which stays as it is. Until one is on in a workspace, its agents can't start: a notice, the project, the Assistant panel and Agent Setup each offer **Add a Connection**. Your old default model, effort and context go to your first connection of each CLI, and each project's onto its agents. GitHub Copilot keeps its own sign-in (Connections, below).
 
 ### Hive moves cards by your project's rules
 
@@ -88,6 +89,13 @@ Hive 1.0 adds a workflow layer: your project's options decide how a card goes fr
 - **Undo the Assistant's changes.** Hive keeps what the Assistant changes for 7 days, grouped by your message. **Done by the Assistant** in its panel lists them, each with **Undo**, and a message's **Undo** takes back all of its changes, keeping what you or an agent changed since and saying so; you can also ask the Assistant to undo. It no longer stops after 30 changes for one message (#1170, #1282, #1283).
 - **It asks you less.** Its skills and modes describe what Hive now decides (a lane's review, its round limit, who merges, a lane's end), so it doesn't ask you about them; Coordinator looks a fact up before asking you, and Release manager asks for each step that builds, versions, merges, tags or publishes (#1527, #1528).
 - **A fold button on its panel** (Ctrl+Alt+I), as the Progress panel has (#1330).
+
+### Connections
+
+- **Several sign-ins, side by side.** **Settings → Connections** keeps Claude Code and Codex sign-ins, each in a folder of its own and signed in through the CLI's own sign-in: two Max plans, a work and a personal account. Each workspace chooses which are on and its default; any agent, and the Assistant, can run on its own. Conversations are shared between them (Codex keeps its memory per connection). Switch an agent's connection in Agent Settings: a running one moves at its next safe point (HI-980, HI-1755, HI-1757).
+- **A connection can get its model from a server** with a base URL and key: DeepSeek, Ollama on this PC, or your own gateway, each model standing in for a Claude name. Read Models lists what the server has. Its key is stored encrypted and masked wherever Hive prints it. A conversation run only on this PC is **free (local)**; Ollama's cloud models and other servers are priced only by your own prices, never by the CLI's Claude price (HI-1772, HI-1773, HI-1825).
+- **Model, effort and context belong to the connection** (its **Defaults for agents on it**), the agent's own first. The rows, the Overview, the status bar's plan limits and the Agent API name the connection each agent runs on; the plan limits are per connection (HI-1756, HI-1769, HI-1770, HI-1771).
+- **GitHub Copilot has no connections:** it signs in once for the whole PC, and its agents use that, as before (HI-1758).
 
 ### Agents and their guidance
 

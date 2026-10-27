@@ -136,6 +136,8 @@
   "tips.compareBranches.title": "比较两个分支，例如 1.0.0 与 main",
   "tips.conflictHunks.text": "当合并队列因冲突退回卡片时，其“工作记录”部分会列出文件：点击一个文件即可查看其冲突，目标一方和卡片一方各自标注名称，保持队列测试合并时的样子。",
   "tips.conflictHunks.title": "查看被退回卡片的冲突",
+  "tips.connections.text": "“设置”→“连接”可保存多个 Claude Code 和 Codex 登录，或此电脑上的 Ollama 等服务器。每个工作区可选择启用哪些连接以及默认连接，任何智能体都可以使用自己的连接：在智能体设置中选择。",
+  "tips.connections.title": "让智能体使用不同的登录运行",
   "tips.consoleRecording.text": "在开发者控制台中，“录制”会把智能体的 CLI 发给 Hive 的内容写入文件，除非你为该录制勾选“文本”，否则内容会脱敏；“复制诊断信息”可以把它附到错误报告中。",
   "tips.consoleRecording.title": "录制 CLI 发送的内容",
   "tips.consoleText.text": "“设置”→“高级”→“开发者控制台：显示提示词、回复和命令文本”会在开发者控制台中显示这些文本，并显示一条说明此事的横幅，同时为新录制勾选“文本”。令牌和登录信息仍会遮盖，智能体的 hive_console 仍会脱敏。",

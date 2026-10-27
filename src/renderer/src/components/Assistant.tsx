@@ -13,7 +13,7 @@ import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
 import { legacyOf, placeText, placeTip } from '../agentPlace'
-import { connectionCellText, useConnections, useLaunchConnection } from './ConnectionChoice'
+import { connectionCellText, NoConnectionBanner, useConnections, useLaunchConnection } from './ConnectionChoice'
 import { assistantDefaults } from '@shared/connectionDefaults'
 import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
 import { cardLabel } from '@shared/projectKeys'
@@ -323,6 +323,7 @@ export function AssistantPanel() {
       <PaneResizer paneKey="assistant" edge={left ? 'right' : 'left'} min={300} max={900} keep={380} />
       <AssistantHeader project={a} a={agent} />
       <AssistantStatus a={agent} />
+      {!agent.live && <AssistantConnectionBanner project={a} a={agent} />}
       <AssistantQuestions />
       <AssistantActions />
       <div className="assistant-body" ref={body}>
@@ -369,6 +370,19 @@ export function AssistantPanel() {
       </div>
     </div>
   )
+}
+
+/**
+ * Asks for a connection where the Assistant can't start without one (HI-1774): its CLI has connections, and neither its
+ * own choice (Settings → Assistant) nor the workspace's default is on here. Not for a test copy on its CLI test home.
+ */
+function AssistantConnectionBanner({ project, a }: { project: ProjectInfo; a: AgentInfo }) {
+  const provider = agentProviderOf(project, a)
+  const view = useConnections()
+  const choice = useStore((s) => s.workspace?.config.assistantConnection?.[provider])
+  const conn = useLaunchConnection(choice || undefined, provider)
+  if (conn !== null || !view || view.testHome.includes(provider)) return null
+  return <NoConnectionBanner cli={provider} where="assistant" />
 }
 
 /** The hidden panel: a strip down the right edge; click it to show the panel. Its mark (#399) shows what the Assistant is doing. */
@@ -745,7 +759,7 @@ function OverviewAgent({ project: p, a, state, names, onGo }: { project: Project
   // The state its mark draws first (the board's too: a stalled or blocked card), then what it is doing when that says more.
   const stateText = tr(AGENT_STATE_LABEL[state])
   const detail = activity && !activity.toLowerCase().startsWith(stateText.toLowerCase()) ? activity : ''
-  // Its CLI, and the connection it runs on or would start on (HI-1769, with Connections on).
+  // Its CLI, and the connection it runs on or would start on (HI-1769).
   const cli = providerDescriptor(agentProviderOf(p, a)).name
   const connection = connectionCellText(a.connection, agentProviderOf(p, a), a.live?.launchedConnection, connections)
   const first = tr(M.markLabel, { name: a.name, state: stateText, running: a.live ? 'yes' : 'no', hasDetail: detail ? 'yes' : 'no', detail })

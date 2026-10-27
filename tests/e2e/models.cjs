@@ -59,14 +59,18 @@ const check = (name, ok, extra = '') => {
   const codex = await info('codex')
   check('Codex: its models include gpt-6.1-sol, without the hidden ones', codex.catalog?.models.some((m) => m.value === 'gpt-6.1-sol') && !codex.catalog.models.some((m) => m.value === 'gpt-reserve'), JSON.stringify(codex.catalog?.models.map((m) => m.value)))
 
-  // --- Settings → Claude Code: the pickers.
+  // --- The pickers: Settings → Assistant's, per CLI (Claude Code and Codex have no default model of their own since
+  // HI-1774: each connection's, whose pickers are these same ones).
   await page.keyboard.press('Control+,')
   const openSection = async (name) => {
     await page.locator('.settings-nav .row', { hasText: name }).first().click()
-    await lib.sleep(400)
+    await lib.until(async () => (await page.locator('.settings-nav .row.selected', { hasText: name }).count()) > 0, HUNG_MS)
   }
   await openSection('Claude Code')
-  const modelSelect = page.locator('.model-picker select').first()
+  check('Settings says where the models come from', (await page.locator('.fallback-source', { hasText: 'Models now: From Claude Code 2.1.999' }).count()) === 1)
+  await openSection('Assistant')
+  const defaultsOf = (cli) => page.locator('.assistant-defaults').nth(cli === 'codex' ? 1 : 0)
+  const modelSelect = defaultsOf('claude-code').locator('.model-picker select').first()
   const options = async (sel) => sel.locator('option').evaluateAll((os) => os.map((o) => ({ value: o.value, label: o.textContent, disabled: o.disabled })))
   const offered = (await options(modelSelect)).map((o) => o.value).filter((v) => v && v !== 'custom')
   check('the Claude Code model picker lists exactly the reported models, Fable included', JSON.stringify(offered) === JSON.stringify(reported.map((m) => m.value)) && offered.includes('fable'), JSON.stringify(offered))
@@ -74,42 +78,44 @@ const check = (name, ok, extra = '') => {
   const labelOf = async (v) => (await options(modelSelect)).find((o) => o.value === v)?.label
   check('the picker lists an alias with its model: Opus (Opus 5.5), Haiku (Haiku 4.5)', (await labelOf('opus')) === 'Opus (Opus 5.5)' && (await labelOf('haiku')) === 'Haiku (Haiku 4.5)', `${await labelOf('opus')}, ${await labelOf('haiku')}`)
   check('…and a pinned version as Claude Code names it: Opus 4.8', (await labelOf('claude-opus-4-8')) === 'Opus 4.8', await labelOf('claude-opus-4-8'))
-  check('Settings says where the models come from', (await page.locator('.fallback-source', { hasText: 'Models now: From Claude Code 2.1.999' }).count()) === 1)
   await page.screenshot({ path: path.join(lib.WORK, 'models-claude-settings.png') })
 
-  const effortSelect = page.locator('select.effort-picker').first()
+  const effortSelect = defaultsOf('claude-code').locator('select.effort-picker').first()
   const effortValues = async () => (await options(effortSelect)).map((o) => o.value).filter(Boolean)
-  await update({ providers: { 'claude-code': { defaultModel: 'claude-opus-4-6' } } })
-  await lib.sleep(300)
-  check("with Opus 4.6, the effort picker offers its levels (no Extra high)", JSON.stringify(await effortValues()) === JSON.stringify(['low', 'medium', 'high', 'max']), JSON.stringify(await effortValues()))
-  await update({ providers: { 'claude-code': { defaultModel: 'haiku' } } })
-  await lib.sleep(300)
-  check('with Haiku, none: it has no effort setting, and says so', (await effortValues()).length === 0 && (await page.locator('.effort-caveat', { hasText: 'Haiku 4.5 has no effort setting' }).count()) === 1, JSON.stringify(await effortValues()))
+  // Each change polled until the picker shows it (HI-1774 round 1: never a sleep, then one look).
+  const opusLevels = JSON.stringify(['low', 'medium', 'high', 'max'])
+  await update({ assistant: { providers: { 'claude-code': { model: 'claude-opus-4-6' } } } })
+  check("with Opus 4.6, the effort picker offers its levels (no Extra high)", !!(await lib.until(async () => JSON.stringify(await effortValues()) === opusLevels, HUNG_MS)), JSON.stringify(await effortValues()))
+  await update({ assistant: { providers: { 'claude-code': { model: 'haiku' } } } })
+  check('with Haiku, none: it has no effort setting, and says so', !!(await lib.until(async () => (await effortValues()).length === 0 && (await page.locator('.effort-caveat', { hasText: 'Haiku 4.5 has no effort setting' }).count()) === 1, HUNG_MS)), JSON.stringify(await effortValues()))
   // A choice the model doesn't take stays chosen, marked, never changed behind the user's back.
-  await update({ providers: { 'claude-code': { defaultModel: 'claude-opus-4-6', defaultEffort: 'xhigh' } } })
-  await lib.sleep(300)
-  const unsupported = (await options(effortSelect)).find((o) => o.value === 'xhigh')
-  check("an effort the model doesn't take stays, marked as such", (await effortSelect.inputValue()) === 'xhigh' && /not offered with Opus 4\.6/.test(unsupported?.label ?? '') && (await page.locator('.effort-caveat', { hasText: "doesn't offer Extra high with Opus 4.6" }).count()) === 1, JSON.stringify(unsupported))
+  await update({ assistant: { providers: { 'claude-code': { model: 'claude-opus-4-6', effort: 'xhigh' } } } })
+  const unsupportedShown = async () => {
+    const o = (await options(effortSelect)).find((x) => x.value === 'xhigh')
+    return (await effortSelect.inputValue()) === 'xhigh' && /not offered with Opus 4\.6/.test(o?.label ?? '') && (await page.locator('.effort-caveat', { hasText: "doesn't offer Extra high with Opus 4.6" }).count()) === 1
+  }
+  check("an effort the model doesn't take stays, marked as such", !!(await lib.until(unsupportedShown, HUNG_MS)), JSON.stringify((await options(effortSelect)).find((o) => o.value === 'xhigh')))
   await page.screenshot({ path: path.join(lib.WORK, 'models-effort-unsupported.png') })
   // Both themes: the warning and the lists in light too.
+  const themed = (t) => lib.until(async () => (await page.evaluate(() => document.documentElement.getAttribute('data-theme'))) === t, HUNG_MS)
   const light = async (file) => {
     await update({ appearance: { theme: 'light' } })
-    await lib.sleep(300)
+    await themed('light')
     await page.screenshot({ path: path.join(lib.WORK, file) })
     await update({ appearance: { theme: 'dark' } })
-    await lib.sleep(200)
+    await themed('dark')
   }
   await light('models-effort-unsupported-light.png')
-  await update({ providers: { 'claude-code': { defaultModel: '', defaultEffort: '' } } })
+  await update({ assistant: { providers: { 'claude-code': { model: '', effort: '' } } } })
 
-  // --- Settings → Codex.
-  await openSection('Codex')
-  const codexOffered = (await options(page.locator('.model-picker select').first())).map((o) => o.value)
+  // --- Codex's, in Settings → Assistant too.
+  const codexOffered = (await options(defaultsOf('codex').locator('.model-picker select').first())).map((o) => o.value)
   check('the Codex model picker includes gpt-6.1-sol', codexOffered.includes('gpt-6.1-sol') && !codexOffered.includes('gpt-reserve'), JSON.stringify(codexOffered))
-  await update({ providers: { codex: { defaultModel: 'gpt-5.5' } } })
-  await lib.sleep(300)
-  check('with GPT-5.5, the Codex effort picker stops at Extra high', JSON.stringify(await effortValues()) === JSON.stringify(['low', 'medium', 'high', 'xhigh']), JSON.stringify(await effortValues()))
-  await update({ providers: { codex: { defaultModel: '' } } })
+  await update({ assistant: { providers: { codex: { model: 'gpt-5.5' } } } })
+  const codexEfforts = async () => (await options(defaultsOf('codex').locator('select.effort-picker').first())).map((o) => o.value).filter(Boolean)
+  const codexLevels = JSON.stringify(['low', 'medium', 'high', 'xhigh'])
+  check('with GPT-5.5, the Codex effort picker stops at Extra high', !!(await lib.until(async () => JSON.stringify(await codexEfforts()) === codexLevels, HUNG_MS)), JSON.stringify(await codexEfforts()))
+  await update({ assistant: { providers: { codex: { model: '' } } } })
 
   // --- The footer: a model's default effort when nothing is set or reported.
   await lib.openWorkspace(inv, page, ws)
@@ -175,7 +181,10 @@ const check = (name, ok, extra = '') => {
   await inv('provider:refresh', 'claude-code')
   await lib.until(async () => { const i = await info('claude-code'); return !i.checking && i.version === '2.1.998' && !i.catalog }, 20000)
   check('the broken CLI is the one Hive uses, and it gave no models', (await info('claude-code')).version === '2.1.998' && !(await info('claude-code')).catalog, JSON.stringify((await info('claude-code')).version))
-  const fallbackOffered = (await options(page.locator('.model-picker select').first())).map((o) => o.value)
+  // The picker: Settings → Assistant's (Claude Code has no default model of its own, HI-1774); the list's source on its page.
+  await openSection('Assistant')
+  const fallbackOffered = (await options(defaultsOf('claude-code').locator('.model-picker select').first())).map((o) => o.value)
+  await openSection('Claude Code')
   check('without the CLI, the picker offers your fallback list', fallbackOffered.includes('claude-test-9') && !fallbackOffered.includes('claude-sonnet-5'), JSON.stringify(fallbackOffered))
   check('…and Settings says so', (await page.locator('.fallback-source', { hasText: "Fallback (Claude Code couldn't be asked), as you edited it" }).count()) === 1)
   await page.screenshot({ path: path.join(lib.WORK, 'models-fallback.png') })
@@ -183,18 +192,24 @@ const check = (name, ok, extra = '') => {
   await light('models-fallback-light.png')
   await modelsRow.getByRole('button', { name: 'Reset to defaults' }).click()
   await lib.until(async () => !(await update({})).providers['claude-code'].modelFallback, HUNG_MS)
-  const shipped = await page.locator('.model-picker select').first().locator('optgroup').evaluateAll((gs) => gs.map((g) => g.label))
+  await openSection('Assistant')
+  const shipped = await defaultsOf('claude-code').locator('.model-picker select').first().locator('optgroup').evaluateAll((gs) => gs.map((g) => g.label))
   check("Reset to defaults: Hive's own list again", !(await update({})).providers['claude-code'].modelFallback && shipped[0] === 'Latest (follows new releases)', JSON.stringify(shipped))
+  await openSection('Claude Code')
   // The effort fallback: renamed levels name the pickers' options.
   const effortsRow = page.locator('.fallback-table', { has: page.locator('.fallback-source', { hasText: /levels|per-model/ }) })
   if (await effortsRow.locator('.fallback-toggle').count()) await effortsRow.locator('.fallback-toggle').click()
   await effortsRow.getByLabel('Name 1').fill('Quick')
   await effortsRow.getByLabel('Name 1').blur()
   await lib.until(async () => ((await update({})).providers['claude-code'].effortFallback ?? [])[0]?.label === 'Quick', HUNG_MS)
+  await openSection('Assistant')
   check('a renamed effort level names the effort picker option', (await options(effortSelect)).some((o) => o.value === 'low' && o.label === 'Quick'), JSON.stringify(await options(effortSelect)))
+  await openSection('Claude Code')
   await effortsRow.getByRole('button', { name: 'Reset to defaults' }).click()
   await lib.until(async () => !(await update({})).providers['claude-code'].effortFallback, HUNG_MS)
+  await openSection('Assistant')
   check('…and Reset to defaults names it Low again', (await options(effortSelect)).some((o) => o.value === 'low' && o.label === 'Low'))
+  await openSection('Claude Code')
 
   // --- Prices: add, remove, reset.
   const prices = page.locator('.fallback-table', { has: page.locator('.price-table') })

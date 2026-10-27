@@ -154,7 +154,8 @@ const prose = (seed, n) => {
   console.log('\n--- hive tools (as an agent)')
   const projects = measure('hive_list_projects', tool('hive_list_projects', {}), 1000)
   check('projects: a line each, with their agents and their roles in the workflow (#1430)', /^alpha \(on, \w+\): Coder \[claude-code, builder\] idle; Tester \[claude-code, builder\] stopped$/m.test(projects), projects)
-  measure('hive_project_status', tool('hive_project_status', {}), 3000)
+  // About 3,030 characters: each Claude Code agent's connection fields (HI-1771), there for everyone since HI-1774.
+  measure('hive_project_status', tool('hive_project_status', {}), 3200)
   const usage = measure('hive_session_usage', tool('hive_session_usage', {}), 1500)
   check('usage leaves out its days unless asked', !usage.includes('"days"') && tool('hive_session_usage', { days: true }).text.includes('"days"'))
   const notes = measure('hive_list_shared_notes', tool('hive_list_shared_notes', {}), 1500)
@@ -376,8 +377,9 @@ const prose = (seed, n) => {
   const recolour = measure('hive_update_setting (a table)', tool('hive_update_setting', { id: 'board.colors', value: { doing: '#ff0000' } }, 'assistant+settings'), 400)
   check('a table change says which entry changed, old → new', /^Changed Settings → Board → Column colours \(board\.colors\): doing: #[0-9a-f]{6} → doing: #ff0000\./.test(recolour), recolour)
   await inv('settings:update', { board: { colors: { doing: '#3b82f6' } } })
-  const badEffort = tool('hive_update_setting', { id: 'claude-code.defaultEffort', value: 'bananas' }, 'assistant+settings')
-  check("an effort level the picker doesn't offer is refused, naming those it does", badEffort.isError && /takes one of: /.test(badEffort.text) && (await inv('settings:get')).providers['claude-code'].defaultEffort === '', badEffort.text)
+  // Copilot's: a CLI with connections has no default effort of its own (HI-1774).
+  const badEffort = tool('hive_update_setting', { id: 'copilot.defaultEffort', value: 'bananas' }, 'assistant+settings')
+  check("an effort level the picker doesn't offer is refused, naming those it does", badEffort.isError && /takes one of: /.test(badEffort.text) && (await inv('settings:get')).providers.copilot.defaultEffort === '', badEffort.text)
   await inv('settings:update', { assistant: { providers: { 'claude-code': { model: 'opus' } } } })
   const ownModel = tool('hive_read_setting', { id: 'assistant.claude-code.model' }, 'assistant').text
   check("the Assistant's own model reads as it is, and is the user's", /\(assistant\.claude-code\.model\): opus \(default \(empty\)\)/.test(ownModel) && /Read-only to you: /.test(ownModel), ownModel)
@@ -699,9 +701,8 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
   check('merge slot: released in a line', /^Released the merge slot for main\.$/.test(measure('hive_merge_slot (release)', slot({ action: 'release' }), 120)), texts['hive_merge_slot (release)'])
   check("merge slot: agents have the tool, the Assistant doesn't", !!toolDescription('hive_merge_slot') && !toolDescription('hive_merge_slot', 'assistant'))
 
-  // Connections (HI-1771, with the preview on; last, as a connection on changes how this workspace's agents start): an
-  // agent added on one by name, the providers listing those on here, the status with each agent's connection.
-  await inv('advanced:set', 'hive.accounts.preview', true)
+  // Connections (HI-1771; last, as a connection on changes how this workspace's agents start): an agent added on one by
+  // name, the providers listing those on here, the status with each agent's connection.
   const max = await inv('connections:add', 'claude-code', 'Max')
   await inv('connections:setOn', max.id, true)
   const linked = measure('hive_add_agent (connection)', tool('hive_add_agent', { project: 'beta', name: 'Linked', connection: 'Max' }, 'assistant'), 400)
@@ -711,10 +712,6 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
   // beta's status with Linked's connection and each agent's connection fields (about 3,040 characters).
   measure('hive_project_status (connections)', tool('hive_project_status', { project: 'beta' }, 'assistant'), 3500)
   await inv('connections:setOn', max.id, false)
-  await inv('advanced:set', 'hive.accounts.preview', false)
-  // The preview off: an empty connection (the default, as documented) still reaches the API, which refuses it.
-  const emptyOff = tool('hive_add_agent', { project: 'beta', name: 'Emptied', connection: '' }, 'assistant')
-  check('with Connections off, hive_add_agent with an empty connection is refused, nothing added', emptyOff.isError && /Connections are a preview/.test(emptyOff.text), emptyOff.text)
 
   // A request that began in this workspace and ends after the window opened another: counted nowhere (not the next).
   const nextWs = path.join(lib.WORK, 'replysize-next-ws')

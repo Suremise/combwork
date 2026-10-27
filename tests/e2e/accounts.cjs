@@ -1,4 +1,4 @@
-// Settings → Connections (HI-980: sign-in connections, the section's id still 'accounts'; staged behind Settings → Advanced → Connections (preview)): hidden while the preview is off;
+// Settings → Connections (HI-980: sign-in connections, the section's id still 'accounts'; on for everyone since HI-1774):
 // Add Account… makes the account's folder (its projects\ a junction to the CLI home's) and opens its sign-in in Hive's
 // terminal, nothing typed into it; once it ends, the row says who it is signed in as, and Set Up (HI-1826) runs the CLI
 // itself on the folder for its first-run screens. Turned on, it is this workspace's
@@ -67,12 +67,9 @@ const check = (name, ok, extra = '') => {
       await page.locator('.dialog .dialog-footer .btn.primary').click()
     }
 
-    // --- Hidden while the preview is off.
+    // --- Always there (S8, HI-1774: no preview switch any more).
     await openSettings()
-    check('Settings → Connections is hidden while its preview is off', (await nav.count()) === 0)
-    check('…and nothing about accounts is given out', (await list()).preview === false)
-    await inv('advanced:set', 'hive.accounts.preview', true)
-    check('the preview on, Settings → Connections shows', !!(await lib.until(async () => (await nav.count()) === 1, HUNG_MS)))
+    check('Settings → Connections shows, with nothing turned on first', !!(await lib.until(async () => (await nav.count()) === 1, HUNG_MS)))
     await nav.click()
     check('…with no connections yet', !!(await lib.until(async () => (await page.getByText('No connections yet').count()) === 1, HUNG_MS)))
 

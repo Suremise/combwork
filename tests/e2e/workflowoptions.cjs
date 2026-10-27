@@ -149,7 +149,13 @@ async function theForm(page, app, inv) {
     const status = (agentId, s) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'session-status', state: { provider: 'claude-code', runId: `wo-${agentId}`, projectPath: project, agentId, cwd: project, sessionId: '', status: s, runtime: { lifecycle: s === 'stopped' ? 'stopped' : 'running', maintenance: null, attention: null, composer: 'free' }, startedAt: new Date().toISOString(), launchSignature: '', unseen: false } })
     const running = page.locator('.project-row', { hasText: 'web' }).locator('.agent-count')
     for (const s of ['ready', 'working', 'waiting', 'working']) for (const a of ['b1', 'r1']) await status(a, s)
-    const twoShown = !!(await lib.until(async () => (await running.count()) === 1 && (await running.innerText()).trim() === '2', HUNG_MS))
+    // Main knows nothing of these made-up runs, so a workspace refresh meanwhile (a project.json write's) drops them: they
+    // go on reporting, as running agents do, until the row shows them (HI-1774: it raced that refresh).
+    const twoShown = !!(await lib.until(async () => {
+      if ((await running.count()) === 1 && (await running.innerText()).trim() === '2') return true
+      for (const a of ['b1', 'r1']) await status(a, 'working')
+      return false
+    }, HUNG_MS))
     for (const a of ['b1', 'r1']) await status(a, 'stopped')
     const noneShown = !!(await lib.until(async () => (await running.count()) === 0, HUNG_MS))
     const presetsCalls = await app.evaluate(() => globalThis.__presetsCalls)

@@ -11,7 +11,6 @@
   "main.accounts.noProvider": "Hive aún no puede tener conexiones con inicio de sesión de {cli}.",
   "main.accounts.notFound": "Esa conexión no existe.",
   "main.accounts.nothingToKeep": "Hive no pudo comprobar con quién inició sesión la conexión {name}, así que no hay ningún inicio de sesión que conservar.",
-  "main.accounts.previewOff": "Las conexiones son una vista previa: activa primero Configuración → Avanzado → Conexiones (vista previa).",
   "main.accounts.removeFailed": "No se quitó la conexión {name}: {error}. No se tocó nada fuera de su carpeta; Quitar lo vuelve a intentar.",
   "main.antivirus.allExcluded": "Todas las carpetas que Hive puede ofrecer ya están excluidas.",
   "main.antivirus.changed": "El espacio de trabajo cambió desde que se te preguntó: no se cambió nada.",

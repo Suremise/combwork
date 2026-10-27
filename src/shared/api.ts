@@ -975,6 +975,8 @@ export interface HiveRequests {
   'connections:notice': () => MovedNotice[]
   /** Dismisses those of the notice's entries (by key) that it lists now. */
   'connections:dismissNotice': (keys: string[]) => void
+  /** Dismisses the one-time notice that agents run on connections (HI-1774), for good, in every window. */
+  'connections:dismissIntro': () => void
   /** Switches this window's workspace's running agents whose connection isn't the one chosen now, each at its next safe point. */
   'connections:switchAffected': () => { projectPath: string; agentId: string; result: 'queued' | 'waiting' | 'notRunning' }[]
   /** Switches one agent to the connection chosen for it now, at its next safe point (HI-1755). */

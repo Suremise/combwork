@@ -1,4 +1,5 @@
 {
+  "assistant.banner.connectionSetup": "このワークスペースで有効な{cli}の接続がないため、アシスタントを起動できません。接続を追加してサインインしてください。",
   "assistant.hiveTemplates.pair": "ペア",
   "assistant.hiveTemplates.pairOne": "ペア：1つのプロバイダー",
   "assistant.hiveTemplates.pairOneText": "ビルダーとレビュアー（どちらもClaude Code）。コーディングエージェントが1つしかインストールされていない場合に使います。",

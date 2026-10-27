@@ -8,6 +8,9 @@ interface HiveMessageValues {
   'connections.choice.none': { cli: string | number }
   'connections.choice.off': { name: string | number }
   'connections.choice.otherCli': { cli: string | number }
+  'connections.intro.add': undefined
+  'connections.intro.dismiss': undefined
+  'connections.intro.text': { clis: string | number }
   'connections.mark.anotherMark': undefined
   'connections.mark.deleted': undefined
   'connections.mark.deletedTip': undefined

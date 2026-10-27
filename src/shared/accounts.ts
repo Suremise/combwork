@@ -7,8 +7,6 @@ import type { Connection, ProviderId, WorkspaceConnections, WorkspaceConfig } fr
 
 /** What Settings → Accounts shows (accounts:list): the connections, and the asking window's workspace's choice of them. */
 export interface ConnectionsView {
-  /** Settings → Advanced → Connections (preview) (until S8): off, nothing about connections is shown, and nothing listed. */
-  preview: boolean
   /** The providers that can have connections (capabilities.connections) and are on in Settings. */
   providers: ProviderId[]
   /** `key`: a server connection's key is set (HI-1772), its last 4 characters and when; never the key. */
@@ -18,10 +16,24 @@ export interface ConnectionsView {
   /** Providers a test copy runs on its CLI test home where nothing is on (the test seam, HI-1755): no setup is asked for. */
   testHome: ProviderId[]
   /**
+   * The CLIs the one-time notice that agents run on connections names (HI-1774): those with connections, on and not on
+   * a test home, while no connection was ever added and it wasn't dismissed. Absent: no notice.
+   */
+  intro?: ProviderId[]
+  /**
    * Server connections' key masking (HI-1772): `unavailable`, its data can't be read (strict, exports refused: Reset
    * Masking Data); `gap`, a reset lost some (strict for good, since `gapSince`); `full`, near the most keys it keeps.
    */
   masking?: { state: 'none' | 'pending' | 'ready' | 'unavailable'; gap: boolean; gapSince?: string; full: boolean }
+}
+
+/**
+ * Whether a CLI's agents run on connections here, for what the window shows (HI-1774): it has them and is on (the view
+ * lists it), unless this is a test copy on its CLI test home with none on in the workspace, which launches as before
+ * connections (the seam, HI-1755) and so shows none of them (no Connection column, the CLI's own plan limits).
+ */
+export function connectionsApply<V extends Pick<ConnectionsView, 'providers' | 'testHome' | 'workspace'>>(view: V | null | undefined, cli: ProviderId): view is V {
+  return !!view && view.providers.includes(cli) && !(view.testHome.includes(cli) && !view.workspace[cli]?.default)
 }
 
 /**

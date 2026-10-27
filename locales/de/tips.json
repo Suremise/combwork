@@ -136,6 +136,8 @@
   "tips.compareBranches.title": "Zwei Branches vergleichen, etwa 1.0.0 mit main",
   "tips.conflictHunks.text": "Schickt die Merge-Warteschlange eine Karte wegen eines Konflikts zurück, listet ihr Abschnitt Arbeit die Dateien: Klicke auf eine, um ihre Konflikte zu sehen, die Seite des Ziels und die der Karte unter ihren Namen, so wie der Test-Merge der Warteschlange sie hatte.",
   "tips.conflictHunks.title": "Die Konflikte einer zurückgegebenen Karte sehen",
+  "tips.connections.text": "Einstellungen → Verbindungen verwaltet mehrere Anmeldungen für Claude Code und Codex oder einen Server wie Ollama auf diesem PC. Jeder Arbeitsbereich wählt, welche eingeschaltet sind und welche Standard ist, und jeder Agent kann seine eigene nutzen: Wähle sie in den Agent-Einstellungen.",
+  "tips.connections.title": "Agenten mit verschiedenen Anmeldungen ausführen",
   "tips.consoleRecording.text": "In der Entwicklerkonsole schreibt „Aufzeichnen“ in eine Datei, was die CLI eines Agenten an Hive sendet, geschwärzt, außer du hakst für diese Aufzeichnung Text an. „Diagnosedaten kopieren“ kann sie an einen Fehlerbericht anhängen.",
   "tips.consoleRecording.title": "Aufzeichnen, was eine CLI sendet",
   "tips.consoleText.text": "Einstellungen → Erweitert → „Entwicklerkonsole: Prompt-, Antwort- und Befehlstext anzeigen“ zeigt diese Texte in der Entwicklerkonsole, unter einem Banner, das darauf hinweist, und hakt Text für neue Aufzeichnungen an. Tokens und Anmeldungen bleiben maskiert, und hive_console der Agenten bleibt geschwärzt.",

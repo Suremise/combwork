@@ -3,7 +3,7 @@ import { join, resolve } from 'path'
 import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
 import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
-import type { Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, ProviderId, ServerConnection, ServerModel, WorkspaceConfig } from '../shared/types'
+import type { AppConfig, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, ProviderId, ServerConnection, ServerModel, WorkspaceConfig } from '../shared/types'
 import { cliDefaults } from '../shared/connectionDefaults'
 import { acceptable, accountState, resolveConnection, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { profileFolder } from '../shared/appName'
@@ -16,7 +16,7 @@ import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { connectionLoginChanged, forgetConnectionUsage, usageLogin } from './planUsage'
 import { childEnv, hasPty } from './ptyHost'
-import { connectionsManaged, connectionsOn, testHomeSeam } from './connectionSeam'
+import { connectionsManaged, testHomeSeam } from './connectionSeam'
 import { provider } from './providers'
 import { withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
@@ -105,14 +105,8 @@ function changeAccount(id: string, fn: (a: Connection) => void): void {
 // Refusals, in the user's language.
 // ---------------------------------------------------------------------------
 
-const PREVIEW_OFF = msg({ id: 'main.accounts.previewOff', defaultMessage: 'Connections are a preview: turn on Settings → Advanced → Connections (preview) first.', description: 'An error: something about connections was asked while their preview switch is off. Settings → Advanced → Connections (preview) names a setting: use its name as Hive shows it.' })
 const NO_NAME = msg({ id: 'main.accounts.noName', defaultMessage: 'Give the connection a name.', description: 'An error adding or renaming a connection in Settings → Connections: its name is empty.' })
 const NO_ACCOUNT = msg({ id: 'main.accounts.notFound', defaultMessage: 'There is no such connection.', description: 'An error: a connection named by its id is not in Settings → Connections (removed meanwhile).' })
-
-/** Refuses an action on connections while they are off (the preview switch, until S8): nothing is made or changed. */
-function assertOn(): void {
-  if (!connectionsOn()) throw hiveError(PREVIEW_OFF, undefined, { kind: 'forbidden' })
-}
 
 function mustGet(id: string): Connection {
   const a = getAccount(id)
@@ -166,7 +160,6 @@ const claims = new Map<string, number>()
  * refused while one is held. Returns its release.
  */
 export async function claimAccount(id: string): Promise<() => void> {
-  assertOn()
   await locked(id, async () => {
     await assertUsable(mustGet(id))
     claims.set(id, (claims.get(id) ?? 0) + 1)
@@ -196,7 +189,6 @@ export const isServer = (a: Pick<Connection, 'kind'> | undefined): boolean => a?
 /** For serverConnections.ts (HI-1772): a connection's lock, and its changes, as this module's own take them. */
 export const connectionInternals = {
   locked: <T>(id: string, fn: () => Promise<T>): Promise<T> => locked(id, fn),
-  assertOn: (): void => assertOn(),
   mustGet: (id: string): Connection => mustGet(id),
   change: (id: string, fn: (a: Connection) => void): void => changeAccount(id, fn),
   inUse: (a: Connection): boolean => sessionsOn(a.id) || (claims.get(a.id) ?? 0) > 0 || loginsOpen.has(a.id) || hasPty(loginKey(a)),
@@ -422,13 +414,13 @@ export async function finishLeftoverRemovals(): Promise<void> {
  * connection) or it is ready to use (a server connection, HI-1772: `server` given, checked by serverConnections.ts).
  */
 export async function addAccount(id: ProviderId, name: string, server?: ServerConnection): Promise<Connection> {
-  assertOn()
   support(id)
   const n = name.trim()
   if (!n) throw hiveError(NO_NAME, undefined, { kind: 'invalid' })
-  // Its defaults the CLI's as they are now (HI-1770), until edited; a server's models aren't the CLI's, so none.
+  // Its defaults (HI-1770, HI-1774): the CLI's old per-CLI ones for its first sign-in connection only (they are migration
+  // input, taken once: takeCliDefaults), else none, the CLI deciding; a server's models aren't the CLI's, so none.
   const base = { id: `a-${randomBytes(4).toString('hex')}`, provider: id, name: n, createdAt: new Date().toISOString() }
-  const a: Connection = server ? { ...base, kind: 'server', server, defaults: {} } : { ...base, kind: 'signIn', defaults: cliDefaults(config.settings, id), defaultsFrom: 'cli' }
+  const a: Connection = server ? { ...base, kind: 'server', server, defaults: {} } : { ...base, kind: 'signIn', defaults: {} }
   return locked(a.id, async () => {
     try {
       await makeFolder(a)
@@ -438,10 +430,17 @@ export async function addAccount(id: ProviderId, name: string, server?: ServerCo
       throw e
     }
     generations.set(a.id, generation(a.id) + 1)
-    changeAccounts((all) => all.push(a))
+    let added = a
+    config.update((c) => {
+      added = a.kind === 'signIn' ? takeCliDefaults(c, a) : a
+      c.connections = [...(c.connections ?? []), added]
+      // Its notice (HI-1774) has done its job: never shown again, even with every connection removed later.
+      c.ui.connectionsIntroShown = true
+    })
+    emit({ type: 'connections-changed' })
     log.info(`account ${a.id} added (${a.provider})`)
     syncWatches()
-    return a
+    return added
   })
 }
 
@@ -450,7 +449,6 @@ export async function addAccount(id: ProviderId, name: string, server?: ServerCo
  * CLI. Edited, they are the user's (no longer the CLI's as copied).
  */
 export function setConnectionDefaults(id: string, patch: { model?: string | null; effort?: string | null; use200kContext?: boolean | null }): void {
-  assertOn()
   const a = mustGet(id)
   const next: ConnectionDefaults = { ...a.defaults }
   if (patch.model !== undefined) next.model = patch.model?.trim() || undefined
@@ -464,18 +462,37 @@ export function setConnectionDefaults(id: string, patch: { model?: string | null
 }
 
 /**
- * Connections made before they had defaults (HI-1755's) get the CLI's, once (HI-1770): only where `defaults` is absent,
- * so one the user emptied or edited is never filled in again.
+ * A connection given the CLI's old per-CLI model, effort and context (Settings → <CLI> before connections, kept in
+ * config only as migration input: HI-1774), if its CLI's haven't been given yet; recorded in the same write, so they
+ * are taken once, by the first sign-in connection of an upgrade from 0.9. Inside the config.update adding it.
+ */
+function takeCliDefaults(c: AppConfig, a: Connection): Connection {
+  const taken = c.connectionDefaultsTaken ?? []
+  if (taken.includes(a.provider)) return a
+  c.connectionDefaultsTaken = [...taken, a.provider]
+  // A connection of its CLI made before this record (a preview's) had them already: recorded as taken, not given again.
+  if ((c.connections ?? []).some((x) => x.provider === a.provider)) return a
+  return { ...a, defaults: cliDefaults(c.settings, a.provider), defaultsFrom: 'cli' }
+}
+
+/**
+ * The connections from before this record (a preview's, HI-1774 round 1): connections made before they had defaults
+ * (HI-1755's) get the CLI's old ones (HI-1770), only where `defaults` is absent (one the user emptied or edited is never
+ * filled in again); and every CLI with a connection, whatever its defaults, is recorded as having taken them, so none is
+ * given them again, even once those connections are removed.
  */
 export function seedConnectionDefaults(): void {
-  if (!list().some((a) => a.defaults === undefined)) return
-  changeAccounts((all) => {
-    for (const [i, a] of all.entries()) if (a.defaults === undefined) all[i] = { ...a, defaults: cliDefaults(config.settings, a.provider), defaultsFrom: 'cli' }
+  const all = list()
+  const taken = config.get().connectionDefaultsTaken ?? []
+  if (!all.some((a) => a.defaults === undefined || !taken.includes(a.provider))) return
+  config.update((c) => {
+    c.connections = (c.connections ?? []).map((a) => (a.defaults === undefined ? { ...a, defaults: cliDefaults(c.settings, a.provider), defaultsFrom: 'cli' as const } : a))
+    c.connectionDefaultsTaken = [...new Set([...(c.connectionDefaultsTaken ?? []), ...c.connections.map((a) => a.provider)])]
   })
+  emit({ type: 'connections-changed' })
 }
 
 export function renameAccount(id: string, name: string): void {
-  assertOn()
   mustGet(id)
   const n = name.trim()
   if (!n) throw hiveError(NO_NAME, undefined, { kind: 'invalid' })
@@ -487,7 +504,6 @@ export function renameAccount(id: string, name: string): void {
  * (removeFolder); the account stays listed, saying what's left, until that succeeds.
  */
 export async function removeAccount(id: string): Promise<void> {
-  assertOn()
   const a = mustGet(id)
   const inUse = (): boolean => sessionsOn(id) || (claims.get(id) ?? 0) > 0 || loginsOpen.has(id) || hasPty(loginKey(a))
   const IN_USE = msg({ id: 'main.accounts.inUse', defaultMessage: '{name} is in use: stop the agents on it and close its sign-in, then remove it.', description: 'An error removing a connection ({name}, its name in Settings → Connections): agents run on it, or its sign-in terminal is open.' })
@@ -644,7 +660,6 @@ export function setUpSignInConnection(id: string): Promise<string> {
 }
 
 async function openLoginTerminal(id: string, setUp: boolean): Promise<string> {
-  assertOn()
   // A server connection has no sign-in: its Set Up opens the CLI instead (serverConnections.ts).
   if (isServer(mustGet(id))) throw hiveError(NO_ACCOUNT, undefined, { kind: 'invalid' })
   // Started under the account's lock, so never while it is being removed: the account checked still there (a removal
@@ -690,7 +705,6 @@ async function assertUsable(a: Connection): Promise<void> {
 
 /** Keeps the login an account is now signed in as (its change answered): refused without a good one to keep. */
 export function keepNewLogin(id: string): void {
-  assertOn()
   const a = mustGet(id)
   const ok = acceptable(a.observed, namesOrgs(a.provider))
   if (!ok) throw hiveError(msg({ id: 'main.accounts.nothingToKeep', defaultMessage: "{name} isn't signed in as anyone Hive could check, so there's no login to keep.", description: "An error: Keep the new login was asked for a connection ({name}) whose latest check didn't find it signed in." }), { name: a.name }, { kind: 'conflict' })
@@ -850,8 +864,6 @@ export function stopAccountWatches(): void {
 
 /** What Settings → Accounts shows for the asking window's workspace; each account checked again as it is shown. */
 export function accountsView(check = false): ConnectionsView {
-  // Off (the preview switch, until S8): nothing is listed, and nothing is checked.
-  if (!connectionsOn()) return { preview: false, providers: [], connections: [], workspace: {}, testHome: [] }
   const all = list()
   if (check) for (const a of all) if (!isServer(a)) void checkAccount(a.id)
   void loadKeys()
@@ -868,7 +880,15 @@ export function accountsView(check = false): ConnectionsView {
     const k = isServer(a) ? keyInfo(a.id) : undefined
     return k && k.origin === originOf(a.server?.baseUrl ?? '') ? { key: { last4: k.last4, at: k.at } } : {}
   }
-  return { preview: true, providers, connections: all.map((a) => ({ ...shownServer(a), signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a) })), workspace: ws, testHome, masking: coverageView() }
+  const intro = !config.get().ui.connectionsIntroShown && !all.length ? providers.filter((p) => !testHome.includes(p)) : []
+  return { ...(intro.length ? { intro } : {}), providers, connections: all.map((a) => ({ ...shownServer(a), signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a) })), workspace: ws, testHome, masking: coverageView() }
+}
+
+/** Dismisses the one-time notice that agents run on connections (HI-1774), in every window. */
+export function dismissConnectionsIntro(): void {
+  if (config.get().ui.connectionsIntroShown) return
+  config.update((c) => void (c.ui.connectionsIntroShown = true))
+  emit({ type: 'connections-changed' })
 }
 
 /** Saves the asking window's workspace's accounts for a provider, worked out from how they are when it is written. */
@@ -880,7 +900,6 @@ async function saveChoice(fn: (cfg: WorkspaceConfig) => WorkspaceConfig['connect
 
 /** Turns an account on or off in the asking window's workspace (on, with no default yet: it becomes the default). */
 export async function setAccountOn(id: string, on: boolean): Promise<void> {
-  assertOn()
   const a = mustGet(id)
   let chosen: string | null = null
   await saveChoice((c) => {
@@ -893,7 +912,6 @@ export async function setAccountOn(id: string, on: boolean): Promise<void> {
 
 /** Makes an account the asking window's workspace's default for its provider (turning it on if it isn't). */
 export async function setAccountDefault(id: string): Promise<void> {
-  assertOn()
   const a = mustGet(id)
   await saveChoice((c) => {
     const cur = workspaceAccounts(c, a.provider, list())
@@ -905,7 +923,6 @@ export async function setAccountDefault(id: string): Promise<void> {
 
 /** The Assistant's own connection for a provider in the asking window's workspace (HI-1755); null: the default. */
 export async function setAssistantConnection(id: ProviderId, connection: string | null): Promise<void> {
-  assertOn()
   if (connection) {
     const a = mustGet(connection)
     if (a.provider !== id) throw hiveError(NO_ACCOUNT, undefined, { kind: 'invalid' })
@@ -1049,8 +1066,8 @@ async function serverPart(a: Connection, caps: ServerCaps, agentName: string): P
  */
 export async function connectionForLaunch(o: { provider: ProviderId; workspaceConfig: WorkspaceConfig | null; wanted: string | null | undefined; agentName: string }): Promise<LaunchConnection | null> {
   const caps = providerDescriptor(o.provider).capabilities.connections
-  // Connections off (the preview switch, until S8): everything launches as before.
-  if (!caps || !connectionsOn()) return null
+  // A CLI without connections (Copilot: its own machine-wide login, HI-1758) launches as it always has.
+  if (!caps) return null
   const cli = providerDescriptor(o.provider).name
   const choose = (wanted: string | null | undefined): ReturnType<typeof resolveConnection> => resolveConnection(o.workspaceConfig, o.provider, wanted, list())
   const choice = choose(o.wanted)
@@ -1129,8 +1146,8 @@ class ConnectionChanged extends Error {}
  * (and the defaults it follows) only, so another agent's or the Assistant's save never ends it.
  */
 export async function launchOnChosen(o: { provider: ProviderId; workspaceConfig: WorkspaceConfig | null; agentName: string; chosen: () => Promise<string | null | undefined> }, run: (conn: LaunchConnection | null, lastLook: () => Promise<void>) => Promise<void>): Promise<void> {
-  // Connections off (the preview switch, until S8), or none for this CLI: it launches as before, its choice not read.
-  if (!providerDescriptor(o.provider).capabilities.connections || !connectionsOn()) return run(null, async () => undefined)
+  // A CLI without connections (Copilot): it launches on its own login, no choice read.
+  if (!providerDescriptor(o.provider).capabilities.connections) return run(null, async () => undefined)
   for (let again = false; ; again = true) {
     const conn = await connectionForLaunch({ provider: o.provider, workspaceConfig: o.workspaceConfig, wanted: await o.chosen(), agentName: o.agentName })
     try {
@@ -1202,6 +1219,8 @@ export function connectionOnHere(id: string, cli: ProviderId, projectPath: strin
  * workspace starts with the last-used connections, and the watches follow the open workspaces and their choices.
  */
 export function initConnections(): void {
+  // Connections from before the old per-CLI defaults' record (a preview's) count as having taken them, at once.
+  seedConnectionDefaults()
   setNewWorkspaceExtras(() => {
     const connections = newWorkspaceAccounts()
     return connections ? { connections } : {}

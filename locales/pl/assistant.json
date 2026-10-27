@@ -1,4 +1,5 @@
 {
+  "assistant.banner.connectionSetup": "W tym obszarze roboczym nie jest włączone żadne połączenie {cli}, więc Asystent nie może się uruchomić. Dodaj połączenie i je zaloguj.",
   "assistant.hiveTemplates.pair": "Para",
   "assistant.hiveTemplates.pairOne": "Para: jeden dostawca",
   "assistant.hiveTemplates.pairOneText": "Wykonawca i recenzent, obaj na Claude Code: gdy zainstalowany jest tylko jeden agent programistyczny.",

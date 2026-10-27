@@ -19,7 +19,7 @@ import { keptLaneOrder } from '../shared/laneBar'
 import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../shared/tips'
 import { allProviders } from './providers'
 import { providerService } from './providerService'
-import { accountsView, addAccount, connectionHomes, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, setConnectionDefaults, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
+import { accountsView, addAccount, connectionHomes, dismissConnectionsIntro, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, setConnectionDefaults, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
 import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setUpServerConnection } from './serverConnections'
 import { requireMasking } from './keyCoverage'
 import { resetMasking } from './keyStore'
@@ -1589,6 +1589,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'connections:setDefaults': (id, patch) => setConnectionDefaults(id, patch),
     'connections:notice': () => movedNotice(workspace),
     'connections:dismissNotice': (keys) => dismissMovedNotice(workspace, Array.isArray(keys) ? keys.filter((k) => typeof k === 'string') : []),
+    'connections:dismissIntro': () => dismissConnectionsIntro(),
     'session:switchConnection': (p, agentId) => sessions.switchAtSafePoint(p, agentId),
 
     'api:info': () => apiInfo(),

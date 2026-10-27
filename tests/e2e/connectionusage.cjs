@@ -1,9 +1,8 @@
-// Plan usage per connection (HI-1756, Connections S5; behind Settings → Advanced → Connections (preview), the test seam
+// Plan usage per connection (HI-1756, Connections S5; the test seam
 // off): two connections signed in through the fake Claude Code, an agent on each, each reporting its own limits
 // ("planusage F W", as Claude Code's status line does). The status bar shows one item per connection, named, side by
 // side, and no Claude Code-wide item; the Overview lists each connection with its login and its limits; the footer names
-// each agent's connection, with who it is signed in as in its hover; the 95% warning is Max 2's alone, naming it. With the
-// preview off, the connections' items go. Screenshots of the status bar and the Overview, in both themes.
+// each agent's connection, with who it is signed in as in its hover; the 95% warning is Max 2's alone, naming it. Screenshots of the status bar and the Overview, in both themes.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -34,7 +33,6 @@ const check = (name, ok, extra = '') => {
   const { app, page, inv } = await lib.launch({ userData, env: { ...env, HIVE_TEST_CLI_HOME_CONNECTION: '0', HIVE_TEST_NOTIFY_LOG: notifyLog }, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    await inv('advanced:set', 'hive.accounts.preview', true)
     await lib.openWorkspace(inv, page, ws)
     const live = async (agentId) => (await inv('session:live')).find((s) => s.agentId === agentId && s.status !== 'stopped') ?? null
     const shots = async (name, clip) => {
@@ -125,9 +123,6 @@ const check = (name, ok, extra = '') => {
     check('the status bar shows Max 2 at the new login’s 5h 1% · Week 1%, not warned', !!(await lib.until(async () => /Max 2.*5h 1%.*Week 1%/.test(await text(max2.id)), HUNG_MS)) && !/\b(warn|caution)\b/.test((await item(max2.id).getAttribute('class')) ?? ''), await text(max2.id))
     check('…and Max 1’s own figures are as they were', /Max 1.*5h 62%.*Week 10%/.test(await text(max1.id)), await text(max1.id))
 
-    // --- The preview off: the connections' items go.
-    await inv('advanced:set', 'hive.accounts.preview', false)
-    check('with the preview off, no connection’s item is shown', !!(await lib.until(async () => (await page.locator('.statusbar [data-plan-connection]').count()) === 0, HUNG_MS)))
     for (const id of ['a-one', 'a-two']) await inv('session:stop', alpha, id)
   } catch (e) {
     check('the suite ran to its end', false, e.stack)

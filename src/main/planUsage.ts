@@ -125,7 +125,7 @@ const shownValues = (u: PlanUsage | null | undefined): string => JSON.stringify(
  *
  * A session launched on a connection (HI-1756) reports that connection's own limits: kept by its id
  * (`connectionPlanUsage`), never mixed into its CLI's, and warned of per connection (`connection:<id>:<limit>`), the
- * notice naming it. One whose session isn't on a connection (the preview off) is its CLI's, as before.
+ * notice naming it. One whose session isn't on a connection (a CLI without them: Copilot) is its CLI's.
  * They are a login's (HR2's round 1): kept with the login they came from (`login`, usageLogin), and taken only from a
  * session launched as the login the connection is signed in as now. One still running as another (a login kept since,
  * or changed in a pane) or whose login its launch couldn't tell is left out: it never fills another login's figures.
