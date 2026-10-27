@@ -120,7 +120,9 @@ const mode = ({ name, word: w }) =>
     check('…the question’s own turn ends with its reply', !!ended, `question ${question.id}; ${JSON.stringify({ status: state?.status, since: state?.statusSince })}`)
     return reply
   }
-  const answers = (reply, m) => reply.includes(m.word) && Object.values(modes).every((o) => o === m || !reply.includes(o.word))
+  // Its answer is the first codeword in the reply (HI-1669: Haiku may go on to name its earlier one, "My earlier reply,
+  // ALPHA-…, was wrong."): a wrong first answer, or a codeword from an earlier run, still fails.
+  const answers = (reply, m) => /\b(?:ALPHA|BRAVO|CHARLIE)-[0-9A-F]{6}\b/.exec(reply)?.[0] === m.word
   // The mode menu in the Assistant panel's header.
   const panel = page.locator('.assistant-panel')
   const menu = async (label) => {
