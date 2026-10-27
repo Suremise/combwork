@@ -117,6 +117,7 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
   const group = page.locator('.image-group', { hasText: 'Planning the week' })
   await lib.until(async () => (await group.locator('.thumb').count()) === 4, 10000)
   check("the pasted files show, under their conversation's name", (await group.locator('.thumb').count()) === 4)
+  check('…with no tabs: the Assistant has pane attachments alone (HI-1841)', (await page.locator('.images-page .attachment-tabs').count()) === 0 && (await page.locator('.images-page [role="tabpanel"]').count()) === 0)
   check('the toolbar counts them by conversation', /4 in 1 conversation\b/.test(await page.locator('.images-toolbar').innerText()), await page.locator('.images-toolbar').innerText())
   const desc = await page.locator('.images-desc').innerText().catch(() => '')
   check('a line says what the view holds', desc === 'Files pasted or dropped into the Assistant, by conversation.', desc)

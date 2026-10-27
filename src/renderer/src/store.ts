@@ -251,6 +251,8 @@ interface State {
   /** Set to select a session in its project's Sessions tab. */
   /** Open the Sessions tab on a session, and in it at its nth compaction (from 0, oldest first) when given. */
   sessionsJump: { project: string; id: string; nonce: number; compaction?: number } | null
+  /** A link into a project's Attachments tab (HI-1841): its tab, at a card's or a session's files; cleared once shown. */
+  attachmentsJump: AttachmentsJump | null
   /** The Activity tab's view per project (#1254, HI-1677): its range, agents' and cards' filters, Hide finished, paused by hand. */
   activityFilters: Record<string, ActivityView>
   /** A file to show in a project's Files tab (a terminal's file link): whose folder (`root`, a worktree agent's id or ''), the file and the line. */
@@ -536,6 +538,7 @@ export const useStore = create<State>(() => ({
   progressFolded: false,
   progressUnfolded: false,
   sessionsJump: null,
+  attachmentsJump: null,
   activityFilters: {},
   filesJump: null,
   panes: {},
@@ -1085,6 +1088,16 @@ export function openProjectSettings(path: string, section: string): void {
   set({ selectedProject: path, projectSettingsJump: { project: path, section, at: Date.now() } })
   showView('projects')
   setProjectTab(path, 'settings')
+}
+
+/** Where a link into the Attachments tab goes (HI-1841): Card attachments at a card, or Pane attachments at a session. */
+export type AttachmentsJump = { project: string; nonce: number } & ({ tab: 'card'; card: number } | { tab: 'pane'; session: string })
+
+/** Opens a project's Attachments tab on Card attachments at a card, or Pane attachments at a session (HI-1841). */
+export function showAttachments(path: string, at: { card: number } | { session: string }): void {
+  set({ selectedProject: path, attachmentsJump: { project: path, nonce: Date.now(), ...('card' in at ? { tab: 'card' as const, card: at.card } : { tab: 'pane' as const, session: at.session }) } })
+  showView('projects')
+  setProjectTab(path, 'images')
 }
 
 /** Opens the Sessions tab on one session; with `compaction`, at that compaction's divider (its nth, from 0). */

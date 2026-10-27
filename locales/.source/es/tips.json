@@ -65,6 +65,8 @@
   "tips.assistantWaits.title": "Have the Assistant tell you when an agent is done",
   "tips.attachFiles.text": "Drop a PDF, a log or any file onto an agent's terminal: Hive keeps a copy with the session and pastes its path. A chip shows what's attached, and says when the agent's CLI doesn't read that kind of file itself, so the agent opens it by its path.",
   "tips.attachFiles.title": "Attach any file to a prompt",
+  "tips.attachmentsTabs.text": "The Attachments tab has Pane attachments and Card attachments. Show in Attachments, beside a card's attachments, opens Card attachments at that card; Show Session's Attachments, in an agent's ⋯ menu, opens Pane attachments at its session.",
+  "tips.attachmentsTabs.title": "Jump to a card's or a session's files",
   "tips.backupRetention.text": "Hive compresses its transcript backups once a session ends, and Storage shows what they hold. To let old ones go, set Settings → Sessions → Keep transcript backups: only copies of sessions the CLI still has go to the Recycle Bin.",
   "tips.backupRetention.title": "Backups take less room, and can expire",
   "tips.banners.text": "While you use Hive, an agent finishing or needing you is a banner in the window, not a Windows notification over the Assistant. Settings → Notifications chooses where it shows, for which workspaces, and for how long.",

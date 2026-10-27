@@ -23,7 +23,7 @@ import { formatDateTime, formatWhen } from '@shared/dates'
 import * as actions from '../actions'
 import { HAND_OVER_TEXT, handOverNow, onRunningLane } from '@shared/handOver'
 import { call, errorMessage } from '../api'
-import { NO_IDS, NO_PROJECTS, agentPage, get, agentProviderOf, clearStartFailure, closeTile, focusAgent, focusedAgentId, isAssistantPath, notify, openActivity, openInSessionsTab, paneAssignment, paneCells, projectKey, prompt, revealAgent, seenAgents, set, setProjectTab, showAgent, openVersionControl, showInOverview, showPage, shownLayout, startingKey, startingLabel, useLanguage, useStarting, useStore } from '../store'
+import { NO_IDS, NO_PROJECTS, agentPage, get, agentProviderOf, clearStartFailure, closeTile, focusAgent, focusedAgentId, isAssistantPath, notify, openActivity, openInSessionsTab, paneAssignment, paneCells, projectKey, prompt, revealAgent, seenAgents, set, setProjectTab, showAgent, openVersionControl, showAttachments, showInOverview, showPage, shownLayout, startingKey, startingLabel, useLanguage, useStarting, useStore } from '../store'
 import { useLiveUsage, useLiveUsageState } from '../usage'
 import { commandKeybinding } from '../commands'
 import { cx, formatKeybinding, formatTokens, sessionLabel, timeAgo } from '../util'
@@ -243,7 +243,7 @@ async function renameSession(project: ProjectInfo, sessionId: string, current: s
 
 /**
  * The session an agent is running, in its menu (#978: an icon in its footer before): Open in Sessions Tab, with the
- * session's name and when it started as its detail, and Rename Session….
+ * session's name and when it started as its detail, Show Session's Attachments (HI-1841) and Rename Session….
  */
 function sessionItems(project: ProjectInfo, live: LiveSessionState | null | undefined, usage: SessionUsage | null | undefined): MenuEntry[] {
   if (!live || live.settingUp || !live.sessionId) return []
@@ -251,6 +251,8 @@ function sessionItems(project: ProjectInfo, live: LiveSessionState | null | unde
   const id = live.sessionId
   return [
     { label: tr(msg({ id: 'panes.session.openInTab', defaultMessage: 'Open in Sessions Tab', description: "Menu item (an agent's menu): reads its running session in the Sessions tab; the session's name and start are its detail." })), icon: 'comment-discussion', detail: tr(msg({ id: 'panes.session.detail', defaultMessage: '{session} · since {since}', description: "The detail of Open in Sessions Tab in an agent's menu: the running session's name and when it started ({since}: a date and time)." }), { session: label, since: formatDateTime(live.startedAt) }), onClick: () => openInSessionsTab(project.path, id) },
+    // Its own session's files in the project's Attachments tab (HI-1841); the Assistant's are in its own view.
+    ...(isAssistantPath(project.path) ? [] : [{ label: tr(msg({ id: 'panes.session.showAttachments', defaultMessage: "Show Session's Attachments", description: "Menu item (an agent's menu, HI-1841): opens the project's Attachments tab on Pane attachments, at the files pasted or dropped into this running session." })), icon: 'attach', onClick: () => showAttachments(project.path, { session: id }) }]),
     { label: tr(msg({ id: 'panes.session.renameItem', defaultMessage: 'Rename Session…', description: "Menu item (an agent's menu): renames its running session." })), icon: 'tag', onClick: () => void renameSession(project, id, label) }
   ]
 }

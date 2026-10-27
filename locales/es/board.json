@@ -65,6 +65,7 @@
   "board.attach.removeTitle": "¿Quitar {name} de {card}?",
   "board.attach.removed": "{name} (quitado)",
   "board.attach.show": "Mostrar en la carpeta",
+  "board.attach.showInTab": "Mostrar en Adjuntos",
   "board.attach.toCard": "Adjuntar a {card}",
   "board.attach.tooLarge": "{name} supera {max}, lo máximo que una tarjeta conserva en un archivo (Configuración → Avanzado → Adjuntos de tarjetas: archivo más grande).",
   "board.attach.tooMuch": "Se pueden guardar como máximo {files, number} archivos y {total} a la vez, la descripción y el comentario juntos.",

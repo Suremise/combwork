@@ -67,6 +67,8 @@ interface HiveMessageValues {
   'tips.assistantWaits.title': undefined
   'tips.attachFiles.text': undefined
   'tips.attachFiles.title': undefined
+  'tips.attachmentsTabs.text': undefined
+  'tips.attachmentsTabs.title': undefined
   'tips.backupRetention.text': undefined
   'tips.backupRetention.title': undefined
   'tips.banners.text': undefined

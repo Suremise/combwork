@@ -65,6 +65,7 @@
   "board.attach.removeTitle": "Remover {name} de {card}?",
   "board.attach.removed": "{name} (removido)",
   "board.attach.show": "Mostrar na pasta",
+  "board.attach.showInTab": "Mostrar em Anexos",
   "board.attach.toCard": "Anexar a {card}",
   "board.attach.tooLarge": "{name} passa de {max}, o máximo que um cartão mantém em um arquivo (Configurações → Avançado → Anexos de cartões: maior arquivo).",
   "board.attach.tooMuch": "No máximo {files, number} arquivos e {total} podem ser salvos de uma vez, a descrição e o comentário juntos.",

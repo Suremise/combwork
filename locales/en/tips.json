@@ -263,6 +263,14 @@
     "defaultMessage": "Attach any file to a prompt",
     "description": "A tip's title."
   },
+  "tips.attachmentsTabs.text": {
+    "defaultMessage": "The Attachments tab has Pane attachments and Card attachments. Show in Attachments, beside a card's attachments, opens Card attachments at that card; Show Session's Attachments, in an agent's ⋯ menu, opens Pane attachments at its session.",
+    "description": "A tip (HI-1841). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.attachmentsTabs.title": {
+    "defaultMessage": "Jump to a card's or a session's files",
+    "description": "A tip's title (HI-1841)."
+  },
   "tips.backupRetention.text": {
     "defaultMessage": "Hive compresses its transcript backups once a session ends, and Storage shows what they hold. To let old ones go, set Settings → Sessions → Keep transcript backups: only copies of sessions the CLI still has go to the Recycle Bin.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

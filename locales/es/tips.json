@@ -65,6 +65,8 @@
   "tips.assistantWaits.title": "Que el Asistente te avise cuando un agente termine",
   "tips.attachFiles.text": "Suelta un PDF, un registro o cualquier archivo en la terminal de un agente: Hive guarda una copia con la sesión y pega su ruta. Una etiqueta muestra lo adjunto, y avisa cuando la CLI del agente no lee ese tipo de archivo por sí misma, para que el agente lo abra por su ruta.",
   "tips.attachFiles.title": "Adjunta cualquier archivo a un prompt",
+  "tips.attachmentsTabs.text": "La pestaña Adjuntos tiene Adjuntos de paneles y Adjuntos de tarjetas. Mostrar en Adjuntos, junto a los adjuntos de una tarjeta, abre Adjuntos de tarjetas en esa tarjeta; Mostrar los adjuntos de la sesión, en el menú ⋯ de un agente, abre Adjuntos de paneles en su sesión.",
+  "tips.attachmentsTabs.title": "Ir a los archivos de una tarjeta o una sesión",
   "tips.backupRetention.text": "Hive comprime sus copias de las transcripciones cuando termina una sesión, y Almacenamiento muestra lo que contienen. Para dejar ir las antiguas, ajusta Configuración → Sesiones → Conservar las copias de las transcripciones: solo van a la Papelera de reciclaje las copias de sesiones que la CLI aún tiene.",
   "tips.backupRetention.title": "Las copias ocupan menos y pueden caducar",
   "tips.banners.text": "Mientras usas Hive, que un agente termine o te necesite se muestra como un banner en la ventana, no como una notificación de Windows encima del Asistente. Configuración → Notificaciones elige dónde se muestra, para qué espacios de trabajo y durante cuánto tiempo.",

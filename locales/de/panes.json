@@ -164,6 +164,7 @@
   "panes.session.renameFailed": "Umbenennen fehlgeschlagen",
   "panes.session.renameItem": "Sitzung umbenennen…",
   "panes.session.renameTitle": "Sitzung umbenennen",
+  "panes.session.showAttachments": "Anhänge der Sitzung zeigen",
   "panes.session.starting": "{kind, select, resume {Wird fortgesetzt…} other {Wird gestartet…}}",
   "panes.tab.failed": "Start fehlgeschlagen: {why}",
   "panes.tab.mcp": "MCP-Server: {servers}",

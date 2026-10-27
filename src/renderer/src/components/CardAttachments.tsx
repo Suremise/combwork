@@ -11,8 +11,9 @@ import { agentRowCards, columnName } from '@shared/tasks'
 import { call, errorMessage } from '../api'
 import { useAdvancedValue } from '../advanced'
 import { ATTACHMENT_ANCHOR, type AttachmentLookup } from '../cardAttachLinks'
-import { confirm, notify, set, useStore } from '../store'
+import { confirm, notify, set, showAttachments, useStore } from '../store'
 import { imageUrl, timeAgo } from '../util'
+import { useScopedLoad } from '../scopedLoad'
 import { Icon, IconButton, Tooltip, useContextMenu, type MenuEntry } from './ui'
 
 /** A box of the card dialog that takes drafts. */
@@ -43,6 +44,7 @@ const M = {
   removeMessage: msg({ id: 'board.attach.removeMessage', defaultMessage: '{used, select, none {It goes to the Recycle Bin.} other {It goes to the Recycle Bin. It is shown in {used}: those links will say it was removed.}}', description: 'The confirmation before removing a card attachment (HI-1700); {used}: where the card shows it ("the description and 2 comments"), or none.' }),
   where: msg({ id: 'board.attach.where', defaultMessage: '{description, select, yes {the description} other {}}{both, select, yes { and } other {}}{comments, plural, =0 {} one {a comment} other {# comments}}', description: 'Where a card shows an attachment (HI-1700), in the remove confirmation: the description, and/or how many comments.' }),
   missing: msg({ id: 'board.attach.missing', defaultMessage: 'Its file is gone', description: "A card attachment whose file is no longer on disk (HI-1700): shown on it, with Remove." }),
+  showInTab: msg({ id: 'board.attach.showInTab', defaultMessage: 'Show in Attachments', description: "A link beside the card dialog's Attachments heading (HI-1841): opens the project's Attachments tab on Card attachments, at this card's files." }),
   meta: msg({ id: 'board.attach.meta', defaultMessage: '{size} · {by}, {when}', description: "Under a card attachment's name (HI-1700): its size, who added it and when ({when}: \"4 minutes ago\")." })
 }
 
@@ -228,26 +230,33 @@ export function attachToCardMenu(opts: { hostPath: string; project: string | nul
 }
 
 const TAB = {
-  heading: msg({ id: 'files.attach.cardsHeading', defaultMessage: 'Cards ({n, number})', description: "A section of a project's Attachments tab (HI-1700): files kept with the project's cards, and how many ({n}); the sessions' attachments follow." }),
   archived: msg({ id: 'files.attach.cardArchived', defaultMessage: 'Archived', description: "A badge on a card in the Attachments tab's Cards section (HI-1700): the card is archived (its files are kept)." }),
   openCard: msg({ id: 'files.attach.openCard', defaultMessage: 'Open {card}', description: "Hover of a card's name in the Attachments tab's Cards section (HI-1700): opens the card. {card} is its key." }),
   kept: msg({ id: 'files.attach.cardsKept', defaultMessage: "Kept with the card until it is deleted: Clean Up and Purge don't remove them.", description: "Under the Cards heading of a project's Attachments tab (HI-1700)." })
 }
 
-/** A project's cards' attachments (its Attachments tab), read again whenever the board changes. */
-export function useProjectCardAttachments(projectPath: string | null): { groups: CardAttachmentGroup[]; reload: () => Promise<void> } {
+/**
+ * A project's cards' attachments (its Attachments tab), read again whenever the board changes; `loaded` once a read for
+ * this project has answered (HI-1841: its tabs choose only then), `failed` when the last one failed. Reads go through
+ * useScopedLoad, so an older read (this project's, or one still running for the last project) never replaces a newer
+ * one's answer (HR5's HI-1841 round 1).
+ */
+export function useProjectCardAttachments(projectPath: string | null): { groups: CardAttachmentGroup[]; reload: () => Promise<void>; loaded: boolean; failed: boolean } {
   // Each read of the board: an attachment added or removed leaves the cards, so `tasks`, as they were (HI-1853).
   const reads = useStore((s) => s.boardReads)
-  const [groups, setGroups] = useState<CardAttachmentGroup[]>([])
+  const scope = projectPath ?? ''
+  const read = useScopedLoad<CardAttachmentGroup[]>(scope)
+  const { load } = read
   const reload = useCallback(async () => {
-    if (!projectPath) return setGroups([])
-    setGroups(await call('cards:projectAttachments', projectPath).catch(() => []))
-  }, [projectPath])
+    load(scope, () => (projectPath ? call('cards:projectAttachments', projectPath) : Promise.resolve([])))
+  }, [load, scope, projectPath])
   useEffect(() => {
     void reload()
   }, [reload, reads])
-  return { groups, reload }
+  return { groups: read.data ?? NO_GROUPS, reload, loaded: read.data !== null && !read.error, failed: !!read.error }
 }
+
+const NO_GROUPS: CardAttachmentGroup[] = []
 
 /**
  * The Attachments tab's Cards section (HI-1700): the files kept with the project's cards, by card (its key, which opens
@@ -275,9 +284,7 @@ export function CardAttachmentSection({ groups, kind, reload }: { groups: CardAt
   ]
   return (
     <section className="card-attachment-section" data-section="card-attachments">
-      <h3 className="images-archived">
-        <Icon name="checklist" /> {tr(TAB.heading, { n: shown.reduce((n, g) => n + g.attachments.length, 0) })}
-      </h3>
+      {/* Its tab names it and counts them (HI-1841): what keeps them, under it. */}
       <p className="hint">{tr(TAB.kept)}</p>
       {shown.map((g) => (
         <div key={g.card} className="image-group" data-card={g.card}>
@@ -324,6 +331,8 @@ function usedIn(card: TaskCard, id: string): { description: boolean; comments: n
 /** The card dialog's Attachments: every file kept with the card, newest first, with Open, Show in Folder and Remove. */
 export function CardAttachmentList({ card, label, list, reload, readOnly }: { card: TaskCard; label: string; list: CardAttachment[]; reload: () => Promise<void>; readOnly: boolean }) {
   const [busy, setBusy] = useState<string | null>(null)
+  // Its project in this window, whose Attachments tab Show in Attachments opens (HI-1841).
+  const projectPath = useStore((s) => s.workspace?.projects.find((p) => p.name.toLowerCase() === card.project.toLowerCase())?.path ?? null)
   const remove = async (a: CardAttachment): Promise<void> => {
     const u = usedIn(card, a.id)
     const used = u.description || u.comments ? tr(M.where, { description: u.description ? 'yes' : 'no', both: u.description && u.comments ? 'yes' : 'no', comments: u.comments }) : 'none' // i18n-ignore: ICU select keys
@@ -338,7 +347,14 @@ export function CardAttachmentList({ card, label, list, reload, readOnly }: { ca
   }
   return (
     <div className="card-attachments" data-section="attachments">
-      <div className="task-section-h">{tr(M.heading, { n: list.length })}</div>
+      <div className="task-section-h">
+        {tr(M.heading, { n: list.length })}
+        {list.length > 0 && projectPath && (
+          <button className="link-button card-attachments-show" data-action="show-in-attachments" onClick={() => (set({ taskOpen: null }), showAttachments(projectPath, { card: card.number }))}>
+            {tr(M.showInTab)}
+          </button>
+        )}
+      </div>
       {!list.length ? (
         <div className="faint small">{tr(M.hint)}</div>
       ) : (

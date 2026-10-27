@@ -65,6 +65,7 @@
   "board.attach.removeTitle": "Retirer {name} de {card} ?",
   "board.attach.removed": "{name} (retirée)",
   "board.attach.show": "Afficher dans le dossier",
+  "board.attach.showInTab": "Afficher dans Pièces jointes",
   "board.attach.toCard": "Joindre à {card}",
   "board.attach.tooLarge": "{name} dépasse {max}, le maximum qu’une carte garde dans un fichier (Paramètres → Avancé → Pièces jointes des cartes : plus gros fichier).",
   "board.attach.tooMuch": "Au plus {files, number} fichiers et {total} peuvent être enregistrés à la fois, description et commentaire ensemble.",

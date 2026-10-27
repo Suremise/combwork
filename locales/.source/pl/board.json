@@ -65,6 +65,7 @@
   "board.attach.removeTitle": "Remove {name} from {card}?",
   "board.attach.removed": "{name} (removed)",
   "board.attach.show": "Show in Folder",
+  "board.attach.showInTab": "Show in Attachments",
   "board.attach.toCard": "Attach to {card}",
   "board.attach.tooLarge": "{name} is larger than {max}, the most a card keeps in one file (Settings → Advanced → Card attachments: largest file).",
   "board.attach.tooMuch": "At most {files, number} files and {total} can be saved at once, the description and the comment together.",
