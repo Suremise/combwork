@@ -1466,17 +1466,25 @@ export function cardChanges(ws: WorkspaceService, since: number | null): CardCha
   })
 }
 
+/** What a decision notice reads of a card (decisionNotices.ts): where it is, whose, its review and block, its history and decisions. */
+const DECISION_FIELDS = ['project', 'projectId', 'column', 'agent', 'agentName', 'review', 'blocked', 'history', 'decisions']
+
 /**
- * The live cards at revision `since` or above (every live card when null), in full, with the board's mark and its
- * opening, from one snapshot: nothing of the other cards read (cardChanges reads every card's number and key, HI-1789).
- * Null on a board with no revisions (a 0.9 board waiting for its upgrade).
+ * The live cards at revision `since` or above (every live card when null): their numbers, and DECISION_FIELDS of those
+ * with decisions, with the board's mark and its opening, from one snapshot (HI-1789). Nothing else of any card is read:
+ * no comments or description, and nothing of the cards unchanged (cardChanges reads every card's number and key). Null
+ * on a board with no revisions (a 0.9 board waiting for its upgrade).
  */
-export function liveCardChanges(ws: WorkspaceService, since: number | null): { generation: number; mark: number; live: { number: number; doc: Record<string, unknown> }[] } | null {
+export function decisionChanges(ws: WorkspaceService, since: number | null): { generation: number; mark: number; changed: number[]; docs: { number: number; doc: Record<string, unknown> }[] } | null {
   return readSnapshot(ws, (b, db) => {
     if (b.legacy) return null
     const mark = (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g // i18n-ignore: SQL
-    const sel = since === null ? { where: 'archived = 0' } : { where: 'archived = 0 AND rev >= ?', args: [since] } // i18n-ignore: SQL
-    return { generation: b.generation, mark, live: readCardRows(db, sel).map((r) => ({ number: r.card.number, doc: composeCard(r) })) }
+    const where = `archived = 0${since === null ? '' : ' AND rev >= ?'}` // i18n-ignore: SQL
+    const args = since === null ? [] : [since]
+    const changed = (db.prepare(`SELECT number FROM cards WHERE ${where}`).all(...args) as { number: number }[]).map((r) => r.number) // i18n-ignore: SQL
+    const decided = `${where} AND EXISTS (SELECT 1 FROM card_decisions d WHERE d.card = cards.number)` // i18n-ignore: SQL
+    const docs = cardFields(db, DECISION_FIELDS, { where: decided, args, parts: ['history', 'decisions'] }).map(({ r, fields }) => ({ number: r.card.number, doc: fields }))
+    return { generation: b.generation, mark, changed, docs }
   })
 }
 
