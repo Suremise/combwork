@@ -205,6 +205,13 @@ describe('Hive keeps agent names unique across the workspace', () => {
     mkdirSync(join(fresh, '.hive'), { recursive: true })
     execFileSync('git', ['init', '-q', '-b', 'main', fresh])
     expect((await run(() => templates.templatePlan(fresh, 'workspace', 'trees.json'))).blocked).toEqual([])
+    // The new project made (a refresh writes its project.json) and given its id now, and the refreshes that scheduled run
+    // (HI-1799): left to the workspace's watcher, the id's save landed in a later test after its refresh had read the
+    // projects (#999: that refresh reported the cached workspace).
+    await run(() => w.refresh())
+    await run(() => w.projectIds({ fresh: true }))
+    expect(cfgOf(fresh).id).toMatch(/^p-/)
+    await run(() => w.refreshesSettled())
   })
 
   it('names two projects shared from before are flagged once, with a rename to make, while they last', async () => {
