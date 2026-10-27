@@ -228,17 +228,17 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     // The tab already shown, its filter hiding the target (HR5's HI-1841 round 1): an older card with only an image, below
     // newer cards with text files, opened with Card attachments on Text. Its jump waits for the filter's reset to show,
     // then scrolls to it.
-    const api = (method, url, body) => fetch(`http://127.0.0.1:${PORT}${url}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const patchCard = (num, body) => fetch(`http://127.0.0.1:${PORT}/v1/tasks/${num}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const pic = path.join(alpha, 'docs', 'old-shot.png')
     fs.writeFileSync(pic, lib.samplePng(48, 48))
     const older = await inv('tasks:create', { title: 'Older card with a picture', project: 'alpha' })
-    await api('PATCH', `/v1/tasks/${older.number}`, { attachments: [pic] })
+    await patchCard(older.number, { attachments: [pic] })
     for (let i = 0; i < 6; i++) {
       const t = await inv('tasks:create', { title: `Newer card ${i}`, project: 'alpha' })
       const f = path.join(alpha, 'docs', `newer-${i}.txt`)
       fs.writeFileSync(f, `newer ${i}
 `)
-      await api('PATCH', `/v1/tasks/${t.number}`, { attachments: [f] })
+      await patchCard(t.number, { attachments: [f] })
     }
     const olderGroup = section.locator(`[data-card="${older.number}"]`)
     const cardTotal = () => attachTabs().then((t) => t.find((x) => x.id === 'card')?.count ?? 0)
