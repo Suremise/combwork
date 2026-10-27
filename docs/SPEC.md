@@ -3432,7 +3432,9 @@ Whether a conversation may resume there is its **hold** (none: it may):
     still has another session in it, or processes one left running there"); two at once give one writer.
   - A writer whose Hive is gone is never taken over or cleared from a snapshot of its processes: it stays held until
     the user releases the slot (#1506). A refresh clears only this Hive's own writer whose processes are proven ended
-    but whose release couldn't be written.
+    but whose release couldn't be written. Hive's quit therefore waits, after the leftovers' look that tells each
+    stopped run's outcome, for those releases to be written (at most 3 s, `sessions.writersSettled`) before its
+    workspaces close (HI-1801: a quit that closed them first left the slot held, and the next start there was refused).
   - **Release Slot…** (#1506, the user's recovery, `agentFolders.ts` `heldWriter`/`releaseHeldWriter`): a writer is
     *held* when its run isn't live in this Hive (its token ended: the session over and its leftovers kept, untracked
     or unreadable) and its Hive is this one or one known to have gone (`writerHeld`). The agent's ⋯ offers Release

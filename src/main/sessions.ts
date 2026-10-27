@@ -1620,8 +1620,27 @@ class SessionManager {
     if (!w) return
     this.writers.delete(run)
     // Its claim's tracked work (which a closing pool awaits) ends once its release is written, when nothing of it ran.
-    if (w.spawned) void settleWriter(w.projectPath, run)
-    else void releaseWriter(w.projectPath, run).finally(() => w.done())
+    const settled = w.spawned ? settleWriter(w.projectPath, run) : releaseWriter(w.projectPath, run).finally(() => w.done())
+    // Kept until written: a quit waits for them before its workspaces close (HI-1801).
+    this.writersSettling.add(settled)
+    void settled.finally(() => this.writersSettling.delete(settled))
+  }
+
+  /** Writer releases under way (settleWriterOf): each its write of the release, once its run's outcome is known. */
+  private readonly writersSettling = new Set<Promise<void>>()
+
+  /**
+   * Once the slot writers of the runs that have ended are released (or found held), at most `timeoutMs` (HI-1801: Hive
+   * quitting closed the workspace before a stopped run's release was written, its outcome known only after the
+   * leftovers' look, so the next start found the slot held by a Hive that had gone). Hive's quit, after the leftovers.
+   */
+  async writersSettled(timeoutMs: number): Promise<void> {
+    const all = (async () => {
+      while (this.writersSettling.size) await Promise.allSettled([...this.writersSettling])
+    })()
+    let timer: NodeJS.Timeout | undefined
+    await Promise.race([all, new Promise<void>((r) => (timer = setTimeout(r, timeoutMs)))])
+    clearTimeout(timer)
   }
 
   /** A process of a run holding a slot's writer has spawned (#1434): its exit settles it, and its claim's tracked work ends. */
