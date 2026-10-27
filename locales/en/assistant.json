@@ -1,4 +1,8 @@
 {
+  "assistant.banner.connectionSetup": {
+    "defaultMessage": "No {cli} connection is on in this workspace, so the Assistant can't start. Add one and sign it in.",
+    "description": "Banner in the Assistant panel when its coding agent CLI ({cli}: \"Claude Code\") has no connection on in the workspace (HI-1774): it can't start until one is."
+  },
   "assistant.hiveTemplates.pair": {
     "defaultMessage": "Pair",
     "description": "Name of one of Hive's own agent templates: a builder and a reviewer. Like the preset Pair."

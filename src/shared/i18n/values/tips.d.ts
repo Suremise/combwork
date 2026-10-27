@@ -136,6 +136,8 @@ interface HiveMessageValues {
   'tips.compareBranches.title': undefined
   'tips.conflictHunks.text': undefined
   'tips.conflictHunks.title': undefined
+  'tips.connections.text': undefined
+  'tips.connections.title': undefined
   'tips.consoleRecording.text': undefined
   'tips.consoleRecording.title': undefined
   'tips.consoleText.text': undefined

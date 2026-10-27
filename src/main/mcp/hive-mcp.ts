@@ -127,7 +127,7 @@ const settingsArgs = {
   mode: { type: 'string', description: 'Permission mode (hive_list_providers). Empty follows the project.' },
   context200k: { type: 'string', enum: ['on', 'off', ''], description: "Use a 200K context window instead of the model's 1M one, for providers with context200k (hive_list_providers). Empty follows the project." },
   mcpServers: { type: 'array', items: { type: 'string' }, description: "Only these of the project's MCP servers (names), [] none, [\"*\"] all (the default). The hive server is always given." },
-  connection: { type: 'string', description: "With Connections on: the connection it runs on, by id or name (hive_list_providers lists those on here); its CLI is the provider. Empty: its CLI's default connection. A name two share is refused: use the id." }
+  connection: { type: 'string', description: "The connection it runs on, by id or name (hive_list_providers lists those on here); its CLI is the provider. Empty: its CLI's default connection. A name two share is refused: use the id." }
 }
 const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either'], description: 'Its side in the workflow: builds cards, reviews them, or either (never its own). Default: guessed from its name.' }
 const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/agents/${enc(a.agent || '')}`
@@ -379,7 +379,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_list_providers',
-    description: 'The coding-agent providers: whether each is on and installed, and the models, effort levels, permission modes and (with Connections on) the connections on here to use when adding or changing agents (JSON).',
+    description: 'The coding-agent providers: whether each is on and installed, and the models, effort levels, permission modes and the connections on here to use when adding or changing agents (JSON).',
     inputSchema: { type: 'object', properties: {} },
     run: () => api('GET', '/v1/providers')
   },

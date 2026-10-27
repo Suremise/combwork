@@ -1,4 +1,5 @@
 {
+  "assistant.banner.connectionSetup": "In diesem Arbeitsbereich ist keine Verbindung für {cli} eingeschaltet, daher kann der Assistent nicht starten. Füge eine hinzu und melde sie an.",
   "assistant.hiveTemplates.pair": "Paar",
   "assistant.hiveTemplates.pairOne": "Paar: ein Anbieter",
   "assistant.hiveTemplates.pairOneText": "Ein Bearbeiter und ein Reviewer, beide Claude Code: für den Fall, dass nur ein Coding-Agent installiert ist.",

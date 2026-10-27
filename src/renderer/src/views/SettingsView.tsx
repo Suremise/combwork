@@ -26,7 +26,7 @@ import { AntivirusPanel } from '../components/Antivirus'
 import { AccountsSettings } from '../components/AccountsSettings'
 import { ConnectionChoice, useLaunchConnection } from '../components/ConnectionChoice'
 import { AdvancedSettings } from '../components/AdvancedSettings'
-import { ACCOUNTS_PREVIEW, ADVANCED_DEFS, groupName, shownText, type AdvancedState } from '@shared/advanced'
+import { ADVANCED_DEFS, groupName, shownText, type AdvancedState } from '@shared/advanced'
 import { choose, confirm, get, notify, set, useLanguage, useStore } from '../store'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { LANGUAGES, SOURCE_LANGUAGE, languageOf } from '@shared/i18n/languages'
@@ -81,9 +81,6 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'advanced.reset': () => <ResetAll />
 }
 
-/** A CLI's rows that are each connection's with Connections on (HI-1770). */
-const MOVED_KEYS = new Set(['defaultModel', 'defaultEffort', 'use200kContext'])
-
 /** A provider page's custom controls, by key. */
 function providerControl(provider: ProviderId, key: string): (() => React.ReactNode) | undefined {
   switch (key) {
@@ -91,8 +88,6 @@ function providerControl(provider: ProviderId, key: string): (() => React.ReactN
       return () => <ProviderToggle provider={provider} />
     case 'status':
       return () => <ProviderStatus provider={provider} />
-    case 'movedToConnections':
-      return () => null
     case 'defaultModel':
       return () => <GlobalModelPicker provider={provider} />
     case 'defaultEffort':
@@ -1041,15 +1036,10 @@ export function SettingsView() {
   const workspaceName = useStore((s) => s.workspace?.name ?? null)
   // Searching matches the text as shown, in the language shown.
   const shownLanguage = useLanguage()
-  // Connections only with their preview on (HI-980, HI-1755; the switch goes in S8).
-  const accountsShown = advanced?.values[ACCOUNTS_PREVIEW] === true
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
     return SETTINGS.filter((d) => {
-      if ((d.section === 'accounts' || d.id === 'assistant.connection' || d.key === 'movedToConnections') && !accountsShown) return false
-      // With Connections on, a CLI with them has its model, effort and context on each connection (HI-1770).
-      if (accountsShown && d.provider && d.section === `provider:${d.provider}` && MOVED_KEYS.has(d.key) && providerDescriptor(d.provider).capabilities.connections) return false
       if (d.id === 'workflow.workspaceDefaults' && !workspaceName) return false
       if (d.id === 'advanced.values' && (q || modifiedOnly)) return advancedMatches(q, modifiedOnly, advanced)
       // Its English matches as well as what it shows: Settings can be searched in either.
@@ -1058,7 +1048,7 @@ export function SettingsView() {
       if (!q && !modifiedOnly && d.section !== section) return false
       return true
     })
-  }, [query, section, settings, modifiedOnly, advanced, shownLanguage, accountsShown, workspaceName])
+  }, [query, section, settings, modifiedOnly, advanced, shownLanguage, workspaceName])
 
   if (!settings) return null
   const grouped = SECTIONS.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
@@ -1077,7 +1067,7 @@ export function SettingsView() {
       </div>
       <div className="settings-body">
         <div className="settings-nav">
-          {SECTIONS.filter((s) => s.id !== 'accounts' || accountsShown).map((s) => (
+          {SECTIONS.map((s) => (
             <div key={s.id} className={cx('row', !query && !modifiedOnly && section === s.id && 'selected')} data-section={s.id} onClick={() => {
                 set({ settingsSection: s.id, settingsQuery: '' })
                 setModifiedOnly(false)

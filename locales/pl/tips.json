@@ -134,6 +134,8 @@
   "tips.compareBranches.title": "Porównaj dwie gałęzie, np. 1.0.0 z main",
   "tips.conflictHunks.text": "Gdy kolejka scalania zwraca kartę z powodu konfliktu, jej sekcja Praca wymienia pliki: kliknij jeden, aby zobaczyć jego konflikty, stronę celu i stronę karty pod ich nazwami, tak jak zostawiło je scalanie testowe kolejki.",
   "tips.conflictHunks.title": "Zobacz konflikty zwróconej karty",
+  "tips.connections.text": "Ustawienia → Połączenia przechowują kilka logowań Claude Code i Codex albo serwer, np. Ollama na tym komputerze. Każdy obszar roboczy wybiera, które są włączone i które jest domyślne, a każdy agent może mieć własne: wybierz je w ustawieniach agenta.",
+  "tips.connections.title": "Uruchamiaj agentów na różnych logowaniach",
   "tips.consoleRecording.text": "W konsoli deweloperskiej Nagrywaj zapisuje do pliku to, co CLI agenta wysyła do Hive, z ukrytymi danymi, chyba że zaznaczysz tekst dla tego nagrania; Kopiuj diagnostykę może je dołączyć do zgłoszenia błędu.",
   "tips.consoleRecording.title": "Nagraj, co wysyła CLI",
   "tips.consoleText.text": "Ustawienia → Zaawansowane → Konsola deweloperska: pokazuj tekst promptów, odpowiedzi i poleceń pokazuje je w konsoli deweloperskiej pod banerem, który o tym informuje, i zaznacza tekst w nowych nagraniach. Tokeny i dane logowania pozostają zamaskowane, a hive_console agentów nadal ukrywa dane.",

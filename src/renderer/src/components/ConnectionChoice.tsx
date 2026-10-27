@@ -1,11 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { Connection, LiveSessionState, ProviderId } from '@shared/types'
 import { resolveConnection, type ConnectionsView } from '@shared/accounts'
-import { providerDescriptor } from '@shared/providers'
-import { ACCOUNTS_PREVIEW } from '@shared/advanced'
-import { msg, tr } from '@shared/i18n'
+import { enabledProviders, providerDescriptor } from '@shared/providers'
+import { fmt, msg, tr } from '@shared/i18n'
 import { call } from '../api'
-import { useStore } from '../store'
+import { set, setActivity, useStore } from '../store'
 import { connectionOf, type ConnectionShown } from '@shared/connectionLabel'
 import { Icon, Tooltip } from './ui'
 
@@ -26,8 +25,8 @@ const M = {
 }
 
 /**
- * The list as last read, by when it was asked (the workspace, its change count and the preview switch: turned on or off,
- * it is read again, so the rows, choices and the load dialog follow the switch at once): one read for every row asking.
+ * The list as last read, by when it was asked (the workspace, its change count and the CLIs turned on: a change reads it
+ * again, so the rows, choices and the load dialog follow at once): one read for every row asking.
  */
 let listed: { key: string; view: Promise<ConnectionsView | null>; got?: ConnectionsView | null } | null = null
 function listFor(key: string): NonNullable<typeof listed> {
@@ -43,8 +42,9 @@ function listFor(key: string): NonNullable<typeof listed> {
 export function useConnections(): ConnectionsView | null {
   const changed = useStore((s) => s.connectionsChanged)
   const wsPath = useStore((s) => s.workspace?.path ?? null)
-  const preview = useStore((s) => s.advanced?.values[ACCOUNTS_PREVIEW] === true)
-  const key = `${wsPath ?? ''}\n${changed}\n${preview}`
+  // The CLIs turned on (the view lists those with connections that are): a string, so the selector stays stable.
+  const enabled = useStore((s) => enabledProviders(s.settings).map((p) => p.id).join())
+  const key = `${wsPath ?? ''}\n${changed}\n${enabled}`
   const [view, setView] = useState<ConnectionsView | null>(() => listFor(key).got ?? null)
   useEffect(() => {
     let live = true
@@ -59,12 +59,12 @@ export function useConnections(): ConnectionsView | null {
 }
 
 /**
- * The connection a choice would start on (HI-1770), for its defaults: undefined where connections don't apply (the
- * preview off, a CLI without them), null when none can be used.
+ * The connection a choice would start on (HI-1770), for its defaults: undefined where connections don't apply (a CLI
+ * without them, or turned off), null when none can be used.
  */
 export function useLaunchConnection(own: string | undefined, provider: ProviderId): Connection | null | undefined {
   const view = useConnections()
-  if (!view?.preview || !view.providers.includes(provider)) return undefined
+  if (!view?.providers.includes(provider)) return undefined
   const r = resolveConnection({ connections: view.workspace }, provider, own || undefined, view.connections)
   return r.ok ? (view.connections.find((c) => c.id === r.id) ?? null) : null
 }
@@ -76,7 +76,7 @@ export function useLaunchConnection(own: string | undefined, provider: ProviderI
  */
 export function ConnectionChoice({ provider, value, onChange, onOtherCli, id }: { provider: ProviderId; value: string; onChange: (v: string) => void; onOtherCli?: (provider: ProviderId, connection: string) => void; id?: string }) {
   const view = useConnections()
-  if (!providerDescriptor(provider).capabilities.connections || !view?.preview) return null
+  if (!providerDescriptor(provider).capabilities.connections || !view) return null
   const onFor = (p: ProviderId) => view.connections.filter((c) => c.provider === p && view.workspace[p]?.on.includes(c.id))
   const ws = view.workspace[provider]
   const on = onFor(provider)
@@ -163,10 +163,100 @@ export function connectionCellText(own: string | undefined, provider: ProviderId
   return s.shown ? `${s.shown.name}${s.other ? ' ⟳' : ''}` : unusable(s, providerDescriptor(provider).name, false)
 }
 
+/** Opens Settings → Connections. */
+export function openConnections(): void {
+  set({ settingsSection: 'accounts', settingsQuery: '' })
+  setActivity('settings')
+}
+
+/**
+ * Whether a CLI needs a connection before anything of it starts here (HI-1755's 1a, for everyone since S8): it has
+ * connections and is on (the view lists it), none is on in this workspace, and this isn't a test copy on its CLI test
+ * home. Copilot (none: its own login) never does.
+ */
+export const needsConnection = (view: ConnectionsView | null, cli: ProviderId): boolean => !!view && view.providers.includes(cli) && !view.testHome.includes(cli) && !view.workspace[cli]?.default
+
+const SETUP = {
+  text: msg({ id: 'project.banner.connectionSetup', defaultMessage: "No {cli} connection is on in this workspace, so its agents can't start. Add one and sign it in.", description: 'Banner in a project whose agents\' CLI ({cli}: "Claude Code") has no connection on in the workspace (HI-1755).' }),
+  assistant: msg({ id: 'assistant.banner.connectionSetup', defaultMessage: "No {cli} connection is on in this workspace, so the Assistant can't start. Add one and sign it in.", description: 'Banner in the Assistant panel when its coding agent CLI ({cli}: "Claude Code") has no connection on in the workspace (HI-1774): it can\'t start until one is.' }),
+  add: msg({ id: 'project.banner.connectionSetupAdd', defaultMessage: 'Add a Connection', description: 'Button on the banner asking for a connection: opens Settings → Connections.' }),
+  setupLine: msg({ id: 'shell.setup.connections', defaultMessage: '{n, plural, =0 {{cli} signs in per connection, and none is on in this workspace yet: add one and sign it in.} one {{cli} signs in per connection: # is on in this workspace.} other {{cli} signs in per connection: # are on in this workspace.}}', description: 'Agent Setup, for a coding agent CLI ({cli}: "Claude Code") that signs in per connection (Settings → Connections) rather than here (HI-1774). {n} is how many of its connections are on in the open workspace.' }),
+  open: msg({ id: 'shell.setup.openConnections', defaultMessage: 'Open Connections', description: "Agent Setup's button: opens Settings → Connections, where a coding agent CLI's connections are added and signed in." })
+}
+
+/**
+ * Asks for a connection (HI-1755, Darren's 1a): where a CLI with connections has none on in the workspace, nothing of it
+ * starts (never on the CLI's own login): Add a Connection opens Settings → Connections. `where`: a project's agents, or
+ * the Assistant (HI-1774).
+ */
+export function NoConnectionBanner({ cli, where = 'project' }: { cli: ProviderId; where?: 'project' | 'assistant' }) {
+  return (
+    <div className="banner warn" data-connection-setup={where}>
+      <Icon name="plug" /> {tr(where === 'assistant' ? SETUP.assistant : SETUP.text, { cli: providerDescriptor(cli).name })}
+      <button className="btn small primary" onClick={openConnections}>
+        {tr(SETUP.add)}
+      </button>
+    </div>
+  )
+}
+
+const INTRO = {
+  text: msg({ id: 'connections.intro.text', defaultMessage: "Agents now run on connections: add one for {clis} in Settings → Connections and sign it in there. Hive no longer uses the sign-in of your own terminal, which stays as it is.", description: 'A one-time banner in the main window (HI-1774): coding agents now each run on a connection (a sign-in Hive keeps, Settings → Connections) and none has been added yet. {clis} names the coding agent CLIs, joined ("Claude Code and Codex").' }),
+  add: msg({ id: 'connections.intro.add', defaultMessage: 'Add a Connection', description: 'The one-time connections banner\'s button: opens Settings → Connections.' }),
+  dismiss: msg({ id: 'connections.intro.dismiss', defaultMessage: 'Dismiss', description: 'The one-time connections banner\'s button: hides it for good.' })
+}
+
+/**
+ * The one-time notice that agents run on connections (HI-1774): while none was ever added (an upgrade from 0.9, or a new
+ * install) and it wasn't dismissed. Main decides (ConnectionsView.intro), so every window shows and hides it together.
+ */
+export function ConnectionsIntroBanner() {
+  const view = useConnections()
+  if (!view?.intro?.length) return null
+  return (
+    <div className="banner info wrap-banner" data-connections-intro>
+      <span className="wrap-banner-text">
+        <Icon name="plug" />
+        <span className="grow">{tr(INTRO.text, { clis: fmt.list(view.intro.map((p) => providerDescriptor(p).name)) })}</span>
+      </span>
+      <span className="wrap-banner-actions">
+        <button className="btn small primary" onClick={openConnections}>
+          {tr(INTRO.add)}
+        </button>
+        <button className="btn small" data-dismiss-intro onClick={() => void call('connections:dismissIntro')}>
+          {tr(INTRO.dismiss)}
+        </button>
+      </span>
+    </div>
+  )
+}
+
+/**
+ * Agent Setup's line for a CLI that signs in per connection (HI-1774), in place of a sign-in of its own: how many are on
+ * in this workspace, and Open Connections. Nothing for a CLI without connections, or a test copy on its CLI test home.
+ */
+export function ConnectionSetupLine({ cli, onOpen }: { cli: ProviderId; onOpen: () => void }) {
+  const view = useConnections()
+  if (!view?.providers.includes(cli) || view.testHome.includes(cli)) return null
+  const n = view.workspace[cli]?.on.length ?? 0
+  return (
+    <div className={['banner', n ? 'info' : 'warn'].join(' ')} data-connection-setup-line={n} style={{ borderRadius: 6, marginBottom: 10 }}>
+      <Icon name="plug" />
+      <span className="grow">{tr(SETUP.setupLine, { cli: providerDescriptor(cli).name, n })}</span>
+      <button className="btn small primary" data-open-connections onClick={() => {
+          onOpen()
+          openConnections()
+        }}>
+        {tr(SETUP.open)}
+      </button>
+    </div>
+  )
+}
+
 /**
  * An agent's connection in its rows (HI-1769: the Agents list, the Overview, the agents' hover lists): the one it runs on
  * while it runs (⟳ when that isn't the one chosen now), else the one a start would use, or why none can. Nothing where
- * connections aren't shown (the preview off, a CLI without them).
+ * connections aren't shown (a CLI without them).
  */
 export function ConnectionMark({ own, provider, launched, className, fallback = null }: { own: string | undefined; provider: ProviderId; launched?: LiveSessionState['launchedConnection']; className?: string; fallback?: ReactNode }) {
   const view = useConnections()

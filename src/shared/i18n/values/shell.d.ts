@@ -303,6 +303,7 @@ interface HiveMessageValues {
   'shell.review.status': { status: string | number }
   'shell.search.clear': undefined
   'shell.setup.checkAgain': undefined
+  'shell.setup.connections': { n: number; cli: string | number }
   'shell.setup.docs': { provider: string | number }
   'shell.setup.done': { what: string | number }
   'shell.setup.found': { provider: string | number; version: string | number; source: string | number }
@@ -321,6 +322,7 @@ interface HiveMessageValues {
   'shell.setup.notInstalled': { provider: string | number }
   'shell.setup.notInstalledDetail': { provider: string | number; company: string | number }
   'shell.setup.off': { provider: string | number }
+  'shell.setup.openConnections': undefined
   'shell.setup.rejected': { n: number; path: string | number }
   'shell.setup.setUp': { provider: string | number }
   'shell.setup.signedIn': { provider: string | number }

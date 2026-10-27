@@ -47,10 +47,6 @@
     "defaultMessage": "{name} isn't signed in as anyone Hive could check, so there's no login to keep.",
     "description": "An error: Keep the new login was asked for a connection ({name}) whose latest check didn't find it signed in."
   },
-  "main.accounts.previewOff": {
-    "defaultMessage": "Connections are a preview: turn on Settings → Advanced → Connections (preview) first.",
-    "description": "An error: something about connections was asked while their preview switch is off. Settings → Advanced → Connections (preview) names a setting: use its name as Hive shows it."
-  },
   "main.accounts.removeFailed": {
     "defaultMessage": "{name} wasn't removed: {error}. Nothing outside its folder was touched; Remove tries again.",
     "description": "An error removing a connection ({name}): its folder couldn't all be deleted. {error} is the reason, in English."

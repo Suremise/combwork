@@ -8,6 +8,7 @@ import { call } from './api'
 import { playChime } from './chime'
 import { matchKeybinding, runCommand } from './commands'
 import { AboutDialog, AgentSetupDialog, DiagnosticsDialog, CommandPalette, CompactDialog, Dialogs, NotificationCenter, ProvidersBanner, QuitDialog, QuitPendingBanner, ShortcutsDialog, Toasts } from './components/Overlays'
+import { ConnectionsIntroBanner } from './components/ConnectionChoice'
 import { AddAgentDialog, AgentSettingsDialog, HandOverDialog, MergeDialog, TemplateAgentDialog } from './components/AgentDialogs'
 import { BranchMergeDialog } from './components/BranchMerge'
 import { BoardUpgradeAsk, BoardUpgradeBanner } from './components/BoardUpgrade'
@@ -494,6 +495,7 @@ export function App() {
         <div className="main-area">
           <QuitPendingBanner />
           <ProvidersBanner />
+          <ConnectionsIntroBanner />
           <MovedBanner />
           <BoardUpgradeBanner />
           <PresetsNotice />

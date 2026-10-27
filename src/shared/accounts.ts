@@ -7,8 +7,6 @@ import type { Connection, ProviderId, WorkspaceConnections, WorkspaceConfig } fr
 
 /** What Settings → Accounts shows (accounts:list): the connections, and the asking window's workspace's choice of them. */
 export interface ConnectionsView {
-  /** Settings → Advanced → Connections (preview) (until S8): off, nothing about connections is shown, and nothing listed. */
-  preview: boolean
   /** The providers that can have connections (capabilities.connections) and are on in Settings. */
   providers: ProviderId[]
   /** `key`: a server connection's key is set (HI-1772), its last 4 characters and when; never the key. */
@@ -17,6 +15,11 @@ export interface ConnectionsView {
   workspace: Partial<Record<ProviderId, WorkspaceConnections>>
   /** Providers a test copy runs on its CLI test home where nothing is on (the test seam, HI-1755): no setup is asked for. */
   testHome: ProviderId[]
+  /**
+   * The CLIs the one-time notice that agents run on connections names (HI-1774): those with connections, on and not on
+   * a test home, while no connection was ever added and it wasn't dismissed. Absent: no notice.
+   */
+  intro?: ProviderId[]
   /**
    * Server connections' key masking (HI-1772): `unavailable`, its data can't be read (strict, exports refused: Reset
    * Masking Data); `gap`, a reset lost some (strict for good, since `gapSince`); `full`, near the most keys it keeps.

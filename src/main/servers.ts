@@ -86,7 +86,6 @@ import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
 import { connectionRef, connectionsFor, connectionShown, workspaceAccounts } from '../shared/accounts'
 import { connectionProblem, getAccount } from './accounts'
-import { connectionsOn } from './connectionSeam'
 import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
@@ -507,7 +506,7 @@ async function projectSummary(p: string) {
       mcpChoice: agentChoosesMcp(a) ? 'only' : 'all',
       // The guidance and skill revisions it launched with (compare with GET /v1/status's to spot an old launch).
       launched: a.live?.launched ?? null,
-      // Its connection (HI-1771, with Connections on): the one chosen (null: the default), the one its run is on, and a switch waiting.
+      // Its connection (HI-1771, for a CLI with connections): the one chosen (null: the default), the one its run is on, and a switch waiting.
       ...agentConnectionFields(p, a, a.live?.provider ?? agentProvider(a, info.config, config.settings))
     })),
     // Its builder and reviewer pairs (#1531): its running lanes', then by name; empty without either.
@@ -881,7 +880,7 @@ route('GET', '/v1/providers', async () => {
   const known = await providerService.detected()
   const s = config.settings
   const here = contextWorkspace()
-  const on = connectionsOn() && here ? workspaceConnections(here) : null
+  const on = here ? workspaceConnections(here) : null
   return PROVIDERS.map((p) => {
     const info = providerService.info(p.id)
     return {
@@ -902,7 +901,7 @@ route('GET', '/v1/providers', async () => {
       // Whether agents can be given context200k (a 200K window instead of the model's 1M).
       context200k: p.capabilities.contextLimit,
       modes: offeredModes(p.id, s).map((m) => ({ value: m.value, label: m.label, description: m.description })),
-      // Its connections on in the caller's workspace (HI-1771, with Connections on): what hive_add_agent's connection names.
+      // Its connections on in the caller's workspace (HI-1771): what hive_add_agent's connection names.
       ...(on && p.capabilities.connections ? { connections: (on[p.id]?.on ?? []).map((id: string) => ({ id, name: getAccount(id)?.name ?? id, default: on[p.id]?.default === id })) } : {})
     }
   })
@@ -1106,9 +1105,6 @@ function agentSettings(body: any): { provider?: ProviderId; model?: string; effo
   return out
 }
 
-/** The refusal of anything about connections while they are off (the preview switch, until S8). */
-const CONNECTIONS_OFF = 'Connections are a preview: turn on Settings → Advanced → Connections (preview) first.' // i18n-ignore: an Agent API refusal (agents read it)
-
 /** A workspace's connections per CLI, as they apply (dropping ids gone or another CLI's). */
 function workspaceConnections(ws: WorkspaceService): Partial<Record<ProviderId, WorkspaceConnections>> {
   const all = config.get().connections ?? []
@@ -1118,12 +1114,11 @@ function workspaceConnections(ws: WorkspaceService): Partial<Record<ProviderId, 
 /**
  * A request's `connection` (HI-1771): an id, or a name unique among those on in the project's workspace (several: 409,
  * use its id; none: 404); null or "" clears it (the default again). With its CLI, for a call that names no provider.
- * Refused while Connections are off. Saving it checks it again (on here, for the agent's CLI) with the write.
+ * Saving it checks it again (on here, for the agent's CLI) with the write.
  */
 function connectionArg(body: any, projectPath: string): { connection: string | null; cli?: ProviderId } | undefined {
   const v = body?.connection
   if (v === undefined) return undefined
-  if (!connectionsOn()) throw new HttpError(409, CONNECTIONS_OFF)
   if (v === null || v === '') return { connection: null }
   const all = config.get().connections ?? []
   const onHere = Object.values(workspaceConnections(workspaceOf(projectPath))).flatMap((w) => w?.on ?? [])
@@ -1142,13 +1137,13 @@ function providerWith(set: { provider?: ProviderId }, conn: { cli?: ProviderId }
 }
 
 /**
- * An agent row's connection fields (HI-1771), with Connections on and a CLI with them: `connection`, the one chosen as
+ * An agent row's connection fields (HI-1771), for a CLI with connections: `connection`, the one chosen as
  * saved (its id, its name, and `problem` when it can't be used now: removed, another CLI's, or off here), or null for
  * the default; `launchedConnection`, the one its run is on; `switchPending`. A project agent is never told the name of
  * one that isn't on in its workspace.
  */
 function agentConnectionFields(p: string, a: AgentInfo, cli: ProviderId): Record<string, unknown> {
-  if (!connectionsOn() || !PROVIDERS.find((x) => x.id === cli)?.capabilities.connections) return {}
+  if (!PROVIDERS.find((x) => x.id === cli)?.capabilities.connections) return {}
   const problem = a.connection ? connectionProblem(a.connection, cli, p) : null
   const name = a.connection && (!problem || !agentCaller()) ? (getAccount(a.connection)?.name ?? null) : null
   return {
@@ -1164,14 +1159,12 @@ function agentConnectionFields(p: string, a: AgentInfo, cli: ProviderId): Record
  * as. Never a token, a key, where a login is kept, its settings or defaults.
  */
 route('GET', '/v1/connections', async () => {
-  if (!connectionsOn()) throw new HttpError(409, CONNECTIONS_OFF)
   const ws = workspaceConnections(requireWorkspace())
   const defaults = Object.fromEntries(Object.entries(ws).map(([cli, w]) => [cli, w?.default ?? null]))
   return { connections: connectionsFor(config.get().connections ?? [], ws, !agentCaller()), defaults }
 })
 
 route('GET', '/v1/connections/:ref', async ({ params }) => {
-  if (!connectionsOn()) throw new HttpError(409, CONNECTIONS_OFF)
   const ws = workspaceConnections(requireWorkspace())
   const all = config.get().connections ?? []
   const onHere = Object.values(ws).flatMap((w) => w?.on ?? [])

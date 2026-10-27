@@ -74,7 +74,7 @@ const oldNote = (note: string): ReactNode => <span className="faint template-pla
 export function TemplatePlan({ view, edit, connections }: { view: TemplateLoadView; edit?: NameEdit; connections?: ConnectionEdit }) {
   const goes = new Map(view.removed.map((a) => [a.name.toLowerCase(), a]))
   // The Connection column only where one of its agents' CLIs has connections shown (HI-1769).
-  const conn = connections && connections.view.preview && view.created.some((a) => isKnownProvider(a.provider) && connections.view.providers.includes(a.provider)) ? connections : undefined
+  const conn = connections && view.created.some((a) => isKnownProvider(a.provider) && connections.view.providers.includes(a.provider)) ? connections : undefined
   const columns = conn ? 7 : 6
   return (
     <div className="template-plan">
@@ -168,7 +168,7 @@ export function TemplatePlan({ view, edit, connections }: { view: TemplateLoadVi
 }
 
 /**
- * The Connection column (HI-1769, with Connections on): each agent's connection, and for each one `flagged` (its own can't
+ * The Connection column (HI-1769): each agent's connection, and for each one `flagged` (its own can't
  * be used here: by `create`'s index) the box choosing another: the workspace's default first (null: it follows it), then
  * its CLI's connections on here, each pinned by id. Never matched by name, never another CLI's.
  */

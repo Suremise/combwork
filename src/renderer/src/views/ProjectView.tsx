@@ -11,8 +11,7 @@ import { fmt, msg, tr, tRich } from '@shared/i18n'
 import hexUrl from '../assets/icon.svg'
 import * as actions from '../actions'
 import { call, errorMessage } from '../api'
-import { useConnections } from '../components/ConnectionChoice'
-import { providerDescriptor } from '@shared/providers'
+import { needsConnection, NoConnectionBanner, useConnections } from '../components/ConnectionChoice'
 import { commandKeybinding } from '../commands'
 import { AddAgentButton, PANE_FOOTER, PANE_HEADER, PaneChrome, RESUME_TINT, ResumeButton, SessionToolbar, TerminalLayer, usePanes, useWidth } from '../components/AgentPanes'
 import { terminalMinWidth } from '../components/TerminalView'
@@ -21,7 +20,7 @@ import { paneColumnsFor, projectSessionView, tileStripRoom } from '@shared/defau
 import { Icon, IconButton, Switch, Tooltip, useContextMenu, useFolds, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
 import { ProjectAgentsTable, useAgentsText } from '../components/AgentsTable'
-import { agentProviderOf, notify, projectKey, set, setActivity, setProjectTab, tileFocusOf, useFocusedAgent, useLanguage, useProjectStarting, useStarting, useStore, startingLabel, type ProjectTab } from '../store'
+import { agentProviderOf, notify, projectKey, set, setProjectTab, tileFocusOf, useFocusedAgent, useLanguage, useProjectStarting, useStarting, useStore, startingLabel, type ProjectTab } from '../store'
 import { carriesFiles, cx, formatKeybinding } from '../util'
 import { AttachmentsTab, FilesTab } from './FilesTab'
 import { VersionControl } from './VersionControl'
@@ -657,23 +656,7 @@ function ConnectionSetupBanner({ project }: { project: ProjectInfo }) {
   useLanguage()
   const view = useConnections()
   const settings = useStore((s) => s.settings)
-  if (!view) return null
-  const clis = [...new Set(project.agents.map((a) => agentProviderOf(project, a)))].filter((p) => !!providerDescriptor(p).capabilities.connections && view.providers.includes(p) && !view.testHome.includes(p) && !view.workspace[p]?.default)
-  if (!clis.length || !settings) return null
-  return (
-    <div className="banner warn" data-connection-setup>
-      <Icon name="plug" /> {tr(CONNECTION_SETUP.text, { cli: providerDescriptor(clis[0]).name })}
-      <button className="btn small primary" onClick={() => {
-          set({ settingsSection: 'accounts', settingsQuery: '' })
-          setActivity('settings')
-        }}>
-        {tr(CONNECTION_SETUP.add)}
-      </button>
-    </div>
-  )
-}
-
-const CONNECTION_SETUP = {
-  text: msg({ id: 'project.banner.connectionSetup', defaultMessage: "No {cli} connection is on in this workspace, so its agents can't start. Add one and sign it in.", description: 'Banner in a project whose agents\' CLI ({cli}: "Claude Code") has no connection on in the workspace (HI-1755).' }),
-  add: msg({ id: 'project.banner.connectionSetupAdd', defaultMessage: 'Add a Connection', description: 'Button on the banner asking for a connection: opens Settings → Connections.' })
+  const cli = [...new Set(project.agents.map((a) => agentProviderOf(project, a)))].find((p) => needsConnection(view, p))
+  if (!cli || !settings) return null
+  return <NoConnectionBanner cli={cli} />
 }

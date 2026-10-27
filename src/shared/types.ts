@@ -590,6 +590,8 @@ export interface AppConfig {
     hiveVcsNotice?: Record<string, string>
     /** The connections notice's entries dismissed (HI-1770): `<project path in lower case>|<moved entry's id>`. */
     connectionsNoticeDismissed?: string[]
+    /** The one-time notice that agents run on connections (HI-1774) was dismissed, or a connection was added: never shown again. */
+    connectionsIntroShown?: boolean
     /** The active projects folded in the Assistant panel's Workspace list (#399), by `assistantFoldKey` (workspace and project path); unfolded ones aren't kept. */
     assistantFold?: Record<string, boolean>
     /** Each workspace's board as the user left it, by workspace path in lower case (#170): collapsed columns, folded cards. */
@@ -624,6 +626,11 @@ export interface AppConfig {
   connections?: Connection[]
   /** Per provider: the account last chosen as a workspace's default (or launched on), which a new workspace starts with. */
   lastUsedConnection?: Partial<Record<ProviderId, string>>
+  /**
+   * The CLIs whose old per-CLI model, effort and context (Settings → <CLI> before connections) were given to a
+   * connection (HI-1774): to its first, or to those from before connections had defaults; only once, never again.
+   */
+  connectionDefaultsTaken?: ProviderId[]
   /**
    * Server connections' key masking (HI-1772), mirrored with key-coverage.json and never cleared: `ever`, a key was
    * saved (so fingerprints must exist); `gap`, a reset lost some (masking strict for good).
@@ -1541,7 +1548,7 @@ export interface TemplateLoadPlan {
   /** Providers the template needs that are off or not installed, and which of its agents need each. */
   missing: { provider: ProviderId; reason: string; agents: string[]; problem?: 'unknown' | 'off' | 'notInstalled' }[]
   /**
-   * Agents whose own connection can't be used here (HI-1769, with Connections on), by `create`'s index: removed or never
+   * Agents whose own connection can't be used here (HI-1769), by `create`'s index: removed or never
    * on this machine (`missing`), another CLI's, or off in this workspace. The dialog asks for each (the same CLI's
    * default preselected, which inherits) and the load takes its answers by these indexes. `name` is for display.
    */

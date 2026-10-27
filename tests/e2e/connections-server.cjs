@@ -1,4 +1,4 @@
-// Server connections (HI-1772, S6; behind Settings → Advanced → Connections (preview), the test seam off): Add Connection
+// Server connections (HI-1772, S6; the test seam off): Add Connection
 // asks where a connection gets its model, and a server's form (the DeepSeek preset, a dummy key in a password box) adds
 // one; its row shows its host and the key's last 4 characters only. An agent on it launches with the server's variables
 // (base URL, the key as a bearer token, each Claude name's model) in its own folder; the footer shows the server's model
@@ -58,7 +58,6 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     page.on('console', (m) => consoleText.push(m.text()))
     const invOn = (p) => (ch, ...a) => p.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     const inv = invOn(page)
-    await inv('advanced:set', 'hive.accounts.preview', true)
     await lib.openWorkspace(inv, page, ws1)
     const list = () => inv('connections:list')
     const live = async (agentId) => (await inv('session:live')).find((s) => s.agentId === agentId && s.status !== 'stopped') ?? null

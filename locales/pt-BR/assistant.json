@@ -1,4 +1,5 @@
 {
+  "assistant.banner.connectionSetup": "Nenhuma conexão do {cli} está ativada neste espaço de trabalho, então o Assistente não pode ser iniciado. Adicione uma e faça login nela.",
   "assistant.hiveTemplates.pair": "Dupla",
   "assistant.hiveTemplates.pairOne": "Dupla: um provedor",
   "assistant.hiveTemplates.pairOneText": "Um executor e um revisor, ambos Claude Code: para quando só um agente de código está instalado.",

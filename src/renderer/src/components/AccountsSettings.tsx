@@ -2,7 +2,7 @@ import { ConnectionDefaultsEditor, MovedNoticeBanner } from './ConnectionDefault
 import { useCallback, useEffect, useState } from 'react'
 import type { ProviderId } from '@shared/types'
 import { accountState, duplicateLogins, type ConnectionsView, type ConnectionState } from '@shared/accounts'
-import { providerDescriptor } from '@shared/providers'
+import { enabledProviders, providerDescriptor } from '@shared/providers'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { confirm, notify, prompt, useStore } from '../store'
@@ -19,6 +19,7 @@ import { AddConnectionDialog, hasServers, MaskingBanner, ServerConnectionDetail,
 
 const M = {
   none: msg({ id: 'settings.accounts.none', defaultMessage: 'No connections yet. Add one, then sign it in.', description: 'Settings → Connections when there are no connections.' }),
+  ownLogin: msg({ id: 'settings.accounts.ownLogin', defaultMessage: '{cli} has no connections: it signs in once for the whole PC, in Help → Agent Setup, and its agents use that sign-in.', description: 'A line in Settings → Connections for a coding agent CLI that is on but has no connections ({cli}: "GitHub Copilot", whose sign-in is machine-wide, HI-1758). Help → Agent Setup names a dialog: use its name as Hive shows it.' }),
   noWorkspace: msg({ id: 'settings.accounts.noWorkspace', defaultMessage: 'Open a workspace to choose which connections are on in it.', description: 'Settings → Connections with no workspace open: the On and Default choices are per workspace.' }),
   loading: msg({ id: 'settings.accounts.loading', defaultMessage: 'Loading…', description: 'Settings → Connections while its list loads.' }),
   add: msg({ id: 'settings.accounts.add', defaultMessage: 'Add Connection…', description: 'Button in Settings → Connections: adds a connection (asks its name and where it gets its model), then opens its sign-in or sets up its server.' }),
@@ -74,6 +75,8 @@ export function AccountsSettings() {
   const changed = useStore((s) => s.connectionsChanged)
   const wsPath = useStore((s) => s.workspace?.path ?? null)
   const projects = useStore((s) => s.workspace?.projects)
+  const settings = useStore((s) => s.settings)
+  const withoutConnections = enabledProviders(settings).filter((p) => !p.capabilities.connections)
   const [view, setView] = useState<ConnectionsView | null>(null)
   const [terminal, setTerminal] = useState<{ id: string; key: string; ended: boolean; setUp?: ProviderId } | null>(null)
   // Add Connection's dialog (HI-1772), for a CLI that can also get its model from a server.
@@ -204,6 +207,12 @@ export function AccountsSettings() {
           </div>
         )
       })}
+      {/* A CLI on without connections (Copilot: HI-1758) launches on its own login, shared by the whole PC. */}
+      {withoutConnections.map((p) => (
+        <p key={p.id} className="hint" data-no-connections={p.id}>
+          {tr(M.ownLogin, { cli: p.name })}
+        </p>
+      ))}
       {adding && <AddConnectionDialog cli={adding} onClose={() => setAdding(null)} onSignIn={(id) => void signIn(id)} />}
       {terminal && (
         <div className="account-signin">

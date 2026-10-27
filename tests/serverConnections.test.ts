@@ -9,7 +9,6 @@ import { createServer, type Server, type ServerResponse } from 'http'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { ACCOUNTS_PREVIEW } from '../src/shared/advanced'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-servers-')
@@ -56,7 +55,6 @@ const here = <T>(fn: () => T): T => inWorkspace(w, fn)
 
 beforeAll(async () => {
   advanced.load(profile)
-  await advanced.set(ACCOUNTS_PREVIEW, true)
   mkdirSync(join(home, 'projects'), { recursive: true })
   mkdirSync(join(userHome, '.claude'), { recursive: true })
   mkdirSync(join(wsPath, 'alpha', '.hive'), { recursive: true })

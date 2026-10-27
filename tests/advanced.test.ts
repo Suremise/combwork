@@ -237,6 +237,17 @@ describe('the advanced store', () => {
     expect(read(file)).toEqual({ format: 1, values: {}, madeFor: {} })
   })
 
+  it('a retired setting (the Connections preview, HI-1774) is dropped as read, never unknown, and gone at the next write; a real unknown one stays', async () => {
+    const { s, dir, file } = store()
+    writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.accounts.preview': true, 'hive.nope': 1, 'hive.mcp.replySeconds': 400 }, madeFor: { 'hive.accounts.preview': { version: null, value: true } } }))
+    expect(parseAdvancedFile(readFileSync(file, 'utf8'))).toEqual({ values: { 'hive.nope': 1, 'hive.mcp.replySeconds': 400 }, madeFor: {}, unknown: ['hive.nope'] })
+    s.load(dir)
+    expect(s.state(null).unknown).toEqual(['hive.nope'])
+    await s.set('hive.mcp.replySeconds', 600)
+    expect(read(file)).toEqual({ format: 1, values: { 'hive.nope': 1, 'hive.mcp.replySeconds': 600 }, madeFor: {} })
+    await expect(s.set('hive.accounts.preview', true)).rejects.toThrow('No advanced setting')
+  })
+
   it('reads a file edited by hand: a changed CLI-facing value is made for the CLI installed now; an invalid one falls back', async () => {
     const { s, dir, file } = store()
     writeFileSync(file, JSON.stringify({ values: { 'codex.trust.prompt': 'trust it', 'codex.hooks.timeoutSeconds': 0 }, madeFor: { 'codex.trust.prompt': { version: '0.150.0', value: 'trust that' } } }))

@@ -251,7 +251,7 @@ function PlanUsageStatus() {
   const view = useConnections()
   const inUse = useConnectionsInUse()
   const now = useNow(60000)
-  const byConnections = new Set(view?.preview ? view.providers : [])
+  const byConnections = new Set(view?.providers ?? [])
   return (
     <>
       {enabledProviders(settings).map((p) =>

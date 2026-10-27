@@ -1,4 +1,5 @@
 {
+  "assistant.banner.connectionSetup": "Aucune connexion {cli} n’est activée dans cet espace de travail : l’Assistant ne peut donc pas démarrer. Ajoutes-en une et connecte-toi.",
   "assistant.hiveTemplates.pair": "Binôme",
   "assistant.hiveTemplates.pairOne": "Binôme : un fournisseur",
   "assistant.hiveTemplates.pairOneText": "Un auteur et un relecteur, tous deux Claude Code : quand un seul agent de code est installé.",

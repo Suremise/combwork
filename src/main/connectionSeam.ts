@@ -3,13 +3,11 @@ import { app } from 'electron'
 import { realpathSync } from 'original-fs'
 import type { ProviderId } from '../shared/types'
 import { PROVIDERS, providerDescriptor } from '../shared/providers'
-import { ACCOUNTS_PREVIEW } from '../shared/advanced'
-import { advanced } from './advanced'
 
 /**
  * Whether a provider's sign-in is Hive's connections' (HI-1755), and the test seam that keeps a test copy on its CLI
- * test home instead. Its own module, importing only the advanced settings, so the provider service and adapters can ask
- * without importing the connections themselves.
+ * test home instead. Its own module, so the provider service and adapters can ask without importing the connections
+ * themselves.
  */
 
 /**
@@ -38,14 +36,12 @@ function userHomeOf(homeEnv: string): string {
   return PROVIDERS.find((p) => p.capabilities.connections?.homeEnv === homeEnv)?.capabilities.connections?.userHome ?? '.claude'
 }
 
-/** Whether connections are on (Settings → Advanced → Connections (preview), until the cleanup slice S8 removes it). */
-export const connectionsOn = (): boolean => advanced.get<boolean>(ACCOUNTS_PREVIEW) === true
-
 /**
- * Whether the provider's sign-in belongs to its connections (connections are on, it has them, and the test seam isn't
- * on): its CLI's own home is then never checked or signed in by Hive, and its settings aren't read for its agents.
+ * Whether the provider's sign-in belongs to its connections (it has them, and the test seam isn't on; since S8, HI-1774,
+ * for everyone): its CLI's own home is then never checked or signed in by Hive, and its settings aren't read for its
+ * agents. Copilot has none: its own machine-wide login, as before (HI-1758).
  */
 export function connectionsManaged(id: ProviderId, env: NodeJS.ProcessEnv = process.env): boolean {
   const caps = providerDescriptor(id).capabilities.connections
-  return !!caps && connectionsOn() && !testHomeSeam(caps.homeEnv, env)
+  return !!caps && !testHomeSeam(caps.homeEnv, env)
 }

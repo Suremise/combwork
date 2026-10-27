@@ -1,4 +1,5 @@
 {
+  "assistant.banner.connectionSetup": "No {cli} connection is on in this workspace, so the Assistant can't start. Add one and sign it in.",
   "assistant.hiveTemplates.pair": "Pair",
   "assistant.hiveTemplates.pairOne": "Pair: one provider",
   "assistant.hiveTemplates.pairOneText": "A builder and a reviewer, both Claude Code: for when only one coding agent is installed.",

@@ -22,7 +22,7 @@ import { providerService } from './providerService'
  */
 
 const log = createLogger('servers')
-const { locked, assertOn, mustGet, change } = connectionInternals
+const { locked, mustGet, change } = connectionInternals
 
 /** How long a model listing may take, and how much of its reply is read. */
 const LIST_TIMEOUT_MS = 10_000
@@ -90,7 +90,6 @@ export interface ServerInput {
  * can't be saved leaves the connection added with no key, and says so.
  */
 export async function addServerConnection(input: ServerInput): Promise<Connection & { keyFailed?: boolean }> {
-  assertOn()
   const caps = capsOf(input.cli)
   const b = checkedUrl(input.baseUrl)
   const preset = caps.presets.find((p) => p.id === input.preset)?.id
@@ -121,7 +120,6 @@ export async function addServerConnection(input: ServerInput): Promise<Connectio
  * the same locked step (`keyCleared`), so a key is never sent to a server it wasn't saved for.
  */
 export async function editServerConnection(id: string, patch: { baseUrl?: string; preset?: string | null; models?: ServerModel[]; modelsFrom?: 'typed' | 'listed' }): Promise<{ keyCleared: boolean }> {
-  assertOn()
   serverOf(id)
   return locked(id, async () => {
     const { server, caps } = serverOf(id)
@@ -153,7 +151,6 @@ export async function editServerConnection(id: string, patch: { baseUrl?: string
 
 /** Saves (or replaces) a server connection's key, for its base URL's origin. Returns what the view shows. */
 export async function setServerKey(id: string, key: string): Promise<{ last4: string }> {
-  assertOn()
   checkedKey(key)
   serverOf(id)
   {
@@ -174,7 +171,6 @@ export async function setServerKey(id: string, key: string): Promise<{ last4: st
 
 /** Removes a server connection's key (Remove Key): it then has none, and a launch needing one is refused. */
 export async function removeServerKey(id: string): Promise<void> {
-  assertOn()
   serverOf(id)
   cancelServerModels(id)
   await locked(id, () => removeKey(id))
@@ -210,7 +206,6 @@ export function cancelServerModels(id: string, request?: string): void {
  * What a failure says is its kind (and HTTP status), never the server's reply.
  */
 export async function readServerModels(id: string, request: string): Promise<ListResult> {
-  assertOn()
   const { server, caps } = serverOf(id)
   const b = checkedUrl(server.baseUrl)
   const url = listingUrl(server.baseUrl, listingOf(server, caps))
@@ -303,7 +298,6 @@ async function readBounded(res: Response, abort: AbortController): Promise<strin
  * The key (if any) is masked while the terminal is open. Returns the terminal's key.
  */
 export async function setUpServerConnection(id: string): Promise<string> {
-  assertOn()
   serverOf(id)
   return locked(id, async () => {
     const { a, server, caps } = serverOf(id)

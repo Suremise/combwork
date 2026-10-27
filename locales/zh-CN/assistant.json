@@ -1,4 +1,5 @@
 {
+  "assistant.banner.connectionSetup": "此工作区中没有已启用的 {cli} 连接，因此助手无法启动。请添加一个并登录。",
   "assistant.hiveTemplates.pair": "结对",
   "assistant.hiveTemplates.pairOne": "结对：单一提供方",
   "assistant.hiveTemplates.pairOneText": "一个构建者和一个评审者，都是 Claude Code：适用于只安装了一个编程智能体的情况。",

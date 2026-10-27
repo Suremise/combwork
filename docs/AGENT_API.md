@@ -244,9 +244,9 @@ With `"wake": true` it is an **agent watch** (#416), for an agent's or the Assis
 
 Returns `{ "timedOut": false, "waitedSeconds": 41, "agents": [{ "project": "web", "agent": "Agent 2", "status": "finished", "statusMessage": null, "backgroundTasks": 0 }] }`.
 
-### Connections (preview) <a id="connections-preview"></a>
+### Connections <a id="connections-preview"></a>
 
-From api.version 10 (HI-1771), with **Settings → Advanced → Connections (preview)** on. With it off, every call or field here is refused (`409`, "Connections are a preview…"). A **connection** is a CLI plus where it gets its models (for now, a Claude Code sign-in Hive keeps). Each workspace chooses which connections are on and the default for each CLI; an agent can have its own.
+From api.version 10 (HI-1771), and on for everyone since connections left their preview (HI-1774). A **connection** is a CLI plus where it gets its models: a Claude Code or Codex sign-in Hive keeps, or a server (a base URL and key). GitHub Copilot has none: it runs on its own sign-in. Each workspace chooses which connections are on and the default for each CLI; an agent can have its own.
 
 `GET /v1/connections` and `GET /v1/connections/{id or name}` — the connections, as the caller may see them. None ever includes a token, a key, where a login is kept, a connection's settings or its defaults.
 

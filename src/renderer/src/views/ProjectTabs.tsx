@@ -18,7 +18,7 @@ import { instructionsStarter } from '@shared/projectTabs'
 import { EffortPicker, ModelPicker } from '../components/ModelPicker'
 import { effortText, runsAsName } from '@shared/models'
 import { PROJECT_KEY_DESC, PROJECT_SETTINGS_SECTIONS, settingEntry, shownSetting, type SettingsSectionInfo } from '@shared/settingsCatalog'
-import { ACCOUNTS_PREVIEW, shownText } from '@shared/advanced'
+import { shownText } from '@shared/advanced'
 import { NumberField } from '../components/NumberField'
 import { StorageView } from '../components/Storage'
 import { TaskStrip } from '../components/Board'
@@ -904,7 +904,7 @@ export function PlanLimits({ provider }: { provider: ProviderId }) {
   const inUse = useConnectionsInUse()
   const now = useNow(60000)
   const p = providerDescriptor(provider)
-  if (view?.preview && view.providers.includes(provider)) {
+  if (view?.providers.includes(provider)) {
     const ids = [...new Set([...(view.workspace[provider]?.on ?? []), ...inUse.filter((c) => c.provider === provider).map((c) => c.id)])]
     if (!ids.length) return <p className="hint">{tr(M.noConnectionsOn, { provider: p.name })}</p>
     return (
@@ -1739,10 +1739,10 @@ function DraftInput({ value, onCommit, ...rest }: { value: string; onCommit: (v:
 
 function AgentList({ project }: { project: ProjectInfo }) {
   const settings = useStore((s) => s.settings)
-  // The connection each would start on (HI-1770): with Connections on, its defaults are what an agent without its own runs.
+  // The connection each would start on (HI-1770): its defaults are what an agent without its own runs.
   const connections = useConnections()
   const launchConnection = (a: ProjectInfo['agents'][number], provider: ProviderId) => {
-    if (!connections?.preview || !connections.providers.includes(provider)) return undefined
+    if (!connections?.providers.includes(provider)) return undefined
     const r = resolveConnection({ connections: connections.workspace }, provider, a.connection, connections.connections)
     return r.ok ? (connections.connections.find((c) => c.id === r.id) ?? null) : null
   }
@@ -1859,8 +1859,6 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
   // Its sections and rows are formatted here: a change of language shows them in it at once.
   useLanguage()
   const settings = useStore((s) => s.settings)
-  // With Connections on, a CLI with them has no project model, effort or context (HI-1770: each connection's, and the agents' own).
-  const connectionsShown = useStore((s) => s.advanced?.values[ACCOUNTS_PREVIEW] === true)
   const installs = useStore((s) => s.providers)
   const [section, setSection] = useState<ProjectSection>('general')
   const [query, setQuery] = useState('')
@@ -1904,21 +1902,27 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
     const globalEffort = effortText(id, g.defaultEffort, runModel, installs[id], settings, tr)
     const modes = offeredModes(id, settings)
     const mode = pc.permissionMode === 'inherit' ? g.defaultPermissionMode : pc.permissionMode
+    // A CLI with connections has no project model, effort or context (HI-1770, HI-1774: each connection's, and the agents' own).
+    const ownModel = !p.capabilities.connections
     return [
-      {
-        section: sect,
-        key: `${id}.model`,
-        ...rowText(`project.${id}.model`),
-        modified: pc.model !== 'inherit',
-        render: () => <ModelPicker provider={id} value={pc.model} base={{ value: 'inherit', label: inherit(globalModel) }} onChange={(v) => void save({ model: v })} />
-      },
-      {
-        section: sect,
-        key: `${id}.effort`,
-        ...rowText(`project.${id}.effort`),
-        modified: pc.effort !== 'inherit',
-        render: () => <EffortPicker provider={id} model={runModel} value={pc.effort} base={{ value: 'inherit', label: inherit(globalEffort) }} onChange={(v) => void save({ effort: v })} />
-      },
+      ...(ownModel
+        ? [
+            {
+              section: sect,
+              key: `${id}.model`,
+              ...rowText(`project.${id}.model`),
+              modified: pc.model !== 'inherit',
+              render: () => <ModelPicker provider={id} value={pc.model} base={{ value: 'inherit', label: inherit(globalModel) }} onChange={(v) => void save({ model: v })} />
+            },
+            {
+              section: sect,
+              key: `${id}.effort`,
+              ...rowText(`project.${id}.effort`),
+              modified: pc.effort !== 'inherit',
+              render: () => <EffortPicker provider={id} model={runModel} value={pc.effort} base={{ value: 'inherit', label: inherit(globalEffort) }} onChange={(v) => void save({ effort: v })} />
+            }
+          ]
+        : []),
       {
         section: sect,
         key: `${id}.permissionMode`,
@@ -1945,7 +1949,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
           </select>
         )
       },
-      ...(p.capabilities.contextLimit
+      ...(p.capabilities.contextLimit && ownModel
         ? [
             {
               section: sect,
@@ -1998,7 +2002,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
         </select>
       )
     },
-    ...PROVIDERS.flatMap((p) => providerDefs(p.id).filter((d) => !(connectionsShown && p.capabilities.connections && /\.(model|effort|use200kContext)$/.test(d.key)))),
+    ...PROVIDERS.flatMap((p) => providerDefs(p.id)),
     {
       section: 'sessions',
       key: 'compactSuggestTokens',

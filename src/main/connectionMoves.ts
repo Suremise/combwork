@@ -9,7 +9,6 @@ import { msg, tr } from '../shared/i18n'
 import { config } from './config'
 import { onHiveEvent, toast } from './events'
 import { createLogger, userText } from './logger'
-import { connectionsOn } from './connectionSeam'
 import { accountFolder, getAccount, seedConnectionDefaults } from './accounts'
 import { provider as providerAdapter } from './providers'
 import { providerService } from './providerService'
@@ -23,8 +22,8 @@ import { openWorkspaces, workspaceOf, type WorkspaceService } from './workspace'
 
 const log = createLogger('connections')
 
-/** Whether a CLI's model, effort and context come from connections now: Connections on (the preview, until S8) and a CLI with them. */
-export const connectionLayerFor = (cli: ProviderId): boolean => !!providerDescriptor(cli).capabilities.connections && connectionsOn()
+/** Whether a CLI's model, effort and context come from connections: a CLI with them (since S8, HI-1774, for everyone; Copilot has none). */
+export const connectionLayerFor = (cli: ProviderId): boolean => !!providerDescriptor(cli).capabilities.connections
 
 /** Moves under way, by project and CLI: a start, an open and a toggle at once share one. */
 const moving = new Map<string, Promise<void>>()
@@ -80,7 +79,7 @@ export function effortUsable(cli: ProviderId, model: string | null, conn: Pick<C
  * and before anything else was written. A value the agent no longer has (changed since) isn't listed; nor a dismissed one.
  */
 export async function movedNotice(ws: WorkspaceService): Promise<MovedNotice[]> {
-  if (!connectionsOn() || !ws.path) return []
+  if (!ws.path) return []
   const dismissed = new Set(config.get().ui.connectionsNoticeDismissed ?? [])
   const out: MovedNotice[] = []
   for (const projectPath of await ws.listProjectPaths()) {
@@ -122,16 +121,15 @@ export async function dismissMovedNotice(ws: WorkspaceService, keys: string[]): 
 const MOVE_FAILED = msg({ id: 'main.connections.moveFailed', defaultMessage: "Hive couldn't move {project}'s model settings to its agents", description: "A notice's title (HI-1770): moving a project's own model, effort and context settings onto its agents (connections now hold the defaults) failed; it is tried again at the next start. {project} is the project's name." })
 
 /**
- * Every open workspace's projects moved, for each CLI with connections that is on (at an open, and when Connections are
- * turned on): a failure is logged and said once, and tried again at the next start, open or toggle. Connections made
- * before they had defaults get the CLI's first.
+ * Every open workspace's projects moved, for each CLI with connections that is on (at an open, and when a CLI is turned
+ * on): a failure is logged and said once, and tried again at the next start or open. Connections made before they had
+ * defaults get the CLI's old per-CLI ones first, once (seedConnectionDefaults).
  */
 async function moveOpenProjects(): Promise<void> {
-  if (!connectionsOn()) return
   seedConnectionDefaults()
   const clis = PROVIDERS.filter((p) => p.capabilities.connections && isProviderEnabled(config.settings, p.id)).map((p) => p.id)
   for (const ws of openWorkspaces()) {
-    // Once per workspace opened (a workspace's refreshes say it changed too); again after a toggle.
+    // Once per workspace opened (a workspace's refreshes say it changed too); again after a CLI is turned on.
     if (!ws.path || looked.has(ws.path.toLowerCase())) continue
     looked.add(ws.path.toLowerCase())
     for (const projectPath of await ws.listProjectPaths().catch(() => [])) {
@@ -146,13 +144,13 @@ async function moveOpenProjects(): Promise<void> {
   }
 }
 
-/** Workspaces whose projects were looked at since Hive started or Connections were last turned on or off. */
+/** Workspaces whose projects were looked at since Hive started or a CLI was last turned on. */
 const looked = new Set<string>()
 
-/** The moves' part of Hive's start (index.ts): at each workspace's open, and when Connections (preview) is turned on. */
+/** The moves' part of Hive's start (index.ts): at each workspace's open, and when Settings change (a CLI turned on). */
 export function initConnectionMoves(): void {
   onHiveEvent((e) => {
-    if (e.type === 'advanced-changed') looked.clear()
-    if (e.type === 'workspace-changed' || e.type === 'advanced-changed') void moveOpenProjects()
+    if (e.type === 'settings-changed') looked.clear()
+    if (e.type === 'workspace-changed' || e.type === 'settings-changed') void moveOpenProjects()
   })
 }
