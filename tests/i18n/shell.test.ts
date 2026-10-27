@@ -123,9 +123,9 @@ describe('round 1 of review (#795)', () => {
     expect(otherUsers(users, 'MOD+SHIFT+P', 'project.goto')).toEqual(['palette.show'])
     expect(otherUsers(users, 'Mod+Shift+J', 'view.board')).toEqual([])
     expect(otherUsers(users, undefined, 'help.docs')).toEqual([])
-    // The editor keeps no labels: it names the commands when it shows a clash.
+    // The editor keeps no labels: it names the commands (with their categories, HI-1838) when it shows a clash.
     const editor = readFileSync(join(ROOT, 'src/renderer/src/components/Keybindings.tsx'), 'utf8')
-    expect(editor).toContain('otherUsers(conflicts, r.key, r.c.id).map(commandName)')
+    expect(editor).toContain('otherUsers(conflicts, r.key, r.c.id).map(commandIn)')
     expect(editor).not.toMatch(/filter\(\(l\) => l !== /)
   })
 

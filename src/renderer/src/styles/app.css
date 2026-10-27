@@ -1765,9 +1765,15 @@ textarea.input {
   display: none !important;
 }
 /* The tabs' line runs under the whole row, the selected tab's underline on it. */
-.workflow-defaults-tabs > .hive-tabs-row {
+.workflow-defaults-tabs > .hive-tabs-row,
+.kb-editor > .hive-tabs-row {
   border-block-end: 1px solid var(--border-subtle);
   margin-block-end: 4px;
+}
+/* Keyboard Shortcuts' many categories (HI-1838) wrap onto another line rather than scroll with the last cut off. */
+.hive-tabs.kb-tabs {
+  flex-wrap: wrap;
+  overflow-x: visible;
 }
 /* "From Hive defaults", "From the workspace": a link to that tab of Settings → Version Control (HI-1837). */
 .workflow-origin-link {
@@ -8318,6 +8324,26 @@ button.mode-badge.badge:hover {
 }
 .kb-table tr.recording td.kb-actions {
   background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--bg);
+}
+/* The editor's row isn't highlighted as a whole on hover: its sticky actions, on the page's background, would show as a
+   block of another colour (HI-1838's screenshot review). Its own rows still are. */
+.setting.wide:has(.kb-editor):hover {
+  background: none;
+}
+/*
+ * A narrow editor (HI-1838): the command takes less room, so it and its Shortcut stay in view beside the sticky actions;
+ * Category, after them, is what the table scrolls sideways to.
+ */
+.kb-editor {
+  container-type: inline-size;
+}
+@container (max-width: 620px) {
+  .kb-label {
+    min-width: 7em;
+  }
+  .kb-table td.kb-label .kb-id {
+    min-inline-size: 7rem;
+  }
 }
 .kb-id {
   font-size: 11px;

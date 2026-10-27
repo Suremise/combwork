@@ -114,7 +114,9 @@ export function DataTable<T>({
   useEffect(() => {
     if (view.page !== page) setPage(view.page)
   }, [view.page, page])
-  const filtered = Object.values(filters).some((v) => v.trim())
+  // Only the shown columns' filters count: one kept for a column the table no longer has (Keyboard Shortcuts' Category,
+  // inside a category's tab, HI-1838) neither narrows the rows nor says they are filtered.
+  const filtered = columns.some((c) => c.filter && filters[c.key]?.trim())
   const hasFilters = columns.some((c) => c.filter) && (rows.length > filterFrom || filtered)
   // Selecting every row the filters let through, not only this page's.
   const matchingKeys = useMemo(() => (selection ? tableView(rows, columns, { sort: null, filters, page: 1, pageSize: Math.max(1, rows.length) }).rows.map((r, i) => rowKey(r, i)) : []), [selection, rows, columns, filters, rowKey])
@@ -187,7 +189,8 @@ export function DataTable<T>({
             {hasFilters && (
               <tr className="table-filters">
                 {columns.map((c) => (
-                  <th key={c.key} className={cx(c.num && 'num')}>
+                  // The column's class too, so what styles a column (hidden when narrow, sticky) holds for its filter (HI-1838).
+                  <th key={c.key} className={cx(c.num && 'num', c.className)}>
                     {c.filter?.kind === 'choice' ? (
                       <select className="select" aria-label={tr(msg({ id: 'shell.table.filterBy', defaultMessage: 'Filter {column}', description: "The name, for screen readers, of a table's filter under a column. {column} is the heading." }), { column: c.header })} value={filters[c.key] ?? ''} onChange={(e) => setFilter(c.key, e.target.value)}>
                         <option value="">{tr(msg({ id: 'shell.table.all', defaultMessage: 'All', description: "A table's column filter's first choice: no filter." }))}</option>
