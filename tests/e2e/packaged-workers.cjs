@@ -35,31 +35,34 @@ const threadLines = (report) => {
   lib.git(alpha, ['branch', 'other'])
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
   const app = await _electron.launch({ executablePath: path.join(lib.ROOT, 'dist/win-unpacked/Hive.exe'), args: [], cwd: lib.ROOT, env })
-  const page = await app.firstWindow()
-  page.on('pageerror', (e) => check('no page errors', false, e.message))
-  await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
-  await lib.openWorkspace(inv, page, ws)
-  await page.getByText('alpha', { exact: true }).first().click()
+  // Closed whatever fails from here on, not only when every step does.
+  try {
+    const page = await app.firstWindow()
+    page.on('pageerror', (e) => check('no page errors', false, e.message))
+    await lib.appReady(page)
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    await lib.openWorkspace(inv, page, ws)
+    await page.getByText('alpha', { exact: true }).first().click()
 
-  // Git's worker runs git; a switch to a branch the folder isn't on takes the repository lock; a card is a board write
-  // (its WAL checkpoints) and a board change the usage history shares out again (its worker's reads). The log's writer
-  // and the stall watchdog start with Hive.
-  await inv('git:switch', alpha, 'other')
-  await inv('git:switch', alpha, first)
-  await inv('tasks:create', { title: 'A card', project: 'alpha' })
+    // Git's worker runs git; a switch to a branch the folder isn't on takes the repository lock; a card is a board write
+    // (its WAL checkpoints) and a board change the usage history shares out again (its worker's reads). The log's writer
+    // and the stall watchdog start with Hive.
+    await inv('git:switch', alpha, 'other')
+    await inv('git:switch', alpha, first)
+    await inv('tasks:create', { title: 'A card', project: 'alpha' })
 
-  let lines = {}
-  const allRunning = await lib.until(async () => {
-    lines = threadLines(await inv('app:diagnostics'))
-    // One that ended or runs on main won't change: no need to wait for it.
-    if (WORKERS.some((n) => /^(ended|on main's thread)/.test(lines[n] ?? ''))) return true
-    return WORKERS.every((n) => lines[n] === 'its own thread')
-  }, HUNG_MS)
-  check('Copy Diagnostics lists the worker threads', Object.keys(lines).length === WORKERS.length, JSON.stringify(lines))
-  for (const n of WORKERS) check(`${n}: its own thread`, !!allRunning && lines[n] === 'its own thread', lines[n] ?? 'not listed')
-
-  await app.close()
+    let lines = {}
+    const allRunning = await lib.until(async () => {
+      lines = threadLines(await inv('app:diagnostics'))
+      // One that ended or runs on main won't change: no need to wait for it.
+      if (WORKERS.some((n) => /^(ended|on main's thread)/.test(lines[n] ?? ''))) return true
+      return WORKERS.every((n) => lines[n] === 'its own thread')
+    }, HUNG_MS)
+    check('Copy Diagnostics lists the worker threads', Object.keys(lines).length === WORKERS.length, JSON.stringify(lines))
+    for (const n of WORKERS) check(`${n}: its own thread`, !!allRunning && lines[n] === 'its own thread', lines[n] ?? 'not listed')
+  } finally {
+    await app.close().catch(() => undefined)
+  }
   console.log(failed ? `\n${failed} check(s) FAILED` : '\nALL PASSED')
   process.exit(failed ? 1 : 0)
 })().catch((e) => {
