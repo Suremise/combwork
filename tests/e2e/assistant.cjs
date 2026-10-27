@@ -42,7 +42,9 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('the Assistant has its home and one agent', info.assistant?.path.toLowerCase() === home.toLowerCase() && info.assistant.agents.length === 1)
   check('its home is not listed as a project', info.projects.map((p) => p.name).sort().join(',') === 'api,web')
   check("its sessions are kept out of git", fs.readFileSync(path.join(home, '.gitignore'), 'utf8').includes('*'))
-  check('Hive\'s four modes are in the workspace', fs.readdirSync(path.join(ws, '.hive', 'modes')).sort().join(',') === 'coordinator.md,planner.md,qa-triager.md,release-manager.md')
+  // Brought in after the open (HI-1705): wait for them.
+  const modes = () => (fs.existsSync(path.join(ws, '.hive', 'modes')) ? fs.readdirSync(path.join(ws, '.hive', 'modes')).sort().join(',') : '')
+  check('Hive\'s four modes are in the workspace', await becomes(() => modes() === 'coordinator.md,planner.md,qa-triager.md,release-manager.md'), modes())
   check("it defaults to the agents' model and effort, and Auto mode", JSON.stringify(info.assistant.config.providers['claude-code']) === JSON.stringify({ model: 'inherit', effort: 'inherit', permissionMode: 'auto', extraArgs: '', use200kContext: 'inherit' }), JSON.stringify(info.assistant.config.providers['claude-code']))
 
   // The panel: hidden at first, Ctrl+Alt+I shows it, and each workspace remembers it.
