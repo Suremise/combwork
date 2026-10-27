@@ -209,6 +209,11 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
     const handed = await handOffCarried(ws, projectPath, pool, own, lane ? { lane, agent: builder } : { card: card.id, agent: builder }, name(builder))
     if (handed) return leaseAt(pool, handed)
   }
+  // The slot its own run still writes in, its lease ended (HI-1762): taken over too, or waited for, never a second slot.
+  const written = await startOnWritten(ws, projectPath, pool, builder, lane ? { lane, agent: builder } : { card: card.id, agent: builder }, name(builder), o.dry)
+  if ('wait' in written) return { wait: written.wait }
+  if ('dry' in written) return { slot: written.dry.name, folder: written.dry.folder, lease: '', fresh: false }
+  if ('lease' in written) return leaseAt(pool, written.lease)
   if (o.dry) return couldLend(pool, projectPath, builder)
   const r = await pool.lend(lane ? { lane, agent: builder } : { card: card.id, agent: builder }, { ...(o.target ? { target: o.target } : {}), install: false })
   if (!r.ok) return { wait: refusalText(r.refusal, name) }
@@ -410,6 +415,58 @@ async function handOffCarried(ws: WorkspaceService, projectPath: string, pool: S
     .catch((e) => (log.warn(`handing ${userText(agentName)}'s slot ${userText(own.slot.name)} over`, e), null))
   if (handed) log.info(`${userText(agentName)}'s slot ${userText(own.slot.name)} handed over to ${req.lane ? `lane ${req.lane}` : `#${req.card}`} (lease ${handed.id})`)
   return handed
+}
+
+/** The slot a builder's run now writes in with no open lease (HI-1762), as the pool has it: none, null. */
+function writtenSlotOf(projectPath: string, pool: SlotPool, builder: string): Slot | null {
+  const run = sessions.runNow(projectPath, builder)?.run
+  return (run && pool.slots().find((s) => s.writer?.agent === builder && s.writer.run === run && !pool.openLease(s.name))) || null
+}
+
+/**
+ * The slot a builder's own run still writes in with no open lease (HI-1762: its lane's lease ended, the gentle end
+ * waiting for its turn, while its next lane's start came), taken over by that start: the lease
+ * begins on it, its writer moves to it (the old lease's end no longer owns the run, so it ends nothing), and the run's
+ * conversations bound to the old lease are rebound to it, so they resume there (SlotStore.takeWrittenSlot). Null: none,
+ * or not now (the caller lends another). The slot is then prepared on the new line as any lent slot is, once the
+ * builder is quiet.
+ */
+/**
+ * What a start does about the slot its builder's own run still writes in (HI-1762), keeping one agent to one slot:
+ * `none` (there is none: lend as before), `lease` (taken over), `dry` (a dry start: it would be this one), or `wait`
+ * (there is one, but it can't be taken over now: an operation or job on it, not ready, or it changed while it was taken;
+ * looked at again once): the start waits for it, never lent a second slot meanwhile.
+ */
+async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string }, agentName: string, dry = false): Promise<{ none: true } | { lease: SlotLease } | { dry: Slot } | { wait: string }> {
+  const why = (s: Slot): string | null => (s.op ? 'is being set up or changed' : s.job ? 'has a command of its own running' : s.warmError ? "couldn't be set up" : s.state !== 'lent' ? `isn't ready (${s.state})` : null) // i18n-ignore: agent-facing, a start's wait
+  const waitFor = (s: Slot, because: string): { wait: string } => ({ wait: `${agentName}'s own slot ${s.name}, its run still there, ${because}: this start waits for it rather than take a second slot` }) // i18n-ignore: agent-facing, a start's wait
+  for (let tries = 0; tries < 2; tries++) {
+    const slot = writtenSlotOf(projectPath, pool, builder)
+    if (!slot) return { none: true }
+    const busy = why(slot)
+    if (busy) return waitFor(slot, busy)
+    if (dry) return { dry: slot }
+    const taken = await takeWritten(ws, projectPath, pool, builder, req, agentName)
+    if (taken) return { lease: taken }
+  }
+  const still = writtenSlotOf(projectPath, pool, builder)
+  return still ? waitFor(still, 'changed while it was taken over') : { none: true } // i18n-ignore: agent-facing, a start's wait
+}
+
+async function takeWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string }, agentName: string): Promise<SlotLease | null> {
+  const slot = writtenSlotOf(projectPath, pool, builder)
+  const run = slot?.writer?.run
+  if (!slot || !run) return null
+  const host = (await ws.sessionScope(projectPath)).scope
+  const id = (await ws.projectConfig(projectPath)).id ?? basename(projectPath)
+  const taken = await pool
+    .takeWrittenSlot(slot.name, req, run, (db, lease, was) => {
+      const bound = db.prepare('SELECT id FROM sessions WHERE host = ? AND lease = ?').all(host, was) as { id: string }[] // i18n-ignore: SQL
+      for (const b of bound) rebindSession(db, host, id, b.id, lease.id)
+    })
+    .catch((e) => (log.warn(`taking ${userText(agentName)}'s slot ${userText(slot.name)} over`, e), null))
+  if (taken) log.info(`${userText(agentName)}'s own slot ${userText(slot.name)}, its run still there, taken over by ${req.lane ? `lane ${req.lane}` : `#${req.card}`} (lease ${taken.id})`)
+  return taken
 }
 
 /** Whether an adopted slot can be taken over by a start: no changes not committed, and its head in the target (merged). */
@@ -981,6 +1038,10 @@ export async function lendLane(ws: WorkspaceService, projectPath: string, lane: 
   const own = await carriedToHand(ws, projectPath, pool, builder, target)
   const handed = own ? await handOffCarried(ws, projectPath, pool, own, { lane, agent: builder }, name(builder)) : null
   if (handed) return { slot: handed.slot }
+  // The slot its own run still writes in, its last lease ended (HI-1762), as a card's start does: taken, or waited for.
+  const written = await startOnWritten(ws, projectPath, pool, builder, { lane, agent: builder }, name(builder))
+  if ('wait' in written) return { waiting: written.wait }
+  if ('lease' in written) return { slot: written.lease.slot }
   // Lent with the lane's target (#1627), so the slot records where its lines merge.
   const r = await pool.lend({ lane, agent: builder }, { ...(target ? { target } : {}), install: false })
   if (r.ok) {
@@ -1010,6 +1071,13 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
       const own = await carriedToHand(ws, projectPath, pool, lane.builder.id, null)
       if (stopped()) return
       lease = own ? await handOffCarried(ws, projectPath, pool, own, { lane: lane.id, agent: lane.builder.id }, lane.builder.name) : null
+      if (stopped()) return
+      // The slot its own run still writes in (HI-1762): taken, or this lane goes on waiting (never a second slot).
+      if (!lease) {
+        const written = await startOnWritten(ws, projectPath, pool, lane.builder.id, { lane: lane.id, agent: lane.builder.id }, lane.builder.name)
+        if ('wait' in written) continue
+        if ('lease' in written) lease = written.lease
+      }
     }
     if (stopped()) return
     if (!lease) {

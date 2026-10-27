@@ -535,6 +535,35 @@ export class SlotStore {
   }
 
   /**
+   * The slot an agent's own run still writes in, its lease ended (HI-1762: HB5's lane ended, its session still in its
+   * turn in slot-a, and its next lane's start found no slot free), taken over by its next card or lane in one write: only
+   * while the slot has no open lease, operation or job, is lent with no warm error, its writer is that agent's run `run`
+   * held by this Hive (`holder`), and the agent holds no other dispatch lease. The lease begins on the slot, the writer
+   * moves to it (the old lease's end then no longer owns the run: it stops nothing), and `also` (the caller's rebinding of
+   * the run's conversations) runs in the same write. Null when it can't be now; nothing written.
+   */
+  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string }, run: string, holder: { pid: number; started: number }, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
+    if ((req.card === undefined) === (req.lane === undefined)) throw new Error('a lease is for a card or a lane')
+    try {
+      return await this.conn.write((db) => {
+        const s = this.slotIn(db, slot)
+        if (!s || s.state !== 'lent' || s.op || s.job || s.warmError || openLeaseIn(db, this.project, s.name)) return null
+        const w = s.writer
+        if (!w || w.agent !== req.agent || w.run !== run || w.pid !== holder.pid || w.started !== holder.started) return null
+        if (this.dispatchOf(db, req.agent)) return null
+        const at = this.iso()
+        const lease = this.insertLease(db, `l-${randomBytes(6).toString('hex')}`, s.name, req.card !== undefined ? 'card' : 'lane', req, at)
+        db.prepare('UPDATE slots SET writer_lease = ?, used_at = ? WHERE project = ? AND name = ? AND writer_run = ?').run(lease.id, at, this.project, s.name, run)
+        also?.(db, lease, w.lease)
+        return lease
+      })
+    } catch (e) {
+      if (constraintOf(e)) return null
+      throw e
+    }
+  }
+
+  /**
    * A rename begun (#1441): in one write, the slot taken by a `remove`-kind operation (as `startRemoval`, only while it is
    * free and in state `from`) and its destination reserved: the next generic name no slot of the project has, no other
    * rename's intent has reserved, and whose folder under `root` is absent, recorded as the operation's intent (board_meta
@@ -1195,6 +1224,11 @@ export class SlotPool {
   /** A carried lease handed off to a card or lane of its agent's (#1441), `also` in the same write (SlotStore.handOff). */
   handOff(carried: string, req: { card?: number; lane?: string; agent: string }, also?: (db: DatabaseSync, lease: SlotLease) => void, check?: (slot: Slot) => boolean): Promise<SlotLease | null> {
     return this.store.handOff(carried, req, also, check)
+  }
+
+  /** The slot an agent's own run still writes in, taken over by its next card or lane (HI-1762, SlotStore.takeWrittenSlot), held by this Hive. */
+  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string }, run: string, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
+    return this.store.takeWrittenSlot(slot, req, run, await this.deps.holder.self(), also)
   }
 
   lastLease(name: string): SlotLease | null {

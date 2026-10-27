@@ -336,7 +336,10 @@ export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Sl
     laneEnd(projectPath, lease, slot.name, w, at)
     return
   }
-  stopWhenIdle(projectPath, lease, slot, w)
+  // At the idle moment, the slot's writer still this run under this lease (HI-1762: its next card's start may have taken
+  // the slot over meanwhile, its run then under the new lease, which this end must never stop).
+  const writerNow = at ? (): SlotWriter | null => at.pool.slots().find((s) => s.name === slot.name)?.writer ?? null : null
+  stopWhenIdle(projectPath, lease, slot, w, writerNow ? { go: () => true, writerNow } : undefined)
 }
 
 /**
@@ -600,6 +603,9 @@ export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
 
 /** The lane leases being ended now (by id): a second end of the same lease joins the first, never makes another note. */
 const laneEnds = new Map<string, { done: Promise<string> }>()
+
+/** A lane lease's gentle end under way (tests): how it ends (its log's last word), or null when none is. */
+export const laneEndOf = (lease: string): Promise<string> | null => laneEnds.get(lease)?.done ?? null
 
 /**
  * A lane's lease ended with its builder still running in the slot (HI-1706): its run is ended gently. The builder is
