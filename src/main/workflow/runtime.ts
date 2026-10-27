@@ -2154,12 +2154,13 @@ export class Workflow {
   }
 
   /**
-   * Whether a lane's card is its own (HI-1821): given to no agent on the board, or to its builder. Another agent's card
-   * is another lane's work: its lane never waits on it, and a queued list change never waits for it.
+   * Whether a lane's card is its own (HI-1821, as lanes.ts's view reads it: boardStore's cardOwnersNow): given to its
+   * builder on the board, or given to no agent and its lane (`card.lane`: the newest running lane listing it) this one.
+   * Another's card is another lane's work: its lane never waits on it, and a queued list change never waits for it.
    */
   laneOwn(lane: string, n: number): boolean {
     const agent = this.store.cardAgent(n)
-    return !agent || agent === this.store.laneBuilder(lane)
+    return agent ? agent === this.store.laneBuilder(lane) : this.store.card(n).lane === lane
   }
 
   /**

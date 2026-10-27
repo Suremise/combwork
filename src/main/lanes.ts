@@ -13,7 +13,7 @@ import { onHiveEvent } from './events'
 import { readFile } from 'original-fs/promises'
 import { placeKey, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readTable, saveTable } from './storeTables'
-import { boardOpen, boardWrite, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
+import { boardOpen, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { onAction } from './workflow/actionWorker'
 import { foldCard, forYou } from '../shared/workflow/facts'
@@ -433,7 +433,10 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   const current = recorded.length ? await rulesetsNow(ws) : new Map<string, string>()
   // And their own stages, which a lane under old rules keeps (HR4's #1421 round 1).
   const stagesOf = ws.path ? rulesetStages(ws, recorded) : new Map<string, null>()
-  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null))
+  // Each running lane's cards' owner lanes (HI-1821): a card given to no agent is the lane's that owns it.
+  const owned = ws.path ? cardOwnersNow(ws, [...new Set(lanes.filter(running).flatMap((l) => l.cards))]) : new Map<number, { lane: string | null }>()
+  const owners = new Map([...owned].map(([n, o]) => [n, o.lane]))
+  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners))
 }
 
 /** A running lane's slot, and whether it waits for one (Start Lane… found none free, `slotWait`, and it has none yet). */
@@ -503,14 +506,18 @@ const stillAllDone = (ws: WorkspaceService, l: LaneRecord, cards: readonly numbe
 }
 
 /**
- * Checked under the board's lock (#1270): none of the lane's cards is in flight now for its builder, else its queued list
- * waits. Another agent's card in flight isn't the lane's (HI-1821).
+ * Checked under the board's lock (#1270): none of the lane's own cards is in flight now, else its queued list waits. A
+ * card held elsewhere isn't the lane's (HI-1821, as its view reads it: another agent's, or given to none and another
+ * lane's by cardOwnersNow).
  */
 const stillBetweenCards = (ws: WorkspaceService, l: LaneRecord, cards: readonly number[]) => (): void => {
   const places = cardPlacesNow(ws, cards)
+  const owners = cardOwnersNow(ws, cards)
   const flying = cards.some((n) => {
     const c = places.get(n)
-    return !!c && !c.archived && same(c.project, l.project) && FLYING.has(c.column) && (!c.agent || c.agent === l.builder.id)
+    const o = owners.get(n)
+    const own = o?.agent ? o.agent === l.builder.id : !o?.lane || o.lane === l.id
+    return !!c && !c.archived && same(c.project, l.project) && FLYING.has(c.column) && own
   })
   if (flying) throw new StaleLane(`lane ${l.id}: a card is in flight again`) // i18n-ignore: as above
 }

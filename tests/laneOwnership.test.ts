@@ -492,4 +492,65 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     expect(await store.boardWrite(w, async () => wf.start(`#${a2}`, agentActor('b1')))).toMatchObject({ ok: true })
     await lanes.endLane(w, l.id, { abandoned: true })
   })
+
+  // HI-1821 as reported: HB3's lane [HI-1771, HI-1757, HI-1758, HI-1782], the middle two moved to HB6's lane.
+  it("the reported sequence: the moved cards leave at once; a queued change keeps its own card as anchor through Review and Approved; then the lane's own next card (HI-1821)", async () => {
+    const [own1, x1, x2, own2, extra] = [await make('Seq 1771'), await make('Seq 1757'), await make('Seq 1758'), await make('Seq 1782'), await make('Seq extra')]
+    const la = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [own1, x1, x2, own2], by: 'Assistant' })).lane
+    await move(own1, 'doing')
+    // 04:45: the Assistant re-runs the start without them, the lane's own card in flight: at once.
+    const r = await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [own1, own2], by: 'Assistant' })
+    expect([r.lane.cards.map((c) => c.number), r.lane.queued, r.note]).toEqual([[own1, own2], null, undefined])
+    const lb = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [x1, x2], by: 'Assistant' })
+    expect(lb.note).toBeUndefined()
+    await run(() => tasks.updateTask(x1, { column: 'doing', agent: 'b2' }, user))
+    await run(() => tasks.updateTask(x2, { agent: 'b2', blocked: 'Asked the user' }, user))
+    // A change that adds a card waits for its own card, never B2's, through Review and Approved.
+    expect((await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [own1, own2, extra], by: 'Assistant' })).note).toMatch(new RegExp(`queued: it applies once #${own1} is Done`))
+    await move(own1, 'review')
+    expect([(await lane(la.id)).queued, (await lane(la.id)).status?.card]).toEqual([[own1, own2, extra], own1])
+    await move(own1, 'passed')
+    expect([(await lane(la.id)).queued, (await lane(la.id)).status?.card]).toEqual([[own1, own2, extra], own1])
+    await move(own1, 'done')
+    await vi.waitFor(async () => expect((await lane(la.id)).cards.map((c) => c.number)).toEqual([own1, own2, extra]), { timeout: HUNG_MS })
+    const now = await lane(la.id)
+    expect([now.queued, now.current, now.state, now.status]).toEqual([null, own2, 'active', null])
+    expect((await lanes.laneNext(w, 'alpha', 'b1')).next).toMatchObject({ card: own2, carryOn: false })
+    const wf = (await workflowFor(w, project))!
+    expect(await store.boardWrite(w, async () => wf.start(`#${own2}`, agentActor('b1')))).toMatchObject({ ok: true })
+    for (const l of [la, lb.lane]) await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
+  it('a card given to no agent that two lanes list is the newer lane’s, the holder’s once given; the other lane skips it, the runtime too (HI-1821)', async () => {
+    const [u, a1] = [await make('Shared u'), await make('Shared a1')]
+    const la = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [u, a1], by: 'Assistant' })).lane
+    const lb = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [u], by: 'Assistant' })
+    expect(lb.note).toMatch(new RegExp(`^Warning: #${u} is also in B1's lane \\(${la.id}\\)`))
+    const seenA = await lane(la.id)
+    expect([seenA.cards.find((c) => c.number === u)?.elsewhere, seenA.current]).toEqual([lb.lane.id, a1])
+    expect([(await lane(lb.lane.id)).cards[0].elsewhere, (await lane(lb.lane.id)).current]).toEqual([undefined, u])
+    expect(facts().card(u).lane).toBe(lb.lane.id)
+    expect((await lanes.laneNext(w, 'alpha', 'b1')).next).toMatchObject({ card: a1 })
+    const wf = (await workflowFor(w, project))!
+    expect(await store.boardWrite(w, async () => wf.start(`#${a1}`, agentActor('b1')))).toMatchObject({ ok: true })
+    // Given to B1: B1's lane's (the holder's lane), B2's skips it.
+    await run(() => tasks.updateTask(u, { agent: 'b1' }, user))
+    expect(facts().card(u).lane).toBe(la.id)
+    expect([(await lane(la.id)).cards[0].elsewhere, (await lane(lb.lane.id)).cards[0].elsewhere]).toEqual([undefined, 'b1'])
+    for (const l of [la, lb.lane]) await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
+  it('two lanes started at once with one card: the lanes’ lock orders them, the second’s reply warns from the first’s stored row, and the view and runtime name one owner (HI-1821)', async () => {
+    const u = await make('Race u')
+    const [r1, r2] = await Promise.all([lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [u], by: 'Assistant' }), lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [u], by: 'Assistant' })])
+    const warned = [r1, r2].filter((r) => (r.note ?? '').startsWith('Warning: '))
+    expect(warned).toHaveLength(1)
+    const first = warned[0] === r1 ? r2 : r1
+    expect(warned[0].note).toContain(`is also in ${first === r1 ? 'B1' : 'B2'}'s lane (${first.lane.id})`)
+    // One owner, the same for the view and the runtime: the other lane marks the card held by it.
+    const owner = facts().card(u).lane
+    const other = owner === r1.lane.id ? r2.lane.id : r1.lane.id
+    expect([owner === r1.lane.id || owner === r2.lane.id, (await lane(owner!)).cards[0].elsewhere, (await lane(other)).cards[0].elsewhere]).toEqual([true, undefined, owner])
+    for (const r of [r1, r2]) await lanes.endLane(w, r.lane.id, { abandoned: true })
+  })
 })

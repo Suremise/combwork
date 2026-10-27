@@ -4079,13 +4079,17 @@ applied at the next card boundary, the lane showing "list changes after AM-12"; 
 The lane's cards, Todo ones included, use **the lane's ruleset** (the one in force when the lane started) until the
 lane ends; a Todo card not in a lane uses the current one.
 
-**A card another agent has** [HI-1821] (open, and on the board given to an agent other than the lane's builder) is
-another lane's work: its lane still lists and shows it, but never takes it as its current or next card, never pauses
-or waits on it (a request for you on it, its merge), and never queues a list change behind it; a lane's card starts
-without waiting for it. A change that **only takes cards out** (the list as it was, less some, in its order) and keeps
-the builder's own card in flight applies at once, so a card moved to another lane leaves its old lane at once. A
-`hive_lane start` listing an open card that another builder's running lane lists (or has queued) is not refused: its
-reply warns, naming that lane, so the card is taken out of one of them.
+**A card held elsewhere** [HI-1821] is another lane's work: an open card given on the board to an agent other than
+the lane's builder, or given to none and owned by another lane. A card's **owner lane** is the running lane listing it
+(its list or its queued one) whose builder has it, else the newest running lane listing it; the runtime's card lane
+(its ruleset, its reviewer) is that lane too. Its lane still lists and shows it, but never takes it as its current or
+next card, never pauses or waits on it (a request for you on it, its merge), and never queues a list change behind
+it; a lane's card starts without waiting for it. A queued change waits for the builder's own card in flight, through
+Review and Approved until it is Done ("list changes after" names that card). A change that **only takes cards out**
+(the list as it was, less some, in its order) and keeps the builder's own cards in flight applies at once, so a card
+moved to another lane leaves its old lane at once. A `hive_lane start` listing an open card that another builder's
+running lane lists (or has queued) is not refused (an ended or abandoned lane's history, #512, lists such cards too):
+its reply warns, naming that lane, and the owner lane decides whose the card is meanwhile.
 
 #### 16.11.2 One card at a time
 

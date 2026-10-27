@@ -341,11 +341,12 @@ export class FactStore {
       const labels = lists<string>(`SELECT card, label AS v FROM card_labels WHERE ${of} ORDER BY card, ord`)
       const blockedBy = lists<number>(`SELECT card, target AS v FROM card_links WHERE ${of} AND kind = 'blockedBy' ORDER BY card, ord`)
       const paths = lists<string>(`SELECT card, path AS v FROM card_paths WHERE ${of} AND kind = 'declared' ORDER BY card, ord`)
-      // Its lane (#1291): the newest running lane of this project with it in its list or its queued one.
+      // Its lane (#1291): the newest running lane of this project with it in its list or its queued one, the one whose
+      // builder has it first (HI-1821: boardStore's cardOwnersNow, the same order).
       const lanes = new Map<number, { lane: string; reviewer: string | null; rounds: number; pool: number | null }>()
       // A lane reviewed by the pool says so in its `extra` (#1443); one kept whole there (an array) has no pool.
       const inLanes = `SELECT x.card, l.id AS lane, l.reviewer_id AS reviewer, l.rounds, CASE WHEN json_type(l.extra) = 'object' THEN json_extract(l.extra, '$.pool') END AS pool FROM (SELECT lane, card FROM lane_cards UNION ALL SELECT lane, card FROM lane_pending) x
-        JOIN lanes l ON l.id = x.lane WHERE x.${of} AND l.state = 'active' AND l.project = ? COLLATE NOCASE ORDER BY l.started_at, l.id`
+        JOIN lanes l ON l.id = x.lane WHERE x.${of} AND l.state = 'active' AND l.project = ? COLLATE NOCASE ORDER BY (l.builder_id IS (SELECT agent FROM cards WHERE number = x.card)), l.started_at, l.id`
       for (const r of db.prepare(inLanes).all(...args, this.scope.project) as { card: number; lane: string; reviewer: string | null; rounds: number; pool: number | null }[]) lanes.set(r.card, { lane: r.lane, reviewer: r.reviewer, rounds: r.rounds, pool: r.pool })
       // Its key (#1294): its project's key now and its number there (#1219), else the scope's name and its number.
       const keys = cardKeys(db, rows.map((r) => r.number))

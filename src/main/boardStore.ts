@@ -1169,6 +1169,25 @@ export function cardPlacesNow(ws: WorkspaceService, numbers: readonly number[]):
     return new Map(rows.map((r) => [r.number, { column: r.col, project: r.project, archived: r.archived === 1, agent: r.agent }]))
   })
 }
+/**
+ * Who has each card for the lanes (HI-1821), on one snapshot: its agent on the board, and its owner lane: the running
+ * lane listing it (its list or its queued one) whose builder is that agent, else the newest running lane listing it
+ * (null: none). The runtime's `card.lane` (factStore `inLanes`) orders them the same way.
+ */
+export function cardOwnersNow(ws: WorkspaceService, numbers: readonly number[]): Map<number, { agent: string | null; lane: string | null }> {
+  if (!numbers.length) return new Map()
+  return readSnapshot(ws, (_b, db) => {
+    const at = numbers.map(() => '?').join(', ')
+    const out = new Map<number, { agent: string | null; lane: string | null }>()
+    for (const r of db.prepare(`SELECT number, agent FROM cards WHERE number IN (${at})`).all(...numbers) as { number: number; agent: string | null }[]) out.set(r.number, { agent: r.agent, lane: null }) // i18n-ignore: SQL
+    const rows = db
+      .prepare(`SELECT x.card, l.id FROM (SELECT lane, card FROM lane_cards UNION SELECT lane, card FROM lane_pending) x JOIN lanes l ON l.id = x.lane JOIN cards c ON c.number = x.card WHERE x.card IN (${at}) AND l.state = 'active' ORDER BY (c.agent IS NOT NULL AND c.agent = l.builder_id), l.started_at, l.id`) // i18n-ignore: SQL
+      .all(...numbers) as { card: number; id: string }[]
+    for (const r of rows) out.get(r.card)!.lane = r.id
+    return out
+  })
+}
+
 /** Sets one of the board's own values (inside boardWrite). */
 export const setBoardValue = (ws: WorkspaceService, key: string, value: string): void => writeOp(ws, (b) => setMeta(b.db.writer, key, value))
 
