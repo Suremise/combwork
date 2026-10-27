@@ -109,32 +109,54 @@ export function acceptable(o: Connection['observed'], orgs = true): { email: str
 
 /**
  * A workspace's connections for a provider as they apply: ids of connections that no longer exist (or are another
- * provider's) dropped, and its default replaced when it isn't one of those on. `undefined`: not set up yet.
+ * provider's) dropped, in the preference order, and its `default` **derived** (HI-1875, Darren 27 Oct): the first
+ * connection in the order that's on here (`firstOn`), never a stored choice (one left in workspace.json is ignored).
+ * `undefined`: not set up yet.
  */
 export function workspaceAccounts(cfg: Pick<WorkspaceConfig, 'connections'> | null | undefined, provider: ProviderId, connections: readonly Connection[]): WorkspaceConnections | undefined {
   const w = cfg?.connections?.[provider]
   if (!w) return undefined
-  const ids = new Set(connections.filter((a) => a.provider === provider).map((a) => a.id))
-  const on = w.on.filter((id, i) => ids.has(id) && w.on.indexOf(id) === i)
-  return { on, default: w.default && on.includes(w.default) ? w.default : replacementDefault(on, connections) }
-}
-
-/** The default when the last one is off or gone: the first account of the provider that's on, in the list's order; else none. */
-export function replacementDefault(on: readonly string[], connections: readonly Connection[]): string | null {
-  return connections.find((a) => on.includes(a.id))?.id ?? null
+  const on = connections.filter((a) => a.provider === provider && w.on.includes(a.id)).map((a) => a.id)
+  return { on, default: firstOn(on, connections) }
 }
 
 /**
- * A workspace's connections for a provider after turning one on or off (on: it becomes the default if there is none),
- * from how they apply now (`current`; undefined: not set up yet, so this sets it up).
+ * The connection new launches use (HI-1875): the first in the preference order (each CLI's connections in the list's
+ * order, Hive-wide) that's on; else none.
+ */
+export function firstOn(on: readonly string[], connections: readonly Connection[]): string | null {
+  return connections.find((a) => on.includes(a.id))?.id ?? null
+}
+
+/** The top of a CLI's preference order (HI-1875): the connection wearing the Default hint, on or not; else none. */
+export function topOfOrder(provider: ProviderId, connections: readonly Connection[]): string | null {
+  return connections.find((a) => a.provider === provider)?.id ?? null
+}
+
+/**
+ * A workspace's connections for a provider after turning one on or off, from how they apply now (`current`;
+ * undefined: not set up yet, so this sets it up). Only `on` changes (HI-1875): which is used follows the order.
  */
 export function switchedOn(current: WorkspaceConnections | undefined, id: string, on: boolean, connections: readonly Connection[]): WorkspaceConnections {
   const was = current ?? { on: [], default: null }
   const ids = on ? (was.on.includes(id) ? was.on : [...was.on, id]) : was.on.filter((x) => x !== id)
-  // In the account list's order, so the replacement default is the same in every window.
   const ordered = connections.filter((a) => ids.includes(a.id)).map((a) => a.id)
-  const keep = was.default && ordered.includes(was.default) ? was.default : null
-  return { on: ordered, default: keep ?? (on && !was.default ? id : replacementDefault(ordered, connections)) }
+  return { on: ordered, default: firstOn(ordered, connections) }
+}
+
+/**
+ * Connections with one moved to `index` among its own CLI's (HI-1875: the preference order), the other CLIs' left
+ * where they are. An index past the end puts it last; the list unchanged when it is already there.
+ */
+export function movedConnection<T extends Pick<Connection, 'id' | 'provider'>>(connections: readonly T[], id: string, index: number): T[] {
+  const c = connections.find((a) => a.id === id)
+  if (!c) return [...connections]
+  const own = connections.filter((a) => a.provider === c.provider && a.id !== id)
+  const to = Math.max(0, Math.min(index, own.length))
+  const order = [...own.slice(0, to), c, ...own.slice(to)]
+  let i = 0
+  // Each slot its CLI held keeps holding one of its connections, in the new order.
+  return connections.map((a) => (a.provider === c.provider ? order[i++] : a))
 }
 
 /**
@@ -187,14 +209,17 @@ export interface ConnectionShownApi {
   /** A sign-in connection's: signed in. A server connection's (HI-1772): there is no sign-in, so false. */
   signedIn: boolean
   on?: boolean
+  /** The first in its CLI's order that's on in the caller's workspace: what a provider-only call uses there (HI-1875). */
   default?: boolean
+  /** Its place in its CLI's preference order, from 1 (HI-1875: Hive-wide; 1 wears the Default hint). */
+  order?: number
   email?: string
   plan?: string
   /** A server connection's server, its host only (`wide`): never its key, nor whether it has one. */
   host?: string
 }
 
-export function connectionShown(c: Connection, ws: Partial<Record<ProviderId, WorkspaceConnections>>, wide: boolean): ConnectionShownApi {
+export function connectionShown(c: Connection, ws: Partial<Record<ProviderId, WorkspaceConnections>>, wide: boolean, all: readonly Connection[] = [c]): ConnectionShownApi {
   const state = accountState(c)
   const server = c.kind === 'server'
   const base: ConnectionShownApi = { id: c.id, name: c.name, cli: c.provider, kind: c.kind ?? 'signIn', signedIn: !server && (state === 'signedIn' || state === 'changed') }
@@ -202,7 +227,8 @@ export function connectionShown(c: Connection, ws: Partial<Record<ProviderId, Wo
   const w = ws[c.provider]
   const email = c.observed?.email ?? c.accepted?.email
   const host = server ? hostOf(c.server?.baseUrl ?? '') : null
-  return { ...base, on: !!w?.on.includes(c.id), default: w?.default === c.id, ...(email && !server ? { email } : {}), ...(c.observed?.plan && !server ? { plan: c.observed.plan } : {}), ...(host ? { host } : {}) }
+  const order = all.filter((x) => x.provider === c.provider).findIndex((x) => x.id === c.id) + 1
+  return { ...base, on: !!w?.on.includes(c.id), default: w?.default === c.id, ...(order ? { order } : {}), ...(email && !server ? { email } : {}), ...(c.observed?.plan && !server ? { plan: c.observed.plan } : {}), ...(host ? { host } : {}) }
 }
 
 /** A base URL's host (with its port), or null. */
@@ -216,5 +242,5 @@ function hostOf(url: string): string | null {
 
 /** The connections a caller may see (HI-1771): `wide`, every one; else only those on in its workspace. */
 export function connectionsFor(connections: readonly Connection[], ws: Partial<Record<ProviderId, WorkspaceConnections>>, wide: boolean): ConnectionShownApi[] {
-  return connections.filter((c) => wide || !!ws[c.provider]?.on.includes(c.id)).map((c) => connectionShown(c, ws, wide))
+  return connections.filter((c) => wide || !!ws[c.provider]?.on.includes(c.id)).map((c) => connectionShown(c, ws, wide, connections))
 }

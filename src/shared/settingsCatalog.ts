@@ -385,7 +385,7 @@ const APP_ROWS: Row[] = [
     section: 'accounts',
     key: 'list',
     title: msg({ id: 'settings.accounts.list.title', defaultMessage: 'Connections', description: "A setting's title (Settings → Connections): the list of connections." }),
-    desc: msg({ id: 'settings.accounts.list.desc', defaultMessage: 'Add a connection (signed in, or a server), and choose which are on in this workspace and which is its default.', description: 'What the list "Connections" does, under its title (Settings → Connections).' }),
+    desc: msg({ id: 'settings.accounts.list.desc', defaultMessage: "Add a connection (signed in, or a server) and choose which are on in this workspace. Drag to order each CLI's connections: new agents use the first one that's on here.", description: 'What the list "Connections" does, under its title (Settings → Connections, HI-1875: each coding agent CLI has an order of its connections; the first one on in the workspace is used).' }),
     tip: msg({ id: 'settings.accounts.list.tip', defaultMessage: "A sign-in connection is a folder of its own that Hive made, signed in with Claude Code's own sign-in in your browser: Hive never sees or keeps its login. Its conversations and memory are shared with your other connections through a link to Claude Code's projects folder. Its settings, trusted folders and MCP servers are its own. Removing a connection deletes its folder and its login on this PC, never your conversations.", description: 'The info tip of the list "Connections" (Settings → Connections): more on what it does and when it applies.' }),
     type: 'custom',
     wide: true

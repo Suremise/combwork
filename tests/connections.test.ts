@@ -167,7 +167,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     const c = (await launch())!
     expect(c).toMatchObject({ id: a.id, name: 'Personal', folder: accounts.accountFolder(a.id), homeEnv: 'CLAUDE_CONFIG_DIR' })
     expect(c.note).toBeUndefined()
-    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/in use/)
+    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/has agents running on it/)
     c.release()
     c.release()
     await accounts.removeAccount(a.id)
@@ -226,7 +226,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     const c = (await launch())!
     expect(c.id).toBe(a.id)
     expect(c.stillValid(undefined)).toBe(true)
-    await here(() => accounts.setAccountDefault(b.id))
+    accounts.moveConnection(b.id, 0)
     expect(c.stillValid(undefined)).toBe(false)
     expect(c.stillValid(a.id)).toBe(true)
     // The launch was given the workspace's config as it was: a fresh resolve now picks Work.
@@ -709,7 +709,7 @@ describe('templates’ connections (HI-1769)', () => {
     expect((await byName('T2'))?.connection).toBeUndefined()
     expect((await byName('T3'))?.connection).toBeUndefined()
     expect(await resolved('T2')).toEqual({ ok: true, id: a.id })
-    await here(() => accounts.setAccountDefault(b.id))
+    accounts.moveConnection(b.id, 0)
     expect(await resolved('T2')).toEqual({ ok: true, id: b.id })
     expect(await resolved('T1')).toEqual({ ok: true, id: a.id })
     // Loaded again with Personal chosen for T2 itself: pinned, it stays on Personal whatever the default.
@@ -1038,9 +1038,11 @@ describe('the Agent API and connections (HI-1771)', () => {
     expect(narrow).toEqual([{ id: 'a-1', name: 'Max 1', cli: 'claude-code', kind: 'signIn', signedIn: true }])
     const wide = connectionsFor(all, ws, true)
     expect(wide).toEqual([
-      { id: 'a-1', name: 'Max 1', cli: 'claude-code', kind: 'signIn', signedIn: true, on: true, default: true, email: 'one@example.com', plan: 'max' },
-      { id: 'a-2', name: 'Elsewhere', cli: 'claude-code', kind: 'signIn', signedIn: false, on: false, default: false }
+      { id: 'a-1', name: 'Max 1', cli: 'claude-code', kind: 'signIn', signedIn: true, on: true, default: true, order: 1, email: 'one@example.com', plan: 'max' },
+      { id: 'a-2', name: 'Elsewhere', cli: 'claude-code', kind: 'signIn', signedIn: false, on: false, default: false, order: 2 }
     ])
+    // Its place in its CLI's preference order (HI-1875), whoever asks for one alone.
+    expect(connectionShown(all[1], ws, true, all).order).toBe(2)
     // The detail projection is the same, per caller; nothing of where its login is kept, its settings or defaults.
     for (const shown of [connectionShown(all[0], ws, true), connectionShown(all[0], ws, false), ...wide, ...narrow]) {
       expect(Object.keys(shown).sort()).not.toEqual(expect.arrayContaining(['folder']))

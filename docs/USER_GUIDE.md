@@ -86,7 +86,9 @@ Hive asks each CLI which models it has and what each can do, so a new model, or 
 
 ### Connections <a id="connections-preview"></a>
 
-Each Claude Code or Codex agent, and the Assistant, runs on a **connection**: a sign-in that Hive keeps in a folder of its own, signed in through the CLI's own sign-in, or a server (below). Add them in **Settings → Connections**. Each workspace chooses which connections are on and which is its default; an agent can have its own.
+Each Claude Code or Codex agent, and the Assistant, runs on a **connection**: a sign-in that Hive keeps in a folder of its own, signed in through the CLI's own sign-in, or a server (below). Add them in **Settings → Connections**. Each workspace chooses which connections are on; an agent can have its own.
+
+- **Each CLI's connections have an order**, the same in every workspace: drag a connection by its handle (or press Alt+Up or Alt+Down on it). New agents use the first one in the order that's on in the workspace, so turning connections on and off never means choosing a new default. The top one wears **Default**, a reminder of which you prefer; **Make Default** moves a connection to the top and never turns it on or off. When the Default is off in a workspace, the one used instead says **Used here**. Agents already running keep their connection: a change applies to new agents, and the banner about agents running on another connection offers to switch them when their turn is over.
 
 - **Hive no longer uses the sign-in of your own terminal** (`~/.claude`, `~/.codex`), which stays yours as it is. Upgrading, add a connection and sign it in once: until one is on in the workspace, its agents and the Assistant can't start, and the project, the Assistant panel and **Help → Agent Setup** each offer **Add a Connection** (or **Open Connections**). A notice says so once, until you add one or dismiss it.
 - **GitHub Copilot has no connections.** It signs in once for the whole PC (in Agent Setup), and its agents use that sign-in, as before; its model, effort and context stay in **Settings → GitHub Copilot**.

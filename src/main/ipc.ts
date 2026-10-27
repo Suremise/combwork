@@ -19,7 +19,7 @@ import { keptLaneOrder } from '../shared/laneBar'
 import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../shared/tips'
 import { allProviders } from './providers'
 import { providerService } from './providerService'
-import { accountsView, addAccount, connectionHomes, dismissConnectionsIntro, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, setConnectionDefaults, setUpFolder, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
+import { accountsView, addAccount, connectionHomes, dismissConnectionsIntro, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, moveConnection, setAccountOn, setConnectionDefaults, setUpFolder, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
 import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setUpServerConnection } from './serverConnections'
 import { requireMasking } from './keyCoverage'
 import { resetMasking } from './keyStore'
@@ -1585,7 +1585,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'connections:keepLogin': (id) => keepNewLogin(id),
     'connections:setOn': (id, on) => setAccountOn(id, on),
-    'connections:setDefault': (id) => setAccountDefault(id),
+    'connections:move': (id, index) => moveConnection(id, Number(index)),
     'connections:setAssistant': (provider, id) => setAssistantConnection(provider, id),
     'connections:switchAffected': () => sessions.switchAffected(workspace.path!),
     'connections:setDefaults': (id, patch) => setConnectionDefaults(id, patch),

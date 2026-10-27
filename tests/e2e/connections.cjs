@@ -122,7 +122,7 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     await lib.appReady(p2)
     await lib.openWorkspace(invOn(p2), p2, ws2)
     const inv2 = invOn(p2)
-    // A new workspace starts with the last used (Max 1): this one runs on Max 2 alone.
+    // A new workspace starts with the top of the order on (Max 1, HI-1875): this one runs on Max 2 alone.
     await inv2('connections:setOn', max2.id, true)
     await inv2('connections:setOn', max1.id, false)
     await inv2('session:start', beta, { agentId: 'b-one' })
@@ -143,6 +143,37 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     check('…once its turn is over it carries on, on Max 1 (the default), noted', !!moved && moved.launchedConnection.note === 'offFallback', JSON.stringify(moved?.launchedConnection))
     check('…in the same conversation', !!moved && moved.sessionId === before.sessionId, `${moved?.sessionId} vs ${before.sessionId}`)
     check('…its exit typed once', lines(path.join(accountsRoot, max2.id, 'fake-exits.jsonl')).length === 1, String(lines(path.join(accountsRoot, max2.id, 'fake-exits.jsonl')).length))
+
+    // --- The preference order (HI-1875): new launches use the first in the order that's on; running ones keep theirs.
+    const order = async () => (await inv('connections:list')).connections.filter((c) => c.provider === 'claude-code').map((c) => c.id)
+    const usedHere = async () => (await inv('connections:list')).workspace['claude-code']?.default
+    const onHere = async () => (await inv('connections:list')).workspace['claude-code']?.on ?? []
+    const oneLaunches = (id) => launchedIn(id).filter((l) => l.env.HIVE_AGENT === 'One').length
+    const relaunchOne = async () => {
+      await inv('session:stop', alpha, 'a-one')
+      await lib.until(async () => !(await live('a-one')), HUNG_MS)
+      await inv('session:start', alpha, { agentId: 'a-one' })
+      return lib.until(async () => (await live('a-one'))?.launchedConnection?.id ?? null, HUNG_MS)
+    }
+    await inv('connections:setOn', max2.id, true)
+    const runningOn = (await live('a-one'))?.launchedConnection?.id
+    await inv('connections:move', max2.id, 0)
+    check('Make Default moves Max 2 to the top of the order; it is used here now', JSON.stringify(await order()) === JSON.stringify([max2.id, max1.id]) && (await usedHere()) === max2.id)
+    check('…One, running, keeps its connection (nothing restarts by itself)', runningOn === max1.id && (await live('a-one'))?.launchedConnection?.id === max1.id)
+    const m2 = oneLaunches(max2.id)
+    // Its run says so, and the fake logs the launch in Max 2's folder (written as it starts: waited for).
+    check('…started again, One launches on the top of the order, Max 2', (await relaunchOne()) === max2.id && !!(await lib.until(async () => oneLaunches(max2.id) > m2, HUNG_MS)))
+    await inv('connections:setOn', max2.id, false)
+    check('the top turned off: One, running, keeps it', (await live('a-one'))?.launchedConnection?.id === max2.id)
+    check('…started again, the next on in the order, Max 1', (await relaunchOne()) === max1.id)
+    await inv('connections:setOn', max2.id, true)
+    check('…the top back on: new launches use it again', (await relaunchOne()) === max2.id)
+    // Make Default never turns one on: Max 1 off here, moved to the top, stays off, and Max 2 stays the one used.
+    await inv('connections:setOn', max1.id, false)
+    await inv('connections:move', max1.id, 0)
+    check('Make Default on one that is off here leaves it off; the first on is used', JSON.stringify(await onHere()) === JSON.stringify([max2.id]) && (await usedHere()) === max2.id && (await order())[0] === max1.id)
+    await inv('connections:setOn', max1.id, true)
+    await inv('connections:setOn', max2.id, false)
 
     // --- A signed-out connection: refused, never another in its place.
     await inv('session:stop', alpha, 'a-one')

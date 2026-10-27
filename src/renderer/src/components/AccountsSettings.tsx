@@ -7,7 +7,7 @@ import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { confirm, notify, prompt, useStore } from '../store'
 import { Icon, Switch } from './ui'
-import { timeAgo } from '../util'
+import { cx, timeAgo } from '../util'
 import { TerminalView } from './TerminalView'
 import { ProviderIcon } from './ProviderIcon'
 import { AddConnectionDialog, MaskingBanner, ServerConnectionDetail, setUpConnection, setUpHint, setUpLabel } from './ServerConnections'
@@ -49,9 +49,12 @@ const M = {
   removeOpenConfirm: msg({ id: 'settings.accounts.removeOpenConfirm', defaultMessage: 'Close Terminal and Remove', description: "The confirm button of that dialog." }),
   removing: msg({ id: 'settings.accounts.removing', defaultMessage: 'Removing…', description: 'The confirm button of the dialog removing a connection, while it removes it.' }),
   onHere: msg({ id: 'settings.accounts.onHere', defaultMessage: 'On in this workspace', description: 'The switch on a connection (Settings → Connections): whether it is on in the open workspace.' }),
-  default: msg({ id: 'settings.accounts.default', defaultMessage: 'Default', description: "The choice on a connection (Settings → Connections): the open workspace's default connection for its CLI." }),
-  isDefault: msg({ id: 'settings.accounts.isDefault', defaultMessage: "This workspace's default", description: "Shown on the connection that is the open workspace's default (Settings → Connections)." }),
-  makeDefault: msg({ id: 'settings.accounts.makeDefault', defaultMessage: 'Make Default', description: "Button on a connection (Settings → Connections): makes it the open workspace's default connection for its CLI (turning it on)." }),
+  default: msg({ id: 'settings.accounts.default', defaultMessage: 'Default', description: "Shown on the first connection in its coding agent CLI's order (Settings → Connections, HI-1875): a hint, Hive-wide. New agents use the first connection in the order that's on in the workspace." }),
+  makeDefault: msg({ id: 'settings.accounts.makeDefault', defaultMessage: 'Make Default', description: "Button on a connection (Settings → Connections, HI-1875): moves it to the top of its coding agent CLI's order. It never turns a connection on or off." }),
+  usedHere: msg({ id: 'settings.accounts.usedHere', defaultMessage: 'Used here', description: "Shown on the connection new agents use in the open workspace when the Default (the top of the order) is off there (Settings → Connections, HI-1875): the first one in the order that's on." }),
+  usedHereTip: msg({ id: 'settings.accounts.usedHereTip', defaultMessage: "New agents in this workspace use it: the Default is off here, and it's the first in the order that's on.", description: 'The tooltip of "Used here" on a connection (Settings → Connections, HI-1875).' }),
+  move: msg({ id: 'settings.accounts.move', defaultMessage: 'Drag to change the order of {name}, or press Alt+Up or Alt+Down', description: "The tooltip and label of a connection's drag handle (Settings → Connections, HI-1875): it moves the connection in its coding agent CLI's order. Alt+Up and Alt+Down name keys." }),
+  moveFailed: msg({ id: 'settings.accounts.moveFailed', defaultMessage: "Couldn't change the order", description: "An error's title: moving a connection in its coding agent CLI's order failed (Settings → Connections)." }),
   changeFailed: msg({ id: 'settings.accounts.changeFailed', defaultMessage: "Couldn't change the connection", description: "An error's title: renaming a connection, turning it on or off, or making it the default failed." }),
   removeFailed: msg({ id: 'settings.accounts.removeFailed', defaultMessage: "Couldn't remove the connection", description: "An error's title: removing a connection failed." }),
   sameLogin: msg({ id: 'settings.accounts.sameLogin', defaultMessage: 'Signed in to the same login as another connection: {names}', description: 'A warning on a connection (Settings → Connections): other connections are signed in as the same login. {names} is their names, listed.' }),
@@ -89,6 +92,9 @@ export function AccountsSettings() {
   const [terminal, setTerminal] = useState<{ id: string; key: string; ended: boolean; provider: ProviderId; setUp?: boolean; in?: { project: string; folder: string } } | null>(null)
   // Add a Connection's dialog (HI-1772), which asks its CLI first (HI-1870).
   const [adding, setAdding] = useState(false)
+  // A connection being dragged to another place in its CLI's order (HI-1875), and the row it would drop on.
+  const [dragging, setDragging] = useState<{ id: string; provider: ProviderId } | null>(null)
+  const [dropAt, setDropAt] = useState<string | null>(null)
   const load = useCallback((check: boolean) => {
     call('connections:list', check)
       .then(setView)
@@ -106,9 +112,13 @@ export function AccountsSettings() {
   const affected = (projects ?? []).flatMap((p) => p.agents).filter((a) => a.restartNeeded && a.live?.launchedConnection && !a.live.switchPending).length
   const dups = duplicateLogins(view.connections)
   const nameOf = (id: string): string => view.connections.find((a) => a.id === id)?.name ?? id
-  // One list (HI-1870), grouped by CLI in Settings' order, then by name; a CLI turned off hides its connections.
-  const order = (p: ProviderId): number => view.providers.indexOf(p)
-  const shown = view.connections.filter((a) => order(a.provider) >= 0).sort((a, b) => order(a.provider) - order(b.provider) || a.name.localeCompare(b.name))
+  // One list (HI-1870), grouped by CLI in Settings' order, each CLI's in its preference order (HI-1875: the list's
+  // own order, Hive-wide); a CLI turned off hides its connections.
+  const cliOrder = (p: ProviderId): number => view.providers.indexOf(p)
+  const shown = view.connections.filter((a) => cliOrder(a.provider) >= 0).sort((a, b) => cliOrder(a.provider) - cliOrder(b.provider) || view.connections.indexOf(a) - view.connections.indexOf(b))
+  // Its place among its own CLI's connections: what the order means.
+  const placeOf = (a: { id: string; provider: ProviderId }): number => shown.filter((x) => x.provider === a.provider).findIndex((x) => x.id === a.id)
+  const move = (id: string, index: number): Promise<void> => act(M.moveFailed, () => call('connections:move', id, Math.max(0, index)))
   // The connection an ended sign-in terminal signed in, offered its Set Up (HI-1826).
   const after = terminal?.ended && !terminal.setUp ? view.connections.find((a) => a.id === terminal.id) : undefined
   const signedInAfter = after && after.kind !== 'server' && !after.leftover && accountState(after) === 'signedIn' ? after : undefined
@@ -188,7 +198,11 @@ export function AccountsSettings() {
             const server = a.kind === 'server'
             const state = accountState(a)
             const on = !!ws?.on.includes(a.id)
-            const isDefault = ws?.default === a.id
+            // The top of its CLI's order wears Default (a hint, Hive-wide); the one new agents use here, when the
+            // Default is off here, wears Used here (HI-1875).
+            const place = placeOf(a)
+            const top = place === 0
+            const usedHere = !top && !!wsPath && ws?.default === a.id
             const o = a.observed
             const ident = o?.email ? (o.plan ? tr(M.plan, { email: o.email, plan: o.plan }) : o.email) : a.accepted?.email
             const same = dups.get(a.id)
@@ -204,13 +218,58 @@ export function AccountsSettings() {
               <span className="account-setup-state done" data-set-up-state="done"><Icon name="pass-filled" /> {tr(M.setUpDone)}</span>
             ) : null
             return (
-              <div key={a.id} className="account-row" data-account={a.id} data-cli={a.provider} data-state={server ? 'server' : state}>
+              <div
+                key={a.id}
+                className={cx('account-row', dragging?.id === a.id && 'dragging', dropAt === a.id && 'drop-target')}
+                data-account={a.id}
+                data-cli={a.provider}
+                data-state={server ? 'server' : state}
+                data-order={place + 1}
+                onDragOver={(e) => {
+                  // Only within its own CLI's order.
+                  if (!dragging || dragging.provider !== a.provider) return
+                  e.preventDefault()
+                  setDropAt(a.id)
+                }}
+                onDragLeave={() => setDropAt((x) => (x === a.id ? null : x))}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setDropAt(null)
+                  if (dragging && dragging.provider === a.provider && dragging.id !== a.id) void move(dragging.id, place)
+                  setDragging(null)
+                }}
+              >
+                <button
+                  className="account-handle"
+                  draggable
+                  title={tr(M.move, { name: a.name })}
+                  aria-label={tr(M.move, { name: a.name })}
+                  data-move-handle
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = 'move'
+                    e.dataTransfer.setData('text/plain', a.id)
+                    setDragging({ id: a.id, provider: a.provider })
+                  }}
+                  onDragEnd={() => {
+                    setDragging(null)
+                    setDropAt(null)
+                  }}
+                  onKeyDown={(e) => {
+                    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+                    e.preventDefault()
+                    void move(a.id, place + (e.key === 'ArrowUp' ? -1 : 1))
+                  }}
+                >
+                  <Icon name="gripper" />
+                </button>
                 <div className="account-main">
                   <div className="account-name">
                     {a.name}
                     <span className="account-cli muted">
                       <ProviderIcon provider={a.provider} /> {providerDescriptor(a.provider).name}
                     </span>
+                    {top && <span className="account-default" data-default-hint>{tr(M.default)}</span>}
+                    {usedHere && <span className="account-used-here" data-used-here title={tr(M.usedHereTip)}>{tr(M.usedHere)}</span>}
                   </div>
                   {server ? (
                     <>
@@ -237,7 +296,8 @@ export function AccountsSettings() {
                 </div>
                 <div className="account-actions">
                   <Switch checked={on} disabled={!wsPath || !!a.leftover} label={tr(M.onHere)} onChange={(v) => void act(M.changeFailed, () => call('connections:setOn', a.id, v))} />
-                  {isDefault ? <span className="account-default">{tr(M.isDefault)}</span> : <button className="btn subtle" disabled={!wsPath || !!a.leftover} onClick={() => void act(M.changeFailed, () => call('connections:setDefault', a.id))}>{tr(M.makeDefault)}</button>}
+                  {/* To the top of the order (HI-1875): never on or off, so it needs no workspace. */}
+                  {!top && <button className="btn subtle" data-make-default disabled={!!a.leftover} onClick={() => void move(a.id, 0)}>{tr(M.makeDefault)}</button>}
                   {!server && state === 'changed' && <button className="btn subtle" onClick={() => void keep(a.id, a.name, o?.email)}>{tr(M.keep)}</button>}
                   {!server && !a.leftover && <button className="btn" onClick={() => void signIn(a.id, a.provider)}>{tr(state === 'signedOut' || state === 'changed' ? M.signInAgain : M.signIn)}</button>}
                   {/* Its first-run screens, which a browser sign-in leaves unanswered (HI-1826). */}
