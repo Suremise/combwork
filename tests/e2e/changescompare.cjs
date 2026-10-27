@@ -118,6 +118,28 @@ function state() {
   check('…a page turned after 1.0.0 moved is of the same comparison (its commits pinned)', !!(await lib.until(async () => /Page 1 of 3/.test(await text(commits.locator('.table-paging'))) && /1\.0\.0 work 120/.test(await text(commits.locator('.git-commit').first())), HUNG_MS)) && (await counts.getAttribute('data-compare-ahead')) === '120', await text(commits.locator('.git-commit').first()))
   await page.locator('.split-list .pane-header [aria-label="Compare again"]').click()
   check('…and Refresh reads 1.0.0 as it is now', !!(await lib.until(async () => (await counts.getAttribute('data-compare-ahead').catch(() => null)) === '121' && /1\.0\.0 moved on/.test(await text(commits.locator('.git-commit').first())), HUNG_MS)), await text(counts))
+  check('the Commits view’s left side says what the right shows, not the files', (await text(page.locator('[data-compare-commits-hint]'))).startsWith('On the right: 1.0.0’s commits that main hasn’t') && (await page.locator('[data-compare-files-hint]').count()) === 0 && !(await files.first().isVisible()), await text(page.locator('.split-list')))
+
+  // --- Reads that fail while a result is shown (HR1's round 1): said as stale, with Retry, never passed off as current.
+  const failing = (v) => app.evaluate((_, x) => {
+    process.env.HIVE_TEST_FAIL_IPC = x
+  }, v)
+  const stale = page.locator('[data-compare-stale]')
+  await failing('git:compare*1')
+  await commits.locator('[aria-label="Next page"]').click()
+  check('a page that fails to read: the last page stays, said to be stale, with Retry', !!(await lib.until(async () => (await stale.count()) === 1, HUNG_MS)) && /Could not refresh the comparison/.test(await text(stale)) && /Page 1 of 3/.test(await text(commits.locator('.table-paging'))), await text(page.locator('.split-main')))
+  await shots('stale-page')
+  await stale.getByRole('button', { name: 'Retry' }).click()
+  check('…Retry reads it: the next page, no longer stale', !!(await lib.until(async () => (await stale.count()) === 0 && /Page 2 of 3/.test(await text(commits.locator('.table-paging'))), HUNG_MS)), await text(page.locator('.split-main')))
+  // Hive reads the value again only when it changes: another one, so this read fails once too.
+  await failing('git:compare*1,none-refresh')
+  await page.locator('.split-list .pane-header [aria-label="Compare again"]').click()
+  check('a refresh that fails: the last result stays, said to be stale', !!(await lib.until(async () => (await stale.count()) === 1, HUNG_MS)) && (await counts.getAttribute('data-compare-ahead')) === '121', await text(page.locator('.split-main')))
+  await stale.getByRole('button', { name: 'Retry' }).click()
+  check('…Retry reads it again: current, no longer stale', !!(await lib.until(async () => (await stale.count()) === 0 && (await counts.getAttribute('data-compare-ahead').catch(() => null)) === '121', HUNG_MS)), await text(page.locator('.split-main')))
+  await failing('')
+  await page.locator('[data-compare-view="files"]').click()
+
   // What the rest must leave as it is: the repository with 1.0.0 moved.
   before = state()
 

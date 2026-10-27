@@ -146,6 +146,7 @@
   "project.compare.commitTip": "{hash}\n{author} <{email}>\n{when}",
   "project.compare.slotsGroup": "Slots (der Branch jedes Slots, verglichen)",
   "project.compare.slotOption": "{slot} · {card, select, none {frei} other {{card}}} · {branch}",
+  "project.compare.commitsHint": "Rechts: die Commits von {head}, die {base} nicht hat, dann die von {base}, die {head} nicht hat.",
   "project.compare.filesHint": "Die Dateien, die {head} ändert, seit es von {base} abgezweigt ist. Tauschen Sie, um die von {base} zu sehen.",
   "project.chart.dayTip": "{day}: {tokens} Tokens · {cost} · {prompts, plural, one {# Prompt} other {# Prompts}}",
   "project.chart.label": "Tokens pro Tag",

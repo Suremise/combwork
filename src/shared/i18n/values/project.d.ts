@@ -144,6 +144,7 @@ interface HiveMessageValues {
   'project.compare.binary': undefined
   'project.compare.commitTip': { hash: string | number; author: string | number; email: string | number; when: string | number }
   'project.compare.commits': undefined
+  'project.compare.commitsHint': { head: string | number; base: string | number }
   'project.compare.counts': { head: string | number; ahead: number; base: string | number; behind: number }
   'project.compare.cut': { shown: number; total: number }
   'project.compare.diffFailed': { error: string | number }

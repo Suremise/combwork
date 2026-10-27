@@ -11,7 +11,7 @@ import { languageFor } from '../monacoLang'
 import { Pager } from './DataTable'
 import { DiffView } from './Editors'
 import { PaneResizer } from './Resizer'
-import { Icon, IconButton, LoadFailed, Tooltip } from './ui'
+import { Icon, IconButton, LoadFailed, StaleNote, Tooltip } from './ui'
 
 /**
  * The Changes tab's comparison of two branches (HI-1824): any two local branches, such as the project's integration line
@@ -25,6 +25,7 @@ const M = {
   option: msg({ id: 'project.compare.option', defaultMessage: '{head} ↔ {base}', description: "A comparison in the Changes tab's picker: the branch {head} against {base}." }),
   slotsGroup: msg({ id: 'project.compare.slotsGroup', defaultMessage: 'Slots (each one’s branch, compared)', description: "A group of the Changes tab's picker: the project's slots (working folders lent to cards), each opening its branch compared with where it merges." }),
   slotOption: msg({ id: 'project.compare.slotOption', defaultMessage: '{slot} · {card, select, none {free} other {{card}}} · {branch}', description: "A slot in the Changes tab's picker: its name {slot}, the card it is lent to ({card}; none: free, no card) and its branch {branch}." }),
+  commitsHint: msg({ id: 'project.compare.commitsHint', defaultMessage: 'On the right: {head}’s commits that {base} hasn’t, then {base}’s that {head} hasn’t.', description: "The left caption of the Changes tab's comparison while it shows the commits: each side's commits are listed on the right." }),
   filesHint: msg({ id: 'project.compare.filesHint', defaultMessage: 'The files {head} changes since it left {base}. Swap to see {base}’s.', description: "Above the files in the Changes tab's comparison: they are only the branch's own changes, since the commit where it left the other." }),
   about: msg({ id: 'project.compare.about', defaultMessage: 'What {head} changes since it left {base}: its commits that {base} hasn’t, and the files they change. Read from git, nothing checked out.', description: "The sentence at the top of the Changes tab's comparison of two branches." }),
   head: msg({ id: 'project.compare.head', defaultMessage: 'Branch', description: "A label in the Changes tab's comparison: the branch whose changes are shown." }),
@@ -216,13 +217,16 @@ export function ComparePage({ project, base, head, lines, selector, listWidth, o
     )
 
   const failed = !c && raw.error
+  // A read that failed while an earlier result stays on screen (a refresh, another page): said, with Retry, never
+  // passed off as current.
+  const stale = !!c && !!raw.error && !raw.loading
   return (
     <div className="changes-split" style={{ '--list-width': `${listWidth}px` } as React.CSSProperties}>
       <div className="split" data-compare-page="" data-compare-base={base} data-compare-head={head}>
         <div className="split-list">
           <PaneResizer paneKey="changes" />
           <div className="pane-header" style={{ paddingLeft: 14 }}>
-            {tr(M.files)} {c && <span className="badge" style={{ marginLeft: 6 }} data-compare-files={c.filesTotal}>{fmt.number(c.filesTotal)}</span>}
+            {view === 'commits' ? tr(M.commits) : tr(M.files)} {c && (view === 'commits' ? <span className="badge" style={{ marginLeft: 6 }}>{fmt.number(c.ahead + c.behind)}</span> : <span className="badge" style={{ marginLeft: 6 }} data-compare-files={c.filesTotal}>{fmt.number(c.filesTotal)}</span>)}
             <div className="actions">
               <IconButton icon={raw.loading ? 'loading' : 'refresh'} spin={raw.loading} title={tr(M.refresh)} disabled={raw.loading} onClick={refresh} />
             </div>
@@ -243,12 +247,17 @@ export function ComparePage({ project, base, head, lines, selector, listWidth, o
               </button>
             </div>
           )}
-          {c && c.files.length > 0 && (
+          {c && view === 'commits' && (
+            <div className="hint compare-files-hint" data-compare-commits-hint="">
+              {tr(M.commitsHint, { head, base })}
+            </div>
+          )}
+          {c && view === 'files' && c.files.length > 0 && (
             <div className="hint compare-files-hint" data-compare-files-hint="">
               {tr(M.filesHint, { head, base })}
             </div>
           )}
-          <div className="pane-body">
+          <div className="pane-body" hidden={view === 'commits'}>
             {c && c.files.length === 0 && <div className="pane-empty">{tr(M.noFiles, { head, base })}</div>}
             {c?.files.slice(0, shown).map((f) => (
               <Tooltip block key={f.path} content={tr(M.status, { status: f.status, path: f.path })}>
@@ -276,6 +285,11 @@ export function ComparePage({ project, base, head, lines, selector, listWidth, o
               </div>
             )}
           </div>
+          {stale && (
+            <div data-compare-stale="">
+              <StaleNote what={tr(M.load)} error={raw.error!} at={raw.at} onRetry={raw.reload} />
+            </div>
+          )}
           {failed ? (
             <LoadFailed what={tr(M.load)} error={raw.error!} onRetry={raw.reload} />
           ) : !c ? (

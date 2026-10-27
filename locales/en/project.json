@@ -571,6 +571,10 @@
     "defaultMessage": "Commits",
     "description": "A switch in the Changes tab's comparison: each side's commits."
   },
+  "project.compare.commitsHint": {
+    "defaultMessage": "On the right: {head}’s commits that {base} hasn’t, then {base}’s that {head} hasn’t.",
+    "description": "The left caption of the Changes tab's comparison while it shows the commits: each side's commits are listed on the right."
+  },
   "project.compare.counts": {
     "defaultMessage": "{head} has {ahead, plural, one {# commit} other {# commits}} {base} hasn’t; {base} has {behind, plural, one {# commit} other {# commits}} {head} hasn’t.",
     "description": "The line under the branches in the Changes tab's comparison: how many commits each has that the other hasn't."

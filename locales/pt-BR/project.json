@@ -146,6 +146,7 @@
   "project.compare.commitTip": "{hash}\n{author} <{email}>\n{when}",
   "project.compare.slotsGroup": "Slots (a branch de cada um, comparada)",
   "project.compare.slotOption": "{slot} · {card, select, none {livre} other {{card}}} · {branch}",
+  "project.compare.commitsHint": "À direita: os commits de {head} que {base} não tem e, depois, os de {base} que {head} não tem.",
   "project.compare.filesHint": "Os arquivos que {head} muda desde que saiu de {base}. Troque para ver os de {base}.",
   "project.chart.dayTip": "{day}: {tokens} tokens · {cost} · {prompts, plural, =0 {# prompts} one {# prompt} other {# prompts}}",
   "project.chart.label": "Tokens por dia",

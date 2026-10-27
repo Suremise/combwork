@@ -146,6 +146,7 @@
   "project.compare.commitTip": "{hash}\n{author} <{email}>\n{when}",
   "project.compare.slotsGroup": "スロット（各スロットのブランチを比較）",
   "project.compare.slotOption": "{slot} · {card, select, none {空き} other {{card}}} · {branch}",
+  "project.compare.commitsHint": "右側に、{base} にない {head} のコミット、続いて {head} にない {base} のコミットを表示します。",
   "project.compare.filesHint": "{head} が {base} から分かれて以降に変更したファイルです。入れ替えると {base} の変更を表示します。",
   "project.chart.dayTip": "{day}：{tokens}トークン · {cost} · {prompts, plural, other {プロンプト#件}}",
   "project.chart.label": "1日あたりのトークン",

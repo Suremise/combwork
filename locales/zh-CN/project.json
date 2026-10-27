@@ -146,6 +146,7 @@
   "project.compare.commitTip": "{hash}\n{author} <{email}>\n{when}",
   "project.compare.slotsGroup": "槽位（比较各自的分支）",
   "project.compare.slotOption": "{slot} · {card, select, none {空闲} other {{card}}} · {branch}",
+  "project.compare.commitsHint": "右侧：先是 {base} 没有的 {head} 提交，然后是 {head} 没有的 {base} 提交。",
   "project.compare.filesHint": "{head} 自离开 {base} 以来更改的文件。交换即可查看 {base} 的更改。",
   "project.chart.dayTip": "{day}：{tokens} 个 Token · {cost} · {prompts, plural, other {# 条提示词}}",
   "project.chart.label": "每日 Token 用量",

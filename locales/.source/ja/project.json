@@ -142,6 +142,7 @@
   "project.compare.binary": "A binary file: its changes can’t be shown.",
   "project.compare.commitTip": "{hash}\n{author} <{email}>\n{when}",
   "project.compare.commits": "Commits",
+  "project.compare.commitsHint": "On the right: {head}’s commits that {base} hasn’t, then {base}’s that {head} hasn’t.",
   "project.compare.counts": "{head} has {ahead, plural, one {# commit} other {# commits}} {base} hasn’t; {base} has {behind, plural, one {# commit} other {# commits}} {head} hasn’t.",
   "project.compare.cut": "Only the first {shown, number} of {total, number} files are listed.",
   "project.compare.diffFailed": "Couldn't show this file's changes: {error}",
