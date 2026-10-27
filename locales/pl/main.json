@@ -1,5 +1,6 @@
 {
   "main.accounts.badTarget": "Hive nie powiąże połączenia z {target}: to nie jest żaden z folderów {cli}.",
+  "main.accounts.checkHeld": "Połączenie {name} jest sprawdzane: Hive wciąż upewnia się, że sprawdzanie przez {cli} się zakończyło. Spróbuj ponownie za chwilę.",
   "main.accounts.folderNotUsable": "Folder połączenia {name} nie jest tym, który utworzył Hive (brakuje go albo został przeniesiony lub zastąpiony), więc nic w nim nie uruchomiono. Usuń połączenie i dodaj je ponownie.",
   "main.accounts.inUse": "Połączenie {name} jest w użyciu: zatrzymaj agentów, którzy na nim pracują, i zamknij jego logowanie, a potem je usuń.",
   "main.accounts.leftover": "Połączenie {name} jest usunięte tylko częściowo: najpierw usuń je jeszcze raz.",

@@ -1,6 +1,7 @@
 import { createHash } from 'crypto'
 import { msg, tr } from '../../../shared/i18n'
-import { spawn, type ChildProcess } from 'child_process'
+import { spawn } from 'child_process'
+import { codexCheckHeld, ownedAppServerRequest, type CheckAnswer } from '../../codexChecks'
 import { homedir, tmpdir } from 'os'
 import { basename, join, resolve } from 'path'
 import { readdir, stat } from 'original-fs/promises'
@@ -338,107 +339,14 @@ function askAppServer(executable: string, args: string[], cwd: string, method: s
   return appServerAnswer(executable, args, cwd, method, params, env, timeoutMs).then((a) => (a.ok ? a.result : null))
 }
 
-/** How long a closed app server gets to end by itself (0.164.0 ends in about 0.2 s once its stdin closes) before it is ended. */
-/** How long an ended tree gets to close before Hive gives up waiting on it (it says so in the log). */
-const TREE_END_MS = 10_000
-
-/** Whether a process has ended (its exit seen); Node keeps its handle until then, so its pid is still its own. */
-const ended = (p: ChildProcess): boolean => p.exitCode !== null || p.signalCode !== null
-
-/** The processes started here that have closed (their exit and stdio): noted from their start (watchClose). */
-const closedProcesses = new WeakSet<ChildProcess>()
-function watchClose<T extends ChildProcess>(p: T): T {
-  p.once('close', () => closedProcesses.add(p))
-  return p
-}
-
-/** Resolves once the process has closed (its exit and stdio), or after `ms`: true when it closed. */
-function closedWithin(p: ChildProcess, ms: number): Promise<boolean> {
-  if (closedProcesses.has(p)) return Promise.resolve(true)
-  return new Promise((resolveP) => {
-    const t = setTimeout(() => resolveP(false), ms)
-    p.once('close', () => (clearTimeout(t), resolveP(true)))
-  })
-}
-
-/**
- * Ends a process and everything under it (HI-1757 round 1: a .cmd launcher, a server that ignores its stdin closing, and
- * what it started), without holding main's thread: Windows' taskkill /T /F on its pid, asked while Node still holds its
- * handle (so the pid is its own and its tree is what it started, #655), else SIGKILL. Resolves once it has closed, or
- * after TREE_END_MS (logged): true when it closed.
- */
-async function endProcessTree(p: ChildProcess): Promise<boolean> {
-  if (ended(p)) return true
-  if (process.platform === 'win32' && p.pid) {
-    await new Promise<void>((resolveP) => {
-      const k = spawn('taskkill.exe', ['/pid', String(p.pid), '/t', '/f'], { windowsHide: true, stdio: 'ignore' })
-      const t = setTimeout(() => (k.kill(), resolveP()), TREE_END_MS)
-      k.on('error', () => (clearTimeout(t), resolveP()))
-      k.on('close', () => (clearTimeout(t), resolveP()))
-    })
-  } else p.kill('SIGKILL')
-  const closed = await closedWithin(p, TREE_END_MS)
-  if (!closed) log.warn(`Codex's app server (pid ${p.pid}) didn't end in ${TREE_END_MS / 1000} s after it was ended with what it started`)
-  return closed
-}
-
-/**
- * Closes an app server Hive is done with (HI-1757): its stdin ended, which ends it with what it started (0.164.0 ends in
- * about 0.2 s, its git and console host with it); still there after `codex.appServer.closeSeconds`, its whole tree is
- * ended (endProcessTree). Resolves once it has closed, so it is never left behind unowned.
- */
-async function closeAppServer(p: ChildProcess): Promise<void> {
-  try {
-    p.stdin?.end()
-  } catch {
-    // Already closed.
-  }
-  if (await closedWithin(p, advanced.number('codex.appServer.closeSeconds') * 1000)) return
-  await endProcessTree(p)
-}
-
 /**
  * One request's answer from Codex's app server: its result, its error (`ok: false`, `error` its message), or none
- * (`error` says why: it didn't start, ended, or took past `timeoutMs`). The server is closed on every outcome
- * (closeAppServer) before the answer is given.
+ * (`error` says why). Run through Hive's process ownership (codexChecks.ts, HI-1757): owned before it runs and confirmed
+ * gone before the answer is given; an end not confirmed is a failed answer, its connection held until it is.
  */
-function appServerAnswer(executable: string, args: string[], cwd: string, method: string, params: unknown, env: NodeJS.ProcessEnv | undefined, timeoutMs: number): Promise<{ ok: true; result: any } | { ok: false; error: string }> {
-  return new Promise((resolveP) => {
-    const s = toSpawnable(executable, ['app-server', ...args])
-    const p = watchClose(spawn(s.file, s.args, { cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'], ...(env ? { env } : {}) }))
-    let buf = ''
-    let over = false
-    const done = (v: { ok: true; result: any } | { ok: false; error: string }): void => {
-      if (over) return
-      over = true
-      clearTimeout(timer)
-      void closeAppServer(p).finally(() => resolveP(v))
-    }
-    const timer = setTimeout(() => done({ ok: false, error: `no answer in ${Math.round(timeoutMs / 1000)} s` }), timeoutMs) // i18n-ignore: for the log
-    p.stdin.on('error', () => undefined)
-    p.on('close', (code) => done({ ok: false, error: `it ended (exit ${code})` })) // i18n-ignore: for the log
-    const send = (m: unknown): void => void p.stdin.write(JSON.stringify(m) + '\n')
-    p.on('error', (e) => done({ ok: false, error: `it didn't start: ${e.message}` })) // i18n-ignore: for the log
-    p.stdout.on('data', (d) => {
-      buf += d
-      let i
-      while ((i = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, i)
-        buf = buf.slice(i + 1)
-        let m: any
-        try {
-          m = JSON.parse(line)
-        } catch {
-          continue
-        }
-        if (m.id === 1) {
-          send({ method: 'initialized' })
-          send({ id: 2, method, params })
-        } else if (m.id === 2) done(m.error ? { ok: false, error: String(m.error?.message ?? 'an error') } : { ok: true, result: m.result ?? null }) // i18n-ignore: for the log
-      }
-    })
-    send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'hive', version: '1' } } })
-  })
+function appServerAnswer(executable: string, args: string[], cwd: string, method: string, params: unknown, env: NodeJS.ProcessEnv | undefined, timeoutMs: number): Promise<CheckAnswer> {
+  const s = toSpawnable(executable, ['app-server', ...args])
+  return ownedAppServerRequest({ command: s.file, args: s.args, cwd, env: env ?? process.env, method, params, timeoutMs })
 }
 
 /**
@@ -791,6 +699,11 @@ export class CodexAdapter implements ProviderAdapter {
   /** What Codex reads as a login from its environment (HI-1757: CODEX_ACCESS_TOKEN): left out on a connection. */
   accountEnvDrop(): readonly string[] {
     return advanced.get<string[]>('codex.accounts.dropEnv')
+  }
+
+  /** Whether a connection's folder is held by a check of Codex not yet confirmed ended (codexChecks.ts). */
+  accountHeld(home: string): boolean {
+    return codexCheckHeld(home)
   }
 
   /**

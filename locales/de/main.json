@@ -1,5 +1,6 @@
 {
   "main.accounts.badTarget": "Hive verknüpft keine Verbindung mit {target}: Das ist keiner der eigenen Ordner von {cli}.",
+  "main.accounts.checkHeld": "Die Verbindung {name} wird gerade geprüft: Hive stellt noch sicher, dass die Prüfung durch {cli} beendet ist. Versuche es gleich noch einmal.",
   "main.accounts.folderNotUsable": "Der Ordner der Verbindung {name} ist nicht der, den Hive angelegt hat (er fehlt oder wurde verschoben oder ersetzt), daher wurde darin nichts gestartet. Entferne die Verbindung und füge sie erneut hinzu.",
   "main.accounts.inUse": "Die Verbindung {name} wird verwendet: Stoppe die Agenten darauf und schließe die Anmeldung, dann entferne sie.",
   "main.accounts.leftover": "Die Verbindung {name} ist nur halb entfernt: Entferne sie zuerst erneut.",

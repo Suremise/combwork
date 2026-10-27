@@ -45,7 +45,9 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   // A token in Hive's own environment, as one set on the PC would be: a connection's Codex must never get it.
-  const env = { CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CODEX_ACCESS_TOKEN: 'made-up-not-a-token', HIVE_TEST_CLI_HOME_CONNECTION: '0' }
+  // Each app server the fake runs (Hive's sign-in checks, its hook checks) notes its pid there.
+  const appServers = path.join(userData, 'fake-appservers.txt')
+  const env = { CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CODEX_ACCESS_TOKEN: 'made-up-not-a-token', HIVE_TEST_CLI_HOME_CONNECTION: '0', FAKE_CODEX_APPSERVER_LOG: appServers }
   const { app, page } = await lib.launch({ userData, env, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -134,6 +136,18 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     await inv('connections:remove', home.id)
     check("Home's folder is gone", !fs.existsSync(path.join(accountsRoot, home.id)))
     check("…and Codex's own sessions are untouched", JSON.stringify(rollouts(path.join(codexHome, 'sessions'))) === JSON.stringify(before) && before.length > 0, JSON.stringify(before))
+
+    // --- Every app server Hive ran for its checks was ended before its answer was taken: none is left running.
+    const ran = fs.existsSync(appServers) ? fs.readFileSync(appServers, 'utf8').split(/\r?\n/).map(Number).filter((n) => n > 0) : []
+    const alive = (pid) => {
+      try {
+        process.kill(pid, 0) // signal 0 asks, it ends nothing
+        return true
+      } catch {
+        return false
+      }
+    }
+    check("Hive's checks ran Codex's app server, and none of them is left running", ran.length > 0 && ran.every((pid) => !alive(pid)), JSON.stringify({ ran: ran.length, left: ran.filter(alive) }))
   } catch (e) {
     check('the suite ran to its end', false, e.stack)
   } finally {

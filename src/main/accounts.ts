@@ -115,6 +115,15 @@ function mustGet(id: string): Connection {
   return a
 }
 
+/**
+ * Refuses a sign-in or removal while the CLI's own check of the folder isn't confirmed ended (HI-1757: Codex's app
+ * server, held by codexChecks.ts until it is gone, across a restart too).
+ */
+function assertNotHeld(a: Connection): void {
+  if (!provider(a.provider).accountHeld?.(accountFolder(a.id))) return
+  throw hiveError(msg({ id: 'main.accounts.checkHeld', defaultMessage: "{name} is being checked: Hive is still making sure {cli}'s check of it has ended. Try again in a moment.", description: "An error signing in or removing a connection ({name}, its name in Settings → Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held." }), { name: a.name, cli: providerDescriptor(a.provider).name }, { kind: 'conflict' })
+}
+
 /** Whether the CLI's sign-in names an organisation, which an identity then needs (HI-1757: Codex's names none). */
 const namesOrgs = (id: ProviderId): boolean => providerDescriptor(id).capabilities.connections?.orgs !== false
 
@@ -458,9 +467,11 @@ export async function removeAccount(id: string): Promise<void> {
   const inUse = (): boolean => sessionsOn(id) || (claims.get(id) ?? 0) > 0 || loginsOpen.has(id) || hasPty(loginKey(a))
   const IN_USE = msg({ id: 'main.accounts.inUse', defaultMessage: '{name} is in use: stop the agents on it and close its sign-in, then remove it.', description: 'An error removing a connection ({name}, its name in Settings → Connections): agents run on it, or its sign-in terminal is open.' })
   if (inUse()) throw hiveError(IN_USE, { name: a.name }, { kind: 'conflict' })
+  assertNotHeld(a)
   await locked(id, async () => {
     // Asked again under the lock: a launch or sign-in may have started while it waited.
     if (inUse()) throw hiveError(IN_USE, { name: a.name }, { kind: 'conflict' })
+    assertNotHeld(a)
     // Checks started before are dropped from here (their result would bring it back).
     generations.set(id, generation(id) + 1)
     unwatch(id)
@@ -592,6 +603,7 @@ export async function signInAccount(id: string): Promise<string> {
     const a = mustGet(id)
     const { homeEnv } = support(a.provider)
     await assertUsable(a)
+    assertNotHeld(a)
     const gen = generation(id)
     loginsOpen.add(id)
     try {

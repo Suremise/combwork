@@ -59,6 +59,7 @@ import { startBranchWatch } from './branchWatch'
 import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { queueFolderNeeded, releaseQueueRunners } from './workflow/queueRunner'
+import { restoreCodexCheckHolds, stopCodexChecks } from './codexChecks'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { poolFor, startSlots, stopSlots } from './slotsApp'
 import { setQueueNeed, setSlotPools } from './unusedWorktrees'
@@ -634,6 +635,8 @@ async function quitNow(tellUser: boolean): Promise<void> {
   await quitLeftovers()
   // The merge queues' runners: their processes ended and their leases given up, so another Hive can run them at once.
   await releaseQueueRunners()
+  // Codex's checks (HI-1757): each held one's job ended once more; one not confirmed keeps its record for the next start.
+  await stopCodexChecks().catch((e) => log.warn("ending Codex's checks as Hive closes", e))
   await slotsQuiet
   await usageHistory.stop()
   await progress.saveNow().catch(() => undefined)
@@ -1022,6 +1025,8 @@ app.whenReady().then(async () => {
   // Connections (HI-980, HI-1755): new workspaces' defaults and the watches on their logins.
   initConnections()
   initConnectionMoves()
+  // Codex's checks an earlier run didn't confirm ended hold their connections (HI-1757), before any connection call.
+  await restoreCodexCheckHolds().catch((e) => log.warn("restoring the holds of Codex's earlier checks", e))
 
   // Hook auth files of an earlier run of Hive: their tokens died with it (#345).
   await clearHookAuth()

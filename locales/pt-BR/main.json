@@ -1,5 +1,6 @@
 {
   "main.accounts.badTarget": "O Hive não vincula uma conexão a {target}: não é uma das pastas do próprio {cli}.",
+  "main.accounts.checkHeld": "A conexão {name} está sendo verificada: o Hive ainda está garantindo que a verificação do {cli} terminou. Tente de novo daqui a pouco.",
   "main.accounts.folderNotUsable": "A pasta da conexão {name} não é a que o Hive criou (está faltando, ou foi movida ou substituída), então nada foi iniciado nela. Remova a conexão e adicione-a de novo.",
   "main.accounts.inUse": "A conexão {name} está em uso: pare os agentes que rodam nela e feche o login dela, depois remova.",
   "main.accounts.leftover": "A conexão {name} foi removida só em parte: remova de novo primeiro.",

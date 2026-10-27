@@ -87,7 +87,9 @@ if (args[0] === 'login') {
   process.exit(0)
 }
 if (args[0] === 'app-server') {
-  // Hive asks how this version names and hashes its hooks (none), or who its connection's folder is signed in as.
+  // Hive asks how this version names and hashes its hooks (none), or who its connection's folder is signed in as. Its
+  // pid goes to FAKE_CODEX_APPSERVER_LOG when a suite names one (HI-1757: none may be left running).
+  if (process.env.FAKE_CODEX_APPSERVER_LOG) fs.appendFileSync(process.env.FAKE_CODEX_APPSERVER_LOG, `${process.pid}\n`)
   let buf = ''
   process.stdin.on('data', (d) => {
     buf += d

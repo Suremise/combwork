@@ -106,3 +106,36 @@ const otherProbe: ProcessProbe = {
 }
 
 export const defaultProbe = (): ProcessProbe => (process.platform === 'win32' ? windowsProbe : otherProbe)
+
+/** Waits until none of these processes runs (by pid and start); those still running after `ms`, or null when they can't be listed. */
+export async function goneWithin(probe: ProcessProbe, targets: Listed[], ms: number): Promise<Listed[] | null> {
+  if (!targets.length) return []
+  const until = Date.now() + ms
+  for (;;) {
+    const list = await probe.list()
+    if (!list) return null
+    const still = targets.filter((t) => list.some((p) => p.pid === t.pid && p.started === t.started))
+    if (!still.length || Date.now() > until) return still
+    await new Promise((res) => setTimeout(res, 200))
+  }
+}
+
+/** A recorded process's start may be this far from the one listed (the clock's resolution). */
+const START_SLACK_MS = 50
+
+/**
+ * Ends exactly the processes a journal names (each by its pid and start, with what it started, as the queue's settle
+ * does) and confirms them gone within `ms`: true once none runs (one already gone counts); false when one still runs or
+ * the processes can't be listed (HI-1757: never taken for gone).
+ */
+export async function endJournalled(probe: ProcessProbe, entries: readonly { pid: number; started: number }[], ms: number): Promise<boolean> {
+  if (!entries.length) return true
+  const list = await probe.list()
+  if (!list) return false
+  const roots = entries.flatMap((e) => list.filter((p) => p.pid === e.pid && Math.abs(p.started - e.started) <= START_SLACK_MS))
+  if (!roots.length) return true
+  const tree = roots.flatMap((r) => treeOf(list, r)).filter((p, i, l) => l.findIndex((x) => x.pid === p.pid && x.started === p.started) === i)
+  await probe.end(tree)
+  const still = await goneWithin(probe, tree, ms)
+  return !!still && still.length === 0
+}

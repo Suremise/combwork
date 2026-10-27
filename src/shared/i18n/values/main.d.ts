@@ -2,6 +2,7 @@
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
   'main.accounts.badTarget': { target: string | number; cli: string | number }
+  'main.accounts.checkHeld': { name: string | number; cli: string | number }
   'main.accounts.folderNotUsable': { name: string | number }
   'main.accounts.inUse': { name: string | number }
   'main.accounts.leftover': { name: string | number }
