@@ -77,16 +77,22 @@ export interface SessionsChange {
   deletedUsage?: Rec[]
 }
 
-/**
- * Writes a host's records as `next` has them, only the rows that changed. A record not of Hive's form, or two with one
- * id, throw (a mistake in Hive's code: nothing is written).
- */
-export function writeSessionRecords(db: Db, host: string, next: SessionsChange): void {
+/** A host's records as they are saved (readSessionRecords' records), each's row and cards as text by its id: what a write compares with. */
+export function sessionTexts(host: string, recs: Rec[]): Map<string, { row: string; cards: string }> {
   const had = new Map<string, { row: string; cards: string }>()
-  for (const rec of readSessionRecords(db, host)) {
+  for (const rec of recs) {
     const r = sessionToRows(host, 0, rec)
     if (r) had.set(rec.id as string, sessionText(r))
   }
+  return had
+}
+
+/**
+ * Writes a host's records as `next` has them, only the rows that changed. A record not of Hive's form, or two with one
+ * id, throw (a mistake in Hive's code: nothing is written). `had`: the saved records' texts (sessionTexts), when the
+ * caller read them in the same write transaction before changing them (HI-1803: not read again); else they are read.
+ */
+export function writeSessionRecords(db: Db, host: string, next: SessionsChange, had: Map<string, { row: string; cards: string }> = sessionTexts(host, readSessionRecords(db, host))): void {
   const ords = new Map((db.prepare('SELECT id, ord FROM sessions WHERE host = ?').all(host) as { id: string; ord: number }[]).map((r) => [r.id, r.ord])) // i18n-ignore: SQL
   const ids = new Set<string>()
   const setOrd = db.prepare('UPDATE sessions SET ord = ? WHERE host = ? AND id = ?') // i18n-ignore: SQL
