@@ -3,7 +3,8 @@
 // wait set to its least, 1 minute:
 // - R1 reviews A in copy-1 and gives its verdict while still working (a turn held open): copy-1 is returned but held back
 //   (returning) while R1 is busy;
-// - R2's start review on B waits for a copy ("the pool's copies are in use") while the copy is within the wait;
+// - R2's start review on B waits for a copy ("the pool's 1 copy is in use; copy-1, returned 0 min ago, is held back by
+//   R1 (working)", HI-1764) while the copy is within the wait;
 // - past the minute, R2's review says what still uses it: "copy-1 is still in use by R1 (working)";
 // - R1's turn over, copy-1 is freed and leased to R2.
 // The wait spans a minute by design (its least): every step waits for what it expects, bounded against a hang.
@@ -102,7 +103,7 @@ const lines = (file) => {
     // --- R2's review of B waits; past the minute, it says what still uses copy-1.
     const startB = async () => (await call(tr2, 'PATCH', `/v1/tasks/${b}`, { review: 'start' })).body?.reviewCopy ?? ''
     const first = await startB()
-    check("R2's start review on B waits: the pool's copies are in use", Date.now() - returnedAt < 60_000 && first.startsWith("Waiting for a review copy (the pool's copies are in use)"), first)
+    check("R2's start review on B waits: the pool's copies are in use", Date.now() - returnedAt < 60_000 && /^Waiting for a review copy \(the pool's 1 copy is in use; copy-1, returned \d+ min ago, is held back by R1 \(working\)\)/.test(first), first)
     let said = ''
     const past = await until(async () => /copy-1 is still in use by R1 \(working\)/.test((said = await startB())), QUIET_MS, 5000)
     check('past the wait (1 min), it says what still uses it: "copy-1 is still in use by R1 (working)"', !!past && Date.now() - returnedAt >= 60_000, said)

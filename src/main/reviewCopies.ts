@@ -87,13 +87,17 @@ interface Waiting {
 export const COPY_WAIT_STALL_MS = 5 * 60_000
 
 /**
- * Why every copy is in use, for a waiting reviewer (HI-1764: it was told only "pending"): each copy, what it is lent for
- * and since when, or when it was returned and what holds it back; and when Hive tries again. Agent-facing.
+ * Why every copy is in use, for a waiting reviewer (HI-1764: it was told only "pending"), in one short clause (the reply
+ * stays lean): how many there are, then the copy most likely to come free first, with since when: a returned one and what
+ * holds it back, else the one lent longest and what for. Agent-facing.
  */
 export function copiesInUseText(held: ReturnType<CopyPool['inUse']>, name: (card: number) => string, now = Date.now()): string {
   const ago = (iso: string): string => `${Math.max(0, Math.round((now - Date.parse(iso)) / 60_000))} min`
-  const each = held.map((h) => (h.returned ? `${h.copy} returned ${ago(h.returned)} ago${h.by ? `, held back by ${h.by}` : ''}` : `${h.copy} lent to a ${h.kind} of ${name(h.card)} for ${ago(h.from)}`))
-  return `the pool's copies are in use${each.length ? `: ${each.join('; ')}` : ''}. Hive tries again as each is freed, and every 30 s` // i18n-ignore: agent-facing
+  const all = `the pool's ${held.length} ${held.length === 1 ? 'copy is' : 'copies are'} in use` // i18n-ignore: agent-facing
+  const back = held.filter((h) => h.returned).sort((a, b) => a.returned!.localeCompare(b.returned!))[0]
+  if (back) return `${all}; ${back.copy}, returned ${ago(back.returned!)} ago, is ${back.by ? `held back by ${back.by}` : 'being freed'}` // i18n-ignore: agent-facing
+  const lent = [...held].sort((a, b) => a.from.localeCompare(b.from))[0]
+  return lent ? `${all}; the longest lent, ${lent.copy}, for ${ago(lent.from)} (a ${lent.kind} of ${name(lent.card)})` : all // i18n-ignore: agent-facing
 }
 
 const key = (card: number, agent: string): string => `${card}|${agent}`
@@ -176,7 +180,8 @@ export class ReviewCopies {
       if (!r.ok) {
         const why = r.refusal.why
         if (why === 'noCopy' || why === 'stillInUse' || why === 'returned') {
-          w.why = copiesInUseText(pool.inUse(), (c) => this.named(c))
+          // Past Settings → Advanced's bound, what still uses the copy held back (copies.ts); before it, what holds each.
+          w.why = why === 'stillInUse' ? copyRefusalText(r.refusal) : copiesInUseText(pool.inUse(), (c) => this.named(c))
           return { is: 'waiting', why: w.why }
         }
         if (this.waiting.get(k) === w) this.waiting.delete(k)
