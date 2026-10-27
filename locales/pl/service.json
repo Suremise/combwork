@@ -44,6 +44,7 @@
   "service.cardAttach.refused": "{path} nie jest plikiem, który można tu dołączyć: podaj ścieżkę pliku z własnego projektu (jego folderu, jego slotów) lub folderu tymczasowego. Nic nie dołączono.",
   "service.cardAttach.tooLarge": "{name} przekracza {max}, najwięcej, ile karta przechowuje w jednym pliku (Ustawienia → Zaawansowane → Załączniki kart: największy plik). Nic nie dołączono.",
   "service.cardAttach.tooMuch": "Naraz można dołączyć najwyżej {files, number} plików i {total}. Nic nie dołączono.",
+  "service.cardCleanup.stale": "Ta lista jest nieaktualna: nic nie usunięto. Otwórz ponownie Wyczyść teraz….",
   "service.files.badName": "„{name}” nie jest poprawną nazwą",
   "service.files.exists": "„{name}” już istnieje",
   "service.files.existsIn": "{root, select, yes {„{name}” już istnieje w folderze głównym projektu} other {„{name}” już istnieje w folderze {folder}}}",

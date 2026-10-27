@@ -460,6 +460,8 @@
   "workspace.storage.cardCleanup.done": "Przeniesiono do Kosza {files, plural, one {# plik} few {# pliki} many {# plików} other {# pliku}} ({size}) z {cards, plural, one {# zarchiwizowanej karty} few {# zarchiwizowanych kart} many {# zarchiwizowanych kart} other {# zarchiwizowanej karty}}",
   "workspace.storage.cardCleanup.files": "{count, plural, one {# plik} few {# pliki} many {# plików} other {# pliku}}",
   "workspace.storage.cardCleanup.intro": "Pliki przechowywane z tymi kartami, zarchiwizowanymi co najmniej {days, plural, one {# dzień} few {# dni} many {# dni} other {# dnia}} temu, trafiają do Kosza. Każda karta dostaje o tym komentarz. Otwarte karty i karty z kolumny Gotowe zachowują swoje.",
+  "workspace.storage.cardCleanup.left": "{count, plural, one {# plik pozostawiono bez zmian} few {# pliki pozostawiono bez zmian} many {# plików pozostawiono bez zmian} other {# pliku pozostawiono bez zmian}}: zmieniono je, przeniesiono lub przywrócono z archiwum od czasu utworzenia listy.",
+  "workspace.storage.cardCleanup.more": "Na czyszczenie czeka więcej zarchiwizowanych kart niż te {count, number}: Wyczyść teraz… zajmie się kolejnymi następnym razem.",
   "workspace.storage.cardCleanup.move": "Przenieś do Kosza: {count, plural, one {# plik} few {# pliki} many {# plików} other {# pliku}} ({size})",
   "workspace.storage.cardCleanup.none": "Żadna zarchiwizowana karta nie czeka jeszcze na czyszczenie.",
   "workspace.storage.cardCleanup.now": "Wyczyść teraz…",

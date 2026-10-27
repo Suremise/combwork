@@ -28,6 +28,7 @@ import { insideReal, realPath } from './fsutil'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { trash } from './trash'
+import { fileIdentity, ownFolder, sameFile, type FileIdentity } from './cardCleanupFs'
 import type { WorkspaceService } from './workspace'
 
 const log = createLogger('attachments')
@@ -455,37 +456,63 @@ export async function removeCardAttachment(ws: WorkspaceService, card: number, i
   })
 }
 
+/** A file the clean-up planned to remove (HI-1842 round 2): its row, and the file as it was on disk ('missing': none). */
+export interface CleanupFile {
+  id: string
+  file: string
+  identity: FileIdentity | 'missing'
+}
+
 /**
- * Removes every attachment of a card (the clean-up's, HI-1842), in the change running here (or one of its own): one
- * record for them all, each file renamed into the cards' trash, their rows deleted; once it commits, to the Recycle Bin.
- * Undone, the files are renamed back. Returns what went (their names and sizes); nothing when the card has none.
+ * Removes the planned files of a card (the clean-up's, HI-1842), in the change running here: only those still as they
+ * were planned (the same row, and on disk the same unchanged file, or still none), in a folder that is still the host's
+ * own (a real folder at every step: never through a link). One record for them, each file renamed into the cards'
+ * trash, their rows deleted; once it commits, to the Recycle Bin; undone, renamed back. A file that changed, and every
+ * file of a folder that isn't the host's own, is left with its row. Returns what went and how many were left.
  */
-export async function removeCardAttachments(ws: WorkspaceService, card: number): Promise<{ id: string; name: string; size: number }[]> {
+export async function removeCardAttachments(ws: WorkspaceService, card: number, planned: CleanupFile[]): Promise<{ removed: { id: string; name: string; size: number }[]; left: number; unsafe: boolean }> {
   return boardWrite(ws, async () => {
     const found = boardWriteOp(ws, (db) => {
       const c = db.prepare('SELECT project FROM cards WHERE number = ?').get(card) as { project: string | null } | undefined // i18n-ignore: SQL
       return c ? { host: cardHost(ws, c.project), rows: db.prepare(`SELECT ${COLUMNS} FROM card_attachments WHERE card = ?`).all(card) as Row[] } : null // i18n-ignore: SQL
     })
-    if (!found?.rows.length) return []
+    if (!found) return { removed: [], left: planned.length, unsafe: false }
     const folder = cardFolder(found.host, card)
-    const there = (await Promise.all(found.rows.map(async (r) => ((await exists(join(folder, r.file))) ? r : null)))).filter((r): r is Row => !!r)
-    if (there.length) {
+    if ((await exists(folder)) && !(await ownFolder(found.host, folder))) {
+      log.warn(`${userText(folder)} is a link or not the project's own folder: its attachments are left as they are`)
+      return { removed: [], left: planned.length, unsafe: true }
+    }
+    // Each planned file, as it is now: the same row, and the same file on disk (or still none).
+    const going: { row: Row; there: boolean }[] = []
+    for (const f of planned) {
+      const row = found.rows.find((r) => r.id === f.id && r.file === f.file)
+      if (!row) continue
+      const p = join(folder, f.file)
+      if (f.identity === 'missing') {
+        if (!(await lstat(p).catch(() => null))) going.push({ row, there: false })
+      } else if (sameFile(f.identity, await fileIdentity(p))) going.push({ row, there: true })
+    }
+    const moving = going.filter((g) => g.there).map((g) => g.row)
+    if (moving.length) {
       const dir = await ownCardsFolder(found.host, TRASH, randomBytes(6).toString('hex'))
-      await writeOp(dir, { kind: 'remove', card, files: there.map((r) => ({ id: r.id, file: r.file })) })
+      await writeOp(dir, { kind: 'remove', card, files: moving.map((r) => ({ id: r.id, file: r.file })) })
       const moved: Row[] = []
       onBoardUndone(ws, async () => {
         for (const r of moved) await rename(join(dir, r.file), join(folder, r.file))
         await rm(dir, { recursive: true, force: true })
       })
-      for (const r of there) {
+      for (const r of moving) {
         await rename(join(folder, r.file), join(dir, r.file))
         moved.push(r)
       }
       afterBoardWrite(ws, () => void finishTrash(dir).catch((e) => log.warn("sending a card's cleaned-up attachments to the Recycle Bin", e)))
     }
-    boardWriteOp(ws, (db) => db.prepare('DELETE FROM card_attachments WHERE card = ?').run(card)) // i18n-ignore: SQL
-    boardChanged(ws)
-    return found.rows.sort(newest).map((r) => ({ id: r.id, name: r.name, size: r.size }))
+    if (going.length) {
+      const del = boardWriteOp(ws, (db) => db.prepare('DELETE FROM card_attachments WHERE card = ? AND id = ?')) // i18n-ignore: SQL
+      for (const g of going) del.run(card, g.row.id)
+      boardChanged(ws)
+    }
+    return { removed: going.map((g) => g.row).sort(newest).map((r) => ({ id: r.id, name: r.name, size: r.size })), left: planned.length - going.length, unsafe: false }
   })
 }
 

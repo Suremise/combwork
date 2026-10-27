@@ -542,10 +542,10 @@ export interface HiveRequests {
   'storage:cleanupPreview': (projectPath: string, opts: CleanupOptions) => CleanupItem[]
   /** Moves what the preview listed (its paths) to the Recycle Bin, skipping what no longer qualifies. */
   'storage:cleanup': (projectPath: string, opts: CleanupOptions, listed: string[]) => CleanupResult
-  /** What the project's clean-up of archived cards' attachments would remove now (HI-1842): its due cards and their files. */
-  'storage:cardCleanupPreview': (projectPath: string) => CardCleanupItem[]
-  /** Removes the attachments of those of these cards still due (Clean Up Now), each to the Recycle Bin with a comment of Hive's. */
-  'storage:cardCleanup': (projectPath: string, cards: number[]) => { cards: number; files: number; bytes: number }
+  /** What the project's clean-up of archived cards' attachments would remove now (HI-1842): its due cards and their files, kept as a plan. */
+  'storage:cardCleanupPreview': (projectPath: string) => { plan: string | null; items: CardCleanupItem[]; more: boolean }
+  /** Applies a kept plan (Clean Up Now's Move): only its files still as they were, each card checked again; an expired or used plan is refused. */
+  'storage:cardCleanup': (projectPath: string, plan: string) => { cards: number; files: number; bytes: number; left: number; stopped?: boolean }
   /** What Purge… (#1138) would remove of Hive's for a session, a project or the window's workspace: every file and record, with its size. */
   'storage:purgePreview': (target: PurgeTarget) => PurgePreview
   /** Removes what a preview (its id) listed, those of its keys given, to the Recycle Bin or permanently, skipping what changed since. */

@@ -46,6 +46,7 @@ interface HiveMessageValues {
   'service.cardAttach.refused': { path: string | number }
   'service.cardAttach.tooLarge': { name: string | number; max: string | number }
   'service.cardAttach.tooMuch': { files: number; total: string | number }
+  'service.cardCleanup.stale': undefined
   'service.files.badName': { name: string | number }
   'service.files.exists': { name: string | number }
   'service.files.existsIn': { root: string; name: string | number; folder: string | number }

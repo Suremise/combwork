@@ -44,6 +44,7 @@
   "service.cardAttach.refused": "{path} はここに添付できるファイルではありません。自分のプロジェクト（そのフォルダーやスロット）か一時フォルダーにあるファイルのパスを指定してください。何も添付していません。",
   "service.cardAttach.tooLarge": "{name} は {max} を超えています。カードが 1 ファイルで保持できる上限です（「設定」→「詳細」→「カードの添付ファイル：最大ファイル」）。何も添付していません。",
   "service.cardAttach.tooMuch": "一度に添付できるのは最大 {files, number} ファイル、{total} までです。何も添付していません。",
+  "service.cardCleanup.stale": "この一覧は古くなっています。何も削除していません。「今すぐクリーンアップ…」をもう一度開いてください。",
   "service.files.badName": "「{name}」は有効な名前ではありません",
   "service.files.exists": "「{name}」はすでに存在します",
   "service.files.existsIn": "{root, select, yes {「{name}」はプロジェクトのルートにすでに存在します} other {「{name}」は{folder}にすでに存在します}}",

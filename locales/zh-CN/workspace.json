@@ -460,6 +460,8 @@
   "workspace.storage.cardCleanup.done": "已将 {cards, plural, other {# 张已归档卡片}}的 {files, plural, other {# 个文件}}（{size}）移到回收站",
   "workspace.storage.cardCleanup.files": "{count, plural, other {# 个文件}}",
   "workspace.storage.cardCleanup.intro": "这些卡片已归档 {days, plural, other {# 天}}或更久，它们保留的文件将移到回收站。每张卡片都会收到一条说明此事的评论。未关闭的卡片和“已完成”的卡片保留各自的文件。",
+  "workspace.storage.cardCleanup.left": "{count, plural, other {# 个文件保持原样}}：自列表生成以来，它们已被更改、移动或从归档中恢复。",
+  "workspace.storage.cardCleanup.more": "到期的已归档卡片不止这 {count, number} 张：再次运行“立即清理…”会处理接下来的卡片。",
   "workspace.storage.cardCleanup.move": "将 {count, plural, other {# 个文件}}（{size}）移到回收站",
   "workspace.storage.cardCleanup.none": "还没有到期的已归档卡片。",
   "workspace.storage.cardCleanup.now": "立即清理…",

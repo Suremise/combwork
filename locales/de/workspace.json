@@ -460,6 +460,8 @@
   "workspace.storage.cardCleanup.done": "{files, plural, one {# Datei} other {# Dateien}} ({size}) von {cards, plural, one {# archivierten Karte} other {# archivierten Karten}} in den Papierkorb verschoben",
   "workspace.storage.cardCleanup.files": "{count, plural, one {# Datei} other {# Dateien}}",
   "workspace.storage.cardCleanup.intro": "Die Dateien dieser Karten, die vor {days, plural, one {# Tag} other {# Tagen}} oder länger archiviert wurden, kommen in den Papierkorb. Jede Karte bekommt einen Kommentar dazu. Offene und erledigte Karten behalten ihre.",
+  "workspace.storage.cardCleanup.left": "{count, plural, one {# Datei blieb, wie sie ist} other {# Dateien blieben, wie sie sind}}: geändert, verschoben oder aus dem Archiv zurückgeholt, seit die Liste erstellt wurde.",
+  "workspace.storage.cardCleanup.more": "Es sind mehr archivierte Karten fällig als diese {count, number}: „Jetzt aufräumen…“ nimmt sich danach die nächsten vor.",
   "workspace.storage.cardCleanup.move": "{count, plural, one {# Datei} other {# Dateien}} ({size}) in den Papierkorb verschieben",
   "workspace.storage.cardCleanup.none": "Noch ist keine archivierte Karte fällig.",
   "workspace.storage.cardCleanup.now": "Jetzt aufräumen…",

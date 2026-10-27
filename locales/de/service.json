@@ -44,6 +44,7 @@
   "service.cardAttach.refused": "{path} ist keine Datei, die hier angehängt werden kann: Gib den Pfad einer Datei deines eigenen Projekts (seines Ordners, seiner Slots) oder des Temp-Ordners an. Nichts wurde angehängt.",
   "service.cardAttach.tooLarge": "{name} ist größer als {max}, das Höchste, was eine Karte in einer Datei behält (Einstellungen → Erweitert → Karten-Anhänge: größte Datei). Nichts wurde angehängt.",
   "service.cardAttach.tooMuch": "Höchstens {files, number} Dateien und {total} können auf einmal angehängt werden. Nichts wurde angehängt.",
+  "service.cardCleanup.stale": "Diese Liste ist veraltet: Es wurde nichts entfernt. Öffne „Jetzt aufräumen…“ erneut.",
   "service.files.badName": "„{name}“ ist kein gültiger Name",
   "service.files.exists": "„{name}“ existiert bereits",
   "service.files.existsIn": "{root, select, yes {„{name}“ existiert bereits im Stammordner des Projekts} other {„{name}“ existiert bereits in {folder}}}",

@@ -279,20 +279,27 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     await inv('session:stop', assistantHome, 'assistant').catch(() => undefined)
     // --- Archived cards' attachments cleaned up (HI-1842): Project Settings → Storage's choice (here 3 days, a day being
     // HIVE_TEST_DAY_MS long), then Clean Up Now lists the archived card once it is due and sends its files to the suite's
-    // trash, with Hive's comment on it; an open card and a Done card keep theirs.
+    // trash, with Hive's comment on it; an open card and a Done card keep theirs. Round 2 (HR5): Move applies the list
+    // the dialog showed (a plan kept by main), and a file changed on disk while the dialog was open stays, said so.
+    // Each its own bytes: a card keeps the same bytes once.
+    let shade = 20
     const cleanupFile = (name) => {
       const f = path.join(alpha, 'docs', name)
-      fs.writeFileSync(f, lib.samplePng(40, 24))
+      fs.writeFileSync(f, lib.samplePng(40, ++shade))
       return f
     }
     const archivedCard = await inv('tasks:create', { title: 'Archived card with a screenshot', project: 'alpha' })
     const openCard = await inv('tasks:create', { title: 'Open card with a screenshot', project: 'alpha' })
     const doneCard = await inv('tasks:create', { title: 'Done card with a screenshot', project: 'alpha', column: 'done' })
+    const changedCard = await inv('tasks:create', { title: 'Archived card with a log', project: 'alpha' })
     for (const [c, name] of [[archivedCard, 'archived-shot.png'], [openCard, 'open-shot.png'], [doneCard, 'done-shot.png']]) await patchCard(c.number, { attachments: [cleanupFile(name)] })
+    await patchCard(changedCard.number, { attachments: [cleanupFile('goes.png'), cleanupFile('changes.png')] })
     const readCardJson = async (num) => (await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${num}`, { headers: { Authorization: `Bearer ${token}` } })).json().catch(() => null)
     const keptOf = async (c) => (await readCardJson(c.number))?.attachments ?? []
     const archivedFiles = await keptOf(archivedCard)
+    const changedFiles = await keptOf(changedCard)
     await inv('tasks:archive', archivedCard.number, true)
+    await inv('tasks:archive', changedCard.number, true)
     await lib.openProjectSettings(page)
     await page.locator('.settings-nav .row', { hasText: 'Storage' }).click()
     const choice = page.locator('select[data-setting="cardAttachmentCleanup"]')
@@ -300,18 +307,24 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     check("Storage offers Remove archived cards' attachments, 30 days after archiving by default", (await choice.inputValue()) === '30' && (await choice.locator('option').allInnerTexts()).join('|') === 'Never|3 days after archiving|7 days after archiving|30 days after archiving|90 days after archiving', (await choice.locator('option').allInnerTexts()).join('|'))
     await choice.selectOption('3')
     check('…chosen 3 days, kept in project.json', !!(await until(async () => lib.projectConfig(userData, alpha)?.cardAttachmentCleanup === '3')), JSON.stringify(lib.projectConfig(userData, alpha)?.cardAttachmentCleanup))
-    check('…once it is due, the archived card is listed, and only it', !!(await until(async () => JSON.stringify((await inv('storage:cardCleanupPreview', alpha)).map((i) => i.card)) === JSON.stringify([archivedCard.number]))), JSON.stringify(await inv('storage:cardCleanupPreview', alpha)))
+    const dueNow = async () => (await inv('storage:cardCleanupPreview', alpha)).items.map((i) => i.card)
+    check('…once they are due, the archived cards are listed, and only they', !!(await until(async () => JSON.stringify(await dueNow()) === JSON.stringify([archivedCard.number, changedCard.number]))), JSON.stringify(await dueNow()))
     await page.locator('.card-cleanup-setting button', { hasText: 'Clean Up Now' }).click()
     const cleanupDialog = page.locator('.dialog[role="dialog"]', { hasText: 'Clean Up Card Attachments' })
-    check('Clean Up Now lists the card with its file and size', !!(await until(async () => /Archived card with a screenshot/.test(await cleanupDialog.innerText().catch(() => '')) && /1 file/.test(await cleanupDialog.innerText().catch(() => '')))), await cleanupDialog.innerText().catch(() => ''))
+    const dialogText = () => cleanupDialog.innerText().catch(() => '')
+    check('Clean Up Now lists the cards with their files and sizes', !!(await until(async () => /Archived card with a screenshot/.test(await dialogText()) && /Archived card with a log/.test(await dialogText()) && /2 files/.test(await dialogText()))), await dialogText())
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
       await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
       await cleanupDialog.screenshot({ path: path.join(shots, `cardattach-cleanup-${theme}.png`) })
     }
     await inv('settings:update', { appearance: { theme: 'dark' } })
-    await cleanupDialog.getByRole('button', { name: /^Move 1 file/ }).click()
-    check('…its file goes to the Recycle Bin (the suite’s trash), its row with it', !!(await until(async () => archivedFiles.length === 1 && lib.trashed(path.basename(archivedFiles[0].path)).length === 1 && !fs.existsSync(archivedFiles[0].path) && (await keptOf(archivedCard)).length === 0)), JSON.stringify(archivedFiles))
+    // A file changed on disk while the dialog is open: its Move leaves it.
+    const changing = changedFiles.find((f) => f.name === 'changes.png')
+    fs.writeFileSync(changing.path, lib.samplePng(64, 64))
+    await cleanupDialog.getByRole('button', { name: /^Move 3 files/ }).click()
+    check('…its files go to the Recycle Bin (the suite’s trash), their rows with them', !!(await until(async () => archivedFiles.length === 1 && lib.trashed(path.basename(archivedFiles[0].path)).length === 1 && !fs.existsSync(archivedFiles[0].path) && (await keptOf(archivedCard)).length === 0)), JSON.stringify(archivedFiles))
+    check('…but a file changed since the list was made stays, row and all, and the notice says so', !!(await until(async () => JSON.stringify((await keptOf(changedCard)).map((f) => f.name)) === '["changes.png"]' && fs.existsSync(changing.path) && /Moved 2 files .* of 2 archived cards/.test(await page.locator('.toast, .notification').allInnerTexts().then((t) => t.join(' ')).catch(() => '')) && /1 file was left as it is/.test(await page.locator('.toast, .notification').allInnerTexts().then((t) => t.join(' ')).catch(() => '')))), JSON.stringify(await keptOf(changedCard)))
     const cleaned = await readCardJson(archivedCard.number)
     check("…and Hive's comment on it says how many and which", (cleaned?.comments?.at(-1)?.text ?? '').startsWith("Removed 1 attachment (archived-shot.png): this project removes archived cards' attachments 3 days after archiving") && cleaned.comments.at(-1).by === 'Hive' && cleaned.archived === true, cleaned?.comments?.at(-1)?.text)
     check('an open card and a Done card keep theirs', (await keptOf(openCard)).length === 1 && (await keptOf(doneCard)).length === 1 && fs.existsSync((await keptOf(openCard))[0].path))

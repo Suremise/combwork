@@ -84,6 +84,8 @@ const M = {
   cleanupFiles: msg({ id: 'workspace.storage.cardCleanup.files', defaultMessage: '{count, plural, one {# file} other {# files}}', description: "The Clean Up Now dialog's table: how many files a card keeps." }),
   cleanupNone: msg({ id: 'workspace.storage.cardCleanup.none', defaultMessage: 'No archived card is due yet.', description: 'The Clean Up Now dialog when no archived card has been archived long enough.' }),
   cleanupMove: msg({ id: 'workspace.storage.cardCleanup.move', defaultMessage: 'Move {count, plural, one {# file} other {# files}} ({size}) to the Recycle Bin', description: "The Clean Up Now dialog's button ({size}: \"12 MB\")." }),
+  cleanupMore: msg({ id: 'workspace.storage.cardCleanup.more', defaultMessage: 'More archived cards are due than these {count, number}: Clean Up Now again takes on the next ones.', description: 'The Clean Up Now dialog (Project Settings → Storage), under its list when more archived cards are due than one list takes: {count} is how many it lists.' }),
+  cleanupLeft: msg({ id: 'workspace.storage.cardCleanup.left', defaultMessage: '{count, plural, one {# file was left as it is} other {# files were left as they are}}: changed, moved or brought back from the archive since the list was made.', description: 'Under the notice after Clean Up Now (Project Settings → Storage): files it listed but did not remove, because they or their card changed meanwhile. Running it again does not remove them unless they are due.' }),
   cleanupDone: msg({ id: 'workspace.storage.cardCleanup.done', defaultMessage: 'Moved {files, plural, one {# file} other {# files}} ({size}) of {cards, plural, one {# archived card} other {# archived cards}} to the Recycle Bin', description: 'A notice after Clean Up Now (Project Settings → Storage): {size} like "12 MB".' })
 }
 
@@ -578,12 +580,17 @@ export function CardCleanupSetting({ path, name, value, onChange }: { path: stri
 /** Clean Up Now: the archived cards due now and their files, then each card's files to the Recycle Bin. */
 function CardCleanupDialog({ path, name, days, onClose }: { path: string; name: string; days: number; onClose: () => void }) {
   const [items, setItems] = useState<CardCleanupItem[] | null>(null)
+  const [plan, setPlan] = useState<{ id: string | null; more: boolean }>({ id: null, more: false })
   const [error, setError] = useState<string | null>(null)
   const action = useBusy()
   useEffect(() => {
     let live = true
     call('storage:cardCleanupPreview', path).then(
-      (r) => live && setItems(r),
+      (r) => {
+        if (!live) return
+        setPlan({ id: r.plan, more: r.more })
+        setItems(r.items)
+      },
       (e) => live && setError(errorMessage(e))
     )
     return () => {
@@ -593,11 +600,12 @@ function CardCleanupDialog({ path, name, days, onClose }: { path: string; name: 
   const files = items?.reduce((n, i) => n + i.files.length, 0) ?? 0
   const bytes = items?.reduce((n, i) => n + i.files.reduce((t, f) => t + f.size, 0), 0) ?? 0
   const go = async (): Promise<void> => {
-    if (!items?.length) return
-    const r = await action.run('clean', () => call('storage:cardCleanup', path, items.map((i) => i.card)))
+    if (!items?.length || !plan.id) return
+    const id = plan.id
+    const r = await action.run('clean', () => call('storage:cardCleanup', path, id))
     if (!r) return
     const done = r.value
-    notify(done.files ? 'success' : 'info', done.files ? tr(M.cleanupDone, { files: done.files, cards: done.cards, size: formatSize(done.bytes) }) : tr(M.nothingRemoved))
+    notify(done.files ? 'success' : 'info', done.files ? tr(M.cleanupDone, { files: done.files, cards: done.cards, size: formatSize(done.bytes) }) : tr(M.nothingRemoved), done.left ? tr(M.cleanupLeft, { count: done.left }) : undefined)
     onClose()
   }
   return (
@@ -631,7 +639,10 @@ function CardCleanupDialog({ path, name, days, onClose }: { path: string; name: 
       ) : !items.length ? (
         <div className="faint">{tr(M.cleanupNone)}</div>
       ) : (
-        <DataTable id="storage-card-cleanup" className="card-cleanup-preview" rows={items} columns={cardCleanupColumns()} rowKey={(i) => String(i.card)} defaultPageSize={10} filterFrom={10} empty={tr(M.nothing)} />
+        <>
+          <DataTable id="storage-card-cleanup" className="card-cleanup-preview" rows={items} columns={cardCleanupColumns()} rowKey={(i) => String(i.card)} defaultPageSize={10} filterFrom={10} empty={tr(M.nothing)} />
+          {plan.more && <p className="faint card-cleanup-more">{tr(M.cleanupMore, { count: items.length })}</p>}
+        </>
       )}
     </Modal>
   )

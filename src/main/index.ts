@@ -42,7 +42,7 @@ import { config } from './config'
 import { loadCoverage, startCoverage, startCoverageEarly } from './keyCoverage'
 import { closeConsoleWindows, sendToConsoles } from './consoleWindow'
 import { allTasks, archiveOldDone, endExitedReviews } from './tasks'
-import { cleanUpEverywhere } from './cardAttachmentCleanup'
+import { queueCleanupEverywhere } from './cardAttachmentCleanup'
 import { agentCardText } from '../shared/agentTable'
 import { emit, emitTo, onHiveEvent, toast } from './events'
 import { advanced, bindAdvancedSettings, mcpAdvancedEnv } from './advanced'
@@ -895,7 +895,7 @@ app.whenReady().then(async () => {
   // A replace that gave up because the file was held says which processes had it open (HI-1749).
   renameDiagnostics.holders = fileHolders
   setInterval(archiveOldDoneEverywhere, 3_600_000).unref()
-  setInterval(cleanUpEverywhere, CARD_CLEANUP_EVERY_MS).unref()
+  setInterval(queueCleanupEverywhere, CARD_CLEANUP_EVERY_MS).unref()
 
   workspace.setLiveProvider((p, cfg, scope) => sessions.liveInfo(p, cfg, scope))
   sessions.apiEnv = apiEnv

@@ -179,6 +179,10 @@
     "defaultMessage": "At most {files, number} files and {total} can be attached at once. Nothing was attached.",
     "description": "An error attaching files to a card (HI-1700): more files, or more bytes in all ({total}: a size such as 100 MB), than one change takes; none was attached."
   },
+  "service.cardCleanup.stale": {
+    "defaultMessage": "This list is out of date: nothing was removed. Open Clean Up Now again.",
+    "description": "An error of Clean Up Now (Project Settings → Storage, HI-1842): the list of archived cards' files it showed expired, was used already, or belongs to a workspace closed since; nothing was removed."
+  },
   "service.files.badName": {
     "defaultMessage": "\"{name}\" is not a valid name",
     "description": "An error making or renaming a file or folder: {name} is empty, . or .., or has a character Windows can't have in a name."

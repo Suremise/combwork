@@ -44,6 +44,7 @@
   "service.cardAttach.refused": "{path} is not a file that can be attached here: give the path of a file of your own project (its folder, its slots) or of the temp folder. Nothing was attached.",
   "service.cardAttach.tooLarge": "{name} is larger than {max}, the most a card keeps in one file (Settings → Advanced → Card attachments: largest file). Nothing was attached.",
   "service.cardAttach.tooMuch": "At most {files, number} files and {total} can be attached at once. Nothing was attached.",
+  "service.cardCleanup.stale": "This list is out of date: nothing was removed. Open Clean Up Now again.",
   "service.files.badName": "\"{name}\" is not a valid name",
   "service.files.exists": "\"{name}\" already exists",
   "service.files.existsIn": "{root, select, yes {\"{name}\" already exists in the project root} other {\"{name}\" already exists in {folder}}}",

@@ -1847,6 +1847,14 @@
     "defaultMessage": "The files kept with these cards, archived {days, plural, one {# day} other {# days}} ago or more, go to the Recycle Bin. Each card gets a comment saying so. Open and Done cards keep theirs.",
     "description": "The Clean Up Now dialog (Project Settings → Storage), at the top: {days} is the project's setting."
   },
+  "workspace.storage.cardCleanup.left": {
+    "defaultMessage": "{count, plural, one {# file was left as it is} other {# files were left as they are}}: changed, moved or brought back from the archive since the list was made.",
+    "description": "Under the notice after Clean Up Now (Project Settings → Storage): files it listed but did not remove, because they or their card changed meanwhile. Running it again does not remove them unless they are due."
+  },
+  "workspace.storage.cardCleanup.more": {
+    "defaultMessage": "More archived cards are due than these {count, number}: Clean Up Now again takes on the next ones.",
+    "description": "The Clean Up Now dialog (Project Settings → Storage), under its list when more archived cards are due than one list takes: {count} is how many it lists."
+  },
   "workspace.storage.cardCleanup.move": {
     "defaultMessage": "Move {count, plural, one {# file} other {# files}} ({size}) to the Recycle Bin",
     "description": "The Clean Up Now dialog's button ({size}: \"12 MB\")."

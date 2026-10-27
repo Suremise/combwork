@@ -53,7 +53,9 @@ export default defineConfig({
           // The log's writer thread (HI-1730).
           'log-writer': resolve(__dirname, 'src/main/logWriter.ts'),
           // The WAL checkpoints' worker thread (HI-1691).
-          'wal-checkpoint-worker': resolve(__dirname, 'src/main/walCheckpointWorker.ts')
+          'wal-checkpoint-worker': resolve(__dirname, 'src/main/walCheckpointWorker.ts'),
+          // The card attachments' clean-up plan (HI-1842).
+          'card-cleanup-worker': resolve(__dirname, 'src/main/cardCleanupWorker.ts')
         }
       }
     }

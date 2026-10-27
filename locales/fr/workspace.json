@@ -460,6 +460,8 @@
   "workspace.storage.cardCleanup.done": "{files, plural, one {# fichier} many {# fichiers} other {# fichiers}} ({size}) de {cards, plural, one {# carte archivée} many {# cartes archivées} other {# cartes archivées}} placés dans la Corbeille",
   "workspace.storage.cardCleanup.files": "{count, plural, one {# fichier} many {# fichiers} other {# fichiers}}",
   "workspace.storage.cardCleanup.intro": "Les fichiers gardés avec ces cartes, archivées il y a {days, plural, one {# jour} many {# jours} other {# jours}} ou plus, vont dans la Corbeille. Chaque carte reçoit un commentaire qui le dit. Les cartes ouvertes et Terminé gardent les leurs.",
+  "workspace.storage.cardCleanup.left": "{count, plural, one {# fichier a été laissé tel quel} many {# fichiers ont été laissés tels quels} other {# fichiers ont été laissés tels quels}} : modifiés, déplacés ou ramenés de l’archive depuis que la liste a été faite.",
+  "workspace.storage.cardCleanup.more": "Plus de cartes archivées sont dues que ces {count, number} : Nettoyer maintenant… s’occupe des suivantes la fois d’après.",
   "workspace.storage.cardCleanup.move": "Placer {count, plural, one {# fichier} many {# fichiers} other {# fichiers}} ({size}) dans la Corbeille",
   "workspace.storage.cardCleanup.none": "Aucune carte archivée n’est encore due.",
   "workspace.storage.cardCleanup.now": "Nettoyer maintenant…",

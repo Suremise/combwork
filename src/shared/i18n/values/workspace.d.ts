@@ -463,6 +463,8 @@ interface HiveMessageValues {
   'workspace.storage.cardCleanup.done': { files: number; size: string | number; cards: number }
   'workspace.storage.cardCleanup.files': { count: number }
   'workspace.storage.cardCleanup.intro': { days: number }
+  'workspace.storage.cardCleanup.left': { count: number }
+  'workspace.storage.cardCleanup.more': { count: number }
   'workspace.storage.cardCleanup.move': { count: number; size: string | number }
   'workspace.storage.cardCleanup.none': undefined
   'workspace.storage.cardCleanup.now': undefined

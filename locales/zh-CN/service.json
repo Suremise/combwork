@@ -44,6 +44,7 @@
   "service.cardAttach.refused": "{path} 不是可在此附加的文件：请提供你自己项目（其文件夹、其 slot）或临时文件夹中文件的路径。未附加任何内容。",
   "service.cardAttach.tooLarge": "{name} 超过 {max}，即卡片单个文件可保留的上限（“设置”→“高级”→“卡片附件：最大文件”）。未附加任何内容。",
   "service.cardAttach.tooMuch": "一次最多可附加 {files, number} 个文件、{total}。未附加任何内容。",
+  "service.cardCleanup.stale": "此列表已过期：没有删除任何内容。请重新打开“立即清理…”。",
   "service.files.badName": "“{name}”不是有效的名称",
   "service.files.exists": "“{name}”已存在",
   "service.files.existsIn": "{root, select, yes {项目根目录中已存在“{name}”} other {{folder} 中已存在“{name}”}}",
