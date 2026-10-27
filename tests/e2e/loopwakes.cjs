@@ -206,7 +206,7 @@ const check = (name, ok, extra = '') => {
   await until(() => idle(reviewer.id), 15000)
   check('…which watches the lanes again', await watchLanes())
   await say(builder.id, `boardcomment ${c7}`)
-  check("its builder's comment on the card still blocked wakes it (reblocked)", !!(await until(async () => wakes('Reviewer').length === 5, 20000)) && wakes('Reviewer')[4].includes(`#${c7} is still blocked, with news: "Screenshots for your OK"`), JSON.stringify(wakes('Reviewer').slice(4)))
+  check("its builder's comment on the card still blocked wakes it (reblocked)", !!(await until(async () => wakes('Reviewer').length === 5, 20000)) && wakes('Reviewer')[4].includes(`${n7} is still blocked, with news: "Screenshots for your OK"`), JSON.stringify(wakes('Reviewer').slice(4)))
   await until(async () => (await idle(reviewer.id)) && (await idle(builder.id)), 15000)
   // Other, the new lane's reviewer, waits for the card in Review; the lane is abandoned with the card still in Doing.
   await say(other.id, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [c7], column: 'review', wake: true })}`)

@@ -1441,7 +1441,8 @@ async function laneRound(store: Store, rec: WatchRecord, board: LaneBoard = lane
   for (const n of nows) {
     const from = rec.laneSince ?? rec.since
     const was = rec.laneMarks?.[n.id] ?? (Date.parse(started.get(n.id) ?? '') > Date.parse(from) ? newLaneBase(n, from) : undefined)
-    const h = laneHits(was, n, cond.events, from)
+    // Its hits' texts name cards as the watch's line does (HI-1777): by key, whatever workspace is the context meanwhile.
+    const h = withCardNames(store.ws, () => laneHits(was, n, cond.events, from), rec.scope)
     if (h) hits.push(h)
     next[n.id] = n.mark
   }
