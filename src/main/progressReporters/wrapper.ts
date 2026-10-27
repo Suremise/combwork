@@ -268,12 +268,24 @@ export interface WrapperIo {
   viaElectron?: boolean
   /** The stop signals it listens for (default STOP_SIGNALS); tests pass none, or their own. */
   signals?: NodeJS.Signals[]
-  /** How often an isolated check waiting for a check copy asks again (default ISOLATED_POLL_MS). */
+  /** How often an isolated check waiting for a check copy asks again at first (default ISOLATED_POLL_MS). */
   isolatedPollMs?: number
 }
 
-/** How often an isolated check waiting for a check copy asks Hive again (#1435). */
+/** How often an isolated check waiting for a check copy asks Hive again (#1435), for the wait's first minute. */
 const ISOLATED_POLL_MS = 2000
+/** After that each ask comes half as long again later, up to this (HI-1831: an hour's wait was 1,800 asks). */
+const ISOLATED_POLL_PROMPT_MS = 60_000
+const ISOLATED_POLL_MAX_MS = 10_000
+
+/**
+ * How long an isolated check that has waited `waitedMs` waits before asking again, after waiting `lastMs` last time:
+ * `firstMs` while the wait is short, so a copy freed soon is taken at once, then backing off to ISOLATED_POLL_MAX_MS.
+ */
+export function isolatedPollDelay(waitedMs: number, lastMs: number, firstMs = ISOLATED_POLL_MS): number {
+  if (waitedMs < ISOLATED_POLL_PROMPT_MS) return firstMs
+  return Math.max(firstMs, Math.min(ISOLATED_POLL_MAX_MS, Math.round(lastMs * 1.5)))
+}
 
 /**
  * The command's run as reported: it starts at the first step line that gives the total, or after `waitMs`, so steps
@@ -517,10 +529,14 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
     const ask = { folder: io.cwd, ...(parsed.card !== undefined ? { card: parsed.card } : {}), ...(parsed.revision !== undefined ? { revision: parsed.revision } : {}), ...(parsed.check !== undefined ? { check: parsed.check } : {}), ...(parsed.isolated ? { isolated: true as const } : {}) }
     let r = await resolveRun(target, ask, { fetch: io.fetch, timeoutMs: io.resolveTimeoutMs })
     // No check copy free (#1435): said once, then asked again until one is (Ctrl+C stops waiting).
+    // Asked at once at first, less often after a minute (isolatedPollDelay).
     let said = ''
+    const waitFrom = Date.now()
+    let delay = 0
     while ('wait' in r) {
       if (r.wait !== said) io.stderr.write(`hive-progress: waiting for ${(said = r.wait)}\n`)
-      await new Promise((res) => setTimeout(res, io.isolatedPollMs ?? ISOLATED_POLL_MS))
+      delay = isolatedPollDelay(Date.now() - waitFrom, delay, io.isolatedPollMs)
+      await new Promise((res) => setTimeout(res, delay))
       // Asked again with its ticket: the copy Hive is setting up for this run (none: a new ask).
       r = await resolveRun(target, { ...ask, ...(r.ticket ? { ticket: r.ticket } : {}) }, { fetch: io.fetch, timeoutMs: io.resolveTimeoutMs })
     }

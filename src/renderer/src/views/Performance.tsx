@@ -72,7 +72,7 @@ const M = {
   requests: msg({ id: 'performance.card.requests', defaultMessage: 'API requests', description: "Title of a Performance card: how many Agent API requests Hive answered." }),
   requestsSub: msg({ id: 'performance.card.requestsSub', defaultMessage: '{failed} failed · {cancelled} cancelled', description: "Under the API requests card's number. {failed} and {cancelled} are percentages (\"2%\") or — when there were none." }),
   requestsSubRate: msg({ id: 'performance.card.requestsSubRate', defaultMessage: '{rate, number} an hour recorded · {failed} failed · {cancelled} cancelled', description: "Under the API requests card's number. {rate} is requests per hour while Hive was recording; {failed} and {cancelled} are percentages (\"2%\")." }),
-  requestsTip: msg({ id: 'performance.card.requestsTip', defaultMessage: 'Agent API requests (agents’ tools, the Assistant, scripts). An hour: over the time Hive was recording, not the whole range. Failed: refused, client or server errors. Cancelled: the client went away before the reply.', description: 'Tooltip of the API requests card. An hour, Failed and Cancelled are words of the card: keep them as there.' }),
+  requestsTip: msg({ id: 'performance.card.requestsTip', defaultMessage: 'Agent API requests (agents’ tools, the Assistant, scripts). An hour: over the time Hive was recording, not the whole range. Failed: refused, client or server errors. Cancelled: the client went away before the reply. Waits (an isolated check waiting for a check copy) are counted but never failed.', description: 'Tooltip of the API requests card. An hour, Failed and Cancelled are words of the card, Waits a column of the Agent API table: keep them as there.' }),
   latency: msg({ id: 'performance.card.latency', defaultMessage: 'Latency', description: 'Title of a Performance card: how long Agent API requests took.' }),
   p50: msg({ id: 'performance.card.p50', defaultMessage: 'p50 {latency}', description: 'The median request time, on the Latency card. {latency} is a time such as "≤ 25 ms". Keep p50.' }),
   p95: msg({ id: 'performance.card.p95', defaultMessage: 'p95 {latency}', description: 'The 95th percentile of request time, on the Latency card. {latency} is a time such as "≤ 250 ms". Keep p95.' }),
@@ -109,6 +109,8 @@ const M = {
   trendNotRecorded: msg({ id: 'performance.trend.notRecorded', defaultMessage: 'not recorded (Hive closed, recording off, or before a reset)', description: 'Tooltip of a bar of the requests chart, after its hour or day and a colon: Hive recorded nothing then. Lower case.' }),
   trendDetail: msg({ id: 'performance.trend.detail', defaultMessage: '{requests, plural, one {# request} other {# requests}}{failed, plural, =0 {} other {, # failed{cancelled, plural, =0 {} other { ({cancelled, number} cancelled)}}}} · {toolCalls, plural, one {# tool call} other {# tool calls}} ({chars, number} characters) · {launches, plural, one {# launch} other {# launches}}{partial, select, yes { · recorded for {duration} of it} other {}}', description: 'Tooltip of a bar of the requests chart, after its hour or day and a colon: what happened then. {duration} is how long Hive recorded in it ("40 min"), shown when {partial} is yes. Lower case.' }),
   succeeded: msg({ id: 'performance.trend.succeeded', defaultMessage: 'Succeeded', description: "Legend of the requests chart: the bars' colour for requests that succeeded." }),
+  trendWaits: msg({ id: 'performance.trend.waits', defaultMessage: '{waits, plural, one {# wait} other {# waits}} for a check copy, not failures', description: 'A second line in the tooltip of a bar of the requests chart, shown when there were any: replies telling an isolated check to ask again because no check copy was free. Lower case.' }),
+  waitsLegend: msg({ id: 'performance.trend.waitsLegend', defaultMessage: 'Waits', description: "Legend of the requests chart: the bars' colour for replies that told a check to wait (no check copy free), which aren't failures." }),
   failed: msg({ id: 'performance.trend.failed', defaultMessage: 'Failed', description: "Legend of the requests chart: the bars' colour for requests that failed." }),
   notRecorded: msg({ id: 'performance.trend.notRecordedLegend', defaultMessage: 'Not recorded', description: 'Legend of the requests chart: the hatched bars, when Hive recorded nothing.' }),
   assistant: msg({ id: 'performance.who.assistant', defaultMessage: 'Assistant', description: "In a Performance table's Who column: the Hive Assistant's sessions." }),
@@ -127,6 +129,7 @@ const M = {
   route: msg({ id: 'performance.routes.route', defaultMessage: 'Route', description: "Column header of the Agent API table: the request's method and route (such as GET /api/tasks)." }),
   requestsHeader: msg({ id: 'performance.col.requests', defaultMessage: 'Requests', description: 'Column header of a Performance table: how many requests.' }),
   failedHeader: msg({ id: 'performance.routes.failed', defaultMessage: 'Failed', description: 'Column header of the Agent API table: requests that failed.' }),
+  waitsHeader: msg({ id: 'performance.routes.waits', defaultMessage: 'Waits', description: 'Column header of the Agent API table: replies that told the caller to ask again (an isolated check waiting for a check copy), not failures.' }),
   cancelled: msg({ id: 'performance.routes.cancelled', defaultMessage: 'Cancelled', description: 'Column header of the Agent API table: requests the client gave up on.' }),
   sent: msg({ id: 'performance.routes.sent', defaultMessage: 'Sent', description: 'Column header of the Agent API table: the size of the replies Hive sent.' }),
   received: msg({ id: 'performance.routes.received', defaultMessage: 'Received', description: 'Column header of the Agent API table: the size of the requests Hive received.' }),
@@ -581,12 +584,14 @@ function Trend({ points, step }: { points: TrendPoint[]; step: 'hour' | 'day' })
                       ? tr(M.trendNotRecorded)
                       : tr(M.trendDetail, { requests: p.requests, failed: p.failed, cancelled: p.cancelled, toolCalls: p.toolCalls, chars: p.toolChars, launches: p.launches, partial: p.observedMs < slotMs - 60_000 ? 'yes' : 'no', duration: duration(p.observedMs) })
                 })}
+                {p.waits > 0 && <div>{tr(M.trendWaits, { waits: p.waits })}</div>}
               </div>
             }
           >
             <div className={cx('daily-col', !p.observedMs && !p.requests && 'unobserved', p.observedMs > 0 && p.observedMs < slotMs - 60_000 && 'partial')}>
               <div className="stack-bar" style={{ height: `${p.requests ? Math.max(3, (p.requests / max) * 100) : 0}%` }}>
-                {p.requests - p.failed > 0 && <div className="stack-part" style={{ flexGrow: p.requests - p.failed, background: 'var(--series-1)' }} />}
+                {p.requests - p.failed - p.waits > 0 && <div className="stack-part" style={{ flexGrow: p.requests - p.failed - p.waits, background: 'var(--series-1)' }} />}
+                {p.waits > 0 && <div className="stack-part" style={{ flexGrow: p.waits, background: 'var(--fg-faint)' }} />}
                 {p.failed > 0 && <div className="stack-part" style={{ flexGrow: p.failed, background: 'var(--error)' }} />}
               </div>
             </div>
@@ -601,6 +606,11 @@ function Trend({ points, step }: { points: TrendPoint[]; step: 'hour' | 'day' })
         <span>
           <span className="swatch" style={{ background: 'var(--series-1)' }} /> {tr(M.succeeded)}
         </span>
+        {points.some((p) => p.waits > 0) && (
+          <span>
+            <span className="swatch" style={{ background: 'var(--fg-faint)' }} /> {tr(M.waitsLegend)}
+          </span>
+        )}
         <span>
           <span className="swatch" style={{ background: 'var(--error)' }} /> {tr(M.failed)}
         </span>
@@ -659,6 +669,7 @@ const routeColumns = (): DataColumn<RouteRow>[] => [
   { key: 'requests', header: tr(M.requestsHeader), num: true, descFirst: true, cell: (r) => num(r.requests), sortValue: (r) => r.requests },
   { key: 'failed', header: tr(M.failedHeader), num: true, descFirst: true, cell: (r) => (failedOnly(r) ? `${num(failedOnly(r))} (${pct(failedOnly(r), r.requests)})` : '—'), sortValue: failedOnly },
   { key: 'cancelled', header: tr(M.cancelled), num: true, descFirst: true, cell: (r) => (r.cancelled ? `${num(r.cancelled)} (${pct(r.cancelled, r.requests)})` : '—'), sortValue: (r) => r.cancelled },
+  { key: 'waits', header: tr(M.waitsHeader), num: true, descFirst: true, cell: (r) => (r.waits ? num(r.waits) : '—'), sortValue: (r) => r.waits },
   { key: 'p50', header: tr(M.p50Header), num: true, descFirst: true, cell: (r) => ms(r.p50, r.requests), sortValue: (r) => latencyOrder(r.p50, r.requests) },
   { key: 'p95', header: tr(M.p95Header), num: true, descFirst: true, cell: (r) => ms(r.p95, r.requests), sortValue: (r) => latencyOrder(r.p95, r.requests) },
   { key: 'sent', header: tr(M.sent), num: true, descFirst: true, cell: (r) => formatBytes(r.responseBytes), sortValue: (r) => r.responseBytes },

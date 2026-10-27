@@ -99,7 +99,7 @@ import { ASK_ACTIONS, ASK_ACTIONS_MAX, CATEGORY_STAGE, LOOP_STEPS, type AskActio
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
 import { actorOf, recordDecisionsReceived } from './workflow/recorder'
 import { workflowFor } from './workflow/service'
-import { appMetrics, clock as metricsClock, knownRoute, metricsHandle, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
+import { apiOutcome, appMetrics, clock as metricsClock, knownRoute, metricsHandle, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
 import type { GuidanceSeries, MetricOutcome, MetricsPart, MetricsQuery, MetricsReport } from '../shared/metrics'
@@ -298,16 +298,16 @@ interface ApiRequest {
   /** Not counted as API traffic: the bridge's own metrics reports, event streams (counted as streams), the health check. */
   skip: boolean
   authenticated: boolean
+  /** Answered with a wait (HI-1831: an error status whose body says to ask again): recorded as `waiting`, not a failure. */
+  waiting: boolean
   /** The request's workspace, as far as it was known (the developer console's Hive events). */
   ws: string | null
 }
 const apiRequests = new WeakMap<ServerResponse, ApiRequest>()
 
-/** How a request ended, for its metrics: an aborted one is cancelled, else by its status. */
-function outcomeOf(res: ServerResponse): MetricOutcome {
-  if (!res.writableFinished) return 'cancelled'
-  const s = res.statusCode
-  return s < 400 ? 'ok' : s === 401 || s === 403 ? 'denied' : s < 500 ? 'client-error' : 'server-error'
+/** How a request ended, for its metrics: an aborted one is cancelled, one answered with a wait waiting, else by its status. */
+function outcomeOf(res: ServerResponse, m: ApiRequest): MetricOutcome {
+  return apiOutcome({ finished: res.writableFinished, status: res.statusCode, waiting: m.waiting })
 }
 
 function tokenFile(): string {
@@ -3665,7 +3665,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
   // Measured from here to the response's end (or the client going away): latency on the monotonic clock, bodies'
   // UTF-8 bytes, outcome. Recorded once it ends, never in the way of the request.
   const started = metricsClock.mono()
-  const m: ApiRequest = { route: '(no route)', handle: null, project: null, role: 'unknown', requestBytes: 0, responseBytes: 0, skip: false, authenticated: false, ws: null }
+  const m: ApiRequest = { route: '(no route)', handle: null, project: null, role: 'unknown', requestBytes: 0, responseBytes: 0, skip: false, authenticated: false, waiting: false, ws: null }
   apiRequests.set(res, m)
   appMetrics.requestStarted()
   // Named in a "main process was busy" warning that it overlaps, by its route once known (mainStalls.ts).
@@ -3675,7 +3675,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
     appMetrics.requestEnded()
     working()
     if (!m.authenticated) appMetrics.unauthenticated()
-    else if (!m.skip && m.handle) recordApi(m.handle, m.project, { route: m.route, method: req.method ?? '', role: m.role, outcome: outcomeOf(res), requestBytes: m.requestBytes, responseBytes: m.responseBytes, ms: metricsClock.mono() - started })
+    else if (!m.skip && m.handle) recordApi(m.handle, m.project, { route: m.route, method: req.method ?? '', role: m.role, outcome: outcomeOf(res, m), requestBytes: m.requestBytes, responseBytes: m.responseBytes, ms: metricsClock.mono() - started })
     if (m.authenticated && !m.skip && !m.route.startsWith('/v1/console')) captureApiCall(req, res, url, m, who, metricsClock.mono() - started)
   })
   const url = new URL(req.url ?? '/', 'http://127.0.0.1')
@@ -3788,6 +3788,8 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
   } catch (e) {
     const { status, body } = apiErrorReply(e)
     if (status === 500) log.error(`API ${req.method} ${url.pathname}`, e)
+    // A wait (resolve's 409 while no check copy is free) is an answer to ask again, not a failure (HI-1831).
+    if (e instanceof HttpError && e.extra && 'wait' in e.extra) m.waiting = true
     send(res, status, body)
   }
 }
@@ -3800,7 +3802,7 @@ function captureApiCall(req: IncomingMessage, res: ServerResponse, url: URL, m: 
   const own = who?.kind === 'agent' ? sessionSourceId(who.projectPath, who.agentId) : who?.kind === 'assistant' ? sessionSourceId(join(who.workspace, HIVE_DIR, ASSISTANT_DIR), ASSISTANT_AGENT_ID) : null
   devConsole.capture([m.ws && hiveSourceId(m.ws), own], () => {
     const name = `${req.method ?? ''} ${m.route}`
-    const outcome = outcomeOf(res)
+    const outcome = outcomeOf(res, m)
     const by = who?.kind === 'agent' ? `agent ${who.agentId}` : who?.kind ?? 'unknown'
     return {
       kind: 'api',

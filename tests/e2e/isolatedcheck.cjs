@@ -4,7 +4,8 @@
 // - in the shared folder, another agent's edit while the check runs makes it uncounted; the same check with --isolated,
 //   edited under the same way, counts, runs in copies/copy-1 at the card's revision, and its run's details name the copy;
 // - with the project's one copy leased (its size set to 1), B2's isolated check waits ("waiting for a check copy"), then
-//   runs in copy-1 once B1's has ended and the copy is quiet;
+//   runs in copy-1 once B1's has ended and the copy is quiet; its asks while it waited are waits in the metrics, never
+//   failures (HI-1831);
 // - an isolated check that started a detached process of its own is stopped from the Progress panel: its whole tree ends
 //   (the check and what it left), and the copy is used by the next run.
 // And HR1's round 1: the first copy's setup held past hive-progress's 5 s request limit (it waits, then runs); the
@@ -278,6 +279,36 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
     check('…having said it waited for a check copy', /waiting for a check copy/.test(waited?.stderr ?? ''), waited?.stderr)
     const bCheck = await until(async () => (await inv('tasks:work', b))?.checks.find((c) => c.name === 'quick' && c.isolated), HUNG_MS)
     check("…counted for B's card", bCheck?.counted === true, JSON.stringify(bCheck))
+    // Its asks while it waited are waits in Performance, not failures (HI-1831): what the view reads, by outcome.
+    const resolves = async () => {
+      const r = await inv('metrics:query', { scope: { kind: 'workspace' } })
+      const out = {}
+      for (const part of [r.workspace, ...Object.values(r.projects)].filter(Boolean))
+        for (const s of part.api) if (s.route === '/v1/progress/resolve') out[s.outcome] = (out[s.outcome] ?? 0) + s.count
+      return out
+    }
+    const byOutcome = await until(async () => {
+      const r = await resolves()
+      return r.waiting > 0 ? r : null
+    }, HUNG_MS)
+    check('…its waits for the copy are recorded as waits, and no resolve as a failure', !!byOutcome && Object.keys(byOutcome).every((o) => o === 'ok' || o === 'waiting'), JSON.stringify(byOutcome))
+    // …and Performance shows them so: resolve's row with no failures and its waits apart, the chart's waits in grey.
+    await page.locator('.activitybar button[aria-label="Performance"]').click()
+    const routesTable = page.locator('.performance-page:visible .data-table', { has: page.locator('th', { hasText: 'Route' }) }).first()
+    const resolveRow = routesTable.locator('tbody tr', { hasText: '/v1/progress/resolve' }).first()
+    const cells = async () => (await resolveRow.locator('td').allInnerTexts().catch(() => [])).map((x) => x.trim())
+    const headers = async () => (await routesTable.locator('th').allInnerTexts().catch(() => [])).map((x) => x.trim())
+    const shown = await until(async () => {
+      const [h, c] = [await headers(), await cells()]
+      // innerText as shown: the headers are upper case.
+      const col = (name) => h.findIndex((x) => x.toLowerCase().startsWith(name.toLowerCase()))
+      return c.length && col('Waits') >= 0 ? { failed: c[col('Failed')], waits: c[col('Waits')] } : null
+    }, HUNG_MS)
+    check("…Performance's Agent API table: resolve has no failures, its waits counted apart", shown?.failed === '—' && /^[1-9]/.test(shown?.waits ?? ''), JSON.stringify(shown))
+    check('…and the chart has Waits in its legend', (await page.locator('.performance-page:visible .stack-legend', { hasText: 'Waits' }).count()) === 1)
+    await page.mouse.move(5, 5)
+    await page.locator('.performance-page:visible').screenshot({ path: path.join(shots, 'isolatedcheck-3-performance-waits.png') })
+    await page.locator('.activitybar button[aria-label="Projects"]').click()
 
     // --- Stopped from the panel: the check and the process it started end, and the copy is used again.
     steer('spawn')

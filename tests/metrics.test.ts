@@ -72,6 +72,32 @@ describe('units', () => {
   })
 })
 
+describe('waits (HI-1831)', () => {
+  it("an isolated check's resolve answered with a wait is recorded as waiting: counted, never a failure", async () => {
+    const { byRoute, totals } = await import('../src/shared/metricsView')
+    metrics.knownRoute('/v1/progress/resolve')
+    // How servers.ts tells them: resolve's 409 with `wait` is a wait; a 409 without one, a client error.
+    expect(metrics.apiOutcome({ finished: true, status: 409, waiting: true })).toBe('waiting')
+    expect(metrics.apiOutcome({ finished: true, status: 409, waiting: false })).toBe('client-error')
+    expect(metrics.apiOutcome({ finished: false, status: 409, waiting: true })).toBe('cancelled')
+    expect(metrics.apiOutcome({ finished: true, status: 200, waiting: false })).toBe('ok')
+    const { w } = await open()
+    const resolve = (outcome: 'ok' | 'waiting' | 'client-error') => metrics.recordApi(metrics.metricsHandle(w), 'alpha', api('/v1/progress/resolve', { method: 'POST', outcome }))
+    for (let i = 0; i < 5; i++) resolve('waiting')
+    resolve('ok')
+    resolve('client-error')
+    const q = metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - HOUR).toISOString(), trend: true })
+    const api_ = Object.values(q.projects).flatMap((p) => p.api)
+    expect(api_.find((s) => s.outcome === 'waiting')?.count).toBe(5)
+    const t = totals({ api: api_, mcp: [], guidance: [], catalog: [], providers: [], safeguards: [] })
+    expect([t.requests, t.waits, t.failed, t.errors]).toEqual([7, 5, 1, 1])
+    expect(byRoute(api_)).toMatchObject([{ key: 'POST /v1/progress/resolve', requests: 7, waits: 5, failed: 1 }])
+    const hour = q.trend!.find((p) => p.requests > 0)!
+    expect([hour.requests, hour.waits, hour.failed]).toEqual([7, 5, 1])
+    await disposeWorkspaceService(w)
+  })
+})
+
 describe('time', () => {
   it('hourly buckets; folded into days after a week; gone after 30 days; a range picks what overlaps it', async () => {
     const { w } = await open()

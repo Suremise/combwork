@@ -18,7 +18,11 @@ export interface Timed {
   histogram: number[]
 }
 
-export type MetricOutcome = 'ok' | 'client-error' | 'denied' | 'server-error' | 'cancelled'
+/**
+ * How a request ended. `waiting` (HI-1831): a reply that says to ask again (an isolated check's resolve while no check
+ * copy is free): an expected wait, not a failure. Before HI-1831 those were recorded as `client-error`.
+ */
+export type MetricOutcome = 'ok' | 'client-error' | 'denied' | 'server-error' | 'cancelled' | 'waiting'
 
 /** Agent API requests, by route template, method, caller role and outcome. */
 export interface ApiSeries extends Timed {
@@ -178,6 +182,8 @@ export interface TrendPoint {
   /** Requests that didn't succeed (client or server error, refused, cancelled); `cancelled` of them, by the client. */
   failed: number
   cancelled: number
+  /** Replies that said to ask again (HI-1831), not among `failed`. */
+  waits: number
   requestBytes: number
   responseBytes: number
   toolCalls: number

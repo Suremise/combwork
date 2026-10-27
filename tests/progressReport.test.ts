@@ -9,7 +9,7 @@ import { createRequire } from 'module'
 import { pathToFileURL } from 'url'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { estimateFor, evictionOrder, KEEP_KEYS, ProgressRun, progressTarget, recordTiming, wrappedLines } from '../src/main/progressReporters/report.mts'
-import { cmdEscapeArgument, commandEnv, commandLabel, parseArgs, parseProcessList, runWrapped, spawnSpec, StepFilter, stepLine, timingKey, treeToEnd, uncountedLine, wasInterrupted } from '../src/main/progressReporters/wrapper'
+import { cmdEscapeArgument, commandEnv, commandLabel, isolatedPollDelay, parseArgs, parseProcessList, runWrapped, spawnSpec, StepFilter, stepLine, timingKey, treeToEnd, uncountedLine, wasInterrupted } from '../src/main/progressReporters/wrapper'
 import { installShims, shimFiles, withBinOnPath } from '../src/main/progressReporters/shims'
 import { hiveInstructions, progressRule, wrapsLongCommands } from '../src/shared/hiveGuidance'
 import { launchParts } from '../src/main/guidance'
@@ -370,6 +370,25 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     expect(line('changed', { platform: 'none' })).toBe('not counted as check lint: files changed in the folder while it ran. Run it again with nothing else writing in the folder.')
     expect(line('changed', {}, true)).toBe('not counted as check lint: files changed in the folder while it ran. Run it again with nothing else writing in the folder.')
     for (const answer of [null, {}, { check: { name: 'lint', counted: true } }, { check: { name: 'lint', counted: false, whyNot: 'someday' } }]) expect(uncountedLine(answer, false)).toBeNull()
+  })
+
+  it('an isolated check waiting for a check copy asks every 2 s for a minute, then less often, up to every 10 s (HI-1831)', () => {
+    const delays: number[] = []
+    let waited = 0
+    let last = 0
+    while (waited < 3_600_000) {
+      last = isolatedPollDelay(waited, last)
+      delays.push(last)
+      waited += last
+    }
+    expect(delays.slice(0, 30).every((d) => d === 2000)).toBe(true)
+    expect(delays.slice(30, 33)).toEqual([3000, 4500, 6750])
+    expect(delays.at(-1)).toBe(10_000)
+    // An hour's wait: about 380 asks, where it was 1,800.
+    expect(delays.length).toBeLessThan(400)
+    // A test's own interval stays the first, and never more than the backoff allows.
+    expect(isolatedPollDelay(0, 0, 50)).toBe(50)
+    expect(isolatedPollDelay(120_000, 50, 50)).toBe(75)
   })
 
   it('a Hive from before (no resolve call) still gets the run, as before, unlinked', async () => {

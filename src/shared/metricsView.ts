@@ -110,6 +110,8 @@ export interface PerfTotals {
   denied: number
   /** Failed requests other than cancelled ones (errors and refusals). */
   errors: number
+  /** Replies that said to ask again (an isolated check waiting for a check copy, HI-1831): counted, never failed. */
+  waits: number
   requestBytes: number
   responseBytes: number
   latency: Timed
@@ -139,9 +141,11 @@ export function totals(s: PerfSelection): PerfTotals {
   let failed = 0
   let cancelled = 0
   let denied = 0
+  let waits = 0
   for (const a of s.api) {
     mergeTimed(latency, a)
-    if (a.outcome !== 'ok') failed += a.count
+    if (a.outcome === 'waiting') waits += a.count
+    else if (a.outcome !== 'ok') failed += a.count
     if (a.outcome === 'cancelled') cancelled += a.count
     if (a.outcome === 'denied') denied += a.count
   }
@@ -154,6 +158,7 @@ export function totals(s: PerfSelection): PerfTotals {
     cancelled,
     denied,
     errors: failed - cancelled,
+    waits,
     requestBytes: sum(s.api, (a) => a.requestBytes),
     responseBytes: sum(s.api, (a) => a.responseBytes),
     latency,
@@ -184,6 +189,7 @@ export interface RouteRow {
   requests: number
   failed: number
   cancelled: number
+  waits: number
   p50: number | null
   p95: number | null
   requestBytes: number
@@ -195,10 +201,11 @@ export function byRoute(api: ApiSeries[]): RouteRow[] {
   const rows = new Map<string, RouteRow & { t: Timed }>()
   for (const a of api) {
     const key = `${a.method} ${a.route}`
-    const r = rows.get(key) ?? { key, route: a.route, method: a.method, requests: 0, failed: 0, cancelled: 0, p50: null, p95: null, requestBytes: 0, responseBytes: 0, t: emptyTimed() }
+    const r = rows.get(key) ?? { key, route: a.route, method: a.method, requests: 0, failed: 0, cancelled: 0, waits: 0, p50: null, p95: null, requestBytes: 0, responseBytes: 0, t: emptyTimed() }
     rows.set(key, r)
     mergeTimed(r.t, a)
-    if (a.outcome !== 'ok') r.failed += a.count
+    if (a.outcome === 'waiting') r.waits += a.count
+    else if (a.outcome !== 'ok') r.failed += a.count
     if (a.outcome === 'cancelled') r.cancelled += a.count
     r.requestBytes += a.requestBytes
     r.responseBytes += a.responseBytes
