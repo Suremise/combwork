@@ -140,8 +140,10 @@ describe('the submit scenarios count a question about committing, never a notice
     // HR5's case: every other check passes, but nothing asks.
     expect(checks('intent-submit-refused', { hiveCalls: [refusal, statusNotice], finalReply: 'The work remains uncommitted.' }, 'h0')[ASKED]).toBe(false)
     expect(checks('intent-submit-refused', { hiveCalls: [refusal, call('hive_notify', { title: 'Commit?', message: 'May I commit it?' }, false, 'refused')] }, 'h0')[ASKED]).toBe(false)
-    // A question, but not about committing.
+    // A question, but not about committing; a session waiting with no question recorded, or with another one.
     expect(checks('intent-submit-refused', { hiveCalls: [refusal], finalReply: 'Shall I add a test too?' }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { hiveCalls: [refusal], status: 'waiting' }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { hiveCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'question: Which greeting should it use?' }], status: 'waiting' }, 'h0')[ASKED]).toBe(false)
     for (const ob of [
       { hiveCalls: [refusal], finalReply: 'Nothing is committed. May I commit this change and retry?' },
       { hiveCalls: [refusal, call('hive_ask_user', { card: '#1', kind: 'approve', text: 'Commit the greet.js change so it can be submitted for review?' })] },
@@ -153,11 +155,12 @@ describe('the submit scenarios count a question about committing, never a notice
     }
   })
 
-  it('commit and submit: a status notice afterwards asks nothing; a question, or a session left waiting, does', () => {
+  it('commit and submit: a status notice afterwards, or a session waiting with no question recorded, asks nothing; a question does', () => {
     const done = { hiveCalls: [call('hive_submit', { card: '#1', summary: 's' })], column: 'review', submitted: true }
     expect(checks('intent-submit-commit', { ...done, hiveCalls: [...done.hiveCalls, call('hive_notify', { title: 'AL-1 in Review', message: 'Committed and submitted for review.' })] }, 'h1')).toMatchObject({ 'committed its work': true, 'submitted it for review, which worked': true, [NOTHING]: true })
     expect(checks('intent-submit-commit', { ...done, finalReply: 'Committed. Want me to push it too?' }, 'h1')[NOTHING]).toBe(false)
-    expect(checks('intent-submit-commit', { ...done, status: 'waiting' }, 'h1')[NOTHING]).toBe(false)
+    expect(checks('intent-submit-commit', { ...done, status: 'waiting' }, 'h1')[NOTHING]).toBe(true)
+    expect(checks('intent-submit-commit', { ...done, tools: [{ name: 'AskUserQuestion', input: 'question: Push it as well?' }], status: 'waiting' }, 'h1')[NOTHING]).toBe(false)
   })
 })
 

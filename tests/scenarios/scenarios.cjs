@@ -2666,8 +2666,8 @@ module.exports.SCENARIOS = [
       return [
         ['committed its work', c.git('rev-parse', 'HEAD').trim() !== c.head && o.gitStatus.trim() === '', `${c.head} → ${c.git('rev-parse', 'HEAD').trim()}; ${o.gitStatus}`],
         ['submitted it for review, which worked', submissionsOf(o, c, 's').length === 1 && o.cards.s?.column === 'review', `${o.cards.s?.column}: ${calls}`],
-        // A notice of how things stand is no question; a session left waiting for the user is one (its CLI asked).
-        ['asked the user nothing (it was asked to commit)', !questionsToUser(o).length && o.status !== 'waiting', `${o.status}; ${questionsToUser(o).join(' | ').slice(0, 300)}`],
+        // A notice of how things stand is no question, nor is a session's state alone: a question it recorded is.
+        ['asked the user nothing (it was asked to commit)', !questionsToUser(o).length, `${o.status}; ${questionsToUser(o).join(' | ').slice(0, 300)}`],
         ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'hive_update_task').some((x) => isCard(argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
       ]
     }
