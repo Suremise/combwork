@@ -234,10 +234,24 @@ const beta = path.join(fx.ws, 'beta')
     // --- Japanese (a long locale): Hive started again in it, the same lanes.
     fs.writeFileSync(fx.go, 'go')
     await h.app.close()
+    // The lanes' agents were working: Hive offers to resume them (its restart record), in a notice over Pulse's bar and
+    // marks, perhaps more than one as each is decided (HI-1792: the hovers below timed out under it). Answered Don't
+    // Resume until the record is gone (nothing left to offer) and no offer shows.
+    const restartRecord = path.join(fx.userData, 'restart.json')
+    const offered = fs.existsSync(restartRecord)
     h = await q.startHive(fx, { port: PORT, keepOptions: true, env: { HIVE_LANG: 'ja' } })
     page = h.page
     page.on('pageerror', (e) => check('no page errors (ja)', false, e.message))
     await lib.fitWindow(h.app, page, { width: 1500, height: 950 })
+    if (offered) {
+      const jaMain = JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', 'ja', 'main.json'), 'utf8'))
+      const dontResume = page.locator('.toast').getByRole('button', { name: jaMain['main.restart.dismiss'], exact: true })
+      const answered = await waitHung(async () => {
+        if (await dontResume.count()) await dontResume.first().click().catch(() => undefined)
+        return !fs.existsSync(restartRecord) && (await dontResume.count()) === 0
+      })
+      check("ja: the offer to resume the lanes' agents answered Don't Resume, and gone", !!answered, String(fs.existsSync(restartRecord)))
+    }
     await page.getByText('alpha', { exact: true }).first().click()
     const panelJa = page.locator('.progress-panel')
     if (!(await panelJa.count())) await page.locator('.progress-rail').click()
