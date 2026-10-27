@@ -305,13 +305,21 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
  * folder (its next start elsewhere moves it); nothing reuses or removes a slot while it has a writer. With nothing else,
  * it is stopped once its turn is over: workNow, the run, its idleness and the slot's writer read again at that moment,
  * with nothing awaited between that look and the stop (HR4's design review: work arriving during an await is never
- * missed). The promise returned (a carried lease's only) settles once the first look is made.
+ * missed). Work found is asked again at each idle moment after, until the run leaves the slot (HI-1784: the watch on
+ * the lane's last card, ending a moment after the lane, kept B1 in its old folder for good). The promise returned (a
+ * carried lease's only) settles once the first look is made.
  */
 export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Slot, at?: { ws: WorkspaceService; pool: SlotPool }): Promise<void> | void {
   const w = slot.writer
   if (!w || w.lease !== lease.id) return
   if (lease.kind === 'carried' && at) {
-    const keep = (work: string): void => log.info(`Keeps ${userText(w.agent)}'s session in ${userText(slot.name)} running: its carried lease ${lease.id} ended (${lease.why ?? 'released'}), but it ${work}`)
+    // Logged when what keeps it changes, not at each look.
+    let kept: string | null = null
+    const keep = (work: string): void => {
+      if (work === kept) return
+      kept = work
+      log.info(`Keeps ${userText(w.agent)}'s session in ${userText(slot.name)} running: its carried lease ${lease.id} ended (${lease.why ?? 'released'}), but it ${work}`)
+    }
     // Its one await first (watches.ts, imported here: it registers its delivery sources as it loads, which slots' own
     // users needn't); every look after it is synchronous.
     return import('./watches').then(
@@ -322,7 +330,7 @@ export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Sl
           return !work
         }
         const writerNow = (): SlotWriter | null => at.pool.slots().find((s) => s.name === slot.name)?.writer ?? null
-        if (go()) stopWhenIdle(projectPath, lease, slot, w, { go, writerNow })
+        stopWhenIdle(projectPath, lease, slot, w, { go, writerNow })
       },
       (e) => keep(`may work elsewhere (that couldn't be told: ${e instanceof Error ? e.message : String(e)})`) // i18n-ignore: a log line
     )
@@ -369,8 +377,9 @@ export function workNow(projectPath: string, agent: string, lease: SlotLease, at
 
 /**
  * The lease's run stopped once its turn and its runs have finished; a start still being prepared at once (#1434).
- * `check` (a carried lease's, HI-1731): at that moment, with nothing awaited, `go` (false: it has work, kept running),
- * then the run still the slot's writer under this lease (`writerNow`).
+ * `check` (a carried lease's, HI-1731): at that moment, with nothing awaited, the run still the slot's writer under this
+ * lease (`writerNow`; not: nothing more is looked at), then `go` (false: it has work, kept running and asked again at
+ * its next idle moment, HI-1784).
  */
 function stopWhenIdle(projectPath: string, lease: SlotLease, slot: Slot, w: SlotWriter, check?: { go: () => boolean; writerNow: () => SlotWriter | null }): void {
   const mine = (): { run: string; starting: boolean } | null => {
@@ -387,9 +396,10 @@ function stopWhenIdle(projectPath: string, lease: SlotLease, slot: Slot, w: Slot
     if (!r) return done()
     if (!r.starting && (agentBusy(projectPath, w.agent) || agentRunsGoing(projectPath, w.agent).length)) return
     if (check) {
-      if (!check.go()) return done()
       const writer = check.writerNow()
       if (!writer || writer.run !== w.run || writer.lease !== lease.id) return done()
+      // Work now: asked again at its next idle moment.
+      if (!check.go()) return
     }
     done()
     log.info(`Stopping ${userText(w.agent)}'s ${r.starting ? 'start' : 'session'} in ${userText(slot.name)}: its lease ${lease.id} ended (${lease.why ?? 'released'})`)

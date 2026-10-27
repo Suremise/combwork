@@ -131,6 +131,10 @@ const isIn = (dir, rev, ref) => {
     await until(async () => same((await live(alpha, 'b2'))?.cwd, slotA) && (await idle(alpha, 'b2')), HUNG_MS)
     const s1 = await intent(await tokenOf(alpha, 'b2'), c1, 'start')
     check(`${key} starts in slot-a`, s1.status === 200 && same(s1.body?.data?.folder, slotA), JSON.stringify(s1.body))
+    // Its slot made ready and B2 placed there before Hive closes (HI-1784): a preparation left under way runs again after
+    // Repair, and B2's start meanwhile is refused (slot-a "is still being set up").
+    const settled = await until(async () => (await inv('tasks:facts', c1)).some((f) => f.kind === 'BuilderPlaced'), HUNG_MS)
+    check('…its slot prepared and B2 placed there', !!settled, JSON.stringify((await inv('tasks:facts', c1)).map((f) => f.kind)))
     await h.app.close()
     h = null
     // A review copy, as #1435's pool keeps one (its worktree, detached, and its row).

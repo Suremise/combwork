@@ -76,6 +76,8 @@ afterEach(() => {
   lanesNow = []
   watching.clear()
   runs.clear()
+  // A look still listening (a carried lease's that found work, HI-1784) sees its run gone and lets go.
+  status()
   stopped.length = 0
   setAgentBusy(null)
   setRunsGoing(null)
@@ -220,12 +222,47 @@ describe("a carried lease's end never stops an agent with work elsewhere (HI-173
     let busy = true
     setAgentBusy(() => busy)
     await stopLeaseSession(P, CARRIED, slotWith({ run: 'run-1', lease: 'l1' }), at())
-    // Its turn starts a card meanwhile (no lease yet, so the first look found nothing); at the idle moment the look, made
-    // then with nothing awaited, sees it.
+    // Its turn starts a card meanwhile (no lease yet); at the idle moment the look, made then with nothing awaited (and
+    // the first it makes: in a turn till then), sees it.
+    expect(asked()).toBe(0)
     inFlight = { number: 13 }
     busy = false
     status()
-    expect(asked()).toBe(4)
+    expect(asked()).toBe(2)
+    expect(stopped).toEqual([])
+  })
+
+  it('work that ends after its lease is asked again at each idle moment: once there is none, it is stopped (HI-1784)', async () => {
+    // B1's: the lane's carried lease ended as its last card was merged, its watch on that card not ended yet.
+    runs.set('b1', { run: 'run-1', starting: false })
+    watching.set('b1', { label: 'Waiting for AL-2 → Passed' })
+    await stopLeaseSession(P, CARRIED, slotWith({ run: 'run-1', lease: 'l1' }), at())
+    status()
+    expect(stopped).toEqual([])
+    // Its watch ends (a status event), it takes its turn, and is idle again with nothing.
+    let busy = true
+    setAgentBusy(() => busy)
+    watching.clear()
+    status()
+    expect(stopped).toEqual([])
+    busy = false
+    status()
+    expect(stopped).toEqual(['b1:run-1'])
+  })
+
+  it("work found is never asked again once its run has left the slot (the slot's writer another run, or none)", async () => {
+    runs.set('b1', { run: 'run-1', starting: false })
+    watching.set('b1', { label: 'Waiting for HI-9 → Review' })
+    let writer: { run: string; lease: string } | null = { run: 'run-1', lease: 'l1' }
+    const moving = { ...at(), pool: { ...at().pool, slots: () => [slotWith(writer)] } } as unknown as NonNullable<Parameters<typeof stopLeaseSession>[3]>
+    await stopLeaseSession(P, CARRIED, slotWith({ run: 'run-1', lease: 'l1' }), moving)
+    expect(asked()).toBe(2)
+    // Its next start elsewhere moved it: the slot drains, and its looks end there, never reading the board again.
+    writer = null
+    watching.clear()
+    status()
+    status()
+    expect(asked()).toBe(2)
     expect(stopped).toEqual([])
   })
 
