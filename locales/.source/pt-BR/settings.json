@@ -1075,7 +1075,7 @@
   "settings.resetToDefault": "Reset to default ({value})",
   "settings.saveFailed": "Could not save setting",
   "settings.search": "Search settings",
-  "settings.section.accounts.desc": "How your agents reach their models: a Claude Code sign-in Hive keeps, signed in through Claude Code's own sign-in, or a server such as DeepSeek or Ollama, reached by its base URL and key. Each has a folder of its own, and every connection shares your conversations and Claude Code's memory. Each agent and the Assistant runs on its own connection, or the workspace's default.",
+  "settings.section.accounts.desc": "How your agents reach their models: a Claude Code sign-in Hive keeps, signed in through Claude Code's own sign-in, or a server such as DeepSeek or Ollama, reached by its base URL and key. Each has a folder of its own, and every connection shares your conversations and Claude Code's memory. Each agent and the Assistant runs on its own connection, or the first in your order that's on in this workspace.",
   "settings.section.accounts.label": "Connections",
   "settings.section.advanced.desc": "Developer features, the details Hive relies on that a CLI update can break (advanced.json), logs, data and resetting Hive.",
   "settings.section.advanced.label": "Advanced",

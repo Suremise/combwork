@@ -1067,7 +1067,7 @@
   "settings.resetToDefault": "Restaurar padrão ({value})",
   "settings.saveFailed": "Não foi possível salvar a configuração",
   "settings.search": "Pesquisar configurações",
-  "settings.section.accounts.desc": "Como seus agentes chegam aos modelos: um login do Claude Code que o Hive guarda, feito pelo próprio login do Claude Code, ou um servidor como DeepSeek ou Ollama, acessado pela URL base e pela chave. Cada uma tem sua própria pasta, e todas as conexões compartilham suas conversas e a memória do Claude Code. Cada agente e o Assistente rodam na própria conexão ou na padrão do espaço de trabalho.",
+  "settings.section.accounts.desc": "Como seus agentes chegam aos modelos: um login do Claude Code que o Hive guarda, feito pelo próprio login do Claude Code, ou um servidor como DeepSeek ou Ollama, acessado pela URL base e pela chave. Cada uma tem sua própria pasta, e todas as conexões compartilham suas conversas e a memória do Claude Code. Cada agente e o Assistente rodam na própria conexão ou na primeira da sua ordem que está ativada neste espaço de trabalho.",
   "settings.section.accounts.label": "Conexões",
   "settings.section.advanced.desc": "Recursos de desenvolvedor, detalhes de que o Hive depende e que uma atualização de CLI pode quebrar (advanced.json), logs, dados e a redefinição do Hive.",
   "settings.section.advanced.label": "Avançado",

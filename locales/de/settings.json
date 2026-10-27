@@ -1067,7 +1067,7 @@
   "settings.resetToDefault": "Auf Standard zurücksetzen ({value})",
   "settings.saveFailed": "Einstellung konnte nicht gespeichert werden",
   "settings.search": "Einstellungen durchsuchen",
-  "settings.section.accounts.desc": "Wie deine Agenten ihre Modelle erreichen: eine Anmeldung für Claude Code, die Hive führt, angemeldet über die Anmeldung von Claude Code selbst, oder ein Server wie DeepSeek oder Ollama, erreicht über seine Basis-URL und seinen Schlüssel. Jede hat einen eigenen Ordner, und alle Verbindungen teilen deine Unterhaltungen und das Gedächtnis von Claude Code. Jeder Agent und der Assistent läuft mit seiner eigenen Verbindung oder dem Standard des Arbeitsbereichs.",
+  "settings.section.accounts.desc": "Wie deine Agenten ihre Modelle erreichen: eine Anmeldung für Claude Code, die Hive führt, angemeldet über die Anmeldung von Claude Code selbst, oder ein Server wie DeepSeek oder Ollama, erreicht über seine Basis-URL und seinen Schlüssel. Jede hat einen eigenen Ordner, und alle Verbindungen teilen deine Unterhaltungen und das Gedächtnis von Claude Code. Jeder Agent und der Assistent läuft mit seiner eigenen Verbindung oder der ersten in deiner Reihenfolge, die in diesem Arbeitsbereich aktiv ist.",
   "settings.section.accounts.label": "Verbindungen",
   "settings.section.advanced.desc": "Entwicklerfunktionen, die Details, auf die sich Hive verlässt und die ein CLI-Update kaputt machen kann (advanced.json), Logs, Daten und das Zurücksetzen von Hive.",
   "settings.section.advanced.label": "Erweitert",

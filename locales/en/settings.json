@@ -4272,7 +4272,7 @@
     "description": "Placeholder of Settings' search box."
   },
   "settings.section.accounts.desc": {
-    "defaultMessage": "How your agents reach their models: a Claude Code sign-in Hive keeps, signed in through Claude Code's own sign-in, or a server such as DeepSeek or Ollama, reached by its base URL and key. Each has a folder of its own, and every connection shares your conversations and Claude Code's memory. Each agent and the Assistant runs on its own connection, or the workspace's default.",
+    "defaultMessage": "How your agents reach their models: a Claude Code sign-in Hive keeps, signed in through Claude Code's own sign-in, or a server such as DeepSeek or Ollama, reached by its base URL and key. Each has a folder of its own, and every connection shares your conversations and Claude Code's memory. Each agent and the Assistant runs on its own connection, or the first in your order that's on in this workspace.",
     "description": "Under the heading of the section \"Connections\" of Settings: what it holds."
   },
   "settings.section.accounts.label": {

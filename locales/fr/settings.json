@@ -1067,7 +1067,7 @@
   "settings.resetToDefault": "Rétablir la valeur par défaut ({value})",
   "settings.saveFailed": "Impossible d’enregistrer le paramètre",
   "settings.search": "Rechercher dans les paramètres",
-  "settings.section.accounts.desc": "Comment vos agents accèdent à leurs modèles : une connexion par compte Claude Code que Hive conserve, ouverte par la propre connexion de Claude Code, ou un serveur comme DeepSeek ou Ollama, joint par son URL de base et sa clé. Chacune a son propre dossier, et toutes les connexions partagent vos conversations et la mémoire de Claude Code. Chaque agent et l'Assistant s'exécutent sur leur propre connexion, ou sur celle par défaut de l'espace de travail.",
+  "settings.section.accounts.desc": "Comment vos agents accèdent à leurs modèles : une connexion par compte Claude Code que Hive conserve, ouverte par la propre connexion de Claude Code, ou un serveur comme DeepSeek ou Ollama, joint par son URL de base et sa clé. Chacune a son propre dossier, et toutes les connexions partagent vos conversations et la mémoire de Claude Code. Chaque agent et l’Assistant utilisent leur propre connexion, ou la première de ton ordre qui est activée dans cet espace de travail.",
   "settings.section.accounts.label": "Connexions",
   "settings.section.advanced.desc": "Fonctions pour développeurs, les détails dont Hive dépend et qu’une mise à jour d’une CLI peut casser (advanced.json), journaux, données et réinitialisation de Hive.",
   "settings.section.advanced.label": "Avancé",

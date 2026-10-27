@@ -211,7 +211,7 @@ const generation = (id: string): number => generations.get(id) ?? 0
 // ---------------------------------------------------------------------------
 
 /** For tests: run before each delete of a removal (with the folder it is in), to change the folder meanwhile. */
-export const accountTestHooks: { beforeDelete?: (dir: string) => Promise<void> } = {}
+export const accountTestHooks: { beforeDelete?: (dir: string) => Promise<void>; beforeOrderRead?: () => Promise<void> } = {}
 
 /** Why a folder can't be used or removed safely, in English (the log and `leftover`), with the text for the user. */
 class Unsafe extends Error {}
@@ -1284,6 +1284,7 @@ export function moveConnection(id: string, index: number): void {
  */
 export async function migrateConnectionOrder(): Promise<void> {
   if (config.get().connectionOrderMigrated) return
+  await accountTestHooks.beforeOrderRead?.()
   const before = list().map((a) => a.id).join()
   const tops = new Map<ProviderId, string>()
   for (const ws of config.get().recentWorkspaces) {
@@ -1454,6 +1455,8 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
   const caps = providerDescriptor(o.provider).capabilities.connections
   // A CLI without connections (Copilot: its own machine-wide login, HI-1758) launches as it always has.
   if (!caps) return null
+  // Never on the order from before its one-time move (HI-1875 round 1): agents and the Assistant alike come here.
+  await connectionOrderReady()
   const cli = providerDescriptor(o.provider).name
   const choose = (wanted: string | null | undefined): ReturnType<typeof resolveConnection> => resolveConnection(o.workspaceConfig, o.provider, wanted, list())
   const choice = choose(o.wanted)
@@ -1604,12 +1607,27 @@ export function connectionOnHere(id: string, cli: ProviderId, projectPath: strin
  * Connections' part of Hive's start (index.ts; nothing runs as this module loads, which other modules import): a new
  * workspace starts with the last-used connections, and the watches follow the open workspaces and their choices.
  */
-export function initConnections(): void {
+/** The connections' one-time order move under way or done (HI-1875 round 1): what depends on the order waits for it. */
+let orderReady: Promise<void> = Promise.resolve()
+
+/** Starts the one-time order move (once, at Hive's start); its failure is logged, the order then as it was. */
+export function startConnectionOrder(): Promise<void> {
+  orderReady = migrateConnectionOrder().catch((e) => log.warn("connections: the preference order's one-time move failed", e))
+  return orderReady
+}
+
+/** Resolves once the connections' order is final: before it, a launch or a new workspace would use the old one. */
+export const connectionOrderReady = (): Promise<void> => orderReady
+
+/** Returns once the order is final (index.ts waits for it before workspaces open and the Agent API starts). */
+export function initConnections(): Promise<void> {
   // Connections from before the old per-CLI defaults' record (a preview's) count as having taken them, at once.
   seedConnectionDefaults()
-  // The most recent workspace default becomes the top of its CLI's preference order, once (HI-1875).
-  void migrateConnectionOrder().catch((e) => log.warn("connections: the preference order's one-time move failed", e))
-  setNewWorkspaceExtras(() => {
+  // The most recent workspace default becomes the top of its CLI's preference order, once (HI-1875); what depends on
+  // the order (a launch on a connection, a new workspace's seeding) waits for it.
+  const ready = startConnectionOrder()
+  setNewWorkspaceExtras(async () => {
+    await connectionOrderReady()
     const connections = newWorkspaceAccounts()
     return connections ? { connections } : {}
   })
@@ -1628,4 +1646,5 @@ export function initConnections(): void {
     shown = now
     emit({ type: 'connections-changed' })
   })
+  return ready
 }

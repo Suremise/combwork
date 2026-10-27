@@ -34,7 +34,7 @@ const { config } = await import('../src/main/config')
 const { advanced } = await import('../src/main/advanced')
 const { provider } = await import('../src/main/providers')
 const { providerService } = await import('../src/main/providerService')
-const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
+const { createWorkspaceService, disposeWorkspaceService, inWorkspace, setNewWorkspaceExtras } = await import('../src/main/workspace')
 const { runSwitch } = await import('../src/main/connectionSwitch')
 const { authScope, sessions } = await import('../src/main/sessions')
 const moves = await import('../src/main/connectionMoves')
@@ -218,6 +218,51 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     const c2 = (await launch())!
     expect(c2.note).toBe('loginChanged')
     c2.release()
+  })
+
+  it("waits for the order's one-time move at start (HI-1875 round 1): no launch and no new workspace on the order from before it", async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const b = await signedInConnection('Work', 'work@example.com')
+    // The most recently opened workspace's recorded default was Work, though Personal is first in the list.
+    const recent = join(base, 'order-recent')
+    mkdirSync(join(recent, '.hive'), { recursive: true })
+    writeFileSync(join(recent, '.hive', 'workspace.json'), JSON.stringify({ version: 1, connections: { 'claude-code': { on: [a.id, b.id], default: b.id } } }))
+    const was = config.get().recentWorkspaces
+    config.update((c) => {
+      c.recentWorkspaces = [recent]
+      delete c.connectionOrderMigrated
+    })
+    // The move held while it reads the recent workspaces, as a slow disk would.
+    let release: () => void = () => undefined
+    let reached = false
+    accounts.accountTestHooks.beforeOrderRead = () => new Promise<void>((r) => ((reached = true), (release = r)))
+    const fresh = join(base, 'order-new-ws')
+    let w2: ReturnType<typeof createWorkspaceService> | null = null
+    try {
+      const ready = accounts.initConnections()
+      await vi.waitFor(() => expect(reached).toBe(true), { timeout: HUNG_MS })
+      // Asked for while held: a launch with no connection of its own, and a new workspace's seeding.
+      const launched = launch()
+      mkdirSync(fresh, { recursive: true })
+      w2 = createWorkspaceService()
+      const opened = w2.open(fresh)
+      release()
+      await ready
+      // Not the old first in the list (Personal): the moved top, Work.
+      const c = (await launched)!
+      expect(c.id).toBe(b.id)
+      c.release()
+      await opened
+      expect(JSON.parse(readFileSync(join(fresh, '.hive', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [b.id], default: b.id } })
+      expect((config.get().connections ?? []).map((x) => x.id)).toEqual([b.id, a.id])
+    } finally {
+      accounts.accountTestHooks.beforeOrderRead = undefined
+      release()
+      if (w2) await disposeWorkspaceService(w2)
+      config.update((c) => void (c.recentWorkspaces = was))
+      // initConnections set new workspaces' seeding (the top of the order on): the later tests' new workspaces start bare.
+      setNewWorkspaceExtras(async () => ({}))
+    }
   })
 
   it('stillValid: false once another connection is chosen meanwhile, or it is removed', async () => {

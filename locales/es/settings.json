@@ -1067,7 +1067,7 @@
   "settings.resetToDefault": "Restablecer el predeterminado ({value})",
   "settings.saveFailed": "No se pudo guardar la opción",
   "settings.search": "Buscar en la configuración",
-  "settings.section.accounts.desc": "Cómo llegan tus agentes a sus modelos: un inicio de sesión de Claude Code que Hive conserva, hecho con el propio inicio de sesión de Claude Code, o un servidor como DeepSeek u Ollama, al que se llega por su URL base y su clave. Cada una tiene su propia carpeta, y todas las conexiones comparten tus conversaciones y la memoria de Claude Code. Cada agente y el Asistente se ejecutan en su propia conexión o en la predeterminada del espacio de trabajo.",
+  "settings.section.accounts.desc": "Cómo llegan tus agentes a sus modelos: un inicio de sesión de Claude Code que Hive conserva, hecho con el propio inicio de sesión de Claude Code, o un servidor como DeepSeek u Ollama, al que se llega por su URL base y su clave. Cada una tiene su propia carpeta, y todas las conexiones comparten tus conversaciones y la memoria de Claude Code. Cada agente y el Asistente se ejecutan con su propia conexión o con la primera de tu orden que esté activada en este espacio de trabajo.",
   "settings.section.accounts.label": "Conexiones",
   "settings.section.advanced.desc": "Funciones para desarrolladores, los detalles de los que depende Hive y que una actualización de una CLI puede romper (advanced.json), registros, datos y restablecer Hive.",
   "settings.section.advanced.label": "Avanzado",

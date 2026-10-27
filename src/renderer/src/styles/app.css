@@ -4433,7 +4433,10 @@ h2.section#unused-worktrees {
   align-items: center;
   margin-top: 4px;
 }
+/* Always the row's own bottom line (HI-1875, Darren 27 Oct): the switch and buttons in the same place on every row,
+   on or off, however short its details are (a short row would otherwise wrap them up beside its name). */
 .account-actions {
+  flex-basis: 100%;
   display: flex;
   gap: 6px;
   align-items: center;

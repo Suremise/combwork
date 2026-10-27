@@ -261,6 +261,20 @@ const check = (name, ok, extra = '') => {
     check('Make Default moves Work to the top, wearing Default', !!(await lib.until(async () => JSON.stringify(await claudeOrder()) === JSON.stringify([work.id, personal.id]) && (await row('Work').locator('[data-default-hint]').count()) === 1, HUNG_MS)))
     check('…turning nothing on or off', JSON.stringify(await onHere()) === onBefore && !(await onHere()).includes(work.id))
     check('…the Default off here, the first on wears Used here', !!(await lib.until(async () => (await row('Two').locator('[data-used-here]').count()) === 1, HUNG_MS)) && (await list()).workspace['claude-code']?.default === personal.id)
+    // Every row keeps its switch and buttons in the same place, its bottom line, on or off (Darren, 27 Oct ~22:30).
+    const actionsAt = async (name) => {
+      const r = await row(name).boundingBox()
+      const a = await row(name).locator('.account-actions').boundingBox()
+      const n = await row(name).locator('.account-name').boundingBox()
+      return r && a && n ? { left: Math.round(a.x - r.x), belowName: a.y >= n.y + n.height, bottomGap: Math.round(r.y + r.height - (a.y + a.height)) } : null
+    }
+    // In a wide window, where they would fit beside the name (rc.9 put a short row's there).
+    await page.setViewportSize({ width: 2200, height: 950 })
+    await lib.until(async () => ((await row('Work').boundingBox())?.width ?? 0) > 1400, HUNG_MS)
+    const offRow = await actionsAt('Work')
+    const onRow = await actionsAt('Two')
+    await page.setViewportSize({ width: 1400, height: 950 })
+    check('an off row and an on row put their switch and buttons in the same place: the bottom line, below the name', !!offRow && !!onRow && offRow.belowName && onRow.belowName && offRow.left === onRow.left && offRow.bottomGap === onRow.bottomGap, JSON.stringify({ offRow, onRow }))
     await shots('order')
     // Dragged back to the top by its handle.
     await row('Two').locator('[data-move-handle]').dragTo(row('Work'))

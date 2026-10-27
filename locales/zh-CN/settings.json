@@ -1067,7 +1067,7 @@
   "settings.resetToDefault": "重置为默认值（{value}）",
   "settings.saveFailed": "无法保存设置",
   "settings.search": "搜索设置",
-  "settings.section.accounts.desc": "你的代理如何访问其模型：Hive 保存的 Claude Code 登录（通过 Claude Code 自己的登录完成），或像 DeepSeek、Ollama 这样的服务器（通过其基础 URL 和密钥访问）。每个连接都有自己的文件夹，所有连接共享你的对话和 Claude Code 的记忆。每个代理和助手都在自己的连接或工作区的默认连接上运行。",
+  "settings.section.accounts.desc": "你的代理如何访问其模型：Hive 保存的 Claude Code 登录（通过 Claude Code 自己的登录完成），或像 DeepSeek、Ollama 这样的服务器（通过其基础 URL 和密钥访问）。每个连接都有自己的文件夹，所有连接共享你的对话和 Claude Code 的记忆。每个智能体和助手都在自己的连接上运行，或在你的顺序中此工作区第一个已开启的连接上运行。",
   "settings.section.accounts.label": "连接",
   "settings.section.advanced.desc": "开发者功能、Hive 依赖但 CLI 更新可能破坏的细节（advanced.json）、日志、数据以及重置 Hive。",
   "settings.section.advanced.label": "高级",

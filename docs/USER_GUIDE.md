@@ -88,7 +88,6 @@ Hive asks each CLI which models it has and what each can do, so a new model, or 
 
 Each Claude Code or Codex agent, and the Assistant, runs on a **connection**: a sign-in that Hive keeps in a folder of its own, signed in through the CLI's own sign-in, or a server (below). Add them in **Settings → Connections**. Each workspace chooses which connections are on; an agent can have its own.
 
-- **Each CLI's connections have an order**, the same in every workspace: drag a connection by its handle (or press Alt+Up or Alt+Down on it). New agents use the first one in the order that's on in the workspace, so turning connections on and off never means choosing a new default. The top one wears **Default**, a reminder of which you prefer; **Make Default** moves a connection to the top and never turns it on or off. When the Default is off in a workspace, the one used instead says **Used here**. Agents already running keep their connection: a change applies to new agents, and the banner about agents running on another connection offers to switch them when their turn is over.
 
 - **Hive no longer uses the sign-in of your own terminal** (`~/.claude`, `~/.codex`), which stays yours as it is. Upgrading, add a connection and sign it in once: until one is on in the workspace, its agents and the Assistant can't start, and the project, the Assistant panel and **Help → Agent Setup** each offer **Add a Connection** (or **Open Connections**). A notice says so once, until you add one or dismiss it.
 - **GitHub Copilot has no connections.** It signs in once for the whole PC (in Agent Setup), and its agents use that sign-in, as before; its model, effort and context stay in **Settings → GitHub Copilot**.
@@ -108,6 +107,16 @@ Each Claude Code or Codex agent, and the Assistant, runs on a **connection**: a 
 - **What's gone:** the default model, effort and context in **Settings → Claude Code** and **→ Codex**, and each project's model, effort and context in **Project Settings** for them. Permission mode and extra arguments stay where they were.
 - **A project's own model, effort and context move onto its agents** once, the first time it opens with connections: each agent without its own gets the project's, and an agent with its own keeps it. Nothing is lost.
 - **Settings a connection can't use** (an effort its model doesn't take) stay on the agent, aren't passed to the CLI, and are listed once at the top of Settings → Connections until you **Dismiss** them. Change them in the agent's Agent Settings.
+
+#### The order of connections <a id="connection-order"></a>
+
+Each CLI's connections have an **order**, the same in every workspace. New agents use the first one in the order that's on in the workspace, so turning connections on and off never means choosing a new default.
+
+- **Reorder** in **Settings → Connections** by dragging a connection by its handle, or press Alt+Up or Alt+Down on the handle.
+- **Default** marks the top of the order: a reminder of the one you prefer. **Make Default** moves a connection to the top. It never turns a connection on or off.
+- **Used here** marks the one new agents use in this workspace when the Default is off here.
+- **Agents already running keep their connection.** A change applies to new agents; the banner about agents running on another connection offers to switch them when their turn is over.
+- **Updating from an earlier version**, the default of the workspace you used most recently becomes the top of the order.
 
 ## Workspaces and projects <a id="workspaces-and-projects"></a>
 

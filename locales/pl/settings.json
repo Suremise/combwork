@@ -1067,7 +1067,7 @@
   "settings.resetToDefault": "Przywróć domyślne ({value})",
   "settings.saveFailed": "Nie udało się zapisać ustawienia",
   "settings.search": "Szukaj ustawień",
-  "settings.section.accounts.desc": "Jak Twoi agenci docierają do swoich modeli: logowanie do Claude Code, które przechowuje Hive, wykonane przez własne logowanie Claude Code, albo serwer, taki jak DeepSeek czy Ollama, osiągany przez swój bazowy URL i klucz. Każde ma własny folder, a wszystkie połączenia współdzielą Twoje rozmowy i pamięć Claude Code. Każdy agent i Asystent działa na własnym połączeniu albo na domyślnym połączeniu obszaru roboczego.",
+  "settings.section.accounts.desc": "Jak Twoi agenci docierają do swoich modeli: logowanie do Claude Code, które przechowuje Hive, wykonane przez własne logowanie Claude Code, albo serwer, taki jak DeepSeek czy Ollama, osiągany przez swój bazowy URL i klucz. Każde ma własny folder, a wszystkie połączenia współdzielą Twoje rozmowy i pamięć Claude Code. Każdy agent i Asystent działa na własnym połączeniu albo na pierwszym w Twojej kolejności, które jest włączone w tym obszarze roboczym.",
   "settings.section.accounts.label": "Połączenia",
   "settings.section.advanced.desc": "Funkcje deweloperskie, szczegóły, na których polega Hive, a które aktualizacja CLI może zepsuć (advanced.json), logi, dane i resetowanie Hive.",
   "settings.section.advanced.label": "Zaawansowane",

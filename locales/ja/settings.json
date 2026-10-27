@@ -1067,7 +1067,7 @@
   "settings.resetToDefault": "既定値に戻す（{value}）",
   "settings.saveFailed": "設定を保存できませんでした",
   "settings.search": "設定を検索",
-  "settings.section.accounts.desc": "エージェントがモデルに届く方法です。Hive が保持する Claude Code のサインイン（Claude Code 自身のサインインで行います）か、DeepSeek や Ollama のようなサーバー（ベース URL とキーで接続）です。それぞれに専用のフォルダーがあり、すべての接続が会話と Claude Code のメモリーを共有します。各エージェントとアシスタントは、自分の接続かワークスペースの既定の接続で動きます。",
+  "settings.section.accounts.desc": "エージェントがモデルに届く方法です。Hive が保持する Claude Code のサインイン（Claude Code 自身のサインインで行います）か、DeepSeek や Ollama のようなサーバー（ベース URL とキーで接続）です。それぞれに専用のフォルダーがあり、すべての接続が会話と Claude Code のメモリーを共有します。各エージェントとアシスタントは、自分の接続か、あなたの順序の中でこのワークスペースでオンになっている最初の接続で動きます。",
   "settings.section.accounts.label": "接続",
   "settings.section.advanced.desc": "開発者向け機能、CLIの更新で壊れることがあるHiveが頼りにしている詳細（advanced.json）、ログ、データ、Hiveのリセットです。",
   "settings.section.advanced.label": "詳細",

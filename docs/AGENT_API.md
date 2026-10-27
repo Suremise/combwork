@@ -263,7 +263,7 @@ Both list `defaults` too: each CLI's connection a `provider`-only call uses in t
 - **`provider` alone** keeps its meaning: no connection of its own, so the agent follows that CLI's default connection in the workspace, and is refused a start while none is on. Never the CLI's own home.
 - **Left out**, a PATCH keeps the saved connection; `null` or `""` clears it.
 
-**Status:** each agent of `GET /v1/projects/{name}` has `connection` (the one chosen: `{ id, name, problem? }`, where `problem` is `missing`, `otherCli` or `off` when it can't be used now, and `name` is null for a project agent when it isn't on in its workspace; `null`: the workspace's default), `launchedConnection` (the one its run is on: `{ id, name, note? }`, or null) and `switchPending` while it switches at its next safe point.
+**Status:** each agent of `GET /v1/projects/{name}` has `connection` (the one chosen: `{ id, name, problem? }`, where `problem` is `missing`, `otherCli` or `off` when it can't be used now, and `name` is null for a project agent when it isn't on in its workspace; `null`: the first of its CLI's connections in the order that's on in the workspace (HI-1875)), `launchedConnection` (the one its run is on: `{ id, name, note? }`, or null) and `switchPending` while it switches at its next safe point.
 
 ### Deliveries and the inbox
 
