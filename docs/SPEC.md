@@ -3906,7 +3906,8 @@ decided again in it):
   elsewhere: another open lease, a running lane it builds or reviews, a card in flight it builds or reviews, or a
   watch of its own; what can't be told (its watches not loaded yet, a read that fails) counts as work. Its run goes on,
   and the slot drains once it leaves the folder; with nothing else, it is stopped once its turn is over, its work asked
-  again just before. Kept for nothing: the agent keeps starting and resuming there until its next card or lane under
+  again just before. Work found is asked again at each of its idle moments after, while it still writes in the slot: once
+  it has none (the watch on its lane's last card ending a moment after the lane, HI-1784), it is stopped. Kept for nothing: the agent keeps starting and resuming there until its next card or lane under
   slots, which **takes the slot over** when it is clean and its head is in the target: in one write the carried lease
   ends (`handedOff`), the card's or lane's lease begins on the same slot and its conversations are rebound to it, so the
   conversation goes on there and resumes there after a restart. Otherwise the card gets another slot and the carried one
