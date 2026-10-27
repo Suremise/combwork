@@ -122,6 +122,8 @@ vi.mock('../src/main/sessions', async (orig) => {
   const stub = {
     liveFor: () => (state.live ? { ...state.live, status: 'ready' } : null),
     agentNow: () => (state.live ? { status: 'ready', pending: false, backgroundTasks: 0 } : null),
+    // No run writes in a slot here (HI-1762's takeover of the slot an agent's own run still writes in finds none).
+    runNow: () => null,
     hiveMcp: () => null,
     start: async (_p: string, o: { prompt?: string }) => {
       state.calls.push(o.prompt ? 'start with the card' : 'start')
