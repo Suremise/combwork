@@ -1176,7 +1176,7 @@ route('GET', '/v1/connections/:ref', async ({ params }) => {
   const c = r.ok ? all.find((x) => x.id === r.id) : undefined
   if (r.ok === false && r.why === 'ambiguous') throw new HttpError(409, `Several connections are named "${ref}": use its id (${r.ids!.join(', ')}).`)
   if (!c || (agentCaller() && !onHere.includes(c.id))) throw new HttpError(404, `No connection named "${ref}" is on in this workspace, and none has that id.`)
-  return connectionShown(c, ws, !agentCaller())
+  return connectionShown(c, ws, !agentCaller(), all)
 })
 
 /** A workflowRole argument (#1430): builder, reviewer or either. */

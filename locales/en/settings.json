@@ -37,7 +37,7 @@
   },
   "settings.accounts.default": {
     "defaultMessage": "Default",
-    "description": "The choice on a connection (Settings → Connections): the open workspace's default connection for its CLI."
+    "description": "Shown on the first connection in its coding agent CLI's order (Settings → Connections, HI-1875): a hint, Hive-wide. New agents use the first connection in the order that's on in the workspace."
   },
   "settings.accounts.defaults": {
     "defaultMessage": "Defaults for agents on it",
@@ -63,10 +63,6 @@
     "defaultMessage": "Model",
     "description": "Label of a connection's default model (Settings → Connections → Defaults for agents on it)."
   },
-  "settings.accounts.isDefault": {
-    "defaultMessage": "This workspace's default",
-    "description": "Shown on the connection that is the open workspace's default (Settings → Connections)."
-  },
   "settings.accounts.keep": {
     "defaultMessage": "Keep the New Login",
     "description": "Button on a connection whose login changed (Settings → Connections): takes on the login it is now signed in as."
@@ -84,8 +80,8 @@
     "description": "A warning on a connection (Settings → Connections) whose removal stopped partway. {what} is what's left, in English."
   },
   "settings.accounts.list.desc": {
-    "defaultMessage": "Add a connection (signed in, or a server), and choose which are on in this workspace and which is its default.",
-    "description": "What the list \"Connections\" does, under its title (Settings → Connections)."
+    "defaultMessage": "Add a connection (signed in, or a server) and choose which are on in this workspace. Drag to order each CLI's connections: new agents use the first one that's on here.",
+    "description": "What the list \"Connections\" does, under its title (Settings → Connections, HI-1875: each coding agent CLI has an order of its connections; the first one on in the workspace is used)."
   },
   "settings.accounts.list.tip": {
     "defaultMessage": "A sign-in connection is a folder of its own that Hive made, signed in with Claude Code's own sign-in in your browser: Hive never sees or keeps its login. Its conversations and memory are shared with your other connections through a link to Claude Code's projects folder. Its settings, trusted folders and MCP servers are its own. Removing a connection deletes its folder and its login on this PC, never your conversations.",
@@ -101,11 +97,19 @@
   },
   "settings.accounts.makeDefault": {
     "defaultMessage": "Make Default",
-    "description": "Button on a connection (Settings → Connections): makes it the open workspace's default connection for its CLI (turning it on)."
+    "description": "Button on a connection (Settings → Connections, HI-1875): moves it to the top of its coding agent CLI's order. It never turns a connection on or off."
   },
   "settings.accounts.moreProjects": {
     "defaultMessage": "{n, plural, one {# more} other {# more}}",
     "description": "The last item of that list when it names only the first projects: how many more there are."
+  },
+  "settings.accounts.move": {
+    "defaultMessage": "Drag to change the order of {name}, or press Alt+Up or Alt+Down",
+    "description": "The tooltip and label of a connection's drag handle (Settings → Connections, HI-1875): it moves the connection in its coding agent CLI's order. Alt+Up and Alt+Down name keys."
+  },
+  "settings.accounts.moveFailed": {
+    "defaultMessage": "Couldn't change the order",
+    "description": "An error's title: moving a connection in its coding agent CLI's order failed (Settings → Connections)."
   },
   "settings.accounts.name": {
     "defaultMessage": "Name",
@@ -278,6 +282,14 @@
   "settings.accounts.switchAffected": {
     "defaultMessage": "Switch Them When Their Turn Is Over",
     "description": "Button on that banner: each of those agents ends once its turn is over and carries on, on the connection chosen now."
+  },
+  "settings.accounts.usedHere": {
+    "defaultMessage": "Used here",
+    "description": "Shown on the connection new agents use in the open workspace when the Default (the top of the order) is off there (Settings → Connections, HI-1875): the first one in the order that's on."
+  },
+  "settings.accounts.usedHereTip": {
+    "defaultMessage": "New agents in this workspace use it: the Default is off here, and it's the first in the order that's on.",
+    "description": "The tooltip of \"Used here\" on a connection (Settings → Connections, HI-1875)."
   },
   "settings.advanced.claude-code.accounts.dropEnv.desc": {
     "defaultMessage": "The environment variables Hive leaves out when it runs Claude Code on a connection (its sign-in, its checks, Set Up and its agents), by name: a key, token, request header, server, provider switch or model set on this PC can't stand in for the connection's own. A server connection's own (its server, key and models) are set after. Wrong, a variable Claude Code reads as a login, a header or a server could make a connection run as someone else, or send a key elsewhere.",
@@ -4276,7 +4288,7 @@
     "description": "Placeholder of Settings' search box."
   },
   "settings.section.accounts.desc": {
-    "defaultMessage": "How your agents reach their models: a Claude Code sign-in Hive keeps, signed in through Claude Code's own sign-in, or a server such as DeepSeek or Ollama, reached by its base URL and key. Each has a folder of its own, and every connection shares your conversations and Claude Code's memory. Each agent and the Assistant runs on its own connection, or the workspace's default.",
+    "defaultMessage": "How your agents reach their models: a Claude Code sign-in Hive keeps, signed in through Claude Code's own sign-in, or a server such as DeepSeek or Ollama, reached by its base URL and key. Each has a folder of its own, and every connection shares your conversations and Claude Code's memory. Each agent and the Assistant runs on its own connection, or the first in your order that's on in this workspace.",
     "description": "Under the heading of the section \"Connections\" of Settings: what it holds."
   },
   "settings.section.accounts.label": {

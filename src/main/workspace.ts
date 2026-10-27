@@ -550,7 +550,7 @@ export class WorkspaceService {
     await whenAll([join(h, 'shared', 'handovers'), join(h, 'skills'), join(h, 'mcp'), join(h, 'tasks')].map((d) => mkdir(d, { recursive: true })))
     const hr = join(h, 'shared', 'handovers', 'README.md')
     await whenAll([
-      existsSync(join(h, 'workspace.json')) ? undefined : writeKeptJson(join(h, 'workspace.json'), newWorkspaceConfig()),
+      existsSync(join(h, 'workspace.json')) ? undefined : newWorkspaceConfig().then((c) => writeKeptJson(join(h, 'workspace.json'), c)),
       existsSync(join(h, 'README.md')) ? undefined : writeFile(join(h, 'README.md'), WORKSPACE_README),
       // The board's database and what its move from files left (#1017) are this machine's: kept out of git if the workspace is a repository.
       existsSync(join(h, '.gitignore')) ? addUsageIgnore(join(h, '.gitignore')) : writeFile(join(h, '.gitignore'), BOARD_GITIGNORE),
@@ -1619,13 +1619,16 @@ export async function disposeWorkspaceService(w: WorkspaceService): Promise<void
   services.delete(w)
 }
 
-/** What a new workspace's workspace.json gets beyond the defaults (HI-980: its accounts, from accounts.ts). */
-let newWorkspaceExtras: () => Partial<WorkspaceConfig> = () => ({})
-export function setNewWorkspaceExtras(fn: () => Partial<WorkspaceConfig>): void {
+/**
+ * What a new workspace's workspace.json gets beyond the defaults (HI-980: its accounts, from accounts.ts), once ready
+ * (HI-1875: after the connections' one-time order move, so it is never seeded from the order before it).
+ */
+let newWorkspaceExtras: () => Promise<Partial<WorkspaceConfig>> = async () => ({})
+export function setNewWorkspaceExtras(fn: () => Promise<Partial<WorkspaceConfig>>): void {
   newWorkspaceExtras = fn
 }
 /** A new workspace's settings: the defaults and those extras (only when it is made, never when one is opened). */
-const newWorkspaceConfig = (): WorkspaceConfig => ({ ...structuredClone(DEFAULT_WORKSPACE_CONFIG), ...newWorkspaceExtras() })
+const newWorkspaceConfig = async (): Promise<WorkspaceConfig> => ({ ...structuredClone(DEFAULT_WORKSPACE_CONFIG), ...(await newWorkspaceExtras()) })
 
 /** Runs fn with `workspace` standing for w. */
 export function inWorkspace<T>(w: WorkspaceService, fn: () => T): T {

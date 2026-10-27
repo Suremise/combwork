@@ -624,10 +624,15 @@ export interface AppConfig {
   connectionPlanUsage?: Record<string, ConnectionPlanUsage>
   /** Highest warning shown per "provider:limit", and for which reset period. */
   planWarnings: Record<string, { resetsAt: string | null; level: number }>
-  /** The CLI accounts Hive keeps (HI-980: Settings → Accounts), each a folder of its own, in the order Settings lists them. */
+  /**
+   * The CLI accounts Hive keeps (HI-980: Settings → Accounts), each a folder of its own. Their order, within each CLI,
+   * is its preference order (HI-1875): new launches use the first that's on in the workspace; the first wears Default.
+   */
   connections?: Connection[]
-  /** Per provider: the account last chosen as a workspace's default (or launched on), which a new workspace starts with. */
+  /** Per provider: the account last chosen as a workspace's default (or launched on). Since HI-1875 only its migration's. */
   lastUsedConnection?: Partial<Record<ProviderId, string>>
+  /** HI-1875's one-time move (the most recently used default to the top of each CLI's order) is done. */
+  connectionOrderMigrated?: true
   /**
    * The CLIs whose old per-CLI model, effort and context (Settings → <CLI> before connections) were given to a
    * connection (HI-1774): to its first, or to those from before connections had defaults; only once, never again.

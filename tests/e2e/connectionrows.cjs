@@ -60,10 +60,10 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const max2 = await connect('Max 2', 'two@example.com')
     await inv('agents:update', alpha, 'a-two', { connection: max2.id })
 
-    // --- One runs on the default (Max 1); then the default becomes Max 2: it keeps Max 1 until it restarts, marked ⟳.
+    // --- One runs on the default (Max 1); then Max 2 is made Default (the top of the order, HI-1875): it keeps Max 1 until it restarts, marked ⟳.
     await inv('session:start', alpha, { agentId: 'a-one' })
     check('One runs on the default, Max 1', !!(await lib.until(async () => (await live('a-one'))?.launchedConnection?.id === max1.id, HUNG_MS)))
-    await inv('connections:setDefault', max2.id)
+    await inv('connections:move', max2.id, 0)
     await page.locator('.project-row', { hasText: 'alpha' }).first().click()
     await lib.openProjectSettings(page)
     // The list of agents is Project Settings → Agents' (HI-1765: it opens on General).
@@ -91,7 +91,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await lib.until(async () => !(await live('a-one')), HUNG_MS)
 
     // --- A template: Two's connection named beside its id. Max 2 removed, then the template loaded into alpha again.
-    await inv('connections:setDefault', max1.id)
+    await inv('connections:move', max1.id, 0)
     await inv('templates:save', alpha, 'workspace', 'Rows', false)
     const saved = JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'templates', 'rows.json'), 'utf8'))
     check("the template keeps Two's connection by id, its name beside it for display", saved.agents.find((a) => a.name === 'Two')?.connection === max2.id && saved.agents.find((a) => a.name === 'Two')?.connectionName === 'Max 2', JSON.stringify(saved.agents))

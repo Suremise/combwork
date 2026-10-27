@@ -17,7 +17,6 @@ interface HiveMessageValues {
   'settings.accounts.defaults.effort': undefined
   'settings.accounts.defaults.failed': undefined
   'settings.accounts.defaults.model': undefined
-  'settings.accounts.isDefault': undefined
   'settings.accounts.keep': undefined
   'settings.accounts.keepFailed': undefined
   'settings.accounts.keepRename': { name: string | number }
@@ -28,6 +27,8 @@ interface HiveMessageValues {
   'settings.accounts.loading': undefined
   'settings.accounts.makeDefault': undefined
   'settings.accounts.moreProjects': { n: number }
+  'settings.accounts.move': { name: string | number }
+  'settings.accounts.moveFailed': undefined
   'settings.accounts.name': undefined
   'settings.accounts.needName': undefined
   'settings.accounts.noWorkspace': undefined
@@ -71,6 +72,8 @@ interface HiveMessageValues {
   'settings.accounts.state.signedOut': undefined
   'settings.accounts.state.unchecked': undefined
   'settings.accounts.switchAffected': undefined
+  'settings.accounts.usedHere': undefined
+  'settings.accounts.usedHereTip': undefined
   'settings.advanced.claude-code.accounts.dropEnv.desc': undefined
   'settings.advanced.claude-code.accounts.dropEnv.title': undefined
   'settings.advanced.claude-code.accounts.emailField.desc': undefined

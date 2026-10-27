@@ -3,9 +3,11 @@ import { join, resolve } from 'path'
 import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
 import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
-import type { AppConfig, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, ProviderId, ServerConnection, ServerModel, WorkspaceConfig } from '../shared/types'
+import type { AppConfig, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, ProviderId, ServerConnection, ServerModel, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
+import { HIVE_DIR } from '../shared/defaults'
+import { readKeptJson } from './fsutil'
 import { cliDefaults } from '../shared/connectionDefaults'
-import { acceptable, accountState, resolveConnection, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
+import { acceptable, accountState, movedConnection, resolveConnection, topOfOrder, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { profileFolder } from '../shared/appName'
 import { isProviderEnabled, providerDescriptor, PROVIDERS } from '../shared/providers'
 import { msg, type Msg } from '../shared/i18n'
@@ -209,7 +211,7 @@ const generation = (id: string): number => generations.get(id) ?? 0
 // ---------------------------------------------------------------------------
 
 /** For tests: run before each delete of a removal (with the folder it is in), to change the folder meanwhile. */
-export const accountTestHooks: { beforeDelete?: (dir: string) => Promise<void> } = {}
+export const accountTestHooks: { beforeDelete?: (dir: string) => Promise<void>; beforeOrderRead?: () => Promise<void> } = {}
 
 /** Why a folder can't be used or removed safely, in English (the log and `leftover`), with the text for the user. */
 class Unsafe extends Error {}
@@ -1257,15 +1259,50 @@ export async function setAccountOn(id: string, on: boolean): Promise<void> {
   if (chosen) noteLastUsed(a.provider, chosen)
 }
 
-/** Makes an account the asking window's workspace's default for its provider (turning it on if it isn't). */
-export async function setAccountDefault(id: string): Promise<void> {
-  const a = mustGet(id)
-  await saveChoice((c) => {
-    const cur = workspaceAccounts(c, a.provider, list())
-    const on = switchedOn(cur, id, true, list())
-    return { ...c.connections, [a.provider]: { on: on.on, default: id } }
+/**
+ * Moves a connection to `index` in its CLI's preference order (HI-1875: Hive-wide; 0, the top: Make Default). It never
+ * turns one on or off: which is used in a workspace is the first in the order that's on there, for new launches only.
+ */
+export function moveConnection(id: string, index: number): void {
+  mustGet(id)
+  const before = list().map((a) => a.id).join()
+  config.update((c) => void (c.connections = movedConnection(c.connections ?? [], id, Math.trunc(index))))
+  if (list().map((a) => a.id).join() === before) return
+  emit({ type: 'connections-changed' })
+  // Running agents keep their connection; each open workspace is read again, so one now on another connection than
+  // the order picks shows the restart banner's offer to switch it at its next safe point (HI-1755).
+  for (const w of openWorkspaces()) void w.refresh().catch(() => undefined)
+}
+
+/**
+ * HI-1875's one-time move, quietly, at start: each CLI's most recently used workspace default goes to the top of its
+ * order, the rest in the list's order. That default is the one recorded in the workspace.json of the most recently
+ * opened workspace (`recentWorkspaces`, newest first) that has one for that CLI, read only; never
+ * `lastUsedConnection`, which a launch on an agent's own connection writes too (HR3, HI-1875's design). None recorded:
+ * the list's order stays. A default left in a workspace.json is ignored from then on (the first on in the order is
+ * used). Reordered meanwhile by the user: their order stands.
+ */
+export async function migrateConnectionOrder(): Promise<void> {
+  if (config.get().connectionOrderMigrated) return
+  await accountTestHooks.beforeOrderRead?.()
+  const before = list().map((a) => a.id).join()
+  const tops = new Map<ProviderId, string>()
+  for (const ws of config.get().recentWorkspaces) {
+    const cfg = await readKeptJson<Partial<WorkspaceConfig>>(join(ws, HIVE_DIR, 'workspace.json'), {})
+    for (const [p, w] of Object.entries(cfg.connections ?? {}) as [ProviderId, WorkspaceConnections | undefined][]) {
+      const id = w?.default
+      if (id && !tops.has(p) && getAccount(id)?.provider === p) tops.set(p, id)
+    }
+  }
+  config.update((c) => {
+    if (c.connectionOrderMigrated) return
+    if ((c.connections ?? []).map((a) => a.id).join() === before) for (const id of tops.values()) c.connections = movedConnection(c.connections ?? [], id, 0)
+    c.connectionOrderMigrated = true
   })
-  noteLastUsed(a.provider, id)
+  if (tops.size) {
+    log.info(`connections: preference order begins with each CLI's most recent workspace default (HI-1875): ${[...tops].map(([p, id]) => `${p} ${id}`).join(', ')}`)
+    emit({ type: 'connections-changed' })
+  }
 }
 
 /** The Assistant's own connection for a provider in the asking window's workspace (HI-1755); null: the default. */
@@ -1285,12 +1322,15 @@ export function noteLastUsed(id: ProviderId, accountId: string): void {
 }
 
 /**
- * A new workspace's accounts (only when it is made: opening one never turns an account on): the last used of each
- * provider, on and its default. Undefined with none.
+ * A new workspace's accounts (only when it is made: opening one never turns an account on): the top of each CLI's
+ * preference order, on (HI-1875: the Default). Undefined with none.
  */
 export function newWorkspaceAccounts(): WorkspaceConfig['connections'] | undefined {
   const out: NonNullable<WorkspaceConfig['connections']> = {}
-  for (const [p, id] of Object.entries(config.get().lastUsedConnection ?? {}) as [ProviderId, string][]) if (id && getAccount(id)?.provider === p) out[p] = { on: [id], default: id }
+  for (const p of PROVIDERS) {
+    const top = topOfOrder(p.id, list())
+    if (top) out[p.id] = { on: [top], default: top }
+  }
   return Object.keys(out).length ? out : undefined
 }
 
@@ -1415,6 +1455,8 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
   const caps = providerDescriptor(o.provider).capabilities.connections
   // A CLI without connections (Copilot: its own machine-wide login, HI-1758) launches as it always has.
   if (!caps) return null
+  // Never on the order from before its one-time move (HI-1875 round 1): agents and the Assistant alike come here.
+  await connectionOrderReady()
   const cli = providerDescriptor(o.provider).name
   const choose = (wanted: string | null | undefined): ReturnType<typeof resolveConnection> => resolveConnection(o.workspaceConfig, o.provider, wanted, list())
   const choice = choose(o.wanted)
@@ -1565,10 +1607,27 @@ export function connectionOnHere(id: string, cli: ProviderId, projectPath: strin
  * Connections' part of Hive's start (index.ts; nothing runs as this module loads, which other modules import): a new
  * workspace starts with the last-used connections, and the watches follow the open workspaces and their choices.
  */
-export function initConnections(): void {
+/** The connections' one-time order move under way or done (HI-1875 round 1): what depends on the order waits for it. */
+let orderReady: Promise<void> = Promise.resolve()
+
+/** Starts the one-time order move (once, at Hive's start); its failure is logged, the order then as it was. */
+export function startConnectionOrder(): Promise<void> {
+  orderReady = migrateConnectionOrder().catch((e) => log.warn("connections: the preference order's one-time move failed", e))
+  return orderReady
+}
+
+/** Resolves once the connections' order is final: before it, a launch or a new workspace would use the old one. */
+export const connectionOrderReady = (): Promise<void> => orderReady
+
+/** Returns once the order is final (index.ts waits for it before workspaces open and the Agent API starts). */
+export function initConnections(): Promise<void> {
   // Connections from before the old per-CLI defaults' record (a preview's) count as having taken them, at once.
   seedConnectionDefaults()
-  setNewWorkspaceExtras(() => {
+  // The most recent workspace default becomes the top of its CLI's preference order, once (HI-1875); what depends on
+  // the order (a launch on a connection, a new workspace's seeding) waits for it.
+  const ready = startConnectionOrder()
+  setNewWorkspaceExtras(async () => {
+    await connectionOrderReady()
     const connections = newWorkspaceAccounts()
     return connections ? { connections } : {}
   })
@@ -1587,4 +1646,5 @@ export function initConnections(): void {
     shown = now
     emit({ type: 'connections-changed' })
   })
+  return ready
 }

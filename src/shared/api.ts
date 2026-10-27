@@ -966,7 +966,8 @@ export interface HiveRequests {
   /** Turns an account on or off in this window's workspace. */
   'connections:setOn': (id: string, on: boolean) => void
   /** Makes an account this window's workspace's default for its CLI. */
-  'connections:setDefault': (id: string) => void
+  /** Moves a connection to `index` in its CLI's preference order (HI-1875; 0: the top, Make Default); never on or off. */
+  'connections:move': (id: string, index: number) => void
   /** The Assistant's own connection for a CLI in this window's workspace (HI-1755); null: the workspace's default. */
   'connections:setAssistant': (provider: ProviderId, id: string | null) => void
   /** A connection's defaults for the agents on it (HI-1770): model, effort and context; '' or null leaves one to the CLI. */

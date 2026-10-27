@@ -199,6 +199,10 @@ const check = (name, ok, extra = '') => {
     // Its Set Up opens in the new project's folder, where its trust is answered (the fake records it): set up again.
     await row('Personal').locator('[data-set-up]').click()
     check('…its Set Up opens in the new project’s folder', !!(await lib.until(async () => /gamma's folder/.test(await page.locator('.account-signin [data-set-up-in]').innerText().catch(() => '')), HUNG_MS)))
+    // Its trust answered there (the fake records it as it starts) before the terminal is closed: closed sooner, it would
+    // rightly still need set up.
+    const gammaKey = fs.realpathSync.native(path.join(ws1, 'gamma')).replace(/\\/g, '/')
+    await lib.until(async () => JSON.parse(fs.readFileSync(path.join(folder, '.claude.json'), 'utf8')).projects?.[gammaKey]?.hasTrustDialogAccepted === true, HUNG_MS)
     await closeRunning(true)
     check('…and, trusted there, it is set up again', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
     // A project it already trusts, added while the read is held (round 3): Checking…, then, released, the row clears to
@@ -247,6 +251,42 @@ const check = (name, ok, extra = '') => {
     check('two accounts on one login are both flagged', !!(await lib.until(async () => (await page.locator('[data-warning="duplicate"]').count()) === 2, HUNG_MS)))
     await shots('duplicate')
 
+    // --- The preference order (HI-1875): the top wears Default (a hint, Hive-wide); Make Default moves one to the top
+    // and never turns it on; drag or Alt+Up/Down reorders; when the Default is off here, the first on wears Used here.
+    const claudeOrder = async () => (await list()).connections.filter((c) => c.provider === 'claude-code').map((c) => c.id)
+    const onHere = async () => (await list()).workspace['claude-code']?.on ?? []
+    check('the top of the order wears Default, with no Make Default; the next has Make Default', (await row('Two').locator('[data-default-hint]').count()) === 1 && (await row('Two').locator('[data-make-default]').count()) === 0 && (await row('Work').locator('[data-make-default]').count()) === 1)
+    const onBefore = JSON.stringify(await onHere())
+    await row('Work').locator('[data-make-default]').click()
+    check('Make Default moves Work to the top, wearing Default', !!(await lib.until(async () => JSON.stringify(await claudeOrder()) === JSON.stringify([work.id, personal.id]) && (await row('Work').locator('[data-default-hint]').count()) === 1, HUNG_MS)))
+    check('…turning nothing on or off', JSON.stringify(await onHere()) === onBefore && !(await onHere()).includes(work.id))
+    check('…the Default off here, the first on wears Used here', !!(await lib.until(async () => (await row('Two').locator('[data-used-here]').count()) === 1, HUNG_MS)) && (await list()).workspace['claude-code']?.default === personal.id)
+    // Every row keeps its switch and buttons in the same place, its bottom line, on or off (Darren, 27 Oct ~22:30).
+    const actionsAt = async (name) => {
+      const r = await row(name).boundingBox()
+      const a = await row(name).locator('.account-actions').boundingBox()
+      const n = await row(name).locator('.account-name').boundingBox()
+      return r && a && n ? { left: Math.round(a.x - r.x), belowName: a.y >= n.y + n.height, bottomGap: Math.round(r.y + r.height - (a.y + a.height)) } : null
+    }
+    // In a wide window, where they would fit beside the name (rc.9 put a short row's there).
+    await page.setViewportSize({ width: 2200, height: 950 })
+    await lib.until(async () => ((await row('Work').boundingBox())?.width ?? 0) > 1400, HUNG_MS)
+    const offRow = await actionsAt('Work')
+    const onRow = await actionsAt('Two')
+    await page.setViewportSize({ width: 1400, height: 950 })
+    check('an off row and an on row put their switch and buttons in the same place: the bottom line, below the name', !!offRow && !!onRow && offRow.belowName && onRow.belowName && offRow.left === onRow.left && offRow.bottomGap === onRow.bottomGap, JSON.stringify({ offRow, onRow }))
+    await shots('order')
+    // Dragged back to the top by its handle.
+    await row('Two').locator('[data-move-handle]').dragTo(row('Work'))
+    check('dragging a row onto another moves it there in its CLI’s order', !!(await lib.until(async () => JSON.stringify(await claudeOrder()) === JSON.stringify([personal.id, work.id]), HUNG_MS)) && (await row('Two').locator('[data-used-here]').count()) === 0)
+    // From the keyboard: Alt+Down on its handle, then Alt+Up.
+    await row('Two').locator('[data-move-handle]').focus()
+    await page.keyboard.press('Alt+ArrowDown')
+    check('Alt+Down on the handle moves it down', !!(await lib.until(async () => JSON.stringify(await claudeOrder()) === JSON.stringify([work.id, personal.id]), HUNG_MS)))
+    await row('Two').locator('[data-move-handle]').focus()
+    await page.keyboard.press('Alt+ArrowUp')
+    check('…Alt+Up back to the top', !!(await lib.until(async () => JSON.stringify(await claudeOrder()) === JSON.stringify([personal.id, work.id]), HUNG_MS)))
+
     // --- A second window: its workspace keeps its own choice.
     const next = app.waitForEvent('window')
     await inv('window:new')
@@ -255,7 +295,7 @@ const check = (name, ok, extra = '') => {
     await lib.appReady(p2)
     await lib.openWorkspace(invOn(p2), p2, ws2)
     // A new workspace starts with the last account chosen as a default (Darren, 26 Oct): Personal.
-    check('a new workspace starts with the last-used account on, as its default', JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [personal.id], default: personal.id } }), JSON.stringify(wsJson(ws2)))
+    check('a new workspace starts with the top of the order on (HI-1875), the one used there', JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [personal.id], default: personal.id } }), JSON.stringify(wsJson(ws2)))
     // One connection, two workspaces (HI-1870): set up for the first one's folders, not yet for this one's.
     const alpha2 = fs.realpathSync.native(path.join(ws2, 'alpha'))
     check('one connection in two workspaces: each window says its own (here alpha untrusted, set up in the first)', !!(await lib.until(async () => JSON.stringify((await trustOf(invOn(p2), personal.id))?.pending) === JSON.stringify([{ project: 'alpha', folder: alpha2 }]), HUNG_MS)) && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }), JSON.stringify([await trustOf(invOn(p2), personal.id), await trustOf(inv, personal.id), alpha2]))
@@ -318,6 +358,36 @@ const check = (name, ok, extra = '') => {
     check('the suite ran to its end', false, e.stack)
   } finally {
     await app.close().catch(() => undefined)
+  }
+
+  // --- The preference order's one-time move (HI-1875), on a profile from before it: two workspaces with different
+  // defaults, the most recently opened's (Max 2) goes to the top; an agent pinned to Max 3 launched last
+  // (lastUsedConnection) is never taken for a default. Read once at start; nothing else changed.
+  const migProfile = path.join(lib.WORK, 'accounts-migrate-profile')
+  const migNew = path.join(lib.WORK, 'accounts-migrate-new')
+  const migOld = path.join(lib.WORK, 'accounts-migrate-old')
+  for (const d of [migProfile, migNew, migOld]) fs.rmSync(d, { recursive: true, force: true })
+  const migEnv = lib.fakeClaude(migProfile, home, [])
+  const migCfgFile = path.join(migProfile, 'config.json')
+  const migCfg = JSON.parse(fs.readFileSync(migCfgFile, 'utf8'))
+  const conn = (id, name) => ({ id, provider: 'claude-code', kind: 'signIn', name, createdAt: '2026-10-27T00:00:00.000Z', defaults: {} })
+  migCfg.connections = [conn('a-max1', 'Max 1'), conn('a-max2', 'Max 2'), conn('a-max3', 'Max 3')]
+  migCfg.lastUsedConnection = { 'claude-code': 'a-max3' }
+  migCfg.recentWorkspaces = [migNew, migOld]
+  fs.writeFileSync(migCfgFile, JSON.stringify(migCfg, null, 2))
+  for (const [w, def] of [[migNew, 'a-max2'], [migOld, 'a-max1']]) {
+    fs.mkdirSync(path.join(w, '.hive'), { recursive: true })
+    fs.writeFileSync(path.join(w, '.hive', 'workspace.json'), JSON.stringify({ version: 1, connections: { 'claude-code': { on: ['a-max1', 'a-max2'], default: def } } }))
+  }
+  const mig = await lib.launch({ userData: migProfile, env: migEnv, viewport: { width: 1200, height: 800 } })
+  try {
+    const order = () => (JSON.parse(fs.readFileSync(migCfgFile, 'utf8')).connections ?? []).map((c) => c.id).join(',')
+    check('migration: the most recent workspace default (Max 2) is the top of the order, the rest in their order', !!(await lib.until(async () => order() === 'a-max2,a-max1,a-max3', HUNG_MS)), order())
+    check('…never the last launch on an agent’s own connection (Max 3), and done once', JSON.parse(fs.readFileSync(migCfgFile, 'utf8')).connectionOrderMigrated === true)
+  } catch (e) {
+    check('the migration part ran to its end', false, e.stack)
+  } finally {
+    await mig.app.close().catch(() => undefined)
   }
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)

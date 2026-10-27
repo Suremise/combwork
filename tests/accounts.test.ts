@@ -6,7 +6,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSyn
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { accountState, connectionReadiness, duplicateLogins, switchedOn, workspaceAccounts } from '../src/shared/accounts'
+import { accountState, connectionReadiness, duplicateLogins, movedConnection, switchedOn, topOfOrder, workspaceAccounts } from '../src/shared/accounts'
 import type { Connection } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
@@ -728,15 +728,86 @@ describe("a workspace's accounts", () => {
     expect(workspaceAccounts({ connections: { 'claude-code': { on: ['gone', 'a2', 'x1'], default: 'gone' } } }, 'claude-code', all)).toEqual({ on: ['a2'], default: 'a2' })
   })
 
-  it('the first one on becomes the default; the default off is replaced by the first on in list order, never another provider’s', () => {
+  it('the one used is the first in the preference order that’s on (HI-1875): a stored default is ignored, never another provider’s', () => {
     let w = switchedOn(undefined, 'a3', true, all)
     expect(w).toEqual({ on: ['a3'], default: 'a3' })
+    // On above it in the order: it is the one used now (no "default" stays put).
     w = switchedOn(w, 'a1', true, all)
-    expect(w).toEqual({ on: ['a1', 'a3'], default: 'a3' })
-    w = switchedOn(w, 'a3', false, all)
-    expect(w).toEqual({ on: ['a1'], default: 'a1' })
+    expect(w).toEqual({ on: ['a1', 'a3'], default: 'a1' })
+    // The top off: the next on; back on: the top again.
     w = switchedOn(w, 'a1', false, all)
+    expect(w).toEqual({ on: ['a3'], default: 'a3' })
+    w = switchedOn(w, 'a1', true, all)
+    expect(w).toEqual({ on: ['a1', 'a3'], default: 'a1' })
+    w = switchedOn(switchedOn(w, 'a1', false, all), 'a3', false, all)
     expect(w).toEqual({ on: [], default: null })
+    // A default left in workspace.json from before is ignored.
+    expect(workspaceAccounts({ connections: { 'claude-code': { on: ['a3', 'a2'], default: 'a3' } } }, 'claude-code', all)).toEqual({ on: ['a2', 'a3'], default: 'a2' })
+    expect(topOfOrder('claude-code', all)).toBe('a1')
+    expect(topOfOrder('codex', all)).toBe('x1')
+  })
+
+  it("migrates once: each CLI's most recent workspace default (as recorded there) goes to the top of its order, never an agent's own launch (HI-1875)", async () => {
+    const one = await accounts.addAccount('claude-code', 'Anthropic-1')
+    const two = await accounts.addAccount('claude-code', 'Anthropic-2')
+    const three = await accounts.addAccount('claude-code', 'Anthropic-3')
+    // Two workspaces with different defaults; the newer one (opened last) had Anthropic-2. An agent pinned to
+    // Anthropic-3 launched last of all, so lastUsedConnection says Anthropic-3: never taken for a default.
+    const newer = join(base, 'mig-newer')
+    const older = join(base, 'mig-older')
+    const none = join(base, 'mig-none')
+    const wsJson = (dir: string, connections: unknown): void => {
+      mkdirSync(join(dir, '.hive'), { recursive: true })
+      writeFileSync(join(dir, '.hive', 'workspace.json'), JSON.stringify({ version: 1, connections }))
+    }
+    wsJson(newer, { 'claude-code': { on: [one.id, two.id], default: two.id } })
+    wsJson(older, { 'claude-code': { on: [one.id], default: one.id } })
+    wsJson(none, {})
+    const recent = config.get().recentWorkspaces
+    config.update((c) => {
+      c.recentWorkspaces = [none, newer, older]
+      c.lastUsedConnection = { 'claude-code': three.id }
+      delete c.connectionOrderMigrated
+    })
+    try {
+      await accounts.migrateConnectionOrder()
+      const ids = () => (config.get().connections ?? []).filter((a) => a.provider === 'claude-code').map((a) => a.id)
+      expect(ids()).toEqual([two.id, one.id, three.id])
+      expect(config.get().connectionOrderMigrated).toBe(true)
+      // A new workspace starts with the top of the order on.
+      expect(accounts.newWorkspaceAccounts()?.['claude-code']).toEqual({ on: [two.id], default: two.id })
+      // Once only: reordered since, it stays as the user ordered it.
+      accounts.moveConnection(three.id, 0)
+      await accounts.migrateConnectionOrder()
+      expect(ids()).toEqual([three.id, two.id, one.id])
+      // No default recorded anywhere: the list's order stays (the last launch is never taken for one).
+      config.update((c) => {
+        c.recentWorkspaces = [none]
+        c.lastUsedConnection = { 'claude-code': one.id }
+        delete c.connectionOrderMigrated
+      })
+      await accounts.migrateConnectionOrder()
+      expect(ids()).toEqual([three.id, two.id, one.id])
+    } finally {
+      config.update((c) => void (c.recentWorkspaces = recent))
+    }
+  })
+
+  it('moving one reorders its own CLI only; the order decides which is used, on or off untouched (HI-1875)', () => {
+    const mixed = [acct('a1'), acct('x1', 'codex'), acct('a2'), acct('x2', 'codex'), acct('a3')]
+    const ids = (l: Connection[]) => l.map((a) => a.id)
+    // To the top (Make Default): the other CLI's slots keep theirs.
+    expect(ids(movedConnection(mixed, 'a3', 0))).toEqual(['a3', 'x1', 'a1', 'x2', 'a2'])
+    expect(ids(movedConnection(mixed, 'a1', 1))).toEqual(['a2', 'x1', 'a1', 'x2', 'a3'])
+    expect(ids(movedConnection(mixed, 'a1', 99))).toEqual(['a2', 'x1', 'a3', 'x2', 'a1'])
+    expect(ids(movedConnection(mixed, 'x2', 0))).toEqual(['a1', 'x2', 'a2', 'x1', 'a3'])
+    expect(ids(movedConnection(mixed, 'gone', 0))).toEqual(ids(mixed))
+    // a2 on and a3 on: a2 is used; a3 made the default (moved to the top): a3 is used, and nothing was turned on or off.
+    const cfg = { connections: { 'claude-code': { on: ['a2', 'a3'], default: null } } }
+    expect(workspaceAccounts(cfg, 'claude-code', mixed)?.default).toBe('a2')
+    expect(workspaceAccounts(cfg, 'claude-code', movedConnection(mixed, 'a3', 0))).toEqual({ on: ['a3', 'a2'], default: 'a3' })
+    // The top made default while off here: still off; the first on is used.
+    expect(workspaceAccounts(cfg, 'claude-code', movedConnection(mixed, 'a1', 0))).toEqual({ on: ['a2', 'a3'], default: 'a2' })
   })
 
   describe('in an open workspace', () => {

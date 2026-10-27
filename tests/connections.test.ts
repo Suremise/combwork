@@ -34,7 +34,7 @@ const { config } = await import('../src/main/config')
 const { advanced } = await import('../src/main/advanced')
 const { provider } = await import('../src/main/providers')
 const { providerService } = await import('../src/main/providerService')
-const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
+const { createWorkspaceService, disposeWorkspaceService, inWorkspace, setNewWorkspaceExtras } = await import('../src/main/workspace')
 const { runSwitch } = await import('../src/main/connectionSwitch')
 const { authScope, sessions } = await import('../src/main/sessions')
 const moves = await import('../src/main/connectionMoves')
@@ -167,7 +167,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     const c = (await launch())!
     expect(c).toMatchObject({ id: a.id, name: 'Personal', folder: accounts.accountFolder(a.id), homeEnv: 'CLAUDE_CONFIG_DIR' })
     expect(c.note).toBeUndefined()
-    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/in use/)
+    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/has agents running on it/)
     c.release()
     c.release()
     await accounts.removeAccount(a.id)
@@ -220,13 +220,58 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     c2.release()
   })
 
+  it("waits for the order's one-time move at start (HI-1875 round 1): no launch and no new workspace on the order from before it", async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const b = await signedInConnection('Work', 'work@example.com')
+    // The most recently opened workspace's recorded default was Work, though Personal is first in the list.
+    const recent = join(base, 'order-recent')
+    mkdirSync(join(recent, '.hive'), { recursive: true })
+    writeFileSync(join(recent, '.hive', 'workspace.json'), JSON.stringify({ version: 1, connections: { 'claude-code': { on: [a.id, b.id], default: b.id } } }))
+    const was = config.get().recentWorkspaces
+    config.update((c) => {
+      c.recentWorkspaces = [recent]
+      delete c.connectionOrderMigrated
+    })
+    // The move held while it reads the recent workspaces, as a slow disk would.
+    let release: () => void = () => undefined
+    let reached = false
+    accounts.accountTestHooks.beforeOrderRead = () => new Promise<void>((r) => ((reached = true), (release = r)))
+    const fresh = join(base, 'order-new-ws')
+    let w2: ReturnType<typeof createWorkspaceService> | null = null
+    try {
+      const ready = accounts.initConnections()
+      await vi.waitFor(() => expect(reached).toBe(true), { timeout: HUNG_MS })
+      // Asked for while held: a launch with no connection of its own, and a new workspace's seeding.
+      const launched = launch()
+      mkdirSync(fresh, { recursive: true })
+      w2 = createWorkspaceService()
+      const opened = w2.open(fresh)
+      release()
+      await ready
+      // Not the old first in the list (Personal): the moved top, Work.
+      const c = (await launched)!
+      expect(c.id).toBe(b.id)
+      c.release()
+      await opened
+      expect(JSON.parse(readFileSync(join(fresh, '.hive', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [b.id], default: b.id } })
+      expect((config.get().connections ?? []).map((x) => x.id)).toEqual([b.id, a.id])
+    } finally {
+      accounts.accountTestHooks.beforeOrderRead = undefined
+      release()
+      if (w2) await disposeWorkspaceService(w2)
+      config.update((c) => void (c.recentWorkspaces = was))
+      // initConnections set new workspaces' seeding (the top of the order on): the later tests' new workspaces start bare.
+      setNewWorkspaceExtras(async () => ({}))
+    }
+  })
+
   it('stillValid: false once another connection is chosen meanwhile, or it is removed', async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     const b = await signedInConnection('Work', 'work@example.com')
     const c = (await launch())!
     expect(c.id).toBe(a.id)
     expect(c.stillValid(undefined)).toBe(true)
-    await here(() => accounts.setAccountDefault(b.id))
+    accounts.moveConnection(b.id, 0)
     expect(c.stillValid(undefined)).toBe(false)
     expect(c.stillValid(a.id)).toBe(true)
     // The launch was given the workspace's config as it was: a fresh resolve now picks Work.
@@ -709,7 +754,7 @@ describe('templates’ connections (HI-1769)', () => {
     expect((await byName('T2'))?.connection).toBeUndefined()
     expect((await byName('T3'))?.connection).toBeUndefined()
     expect(await resolved('T2')).toEqual({ ok: true, id: a.id })
-    await here(() => accounts.setAccountDefault(b.id))
+    accounts.moveConnection(b.id, 0)
     expect(await resolved('T2')).toEqual({ ok: true, id: b.id })
     expect(await resolved('T1')).toEqual({ ok: true, id: a.id })
     // Loaded again with Personal chosen for T2 itself: pinned, it stays on Personal whatever the default.
@@ -1038,9 +1083,11 @@ describe('the Agent API and connections (HI-1771)', () => {
     expect(narrow).toEqual([{ id: 'a-1', name: 'Max 1', cli: 'claude-code', kind: 'signIn', signedIn: true }])
     const wide = connectionsFor(all, ws, true)
     expect(wide).toEqual([
-      { id: 'a-1', name: 'Max 1', cli: 'claude-code', kind: 'signIn', signedIn: true, on: true, default: true, email: 'one@example.com', plan: 'max' },
-      { id: 'a-2', name: 'Elsewhere', cli: 'claude-code', kind: 'signIn', signedIn: false, on: false, default: false }
+      { id: 'a-1', name: 'Max 1', cli: 'claude-code', kind: 'signIn', signedIn: true, on: true, default: true, order: 1, email: 'one@example.com', plan: 'max' },
+      { id: 'a-2', name: 'Elsewhere', cli: 'claude-code', kind: 'signIn', signedIn: false, on: false, default: false, order: 2 }
     ])
+    // Its place in its CLI's preference order (HI-1875), whoever asks for one alone.
+    expect(connectionShown(all[1], ws, true, all).order).toBe(2)
     // The detail projection is the same, per caller; nothing of where its login is kept, its settings or defaults.
     for (const shown of [connectionShown(all[0], ws, true), connectionShown(all[0], ws, false), ...wide, ...narrow]) {
       expect(Object.keys(shown).sort()).not.toEqual(expect.arrayContaining(['folder']))

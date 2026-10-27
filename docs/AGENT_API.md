@@ -246,16 +246,16 @@ Returns `{ "timedOut": false, "waitedSeconds": 41, "agents": [{ "project": "web"
 
 ### Connections <a id="connections-preview"></a>
 
-From api.version 10 (HI-1771), and on for everyone since connections left their preview (HI-1774). A **connection** is a CLI plus where it gets its models: a Claude Code or Codex sign-in Hive keeps, or a server (a base URL and key). GitHub Copilot has none: it runs on its own sign-in. Each workspace chooses which connections are on and the default for each CLI; an agent can have its own.
+From api.version 10 (HI-1771), and on for everyone since connections left their preview (HI-1774). A **connection** is a CLI plus where it gets its models: a Claude Code or Codex sign-in Hive keeps, or a server (a base URL and key). GitHub Copilot has none: it runs on its own sign-in. Each workspace chooses which connections are on; each CLI's connections have a preference order, Hive-wide (HI-1875), and a workspace uses the first one in it that's on. An agent can have its own.
 
 `GET /v1/connections` and `GET /v1/connections/{id or name}` — the connections, as the caller may see them. None ever includes a token, a key, where a login is kept, a connection's settings or its defaults.
 
 | Caller | Sees |
 |---|---|
 | A project agent | Only those on in its own workspace: `id`, `name`, `cli`, `kind`, `signedIn`. Asking after another one, by id or name, is `404` |
-| The workspace token, the Hive Assistant | Every connection, with the same fields and `on` and `default` (in the caller's workspace), `email` and `plan` |
+| The workspace token, the Hive Assistant | Every connection, in each CLI's preference order, with the same fields and `on` and `default` (in the caller's workspace: the first in the order that's on, what a `provider`-only call uses), `order` (its place in its CLI's order, from 1; 1 is the one Settings marks Default), `email` and `plan` |
 
-Both list `defaults` too: each CLI's default connection in the caller's workspace (its id, or null).
+Both list `defaults` too: each CLI's connection a `provider`-only call uses in the caller's workspace, the first in the order that's on (its id, or null).
 
 **An agent's connection** (`connection` on `POST` and `PATCH /v1/projects/{name}/agents…`, the Assistant's) is an id, or a name: a name binds only when it is unique among those on in the workspace (two share it: `409`, use its id; none: `404`). Saving it checks it is on in the workspace for the agent's CLI (`409` otherwise), in the same write as the rest of the change.
 
@@ -263,7 +263,7 @@ Both list `defaults` too: each CLI's default connection in the caller's workspac
 - **`provider` alone** keeps its meaning: no connection of its own, so the agent follows that CLI's default connection in the workspace, and is refused a start while none is on. Never the CLI's own home.
 - **Left out**, a PATCH keeps the saved connection; `null` or `""` clears it.
 
-**Status:** each agent of `GET /v1/projects/{name}` has `connection` (the one chosen: `{ id, name, problem? }`, where `problem` is `missing`, `otherCli` or `off` when it can't be used now, and `name` is null for a project agent when it isn't on in its workspace; `null`: the workspace's default), `launchedConnection` (the one its run is on: `{ id, name, note? }`, or null) and `switchPending` while it switches at its next safe point.
+**Status:** each agent of `GET /v1/projects/{name}` has `connection` (the one chosen: `{ id, name, problem? }`, where `problem` is `missing`, `otherCli` or `off` when it can't be used now, and `name` is null for a project agent when it isn't on in its workspace; `null`: the first of its CLI's connections in the order that's on in the workspace (HI-1875)), `launchedConnection` (the one its run is on: `{ id, name, note? }`, or null) and `switchPending` while it switches at its next safe point.
 
 ### Deliveries and the inbox
 

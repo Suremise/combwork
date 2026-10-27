@@ -555,8 +555,16 @@
     "defaultMessage": "See a returned card's conflicts",
     "description": "A tip's title."
   },
+  "tips.connectionOrder.text": {
+    "defaultMessage": "Drag each CLI's connections into your order in Settings → Connections: new agents use the first one that's on in the workspace. Make Default moves one to the top without turning it on; running agents keep theirs.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Make Default is a button)."
+  },
+  "tips.connectionOrder.title": {
+    "defaultMessage": "Put your connections in order",
+    "description": "A tip's title."
+  },
   "tips.connections.text": {
-    "defaultMessage": "Settings → Connections keeps several Claude Code and Codex sign-ins, or a server such as Ollama on this PC. Each workspace chooses which are on and its default, and any agent can run on its own: pick it in Agent Settings.",
+    "defaultMessage": "Settings → Connections keeps several Claude Code and Codex sign-ins, or a server such as Ollama on this PC. Each workspace chooses which are on, new agents use the first one on in your order, and any agent can run on its own: pick it in Agent Settings.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Ollama is a product's name."
   },
   "tips.connections.title": {

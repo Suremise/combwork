@@ -4434,15 +4434,50 @@ h2.section#unused-worktrees {
   align-items: center;
   margin-top: 4px;
 }
+/* Always the row's own bottom line (HI-1875, Darren 27 Oct): the switch and buttons in the same place on every row,
+   on or off, however short its details are (a short row would otherwise wrap them up beside its name). */
 .account-actions {
+  flex-basis: 100%;
   display: flex;
   gap: 6px;
   align-items: center;
   flex-wrap: wrap;
 }
+.account-default,
+.account-used-here {
+  font-weight: normal;
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+/* The top of a CLI's order (HI-1875): a hint, Hive-wide. */
 .account-default {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+/* The one new agents use here when the Default is off here. */
+.account-used-here {
   color: var(--fg-muted);
-  font-size: 12px;
+}
+/* Its handle: drag within its CLI's order, or Alt+Up/Down. */
+.account-handle {
+  align-self: center;
+  background: none;
+  border: 0;
+  padding: 2px;
+  color: var(--fg-faint);
+  cursor: grab;
+}
+.account-handle:hover,
+.account-handle:focus-visible {
+  color: var(--fg);
+}
+.account-row.dragging {
+  opacity: 0.5;
+}
+.account-row.drop-target {
+  border-color: var(--accent);
 }
 .account-signin {
   align-self: stretch;

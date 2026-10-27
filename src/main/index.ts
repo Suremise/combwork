@@ -1033,8 +1033,9 @@ app.whenReady().then(async () => {
   providerService.setLiveSessionCounter((p) => sessions.liveCount(p))
   // Agents stopped by a refused sign-in can carry on once the CLI is signed in again (#309).
   providerService.onSignedIn((p) => sessions.signedInAgain(p, true))
-  // Connections (HI-980, HI-1755): new workspaces' defaults and the watches on their logins.
-  initConnections()
+  // Connections (HI-980, HI-1755): new workspaces' defaults and the watches on their logins. Waited for: their order's
+  // one-time move (HI-1875) is done before any workspace opens or the Agent API starts.
+  await initConnections()
   initConnectionMoves()
 
   // Hook auth files of an earlier run of Hive: their tokens died with it (#345).
