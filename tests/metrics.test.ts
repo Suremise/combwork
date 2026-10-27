@@ -837,6 +837,8 @@ describe('round 4: bounded loss owners, unreadable copied headers', () => {
 describe('round 5: closing, and project-scoped losses', () => {
   it('nothing is admitted while a workspace is closing; after it reopens, recording works and is saved', async () => {
     const { w, path } = await open()
+    // Its open settled (HI-1747: the bundled items' update after it, HI-1705, ended), so its close waits on nothing first.
+    await w.itemsUpToDate()
     metrics.recordApi(metrics.metricsHandle(w), 'alpha', api())
     const closing = w.close()
     const late = metrics.metricsHandle(w)

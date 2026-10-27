@@ -163,6 +163,8 @@ export class WorkspaceService {
   static bringItemsUpToDate: ((fresh: boolean) => Promise<void>) | null = null
   /** Its skills and modes being brought up to date as it opened, until they are (it never fails). */
   private itemsSynced: Promise<void> = Promise.resolve()
+  /** Whether itemsSynced hasn't ended yet: a close waits only then (HI-1747). */
+  private itemsSyncing = false
 
   /** Once the open has brought its bundled skills and modes up to date: what a launch reads of them waits for it. */
   itemsUpToDate(): Promise<void> {
@@ -429,7 +431,13 @@ export class WorkspaceService {
         this.emit({ type: 'modes-changed' })
       })
       .catch((e) => log.warn("updating the workspace's bundled skills and modes", e))
-    this.itemsSynced = after.track('its bundled skills and modes', items, () => began) // i18n-ignore: a part of a log line's timing
+    const synced = after.track('its bundled skills and modes', items, () => began) // i18n-ignore: a part of a log line's timing
+    this.itemsSynced = synced
+    this.itemsSyncing = true
+    const ended = (): void => {
+      if (this.itemsSynced === synced) this.itemsSyncing = false
+    }
+    void synced.then(ended, ended)
     let ok = false
     try {
       await inWorkspace(this, async () => WorkspaceService.onOpened?.(fresh, after)).catch((e) => log.warn('opening the workspace', e))
@@ -457,8 +465,9 @@ export class WorkspaceService {
 
   async close(): Promise<void> {
     // Its skills and modes still being brought up to date (HI-1705) finish first: they are written into this workspace's
-    // .hive, by the path this service has until it closes.
-    await this.itemsSynced
+    // .hive, by the path this service has until it closes. Only while they are going (HI-1747): an await of nothing would
+    // let in what starts before the abort below, which a close with no closing tasks has always refused at once.
+    if (this.itemsSyncing) await this.itemsSynced
     if (this.path) {
       const was = this.path
       for (const t of WorkspaceService.closingTasks) await t(was).catch((e) => log.warn('closing the workspace', e))
