@@ -381,6 +381,7 @@ interface HiveMessageValues {
   'project.tab.templates': undefined
   'project.tab.versionControl': undefined
   'project.tabs.more': undefined
+  'project.tabs.moreSettings': undefined
   'project.tabs.moreTip': { tabs: string | number }
   'project.tabs.tip': { tab: string | number; key: string | number }
 }

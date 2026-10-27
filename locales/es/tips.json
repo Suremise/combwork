@@ -334,6 +334,8 @@
   "tips.projectTabs.title": "Pestañas que hacen sitio",
   "tips.projectTabsKeys.text": "Alt+1 a Alt+8 abren las pestañas de un proyecto en el orden en que aparecen, de Sesión a Git. Memoria, Habilidades, Plantillas y MCP están en Más ▾ al final, y en el menú Proyecto de la barra de menús.",
   "tips.projectTabsKeys.title": "Alt y un número para cada pestaña",
+  "tips.projectTabsSettings.text": "El último elemento de Más ▾, al final de las pestañas de un proyecto, es Configuración del proyecto…, con su atajo (Alt+0 si no lo cambias).",
+  "tips.projectTabsSettings.title": "La configuración del proyecto desde Más ▾",
   "tips.quitWhenDone.text": "Si sales mientras un agente trabaja, se ofrece Salir cuando terminen los agentes: Hive se oculta y sale solo cuando terminan. Las conversaciones siempre se conservan.",
   "tips.quitWhenDone.title": "Salir cuando terminen los agentes",
   "tips.recentWorkspaces.text": "Quita un espacio de trabajo de Archivo → Abrir reciente o de la página de bienvenida con su ✕, o haciendo clic derecho en él. Borrar los abiertos recientemente los olvida todos; las carpetas que ya no existen aparecen como no encontradas.",

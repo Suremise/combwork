@@ -334,6 +334,8 @@
   "tips.projectTabs.title": "Tabs, die Platz machen",
   "tips.projectTabsKeys.text": "Alt+1 bis Alt+8 öffnen die Tabs eines Projekts in der Reihenfolge, in der sie erscheinen, von Sitzung bis Git. Gedächtnis, Skills, Vorlagen und MCP sind unter Mehr ▾ am Ende und im Menü Projekt der Menüleiste.",
   "tips.projectTabsKeys.title": "Alt und eine Zahl für jeden Tab",
+  "tips.projectTabsSettings.text": "Der letzte Eintrag von „Mehr ▾“ am Ende der Tabs eines Projekts ist „Projekteinstellungen…“, mit seiner Tastenkombination (Alt+0, sofern du sie nicht änderst).",
+  "tips.projectTabsSettings.title": "Projekteinstellungen aus „Mehr ▾“",
   "tips.quitWhenDone.text": "Beendest du Hive, während ein Agent arbeitet, bietet es „Beenden, wenn Agenten fertig sind“ an: Hive blendet sich aus und beendet sich selbst, sobald sie fertig sind. Unterhaltungen bleiben immer erhalten.",
   "tips.quitWhenDone.title": "Beenden, wenn Agenten fertig sind",
   "tips.recentWorkspaces.text": "Entferne einen Arbeitsbereich aus Datei → Zuletzt geöffnet oder von der Startseite mit seinem ✕ oder per Rechtsklick. „Zuletzt geöffnete leeren“ vergisst alle; Ordner, die nicht mehr da sind, erscheinen als nicht gefunden.",

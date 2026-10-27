@@ -334,6 +334,8 @@
   "tips.projectTabs.title": "Abas que abrem espaço",
   "tips.projectTabsKeys.text": "Alt+1 a Alt+8 abrem as abas de um projeto na ordem em que aparecem, de Sessão a Git. Memória, Skills, Modelos e MCP ficam em Mais ▾ no fim, e no menu Projeto da barra de menus.",
   "tips.projectTabsKeys.title": "Alt e um número para cada aba",
+  "tips.projectTabsSettings.text": "O último item de Mais ▾, no fim das abas de um projeto, é Configurações do projeto…, com seu atalho (Alt+0, a menos que você o altere).",
+  "tips.projectTabsSettings.title": "Configurações do projeto em Mais ▾",
   "tips.quitWhenDone.text": "Sair enquanto um agente trabalha oferece Sair quando os agentes terminarem: o Hive se oculta e sai sozinho quando eles terminam. As conversas são sempre mantidas.",
   "tips.quitWhenDone.title": "Sair quando os agentes terminarem",
   "tips.recentWorkspaces.text": "Remova um espaço de trabalho de Arquivo → Abrir recente ou da página de boas-vindas com o ✕ dele, ou clicando nele com o botão direito. Limpar abertos recentemente esquece todos; pastas que sumiram aparecem como não encontradas.",

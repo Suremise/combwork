@@ -389,6 +389,7 @@
   "project.tab.templates": "Templates",
   "project.tab.versionControl": "Version Control",
   "project.tabs.more": "More",
+  "project.tabs.moreSettings": "Project Settings…",
   "project.tabs.moreTip": "The project's {tabs}",
   "project.tabs.tip": "{tab} ({key})"
 }

@@ -334,6 +334,8 @@
   "tips.projectTabs.title": "場所を譲るタブ",
   "tips.projectTabsKeys.text": "Alt+1～Alt+8 で、プロジェクトのタブを表示順（セッションから Git まで）に開けます。メモリ、スキル、テンプレート、MCP は末尾の「その他 ▾」と、メニューバーの「プロジェクト」メニューにあります。",
   "tips.projectTabsKeys.title": "各タブに Alt と数字",
+  "tips.projectTabsSettings.text": "プロジェクトのタブの最後にある「その他 ▾」の最後の項目は「プロジェクトの設定…」で、ショートカットも表示されます（変更しない限り Alt+0）。",
+  "tips.projectTabsSettings.title": "「その他 ▾」からプロジェクトの設定へ",
   "tips.quitWhenDone.text": "エージェントの作業中に終了しようとすると「エージェントの完了後に終了」が表示されます。Hiveは非表示になり、作業が終わると自動で終了します。会話は常に保持されます。",
   "tips.quitWhenDone.title": "エージェントの完了後に終了",
   "tips.recentWorkspaces.text": "「ファイル」→「最近使った項目を開く」やようこそページで、ワークスペースを「✕」で削除するか、右クリックします。「最近開いた項目をクリア」ですべて消去されます。なくなったフォルダーは「見つかりません」と表示されます。",

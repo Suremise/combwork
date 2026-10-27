@@ -1519,6 +1519,10 @@
     "defaultMessage": "More",
     "description": "The last of a project's tabs: opens a menu of its other tabs (Memory, Skills, Templates, MCP). When one of them is open, the button shows its name instead. Keep it short."
   },
+  "project.tabs.moreSettings": {
+    "defaultMessage": "Project Settings…",
+    "description": "The last item of the project tabs' More ▾ menu, after a separator (HI-1840): opens the project's settings. Keep the …."
+  },
   "project.tabs.moreTip": {
     "defaultMessage": "The project's {tabs}",
     "description": "Tooltip on the project tabs' More ▾ button. {tabs} lists the tabs in its menu, such as Memory, Skills, Templates and MCP."
