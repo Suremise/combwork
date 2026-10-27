@@ -2,9 +2,9 @@ import { lstat, realpath } from 'original-fs/promises'
 import { join, relative, resolve, sep } from 'path'
 
 /**
- * The file checks of the card attachments' clean-up (HI-1842 round 2), used by its plan (in its worker) and again by
+ * The file checks of the card attachments' clean-up (HI-1842 round 2), used by its plan and again by
  * each card's removal (on main, in the board's change): a card's folder is the host's own, a real folder at every step,
- * and a file is the one planned (the same on-disk file, unchanged). Node only: the worker loads it too.
+ * and a file is the one planned (the same on-disk file, unchanged).
  */
 
 /** A file as it is on disk: what says it is the same, unchanged file (its identity, size and last write). */

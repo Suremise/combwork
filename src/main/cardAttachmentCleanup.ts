@@ -1,39 +1,39 @@
 // Card attachments' clean-up (HI-1842, Darren's decisions of 27 Oct 2026; shared/cardCleanup.ts has the rules): each
 // project's archived cards lose their attachments the days its Project Settings → Storage says after they were archived.
 //
-// Round 2's contract (HR5's review): a plan, then an apply that checks the plan again.
-// - The plan (cardCleanupWorker.ts) runs in a worker thread on a read-only connection of its own: a batch of a project's
-//   cards that can be due, from a cursor, bounded in the cards it examines and plans; each due card's files as they are
-//   on disk then (identity, size and last write), and cards whose folder isn't the project's own left out.
-// - The apply runs here, a card at a time, each one change of the board (tasks.cleanUpAttachments) refused once the
-//   run's workspace is no longer open; in it the card's project, archive and due date under the project's setting as it
-//   is now, its folder and each file are checked again, and only planned files unchanged since go.
-// - Each run belongs to one workspace lifetime: it stops when that workspace closes or the window opens another, a reply
-//   from the worker for a lifetime that ended is dropped, and a new lifetime never joins or waits for an old one's run.
+// Round 2's contract (HR5's review), on main since round 3 (Darren's decision "Simplify: no worker"): a plan, then an
+// apply that checks the plan again.
+// - The plan (planBatch) reads a batch of a project's cards that can be due, from a cursor, bounded in the cards it
+//   examines and plans, a card at a time with a yield between, so each step is a few milliseconds: each due card's files
+//   as they are on disk then (identity, size and last write); cards whose folder isn't the project's own left out.
+// - The apply, a card at a time, is one change of the board each (tasks.cleanUpAttachments), refused once the run's
+//   workspace is no longer open; in it the card's project (still shown), archive and due date under the project's
+//   setting as it is now, its folder and each file are checked again, and only planned files unchanged since go.
+// - Each run belongs to one workspace lifetime: it stops when that workspace closes or the window opens another, and a
+//   new lifetime never joins or waits for an old one's run. One listener per lifetime clears what it kept.
 // - Clean Up Now's preview is a plan kept here (an id, its lifetime and project, a few minutes): its Move applies that
 //   plan, never one rebuilt from what the window sends back.
 // - The automatic run is queued when a workspace opens and once a day while it is open, and runs only while the PC is
 //   idle (no input for IDLE_SECONDS), checked again between cards: input pauses it until the next idle moment.
 import { randomBytes } from 'crypto'
 import { basename, join } from 'path'
-import { Worker } from 'worker_threads'
+import { lstat } from 'original-fs/promises'
 import { app, powerMonitor } from 'electron'
-import { DAY_MS, cleanupDays, cleanupDue as dueAt, type CardCleanupItem } from '../shared/cardCleanup'
-import { boardFile, cardKeys } from './boardStore'
-import { cardHost, cardsRoot } from './cardAttachments'
-import { planCleanup, type PlanReply, type PlanRequest, type PlanResult, type PlannedCard } from './cardCleanupWorker'
+import { DAY_MS, archivedSince, cleanupDays, cleanupDue as dueAt, type CardCleanupItem } from '../shared/cardCleanup'
+import { boardRead, cardKeys } from './boardStore'
+import { cardFolder, cardHost, type CleanupFile } from './cardAttachments'
+import { fileIdentity, ownFolder } from './cardCleanupFs'
 import { createLogger, userText } from './logger'
 import { hiveError } from './hiveError'
 import { msg } from '../shared/i18n'
 import * as tasks from './tasks'
-import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 import { openWorkspaces, workspace, type WorkspaceService } from './workspace'
 
 const log = createLogger('attachments')
 
-/** A batch: the most cards the worker examines, and the most due cards it plans. */
-const EXAMINE = 500
-const PLAN = 50
+/** A batch: the most cards a plan examines, and the most due cards it plans. */
+const EXAMINE = 100
+const PLAN = 20
 /** The most cards a run (automatic) or a preview (Clean Up Now) takes on: past it, the next run, or Clean Up Now again. */
 export const RUN_CARDS = 200
 /** Between cards, so a run never holds main or the board for long. */
@@ -66,7 +66,7 @@ export function pcIdle(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// A workspace lifetime: what a run, a plan and a worker reply belong to.
+// A workspace lifetime: what a run and a plan belong to.
 // ---------------------------------------------------------------------------
 
 interface Life {
@@ -83,79 +83,95 @@ async function daysOf(ws: WorkspaceService, projectPath: string): Promise<number
 }
 
 // ---------------------------------------------------------------------------
-// The worker (as the WAL checkpoints' and the repository lock's): started with the first plan; without its script
-// (unit tests), each plan runs here.
+// The plan: a batch of a project's due cards, from a cursor.
 // ---------------------------------------------------------------------------
 
-class PlanThread {
-  private worker: Worker | null = null
-  private calls = new Map<number, { resolve: (r: PlanResult) => void; reject: (e: Error) => void }>()
-  private next = 0
-
-  run(req: Omit<PlanRequest, 'id'>): Promise<PlanResult> {
-    const w = this.worker ?? this.start()
-    if (!w) return planCleanup({ ...req, id: 0 })
-    const id = ++this.next
-    return new Promise<PlanResult>((resolve, reject) => {
-      this.calls.set(id, { resolve, reject })
-      const m: PlanRequest = { ...req, id }
-      w.postMessage(m)
-    })
-  }
-
-  private start(): Worker | null {
-    if (!bundledScriptExists(workerScript())) {
-      workerHere('card clean-up', "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
-      return null
-    }
-    const w = new Worker(workerScript())
-    this.worker = w
-    workerStarted('card clean-up', w) // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
-    w.on('message', (m: PlanReply) => {
-      const call = this.calls.get(m.id)
-      if (!call) return
-      this.calls.delete(m.id)
-      if (m.ok) call.resolve(m.value)
-      else call.reject(new Error(m.error))
-    })
-    // Ended (an error, or the app quitting): its plans fail, and the next plan starts it again. Each plan's connection
-    // is its own, opened and closed within the request, so nothing is left open by a worker that ends.
-    const gone = (why: string): void => {
-      if (this.worker !== w) return
-      this.worker = null
-      const calls = [...this.calls.values()]
-      this.calls.clear()
-      for (const c of calls) c.reject(new Error(`its worker ended (${why})`)) // i18n-ignore: an internal error, for the log
-    }
-    w.on('error', (e: Error) => gone(e.message))
-    w.on('exit', (code) => gone(`exit code ${code}`)) // i18n-ignore: for the log
-    w.unref()
-    return w
-  }
+/** A due card, as planned: its files as they were on disk ('missing': none there, its row only). */
+export interface PlannedCard {
+  card: number
+  title: string
+  archivedAt: string
+  files: (CleanupFile & { name: string; size: number })[]
 }
 
-/** The worker's script, beside main's; a test's build of it (`useCleanupWorker`). */
-let scriptForTests: string | null = null
-const workerScript = (): string => scriptForTests ?? join(__dirname, 'card-cleanup-worker.js')
-let thread = new PlanThread()
+interface PlanResult {
+  cards: PlannedCard[]
+  /** The last card examined (the next batch starts after it), and whether the board had more past it. */
+  last: number
+  more: boolean
+}
 
-/** Tests: the plan's worker from this script (a build of cardCleanupWorker.ts), or null for the default; a new thread. */
-export function useCleanupWorker(file: string | null): void {
-  scriptForTests = file
-  thread = new PlanThread()
+const yieldMain = (): Promise<void> => new Promise((r) => setImmediate(r))
+
+/**
+ * What belongs to a lifetime goes when it ends, from one listener per lifetime: its kept plans and its queued run (its
+ * cursors are keyed by it, and go with it).
+ */
+const watched = new WeakSet<AbortSignal>()
+function watchLife(life: Life): void {
+  if (watched.has(life.signal)) return
+  watched.add(life.signal)
+  life.signal.addEventListener(
+    'abort',
+    () => {
+      for (const [id, k] of plans) if (k.life.signal === life.signal) plans.delete(id)
+      queued.delete(life.signal)
+    },
+    { once: true }
+  )
 }
 
 /**
- * A batch of a project's plan, for a lifetime: null when that lifetime ended meanwhile (its reply is dropped, never
- * applied), or the project's clean-up is off.
+ * A batch of a project's plan, for a lifetime: at most EXAMINE cards that can be due (archived, not with a hidden or
+ * removed project, with attachments: the board's index, so cards that never qualify use up no batch) after `after`, at
+ * most `due` of them planned, a card at a time with a yield between. Null when the lifetime ended meanwhile, or the
+ * project's clean-up is off.
  */
-async function planBatch(life: Life, projectPath: string, after: number, now: number, due = PLAN): Promise<(PlanResult & { days: number }) | null> {
-  const days = await daysOf(life.ws, projectPath)
+export async function planBatch(ws: WorkspaceService, projectPath: string, after: number, now: number, due = PLAN, examine = EXAMINE): Promise<(PlanResult & { days: number }) | null> {
+  const life = lifeOf(ws)
+  if (!life) return null
+  const days = await daysOf(ws, projectPath)
   if (days === null || !alive(life)) return null
   const project = basename(projectPath)
-  const host = cardHost(life.ws, project)
-  const r = await thread.run({ db: boardFile(life.path), host, cardsRoot: cardsRoot(host), project, days, now, dayMs: dayMs(), after, examine: EXAMINE, due })
-  return alive(life) ? { ...r, days } : null
+  const host = cardHost(ws, project)
+  const candidates = boardRead(ws, (db) => {
+    const legacy = db.prepare("SELECT 1 FROM pragma_table_info('cards') WHERE name = 'doc'").get() !== undefined // i18n-ignore: SQL
+    const kept = legacy ? "coalesce(json_extract(c.doc, '$.archivedFor'), '')" : "coalesce(c.archived_for, '')" // i18n-ignore: SQL
+    return (db.prepare(`SELECT c.number AS n FROM cards c WHERE c.archived = 1 AND c.project = ? COLLATE NOCASE AND ${kept} NOT IN ('project-hidden', 'project-removed') AND c.number > ? AND EXISTS (SELECT 1 FROM card_attachments a WHERE a.card = c.number) ORDER BY c.number LIMIT ?`).all(project, after, examine + 1) as { n: number }[]).map((r) => r.n) // i18n-ignore: SQL
+  })
+  const out: PlanResult = { cards: [], last: after, more: candidates.length > examine }
+  for (const n of candidates.slice(0, examine)) {
+    if (out.cards.length >= due) {
+      out.more = true
+      break
+    }
+    await yieldMain()
+    if (!alive(life)) return null
+    out.last = n
+    const card = await tasks.getTask(n, ws).catch(() => null)
+    if (!card || !cleanupDue(card, days, now)) continue
+    const folder = cardFolder(host, n)
+    if ((await lstat(folder).catch(() => null)) && !(await ownFolder(host, folder))) {
+      log.warn(`#${n} in ${userText(project)}: its attachments' folder is a link or not the project's own: left as it is`)
+      continue
+    }
+    const rows = boardRead(ws, (db) => db.prepare('SELECT id, file, name, size FROM card_attachments WHERE card = ? ORDER BY at, file').all(n) as { id: string; file: string; name: string; size: number }[]) // i18n-ignore: SQL
+    const files: PlannedCard['files'] = []
+    let unsafe = false
+    for (const r of rows) {
+      const p = join(folder, r.file)
+      const missing = await lstat(p).then(
+        () => false,
+        (e: NodeJS.ErrnoException) => e.code === 'ENOENT'
+      )
+      const identity = missing ? 'missing' : await fileIdentity(p)
+      if (!identity) unsafe = true
+      else files.push({ ...r, identity })
+    }
+    if (unsafe) log.warn(`#${n} in ${userText(project)}: a link where an attachment was: left as it is`)
+    else if (files.length) out.cards.push({ card: n, title: card.title, archivedAt: new Date(archivedSince(card)).toISOString(), files })
+  }
+  return alive(life) ? { ...out, days } : null
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +194,7 @@ const noneDone = (): CardCleanupResult => ({ cards: 0, files: 0, bytes: 0, left:
 async function applyCard(life: Life, projectPath: string, c: PlannedCard, out: CardCleanupResult, now: () => number): Promise<void> {
   const project = basename(projectPath)
   const r = await tasks
-    .cleanUpAttachments(c.card, { project, files: c.files, days: () => daysOf(life.ws, projectPath), due: (card, days) => cleanupDue(card, days, now()) }, life.ws, () => alive(life))
+    .cleanUpAttachments(c.card, { project, files: c.files, visible: () => life.ws.isProjectPath(projectPath), days: () => daysOf(life.ws, projectPath), due: (card, days) => cleanupDue(card, days, now()) }, life.ws, () => alive(life))
     .catch((e) => {
       if (alive(life)) log.warn(`cleaning up the attachments of #${c.card} in ${userText(project)}`, e)
       return { files: [], left: c.files.length }
@@ -212,9 +228,8 @@ export async function cleanUpProject(ws: WorkspaceService, projectPath: string, 
   let wrapped = after === 0
   let taken = 0
   while (taken < RUN_CARDS) {
-    const batch = await planBatch(life, projectPath, after, opts.now ?? Date.now(), Math.min(PLAN, RUN_CARDS - taken))
+    const batch = await planBatch(ws, projectPath, after, opts.now ?? Date.now(), Math.min(PLAN, RUN_CARDS - taken))
     if (!batch) return { ...out, stopped: !alive(life) }
-    for (const n of batch.unsafe) log.warn(`#${n} in ${userText(basename(projectPath))}: its attachments' folder or a file in it is a link or not the project's own: left as it is`)
     for (const c of batch.cards) {
       if (!alive(life)) return { ...out, stopped: true }
       if (!idle()) {
@@ -273,8 +288,8 @@ function keepPlan(p: KeptPlan): string {
   while (plans.size >= MAX_PLANS) plans.delete(plans.keys().next().value!)
   const id = randomBytes(9).toString('hex')
   plans.set(id, p)
-  // Gone with its workspace's lifetime.
-  p.life.signal.addEventListener('abort', () => plans.delete(id), { once: true })
+  // Gone with its workspace's lifetime (the lifetime's one listener).
+  watchLife(p.life)
   return id
 }
 
@@ -294,7 +309,7 @@ export async function cardCleanupPreview(projectPath: string, ws: WorkspaceServi
   let after = 0
   let more = false
   while (cards.length < RUN_CARDS) {
-    const batch = await planBatch(life, projectPath, after, now, Math.min(PLAN, RUN_CARDS - cards.length))
+    const batch = await planBatch(ws, projectPath, after, now, Math.min(PLAN, RUN_CARDS - cards.length))
     if (!batch) return { plan: null, items: [], more: false }
     cards.push(...batch.cards)
     after = batch.last
@@ -331,17 +346,17 @@ export async function applyCleanupPlan(projectPath: string, id: string, ws: Work
 // The automatic run: queued at a workspace's open and once a day, run while the PC is idle.
 // ---------------------------------------------------------------------------
 
-/** The lifetimes with a run queued, and the one running now (one at a time). */
+/** The lifetimes with a run queued, and each lifetime's run under way: one each, never waiting for another's. */
 const queued = new Map<AbortSignal, Life>()
-let running: Promise<void> | null = null
+const runs = new Map<AbortSignal, Promise<void>>()
 let ticker: NodeJS.Timeout | null = null
 
 /** Queues an automatic run for a workspace's lifetime (at its open, and daily); it runs once the PC is idle. */
 export function queueCleanup(ws: WorkspaceService): void {
   const life = lifeOf(ws)
   if (!life || queued.has(life.signal)) return
+  watchLife(life)
   queued.set(life.signal, life)
-  life.signal.addEventListener('abort', () => queued.delete(life.signal), { once: true })
   if (!ticker) {
     ticker = setInterval(() => void tick(), TICK_MS)
     ticker.unref?.()
@@ -353,24 +368,28 @@ export function queueCleanupEverywhere(): void {
   for (const w of openWorkspaces()) queueCleanup(w)
 }
 
-/** Runs what is queued, one lifetime at a time, while the PC is idle; a run the PC's use paused stays queued. */
+/**
+ * Starts the queued runs while the PC is idle, each lifetime's on its own (one stuck or slow never holds up another's);
+ * a run the PC's use paused stays queued. Resolves once the runs it started have ended.
+ */
 export function tick(idle: () => boolean = pcIdle, now?: number): Promise<void> {
-  if (running) return running
-  running = (async () => {
-    for (const [signal, life] of [...queued]) {
-      if (!alive(life)) {
-        queued.delete(signal)
-        continue
-      }
-      if (!idle()) return
-      const r = await cleanUpWorkspace(life.ws, { idle, now }).catch((e) => {
-        log.warn('cleaning up card attachments', e)
-        return null
-      })
-      if (r && !r.stopped) queued.delete(signal)
+  const started: Promise<void>[] = []
+  for (const [signal, life] of [...queued]) {
+    if (!alive(life)) {
+      queued.delete(signal)
+      continue
     }
-  })().finally(() => {
-    running = null
-  })
-  return running
+    if (runs.has(signal) || !idle()) continue
+    const run = cleanUpWorkspace(life.ws, { idle, now })
+      .then(
+        (r) => {
+          if (!r.stopped) queued.delete(signal)
+        },
+        (e) => log.warn('cleaning up card attachments', e)
+      )
+      .finally(() => runs.delete(signal))
+    runs.set(signal, run)
+    started.push(run)
+  }
+  return Promise.all(started).then(() => undefined)
 }

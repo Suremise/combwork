@@ -1,11 +1,14 @@
 // Archived cards' attachments cleaned up (HI-1842, Darren's decisions of 27 Oct 2026), on the real board (a temp hive.db):
 // only archived cards, the project's days after archiving (30 by default, Never keeps them); open and Done cards keep theirs,
 // as do cards brought back from the archive, or archived with their hidden or removed project. Round 2 (HR5's review): a
-// plan (the worker's code, here in-process) and an apply that checks it again in each card's change: only planned files
+// plan and an apply that checks it again in each card's change: only planned files
 // still the same on disk, in a folder of the project's own (never through a junction), of a card still archived in the
 // planned project and due under the project's setting now; a plan kept for Clean Up Now is used once, within its
-// workspace's lifetime; the worker's candidates leave out cards that can never be due; the automatic run waits for an idle PC.
+// workspace's lifetime; the plan's candidates leave out cards that can never be due; the automatic run waits for an idle PC.
+// Round 3 (no worker, Darren's decision): a project hidden or removed since the plan keeps its cards' files; one listener
+// per workspace lifetime, however many previews and queueings.
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
+import { getEventListeners } from 'events'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -22,7 +25,6 @@ const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const att = await import('../src/main/cardAttachments')
 const cleanup = await import('../src/main/cardAttachmentCleanup')
-const { planCleanup } = await import('../src/main/cardCleanupWorker')
 const { advanced } = await import('../src/main/advanced')
 const { archivedSince, cleanupDays, cleanupDue } = await import('../src/shared/cardCleanup')
 
@@ -244,21 +246,19 @@ describe("cleaning up archived cards' attachments (HI-1842)", () => {
     expect(rows(w, b.n)).toBe(1)
   })
 
-  it('the worker leaves out cards that can never be due, so they never use up a batch; each batch is bounded', async () => {
-    const { w, root, p } = await workspace()
+  it('the plan leaves out cards that can never be due, so they never use up a batch; each batch is bounded', async () => {
+    const { w, p } = await workspace()
     const kept: number[] = []
     for (let i = 0; i < 6; i++) kept.push((await card(w, { archived: true, files: [`k${i}.txt`] })).n)
     // Archived with their project hidden (restoring it brings them back): never due.
     await store.boardWrite(w, async () => store.boardWriteOp(w, (db) => db.prepare(`UPDATE cards SET archived_for = 'project-hidden' WHERE number IN (${kept.join(',')})`).run()))
     const due = await card(w, { archived: true, files: ['due.txt'] })
-    const host = join(root, 'p')
-    const req = { id: 0, db: store.boardFile(root), host, cardsRoot: att.cardsRoot(host), project: 'p', days: 30, now: later(31), dayMs: DAY, after: 0, examine: 2, due: 1 }
-    const first = await planCleanup(req)
-    expect(first.cards.map((c) => c.card)).toEqual([due.n])
-    expect(first.cards[0].files[0].identity).toMatchObject({ dev: expect.any(String), ino: expect.any(String) })
-    // Bounded: two cards examined at most, from the cursor.
-    const none = await planCleanup({ ...req, after: due.n })
-    expect(none).toMatchObject({ cards: [], more: false })
+    // Two cards examined at most, one planned: the six ahead don't count.
+    const first = await inWorkspace(w, () => cleanup.planBatch(w, p, 0, later(31), 1, 2))
+    expect(first?.cards.map((c) => c.card)).toEqual([due.n])
+    expect(first?.cards[0].files[0].identity).toMatchObject({ dev: expect.any(String), ino: expect.any(String) })
+    // From the cursor: nothing after it.
+    expect(await inWorkspace(w, () => cleanup.planBatch(w, p, due.n, later(31), 1, 2))).toMatchObject({ cards: [], more: false })
     expect((await run(w, p, 31)).files).toBe(1)
     expect(kept.every((k) => rows(w, k) === 1)).toBe(true)
   })
@@ -274,5 +274,29 @@ describe("cleaning up archived cards' attachments (HI-1842)", () => {
     await inWorkspace(w, () => cleanup.tick(idle, later(4)))
     expect(rows(w, c.n)).toBe(0)
     expect(p).toBeTruthy()
+  })
+
+  it("a project hidden or removed between the preview and its Move keeps its cards' files", async () => {
+    const { w, p } = await workspace()
+    const c = await card(w, { archived: true, files: ['hidden.txt'] })
+    for (const mode of ['hidden', 'removed'] as const) {
+      const shown = await preview(w, p, 31)
+      expect(shown.items.map((i) => i.card)).toEqual([c.n])
+      await w.setHidden('p', mode)
+      expect(await apply(w, p, shown.plan!, 31)).toMatchObject({ cards: 0, files: 0, left: 1 })
+      expect(rows(w, c.n)).toBe(1)
+      await w.setHidden('p', null)
+    }
+  })
+
+  it('one abort listener per workspace lifetime, however many previews and queueings', async () => {
+    const { w, p } = await workspace()
+    await card(w, { archived: true, files: ['l.txt'] })
+    await preview(w, p, 31)
+    const one = getEventListeners(w.lifetime, 'abort').length
+    for (let i = 0; i < 15; i++) await preview(w, p, 31)
+    cleanup.queueCleanup(w)
+    cleanup.queueCleanup(w)
+    expect(getEventListeners(w.lifetime, 'abort').length).toBe(one)
   })
 })

@@ -2267,18 +2267,19 @@ export async function commentAsHive(n: number, said: string | StoredText, ws: Wo
 }
 
 /** Why the clean-up left a card's planned files (HI-1842 round 2): what changed since its plan. */
-export type CleanupLeft = 'gone' | 'unarchived' | 'moved' | 'policy' | 'changed' | 'unsafe'
+export type CleanupLeft = 'gone' | 'unarchived' | 'moved' | 'hidden' | 'policy' | 'changed' | 'unsafe'
 
 /**
  * The clean-up of an archived card's attachments (HI-1842, cardAttachmentCleanup.ts): its planned files to the Recycle
  * Bin and their rows, with a comment of Hive's saying how many, which and why, in one change of the board, refused when
  * the run's workspace is no longer open (`alive`, checked again once the lock is held). In the change, the card is
- * checked again: still on the board, archived and in the planned project, and still due under the project's setting as
- * it is now (`days`, read here); then each file (removeCardAttachments). What it left says why.
+ * checked again: still on the board, archived and in the planned project, that project still shown (not hidden or
+ * removed), and still due under the project's setting as it is now (`days`, read here); then each file
+ * (removeCardAttachments). What it left says why.
  */
 export async function cleanUpAttachments(
   n: number,
-  plan: { project: string; files: CleanupFile[]; days: () => Promise<number | null>; due: (card: TaskCard, days: number) => boolean },
+  plan: { project: string; files: CleanupFile[]; visible: () => boolean; days: () => Promise<number | null>; due: (card: TaskCard, days: number) => boolean },
   ws: WorkspaceService,
   alive: () => boolean
 ): Promise<{ files: { name: string; size: number }[]; left: number; why?: CleanupLeft }> {
@@ -2290,6 +2291,8 @@ export async function cleanUpAttachments(
       if (!card) return leave('gone')
       if (!card.archived) return leave('unarchived')
       if ((card.project ?? '').toLowerCase() !== plan.project.toLowerCase()) return leave('moved')
+      // Its project hidden or removed since the plan: its cards wait for it to come back (HR5's round 2).
+      if (!plan.visible()) return leave('hidden')
       const days = await plan.days()
       if (days === null || !plan.due(card, days)) return leave('policy')
       const done = await removeCardAttachments(ws, n, plan.files)
