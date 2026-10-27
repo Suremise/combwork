@@ -70,14 +70,14 @@ export function LeftoversPage({ project, read, selector, listWidth, onCompare }:
     <div key={b.name} className="git-row git-branch leftover-branch" data-leftover={b.name} data-merged={b.toTarget === 0 ? 'yes' : 'no'}>
       <Icon name="git-branch" />
       <span className="git-name">{b.name}</span>
-      <BranchCards cards={onBranch.get(b.name) ?? []} project={project} names={names} />
+      <BranchCards cards={onBranch.get(b.name) ?? []} project={project} names={names} inTarget={b.toTarget === 0} />
       {b.toTarget !== 0 && <span className="badge leftover-ahead">{b.toTarget == null ? tr(M.notCounted, { target: target ?? '' }) : tr(M.ahead, { n: b.toTarget, target: target ?? '' })}</span>}
       <span className="git-subject faint">{b.subject}</span>
       <span className="git-meta faint">{at(b.date)}</span>
       <button className="btn small subtle" data-action="compare-leftover" title={tr(M.compareTip, { branch: b.name, target: target ?? '' })} onClick={() => target && onCompare(target, b.name)}>
         <Icon name="git-compare" /> {tr(M.compare)}
       </button>
-      <button className="btn small subtle danger" data-action="delete-leftover" onClick={() => target && void deleteBranch(project, b, target)}>
+      <button className="btn small subtle" data-action="delete-leftover" onClick={() => target && void deleteBranch(project, b, target)}>
         <Icon name="trash" /> {tr(M.delete)}
       </button>
     </div>

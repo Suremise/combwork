@@ -974,7 +974,7 @@ const CARDS = {
  * review (with a copy button) or, Done, that it was merged and as what; and how many earlier cards worked on the same
  * branch. A worktree's: its agent's card, the same way.
  */
-export function BranchCards({ cards, project, names }: { cards: BranchCard[]; project: ProjectInfo; names: Partial<Record<BranchCard['stage'], string>> | undefined }) {
+export function BranchCards({ cards, project, names, inTarget }: { cards: BranchCard[]; project: ProjectInfo; names: Partial<Record<BranchCard['stage'], string>> | undefined; inTarget?: boolean }) {
   const tasks = useStore((st) => st.tasks)
   const [copied, setCopied] = useState(false)
   useEffect(() => {
@@ -1011,7 +1011,8 @@ export function BranchCards({ cards, project, names }: { cards: BranchCard[]; pr
           )}
         </span>
       )}
-      {c.stage === 'done' && (
+      {/* Done, and merged unless its branch is known not to be in the target (a leftover with commits of its own, HI-1823). */}
+      {c.stage === 'done' && inTarget !== false && (
         <span className="git-branch-card-merged faint" data-merged={c.merged ?? ''}>
           {tr(CARDS.merged, { has: c.merged ? 'yes' : 'no', revision: c.merged ? short(c.merged) : '' })}
         </span>
