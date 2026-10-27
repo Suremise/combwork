@@ -7489,6 +7489,12 @@ button.agent-place:hover {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+/* One line (HI-1884): the key and the column never wrap or shrink; only the title gives way, cut with "…". */
+.activity-card-key,
+.activity-card-column {
+  flex: none;
+  white-space: nowrap;
+}
 .activity-card-title {
   color: var(--fg-strong);
   white-space: nowrap;

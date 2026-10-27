@@ -385,12 +385,16 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
                 <button className="link activity-card-key" title={tr(M.openCard)} onClick={() => set({ taskOpen: card.number })}>
                   {card.label}
                 </button>
-                <span className="activity-card-title">{card.title}</span>
-                <span className="faint">· {tr(M.column, { column: card.column })}</span>
+                <span className="activity-card-title" title={card.title}>
+                  {card.title}
+                </span>
+                <span className="faint activity-card-column">· {tr(M.column, { column: card.column })}</span>
               </div>
             ) : solo ? (
               <div className="activity-card-head">
-                <span className="activity-card-title">{solo.title || solo.name || solo.id.slice(0, 8)}</span>
+                <span className="activity-card-title" title={solo.title || solo.name || solo.id.slice(0, 8)}>
+                  {solo.title || solo.name || solo.id.slice(0, 8)}
+                </span>
               </div>
             ) : null}
             {parts.map((p) => (
