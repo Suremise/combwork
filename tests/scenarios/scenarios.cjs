@@ -3015,6 +3015,30 @@ module.exports.SCENARIOS = [
     }
   },
   {
+    id: 'card-loop-ask-assistant',
+    title: "A builder whose card's decision needs what only the Assistant may do (HI-1866): it asks the Assistant with hive_ask_assistant, not in a comment, and doesn't ask the user again",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    async setup(c) {
+      await c.card('h', { title: 'Greeting in French', description: 'A French greeting, for after the release.' })
+      await c.card('a', { title: 'Greeting options', description: 'Choose how greet.js greets, A or B. A: keep "Hello" now, and park the French greeting card until after the release.', column: 'doing', agent: 'coder' })
+      await c.inv('tasks:update', c.cards.a, { decision: `Option A: keep "Hello", nothing to build here. Put #${c.cards.h} On Hold until after the release, and move this card to Done with this decision as the reason.` })
+    },
+    prompt: (c) => `You're the builder of card #${c.cards.a} in a card loop (the card-loop skill). The user has decided it: read its decisions and see it through.`,
+    fake: (c) =>
+      `skill card-loop then hive hive_read_task {"number":${c.cards.a}} then hive hive_ask_assistant ${JSON.stringify({ card: `#${c.cards.a}`, text: `The user chose option A (the card's decision): please put #${c.cards.h} On Hold until after the release, and move #${c.cards.a} to Done with that decision as the reason.` })}`,
+    expect: (o) => {
+      const tools = o.hiveCalls.map((x) => x.tool)
+      const asked = ran(o, 'hive_ask_assistant')
+      return [
+        ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
+        ['asked the Assistant with hive_ask_assistant', asked.length > 0, tools.join(',')],
+        ['…on the card, which says so in its history', history(o.cards.a).some((h) => h.startsWith('Asked the Hive Assistant: ')), history(o.cards.a).join(' | ')],
+        ["didn't ask the user what they already decided", !ran(o, 'hive_ask_user').length, tools.join(',')],
+        ['moved neither card past its rules itself', o.cards.h?.column === 'todo' && o.cards.a?.column === 'doing', `${o.cards.h?.column} / ${o.cards.a?.column}`]
+      ]
+    }
+  },
+  {
     id: 'old-move-submit',
     title: "A builder's move to Review is its submission for now (#1268): today's skills, the card's rules (Pair in the project folder), its summary the comment",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },

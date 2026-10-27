@@ -66,9 +66,9 @@ export function laneBrief(i: LaneBriefInput, role: LaneRole): string {
   lines.push('', 'The cards, one at a time in this order:', ...cards, '', `${where}${target}.`)
   lines.push('', "The project's rules:", ...laneRules(i.options).map((l) => `- ${l}`))
   if (role === 'builder') {
-    lines.push('', 'Ask Hive for your next card with hive_lane next. Move cards by what you did: hive_start_card, hive_submit with a summary, and hive_report_merge after a merge. A refused move says what to do next; do that. Questions for the user go through hive_ask_user, reports as comments on the card.')
+    lines.push('', 'Ask Hive for your next card with hive_lane next. Move cards by what you did: hive_start_card, hive_submit with a summary, and hive_report_merge after a merge. A refused move says what to do next; do that. Questions for the user go through hive_ask_user, requests for the Hive Assistant through hive_ask_assistant, reports as comments on the card.')
   } else {
-    lines.push('', 'Wait for each card in Review, then hive_start_review and hive_verdict on the revision it names. Questions for the builder go through hive_request_builder, for the user through hive_ask_user.')
+    lines.push('', 'Wait for each card in Review, then hive_start_review and hive_verdict on the revision it names. Questions for the builder go through hive_request_builder, for the user through hive_ask_user, for the Hive Assistant through hive_ask_assistant.')
   }
   const note = i.note.trim()
   if (note) lines.push('', `The user's note: ${note}`)

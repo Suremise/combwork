@@ -189,6 +189,30 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     const putBack = await call(assistantToken, `/v1/tasks/${n}/put-back`, { why: 'The user wants it later.' })
     check("at Control agents the Assistant puts it back, by its number: Todo", putBack.status === 200 && putBack.body?.to === 'todo' && (await card(n))?.column === 'todo' && (await card(n))?.comments.at(-1)?.text === 'The user wants it later.', JSON.stringify(putBack.body))
     check("…listed in what it did", (await inv('assistant:actions')).some((x) => x.ok && x.text.includes('put back')), JSON.stringify((await inv('assistant:actions')).map((x) => x.text)))
+
+    // An agent asks the Assistant on a card (HI-1866): its comment and a history line, and the Assistant's inbox, whose
+    // doorbell its idle session takes. Refused, with nothing written: a plain number, no text, the Assistant itself, and
+    // at Look and advise (it can't act on it). What the Assistant's fake read: it follows Hive's doorbell with
+    // hive_inbox and logs what it read.
+    const asks = () => {
+      const f = path.join(claudeHome, 'fake-wakes.jsonl')
+      return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === 'Assistant').map((w) => w.text)
+    }
+    const asksBefore = asks().length
+    const plainAsk = await asBuilder(`/v1/tasks/${n}/ask-assistant`, { text: 'Park it.' })
+    check("asking the Assistant by a plain number is refused (409, card.plainNumber)", plainAsk.status === 409 && plainAsk.body?.rule === 'card.plainNumber', JSON.stringify(plainAsk.body))
+    check('…and without text is 400', (await asBuilder(`/v1/tasks/${ref}/ask-assistant`, {})).status === 400)
+    check("…and the Assistant can't ask itself (403)", (await call(assistantToken, `/v1/tasks/${ref}/ask-assistant`, { text: 'Park it.' })).status === 403)
+    await inv('settings:update', { assistant: { control: 'look' } })
+    const lookAsk = await asBuilder(`/v1/tasks/${ref}/ask-assistant`, { text: 'Park it.' })
+    check('…and at Look and advise it is refused (409), saying to ask the user', lookAsk.status === 409 && /hive_ask_user/.test(JSON.stringify(lookAsk.body)), JSON.stringify(lookAsk.body))
+    check('…with nothing written', !(await card(n))?.comments.some((c) => c.text === 'Park it.'), JSON.stringify((await card(n))?.comments.slice(-2)))
+    await inv('settings:update', { assistant: { control: 'agents' } })
+    const askedAssistant = await asBuilder(`/v1/tasks/${ref}/ask-assistant`, { text: 'Please put this card On Hold: the user said so.' })
+    const askId = askedAssistant.body?.delivery
+    check('the builder asks the Assistant: the card and its id in the Assistant\'s inbox', askedAssistant.status === 200 && askedAssistant.body?.card === key && /^m\d+$/.test(askId ?? ''), JSON.stringify(askedAssistant.body))
+    check("…its comment and a line of its history, by the builder", (await card(n))?.comments.at(-1)?.text === 'Please put this card On Hold: the user said so.' && (await card(n))?.history.some((h) => h.what === 'Asked the Hive Assistant: "Please put this card On Hold: the user said so."' && h.by.startsWith('Builder')), JSON.stringify((await card(n))?.history.slice(-2)))
+    check("…and the Assistant's idle session is woken and reads it, whole, as the builder's request", !!(await until(() => asks().slice(asksBefore).some((t) => t.includes("Builder (alpha) asks you on ") && t.includes('<<<Please put this card On Hold: the user said so.>>>')), HUNG_MS)), JSON.stringify(asks().slice(asksBefore)))
     await inv('session:stop', home, 'assistant')
 
     // An agent's hive tool: hive_start_card runs the start intent. Called through hive-mcp.js with the builder's own

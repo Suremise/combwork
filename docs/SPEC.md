@@ -2681,7 +2681,23 @@ worded as one ("nothing is to be done for it"), never as a grant; otherwise "Thi
 an open no-code or review-skip proposal, a card in Passed its agent doesn't merge, a block), else "For you to check … if
 it grants a change {asker} can't make itself, make it". It is given only while the Assistant's hive tools are on and
 Settings → Assistant → Control lets it change cards, checked at each offer and hand-out; one it can't be given, or that
-ends unread, says so on the card and in a notice ("… couldn't be told of your answer"). **No code, proposed:** a code
+ends unread, says so on the card and in a notice ("… couldn't be told of your answer"). **An agent asking the
+Assistant (HI-1866; on 27 Oct HB6 asked it in a comment to park HI-1865 and move HI-1759 to Done on the user's answer,
+and a comment reaches no inbox: it sat an hour unseen):** `hive_ask_assistant` (`POST /v1/tasks/{card}/ask-assistant`,
+`text`), a project agent's only (the Assistant and scripts are refused, 403), on a card of its project not archived or
+in Done (another project's is unknown to it), for what only the Assistant or the user may do on it (park a card On
+Hold, move one past its rules on the user's recorded answer, unblock, reassign). It moves nothing and counts no round:
+the text is the agent's comment (at most a comment's 20,000 characters, refused rather than cut) with a history line
+("Asked the Hive Assistant: …"), and a `control` delivery to the Assistant (`assistantAsk.ts`, `assistant-ask`, from
+the agent: sender kind `agent` with its project and id) quoting it whole as an agent's request, not the user's
+decision, with the card's key, offered at once: an idle or watching Assistant (its lane watch, which carries on) is
+woken by the doorbell, a busy one told at its next tool call. The Assistant acts on it only within its Control and what
+the user decided or answered on the card, and tells the agent with `hive_message_agent`. Refused before anything is
+written (409, saying to ask the user with `hive_ask_user`) while the Assistant can't act on it (the same check as the
+relay's); one that ends unread (cancelled when Control is turned down before it is handed out, expired) says so on the
+card and in a notice ("The Hive Assistant couldn't be told of {agent}'s request …"). The card-loop skill says when to
+use it (what only the Assistant may do, already decided; a decision still the user's goes to them), coordinate-agents
+how the Assistant answers. **No code, proposed:** a code
 card that passes review with its change already in its target (nothing to merge) is proposed no code by Hive
 (`KindProposed`, once; the user confirms). Skip Review is dropped from a question's actions on a card whose rules don't
 review it (nothing to skip). A refused answer (answered or retired meanwhile) is said in a

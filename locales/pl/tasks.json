@@ -92,6 +92,8 @@
   "tasks.history.archivedHidden": "Zarchiwizowano: ukryto projekt {project}",
   "tasks.history.archivedInBatch": "Zarchiwizowano w partii „{label}” (kart: {n, number})",
   "tasks.history.archivedRemoved": "Zarchiwizowano: usunięto projekt {project} z Hive",
+  "tasks.history.assistantAskUntold": "Nie udało się przekazać Asystentowi Hive prośby {agent} dotyczącej tej karty: przeczytaj ją w komentarzach karty i zajmij się nią sam, jeśli trzeba",
+  "tasks.history.assistantAsked": "Poproszono Asystenta Hive: „{text}”",
   "tasks.history.backWithBatch": "Przywrócono z partią „{label}”",
   "tasks.history.blocked": "Zablokowano: {reason}",
   "tasks.history.context": "Przeczytaj najpierw: {refs}",

@@ -11,6 +11,7 @@ import { initInboxNotices } from './inboxNotices'
 import { initDecisionWakes } from './decisionWakes'
 // The user's answers given to the Assistant too (HI-1734): its delivery source, registered at start.
 import './answerRelay'
+import './assistantAsk'
 import { initWorkflowNotices } from './workflowNotices'
 import { initDevConsole } from './devConsoleSources'
 import { flightRecorder } from './flightRecorder'

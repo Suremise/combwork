@@ -76,7 +76,7 @@ The checks are positive and negative:
   reviews it when Hive wakes it once the card is unblocked and back in Review (#481).
   A reviewer woken by Hive's own loop wake, with no watch of its own, reviews the card and waits for the next (#405).
   A builder told no rounds or wait gets the workspace's Card loop settings for its lane and its wait; one told its own keeps them (#412).
-  The Assistant at Look and advise lists the running lanes when asked, and changes none (#500).
+  The Assistant at Look and advise lists the running lanes when asked, and changes none (#500). A builder whose card's decision needs what only the Assistant may do (park another card, move its own to Done) asks it with `hive_ask_assistant`, not in a comment, and doesn't ask the user again (HI-1866).
 - **The intents and their gates** (1.0): an agent starts, puts back, submits, reviews and gives verdicts with the intent
   tools (`hive_start_card`, `hive_submit`, `hive_start_review`, `hive_verdict`…). **work-on-card** runs in a project
   whose work an agent reviews and requires them: started, committed, submitted, stopping in Review. Most other

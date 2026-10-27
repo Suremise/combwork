@@ -9,6 +9,7 @@
   "service.advanced.notValues": "advanced.json 中的“values”应为“设置 → 值”形式的对象。",
   "service.advanced.unknown": "没有名为“{id}”的高级设置。",
   "service.answerRelay.title": "{card}：没有其他人收到你的回答",
+  "service.assistantAsk.title": "{card}：Hive 助手没有收到智能体的请求",
   "service.attachments.badFolder": "不是会话文件夹的名称。",
   "service.attachments.badRecord": "{file} 不是已移动文件的记录",
   "service.attachments.notOwn": "{folder} 是链接，或不是项目自己的文件夹，因此 Hive 不在其中保存附件。",

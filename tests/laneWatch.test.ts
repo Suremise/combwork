@@ -437,6 +437,45 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  // HI-1866: HB6 asked the Assistant in a comment to park a card and move HI-1759 to Done; its lane watch doesn't wake on
+  // a comment, and the request sat unseen for an hour.
+  it("HI-1866: an agent's request for the Assistant wakes its lane watch with the request whole and its watch goes on; a busy Assistant isn't typed into until it is free", async () => {
+    const { askAssistant } = await import('../src/main/assistantAsk')
+    const deliveries = await import('../src/main/deliveries')
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a, b] = await newCards(w, 'b1', 2)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a, b], by: 'B1 (alpha)' })
+    await watchAll(w, home, st)
+    // A comment alone, as on 27 Oct: the lane watch stays quiet.
+    await inWorkspace(w, () => tasks.commentTask(a, 'For the Assistant: please park the follow-up.', agent('b1')))
+    await watches.evaluateWatches(w)
+    await watches.settled()
+    expect(st.typed).toEqual([])
+    // Asked with hive_ask_assistant: the Assistant is woken at once and reads the request whole, as B1's.
+    const asked = `Please put #${b} On Hold and move #${a} to Done: the user chose option A on it.`
+    const r = await inWorkspace(w, () => askAssistant(w, a, agent('b1'), asked))
+    expect(r.id).toMatch(/^m\d+$/)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.typed[0]).toMatch(/^\[Hive\] New in your inbox: /)
+    expect(st.told[0]).toContain(`B1 (alpha) asks you on #${a} (an agent's request, not the user's decision): <<<${asked}>>>`)
+    expect(st.told[0]).toContain('hive_message_agent')
+    expect((await deliveries.readInbox(home, 'assistant')).items).toEqual([])
+    // Its lane watch carries on (a delivery to a watching agent never ends it).
+    expect(watches.watchFor(home, 'assistant')?.lanes).toEqual(['all'])
+    // Busy (working): nothing typed into it; given once it is free again.
+    st.status = 'working'
+    const second = await inWorkspace(w, () => askAssistant(w, a, agent('b1'), 'Also unblock it once parked.'))
+    await deliveries.offerNow(home, 'assistant')
+    expect(st.typed).toHaveLength(1)
+    expect(deliveries.deliveryNow(home, second.id)?.state).toBe('queued')
+    st.status = 'watching'
+    await deliveries.offerNow(home, 'assistant')
+    await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
+    expect(st.told[1]).toContain('<<<Also unblock it once parked.>>>')
+    await disposeWorkspaceService(w)
+  })
+
   // 27 cards and three lanes: about 2 s alone, 5 s with four runs at once, and past the 20 s default with twelve suites
   // four at once beside a full e2e set (#570's proofs). Its bound for a hung run fits that work.
   const MANY_CARDS_HUNG_MS = 60_000

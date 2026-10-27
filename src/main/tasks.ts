@@ -2393,6 +2393,26 @@ export async function commentTask(n: number, comment: string, actor: TaskActor):
   }))
 }
 
+/**
+ * An agent's request for the Hive Assistant on a card (HI-1866, assistantAsk.ts): written as its comment, with a history
+ * line, in one change of the board. `check` sees the card as it is in the change (another project's is unknown first) and
+ * throws to refuse it, so a refused request writes nothing.
+ */
+export async function askAssistantOn(n: number, asked: string, actor: TaskActor, check: (card: TaskCard) => void, ws: WorkspaceService = workspace): Promise<TaskCard> {
+  const t = commentText(asked)
+  return recordingAs(actor, () => boardLock(ws, async () => {
+    const c = await getTask(n, ws)
+    if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
+    check(c)
+    const by = actorName(actor)
+    note(c, by, storedText(HISTORY.assistantAsked, { text: clip(t) }))
+    addComment(c, by, t)
+    await saveCard(ws, n, c)
+    changed(ws)
+    return c
+  }))
+}
+
 /** Files attached with a card's change (HI-1700): staged (cardAttachments.stage), and the draft link each stands for, if any. */
 export interface ChangeAttachments {
   staging: Staging
