@@ -1333,6 +1333,10 @@ export class Workflow {
     // The head moved since the submission (a card with its own line): same change or not (§16.4.4).
     const before = await this.evidenceOf(card, s, r.options)
     const moved = args.pass && sub?.revision ? await this.platform(r.options).headMoved(card, s, r.options, { base: sub.base, revision: sub.revision, key: sub.key }) : null
+    // HI-1763 (the Assistant's design call, 26 Oct): a pass covers only the revision submitted, while it is the card's head
+    // or the same change. A line moved on to another change (a follow-up commit, OK'd or not) refuses the pass: the
+    // builder submits the new revision, which runs its checks, the user's gates and a review copy as any submission does.
+    if (args.pass && moved && !moved.same) return this.refuse(card, actor, 'verdict', { rule: 'review.headMoved', values: { card: card.key, submitted: (sub?.revision ?? '').slice(0, 7), head: moved.to.slice(0, 7) } } as GuardRefusal)
     const fin = args.pass ? await this.finishInputs(card, s, r, moved?.same ? moved.to : sub?.revision) : {}
     // HI-1734: a code card passing with nothing to merge (its change already in its target: HI-1449's checks only, which
     // others' merges had superseded) is proposed no code. Read before the write; unknown is no proposal.
@@ -1538,6 +1542,7 @@ export class Workflow {
     const values: Record<string, string | number> = { card: card.key, queue: q.state }
     if (q.state === 'queued' || q.state === 'testing' || q.state === 'paused') values.target = q.target
     if (q.state === 'queued') values.n = q.position
+    if (q.state === 'stale') values.current = (q.current ?? '').slice(0, 7)
     // What the pause waits for (#1406): the refusal's next step says it.
     if (q.state === 'paused') values.waits = pauseWait(q.reason, q.stuck)
     return { rule: 'merge.hiveMerges', values }

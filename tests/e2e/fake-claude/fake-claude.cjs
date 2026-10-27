@@ -162,6 +162,38 @@ function expiredAtLaunch() {
   }
 }
 // As Claude Code prints it: indented JSON, and exit 1 when it isn't logged in (#577).
+// An account's folder (HI-980: one in an accounts folder; a suite may trust folders in it, fake-trusted.json, as a sign-in would): `auth login` signs it in as fake-login-as.json beside the
+// accounts folder says ({ email, orgId }), writing fake-account.json (and .claude.json, as a sign-in changes it), with no
+// browser; `auth status` answers from fake-account.json, signed out without one.
+const accountHome = process.env.CLAUDE_CONFIG_DIR || ''
+const accountFolder = !!accountHome && path.basename(path.dirname(accountHome)).toLowerCase() === 'accounts'
+if (args[0] === 'auth' && accountFolder) {
+  const file = path.join(accountHome, 'fake-account.json')
+  if (args[1] === 'login') {
+    let as = { email: 'fake@example.com', orgId: 'org-fake' }
+    try {
+      as = JSON.parse(fs.readFileSync(path.join(accountHome, '..', 'fake-login-as.json'), 'utf8'))
+    } catch {
+      // The default identity.
+    }
+    console.log('Opening the browser to sign in… (the fake opens none)')
+    fs.writeFileSync(file, JSON.stringify(as))
+    fs.writeFileSync(path.join(accountHome, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: as.email } }))
+    console.log(`Signed in as ${as.email}`)
+    process.stdout.write('', () => process.exit(0))
+    return
+  }
+  let acct = null
+  try {
+    acct = JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch {
+    // Signed out.
+  }
+  const base = { authMethod: acct ? 'claude.ai' : 'none', apiProvider: 'firstParty', analyticsDisabled: false, projectsDirectory: path.join(accountHome, 'projects'), configDirectory: accountHome }
+  console.log(JSON.stringify(acct ? { loggedIn: true, ...base, email: acct.email, orgId: acct.orgId, orgName: 'Fake Org', subscriptionType: 'max' } : { loggedIn: false, ...base }, null, 2))
+  process.stdout.write('', () => process.exit(acct ? 0 : 1))
+  return
+}
 if (args[0] === 'auth') {
   const out = signedOut()
   console.log(JSON.stringify(out ? { loggedIn: false, authMethod: 'none' } : { loggedIn: true, authMethod: 'claude.ai' }, null, 2))
@@ -252,7 +284,7 @@ function runMode() {
 }
 // What it was started with, for suites that check the launch: the options, Claude Code's own variables and the
 // Agent API token Hive gave it.
-const launchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('CLAUDE_CODE_') || k.startsWith('HIVE_API_TOKEN')))
+const launchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('CLAUDE_CODE_') || k.startsWith('HIVE_API_TOKEN') || k === 'HIVE_AGENT' || k === 'CLAUDE_CONFIG_DIR'))
 fs.appendFileSync(path.join(home, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), sessionId, pid: process.pid, parent: process.ppid, opts, env: launchEnv }) + '\n')
 // How it ended, in fake-exits.jsonl in its home (#551): its own exit with the code, or an error it didn't catch (then
 // exit 1, as Node would). A launch with no line there was ended by Ctrl+C, its console closing or a kill.

@@ -77,6 +77,7 @@ interface HiveMessageValues {
   'providers.export.summary': undefined
   'providers.export.thinking': undefined
   'providers.export.you': undefined
+  'providers.memory.connection': { file: string | number; name: string | number }
   'providers.memory.user': { file: string | number }
   'providers.readiness.notInstalled': { provider: string | number }
   'providers.readiness.signedOut': { provider: string | number }

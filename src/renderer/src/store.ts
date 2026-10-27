@@ -23,6 +23,7 @@ import type { TemplateAgent, TemplateRef } from '@shared/templates'
 import type { GitTool } from '@shared/gitTool'
 import type { RunsFilter } from '@shared/progressTabs'
 import { loadActivityView, saveActivityView, type ActivityView } from './activityView'
+import { cardWorker } from '@shared/activity'
 import { boardReader } from './boardReads'
 import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkspaceUsage, RecentWorkspace } from '@shared/types'
 import type { PresetId } from '@shared/workflow/options'
@@ -195,6 +196,8 @@ interface State {
   settings: AppSettings | null
   /** Settings → Advanced (#367): advanced.json's overrides, this window's workspace's own values and the installed CLIs. */
   advanced: AdvancedState | null
+  /** Moves on each time main says Hive's accounts changed (HI-980): Settings → Accounts reads them again. */
+  connectionsChanged: number
   workspace: WorkspaceInfo | null
   /** The recent workspaces as this window sees them (#144). */
   recent: RecentWorkspace[]
@@ -227,6 +230,19 @@ interface State {
   sidebarWidth: number
   /** Projects sidebar collapsed to a rail of status dots. */
   sidebarCompact: boolean
+  /**
+   * The Projects sidebar folded to its rail for now (HI-1737): the window too narrow for it beside the side panels and
+   * the work (layoutRoom.ts). Never saved; `sidebarUnfolded`: the user's Expand Sidebar meanwhile, until there's room.
+   */
+  sidebarFolded: boolean
+  sidebarUnfolded: boolean
+  /**
+   * The Progress panel folded to its strip for now (HI-1737, the Assistant's rule): the work short of its least width
+   * even with the sidebar given way. Never saved (the panel stays open in what is kept); `progressUnfolded`: the user
+   * opened it meanwhile, until there's room.
+   */
+  progressFolded: boolean
+  progressUnfolded: boolean
   /** Set to select a session in its project's Sessions tab. */
   /** Open the Sessions tab on a session, and in it at its nth compaction (from 0, oldest first) when given. */
   sessionsJump: { project: string; id: string; nonce: number; compaction?: number } | null
@@ -479,6 +495,7 @@ interface State {
 export const useStore = create<State>(() => ({
   settings: null,
   advanced: null,
+  connectionsChanged: 0,
   workspace: null,
   recent: [],
   openProgress: null,
@@ -500,6 +517,10 @@ export const useStore = create<State>(() => ({
   sidebarVisible: true,
   sidebarWidth: 280,
   sidebarCompact: false,
+  sidebarFolded: false,
+  sidebarUnfolded: false,
+  progressFolded: false,
+  progressUnfolded: false,
   sessionsJump: null,
   activityFilters: {},
   filesJump: null,
@@ -910,9 +931,15 @@ export async function setAssistantSide(side: AssistantPanelSide): Promise<void> 
 
 const progressOpenKey = (ws: string): string => `progress-open:${ws.toLowerCase()}`
 
-/** Whether this window's workspace's Progress panel is open (else it is folded to its strip). */
+/** Whether this window's workspace's Progress panel shows open (else it is folded to its strip, by the user or for the room). */
 export function useProgressOpen(): boolean {
-  return useStore((s) => !!s.workspace && s.panes[progressOpenKey(s.workspace.path)] === 1)
+  return useStore((s) => !!s.workspace && s.panes[progressOpenKey(s.workspace.path)] === 1 && !(s.progressFolded && !s.progressUnfolded))
+}
+
+/** Whether the user left the Progress panel open (what is kept), folded for the room or not (HI-1737's layoutRoom). */
+export function progressWanted(): boolean {
+  const ws = get().workspace?.path
+  return !!ws && get().panes[progressOpenKey(ws)] === 1
 }
 
 /** The Progress panel's filter as chosen for this window's workspace (#251), if any. */
@@ -936,14 +963,15 @@ export function setProgressFilter(f: ProgressFilter): void {
 export function setProgressOpen(open: boolean): void {
   const ws = get().workspace?.path
   if (!ws) return
-  set((s) => ({ panes: { ...s.panes, [progressOpenKey(ws)]: open ? 1 : 0 } }))
+  // Folded for the room (HI-1737): opening it shows it anyway, until there's room; folding it is the user's again.
+  set((s) => ({ panes: { ...s.panes, [progressOpenKey(ws)]: open ? 1 : 0 }, progressUnfolded: open && s.progressFolded }))
   void window.hive.invoke('ui:setPane', progressOpenKey(ws), open ? 1 : 0)
 }
 
 /** Whether the Progress panel is open now (for commands). */
 export function progressIsOpen(): boolean {
-  const ws = get().workspace?.path
-  return !!ws && get().panes[progressOpenKey(ws)] === 1
+  const s = get()
+  return progressWanted() && !(s.progressFolded && !s.progressUnfolded)
 }
 
 /** Whether a workspace's Assistant panel was left open. */
@@ -965,9 +993,11 @@ export function setActivity(a: Activity): void {
 }
 
 /** Collapses the Projects sidebar to a rail of status dots, or expands it again. Either way the Projects list is shown. */
-export function toggleCompactSidebar(compact = !get().sidebarCompact): void {
+export function toggleCompactSidebar(compact = !(get().sidebarCompact || (get().sidebarFolded && !get().sidebarUnfolded))): void {
   set((s) => ({
     sidebarCompact: compact,
+    // Folded for the room (HI-1737): Expand shows the list anyway, until there's room again; Collapse folds it back.
+    sidebarUnfolded: s.sidebarFolded && !compact,
     sidebarVisible: true,
     lastSideActivity: 'projects',
     activity: s.activity === 'docs' || s.activity === 'settings' ? s.activity : 'projects'
@@ -988,18 +1018,33 @@ export function openInSessionsTab(path: string, id: string, compaction?: number)
 }
 
 /**
- * Opens a project's Activity tab (#1254), filtered to an agent's work or a card's (null: as it was left). Its range,
- * Hide finished and pause stay as they were (HI-1677).
+ * Opens a project's Activity tab (#1254), frozen (HI-1743): filtered to an agent, its tab shown; or to a card, on the tab
+ * of the agent working on it (`agentId`); null: as it was left. Hide finished and the zoom stay as they were.
  */
 export function openActivity(path: string, filter: { agentId?: string; card?: number } | null): void {
   set((s) => {
     const was = s.activityFilters[path] ?? loadActivityView(path)
-    const view: ActivityView = filter ? { ...was, agents: filter.agentId ? [filter.agentId] : [], cards: filter.card !== undefined ? [filter.card] : [] } : was
+    const opened = Date.now()
+    const view: ActivityView = filter ? { ...was, agents: filter.agentId && filter.card === undefined ? [filter.agentId] : [], cards: filter.card !== undefined ? [filter.card] : [], ...(filter.agentId ? { tab: filter.agentId } : {}), opened } : { ...was, opened }
     saveActivityView(path, view)
     return { activityFilters: { ...s.activityFilters, [path]: view }, selectedProject: path }
   })
   showView('projects')
   setProjectTab(path, 'activity')
+}
+
+/** Whether a card has an Activity to open (HI-1743): in progress (Doing or Review) in a project of this window. */
+export const cardHasActivity = (c: Pick<TaskCard, 'column' | 'project' | 'archived'>): boolean => !c.archived && !!c.project && (c.column === 'doing' || c.column === 'review')
+
+/** Opens a card's Activity (HI-1743): its project's tab, frozen, on the agent working on it (its builder while it runs, else its reviewer). */
+export function openCardActivity(c: TaskCard): void {
+  const p = get().workspace?.projects.find((x) => x.name.toLowerCase() === c.project.toLowerCase())
+  if (!p || !cardHasActivity(c)) return
+  // The agent on this card now: a builder gone on to its next card isn't (HR6's round 1).
+  const asActivity = (t: TaskCard) => ({ number: t.number, label: '', title: t.title, column: t.column, builder: t.agent, reviewer: t.review?.agent ?? null })
+  const cards = get().tasks.filter((t) => !t.archived && t.project.toLowerCase() === c.project.toLowerCase()).map(asActivity)
+  const worker = cardWorker(asActivity(c), cards, (id) => !!p.agents.find((a) => a.id === id)?.live)
+  openActivity(p.path, { card: c.number, ...(worker ? { agentId: worker } : {}) })
 }
 
 /** Shows an agent's pane on the Session tab and focuses it. */

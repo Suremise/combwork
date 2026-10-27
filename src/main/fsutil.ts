@@ -426,6 +426,7 @@ export async function writeTextAtomic(path: string, text: string): Promise<void>
  * away meanwhile (a closed workspace) never renames late. `renameOnce` is the single rename (tests replace it).
  */
 export async function renameRetrying(from: string, to: string, tries = 20, guard?: () => void, renameOnce: (a: string, b: string) => Promise<void> = rename): Promise<void> {
+  const started = Date.now()
   for (let attempt = 0; ; attempt++) {
     guard?.()
     try {
@@ -433,10 +434,59 @@ export async function renameRetrying(from: string, to: string, tries = 20, guard
       return
     } catch (e) {
       const code = (e as NodeJS.ErrnoException).code
-      if (attempt >= tries || !(code === 'EPERM' || code === 'EACCES' || code === 'EBUSY')) throw e
+      const held = code === 'EPERM' || code === 'EACCES' || code === 'EBUSY'
+      if (held && attempt >= tries) renameGaveUp(to, code, attempt + 1, Date.now() - started)
+      if (attempt >= tries || !held) throw e
       await new Promise((r) => setTimeout(r, 15 + attempt * 10))
     }
   }
+}
+
+/**
+ * Who has a file open (fileHolders.ts), for a rename that gave up: `holders` is set by main's entry (none in workers and
+ * unit tests). Each lookup starts a process, so at most `max` run at once, one per file, each given up after `timeoutMs`.
+ */
+export const renameDiagnostics: { holders: ((path: string) => Promise<string[]>) | null; max: number; timeoutMs: number } = { holders: null, max: 2, timeoutMs: 30_000 }
+
+// The files whose holders are being looked up (lower-cased paths).
+const lookingUp = new Set<string>()
+
+/** How many holder lookups are under way (tests). */
+export const holderLookupsRunning = (): number => lookingUp.size
+
+/**
+ * A replace that kept failing because the file was held (HI-1749: a view switch's "EPERM … rename" reached the window and
+ * nothing of it hive.log): said with the file, the code and how long it was tried, then which processes have it open, as
+ * far as Windows can say (it may have let go by then). A lookup already under way for the file says it for this one too;
+ * with `max` under way, none is started (never queued: failures while Hive's I/O struggles mustn't pile up processes).
+ */
+function renameGaveUp(to: string, code: string, tries: number, ms: number): void {
+  log.warn(`replacing ${userText(to)} failed with ${code} after ${tries} tries over ${ms} ms: another process had it open`)
+  const holders = renameDiagnostics.holders
+  const key = to.toLowerCase()
+  if (!holders || lookingUp.has(key)) return
+  if (lookingUp.size >= renameDiagnostics.max) {
+    log.warn(`not looking up what had ${userText(to)} open: ${lookingUp.size} lookups already under way`)
+    return
+  }
+  lookingUp.add(key)
+  let timer: NodeJS.Timeout | undefined
+  const timedOut = new Promise<null>((res) => {
+    timer = setTimeout(() => res(null), renameDiagnostics.timeoutMs)
+    timer.unref?.()
+  })
+  void Promise.race([holders(to), timedOut])
+    .then(
+      (found) => {
+        if (found === null) log.warn(`could not tell what had ${userText(to)} open: the lookup took over ${renameDiagnostics.timeoutMs} ms`)
+        else log.warn(`${userText(to)} was open in ${found.length ? found.map((h) => userText(h)).join(', ') : 'no process Windows could name (it may have let go)'}`)
+      },
+      () => undefined
+    )
+    .finally(() => {
+      clearTimeout(timer)
+      lookingUp.delete(key)
+    })
 }
 
 /**

@@ -328,7 +328,8 @@ kbd {
 
 .main-area {
   flex: 1;
-  min-width: 0;
+  /* The work keeps its room while it can (HI-1737): layoutRoom.ts sets the least width the window leaves it. */
+  min-width: var(--main-min, 0px);
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -606,7 +607,10 @@ kbd {
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  min-width: 200px;
+  /* Narrowed for the work only once the side panels have given way (their shrink far outweighs this one), down to its
+     least width (HI-1737); a drag still keeps it 200 px or more. */
+  flex-shrink: 1;
+  min-width: 160px;
   max-width: 600px;
   position: relative;
 }
@@ -4168,6 +4172,65 @@ h2.section#unused-worktrees {
   margin: 0 0 6px;
   line-height: 1.45;
 }
+/* Settings → Accounts (HI-980) */
+.accounts-provider {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.account-row {
+  align-self: stretch;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.account-main {
+  flex: 1 1 360px;
+  min-width: 220px;
+}
+.account-name {
+  font-weight: 600;
+}
+.account-state {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 2px;
+}
+.account-state.state-signedIn .codicon {
+  color: var(--success);
+}
+.account-state.state-changed .codicon,
+.account-state.state-missing .codicon,
+.account-warning .codicon {
+  color: var(--warning);
+}
+.account-warning {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 4px;
+}
+.account-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.account-default {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+.account-signin {
+  align-self: stretch;
+  margin-top: 10px;
+}
 .task-terminal {
   height: 280px;
   background: #1a1a1a;
@@ -7064,7 +7127,7 @@ button.agent-place:hover {
   justify-content: space-between;
   gap: 8px 12px;
 }
-/* The Activity tab (#1254): the project's live work as a tree running left to right, its details beside it. */
+/* The Activity tab (#1254, HI-1743): a tab per running agent, its current work as a list, its details beside it. */
 .activity-tab {
   display: flex;
   height: 100%;
@@ -7089,96 +7152,171 @@ button.agent-place:hover {
   display: flex;
   gap: 2px;
 }
-.activity-filter {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.activity-tree {
+/* The list (HI-1743): a header line, then each agent's groups of rows, top to bottom; nothing off to the side. */
+.activity-list {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 12px 14px;
+  padding: 10px 14px 16px;
 }
-.activity-canvas {
-  position: relative;
-  transform-origin: 0 0;
+.activity-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: 6px;
+  font-size: 13px;
 }
-/* The tree's box at its zoom (HI-1678): the canvas is scaled inside it, so the scrollbars follow the zoom. */
-.activity-scaled {
-  position: relative;
-}
-.activity-zoom {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-.activity-zoom-value {
-  min-width: 46px;
+.activity-card-key {
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-.activity-lines {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+.activity-card-title {
+  color: var(--fg-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
-.activity-lines path {
-  fill: none;
-  stroke: var(--border);
-  stroke-width: 1;
+.activity-part + .activity-part {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
 }
-.activity-node {
-  position: absolute;
-  box-sizing: border-box;
+.activity-part-head {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 8px 0 2px;
-  border: 1px solid var(--border-subtle);
-  border-left: 3px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-elevated);
-  cursor: pointer;
-  overflow: hidden;
+  font-size: 12px;
+  margin-bottom: 2px;
 }
-.activity-node:hover {
+.activity-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.activity-own {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: normal;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 900px;
+  padding: 4px 8px;
+  border-left: 3px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.activity-row + .activity-row {
+  margin-top: 2px;
+}
+.activity-row:hover {
   background: var(--bg-hover);
 }
-.activity-node.selected,
-.activity-node:focus-visible {
+.activity-row.selected,
+.activity-row:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
 }
-.activity-node.act-working {
+.activity-row-plain {
+  cursor: default;
+}
+.activity-row-plain:hover {
+  background: transparent;
+}
+.activity-row.act-working {
   border-left-color: var(--accent);
 }
-.activity-node.act-waiting {
+.activity-row.act-waiting {
   border-left-color: var(--state-waiting, var(--warning));
 }
-.activity-node.act-failed {
+.activity-row.act-failed {
   border-left-color: var(--error);
 }
-.activity-node.act-done {
+.activity-row.act-done {
   border-left-color: var(--success);
-}
-.activity-node.act-more {
-  border-style: dashed;
-  background: transparent;
-  color: var(--fg-muted);
-}
-.activity-node.act-card {
-  border-left-color: var(--info);
-}
-/* Finished work dims where it is; what ended (or left the range) dims more, until a refresh (HI-1677). */
-.activity-node.act-done {
   opacity: 0.72;
 }
-.activity-node.act-gone {
-  opacity: 0.45;
-  border-style: dashed;
+/* Live, what ended fades out where it was, then leaves (HI-1743: FADE_MS). */
+.activity-row.act-gone {
+  border-left-style: dashed;
+  animation: activity-fade 1.5s ease-in forwards;
 }
-.activity-range button {
-  padding: 2px 8px;
+@keyframes activity-fade {
+  from { opacity: 0.6; }
+  to { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .activity-row.act-gone { animation: none; opacity: 0.45; }
+}
+.activity-row-text {
+  min-width: 0;
+  flex: 0 1 auto;
+  line-height: 1.25;
+}
+.activity-row-title {
+  font-size: 12px;
+  color: var(--fg-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.activity-row-sub {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* A tab per agent (HI-1743), scrolling sideways when they don't fit, as the Progress panel's tabs. */
+.activity-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.activity-agent-tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.activity-agent-tab:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+.activity-agent-tab.active {
+  color: var(--fg-strong);
+  border-bottom-color: var(--accent);
+}
+.activity-agent-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.activity-agent-tab-card {
+  font-variant-numeric: tabular-nums;
 }
 .activity-pick.on,
 .activity-live.on {
@@ -7196,43 +7334,10 @@ button.agent-place:hover {
   background: var(--accent-soft);
   border-color: var(--accent);
 }
-.activity-paused {
-  font-size: 12px;
-}
-.activity-twisty {
+/* Just after what it marks, not off at the row's far end. */
+.activity-pulse {
   flex: none;
-  width: 18px;
-  height: 18px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--fg-muted);
-  cursor: pointer;
-}
-.activity-node-text {
-  min-width: 0;
-  flex: 1;
-  line-height: 1.2;
-}
-.activity-node-title {
-  font-size: 12px;
-  color: var(--fg-strong);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.activity-node-sub {
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.activity-spin {
-  flex: none;
-  color: var(--accent);
+  margin-left: 2px;
 }
 .activity-details {
   flex: none;
@@ -8054,8 +8159,10 @@ button.mode-badge.badge:hover {
   position: relative;
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
-  min-width: 300px;
+  /* Gives way first when the window is short of room for the work (HI-1737), down to its least width: 240 px, or less
+     (to 190) once everything else has given way (layoutRoom.ts sets it). */
+  flex-shrink: 1000;
+  min-width: var(--assistant-min, 240px);
   max-width: 70vw;
   background: var(--bg-sidebar);
   border-left: 1px solid var(--border-subtle);
@@ -8120,6 +8227,9 @@ button.mode-badge.badge:hover {
   font: inherit;
   font-size: 11px;
   cursor: pointer;
+  /* Squeezed past its icon and caret (the panel narrowed for the work, HI-1737): cut inside the pill, never drawn over
+     Start beside it. */
+  overflow: hidden;
 }
 .assistant-mode:hover {
   color: var(--fg);
@@ -10940,7 +11050,9 @@ textarea.input.task-blocked-input {
   position: relative;
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
+  /* Gives way after the Assistant's panel and before the sidebar (HI-1737: their shrinks far apart), down to its least
+     width. */
+  flex-shrink: 10;
   min-width: 240px;
   max-width: 50vw;
   background: var(--bg-sidebar);

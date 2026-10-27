@@ -3,6 +3,7 @@ import type { ActivityDetail, ActivityNow, ActivityTurns, EndProcessResult } fro
 import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
+import type { ConnectionsView } from './accounts'
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
   ArchiveBatch,
@@ -51,6 +52,7 @@ import type {
   PurgeTarget,
   ModeInfo,
   RecentWorkspace,
+  Connection,
   AgentInstallInfo,
   AppConfig,
   AppInfo,
@@ -908,6 +910,28 @@ export interface HiveRequests {
   'provider:retryUpdate': (provider: ProviderId) => string
   /** Stops every running agent of a provider (turning it off). */
   'provider:stopAgents': (provider: ProviderId) => void
+
+  /** Hive's accounts (HI-980) and this window's workspace's choice of them; `check`: each checked again (Settings shown). */
+  'connections:list': (check?: boolean) => ConnectionsView
+  /** Adds an account (its folder and junctions made); returns it, for its Sign in. */
+  'connections:add': (provider: ProviderId, name: string) => Connection
+  'connections:rename': (id: string, name: string) => void
+  /** Removes an account and its folder for good (refused while it is in use). */
+  'connections:remove': (id: string) => void
+  /** Opens the account's sign-in (the CLI's own) in a terminal; returns the terminal's key. */
+  'connections:signIn': (id: string) => string
+  /** Takes on the login an account is now signed in as (its change answered). */
+  'connections:keepLogin': (id: string) => void
+  /** Turns an account on or off in this window's workspace. */
+  'connections:setOn': (id: string, on: boolean) => void
+  /** Makes an account this window's workspace's default for its CLI. */
+  'connections:setDefault': (id: string) => void
+  /** The Assistant's own connection for a CLI in this window's workspace (HI-1755); null: the workspace's default. */
+  'connections:setAssistant': (provider: ProviderId, id: string | null) => void
+  /** Switches this window's workspace's running agents whose connection isn't the one chosen now, each at its next safe point. */
+  'connections:switchAffected': () => { projectPath: string; agentId: string; result: 'queued' | 'waiting' | 'notRunning' }[]
+  /** Switches one agent to the connection chosen for it now, at its next safe point (HI-1755). */
+  'session:switchConnection': (projectPath: string, agentId: string) => 'queued' | 'waiting' | 'notRunning'
 
   'api:info': () => AgentApiInfo
   'api:regenerateToken': () => AgentApiInfo

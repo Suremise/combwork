@@ -13,9 +13,10 @@
 //   returning copy has been held back past Settings → Advanced's bound.
 // - Returning (`returnCopy`: a verdict, a review given up, the run's end) makes it `returning`, never free at once. The
 //   quiescence barrier frees it only when, in this order: no Progress run with its folder in the copy is running; its
-//   lease's job (an isolated run's processes) is settled (ended and seen gone, its journal sealed: slotJobs.ts); its
-//   holder agent isn't in a turn and has no background tasks (or has stopped); and a rename of its folder aside and
-//   back proves no process has it open. Until then it stays returning, looked at again on every lease and refresh.
+//   lease's job (an isolated run's processes) is settled (ended and seen gone, its journal sealed: slotJobs.ts); a
+//   review's holder agent isn't in a turn and has no background tasks (or has stopped; a check's isn't waited for, its
+//   processes all in its job: HI-1764); and a rename of its folder aside and back proves no process has it open. Until
+//   then it stays returning, tried again within seconds of its return (`soon`), then on every lease and refresh.
 // - Restart and crash: a lease whose holder Hive is gone, or (this Hive's) whose run is over, is returned and goes
 //   through the same barrier: a copy is never taken for quiet because Hive restarted. Operations (leasing, removal) own a
 //   copy as slots' do (slots.ts): token-fenced writes, taken over only once their holder process is gone.
@@ -31,7 +32,7 @@ import { basename, join } from 'path'
 import { samePlace } from './fsutil'
 import { git } from './git'
 import { createLogger, userText } from './logger'
-import { deletingIn, IDLE_MS, lockHash, OpLost, quiet, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRunner, type SlotRunEnd } from './slots'
+import { deletingIn, folderThere, IDLE_MS, lockHash, OpLost, quiet, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRunner, type SlotRunEnd } from './slots'
 import { copyIgnored, listWorktrees } from './worktrees'
 
 const log = createLogger('copies')
@@ -40,6 +41,8 @@ const log = createLogger('copies')
 export const COPIES_DIR = 'copies'
 /** What a lease's operation taken over from a gone holder leaves as the copy's error. */
 export const INTERRUPTED = 'its reset was interrupted'
+/** The waits before a copy held back as it was returned is tried again (CopyPool.soon): about 16 s in all. */
+export const RETRY_MS = [500, 1000, 2000, 4000, 8000]
 
 export type CopyState = 'creating' | 'free' | 'leased' | 'returning' | 'dirty' | 'gone'
 export type CopyKind = 'review' | 'check'
@@ -451,6 +454,8 @@ export class CopyPool {
 
   async close(): Promise<void> {
     this.life.abort()
+    for (const t of this.retrying.values()) clearTimeout(t)
+    this.retrying.clear()
     await Promise.allSettled([...this.running])
   }
 
@@ -533,7 +538,7 @@ export class CopyPool {
         return { why: 'noCopy', size: 0 }
       }
       const opts = await this.deps.options()
-      let made = fresh || copy.state === 'gone' || !existsSync(copy.folder)
+      let made = fresh || copy.state === 'gone' || !(await folderThere(copy.folder))
       if (!made && !(await this.listed(copy.folder))) {
         await this.store.fenced(name, token, (db) => {
           this.store.dropIn(db, lease.id, 'gone')
@@ -621,13 +626,46 @@ export class CopyPool {
   async returnCopy(lease: string, why: string): Promise<boolean> {
     const l = await this.store.returnLease(lease, why)
     if (!l) return false
-    await this.tryFree(l.copy)
+    if (await this.tryFree(l.copy)) this.soon(l.copy)
     return true
+  }
+
+  /** The copies being tried again soon (soon), with their timers. */
+  private readonly retrying = new Map<string, NodeJS.Timeout>()
+
+  /**
+   * A returned copy held back as it was returned (its run's processes still ending, a handle not let go yet): tried again
+   * after RETRY_MS, then each wait twice the last, until freed or no longer returning; the pools' looks (every 30 s) go on
+   * after (HI-1764: freed within seconds of its run ending, not at the next look).
+   */
+  private soon(name: string, at = 0): void {
+    if (this.closed || at >= RETRY_MS.length || this.retrying.has(name)) return
+    const t = setTimeout(() => {
+      this.retrying.delete(name)
+      if (this.closed) return
+      const p = this.tryFree(name).then(
+        (held) => {
+          if (held) this.soon(name, at + 1)
+        },
+        (e) => log.warn(`freeing ${userText(name)}`, e)
+      )
+      this.running.add(p)
+      void p.finally(() => this.running.delete(p))
+    }, RETRY_MS[at])
+    t.unref?.()
+    this.retrying.set(name, t)
+  }
+
+  /** The copies not free now, for a wait's reply: each lease not freed, since when, and what last held a returning one back. */
+  inUse(): { copy: string; kind: CopyKind; card: number; from: string; returned: string | null; by: string | null }[] {
+    return this.store.unfreed().map((l) => ({ copy: l.copy, kind: l.kind, card: l.card, from: l.from, returned: l.returned, by: l.returned ? (this.held.get(l.id)?.by ?? null) : null }))
   }
 
   /**
    * The quiescence barrier for a returning copy: freed only when, in order, no run is in it, its lease's job is settled,
-   * its holder is idle, and no process holds its folder. What holds it back, or null once freed (or nothing to free).
+   * (a review's) its holder is idle, and no process holds its folder. What holds it back, or null once freed (or nothing
+   * to free). A check's holder isn't waited for (HI-1764): every process of its run is in its job, so a builder busy with
+   * its card (as one in a card loop always is) kept each check copy it had used, and reviewers got none.
    */
   async tryFree(name: string): Promise<CopyHeld | null> {
     const c = this.store.copy(name)
@@ -637,11 +675,11 @@ export class CopyPool {
     const run = this.deps.runIn(c.folder)
     if (run) return hold({ why: 'run', by: run })
     if (l.job && !(await this.deps.settle(l.job))) return hold({ why: 'job', by: `its run's processes (${l.job})` })
-    if (l.agent) {
+    if (l.agent && l.kind === 'review') {
       const busy = this.deps.holderBusy(l.agent)
       if (busy) return hold({ why: 'holder', by: busy })
     }
-    if (existsSync(c.folder) && !(await quiet(c.folder))) return hold({ why: 'process', by: 'a process with a file or folder open in it' })
+    if ((await folderThere(c.folder)) && !(await quiet(c.folder))) return hold({ why: 'process', by: 'a process with a file or folder open in it' })
     if (await this.store.free(l.id, name)) this.held.delete(l.id)
     return null
   }
@@ -670,7 +708,7 @@ export class CopyPool {
     }
     for (const c of this.store.copies()) {
       if (c.state === 'returning') await this.tryFree(c.name)
-      else if (c.state === 'free' && !existsSync(c.folder)) await this.store.markGone(c.name)
+      else if (c.state === 'free' && !(await folderThere(c.folder))) await this.store.markGone(c.name)
     }
   }
 
@@ -707,7 +745,7 @@ export class CopyPool {
           })
           return
         }
-        const to: CopyState = existsSync(c.folder) ? 'free' : 'gone'
+        const to: CopyState = (await folderThere(c.folder)) ? 'free' : 'gone'
         await this.store.fenced(c.name, token, (db) => this.store.setIn(db, c.name, to, {}, { op: null, ...job }))
       } catch (e) {
         if (!(e instanceof OpLost)) throw e
@@ -733,7 +771,7 @@ export class CopyPool {
       try {
         const run = this.deps.runIn(c.folder)
         if (run) return await keep({ why: 'run' as const, by: run })
-        if (existsSync(c.folder)) {
+        if (await folderThere(c.folder)) {
           if (!(await quiet(c.folder))) return await keep({ why: 'process' as const, by: 'a process with a file or folder open in it' })
           await this.store.fenced(name, token, () => undefined)
           // A copy holds nobody's work (detached at a revision): its build outputs go with it.

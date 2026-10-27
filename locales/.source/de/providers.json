@@ -75,6 +75,7 @@
   "providers.export.summary": "Summary",
   "providers.export.thinking": "Thinking",
   "providers.export.you": "You",
+  "providers.memory.connection": "{file} of connection {name} (its agents, all projects)",
   "providers.memory.user": "User {file} (all projects)",
   "providers.readiness.notInstalled": "{provider} is not installed.",
   "providers.readiness.signedOut": "{provider} is not signed in.",

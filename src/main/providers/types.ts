@@ -124,6 +124,9 @@ export interface UpdateRetry {
   notice: ProviderUpdateRetry
 }
 
+/** A home folder's sign-in, as its CLI reports it (HI-980): `ok: false` when it couldn't be told, `error` in English. */
+export type ConnectionStatus = { ok: true; loggedIn: boolean; email?: string; orgId?: string; plan?: string | null } | { ok: false; error: string }
+
 export interface CommandSpec {
   file: string
   args: string[]
@@ -363,6 +366,16 @@ export interface ProviderAdapter {
   /** A known update failure's explanation and explicit retry, if this installer supports one. */
   updateRetry?(executable: string, exitCode: number): UpdateRetry | null
   loginCommand(executable: string): CommandSpec
+  /**
+   * Who a home folder is signed in as (HI-980: an account's folder, given in `env` under the descriptor's
+   * `capabilities.connections.homeEnv`), from the CLI's own status: never a token. `ok: false` when it couldn't be told
+   * (a timeout, output it couldn't read), which isn't signed out.
+   */
+  accountStatus?(executable: string, env: NodeJS.ProcessEnv): Promise<ConnectionStatus>
+  /** Where a shared folder of an account (capabilities.connections.shared) links to: that folder of the CLI's own home. */
+  accountSharedTarget?(name: string): string
+  /** Whether a file in an account's folder is one that changes when the CLI signs in or out there: watched, never read. */
+  accountLoginFile?(name: string): boolean
   /** A one-time setup task (Codex's Windows sandbox), when the provider has one. */
   setupCommand?(executable: string): CommandSpec
   /** The CLI's own home (its sign-in and config) as Hive's sessions get it: what a test copy notes beside the CLI (#368). */
@@ -377,7 +390,8 @@ export interface ProviderAdapter {
   /** Extra lines for Help → Copy Diagnostics (Codex: its Windows sandbox), with no paths or names in them. */
   diagnostics?(): string[]
   /** The CLI's own default model from its settings, if set. */
-  configuredDefaultModel(): string | null
+  /** The CLI's own default model from its settings; `home`: a connection's home (HI-1755) rather than the CLI's own. */
+  configuredDefaultModel(home?: string): string | null
   /** Whether a model seen in a transcript is this provider's (to learn the CLI's default). */
   ownsModel(model: string): boolean
   /** Environment variables to remove from sessions: a parent session's identity when Hive runs inside one. */
@@ -567,10 +581,13 @@ export interface ProviderAdapter {
   exportSubtitle(sessionId: string, project: string): string
 
   // Project files
-  memorySources(projectPath: string): Promise<MemorySource[]>
+  /** `homes`: the connections' homes on in the project's workspace (HI-1755), whose user memory replaces the CLI's own home's. */
+  memorySources(projectPath: string, homes?: readonly { id: string; name: string; home: string }[]): Promise<MemorySource[]>
   /** Files in the CLI's own folder Hive may show and edit (instructions, memory); false for anything else. */
-  fileAllowed(path: string, write: boolean): boolean
-  skillRoots(): SkillRoots
+  /** `homes`: the connections' homes (HI-1755) to allow in place of the CLI's own home. */
+  fileAllowed(path: string, write: boolean, homes?: readonly string[]): boolean
+  /** `home`: a connection's home (HI-1755) rather than the CLI's own. */
+  skillRoots(home?: string): SkillRoots
   /** MCP servers a project defines in the CLI's own config, which Hive leaves off until copied to the workspace. */
   projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>>
 

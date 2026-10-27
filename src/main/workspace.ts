@@ -18,6 +18,7 @@ import { fmt, msg, tr } from '../shared/i18n'
 import { HiveError, hiveError } from './hiveError'
 import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSessionState, ProjectConfig, ProjectInfo, RemovedData, SessionRecord, WorkspaceConfig, WorkspaceInfo, WorkspaceMoved } from '../shared/types'
 import { config } from './config'
+import { changesConfig, viewOf, withoutView } from '../shared/projectView'
 import { emit, emitTo } from './events'
 import { containsPlace, insideReal, isDir, placeKey, readJson, readKeptJson, removePath, retryWhileSaving, samePlace, withFileLock, writeKeptJson, type KeptReadOptions } from './fsutil'
 import { admit, dismiss, setFenceReason } from './openingFence'
@@ -35,6 +36,9 @@ import { duplicateAgentNames, suggestAgentName } from '../shared/agentNames'
 import { NO_PROJECT_IDS, isProjectId, settleProjectIds, type ProjectIdEntry, type ProjectIdIndex } from '../shared/projectIds'
 
 const log = createLogger('workspace')
+
+/** Where this user's view of a project is kept (AppConfig.ui.projectViews, HI-1749): by its id, which a rename or a move keeps, else by its folder. */
+export const projectViewKey = (cfg: Pick<ProjectConfig, 'id'>, projectPath: string): string => (cfg.id ? `id:${cfg.id}` : `path:${resolve(projectPath).toLowerCase()}`)
 /** A project's read for the window this slow is logged with its parts' times (HI-1694). */
 const SLOW_PROJECT_READ_MS = 1000
 /** What the board keeps in .hive (#1017): its database and the files beside it, the cards' old folders, backups and the deleted cards' staging. */
@@ -159,6 +163,8 @@ export class WorkspaceService {
   static bringItemsUpToDate: ((fresh: boolean) => Promise<void>) | null = null
   /** Its skills and modes being brought up to date as it opened, until they are (it never fails). */
   private itemsSynced: Promise<void> = Promise.resolve()
+  /** Whether itemsSynced hasn't ended yet: a close waits only then (HI-1747). */
+  private itemsSyncing = false
 
   /** Once the open has brought its bundled skills and modes up to date: what a launch reads of them waits for it. */
   itemsUpToDate(): Promise<void> {
@@ -425,7 +431,13 @@ export class WorkspaceService {
         this.emit({ type: 'modes-changed' })
       })
       .catch((e) => log.warn("updating the workspace's bundled skills and modes", e))
-    this.itemsSynced = after.track('its bundled skills and modes', items, () => began) // i18n-ignore: a part of a log line's timing
+    const synced = after.track('its bundled skills and modes', items, () => began) // i18n-ignore: a part of a log line's timing
+    this.itemsSynced = synced
+    this.itemsSyncing = true
+    const ended = (): void => {
+      if (this.itemsSynced === synced) this.itemsSyncing = false
+    }
+    void synced.then(ended, ended)
     let ok = false
     try {
       await inWorkspace(this, async () => WorkspaceService.onOpened?.(fresh, after)).catch((e) => log.warn('opening the workspace', e))
@@ -453,8 +465,9 @@ export class WorkspaceService {
 
   async close(): Promise<void> {
     // Its skills and modes still being brought up to date (HI-1705) finish first: they are written into this workspace's
-    // .hive, by the path this service has until it closes.
-    await this.itemsSynced
+    // .hive, by the path this service has until it closes. Only while they are going (HI-1747): an await of nothing would
+    // let in what starts before the abort below, which a close with no closing tasks has always refused at once.
+    if (this.itemsSyncing) await this.itemsSynced
     if (this.path) {
       const was = this.path
       for (const t of WorkspaceService.closingTasks) await t(was).catch((e) => log.warn('closing the workspace', e))
@@ -526,7 +539,7 @@ export class WorkspaceService {
     await whenAll([join(h, 'shared', 'handovers'), join(h, 'skills'), join(h, 'mcp'), join(h, 'tasks')].map((d) => mkdir(d, { recursive: true })))
     const hr = join(h, 'shared', 'handovers', 'README.md')
     await whenAll([
-      existsSync(join(h, 'workspace.json')) ? undefined : writeKeptJson(join(h, 'workspace.json'), DEFAULT_WORKSPACE_CONFIG),
+      existsSync(join(h, 'workspace.json')) ? undefined : writeKeptJson(join(h, 'workspace.json'), newWorkspaceConfig()),
       existsSync(join(h, 'README.md')) ? undefined : writeFile(join(h, 'README.md'), WORKSPACE_README),
       // The board's database and what its move from files left (#1017) are this machine's: kept out of git if the workspace is a repository.
       existsSync(join(h, '.gitignore')) ? addUsageIgnore(join(h, '.gitignore')) : writeFile(join(h, '.gitignore'), BOARD_GITIGNORE),
@@ -1013,6 +1026,14 @@ export class WorkspaceService {
     return this.updateAgent(projectPath, agentId, fields as Partial<AgentDef>)
   }
 
+  /**
+   * An agent as saved now, read under the lock its changes take (mutateProjectConfig): a launch's last look at its
+   * connection (HI-1755), so a save under way is either in it or not yet begun.
+   */
+  async savedAgent(projectPath: string, agentId: string): Promise<AgentDef | undefined> {
+    return withFileLock(join(projectPath, HIVE_DIR, 'project.json'), async () => projectAgents(await this.projectConfig(projectPath)).find((a) => a.id === agentId))
+  }
+
   /** Changes one agent's definition. */
   /** `check`: sees the agent as saved, under the project's lock, before the change; throwing refuses it (#1282's undo). */
   async updateAgent(projectPath: string, agentId: string, patch: Partial<AgentDef>, check?: (current: AgentDef) => void): Promise<AgentDef> {
@@ -1037,7 +1058,7 @@ export class WorkspaceService {
       (async () => {
         await whenAll([mkdir(join(h, 'sessions'), { recursive: true }), mkdir(join(h, 'archive'), { recursive: true })])
         // Its platform is recorded as it is made, from what detection finds (SPEC §16.3.5): never switched silently after.
-        if (!existsSync(join(h, 'project.json'))) await writeKeptJson(join(h, 'project.json'), { ...DEFAULT_PROJECT_CONFIG, platform: detect(projectPath).platform })
+        if (!existsSync(join(h, 'project.json'))) await writeKeptJson(join(h, 'project.json'), withoutView({ ...DEFAULT_PROJECT_CONFIG, platform: detect(projectPath).platform }))
         // 0.1's launch folder for Agent 1; every agent now has launch-<id>.
         if (existsSync(join(h, 'launch'))) await removePath(join(h, 'launch')).catch(() => undefined)
       })()
@@ -1078,9 +1099,32 @@ export class WorkspaceService {
   /** A project's config; `opts` for a read that is written back (mutateProjectConfig, #1600). */
   async projectConfig(projectPath: string, opts?: KeptReadOptions): Promise<ProjectConfig> {
     const raw = await readKeptJson<Record<string, unknown>>(join(projectPath, HIVE_DIR, 'project.json'), {}, opts)
-    const cfg = mergeDefaults(structuredClone(DEFAULT_PROJECT_CONFIG), migrateProjectConfig(raw))
+    const cfg = this.withView(projectPath, mergeDefaults(structuredClone(DEFAULT_PROJECT_CONFIG), migrateProjectConfig(raw)), raw)
     // The Assistant's "project" settings are Settings → Assistant; its file keeps the workspace's own choices.
     return this.isAssistantHome(projectPath) ? assistantProjectConfig(cfg, config.settings) : cfg
+  }
+
+  /**
+   * A project's config with this user's view of it (HI-1749: AppConfig.ui.projectViews) over its file's. The first read of
+   * a project with none kept takes what its project.json has (from before the view moved out), so no one loses a layout.
+   */
+  private withView(projectPath: string, cfg: ProjectConfig, raw: Record<string, unknown>): ProjectConfig {
+    const views = config.get().ui.projectViews
+    // One kept by its folder before it had an id is still its view.
+    let view = views?.[projectViewKey(cfg, projectPath)] ?? views?.[projectViewKey({}, projectPath)]
+    if (!view) {
+      view = viewOf(Object.fromEntries(Object.keys(viewOf(raw as Partial<ProjectConfig>)).map((k) => [k, cfg[k as keyof ProjectConfig]])) as Partial<ProjectConfig>)
+      if (Object.keys(view).length) this.keepView(projectPath, { ...cfg, ...view })
+    }
+    return { ...cfg, ...view }
+  }
+
+  /** Keeps a project's view (its config's view fields) in this user's UI state, when it changed. */
+  private keepView(projectPath: string, cfg: ProjectConfig): void {
+    const key = projectViewKey(cfg, projectPath)
+    const view = viewOf(cfg)
+    if (JSON.stringify(config.get().ui.projectViews?.[key] ?? {}) === JSON.stringify(view)) return
+    config.update((c) => void (c.ui.projectViews = { ...c.ui.projectViews, [key]: view }))
   }
 
   /** A stamp of Hive's last write of this project's project.json (#1432, #1498): compared, whether it changed since a read. */
@@ -1138,7 +1182,10 @@ export class WorkspaceService {
         // The agents changed: each layout's pane placement takes in those added and lets go of those removed (#762), so
         // every agent keeps its cell (not one worked out again from the order on each read).
         if ('agents' in patch && updated.placement) updated = { ...updated, placement: settlePlacements(updated.placement, projectAgents(updated).map((a) => a.id)) }
-        await writeKeptJson(file, withLegacyProjectFields(updated))
+        // The view (HI-1749) to this user's UI state, saved a moment later and on quit; project.json only for a change of
+        // the config, written without the view (one from before moves out as it is written).
+        this.keepView(projectPath, updated)
+        if (changesConfig(patch)) await writeKeptJson(file, withLegacyProjectFields(withoutView(updated)))
         // As it is written: a read begun before now may have found the config from before.
         ticket = ++this.rootTickets
         // Kept only for the workspace it was asked in (#1498): one that closed (or gave way to another) meanwhile keeps
@@ -1530,6 +1577,14 @@ export async function disposeWorkspaceService(w: WorkspaceService): Promise<void
   await w.close()
   services.delete(w)
 }
+
+/** What a new workspace's workspace.json gets beyond the defaults (HI-980: its accounts, from accounts.ts). */
+let newWorkspaceExtras: () => Partial<WorkspaceConfig> = () => ({})
+export function setNewWorkspaceExtras(fn: () => Partial<WorkspaceConfig>): void {
+  newWorkspaceExtras = fn
+}
+/** A new workspace's settings: the defaults and those extras (only when it is made, never when one is opened). */
+const newWorkspaceConfig = (): WorkspaceConfig => ({ ...structuredClone(DEFAULT_WORKSPACE_CONFIG), ...newWorkspaceExtras() })
 
 /** Runs fn with `workspace` standing for w. */
 export function inWorkspace<T>(w: WorkspaceService, fn: () => T): T {

@@ -14,10 +14,27 @@ import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { ABANDON_MS, COPIES_DIR, CopyPool, copyPoolSize, CopyStore, IsolatedRequests, type CopyLease } from '../src/main/copies'
-import { fileSlotConn, quiet, type OpHolder, type SlotRun, type SlotRunEnd } from '../src/main/slots'
+import { fileSlotConn, folderWaiting, quiet, type OpHolder, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { BoundedLog, execCommand, FILE_IO } from '../src/main/workflow/queueChecks'
 import { resolveRunLink, type RunLinkDeps } from '../src/main/workflow/runLink'
 import { commit, gitRepo, sh } from './workflow/harness'
+
+// A quiet check held with its folder renamed aside (HI-1753): `go` set, the next rename aside waits for it after moving
+// the folder, `entered` called then. Every other rename passes straight through.
+const aside = vi.hoisted(() => ({ go: null as Promise<void> | null, entered: null as (() => void) | null }))
+vi.mock('fs/promises', async (original) => {
+  const real = await original<typeof import('fs/promises')>()
+  const rename = async (from: string, to: string): Promise<void> => {
+    await real.rename(from, to)
+    const go = aside.go
+    if (go && /\.hive-quiet-/.test(to)) {
+      aside.go = null
+      aside.entered?.()
+      await go
+    }
+  }
+  return { ...real, default: { ...real, rename }, rename }
+})
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -65,6 +82,7 @@ function world(o: { setup?: string; size?: number } = {}): World {
   const dir = join(`${ws}.worktrees`, 'project', COPIES_DIR)
   const gates = new Map<string, { entered: () => void; go: Promise<void> }>()
   const stores: CopyStore[] = []
+  const pools: CopyPool[] = []
   const make = (pid: number): { pool: CopyPool; store: CopyStore } => {
     const store = new CopyStore(fileSlotConn(boardFile(ws)), 'p-test')
     stores.push(store)
@@ -99,6 +117,7 @@ function world(o: { setup?: string; size?: number } = {}): World {
       reviewOn: () => set.review,
       quietWaitMs: () => set.quietMs
     })
+    pools.push(pool)
     return { pool, store }
   }
   const first = make(1)
@@ -121,6 +140,8 @@ function world(o: { setup?: string; size?: number } = {}): World {
       return { started, open: () => open() }
     },
     close: () => {
+      // Closing stops their retries at once (CopyPool.soon), before the stores go.
+      for (const p of pools) void p.close()
       for (const s of stores) s.conn.close()
       closeBoard(ws)
       dismiss()
@@ -265,7 +286,7 @@ describe('copies: leasing at a revision (#1435)', { timeout: 60_000 }, () => {
 describe('copies: the quiescence barrier (#1435)', { timeout: 60_000 }, () => {
   it('holds a returned copy back for each condition in turn, in order, and frees it once none holds', async () => {
     const w = world({ size: 1 })
-    const l = await leased(w, { agent: 'R1' })
+    const l = await leased(w, { kind: 'review', agent: 'R1' })
     await w.store.setLeaseJob(l.lease.id, 'copy-job')
     const key = l.folder.toLowerCase()
     w.set.runIn.set(key, 'R1: unit')
@@ -313,7 +334,7 @@ describe('copies: the quiescence barrier (#1435)', { timeout: 60_000 }, () => {
 
   it('a copy held back past the bound says what still uses it', async () => {
     const w = world({ size: 1 })
-    const l = await leased(w, { agent: 'R1' })
+    const l = await leased(w, { kind: 'review', agent: 'R1' })
     w.set.busy.set('R1', 'R1 (working)')
     await w.pool.returnCopy(l.lease.id, 'verdict')
     w.set.quietMs = 0
@@ -322,8 +343,8 @@ describe('copies: the quiescence barrier (#1435)', { timeout: 60_000 }, () => {
 
   it('restart: a leased copy whose Hive is gone and a returning one are both freed only through the barrier', async () => {
     const w = world({ size: 3 })
-    const a = await leased(w, { card: 1, agent: 'A1' })
-    const b = await leased(w, { card: 2, agent: 'B1' })
+    const a = await leased(w, { kind: 'review', card: 1, agent: 'A1' })
+    const b = await leased(w, { kind: 'review', card: 2, agent: 'B1' })
     // b's holder still busy when it returned: returning. Then Hive 1 goes, and Hive 2 opens the workspace.
     w.set.busy.set('B1', 'B1 (working)')
     await w.pool.returnCopy(b.lease.id, 'verdict')
@@ -433,18 +454,19 @@ describe("copies: HR1's round 1", { timeout: 90_000 }, () => {
     const a = await leased(w, { agent: 'a1' })
     await w.pool.returnCopy(a.lease.id, 'runEnded')
     commit(w.project, { 'package-lock.json': '{"v":2}\n' }, 'lock 2')
-    w.set.busy.set('a1', 'a1 (working)')
     const gate = w.hold('copy-1', 'install')
     const leasing = w.pool.leaseCopy({ kind: 'check', card: 2, revision: head(w.project), agent: 'a1', ref: 'run-2' })
     await gate.started
+    // A run comes into it meanwhile (a check's holder isn't waited for: HI-1764).
+    w.set.runIn.set(join(w.dir, 'copy-1').toLowerCase(), 'a1: unit')
     // Its run over (as a look finds an expired link): returned by the look while the reset still runs.
     w.set.over.add('run-2')
     await w.pool.refresh()
     gate.open()
     expect(await leasing).toEqual({ ok: false, refusal: { why: 'returned', copy: 'copy-1' } })
-    // Its holder still busy: returning, held back; then freed.
+    // The run still in it: returning, held back; then freed.
     expect(w.store.copy('copy-1')?.state).toBe('returning')
-    w.set.busy.clear()
+    w.set.runIn.clear()
     expect(await w.pool.tryFree('copy-1')).toBeNull()
     expect(w.store.copy('copy-1')?.state).toBe('free')
   })
@@ -602,6 +624,104 @@ describe('copies: isolated requests apart from the request (HR1 round 1)', () =>
     ).toEqual({ refused: 'the workspace closed' })
     expect(leasedAgain).toBe(false)
     expect(back).toEqual(['c-closed'])
+  })
+})
+
+describe('copies: check copies freed while their builder works (HI-1764)', { timeout: 60_000 }, () => {
+  // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
+  const HUNG_MS = 20_000
+
+  it("a check's copy isn't held for its holder's turn (its processes are all in its job); a review's still is", async () => {
+    const w = world({ size: 2 })
+    w.set.busy.set('HB1', 'HB1 (background)')
+    w.set.busy.set('R1', 'R1 (working)')
+    const check = await leased(w, { agent: 'HB1' })
+    await w.pool.returnCopy(check.lease.id, 'runEnded')
+    expect(w.store.copy(check.name)?.state).toBe('free')
+    const review = await leased(w, { kind: 'review', card: 2, agent: 'R1' })
+    await w.pool.returnCopy(review.lease.id, 'verdict')
+    expect(await w.pool.tryFree(review.name)).toEqual({ why: 'holder', by: 'R1 (working)' })
+  })
+
+  it('several isolated checks back to back, their builder busy throughout, then a review: it gets a copy at once, and each check copy is freed by itself once its run has ended', async () => {
+    const w = world({ size: 2 })
+    // A builder in a card loop: in a turn, a background command running, all along.
+    w.set.busy.set('HB1', 'HB1 (background)')
+    for (const n of [1, 2, 3, 4]) {
+      const l = await leased(w, { agent: 'HB1', ref: `run-${n}` })
+      const job = await w.pool.setLeaseJob(l.lease.id)
+      // Its run ends: returned while its processes are still going away, so held back for its job...
+      w.set.jobs.set(job!, false)
+      await w.pool.returnCopy(l.lease.id, 'runEnded')
+      expect(w.store.copy(l.name)?.state).toBe('returning')
+      // ...then they are gone: freed by the pool's own retry, with no lease or look asking (those are 30 s apart).
+      w.set.jobs.set(job!, true)
+      await vi.waitFor(() => expect(w.store.lease(l.lease.id)?.freed).toEqual(expect.any(String)), { timeout: HUNG_MS, interval: 50 })
+      expect(w.store.copy(l.name)?.state).toBe('free')
+    }
+    // A review asks: a copy at once, and nothing of the checks is left unfreed.
+    const got = await w.pool.leaseCopy({ kind: 'review', card: 9, revision: head(w.project), agent: 'R1', ref: '1' })
+    expect(got.ok).toBe(true)
+    expect(w.store.unfreed().map((l) => l.kind)).toEqual(['review'])
+  })
+
+  it("a copy whose quiet check has its folder aside isn't freed by another look meanwhile: that look waits for the check (HI-1753)", async () => {
+    const w = world({ size: 1 })
+    const l = await leased(w)
+    const job = await w.pool.setLeaseJob(l.lease.id)
+    w.set.jobs.set(job!, false)
+    await w.pool.returnCopy(l.lease.id, 'runEnded')
+    w.set.jobs.set(job!, true)
+    // Whether its folder was there each time the copy was freed.
+    const freedWith: boolean[] = []
+    const free = w.store.free.bind(w.store)
+    w.store.free = (id, name) => (freedWith.push(existsSync(l.folder)), free(id, name))
+    let entered!: () => void
+    let open!: () => void
+    const held = new Promise<void>((r) => (entered = r))
+    aside.entered = entered
+    aside.go = new Promise<void>((r) => (open = r))
+    const first = w.pool.tryFree(l.name)
+    try {
+      await held
+      expect(existsSync(l.folder)).toBe(false)
+      // Another look while it is aside: it waits for that check (before HI-1753's round 2 it read the folder as gone and freed it).
+      let done = false
+      const second = w.pool.tryFree(l.name).finally(() => (done = true))
+      await vi.waitFor(() => expect(done || folderWaiting() === 1).toBe(true), { timeout: HUNG_MS })
+      expect(freedWith).toEqual([])
+      expect(w.store.lease(l.lease.id)?.freed).toBeNull()
+      open()
+      expect(await first).toBeNull()
+      expect(await second).toBeNull()
+    } finally {
+      open()
+      aside.go = null
+      await first.catch(() => undefined)
+    }
+    // Each try at freeing it (the second finds it freed already) came with its folder back in place.
+    expect(freedWith.length).toBeGreaterThan(0)
+    expect(freedWith.every((there) => there)).toBe(true)
+    expect(w.store.copy(l.name)?.state).toBe('free')
+    expect(existsSync(l.folder)).toBe(true)
+    expect(folderWaiting()).toBe(0)
+  })
+
+  it('a wait says what holds each copy: lent since when, or returned and held back by what', async () => {
+    const w = world({ size: 2 })
+    const a = await leased(w, { kind: 'review', card: 4, agent: 'R1' })
+    const b = await leased(w, { card: 5, agent: 'HB1' })
+    const job = await w.pool.setLeaseJob(b.lease.id)
+    w.set.jobs.set(job!, false)
+    await w.pool.returnCopy(b.lease.id, 'runEnded')
+    const inUse = w.pool.inUse()
+    expect(inUse).toHaveLength(2)
+    expect(inUse).toEqual(
+      expect.arrayContaining([
+        { copy: a.name, kind: 'review', card: 4, from: expect.any(String), returned: null, by: null },
+        { copy: b.name, kind: 'check', card: 5, from: expect.any(String), returned: expect.any(String), by: `its run's processes (${job})` }
+      ])
+    )
   })
 })
 

@@ -8,7 +8,7 @@ import { COLUMN_TEXT, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBa
 import { enabledProviders, isProviderEnabled, projectDefaultProvider, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { NO_PROJECTS, agentProviderOf, cardLabelOf, choose, confirm, get, loadTasks, notify, openActivity, prompt, revealAgent, set, setProjectTab, showView, useDateStyle, useLanguage, useStore, wantFullArchive, type ArchiveAllRequest, type DoingRequest } from '../store'
+import { NO_PROJECTS, agentProviderOf, cardHasActivity, cardLabelOf, choose, confirm, get, loadTasks, notify, openCardActivity, prompt, revealAgent, set, setProjectTab, showView, useDateStyle, useLanguage, useStore, wantFullArchive, type ArchiveAllRequest, type DoingRequest } from '../store'
 import { cardLabel } from '@shared/projectKeys'
 import { cardNumberOf } from '../projectKeys'
 import { MARKDOWN_CARDS } from '../cardLinks'
@@ -309,6 +309,8 @@ function cardMenu(c: TaskCard, readOnly: string | null): MenuEntry[] {
       : [
           { label: tr(msg({ id: 'board.menu.start', defaultMessage: 'Start…', description: 'Menu item on a card (right-click): gives it to an agent to start (opens a dialog).' })), icon: 'play', disabled: !c.project || !!readOnly, ...(readOnly ? { detail: readOnly } : {}), onClick: () => set({ taskStartFor: c.number }) },
           ...(c.column === 'todo' && c.project ? [{ label: tr(msg({ id: 'board.menu.startLane', defaultMessage: 'Start Lane with It…', description: "Menu item on a Todo card (right-click): opens Start Lane with this card first in the lane's list (a lane: a builder and a reviewer working through cards in turn). Glossary: lane." })), icon: 'list-ordered', disabled: !!readOnly, onClick: () => openLaneStart(c.project, [c.number]) }] : []),
+          // What runs on it now (HI-1743), for a card in progress.
+          ...(cardHasActivity(c) ? [{ label: tr(ACTIVITY), icon: 'type-hierarchy', onClick: () => openCardActivity(c) }] : []),
           { separator: true },
           { header: true, label: tr(msg({ id: 'board.menu.moveTo', defaultMessage: 'Move to', description: "A heading in a card's right-click menu, above the board columns it can move to." })) },
           ...TASK_COLUMNS.filter((x) => x.id !== c.column).map((x) => ({ label: tr(COLUMN_TEXT[x.id].label), icon: 'arrow-right', disabled: !!readOnly, onClick: () => (x.id === 'doing' ? moveToDoing({ n: c.number, project: c.project, agent: c.agent }) : void moveCard(c, x.id)) })),
@@ -320,6 +322,10 @@ function cardMenu(c: TaskCard, readOnly: string | null): MenuEntry[] {
     { label: tr(msg({ id: 'board.menu.delete', defaultMessage: 'Delete…', description: 'Menu item on a card (right-click): deletes it after asking.' })), icon: 'trash', danger: true, disabled: !!readOnly, onClick: () => void remove(c) }
   ]
 }
+
+/** A card in progress's Activity (HI-1743): the card dialog's button and its right-click menu's item. */
+const ACTIVITY = msg({ id: 'board.dialog.activity', defaultMessage: 'Activity', description: "A button in the card dialog and an item of a card's right-click menu, for a card in Doing or Review: opens its project's Activity tab on the agent working on it, showing what runs on it now." })
+const ACTIVITY_TIP = msg({ id: 'board.dialog.activityTip', defaultMessage: 'See what runs on this card now: the turn, tool calls, background tasks, subagents and processes of the agent working on it.', description: "Tooltip of the card dialog's Activity button, and the detail of the card menu's Activity item." })
 
 /** A card's agent when its name isn't known. */
 const ITS_AGENT = msg({ id: 'board.agent.unnamed', defaultMessage: 'its agent', description: "Stands for a card's agent when its name isn't known (it was removed), in place of a name in other messages. Lower case." })
@@ -2054,16 +2060,11 @@ export function TaskDialog() {
                     </BusyButton>
                   </Tooltip>
                 )}
-                {!!card.project && (
-                  <Tooltip content={tr(msg({ id: 'board.dialog.activityTip', defaultMessage: "Show this card's agents, sessions, turns and processes in its project's Activity tab.", description: "Tooltip on the card dialog's Activity button." }))}>
-                    <button
-                      className="btn subtle"
-                      onClick={() => {
-                        const p = get().workspace?.projects.find((x) => x.name.toLowerCase() === card.project.toLowerCase())
-                        if (p) void tryClose().then((closed) => closed && openActivity(p.path, { card: card.number }))
-                      }}
-                    >
-                      <Icon name="type-hierarchy" /> {tr(msg({ id: 'board.dialog.activity', defaultMessage: 'Activity', description: "Button in the card dialog: opens its project's Activity tab showing this card's work." }))}
+                {/* Only for a card in progress (HI-1743): what runs on it now; its history is the card's. */}
+                {cardHasActivity(card) && (
+                  <Tooltip content={tr(ACTIVITY_TIP)}>
+                    <button className="btn subtle" onClick={() => void tryClose().then((closed) => closed && openCardActivity(card))}>
+                      <Icon name="type-hierarchy" /> {tr(ACTIVITY)}
                     </button>
                   </Tooltip>
                 )}

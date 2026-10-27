@@ -4,7 +4,8 @@ import { agentRuntime } from '../shared/runtime'
 import { columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, type LaneOrderView } from '../shared/tasks'
 import type { TaskCard } from '../shared/types'
 import { loopStepWaitMinutes } from '../shared/lanes'
-import { queueReturnOf } from './queueReturn'
+import { queueReturnOf, staleApprovalOf } from './queueReturn'
+import { reviewCopyWaitReason } from './reviewCopies'
 import { isResuming } from './restartResume'
 import { sessions } from './sessions'
 import { workspaceOf, type WorkspaceService } from './workspace'
@@ -16,7 +17,8 @@ import { workspaceOf, type WorkspaceService } from './workspace'
  * or one whose lane is deadlocked, its reviewer waiting for another of its cards while its builder waits on it (#1410),
  * or a card whose builder waits on a check nobody gives: of its design in Doing (#1382), or of its follow-up in Review or
  * Passed (#1467), or a card the merge queue returned that its builder, idle or only watching, hasn't taken up (HI-1721),
- * or a running lane's next card its builder, idle, only watching or not running, hasn't started (HI-1741).
+ * or a running lane's next card its builder, idle, only watching or not running, hasn't started (HI-1741), or a card in
+ * Review whose reviewer has waited minutes for a review copy (HI-1764).
  * Null when it isn't.
  */
 
@@ -38,6 +40,24 @@ export function returnedWaitReason(c: Pick<TaskCard, 'number' | 'key' | 'column'
   const min = Math.round((now - since) / 60_000)
   const name = c.key ?? `#${c.number}`
   return `${name} came back from the merge queue ${min} min ago; ${builder.name} is ${builder.watching ? 'only watching it' : 'idle'}, not fixing it.` // i18n-ignore: agent-facing (the Agent API's stalled)
+}
+
+/** How long an approved card with a stale pass waits, its builder idle or watching, before it is stalled (HI-1763). */
+export const STALE_STALL_MS = 10 * 60_000
+
+/**
+ * Why an approved card whose pass went stale is stalled (HI-1763), or null: in Passed (Approved), not blocked, stale for
+ * STALE_STALL_MS since its `Stale` fact (a stable start: nothing later moves it), and its builder not in a turn (idle,
+ * or only watching; a watch kept while it works isn't a stall). Agent-facing.
+ */
+export function staleWaitReason(c: Pick<TaskCard, 'number' | 'key' | 'column' | 'archived' | 'blocked'>, stale: { since: string; approved: string | null; current: string | null } | null | undefined, builder: { name: string; status: string; watching: boolean } | null, now = Date.now()): string | null {
+  if (!stale || !builder || c.archived || c.blocked || c.column !== 'passed') return null
+  if (!IDLE.includes(builder.status)) return null
+  const since = Date.parse(stale.since) || 0
+  if (!since || now - since < STALE_STALL_MS) return null
+  const name = c.key ?? `#${c.number}`
+  const rev = (r: string | null): string => (r ? r.slice(0, 7) : '—')
+  return `${name}'s pass is for ${rev(stale.approved)} but its line is at ${rev(stale.current)}; ${builder.name} is ${builder.watching ? 'only watching it' : 'idle'}, not submitting it.` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
 
 /** A builder's statuses with no turn going (watching counts too: returnedWaitReason). */
@@ -80,12 +100,13 @@ function liveOf(wsPath: string): { name: string; project: string; agentId: strin
  * folder, its running lane (none: no lane's deadlock is looked for), and how long a design waits for its check
  * (stepWaitMs: its project's Card loops → Design check wait).
  */
-export function cardStall(c: TaskCard, agentNow: { name: string; running: boolean } | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = loopStepWaitMinutes() * 60_000, returned?: { at: string } | null): string | null {
+export function cardStall(c: TaskCard, agentNow: { name: string; running: boolean } | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = loopStepWaitMinutes() * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null): string | null {
   const live = wsPath ? liveOf(wsPath) : []
   const watchers = live.filter((a) => a.cards.length)
-  const builder = returned && c.agent && c.project ? live.find((a) => a.agentId === c.agent && a.project.toLowerCase() === c.project!.toLowerCase()) : undefined
-  const back = builder ? returnedWaitReason(c, returned, { name: builder.name, status: builder.status, watching: builder.cards.length > 0 }) : null
-  return stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? reviewWaitReason(c, watchers) ?? reviewVerdictWaitReason(c, watchers) ?? laneOrderWaitReason(c, lane, watchers) ?? loopStepWaitReason(c, watchers, stepWaitMs) ?? laneNext(c, lane, live, agentNow)
+  const builder = (returned || stale) && c.agent && c.project ? live.find((a) => a.agentId === c.agent && a.project.toLowerCase() === c.project!.toLowerCase()) : undefined
+  const now = builder ? { name: builder.name, status: builder.status, watching: builder.cards.length > 0 } : null
+  const back = now ? (returnedWaitReason(c, returned, now) ?? staleWaitReason(c, stale, now)) : null
+  return stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? reviewWaitReason(c, watchers) ?? reviewVerdictWaitReason(c, watchers) ?? laneOrderWaitReason(c, lane, watchers) ?? loopStepWaitReason(c, watchers, stepWaitMs) ?? laneNext(c, lane, live, agentNow) ?? reviewCopyWaitReason(c, wsPath)
 }
 
 /**
@@ -133,5 +154,7 @@ export async function cardStallIn(ws: WorkspaceService, c: TaskCard, agents = ne
   }
   // A card in Doing with its agent: has the merge queue returned it (HI-1721)?
   const returned = c.column === 'doing' && c.agent && c.project && ws.path ? await queueReturnOf(ws, join(ws.path, c.project), c.number) : null
-  return cardStall(c, now, ws.path, lane, await stepWaitOf(ws, c), returned)
+  // An approved card whose pass went stale (HI-1763).
+  const stale = c.column === 'passed' && c.agent && c.project && ws.path ? await staleApprovalOf(ws, join(ws.path, c.project), c.number) : null
+  return cardStall(c, now, ws.path, lane, await stepWaitOf(ws, c), returned, stale)
 }

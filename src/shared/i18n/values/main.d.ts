@@ -1,6 +1,18 @@
 // Generated from locales/en/main.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
+  'main.accounts.badTarget': { target: string | number; cli: string | number }
+  'main.accounts.folderNotUsable': { name: string | number }
+  'main.accounts.inUse': { name: string | number }
+  'main.accounts.leftover': { name: string | number }
+  'main.accounts.makeFailed': { error: string | number }
+  'main.accounts.noHome': { cli: string | number; folder: string | number }
+  'main.accounts.noName': undefined
+  'main.accounts.noProvider': { cli: string | number }
+  'main.accounts.notFound': undefined
+  'main.accounts.nothingToKeep': { name: string | number }
+  'main.accounts.previewOff': undefined
+  'main.accounts.removeFailed': { name: string | number; error: string | number }
   'main.antivirus.allExcluded': undefined
   'main.antivirus.changed': undefined
   'main.antivirus.closed': undefined
@@ -22,6 +34,13 @@ interface HiveMessageValues {
   'main.branchMerge.cardWork': { branch: string | number; card: string | number }
   'main.branchMerge.notBranch': { branch: string | number }
   'main.branchMerge.same': { branch: string | number }
+  'main.connections.launch.changedAgain': { agent: string | number }
+  'main.connections.launch.changing': { name: string | number; agent: string | number }
+  'main.connections.launch.deleted': { agent: string | number }
+  'main.connections.launch.none': { cli: string | number; agent: string | number }
+  'main.connections.launch.offNoDefault': { agent: string | number; name: string | number; cli: string | number }
+  'main.connections.launch.otherProvider': { agent: string | number; cli: string | number }
+  'main.connections.launch.signedOut': { name: string | number; agent: string | number }
   'main.console.noWorkspace': undefined
   'main.console.title': { workspace: string | number }
   'main.corrupt.damaged': { file: string | number }

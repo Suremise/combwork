@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import type { ForYouItem, ForYouSummary } from '@shared/workflow/workView'
 import { useScopedLoad } from './scopedLoad'
+import { sharedRead } from './sharedRead'
 import { useStore } from './store'
 
 // What waits for the user (For you, #1276, SPEC §16.8.5): every live card's open requests, read from main
@@ -9,13 +10,16 @@ import { useStore } from './store'
 
 const NONE: ForYouSummary = { items: [], count: 0 }
 
+/** The read for a workspace and board read, shared by every view showing For you (HI-1754). */
+const readForYou = sharedRead<ForYouSummary>(() => window.hive.invoke('tasks:forYou'))
+
 /** The workspace's requests for the user, and by card; empty while loading. */
 export function useForYou(): { summary: ForYouSummary; byCard: Map<number, ForYouItem[]> } {
   const ws = useStore((s) => s.workspace?.path ?? '')
   const tasks = useStore((s) => s.tasks)
   const { data, load } = useScopedLoad<ForYouSummary>(ws)
   useEffect(() => {
-    if (ws) load(ws, () => window.hive.invoke('tasks:forYou'))
+    if (ws) load(ws, () => readForYou(ws, tasks))
   }, [ws, tasks, load])
   const summary = data ?? NONE
   const byCard = useMemo(() => {

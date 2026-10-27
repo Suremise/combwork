@@ -596,6 +596,12 @@ export interface AppConfig {
     assistantFold?: Record<string, boolean>
     /** Each workspace's board as the user left it, by workspace path in lower case (#170): collapsed columns, folded cards. */
     boardFold?: Record<string, BoardFold>
+    /**
+     * Each project's Session tab as the user left it (HI-1749: Panes or Tiles, its layout, where its panes are), by
+     * projectViewKey: this user's view, not the project's config, so it is never written to project.json (where another
+     * program holding the file made a view switch fail). A project's project.json from before keeps its view until read.
+     */
+    projectViews?: Record<string, ProjectView>
     /** Each workspace's Progress panel filter (#251), by workspace path in lower case: one project's runs (and agent's), or all. */
     progressFilter?: Record<string, { project: string; agent?: string }>
     /** Each workspace's running lanes in the order the user put them in the Progress panel (#568), by workspace path in lower case: lane ids. */
@@ -614,6 +620,10 @@ export interface AppConfig {
   planUsage: Record<ProviderId, PlanUsage>
   /** Highest warning shown per "provider:limit", and for which reset period. */
   planWarnings: Record<string, { resetsAt: string | null; level: number }>
+  /** The CLI accounts Hive keeps (HI-980: Settings → Accounts), each a folder of its own, in the order Settings lists them. */
+  connections?: Connection[]
+  /** Per provider: the account last chosen as a workspace's default (or launched on), which a new workspace starts with. */
+  lastUsedConnection?: Partial<Record<ProviderId, string>>
   /** A version the user chose to skip; automatic checks don't offer it. */
   skippedUpdate?: string
   /** Version that last ran, to say "Hive updated" once after an update. */
@@ -642,8 +652,67 @@ export interface PlanUsage {
   updatedAt: string
 }
 
+/** Who an account's folder is signed in as (HI-980): what the CLI's own status says, never a token. */
+export interface ConnectionIdentity {
+  email: string
+  /** The organisation's id: with the email, it tells two logins apart. */
+  orgId: string
+}
+
+/** An account's latest check (HI-980): what the CLI said, or why it couldn't be asked. */
+export interface ConnectionObserved {
+  at: string
+  /** null: the check failed (`error` says why), which never counts as signed out. */
+  loggedIn: boolean | null
+  email?: string
+  orgId?: string
+  /** Its plan, as the CLI names it ("max"). */
+  plan?: string | null
+  /** A check that failed (a timeout, output Hive couldn't read), in English for the log; the last good identity is kept. */
+  error?: string
+  /** Its folder isn't there, or isn't a folder Hive made (replaced from outside). */
+  missing?: boolean
+}
+
+/**
+ * A CLI login Hive keeps (HI-980), in a folder of its own under the accounts folder (`<accounts>\<id>\`), linked to the
+ * CLI's home by a junction for what all accounts share. `accepted` is who the user took it on as; `observed` the latest
+ * check: they differ when its login changed (a /login typed in a pane), which the user answers.
+ */
+export interface Connection {
+  /** Stable and random ("a-3f9c2e1b"): its folder's name. A rename never changes it. */
+  id: string
+  provider: ProviderId
+  /**
+   * How it runs its CLI (Darren, 26 Oct ~22:10: configured providers): `signIn`, a login folder of Hive's signed in
+   * through the CLI's own sign-in. The endpoint kind (a base URL and an API key) comes with its own card. Absent in a
+   * record from before it: signIn.
+   */
+  kind?: 'signIn'
+  /** The user's name for it ("Personal", "Hive overnight"). */
+  name: string
+  createdAt: string
+  accepted?: ConnectionIdentity
+  observed?: ConnectionObserved
+  /** A removal that stopped partway, in English: what is left, for Remove to try again. */
+  leftover?: string
+}
+
+/** A workspace's accounts for one provider (HI-980): those on in it, and its default among them (null: none). */
+export interface WorkspaceConnections {
+  on: string[]
+  default: string | null
+}
+
 export interface WorkspaceConfig {
   version: 1
+  /**
+   * The accounts on in this workspace, per provider (HI-980). No entry for a provider: not set up yet (nothing is turned
+   * on by itself); `{ on: [], default: null }`: the user turned them all off.
+   */
+  connections?: Partial<Record<ProviderId, WorkspaceConnections>>
+  /** The Assistant's own connection per provider in this workspace (HI-1755: Settings → Assistant); absent or null: the default. */
+  assistantConnection?: Partial<Record<ProviderId, string | null>>
   /** Where the workspace was last opened (#146): a different folder now means it was moved, and Repair… is offered. */
   lastPath?: string
   /** The last project rename (#514, `project-names.json`'s number) its hidden and removed projects follow. */
@@ -1143,6 +1212,9 @@ export interface PlatformSwitchCheck {
   queue: boolean
 }
 
+/** A project's Session tab as this user left it (AppConfig.ui.projectViews, HI-1749): ProjectConfig's view fields. */
+export type ProjectView = Partial<Pick<ProjectConfig, 'sessionView' | 'layout' | 'placement'>>
+
 export interface ProjectConfig {
   /** 2 since 0.2.0: agents are all equal and a project starts with none (0.1's agents are cleared). */
   version: 2
@@ -1346,10 +1418,15 @@ export interface AgentDef {
    * built-in hive server is given whatever this says.
    */
   mcpServers?: string[]
+  /**
+   * The connection it runs on (HI-1755: a Connection's id), for a provider that has connections; absent: the
+   * workspace's default for its provider. Off in the workspace, the default is used, and the agent says so.
+   */
+  connection?: string
 }
 
 /** A change to an agent's settings: empty values (null for use200kContext and mcpServers) clear an override so it follows the project. */
-export type AgentPatch = Partial<Pick<AgentDef, 'name' | 'provider' | 'model' | 'effort' | 'permissionMode' | 'mode' | 'role'>> & { use200kContext?: boolean | null; mcpServers?: string[] | null; workflowRole?: WorkflowRole | null }
+export type AgentPatch = Partial<Pick<AgentDef, 'name' | 'provider' | 'model' | 'effort' | 'permissionMode' | 'mode' | 'role'>> & { use200kContext?: boolean | null; mcpServers?: string[] | null; workflowRole?: WorkflowRole | null; connection?: string | null }
 
 /** What loading a template into a project would do (#126), and what stops it now. */
 export interface TemplateLoadPlan {
@@ -1430,6 +1507,8 @@ export interface AddAgentOptions {
   workflowRole?: WorkflowRole
   /** Only these of the project's MCP servers (#537); absent: all of them. */
   mcpServers?: string[]
+  /** The connection it runs on (HI-1755), when it is on in the workspace; absent (or not on): the workspace's default. */
+  connection?: string
   /**
    * #456: new-worktree, work in the project's unused worktree on that branch instead when it is merged into the base and
    * clean, brought up to the base; existing-worktree, bring the one chosen up to the base when it is merged and clean.
@@ -1616,6 +1695,8 @@ export interface MergeResult {
 }
 
 export interface SessionRecord {
+  /** The connection its latest run launched on (HI-1755), id and name as then; absent: none (a provider without connections). */
+  connection?: { id: string; name: string }
   id: string
   /** The provider that ran it ("claude-code", "codex"). The field name predates providers. */
   agent: ProviderId
@@ -1854,6 +1935,13 @@ export interface LiveSessionState {
   startedAt: string
   /** Effective settings the session launched with — used to detect "restart to apply". */
   launchSignature: string
+  /**
+   * The connection this run launched on (HI-1755), kept for the run whatever is chosen meanwhile; absent: a provider
+   * without connections (or a test copy on its CLI test home). `note`: why it isn't the one chosen (its choice was off).
+   */
+  launchedConnection?: { id: string; name: string; note?: 'offFallback' | 'unknownLogin' | 'loginChanged' }
+  /** A switch to the connection it would launch on now waits for its turn to be over (HI-1755). */
+  switchPending?: boolean
   /**
    * What it was given at launch (GET /v1/projects/{name}): Hive's guidance revision, the content hash of each Hive skill's
    * copy it reads, and why a skill isn't as asked for (a folder of the user's has its name, an old copy kept while in use).
@@ -2965,6 +3053,8 @@ export type HiveEvent =
   /** A worktree agent's unmerged work changed (null: git couldn't check it). */
   | { type: 'branch-status'; projectPath: string; agentId: string; status: AgentBranchStatus | null }
   | { type: 'plan-usage'; provider: ProviderId; usage: PlanUsage }
+  /** Hive's accounts changed (HI-980: one added, renamed, removed, checked, or a workspace's choice of them): read them again. */
+  | { type: 'connections-changed' }
   | { type: 'window-state'; maximized: boolean; focused: boolean; alwaysOnTop: boolean }
   /** A window opened or closed: how many there are now (File → Exit says it closes them all). */
   | { type: 'windows-changed'; count: number }

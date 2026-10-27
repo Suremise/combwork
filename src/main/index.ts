@@ -23,6 +23,7 @@ import { appendFile, readFile, stat } from 'original-fs/promises'
 import { Readable } from 'stream'
 import type { AppInfo, McpServerDef, QuitChoice, QuitScope, QuitSession, TaskCard, WindowState } from '../shared/types'
 import { providerService } from './providerService'
+import { initConnections } from './accounts'
 import { checkGit } from './gitTool'
 import { handoverSession, hiveInstructions, withJournal, withLatestHandover, wrapsLongCommands } from '../shared/hiveGuidance'
 import { handoversFor } from './notes'
@@ -75,7 +76,7 @@ import { killAll } from './ptyHost'
 import { allLeftovers, closeProcessTracking, leftoversSaved, leftoversSettled, restoreLeftovers, settleAllLeftovers, settleLeftovers, warmProcessTracking } from './agentProcesses'
 import { leftoversSummary } from '../shared/agentProcesses'
 import { installShims } from './progressReporters/shims'
-import { insideArchive, onCorruptFile } from './fsutil'
+import { insideArchive, onCorruptFile, renameDiagnostics } from './fsutil'
 import { apiEnv, assistantApiUrl, startApiServer, startHookServer } from './servers'
 import { clearDiscovery, clearDiscoveryNow } from './apiDiscovery'
 import { clearHookAuth } from './hookTokens'
@@ -91,6 +92,7 @@ import { closedNotice, focusedHive, routeAppNotice, setFocusedHive, startNoticeR
 import { initUpdater, installNow, installsOnQuit } from './updater'
 import { flushMetrics } from './metrics'
 import { watchMainStalls } from './mainStalls'
+import { fileHolders } from './fileHolders'
 import { createWorkspaceService, disposeWorkspaceService, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
 import { journalSettingsOf } from './journalService'
 import { assistantStartView } from './startView'
@@ -871,6 +873,8 @@ app.whenReady().then(async () => {
   startMemoryLog()
   startHeapSnapshots(app.getPath('userData'), heapSnapshots)
   watchMainStalls()
+  // A replace that gave up because the file was held says which processes had it open (HI-1749).
+  renameDiagnostics.holders = fileHolders
   setInterval(archiveOldDoneEverywhere, 3_600_000).unref()
 
   workspace.setLiveProvider((p, cfg, scope) => sessions.liveInfo(p, cfg, scope))
@@ -1014,6 +1018,8 @@ app.whenReady().then(async () => {
   providerService.setLiveSessionCounter((p) => sessions.liveCount(p))
   // Agents stopped by a refused sign-in can carry on once the CLI is signed in again (#309).
   providerService.onSignedIn((p) => sessions.signedInAgain(p, true))
+  // Connections (HI-980, HI-1755): new workspaces' defaults and the watches on their logins.
+  initConnections()
 
   // Hook auth files of an earlier run of Hive: their tokens died with it (#345).
   await clearHookAuth()

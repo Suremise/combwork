@@ -6,14 +6,80 @@ import type { Db } from '../db'
 import { boardRead } from '../boardStore'
 import type { WorkspaceService } from '../workspace'
 import { CATEGORY_STAGE, foldCard, STAGE_CATEGORY, ROUND_LIMIT_GATE, type CardKind, type Category, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
-import { forYouItems, kindProposed, reviewSkipOf, workBadge, workView, type ForYouSummary, type WorkBadge, type WorkCard, type WorkView } from '../../shared/workflow/workView'
+import { forYouItems, kindProposed, reviewSkipOf, workBadge, workView, type ForYouItem, type ForYouSummary, type WorkBadge, type WorkCard, type WorkView } from '../../shared/workflow/workView'
 import { factOf } from './factStore'
 import { QUERIES } from '../schema/v1_0'
 
 type Row = Record<string, string | number | null>
 
+/** Each connection's statements, prepared once (HI-1754: preparing them on every call cost main ~10 ms a For you read). */
+const statements = new WeakMap<Db['reader'], Map<string, ReturnType<Db['reader']['prepare']>>>()
+function prepared(db: Db['reader'], sql: string): ReturnType<Db['reader']['prepare']> {
+  let kept = statements.get(db)
+  if (!kept) statements.set(db, (kept = new Map()))
+  let s = kept.get(sql)
+  if (!s) kept.set(sql, (s = db.prepare(sql)))
+  return s
+}
+
 /** Whether the board has the fact log (a board waiting for its 1.0 upgrade hasn't). */
-const hasFacts = (db: Db['reader']): boolean => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'card_facts'").get()
+const hasFacts = (db: Db['reader']): boolean => !!prepared(db, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'card_facts'").get()
+
+/**
+ * Each live card's newest fact and how many (#1629), as `seq/n`: with its row, what a kept read of it is made from. Facts
+ * are only ever added, so a card whose key is as it was has the same facts.
+ */
+function factHeads(db: Db['reader']): Map<number, string> {
+  const heads = new Map<number, string>()
+  for (const r of prepared(db, 'SELECT f.card, max(f.seq) AS seq, count(*) AS n FROM card_facts f JOIN cards c ON c.number = f.card WHERE c.archived = 0 GROUP BY f.card').all() as Row[]) heads.set(r.card as number, `${r.seq}/${r.n}`)
+  return heads
+}
+
+/** Up to how many changed cards are read one by one; more (the first read, a board changed in bulk), and every live card's facts are read at once. */
+const ONE_BY_ONE = 40
+
+/** These live cards' facts, by card: each card's own, or every live card's in one read when there are many. */
+function factsOfCards(db: Db['reader'], numbers: readonly number[]): Map<number, Fact[]> {
+  const facts = new Map<number, Fact[]>()
+  const add = (r: Row): void => {
+    const f = factOf(r)
+    const list = facts.get(f.card)
+    if (list) list.push(f)
+    else facts.set(f.card, [f])
+  }
+  if (numbers.length > ONE_BY_ONE) for (const r of prepared(db, QUERIES['facts.live'].sql).all() as Row[]) add(r)
+  else {
+    const stmt = prepared(db, QUERIES['facts.ofCard'].sql)
+    for (const n of numbers) for (const r of stmt.all(n) as Row[]) add(r)
+  }
+  return facts
+}
+
+/** What a workspace keeps per live card (its badge, its For you items), with the key each was made from; a workspace opened again starts afresh. */
+type Kept<T> = WeakMap<WorkspaceService, { path: string | null; life: unknown; cards: Map<number, { key: string; value: T }> }>
+
+function keptOf<T>(kept: Kept<T>, ws: WorkspaceService): Map<number, { key: string; value: T }> {
+  let c = kept.get(ws)
+  if (!c || c.path !== ws.path || c.life !== ws.lifetime) kept.set(ws, (c = { path: ws.path, life: ws.lifetime, cards: new Map() }))
+  return c.cards
+}
+
+/**
+ * Each live card's value, kept by its key: only the cards whose key changed are read and made again, from their facts;
+ * cards archived or gone since are let go.
+ */
+function keptValues<T>(db: Db['reader'], kept: Map<number, { key: string; value: T }>, cards: readonly Row[], keyOf: (r: Row) => string, make: (r: Row, facts: Fact[]) => T): T[] {
+  const changed = cards.filter((r) => kept.get(r.number as number)?.key !== keyOf(r))
+  if (changed.length) {
+    const facts = factsOfCards(db, changed.map((r) => r.number as number))
+    for (const r of changed) kept.set(r.number as number, { key: keyOf(r), value: make(r, facts.get(r.number as number) ?? []) })
+  }
+  if (kept.size > cards.length) {
+    const live = new Set(cards.map((r) => r.number as number))
+    for (const n of kept.keys()) if (!live.has(n)) kept.delete(n)
+  }
+  return cards.map((r) => kept.get(r.number as number)!.value)
+}
 
 const cardOf = (r: Row): WorkCard => ({ card: r.number as number, stage: (r.stage as StageId | null) ?? CATEGORY_STAGE[r.col as Category] ?? 'todo', preWorkflow: !!r.pre_workflow, ...(r.kind === 'no-code' || r.kind === 'code' ? { kind: r.kind } : {}) })
 
@@ -21,9 +87,9 @@ const cardOf = (r: Row): WorkCard => ({ card: r.number as number, stage: (r.stag
 export function cardFacts(ws: WorkspaceService, n: number): { card: WorkCard; facts: Fact[] } | null {
   return boardRead(ws, (db) => {
     if (!hasFacts(db)) return null
-    const r = db.prepare('SELECT number, col, stage, pre_workflow, kind FROM cards WHERE number = ?').get(n) as Row | undefined
+    const r = prepared(db, 'SELECT number, col, stage, pre_workflow, kind FROM cards WHERE number = ?').get(n) as Row | undefined
     if (!r) return null
-    return { card: cardOf(r), facts: (db.prepare(QUERIES['facts.ofCard'].sql).all(n) as Row[]).map(factOf) }
+    return { card: cardOf(r), facts: (prepared(db, QUERIES['facts.ofCard'].sql).all(n) as Row[]).map(factOf) }
   })
 }
 
@@ -41,55 +107,21 @@ export function cardWork(ws: WorkspaceService, n: number): WorkView | null {
 export function workBadges(ws: WorkspaceService, rulesetsNow: ReadonlyMap<string, string> = new Map()): WorkBadge[] {
   return boardRead(ws, (db) => {
     if (!hasFacts(db)) return []
-    const cards = db.prepare('SELECT number, col, stage, pre_workflow, kind, project FROM cards WHERE archived = 0 ORDER BY number').all() as Row[]
-    // Each card's newest fact and how many (#1629): with its row and its project's ruleset now, what its badge is made
-    // from. Facts are only ever added, and a stored ruleset never changes, so a card whose key is as it was keeps its
-    // badge; only the cards a change touched are read and folded again.
-    const heads = new Map<number, string>()
-    for (const r of db.prepare('SELECT f.card, max(f.seq) AS seq, count(*) AS n FROM card_facts f JOIN cards c ON c.number = f.card WHERE c.archived = 0 GROUP BY f.card').all() as Row[]) heads.set(r.card as number, `${r.seq}/${r.n}`)
-    const kept = badgeCache(ws)
+    const cards = prepared(db, 'SELECT number, col, stage, pre_workflow, kind, project FROM cards WHERE archived = 0 ORDER BY number').all() as Row[]
+    // A card's row, its facts' head and its project's ruleset now are what its badge is made from (#1629); a stored
+    // ruleset never changes, so a card whose key is as it was keeps its badge.
+    const heads = factHeads(db)
     const keyOf = (r: Row): string => [r.col, r.stage, r.pre_workflow, r.kind, heads.get(r.number as number) ?? '', rulesetsNow.get(String(r.project ?? '').toLowerCase()) ?? ''].join('\n')
-    const changed = cards.filter((r) => kept.get(r.number as number)?.key !== keyOf(r))
-    if (changed.length) {
-      const facts = new Map<number, Fact[]>()
-      const add = (r: Row): void => {
-        const f = factOf(r)
-        const list = facts.get(f.card)
-        if (list) list.push(f)
-        else facts.set(f.card, [f])
-      }
-      // Many (the first read, a board changed in bulk): the live cards' facts in one read; else each changed card's.
-      if (changed.length > BADGES_ONE_BY_ONE) for (const r of db.prepare(QUERIES['facts.live'].sql).all() as Row[]) add(r)
-      else {
-        const stmt = db.prepare(QUERIES['facts.ofCard'].sql)
-        for (const r of changed) for (const f of stmt.all(r.number) as Row[]) add(f)
-      }
-      const stages = stagesReader(db)
-      for (const r of changed) kept.set(r.number as number, { key: keyOf(r), badge: workBadge(workView(cardOf(r), facts.get(r.number as number) ?? []), rulesetsNow.get(String(r.project ?? '').toLowerCase()), stages) })
-    }
-    // Cards archived or gone since let go.
-    if (kept.size > cards.length) {
-      const live = new Set(cards.map((r) => r.number as number))
-      for (const n of kept.keys()) if (!live.has(n)) kept.delete(n)
-    }
-    return cards.map((r) => kept.get(r.number as number)!.badge)
+    let stages: ReturnType<typeof stagesReader> | null = null
+    return keptValues(db, keptOf(badges, ws), cards, keyOf, (r, facts) => workBadge(workView(cardOf(r), facts), rulesetsNow.get(String(r.project ?? '').toLowerCase()), (stages ??= stagesReader(db))))
   })
 }
 
-/** Up to how many changed cards workBadges reads one by one; more, and it reads every live card's facts at once. */
-const BADGES_ONE_BY_ONE = 40
-
-/** Each workspace's badges by card, with the key each was made from (workBadges); a workspace opened again starts afresh. */
-const badges = new WeakMap<WorkspaceService, { path: string | null; life: unknown; cards: Map<number, { key: string; badge: WorkBadge }> }>()
+/** Each workspace's badges by card (workBadges). */
+const badges: Kept<WorkBadge> = new WeakMap()
 /** Drops a workspace's kept badges: its next workBadges makes every one afresh (tests compare the two). */
 export function forgetBadges(ws: WorkspaceService): void {
   badges.delete(ws)
-}
-
-function badgeCache(ws: WorkspaceService): Map<number, { key: string; badge: WorkBadge }> {
-  let c = badges.get(ws)
-  if (!c || c.path !== ws.path || c.life !== ws.lifetime) badges.set(ws, (c = { path: ws.path, life: ws.lifetime, cards: new Map() }))
-  return c.cards
 }
 
 /** A stored ruleset's stages by its id, in board order (each read once; null for one not stored or not readable). */
@@ -97,7 +129,7 @@ function stagesReader(db: Db['reader']): (ruleset: string) => StageId[] | null {
   const read = new Map<string, StageId[] | null>()
   return (id) => {
     if (!read.has(id)) {
-      const row = db.prepare(QUERIES['rulesets.byId'].sql).get(id) as { data: string } | undefined
+      const row = prepared(db, QUERIES['rulesets.byId'].sql).get(id) as { data: string } | undefined
       let stages: StageId[] | null = null
       try {
         const parsed = row ? (JSON.parse(row.data) as { stages?: { id?: unknown }[] }) : null
@@ -126,23 +158,27 @@ export function rulesetStages(ws: WorkspaceService, ids: readonly string[]): Map
 /**
  * What waits for the user (IPC `tasks:forYou`, §16.8.5): every live card's open requests, of one project (its folder
  * name) or the whole workspace, oldest first, and their count. Read on one snapshot; the window reads it again on
- * `tasks-changed` (a request or an answer is a board change).
+ * `tasks-changed` (a request or an answer is a board change). Each card's items are kept by its row and its facts' head
+ * (HI-1754, as workBadges keeps badges): a change reads and folds again only the cards it touched.
  */
 export function forYou(ws: WorkspaceService, project?: string | null): ForYouSummary {
   const items = boardRead(ws, (db) => {
     if (!hasFacts(db)) return []
-    const cards = db.prepare('SELECT number, col, stage, pre_workflow, project FROM cards WHERE archived = 0 ORDER BY number').all() as Row[]
-    const facts = new Map<number, Fact[]>()
-    for (const r of db.prepare(QUERIES['facts.live'].sql).all() as Row[]) {
-      const f = factOf(r)
-      facts.set(f.card, [...(facts.get(f.card) ?? []), f])
-    }
-    return cards
-      .filter((r) => project == null || String(r.project ?? '').toLowerCase() === project.toLowerCase())
-      .flatMap((r) => (facts.has(r.number as number) ? forYouItems({ card: r.number as number, project: String(r.project ?? ''), stage: cardOf(r).stage }, facts.get(r.number as number)!) : []))
+    const cards = prepared(db, 'SELECT number, col, stage, pre_workflow, project FROM cards WHERE archived = 0 ORDER BY number').all() as Row[]
+    const heads = factHeads(db)
+    const keyOf = (r: Row): string => [r.col, r.stage, r.pre_workflow, r.project, heads.get(r.number as number) ?? ''].join('\n')
+    const all = keptValues(db, keptOf(forYous, ws), cards, keyOf, (r, facts) => (facts.length ? forYouItems({ card: r.number as number, project: String(r.project ?? ''), stage: cardOf(r).stage }, facts) : []))
+    return cards.flatMap((r, i) => (project == null || String(r.project ?? '').toLowerCase() === project.toLowerCase() ? all[i] : []))
   })
   items.sort((a, b) => (a.since < b.since ? -1 : a.since > b.since ? 1 : a.card - b.card))
   return { items, count: items.length }
+}
+
+/** Each workspace's For you items by card (forYou). */
+const forYous: Kept<ForYouItem[]> = new WeakMap()
+/** Drops a workspace's kept For you items: its next forYou makes every card's afresh (tests compare the two). */
+export function forgetForYou(ws: WorkspaceService): void {
+  forYous.delete(ws)
 }
 
 /** Of these cards, those waiting for the user at their round limit (§16.11.4): a round-limit request open. */
@@ -151,7 +187,7 @@ export function roundLimitCards(ws: WorkspaceService, numbers: readonly number[]
   if (!numbers.length) return out
   boardRead(ws, (db) => {
     if (!hasFacts(db)) return
-    const stmt = db.prepare(QUERIES['facts.ofCard'].sql)
+    const stmt = prepared(db, QUERIES['facts.ofCard'].sql)
     for (const n of new Set(numbers)) {
       const facts = (stmt.all(n) as Row[]).map(factOf)
       if (facts.some((f) => f.kind === 'ApprovalRequested') && foldCard(facts).requests.some((r) => r.gate === ROUND_LIMIT_GATE)) out.add(n)
@@ -167,9 +203,9 @@ export function roundLimitCards(ws: WorkspaceService, numbers: readonly number[]
 export function cardKind(ws: WorkspaceService, n: number): { kind: CardKind; kindProposed: CardKind | null } | null {
   return boardRead(ws, (db) => {
     if (!hasFacts(db)) return null
-    const r = db.prepare('SELECT kind FROM cards WHERE number = ?').get(n) as { kind: CardKind } | undefined
+    const r = prepared(db, 'SELECT kind FROM cards WHERE number = ?').get(n) as { kind: CardKind } | undefined
     if (!r) return null
-    const facts = (db.prepare(QUERIES['facts.ofCard'].sql).all(n) as Row[]).map(factOf).filter((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided')
+    const facts = (prepared(db, QUERIES['facts.ofCard'].sql).all(n) as Row[]).map(factOf).filter((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided')
     return { kind: r.kind, kindProposed: kindProposed(facts) }
   })
 }
@@ -178,7 +214,7 @@ export function cardKind(ws: WorkspaceService, n: number): { kind: CardKind; kin
 export function cardReviewSkip(ws: WorkspaceService, n: number): ReturnType<typeof reviewSkipOf> | null {
   return boardRead(ws, (db) => {
     if (!hasFacts(db)) return null
-    return reviewSkipOf((db.prepare(QUERIES['facts.ofCard'].sql).all(n) as Row[]).map(factOf).filter((f) => f.kind === 'ReviewSkipSet' || f.kind === 'ReviewSkipProposed'))
+    return reviewSkipOf((prepared(db, QUERIES['facts.ofCard'].sql).all(n) as Row[]).map(factOf).filter((f) => f.kind === 'ReviewSkipSet' || f.kind === 'ReviewSkipProposed'))
   })
 }
 

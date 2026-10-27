@@ -10,7 +10,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.hiveMerges' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.hiveMerges' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -213,6 +213,10 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.review.noSubmission.message', defaultMessage: '{card} has nothing submitted to review.', description: 'A refused review: the card has no submission.' }),
     msg({ id: 'workflow.refused.review.noSubmission.next', defaultMessage: 'Wait for its builder to submit it.', description: 'The next step when there is nothing to review.' })
   ),
+  'review.headMoved': r(
+    msg({ id: 'workflow.refused.review.headMoved.message', defaultMessage: "{card}'s line has moved since it was submitted: it was submitted at {submitted}, and its head is now {head}, a different change. A pass covers only the revision submitted.", description: "A refused passing verdict (HI-1763): the card's branch has new commits since the revision under review (a follow-up, say). {card} is the card's key; {submitted} and {head} are commits' short hashes." }),
+    msg({ id: 'workflow.refused.review.headMoved.next', defaultMessage: 'Give a failing verdict saying so (hive_verdict, pass: false): its builder then submits {head}, which is reviewed as any submission.', description: "The next step after a pass refused because the branch moved on (HI-1763): fail the review so the builder submits the new commit. {head} is a commit's short hash; keep the tool name and its argument as they are." })
+  ),
   // Submitting is "submit for review": it hands committed work to review and never commits it (HI-1618, Darren's
   // decision): what is missing is said in git's words, and committing stays the user's call.
   'submit.empty': r(
@@ -256,6 +260,7 @@ export const QUEUE_NEXT = {
   testing: msg({ id: 'workflow.refused.merge.hiveMerges.nextTesting', defaultMessage: 'The merge queue is merging it into {target} now and moves it to Done once merged: wait for that, or for it to come back.', description: 'The next step after a refused merge of a card the merge queue is testing or merging now. {target} is a branch name.' }),
   paused: msg({ id: 'workflow.refused.merge.hiveMerges.nextPaused', defaultMessage: 'It is in the merge queue for {target}, which is paused until it is resumed: wait for Done, or for it to come back.', description: "The next step after a refused merge of a card in a paused merge queue. {target} is a branch name." }),
   returned: msg({ id: 'workflow.refused.merge.hiveMerges.nextReturned', defaultMessage: 'It came back from the merge queue: fix it in your worktree, commit and submit again.', description: 'The next step after a refused merge of a card the merge queue returned to its builder (a conflict, failed checks, a hook).' }),
+  stale: msg({ id: 'workflow.refused.merge.hiveMerges.nextStale', defaultMessage: 'Its pass is stale: its line changed since it was approved (it is at {current}). Submit it again for review; it is queued once that is approved.', description: "The next step after a refused merge of a card Hive merges, approved but its pass stale: its branch has commits the review didn't cover. {current} is a commit's short hash." }),
   merged: msg({ id: 'workflow.refused.merge.hiveMerges.nextMerged', defaultMessage: 'The merge queue has merged it already: nothing is left to do.', description: 'The next step after a refused merge of a card Hive has already merged.' })
 } satisfies Record<string, Msg>
 

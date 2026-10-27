@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { HiveEvent } from '../src/shared/types'
+import type { ForYouSummary } from '../src/shared/workflow/workView'
 
 const base = tempDir('hive-card-work-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -16,7 +17,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
-const { cardWork, factRow, forgetBadges, workBadges } = await import('../src/main/workflow/cardWork')
+const { cardWork, factRow, forgetBadges, forgetForYou, forYou, workBadges } = await import('../src/main/workflow/cardWork')
 const { onHiveEvent } = await import('../src/main/events')
 const { revisionShort } = await import('../src/shared/platform/descriptors')
 
@@ -152,6 +153,48 @@ describe("a card's work from the board (#1223)", () => {
     same()
     // The project's rules changed (#1421's old rules marks), and back.
     same(new Map([['p', 'another-ruleset']]))
+    same()
+  })
+
+  it('gives the same For you kept as read afresh, reading again only the cards a change touched (HI-1754)', async () => {
+    const w = await workspace()
+    const facts = FactStore.forBoard(w, { project: 'p', key: 'P' })
+    const cards: number[] = []
+    for (let i = 0; i < 4; i++) cards.push(await cardWithWork(w, `Card ${i}`))
+    const ask = (card: number, request: string, text: string) => store.boardWrite(w, async () => facts.tx((tx) => tx.append(card, { kind: 'ApprovalRequested', actor: 'agent:B1', source: 'recorded', data: { request, kind: 'decide', gate: 'question', text } })))
+    // What the kept items give, then the same read with nothing kept (every card folded again, as before HI-1754).
+    const same = (project?: string | null): ForYouSummary => {
+      const kept = forYou(w, project)
+      forgetForYou(w)
+      expect(kept).toEqual(forYou(w, project))
+      return kept
+    }
+    expect(same().items).toEqual([])
+    await ask(cards[0], 'q1', 'Which one?')
+    await ask(cards[2], 'q2', 'Ship it?')
+    expect(same().items.map((i) => [i.card, i.text])).toEqual([[cards[0], 'Which one?'], [cards[2], 'Ship it?']])
+    expect(same('P').items).toHaveLength(2)
+    expect(same('other').items).toEqual([])
+    // Nothing changed: no fact decoded again. One card's answer: that card's facts alone.
+    const parse = vi.spyOn(JSON, 'parse')
+    try {
+      forYou(w)
+      expect(parse).not.toHaveBeenCalled()
+      await store.boardWrite(w, async () => facts.tx((tx) => tx.append(cards[0], { kind: 'Approval', actor: 'user', source: 'recorded', data: { request: 'q1', answer: 'answered', note: 'That one', generation: 0 } })))
+      parse.mockClear()
+      expect(forYou(w).items.map((i) => i.card)).toEqual([cards[2]])
+      // Its four facts (started, submitted, asked, answered), not the other cards' seven.
+      expect(parse).toHaveBeenCalledTimes(4)
+    } finally {
+      parse.mockRestore()
+    }
+    expect(same().items.map((i) => i.card)).toEqual([cards[2]])
+    // A move, archiving and back keep it the same as afresh.
+    await store.boardWrite(w, async () => facts.tx((tx) => tx.setStage(cards[2], 'done')))
+    same()
+    await inWorkspace(w, () => tasks.archiveTask(cards[2], true))
+    expect(same().items).toEqual([])
+    await inWorkspace(w, () => tasks.archiveTask(cards[2], false))
     same()
   })
 

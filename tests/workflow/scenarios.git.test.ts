@@ -752,7 +752,7 @@ describe('workflow scenarios, Git', () => {
     expect(e.wf.state(card).stage).toBe('approved')
   })
 
-  it('a refused verdict on an older submission names the latest; a verdict is always recorded and a moved head makes the pass stale at once', async () => {
+  it('a refused verdict on an older submission names the latest; a pass when the head has moved to another change is refused (HI-1763), a fail recorded', async () => {
     const e = agentMerges()
     const { card, folder } = await started(e)
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
@@ -760,11 +760,71 @@ describe('workflow scenarios, Git', () => {
     moved(await e.wf.startReview(card.key, R1))
     // The builder commits more while the review runs.
     commit(folder, { 'late.txt': 'late\n' }, 'late')
-    moved(await e.wf.verdict(card.key, R1, { submission: first, pass: true, comment: 'good' }))
+    refusedBy(await e.wf.verdict(card.key, R1, { submission: first, pass: true, comment: 'good' }), 'review.headMoved')
+    expect(e.wf.state(card)).toMatchObject({ verdicts: [], stale: null, stage: 'review' })
+    moved(await e.wf.verdict(card.key, R1, { submission: first, pass: false, comment: 'Submit the late commit' }))
     const s = e.wf.state(card)
     expect(s.verdicts).toHaveLength(1)
-    expect(s.stale?.why).toBe('change')
-    expect(s.stage).toBe('approved')
+    expect(s.stage).toBe('active')
     expect((e.store.facts(card.id).find((f) => f.kind === 'Verdict')!.data as FactData['Verdict']).revision).toBe(s.latest!.revision)
+  })
+})
+
+describe('a pass covers only the revision submitted; a stale pass says so (HI-1763)', () => {
+  const reviewer = { waitMinutes: 30, reviewer: async () => 'R1' }
+  const head = (folder: string): string => sh(folder, 'rev-parse', 'HEAD').trim()
+
+  it("HI-1737's sequence: a follow-up commit in Review, OK'd, then a pass: refused, saying to resubmit the head; resubmitted, it is reviewed and queued there", async () => {
+    const e = pair()
+    const { card, folder } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    const submitted = e.wf.state(card).latest!.revision!
+    moved(await e.wf.startReview(card.key, R1))
+    commit(folder, { 'tests/fix.test.txt': 'one more assertion\n' }, 'follow-up')
+    const now = head(folder)
+    const posted = await e.wf.loopStep(card.key, B1, 'followUp', 'One more assertion', reviewer)
+    moved(posted)
+    moved(await e.wf.loopStep(card.key, R1, 'ok', 'Checked', { ...reviewer, design: (posted as { data?: Record<string, unknown> }).data?.design as string }))
+    const r = refusedBy(await e.wf.verdict(card.key, R1, { pass: true, comment: 'good' }), 'review.headMoved')
+    expect(r.message).toBe(`${card.key}'s line has moved since it was submitted: it was submitted at ${submitted.slice(0, 7)}, and its head is now ${now.slice(0, 7)}, a different change. A pass covers only the revision submitted.`)
+    expect(r.next).toBe(`Give a failing verdict saying so (hive_verdict, pass: false): its builder then submits ${now.slice(0, 7)}, which is reviewed as any submission.`)
+    // Nothing silent: still in Review, no pass, no Stale, nothing queued.
+    expect(e.wf.state(card)).toMatchObject({ stage: 'review', stale: null, verdicts: [] })
+    expect(await e.queue().runOnce('main')).toBeNull()
+    // The normal path: failed so, then B submitted, reviewed, passed, queued at B.
+    moved(await e.wf.verdict(card.key, R1, { pass: false, comment: `The head moved: submit ${now.slice(0, 7)}` }))
+    moved(await e.wf.submit(card.key, B1, { summary: 'with the follow-up', note: 'the follow-up commit' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'good' }))
+    const s = e.wf.state(card)
+    expect(s.stage).toBe('merging')
+    expect(s.entries.at(-1)).toMatchObject({ state: 'open', revision: now })
+  })
+
+  it('a fail is never refused for a moved head: the card goes back to its builder', async () => {
+    const e = pair()
+    const { card, folder } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    moved(await e.wf.startReview(card.key, R1))
+    commit(folder, { 'tests/fix.test.txt': 'one more assertion\n' }, 'follow-up')
+    moved(await e.wf.verdict(card.key, R1, { pass: false, comment: 'Submit the follow-up' }))
+    expect(e.wf.state(card).stage).toBe('active')
+  })
+
+  it("a pass that goes stale after it is given (the head moves on): its builder told at once what it was for and what to submit, the card's merge line and a refused merge saying so", async () => {
+    const e = pair()
+    const { card, folder } = await approved(e)
+    const passed = e.wf.state(card).approved!.revision!
+    expect(e.wf.state(card).stage).toBe('merging')
+    commit(folder, { 'src/more.txt': 'unreviewed\n' }, 'after the pass')
+    const now = head(folder)
+    await reconcile(e.wf, card)
+    const s = e.wf.state(card)
+    expect(s).toMatchObject({ stage: 'approved', stale: { approved: passed, current: now, why: 'change' } })
+    expect(s.staleSince).toBeTruthy()
+    expect(e.wakes.some((w) => w.agent === 'B1' && w.why === `${card.key}: its pass is stale: it is for ${passed.slice(0, 7)}, but its line is at ${now.slice(0, 7)} (changed since). Submit ${now.slice(0, 7)} for review (hive_submit). Or put its branch back at ${passed.slice(0, 7)}.`)).toBe(true)
+    expect(e.wf.queueLineOf(card.key)).toContain(`Its pass is for ${passed.slice(0, 7)}, but its line is at ${now.slice(0, 7)}`)
+    expect(refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges').next).toBe(`Its pass is stale: its line changed since it was approved (it is at ${now.slice(0, 7)}). Submit it again for review; it is queued once that is approved.`)
+    expect(await e.queue().runOnce('main')).toBeNull()
   })
 })

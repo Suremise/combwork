@@ -14,6 +14,7 @@ import { noteCliFolder, refreshPath } from './freshPath'
 import { emit, toast } from './events'
 import { createLogger } from './logger'
 import { childEnv, hasPty, killPty, spawnPty, startSize, writePty } from './ptyHost'
+import { connectionsManaged } from './connectionSeam'
 import { KeyGate } from './taskKeys'
 import { KeysStopped, PickNotFound, typeKeySteps } from './keySteps'
 import { compareTested, noteSelectedCli, testedVersion } from './testedClis'
@@ -80,7 +81,9 @@ class ProviderService {
    * "default"), else the model last seen in a session started without a model choice.
    */
   private resolveDefaultModel(id: ProviderId, catalog?: ModelCatalog | null): string | null {
-    return provider(id).configuredDefaultModel() ?? catalog?.defaultModel ?? config.get().observedDefaultModel[id] ?? null
+    // Its connections' settings are each their own (HI-1755: a launch reads its connection's); ~/.claude's isn't theirs.
+    const own = connectionsManaged(id) ? null : provider(id).configuredDefaultModel()
+    return own ?? catalog?.defaultModel ?? config.get().observedDefaultModel[id] ?? null
   }
 
   /** The efforts sessions started without an effort choice ran with, per model (the CLI's own defaults). */
@@ -353,6 +356,24 @@ class ProviderService {
     return key
   }
 
+  /**
+   * Signs an account's folder in (HI-980): the CLI's own login in a terminal of Hive's, with the folder as its home
+   * (`env`), and nothing typed into it: the user signs in through the CLI's flow. One per account: a second start gets
+   * the open one's key. `onExit` once it ends. The CLI's own sign-in state isn't changed by it (that is ~/.claude's).
+   */
+  runAccountLogin(id: ProviderId, accountId: string, env: Record<string, string>, onExit: (code: number) => void): string {
+    const adapter = provider(id)
+    const info = this.info(id)
+    if (!info.path) throw hiveError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: adapter.descriptor.name })
+    const key = `task:${id}:login:${accountId}`
+    if (hasPty(key)) return key
+    const cmd = adapter.loginCommand(info.path)
+    const s = toSpawnable(cmd.file, cmd.args)
+    log.info(`${adapter.descriptor.name} sign-in for account ${accountId}`)
+    spawnPty(key, { file: s.file, args: s.args, cwd: homedir(), env: childEnv(env), onExit })
+    return key
+  }
+
   /** Starts a provider task in a terminal and returns its terminal key. */
   runProviderTask(id: ProviderId, task: ProviderTask, retryUpdate = false): string {
     const adapter = provider(id)
@@ -381,6 +402,8 @@ class ProviderService {
       return key
     }
     if (task === 'login') {
+      // Signed in per connection (HI-1755): its sign-in is Settings → Connections', never ~/.claude's.
+      if (connectionsManaged(id)) throw hiveError(msg({ id: 'service.providers.signInConnections', defaultMessage: '{cli} is signed in per connection: sign in from Settings → Connections.', description: 'An error: Agent Setup was asked to sign a coding agent CLI ({cli}: "Claude Code") in, but its logins are Connections (Settings → Connections names a section).' }), { cli: name }, { kind: 'conflict' })
       const cmd = adapter.loginCommand(info.path)
       return this.runTask(id, task, cmd.file, cmd.args, `${name} sign-in`, undefined, shown) // i18n-ignore: the task's name in the log
     }

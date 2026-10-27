@@ -52,7 +52,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await lib.waitForProvider(inv)
-  const projectCfg = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8'))
+  const projectCfg = (p) => lib.projectConfig(userData, p) // with this user's view over it (HI-1749)
   const dialog = page.locator('.dialog').last()
   const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `templateshare-${name}.png`) })
   const sidebar = page.locator('.sidebar')
@@ -123,7 +123,7 @@ const check = (name, ok, extra = '') => {
   await nameBoxes(confirmLoad).nth(1).fill('BReviewer')
   await lib.until(() => loadOf(confirmLoad).isEnabled(), 5000)
   await loadOf(confirmLoad).click()
-  check('Load into Project… replaces that project\'s agents and layout', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["BBuilder","BReviewer"]', 10000)) && projectCfg(beta).layout === 'columns2', JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
+  check('Load into Project… replaces that project\'s agents and layout', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["BBuilder","BReviewer"]' && projectCfg(beta).layout === 'columns2', 10000)), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
 
   // Export to a test folder: what the template holds, nothing personal.
   const exported = path.join(exports_, 'Team.hive-template.json')
@@ -273,7 +273,7 @@ const check = (name, ok, extra = '') => {
   await nameBoxes(loadEdited).nth(1).fill('BReviewer')
   await lib.until(() => loadOf(loadEdited).isEnabled(), 5000)
   await loadOf(loadEdited).click()
-  check('loaded into beta: exactly those agents, in order, with that layout', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => [a.name, a.workflowRole, a.role ?? '', !!a.worktree])) === '[["Tester","builder","",false],["BReviewer","either","checker",false]]', 15000)) && projectCfg(beta).layout === 'columns3', JSON.stringify(projectCfg(beta).agents))
+  check('loaded into beta: exactly those agents, in order, with that layout', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => [a.name, a.workflowRole, a.role ?? '', !!a.worktree])) === '[["Tester","builder","",false],["BReviewer","either","checker",false]]' && projectCfg(beta).layout === 'columns3', 15000)), JSON.stringify(projectCfg(beta).agents))
   // A save made while the editor is open is never overwritten (#271): the draft (a new name) is open; "Team edited" is
   // changed on disk (a description) and the editor's own list refreshes (another template saved, from the palette).
   // The editor says so; Save is refused, keeping both the draft and the change; Discard and Reload shows the change.

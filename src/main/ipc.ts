@@ -19,6 +19,7 @@ import { keptLaneOrder } from '../shared/laneBar'
 import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../shared/tips'
 import { allProviders } from './providers'
 import { providerService } from './providerService'
+import { accountsView, addAccount, connectionHomes, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, signInAccount } from './accounts'
 import { config } from './config'
 import { clearRecent, recentChanged, recentFor, removeRecent } from './recentWorkspaces'
 import { emit, emitTo, onHiveEvent } from './events'
@@ -102,7 +103,7 @@ import { CONSOLE_WINDOW_CHANNELS, consoleOwner, openConsoleWindow, sendToConsole
 import { isRecordingName, latestRecording, listCaptures, recordingOf, recordingsDir, startRecording, stopRecording, stopRecordingsWhere } from './consoleRecorder'
 import { mayRead, type ConsoleEvent } from '../shared/devConsole'
 import { benchContext, importBenchmark, keepReport, listBenchmarks, pinBenchmark, readBenchmark, removeBenchmark, selectBenchmarks } from './benchmarks'
-import { capturedText, HiveError, hiveError, windowError } from './hiveError'
+import { capturedText, englishError, HiveError, hiveError, windowError } from './hiveError'
 import { deleteJournalEntry, deleteWorkspaceJournal, editJournalEntry, forgetJournalEntries, forgetJournalPreview, journalEntry, journalStatus, setJournalSettings } from './journalService'
 import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
@@ -246,7 +247,8 @@ function assertExtraArgs(args: unknown): void {
 
 function guardFile(path: string, write = false): string {
   if (insideArchive(path)) throw hiveError(M.insideArchive, undefined, { kind: 'forbidden' })
-  if (workspace.isAllowedPath(path) || allProviders().some((p) => p.fileAllowed(path, write))) return path
+  // A CLI's own files: its connections' homes on in this workspace (HI-1755), else the CLI's own home.
+  if (workspace.isAllowedPath(path) || allProviders().some((p) => p.fileAllowed(path, write, connectionHomes(p.id, workspace.path ? workspace.config : null)?.map((h) => h.home)))) return path
   // The skills that ship with Hive, to view one the workspace doesn't have.
   if (!write && insideReal(path, [skills.bundledSkillsDir()])) return path
   throw hiveError(M.outsideWorkspace, undefined, { kind: 'forbidden' })
@@ -1427,7 +1429,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
 
     'memory:list': async (p) => {
       const project = workspace.assertProject(p)
-      return (await Promise.all(allProviders().map((a) => a.memorySources(project)))).flat()
+      return (await Promise.all(allProviders().map((a) => a.memorySources(project, connectionHomes(a.id, workspace.config))))).flat()
     },
     'memory:instructionsShared': async (p, ids) => {
       const project = workspace.assertProject(p)
@@ -1509,6 +1511,21 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'provider:stopAgents': (id) => sessions.stopProvider(id),
 
+    'connections:list': (check) => accountsView(check === true),
+    'connections:add': (id, name) => addAccount(id, name),
+    'connections:rename': (id, name) => renameAccount(id, name),
+    'connections:remove': (id) => removeAccount(id),
+    'connections:signIn': async (id) => {
+      await refreshPathBeforeStart()
+      return signInAccount(id)
+    },
+    'connections:keepLogin': (id) => keepNewLogin(id),
+    'connections:setOn': (id, on) => setAccountOn(id, on),
+    'connections:setDefault': (id) => setAccountDefault(id),
+    'connections:setAssistant': (provider, id) => setAssistantConnection(provider, id),
+    'connections:switchAffected': () => sessions.switchAffected(workspace.path!),
+    'session:switchConnection': (p, agentId) => sessions.switchAtSafePoint(p, agentId),
+
     'api:info': () => apiInfo(),
     'api:regenerateToken': async () => {
       await regenerateToken()
@@ -1565,6 +1582,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
         if (block?.ms) for (const until = Date.now() + block.ms; Date.now() < until; );
         return await senderStore.run(e.sender, () => inWorkspace(w.ws, () => (fn as (...a: unknown[]) => unknown)(...args)))
       } catch (err) {
+        // A failure that isn't one of Hive's own refusals (a file that couldn't be written, HI-1749): the window shows it, and
+        // hive.log has it too, so every "Could not …" notification has its line.
+        if (!(err instanceof HiveError)) log.warn(`ipc ${channel} failed: ${userText(englishError(err))}${typeof (err as NodeJS.ErrnoException)?.code === 'string' ? ` (${(err as NodeJS.ErrnoException).code})` : ''}`)
         throw windowError(err)
       } finally {
         done()

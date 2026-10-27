@@ -276,6 +276,8 @@ describe('saving and loading templates', () => {
   const beta = join(wsPath, 'beta')
   const git = (cwd: string, ...a: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd, stdio: 'pipe' })
   const cfgOf = (p: string) => JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8'))
+  /** A project's layout, as this user's view of it has it (HI-1749: not in project.json). */
+  const layoutOf = async (p: string) => (await run(() => w.projectConfig(p))).layout
   let legacyNo = 0
   /**
    * An agent with a 0.9 worktree, as a project upgraded from 0.9 has one (#1451: 1.0 adds none): a worktree on its own
@@ -373,7 +375,7 @@ describe('saving and loading templates', () => {
     const r = await run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', ['b1'], undefined, B))
     expect(r).toEqual({ created: B, removed: ['Old'] })
     const cfg = cfgOf(beta)
-    expect(cfg.layout).toBe('columns2')
+    expect(await layoutOf(beta)).toBe('columns2')
     // Each with its role in the workflow and note (alpha's "builder" note), in the project folder (#1436).
     expect(cfg.agents.map((a: StoredAgent) => [a.name, a.workflowRole, a.role, a.model, a.provider, a.worktree])).toEqual([['BBuilder', 'builder', 'builder', 'opus', 'claude-code', undefined], ['BReviewer', 'reviewer', undefined, undefined, 'claude-code', undefined]])
     expect(cfg.agents.some((a: StoredAgent) => a.id === 'b1')).toBe(false)
@@ -476,12 +478,13 @@ describe('saving and loading templates', () => {
 
   it('an agent added while the load was staging is kept, and the load refused', async () => {
     const before = cfgOf(alpha)
+    const beforeLayout = await layoutOf(alpha)
     templates.testHooks.staged = async (name) => {
       if (name === 'Builder') await run(() => addAgent(alpha, { name: 'Concurrent', location: 'project' }))
     }
     await expect(run(() => templates.loadTemplate(alpha, 'workspace', 'pair.json', before.agents.map((a: StoredAgent) => a.id)))).rejects.toThrow(/changed while the template was loading: nothing was changed/)
     expect(names(alpha)).toEqual([...before.agents.map((a: StoredAgent) => a.name), 'Concurrent'])
-    expect(cfgOf(alpha).layout).toBe(before.layout)
+    expect(await layoutOf(alpha)).toBe(beforeLayout)
   })
 
   it('adds one agent of a template, the others left alone; a taken name gets a number', async () => {
@@ -646,7 +649,7 @@ describe('saving and loading templates', () => {
     await expect(run(() => templates.templatePlan(beta, 'project', 'trees.json'))).rejects.toThrow(/no longer there/)
     const r = await run(() => templates.loadTemplate(beta, 'project', 'trees.json', ids, alpha))
     expect(r.created).toEqual(['Tree A', 'Tree B'])
-    expect(cfgOf(beta).layout).toBe(plan.layout)
+    expect(await layoutOf(beta)).toBe(plan.layout)
     // In beta's folder: no worktree, branch or setup made; alpha's own untouched.
     expect(cfgOf(beta).agents.map((a: StoredAgent) => [a.name, a.workflowRole, a.role, a.worktree, a.needsSetup])).toEqual([['Tree A', 'builder', undefined, undefined, undefined], ['Tree B', 'reviewer', 'checks', undefined, undefined]])
     expect(git(beta, 'branch', '--list').toString()).toBe(branches)
@@ -671,7 +674,7 @@ describe('saving and loading templates', () => {
     expect(plan.pairs).toEqual([{ builder: 0, reviewer: 3 }, { builder: 1, reviewer: 4 }, { builder: 2, reviewer: 5 }])
     await run(() => templates.loadTemplate(beta, 'hive', 'team-3x3.json', ids))
     const made = cfgOf(beta)
-    expect(made.layout).toBe('grid6')
+    expect(await layoutOf(beta)).toBe('grid6')
     expect(made.agents.map((a: StoredAgent) => [a.name, a.workflowRole, a.provider, a.pairedWith, a.worktree])).toEqual([
       [want[0], 'builder', 'claude-code', want[3], undefined],
       [want[1], 'builder', 'claude-code', want[4], undefined],

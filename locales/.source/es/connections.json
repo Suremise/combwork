@@ -1,0 +1,8 @@
+{
+  "connections.choice.default": "Workspace's default ({name})",
+  "connections.choice.defaultNone": "Workspace's default (none on)",
+  "connections.choice.gone": "A removed connection (the agent is refused a start)",
+  "connections.choice.label": "Connection",
+  "connections.choice.none": "No {cli} connection is on in this workspace. Add one in Settings → Connections.",
+  "connections.choice.off": "{name} (off in this workspace: the default runs it)"
+}

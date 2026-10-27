@@ -10,7 +10,9 @@ import { mostUrgent, projectAgentStates, projectStateShort, projectStateSummary 
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import hexUrl from '../assets/icon.svg'
 import * as actions from '../actions'
-import { call } from '../api'
+import { call, errorMessage } from '../api'
+import { useConnections } from '../components/ConnectionChoice'
+import { providerDescriptor } from '@shared/providers'
 import { commandKeybinding } from '../commands'
 import { AddAgentButton, PANE_FOOTER, PANE_HEADER, PaneChrome, RESUME_TINT, ResumeButton, SessionToolbar, TerminalLayer, usePanes, useWidth } from '../components/AgentPanes'
 import { terminalMinWidth } from '../components/TerminalView'
@@ -19,7 +21,7 @@ import { paneColumnsFor, projectSessionView, tileStripRoom } from '@shared/defau
 import { Icon, IconButton, Switch, Tooltip, useContextMenu, useFolds, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
 import { ProjectAgentsTable, useAgentsText } from '../components/AgentsTable'
-import { agentProviderOf, projectKey, set, setProjectTab, tileFocusOf, useFocusedAgent, useLanguage, useProjectStarting, useStarting, useStore, startingLabel, type ProjectTab } from '../store'
+import { agentProviderOf, notify, projectKey, set, setActivity, setProjectTab, tileFocusOf, useFocusedAgent, useLanguage, useProjectStarting, useStarting, useStore, startingLabel, type ProjectTab } from '../store'
 import { carriesFiles, cx, formatKeybinding } from '../util'
 import { AttachmentsTab, FilesTab } from './FilesTab'
 import { VersionControl } from './VersionControl'
@@ -84,6 +86,8 @@ const M = {
   terminal: msg({ id: 'project.menu.terminal', defaultMessage: 'Terminal', description: "The project header's ⋯ menu: opens a terminal in the project folder." }),
   projectSettings: msg({ id: 'project.menu.settings', defaultMessage: 'Project Settings', description: "The project header's ⋯ menu." }),
   removeProject: msg({ id: 'project.menu.remove', defaultMessage: 'Remove Project…', description: "The project header's ⋯ menu: removes the project from the workspace (asks first)." }),
+  restartWhenDone: msg({ id: 'project.banner.restartWhenDone', defaultMessage: 'Restart When Its Turn Is Over', description: "Button on the restart banner of an agent running on another connection than the one chosen now (HI-1755): it ends once its turn is over and carries on, on the new connection." }),
+  switchFailed: msg({ id: 'project.banner.switchFailed', defaultMessage: "Couldn't arrange the restart", description: "An error's title: Restart When Its Turn Is Over failed." }),
   restartNeeded: msg({ id: 'project.banner.restartNeeded', defaultMessage: "Skills, MCP servers or settings changed since {many, select, yes {{agent}'s} other {this}} session started. Restart the session to apply them — the conversation continues.", description: "Banner over a running session whose skills, MCP servers or settings changed. {agent} is the focused agent's name (when there are several)." }),
   restart: msg({ id: 'project.banner.restart', defaultMessage: 'Restart session', description: 'Button in that banner.' }),
   unmanagedMcp: msg({ id: 'project.banner.unmanagedMcp', defaultMessage: 'This project defines MCP servers that are not in the workspace: <b>{names}</b>. They stay disabled until copied to the workspace.', description: 'Banner of a project with MCP servers of its own. {names} is their names. <b> is bold.' }),
@@ -585,8 +589,15 @@ export function ProjectView({ visible }: { visible: boolean }) {
           <button className="btn small primary" onClick={() => void restart()}>
             {tr(M.restart)}
           </button>
+          {/* A connection to switch to (HI-1755): once its turn is over, never mid-turn. */}
+          {live.launchedConnection && !live.switchPending && (
+            <button className="btn small" onClick={() => void call('session:switchConnection', project.path, focusedAgent.id).catch((e) => notify('error', tr(M.switchFailed), errorMessage(e)))}>
+              {tr(M.restartWhenDone)}
+            </button>
+          )}
         </div>
       )}
+      <ConnectionSetupBanner project={project} />
       <RemovedDataBanner project={project} />
       {project.unmanagedMcp.length > 0 && (
         <div className="banner warn">
@@ -637,3 +648,32 @@ export function ProjectView({ visible }: { visible: boolean }) {
   )
 }
 
+/**
+ * Asks for a connection (HI-1755, Darren's 1a): in a project whose agents' CLI has connections but none is on in its
+ * workspace, nothing of that CLI starts (it never falls back to the CLI's own login): Add a Connection opens Settings →
+ * Connections. Not asked for a test copy on its CLI test home.
+ */
+function ConnectionSetupBanner({ project }: { project: ProjectInfo }) {
+  useLanguage()
+  const view = useConnections()
+  const settings = useStore((s) => s.settings)
+  if (!view) return null
+  const clis = [...new Set(project.agents.map((a) => agentProviderOf(project, a)))].filter((p) => !!providerDescriptor(p).capabilities.connections && view.providers.includes(p) && !view.testHome.includes(p) && !view.workspace[p]?.default)
+  if (!clis.length || !settings) return null
+  return (
+    <div className="banner warn" data-connection-setup>
+      <Icon name="plug" /> {tr(CONNECTION_SETUP.text, { cli: providerDescriptor(clis[0]).name })}
+      <button className="btn small primary" onClick={() => {
+          set({ settingsSection: 'accounts', settingsQuery: '' })
+          setActivity('settings')
+        }}>
+        {tr(CONNECTION_SETUP.add)}
+      </button>
+    </div>
+  )
+}
+
+const CONNECTION_SETUP = {
+  text: msg({ id: 'project.banner.connectionSetup', defaultMessage: "No {cli} connection is on in this workspace, so its agents can't start. Add one and sign it in.", description: 'Banner in a project whose agents\' CLI ({cli}: "Claude Code") has no connection on in the workspace (HI-1755).' }),
+  add: msg({ id: 'project.banner.connectionSetupAdd', defaultMessage: 'Add a Connection', description: 'Button on the banner asking for a connection: opens Settings → Connections.' })
+}

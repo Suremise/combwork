@@ -409,6 +409,8 @@ export interface CardState {
    * given a verdict.
    */
   step: { step: LoopAsk; id: string; seq: number; at: string; until: string | null; by: string | null } | null
+  /** When the content-stale pass (`stale`) went stale: its `Stale` fact's time, which nothing later moves (HI-1763's stall). */
+  staleSince: string | null
   lastSeq: number
 }
 
@@ -437,6 +439,7 @@ export const emptyState = (): CardState => ({
   received: {},
   approved: null,
   stale: null,
+  staleSince: null,
   requests: [],
   made: {},
   approvals: [],
@@ -502,6 +505,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         s.latest = sub
         s.approved = { revision: d.revision, base: d.base }
         s.stale = null
+        s.staleSince = null
         // A new submission retires the requests bound to an earlier one: they can't approve this one.
         s.requests = s.requests.filter((r) => r.submission === undefined)
         s.approvalOverridden = false
@@ -524,6 +528,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         s.approved = { revision: d.to, base: d.toBase }
         // Its line back at exactly the revision a stale pass was for (#1623): the reviewer passed that commit, so it holds.
         if (d.how === 'sameRevision' && s.stale?.approved === d.to) s.stale = null
+        if (!s.stale) s.staleSince = null
         break
       }
       case 'Updated': {
@@ -537,7 +542,11 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'Stale': {
         const d = f.data as FactData['Stale']
         // A decision makes passes stale by generation; only a content-stale pass waits for the builder (§16.4.6).
-        if (d.why !== 'decision') s.stale = d
+        if (d.why !== 'decision') {
+          // Its start, kept while the same stale pass stands (HI-1763: the stall counts from here).
+          if (!s.stale || s.stale.current !== d.current || s.stale.approved !== d.approved) s.staleSince = f.at
+          s.stale = d
+        }
         break
       }
       case 'ApprovalRequested': {

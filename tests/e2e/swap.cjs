@@ -45,7 +45,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const projectJson = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8'))
+  const projectJson = () => lib.projectConfig(userData, alpha) // with this user's view over it (HI-1749)
   const saved = () => projectJson().agents.map((a) => a.name)
   const paneNames = async () => (await page.locator('.pane-header-bar .agent-name').allInnerTexts()).map((t) => t.trim())
   const activePage = async () => Number((await page.locator('.page-switch button.active').innerText().catch(() => '1')).trim())

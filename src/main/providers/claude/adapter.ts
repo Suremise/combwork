@@ -13,10 +13,11 @@ import { config } from '../../config'
 import { claudeFileAllowed, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
-import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
+import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
-import type { Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
+import type { ConnectionStatus, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
 import { autoCompactOf, settingsScopes } from './autoCompact'
+import { connectionsManaged } from '../../connectionSeam'
 import { hiveStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
 import { claudeBackgroundTasks } from './background'
 import { claudeSafeguards } from './safeguards'
@@ -86,6 +87,47 @@ export function claudeTurnScreen(screen: string): 'idle' | 'working' | null {
 
 export function claudeHome(): string {
   return process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
+}
+
+/** The fields Hive reads from `claude auth status --json` (HI-980), as Settings → Advanced names them. */
+export interface AuthStatusFields {
+  loggedIn: string
+  email: string
+  orgId: string
+  plan: string
+}
+
+/**
+ * Who `claude auth status --json` says a folder is signed in as (HI-980), from its output (it exits 1 when signed out,
+ * with the same JSON): only the fields named, never anything else it prints. Not told (no JSON, no boolean signed-in
+ * field) is `ok: false`, never signed out.
+ */
+/**
+ * An account's status from `claude auth status --json`'s run (HI-980): only a check that ended by itself counts. Exit
+ * 0 with its answer, or exit 1 with signed-out JSON (how it says signed out); anything else (a timeout, another exit,
+ * exit 1 claiming signed in) is a failed check, whatever it printed.
+ */
+export function claudeAccountStatus(r: { stdout: string; code: number; ended?: true }, f: AuthStatusFields): ConnectionStatus {
+  if (r.ended) return { ok: false, error: `it didn't finish (exit ${r.code})` } // i18n-ignore: for the log
+  const s = parseClaudeAuthStatus(r.stdout, f)
+  if (r.code === 0) return s
+  if (r.code === 1 && s.ok && !s.loggedIn) return s
+  return { ok: false, error: s.ok ? `it exited ${r.code} saying ${s.loggedIn ? 'signed in' : 'signed out'}` : `${s.error} (exit ${r.code})` } // i18n-ignore: for the log
+}
+
+export function parseClaudeAuthStatus(stdout: string, f: AuthStatusFields): ConnectionStatus {
+  let j: unknown
+  try {
+    j = JSON.parse(stdout.trim())
+  } catch {
+    return { ok: false, error: 'its status was not JSON' } // i18n-ignore: for the log
+  }
+  if (!j || typeof j !== 'object') return { ok: false, error: 'its status was not an object' } // i18n-ignore: for the log
+  const o = j as Record<string, unknown>
+  const signedIn = o[f.loggedIn]
+  if (typeof signedIn !== 'boolean') return { ok: false, error: `its status had no "${f.loggedIn}"` } // i18n-ignore: for the log
+  const str = (k: string): string | undefined => (typeof o[k] === 'string' && o[k] ? (o[k] as string) : undefined)
+  return { ok: true, loggedIn: signedIn, email: str(f.email), orgId: str(f.orgId), plan: str(f.plan) ?? null }
 }
 
 /**
@@ -228,7 +270,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       break
     }
     if (!info.found) info.editorExtensionOnly = await this.editorExtensionPresent()
-    if (info.path) {
+    // Its sign-in is its connections' (HI-1755): ~/.claude's own login is never checked.
+    if (info.path && !connectionsManaged(this.id)) {
       const auth = await run(info.path, ['auth', 'status', '--json'], 10000)
       try {
         const j = JSON.parse(auth.stdout)
@@ -284,10 +327,29 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return { file: executable, args: ['auth', 'login'] }
   }
 
-  /** Claude Code's own default: "model" in ~/.claude/settings.json. */
-  configuredDefaultModel(): string | null {
+  async accountStatus(executable: string, env: NodeJS.ProcessEnv): Promise<ConnectionStatus> {
+    const r = await run(executable, ['auth', 'status', '--json'], advanced.number('claude-code.accounts.statusSeconds') * 1000, env)
+    const fields: AuthStatusFields = {
+      loggedIn: advanced.get<string>('claude-code.accounts.loggedInField'),
+      email: advanced.get<string>('claude-code.accounts.emailField'),
+      orgId: advanced.get<string>('claude-code.accounts.orgField'),
+      plan: advanced.get<string>('claude-code.accounts.planField')
+    }
+    return claudeAccountStatus(r, fields)
+  }
+
+  accountSharedTarget(name: string): string {
+    return join(claudeHome(), name)
+  }
+
+  accountLoginFile(name: string): boolean {
+    return advanced.pattern('claude-code.accounts.loginFiles').test(name)
+  }
+
+  /** Claude Code's own default: "model" in its home's settings.json (~/.claude's, or a connection's: HI-1755). */
+  configuredDefaultModel(home = claudeHome()): string | null {
     try {
-      const m = JSON.parse(readFileSync(join(claudeHome(), 'settings.json'), 'utf8')).model
+      const m = JSON.parse(readFileSync(join(home, 'settings.json'), 'utf8')).model
       if (typeof m === 'string' && m.trim()) return m.trim()
     } catch {
       // no settings file, or no model in it
@@ -868,13 +930,17 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   // Project files
   // -------------------------------------------------------------------------
 
-  async memorySources(projectPath: string): Promise<MemorySource[]> {
+  async memorySources(projectPath: string, homes?: readonly { id: string; name: string; home: string }[]): Promise<MemorySource[]> {
     const p = this.id
+    // The user's own file: each connection's on in the workspace (HI-1755: each is its own home), else ~/.claude's.
+    const users: MemorySource[] = homes
+      ? homes.map((h) => ({ provider: p, id: `user:${h.id}`, label: connectionMemoryLabel('CLAUDE.md', h.name), path: join(h.home, 'CLAUDE.md'), kind: 'claude-md', exists: false })) // i18n-ignore: a file's name
+      : [{ provider: p, id: 'user', label: userMemoryLabel('CLAUDE.md'), path: join(claudeHome(), 'CLAUDE.md'), kind: 'claude-md', exists: false }] // i18n-ignore: a file's name
     const sources: MemorySource[] = [
       { provider: p, id: 'project', label: 'CLAUDE.md', path: join(projectPath, 'CLAUDE.md'), kind: 'claude-md', exists: false }, // i18n-ignore: a file's name
       { provider: p, id: 'project-dot', label: '.claude/CLAUDE.md', path: join(projectPath, '.claude', 'CLAUDE.md'), kind: 'claude-md', exists: false }, // i18n-ignore: a file's name
       { provider: p, id: 'local', label: 'CLAUDE.local.md', path: join(projectPath, 'CLAUDE.local.md'), kind: 'local-md', exists: false }, // i18n-ignore: a file's name
-      { provider: p, id: 'user', label: userMemoryLabel('CLAUDE.md'), path: join(claudeHome(), 'CLAUDE.md'), kind: 'claude-md', exists: false }
+      ...users
     ]
     for (const s of sources) s.exists = existsSync(s.path)
     const dir = await this.transcriptDir(projectPath)
@@ -888,12 +954,12 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return sources
   }
 
-  fileAllowed(path: string, write: boolean): boolean {
-    return claudeFileAllowed(path, write, claudeHome())
+  fileAllowed(path: string, write: boolean, homes?: readonly string[]): boolean {
+    return (homes ?? [claudeHome()]).some((home) => claudeFileAllowed(path, write, home))
   }
 
-  skillRoots(): SkillRoots {
-    return { machine: [join(claudeHome(), 'skills')], plugins: join(claudeHome(), 'plugins'), local: [join('.claude', 'skills')], hiveCopyPrefix: null }
+  skillRoots(home = claudeHome()): SkillRoots {
+    return { machine: [join(home, 'skills')], plugins: join(home, 'plugins'), local: [join('.claude', 'skills')], hiveCopyPrefix: null }
   }
 
   async projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>> {

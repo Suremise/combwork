@@ -303,6 +303,10 @@
     "defaultMessage": "You",
     "description": "The Markdown export of a conversation (Sessions tab → Export): the heading over the user's messages."
   },
+  "providers.memory.connection": {
+    "defaultMessage": "{file} of connection {name} (its agents, all projects)",
+    "description": "In the Memory view: a connection's own instructions file (HI-1755), which the agents running on that connection read in every project. {file} is its name (CLAUDE.md), {name} the connection's name (\"Personal\")."
+  },
   "providers.memory.user": {
     "defaultMessage": "User {file} (all projects)",
     "description": "In the Memory view: the user's own instructions file, which every project's agents read. {file} is its name (CLAUDE.md)."

@@ -2,8 +2,9 @@
 // Settings → Sessions → Warn when a transcript is over, the notice informs, and offers Hand Over to… only while the agent
 // may end its conversation now:
 // - Idle, on no lane: Hand Over to…, which opens the dialog with the agent itself chosen.
-// - Working, or the idle builder of a running lane: nothing to click, only that it can hand over when it has finished;
-//   the footer's size says the same and opens nothing; the Agent API refuses a hand-over to itself (409).
+// - Working (HI-1695): no notice until its turn ends, the footer's size saying it can hand over when it has finished and
+//   opening nothing, the Agent API refusing a hand-over to itself (409); its turn over, the notice, with Hand Over to….
+// - The idle builder of a running lane: nothing to click, only that it can hand over when it has finished.
 // - A notice made while idle, clicked once the agent is on a lane: no dialog, a notice that it is busy; Hand Over to…
 //   (⋯) doesn't offer the agent itself.
 // - Hand Over to… itself, checked again before the conversation ends: the merge slot taken, or other work begun, while
@@ -122,22 +123,26 @@ const check = (name, ok, extra = '') => {
     await page.keyboard.press('Escape')
     await lib.until(async () => (await dialog.count()) === 0, HUNG_MS, 200)
 
-    // --- Working: nothing to click; the footer says the same and opens nothing; the Agent API refuses.
+    // --- Working (HI-1695, Darren's option 1): no notice until its turn ends; meanwhile the footer says it can hand over
+    // when it has finished and opens nothing, and the Agent API refuses. Its turn over: the notice, with Hand Over to….
     await say(busy, 'pad 1200 holduntil go-busy')
     const busyToast = toastOf('Busy')
-    check('working: the notice says so', !!(await lib.until(async () => (await busyToast.count()) === 1, HUNG_MS, 200)))
-    const busyText = await busyToast.innerText().catch(() => '')
-    check('…that it can hand over when it has finished, with nothing to click', /when it has finished/.test(busyText) && (await busyToast.getByRole('button', { name: 'Hand Over to…' }).count()) === 0, busyText)
-    await shoot('notice-working')
+    // Past the limit as Hive's look has read it (its size in the footer's state), still in its turn.
+    check('working past the limit', !!(await lib.until(async () => ((await live(busy.id))?.transcriptBytes ?? 0) > 1024 * 1024 && (await live(busy.id))?.status === 'working', HUNG_MS, 200)), JSON.stringify(await live(busy.id)))
+    check('…no notice while it works', (await busyToast.count()) === 0)
     const busyFoot = footerOf('Busy')
     const tip = await lib.hoverTip(page, busyFoot, (t) => /when it has finished/.test(t))
-    check("the footer's size says the same", /when it has finished/.test(tip), tip)
+    check("the footer's size says it can hand over when it has finished", /when it has finished/.test(tip), tip)
     await page.mouse.move(5, 5)
     await busyFoot.click()
     check('…and a click on it opens nothing', (await dialog.count()) === 0)
     const refused = await api(workspaceToken, 'POST', '/v1/projects/alpha/handover', { from: 'Busy', to: 'Busy', handover: false })
     check('the Agent API refuses handing it over to itself', refused.status === 409, JSON.stringify(refused))
     fs.writeFileSync(path.join(claudeHome, 'go-busy'), '')
+    check('its turn over: the notice says so', !!(await lib.until(async () => (await busyToast.count()) === 1, HUNG_MS, 200)))
+    const busyText = await busyToast.innerText().catch(() => '')
+    check('…once, with Hand Over to… now it may hand over', /over 1 MB\): it may slow down/.test(busyText) && (await busyToast.getByRole('button', { name: 'Hand Over to…' }).count()) === 1, busyText)
+    await shoot('notice-after-turn')
 
     // --- On a running lane, idle: nothing to click either.
     const n1 = await make('Lane card', 'review', builder.id)

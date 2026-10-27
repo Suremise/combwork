@@ -31,6 +31,9 @@ describe('a process as the user recognises it', () => {
     expect(processLabel('node.exe', '"C:\\Program Files\\nodejs\\node.exe" "C:\\Users\\x\\AppData\\Roaming\\npm\\node_modules\\npm\\bin\\npm-cli.js" run serve')).toBe('node npm-cli.js run serve')
     expect(processLabel('tail.exe', 'C:\\Program Files\\Git\\usr\\bin\\tail.exe -f .cache/capture-1.log')).toBe('tail -f .cache/capture-1.log')
     expect(processLabel('bash.exe', '/usr/bin/bash -c "npm run serve > .cache/serve.log 2>&1"')).toBe('bash -c "npm run serve > .cache/serve.log 2>&1"')
+    // A switch keeps its slash (HI-1743: "cmd d s c"), a path after it still cut.
+    expect(processLabel('cmd.exe', 'C:\\WINDOWS\\system32\\cmd.exe /d /s /c "node -e x"')).toBe('cmd /d /s /c "node -e x"')
+    expect(processLabel('cmd.exe', 'cmd.exe /c C:\\tools\\run.bat')).toBe('cmd /c run.bat')
   })
 
   it('is the name alone without a command line, and short', () => {

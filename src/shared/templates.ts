@@ -67,6 +67,11 @@ export interface TemplateAgent {
   use200kContext?: boolean
   /** Only these of the project's MCP servers (#537); absent: all of them. */
   mcpServers?: string[]
+  /**
+   * The connection it ran on (HI-1755), with `model`: what runs it. A connection's id is this machine's: where it isn't
+   * on, an agent added from the template uses the workspace's default.
+   */
+  connection?: string
 }
 
 export interface AgentTemplate {
@@ -135,7 +140,8 @@ export function templateFrom(name: string, agents: AgentDef[], layout: PageLayou
       ...(a.effort ? { effort: a.effort } : {}),
       ...(a.permissionMode ? { permissionMode: a.permissionMode } : {}),
       ...(typeof a.use200kContext === 'boolean' ? { use200kContext: a.use200kContext } : {}),
-      ...(Array.isArray(a.mcpServers) ? { mcpServers: [...a.mcpServers] } : {})
+      ...(Array.isArray(a.mcpServers) ? { mcpServers: [...a.mcpServers] } : {}),
+      ...(a.connection ? { connection: a.connection } : {})
     })),
     ...(suggestedPreset ? { suggestedPreset } : {}),
     ...(pairs.length ? { pairs } : {})
@@ -240,7 +246,8 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
       ...(a.effort ? { effort: a.effort as string } : {}),
       ...(a.permissionMode ? { permissionMode: a.permissionMode as string } : {}),
       ...(typeof a.use200kContext === 'boolean' ? { use200kContext: a.use200kContext } : {}),
-      ...(mcpServers ? { mcpServers } : {})
+      ...(mcpServers ? { mcpServers } : {}),
+      ...(typeof a.connection === 'string' && a.connection ? { connection: a.connection } : {})
     })
   }
   // Two agents named alike once their patterns are made (`{key}-B{n}` twice is HI-B1 and HI-B2: different).

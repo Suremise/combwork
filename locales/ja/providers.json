@@ -75,6 +75,7 @@
   "providers.export.summary": "要約",
   "providers.export.thinking": "思考",
   "providers.export.you": "ユーザー",
+  "providers.memory.connection": "接続{name}の{file}（その接続のエージェント、すべてのプロジェクト）",
   "providers.memory.user": "ユーザーの{file}（すべてのプロジェクト）",
   "providers.readiness.notInstalled": "{provider}がインストールされていません。",
   "providers.readiness.signedOut": "{provider}にサインインしていません。",
