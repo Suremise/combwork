@@ -64,7 +64,7 @@ import type {
 import { provider as providerAdapter, allProviders } from './providers'
 import { runSwitch, type SwitchOp } from './connectionSwitch'
 import { connectionsOn } from './connectionSeam'
-import { checkAccount, connectionForLaunch, onConnectionSignedIn, selectionGeneration, setAccountSessions, type LaunchConnection } from './accounts'
+import { checkAccount, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
 import { resolveConnection } from '../shared/accounts'
 import { recacheEstimate } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
@@ -1835,19 +1835,11 @@ class SessionManager {
     const l = this.live.get(liveId(projectPath, agent.id))!
     this.followConnections()
     const ws = workspaceOf(projectPath)
-    const assistant = workspace.isAssistantHome(projectPath)
-    // Its choice as saved now (not as it was when its start began), and the selection it was read at: a choice saved
-    // during the launch makes it out of date (stillValid), so it never spawns on a connection no longer chosen.
-    const saved = assistant ? null : projectAgents(await ws.projectConfig(projectPath)).find((a) => a.id === agent.id)
-    const selection = selectionGeneration()
-    const wanted = assistant ? ws.config.assistantConnection?.[l.adapter.id] : (saved ?? agent).connection
-    const conn = await connectionForLaunch({ provider: l.adapter.id, workspaceConfig: ws.path ? ws.config : null, wanted, agentName: agent.name, selection })
-    times?.mark('connection')
-    try {
-      await this.launchOn(projectPath, agent, opts, times, conn)
-    } finally {
-      conn?.release()
-    }
+    // On its choice as saved now (not as it was when its start began), looked at again as launchOn's last await.
+    await launchOnChosen({ provider: l.adapter.id, workspaceConfig: ws.path ? ws.config : null, agentName: agent.name, chosen: () => this.chosenConnection(projectPath, agent, l.adapter.id) }, async (conn, lastLook) => {
+      times?.mark('connection')
+      await this.launchOn(projectPath, agent, opts, times, conn, lastLook)
+    })
   }
 
   /**
@@ -1939,7 +1931,17 @@ class SessionManager {
     })
   }
 
-  private async launchOn(projectPath: string, agent: AgentDef, opts: { sessionId: string; name: string; resume: boolean }, times: StepTimes | undefined, conn: LaunchConnection | null): Promise<void> {
+  /**
+   * The connection an agent (or the Assistant) has chosen, as saved now (HI-1755): an agent's own, read under the lock
+   * its changes take; the Assistant's, its workspace's setting. Undefined: none chosen (the workspace's default).
+   */
+  private async chosenConnection(projectPath: string, agent: AgentDef, provider: ProviderId): Promise<string | null | undefined> {
+    const ws = workspaceOf(projectPath)
+    if (workspace.isAssistantHome(projectPath)) return ws.config.assistantConnection?.[provider]
+    return ((await ws.savedAgent(projectPath, agent.id)) ?? agent).connection
+  }
+
+  private async launchOn(projectPath: string, agent: AgentDef, opts: { sessionId: string; name: string; resume: boolean }, times: StepTimes | undefined, conn: LaunchConnection | null, lastLook: () => Promise<void>): Promise<void> {
     const id = liveId(projectPath, agent.id)
     const l = this.live.get(id)!
     const { state, adapter } = l
@@ -2076,11 +2078,13 @@ class SessionManager {
     // Not while its folder is being changed under it (#646: a Git switch or pull there): it starts once that is done.
     await folderSteady(cwd)
     times?.mark('folderSteady')
+    // Its connection, the last await (HI-1755): its choice as saved now (read under the lock saves take), resolved again,
+    // must still be the one prepared. From here to the spawn nothing awaits, so no save lands between. Another chosen,
+    // or the one prepared removed: this launch ends, and it starts again on the choice saved now (launchOnChosen).
+    await lastLook()
     // Checked after the last await, just before spawning: stopped, its workspace closed or switched, or the
     // provider turned off while this launch was being prepared, it must not start a process.
     if (l.stopRequested || this.live.get(id) !== l || this.starting.get(id)?.cancelled || !workspaceFor(projectPath) || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
-    // Its connection changed meanwhile (another chosen, or removed): this launch is out of date (HI-1755).
-    if (conn && !conn.stillValid()) throw hiveError(M.stoppedBeforeStart)
     state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}) } : undefined
     if (!isProviderEnabled(config.settings, adapter.id)) throw hiveError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name })
     l.startAllowed?.()

@@ -801,7 +801,6 @@ export async function setAssistantConnection(id: ProviderId, connection: string 
     if (a.provider !== id) throw hiveError(NO_ACCOUNT, undefined, { kind: 'invalid' })
   }
   await workspace.saveWorkspaceConfigWith((c) => ({ assistantConnection: { ...c.assistantConnection, [id]: connection } }))
-  choiceChanged()
   emit({ type: 'connections-changed' })
 }
 
@@ -825,16 +824,6 @@ export function newWorkspaceAccounts(): WorkspaceConfig['connections'] | undefin
 // Launching on a connection (HI-1755).
 // ---------------------------------------------------------------------------
 
-/**
- * Moves on whenever an agent's or the Assistant's own choice of connection is saved (choiceChanged): a launch taken
- * before it is out of date (stillValid), whatever the new choice is.
- */
-let selections = 0
-export const selectionGeneration = (): number => selections
-export function choiceChanged(): void {
-  selections++
-}
-
 /** A launch's connection: its folder given as the CLI's home, held (claimed) until the launch ends either way. */
 export interface LaunchConnection {
   id: string
@@ -845,8 +834,11 @@ export interface LaunchConnection {
   note?: 'offFallback' | 'unknownLogin' | 'loginChanged'
   /** Ends the launch's claim: once its session runs (its live state then keeps it from removal) or it failed. */
   release: () => void
-  /** Asked again just before the process starts: still the connection the launch would pick, and still there. */
-  stillValid: () => boolean
+  /**
+   * Asked at the last moment, with the agent's (or the Assistant's) choice as saved then: whether that choice, resolved
+   * again with its workspace's connections as they are now, is still this connection, and it is still there.
+   */
+  stillValid: (wanted: string | null | undefined) => boolean
 }
 
 /** Told when a connection is found signed in (its check), with its id: sessions end that connection's sign-out wait. */
@@ -859,6 +851,7 @@ const LAUNCH = {
   none: msg({ id: 'main.connections.launch.none', defaultMessage: 'No {cli} connection is on in this workspace. Add one in Settings → Connections and sign it in, then start {agent} again.', description: "Starting an agent ({agent}, its name) is refused: its workspace has no connection on for its coding agent CLI ({cli}: \"Claude Code\"). Settings → Connections names a section." }),
   offNoDefault: msg({ id: 'main.connections.launch.offNoDefault', defaultMessage: "{agent}'s connection, {name}, is off in this workspace, and no other {cli} connection is on. Turn one on in Settings → Connections.", description: "Starting an agent ({agent}) is refused: the connection chosen for it ({name}) is off in this workspace and there's no default to use instead. {cli} is the coding agent CLI." }),
   deleted: msg({ id: 'main.connections.launch.deleted', defaultMessage: "The connection chosen for {agent} no longer exists. Pick another in its Agent Settings, or let it use the workspace's default.", description: 'Starting an agent ({agent}) is refused: the connection chosen for it was removed. Agent Settings names a dialog.' }),
+  changedAgain: msg({ id: 'main.connections.launch.changedAgain', defaultMessage: "{agent}'s connection was changed again while it was starting. Start it again.", description: "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Hive started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Connections)." }),
   otherProvider: msg({ id: 'main.connections.launch.otherProvider', defaultMessage: 'The connection chosen for {agent} is for another CLI. Pick a {cli} connection in its Agent Settings.', description: 'Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent\'s CLI ("Claude Code").' }),
   signedOut: msg({ id: 'main.connections.launch.signedOut', defaultMessage: '{name} is signed out. Sign it in again in Settings → Connections, then start {agent}.', description: "Starting an agent ({agent}) is refused: its connection ({name}) isn't signed in." }),
   changing: msg({ id: 'main.connections.launch.changing', defaultMessage: "{name}'s login kept changing while Hive checked it. Try starting {agent} again in a moment.", description: "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Hive checked who it is signed in as." })
@@ -871,15 +864,13 @@ const LAUNCH = {
  * afresh: signed out, still changing, or its folder unusable refuse; a check that couldn't tell goes ahead, noted. The
  * caller releases it however the launch ends, and asks stillValid() again before its process starts.
  */
-export async function connectionForLaunch(o: { provider: ProviderId; workspaceConfig: WorkspaceConfig | null; wanted: string | null | undefined; agentName: string; selection?: number }): Promise<LaunchConnection | null> {
-  // The selection as the caller read its choice (taken now when it didn't say).
-  const selection = o.selection ?? selectionGeneration()
+export async function connectionForLaunch(o: { provider: ProviderId; workspaceConfig: WorkspaceConfig | null; wanted: string | null | undefined; agentName: string }): Promise<LaunchConnection | null> {
   const caps = providerDescriptor(o.provider).capabilities.connections
   // Connections off (the preview switch, until S8): everything launches as before.
   if (!caps || !connectionsOn()) return null
   const cli = providerDescriptor(o.provider).name
-  const choose = (): ReturnType<typeof resolveConnection> => resolveConnection(o.workspaceConfig, o.provider, o.wanted, list())
-  const choice = choose()
+  const choose = (wanted: string | null | undefined): ReturnType<typeof resolveConnection> => resolveConnection(o.workspaceConfig, o.provider, wanted, list())
+  const choice = choose(o.wanted)
   if (!choice.ok) {
     if (choice.why === 'none' && testHomeSeam(caps.homeEnv)) return null
     const name = choice.wanted ? (getAccount(choice.wanted)?.name ?? choice.wanted) : ''
@@ -904,14 +895,44 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
       homeEnv: caps.homeEnv,
       ...(note ? { note } : {}),
       release,
-      stillValid: () => selectionGeneration() === selection && generation(id) === gen && !!getAccount(id) && (() => {
-        const now = choose()
+      stillValid: (wanted) => generation(id) === gen && !!getAccount(id) && (() => {
+        const now = choose(wanted)
         return now.ok && now.id === id
       })()
     }
   } catch (e) {
     release()
     throw e
+  }
+}
+
+/** A launch whose connection's choice was changed (or the connection removed) while it was starting: started again once. */
+class ConnectionChanged extends Error {}
+
+/**
+ * Launches on the connection chosen (HI-1755): the choice as saved now (`chosen`), prepared (connectionForLaunch), and
+ * looked at again at the last moment: `run` awaits `lastLook()` as its last await before the spawn, which ends the run
+ * when the choice saved then, resolved again, isn't the connection prepared. It is then started once more on that
+ * choice (the first claim released), and refused, saying why, if that changes too. Each launch looks at its own choice
+ * (and the defaults it follows) only, so another agent's or the Assistant's save never ends it.
+ */
+export async function launchOnChosen(o: { provider: ProviderId; workspaceConfig: WorkspaceConfig | null; agentName: string; chosen: () => Promise<string | null | undefined> }, run: (conn: LaunchConnection | null, lastLook: () => Promise<void>) => Promise<void>): Promise<void> {
+  // Connections off (the preview switch, until S8), or none for this CLI: it launches as before, its choice not read.
+  if (!providerDescriptor(o.provider).capabilities.connections || !connectionsOn()) return run(null, async () => undefined)
+  for (let again = false; ; again = true) {
+    const conn = await connectionForLaunch({ provider: o.provider, workspaceConfig: o.workspaceConfig, wanted: await o.chosen(), agentName: o.agentName })
+    try {
+      await run(conn, async () => {
+        if (conn && !conn.stillValid(await o.chosen())) throw new ConnectionChanged()
+      })
+      return
+    } catch (e) {
+      if (!(e instanceof ConnectionChanged)) throw e
+      if (again) throw hiveError(LAUNCH.changedAgain, { agent: o.agentName }, { kind: 'conflict' })
+      log.info(`${userText(o.agentName)}: its connection was changed while it was starting; starting it on the one chosen now`)
+    } finally {
+      conn?.release()
+    }
   }
 }
 

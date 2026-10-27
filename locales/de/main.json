@@ -32,6 +32,7 @@
   "main.branchMerge.cardWork": "{branch} ist die Arbeit von {card}: Merge sie über ihre Karte oder bestätige, sie hier zu mergen.",
   "main.branchMerge.notBranch": "{branch} ist kein lokaler Branch des Projekts.",
   "main.branchMerge.same": "{branch} kann nicht in sich selbst gemergt werden.",
+  "main.connections.launch.changedAgain": "Die Verbindung von {agent} wurde während des Starts noch einmal geändert. Starte {agent} erneut.",
   "main.connections.launch.changing": "Die Anmeldung von {name} hat sich immer wieder geändert, während Hive sie geprüft hat. Versuche gleich noch einmal, {agent} zu starten.",
   "main.connections.launch.deleted": "Die für {agent} gewählte Verbindung gibt es nicht mehr. Wähle in den Agent-Einstellungen eine andere, oder lass den Agenten den Standard des Arbeitsbereichs verwenden.",
   "main.connections.launch.none": "In diesem Arbeitsbereich ist keine Verbindung für {cli} eingeschaltet. Füge unter Einstellungen → Verbindungen eine hinzu und melde sie an, dann starte {agent} erneut.",

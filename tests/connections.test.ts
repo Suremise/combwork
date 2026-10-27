@@ -30,6 +30,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const { runSwitch } = await import('../src/main/connectionSwitch')
 const { authScope } = await import('../src/main/sessions')
 const { updateAgent } = await import('../src/main/projectAgents')
+const { fileLockDepth, withFileLock } = await import('../src/main/fsutil')
 const { listSkills, invalidateSkillCache } = await import('../src/main/skills')
 
 const status = new Map<string, () => Promise<{ ok: true; loggedIn: boolean; email?: string; orgId?: string } | { ok: false; error: string }>>()
@@ -199,8 +200,10 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     const b = await signedInConnection('Work', 'work@example.com')
     const c = (await launch())!
     expect(c.id).toBe(a.id)
-    expect(c.stillValid()).toBe(true)
+    expect(c.stillValid(undefined)).toBe(true)
     await here(() => accounts.setAccountDefault(b.id))
+    expect(c.stillValid(undefined)).toBe(false)
+    expect(c.stillValid(a.id)).toBe(true)
     // The launch was given the workspace's config as it was: a fresh resolve now picks Work.
     const fresh = await accounts.connectionForLaunch({ provider: 'claude-code', workspaceConfig: w.config, wanted: undefined, agentName: 'Builder' })
     expect(fresh?.id).toBe(b.id)
@@ -342,45 +345,128 @@ describe('a switch at the next safe point (runSwitch)', () => {
   })
 })
 
-describe('round 1: a choice saved during a launch, skills per workspace, the switch off', () => {
-  /** A launch held at its login check until released (the check's answer then: signed in). */
-  async function heldLaunch(a: Connection, wanted: string | null) {
-    let release!: () => void
-    const held = new Promise<void>((r) => (release = r))
-    status.set(accounts.accountFolder(a.id), async () => {
-      await held
-      return { ok: true, loggedIn: true, email: a.accepted?.email ?? 'x@example.com', orgId: 'org-1' }
+describe('a choice saved while starting: the last look at its own choice, skills per workspace, the switch off', () => {
+  const alpha = join(wsPath, 'alpha')
+  const deferred = () => {
+    let done!: () => void
+    const p = new Promise<void>((r) => (done = r))
+    return { p, done }
+  }
+  /** Agent One's connection as saved now, read as a launch reads it (under the lock its saves take). */
+  const oneChose = () => w.savedAgent(alpha, 'a-one').then((a) => a?.connection)
+  const assistantChose = async () => w.config.assistantConnection?.['claude-code']
+
+  /**
+   * A launch on `chosen` whose first `holds` runs wait, before their last look, until let go: `entered(i)` once run i
+   * waits there, `go(i)` lets it on. What each run was prepared on, and what spawned (after the last look).
+   */
+  function heldRun(chosen: () => Promise<string | null | undefined>, holds = 1) {
+    const at = Array.from({ length: holds }, deferred)
+    const gates = Array.from({ length: holds }, deferred)
+    const prepared: (string | null)[] = []
+    const spawned: (string | null)[] = []
+    const done = accounts.launchOnChosen({ provider: 'claude-code', workspaceConfig: w.config, agentName: 'One', chosen }, async (conn, lastLook) => {
+      const i = prepared.push(conn?.id ?? null) - 1
+      if (i < holds) {
+        at[i].done()
+        await gates[i].p
+      }
+      await lastLook()
+      spawned.push(conn?.id ?? null)
     })
-    const launching = accounts.connectionForLaunch({ provider: 'claude-code', workspaceConfig: w.config, wanted, agentName: 'One', selection: accounts.selectionGeneration() })
-    await vi.waitFor(() => expect(provider('claude-code').accountStatus).toHaveBeenCalled(), { timeout: HUNG_MS })
-    return { release, launching }
+    // Settled here too, so a refusal a test expects isn't unhandled while it waits.
+    done.catch(() => undefined)
+    return { done, prepared, spawned, entered: (i: number) => at[i].p, go: (i: number) => gates[i].done() }
   }
 
-  it("an agent's own choice saved during its launch: the launch is out of date (stillValid false), whatever was chosen", async () => {
+  it("launch first, save second: the last look sees the new choice, the first claim is let go, and it starts on the new one", async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     const b = await signedInConnection('Work', 'work@example.com')
-    await here(() => updateAgent(join(wsPath, 'alpha'), 'a-one', { connection: a.id }))
-    const { release, launching } = await heldLaunch(a, a.id)
-    // Its saved choice changes from Personal to Work while its launch waits on the check.
-    await here(() => updateAgent(join(wsPath, 'alpha'), 'a-one', { connection: b.id }))
-    release()
-    const c = (await launching)!
-    expect(c.id).toBe(a.id)
-    expect(c.stillValid()).toBe(false)
-    c.release()
-    // Nothing still holds it.
-    await accounts.removeAccount(a.id)
+    await here(() => updateAgent(alpha, 'a-one', { connection: a.id }))
+    const run = heldRun(oneChose)
+    await run.entered(0)
+    await here(() => updateAgent(alpha, 'a-one', { connection: b.id }))
+    run.go(0)
+    await run.done
+    expect(run.prepared).toEqual([a.id, b.id])
+    expect(run.spawned).toEqual([b.id])
+    // Nothing still holds either (removal is refused while a launch's claim is held).
+    expect(await outcome(accounts.removeAccount(a.id))).toBe('ok')
+    expect(await outcome(accounts.removeAccount(b.id))).toBe('ok')
   })
 
-  it("the Assistant's own choice saved during its launch: out of date too", async () => {
+  it('save first, launch second: a launch begun while the save waits on its lock reads the saved choice, never the old one', async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     const b = await signedInConnection('Work', 'work@example.com')
-    const { release, launching } = await heldLaunch(a, null)
+    await here(() => updateAgent(alpha, 'a-one', { connection: a.id }))
+    // The project's lock held, so the save of Work waits on it (queued), not yet written.
+    const file = join(alpha, '.hive', 'project.json')
+    const lock = deferred()
+    const holding = withFileLock(file, () => lock.p)
+    const saving = here(() => updateAgent(alpha, 'a-one', { connection: b.id }))
+    await vi.waitFor(() => expect(fileLockDepth(file)).toBe(2), { timeout: HUNG_MS })
+    const run = heldRun(oneChose, 0)
+    await vi.waitFor(() => expect(fileLockDepth(file)).toBe(3), { timeout: HUNG_MS })
+    lock.done()
+    await holding
+    await saving
+    await run.done
+    expect(run.prepared).toEqual([b.id])
+    expect(run.spawned).toEqual([b.id])
+  })
+
+  it("the Assistant's choice saved while it starts: it starts on the new one", async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const b = await signedInConnection('Work', 'work@example.com')
+    const run = heldRun(assistantChose)
+    await run.entered(0)
     await here(() => accounts.setAssistantConnection('claude-code', b.id))
-    release()
-    const c = (await launching)!
-    expect(c.stillValid()).toBe(false)
-    c.release()
+    run.go(0)
+    await run.done
+    expect(run.prepared).toEqual([a.id, b.id])
+    expect(run.spawned).toEqual([b.id])
+  })
+
+  it("others' saves never end it: the Assistant's here, and another workspace's agent, chosen meanwhile", async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const b = await signedInConnection('Work', 'work@example.com')
+    await here(() => updateAgent(alpha, 'a-one', { connection: a.id }))
+    const ws2Path = join(base, 'ws-others')
+    mkdirSync(join(ws2Path, 'beta', '.hive'), { recursive: true })
+    writeFileSync(join(ws2Path, 'beta', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b-one', name: 'Beta One' }] }))
+    const w2 = createWorkspaceService()
+    await w2.open(ws2Path)
+    try {
+      await inWorkspace(w2, () => accounts.setAccountOn(b.id, true))
+      const run = heldRun(oneChose)
+      await run.entered(0)
+      await here(() => accounts.setAssistantConnection('claude-code', b.id))
+      await inWorkspace(w2, () => updateAgent(join(ws2Path, 'beta'), 'b-one', { connection: b.id }))
+      run.go(0)
+      await run.done
+      expect(run.prepared).toEqual([a.id])
+      expect(run.spawned).toEqual([a.id])
+    } finally {
+      await disposeWorkspaceService(w2)
+    }
+  })
+
+  it('changed again while it starts once more: refused, saying so, both claims let go', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const b = await signedInConnection('Work', 'work@example.com')
+    await here(() => updateAgent(alpha, 'a-one', { connection: a.id }))
+    const run = heldRun(oneChose, 2)
+    await run.entered(0)
+    await here(() => updateAgent(alpha, 'a-one', { connection: b.id }))
+    run.go(0)
+    await run.entered(1)
+    await here(() => updateAgent(alpha, 'a-one', { connection: a.id }))
+    run.go(1)
+    expect(await outcome(run.done)).toMatch(/changed again while it was starting/)
+    expect(run.prepared).toEqual([a.id, b.id])
+    expect(run.spawned).toEqual([])
+    expect(await outcome(accounts.removeAccount(a.id))).toBe('ok')
+    expect(await outcome(accounts.removeAccount(b.id))).toBe('ok')
   })
 
   it("machine skills: each workspace's own connections' only; a connection turned on shows its skills at once, the cache warm", async () => {

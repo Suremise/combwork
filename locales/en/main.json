@@ -131,6 +131,10 @@
     "defaultMessage": "{branch} can't be merged into itself.",
     "description": "An error merging from the Merge dialog: the branch picked and the target are the same ({branch})."
   },
+  "main.connections.launch.changedAgain": {
+    "defaultMessage": "{agent}'s connection was changed again while it was starting. Start it again.",
+    "description": "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Hive started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Connections)."
+  },
   "main.connections.launch.changing": {
     "defaultMessage": "{name}'s login kept changing while Hive checked it. Try starting {agent} again in a moment.",
     "description": "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Hive checked who it is signed in as."

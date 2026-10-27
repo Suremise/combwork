@@ -32,6 +32,7 @@
   "main.branchMerge.cardWork": "La branche {branch} est le travail de la carte {card} : fusionne-la depuis sa carte, ou confirme sa fusion ici.",
   "main.branchMerge.notBranch": "{branch} n’est pas une branche locale du projet.",
   "main.branchMerge.same": "La branche {branch} ne peut pas être fusionnée dans elle-même.",
+  "main.connections.launch.changedAgain": "La connexion de {agent} a de nouveau changé pendant son démarrage. Démarre {agent} à nouveau.",
   "main.connections.launch.changing": "Les identifiants de {name} ont changé à plusieurs reprises pendant que Hive les vérifiait. Réessaie de démarrer {agent} dans un instant.",
   "main.connections.launch.deleted": "La connexion choisie pour {agent} n’existe plus. Choisis-en une autre dans les Paramètres de l’agent, ou laisse-le utiliser celle par défaut de l’espace de travail.",
   "main.connections.launch.none": "Aucune connexion {cli} n’est activée dans cet espace de travail. Ajoutes-en une dans Paramètres → Connexions et connecte-toi, puis démarre {agent} à nouveau.",

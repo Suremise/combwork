@@ -32,6 +32,7 @@
   "main.branchMerge.cardWork": "{branch}は{card}の作業です。そのカードを通してマージするか、ここでマージすることを確認してください。",
   "main.branchMerge.notBranch": "{branch}はプロジェクトのローカルブランチではありません。",
   "main.branchMerge.same": "{branch}を自分自身にマージすることはできません。",
+  "main.connections.launch.changedAgain": "{agent}の接続が起動中にもう一度変更されました。もう一度{agent}を起動してください。",
   "main.connections.launch.changing": "Hiveが確認している間に{name}のログインが何度も変わりました。少し待ってから、もう一度{agent}を起動してください。",
   "main.connections.launch.deleted": "{agent}に選ばれた接続はもうありません。「エージェント設定」で別の接続を選ぶか、ワークスペースの既定を使ってください。",
   "main.connections.launch.none": "このワークスペースで有効な{cli}の接続がありません。「設定」→「接続」で追加してサインインしてから、もう一度{agent}を起動してください。",

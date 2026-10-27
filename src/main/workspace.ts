@@ -1013,6 +1013,14 @@ export class WorkspaceService {
     return this.updateAgent(projectPath, agentId, fields as Partial<AgentDef>)
   }
 
+  /**
+   * An agent as saved now, read under the lock its changes take (mutateProjectConfig): a launch's last look at its
+   * connection (HI-1755), so a save under way is either in it or not yet begun.
+   */
+  async savedAgent(projectPath: string, agentId: string): Promise<AgentDef | undefined> {
+    return withFileLock(join(projectPath, HIVE_DIR, 'project.json'), async () => projectAgents(await this.projectConfig(projectPath)).find((a) => a.id === agentId))
+  }
+
   /** Changes one agent's definition. */
   /** `check`: sees the agent as saved, under the project's lock, before the change; throwing refuses it (#1282's undo). */
   async updateAgent(projectPath: string, agentId: string, patch: Partial<AgentDef>, check?: (current: AgentDef) => void): Promise<AgentDef> {

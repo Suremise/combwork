@@ -809,7 +809,7 @@ The design across every surface is HI-1755's design note and addendum. The decis
     - **Refused:** signed out, its login changing throughout the check (`fresh: false`), or its folder missing or replaced.
     - **Goes ahead, noted:** a check that couldn't tell, or a changed login.
   - **Its home:** the connection's folder, set in the launch's environment under the descriptor's `homeEnv`.
-  - **Just before spawning:** checked again that the choice still resolves to it and it still exists.
+  - **Just before spawning** (`launchOnChosen`, the launch's last await): the agent's own choice as saved then, read under the lock its saves take (the Assistant's: its workspace setting), is resolved again and must still be this connection, and it must still exist. Nothing awaits from there to the spawn, so no save lands between. Changed meanwhile: the claim is released and it starts once more on the choice saved now; changed again during that: refused ("changed again while it was starting"). Each launch looks at its own choice and the defaults it follows only: another agent's or the Assistant's save never ends it.
   - **On the run:** `launchedConnection` (id, name, note), fixed until the run ends. The session record keeps it, and the footer names it.
   - **The choice** is part of the launch signature ("restart needed").
 - **The CLI's own home, never read for a connection's agents:** its default model (`configuredDefaultModel(home)`), user memory (`memorySources(project, homes)`), skills and plugins (`skillRoots(home)`), file access (`fileAllowed(path, write, homes)`, the same narrow policy).
