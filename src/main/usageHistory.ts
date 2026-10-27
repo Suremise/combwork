@@ -56,8 +56,21 @@ interface ProjectHolds {
 interface BoardCards {
   at: number
   cards: Promise<CardHolds[]>
-  projects: Map<string, { index: HoldIndex | null; agents: string | null; keys: Map<string, string> }>
+  projects: Map<string, ProjectEntry>
+  /** The read before this one's projects: a project whose holds are as they were keeps its agents' keys. */
+  prior: Map<string, ProjectEntry> | null
 }
+
+/** A project's holds worked out once, their fingerprint, and its agents' keys while its agents are `agents`. */
+interface ProjectEntry {
+  index: HoldIndex | null
+  fp: string
+  agents: string | null
+  keys: Map<string, string>
+}
+
+/** A project's holds as they are (each card's: whose, which role, from when to when): equal, its agents' keys are too. */
+const holdsFingerprint = (index: HoldIndex): string => createHash('sha1').update(JSON.stringify(index.cards.map((c) => [c.number, c.holds.map(({ hold: h }) => [h.agent ?? null, h.name, h.role, h.from, h.to ?? null])]))).digest('hex')
 
 const whoKey = (who: SessionWho): string => `${who.agentId ?? ''}\0${who.agentName ?? ''}`
 
@@ -120,7 +133,8 @@ class UsageHistory {
     onHiveEvent((e) => {
       // The board changed: its holds are read again, and running sessions' cards shared out again if they changed.
       if (e.type === 'tasks-changed') {
-        this.cards.delete(wsKey(e.workspacePath))
+        const c = this.cards.get(wsKey(e.workspacePath))
+        if (c) c.at = Number.NEGATIVE_INFINITY
         this.cardsChanged(e.workspacePath)
       }
       // A turn ended: what it used is recorded now, not at the next tick, so views that read the history have it.
@@ -481,7 +495,10 @@ class UsageHistory {
     let kept = c.projects.get(project)
     if (!kept) {
       const own = all.filter((card) => card.project.toLowerCase() === project)
-      c.projects.set(project, (kept = { index: own.length ? holdIndex(own) : null, agents: null, keys: new Map() }))
+      const index = own.length ? holdIndex(own) : null
+      const fp = index ? holdsFingerprint(index) : ''
+      const was = c.prior?.get(project)
+      c.projects.set(project, (kept = was && was.fp === fp ? was : { index, fp, agents: null, keys: new Map() }))
     }
     const index = kept.index
     if (!index) return null
@@ -501,7 +518,9 @@ class UsageHistory {
     let c = this.cards.get(key)
     if (!c || Date.now() - c.at > CARDS_MS) {
       // Only the cards' holds (#1107: never their comments).
-      c = { at: Date.now(), cards: cardHolds(ws).catch(() => []), projects: new Map() }
+      // What the last read worked out, for the projects whose holds a change left as they were (most: a comment, a move of another project's card).
+      const prior = c ? new Map([...(c.prior ?? []), ...c.projects]) : null
+      c = { at: Date.now(), cards: cardHolds(ws).catch(() => []), projects: new Map(), prior }
       this.cards.set(key, c)
     }
     return c
