@@ -1,12 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import type { QueueView } from '@shared/workflow/queue'
 import { msg, tr } from '@shared/i18n'
 import { gitStatusText, gitStatusTip, VC_SECTIONS, vcSections, vcSectionShown, type GitRepoSummary } from '@shared/gitRepo'
 import { showVersionControl, useStore } from '../store'
 import { refreshWorkspace } from '../actions'
-import { cx } from '../util'
 import { Icon, Tooltip } from '../components/ui'
+import { tabIds, Tabs } from '../components/Tabs'
 import { INIT_TEXT, InitRepoButton, InitRepoHost } from '../components/InitRepo'
 import { GitQueueSection, useProjectQueues } from '../components/GitQueueSection'
 import { WorkflowOptionsForm } from '../components/WorkflowOptions'
@@ -74,33 +74,7 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
   const status = platform === 'git' && !!s?.isRepo
   useDetectionCatchUp(project, s)
   const sectionsShown = VC_SECTIONS.filter((x) => shown.includes(x.id))
-  const headRef = useRef<HTMLDivElement>(null)
-  const tabsRef = useRef<HTMLDivElement>(null)
-  const measureRef = useRef<HTMLDivElement>(null)
-  // The room the header row has, and the width the sections need with every name (measured off screen, so in any language).
-  const [fit, setFit] = useState({ room: 0, need: 0 })
-  useLayoutEffect(() => {
-    const head = headRef.current
-    const row = measureRef.current
-    if (!head || !row) return
-    const measure = (): void => {
-      const cs = getComputedStyle(head)
-      const room = head.clientWidth - parseFloat(cs.paddingInlineStart) - parseFloat(cs.paddingInlineEnd)
-      const need = Math.ceil(row.getBoundingClientRect().width)
-      // Nothing to measure while the tab isn't shown: keep the last fit.
-      if (room > 0 && need > 0) setFit((f) => (f.room === room && f.need === need ? f : { room, need }))
-    }
-    const ro = new ResizeObserver(measure)
-    ro.observe(head)
-    ro.observe(row)
-    measure()
-    return () => ro.disconnect()
-  }, [])
-  const icons = fit.need > 0 && fit.need + (status ? STATUS_ROOM : 0) > fit.room
-  // The selected section stays in view when even the icons don't fit and the row scrolls.
-  useEffect(() => {
-    tabsRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  }, [section, fit, icons])
+  const tabsId = useId()
   return (
     <div className="git-view vc-view" data-platform={platform}>
       <VersionControlHeader project={project} platform={platform} form={form} />
@@ -111,25 +85,9 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
         </div>
       )}
       <PresetStep project={project} platform={platform} form={form} />
-      <div className="git-head" ref={headRef}>
-        <div ref={tabsRef} className={cx('segmented', 'git-sections', icons && 'icons')} role="tablist" aria-label={tr(M.tabs)}>
-          {sectionsShown.map((x) => (
-            // Folded to its icon (#1461): its name on hover and for screen readers.
-            <Tooltip key={x.id} content={icons ? tr(x.label) : null}>
-              <button role="tab" data-section={x.id} aria-selected={section === x.id} className={cx(section === x.id && 'active', icons && section !== x.id && 'icon-only')} onClick={() => showVersionControl(project.path, x.id)}>
-                <Icon name={x.icon} /> <span className="git-section-label">{tr(x.label)}</span>
-              </button>
-            </Tooltip>
-          ))}
-        </div>
-        {/* The sections with every name, for measuring; the names are CSS content, so no text here repeats a section's. */}
-        <div ref={measureRef} className="segmented git-sections-measure" aria-hidden inert>
-          {sectionsShown.map((x) => (
-            <button key={x.id} tabIndex={-1} data-label={tr(x.label)}>
-              <Icon name={x.icon} />
-            </button>
-          ))}
-        </div>
+      <div className="git-head">
+        {/* The sections, tabs (HI-1837) folded to their icons when short of room (#1461), the status line giving way first. */}
+        <Tabs idBase={tabsId} className="git-sections" label={tr(M.tabs)} value={section} onChange={(id) => showVersionControl(project.path, id)} fold reserve={status ? STATUS_ROOM : 0} items={sectionsShown.map((x) => ({ id: x.id, label: tr(x.label), icon: x.icon, attrs: { 'data-section': x.id } }))} />
         {status && s && (
           <Tooltip content={<span style={{ whiteSpace: 'pre-line' }}>{gitStatusTip(s, at(s.fetchedAt))}</span>}>
             <span className="git-head-status faint">
@@ -138,7 +96,7 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
           </Tooltip>
         )}
       </div>
-      <div className="git-body">
+      <div className="git-body" role="tabpanel" id={tabIds(tabsId, section).panel} aria-labelledby={tabIds(tabsId, section).tab}>
         {section === 'workflow' ? (
           <div className="scroll-page">
             <div className="page-narrow vc-workflow-page" data-vc-workflow="">

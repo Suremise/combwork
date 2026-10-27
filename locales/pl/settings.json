@@ -1184,6 +1184,7 @@
   "settings.workflow.hiveDefaults.desc": "Dla każdego obszaru roboczego: od czego zaczyna każdy projekt, jeśli ani jego obszar roboczy, ani sam projekt nie ustawi własnych. Wybierz szablon albo ustaw każdą opcję, dla Brak lub dla Git.",
   "settings.workflow.hiveDefaults.tip": "Do porządków w ustawieniach w 1.0: Ustawienia → Domyślny przepływ pracy; to, co tam ustawiono, się nie zmienia.",
   "settings.workflow.hiveDefaults.title": "Ustawienia domyślne Hive",
+  "settings.workflow.tabs": "Domyślny przepływ pracy",
   "settings.workflow.workspaceDefaults.desc": "Dla projektów tego obszaru roboczego, nad ustawieniami domyślnymi Hive; projekt ustawia własne na swojej karcie Kontrola wersji.",
   "settings.workflow.workspaceDefaults.tip": "Do porządków w ustawieniach w 1.0: ustawienia domyślne przepływu pracy w Ustawienia → Obszar roboczy; to, co tam ustawiono, się nie zmienia.",
   "settings.workflow.workspaceDefaults.title": "Ustawienia domyślne obszaru roboczego",

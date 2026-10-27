@@ -957,12 +957,12 @@ Without version control, **Solo** has no review (a card is done when its builder
 
 ### Hive and workspace defaults <a id="workflow-defaults"></a>
 
-Each project's workflow options start from defaults, which you set in **Settings → Version Control**, in two parts:
+Each project's workflow options start from defaults, which you set in **Settings → Version Control**, on two tabs:
 
 - **Hive defaults**: for every project in every workspace.
 - **Workspace defaults** (named after the open workspace): for the open workspace's projects, over Hive defaults. Shown while a workspace is open.
 
-(Before 1.0's last settings tidy these were Settings → Workflow defaults and Settings → Workspace's workflow defaults; nothing you set there changed.) Each part has its own None · Git choice, presets, draft and **Save…**: saving one leaves the other's unsaved changes as they are.
+(Before 1.0's last settings tidy these were Settings → Workflow defaults and Settings → Workspace's workflow defaults; nothing you set there changed.) Each tab shows only its own form, with its own None · Git choice, presets, draft and **Save…**: saving one leaves the other's unsaved changes as they are. Switching tabs keeps each draft, and a tab with unsaved changes has a dot. Settings opens on the tab you last chose; a search shows the tabs it finds. In a project's options, **From Hive defaults** and **From the workspace** are links to their tab. The arrow keys, Home and End move between tabs.
 
 The order they win in: a project's own option (its Version Control tab), then the workspace's default, then Hive's, then the option off. Each level has its own defaults for **None** and for **Git**: choose which at the top.
 

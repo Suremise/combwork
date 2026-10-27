@@ -1900,7 +1900,8 @@ control; another system found, so None; the repository gone), and **Workflow: Gi
 no preset chosen, from `workflow:form`), which opens Workflow. The sections (`VC_SECTIONS`, `vcSections` in
 `gitRepo.ts`, kept per project while Hive runs) are Workflow, then Git's Changes, History, Branches & remotes
 (`GitBranches.tsx`) and Merge queue (#1357's section, placed as it was); a project opens at Changes for Git and at
-Workflow for None. When the sections' names don't fit the tab's width beside the status line [#1461], they fold to
+Workflow for None. The sections are tabs (HI-1837: the shared `Tabs` component, `components/Tabs.tsx`; the body is
+their tab panel). When the sections' names don't fit the tab's width beside the status line [#1461], they fold to
 their icons (each name in its tooltip and for screen readers), the selected section keeping its name; narrower still,
 the row scrolls with the selected section in view. **None's page:** Workflow, with Initialise repository… under the header while the folder has no
 repository; and **Merge queue while an old Git ruleset's queue is still there**, by #1356's actual-state rule
@@ -2064,7 +2065,12 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
 - **Built [#1422], the defaults at each level**: since HI-1768 both in **Settings → Version Control** (section id
   `workflow`, after Board): **Hive defaults** (`workflow.defaults`, "for every workspace") and **Workspace defaults
   (<name>)** (`workflow.workspaceDefaults`, shown while a workspace is open; before HI-1768 Settings → Workflow defaults
-  and Settings → Workspace → Workflow defaults; the values stay where they were, config.json and workspace.json), each with a None · Git choice of which platform's it shows,
+  and Settings → Workspace → Workflow defaults; the values stay where they were, config.json and workspace.json). Since
+  HI-1837 they are two **tabs** under the section's intro line, each showing only its own form and its own line; both
+  forms stay mounted while the section shows, so switching (or a search offering one tab) keeps each draft, and a tab
+  with an unsaved draft is marked. The tab last chosen is remembered (`ui.tabs['settings.workflow']`); a search offers
+  only the tabs it finds; a **From Hive defaults** or **From the workspace** origin (an option's, or the copied files')
+  links to its tab (`showWorkflowDefaults`). Each with a None · Git choice of which platform's it shows,
   in #1418's editor in a level mode (`WorkflowLevelForm`): the same groups, labels, presets, All off and live
   contradictions; a value set at the level says *Set here*, and Inherit goes back to the level below (the workspace's
   to Hive's, Hive's to the platform's all-off). G12 (the project's identity) and the rows shown elsewhere aren't at a

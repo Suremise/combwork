@@ -167,7 +167,19 @@ async function theForm(page, app, inv) {
     await inv('workspace:refresh')
     const workflowTab = page.locator('.git-sections [data-section="workflow"]')
     check('Choose… opens the project’s Version Control tab at Workflow', !!(await lib.until(async () => (await section.count()) > 0 && (await workflowTab.getAttribute('aria-selected')) === 'true' && (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1, HUNG_MS)))
-    check('the notice is gone, and answered for good', !!(await lib.until(async () => (await notice.count()) === 0 && (await inv('workflow:presetsNotice')) === null, HUNG_MS)), `notice shown: ${await notice.count()}, presetsNotice: ${JSON.stringify(await inv('workflow:presetsNotice'))}`)
+    // The sections are tabs (HI-1837): the arrows select and focus the next, its page the tab panel it labels; only the
+    // selected one in the Tab order.
+    const sectionTabs = page.locator('.git-sections[role="tablist"] [role="tab"]')
+    const focusedSection = () => page.evaluate(() => document.activeElement?.getAttribute('data-section') ?? null)
+    const panelFor = () => page.evaluate(() => { const b = document.querySelector('.git-body[role="tabpanel"]'); return b ? document.getElementById(b.getAttribute('aria-labelledby'))?.getAttribute('data-section') ?? null : null })
+    await workflowTab.focus()
+    await page.keyboard.press('ArrowRight')
+    check('the sections are tabs: ArrowRight selects and focuses Changes, its page labelled by it', !!(await lib.until(async () => (await page.locator('.git-sections [aria-selected="true"]').getAttribute('data-section')) === 'changes' && (await focusedSection()) === 'changes' && (await panelFor()) === 'changes', HUNG_MS)), JSON.stringify([await focusedSection(), await panelFor()]))
+    check('…only the selected section in the Tab order', JSON.stringify(await sectionTabs.evaluateAll((els) => els.filter((e) => e.tabIndex === 0).map((e) => e.getAttribute('data-section')))) === '["changes"]')
+    await page.keyboard.press('ArrowLeft')
+    check('…ArrowLeft back to Workflow', !!(await lib.until(async () => (await workflowTab.getAttribute('aria-selected')) === 'true' && (await focusedSection()) === 'workflow' && (await panelFor()) === 'workflow', HUNG_MS)))
+    await themes('section-tabs', page.locator('.git-head'))
+    check('the notice is gone, and answered for good',!!(await lib.until(async () => (await notice.count()) === 0 && (await inv('workflow:presetsNotice')) === null, HUNG_MS)), `notice shown: ${await notice.count()}, presetsNotice: ${JSON.stringify(await inv('workflow:presetsNotice'))}`)
     await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
 
     // --- The form as the upgrade left it: in groups, no preset, each option worded as an outcome with its origin.

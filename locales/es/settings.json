@@ -1184,6 +1184,7 @@
   "settings.workflow.hiveDefaults.desc": "Para todos los espacios de trabajo: con qué empieza cada proyecto salvo que su espacio de trabajo o el propio proyecto fijen los suyos. Elige una plantilla o fija cada opción, para Ninguno o para Git.",
   "settings.workflow.hiveDefaults.tip": "Hasta la reorganización de la configuración de 1.0: Configuración → Flujo de trabajo predeterminado; lo que estaba fijado ahí no cambia.",
   "settings.workflow.hiveDefaults.title": "Valores predeterminados de Hive",
+  "settings.workflow.tabs": "Flujo de trabajo predeterminado",
   "settings.workflow.workspaceDefaults.desc": "Para los proyectos de este espacio de trabajo, por encima de los valores predeterminados de Hive; un proyecto fija los suyos en su pestaña Control de versiones.",
   "settings.workflow.workspaceDefaults.tip": "Hasta la reorganización de la configuración de 1.0: los valores predeterminados de flujo de trabajo de Configuración → Espacio de trabajo; lo que estaba fijado ahí no cambia.",
   "settings.workflow.workspaceDefaults.title": "Valores predeterminados del espacio de trabajo",

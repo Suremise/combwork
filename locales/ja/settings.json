@@ -1184,6 +1184,7 @@
   "settings.workflow.hiveDefaults.desc": "すべてのワークスペースに適用されます。ワークスペースやプロジェクトが独自に設定しない限り、各プロジェクトはこの値から始まります。なしまたはGitについて、プリセットを選ぶか各オプションを設定します。",
   "settings.workflow.hiveDefaults.tip": "1.0で設定を整理するまでは「設定」→「ワークフローの既定値」でした。そこで設定した内容は変わりません。",
   "settings.workflow.hiveDefaults.title": "Hiveの既定値",
+  "settings.workflow.tabs": "ワークフローの既定値",
   "settings.workflow.workspaceDefaults.desc": "このワークスペースのプロジェクトに、Hiveの既定値より優先して適用されます。プロジェクトは自身のバージョン管理タブで独自に設定できます。",
   "settings.workflow.workspaceDefaults.tip": "1.0で設定を整理するまでは「設定」→「ワークスペース」のワークフローの既定値でした。そこで設定した内容は変わりません。",
   "settings.workflow.workspaceDefaults.title": "ワークスペースの既定値",

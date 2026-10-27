@@ -55,6 +55,7 @@ import type { KeptReturn } from '@shared/progressQueue'
 import type { SessionAction } from './util'
 import { storeUpdated } from './pageMarks'
 import { keepSame } from '@shared/keepSame'
+import { rememberTab, shownTab } from '@shared/tabs'
 
 export type Activity = 'projects' | 'overview' | 'performance' | 'board' | 'notes' | 'skills' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
 export type { ProjectTab } from '@shared/projectTabs'
@@ -269,6 +270,8 @@ interface State {
   progressFilter: Record<string, ProgressFilter>
   /** Each workspace's running lanes in the user's order (#568; saved in ui), lane ids by workspace path in lower case. */
   laneOrder: Record<string, string[]>
+  /** The tab each remembered row of tabs last showed (HI-1837; saved in ui), by the row's key. */
+  tabs: Record<string, string>
   selectedProject: string | null
   projectTabs: Record<string, ProjectTab>
   selectedNote: string | null
@@ -544,6 +547,7 @@ export const useStore = create<State>(() => ({
   boardFold: {},
   progressFilter: {},
   laneOrder: {},
+  tabs: {},
   selectedProject: null,
   projectTabs: {},
   selectedNote: null,
@@ -1005,6 +1009,30 @@ export function setProgressFilter(f: ProgressFilter): void {
   const kept = Object.fromEntries(Object.entries(next).slice(-100))
   set({ progressFilter: kept })
   void window.hive.invoke('ui:set', { progressFilter: kept }).catch(() => undefined)
+}
+
+/** The tab a remembered row of tabs shows (HI-1837): the one last chosen while it is offered, else `fallback`. */
+export function useRememberedTab<T extends string>(key: string, ids: readonly T[], fallback: T): T {
+  const wanted = useStore((s) => s.tabs[key])
+  return shownTab(ids, wanted, fallback)
+}
+
+/** Chooses a remembered row's tab (a click, or a link to it), kept across restarts (at most 100 rows, the oldest go). */
+export function chooseTab(key: string, id: string): void {
+  const kept = rememberTab(get().tabs, key, id)
+  set({ tabs: kept })
+  void window.hive.invoke('ui:set', { tabs: kept }).catch(() => undefined)
+}
+
+/** Settings → Version Control's tabs (HI-1837): Hive defaults and the open workspace's, by their rows' ids. */
+export const WORKFLOW_DEFAULTS_TABS = 'settings.workflow'
+export const WORKFLOW_DEFAULTS_TAB = { global: 'workflow.defaults', workspace: 'workflow.workspaceDefaults' } as const
+
+/** Opens Settings → Version Control on a level's tab (a "From Hive defaults" or "From the workspace" origin's link). */
+export function showWorkflowDefaults(level: keyof typeof WORKFLOW_DEFAULTS_TAB): void {
+  chooseTab(WORKFLOW_DEFAULTS_TABS, WORKFLOW_DEFAULTS_TAB[level])
+  set({ settingsSection: 'workflow', settingsQuery: '', settingsModifiedOnly: false })
+  setActivity('settings')
 }
 
 /** Shows or folds the Progress panel, remembered per workspace. */

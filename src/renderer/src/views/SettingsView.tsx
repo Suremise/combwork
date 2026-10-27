@@ -1,6 +1,6 @@
 import { WorkflowLevelForm } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, ModelPrice, PermissionMode, ProviderId, TaskColumn } from '@shared/types'
 import { DEFAULT_COLUMN_COLORS, TASK_COLUMNS, columnColor, columnName } from '@shared/tasks'
 import { DEFAULT_MODE } from '@shared/assistant'
@@ -27,7 +27,8 @@ import { AccountsSettings } from '../components/AccountsSettings'
 import { ConnectionChoice, useLaunchConnection } from '../components/ConnectionChoice'
 import { AdvancedSettings } from '../components/AdvancedSettings'
 import { ADVANCED_DEFS, groupName, shownText, type AdvancedState } from '@shared/advanced'
-import { choose, confirm, get, notify, set, useLanguage, useStore } from '../store'
+import { choose, chooseTab, confirm, get, notify, set, useLanguage, useRememberedTab, useStore, WORKFLOW_DEFAULTS_TAB, WORKFLOW_DEFAULTS_TABS } from '../store'
+import { TabPanel, Tabs } from '../components/Tabs'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { LANGUAGES, SOURCE_LANGUAGE, languageOf } from '@shared/i18n/languages'
 import { LANGUAGE_TEXT } from '@shared/i18n/languageText'
@@ -59,9 +60,6 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'workspace.hiddenProjects': () => <HiddenProjectsList />,
   'workspace.storage': () => <WorkspaceStorageList />,
   'workspace.antivirus': () => <AntivirusPanel />,
-  // Settings → Version Control's two parts (HI-1768): Hive defaults, then the open workspace's.
-  'workflow.defaults': () => <WorkflowLevelForm level="global" />,
-  'workflow.workspaceDefaults': () => <WorkflowLevelForm level="workspace" />,
   'board.colors': () => <ColumnColors />,
   'assistant.provider': () => <AssistantProviderPicker />,
   'assistant.connection': () => <AssistantConnectionPicker />,
@@ -1022,6 +1020,41 @@ function ResetAll() {
 
 /** Settings → Version Control's workspace part with the open workspace's name (HI-1768). */
 const WORKSPACE_DEFAULTS_NAMED = msg({ id: 'settings.workflow.workspaceDefaultsNamed', defaultMessage: 'Workspace defaults ({workspace})', description: 'The title of the part of Settings → Version Control holding the open workspace’s workflow defaults; {workspace} is its name.' })
+const WORKFLOW_TABS_LABEL = msg({ id: 'settings.workflow.tabs', defaultMessage: 'Workflow defaults', description: "Accessible name of Settings → Version Control's tabs: Hive defaults and the open workspace's (HI-1837)." })
+
+/**
+ * Settings → Version Control's two levels as tabs (HI-1837): Hive defaults and the open workspace's, each its own form
+ * and Save…, the tab last chosen shown. Both forms stay mounted while the section is shown, so switching (or a search
+ * offering only one tab) keeps each draft; a tab with one says so. `rows` are the section's rows the search shows.
+ */
+function WorkflowDefaultsTabs({ rows, searching }: { rows: SettingDef[]; searching: boolean }) {
+  const workspaceName = useStore((s) => s.workspace?.name ?? null)
+  const idBase = useId()
+  const [dirty, setDirty] = useState<Record<string, boolean>>({})
+  const all = SETTINGS.filter((d) => d.id === WORKFLOW_DEFAULTS_TAB.global || (d.id === WORKFLOW_DEFAULTS_TAB.workspace && workspaceName))
+  // Searching: only the parts it finds are offered, the one shown among them.
+  const offered = searching ? all.filter((d) => rows.includes(d)) : all
+  const shown = useRememberedTab(WORKFLOW_DEFAULTS_TABS, offered.map((d) => d.id), WORKFLOW_DEFAULTS_TAB.global)
+  const onDirty = useCallback((id: string, v: boolean): void => setDirty((m) => (!!m[id] === v ? m : { ...m, [id]: v })), [])
+  const onGlobalDirty = useCallback((v: boolean) => onDirty(WORKFLOW_DEFAULTS_TAB.global, v), [onDirty])
+  const onWorkspaceDirty = useCallback((v: boolean) => onDirty(WORKFLOW_DEFAULTS_TAB.workspace, v), [onDirty])
+  const title = (d: SettingDef): string => (d.id === WORKFLOW_DEFAULTS_TAB.workspace && workspaceName ? tr(WORKSPACE_DEFAULTS_NAMED, { workspace: workspaceName }) : rowText(d).title)
+  return (
+    <div className="workflow-defaults-tabs">
+      <Tabs idBase={idBase} label={tr(WORKFLOW_TABS_LABEL)} value={shown} onChange={(id) => chooseTab(WORKFLOW_DEFAULTS_TABS, id)} items={offered.map((d) => ({ id: d.id, label: title(d), unsaved: !!dirty[d.id], attrs: { 'data-setting-tab': d.id } }))} />
+      {all.map((d) => (
+        <TabPanel key={d.id} idBase={idBase} id={d.id} selected={d.id === shown && offered.includes(d)} className="setting wide" data-setting={d.id}>
+          <div className="s-text">
+            <div className="s-desc">
+              {rowText(d).desc} <InfoTip text={<span style={{ whiteSpace: 'pre-line' }}>{rowText(d).tip}</span>} />
+            </div>
+            {d.id === WORKFLOW_DEFAULTS_TAB.global ? <WorkflowLevelForm level="global" onDirty={onGlobalDirty} /> : <WorkflowLevelForm level="workspace" onDirty={onWorkspaceDirty} />}
+          </div>
+        </TabPanel>
+      ))}
+    </div>
+  )
+}
 
 export function SettingsView() {
   const settings = useStore((s) => s.settings)
@@ -1083,14 +1116,15 @@ export function SettingsView() {
             <div key={g.id} className="settings-group" data-section={g.id}>
               <h2>{sectionText(g).label}</h2>
               <p>{sectionText(g).desc}</p>
-              {g.items.map((d) => {
+              {g.id === 'workflow' && <WorkflowDefaultsTabs rows={g.items} searching={!!query.trim() || modifiedOnly} />}
+              {g.id !== 'workflow' && g.items.map((d) => {
                 const modified = (d.type !== 'custom' || ['defaultModel', 'defaultEffort', 'defaultProvider', 'modelFallback', 'effortFallback'].includes(d.key)) && getValue(settings, d) !== defaultValue(d)
                 return (
                   d.wide ? (
                     <div key={`${d.section}.${d.key}`} className="setting wide" data-setting={d.id}>
                       <div className="s-text">
                         <div className="s-title">
-                          {d.id === 'workflow.workspaceDefaults' && workspaceName ? tr(WORKSPACE_DEFAULTS_NAMED, { workspace: workspaceName }) : rowText(d).title} <InfoTip text={<span style={{ whiteSpace: 'pre-line' }}>{rowText(d).tip}</span>} />
+                          {rowText(d).title} <InfoTip text={<span style={{ whiteSpace: 'pre-line' }}>{rowText(d).tip}</span>} />
                         </div>
                         {d.desc && <div className="s-desc">{rowText(d).desc}</div>}
                         {d.render?.()}
