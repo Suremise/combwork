@@ -180,6 +180,39 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
     return { inside: tabs.every((t) => t.left >= l.left - 0.5 && t.right <= l.right + 0.5), scrolls: list.scrollWidth > list.clientWidth + 1, lines: new Set(tabs.map((t) => Math.round(t.top))).size, first: list.querySelector('.hive-tab-label')?.textContent }
   })
   check('German, narrow: the tabs wrap, each whole, none scrolled away', !!(await lib.until(async () => { const f = await tabsFit(); return f.first === 'Alle' && f.inside && !f.scrolls && f.lines > 1 }, HUNG_MS)), JSON.stringify(await tabsFit()))
+  // …and the table: the command and its Shortcut whole beside the sticky actions, Category (kept, with its filter) after
+  // them, reached by scrolling sideways; the filters under their own columns; the sticky cells on the editor's own
+  // surface, the editor hovered (HR5's HI-1838 round 1, the Assistant's screenshot review).
+  const tableFit = () => page.locator('.kb-table').evaluate((t) => {
+    const wrap = t.querySelector('.table-wrap')
+    const w = wrap.getBoundingClientRect()
+    const box = (sel) => t.querySelector(sel)?.getBoundingClientRect() ?? null
+    const actions = box('thead tr:first-child th.kb-actions'), cat = box('thead tr:first-child th.kb-category'), label = box('thead tr:first-child th.kb-label')
+    const shownCells = (row) => [...(t.querySelector(row)?.children ?? [])].filter((c) => c.getBoundingClientRect().width > 0).length
+    const bg = (el) => getComputedStyle(el).backgroundColor
+    const stickyHead = t.querySelector('thead tr:first-child th.kb-actions')
+    return {
+      // The values themselves, row by row: the Shortcut cell may run on under the actions, empty there.
+      labelAndKeyWhole: !!label && label.left >= w.left - 0.5 && [...t.querySelectorAll('tbody tr')].slice(0, 8).every((tr) => { const v = tr.querySelector('.kb-key-value')?.getBoundingClientRect(), a = tr.querySelector('td.kb-actions')?.getBoundingClientRect(), n = tr.querySelector('td.kb-label')?.getBoundingClientRect(); return !!v && !!a && !!n && v.right <= a.left + 0.5 && n.left >= w.left - 0.5 }),
+      categoryKept: !!cat && cat.width > 0 && !!t.querySelector('tr.table-filters th.kb-category select'),
+      categoryInView: !!cat && !!actions && cat.left >= w.left - 0.5 && cat.right <= actions.left + 0.5,
+      aligned: shownCells('thead tr:first-child') === shownCells('thead tr.table-filters'),
+      surface: bg(stickyHead) === bg(document.body) && ['rgba(0, 0, 0, 0)', 'transparent'].includes(bg(t.closest('.setting'))),
+      scrolls: wrap.scrollWidth > wrap.clientWidth
+    }
+  })
+  await page.locator('.kb-table tbody tr').first().hover()
+  check('German, narrow: the command and its Shortcut whole beside the actions, Category kept after them, the filters aligned, the sticky cells on the editor’s surface', !!(await lib.until(async () => { const f = await tableFit(); return f.labelAndKeyWhole && f.categoryKept && f.aligned && f.surface }, HUNG_MS)), JSON.stringify(await tableFit()))
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((th) => document.documentElement.setAttribute('data-theme', th), theme)
+    check(`…its sticky header on the editor’s surface in the ${theme} theme`, !!(await lib.until(async () => (await tableFit()).surface, HUNG_MS)))
+  }
+  if ((await tableFit()).scrolls) {
+    await page.locator('.kb-table .table-wrap').evaluate((w) => (w.scrollLeft = w.scrollWidth))
+    check('…scrolled sideways, Category whole beside the actions', !!(await lib.until(async () => (await tableFit()).categoryInView, HUNG_MS)), JSON.stringify(await tableFit()))
+    await page.locator('.kb-table .table-wrap').evaluate((w) => (w.scrollLeft = 0))
+  }
+  await page.mouse.move(5, 5)
   await page.locator('.kb-tabs').scrollIntoViewIfNeeded()
   await page.screenshot({ path: path.join(scratch, 'keys-tabs-narrow-de-dark.png') })
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))

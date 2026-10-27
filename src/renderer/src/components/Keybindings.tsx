@@ -267,7 +267,7 @@ interface KeyEditing {
   conflicts: Map<string, string[]>
 }
 
-/** The editor's columns: the command, its category, its shortcut (recorded in place), where it comes from, and its actions. */
+/** The editor's columns: the command, its shortcut (recorded in place), its category, where it comes from, and its actions. */
 function keyColumns({ project, recording, setRecording, record, save, conflicts }: KeyEditing): DataColumn<Row>[] {
   return [
     {
@@ -284,7 +284,6 @@ function keyColumns({ project, recording, setRecording, record, save, conflicts 
       ),
       sortValue: (r) => r.c.label
     },
-    { key: 'category', header: tr(msg({ id: 'settings.keys.column.category', defaultMessage: 'Category', description: "A column of the keyboard shortcuts editor: the command's category (Project, Session…)." })), className: 'kb-category faint', cell: (r) => commandCategory(r.c), sortValue: (r) => commandCategory(r.c), filter: { kind: 'choice', value: (r) => commandCategory(r.c) } }, // i18n-ignore: class names
     {
       key: 'key',
       header: tr(msg({ id: 'settings.keys.column.shortcut', defaultMessage: 'Shortcut', description: 'A column of the keyboard shortcuts editor: the keys.' })),
@@ -312,6 +311,9 @@ function keyColumns({ project, recording, setRecording, record, save, conflicts 
       // Commands without a shortcut sort last.
       sortValue: (r) => (r.key ? formatKeybinding(r.key) : null)
     },
+    // After the shortcut (HI-1838): in a narrow editor the command and its shortcut stay in view, and Category is what
+    // the table scrolls to.
+    { key: 'category', header: tr(msg({ id: 'settings.keys.column.category', defaultMessage: 'Category', description: "A column of the keyboard shortcuts editor: the command's category (Project, Session…)." })), className: 'kb-category faint', cell: (r) => commandCategory(r.c), sortValue: (r) => commandCategory(r.c), filter: { kind: 'choice', value: (r) => commandCategory(r.c) } }, // i18n-ignore: class names
     {
       key: 'source',
       header: tr(msg({ id: 'settings.keys.column.set', defaultMessage: 'Set', description: 'A column of the keyboard shortcuts editor: where the shortcut comes from (changed, removed, this project…). Keep it short.' })),

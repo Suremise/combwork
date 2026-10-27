@@ -189,7 +189,8 @@ export function DataTable<T>({
             {hasFilters && (
               <tr className="table-filters">
                 {columns.map((c) => (
-                  <th key={c.key} className={cx(c.num && 'num')}>
+                  // The column's class too, so what styles a column (hidden when narrow, sticky) holds for its filter (HI-1838).
+                  <th key={c.key} className={cx(c.num && 'num', c.className)}>
                     {c.filter?.kind === 'choice' ? (
                       <select className="select" aria-label={tr(msg({ id: 'shell.table.filterBy', defaultMessage: 'Filter {column}', description: "The name, for screen readers, of a table's filter under a column. {column} is the heading." }), { column: c.header })} value={filters[c.key] ?? ''} onChange={(e) => setFilter(c.key, e.target.value)}>
                         <option value="">{tr(msg({ id: 'shell.table.all', defaultMessage: 'All', description: "A table's column filter's first choice: no filter." }))}</option>
