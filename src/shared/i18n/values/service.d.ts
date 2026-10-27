@@ -63,6 +63,7 @@ interface HiveMessageValues {
   'service.git.failed': { command: string | number; why: string | number }
   'service.git.outside': undefined
   'service.git.tooLarge': { kb: number }
+  'service.gitCompare.noBranch': { branch: string | number }
   'service.gitRepo.addFailed': { remote: string | number; why: string | number }
   'service.gitRepo.added': { remote: string | number }
   'service.gitRepo.alreadyOn': { branch: string | number }

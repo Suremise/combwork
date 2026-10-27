@@ -61,6 +61,7 @@
   "service.git.failed": "Polecenie {command} nie powiodło się: {why}",
   "service.git.outside": "Ścieżka wychodzi poza projekt",
   "service.git.tooLarge": "Plik jest za duży, by pokazać różnice ({kb, number} KB).",
+  "service.gitCompare.noBranch": "Nie ma już tutaj gałęzi {branch}.",
   "service.gitRepo.addFailed": "Nie udało się dodać zdalnego repozytorium {remote}: {why}",
   "service.gitRepo.added": "Dodano zdalne repozytorium {remote}.",
   "service.gitRepo.alreadyOn": "Już na gałęzi {branch}.",

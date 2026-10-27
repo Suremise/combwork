@@ -132,6 +132,7 @@ export function migrateSlots(ws: WorkspaceService): Promise<void> {
       // The project folders as the adoption lists them (hidden ones too: their agents' worktrees are theirs), not the
       // window's list, which may not be read yet while the workspace opens.
       const folders = [...(await ws.listProjectPaths()), ...(await ws.listProjectPaths({ hidden: true }))]
+      let moved = 0
       for (const p of folders) {
         if (ws.lifetime.aborted || ws.path !== path) return
         const name = basename(p)
@@ -140,8 +141,15 @@ export function migrateSlots(ws: WorkspaceService): Promise<void> {
         // Nothing to do: migrated already, with no agent's worktree left to take over.
         if (done[id] && projectAgents(cfg).every((a) => !legacyWorktree(a) || done[id].agents.includes(a.id))) continue
         lanes ??= await rawLanes(ws)
-        await migrateProject(ws, p, name, id, lanes, done[id]?.agents ?? []).catch((e) => log.warn(`migrating ${userText(name)}'s worktrees into slots (tried again at the next opening)`, e))
+        moved += await migrateProject(ws, p, name, id, lanes, done[id]?.agents ?? []).catch((e) => {
+          log.warn(`migrating ${userText(name)}'s worktrees into slots (tried again at the next opening)`, e)
+          return 0
+        })
       }
+      // The windows read where agents work as the workspace opened, before this: told again, so an agent whose 0.9
+      // worktree became its carried slot (or a retired home) isn't shown in its old place until something else
+      // refreshes (HI-1824: the Changes picker kept "Coder's worktree" whenever no refresh came after).
+      if (moved && !ws.lifetime.aborted && ws.path === path) await ws.refresh().catch((e: unknown) => log.warn('reading the projects again after migrating worktrees into slots', e))
     } catch (e) {
       log.warn(`migrating ${userText(path)}'s worktrees into slots (tried again at the next opening)`, e)
     }
@@ -152,7 +160,7 @@ export function migrateSlots(ws: WorkspaceService): Promise<void> {
  * One project's agents not migrated yet: builders' worktrees adopted, each with its record in its write; reviewers'
  * recorded as retired homes; then the project's record (made even with nothing to adopt).
  */
-async function migrateProject(ws: WorkspaceService, projectPath: string, name: string, id: string, lanes: readonly LaneRecord[], done: readonly string[]): Promise<void> {
+async function migrateProject(ws: WorkspaceService, projectPath: string, name: string, id: string, lanes: readonly LaneRecord[], done: readonly string[]): Promise<number> {
   const agents = projectAgents(await ws.projectConfig(projectPath)).filter((a) => legacyWorktree(a) && !done.includes(a.id))
   const store = new SlotStore(boardConn(ws), id)
   const host = (await ws.sessionScope(projectPath)).scope
@@ -210,6 +218,8 @@ async function migrateProject(ws: WorkspaceService, projectPath: string, name: s
     })
   )
   log.info(`${userText(name)}: ${adopted} worktree(s) adopted as slots, ${homes.length} reviewer worktree(s) kept as retired homes`)
+  // What changed where agents work: the adoptions, and the reviewers now in retired homes.
+  return adopted + reviewers.length
 }
 
 /** The agent's card in flight on the board (Doing, Review or Passed), if any: what its carried lease is kept for. */

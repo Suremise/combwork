@@ -130,6 +130,8 @@
   "tips.compactSidebar.title": "紧凑的项目列表",
   "tips.compactionHistory.text": "“概览”中的压缩历史可对长会话的各次压缩分页、筛选和排序；点击其中一次即可在会话记录中阅读，并看到智能体据以继续工作的摘要。",
   "tips.compactionHistory.title": "在会话记录中查看每次压缩",
+  "tips.compareBranches.text": "“版本控制”→“更改”可在不检出任何内容的情况下比较任意两个本地分支：在“分支”下选择一个，即可查看双方各自独有的提交、它更改的文件以及每个文件的差异。",
+  "tips.compareBranches.title": "比较两个分支，例如 1.0.0 与 main",
   "tips.conflictHunks.text": "当合并队列因冲突退回卡片时，其“工作记录”部分会列出文件：点击一个文件即可查看其冲突，目标一方和卡片一方各自标注名称，保持队列测试合并时的样子。",
   "tips.conflictHunks.title": "查看被退回卡片的冲突",
   "tips.consoleRecording.text": "在开发者控制台中，“录制”会把智能体的 CLI 发给 Hive 的内容写入文件，除非你为该录制勾选“文本”，否则内容会脱敏；“复制诊断信息”可以把它附到错误报告中。",

@@ -72,6 +72,7 @@ export const SUITES = [
   { name: 'cardwork' },
   { name: 'carryingon' },
   { name: 'changes' },
+  { name: 'changescompare' },
   { name: 'changespicker' },
   { name: 'claude-real', needs: ['claude'], claudeHome: 'own' },
   { name: 'claudehome', needs: ['claude'], claudeHome: 'own' },

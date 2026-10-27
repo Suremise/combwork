@@ -120,13 +120,22 @@ export async function folderFacts(projectPath: string): Promise<FolderFacts> {
   facts.migrated = migrated !== null
   facts.migratedAgents = migrated ?? []
   facts.homes = await homesOf(projectPath)
+  facts.slots = await boardSlots(projectPath, ws)
+  return facts
+}
+
+/**
+ * A project's slots as the board records them, and nothing else: a read that never makes the slot pool or asks the
+ * 0.9 migration anything (the Changes tab's picker, HI-1824, reads it as the project opens). None when the board is
+ * still 0.9's or none is open.
+ */
+export async function boardSlots(projectPath: string, ws = workspaceOf(projectPath)): Promise<FolderSlot[]> {
   try {
     const project = (await ws.projectConfig(projectPath)).id ?? basename(projectPath)
-    facts.slots = boardRead(ws, (db) => slotsIn(db, project))
+    return boardRead(ws, (db) => slotsIn(db, project))
   } catch {
-    // A board still 0.9's, or none open: no slots.
+    return []
   }
-  return facts
 }
 
 /**

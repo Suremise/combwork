@@ -61,6 +61,7 @@
   "service.git.failed": "{command} 失败：{why}",
   "service.git.outside": "路径在项目之外",
   "service.git.tooLarge": "文件太大，无法比较差异（{kb, number} KB）。",
+  "service.gitCompare.noBranch": "这里已没有分支 {branch}。",
   "service.gitRepo.addFailed": "无法添加 {remote}：{why}",
   "service.gitRepo.added": "已添加 {remote}。",
   "service.gitRepo.alreadyOn": "已经在 {branch} 上。",

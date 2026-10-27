@@ -130,6 +130,8 @@
   "tips.compactSidebar.title": "A compact project list",
   "tips.compactionHistory.text": "The Overview's compaction history pages, filters and sorts a long session's compactions; click one to read it in the transcript, with the summary the agent carried on from.",
   "tips.compactionHistory.title": "Read a compaction where it happened",
+  "tips.compareBranches.text": "Version Control → Changes compares any two local branches without checking anything out: pick one under Branches to see the commits each has that the other hasn't, the files it changes, and each file's diff.",
+  "tips.compareBranches.title": "Compare two branches, such as 1.0.0 with main",
   "tips.conflictHunks.text": "When the merge queue sends a card back for a conflict, its Work section lists the files: click one to see its conflicts, the target's side and the card's under their names, as the queue's test merge had them.",
   "tips.conflictHunks.title": "See a returned card's conflicts",
   "tips.consoleRecording.text": "In the developer console, Record writes what an agent's CLI sends Hive to a file, redacted unless you tick text for that recording, and Copy Diagnostics can attach it to a bug report.",

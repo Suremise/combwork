@@ -61,6 +61,7 @@
   "service.git.failed": "{command}が失敗しました：{why}",
   "service.git.outside": "パスがプロジェクトの外にあります",
   "service.git.tooLarge": "ファイルが大きすぎるため、差分を表示できません（{kb, number} KB）。",
+  "service.gitCompare.noBranch": "ブランチ {branch} はもうありません。",
   "service.gitRepo.addFailed": "{remote}を追加できませんでした：{why}",
   "service.gitRepo.added": "{remote}を追加しました。",
   "service.gitRepo.alreadyOn": "すでに{branch}にいます。",
