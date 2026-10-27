@@ -269,9 +269,13 @@ class RepoWatch {
   private reflogFolder = new Map<string, string>()
   /** git dir (lower-cased) → its HEAD reflog's size at the last read: an entry whose event was lost still counts. */
   private reflogSize = new Map<string, number>()
-  /** The read under way in git's worker (HI-1814), and whether another was asked for meanwhile. */
+  /** The reads under way in git's worker (HI-1814), one after another while more are asked for. */
   private reading: Promise<void> | null = null
-  private again = false
+  /** Reads asked for (each `read()`), and how many of them the reads in so far have covered. */
+  private asked = 0
+  private covered = 0
+  /** Callers of `current()`, each until the reads owed when it asked are in. */
+  private owed: { want: number; done: () => void }[] = []
   private closed = false
 
   constructor(
@@ -324,31 +328,49 @@ class RepoWatch {
    */
   read(): void {
     this.release()
-    if (this.reading) {
-      this.again = true
-      return
-    }
+    this.asked++
+    if (this.reading) return
     this.reading = (async () => {
       try {
-        for (;;) {
-          this.again = false
-          const refs = await readRefsOffMain(this.common, MAX_FOLDERS)
-          if (this.closed) break
-          this.apply(refs)
-          if (!this.again) break
+        while (this.covered < this.asked && !this.closed) {
+          // What a read finds covers every read asked for before it began.
+          const covers = this.asked
+          try {
+            const refs = await readRefsOffMain(this.common, MAX_FOLDERS)
+            if (this.closed) break
+            this.apply(refs)
+          } catch (e) {
+            log.warn(`reading ${userText(this.common)}'s refs failed`, e)
+          }
+          this.settle(covers)
         }
-      } catch (e) {
-        log.warn(`reading ${userText(this.common)}'s refs failed`, e)
       } finally {
-        // Here, with nothing awaited since the last check: a read asked for from now on starts a new one.
+        // Here, with nothing awaited since the loop's last check: a read asked for from now on starts a new one.
         this.reading = null
+        if (this.closed) this.settle(Infinity)
       }
     })()
   }
 
-  /** Once the reads asked for so far are in. */
-  async current(): Promise<void> {
-    while (this.reading) await this.reading
+  /**
+   * Once the reads asked for so far are in: never waiting for those asked for after it (HR1's round 1: a busy
+   * repository's refreshes kept every check waiting), nor for any once the watch has closed.
+   */
+  current(): Promise<void> {
+    if (this.closed || this.covered >= this.asked) return Promise.resolve()
+    const want = this.asked
+    return new Promise((done) => this.owed.push({ want, done }))
+  }
+
+  /** The reads asked for up to `n` are in: those waiting for no more go on. */
+  private settle(n: number): void {
+    this.covered = Math.max(this.covered, n)
+    const left: typeof this.owed = []
+    for (const w of this.owed) {
+      if (w.want <= this.covered) w.done()
+      else left.push(w)
+    }
+    this.owed = left
   }
 
   /** Lets go of the write logs of folders being deleted or removed (Windows can't delete a folder a watch holds). */
@@ -396,6 +418,7 @@ class RepoWatch {
 
   close(): void {
     this.closed = true
+    this.settle(Infinity)
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
     this.bare?.close()
@@ -545,9 +568,12 @@ export class Observer {
     for (const l of [...this.folders.values(), ...[...this.repos.values()].flatMap((r) => [...r.logs.values()])]) l.verify()
   }
 
-  /** Once every repository's reads asked for so far are in: a worktree a refresh just followed has its write log. */
+  /**
+   * Once every repository's reads asked for so far are in (a worktree a refresh just followed then has its write log):
+   * only those, never reads asked for meanwhile.
+   */
   private async current(): Promise<void> {
-    for (const r of [...this.repos.values()]) await r.current()
+    await Promise.all([...this.repos.values()].map((r) => r.current()))
   }
 
   private logOf(folder: string): FolderLog | null {

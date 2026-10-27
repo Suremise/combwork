@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { Worker } from 'worker_threads'
 import { describe, expect, it, vi } from 'vitest'
-import { DAMAGED_AGE_MS, KeptFileBusy, keptSettleSteps, onCorruptFile, readKeptJson, readKeptJsonByStat, readKeptJsonSync, writeKeptJson, type KeptSample, type KeptSettled } from '../src/main/fsutil'
+import { DAMAGED_AGE_MS, KEPT_BY_STAT_MAX, KeptFileBusy, keptSettleSteps, onCorruptFile, readKeptJson, readKeptJsonByStat, readKeptJsonSync, writeKeptJson, type KeptSample, type KeptSettled } from '../src/main/fsutil'
 import { tempDir } from './tempDir'
 
 describe('kept files', () => {
@@ -83,6 +83,28 @@ describe('kept files', () => {
     age(f)
     expect(await read(true)).toEqual({ n: 2, list: ['b'] })
     expect(await readKeptJsonByStat(join(dir, 'stat-missing.json'), 7, (v) => v)).toBe(7)
+  })
+
+  it('keeps at most KEPT_BY_STAT_MAX files by their stat, letting go of the least recently read (HR1, HI-1814)', async () => {
+    let derived = 0
+    const derive = (v: { i: number } | null): { i: number } | null => (derived++, v)
+    const files = Array.from({ length: KEPT_BY_STAT_MAX + 1 }, (_, i) => join(dir, `lru-${i}.json`))
+    for (const [i, f] of files.entries()) {
+      writeFileSync(f, JSON.stringify({ i }))
+      age(f)
+    }
+    const read = (i: number) => readKeptJsonByStat(files[i], null, derive)
+    // File 1 read again before the last is kept: it stays, and file 0 (least recently read) goes.
+    for (let i = 0; i < KEPT_BY_STAT_MAX; i++) await read(i)
+    await read(1)
+    await read(KEPT_BY_STAT_MAX)
+    expect(derived).toBe(KEPT_BY_STAT_MAX + 1)
+    expect(await read(1)).toEqual({ i: 1 })
+    expect(await read(KEPT_BY_STAT_MAX)).toEqual({ i: KEPT_BY_STAT_MAX })
+    expect(derived).toBe(KEPT_BY_STAT_MAX + 1)
+    // Let go of, it is read again in full, and correctly.
+    expect(await read(0)).toEqual({ i: 0 })
+    expect(derived).toBe(KEPT_BY_STAT_MAX + 2)
   })
 
   it('sets aside an empty file that was emptied a while ago', async () => {

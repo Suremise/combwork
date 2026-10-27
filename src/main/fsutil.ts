@@ -215,8 +215,13 @@ export async function readKeptJson<T>(path: string, fallback: T, opts: KeptReadO
   }
 }
 
-/** Kept files read by their stat (readKeptJsonByStat): path (lower-cased) → the stat it was read at and what it gave. */
+/**
+ * Kept files read by their stat (readKeptJsonByStat): path (lower-cased) → the stat it was read at and what it gave, the
+ * least recently read first.
+ */
 const keptByStat = new Map<string, { mtimeMs: number; size: number; ino: number; derive: (v: never) => unknown; derived: unknown }>()
+/** The most files kept by their stat (HR1's round 1): one more lets go of the least recently read. */
+export const KEPT_BY_STAT_MAX = 64
 
 /** Forgets what readKeptJsonByStat kept of a file: Hive is writing it. */
 const forgetKeptStat = (path: string): boolean => keptByStat.delete(path.toLowerCase())
@@ -240,8 +245,12 @@ export async function readKeptJsonByStat<T, D>(path: string, fallback: T, derive
   const asked = Date.now()
   const st = await stat(path).catch(() => null)
   const kept = keptByStat.get(key)
-  if (st && kept && kept.derive === derive && kept.mtimeMs === st.mtimeMs && kept.size === st.size && kept.ino === st.ino) return structuredClone(kept.derived) as D
   keptByStat.delete(key)
+  if (st && kept && kept.derive === derive && kept.mtimeMs === st.mtimeMs && kept.size === st.size && kept.ino === st.ino) {
+    // Read again: the most recently read now.
+    keptByStat.set(key, kept)
+    return structuredClone(kept.derived) as D
+  }
   if (!st) return derive(await readKeptJson(path, fallback, opts))
   const text = await readFile(path, 'utf8').catch(() => null)
   let value: T
@@ -252,7 +261,13 @@ export async function readKeptJsonByStat<T, D>(path: string, fallback: T, derive
     return derive(await readKeptJson(path, fallback, opts))
   }
   const derived = derive(value)
-  if (st.mtimeMs < asked - KEPT_RACY_MS) keptByStat.set(key, { mtimeMs: st.mtimeMs, size: st.size, ino: st.ino, derive, derived: structuredClone(derived) })
+  if (st.mtimeMs < asked - KEPT_RACY_MS) {
+    keptByStat.set(key, { mtimeMs: st.mtimeMs, size: st.size, ino: st.ino, derive, derived: structuredClone(derived) })
+    for (const k of keptByStat.keys()) {
+      if (keptByStat.size <= KEPT_BY_STAT_MAX) break
+      keptByStat.delete(k)
+    }
+  }
   return derived
 }
 
