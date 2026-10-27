@@ -103,14 +103,22 @@ const VERDICT_FAILED = /^Review failed/
 /** Whether a lane is still running (active or paused). */
 export const running = (l: Pick<LaneRecord, 'state'>): boolean => l.state === 'active'
 
-/** A lane's card as the board has it (null: gone, archived, or in another project now). */
-export function laneCard(n: number, card: TaskCard | null): LaneCard {
+/**
+ * A lane's card as the board has it (null: gone, archived, or in another project now). `of`: the running lane it is read
+ * for, so an open card that isn't its own is marked held elsewhere (HI-1821): given to another agent than its builder,
+ * or given to none and owned by another lane (`owner`: main's cardOwnersNow, the running lane listing it that owns it).
+ */
+export function laneCard(n: number, card: TaskCard | null, of?: { lane: string; builder: string; owner?: string | null }): LaneCard {
   if (!card) return { number: n, title: '', column: 'gone', blocked: null, round: 1, reviewing: false }
-  return { number: n, title: card.title, column: card.column, blocked: card.blocked || null, round: card.history.filter((h) => VERDICT_FAILED.test(h.what)).length + 1, reviewing: !!card.review }
+  const elsewhere = !of || card.column === 'done' ? null : card.agent ? (card.agent !== of.builder ? card.agent : null) : of.owner && of.owner !== of.lane ? of.owner : null
+  return { number: n, title: card.title, column: card.column, blocked: card.blocked || null, round: card.history.filter((h) => VERDICT_FAILED.test(h.what)).length + 1, reviewing: !!card.review, ...(elsewhere ? { elsewhere } : {}) }
 }
 
 /** Whether a lane's card is finished for the loop: passed review, merged, or gone. */
 const finished = (c: LaneCard): boolean => c.column === 'passed' || c.column === 'done' || c.column === 'gone'
+
+/** Whether a lane's card is the lane's own work now: open and not held by another agent (HI-1821). */
+export const ownOpen = (c: LaneCard): boolean => c.column !== 'done' && c.column !== 'gone' && c.column !== 'unrecorded' && !c.elsewhere
 
 /** Whether a lane reads its cards as it left them (ended or abandoned, with its snapshot) rather than from the board. */
 export const isFrozen = (rec: Pick<LaneRecord, 'state' | 'frozen'>): boolean => !running(rec) && !!rec.frozen
@@ -126,14 +134,15 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * lane's project); an ended or abandoned one's as it left them (`frozen`), or `unrecorded` without that record, never
  * as the board has them now (#512). Its agents' names as the project has them now (`names`: by id; one missing keeps the
  * name last known). Its current card is the one being worked, and it is paused only while it waits for the user
- * (currentCard); an ended lane without its record has none.
+ * (currentCard); an ended lane without its record has none. A card held elsewhere (HI-1821: another agent's, or, given
+ * to none, another lane's: `owners`, main's owner lane by card) is never its current card nor why it waits.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null } | null): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null } | null, owners?: ReadonlyMap<number, string | null>): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
   // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
-  const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
+  const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null, { lane: rec.id, builder: rec.builder.id, owner: owners?.get(n) }), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
   const list = isFrozen(rec) ? rec.frozen! : rec.cards.map((n) => (unrecorded ? unrecordedCard(n, cards.get(n) ?? null) : live(n)))
-  const { current, waiting } = unrecorded ? { current: null, waiting: false } : currentCard(list.map((c) => ({ number: c.number, state: laneCardState(c), finished: finished(c) })))
+  const { current, waiting } = unrecorded ? { current: null, waiting: false } : currentCard(list.map((c) => ({ number: c.number, state: laneCardState(c), finished: finished(c) || !!c.elsewhere })))
   // Its next card waiting while its builder's branch is brought up to date (§16.19.2, `line`: the main side's), when
   // nothing more pressing says why.
   const named = (a: LaneAgent): LaneAgent => ({ id: a.id, name: names?.get(a.id) ?? a.name })
@@ -212,7 +221,8 @@ const USERS: ReadonlySet<LaneWaitReason> = new Set(['blocked', 'hold', 'you', 'r
  * while workflow rules are enforced: without them, only a blocked or held card says why, as before 1.0.
  */
 export function laneStatus(rec: Pick<LaneRecord, 'rounds' | 'pending'>, cards: readonly LaneCard[], current: number | null, waiting: boolean, facts: ReadonlyMap<number, LaneCardFacts> | null): LaneStatus | null {
-  const open = cards.filter((c) => c.column !== 'done' && c.column !== 'gone' && c.column !== 'unrecorded')
+  // Another agent's card isn't the lane's to wait on (HI-1821).
+  const open = cards.filter(ownOpen)
   if (!open.length) return null
   if (waiting && current !== null) {
     const c = open.find((x) => x.number === current)!
@@ -230,7 +240,10 @@ export function laneStatus(rec: Pick<LaneRecord, 'rounds' | 'pending'>, cards: r
   if (focus.column === 'passed' && open.some((c) => c.column !== 'passed')) return { reason: f?.stage === 'merging' ? 'merging' : 'notMerged', card: focus.number }
   if (f?.stale) return { reason: 'stale', card: focus.number }
   if (focus.column === 'review' && !focus.reviewing) return { reason: 'reviewer', card: focus.number }
-  if (rec.pending && current !== null) return { reason: 'listChanges', card: current }
+  // A queued change waits for its own card in flight, through Review and Approved until it is Done (HI-1821), never
+  // for the card the lane would be on next.
+  const anchor = open.find((c) => c.column === 'doing' || c.column === 'review' || c.column === 'passed')
+  if (rec.pending && anchor) return { reason: 'listChanges', card: anchor.number }
   return null
 }
 

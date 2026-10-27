@@ -130,6 +130,8 @@
   "tips.compactSidebar.title": "Kompaktowa lista projektów",
   "tips.compactionHistory.text": "Historia kompaktowań w Przeglądzie dzieli na strony, filtruje i sortuje kompaktowania długiej sesji; kliknij jedno, żeby przeczytać je w transkrypcji razem ze streszczeniem, od którego agent kontynuował.",
   "tips.compactionHistory.title": "Przeczytaj kompaktowanie tam, gdzie nastąpiło",
+  "tips.compareBranches.text": "Kontrola wersji → Zmiany porównuje dowolne dwie lokalne gałęzie bez pobierania czegokolwiek: wybierz jedną w grupie Gałęzie, aby zobaczyć commity, które ma każda z nich, a druga nie, zmieniane pliki i różnice w każdym pliku.",
+  "tips.compareBranches.title": "Porównaj dwie gałęzie, np. 1.0.0 z main",
   "tips.conflictHunks.text": "Gdy kolejka scalania zwraca kartę z powodu konfliktu, jej sekcja Praca wymienia pliki: kliknij jeden, aby zobaczyć jego konflikty, stronę celu i stronę karty pod ich nazwami, tak jak zostawiło je scalanie testowe kolejki.",
   "tips.conflictHunks.title": "Zobacz konflikty zwróconej karty",
   "tips.consoleRecording.text": "W konsoli deweloperskiej Nagrywaj zapisuje do pliku to, co CLI agenta wysyła do Hive, z ukrytymi danymi, chyba że zaznaczysz tekst dla tego nagrania; Kopiuj diagnostykę może je dołączyć do zgłoszenia błędu.",

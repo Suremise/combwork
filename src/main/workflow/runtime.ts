@@ -1190,7 +1190,7 @@ export class Workflow {
     const l = now.lane ? this.lane(now.lane) : null
     if (!l || l.ended || l.pending?.length) return null
     const at = l.cards.indexOf(card.id)
-    const open = l.cards.slice(0, Math.max(at, 0)).filter((c) => !this.laneDone(c)).map((c) => this.store.card(c))
+    const open = l.cards.slice(0, Math.max(at, 0)).filter((c) => !this.laneDone(c) && this.laneOwn(l.id, c)).map((c) => this.store.card(c))
     if (!open.some((c) => c.stage === 'todo') || open.some((c) => c.stage === 'active' || c.stage === 'review')) return null
     const ahead = open.filter((c) => c.stage === 'todo')
     const first = l.cards.indexOf(ahead[0].id)
@@ -2149,8 +2149,18 @@ export class Workflow {
    * none of its cards is in flight (the card boundary has passed), the queued list, which `applies` then.
    */
   laneNow(l: LaneList): { cards: number[]; applies: boolean } {
-    if (!l.pending?.length || l.cards.some((c) => this.laneCardFlying(c))) return { cards: l.cards, applies: false }
+    if (!l.pending?.length || l.cards.some((c) => this.laneCardFlying(c) && this.laneOwn(l.id, c))) return { cards: l.cards, applies: false }
     return { cards: l.pending, applies: true }
+  }
+
+  /**
+   * Whether a lane's card is its own (HI-1821, as lanes.ts's view reads it: boardStore's cardOwnersNow): given to its
+   * builder on the board, or given to no agent and its lane (`card.lane`: the newest running lane listing it) this one.
+   * Another's card is another lane's work: its lane never waits on it, and a queued list change never waits for it.
+   */
+  laneOwn(lane: string, n: number): boolean {
+    const agent = this.store.cardAgent(n)
+    return agent ? agent === this.store.laneBuilder(lane) : this.store.card(n).lane === lane
   }
 
   /**
@@ -2164,8 +2174,10 @@ export class Workflow {
     if (!l || l.ended) return null
     const now = this.laneNow(l)
     let open: number | undefined
-    if (now.cards.includes(card.id)) open = now.cards.slice(0, now.cards.indexOf(card.id)).find((c) => !this.laneDone(c))
-    else if (l.pending?.includes(card.id)) open = l.cards.find((c) => this.laneCardFlying(c)) ?? l.cards.find((c) => c !== card.id && !this.laneDone(c))
+    // Never on another agent's card (HI-1821).
+    const waitsOn = (c: number): boolean => !this.laneDone(c) && this.laneOwn(l.id, c)
+    if (now.cards.includes(card.id)) open = now.cards.slice(0, now.cards.indexOf(card.id)).find(waitsOn)
+    else if (l.pending?.includes(card.id)) open = l.cards.find((c) => this.laneCardFlying(c) && this.laneOwn(l.id, c)) ?? l.cards.find((c) => c !== card.id && waitsOn(c))
     return open === undefined ? null : this.store.card(open)
   }
 

@@ -263,7 +263,39 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
     // --add-dir (2.1.309).
     extraDirs: true,
     // Each account a folder of its own (HI-980), its transcripts and memory shared with the others through projects\.
-    connections: { homeEnv: 'CLAUDE_CONFIG_DIR', shared: ['projects'], userHome: '.claude', orgs: true }
+    connections: {
+      homeEnv: 'CLAUDE_CONFIG_DIR',
+      shared: ['projects'],
+      userHome: '.claude',
+      orgs: true,
+      // A server of the user's (HI-1772), as Claude Code's environment variables reference has it (checked 27 Oct 2026):
+      // the key as a bearer token (ANTHROPIC_API_KEY would ask to be approved first, in a pane).
+      server: {
+        baseUrlEnv: 'ANTHROPIC_BASE_URL',
+        keyEnv: 'ANTHROPIC_AUTH_TOKEN',
+        keylessToken: 'none',
+        modelEnv: 'ANTHROPIC_MODEL',
+        aliasEnv: { opus: 'ANTHROPIC_DEFAULT_OPUS_MODEL', sonnet: 'ANTHROPIC_DEFAULT_SONNET_MODEL', haiku: 'ANTHROPIC_DEFAULT_HAIKU_MODEL' },
+        subagentEnv: 'CLAUDE_CODE_SUBAGENT_MODEL',
+        listing: { path: 'v1/models', list: 'data', id: 'id' },
+        presets: [
+          // DeepSeek's Claude Code guide (api-docs.deepseek.com/quick_start/agent_integrations/claude_code, 27 Oct 2026):
+          // its recommended models for each alias. (Its server also maps any claude-opus* name to deepseek-v4-pro, a
+          // fallback Hive doesn't rely on: v4-pro is listed for the user to map.)
+          {
+            id: 'deepseek',
+            name: 'DeepSeek',
+            baseUrl: 'https://api.deepseek.com/anthropic',
+            models: [{ id: 'deepseek-flash[1m]', as: ['opus', 'sonnet'] }, { id: 'deepseek-flash', as: ['haiku'] }, { id: 'deepseek-v4-pro' }],
+            listing: { path: '/models', list: 'data', id: 'id' },
+            docs: 'https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code'
+          },
+          // Ollama's Anthropic-compatible API (docs.ollama.com/api/anthropic-compatibility, Ollama 0.14 and later): no key,
+          // its models those it has pulled.
+          { id: 'ollama', name: 'Ollama', baseUrl: 'http://localhost:11434', keyless: true, listing: { path: '/api/tags', list: 'models', id: 'name' }, docs: 'https://docs.ollama.com/api/anthropic-compatibility' } // i18n-ignore: a product's name
+        ]
+      }
+    }
   },
   reservedKeys: ['MOD+B', 'MOD+K', 'MOD+O', 'MOD+R', 'MOD+T', 'MOD+G'],
   instructionsFile: 'CLAUDE.md',

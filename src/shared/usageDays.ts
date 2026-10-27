@@ -84,6 +84,32 @@ export function withDayCosts(usage: SessionUsage, settings?: Pick<AppSettings, '
 }
 
 /**
+ * A session's usage without the CLI's own cost reports (HI-1772: a session that ran on a server connection, whose CLI
+ * prices the server's model as a Claude model): priced then by Hive's estimate from its real model id alone, unpriced
+ * where Hive has no price for it.
+ */
+export function withoutCostReports<T extends SessionUsage>(raw: T): T {
+  const t = raw.timeline
+  if (raw.costUsd === null && !raw.costReports && !raw.costUnreported && !t?.reports.length) return raw
+  const out = { ...raw, costUsd: null, costEstimated: false }
+  delete out.costReports
+  delete out.costUnreported
+  // Its timeline's charges too (the usage history's rows are made from them): every row then priced by its model.
+  if (t) out.timeline = { ...t, reports: [], rows: t.rows.map((r) => (r[6] >= 0 ? (Object.assign([...r], { 6: -1 }) as typeof r) : r)) }
+  return out
+}
+
+/**
+ * A free session's usage (HI-1772: it ran only on servers on this PC): a known $0, its days too, whatever prices are set;
+ * its tokens as they are.
+ */
+export function withCostFree<T extends SessionUsage>(raw: T): T {
+  const out = { ...withoutCostReports(raw), costUsd: 0, costEstimated: false, costFree: true as const }
+  if (out.days) out.days = Object.fromEntries(Object.entries(out.days).map(([d, u]) => [d, { ...u, costUsd: 0, costEstimated: false }]))
+  return out
+}
+
+/**
  * A session's usage with costs from the current prices: the provider's report, else (or on top, for what came after
  * it) Hive's estimate; or, when the user chose their own prices over the report (usesOwnPrices, #436), Hive's estimate
  * alone wherever it has a price. Then each day's share (withDayCosts).

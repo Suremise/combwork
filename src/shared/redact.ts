@@ -204,9 +204,16 @@ export function redact(text: string, ctx: RedactContext): string {
  * formats, sign-in codes in URLs, long hex or base64 runs and emails; names and paths before them stay.
  */
 export function maskSecrets(text: string): string {
-  let out = text
+  // Server connections' keys in use first (HI-1772, main's keyMatcher.ts), whatever their shape.
+  let out = keyMasker ? keyMasker(text) : text
   for (const step of SECRETS) out = step(out)
   return out
+}
+
+/** Masks the keys Hive holds in use: main's keyMatcher.ts sets it; nothing in a window holds a key. */
+let keyMasker: ((text: string) => string) | null = null
+export function setKeyMasker(fn: ((text: string) => string) | null): void {
+  keyMasker = fn
 }
 
 /**

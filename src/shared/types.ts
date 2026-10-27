@@ -624,6 +624,11 @@ export interface AppConfig {
   connections?: Connection[]
   /** Per provider: the account last chosen as a workspace's default (or launched on), which a new workspace starts with. */
   lastUsedConnection?: Partial<Record<ProviderId, string>>
+  /**
+   * Server connections' key masking (HI-1772), mirrored with key-coverage.json and never cleared: `ever`, a key was
+   * saved (so fingerprints must exist); `gap`, a reset lost some (masking strict for good).
+   */
+  keyMasking?: { ever?: true; gap?: true }
   /** A version the user chose to skip; automatic checks don't offer it. */
   skippedUpdate?: string
   /** Version that last ran, to say "Hive updated" once after an update. */
@@ -687,11 +692,13 @@ export interface Connection {
   id: string
   provider: ProviderId
   /**
-   * How it runs its CLI (Darren, 26 Oct ~22:10: configured providers): `signIn`, a login folder of Hive's signed in
-   * through the CLI's own sign-in. The endpoint kind (a base URL and an API key) comes with its own card. Absent in a
-   * record from before it: signIn.
+   * Where it gets its model (Darren, 27 Oct ~08:55): `signIn`, a login folder of Hive's signed in through the CLI's own
+   * sign-in; `server`, a server it reaches by a base URL, with a key or none (HI-1772: DeepSeek, Ollama…), in a folder of
+   * Hive's too. Absent in a record from before it: signIn.
    */
-  kind?: 'signIn'
+  kind?: 'signIn' | 'server'
+  /** A server connection's server (HI-1772). Its key is never here: only in the key store (keyStore.ts). */
+  server?: ServerConnection
   /** The user's name for it ("Personal", "Hive overnight"). */
   name: string
   createdAt: string
@@ -706,6 +713,26 @@ export interface Connection {
   defaults?: ConnectionDefaults
   /** 'cli': `defaults` are still the CLI's per-CLI defaults as copied; cleared once they are edited. */
   defaultsFrom?: 'cli'
+}
+
+/** The Claude names a server's model can stand in for (HI-1772): the CLI's aliases. */
+export type ModelAlias = 'opus' | 'sonnet' | 'haiku'
+
+/** One of a server's models (HI-1772): its id at the server, and the aliases it stands in for (each alias at most one model). */
+export interface ServerModel {
+  id: string
+  as?: ModelAlias[]
+}
+
+/**
+ * A server connection's server (HI-1772): its base URL, its preset (the descriptor's, for its model listing), and its
+ * models, typed or read from it. Nothing secret: a key is in the key store, bound to the URL's origin.
+ */
+export interface ServerConnection {
+  baseUrl: string
+  preset?: string
+  models: ServerModel[]
+  modelsFrom: 'typed' | 'listed'
 }
 
 /** A connection's defaults (HI-1770); each absent: the CLI decides (its own default model, effort; context off). */
@@ -1751,6 +1778,14 @@ export interface MergeResult {
 export interface SessionRecord {
   /** The connection its latest run launched on (HI-1755), id and name as then; absent: none (a provider without connections). */
   connection?: { id: string; name: string }
+  /**
+   * A run of it was on a server connection (HI-1772), kept once set: its CLI's own cost reports price the server's model
+   * as a Claude model, so they are never counted (`withoutCostReports`): Hive's estimate by the real model id only.
+   */
+  serverRan?: true
+  /** A run of it was on a server on this PC; one ran anywhere else (HI-1772): each kept once set. Free: the first alone. */
+  serverLocal?: true
+  notLocal?: true
   id: string
   /** The provider that ran it ("claude-code", "codex"). The field name predates providers. */
   agent: ProviderId
@@ -1999,9 +2034,13 @@ export interface LiveSessionState {
     note?: 'offFallback' | 'unknownLogin' | 'loginChanged'
     /** Who it launched as (HI-1756: its plan usage is that login's), as plan usage keeps a login (a hash); absent: unknown. */
     login?: string
+    /** A server connection's (HI-1772): its models as launched, so the footer shows the real model and what it stands in for, and whether its server is on this PC. */
+    server?: { models: ServerModel[]; local?: boolean }
   }
   /** A switch to the connection it would launch on now waits for its turn to be over (HI-1755). */
   switchPending?: boolean
+  /** Its conversation ran only on servers on this PC (HI-1772): free, its cost a known $0, shown as "free (local)". */
+  costFree?: boolean
   /**
    * What it was given at launch (GET /v1/projects/{name}): Hive's guidance revision, the content hash of each Hive skill's
    * copy it reads, and why a skill isn't as asked for (a folder of the user's has its name, an old copy kept while in use).
@@ -2473,6 +2512,11 @@ export interface SessionUsage {
    * Hive adds its estimate for them to the reported cost.
    */
   costUnreported?: Pick<SessionUsage, 'inputTokens' | 'outputTokens' | 'cacheWriteTokens' | 'cacheReadTokens'>
+  /**
+   * It ran only on servers on this PC (HI-1772, Darren 27 Oct): free, its cost a known $0, shown as "free (local)"; its
+   * tokens counted as any session's.
+   */
+  costFree?: true
   /** The session's usage by local day (YYYY-MM-DD in this computer's time zone), for periods (see usageDays.ts). */
   days?: Record<string, DayUsage>
   /** From the parser: each cost report's increase and the tokens it covered by day. Hive turns them into day costs and removes them. */
@@ -3172,6 +3216,12 @@ export interface LaneCard {
   reviewing: boolean
   /** At its round limit, waiting for the user's answer (For you, §16.11.4): its lane pauses on it. */
   roundLimit?: boolean
+  /**
+   * Held elsewhere (HI-1821), an open card that isn't the lane's own: the id of the agent it is given to on the board
+   * (not the lane's builder), or, given to none, of the running lane that owns it (another lane listing it: the one whose
+   * builder has it, else the newest). Its lane shows it but never takes it, waits on it or keys a queued list change to it.
+   */
+  elsewhere?: string
 }
 
 export interface LaneInfo {

@@ -5,7 +5,7 @@ import { providerDescriptor, providerName } from '@shared/providers'
 import { LATENCY_BOUNDS_MS, percentile, type GuidanceSeries, type MetricsReport, type MetricsScope, type ProviderUsageSummary, type SafeguardCount, type TrendPoint } from '@shared/metrics'
 import { DEFAULT_PERF_FILTERS, PERF_RANGES, WORKSPACE_OWN, byRoute, byTool, isEmpty, latencyOrder, pageQuery, providersIn, select, totals, type PerfFilters, type PerfRange, type PerfRole, type PerfSelection, type RouteRow, type ToolRow } from '@shared/metricsView'
 import { compareScopeKey, compareScopeOf } from '@shared/benchmark'
-import { moneyLabel } from '@shared/usageTotals'
+import { FREE_LOCAL, moneyLabel } from '@shared/usageTotals'
 import { formatDateTime, formatDayLabel, formatWeekdayTime } from '@shared/dates'
 import { shownText } from '@shared/advanced'
 import { call } from '../api'
@@ -171,6 +171,7 @@ const M = {
   notDetected: msg({ id: 'performance.usage.notDetected', defaultMessage: 'not detected', description: "A cell of the Safeguard stops column for a provider whose transcripts don't record them. Lower case." }),
   cost: msg({ id: 'performance.usage.cost', defaultMessage: 'Cost', description: 'Column header of the Provider usage table: what the usage cost.' }),
   costUnknown: msg({ id: 'performance.usage.costUnknown', defaultMessage: '+ {n, number} unknown', description: 'Under a cost: how many sessions\' cost is unknown. Lower case.' }),
+  costFree: msg({ id: 'performance.usage.costFree', defaultMessage: '{n, plural, one {+ # free (local)} other {+ # free (local)}}', description: "Under a cost: how many sessions ran only on a model server on this PC (Ollama, for example), so cost nothing (HI-1772). Lower case." }),
   unknown: msg({ id: 'performance.unknown', defaultMessage: 'unknown', description: 'A cell of a Performance table whose value no session reported (a token count, a model). Lower case.' }),
   agent: msg({ id: 'performance.safeguards.agent', defaultMessage: 'Agent', description: 'Column header of the Safeguard stops table: the agent (and its project).' }),
   model: msg({ id: 'performance.safeguards.model', defaultMessage: 'Model', description: 'Column header of the Safeguard stops table: the model the agent was on.' }),
@@ -824,11 +825,14 @@ const providerColumns = (): DataColumn<ProviderUsageSummary>[] => [
     num: true,
     descFirst: true,
     cell: (p) =>
-      p.costUnknown === p.sessions ? (
+      // Only sessions on servers on this PC (HI-1772): free (local).
+      p.costFree && p.costFree === p.sessions ? (
+        tr(FREE_LOCAL)
+      ) : p.costUnknown === p.sessions ? (
         tr(M.unknown)
       ) : (
         // "≈ $25.87" as one unbreakable value; the unknown sessions under it (#241).
-        <CellLines main={`${p.costEstimated ? '≈ ' : ''}${moneyLabel(p.costUsd)}`} sub={p.costUnknown ? tr(M.costUnknown, { n: p.costUnknown }) : ''} subWarn />
+        <CellLines main={`${p.costEstimated ? '≈ ' : ''}${moneyLabel(p.costUsd)}`} sub={[p.costUnknown ? tr(M.costUnknown, { n: p.costUnknown }) : '', p.costFree ? tr(M.costFree, { n: p.costFree }) : ''].filter(Boolean).join(' · ')} subWarn={!!p.costUnknown} />
       ),
     sortValue: (p) => (p.costUnknown === p.sessions ? null : p.costUsd)
   }

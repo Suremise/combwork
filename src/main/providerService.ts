@@ -3,7 +3,7 @@ import { app } from 'electron'
 import type { AgentInstallInfo, ModelCatalog, ProviderId, ProviderTask } from '../shared/types'
 import { observedEffortKey } from '../shared/models'
 import { autoProviderPending, isProviderEnabled, providerSettings, setInstalledCheck } from '../shared/providers'
-import { shownInstallInfo, toSpawnable, withoutAccountEnv } from './providers/common'
+import { shownInstallInfo, toSpawnable, withoutAccountEnv, withServerEnv } from './providers/common'
 import { allProviders, provider } from './providers'
 import type { KeySteps, UpdateRetry } from './providers/types'
 import { msg, onLanguageChange, tr } from '../shared/i18n'
@@ -361,17 +361,19 @@ class ProviderService {
    * (`env`), and nothing typed into it: the user signs in through the CLI's flow. One per account: a second start gets
    * the open one's key. `onExit` once it ends. The CLI's own sign-in state isn't changed by it (that is ~/.claude's).
    */
-  runAccountLogin(id: ProviderId, accountId: string, env: Record<string, string>, onExit: (code: number) => void): string {
+  runAccountLogin(id: ProviderId, accountId: string, env: Record<string, string>, onExit: (code: number) => void, setUp?: { env: Record<string, string>; cwd: string }): string {
     const adapter = provider(id)
     const info = this.info(id)
     if (!info.path) throw hiveError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: adapter.descriptor.name })
     const key = `task:${id}:login:${accountId}`
     if (hasPty(key)) return key
-    // The connection's own sign-in where the CLI has one (HI-1757), without the variables it would read as a login.
-    const cmd = adapter.accountLoginCommand?.(info.path) ?? adapter.loginCommand(info.path)
+    // The connection's own sign-in where the CLI has one (HI-1757), without the variables it would read as a login. A
+    // server connection's Set Up (HI-1772) runs the CLI itself instead, with its server's variables, for its first-run
+    // screens: the user answers them in the CLI's own way.
+    const cmd = setUp ? { file: info.path, args: [] as string[] } : (adapter.accountLoginCommand?.(info.path) ?? adapter.loginCommand(info.path))
     const s = toSpawnable(cmd.file, cmd.args)
-    log.info(`${adapter.descriptor.name} sign-in for account ${accountId}`)
-    spawnPty(key, { file: s.file, args: s.args, cwd: homedir(), env: withoutAccountEnv(adapter, childEnv(env)), onExit })
+    log.info(`${adapter.descriptor.name} ${setUp ? 'set-up' : 'sign-in'} for account ${accountId}`)
+    spawnPty(key, { file: s.file, args: s.args, cwd: setUp?.cwd ?? homedir(), env: withServerEnv(setUp?.env, withoutAccountEnv(adapter, childEnv(env))), onExit })
     return key
   }
 

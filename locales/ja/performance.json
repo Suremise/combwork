@@ -390,6 +390,7 @@
   "performance.usage.contextMax": "最大{max}{hasWindow, select, yes { / {window}} other {}}",
   "performance.usage.contextTip": "{sessions, plural, other {#件のセッション}}の直前のリクエストのコンテキスト：平均{avg}、最大{max}{hasWindow, select, yes {（ウィンドウ{window}）} other {}}。",
   "performance.usage.cost": "コスト",
+  "performance.usage.costFree": "{n, plural, other {+ 無料（ローカル）{n, number} 件}}",
   "performance.usage.costUnknown": "+ 不明{n, number}件",
   "performance.usage.empty": "プロバイダーの使用量はありません。",
   "performance.usage.heading": "プロバイダーの使用量",

@@ -11,11 +11,17 @@ export interface ConnectionsView {
   preview: boolean
   /** The providers that can have connections (capabilities.connections) and are on in Settings. */
   providers: ProviderId[]
-  connections: (Connection & { signingIn: boolean; folder: string })[]
+  /** `key`: a server connection's key is set (HI-1772), its last 4 characters and when; never the key. */
+  connections: (Connection & { signingIn: boolean; folder: string; key?: { last4: string; at: string } })[]
   /** Per provider, as it applies (workspaceAccounts); absent: not set up in this workspace. */
   workspace: Partial<Record<ProviderId, WorkspaceConnections>>
   /** Providers a test copy runs on its CLI test home where nothing is on (the test seam, HI-1755): no setup is asked for. */
   testHome: ProviderId[]
+  /**
+   * Server connections' key masking (HI-1772): `unavailable`, its data can't be read (strict, exports refused: Reset
+   * Masking Data); `gap`, a reset lost some (strict for good, since `gapSince`); `full`, near the most keys it keeps.
+   */
+  masking?: { state: 'none' | 'pending' | 'ready' | 'unavailable'; gap: boolean; gapSince?: string; full: boolean }
 }
 
 /**
@@ -142,21 +148,35 @@ export interface ConnectionShownApi {
   id: string
   name: string
   cli: ProviderId
-  kind: 'signIn'
+  kind: 'signIn' | 'server'
+  /** A sign-in connection's: signed in. A server connection's (HI-1772): there is no sign-in, so false. */
   signedIn: boolean
   on?: boolean
   default?: boolean
   email?: string
   plan?: string
+  /** A server connection's server, its host only (`wide`): never its key, nor whether it has one. */
+  host?: string
 }
 
 export function connectionShown(c: Connection, ws: Partial<Record<ProviderId, WorkspaceConnections>>, wide: boolean): ConnectionShownApi {
   const state = accountState(c)
-  const base: ConnectionShownApi = { id: c.id, name: c.name, cli: c.provider, kind: c.kind ?? 'signIn', signedIn: state === 'signedIn' || state === 'changed' }
+  const server = c.kind === 'server'
+  const base: ConnectionShownApi = { id: c.id, name: c.name, cli: c.provider, kind: c.kind ?? 'signIn', signedIn: !server && (state === 'signedIn' || state === 'changed') }
   if (!wide) return base
   const w = ws[c.provider]
   const email = c.observed?.email ?? c.accepted?.email
-  return { ...base, on: !!w?.on.includes(c.id), default: w?.default === c.id, ...(email ? { email } : {}), ...(c.observed?.plan ? { plan: c.observed.plan } : {}) }
+  const host = server ? hostOf(c.server?.baseUrl ?? '') : null
+  return { ...base, on: !!w?.on.includes(c.id), default: w?.default === c.id, ...(email && !server ? { email } : {}), ...(c.observed?.plan && !server ? { plan: c.observed.plan } : {}), ...(host ? { host } : {}) }
+}
+
+/** A base URL's host (with its port), or null. */
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url).host || null
+  } catch {
+    return null
+  }
 }
 
 /** The connections a caller may see (HI-1771): `wide`, every one; else only those on in its workspace. */

@@ -56,6 +56,8 @@ interface HiveMessageValues {
   'session.inUse.reserved': undefined
   'session.inUse.running': undefined
   'session.inUse.writing': undefined
+  'session.keyRefused.body': { name: string | number }
+  'session.keyRefused.title': { n: number; agent: string | number; name: string | number }
   'session.leftovers.body': { processes: string | number; n: number }
   'session.leftovers.end': undefined
   'session.leftovers.keep': undefined

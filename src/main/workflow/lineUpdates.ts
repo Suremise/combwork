@@ -133,8 +133,8 @@ function keptDone(ws: WorkspaceService): Map<number, { at: string; done: boolean
 async function laneLine(wf: Workflow, project: string, id: string, on: () => boolean, done: (n: number) => boolean = (n) => wf.laneDone(n)): Promise<number | null> {
   const l = wf.lane(id)
   if (!l || l.ended) return null
-  // The lane's next card: the first not Done, and only before it starts (between cards).
-  const nextId = wf.laneNow(l).cards.find((c) => !done(c))
+  // The lane's next card: the first not Done and not another agent's (HI-1821), and only before it starts (between cards).
+  const nextId = wf.laneNow(l).cards.find((c) => !done(c) && wf.laneOwn(id, c))
   if (nextId === undefined) return null
   const next = wf.store.card(nextId)
   const s = wf.state(next)

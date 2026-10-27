@@ -53,6 +53,7 @@
   "panes.footer.connectionUnknown": "O Hive não conseguiu verificar com quem esta conexão estava conectada quando a sessão foi iniciada.",
   "panes.footer.costClick": "Clique para ver os detalhes desta sessão na Visão geral",
   "panes.footer.costEstimated": "Custo a preços de API desta sessão, estimado pelo Hive a partir dos tokens",
+  "panes.footer.costFreeTip": "Esta conversa roda só em um servidor deste PC, então não custa nada. Os tokens dela continuam sendo contados.",
   "panes.footer.costReported": "Custo a preços de API desta sessão, conforme informado pelo provedor",
   "panes.footer.ctxValue": "ctx {value}",
   "panes.footer.handOverWhen": "{when, select, now {Passe para uma nova conversa: clique para Passar para… e escolha o próprio agente.} other {Ele pode passar para uma nova conversa quando terminar: não enquanto trabalha, faz merge ou está num cartão de um ciclo de cartões.}}",

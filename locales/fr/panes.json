@@ -53,6 +53,7 @@
   "panes.footer.connectionUnknown": "Hive n’a pas pu vérifier, au démarrage, quels identifiants utilise cette connexion.",
   "panes.footer.costClick": "Clique pour voir les détails de cette session dans l’onglet Vue d’ensemble",
   "panes.footer.costEstimated": "Coût équivalent API de cette session, estimé par Hive à partir de ses jetons",
+  "panes.footer.costFreeTip": "Cette conversation ne tourne que sur un serveur de ce PC : elle ne coûte rien. Ses jetons sont tout de même comptés.",
   "panes.footer.costReported": "Coût équivalent API de cette session, tel que le fournisseur l’indique",
   "panes.footer.ctxValue": "ctx {value}",
   "panes.footer.handOverWhen": "{when, select, now {Passe le relais à une nouvelle conversation : clique pour Passer le relais à…, et choisis l’agent lui-même.} other {Il peut passer le relais à une nouvelle conversation une fois qu’il a terminé : pas pendant qu’il travaille, fusionne ou est sur une carte d’une boucle de cartes.}}",

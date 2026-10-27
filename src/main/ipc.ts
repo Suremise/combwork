@@ -20,6 +20,10 @@ import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../sha
 import { allProviders } from './providers'
 import { providerService } from './providerService'
 import { accountsView, addAccount, connectionHomes, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, setConnectionDefaults, signInAccount } from './accounts'
+import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setUpServerConnection } from './serverConnections'
+import { requireMasking } from './keyCoverage'
+import { resetMasking } from './keyStore'
+import { maskDeep, maskKeys } from './keyMatcher'
 import { dismissMovedNotice, movedNotice } from './connectionMoves'
 import { config } from './config'
 import { clearRecent, recentChanged, recentFor, removeRecent } from './recentWorkspaces'
@@ -28,6 +32,7 @@ import { setPinned } from './pin'
 import { presentWindow } from './testQuiet'
 import { insideArchive, insideReal, isFile, samePlace, writeTextAtomic, writeTextUnlessChanged } from './fsutil'
 import { gitDiff, gitStatus } from './git'
+import { compareBranches, compareDiff, compareLines } from './gitCompare'
 import { initCheck, initRepo } from './gitInit'
 import { addRemote, branchDrops, branchUpdatePlan, createBranch, createTag, deleteBranches, deleteRemoteBranches, fetchAll, pull, push, pushToRemote, remoteTracking, removeRemote, renameRemote, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, setUpstream, switchBranch, updateBranch, workTargetOf } from './gitRepo'
 import { checkGit, gitTool } from './gitTool'
@@ -115,7 +120,7 @@ import { repairStages } from './workflow/stageRepair'
 import { attachableSource, attachToCard, cardAttachmentGroups, cardAttachments, recoverCardAttachments, removeCardAttachment, stageDrafts } from './cardAttachments'
 import { settleSlotsUpToDate } from './workflow/slotsUpToDateStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
-import { heldWriter, releaseHeldWriter } from './agentFolders'
+import { boardSlots, heldWriter, releaseHeldWriter } from './agentFolders'
 import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
 import { checkWorkflowChange, chooseMerge, presetsNotice, settleMergeChoices, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
@@ -462,7 +467,11 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'app:openPath': (p) => void shell.openPath(guardFile(p)),
     'app:showInFolder': (p) => shell.showItemInFolder(guardFile(p)),
     'app:openLogs': () => void shell.openPath(logsDir()),
-    'app:diagnostics': (opts) => diagnostics({ recording: opts?.recording === true }),
+    // Not while server connections' keys can't be masked (HI-1772): nothing is copied.
+    'app:diagnostics': async (opts) => {
+      await requireMasking()
+      return diagnostics({ recording: opts?.recording === true })
+    },
     'app:keepAwake': () => keepAwakeCount(),
     'app:resumeAfterClose': async () => {
       const r = await resumeAfterClose()
@@ -691,7 +700,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
         filters: [{ name: 'JSON', extensions: ['json'] }]
       })
       if (r.canceled || !r.filePath) return null
-      await writeTextAtomic(r.filePath, JSON.stringify(metricsExport(report, app.getVersion(), sanitize), null, 2) + '\n')
+      // Masked by every key's fingerprint (HI-1772); refused, nothing written, while they can't be read.
+      await requireMasking()
+      await writeTextAtomic(r.filePath, JSON.stringify(maskDeep(metricsExport(report, app.getVersion(), sanitize)), null, 2) + '\n')
       return r.filePath
     },
     // Each takes the workspace's folder and lifetime before awaiting anything (benchContext): work whose workspace closes
@@ -781,7 +792,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const r = await dialog.showOpenDialog(win(), { title: tr(M.exportBoard), buttonLabel: tr(M.exportBoardButton), defaultPath: app.getPath('documents'), properties: ['openDirectory', 'createDirectory'] })
       if (r.canceled || !r.filePaths[0]) return null
       const dir = join(r.filePaths[0], `hive-board-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`)
-      return { dir, cards: await exportBoard(ws, dir) }
+      await requireMasking()
+      return { dir, cards: await exportBoard(ws, dir, maskDeep) }
     },
     'tasks:create': async (input, drafts) => tasks.changeWithAttachments({ kind: 'user' }, await stageDrafts(currentWorkspace(), drafts, input.project ?? null), 'description', () => tasks.createTask(input, { kind: 'user' })),
     'tasks:setKind': (n, kind, opts) => tasks.setKind(n, kind, { kind: 'user' }, opts ?? {}),
@@ -1056,7 +1068,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const name = await templates.exportName(ref)
       const r = await dialog.showSaveDialog(win(), { title: tr(M.exportTemplate), defaultPath: join(app.getPath('downloads'), name), filters: [{ name: tr(M.templateFiles), extensions: ['json'] }] })
       if (r.canceled || !r.filePath) return null
-      await templates.exportTemplate(ref, r.filePath)
+      await requireMasking()
+      await templates.exportTemplate(ref, r.filePath, maskDeep)
       return r.filePath
     },
     'templates:pickImport': async () => {
@@ -1152,7 +1165,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
         filters: [{ name: 'Markdown', extensions: ['md'] }] // i18n-ignore: a file format's name
       })
       if (r.canceled || !r.filePath) return null
-      await writeTextAtomic(r.filePath, await transcripts.markdown(p, id, title))
+      // No server connection's key in it (HI-1772), whatever the session printed: masked by every key's fingerprint, kept
+      // since it was saved; refused, nothing written, while they can't be read.
+      await requireMasking()
+      await writeTextAtomic(r.filePath, maskKeys(await transcripts.markdown(p, id, title)))
       return r.filePath
     },
     'attachments:copyImage': async (path) => {
@@ -1465,6 +1481,14 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     // An unused worktree too (#400): read only, as the Changes tab opens it.
     'git:status': (root, base) => gitStatus(workspace.assertChangesRoot(root), base),
     'git:diff': (root, f, base) => gitDiff(workspace.assertChangesRoot(root), f, base),
+    'git:compareLines': async (p) => {
+      p = workspace.assertProject(p)
+      // The slots as the board records them: a plain read, never the slot pool or the 0.9 migration (it runs as the project opens).
+      const slots = (await boardSlots(p)).map((s) => ({ name: s.name, folder: s.folder, card: s.open?.card ?? null, agent: s.open?.agent ?? null, target: s.target ?? null }))
+      return compareLines(p, await workTargetOf(p), slots)
+    },
+    'git:compare': (p, base, head, page, pinBase, pinHead) => compareBranches(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), Number(page) || 1, { base: pinBase, head: pinHead }),
+    'git:compareDiff': (p, base, head, f, pinned) => compareDiff(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), String(f ?? ''), pinned && typeof pinned === 'object' ? pinned : null),
     // The file of the diff shown (#495): in the folder the Changes tab shows, which may be an unused worktree outside the
     // workspace that file IPC (guardFile) doesn't reach; inside it by its real location too, so a link can't lead out.
     'changes:openFile': (root, f) => {
@@ -1536,6 +1560,21 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'connections:signIn': async (id) => {
       await refreshPathBeforeStart()
       return signInAccount(id)
+    },
+    // A server connection (HI-1772): the key crosses here once, from its field to the key store, and never back.
+    'connections:addServer': (input) => addServerConnection(input),
+    'connections:editServer': (id, patch) => editServerConnection(id, patch),
+    'connections:setKey': (id, key) => setServerKey(id, typeof key === 'string' ? key : ''),
+    'connections:removeKey': (id) => removeServerKey(id),
+    'connections:readModels': (id, request) => readServerModels(id, String(request)),
+    'connections:cancelModels': (id, request) => cancelServerModels(id, String(request)),
+    'connections:setUp': async (id) => {
+      await refreshPathBeforeStart()
+      return setUpServerConnection(id)
+    },
+    'connections:resetMasking': async () => {
+      await resetMasking()
+      emit({ type: 'connections-changed' })
     },
     'connections:keepLogin': (id) => keepNewLogin(id),
     'connections:setOn': (id, on) => setAccountOn(id, on),

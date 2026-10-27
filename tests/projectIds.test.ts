@@ -15,7 +15,7 @@ import { storeDocs } from './storeDocs'
 const base = tempDir('hive-projectids-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
+const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
 const { movePlan, repairMove } = await import('../src/main/workspaceMove')
@@ -475,12 +475,58 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
       holding = false
       release()
       await older
+      // HI-1817: the older read gave `gone` an id after it had moved, making its folder again; the root watch's read then
+      // listed it, and under load settled before this check.
+      expect(existsSync(gone)).toBe(false)
       expect(w.projectIdsNow().byPath.has(gone.toLowerCase())).toBe(false)
       expect(w.projectIdsNow().byPath.size).toBe(1)
     } finally {
       await disposeWorkspaceService(w)
     }
   })
+
+  // HI-1817 (HR5's round 1): with no later read at all, a project moved out while it was being given its id was made
+  // again by that write: it is given none, whether the move comes before project.json's lock reads it or before it writes.
+  for (const at of ['the read in the lock', 'the write'] as const) {
+    it(`a project moved while it is given its id isn't made again (moved before ${at})`, async () => {
+      const wsPath = join(base, `ws-idmove-${at === 'the write' ? 'write' : 'read'}`)
+      project(wsPath, 'keep')
+      const w = createWorkspaceService()
+      await w.open(wsPath)
+      try {
+        await w.refreshesSettled()
+        const gone = join(wsPath, 'gone')
+        let release!: () => void
+        const held = new Promise<void>((r) => (release = r))
+        let reached = false
+        const hold = async (p: string): Promise<void> => {
+          if (p.toLowerCase() !== gone.toLowerCase() || reached) return
+          reached = true
+          await held
+        }
+        // The listing's read of `gone` is its first; the one in project.json's lock, giving it its id, the second.
+        const read = w.projectConfig.bind(w)
+        let reads = 0
+        w.projectConfig = (async (p: string, o?: never) => {
+          if (at === 'the read in the lock' && p.toLowerCase() === gone.toLowerCase() && ++reads === 2) await hold(p)
+          return read(p, o)
+        }) as typeof w.projectConfig
+        if (at === 'the write') configTestHooks.beforeConfigWrite = hold
+        project(wsPath, 'gone')
+        const ids = w.projectIds({ fresh: true })
+        await vi.waitFor(() => expect(reached).toBe(true), { timeout: HUNG_MS })
+        await moveFolder(gone, join(base, `ws-idmove-out-${at === 'the write' ? 'write' : 'read'}`))
+        release()
+        const index = await ids
+        expect(existsSync(gone)).toBe(false)
+        expect(index.byPath.has(gone.toLowerCase())).toBe(false)
+        expect(w.projectIdsNow().byPath.has(gone.toLowerCase())).toBe(false)
+      } finally {
+        configTestHooks.beforeConfigWrite = undefined
+        await disposeWorkspaceService(w)
+      }
+    })
+  }
 
   /**
    * A workspace whose folder listings the test sets (`folders`), with every read of `gone`'s project.json held until

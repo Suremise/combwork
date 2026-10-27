@@ -175,7 +175,9 @@ export const AREAS = [
   // A card's attachment read through Hive (HI-1751).
   { paths: ['tests/e2e/attachread.cjs'], suites: ['attachread'] },
   // Accounts (HI-980): the store, its checks and watches, Settings → Accounts, and the fake's sign-in.
-  { paths: ['src/main/accounts.ts', 'src/shared/accounts.ts', 'src/renderer/src/components/AccountsSettings.tsx', 'tests/e2e/accounts.cjs'], suites: ['accounts', 'connections', 'connections-codex'] },
+  { paths: ['src/main/accounts.ts', 'src/shared/accounts.ts', 'src/renderer/src/components/AccountsSettings.tsx', 'tests/e2e/accounts.cjs'], suites: ['accounts', 'connections', 'connections-codex', 'connections-server'] },
+  // Server connections (HI-1772): the key store and its masking, the server's form, models and launch variables.
+  { paths: ['src/main/serverConnections.ts', 'src/main/keyStore.ts', 'src/main/keyMatcher.ts', 'src/main/keyCoverage.ts', 'src/shared/serverConnection.ts', 'src/renderer/src/components/ServerConnections.tsx', 'tests/e2e/connections-server.cjs'], suites: ['connections-server'] },
   // Launching on a connection (HI-1755): the launch step, the switch at a safe point, the seam, the Connection choice.
   { paths: ['src/main/connectionSeam.ts', 'src/main/connectionSwitch.ts', 'src/renderer/src/components/ConnectionChoice.tsx', 'tests/e2e/connections.cjs'], suites: ['connections', 'connectionrows', 'connections-codex'] },
   { paths: ['tests/e2e/connections-codex.cjs', 'tests/e2e/fake-codex/', 'src/main/providers/codex/', 'src/shared/codex.ts'], suites: ['connections-codex'] },
@@ -361,7 +363,7 @@ export const AREAS = [
   { paths: ['src/renderer/src/pendingMoves.ts'], suites: ['placement', 'tilesview', 'reorder', 'swap'] },
   { paths: ['src/main/docSections.ts', 'src/shared/docSections.ts', 'src/main/mcp/', 'src/shared/toolReplies.ts'], suites: ['docsections', 'replysize'] },
   { paths: ['src/shared/docRefs.ts', 'src/main/docSections.ts', 'src/main/taskStart.ts', 'src/main/tasks.ts', 'src/renderer/src/components/Board.tsx', 'src/renderer/src/components/DocRefViewer.tsx'], suites: ['cardcontext'] },
-  { paths: ['src/renderer/src/components/TerminalView.tsx', 'src/renderer/src/fileLinks.ts', 'src/shared/fileLinks.ts', 'src/renderer/src/cardLinks.ts', 'src/shared/cardLinks.ts', 'src/shared/osc52.ts'], suites: ['filelinks', 'cardlinks', 'image', 'restart', 'rendercrash', 'termsize', 'assistantbatch', 'copilotsize', 'copilotcopy', 'atlasmerge'] },
+  { paths: ['src/renderer/src/components/TerminalView.tsx', 'src/renderer/src/fileLinks.ts', 'src/shared/fileLinks.ts', 'src/renderer/src/cardLinks.ts', 'src/shared/cardLinks.ts', 'src/shared/osc52.ts', 'src/renderer/src/hiddenTerminalRedraws.ts'], suites: ['filelinks', 'cardlinks', 'image', 'restart', 'rendercrash', 'termsize', 'hiddenredraw', 'assistantbatch', 'copilotsize', 'copilotcopy', 'atlasmerge'] },
   { paths: ['src/renderer/src/deferredFocus.ts'], suites: ['progress', 'restart', 'termsize', 'assistantbatch'] },
   { paths: ['src/renderer/src/components/Inbox.tsx', 'src/renderer/src/inbox.ts', 'src/shared/inbox.ts'], suites: ['inbox', 'attention', 'bell', 'signin'] },
   { paths: ['src/renderer/src/components/Keybindings.tsx'], suites: ['keys'] },
@@ -404,7 +406,8 @@ export const AREAS = [
   { paths: ['src/main/workflow/levels.ts', 'src/renderer/src/views/SettingsView.tsx'], suites: ['workflowdefaults', 'workflowoptions', 'assistantsettings'] },
   { paths: ['src/renderer/src/boardStages.ts', 'src/renderer/src/components/BoardWorkflow.tsx', 'src/renderer/src/components/Board.tsx', 'src/shared/workflow/stages.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/boardstages.cjs'], suites: ['boardstages'] },
   { paths: ['src/shared/workflow/stages.ts', 'src/shared/workflow/projectWorkflow.ts', 'src/shared/workflow/compile.ts', 'src/shared/workflow/options.ts', 'src/shared/tasks.ts', 'src/main/workflow/optionsForm.ts', 'src/main/workflow/rulesets.ts', 'src/shared/settingsCatalog.ts', 'src/main/settingsTools.ts', 'tests/e2e/stagenames.cjs'], suites: ['stagenames'] },
-  { paths: ['src/renderer/src/views/ProjectTabs.tsx'], suites: ['overview', 'taskoverview', 'skillaudience', 'numbers', 'storage', 'unpricedcost', 'changes', 'changespicker', 'unusedwt', 'mcpagents'] },
+  { paths: ['src/renderer/src/views/ProjectTabs.tsx'], suites: ['overview', 'taskoverview', 'skillaudience', 'numbers', 'storage', 'unpricedcost', 'changes', 'changescompare', 'changespicker', 'unusedwt', 'mcpagents'] },
+  { paths: ['src/main/gitCompare.ts', 'src/renderer/src/components/ChangesCompare.tsx'], suites: ['changescompare', 'changespicker'] },
   { paths: ['src/renderer/src/components/DataTable.tsx', 'src/shared/tableView.ts'], suites: ['overview', 'ctxpercent', 'performance', 'perftable', 'boardarchive'] },
   { paths: ['src/renderer/src/views/ProjectView.tsx'], suites: ['agents-ui', 'agentstable', 'resumeall', 'paneheader', 'rail', 'tabstrip', 'startall', 'narrowmain', 'removeall', 'defaultprovider'] },
   { paths: ['src/renderer/src/views/SettingsView.tsx'], suites: ['numbers', 'keys', 'providers', 'context', 'models', 'assistantsettings'] },

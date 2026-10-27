@@ -286,7 +286,8 @@ function runMode() {
 }
 // What it was started with, for suites that check the launch: the options, Claude Code's own variables and the
 // Agent API token Hive gave it.
-const launchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('CLAUDE_CODE_') || k.startsWith('HIVE_API_TOKEN') || k === 'HIVE_AGENT' || k === 'CLAUDE_CONFIG_DIR'))
+// A server connection's (HI-1772): its ANTHROPIC_* variables too, a dummy key among them (a disposable test log).
+const launchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('CLAUDE_CODE_') || k.startsWith('ANTHROPIC_') || k.startsWith('HIVE_API_TOKEN') || k === 'HIVE_AGENT' || k === 'CLAUDE_CONFIG_DIR'))
 fs.appendFileSync(path.join(home, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), sessionId, pid: process.pid, parent: process.ppid, opts, env: launchEnv }) + '\n')
 // How it ended, in fake-exits.jsonl in its home (#551): its own exit with the code, or an error it didn't catch (then
 // exit 1, as Node would). A launch with no line there was ended by Ctrl+C, its console closing or a kill.
@@ -628,6 +629,9 @@ async function runPrompt(text, enter = null) {
   if (late) await hook('PreToolUse', late)
   await endTurn(`Done: ${text}${mode}`, Number(/\bcontext\s+(\d+)/i.exec(text)?.[1] ?? 20), /\bloststop\b/i.test(text), { late, carryOn: /\bstopcontinue\b/i.test(text) })
   if (/\bsafeguardprompt(switch)?\b/i.test(text)) await safeguardPrompt(/\bsafeguardpromptswitch\b/i.test(text))
+  // "statusmodel ID": the status line reports the model it runs as ID, as Claude Code's does (HI-1772: a server's model).
+  const statusModel = /\bstatusmodel\s+(\S+)/i.exec(text)
+  if (statusModel) await statusLine({ model: { id: statusModel[1], display_name: statusModel[1] } })
   // "window N": the status line reports a context window of N tokens, as Claude Code's does.
   const contextWindow = /\bwindow\s+(\d+)/i.exec(text)
   if (contextWindow) await statusLine({ context_window: { context_window_size: Number(contextWindow[1]) } })

@@ -54,6 +54,8 @@
   "session.inUse.reserved": "Hive ya está archivando, eliminando o limpiando esta sesión.",
   "session.inUse.running": "Está en ejecución. Detenla primero.",
   "session.inUse.writing": "Su CLI todavía está escribiendo su transcripción. Vuelve a intentarlo en un momento.",
+  "session.keyRefused.body": "Sustituye la clave de {name} en Configuración → Conexiones; después, Reanudar en la cabecera del proyecto los retoma.",
+  "session.keyRefused.title": "{n, plural, one {{agent} se detuvo: se rechazó la clave de {name}} many {# agentes se detuvieron: se rechazó la clave de {name}} other {# agentes se detuvieron: se rechazó la clave de {name}}}",
   "session.leftovers.body": "{processes}. {n, plural, one {Lo inició el agente y puede estar ocupando la carpeta o los puertos del proyecto.} many {Los inició el agente y pueden estar ocupando la carpeta o los puertos del proyecto.} other {Los inició el agente y pueden estar ocupando la carpeta o los puertos del proyecto.}}",
   "session.leftovers.end": "Terminarlos",
   "session.leftovers.keep": "Dejar en ejecución",

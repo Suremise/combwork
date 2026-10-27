@@ -139,10 +139,44 @@ interface HiveMessageValues {
   'project.compaction.open': { trigger: string | number; when: string | number }
   'project.compaction.turnAdded': { output: string | number }
   'project.compaction.unknownTime': undefined
+  'project.compare.about': { head: string | number; base: string | number }
+  'project.compare.base': undefined
+  'project.compare.binary': undefined
+  'project.compare.commitTip': { hash: string | number; author: string | number; email: string | number; when: string | number }
+  'project.compare.commits': undefined
+  'project.compare.commitsHint': { head: string | number; base: string | number }
+  'project.compare.counts': { head: string | number; ahead: number; base: string | number; behind: number }
+  'project.compare.cut': { shown: number; total: number }
+  'project.compare.diffFailed': { error: string | number }
+  'project.compare.files': undefined
+  'project.compare.filesHint': { head: string | number; base: string | number }
+  'project.compare.group': undefined
+  'project.compare.head': undefined
+  'project.compare.inline': undefined
+  'project.compare.load': undefined
+  'project.compare.loading': { head: string | number; base: string | number }
+  'project.compare.loadingDiff': undefined
+  'project.compare.moreFiles': { shown: number; total: number }
+  'project.compare.noFiles': { head: string | number; base: string | number }
+  'project.compare.none': undefined
+  'project.compare.onlyHead': { head: string | number; base: string | number }
+  'project.compare.option': { head: string | number; base: string | number }
+  'project.compare.parted': { commit: string | number }
+  'project.compare.refresh': undefined
+  'project.compare.retry': undefined
+  'project.compare.selectFile': { head: string | number }
+  'project.compare.sideBySide': undefined
+  'project.compare.slotOption': { slot: string | number; card: string; branch: string | number }
+  'project.compare.slotsGroup': undefined
+  'project.compare.status': { status: string; path: string | number }
+  'project.compare.swap': undefined
+  'project.compare.unrelated': { base: string | number; head: string | number }
   'project.cost.belowCent': { cent: string | number }
+  'project.cost.freeLocal': undefined
   'project.cost.tip': undefined
   'project.cost.unknown': undefined
   'project.cost.unpriced': { model: string | number; provider: string | number }
+  'project.cost.withFree': { cost: string | number }
   'project.empty.addAgent': { project: string | number; provider: string | number }
   'project.empty.allSessions': undefined
   'project.empty.markActive': undefined

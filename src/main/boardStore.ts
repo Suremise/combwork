@@ -1162,13 +1162,33 @@ export const boardValue = (ws: WorkspaceService, key: string): string | null => 
  * against under the board's lock, just before it saves (#1270: a lane ended or its queued list applied only if its
  * cards are still where the decision read them). A card not on the board is missing from the map.
  */
-export function cardPlacesNow(ws: WorkspaceService, numbers: readonly number[]): Map<number, { column: string; project: string; archived: boolean }> {
+export function cardPlacesNow(ws: WorkspaceService, numbers: readonly number[]): Map<number, { column: string; project: string; archived: boolean; agent: string | null }> {
   if (!numbers.length) return new Map()
   return readSnapshot(ws, (_b, db) => {
-    const rows = db.prepare(`SELECT number, col, project, archived FROM cards WHERE number IN (${numbers.map(() => '?').join(', ')})`).all(...numbers) as { number: number; col: string; project: string; archived: number }[] // i18n-ignore: SQL
-    return new Map(rows.map((r) => [r.number, { column: r.col, project: r.project, archived: r.archived === 1 }]))
+    const rows = db.prepare(`SELECT number, col, project, archived, agent FROM cards WHERE number IN (${numbers.map(() => '?').join(', ')})`).all(...numbers) as { number: number; col: string; project: string; archived: number; agent: string | null }[] // i18n-ignore: SQL
+    return new Map(rows.map((r) => [r.number, { column: r.col, project: r.project, archived: r.archived === 1, agent: r.agent }]))
   })
 }
+/**
+ * Who has each card for the lanes (HI-1821), on one snapshot: its agent on the board, and its owner lane: the running
+ * lane of its project now listing it (its list or its queued one; HR4's round 1: never a lane of a project it has
+ * left) whose builder is that agent, else the newest such lane (null: none). The runtime's `card.lane` (factStore
+ * `inLanes`, filtered to its project) orders them the same way.
+ */
+export function cardOwnersNow(ws: WorkspaceService, numbers: readonly number[]): Map<number, { agent: string | null; lane: string | null }> {
+  if (!numbers.length) return new Map()
+  return readSnapshot(ws, (_b, db) => {
+    const at = numbers.map(() => '?').join(', ')
+    const out = new Map<number, { agent: string | null; lane: string | null }>()
+    for (const r of db.prepare(`SELECT number, agent FROM cards WHERE number IN (${at})`).all(...numbers) as { number: number; agent: string | null }[]) out.set(r.number, { agent: r.agent, lane: null }) // i18n-ignore: SQL
+    const rows = db
+      .prepare(`SELECT x.card, l.id FROM (SELECT lane, card FROM lane_cards UNION SELECT lane, card FROM lane_pending) x JOIN lanes l ON l.id = x.lane JOIN cards c ON c.number = x.card WHERE x.card IN (${at}) AND l.state = 'active' AND l.project = c.project COLLATE NOCASE ORDER BY (c.agent IS NOT NULL AND c.agent = l.builder_id), l.started_at, l.id`) // i18n-ignore: SQL
+      .all(...numbers) as { card: number; id: string }[]
+    for (const r of rows) out.get(r.card)!.lane = r.id
+    return out
+  })
+}
+
 /** Sets one of the board's own values (inside boardWrite). */
 export const setBoardValue = (ws: WorkspaceService, key: string, value: string): void => writeOp(ws, (b) => setMeta(b.db.writer, key, value))
 
@@ -2037,13 +2057,14 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
  * Exports the board to plain files (Export Board to JSON): a folder with `<n>.json` for each card, exactly as the cards'
  * files were before 0.9 (so an older Hive can read them), with board.json and archive-batches.json. Returns how many cards.
  */
-export async function exportBoard(ws: WorkspaceService, dir: string): Promise<number> {
+export async function exportBoard(ws: WorkspaceService, dir: string, mask: <T>(v: T) => T = (v) => v): Promise<number> {
   // Its cards, next number and batches as one snapshot of the board.
   const { docs, next, batches } = readSnapshot(ws, (_b, db) => ({ docs: cardDocs(ws), next: nextOf(db), batches: archiveBatchDocs(ws) }))
   await mkdir(dir, { recursive: true })
-  for (const { number, doc } of docs) await writeFile(join(dir, `${number}.json`), JSON.stringify(doc, null, 2) + '\n', 'utf8')
+  // `mask`: each value masked before it is written (HI-1772: no server connection's key in an export).
+  for (const { number, doc } of docs) await writeFile(join(dir, `${number}.json`), JSON.stringify(mask(doc), null, 2) + '\n', 'utf8')
   await writeFile(join(dir, 'board.json'), JSON.stringify({ version: 1, next }, null, 2) + '\n', 'utf8')
-  if (batches.length) await writeFile(join(dir, 'archive-batches.json'), JSON.stringify({ version: 1, batches }, null, 2) + '\n', 'utf8')
+  if (batches.length) await writeFile(join(dir, 'archive-batches.json'), JSON.stringify({ version: 1, batches: mask(batches) }, null, 2) + '\n', 'utf8')
   log.info(`exported ${docs.length} card(s) to ${userText(dir)}`)
   return docs.length
 }

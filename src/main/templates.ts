@@ -351,9 +351,10 @@ export async function exportName(ref: TemplateRef): Promise<string> {
 }
 
 /** Exports a template to a file the user chose: what it holds, nothing else (exportable). */
-export async function exportTemplate(ref: TemplateRef, dest: string): Promise<void> {
+export async function exportTemplate(ref: TemplateRef, dest: string, mask: <T>(v: T) => T = (v) => v): Promise<void> {
   const t = await usable(ref)
-  await writeTextAtomic(dest, JSON.stringify(exportable(t.template), null, 2) + '\n')
+  // `mask`: each value masked before it is written (HI-1772: no server connection's key in an export).
+  await writeTextAtomic(dest, JSON.stringify(mask(exportable(t.template)), null, 2) + '\n')
   log.info(`Exported template ${userText(t.name)} to ${userText(dest)}`)
 }
 

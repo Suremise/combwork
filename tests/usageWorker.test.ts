@@ -1,7 +1,7 @@
 // The usage worker (#1106): records a session from its transcript, reads only what was added since (taking up its
 // parser's state), never makes a session's totals smaller, keeps a kept usage only for a session it doesn't have, and
 // leaves a session another writer recorded meanwhile as that writer wrote it.
-import { appendFileSync, readFileSync, writeFileSync } from 'fs'
+import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { spawn, type ChildProcess } from 'child_process'
 import { join } from 'path'
 import { Worker } from 'worker_threads'
@@ -405,6 +405,109 @@ describe('the usage worker reading a transcript for main', () => {
       expect(got.contextTokens, provider).toBeGreaterThan(0)
     }
     await t.close()
+  })
+
+  it("a session that ran on a server connection (HI-1772): its CLI's Claude-priced cost report never counted, in the history or a read", async () => {
+    const t = await setup()
+    // A server's model (no price of Hive's), with the cost Claude Code reported for it priced as a Claude model.
+    const server = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'deepseek-flash', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
+    const report = JSON.stringify({ type: 'cost-state', timestamp: new Date(T0 + 3000).toISOString(), totalCostUSD: 4.2 }) + '\n'
+    writeFileSync(t.transcript, prompt(0) + server(1) + server(2) + report)
+    const settings = { providers: DEFAULT_SETTINGS.providers }
+    const cost = async () => { const st = (await t.stored())!; return usageFromRows(st.summary, st.rows, settings).costUsd }
+    // As a sign-in session: the report is its cost.
+    expect((await t.ingest()).status).toBe('written')
+    expect(await cost()).toBeCloseTo(4.2)
+    // The same session, now marked (its record's serverRan): the same file, unchanged, read again without the report.
+    const tokens = async () => (await t.stored())!.rows.reduce((n, r) => n + r.outputTokens, 0)
+    const days = async () => [...new Set((await t.stored())!.rows.map((r) => r.day))]
+    const daysBefore = await days()
+    expect((await t.ingest({ reportsIgnored: true })).status).toBe('written')
+    expect(await cost()).toBeNull()
+    expect(await tokens()).toBe(200)
+    expect(await days()).toEqual(daysBefore)
+    // A late job from before it was marked: never brings the report back; then nothing to do.
+    expect((await t.ingest({ reportsIgnored: false })).status).toBe('unchanged')
+    expect(await cost()).toBeNull()
+    // More of the file, read on from its saved parser: still without the report.
+    appendFileSync(t.transcript, server(4) + JSON.stringify({ type: 'cost-state', timestamp: new Date(T0 + 5000).toISOString(), totalCostUSD: 6.3 }) + '\n')
+    expect((await t.ingest()).status).toBe('written')
+    expect(await cost()).toBeNull()
+    expect(await tokens()).toBe(300)
+    // A read for its footer the same way; without the flag, the report.
+    const readFor = (reportsIgnored?: boolean) => call({ type: 'read', path: t.transcript, session: 'abc', provider: 'claude-code', seed: null, ...(reportsIgnored ? { reportsIgnored } : {}) }) as Promise<{ usage: SessionUsage }>
+    expect(priceUsage((await readFor(true)).usage, settings).costUsd).toBeNull()
+    expect(priceUsage((await readFor()).usage, settings).costUsd).toBeCloseTo(6.3)
+    // A session marked once its transcript is gone: its stored rows stripped of the report, counts kept.
+    const g = await setup()
+    writeFileSync(g.transcript, readFileSync(t.transcript, 'utf8'))
+    expect((await g.ingest()).status).toBe('written')
+    rmSync(g.transcript)
+    expect((await g.ingest({ reportsIgnored: true })).status).toBe('written')
+    const gs = (await g.stored())!
+    expect(usageFromRows(gs.summary, gs.rows, settings).costUsd).toBeNull()
+    expect(gs.rows.reduce((n, r) => n + r.outputTokens, 0)).toBe(300)
+    await g.close()
+    await t.close()
+  })
+
+  it('free (HI-1772, Darren 27 Oct): only on servers on this PC, a known $0 whatever prices are set; a run anywhere else ends it for good', async () => {
+    const t = await setup()
+    // A local model, priced by the user (a price local-only sessions never use), and Claude Code's report beside it.
+    const local = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'qwen3:8b', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
+    writeFileSync(t.transcript, prompt(0) + local(1) + JSON.stringify({ type: 'cost-state', timestamp: new Date(T0 + 2000).toISOString(), totalCostUSD: 3 }) + '\n')
+    const settings = { providers: { ...DEFAULT_SETTINGS.providers, 'claude-code': { ...DEFAULT_SETTINGS.providers['claude-code'], prices: { 'qwen3:8b': { input: 1000, cachedInput: 0, output: 1000 } } } } }
+    const usage = async () => {
+      const st = (await t.stored())!
+      return usageFromRows(st.summary, st.rows, settings)
+    }
+    // Local only: free, $0 known, its tokens counted.
+    expect((await t.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('written')
+    expect(await usage()).toMatchObject({ costUsd: 0, costFree: true, outputTokens: 100 })
+    // Unchanged, the same again.
+    expect((await t.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    // A run elsewhere (a remote server, a sign-in): not free from now on; the user's price for its model then applies.
+    expect((await t.ingest({ reportsIgnored: true, notLocal: true })).status).toBe('written')
+    const after = await usage()
+    expect(after.costFree).toBeUndefined()
+    expect(after.costUsd).toBeGreaterThan(0)
+    expect(after.outputTokens).toBe(100)
+    // A stale job from before (local alone) never makes it free again.
+    expect((await t.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    expect((await usage()).costFree).toBeUndefined()
+    // Remote first, then local: never free.
+    const r = await setup()
+    writeFileSync(r.transcript, readFileSync(t.transcript, 'utf8'))
+    expect((await r.ingest({ reportsIgnored: true, notLocal: true })).status).toBe('written')
+    expect((await r.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    const rs = (await r.stored())!
+    expect(usageFromRows(rs.summary, rs.rows, settings).costFree).toBeUndefined()
+    await r.close()
+    await t.close()
+  })
+
+  it('a locality fact on an unchanged file is kept (HI-1772 follow-up): history from before the flags, notLocal, then a stale local job, across a reopen', async () => {
+    const h = await setup()
+    const qwen = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'qwen3:8b', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
+    writeFileSync(h.transcript, prompt(0) + qwen(1))
+    const settings = { providers: { ...DEFAULT_SETTINGS.providers, 'claude-code': { ...DEFAULT_SETTINGS.providers['claude-code'], prices: { 'qwen3:8b': { input: 1000, cachedInput: 0, output: 1000 } } } } }
+    // Recorded with no locality at all (as a history from before this change).
+    expect((await h.ingest({ reportsIgnored: true })).status).toBe('written')
+    // The same file, unchanged: a run elsewhere is told; nothing to read, but the fact is kept.
+    expect((await h.ingest({ reportsIgnored: true, notLocal: true })).status).toBe('unchanged')
+    // A stale local-only job after it: the stored disqualifier stands.
+    expect((await h.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    const priced = async () => {
+      const st = (await h.stored())!
+      return usageFromRows(st.summary, st.rows, settings)
+    }
+    expect((await priced()).costFree).toBeUndefined()
+    expect((await priced()).costUsd).toBeGreaterThan(0)
+    // Reopened (the history's file closed and read again): the same.
+    await h.close()
+    expect((await h.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    expect((await priced()).costFree).toBeUndefined()
+    await h.close()
   })
 })
 

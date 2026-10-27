@@ -20,6 +20,7 @@ import { copyPasteKey } from '@shared/terminalInput'
 import { carriesFiles, cx, HIVE_FILES_MIME, quotePath } from '../util'
 import { addChips, attachFiles, clearChips } from '../attach'
 import { AttachmentChips } from './AttachmentChips'
+import { deferHiddenSelectionRedraws } from '../hiddenTerminalRedraws'
 import { msg, tr } from '@shared/i18n'
 
 type Listener = (data: string) => void
@@ -454,6 +455,8 @@ export function TerminalView({
     // its padding as usable space, so the padding lives on the host and the terminal mounts in an
     // unpadded child — otherwise the last row/column can spill over the status bar or off the edge.
     term.open(mount.current!)
+    // A hidden pane's selection is drawn once it is shown, not on each line its CLI prints meanwhile (HI-1827).
+    deferHiddenSelectionRedraws(term)
     termRef.current = term
     terminals.set(ptyKey, term)
     fits.set(ptyKey, fit)

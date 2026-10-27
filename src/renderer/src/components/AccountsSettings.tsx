@@ -9,6 +9,7 @@ import { confirm, notify, prompt, useStore } from '../store'
 import { Icon, Switch } from './ui'
 import { timeAgo } from '../util'
 import { TerminalView } from './TerminalView'
+import { AddConnectionDialog, hasServers, MaskingBanner, ServerConnectionDetail, setUpHint, setUpServer } from './ServerConnections'
 
 /**
  * Settings → Accounts (HI-980): Hive's accounts, each a CLI login in a folder of its own, signed in through the CLI's
@@ -20,7 +21,7 @@ const M = {
   none: msg({ id: 'settings.accounts.none', defaultMessage: 'No connections yet. Add one, then sign it in.', description: 'Settings → Connections when there are no connections.' }),
   noWorkspace: msg({ id: 'settings.accounts.noWorkspace', defaultMessage: 'Open a workspace to choose which connections are on in it.', description: 'Settings → Connections with no workspace open: the On and Default choices are per workspace.' }),
   loading: msg({ id: 'settings.accounts.loading', defaultMessage: 'Loading…', description: 'Settings → Connections while its list loads.' }),
-  add: msg({ id: 'settings.accounts.add', defaultMessage: 'Add Connection…', description: 'Button in Settings → Connections: adds a connection (asks its name), then opens its sign-in.' }),
+  add: msg({ id: 'settings.accounts.add', defaultMessage: 'Add Connection…', description: 'Button in Settings → Connections: adds a connection (asks its name and where it gets its model), then opens its sign-in or sets up its server.' }),
   addTitle: msg({ id: 'settings.accounts.addTitle', defaultMessage: 'Add a {cli} sign-in connection', description: 'Title of the dialog asking a new connection\'s name (Settings → Connections). {cli} is a coding agent CLI ("Claude Code").' }),
   addMessage: msg({ id: 'settings.accounts.addMessage', defaultMessage: "A name for it, such as Anthropic · Max 1 or Work. Hive makes its folder, then opens {cli}'s sign-in in your browser.", description: "The message of the dialog asking a new connection's name (Settings → Connections). {cli} is a coding agent CLI." }),
   name: msg({ id: 'settings.accounts.name', defaultMessage: 'Name', description: "The label of the box for a connection's name (Settings → Connections)." }),
@@ -74,7 +75,9 @@ export function AccountsSettings() {
   const wsPath = useStore((s) => s.workspace?.path ?? null)
   const projects = useStore((s) => s.workspace?.projects)
   const [view, setView] = useState<ConnectionsView | null>(null)
-  const [terminal, setTerminal] = useState<{ id: string; key: string; ended: boolean } | null>(null)
+  const [terminal, setTerminal] = useState<{ id: string; key: string; ended: boolean; setUp?: ProviderId } | null>(null)
+  // Add Connection's dialog (HI-1772), for a CLI that can also get its model from a server.
+  const [adding, setAdding] = useState<ProviderId | null>(null)
   const load = useCallback((check: boolean) => {
     call('connections:list', check)
       .then(setView)
@@ -104,7 +107,12 @@ export function AccountsSettings() {
       notify('error', tr(M.signInFailed), errorMessage(e))
     }
   }
+  const setUp = async (id: string, provider: ProviderId): Promise<void> => {
+    const key = await setUpServer(id)
+    if (key) setTerminal({ id, key, ended: false, setUp: provider })
+  }
   const add = async (provider: ProviderId): Promise<void> => {
+    if (hasServers(provider)) return setAdding(provider)
     const cli = providerDescriptor(provider).name
     const name = await prompt({ title: tr(M.addTitle, { cli }), message: tr(M.addMessage, { cli }), fieldLabel: tr(M.name), confirmLabel: tr(M.addConfirm), validate: (v) => (v.trim() ? null : tr(M.needName)) })
     if (!name) return
@@ -135,6 +143,7 @@ export function AccountsSettings() {
   return (
     <div className="accounts-settings">
       {!wsPath && <p className="hint">{tr(M.noWorkspace)}</p>}
+      <MaskingBanner masking={view.masking} />
       <MovedNoticeBanner />
       {affected > 0 && (
         <div className="banner warn" data-switch-affected>
@@ -151,6 +160,7 @@ export function AccountsSettings() {
           <div key={p} className="accounts-provider" data-provider={p}>
             {mine.length === 0 && <div className="faint">{tr(M.none)}</div>}
             {mine.map((a) => {
+              const server = a.kind === 'server'
               const state = accountState(a)
               const on = !!ws?.on.includes(a.id)
               const isDefault = ws?.default === a.id
@@ -158,14 +168,20 @@ export function AccountsSettings() {
               const ident = o?.email ? (o.plan ? tr(M.plan, { email: o.email, plan: o.plan }) : o.email) : a.accepted?.email
               const same = dups.get(a.id)
               return (
-                <div key={a.id} className="account-row" data-account={a.id} data-state={state}>
+                <div key={a.id} className="account-row" data-account={a.id} data-state={server ? 'server' : state}>
                   <div className="account-main">
                     <div className="account-name">{a.name}</div>
-                    <div className="account-ident muted">{ident}</div>
-                    <div className={`account-state state-${state}`} title={o?.at ? tr(M.checkedAt, { when: timeAgo(o.at) }) : undefined}>
-                      <Icon name={STATE_ICON[state]} /> {tr(STATE[state])}
-                      {a.signingIn && terminal?.id !== a.id && <span className="muted"> · {tr(M.signingInElsewhere)}</span>}
-                    </div>
+                    {server ? (
+                      <ServerConnectionDetail c={a} keyLast4={a.key?.last4} onSetUp={(id) => void setUp(id, a.provider)} />
+                    ) : (
+                      <>
+                        <div className="account-ident muted">{ident}</div>
+                        <div className={`account-state state-${state}`} title={o?.at ? tr(M.checkedAt, { when: timeAgo(o.at) }) : undefined}>
+                          <Icon name={STATE_ICON[state]} /> {tr(STATE[state])}
+                          {a.signingIn && terminal?.id !== a.id && <span className="muted"> · {tr(M.signingInElsewhere)}</span>}
+                        </div>
+                      </>
+                    )}
                     {state === 'changed' && a.accepted && o?.email && <div className="account-warning" data-warning="changed"><Icon name="warning" /> {tr(M.changedTo, { now: o.email, was: a.accepted.email })}</div>}
                     {same && <div className="account-warning" data-warning="duplicate"><Icon name="warning" /> {tr(M.sameLogin, { names: fmt.list(same.map(nameOf)) })}</div>}
                     {a.leftover && <div className="account-warning" data-warning="leftover"><Icon name="warning" /> {tr(M.leftover, { what: a.leftover })}</div>}
@@ -174,8 +190,8 @@ export function AccountsSettings() {
                   <div className="account-actions">
                     <Switch checked={on} disabled={!wsPath || !!a.leftover} label={tr(M.onHere)} onChange={(v) => void act(M.changeFailed, () => call('connections:setOn', a.id, v))} />
                     {isDefault ? <span className="account-default">{tr(M.isDefault)}</span> : <button className="btn subtle" disabled={!wsPath || !!a.leftover} onClick={() => void act(M.changeFailed, () => call('connections:setDefault', a.id))}>{tr(M.makeDefault)}</button>}
-                    {state === 'changed' && <button className="btn subtle" onClick={() => void keep(a.id, a.name, o?.email)}>{tr(M.keep)}</button>}
-                    {!a.leftover && <button className="btn" onClick={() => void signIn(a.id)}>{tr(state === 'signedOut' || state === 'changed' ? M.signInAgain : M.signIn)}</button>}
+                    {!server && state === 'changed' && <button className="btn subtle" onClick={() => void keep(a.id, a.name, o?.email)}>{tr(M.keep)}</button>}
+                    {!server && !a.leftover && <button className="btn" onClick={() => void signIn(a.id)}>{tr(state === 'signedOut' || state === 'changed' ? M.signInAgain : M.signIn)}</button>}
                     <button className="btn subtle" disabled={!!a.leftover} onClick={() => void rename(a.id, a.name)}>{tr(M.rename)}</button>
                     <button className="btn subtle" onClick={() => void remove(a.id, a.name)}>{tr(M.remove)}</button>
                   </div>
@@ -188,9 +204,10 @@ export function AccountsSettings() {
           </div>
         )
       })}
+      {adding && <AddConnectionDialog cli={adding} onClose={() => setAdding(null)} onSignIn={(id) => void signIn(id)} />}
       {terminal && (
         <div className="account-signin">
-          <p className="hint">{tr(M.signingIn)}</p>
+          <p className="hint">{terminal.setUp ? setUpHint(terminal.setUp) : tr(M.signingIn)}</p>
           <div className="task-terminal">
             <TerminalView ptyKey={terminal.key} visible onExit={() => setTerminal((t) => (t?.key === terminal.key ? { ...t, ended: true } : t))} />
           </div>

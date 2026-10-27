@@ -1114,7 +1114,7 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'lanePending.of': { sql: 'SELECT card FROM lane_pending WHERE lane = ? ORDER BY ord', args: ['L'], index: 'PRIMARY KEY' },
   'lanePending.ofCard': { sql: 'SELECT lane FROM lane_pending WHERE card = ?', args: [1], index: 'lane_pending_card' },
   'lanes.ofCards': {
-    sql: "SELECT x.card, l.id, l.reviewer_id FROM (SELECT lane, card FROM lane_cards UNION ALL SELECT lane, card FROM lane_pending) x JOIN lanes l ON l.id = x.lane WHERE x.card IN (SELECT number FROM cards WHERE number = ?) AND l.state = 'active' AND l.project = ? COLLATE NOCASE ORDER BY l.started_at, l.id",
+    sql: "SELECT x.card, l.id, l.reviewer_id FROM (SELECT lane, card FROM lane_cards UNION ALL SELECT lane, card FROM lane_pending) x JOIN lanes l ON l.id = x.lane WHERE x.card IN (SELECT number FROM cards WHERE number = ?) AND l.state = 'active' AND l.project = ? COLLATE NOCASE ORDER BY (l.builder_id IS (SELECT agent FROM cards WHERE number = x.card)), l.started_at, l.id",
     args: [1, 'p'],
     index: ['lane_cards_card', 'lane_pending_card']
   },

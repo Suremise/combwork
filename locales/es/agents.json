@@ -242,6 +242,7 @@
   "agents.models.fromCli": "De {provider}{version, select, none {} other { {version}}}",
   "agents.models.olderGroup": "Versiones anteriores",
   "agents.models.providerGroup": "Modelos de {provider}",
+  "agents.models.serverAs": "{model} (como {names})",
   "agents.models.unavailableGroup": "No disponibles para esta cuenta",
   "agents.name.empty": "Escribe un nombre.",
   "agents.name.taken": "Ya hay un agente llamado “{agent}” en el proyecto {project}. Los nombres de los agentes son únicos en todo el espacio de trabajo: prueba con “{suggestion}”.",

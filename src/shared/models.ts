@@ -1,6 +1,8 @@
-import type { AgentInstallInfo, AppSettings, CatalogModel, Connection, EffortLevel, EffortOption, FallbackModel, ProviderId } from './types'
+import type { AgentInstallInfo, AppSettings, CatalogModel, Connection, EffortLevel, EffortOption, FallbackModel, ModelAlias, ProviderId } from './types'
 import { OLDER_VERSIONS } from './claude'
+import { fmt } from './i18n'
 import { msg } from './i18n/msg'
+import { serverDefaultModel } from './serverConnection'
 import { providerDescriptor, type ModelGroup } from './providers'
 import type { Tr } from './tasks'
 
@@ -20,14 +22,31 @@ const text = (v: unknown): v is string => typeof v === 'string' && v.trim() !== 
 
 /**
  * What Hive knows of a connection's models (HI-1770), by its kind, never its CLI: a sign-in connection's are its CLI's
- * (its catalogue, as without connections). The kinds to come (an endpoint's, Ollama's) list their own here.
+ * (its catalogue, as without connections); a server connection's its own list (HI-1772), each with the aliases it
+ * stands in for, none taking an effort, its default the one standing in for Opus (else Sonnet, else its first).
  */
-export function connectionModels(conn: Pick<Connection, 'kind'>, info: Info): Info {
+export function connectionModels(conn: Pick<Connection, 'kind' | 'server'>, info: Info, tr?: Tr): Info {
   switch (conn.kind ?? 'signIn') {
     case 'signIn':
       return info
+    case 'server': {
+      const models = conn.server?.models ?? []
+      const def = serverDefaultModel(models)
+      return { catalog: { source: 'cli', version: null, at: '', models: models.map((m) => ({ value: m.id, label: serverModelLabel(m.id, m.as ?? [], tr), efforts: [] })), ...(def ? { defaultModel: def } : {}) }, ...(def ? { defaultModel: def } : {}) }
+    }
   }
 }
+
+/** A server's model as shown (HI-1772): its id, with the Claude names it stands in for ("deepseek-flash (as Opus, Sonnet)"). */
+export function serverModelLabel(id: string, as: readonly ModelAlias[], tr?: Tr): string {
+  if (!as.length) return id
+  const names = as.map((a) => ALIAS_NAMES[a])
+  const m = msg({ id: 'agents.models.serverAs', defaultMessage: '{model} (as {names})', description: "A model of a server connection (Settings → Connections), with the Claude model names it stands in for. {model} is the server's model id (\"deepseek-flash\"); {names} the Claude names, joined (\"Opus, Sonnet\")." })
+  return tr ? tr(m, { model: id, names: fmt.list(names) }) : `${id} (as ${names.join(', ')})` // i18n-ignore: English without tr
+}
+
+/** The Claude names a server's model stands in for: product names, the same in every language. */
+const ALIAS_NAMES: Record<ModelAlias, string> = { opus: 'Opus', sonnet: 'Sonnet', haiku: 'Haiku' } // i18n-ignore: Claude's model names, the same in every language
 
 /** The descriptor's effort levels: the starting fallback. */
 export const shippedEfforts = (provider: ProviderId): EffortOption[] => providerDescriptor(provider).effortLevels

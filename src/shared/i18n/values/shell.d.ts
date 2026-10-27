@@ -229,6 +229,8 @@ interface HiveMessageValues {
   'shell.errorBoundary.sessions': undefined
   'shell.errorBoundary.tryAgain': undefined
   'shell.errorBoundary.view': undefined
+  'shell.keyRefused.stopped': { name: string | number }
+  'shell.keyRefused.then': { name: string | number }
   'shell.loadFailed': { what: string | number; error: string | number }
   'shell.mcp.copyToWorkspace': undefined
   'shell.mcp.notInWorkspace': { project: string | number }
@@ -351,6 +353,7 @@ interface HiveMessageValues {
   'shell.status.finished': undefined
   'shell.status.finishedWithTasks': { n: number }
   'shell.status.idle': undefined
+  'shell.status.keyRefused': undefined
   'shell.status.question': { status: string | number }
   'shell.status.ready': undefined
   'shell.status.readyWithTasks': { n: number }

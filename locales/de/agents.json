@@ -242,6 +242,7 @@
   "agents.models.fromCli": "Von {provider}{version, select, none {} other { {version}}}",
   "agents.models.olderGroup": "Ältere Versionen",
   "agents.models.providerGroup": "Modelle von {provider}",
+  "agents.models.serverAs": "{model} (als {names})",
   "agents.models.unavailableGroup": "Für dieses Konto nicht verfügbar",
   "agents.name.empty": "Gib einen Namen ein.",
   "agents.name.taken": "Im Projekt {project} gibt es schon einen Agenten namens „{agent}“. Agentennamen sind im ganzen Arbeitsbereich eindeutig: Versuch es mit „{suggestion}“.",

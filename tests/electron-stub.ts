@@ -23,4 +23,22 @@ export const crashReporter = {}
 export const powerMonitor = {}
 // No screens: main code that places windows (testQuiet.ts) is bundled in by trash.ts and config.ts.
 export const screen = { getAllDisplays: (): unknown[] => [] }
-export default { app, BrowserWindow, Notification, clipboard, shell, nativeImage, dialog, crashReporter, powerMonitor, screen }
+// A stand-in for DPAPI (HI-1772's key store): reversible, never plain text on disk; tests turn `available` off.
+export const safeStorage = {
+  available: true,
+  isEncryptionAvailable(): boolean {
+    return this.available
+  },
+  getSelectedStorageBackend(): string {
+    return 'unknown'
+  },
+  encryptString(s: string): Buffer {
+    return Buffer.from(`stub:${Buffer.from(s, 'utf8').toString('hex').split('').reverse().join('')}`, 'utf8')
+  },
+  decryptString(b: Buffer): string {
+    const t = b.toString('utf8')
+    if (!t.startsWith('stub:')) throw new Error('Error while decrypting the ciphertext provided to safeStorage.decryptString.')
+    return Buffer.from(t.slice(5).split('').reverse().join(''), 'hex').toString('utf8')
+  }
+}
+export default { app, BrowserWindow, Notification, clipboard, shell, nativeImage, dialog, crashReporter, powerMonitor, screen, safeStorage }
