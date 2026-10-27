@@ -357,7 +357,8 @@ const columnOfLine = (h: TaskCard['history'][number]): string | null => {
 
 /**
  * The design or follow-up a card's builder posted for its reviewer's check (#1382, #1467) while it still waits: no
- * answer, no going ahead, and the card not moved to another column, returned for review or given a verdict since. A
+ * answer, no going ahead, and the card not moved to another column, returned for review, given a verdict or a follow-up
+ * submitted (HI-1832) since. A
  * change of its place in its column (top, bottom, before another card: "Moved to the bottom of Approved") isn't a move:
  * by its line's column (its message's values), not its words, which are the same for a move into a column at its top
  * (HR4's round 1 finding on #1467). Its history entry and which it is; null when none waits.
@@ -371,7 +372,7 @@ export function pendingStep(card: Pick<TaskCard, 'history'>): { entry: TaskCard[
   const kept = card.history[i].whatText?.values?.column
   let column = typeof kept === 'string' ? kept : (card.history.slice(0, i).map(columnOfLine).findLast((c) => c !== null) ?? null)
   for (const h of card.history.slice(i + 1)) {
-    if (/^(Returned for review|Review (passed|failed))\b/.test(h.what)) return null
+    if (/^(Returned for review|Review (passed|failed)|Follow-up submitted for review)\b/.test(h.what)) return null
     const now = columnOfLine(h)
     if (now === null) {
       // A line without its message (from before #866): a move's words, never a place in the column's.

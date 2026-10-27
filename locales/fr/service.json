@@ -9,6 +9,7 @@
   "service.advanced.notValues": "Dans advanced.json, « values » devrait être un objet paramètre → valeur.",
   "service.advanced.unknown": "Aucun paramètre avancé « {id} ».",
   "service.answerRelay.title": "{card} : personne d'autre n'a ta réponse",
+  "service.assistantAsk.title": "{card} : l'Assistant Hive n'a pas reçu la demande d'un agent",
   "service.attachments.badFolder": "Ce n’est pas un nom de dossier de session.",
   "service.attachments.badRecord": "Le fichier {file} n’est pas un relevé des fichiers déplacés",
   "service.attachments.notOwn": "Le dossier {folder} est un lien ou n’appartient pas au projet lui-même, donc Hive n’y conserve aucune pièce jointe.",

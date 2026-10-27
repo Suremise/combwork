@@ -27,6 +27,8 @@
   "tips.archiveNew.title": "Archive and Start New",
   "tips.assistant.text": "The panel on the right oversees the workspace: ask what the agents are doing, what things cost, or for a plan. {key}",
   "tips.assistant.title": "Ask the Hive Assistant",
+  "tips.assistantAgentRequests.text": "An agent that needs something only the Assistant or you can do on a card, such as parking a card On Hold on your answer, asks the Assistant directly instead of leaving a comment. The request wakes it, and it acts only within its Control and what you decided.",
+  "tips.assistantAgentRequests.title": "Agents can ask the Assistant",
   "tips.assistantBatch.text": "The Assistant can move or label up to {cards, plural, one {# card} other {# cards}} in one step, each card still listed on its own.",
   "tips.assistantBatch.title": "Many cards in one step",
   "tips.assistantCompact.text": "The Assistant usually works with a bigger context than your agents, so its Compact button turns orange later: past {tokens, plural, one {# token} other {# tokens}} by default. Settings → Assistant → Highlight Compact over changes that, or Never turns it off.",

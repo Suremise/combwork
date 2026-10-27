@@ -88,8 +88,10 @@ const check = (name, ok, extra = '') => {
     const heights = () => page.locator('.agent-tile').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height * 10) / 10))
     const before = await heights()
     check('every tile is the same height', before.length === 12 && new Set(before).size === 1, before.join())
-    // Its reply cut at its second line is in full on hover.
-    const replyTip = await lib.hoverTip(page, tile('A').locator('.tile-reply'), (t) => t.includes('so it is cut short'), HUNG_MS)
+    // Its reply cut at its second line is in full on hover. The tip has content once the tile has measured the reply as
+    // cut, which under load can come after a hover began (HI-1861): hovered again until it shows.
+    let replyTip = ''
+    await lib.until(async () => (replyTip = await lib.hoverTip(page, tile('A').locator('.tile-reply'), (t) => t.includes('so it is cut short'), 3000)).includes(longReply), HUNG_MS)
     check("A's reply, cut short, is in full on hover", replyTip.includes(longReply), replyTip)
     await page.mouse.move(5, 5)
     // A run whose title is too long for its line (round 1 finding 1: its tooltip's wrapper changed the line's width, and
@@ -389,7 +391,9 @@ const check = (name, ok, extra = '') => {
     check("…E's blocked card: red, and said so", blocked?.blocked && blocked.col === 'var(--error)' && blocked.label === `Card ${L[blockedCard]}, Active, blocked`, JSON.stringify(blocked))
     check("…C's accessible name: the card and its column", (await chipInfo('C'))?.label === `Card ${L[passedCard]}, Approved`, (await chipInfo('C'))?.label)
     check('…no card, no chip (F)', (await row('F').locator('.card-chip').count()) === 0)
-    check("…A's status drops the number its chip shows: Waiting → Approved", (await row('A').locator('.tile-strip-status').innerText()) === 'Waiting → Approved', await row('A').locator('.tile-strip-status').innerText())
+    // Waited for: A can still say Working… a moment after its watch began (HI-1861), so its status is read until it settles.
+    const statusOf = (name) => row(name).locator('.tile-strip-status').innerText().catch(() => '')
+    check("…A's status drops the number its chip shows: Waiting → Approved", !!(await lib.until(async () => (await statusOf('A')) === 'Waiting → Approved', HUNG_MS)), await statusOf('A'))
     // The layout: the long name cut before its chip, never under it; the chips' right edges in a column.
     const layout = () =>
       page.locator('.tile-strip-row').evaluateAll((rows) =>

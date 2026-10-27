@@ -19,7 +19,7 @@ import { keptLaneOrder } from '../shared/laneBar'
 import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../shared/tips'
 import { allProviders } from './providers'
 import { providerService } from './providerService'
-import { accountsView, addAccount, connectionHomes, dismissConnectionsIntro, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, setConnectionDefaults, signInAccount } from './accounts'
+import { accountsView, addAccount, connectionHomes, dismissConnectionsIntro, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, setConnectionDefaults, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
 import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setUpServerConnection } from './serverConnections'
 import { requireMasking } from './keyCoverage'
 import { resetMasking } from './keyStore'
@@ -1574,7 +1574,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'connections:cancelModels': (id, request) => cancelServerModels(id, String(request)),
     'connections:setUp': async (id) => {
       await refreshPathBeforeStart()
-      return setUpServerConnection(id)
+      // A sign-in connection's Set Up (HI-1826): the CLI on its folder, for the first-run screens its sign-in leaves.
+      return isServer(getAccount(id)) ? setUpServerConnection(id) : setUpSignInConnection(id)
     },
     'connections:resetMasking': async () => {
       await resetMasking()

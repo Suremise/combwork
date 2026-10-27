@@ -272,6 +272,7 @@ interface HiveMessageValues {
   'workflow.refused.move.notFromHere.message': { card: string | number; stage: string | number; move: string | number }
   'workflow.refused.move.notFromHere.next': { stage: string | number; moves: string | number }
   'workflow.refused.move.notFromHere.nextBuilder': undefined
+  'workflow.refused.move.notFromHere.nextBuilderSubmit': undefined
   'workflow.refused.move.notFromHere.nextNone': undefined
   'workflow.refused.move.notFromHere.nextReviewer': { back: string }
   'workflow.refused.move.useIntent.message': undefined
@@ -313,7 +314,11 @@ interface HiveMessageValues {
   'workflow.refused.submit.decisionsReceived.message': { card: string | number }
   'workflow.refused.submit.decisionsReceived.next': undefined
   'workflow.refused.submit.empty.message': { card: string | number }
+  'workflow.refused.submit.empty.messageForUser': undefined
   'workflow.refused.submit.empty.next': undefined
+  'workflow.refused.submit.empty.nextForUser': undefined
+  'workflow.refused.submit.followUpNotBuilder.message': { card: string | number }
+  'workflow.refused.submit.followUpNotBuilder.next': undefined
   'workflow.refused.submit.identity.change': undefined
   'workflow.refused.submit.identity.message': { card: string | number; commit: string | number; email: string | number }
   'workflow.refused.submit.identity.next': { command: string | number }

@@ -14,6 +14,7 @@ import { LOOP_STEP_WAIT_MINUTES } from '../shared/lanes'
 import { projectPreferences } from './workflow/preferences'
 import { loopReviewerOf } from './loopReviewer'
 import { cardRef } from '../shared/projectKeys'
+import { HISTORY, storedText } from '../shared/taskHistory'
 
 /**
  * Agents act by intent (#1267, SPEC §16.8.1): start, put back, submit, declare paths, start review, verdict, report
@@ -29,7 +30,7 @@ import { cardRef } from '../shared/projectKeys'
 export type CardIntent =
   | { kind: 'start' }
   | { kind: 'putBack'; why: string }
-  | { kind: 'submit'; summary: string; revision?: string; note?: string; paths?: string[] }
+  | { kind: 'submit'; summary: string; revision?: string; note?: string; paths?: string[]; followUp?: boolean }
   | { kind: 'declarePaths'; paths: string[] }
   | { kind: 'startReview'; submission?: number }
   | { kind: 'verdict'; submission?: number; pass: boolean; failKind?: 'content' | 'explanation'; comment: string }
@@ -96,7 +97,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'putBack':
         return w.putBack(named, who, { why: intent.why })
       case 'submit':
-        return w.submit(named, who, { summary: intent.summary, ...(intent.revision ? { revision: intent.revision } : {}), ...(intent.note ? { note: intent.note } : {}), ...(intent.paths ? { paths: intent.paths } : {}) })
+        return w.submit(named, who, { summary: intent.summary, ...(intent.revision ? { revision: intent.revision } : {}), ...(intent.note ? { note: intent.note } : {}), ...(intent.paths ? { paths: intent.paths } : {}), ...(intent.followUp ? { followUp: true } : {}) })
       case 'startReview':
         return w.startReview(named, who, { ...(intent.submission !== undefined ? { submission: intent.submission } : {}) })
       case 'verdict':
@@ -138,8 +139,11 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
     switch (intent.kind) {
       case 'putBack':
         return { opts: { keepAgent, comment: intent.why } }
-      case 'submit':
-        return { opts: { keepAgent, comment: intent.summary } }
+      case 'submit': {
+        // A follow-up's (HI-1832): no move to say it, so a line of its own, which its reviewer's watch and pendingStep read.
+        const sub = w.written.findLast((f) => f.kind === 'Submitted')?.data as { followUp?: boolean; revision?: string | null } | undefined
+        return { opts: { keepAgent, comment: intent.summary, ...(sub?.followUp ? { note: [storedText(HISTORY.followUpSubmitted, { revision: (sub.revision ?? '').slice(0, 7) })] } : {}) } }
+      }
       case 'startReview':
         // The card marked as this reviewer's (an agent's own review; the Assistant and scripts don't review).
         return { ...(self ? { patch: { review: 'start' } } : {}), opts: { keepAgent } }

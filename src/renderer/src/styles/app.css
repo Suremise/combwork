@@ -2360,6 +2360,9 @@ textarea.input {
 .terminal-host.hidden {
   visibility: hidden;
   pointer-events: none;
+  /* Off screen too (HI-1828): xterm draws a terminal only while its screen intersects the window (an
+     IntersectionObserver), and visibility alone doesn't change that, so hidden terminals were drawn with every write. */
+  transform: translateX(-200vw);
 }
 .terminal-mount {
   width: 100%;
@@ -2382,8 +2385,9 @@ textarea.input {
   overflow: auto;
   container-type: inline-size;
 }
-/* Very little room: the title and the buttons; the explanation and the mark go (#227). Warnings stay. */
-@container (max-width: 280px) {
+/* Very little room: the title and the buttons; the explanation and the mark go (#227). Warnings stay. Under 280 px, not
+   at it: 280 is the work's least width beside the side panels (HI-1737, MAIN_MIN), where the card shows in full (HI-1857). */
+@container (width < 280px) {
   .session-empty-card {
     padding: 12px 8px;
   }

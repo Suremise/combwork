@@ -645,6 +645,9 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
   check('…and its lane ends', !!designLane && tool('hive_lane', { action: 'end', lane: designLane, abandoned: true }).text.startsWith('Lane abandoned: '), designLane)
   const putBack = measure('hive_put_back', intent('hive_put_back', { card: `#${todo[40]}`, why: 'Not yet.' }), 200)
   check('put back names the start as next', putBack.endsWith(' Next on it: hive_start_card.'), putBack)
+  // A request for the Assistant (HI-1866): the card, and its id in the Assistant's inbox.
+  const askedAssistant = measure('hive_ask_assistant', intent('hive_ask_assistant', { card: `#${todo[40]}`, text: 'Please put this card On Hold.' }), 120)
+  check('asking the Assistant names the card and its inbox id', /^[A-Z]+-\d+: asked the Hive Assistant \(m\d+ in its inbox\)\. Its answer comes to your inbox\.$/.test(askedAssistant), askedAssistant)
   const plainRefused = intent('hive_put_back', { card: String(todo[40]), why: 'Not yet.' })
   check("an intent refuses the coder's plain number, naming the card by its key", plainRefused.isError && plainRefused.text.includes(`Name the card by its key: ${K(todo[40])}.`) && plainRefused.text.length <= 600, plainRefused.text)
   check('metrics: a project agent has no role or mode', g?.roleBytes === 0 && g?.modeBytes === 0, JSON.stringify(g))

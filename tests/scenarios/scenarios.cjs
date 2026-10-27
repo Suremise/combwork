@@ -2941,7 +2941,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'card-loop-follow-up',
-    title: "A card loop builder asked for a change its reviewer checks, on a card in Review (#1467): it arms its watch and posts a follow-up with hive_loop_step, not a comment",
+    title: "A card loop builder asked for a commit its reviewer checks, on a card in Review (HI-1832, #1467): it submits it with hive_submit followUp, the card staying in Review and its own, no round counted",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       await pairInProject(c)
@@ -2963,16 +2963,15 @@ module.exports.SCENARIOS = [
     prompt: (c) =>
       `You are the builder of card #${c.cards.f} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). The card is in Review. The user asked for one change for Implementer to check: greet.js trims the name. You have made it and committed it (${c.commit}). Hand it to your reviewer as your loop says.`,
     fake: (c) =>
-      `skill card-loop then hive hive_wait_for_tasks {"cards":[${c.cards.f}],"changes":["comment","column","verdict"],"wake":true,"limitMinutes":360} then hive hive_loop_step ${JSON.stringify({ card: `#${c.cards.f}`, step: 'followUp', text: `Follow-up ready: greet.js trims the name, at ${c.commit}.` })}`,
+      `skill card-loop then hive hive_submit ${JSON.stringify({ card: `#${c.cards.f}`, summary: `Follow-up: greet.js trims the name, at ${c.commit}.`, followUp: true })}`,
     expect: (o) => {
       const tools = o.hiveCalls.map((x) => x.tool)
-      const watchAt = tools.indexOf('hive_wait_for_tasks')
-      const postAt = tools.findIndex((t, i) => t === 'hive_loop_step' && argsOf(o.hiveCalls[i]).step === 'followUp')
+      const subs = factsOf(o, 'f', 'Submitted')
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
-        ['posted a follow-up with hive_loop_step (a LoopStep fact)', postAt >= 0 && factsOf(o, 'f', 'LoopStep').some((f) => f.data.step === 'followUp'), tools.join(',')],
-        ['armed its watch on the card before posting it', watchAt >= 0 && postAt > watchAt, tools.join(',')],
-        ['the card stays in Review, not submitted again', o.cards.f?.column === 'review' && factsOf(o, 'f', 'Submitted').length === 1, `${o.cards.f?.column}, ${factsOf(o, 'f', 'Submitted').length} submissions`]
+        ['submitted it with hive_submit followUp (a second Submitted fact, a follow-up)', tools.some((t, k) => t === 'hive_submit' && argsOf(o.hiveCalls[k]).followUp === true) && subs.length === 2 && subs[1].data.followUp === true, tools.join(',')],
+        ['the card stays in Review, its own, in the same round', o.cards.f?.column === 'review' && o.cards.f?.agentName === 'Coder' && subs.length === 2 && subs[1].data.round === subs[0].data.round, `${o.cards.f?.column}, ${o.cards.f?.agentName}, ${subs.map((x) => x.data.round).join(',')}`],
+        ['posted no loop step for it', !factsOf(o, 'f', 'LoopStep').length, tools.join(',')]
       ]
     }
   },
@@ -3012,6 +3011,30 @@ module.exports.SCENARIOS = [
         ['named the follow-up it was shown', answers.some((x) => argsOf(x).design === c.followUp) && factsOf(o, 'f', 'LoopStep').some((f) => ['ok', 'gaps'].includes(f.data.step) && f.data.design === c.followUp), JSON.stringify(answers.map((x) => argsOf(x)))],
         ['gave no verdict (a follow-up check is not a review)', !factsOf(o, 'f', 'Verdict').length, (o.facts?.f ?? []).map((f) => f.kind).join(',')],
         ['the card stays in Review', o.cards.f?.column === 'review', o.cards.f?.column]
+      ]
+    }
+  },
+  {
+    id: 'card-loop-ask-assistant',
+    title: "A builder whose card's decision needs what only the Assistant may do (HI-1866): it asks the Assistant with hive_ask_assistant, not in a comment, and doesn't ask the user again",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    async setup(c) {
+      await c.card('h', { title: 'Greeting in French', description: 'A French greeting, for after the release.' })
+      await c.card('a', { title: 'Greeting options', description: 'Choose how greet.js greets, A or B. A: keep "Hello" now, and park the French greeting card until after the release.', column: 'doing', agent: 'coder' })
+      await c.inv('tasks:update', c.cards.a, { decision: `Option A: keep "Hello", nothing to build here. Put #${c.cards.h} On Hold until after the release, and move this card to Done with this decision as the reason.` })
+    },
+    prompt: (c) => `You're the builder of card #${c.cards.a} in a card loop (the card-loop skill). The user has decided it: read its decisions and see it through.`,
+    fake: (c) =>
+      `skill card-loop then hive hive_read_task {"number":${c.cards.a}} then hive hive_ask_assistant ${JSON.stringify({ card: `#${c.cards.a}`, text: `The user chose option A (the card's decision): please put #${c.cards.h} On Hold until after the release, and move #${c.cards.a} to Done with that decision as the reason.` })}`,
+    expect: (o) => {
+      const tools = o.hiveCalls.map((x) => x.tool)
+      const asked = ran(o, 'hive_ask_assistant')
+      return [
+        ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
+        ['asked the Assistant with hive_ask_assistant', asked.length > 0, tools.join(',')],
+        ['…on the card, which says so in its history', history(o.cards.a).some((h) => h.startsWith('Asked the Hive Assistant: ')), history(o.cards.a).join(' | ')],
+        ["didn't ask the user what they already decided", !ran(o, 'hive_ask_user').length, tools.join(',')],
+        ['moved neither card past its rules itself', o.cards.h?.column === 'todo' && o.cards.a?.column === 'doing', `${o.cards.h?.column} / ${o.cards.a?.column}`]
       ]
     }
   },

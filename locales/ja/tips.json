@@ -27,6 +27,8 @@
   "tips.archiveNew.title": "アーカイブして新規開始",
   "tips.assistant.text": "右側のパネルでワークスペース全体を見渡せます。エージェントが何をしているか、コストはどれくらいかを聞いたり、計画を頼んだりできます。{key}",
   "tips.assistant.title": "Hive Assistantに聞く",
+  "tips.assistantAgentRequests.text": "あなたの回答に沿ってカードを「保留」にするなど、アシスタントかあなたにしかできないことがカードで必要になったエージェントは、コメントを残す代わりにアシスタントに直接依頼します。依頼でアシスタントが起動し、「操作範囲」とあなたの決定の範囲内でのみ対応します。",
+  "tips.assistantAgentRequests.title": "エージェントはアシスタントに依頼できます",
   "tips.assistantBatch.text": "アシスタントは最大{cards, plural, other {#件のカード}}を1ステップで移動したりラベルを付けたりできます。カードは1件ずつ一覧に表示されます。",
   "tips.assistantBatch.title": "多数のカードを1ステップで",
   "tips.assistantCompact.text": "アシスタントは通常エージェントより大きなコンテキストで動くため、「コンパクト化」ボタンがオレンジになるのも遅く、既定では{tokens, plural, other {#トークン}}を超えたときです。「設定」→「アシスタント」→「コンパクト化を強調するサイズ」で変更でき、「しない」にするとオフになります。",

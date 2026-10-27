@@ -2565,15 +2565,15 @@
   },
   "settings.connections.server.setUp": {
     "defaultMessage": "Set Up",
-    "description": "Button on a server connection: opens the CLI on it in a terminal, for its first-run screens (its theme, its notes), answered by the user."
+    "description": "Button on a connection (a server one, or one signed in): opens the CLI on it in a terminal, for its first-run screens (its theme, its notes), answered by the user."
   },
   "settings.connections.server.setUpFailed": {
     "defaultMessage": "Couldn't open the setup",
-    "description": "An error's title: a server connection's Set Up terminal couldn't be opened."
+    "description": "An error's title: a connection's Set Up terminal couldn't be opened."
   },
   "settings.connections.server.setUpHint": {
     "defaultMessage": "The first time {cli} runs on it, it asks a few setup questions (its look, its notes). Answer them here once, or in the first agent's pane.",
-    "description": "Above the Set Up terminal of a server connection ({cli}: the coding agent CLI): what the terminal is for."
+    "description": "Above a connection's Set Up terminal ({cli}: the coding agent CLI): what the terminal is for."
   },
   "settings.connections.server.why.failed": {
     "defaultMessage": "The server answered with an error ({status}). Try again later.",

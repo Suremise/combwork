@@ -9,6 +9,7 @@ import { emit } from './events'
 import { hiveError } from './hiveError'
 import { keyInfo, removeKey, saveKey, withKey } from './keyStore'
 import { createLogger, userText } from './logger'
+import { plainHttpGet, type PlainReply } from './plainHttpsJson'
 import { providerService } from './providerService'
 
 /**
@@ -225,21 +226,23 @@ export async function readServerModels(id: string, request: string): Promise<Lis
   }
   const said = (r: Exclude<ListResult, { ok: true }>): ListResult => (current() ? r : { ok: false, why: 'stale' }) // i18n-ignore: a reason's code, not text
   try {
-    let res: Response
+    // Node's http(s), not fetch (HI-1836): no reply reaches Node's Brotli decoder (#1582); none is followed elsewhere.
+    let res: PlainReply
     try {
-      res = await fetch(url, { method: 'GET', redirect: 'manual', signal: abort.signal, headers: { accept: 'application/json', ...(got ? { authorization: `Bearer ${got.key}` } : {}) } }) // i18n-ignore: an HTTP header
+      res = await plainHttpGet(url, { maxBytes: LIST_MAX_BYTES, signal: abort.signal, headers: { Accept: 'application/json', ...(got ? { Authorization: `Bearer ${got.key}` } : {}) } }) // i18n-ignore: an HTTP header
     } catch {
       return said({ ok: false, why: 'unreachable' }) // i18n-ignore: a reason's code, not text
     }
     if (res.status >= 300 && res.status < 400) return said({ ok: false, why: 'redirect', status: res.status }) // i18n-ignore: a reason's code, not text
     if (res.status === 401) return said({ ok: false, why: 'refused', status: 401 }) // i18n-ignore: a reason's code, not text
     if (res.status === 403) return said({ ok: false, why: 'forbidden', status: 403 }) // i18n-ignore: a reason's code, not text
-    if (!res.ok) return said({ ok: false, why: 'failed', status: res.status }) // i18n-ignore: a reason's code, not text
-    const body = await readBounded(res, abort)
-    if (body === null) return said({ ok: false, why: 'tooBig' }) // i18n-ignore: a reason's code, not text
+    if (res.status < 200 || res.status >= 300) return said({ ok: false, why: 'failed', status: res.status }) // i18n-ignore: a reason's code, not text
+    if (res.refused === 'tooBig') return said({ ok: false, why: 'tooBig' }) // i18n-ignore: a reason's code, not text
+    // An encoded reply is refused unread: not a listing Hive can read.
+    if (res.refused) return said({ ok: false, why: 'shape' }) // i18n-ignore: a reason's code, not text
     let parsed: unknown
     try {
-      parsed = JSON.parse(body)
+      parsed = JSON.parse(res.text)
     } catch {
       return said({ ok: false, why: 'shape' }) // i18n-ignore: a reason's code, not text
     }
@@ -263,29 +266,6 @@ export async function readServerModels(id: string, request: string): Promise<Lis
     clearTimeout(timer)
     if (listings.get(id)?.request === request) listings.delete(id)
   }
-}
-
-/** A reply's text, read until LIST_MAX_BYTES: past that (or aborted) null, the request ended. */
-async function readBounded(res: Response, abort: AbortController): Promise<string | null> {
-  const reader = res.body?.getReader()
-  if (!reader) return ''
-  const chunks: Uint8Array[] = []
-  let size = 0
-  try {
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      size += value.byteLength
-      if (size > LIST_MAX_BYTES) {
-        abort.abort()
-        return null
-      }
-      chunks.push(value)
-    }
-  } catch {
-    return null
-  }
-  return Buffer.concat(chunks).toString('utf8')
 }
 
 // ---------------------------------------------------------------------------

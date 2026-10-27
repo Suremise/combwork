@@ -3,7 +3,7 @@ import type { IPty } from '@lydell/node-pty'
 import { sendPty } from './events'
 import { argsForLog, createLogger, userText } from './logger'
 import { allProviders } from './providers'
-import { launchGate, type GateWord } from './launchGate'
+import { launchGate, type GateWord, type LaunchGate } from './launchGate'
 import { envWithCliFolders } from './freshPath'
 
 const log = createLogger('pty')
@@ -25,6 +25,8 @@ interface PtyEntry {
   refresh?: ReturnType<typeof setTimeout>
   /** The size the window gave it during a refresh, which it ends at. */
   wanted?: { cols: number; rows: number }
+  /** Its launch gate (launchGate.ts), until the command has had its word. */
+  gate?: LaunchGate
 }
 
 const entries = new Map<string, PtyEntry>()
@@ -177,7 +179,7 @@ export function spawnPty(key: string, opts: SpawnOptions): IPty {
   }
   const prior = opts.continueBuffer ? carried.get(key) ?? [] : []
   carried.delete(key)
-  const entry: PtyEntry = { proc, onResize: opts.onResize, buffer: [...prior], size: prior.reduce((n, s) => n + s.length, 0) }
+  const entry: PtyEntry = { proc, onResize: opts.onResize, buffer: [...prior], size: prior.reduce((n, s) => n + s.length, 0), ...(gate ? { gate } : {}) }
   entries.set(key, entry)
   proc.onData((data) => {
     entry.buffer.push(data)
@@ -302,6 +304,10 @@ export function killPty(key: string): void {
   if (!e || e.killed) return
   e.killed = true
   log.info(`kill ${userText(key)} (process ${e.proc.pid})`)
+  // A command not yet started never starts now (HI-1819): started as its console closes, it would miss the close and
+  // run on without one. The gate is told before the kill, so it ends on its own if the kill can't reach it.
+  // i18n-ignore: the launch gate's reason, printed in the terminal by its script in English (launchGate.ts, CLI-facing)
+  e.gate?.stop('its terminal was closed before it started')
   logConsoleKills(key, e.proc)
   try {
     e.proc.kill()

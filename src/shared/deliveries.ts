@@ -43,9 +43,10 @@ export type DeliveryState = (typeof DELIVERY_STATES)[number]
 /**
  * Who a delivery is from. The Assistant's names its workspace and the launch that sent it: its permission is worked out
  * again from those and the settings at every step (never a token or a closure, which can't be saved), and a launch that
- * has ended sends nothing more (#645). Hive's own (board events) and the user's need no more.
+ * has ended sends nothing more (#645). Hive's own (board events) and the user's need no more. An agent's (HI-1866: its
+ * request for the Assistant on a card) names its project and id, so whoever reads it knows which agent asked.
  */
-export type DeliverySender = { kind: 'assistant'; name: string; workspace: string; launch: string } | { kind: 'hive'; name: string } | { kind: 'user'; name: string }
+export type DeliverySender = { kind: 'assistant'; name: string; workspace: string; launch: string } | { kind: 'hive'; name: string } | { kind: 'user'; name: string } | { kind: 'agent'; name: string; project: string; agentId: string }
 
 export interface DeliveryRecord {
   /** Short and unique in its project ("m12"): what the agent acks. */
@@ -291,6 +292,7 @@ function readSender(v: unknown): DeliverySender | null {
   const s = v as Record<string, unknown>
   if (!str(s.name, 200) || !s.name) return null
   if (s.kind === 'assistant') return str(s.workspace, 1024) && s.workspace && str(s.launch, 200) ? { kind: 'assistant', name: s.name, workspace: s.workspace, launch: s.launch } : null
+  if (s.kind === 'agent') return str(s.project, 300) && s.project && str(s.agentId, 128) && s.agentId ? { kind: 'agent', name: s.name, project: s.project, agentId: s.agentId } : null
   if (s.kind === 'hive' || s.kind === 'user') return { kind: s.kind, name: s.name }
   return null
 }

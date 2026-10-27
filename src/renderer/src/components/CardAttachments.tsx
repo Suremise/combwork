@@ -48,7 +48,8 @@ const M = {
 
 /** A card's attachments, newest first, read again whenever the board changes. */
 export function useCardAttachments(card: number | null): { list: CardAttachment[]; reload: () => Promise<void> } {
-  const tasks = useStore((s) => s.tasks)
+  // Each read of the board: an attachment added or removed leaves the cards, so `tasks`, as they were (HI-1853).
+  const reads = useStore((s) => s.boardReads)
   const [list, setList] = useState<CardAttachment[]>([])
   const reload = useCallback(async () => {
     if (card === null) return setList([])
@@ -56,7 +57,7 @@ export function useCardAttachments(card: number | null): { list: CardAttachment[
   }, [card])
   useEffect(() => {
     void reload()
-  }, [reload, tasks])
+  }, [reload, reads])
   return { list, reload }
 }
 
@@ -235,7 +236,8 @@ const TAB = {
 
 /** A project's cards' attachments (its Attachments tab), read again whenever the board changes. */
 export function useProjectCardAttachments(projectPath: string | null): { groups: CardAttachmentGroup[]; reload: () => Promise<void> } {
-  const tasks = useStore((s) => s.tasks)
+  // Each read of the board: an attachment added or removed leaves the cards, so `tasks`, as they were (HI-1853).
+  const reads = useStore((s) => s.boardReads)
   const [groups, setGroups] = useState<CardAttachmentGroup[]>([])
   const reload = useCallback(async () => {
     if (!projectPath) return setGroups([])
@@ -243,7 +245,7 @@ export function useProjectCardAttachments(projectPath: string | null): { groups:
   }, [projectPath])
   useEffect(() => {
     void reload()
-  }, [reload, tasks])
+  }, [reload, reads])
   return { groups, reload }
 }
 

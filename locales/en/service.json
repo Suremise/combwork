@@ -39,6 +39,10 @@
     "defaultMessage": "{card}: nobody else has your answer",
     "description": "A notification's title (a banner, a Windows notification): the user answered an agent's question on card {card} (its key, such as HI-12), and the Hive Assistant, which could act on it, couldn't be told."
   },
+  "service.assistantAsk.title": {
+    "defaultMessage": "{card}: the Hive Assistant didn't get an agent's request",
+    "description": "A notification's title (a banner, a Windows notification), HI-1866: an agent asked the Hive Assistant for something on card {card} (its key, such as HI-12), and the request couldn't reach the Assistant."
+  },
   "service.attachments.badFolder": {
     "defaultMessage": "Not a session folder name.",
     "description": "An error: a name given for a session's attachments folder isn't one Hive makes (a session id)."

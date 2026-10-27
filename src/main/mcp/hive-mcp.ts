@@ -18,7 +18,7 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import type { QueuePublic } from '../../shared/workflow/queue'
 import { LOOP_STEPS } from '../../shared/workflow/facts'
@@ -168,10 +168,10 @@ function intentTools(): Tool[] {
     intent(
       'hive_submit',
       'submit',
-      'Submit a card in Doing for review: hands its committed work to review (a code card in Git needs its work committed; submitting never commits), and it moves on (to Review, or past it where its project has no review). Writes summary as a comment. A revision already reviewed needs note (what is different). As a lane\'s builder, Hive then watches it for you, for its review. Replies with warnings (files outside its paths, other agents\' changes in a shared folder) and the watch.',
-      { summary: { type: 'string', description: 'What was done, a line first.' }, revision, note: { type: 'string', description: 'For a revision already reviewed: what this submission adds (an explanation).' }, paths: { type: 'array', items: { type: 'string' }, description: 'The files the work changed, relative to the project, for a project with no version control.' } },
+      'Submit a card in Doing for review: hands its committed work to review (a code card in Git needs its work committed; submitting never commits), and it moves on (to Review, or past it where its project has no review). Writes summary as a comment. A revision already reviewed needs note (what is different). In Review, a commit asked for while it is reviewed goes in with followUp. As a lane\'s builder, Hive then watches it for you, for its review. Replies with warnings (files outside its paths, other agents\' changes in a shared folder) and the watch.',
+      { summary: { type: 'string', description: 'What was done, a line first.' }, revision, note: { type: 'string', description: 'For a revision already reviewed: what this submission adds (an explanation).' }, paths: { type: 'array', items: { type: 'string' }, description: 'The files the work changed, relative to the project, for a project with no version control.' }, followUp: { type: 'boolean', description: 'Its builder, the card in Review: a commit its reviewer asked for becomes the revision under review. It stays in Review, no round counted; its reviewer is woken to start its review again.' } },
       ['summary'],
-      (a) => ({ summary: a.summary, revision: a.revision, note: a.note, paths: a.paths })
+      (a) => ({ summary: a.summary, revision: a.revision, note: a.note, paths: a.paths, followUp: a.followUp })
     ),
     intent('hive_declare_paths', 'declare-paths', "Declare the paths a card's work will change (relative to the project), for a folder shared with other agents. Moves nothing.", { paths: { type: 'array', items: { type: 'string' } } }, ['paths'], (a) => ({ paths: a.paths })),
     intent('hive_start_review', 'start-review', "Start reviewing a card in Review: you are its reviewer; it stays where it is. Replies with the revision, base and files to review, and the review copy to read and run commands in, when the project has them.", { submission }, [], (a) => ({ submission: a.submission })),
@@ -498,6 +498,13 @@ const tools: Tool[] = [
       // Only the ways the carrying-on switches leave on for it (#1497); an older Hive's reply has no tells: all three.
       return messageQueuedText({ who, id: String(r.id), tied, status: String(r.status), queued: r.queued ?? 0, tells: r.tells ?? INBOX_SWITCHES })
     }
+  },
+  {
+    name: 'hive_ask_assistant',
+    description:
+      "Ask the Hive Assistant for something on a card that only it or the user can do (park a card On Hold, move one past its rules on the user's recorded answer): written as your comment, and it lands in the Assistant's inbox, which wakes it. Moves nothing; a decision only the user can make goes to them (hive_ask_user). Its answer comes to your inbox.",
+    inputSchema: { type: 'object', properties: { card: intentCardArg, text: { type: 'string', description: 'What you ask, whole: the card or cards and what to do, and on whose decision.' } }, required: ['card', 'text'] },
+    run: async (a) => askedAssistantText((await api('POST', `/v1/tasks/${enc(String(a.card))}/ask-assistant`, { text: a.text })) as AskedAssistant)
   },
   {
     name: 'hive_hand_over',

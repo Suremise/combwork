@@ -116,7 +116,8 @@ const check = (name, ok, extra = '') => {
       const tag = `Assistant ${side}, ${z * 100}%`
       const p = await run(`${tag}, no agents`, 'alpha', [['New Session', '.session-empty-card .btn.act-start']], 1)
       const lead = await explanation()
-      check(`${tag}, no agents: the explanation ${p.main.width < 280 ? 'gives way to the title and buttons' : 'shows'}`, lead === p.main.width >= 280, String(lead))
+      const room = await page.evaluate(() => document.querySelector('.session-empty-card')?.parentElement?.getBoundingClientRect().width ?? null)
+      check(`${tag}, no agents: the explanation ${p.main.width < 280 ? 'gives way to the title and buttons' : 'shows'}`, lead === p.main.width >= 280, `${lead}; main ${p.main.width}px, the card's room ${room}px`)
       await page.screenshot({ path: path.join(lib.WORK, `narrowmain-${side}-${z * 100}-alpha.png`) })
       // Two columns chosen are too narrow for a terminal here: one at a time, the agent's empty state alone (#1037).
       await run(`${tag}, an agent not running, two columns chosen`, 'beta', [['New Session', '.session-empty-card .btn.act-start']], 1)

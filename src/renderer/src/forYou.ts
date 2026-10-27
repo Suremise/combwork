@@ -21,11 +21,12 @@ const readForYou = sharedRead<ForYouSummary>(() => window.hive.invoke('tasks:for
 /** The workspace's requests for the user, and by card; empty while loading. */
 export function useForYou(): { summary: ForYouSummary; byCard: Map<number, ForYouItem[]> } {
   const ws = useStore((s) => s.workspace?.path ?? '')
-  const tasks = useStore((s) => s.tasks)
+  // Each read of the board: a request or an answer may write only facts, leaving the cards as they were (HI-1859).
+  const reads = useStore((s) => s.boardReads)
   const { data, load } = useScopedLoad<ForYouSummary>(ws)
   useEffect(() => {
-    if (ws) load(ws, () => readForYou(ws, tasks))
-  }, [ws, tasks, load])
+    if (ws) load(ws, () => readForYou(ws, reads))
+  }, [ws, reads, load])
   const summary = data ?? NONE
   const byCard = useMemo(() => {
     const m = new Map<number, ForYouItem[]>()

@@ -69,9 +69,9 @@ const M = {
   readDone: msg({ id: 'settings.connections.server.readDone', defaultMessage: '{n, plural, one {# model read from {name}.} other {# models read from {name}.}}', description: "A notice after reading a server connection's models ({name}, its name)." }),
   readDropped: msg({ id: 'settings.connections.server.readDropped', defaultMessage: 'No longer listed, so taken out: {models}', description: "A second line of that notice: models the server doesn't list any more, removed from the connection ({models}, their ids)." }),
   readFailed: msg({ id: 'settings.connections.server.readFailed', defaultMessage: "Couldn't read {name}'s models", description: "An error's title: reading a server connection's models failed ({name}, its name)." }),
-  setUp: msg({ id: 'settings.connections.server.setUp', defaultMessage: 'Set Up', description: "Button on a server connection: opens the CLI on it in a terminal, for its first-run screens (its theme, its notes), answered by the user." }),
-  setUpHint: msg({ id: 'settings.connections.server.setUpHint', defaultMessage: "The first time {cli} runs on it, it asks a few setup questions (its look, its notes). Answer them here once, or in the first agent's pane.", description: "Above the Set Up terminal of a server connection ({cli}: the coding agent CLI): what the terminal is for." }),
-  setUpFailed: msg({ id: 'settings.connections.server.setUpFailed', defaultMessage: "Couldn't open the setup", description: "An error's title: a server connection's Set Up terminal couldn't be opened." }),
+  setUp: msg({ id: 'settings.connections.server.setUp', defaultMessage: 'Set Up', description: "Button on a connection (a server one, or one signed in): opens the CLI on it in a terminal, for its first-run screens (its theme, its notes), answered by the user." }),
+  setUpHint: msg({ id: 'settings.connections.server.setUpHint', defaultMessage: "The first time {cli} runs on it, it asks a few setup questions (its look, its notes). Answer them here once, or in the first agent's pane.", description: "Above a connection's Set Up terminal ({cli}: the coding agent CLI): what the terminal is for." }),
+  setUpFailed: msg({ id: 'settings.connections.server.setUpFailed', defaultMessage: "Couldn't open the setup", description: "An error's title: a connection's Set Up terminal couldn't be opened." }),
   changeFailed: msg({ id: 'settings.connections.server.changeFailed', defaultMessage: "Couldn't change the connection", description: "An error's title: changing a server connection failed (Settings → Connections)." })
 }
 
@@ -435,8 +435,8 @@ export function MaskingBanner({ masking }: { masking?: { state: string; gap: boo
   )
 }
 
-/** Opens a server connection's Set Up terminal; its key, or null when it couldn't be opened (said). */
-export async function setUpServer(id: string): Promise<string | null> {
+/** Opens a connection's Set Up terminal (a server one's, or a sign-in one's: HI-1826); its key, or null when it couldn't be opened (said). */
+export async function setUpConnection(id: string): Promise<string | null> {
   try {
     return await call('connections:setUp', id)
   } catch (e) {
@@ -445,5 +445,8 @@ export async function setUpServer(id: string): Promise<string | null> {
   }
 }
 
-/** The hint above a server connection's Set Up terminal. */
+/** The hint above a connection's Set Up terminal. */
 export const setUpHint = (cli: ProviderId): string => tr(M.setUpHint, { cli: providerDescriptor(cli).name })
+
+/** The Set Up button's label. */
+export const setUpLabel = (): string => tr(M.setUp)

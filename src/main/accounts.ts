@@ -645,7 +645,21 @@ export async function confirmAccount(id: string): Promise<{ observed: Connection
  * Opens the account's sign-in: the CLI's own login in a terminal of Hive's, on its folder. Once it ends, the account is
  * checked; its first good login becomes the one accepted. Returns the terminal's key.
  */
-export async function signInAccount(id: string): Promise<string> {
+export function signInAccount(id: string): Promise<string> {
+  return openLoginTerminal(id, false)
+}
+
+/**
+ * Opens a sign-in connection's Set Up (HI-1826): the CLI itself on its folder, so the user answers its first-run screens
+ * (its theme, its notes), which a browser sign-in (`claude auth login`) leaves unanswered, before an agent starts on it.
+ * Hive types nothing and writes none of its files. The terminal is the sign-in's (one of the two at a time), and once it
+ * ends the account is checked as after a sign-in. Returns the terminal's key.
+ */
+export function setUpSignInConnection(id: string): Promise<string> {
+  return openLoginTerminal(id, true)
+}
+
+async function openLoginTerminal(id: string, setUp: boolean): Promise<string> {
   // A server connection has no sign-in: its Set Up opens the CLI instead (serverConnections.ts).
   if (isServer(mustGet(id))) throw hiveError(NO_ACCOUNT, undefined, { kind: 'invalid' })
   // Started under the account's lock, so never while it is being removed: the account checked still there (a removal
@@ -667,7 +681,7 @@ export async function signInAccount(id: string): Promise<string> {
           // Only a good, signed-in answer is taken on, and only when none is yet; a different one is a change to answer.
           if (ok && !getAccount(id)?.accepted) changeAccount(id, (x) => (x.accepted = ok))
         })
-      })
+      }, setUp ? { env: {}, cwd: accountFolder(id) } : undefined)
     } catch (e) {
       loginsOpen.delete(id)
       throw e

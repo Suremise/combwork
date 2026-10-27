@@ -41,13 +41,16 @@ const outcome = (p: Promise<unknown>): Promise<string> => p.then(() => 'ok', (e:
 const aside = (id: string): string => join(base, 'profile', 'accounts', `.removing-${id}`)
 /** Each open sign-in's end, by account: the faked terminal stays open until a test ends it. */
 const logins = new Map<string, (code: number) => void>()
+/** What each terminal was opened to run, by account: its Set Up's working folder and variables, or none for its sign-in. */
+const setUps = new Map<string, { env: Record<string, string>; cwd: string } | undefined>()
 
 beforeAll(async () => {
   advanced.load(join(base, 'profile'))
   mkdirSync(home, { recursive: true })
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never
-  vi.spyOn(providerService, 'runAccountLogin').mockImplementation((_p, id, _env, onExit) => {
+  vi.spyOn(providerService, 'runAccountLogin').mockImplementation((_p, id, _env, onExit, setUp) => {
+    setUps.set(id, setUp)
     logins.set(id, (code) => {
       logins.delete(id)
       onExit(code)
@@ -313,6 +316,37 @@ describe('removing an account', () => {
     rmSync(folderOf(a))
     // Missing altogether: the same.
     expect(await outcome(accounts.signInAccount(a.id))).toMatch(/isn't the one Hive made/)
+  })
+})
+
+describe("a sign-in connection's Set Up (HI-1826)", () => {
+  it("runs the CLI itself on its folder, in the sign-in's terminal; once it ends the account is checked and its login taken on", async () => {
+    const a = await accounts.addAccount('claude-code', 'Fresh')
+    status.set(folderOf(a), signedIn('fresh@example.com'))
+    expect(await accounts.setUpSignInConnection(a.id)).toBe(`task:claude-code:login:${a.id}`)
+    // The CLI on the folder, as its working folder, with no variables of a server's.
+    expect(setUps.get(a.id)).toEqual({ env: {}, cwd: folderOf(a) })
+    // Open, it counts as the sign-in's terminal: removal waits for it.
+    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/Fresh is in use/)
+    logins.get(a.id)!(0)
+    await vi.waitFor(() => expect(accounts.getAccount(a.id)?.accepted?.email).toBe('fresh@example.com'), { timeout: HUNG_MS })
+    // Its sign-in opens the login, not the CLI.
+    await accounts.signInAccount(a.id)
+    expect(setUps.get(a.id)).toBeUndefined()
+    logins.get(a.id)!(0)
+  })
+
+  it("is refused on a folder replaced by a link, and on a server connection (whose Set Up is serverConnections')", async () => {
+    const a = await accounts.addAccount('claude-code', 'Moved')
+    rmSync(join(folderOf(a), 'projects'))
+    renameSync(folderOf(a), `${folderOf(a)}-real`)
+    symlinkSync(home, folderOf(a), 'junction')
+    expect(await outcome(accounts.setUpSignInConnection(a.id))).toMatch(/isn't the one Hive made/)
+    expect(logins.has(a.id)).toBe(false)
+    rmSync(folderOf(a))
+    config.update((c) => c.connections!.push({ id: 'acc-server1', provider: 'claude-code', name: 'Server', kind: 'server' } as Connection))
+    expect(await outcome(accounts.setUpSignInConnection('acc-server1'))).not.toBe('ok')
+    expect(logins.has('acc-server1')).toBe(false)
   })
 })
 

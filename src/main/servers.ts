@@ -37,7 +37,8 @@ import { DOC_MAX, SHARED_PREFIX, readDoc } from './docSections'
 import { docOutline, findHeading, sectionText, type DocHeading } from '../shared/docSections'
 import { providerService } from './providerService'
 import { config } from './config'
-import type { Refusal } from '../shared/workflow/refusals'
+import { refusal, type Refusal } from '../shared/workflow/refusals'
+import { askAssistant, AskRefused } from './assistantAsk'
 import { agentWorkflowRole, isWorkflowRole, workflowPairs, type WorkflowRole } from '../shared/workflow/roles'
 import { deleteEntry, JournalBusy, JournalError, readEntry, recall, updateEntry, writeEntry } from './journal'
 import { journalSettingsOf, journalSuggestion } from './journalService'
@@ -3116,7 +3117,10 @@ const ASK_KINDS: readonly ForYouKind[] = ['approve', 'decide', 'test', 'signIn',
 /** Each intent's route (POST /v1/tasks/:n/<route>) and its arguments from the body; start is /start's (below). */
 export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
   'put-back': (body) => ({ kind: 'putBack', why: textField(body, 'why', true) }),
-  submit: (body) => ({ kind: 'submit', summary: textField(body, 'summary', true), revision: textField(body, 'revision'), note: textField(body, 'note'), paths: pathsField(body, false) }),
+  submit: (body) => {
+    if (body?.followUp !== undefined && body?.followUp !== null && typeof body.followUp !== 'boolean') throw new HttpError(400, 'followUp is true or false.')
+    return { kind: 'submit', summary: textField(body, 'summary', true), revision: textField(body, 'revision'), note: textField(body, 'note'), paths: pathsField(body, false), ...(body?.followUp === true ? { followUp: true } : {}) }
+  },
   'declare-paths': (body) => ({ kind: 'declarePaths', paths: pathsField(body, true)! }),
   'start-review': (body) => ({ kind: 'startReview', submission: submissionField(body) }),
   verdict: (body) => {
@@ -3145,6 +3149,25 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
   }
 }
 for (const [path, intentOf] of Object.entries(INTENT_ROUTES)) route('POST', `/v1/tasks/:n/${path}`, async ({ params, body }) => cardIntent(params[0], intentOf(body)))
+
+// An agent asks the Hive Assistant on a card (HI-1866): its comment, and the Assistant's inbox. An agent's alone: the
+// Assistant has its own tools, and the user acts on the board.
+route('POST', '/v1/tasks/:n/ask-assistant', async ({ params, body }) => {
+  const ws = requireWorkspace()
+  const ref = intentRef(params[0])
+  const actor = await taskActor()
+  if (actor.kind !== 'agent' || !actor.self) throw new HttpError(403, "Only a project's agents ask the Hive Assistant on a card.")
+  const text = textField(body, 'text', true)
+  // An agent's plain number is refused, naming the card's key (S48), as for the intents.
+  if (ref.plain) throw new tasks.WorkflowRefusedError(refusal('card.plainNumber', { key: (await tasks.readTask(ref.n, actor)).key ?? `#${ref.n}` }, null))
+  try {
+    const { card, id } = await askAssistant(ws, ref.n, actor, text)
+    return { ok: true, card: card.key ?? cardRef(ref.n), delivery: id }
+  } catch (e) {
+    if (e instanceof AskRefused) throw new HttpError(e.status, e.message)
+    throw e
+  }
+})
 
 // An agent starting a card itself runs its start intent (#1267); the Assistant starts a card on an agent.
 route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {

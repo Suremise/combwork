@@ -15,13 +15,14 @@ import { useShallow } from 'zustand/react/shallow'
  */
 export function useCardWork(n: number | null): { view: WorkView | null; error: string | null; loaded: boolean; retry: () => void } {
   const ws = useStore((s) => s.workspace?.path ?? '')
-  const tasks = useStore((s) => s.tasks)
+  // Each read of the board, its cards changed or only their facts (HI-1859).
+  const reads = useStore((s) => s.boardReads)
   const [again, setAgain] = useState(0)
   const scope = `${ws}\n${n ?? ''}`
   const { data, error, at, load } = useScopedLoad<WorkView | null>(scope)
   useEffect(() => {
     if (n !== null && ws) load(scope, () => window.hive.invoke('tasks:work', n))
-  }, [scope, n, ws, tasks, load, again])
+  }, [scope, n, ws, reads, load, again])
   return { view: data, error, loaded: at > 0, retry: () => setAgain((x) => x + 1) }
 }
 
@@ -31,15 +32,16 @@ export function useCardWork(n: number | null): { view: WorkView | null; error: s
  */
 export function useWorkBadges(): Map<number, WorkBadge> {
   const ws = useStore((s) => s.workspace?.path ?? '')
-  const tasks = useStore((s) => s.tasks)
+  // Each read of the board, its cards changed or only their facts (a refusal, HI-1859).
+  const reads = useStore((s) => s.boardReads)
   // A project's workflow written, or the projects read again (their version control recorded): its cards' old rules
   // marks may have changed (#1421). The projects as read, not their agents' states (HI-1806): an agent's turn asked them
   // all again. The store keeps each part that didn't change the same object (keepSame).
   const workflow = useStore((s) => s.workflowVersion)
   const projects = useStore(useShallow((s) => (s.workspace?.projects ?? []).flatMap((p) => [p.path, p.config, p.platform, p.isGitRepo, p.branch])))
   useEffect(() => {
-    if (ws) badgeSource.ask(ws, [tasks, workflow, ...projects])
-  }, [ws, tasks, workflow, projects])
+    if (ws) badgeSource.ask(ws, [reads, workflow, ...projects])
+  }, [ws, reads, workflow, projects])
   const shown = useSyncExternalStore(badgeSource.subscribe, badgeSource.get)
   return shown.ws === ws ? shown.badges : NO_BADGES
 }

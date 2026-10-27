@@ -25,7 +25,7 @@ import type { RunsFilter } from '@shared/progressTabs'
 import { loadActivityView, saveActivityView, type ActivityView } from './activityView'
 import { cardWorker } from '@shared/activity'
 import { boardReader } from './boardReads'
-import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkspaceUsage, RecentWorkspace } from '@shared/types'
+import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkflowForm, WorkspaceUsage, RecentWorkspace } from '@shared/types'
 import type { PresetId } from '@shared/workflow/options'
 import type {
   AgentApiInfo,
@@ -439,13 +439,19 @@ interface State {
 
   /** The workspace's task board (archived cards too), and the board view's filters. */
   tasks: TaskCard[]
+  /**
+   * Bumped by each read of the board (HI-1859): a change that writes only a card's facts (an agent's refusal) leaves
+   * `tasks` the same object (keepSame, HI-1806), so what is made from the facts (the work badges, a card's work) reads
+   * again on this.
+   */
+  boardReads: number
   /** Whether the board is read-only and why, and its kept 0.9 copy (#1207): read with the board. */
   boardState: BoardState | null
   /**
    * Every project's stages for the board's columns (`board:stages`, HI-1682), by path in lower case: read with the
    * board when what they were read for (`for`, boardStagesFor) has changed, so its columns come with its cards.
    */
-  boardStages: { for: string; byPath: Record<string, ProjectStages | null> } | null
+  boardStages: { for: string; byPath: Record<string, ProjectStages | null>; forms: Record<string, WorkflowForm> } | null
   /** Each project's key and its old keys (#1221), read with the board (a key change is a board change). */
   projectKeys: ProjectKeys[]
   /** The names moved cards keep in the projects they left (`HI-1` → card), read with the board too (#1221). */
@@ -629,6 +635,7 @@ export const useStore = create<State>(() => ({
   filesRoot: {},
 
   tasks: [],
+  boardReads: 0,
   boardState: null,
   boardStages: null,
   projectKeys: [],
@@ -1440,11 +1447,14 @@ async function readTasks(): Promise<void> {
     const readStages = get().boardStages?.for !== stagesFor
     // What changed since this window's copy of the board (HI-1715), or the whole board while the archived cards are wanted in full.
     const board = boardReads.begin(ws, fullArchive > 0)
-    const [cards, boardState, projectKeys, movedCardNames, stages] = await Promise.all([board.request, window.hive.invoke('board:state'), window.hive.invoke('project:keys'), window.hive.invoke('project:movedCardNames'), readStages ? window.hive.invoke('board:stages').catch(() => ({})) : null])
+    // With them, each project's workflow line for the toolbar's link (#1420): it came after the board's first paint, and
+    // a toolbar it made wrap moved every column down under the pointer (HI-1852).
+    const forms = readStages ? workflowForms() : null
+    const [cards, boardState, projectKeys, movedCardNames, stages, formsRead] = await Promise.all([board.request, window.hive.invoke('board:state'), window.hive.invoke('project:keys'), window.hive.invoke('project:movedCardNames'), readStages ? window.hive.invoke('board:stages').catch(() => ({})) : null, forms])
     if (mine !== tasksLoad) return
     const tasks = board.take(cards, { ws: get().workspace?.path ?? null, whole: fullArchive > 0 })
     if (tasks === 'again') return void loadTasks()
-    if (tasks) set({ tasks, boardState, projectKeys, movedCardNames, ...(stages ? { boardStages: { for: stagesFor, byPath: stages } } : {}) })
+    if (tasks) set({ tasks, boardReads: get().boardReads + 1, boardState, projectKeys, movedCardNames, ...(stages ? { boardStages: { for: stagesFor, byPath: stages, forms: formsRead ?? {} } } : {}) })
   } catch {
     // The workspace closed meanwhile.
   }
@@ -1457,7 +1467,14 @@ const boardReads = boardReader({ list: () => window.hive.invoke('tasks:list', tr
  * What the board's stages are read for: the workspace, its projects and their version control, and the workflows
  * written since the window opened (`workflow-changed`). Stages read for another are read again with the board.
  */
-export const boardStagesFor = (s: Pick<State, 'workspace' | 'workflowVersion'>): string => `${s.workspace?.path ?? ''}|${s.workflowVersion}|${(s.workspace?.projects ?? []).map((p) => `${p.path}:${p.platform?.id ?? ''}`).join('|')}`
+/** Each project with version control's workflow form, by path in lower case; one that can't be read is left out. */
+async function workflowForms(): Promise<Record<string, WorkflowForm>> {
+  const projects = (get().workspace?.projects ?? []).filter((p) => p.platform)
+  const read = await Promise.all(projects.map((p) => window.hive.invoke('workflow:form', p.path).then((f) => [p.path.toLowerCase(), f] as const, () => null)))
+  return Object.fromEntries(read.filter((x) => !!x))
+}
+
+export const boardStagesFor =(s: Pick<State, 'workspace' | 'workflowVersion'>): string => `${s.workspace?.path ?? ''}|${s.workflowVersion}|${(s.workspace?.projects ?? []).map((p) => `${p.path}:${p.platform?.id ?? ''}`).join('|')}`
 
 /** A project's key and its old keys, as the board has them (#1221). */
 export type ProjectKeys = { projectPath: string; key: string; aliases: string[] }

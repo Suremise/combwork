@@ -99,6 +99,25 @@ class ConfigStore {
   }
 
   /**
+   * Key masking's evidence as config.json mirrors it, before ready (keyCoverage.ts's first look, HI-1855): {} for none
+   * (no file, or no record in it), null when the file can't be read or parsed (load() recovers it after ready).
+   */
+  savedKeyMasking(): { ever?: boolean; gap?: boolean } | null {
+    let text: string
+    try {
+      text = readFileSync(this.path, 'utf8')
+    } catch (e) {
+      return (e as NodeJS.ErrnoException).code === 'ENOENT' ? {} : null
+    }
+    try {
+      const m = (JSON.parse(text) as { keyMasking?: { ever?: unknown; gap?: unknown } } | null)?.keyMasking
+      return { ...(m?.ever ? { ever: true } : {}), ...(m?.gap ? { gap: true } : {}) }
+    } catch {
+      return null
+    }
+  }
+
+  /**
    * Settings → General → Language as config.json has it, before ready (Chromium's --lang, i18n.ts). Only a peek: a
    * damaged file is recovered by load(), after ready, and reads as no setting here.
    */

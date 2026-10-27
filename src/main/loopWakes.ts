@@ -259,6 +259,12 @@ function historySince(card: TaskCard, since: TaskHistoryEntry | null): TaskHisto
 function stillDue(p: Wake & { agentId: string }, card: TaskCard | null, inLane: boolean): boolean {
   if (!card || card.archived) return false
   const since = historySince(card, p.since)
+  // A follow-up's (HI-1832: its handoff is its "Follow-up submitted" line): to the reviewer already reviewing, until it
+  // starts again (a renewed review writes no line: its mark's time) or gives a verdict.
+  // (A wake made again keeps only its handoff's id and time: its line is the card's.)
+  const handoff = p.since ? (p.since.whatText ?? card.history.find((h) => h.id === p.since!.id)?.whatText) : undefined
+  const followUp = handoff?.id === 'tasks.history.followUpSubmitted'
+  if (p.kind === 'review' && followUp) return card.column === 'review' && !(card.review && card.review.since > p.since!.at) && !since.some((h) => /^(Started reviewing|Review (passed|failed))$/.test(h.what))
   if (p.kind === 'review') return card.column === 'review' && !card.review && !since.some((h) => /^(Started reviewing|Review (passed|failed))$/.test(h.what))
   // The user's answer, to whoever waits on it (the card's agent or the one that asked): due until it reads it (its
   // receipt ends it), wherever the card is now (an answer that moved it to Done is told too, #1630). Not on the agent's

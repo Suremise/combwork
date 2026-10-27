@@ -111,8 +111,8 @@ fs.mkdirSync(shots, { recursive: true })
   check("a dropped PDF's and zip's paths reach the input line, copies kept with the session", !!pdfs && pdfs[0].endsWith('_q3 report.pdf') && fs.readdirSync(imgDir).length === 4, (await typed()).slice(-400))
   check('their chips: PDF, and the zip by path', !!(await lib.until(async () => JSON.stringify((await chips()).slice(2)) === JSON.stringify(['q3 report.pdf | PDF', 'logs.zip | File · by path']), HUNG_MS)), JSON.stringify(await chips()))
   await page.screenshot({ path: path.join(shots, '2-chips.png') })
-  // A chip's × dismisses it (its path stays in the prompt).
-  await page.locator('.attachment-chip', { hasText: 'logs.zip' }).locator('.attachment-chip-close').click()
+  // A chip's × dismisses it (its path stays in the prompt). By its name: Attach to a card (HI-1700) shares its class.
+  await page.locator('.attachment-chip', { hasText: 'logs.zip' }).getByRole('button', { name: 'Dismiss logs.zip' }).click()
   check("× dismisses a chip", !!(await lib.until(async () => (await chips()).length === 3, HUNG_MS)), JSON.stringify(await chips()))
 
   // A large file is asked about first; cancelled, nothing is pasted or copied.

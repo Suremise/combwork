@@ -29,6 +29,8 @@ interface HiveMessageValues {
   'tips.archiveNew.title': undefined
   'tips.assistant.text': { key: string | number }
   'tips.assistant.title': undefined
+  'tips.assistantAgentRequests.text': undefined
+  'tips.assistantAgentRequests.title': undefined
   'tips.assistantBatch.text': { cards: number }
   'tips.assistantBatch.title': undefined
   'tips.assistantCompact.text': { tokens: number }

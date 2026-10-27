@@ -238,7 +238,7 @@ const MOVE = {
 
 /** A refusal's three sentences, one per line, in the window's language, the card named as the window names it (`name`). */
 const refusalText = (r: Refusal, name: string): string => {
-  const l = refusalLines(r.rule, { ...r.values, ...(r.values.card !== undefined ? { card: name } : {}) }, IN_WINDOW)
+  const l = refusalLines(r.rule, { ...r.values, ...(r.values.card !== undefined ? { card: name } : {}) }, { ...IN_WINDOW, forUser: true })
   return [l.message, l.next, ...(l.change ? [l.change] : [])].join('\n')
 }
 
@@ -1250,8 +1250,10 @@ export function BoardToolbar({
   useLanguage()
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const count = useStore((s) => (s.tasks ?? NO_TASKS).filter((c) => c.archived && (project === null || c.project.toLowerCase() === project.toLowerCase())).length)
-  // How many cards an older Hive saved are set aside (#1044): the ⋯ menu offers them while any are. Read again as the board changes.
+  // How many cards an older Hive saved are set aside (#1044): the ⋯ menu offers them while any are. Read again as the board
+  // changes, and as their dialog closes: a discard there changes no card, so the board alone wouldn't say (HI-1860).
   const tasks = useStore((s) => s.tasks)
+  const asideOpen = useStore((s) => s.setAsideOpen)
   const [aside, setAside] = useState(0)
   useEffect(() => {
     let live = true
@@ -1262,7 +1264,7 @@ export function BoardToolbar({
     return () => {
       live = false
     }
-  }, [tasks])
+  }, [tasks, asideOpen])
   const menu = useContextMenu()
   const waiting = useForYou().summary.items
   const forYouCount = new Set(waiting.filter((i) => project === null || i.project.toLowerCase() === project.toLowerCase()).map((i) => i.card)).size

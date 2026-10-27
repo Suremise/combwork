@@ -1096,6 +1096,23 @@ async function laneReviewerAsks(ws: WorkspaceService, card: TaskCard, patch: Tas
   return projectPreferences(ws, path, await ws.projectConfig(path).catch(() => null)).loopWakes
 }
 
+/**
+ * Whether the acting agent is the reviewer of a card it moves back from Review or Passed (HI-1832): the one reviewing it
+ * now (its board review), or its running lane's reviewer (the board's own record). Such a move leaves the card its
+ * builder's: on HI-1772 a reviewer's move to Doing gave the card to the reviewer and ended its builder's watch. Anyone
+ * else's move keeps taking it.
+ */
+function reviewerMovesBack(ws: WorkspaceService, card: TaskCard, actor: TaskActor): boolean {
+  const self = actor.kind === 'agent' ? actor.self : undefined
+  if (!self || !card.project || !card.agent || card.agent === self.agentId || (card.column !== 'review' && card.column !== 'passed')) return false
+  if (card.review?.agent === self.agentId) return true
+  try {
+    return FactStore.forBoard(ws, { project: card.project, key: '' }).card(card.number).reviewer === self.agentId
+  } catch {
+    return false
+  }
+}
+
 /** A message within a history line's values: a CLI's sentence (providerMessage) or the workflow's (a request's, #1266). */
 const lineMessage = (id: string): Msg | null => providerMessage(id) ?? workflowMessage(id)
 
@@ -2008,8 +2025,8 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     // An agent that moves a card into Doing from another column, naming no agent, is taking it (not in a project
     // change): also from another agent, who wasn't working on it since it wasn't in Doing ("Given to …" in its history).
     // Not when the change keeps its agent (#1267: a reviewer's failed verdict moves the card back into Doing, its builder's
-    // still, whoever it is given to by then).
-    const own = !opts.keepAgent && !transferred && patch.agent === undefined && patch.column === 'doing' && card.column !== 'doing' ? selfIn(actor, card.project) : null
+    // still, whoever it is given to by then), nor the card's reviewer's own move back (HI-1832: it stays its builder's).
+    const own = !opts.keepAgent && !transferred && patch.agent === undefined && patch.column === 'doing' && card.column !== 'doing' && !reviewerMovesBack(ws, card, actor) ? selfIn(actor, card.project) : null
     const agent = patch.agent !== undefined ? patch.agent : (own ?? undefined)
     if (agent !== undefined && !(transferred && !agent)) {
       if (agent) {
@@ -2370,6 +2387,26 @@ export async function commentTask(n: number, comment: string, actor: TaskActor):
     if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
     if (c.archived && actor.kind !== 'user') throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
     addComment(c, actorName(actor), t)
+    await saveCard(ws, n, c)
+    changed(ws)
+    return c
+  }))
+}
+
+/**
+ * An agent's request for the Hive Assistant on a card (HI-1866, assistantAsk.ts): written as its comment, with a history
+ * line, in one change of the board. `check` sees the card as it is in the change (another project's is unknown first) and
+ * throws to refuse it, so a refused request writes nothing.
+ */
+export async function askAssistantOn(n: number, asked: string, actor: TaskActor, check: (card: TaskCard) => void, ws: WorkspaceService = workspace): Promise<TaskCard> {
+  const t = commentText(asked)
+  return recordingAs(actor, () => boardLock(ws, async () => {
+    const c = await getTask(n, ws)
+    if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
+    check(c)
+    const by = actorName(actor)
+    note(c, by, storedText(HISTORY.assistantAsked, { text: clip(t) }))
+    addComment(c, by, t)
     await saveCard(ws, n, c)
     changed(ws)
     return c

@@ -184,6 +184,19 @@ export function intentText(d: IntentDone): string {
   return [`${d.card}: ${where}.${facts.length ? ` ${facts.join('; ')}` : ''}${d.next ? ` ${nextText(d.next)}` : ''}${d.watch ? ` ${d.watch}` : ''}`, ...(d.warnings ?? []).map((w) => `Warning: ${w}`)].join('\n')
 }
 
+/** What asking the Hive Assistant on a card did (HI-1866): the card, and the request's id in the Assistant's inbox ('' when it couldn't be given). */
+export interface AskedAssistant {
+  ok: true
+  card: string
+  delivery: string
+}
+
+/** "HI-12: asked the Hive Assistant (m41 in its inbox). Its answer comes to your inbox." */
+export function askedAssistantText(a: AskedAssistant): string {
+  if (!a.delivery) return `${a.card}: your request is on the card, but the Hive Assistant couldn't be given it; the user is told. Ask the user instead (hive_ask_user).`
+  return `${a.card}: asked the Hive Assistant (${a.delivery} in its inbox). Its answer comes to your inbox.`
+}
+
 /** One of the Assistant's changes as GET /v1/assistant/changes lists it (#1282). */
 export interface ChangeListed {
   id: string

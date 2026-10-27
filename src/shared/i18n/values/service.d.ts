@@ -11,6 +11,7 @@ interface HiveMessageValues {
   'service.advanced.notValues': undefined
   'service.advanced.unknown': { id: string | number }
   'service.answerRelay.title': { card: string | number }
+  'service.assistantAsk.title': { card: string | number }
   'service.attachments.badFolder': undefined
   'service.attachments.badRecord': { file: string | number }
   'service.attachments.notOwn': { folder: string | number }
