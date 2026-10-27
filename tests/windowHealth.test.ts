@@ -11,7 +11,7 @@ vi.mock('../src/main/logger', () => ({
 const { noteLongTasks } = await import('../src/main/rendererWatch')
 
 const where = { view: 'board', project: 'alpha', tab: null, dialog: 'Card HI-12: a title', panels: ['assistant'] }
-const task = (ms: number, scripts: string[] = []): LongTask => ({ at: 1, ms, kind: scripts.length ? 'frame' : 'task', scripts })
+const task = (ms: number, scripts: string[] = [], during: string[] = []): LongTask => ({ at: 1, ms, kind: scripts.length ? 'frame' : 'task', scripts, during })
 
 describe("a window's health in hive.log (HI-1775)", () => {
   it("names where it was, the user's own text wrapped, and what ran in a long task", () => {
@@ -20,7 +20,9 @@ describe("a window's health in hive.log (HI-1775)", () => {
     expect(whereText(null, (s) => s)).toBe('where unknown')
     expect(taskText(task(512.4, ['TimerHandler:setTimeout 500 ms']))).toBe('512 ms (TimerHandler:setTimeout 500 ms)')
     expect(taskText(task(300))).toBe('300 ms')
-    expect(taskText({ at: 1, ms: 300, kind: 'frame', scripts: [] })).toBe('300 ms (no script: layout, style or paint)')
+    expect(taskText({ at: 1, ms: 300, kind: 'frame', scripts: [], during: [] })).toBe('300 ms (no script: layout, style or paint)')
+    // What arrived from main just before it: what it most likely handled.
+    expect(taskText(task(420, [], ['reply tasks:changes', 'event tasks-changed ×3']))).toBe('420 ms (after reply tasks:changes, event tasks-changed ×3)')
   })
 
   it("takes the page's report as data: bounded, and nothing that isn't one", () => {

@@ -1,7 +1,8 @@
 // The window's health for hive.log (HI-1775): its long tasks, and where it is, sent to main, which logs them (and a
 // hang's start and end with them: rendererWatch.ts). Long animation frames where the browser has them (each says which
 // scripts ran in it, so a line names what was busy), else long tasks.
-import { LONG_TASK_MS, MAX_SCRIPTS, MAX_TASKS, type LongTask, type WindowWhere } from '@shared/windowHealth'
+import { LONG_TASK_MS, MAX_DURING, MAX_SCRIPTS, MAX_TASKS, type LongTask, type WindowWhere } from '@shared/windowHealth'
+import { marksBetween } from './pageMarks'
 import { findProject, useStore } from './store'
 
 /** The preload's bridge: none where a component renders outside Hive's window (a unit test). */
@@ -80,6 +81,8 @@ let started = false
 export function startWindowHealth(): void {
   if (started) return
   started = true
+  // A test copy's probes read the marks too (unlimited, where hive.log's lines are rate-limited).
+  if (bridge()?.commitWatch) (window as unknown as { __hivePageMarks?: typeof marksBetween }).__hivePageMarks = marksBetween
   // Where it is: its view, project, tab and panels as they change (a dialog says so itself).
   useStore.subscribe((s, was) => {
     if (s.activity !== was.activity || s.selectedProject !== was.selectedProject || s.projectTabs !== was.projectTabs || s.assistantOpen !== was.assistantOpen || s.inboxOpen !== was.inboxOpen || s.paletteOpen !== was.paletteOpen || s.workspace !== was.workspace) whereChanged()
@@ -107,7 +110,12 @@ export function startWindowHealth(): void {
       const from = e.startTime
       const to = from + e.duration
       // Its frame's scripts, read as the report goes (a frame's entry can come after the task's).
-      const task: LongTask = { at: Math.round(performance.timeOrigin + from), ms: e.duration, kind: 'task', scripts: [] }
+      const at = performance.timeOrigin + from
+      // What came from main just before it began and while it ran, and the store's updates (React renders one in its
+      // next task, so those just before count too): what it was most likely doing. Read now, as its entry comes (the
+      // rings are short: under load they turn over in seconds).
+      const during = [...marksBetween(at - 50, at + e.duration), ...(bridge()?.arrivals?.(at - 50, at + e.duration) ?? [])].slice(0, MAX_DURING)
+      const task: LongTask = { at: Math.round(at), ms: e.duration, kind: 'task', scripts: [], during }
       taskEnded(task, () => {
         const scripts = scriptsAt(from, to)
         if (scripts.length) Object.assign(task, { kind: 'frame', scripts })

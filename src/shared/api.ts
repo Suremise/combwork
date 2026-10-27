@@ -974,4 +974,9 @@ export interface HiveBridge {
   platform: string
   /** A test copy's window: React's commits are watched (HI-1387, renderer commitWatch.ts). */
   commitWatch: boolean
+  /**
+   * What arrived from main between two times (epoch ms): each call's reply, each event and terminal output, in words
+   * ("reply tasks:changes", "event tasks-changed ×3"): what a long task's line names as under way (HI-1775).
+   */
+  arrivals(from: number, to: number): string[]
 }

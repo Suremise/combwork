@@ -23,8 +23,10 @@ export interface LongTask {
   ms: number
   /** A long animation frame (with the scripts it ran), or a long task (the browser says only that it was long). */
   kind: 'frame' | 'task'
-  /** What ran in it, longest first: each script's entry point and its time (a frame's only). */
+  /** What ran in it, longest first: each script's entry point and its time (a frame's only, where the browser says). */
   scripts: string[]
+  /** What arrived from main just before and during it (replies, events, terminal output): most likely what it handled. */
+  during: string[]
 }
 
 /** Tasks this long or longer are reported. */
@@ -32,6 +34,7 @@ export const LONG_TASK_MS = 200
 /** At most this many tasks in one report, and scripts per task. */
 export const MAX_TASKS = 20
 export const MAX_SCRIPTS = 3
+export const MAX_DURING = 8
 
 /** Where a window was, in a log line's words; `user` wraps the user's own text (names, titles) for Copy Diagnostics. */
 export function whereText(w: WindowWhere | null, user: (s: string) => string): string {
@@ -46,7 +49,10 @@ export function whereText(w: WindowWhere | null, user: (s: string) => string): s
 
 /** A long task in a log line's words: its time, and what ran in it. */
 export function taskText(t: LongTask): string {
-  return `${Math.round(t.ms)} ms${t.scripts.length ? ` (${t.scripts.join('; ')})` : t.kind === 'task' ? '' : ' (no script: layout, style or paint)'}`
+  const ran = t.scripts.length ? t.scripts.join('; ') : t.kind === 'task' ? '' : 'no script: layout, style or paint'
+  const after = t.during.length ? `after ${t.during.join(', ')}` : ''
+  const said = [ran, after].filter(Boolean).join('; ')
+  return `${Math.round(t.ms)} ms${said ? ` (${said})` : ''}`
 }
 
 /** A report's tasks as the page sent them, bounded and checked (the page's word is data). */
@@ -55,9 +61,9 @@ export function cleanTasks(raw: unknown): LongTask[] {
   const text = (s: unknown): string => String(s).slice(0, 200)
   return raw.slice(0, MAX_TASKS).flatMap((t): LongTask[] => {
     if (!t || typeof t !== 'object') return []
-    const { at, ms, kind, scripts } = t as Record<string, unknown>
+    const { at, ms, kind, scripts, during } = t as Record<string, unknown>
     if (typeof at !== 'number' || typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) return []
-    return [{ at, ms, kind: kind === 'frame' ? 'frame' : 'task', scripts: Array.isArray(scripts) ? scripts.slice(0, MAX_SCRIPTS).map(text) : [] }]
+    return [{ at, ms, kind: kind === 'frame' ? 'frame' : 'task', scripts: Array.isArray(scripts) ? scripts.slice(0, MAX_SCRIPTS).map(text) : [], during: Array.isArray(during) ? during.slice(0, MAX_DURING).map(text) : [] }]
   })
 }
 
