@@ -163,7 +163,7 @@ const check = (name, ok, extra = '') => {
     check('…and leaving it saves nothing', probe === 'failed' && wsJson().slotDefaults?.copy === 'ext.env', `${probe} ${JSON.stringify(wsJson().slotDefaults)}`)
     // Typed in, then changed elsewhere: the typed text stays, and leaving saves it.
     await inv('slots:setLevelDefault', 'workspace', 'copy', null)
-    await lib.until(async () => (await copyOf(wsCopy)).origin === 'default', HUNG_MS)
+    check('the workspace’s copied files unset elsewhere inherit Hive’s again, the untouched field emptied', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'global' && c.text.includes('again.env') && c.field === '' }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
     await wsField.fill('mine.env')
     await inv('slots:setLevelDefault', 'workspace', 'copy', 'other.env')
     check('a field typed in keeps its text over a value changed elsewhere', !!(await lib.until(async () => (await copyOf(wsCopy)).origin === 'here', HUNG_MS)) && (await wsField.inputValue()) === 'mine.env', JSON.stringify(await copyOf(wsCopy)))
