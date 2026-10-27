@@ -3,7 +3,7 @@ import { app } from 'electron'
 import type { AgentInstallInfo, ModelCatalog, ProviderId, ProviderTask } from '../shared/types'
 import { observedEffortKey } from '../shared/models'
 import { autoProviderPending, isProviderEnabled, providerSettings, setInstalledCheck } from '../shared/providers'
-import { shownInstallInfo, toSpawnable } from './providers/common'
+import { shownInstallInfo, toSpawnable, withoutAccountEnv } from './providers/common'
 import { allProviders, provider } from './providers'
 import type { KeySteps, UpdateRetry } from './providers/types'
 import { msg, onLanguageChange, tr } from '../shared/i18n'
@@ -367,10 +367,11 @@ class ProviderService {
     if (!info.path) throw hiveError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: adapter.descriptor.name })
     const key = `task:${id}:login:${accountId}`
     if (hasPty(key)) return key
-    const cmd = adapter.loginCommand(info.path)
+    // The connection's own sign-in where the CLI has one (HI-1757), without the variables it would read as a login.
+    const cmd = adapter.accountLoginCommand?.(info.path) ?? adapter.loginCommand(info.path)
     const s = toSpawnable(cmd.file, cmd.args)
     log.info(`${adapter.descriptor.name} sign-in for account ${accountId}`)
-    spawnPty(key, { file: s.file, args: s.args, cwd: homedir(), env: childEnv(env), onExit })
+    spawnPty(key, { file: s.file, args: s.args, cwd: homedir(), env: withoutAccountEnv(adapter, childEnv(env)), onExit })
     return key
   }
 

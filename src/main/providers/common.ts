@@ -533,3 +533,17 @@ export const userMemoryLabel = (file: string): string => tr(USER_MEMORY, { file 
 const CONNECTION_MEMORY = msg({ id: 'providers.memory.connection', defaultMessage: '{file} of connection {name} (its agents, all projects)', description: "In the Memory view: a connection's own instructions file (HI-1755), which the agents running on that connection read in every project. {file} is its name (CLAUDE.md), {name} the connection's name (\"Personal\")." })
 /** The Memory view's label for a connection's own instructions file (HI-1755). */
 export const connectionMemoryLabel = (file: string, name: string): string => tr(CONNECTION_MEMORY, { file, name })
+
+/**
+ * An environment for running a CLI on a connection (HI-1757): without the variables it would read as a login instead.
+ * `adapter` null (not on a connection): the environment as it is.
+ */
+export function withoutAccountEnv<T extends Record<string, string | undefined>>(adapter: { accountEnvDrop?(): readonly string[] } | null, env: T): T {
+  const drop = adapter?.accountEnvDrop?.() ?? []
+  if (!drop.length) return env
+  const out = { ...env }
+  // Windows' variable names aren't case-sensitive: any spelling of one goes.
+  const names = new Set(drop.map((k) => k.toUpperCase()))
+  for (const k of Object.keys(out)) if (names.has(k.toUpperCase())) delete out[k]
+  return out
+}

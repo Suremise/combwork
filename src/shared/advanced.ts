@@ -1481,6 +1481,94 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/codex-0.159.jsonl`, version: '0.159.0', fields: ['used_percent', 'window_minutes', 'resets_at'] }]
   },
+  // Connections (HI-1757): what Hive asks Codex's app server in a connection's CODEX_HOME, never a token.
+  {
+    id: 'codex.accounts.statusSeconds',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.accounts.statusSeconds.title', defaultMessage: 'Connections: sign-in check timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.accounts.statusSeconds.desc', defaultMessage: "How long Hive gives Codex's app server to say who a connection's folder is signed in as (`account/read`). Past it, the connection shows \"Couldn't check\", never signed out.", description: 'What the advanced setting "Connections: sign-in check timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `account/read` as it is (a request\'s name).' }),
+    kind: 'number',
+    default: 20,
+    min: 5,
+    max: 120,
+    unit: 's',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/account-read-codex-0.164.0.jsonl`, version: '0.164.0', text: 'account/read', shows: "Codex's app server answering who its CODEX_HOME is signed in as" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'codex.accounts.readMethod',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.accounts.readMethod.title', defaultMessage: 'Connections: sign-in request', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.accounts.readMethod.desc', defaultMessage: "The request Hive sends Codex's app server to ask who a connection's folder is signed in as. Wrong, Hive can't tell, and its Codex connections show \"Couldn't check\".", description: 'What the advanced setting "Connections: sign-in request" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'account/read',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/account-read-codex-0.164.0.jsonl`, version: '0.164.0', text: 'account/read' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'codex.accounts.accountField',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.accounts.accountField.title', defaultMessage: 'Connections: account field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.accounts.accountField.desc', defaultMessage: "The field of Codex's sign-in answer with the account a connection's folder is signed in as (empty when it is signed out). Wrong, Hive can't tell, and its Codex connections show \"Couldn't check\".", description: 'What the advanced setting "Connections: account field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'account',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/account-read-codex-0.164.0.jsonl`, version: '0.164.0', fields: ['account', 'requiresOpenaiAuth', 'workspaceRouting'] }]
+  },
+  {
+    id: 'codex.accounts.emailField',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.accounts.emailField.title', defaultMessage: 'Connections: email field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.accounts.emailField.desc', defaultMessage: "The field of Codex's account with the email a connection's folder is signed in as. Wrong, Hive can't tell who a connection is signed in as, and can't warn when its login changes.", description: 'What the advanced setting "Connections: email field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'email',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/account-read-codex-0.164.0.jsonl`, version: '0.164.0', fields: ['type', 'email', 'planType'] }]
+  },
+  {
+    id: 'codex.accounts.planField',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.accounts.planField.title', defaultMessage: 'Connections: plan field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.accounts.planField.desc', defaultMessage: "The field of Codex's account with a connection's plan (\"plus\", \"pro\"), shown beside its email in Settings → Connections. Wrong, no plan is shown.", description: 'What the advanced setting "Connections: plan field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep "plus" and "pro" as they are (plan names).' }),
+    kind: 'field',
+    default: 'planType',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/account-read-codex-0.164.0.jsonl`, version: '0.164.0', fields: ['type', 'email', 'planType'] }]
+  },
+  {
+    id: 'codex.accounts.loginFiles',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.accounts.loginFiles.title', defaultMessage: 'Connections: login files', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.accounts.loginFiles.desc', defaultMessage: "The names of the files in a connection's folder that change when Codex signs in or out there, as a regular expression. Hive watches them (it never reads them) and checks the connection again when one changes. Wrong, a sign-in or sign-out in an agent's pane is only found at the connection's next check.", description: 'What the advanced setting "Connections: login files" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'pattern',
+    default: '^auth\\.json$',
+    flags: 'i',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/home-codex-0.164.0.txt`, version: '0.164.0', text: 'auth.json', shows: 'The login file at the top of a signed-in Codex home (its contents never read)' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'codex.accounts.dropEnv',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.accounts.dropEnv.title', defaultMessage: 'Connections: sign-in variables left out', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.accounts.dropEnv.desc', defaultMessage: "The environment variables Hive leaves out when it runs Codex on a connection (its sign-in, its checks and its agents), so a key or token set on this PC can't stand in for the connection's own login. Wrong, a variable Codex reads as a login could make a connection run as someone else.", description: 'What the advanced setting "Connections: sign-in variables left out" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'list',
+    default: ['CODEX_ACCESS_TOKEN', 'CODEX_API_KEY', 'OPENAI_API_KEY'],
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/ambient-auth-codex-0.164.0.txt`, version: '0.164.0', text: 'CODEX_ACCESS_TOKEN alone: "Error checking login status: invalid agent identity JWT format"', shows: 'A token in the environment taken over a connection home that is signed out' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'codex.appServer.closeSeconds',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.appServer.closeSeconds.title', defaultMessage: 'App server: time to close', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.appServer.closeSeconds.desc', defaultMessage: "How long Codex's app server gets to end by itself once Hive has its answer (a connection's sign-in check, its hooks' check). Past it, Hive ends it with everything it started. Too short, Codex is cut off as it ends; too long, its processes stay a little longer.", description: 'What the advanced setting "App server: time to close" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'number',
+    default: 3,
+    min: 1,
+    max: 30,
+    unit: 's',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/appserver-close-codex-0.164.0.txt`, version: '0.164.0', text: 'exited by itself in 198 ms', shows: "Codex's app server ending by itself once its stdin closed" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   {
     id: 'codex.title.items',
     group: 'codex',

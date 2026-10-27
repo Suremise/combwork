@@ -67,7 +67,7 @@ import { checkAccount, launchOnChosen, onConnectionSignedIn, setAccountSessions,
 import { connectionLayerFor, effortUsable, ensureMoved } from './connectionMoves'
 import { assistantOwn } from '../shared/connectionDefaults'
 import { resolveConnection } from '../shared/accounts'
-import { recacheEstimate } from './providers/common'
+import { recacheEstimate, withoutAccountEnv } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage } from '../shared/usageDays'
@@ -2149,7 +2149,9 @@ class SessionManager {
       trustedHiveTools: workspace.isAssistantHome(projectPath) ? assistantTools(config.settings.assistant?.control, config.settings.assistant?.changeSettings === true, journalSettingsOf(workspaceOf(projectPath)).enabled) : undefined,
       initialPrompt: l.initialPrompt,
       allowBackgroundSessions: providerSettings(config.settings, adapter.id).allowBackgroundSessions,
-      env: withBinOnPath(childEnv({
+      ...(conn ? { connectionHome: conn.folder } : {}),
+      // On a connection, without the variables its CLI would read as a login in its place (HI-1757).
+      env: withBinOnPath(withoutAccountEnv(conn ? adapter : null, childEnv({
         HIVE_HOOK_TOKEN: hookAuth.token,
         HIVE_PROJECT: basename(projectPath),
         HIVE_PROJECT_PATH: projectPath,
@@ -2164,7 +2166,7 @@ class SessionManager {
         ...(conn ? { [conn.homeEnv]: conn.folder } : {}),
         // Not for the Assistant: it reaches the API through its hive tools, with its own token.
         ...(workspace.isAssistantHome(projectPath) ? {} : this.apiEnv(projectPath, agent.id))
-      }), this.binDir)
+      })), this.binDir)
     }
     const delivered = await adapter.prepareLaunch(ctx)
     times?.mark('prepareLaunch')

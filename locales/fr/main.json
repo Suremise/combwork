@@ -1,5 +1,6 @@
 {
   "main.accounts.badTarget": "Hive ne liera pas de connexion à {target} : ce n’est pas un des dossiers propres à {cli}.",
+  "main.accounts.checkHeld": "La connexion {name} est en cours de vérification : Hive s’assure encore que la vérification de {cli} est terminée. Réessaie dans un instant.",
   "main.accounts.folderNotUsable": "Le dossier de la connexion {name} n’est pas celui que Hive a créé (il manque, ou a été déplacé ou remplacé) : rien n’y a été lancé. Retire la connexion, puis ajoute-la à nouveau.",
   "main.accounts.inUse": "La connexion {name} est utilisée : arrête les agents qui l’utilisent et ferme son terminal d’identification, puis retire-la.",
   "main.accounts.leftover": "La connexion {name} n’est retirée qu’à moitié : retire-la d’abord à nouveau.",

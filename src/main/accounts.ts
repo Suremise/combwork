@@ -17,6 +17,7 @@ import { connectionLoginChanged, forgetConnectionUsage, usageLogin } from './pla
 import { childEnv, hasPty } from './ptyHost'
 import { connectionsManaged, connectionsOn, testHomeSeam } from './connectionSeam'
 import { provider } from './providers'
+import { withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
 import { openWorkspaces, setNewWorkspaceExtras, workspace, workspaceOf } from './workspace'
 
@@ -113,6 +114,18 @@ function mustGet(id: string): Connection {
   if (!a) throw hiveError(NO_ACCOUNT, undefined, { kind: 'notFound' })
   return a
 }
+
+/**
+ * Refuses a sign-in or removal while the CLI's own check of the folder isn't confirmed ended (HI-1757: Codex's app
+ * server, held by codexChecks.ts until it is gone, across a restart too).
+ */
+function assertNotHeld(a: Connection): void {
+  if (!provider(a.provider).accountHeld?.(accountFolder(a.id))) return
+  throw hiveError(msg({ id: 'main.accounts.checkHeld', defaultMessage: "{name} is being checked: Hive is still making sure {cli}'s check of it has ended. Try again in a moment.", description: "An error signing in or removing a connection ({name}, its name in Settings → Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held." }), { name: a.name, cli: providerDescriptor(a.provider).name }, { kind: 'conflict' })
+}
+
+/** Whether the CLI's sign-in names an organisation, which an identity then needs (HI-1757: Codex's names none). */
+const namesOrgs = (id: ProviderId): boolean => providerDescriptor(id).capabilities.connections?.orgs !== false
 
 /** The provider's account support, or a refusal: one without it can't have accounts in Hive. */
 function support(id: ProviderId): { homeEnv: string; shared: readonly string[]; adapter: ReturnType<typeof provider> } {
@@ -454,9 +467,11 @@ export async function removeAccount(id: string): Promise<void> {
   const inUse = (): boolean => sessionsOn(id) || (claims.get(id) ?? 0) > 0 || loginsOpen.has(id) || hasPty(loginKey(a))
   const IN_USE = msg({ id: 'main.accounts.inUse', defaultMessage: '{name} is in use: stop the agents on it and close its sign-in, then remove it.', description: 'An error removing a connection ({name}, its name in Settings → Connections): agents run on it, or its sign-in terminal is open.' })
   if (inUse()) throw hiveError(IN_USE, { name: a.name }, { kind: 'conflict' })
+  assertNotHeld(a)
   await locked(id, async () => {
     // Asked again under the lock: a launch or sign-in may have started while it waited.
     if (inUse()) throw hiveError(IN_USE, { name: a.name }, { kind: 'conflict' })
+    assertNotHeld(a)
     // Checks started before are dropped from here (their result would bring it back).
     generations.set(id, generation(id) + 1)
     unwatch(id)
@@ -516,7 +531,7 @@ async function checkOnce(id: string): Promise<ConnectionObserved | null> {
     const exe = providerService.info(a.provider).path
     if (!exe) observed = { ...a.observed, at, loggedIn: null, error: `${adapter.descriptor.name} isn't installed` } // i18n-ignore: for the log
     else {
-      const s = await slot(() => adapter.accountStatus!(exe, childEnv({ [homeEnv]: dir })))
+      const s = await slot(() => adapter.accountStatus!(exe, withoutAccountEnv(adapter, childEnv({ [homeEnv]: dir }))))
       observed = s.ok ? { at, loggedIn: s.loggedIn, ...(s.loggedIn ? { email: s.email, orgId: s.orgId, plan: s.plan ?? null } : {}) } : { ...keptIdentity(a.observed), at, loggedIn: null, error: s.error }
     }
   } catch (e) {
@@ -588,6 +603,7 @@ export async function signInAccount(id: string): Promise<string> {
     const a = mustGet(id)
     const { homeEnv } = support(a.provider)
     await assertUsable(a)
+    assertNotHeld(a)
     const gen = generation(id)
     loginsOpen.add(id)
     try {
@@ -595,7 +611,7 @@ export async function signInAccount(id: string): Promise<string> {
         loginsOpen.delete(id)
         void checkAccount(id).then((o) => {
           if (generation(id) !== gen) return
-          const ok = acceptable(o ?? undefined)
+          const ok = acceptable(o ?? undefined, namesOrgs(a.provider))
           // Only a good, signed-in answer is taken on, and only when none is yet; a different one is a change to answer.
           if (ok && !getAccount(id)?.accepted) changeAccount(id, (x) => (x.accepted = ok))
         })
@@ -625,7 +641,7 @@ async function assertUsable(a: Connection): Promise<void> {
 export function keepNewLogin(id: string): void {
   assertOn()
   const a = mustGet(id)
-  const ok = acceptable(a.observed)
+  const ok = acceptable(a.observed, namesOrgs(a.provider))
   if (!ok) throw hiveError(msg({ id: 'main.accounts.nothingToKeep', defaultMessage: "{name} isn't signed in as anyone Hive could check, so there's no login to keep.", description: "An error: Keep the new login was asked for a connection ({name}) whose latest check didn't find it signed in." }), { name: a.name }, { kind: 'conflict' })
   changeAccount(id, (x) => (x.accepted = ok))
 }

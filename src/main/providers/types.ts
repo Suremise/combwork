@@ -80,6 +80,8 @@ export interface LaunchContext {
   /** The first task, given on the command line so the CLI starts on it (e.g. from the Hive Assistant). */
   initialPrompt?: string
   env: Record<string, string>
+  /** The connection's folder this launch runs on (HI-1757: its homeEnv's value in `env`), absent when it runs on the CLI's own home. */
+  connectionHome?: string
   /** The user lets sessions move into the CLI's own background service (see capabilities.backgroundSessions). */
   allowBackgroundSessions: boolean
   /** A 200K context window instead of the model's 1M one (capabilities.contextLimit). */
@@ -376,6 +378,18 @@ export interface ProviderAdapter {
   accountSharedTarget?(name: string): string
   /** Whether a file in an account's folder is one that changes when the CLI signs in or out there: watched, never read. */
   accountLoginFile?(name: string): boolean
+  /** A connection's sign-in, when it differs from loginCommand (HI-1757: Codex keeps the login in the connection's folder). */
+  accountLoginCommand?(executable: string): CommandSpec
+  /**
+   * Environment variables the CLI reads as a login (HI-1757: Codex's CODEX_ACCESS_TOKEN), left out wherever it runs on a
+   * connection (its sign-in, its checks, its sessions: withoutAccountEnv), so they can't stand in for the connection's own.
+   */
+  accountEnvDrop?(): readonly string[]
+  /**
+   * Whether a connection's folder (its home) is held by the CLI's own check of it, not yet confirmed ended (HI-1757:
+   * Codex's app server): its sign-in and removal are refused meanwhile, as while a launch holds it.
+   */
+  accountHeld?(home: string): boolean
   /** A one-time setup task (Codex's Windows sandbox), when the provider has one. */
   setupCommand?(executable: string): CommandSpec
   /** The CLI's own home (its sign-in and config) as Hive's sessions get it: what a test copy notes beside the CLI (#368). */

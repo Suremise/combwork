@@ -28,16 +28,16 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const env = () => lib.childEnv({ CODEX_HOME: home, PATH: lib.pathWithoutStoreAliases() })
+const env = (codexHome = home) => lib.childEnv({ CODEX_HOME: codexHome, PATH: lib.pathWithoutStoreAliases() })
 const toml = (s) => JSON.stringify(s)
 
 /** Hive's form of a hook (-c hooks.<event>=[{ matcher, hooks = [{ type, command, timeout }] }]). */
 const hiveHook = (event, matcher) => ['-c', `hooks.${event}=[{ ${matcher ? `matcher = ${toml(matcher)}, ` : ''}hooks = [{ type = "command", command = ${toml(`echo hive-${event}`)}, timeout = 5 }] }]`]
 
-/** Codex's app server's hooks/list for the project, given `args`: its hooks, each with its source, command and trust. */
-function hooksList(args) {
+/** Codex's app server's hooks/list for the project, given `args` (in `codexHome`): its hooks, each with its source, command and trust. */
+function hooksList(args, codexHome = home) {
   return new Promise((resolve) => {
-    const p = spawn('codex.exe', ['app-server', ...args], { cwd: proj, env: env(), windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
+    const p = spawn('codex.exe', ['app-server', ...args], { cwd: proj, env: env(codexHome), windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
     let buf = ''
     let err = ''
     const done = (v) => {
@@ -101,6 +101,19 @@ const brief = (r) => (r.error ? r.error : JSON.stringify(r.hooks.map((h) => ({ s
   const withState = await hooksList([...hive, '-c', state])
   check("with Hive's hooks.state table, the user's hooks stay trusted", user(withState).length === 2 && user(withState).every((h) => h.trustStatus === 'trusted'), brief(withState))
   check("…and Hive's are trusted by their own records", ours(withState).length === 2 && ours(withState).every((h) => h.trustStatus === 'trusted'), brief(withState))
+
+  // A connection's home (HI-1757): new, as Hive makes one (its sessions and archived_sessions junctions to the CLI home's,
+  // no config, no sign-in), with the file store a connection's Codex is given. Hive's hooks are trusted by their own
+  // records on the command line alone; the user's, in ~/.codex's config, aren't this home's.
+  const conn = path.join(work, 'accounts', 'a-connection')
+  fs.mkdirSync(conn, { recursive: true })
+  for (const n of ['sessions', 'archived_sessions']) {
+    fs.mkdirSync(path.join(home, n), { recursive: true })
+    fs.symlinkSync(path.join(home, n), path.join(conn, n), 'junction')
+  }
+  const inConnection = await hooksList(['-c', 'cli_auth_credentials_store="file"', ...hive, '-c', state], conn)
+  check("in a connection's new home, with the file store, Hive's hooks are trusted by their own records", ours(inConnection).length === 2 && ours(inConnection).every((h) => h.trustStatus === 'trusted'), brief(inConnection))
+  check("…and the user's own hooks (their home's config) aren't the connection's", user(inConnection).length === 0, brief(inConnection))
 
   // ---- developer_instructions (#1285, HR4's rounds 1–3, the Assistant's design): Hive asks Codex which apply by
   // rendering the session's prompt offline with the agent's own arguments (debug prompt-input), as is and with them

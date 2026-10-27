@@ -835,6 +835,8 @@ export interface JobList {
  */
 export class JobHost {
   private proc: ChildProcessWithoutNullStreams | null = null
+  /** How many helpers have started (instance). */
+  private helpers = 0
   private ready: Promise<boolean> | null = null
   private next = 1
   private waiting = new Map<number, (reply: unknown) => void>()
@@ -895,6 +897,7 @@ export class JobHost {
         return resolve(false)
       }
       this.proc = p
+      this.helpers++
       const state = { up: false, gone: new Promise<void>((r) => p.once('exit', () => r())) }
       // A helper that never started (no pid) has nothing to wait for.
       if (p.pid === undefined) state.gone = Promise.resolve()
@@ -1015,6 +1018,14 @@ export class JobHost {
   /** The helper's process id while it runs (tests: to end it as a crash would). */
   get pid(): number | null {
     return this.proc?.pid ?? null
+  }
+
+  /**
+   * Which helper runs now (HI-1757): a number that goes up each time one starts, so never the same for two helpers (a
+   * pid can be reused); null while none runs. A job this host made is this helper's only while it is unchanged.
+   */
+  get instance(): number | null {
+    return this.proc ? this.helpers : null
   }
 
   /**

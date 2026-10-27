@@ -127,6 +127,22 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.turnScreen.done.title': undefined
   'settings.advanced.claudeFooter.desc': { mode: string | number; footer: string | number }
   'settings.advanced.claudeFooter.title': { mode: string | number }
+  'settings.advanced.codex.accounts.accountField.desc': undefined
+  'settings.advanced.codex.accounts.accountField.title': undefined
+  'settings.advanced.codex.accounts.dropEnv.desc': undefined
+  'settings.advanced.codex.accounts.dropEnv.title': undefined
+  'settings.advanced.codex.accounts.emailField.desc': undefined
+  'settings.advanced.codex.accounts.emailField.title': undefined
+  'settings.advanced.codex.accounts.loginFiles.desc': undefined
+  'settings.advanced.codex.accounts.loginFiles.title': undefined
+  'settings.advanced.codex.accounts.planField.desc': undefined
+  'settings.advanced.codex.accounts.planField.title': undefined
+  'settings.advanced.codex.accounts.readMethod.desc': undefined
+  'settings.advanced.codex.accounts.readMethod.title': undefined
+  'settings.advanced.codex.accounts.statusSeconds.desc': undefined
+  'settings.advanced.codex.accounts.statusSeconds.title': undefined
+  'settings.advanced.codex.appServer.closeSeconds.desc': undefined
+  'settings.advanced.codex.appServer.closeSeconds.title': undefined
   'settings.advanced.codex.exit.command.desc': undefined
   'settings.advanced.codex.exit.command.title': undefined
   'settings.advanced.codex.exit.graceSeconds.desc': { took: number }

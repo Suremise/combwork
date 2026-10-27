@@ -146,9 +146,11 @@ export interface ProviderCapabilities {
   /**
    * The CLI keeps its login in a home folder given at launch (HI-980: Claude Code's CLAUDE_CONFIG_DIR), so Hive can keep
    * an account per folder: `homeEnv` names the variable, `shared` the home's folders each account's folder links to by a
-   * junction (the adapter's accountSharedTarget says where). Absent: the CLI has no accounts in Hive.
+   * junction (the adapter's accountSharedTarget says where), `userHome` the CLI's own home in the user's folder
+   * (`.claude`), which a test home is never (the test seam), and `orgs` whether its sign-in names an organisation, which
+   * an identity then needs to be taken on (false: its email alone, HI-1757). Absent: the CLI has no accounts in Hive.
    */
-  connections?: { homeEnv: string; shared: readonly string[] }
+  connections?: { homeEnv: string; shared: readonly string[]; userHome: string; orgs: boolean }
 }
 
 /** What the CLI said about a model, for modeCaveat. */
