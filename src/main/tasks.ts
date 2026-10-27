@@ -31,7 +31,7 @@ import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, STAGE_CATEGORY, type AskAction
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
-import { afterBoardWrite, archiveBatchDocs, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
+import { afterBoardWrite, archiveBatchDocs, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardChanges, type CardQuery } from './boardStore'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
@@ -344,6 +344,54 @@ export async function boardHolds(ws: WorkspaceService): Promise<CardHolds[]> {
   }
   keptHolds.set(ws, { path, stamp: `${got.generation}:${names}`, mark: got.mark, cards })
   return got.numbers.flatMap((n) => cards.get(n) ?? [])
+}
+
+/** Each workspace's live cards with decisions as liveDecisionCards last read them: the board's stamp and mark then, each card with its decision generation. */
+const keptDecisions = new WeakMap<WorkspaceService, { path: string; board: string; mark: number; cards: Map<number, { card: TaskCard; generation: number }> }>()
+
+/**
+ * The live cards that have decisions, each with its decision generation read with it (#1216), as allTasksSeen gives
+ * them: kept, and read again only for the cards a change touched (cardChanges, HI-1789: decision notices read them on
+ * every hive tool reply after a board change, a dozen agents' changes a minute). A decision's generation is recorded in
+ * the change that writes the card's decisions (recorder.ts), so it moves only with the card's revision. Read whole after
+ * the board was opened again or its stamp changed (a project's name by id, a card's key: windowChanges' rule), and on a
+ * board waiting for its 1.0 upgrade (every live card, as allTasksSeen). A kept card's links are as when it was read.
+ */
+export async function liveDecisionCards(ws: WorkspaceService): Promise<{ cards: TaskCard[]; generations: Map<number, number> }> {
+  const path = ws.path
+  if (!path) return { cards: [], generations: new Map() }
+  const ids = await ws.projectIds()
+  if (ws.path !== path) return { cards: [], generations: new Map() }
+  const was = keptDecisions.get(ws)
+  const own = was && was.path === path ? was : undefined
+  // The changed cards and their generations from one snapshot: what a line tells, its receipt records.
+  const read = (since: number | null): { got: CardChanges; generations: Map<number, number> } =>
+    boardRead(ws, () => {
+      const got = cardChanges(ws, since)
+      return { got, generations: decisionGenerations(ws, got.live.map((d) => d.number)) }
+    })
+  let r = read(own ? own.mark : null)
+  let board = boardStamp(r.got.generation, ids, r.got.keys)
+  const whole = !own || own.board !== board
+  if (own && whole && r.got.mark !== null) {
+    r = read(null)
+    board = boardStamp(r.got.generation, ids, r.got.keys)
+  }
+  const { got, generations } = r
+  const mark = got.mark
+  if (mark === null) return allTasksSeen(ws, { archived: false })
+  const cards = !own || whole ? new Map<number, { card: TaskCard; generation: number }>() : own.cards
+  const numbers = new Set(got.numbers)
+  for (const d of got.live) {
+    const card = withoutGone(clean(d.doc, d.number, ids, got.keys.get(d.number)), (x) => numbers.has(x))
+    if (card.decisions?.length) cards.set(d.number, { card, generation: generations.get(d.number) ?? 0 })
+    else cards.delete(d.number)
+  }
+  // Archived since (its revision moved with it) or gone from the board.
+  for (const d of got.summaries) cards.delete(d.number)
+  for (const n of cards.keys()) if (!numbers.has(n)) cards.delete(n)
+  keptDecisions.set(ws, { path, board, mark, cards })
+  return { cards: sortCards([...cards.values()].map((x) => x.card)), generations: new Map([...cards].map(([n, x]) => [n, x.generation])) }
 }
 
 /**
