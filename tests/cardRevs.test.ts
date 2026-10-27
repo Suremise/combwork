@@ -40,7 +40,8 @@ let b = 0
 let c = 0
 beforeAll(async () => {
   mkdirSync(join(wsPath, 'alpha', '.hive'), { recursive: true })
-  writeFileSync(join(wsPath, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+  // Two agents, for cards held (the usage history's holds, HI-1748).
+  writeFileSync(join(wsPath, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'agent-1', name: 'Agent 1' }, { id: 'agent-2', name: 'Agent 2' }] }))
   w = createWorkspaceService()
   await w.open(wsPath)
   a = (await run(() => tasks.createTask({ title: 'A', project: 'alpha' }, user))).number
@@ -210,5 +211,49 @@ describe('tasks:changes (HI-1715)', () => {
       w.projectIds = real
     }
     expect((await read(cursor(first))).full).toBe(true)
+  })
+})
+
+describe("the usage history's card holds, kept and read again for the cards a change touched (HI-1748)", () => {
+  const kept = (): Promise<import('../src/main/tasks').CardHolds[]> => run(() => tasks.boardHolds(w))
+  const whole = (): Promise<import('../src/main/tasks').CardHolds[]> => run(() => tasks.cardHolds(w))
+  const same = async (): Promise<import('../src/main/tasks').CardHolds[]> => {
+    const got = await kept()
+    expect(got).toEqual(await whole())
+    return got
+  }
+
+  it('are every card holds as a whole read gives them, through moves, comments, new, archived, deleted cards and another connection', async () => {
+    const first = await same()
+    // A comment changes no holds: every card the same object, read again for that card alone.
+    await run(() => tasks.commentTask(a, 'no holds change', user))
+    const mark = store.holdChanges(w, null)!.mark
+    await run(() => tasks.commentTask(b, 'one card', user))
+    // B, and A at the mark (the read is inclusive: a write committed after it is in the next).
+    expect(store.holdChanges(w, mark)!.docs.map((d) => d.number)).toEqual([a, b])
+    const after = await same()
+    for (const x of after) if (x.number !== a && x.number !== b) expect(x).toBe(first.find((y) => y.number === x.number))
+    // A move into Doing for an agent: a hold begins; out of it, it ends.
+    await run(() => tasks.updateTask(a, { column: 'doing', agent: 'agent-1' }, user))
+    expect((await same()).find((x) => x.number === a)!.held?.length).toBeGreaterThan(0)
+    await run(() => tasks.updateTask(a, { column: 'todo' }, user))
+    await same()
+    const made = (await run(() => tasks.createTask({ title: 'Held later', project: 'alpha', column: 'doing', agent: 'agent-2' }, user))).number
+    expect((await same()).some((x) => x.number === made)).toBe(true)
+    await run(() => tasks.archiveTask(made, true))
+    await same()
+    // Another connection's write to a card's holds, and a card it deletes.
+    const db = other()
+    db.exec(`DELETE FROM card_holds WHERE card = ${made}`)
+    db.exec(`PRAGMA foreign_keys = ON; DELETE FROM cards WHERE number = ${c}`)
+    db.close()
+    expect((await same()).some((x) => x.number === c)).toBe(false)
+  })
+
+  it('are read whole again after the board is opened again', async () => {
+    await same()
+    store.closeBoard(wsPath)
+    await run(() => tasks.commentTask(a, 'reopened', user))
+    await same()
   })
 })

@@ -14,7 +14,7 @@ import { config } from './config'
 import { emit, onHiveEvent } from './events'
 import { createLogger, userText } from './logger'
 import { recordProvider, sessions } from './sessions'
-import { cardHolds, type CardHolds } from './tasks'
+import { boardHolds, cardHolds, type CardHolds } from './tasks'
 import { usageFile, type SessionId, type SessionMeta, type StoredSession } from './usageDb'
 import type { IngestJob, IngestResult, KeptJob, ReadResult, ReadSeed, WorkerReply, WorkerRequest } from './usageWorker'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
@@ -520,7 +520,7 @@ class UsageHistory {
       // Only the cards' holds (#1107: never their comments).
       // What the last read worked out, for the projects whose holds a change left as they were (most: a comment, a move of another project's card).
       const prior = c ? new Map([...(c.prior ?? []), ...c.projects]) : null
-      c = { at: Date.now(), cards: cardHolds(ws).catch(() => []), projects: new Map(), prior }
+      c = { at: Date.now(), cards: boardHolds(ws).catch(() => []), projects: new Map(), prior }
       this.cards.set(key, c)
     }
     return c

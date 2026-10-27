@@ -31,7 +31,7 @@ import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, STAGE_CATEGORY, type AskAction
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
-import { afterBoardWrite, archiveBatchDocs, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
+import { afterBoardWrite, archiveBatchDocs, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
@@ -307,10 +307,43 @@ export async function cardHolds(ws: WorkspaceService, o: { live?: boolean } = {}
   if (!ws.path) return []
   const ids = await ws.projectIds()
   if (!ws.path) return []
-  return holdDocs(ws, o).map(({ number, doc }) => {
-    const c = clean(doc as Partial<TaskCard> & { projectId?: unknown }, number, ids)
-    return { number, project: c.project, held: c.held, history: c.history, agent: c.agent, agentName: c.agentName, review: c.review }
-  })
+  return holdDocs(ws, o).map(({ number, doc }) => holdFields(doc, number, ids))
+}
+
+const holdFields = (doc: Record<string, unknown>, number: number, ids: ProjectIdIndex): CardHolds => {
+  const c = clean(doc as Partial<TaskCard> & { projectId?: unknown }, number, ids)
+  return { number, project: c.project, held: c.held, history: c.history, agent: c.agent, agentName: c.agentName, review: c.review }
+}
+
+/** Each workspace's cards' holds as boardHolds last read them: the board's opening and mark then, and the project names by id. */
+const keptHolds = new WeakMap<WorkspaceService, { path: string; stamp: string; mark: number; cards: Map<number, CardHolds> }>()
+
+/**
+ * Every card's holds, as cardHolds gives them, in number order: kept, and read again only for the cards a change
+ * touched (holdChanges, HI-1748: the usage history reads them after every board change, a dozen agents' changes a
+ * minute). Read whole after the board was opened again or a project's name or id changed (a card's project is named by
+ * them), and on a board waiting for its 1.0 upgrade. A kept card's object is the same until it changes.
+ */
+export async function boardHolds(ws: WorkspaceService): Promise<CardHolds[]> {
+  const path = ws.path
+  if (!path) return []
+  const ids = await ws.projectIds()
+  if (ws.path !== path) return []
+  const was = keptHolds.get(ws)
+  const names = JSON.stringify([...ids.byId])
+  const same = (generation: number): boolean => !!was && was.path === path && was.stamp === `${generation}:${names}`
+  let got = holdChanges(ws, was && was.path === path ? was.mark : null)
+  if (!got) return cardHolds(ws)
+  if (was && got.docs.length !== got.numbers.length && !same(got.generation)) got = holdChanges(ws, null)
+  if (!got) return cardHolds(ws)
+  const cards = was && same(got.generation) ? was.cards : new Map<number, CardHolds>()
+  for (const { number, doc } of got.docs) cards.set(number, holdFields(doc, number, ids))
+  if (cards.size > got.numbers.length) {
+    const live = new Set(got.numbers)
+    for (const n of cards.keys()) if (!live.has(n)) cards.delete(n)
+  }
+  keptHolds.set(ws, { path, stamp: `${got.generation}:${names}`, mark: got.mark, cards })
+  return got.numbers.flatMap((n) => cards.get(n) ?? [])
 }
 
 /**

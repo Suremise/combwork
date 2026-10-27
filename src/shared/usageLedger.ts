@@ -606,10 +606,15 @@ const parsed = (iso: string | undefined | null): number => (iso ? Date.parse(iso
 const at = (t: number, now: number): number => (Number.isFinite(t) ? t : now)
 const spanOf = (h: TimedHold, now: number): Span => [at(h.from, now), at(h.to, now)]
 
+/** Each card's holds as holdsOfCard works them out, kept by the card's object (one the board read keeps until it changes). */
+const derived = new WeakMap<CardHoldFields, TaskHold[]>()
+
 export function holdIndex(cards: CardHoldFields[]): HoldIndex {
   const index: HoldIndex = { cards: [], byName: new Map() }
   for (const c of cards) {
-    const holds = holdsOfCard(c).map((hold) => ({ hold, from: parsed(hold.from), to: parsed(hold.to) }))
+    let own = derived.get(c)
+    if (!own) derived.set(c, (own = holdsOfCard(c)))
+    const holds = own.map((hold) => ({ hold, from: parsed(hold.from), to: parsed(hold.to) }))
     index.cards.push({ number: c.number, holds })
     for (const h of holds) {
       const name = h.hold.name.toLowerCase()
