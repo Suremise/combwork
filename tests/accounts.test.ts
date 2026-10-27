@@ -2,13 +2,34 @@
 // the CLI's home (also with links added partway through), accepted and observed identities kept apart, checks queued
 // while one runs, the watches, and a workspace's choice of accounts. All in this file's temp folders: the CLI is never
 // run (its status is faked), nothing signs in, and no real home or accounts folder is touched.
-import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs'
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { accountState, duplicateLogins, switchedOn, workspaceAccounts } from '../src/shared/accounts'
+import { accountState, connectionReadiness, duplicateLogins, switchedOn, workspaceAccounts } from '../src/shared/accounts'
 import type { Connection } from '../src/shared/types'
 import { tempDir } from './tempDir'
+
+/**
+ * The terminals (HI-1870): which are open, by key, and what closing one does. `endsOnKill` (the default) ends it as a
+ * kill does, its exit run; off, a kill that never ends it. `gone` is ptyGone's answer, the bound passed.
+ */
+const terminals = vi.hoisted(() => ({ open: new Set<string>(), killed: [] as string[], endsOnKill: true, onKill: (_key: string): void => undefined, beforeGone: async (): Promise<void> => undefined }))
+vi.mock('../src/main/ptyHost', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../src/main/ptyHost')>()
+  return {
+    ...real,
+    hasPty: (key: string) => terminals.open.has(key),
+    killPty: (key: string) => {
+      terminals.killed.push(key)
+      if (terminals.endsOnKill) terminals.onKill(key)
+    },
+    ptyGone: async (key: string) => {
+      await terminals.beforeGone()
+      return !terminals.open.has(key)
+    }
+  }
+})
 
 const base = tempDir('hive-accounts-')
 const home = join(base, 'claude-home')
@@ -50,13 +71,18 @@ beforeAll(async () => {
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never
   vi.spyOn(providerService, 'runAccountLogin').mockImplementation((_p, id, _env, onExit, setUp) => {
+    const key = `task:claude-code:login:${id}`
     setUps.set(id, setUp)
+    terminals.open.add(key)
     logins.set(id, (code) => {
       logins.delete(id)
+      terminals.open.delete(key)
       onExit(code)
     })
-    return `task:claude-code:login:${id}`
+    return key
   })
+  // A kill ends the terminal, its exit run, as node-pty's does.
+  terminals.onKill = (key) => logins.get(key.split(':').at(-1)!)?.(1)
   vi.spyOn(provider('claude-code'), 'accountStatus').mockImplementation(async (_exe, env) => {
     const dir = env.CLAUDE_CONFIG_DIR!
     asked.push(dir)
@@ -274,10 +300,10 @@ describe('removing an account', () => {
   it('is refused while a launch holds it, its sessions run, or its sign-in is open', async () => {
     const a = await accounts.addAccount('claude-code', 'Busy')
     const release = await accounts.claimAccount(a.id)
-    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/Busy is in use/)
+    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/Busy has agents running on it/)
     release()
     accounts.setAccountSessions((id) => id === a.id)
-    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/Busy is in use/)
+    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/Busy has agents running on it/)
     accounts.setAccountSessions(() => false)
     // Its sign-in open (the terminal not ended yet).
     await accounts.signInAccount(a.id)
@@ -286,6 +312,72 @@ describe('removing an account', () => {
     logins.get(a.id)!(0)
     await accounts.removeAccount(a.id)
     expect(accounts.getAccount(a.id)).toBeUndefined()
+  })
+
+  describe('with its sign-in or Set Up terminal open, the user saying to close it (HI-1870)', () => {
+    afterEach(() => {
+      terminals.killed.length = 0
+      terminals.endsOnKill = true
+      terminals.beforeGone = async () => undefined
+      accounts.setAccountSessions(() => false)
+    })
+
+    it('ends the terminal, waits for its end, then removes it; without being told to, still refused', async () => {
+      const a = await accounts.addAccount('claude-code', 'Open')
+      await accounts.setUpSignInConnection(a.id)
+      expect(await outcome(accounts.removeAccount(a.id))).toMatch(/Open is in use/)
+      expect(terminals.killed).toEqual([])
+      await accounts.removeAccount(a.id, { closeTerminal: true })
+      expect(terminals.killed).toEqual([`task:claude-code:login:${a.id}`])
+      expect(logins.has(a.id)).toBe(false)
+      expect(accounts.getAccount(a.id)).toBeUndefined()
+      expect(existsSync(folderOf(a))).toBe(false)
+    })
+
+    it('agents running on it still refuse, and its terminal is left open', async () => {
+      const a = await accounts.addAccount('claude-code', 'Running')
+      await accounts.signInAccount(a.id)
+      accounts.setAccountSessions((id) => id === a.id)
+      expect(await outcome(accounts.removeAccount(a.id, { closeTerminal: true }))).toMatch(/Running has agents running on it/)
+      expect(terminals.killed).toEqual([])
+      expect(logins.has(a.id)).toBe(true)
+      expect(accounts.getAccount(a.id)).toBeDefined()
+      logins.get(a.id)!(0)
+    })
+
+    it('a kill that never ends it is refused, the connection and its folder kept', async () => {
+      const a = await accounts.addAccount('claude-code', 'Stuck')
+      await accounts.signInAccount(a.id)
+      terminals.endsOnKill = false
+      expect(await outcome(accounts.removeAccount(a.id, { closeTerminal: true }))).toMatch(/Stuck is in use/)
+      expect(terminals.killed).toHaveLength(1)
+      expect(accounts.getAccount(a.id)).toBeDefined()
+      expect(existsSync(folderOf(a))).toBe(true)
+      logins.get(a.id)!(0)
+    })
+
+    it('an agent or a sign-in started while it waited for the terminal to end is still refused (checked again after)', async () => {
+      const a = await accounts.addAccount('claude-code', 'Gap')
+      await accounts.signInAccount(a.id)
+      terminals.beforeGone = async () => accounts.setAccountSessions((id) => id === a.id)
+      expect(await outcome(accounts.removeAccount(a.id, { closeTerminal: true }))).toMatch(/Gap has agents running on it/)
+      expect(accounts.getAccount(a.id)).toBeDefined()
+      accounts.setAccountSessions(() => false)
+      await accounts.signInAccount(a.id)
+      terminals.beforeGone = async () => void (await accounts.signInAccount(a.id))
+      expect(await outcome(accounts.removeAccount(a.id, { closeTerminal: true }))).toMatch(/Gap is in use/)
+      expect(accounts.getAccount(a.id)).toBeDefined()
+      logins.get(a.id)!(0)
+    })
+
+    it('a terminal already ended removes as usual, nothing killed', async () => {
+      const a = await accounts.addAccount('claude-code', 'Ended')
+      await accounts.signInAccount(a.id)
+      logins.get(a.id)!(0)
+      await accounts.removeAccount(a.id, { closeTerminal: true })
+      expect(terminals.killed).toEqual([])
+      expect(accounts.getAccount(a.id)).toBeUndefined()
+    })
   })
 
   it('a sign-in or launch asked for once removal has begun is never started: the account is gone by its turn', async () => {
@@ -347,6 +439,141 @@ describe("a sign-in connection's Set Up (HI-1826)", () => {
     config.update((c) => c.connections!.push({ id: 'acc-server1', provider: 'claude-code', name: 'Server', kind: 'server' } as Connection))
     expect(await outcome(accounts.setUpSignInConnection('acc-server1'))).not.toBe('ok')
     expect(logins.has('acc-server1')).toBe(false)
+  })
+})
+
+describe("whether a connection's first-run setup is done (HI-1870: Needs set up)", () => {
+  const ONBOARDING = join(__dirname, 'fixtures', 'advanced', 'onboarding-claude-2.1.311.jsonl')
+  const [onboarded, fresh] = readFileSync(ONBOARDING, 'utf8').trim().split(/\r?\n/)
+  const setUpOf = (dir: string) => provider('claude-code').connectionSetUp!(dir)
+  const folder = (name: string, claudeJson?: string): string => {
+    const dir = join(base, 'setup', name)
+    mkdirSync(dir, { recursive: true })
+    if (claudeJson !== undefined) writeFileSync(join(dir, '.claude.json'), claudeJson)
+    return dir
+  }
+
+  it("Claude Code: done in the recorded onboarded home, not in a new one (its sign-in check run there), nor with no .claude.json yet", async () => {
+    expect(await setUpOf(folder('onboarded', onboarded))).toBe(true)
+    expect(await setUpOf(folder('fresh', fresh))).toBe(false)
+    expect(await setUpOf(folder('none'))).toBe(false)
+  })
+
+  it("can't be told from a file it can't read (not JSON): unknown, never done or not", async () => {
+    expect(await setUpOf(folder('broken', '{"hasCompletedOnboarding": tru'))).toBeNull()
+  })
+
+  it('reads the field Settings → Advanced names', async () => {
+    const dir = folder('renamed', JSON.stringify({ onboardedAt: true }))
+    expect(await setUpOf(dir)).toBe(false)
+    await advanced.set('claude-code.accounts.onboardedField', 'onboardedAt')
+    try {
+      expect(await setUpOf(dir)).toBe(true)
+    } finally {
+      await advanced.set('claude-code.accounts.onboardedField', null)
+    }
+  })
+
+  it("is in the connections' list once read, again as Settings shows it, and gone with the connection", async () => {
+    const a = await accounts.addAccount('claude-code', 'Fresh one')
+    accounts.accountsView(true)
+    await vi.waitFor(() => expect(accounts.accountsView().connections.find((c) => c.id === a.id)?.setUp).toBe(false), { timeout: HUNG_MS })
+    writeFileSync(join(folderOf(a), '.claude.json'), onboarded)
+    accounts.accountsView(true)
+    await vi.waitFor(() => expect(accounts.accountsView().connections.find((c) => c.id === a.id)?.setUp).toBe(true), { timeout: HUNG_MS })
+    await accounts.removeAccount(a.id)
+    const again = await accounts.addAccount('claude-code', 'Fresh one')
+    expect(accounts.accountsView().connections.find((c) => c.id === again.id)).not.toHaveProperty('setUp')
+  })
+})
+
+describe("whether a connection trusts a workspace's folders (HI-1870)", () => {
+  const TRUST = join(__dirname, 'fixtures', 'advanced', 'trust-entry-claude-2.1.311.json')
+  const trustsOf = (dir: string, targets: { root: string | null; git: boolean; short: boolean }[]) => provider('claude-code').connectionTrusts!(dir, targets)
+  const trustHome = (name: string, claudeJson?: string): string => {
+    const dir = join(base, 'trust', name)
+    mkdirSync(dir, { recursive: true })
+    if (claudeJson !== undefined) writeFileSync(join(dir, '.claude.json'), claudeJson)
+    return dir
+  }
+  const t = (root: string | null, short = false) => ({ root, git: true, short })
+
+  it("Claude Code: the recorded entry's folder and its subfolders; not another case, not an 8.3 path (unknown), as 2.1.311 looked them up", async () => {
+    // The recorded entry (C:/work/alpha), and the entry Claude Code writes itself for a subfolder it ran in (false).
+    const j = JSON.parse(readFileSync(TRUST, 'utf8'))
+    j.projects['C:/work/alpha/child'] = { hasTrustDialogAccepted: false }
+    const dir = trustHome('claude', JSON.stringify(j))
+    expect(await trustsOf(dir, [t('C:\\work\\alpha'), t('C:\\work\\alpha\\child'), t('C:\\work\\beta'), t('C:\\WORK\\ALPHA'), t('C:\\work\\alpha', true), t(null)])).toEqual([true, true, false, false, null, null])
+  })
+
+  it("Claude Code: no .claude.json yet is untrusted; one it can't read is unknown", async () => {
+    expect(await trustsOf(trustHome('none'),[t('C:\\work\\alpha')])).toEqual([false])
+    expect(await trustsOf(trustHome('broken','{"projects": {'), [t('C:\\work\\alpha')])).toEqual([null])
+  })
+
+  it('Claude Code: reads the field Settings → Advanced names', async () => {
+    const dir = trustHome('renamed',JSON.stringify({ projects: { 'C:/work/alpha': { trustedNow: true } } }))
+    expect(await trustsOf(dir, [t('C:\\work\\alpha')])).toEqual([false])
+    await advanced.set('claude-code.accounts.trustField', 'trustedNow')
+    try {
+      expect(await trustsOf(dir, [t('C:\\work\\alpha')])).toEqual([true])
+    } finally {
+      await advanced.set('claude-code.accounts.trustField', null)
+    }
+  })
+
+  it("finds each project's folder as the CLIs look it up: a worktree project's main repository root, which covers its slots", async () => {
+    const { execFileSync } = await import('child_process')
+    const g = (cwd: string, ...a: string[]): void => void execFileSync('git', a, { cwd })
+    const repo = join(base, 'trust-git', 'alpha')
+    mkdirSync(repo, { recursive: true })
+    g(repo, 'init', '-q')
+    g(repo, '-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '--allow-empty', '-m', 'x')
+    const asProject = join(base, 'trust-git', 'alpha-wt')
+    g(repo, 'worktree', 'add', '-q', '--detach', asProject)
+    const slot = join(base, 'trust-git.worktrees', 'alpha-wt', 'slot-a')
+    g(asProject, 'worktree', 'add', '-q', '--detach', slot)
+    const plain = join(base, 'trust-git', 'notes')
+    mkdirSync(plain, { recursive: true })
+    // Its git folder kept elsewhere (`--separate-git-dir`): the working tree is still the root. A bare one has none.
+    const separate = join(base, 'trust-git', 'separate')
+    mkdirSync(join(base, 'trust-git-meta'), { recursive: true })
+    g(join(base, 'trust-git'), 'init', '-q', '--separate-git-dir', join(base, 'trust-git-meta', 'separate.git'), separate)
+    const bare = join(base, 'trust-git', 'bare.git')
+    g(join(base, 'trust-git'), 'init', '-q', '--bare', bare)
+    const got = await accounts.trustTargets([
+      { name: 'alpha', path: repo },
+      { name: 'alpha-wt', path: asProject },
+      { name: 'slot', path: slot },
+      { name: 'notes', path: plain },
+      { name: 'separate', path: separate },
+      { name: 'bare', path: bare },
+      { name: 'gone', path: join(base, 'trust-git', 'gone') }
+    ])
+    const root = realpathSync.native(repo)
+    expect(got.map((x) => [x.project, x.root, x.git])).toEqual([
+      ['alpha', root, true],
+      ['alpha-wt', root, true],
+      ['slot', root, true],
+      ['notes', realpathSync.native(plain), false],
+      ['separate', realpathSync.native(separate), true],
+      ['bare', null, true],
+      ['gone', null, false]
+    ])
+  })
+})
+
+describe("whether a connection is set up (connectionReadiness, HI-1870)", () => {
+  it('anything definitely not done wins, then anything unknown, else done', () => {
+    const none = { pending: [], unknown: false }
+    const pending = { pending: [{ project: 'alpha', folder: 'C:\\w\\alpha' }], unknown: false }
+    expect(connectionReadiness({ setUp: true })).toBe('done')
+    expect(connectionReadiness({ setUp: true, trust: none })).toBe('done')
+    expect(connectionReadiness({ setUp: false, trust: { ...none, unknown: true } })).toBe('needed')
+    expect(connectionReadiness({ setUp: null, trust: pending })).toBe('needed')
+    expect(connectionReadiness({ setUp: true, trust: { ...none, unknown: true } })).toBe('unknown')
+    expect(connectionReadiness({ setUp: null })).toBe('unknown')
+    expect(connectionReadiness({})).toBe('unknown')
   })
 })
 
@@ -556,6 +783,158 @@ describe("a workspace's accounts", () => {
       writeFileSync(join(folderOf(a), '.claude.json'), '{}')
       await vi.waitFor(() => expect(accounts.getAccount(a.id)?.observed?.email).toBe('third@example.com'), { timeout: HUNG_MS })
       await run(() => accounts.setAccountOn(a.id, false))
+    })
+
+    describe("its trust of the workspace's projects (HI-1870 round 3: one read at a time, dirty not queued, answers kept only while current)", () => {
+      const names = ['alpha', 'beta', 'gamma']
+      const folders = names.map((n) => join(wsPath, n))
+      // Each trust read held until the test answers it: how many projects it was asked about, and its answer.
+      let held: { projects: number; answer: (v: (boolean | null)[]) => void }[] = []
+      let spy: ReturnType<typeof vi.spyOn>
+      let a: Connection
+      const row = () => run(() => accounts.accountsView()).connections.find((c) => c.id === a.id)!
+      const projectsNow = async (n: number): Promise<void> => {
+        for (const [i, f] of folders.entries()) if (i < n) mkdirSync(f, { recursive: true })
+        else rmSync(f, { recursive: true, force: true })
+        await w.refresh()
+      }
+      beforeEach(async () => {
+        held = []
+        spy = vi.spyOn(provider('claude-code'), 'connectionTrusts').mockImplementation((_home, targets) => new Promise((answer) => held.push({ projects: targets.length, answer })))
+        a = await accounts.addAccount('claude-code', 'Trusting')
+        writeFileSync(join(folderOf(a), '.claude.json'), JSON.stringify({ hasCompletedOnboarding: true }))
+        await projectsNow(1)
+        await run(() => accounts.setAccountOn(a.id, true))
+        await vi.waitFor(() => expect(row().setUp).toBe(true), { timeout: HUNG_MS })
+        await vi.waitFor(() => expect(held).toHaveLength(1), { timeout: HUNG_MS })
+      })
+      afterEach(async () => {
+        spy.mockRestore()
+        for (const h of held) h.answer([])
+        await run(() => accounts.setAccountOn(a.id, false)).catch(() => undefined)
+        await projectsNow(0)
+      })
+
+      it('while its first read is held: Checking…, never done; refreshes mark it dirty, so one more read, not one each', async () => {
+        expect(row().trust).toEqual({ pending: [], unknown: true, checking: true })
+        expect(connectionReadiness(row())).toBe('unknown')
+        for (let i = 0; i < 13; i++) run(() => accounts.accountsView(true))
+        held[0].answer([true])
+        // Answered while dirty: kept (its generation is current: same projects), then exactly one more read.
+        await vi.waitFor(() => expect(held).toHaveLength(2), { timeout: HUNG_MS })
+        expect(row().trust).toEqual({ pending: [], unknown: false })
+        expect(connectionReadiness(row())).toBe('done')
+        held[1].answer([true])
+        // Settled: a Set Up asked now waits for nothing new to be read... except its own (a terminal's end is a change).
+        await vi.waitFor(() => expect(row().trust).toEqual({ pending: [], unknown: false }), { timeout: HUNG_MS })
+        // Passive refreshes (the window reloading the list on connections-changed) start no read: no read/emit/refresh cycle.
+        for (let i = 0; i < 5; i++) run(() => accounts.accountsView())
+        expect(held).toHaveLength(2)
+      })
+
+      it('a project added that it already trusts: the windows are told when the answer for the new set is in, though it reads the same (round 3)', async () => {
+        const { onHiveEvent } = await import('../src/main/events')
+        held[0].answer([true])
+        await vi.waitFor(() => expect(row().trust).toEqual({ pending: [], unknown: false }), { timeout: HUNG_MS })
+        // What a window reloading on each connections-changed would show (it reloads only then), for the events the trust
+        // read sends: the login check's own (its folder's watch, any time) would hide a missing one.
+        const shown: unknown[] = []
+        const off = onHiveEvent((e) => void (e.type === 'connections-changed' && /\brunTrust\b/.test(new Error().stack ?? '') && shown.push(row().trust)))
+        try {
+          await projectsNow(2)
+          // The window reloads for the new project list: Checking… while it is read.
+          expect(row().trust).toEqual({ pending: [], unknown: true, checking: true })
+          await vi.waitFor(() => expect(held).toHaveLength(2), { timeout: HUNG_MS })
+          held[1].answer([true, true])
+          // The same answer as before (nothing pending), for a new generation: still a change the windows must hear of,
+          // or a window showing Checking… keeps it until something else reloads the list.
+          await vi.waitFor(() => expect(shown).toContainEqual({ pending: [], unknown: false }), { timeout: HUNG_MS })
+        } finally {
+          off()
+        }
+      })
+
+      it("a terminal's end, then the projects changing, while a read is held; the stale read answered first: dropped, one read for the current set, Set Up gets its folder", async () => {
+        // A Set Up asked for (its terminal's end has the same effect): marks it dirty and moves its generation.
+        const folder = run(() => accounts.setUpFolder(a.id))
+        await projectsNow(2)
+        row()
+        held[0].answer([false])
+        // The stale answer (alpha untrusted) is never applied; one read for both projects follows, none for alpha alone.
+        await vi.waitFor(() => expect(held).toHaveLength(2), { timeout: HUNG_MS })
+        expect(held[1].projects).toBe(2)
+        expect(row().trust?.checking).toBe(true)
+        held[1].answer([true, false])
+        // The Set Up asked against the old set gets the current set's folder.
+        expect(await folder).toBe(realpathSync.native(folders[1]))
+        expect(row().trust).toEqual({ pending: [{ project: 'beta', folder: realpathSync.native(folders[1]) }], unknown: false })
+        for (let i = 0; i < 5; i++) run(() => accounts.accountsView())
+        expect(held).toHaveLength(2)
+      })
+
+      it('the same, with the newer read answered while still dirty: never the stale answer, exactly one more read for the current set', async () => {
+        await projectsNow(2)
+        row()
+        const folder = run(() => accounts.setUpFolder(a.id))
+        held[0].answer([false])
+        await vi.waitFor(() => expect(held).toHaveLength(2), { timeout: HUNG_MS })
+        // Asked again while that one runs (Settings shown): dirty, so one more after it, for the same two projects.
+        run(() => accounts.accountsView(true))
+        held[1].answer([false, true])
+        await vi.waitFor(() => expect(held).toHaveLength(3), { timeout: HUNG_MS })
+        expect(held[2].projects).toBe(2)
+        held[2].answer([true, true])
+        // A current answer with nothing pending: no folder (its own then), which isn't a cancellation.
+        expect(await folder).toBeUndefined()
+        expect(row().trust).toEqual({ pending: [], unknown: false })
+        for (let i = 0; i < 5; i++) run(() => accounts.accountsView())
+        expect(held).toHaveLength(3)
+      })
+
+      it('removed while a read is held: its Set Up is cancelled (it opens nowhere), and the read stores nothing and reads no more', async () => {
+        const folder = run(() => accounts.setUpFolder(a.id))
+        await run(() => accounts.setAccountOn(a.id, false))
+        await accounts.removeAccount(a.id)
+        expect(await outcome(folder)).toMatch(/Set Up didn't open: the connection was removed or its workspace closed/)
+        held[0].answer([false])
+        // Its read ends retired: once it has, nothing more was asked of the CLI.
+        await vi.waitFor(() => expect(spy.mock.settledResults).toHaveLength(1), { timeout: HUNG_MS })
+        expect(held).toHaveLength(1)
+      })
+
+      it("its workspace closed while Set Up waits: cancelled; reopened, the old read's answer can't reach the new state", async () => {
+        // A second workspace, the connection on there too, its own read held.
+        const ws2 = join(base, 'ws-trust-2')
+        mkdirSync(join(ws2, 'delta'), { recursive: true })
+        let w2 = createWorkspaceService()
+        await w2.open(ws2)
+        const in2 = <T>(fn: () => T): T => inWorkspace(w2, fn)
+        await in2(() => accounts.setAccountOn(a.id, true))
+        in2(() => accounts.accountsView())
+        await vi.waitFor(() => expect(held).toHaveLength(2), { timeout: HUNG_MS })
+        const folder = in2(() => accounts.setUpFolder(a.id))
+        await disposeWorkspaceService(w2)
+        // The next list read prunes it (as the close's own event does in the app).
+        row()
+        expect(await outcome(folder)).toMatch(/Set Up didn't open/)
+        // Opened again: a new state, a new read; the old read answered late changes nothing of it.
+        w2 = createWorkspaceService()
+        await w2.open(ws2)
+        try {
+          const row2 = () => inWorkspace(w2, () => accounts.accountsView()).connections.find((c) => c.id === a.id)!
+          row2()
+          await vi.waitFor(() => expect(held).toHaveLength(3), { timeout: HUNG_MS })
+          held[1].answer([false])
+          held[2].answer([true])
+          await vi.waitFor(() => expect(row2().trust).toEqual({ pending: [], unknown: false }), { timeout: HUNG_MS })
+          await vi.waitFor(() => expect(spy.mock.settledResults.filter((r: { type: string }) => r.type === 'fulfilled')).toHaveLength(2), { timeout: HUNG_MS })
+          expect(row2().trust).toEqual({ pending: [], unknown: false })
+          expect(held).toHaveLength(3)
+          await inWorkspace(w2, () => accounts.setAccountOn(a.id, false))
+        } finally {
+          await disposeWorkspaceService(w2)
+        }
+      })
     })
 
     it('a busy folder whose login stays put is fresh at a launch: nameless events and other files written (HI-1873)', async () => {

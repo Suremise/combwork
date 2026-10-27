@@ -1,23 +1,7 @@
 {
-  "settings.accounts.add": {
-    "defaultMessage": "Add Connection…",
-    "description": "Button in Settings → Connections: adds a connection (asks its name and where it gets its model), then opens its sign-in or sets up its server."
-  },
-  "settings.accounts.addConfirm": {
-    "defaultMessage": "Add and Sign In",
-    "description": "The confirm button of the dialog adding a connection (Settings → Connections)."
-  },
-  "settings.accounts.addFailed": {
-    "defaultMessage": "Couldn't add the connection",
-    "description": "An error's title: adding a connection failed (Settings → Connections)."
-  },
-  "settings.accounts.addMessage": {
-    "defaultMessage": "A name for it, such as Anthropic · Max 1 or Work. Hive makes its folder, then opens {cli}'s sign-in in your browser.",
-    "description": "The message of the dialog asking a new connection's name (Settings → Connections). {cli} is a coding agent CLI."
-  },
-  "settings.accounts.addTitle": {
-    "defaultMessage": "Add a {cli} sign-in connection",
-    "description": "Title of the dialog asking a new connection's name (Settings → Connections). {cli} is a coding agent CLI (\"Claude Code\")."
+  "settings.accounts.addOne": {
+    "defaultMessage": "Add a Connection…",
+    "description": "Button under the list in Settings → Connections: adds a connection (asks which coding agent CLI, its name and where it gets its model), then opens its sign-in or sets up its server."
   },
   "settings.accounts.affected": {
     "defaultMessage": "{n, plural, one {# running agent runs on another connection than the one chosen for it now.} other {# running agents run on another connection than the one chosen for them now.}}",
@@ -35,9 +19,21 @@
     "defaultMessage": "Checked {when}",
     "description": "The tooltip of a connection's state (Settings → Connections): when it was last checked. {when} is how long ago (\"5 min ago\")."
   },
+  "settings.accounts.closeRunningConfirm": {
+    "defaultMessage": "Close Terminal",
+    "description": "The confirm button of that dialog: ends the CLI and hides its terminal."
+  },
+  "settings.accounts.closeRunningMessage": {
+    "defaultMessage": "{cli} is still running in it. Closing the terminal ends it.",
+    "description": "The message of that dialog ({cli}: the coding agent CLI, \"Codex\"): closing ends the CLI and what it started."
+  },
+  "settings.accounts.closeRunningTitle": {
+    "defaultMessage": "Close the terminal?",
+    "description": "Title of the dialog asked by Close under a connection's sign-in or Set Up terminal while the CLI in it still runs (Settings → Connections)."
+  },
   "settings.accounts.closeTerminal": {
     "defaultMessage": "Close",
-    "description": "Button under a connection's ended sign-in terminal (Settings → Connections): hides it."
+    "description": "Button under a connection's sign-in or Set Up terminal (Settings → Connections): hides it, ending the CLI in it if it still runs (asks first then)."
   },
   "settings.accounts.default": {
     "defaultMessage": "Default",
@@ -107,6 +103,10 @@
     "defaultMessage": "Make Default",
     "description": "Button on a connection (Settings → Connections): makes it the open workspace's default connection for its CLI (turning it on)."
   },
+  "settings.accounts.moreProjects": {
+    "defaultMessage": "{n, plural, one {# more} other {# more}}",
+    "description": "The last item of that list when it names only the first projects: how many more there are."
+  },
   "settings.accounts.name": {
     "defaultMessage": "Name",
     "description": "The label of the box for a connection's name (Settings → Connections)."
@@ -122,6 +122,10 @@
   "settings.accounts.none": {
     "defaultMessage": "No connections yet. Add one, then sign it in.",
     "description": "Settings → Connections when there are no connections."
+  },
+  "settings.accounts.notTrusted": {
+    "defaultMessage": "Not trusted yet in this workspace: {projects}",
+    "description": "Under a connection that needs set up (Settings → Connections, HI-1870): the projects of the open workspace whose folders its coding agent CLI hasn't been told to trust yet ({projects}: their names, listed). Set Up asks the CLI's trust question for each in turn."
   },
   "settings.accounts.notice.context": {
     "defaultMessage": "Use 200K context: {value} (its CLI has no such choice)",
@@ -179,6 +183,14 @@
     "defaultMessage": "Its folder is deleted for good, with its login on this PC (it doesn't go to the Recycle Bin). Your conversations and Claude Code's memory are kept: they are shared with your other connections. The account itself stays yours at Anthropic.",
     "description": "The message of the dialog confirming a connection's removal (Settings → Connections)."
   },
+  "settings.accounts.removeOpenConfirm": {
+    "defaultMessage": "Close Terminal and Remove",
+    "description": "The confirm button of that dialog."
+  },
+  "settings.accounts.removeOpenTitle": {
+    "defaultMessage": "Close its terminal and remove {name}?",
+    "description": "Title of the dialog confirming a connection's removal ({name}, its name) while its sign-in or Set Up terminal is open: the terminal is closed first, ending the CLI in it."
+  },
   "settings.accounts.removeTitle": {
     "defaultMessage": "Remove {name}?",
     "description": "Title of the dialog confirming a connection's removal ({name}, its name)."
@@ -202,6 +214,22 @@
   "settings.accounts.sameLogin": {
     "defaultMessage": "Signed in to the same login as another connection: {names}",
     "description": "A warning on a connection (Settings → Connections): other connections are signed in as the same login. {names} is their names, listed."
+  },
+  "settings.accounts.setUpChecking": {
+    "defaultMessage": "Checking…",
+    "description": "A connection's state (Settings → Connections, HI-1870): Hive is still reading whether its coding agent CLI trusts the open workspace's project folders, so it doesn't say yet whether it is set up."
+  },
+  "settings.accounts.setUpDone": {
+    "defaultMessage": "Set up",
+    "description": "A connection's state (Settings → Connections, HI-1870): its CLI's one-time first-run setup is done. An adjective (\"is set up\"), not the button."
+  },
+  "settings.accounts.setUpIn": {
+    "defaultMessage": "It opens in {project}'s folder, {folder}: answer {cli}'s question to trust it.",
+    "description": "Above a connection's Set Up terminal when it opens in a project's folder its coding agent CLI ({cli}) doesn't trust yet (HI-1870): {project} is the project's name, {folder} the folder."
+  },
+  "settings.accounts.setUpNeeded": {
+    "defaultMessage": "Needs set up",
+    "description": "A connection's state (Settings → Connections, HI-1870): its CLI's one-time first-run setup (Set Up, a button beside it) hasn't been done in its folder yet."
   },
   "settings.accounts.signIn": {
     "defaultMessage": "Sign In",
@@ -283,6 +311,14 @@
     "defaultMessage": "Connections: login files",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.claude-code.accounts.onboardedField.desc": {
+    "defaultMessage": "The field of a connection folder's `.claude.json` that says Claude Code's first-run screens were answered there (read only). Wrong, every Claude Code connection shows \"Needs set up\" in Settings → Connections.",
+    "description": "What the advanced setting \"Connections: set-up field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `.claude.json` as it is (a file name); \"Needs set up\" is a state Hive shows: use its name as Hive shows it."
+  },
+  "settings.advanced.claude-code.accounts.onboardedField.title": {
+    "defaultMessage": "Connections: set-up field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.claude-code.accounts.orgField.desc": {
     "defaultMessage": "The field of `claude auth status --json` with the organisation's id a connection's folder is signed in to. With the email, it tells two logins apart. Wrong, Hive can't tell who a connection is signed in as.",
     "description": "What the advanced setting \"Connections: organisation field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command)."
@@ -305,6 +341,14 @@
   },
   "settings.advanced.claude-code.accounts.statusSeconds.title": {
     "defaultMessage": "Connections: sign-in check timeout",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.accounts.trustField.desc": {
+    "defaultMessage": "The field of a folder's entry under `projects` in a connection folder's `.claude.json` that says Claude Code was told to trust that folder (read only). Wrong, every Claude Code connection on in a workspace shows \"Needs set up\" in Settings → Connections.",
+    "description": "What the advanced setting \"Connections: trusted folder field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `projects` and `.claude.json` as they are; \"Needs set up\" is a state Hive shows: use its name as Hive shows it."
+  },
+  "settings.advanced.claude-code.accounts.trustField.title": {
+    "defaultMessage": "Connections: trusted folder field",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.claude-code.connections.remoteModels.desc": {
@@ -2343,6 +2387,10 @@
     "defaultMessage": "Adding…",
     "description": "The confirm button of Add Connection while it adds the connection."
   },
+  "settings.connections.add.cli": {
+    "defaultMessage": "For",
+    "description": "Label of the choice in Add a Connection (Settings → Connections) of the coding agent CLI the connection is for (Claude Code, Codex), each shown with its icon."
+  },
   "settings.connections.add.from": {
     "defaultMessage": "Gets its model from",
     "description": "Label of the choice in Add Connection (Settings → Connections): where the connection gets its model, its sign-in or a server (Darren, 27 Oct)."
@@ -2369,7 +2417,11 @@
   },
   "settings.connections.add.title": {
     "defaultMessage": "Add a {cli} connection",
-    "description": "Title of the dialog adding a connection (Settings → Connections). {cli} is a coding agent CLI (\"Claude Code\")."
+    "description": "Title of the dialog adding a connection (Settings → Connections) when only one coding agent CLI can have them. {cli} is that CLI (\"Claude Code\")."
+  },
+  "settings.connections.add.titleAny": {
+    "defaultMessage": "Add a connection",
+    "description": "Title of the dialog adding a connection (Settings → Connections) when it first asks which coding agent CLI it is for."
   },
   "settings.connections.cancel": {
     "defaultMessage": "Cancel",
@@ -2586,10 +2638,6 @@
   "settings.connections.server.setUpFailed": {
     "defaultMessage": "Couldn't open the setup",
     "description": "An error's title: a connection's Set Up terminal couldn't be opened."
-  },
-  "settings.connections.server.setUpHint": {
-    "defaultMessage": "The first time {cli} runs on it, it asks a few setup questions (its look, its notes). Answer them here once, or in the first agent's pane.",
-    "description": "Above a connection's Set Up terminal ({cli}: the coding agent CLI): what the terminal is for."
   },
   "settings.connections.server.why.failed": {
     "defaultMessage": "The server answered with an error ({status}). Try again later.",

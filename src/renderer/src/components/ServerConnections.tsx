@@ -7,6 +7,7 @@ import { serverModelLabel } from '@shared/models'
 import { call, errorMessage } from '../api'
 import { confirm, notify } from '../store'
 import { Icon, Modal } from './ui'
+import { ProviderIcon } from './ProviderIcon'
 
 /**
  * Server connections in Settings → Connections (HI-1772): Add Connection's choice of where a connection gets its model
@@ -16,7 +17,9 @@ import { Icon, Modal } from './ui'
  */
 
 const M = {
-  addTitle: msg({ id: 'settings.connections.add.title', defaultMessage: 'Add a {cli} connection', description: 'Title of the dialog adding a connection (Settings → Connections). {cli} is a coding agent CLI ("Claude Code").' }),
+  addTitle: msg({ id: 'settings.connections.add.title', defaultMessage: 'Add a {cli} connection', description: 'Title of the dialog adding a connection (Settings → Connections) when only one coding agent CLI can have them. {cli} is that CLI ("Claude Code").' }),
+  addAny: msg({ id: 'settings.connections.add.titleAny', defaultMessage: 'Add a connection', description: 'Title of the dialog adding a connection (Settings → Connections) when it first asks which coding agent CLI it is for.' }),
+  cli: msg({ id: 'settings.connections.add.cli', defaultMessage: 'For', description: 'Label of the choice in Add a Connection (Settings → Connections) of the coding agent CLI the connection is for (Claude Code, Codex), each shown with its icon.' }),
   name: msg({ id: 'settings.connections.add.name', defaultMessage: 'Name', description: "Label of a new connection's name (Settings → Connections → Add Connection)." }),
   namePlaceholder: msg({ id: 'settings.connections.add.namePlaceholder', defaultMessage: 'Anthropic · Max 1, Work, DeepSeek…', description: "Placeholder of a new connection's name box: examples of names." }),
   from: msg({ id: 'settings.connections.add.from', defaultMessage: 'Gets its model from', description: 'Label of the choice in Add Connection (Settings → Connections): where the connection gets its model, its sign-in or a server (Darren, 27 Oct).' }),
@@ -70,7 +73,6 @@ const M = {
   readDropped: msg({ id: 'settings.connections.server.readDropped', defaultMessage: 'No longer listed, so taken out: {models}', description: "A second line of that notice: models the server doesn't list any more, removed from the connection ({models}, their ids)." }),
   readFailed: msg({ id: 'settings.connections.server.readFailed', defaultMessage: "Couldn't read {name}'s models", description: "An error's title: reading a server connection's models failed ({name}, its name)." }),
   setUp: msg({ id: 'settings.connections.server.setUp', defaultMessage: 'Set Up', description: "Button on a connection (a server one, or one signed in): opens the CLI on it in a terminal, for its first-run screens (its theme, its notes), answered by the user." }),
-  setUpHint: msg({ id: 'settings.connections.server.setUpHint', defaultMessage: "The first time {cli} runs on it, it asks a few setup questions (its look, its notes). Answer them here once, or in the first agent's pane.", description: "Above a connection's Set Up terminal ({cli}: the coding agent CLI): what the terminal is for." }),
   setUpFailed: msg({ id: 'settings.connections.server.setUpFailed', defaultMessage: "Couldn't open the setup", description: "An error's title: a connection's Set Up terminal couldn't be opened." }),
   changeFailed: msg({ id: 'settings.connections.server.changeFailed', defaultMessage: "Couldn't change the connection", description: "An error's title: changing a server connection failed (Settings → Connections)." })
 }
@@ -149,10 +151,12 @@ export function ServerModelsEditor({ models, onChange, disabled }: { models: Ser
 }
 
 /**
- * Add Connection (Darren, 27 Oct): a name, then where it gets its model. Its sign-in: added, then signed in
- * (`onSignIn`). A server: its preset, base URL, key (sent once, then cleared from this dialog) and models.
+ * Add a Connection (Darren, 27 Oct): its CLI first (HI-1870: one list, one Add, the choice shown with more than one),
+ * a name, then where it gets its model. Its sign-in: added, then signed in (`onSignIn`). A server: its preset, base
+ * URL, key (sent once, then cleared from this dialog) and models.
  */
-export function AddConnectionDialog({ cli, onClose, onSignIn }: { cli: ProviderId; onClose: () => void; onSignIn: (id: string) => void }) {
+export function AddConnectionDialog({ clis, onClose, onSignIn }: { clis: readonly ProviderId[]; onClose: () => void; onSignIn: (id: string, cli: ProviderId) => void }) {
+  const [cli, setCli] = useState<ProviderId>(clis[0])
   const servers = hasServers(cli)
   const presets = presetsOf(cli)
   const [name, setName] = useState('')
@@ -188,7 +192,7 @@ export function AddConnectionDialog({ cli, onClose, onSignIn }: { cli: ProviderI
       if (from === 'signIn') {
         const a = await call('connections:add', cli, name)
         onClose()
-        onSignIn(a.id)
+        onSignIn(a.id, cli)
         return
       }
       const typed = models.filter((m) => m.id.trim())
@@ -207,9 +211,18 @@ export function AddConnectionDialog({ cli, onClose, onSignIn }: { cli: ProviderI
   const cliName = providerDescriptor(cli).name
   const chosen = presets.find((x) => x.id === preset)
   const docs = chosen?.docs
+  // Another CLI: what was picked for the last one's server doesn't carry over.
+  const pickCli = (p: ProviderId): void => {
+    setCli(p)
+    if (!hasServers(p)) setFrom('signIn')
+    setPreset('')
+    setBaseUrl('')
+    setModels([])
+    setReadAfter(false)
+  }
   return (
     <Modal
-      title={tr(M.addTitle, { cli: cliName })}
+      title={tr(clis.length > 1 ? M.addAny : M.addTitle, { cli: cliName })}
       icon="plug"
       wide={from === 'server'}
       busy={busy}
@@ -223,6 +236,18 @@ export function AddConnectionDialog({ cli, onClose, onSignIn }: { cli: ProviderI
       }
     >
       <div className="agent-form server-form">
+        {clis.length > 1 && (
+          <>
+            <label>{tr(M.cli)}</label>
+            <div className="flex" role="radiogroup" aria-label={tr(M.cli)}>
+              {clis.map((p) => (
+                <label key={p} className="flex conn-cli-choice">
+                  <input type="radio" name="conn-cli" checked={cli === p} disabled={busy} onChange={() => pickCli(p)} data-cli-choice={p} /> <ProviderIcon provider={p} /> {providerDescriptor(p).name}
+                </label>
+              ))}
+            </div>
+          </>
+        )}
         <label htmlFor="conn-name">{tr(M.name)}</label>
         <input id="conn-name" className="input" autoFocus value={name} disabled={busy} placeholder={tr(M.namePlaceholder)} onChange={(e) => setName(e.target.value)} />
         {servers && (
@@ -353,7 +378,7 @@ function EditServerDialog({ c, onClose }: { c: Connection; onClose: () => void }
 }
 
 /** A server connection's part of its row: its server and key, and what can be done with them. */
-export function ServerConnectionDetail({ c, keyLast4, onSetUp }: { c: Connection; keyLast4?: string; onSetUp: (id: string) => void }) {
+export function ServerConnectionDetail({ c, keyLast4, needsSetUp, onSetUp }: { c: Connection; keyLast4?: string; needsSetUp?: boolean; onSetUp: (id: string) => void }) {
   const [dialog, setDialog] = useState<'key' | 'edit' | null>(null)
   const [reading, setReading] = useState(false)
   const url = parseBaseUrl(c.server?.baseUrl ?? '')
@@ -388,7 +413,7 @@ export function ServerConnectionDetail({ c, keyLast4, onSetUp }: { c: Connection
             {tr(reading ? M.reading : M.read)}
           </button>
         )}
-        <button className="btn subtle small" data-set-up onClick={() => onSetUp(c.id)}>{tr(M.setUp)}</button>
+        <button className={needsSetUp ? 'btn primary small' : 'btn subtle small'} data-set-up onClick={() => onSetUp(c.id)}>{tr(M.setUp)}</button>
       </div>
       {dialog === 'key' && <KeyDialog c={c} onClose={() => setDialog(null)} />}
       {dialog === 'edit' && <EditServerDialog c={c} onClose={() => setDialog(null)} />}
@@ -445,8 +470,11 @@ export async function setUpConnection(id: string): Promise<string | null> {
   }
 }
 
-/** The hint above a connection's Set Up terminal. */
-export const setUpHint = (cli: ProviderId): string => tr(M.setUpHint, { cli: providerDescriptor(cli).name })
+/** What Set Up is for, from the CLI's descriptor (HI-1870): above its terminal, and on a connection that needs it. */
+export const setUpHint = (cli: ProviderId): string => {
+  const m = providerDescriptor(cli).capabilities.connections?.setUp
+  return m ? tr(m) : ''
+}
 
 /** The Set Up button's label. */
 export const setUpLabel = (): string => tr(M.setUp)

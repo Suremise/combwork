@@ -1,15 +1,14 @@
 // Generated from locales/en/settings.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
-  'settings.accounts.add': undefined
-  'settings.accounts.addConfirm': undefined
-  'settings.accounts.addFailed': undefined
-  'settings.accounts.addMessage': { cli: string | number }
-  'settings.accounts.addTitle': { cli: string | number }
+  'settings.accounts.addOne': undefined
   'settings.accounts.affected': { n: number }
   'settings.accounts.changeFailed': undefined
   'settings.accounts.changedTo': { now: string | number; was: string | number }
   'settings.accounts.checkedAt': { when: string | number }
+  'settings.accounts.closeRunningConfirm': undefined
+  'settings.accounts.closeRunningMessage': { cli: string | number }
+  'settings.accounts.closeRunningTitle': undefined
   'settings.accounts.closeTerminal': undefined
   'settings.accounts.default': undefined
   'settings.accounts.defaults': undefined
@@ -28,10 +27,12 @@ interface HiveMessageValues {
   'settings.accounts.list.title': undefined
   'settings.accounts.loading': undefined
   'settings.accounts.makeDefault': undefined
+  'settings.accounts.moreProjects': { n: number }
   'settings.accounts.name': undefined
   'settings.accounts.needName': undefined
   'settings.accounts.noWorkspace': undefined
   'settings.accounts.none': undefined
+  'settings.accounts.notTrusted': { projects: string | number }
   'settings.accounts.notice.context': { value: string | number }
   'settings.accounts.notice.dismiss': undefined
   'settings.accounts.notice.effort': { value: string | number }
@@ -46,12 +47,18 @@ interface HiveMessageValues {
   'settings.accounts.removeConfirm': undefined
   'settings.accounts.removeFailed': undefined
   'settings.accounts.removeMessage': undefined
+  'settings.accounts.removeOpenConfirm': undefined
+  'settings.accounts.removeOpenTitle': { name: string | number }
   'settings.accounts.removeTitle': { name: string | number }
   'settings.accounts.removing': undefined
   'settings.accounts.rename': undefined
   'settings.accounts.renameConfirm': undefined
   'settings.accounts.renameTitle': { name: string | number }
   'settings.accounts.sameLogin': { names: string | number }
+  'settings.accounts.setUpChecking': undefined
+  'settings.accounts.setUpDone': undefined
+  'settings.accounts.setUpIn': { project: string | number; folder: string | number; cli: string | number }
+  'settings.accounts.setUpNeeded': undefined
   'settings.accounts.signIn': undefined
   'settings.accounts.signInAgain': undefined
   'settings.accounts.signInFailed': undefined
@@ -72,12 +79,16 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.accounts.loggedInField.title': undefined
   'settings.advanced.claude-code.accounts.loginFiles.desc': undefined
   'settings.advanced.claude-code.accounts.loginFiles.title': undefined
+  'settings.advanced.claude-code.accounts.onboardedField.desc': undefined
+  'settings.advanced.claude-code.accounts.onboardedField.title': undefined
   'settings.advanced.claude-code.accounts.orgField.desc': undefined
   'settings.advanced.claude-code.accounts.orgField.title': undefined
   'settings.advanced.claude-code.accounts.planField.desc': undefined
   'settings.advanced.claude-code.accounts.planField.title': undefined
   'settings.advanced.claude-code.accounts.statusSeconds.desc': undefined
   'settings.advanced.claude-code.accounts.statusSeconds.title': undefined
+  'settings.advanced.claude-code.accounts.trustField.desc': undefined
+  'settings.advanced.claude-code.accounts.trustField.title': undefined
   'settings.advanced.claude-code.connections.remoteModels.desc': undefined
   'settings.advanced.claude-code.connections.remoteModels.title': undefined
   'settings.advanced.claude-code.exit.command.desc': undefined
@@ -587,6 +598,7 @@ interface HiveMessageValues {
   'settings.connections.add.addServer': undefined
   'settings.connections.add.addSignIn': undefined
   'settings.connections.add.adding': undefined
+  'settings.connections.add.cli': undefined
   'settings.connections.add.from': undefined
   'settings.connections.add.fromServer': undefined
   'settings.connections.add.fromSignIn': undefined
@@ -594,6 +606,7 @@ interface HiveMessageValues {
   'settings.connections.add.namePlaceholder': undefined
   'settings.connections.add.needName': undefined
   'settings.connections.add.title': { cli: string | number }
+  'settings.connections.add.titleAny': undefined
   'settings.connections.cancel': undefined
   'settings.connections.masking.full': undefined
   'settings.connections.masking.gap': { date: string | number }
@@ -648,7 +661,6 @@ interface HiveMessageValues {
   'settings.connections.server.setKey': undefined
   'settings.connections.server.setUp': undefined
   'settings.connections.server.setUpFailed': undefined
-  'settings.connections.server.setUpHint': { cli: string | number }
   'settings.connections.server.why.failed': { status: string | number }
   'settings.connections.server.why.forbidden': undefined
   'settings.connections.server.why.redirect': { status: string | number }

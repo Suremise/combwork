@@ -293,6 +293,26 @@ export function hasPty(key: string): boolean {
 }
 
 /**
+ * Resolves once the terminal's process has exited and its `onExit` has run (at once with none), or with false after
+ * `boundMs` (a kill that never ended it), its listener then let go. Called before the kill, so its exit can't be missed.
+ */
+export function ptyGone(key: string, boundMs: number): Promise<boolean> {
+  const e = entries.get(key)
+  if (!e) return Promise.resolve(true)
+  return new Promise((resolve) => {
+    // Registered after spawnPty's own listener, so it runs after the entry is gone and its onExit has run.
+    const listener = e.proc.onExit(() => {
+      clearTimeout(timer)
+      resolve(true)
+    })
+    const timer = setTimeout(() => {
+      listener.dispose()
+      resolve(entries.get(key) !== e)
+    }, boundMs)
+  })
+}
+
+/**
  * Stops a terminal's process, once. On Windows node-pty closes the pseudoconsole a moment after kill() (it first asks
  * which processes are attached), and a second kill before the first has finished closes it again: that corrupts the
  * heap and Hive's main process dies, with nothing in its log (#297). It happened whenever a session being stopped was

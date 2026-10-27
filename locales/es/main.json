@@ -12,6 +12,8 @@
   "main.accounts.notFound": "Esa conexión no existe.",
   "main.accounts.nothingToKeep": "Hive no pudo comprobar con quién inició sesión la conexión {name}, así que no hay ningún inicio de sesión que conservar.",
   "main.accounts.removeFailed": "No se quitó la conexión {name}: {error}. No se tocó nada fuera de su carpeta; Quitar lo vuelve a intentar.",
+  "main.accounts.running": "La conexión {name} tiene agentes en marcha: detenlos y después quítala.",
+  "main.accounts.setUpCancelled": "Configurar no se abrió para la conexión {name}: se quitó la conexión o se cerró su espacio de trabajo mientras Hive revisaba sus carpetas.",
   "main.antivirus.allExcluded": "Todas las carpetas que Hive puede ofrecer ya están excluidas.",
   "main.antivirus.changed": "El espacio de trabajo cambió desde que se te preguntó: no se cambió nada.",
   "main.antivirus.closed": "El espacio de trabajo se cerró mientras tanto.",

@@ -1,7 +1,7 @@
 import { homedir } from 'os'
 import { msg, tr } from '../../../shared/i18n'
 import { join, basename } from 'path'
-import { mkdir, open, readdir, stat, writeFile } from 'original-fs/promises'
+import { mkdir, open, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, readFileSync, realpathSync } from 'original-fs'
 import type { AgentInstallInfo, AutoCompactSetting, McpServerDef, MemorySource, PathDataCopy, PlanLimit, PlanUsage, ReadinessIssue, SubSession } from '../../../shared/types'
 import { HIVE_DIR, assertSessionId, isSessionId } from '../../../shared/defaults'
@@ -15,7 +15,7 @@ import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
-import type { ConnectionStatus, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
+import type { ConnectionStatus, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
 import { autoCompactOf, settingsScopes } from './autoCompact'
 import { connectionsManaged } from '../../connectionSeam'
 import { hiveStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
@@ -336,6 +336,43 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       plan: advanced.get<string>('claude-code.accounts.planField')
     }
     return claudeAccountStatus(r, fields)
+  }
+
+  /** Its first-run screens answered in the folder (HI-1870): its `.claude.json`'s onboarding field; no file yet, not. */
+  async connectionSetUp(home: string): Promise<boolean | null> {
+    try {
+      const j = JSON.parse(await readFile(join(home, '.claude.json'), 'utf8')) as Record<string, unknown>
+      return j[advanced.get<string>('claude-code.accounts.onboardedField')] === true
+    } catch (e) {
+      return (e as NodeJS.ErrnoException).code === 'ENOENT' ? false : null
+    }
+  }
+
+  /**
+   * Its trust of each folder in the folder's `.claude.json` (HI-1870), as Claude Code 2.1.311 looks it up: the real path
+   * or an ancestor's entry with the trust field, forward slashes, letter case as on disk (it asked with an entry in
+   * another case, and for an 8.3 path whatever the long one's entry said: unknown then).
+   */
+  async connectionTrusts(home: string, targets: readonly TrustTarget[]): Promise<(boolean | null)[]> {
+    let entries: Record<string, unknown>
+    try {
+      const j = JSON.parse(await readFile(join(home, '.claude.json'), 'utf8')) as { projects?: unknown }
+      entries = j.projects && typeof j.projects === 'object' ? (j.projects as Record<string, unknown>) : {}
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') return targets.map(() => null)
+      entries = {}
+    }
+    const field = advanced.get<string>('claude-code.accounts.trustField')
+    const trusted = new Set(Object.entries(entries).filter(([, v]) => (v as Record<string, unknown> | null)?.[field] === true).map(([k]) => k.replace(/\\/g, '/')))
+    return targets.map((t) => {
+      if (!t.root || t.short) return null
+      for (let p = t.root.replace(/\\/g, '/').replace(/\/+$/, ''); ; ) {
+        if (trusted.has(p)) return true
+        const up = p.slice(0, p.lastIndexOf('/'))
+        if (!up || up === p || !up.includes(':')) return false
+        p = up
+      }
+    })
   }
 
   accountSharedTarget(name: string): string {

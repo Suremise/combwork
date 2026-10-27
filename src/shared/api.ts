@@ -940,8 +940,8 @@ export interface HiveRequests {
   /** Adds an account (its folder and junctions made); returns it, for its Sign in. */
   'connections:add': (provider: ProviderId, name: string) => Connection
   'connections:rename': (id: string, name: string) => void
-  /** Removes an account and its folder for good (refused while it is in use). */
-  'connections:remove': (id: string) => void
+  /** Removes an account and its folder for good (refused while it is in use; `closeTerminal`, HI-1870: its open sign-in or Set Up terminal ended first). */
+  'connections:remove': (id: string, opts?: { closeTerminal?: boolean }) => void
   /** Opens the account's sign-in (the CLI's own) in a terminal; returns the terminal's key. */
   'connections:signIn': (id: string) => string
   /**

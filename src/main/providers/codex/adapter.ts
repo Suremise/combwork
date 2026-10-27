@@ -4,7 +4,7 @@ import { spawn } from 'child_process'
 import { codexCheckHeld, ownedAppServerRequest, type CheckAnswer } from '../../codexChecks'
 import { homedir, tmpdir } from 'os'
 import { basename, join, resolve } from 'path'
-import { readdir, stat } from 'original-fs/promises'
+import { readdir, readFile, stat } from 'original-fs/promises'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'original-fs'
 import { parse as parseToml } from 'smol-toml'
 import type { AgentInstallInfo, McpServerDef, MemorySource, PermissionMode, ReadinessIssue, SubSession } from '../../../shared/types'
@@ -21,7 +21,7 @@ import { plainHttpsJson } from '../../plainHttpsJson'
 import { findSecretWarnings } from '../../mcpSecrets'
 import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import { storePwshFirst, storePwshIssue } from './storePwsh'
-import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, ExternalSession, KeySteps, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
+import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, TrustTarget, ExternalSession, KeySteps, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
 import { codexBackgroundMemo, codexBackgroundTasks, type CodexBackgroundMemo } from './background'
 import { codexSafeguards } from './safeguards'
 import { codexTranscriptTurns } from './turns'
@@ -686,6 +686,36 @@ export class CodexAdapter implements ProviderAdapter {
   async accountStatus(executable: string, env: NodeJS.ProcessEnv): Promise<ConnectionStatus> {
     const answer = await appServerAnswer(executable, CONNECTION_STORE, homedir(), advanced.get<string>('codex.accounts.readMethod'), {}, env, advanced.number('codex.accounts.statusSeconds') * 1000)
     return codexAccountStatus(answer, { account: advanced.get<string>('codex.accounts.accountField'), email: advanced.get<string>('codex.accounts.emailField'), plan: advanced.get<string>('codex.accounts.planField') })
+  }
+
+  /**
+   * Its Windows sandbox set up for the folder (HI-1870), as its launches have it: the folder's own `windows.sandbox`,
+   * or else this PC's, which launches pass on (launchConnectionArgs). Nothing to set up off Windows.
+   */
+  async connectionSetUp(home: string): Promise<boolean | null> {
+    if (process.platform !== 'win32') return true
+    const own = configOf(home).windows?.sandbox
+    const pc = userConfig().windows?.sandbox
+    return (typeof own === 'string' && !!own) || (typeof pc === 'string' && /^[\w-]{1,24}$/.test(pc))
+  }
+
+  /**
+   * Its trust of each folder in the folder's config.toml (HI-1870), as Codex 0.164.0 looks it up: a `[projects.'<path>']`
+   * with `trust_level = "trusted"` for the main repository root's real path, in any letter case (8.3 paths it expands).
+   * It asks only in a Git repository, so a folder without Git needs none. Its own file only: launches pass no trust.
+   */
+  async connectionTrusts(home: string, targets: readonly TrustTarget[]): Promise<(boolean | null)[]> {
+    let projects: Record<string, unknown>
+    try {
+      const t = parseToml(await readFile(join(home, 'config.toml'), 'utf8')) as Record<string, unknown>
+      projects = t.projects && typeof t.projects === 'object' ? (t.projects as Record<string, unknown>) : {}
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') return targets.map(() => null)
+      projects = {}
+    }
+    const norm = (p: string): string => p.replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase()
+    const trusted = new Set(Object.entries(projects).filter(([, v]) => (v as Record<string, unknown> | null)?.trust_level === 'trusted').map(([k]) => norm(k)))
+    return targets.map((t) => (!t.git ? true : t.root ? trusted.has(norm(t.root)) : null))
   }
 
   accountSharedTarget(name: string): string {

@@ -24,11 +24,13 @@ interface HiveMessageValues {
   'providers.autoCompact.unsureScope': { scope: string | number; unsure: string | number }
   'providers.autoCompact.why.notFile': undefined
   'providers.autoCompact.why.tooBig': undefined
+  'providers.claude.connections.setUp': undefined
   'providers.claude.hint.args': undefined
   'providers.claude.hint.broken': undefined
   'providers.claude.hint.model': undefined
   'providers.claude.hint.signIn': undefined
   'providers.cmdTooLong': { file: string | number; max: number; length: number }
+  'providers.codex.connections.setUp': undefined
   'providers.codex.developerUnread.agentMessage': undefined
   'providers.codex.developerUnread.agentTitle': undefined
   'providers.codex.developerUnread.assistantMessage': undefined

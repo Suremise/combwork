@@ -87,6 +87,19 @@ if (args[0] === 'login') {
   console.log('Logged in using ChatGPT')
   process.exit(0)
 }
+// Started plainly in a connection's folder (HI-1870: its Set Up) with no sandbox there or given: its one-time Windows
+// sandbox setup, answered at once (the non-admin one), written to the folder's config.toml as Codex keeps it.
+if (inConnection && args.length === 0) {
+  const toml = path.join(connectionHome, 'config.toml')
+  const now = fs.existsSync(toml) ? fs.readFileSync(toml, 'utf8') : ''
+  let next = now
+  if (!/^\s*sandbox\s*=/m.test(next)) next = `${next}${next && !next.endsWith('\n') ? '\n' : ''}[windows]\nsandbox = "unelevated"\n`
+  // Run in a project's folder (HI-1870: Set Up opened where it isn't trusted yet): its trust question answered Yes, for
+  // the folder's real path, as Codex records it (the suites' projects are their repositories' roots).
+  const cwd = fs.realpathSync.native(process.cwd())
+  if (path.relative(connectionHome, cwd).startsWith('..') && !next.includes(`[projects.'${cwd}']`)) next += `\n[projects.'${cwd}']\ntrust_level = "trusted"\n`
+  if (next !== now) fs.writeFileSync(toml, next)
+}
 // A busy connection (HI-1873): while fake-busy is in a connection's folder, each run there (an agent, and Hive's own
 // check's app server) writes at its top level as Codex's databases and logs do, in bursts, making and deleting a journal,
 // so Windows reports some of it with no file name. Its login file is never touched.

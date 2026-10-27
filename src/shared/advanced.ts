@@ -1161,6 +1161,26 @@ const SOURCES: readonly AdvancedSource[] = [
     samples: [{ from: `${FIX}/advanced/auth-status-claude-2.1.310.jsonl`, version: '2.1.310', fields: ['loggedIn', 'authMethod', 'apiProvider', 'analyticsDisabled', 'projectsDirectory', 'configDirectory', 'email', 'orgId', 'orgName', 'subscriptionType'] }]
   },
   {
+    id: 'claude-code.accounts.onboardedField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.accounts.onboardedField.title', defaultMessage: 'Connections: set-up field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.onboardedField.desc', defaultMessage: "The field of a connection folder's `.claude.json` that says Claude Code's first-run screens were answered there (read only). Wrong, every Claude Code connection shows \"Needs set up\" in Settings → Connections.", description: 'What the advanced setting "Connections: set-up field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `.claude.json` as it is (a file name); "Needs set up" is a state Hive shows: use its name as Hive shows it.' }),
+    kind: 'field',
+    default: 'hasCompletedOnboarding',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/onboarding-claude-2.1.311.jsonl`, version: '2.1.311', fields: ['additionalModelCostsCache', 'additionalModelOptionsAnsweredAt', 'additionalModelOptionsCache', 'announcementImpressions', 'apiCreditLinkStatusCache', 'autoCompactWindowsCache', 'autoUpdates', 'autoUpdatesProtectedForNative', 'cachedArtifactRoster', 'cachedExperimentData', 'cachedExperimentFeatures', 'cachedExtraUsageDisabledReason', 'cachedGrowthBookFeatures', 'cachedGrowthBookFeaturesAt', 'changelogLastFetched', 'claudeAiMcpEverConnected', 'claudeCodeFirstTokenDate', 'clientDataCacheSlots', 'closedIssuesLastChecked', 'firstStartTime', 'firstStartVersion', 'fullscreenAutoDisabled', 'groveChoiceSeenAt', 'groveConfigCache', 'hasCompletedOnboarding', 'hasResetAutoModeOptInForDefaultOffer', 'hasSeenAutoDefaultNotice', 'hasSeenAutoModeEntryWarning', 'hasVisitedPasses', 'installMethod', 'lastClawdEntranceVersion', 'lastOnboardingVersion', 'lastReleaseNotesSeen', 'machineID', 'migrationVersion', 'modelAccessCache', 'numStartups', 'oauthAccount', 'officialMarketplaceAutoInstallAttempted', 'officialMarketplaceAutoInstalled', 'opusProMigrationComplete', 'orgModelDefaultCache', 'passesEligibilityCache', 'passesLastSeenRemaining', 'passesUpsellSeenCount', 'pluginUsage', 'projects', 'promoStartupSeenCount', 'promoStartupStatusCache', 'promptQueueUseCount', 'seenNotifications', 'skillUsage', 'sonnet1m45MigrationComplete', 'tipLifetimeShownCounts', 'tipsHistory', 'tipsHistoryByCommand', 'userID'] }]
+  },
+  {
+    id: 'claude-code.accounts.trustField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.accounts.trustField.title', defaultMessage: 'Connections: trusted folder field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.trustField.desc', defaultMessage: "The field of a folder's entry under `projects` in a connection folder's `.claude.json` that says Claude Code was told to trust that folder (read only). Wrong, every Claude Code connection on in a workspace shows \"Needs set up\" in Settings → Connections.", description: 'What the advanced setting "Connections: trusted folder field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `projects` and `.claude.json` as they are; "Needs set up" is a state Hive shows: use its name as Hive shows it.' }),
+    kind: 'field',
+    default: 'hasTrustDialogAccepted',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/trust-entry-claude-2.1.311.json`, version: '2.1.311', fields: ['allowedTools', 'disabledMcpjsonServers', 'enabledMcpjsonServers', 'hasClaudeMdExternalIncludesApproved', 'hasClaudeMdExternalIncludesWarningShown', 'hasTrustDialogAccepted', 'lastAPIDuration', 'lastAPIDurationWithoutRetries', 'lastCost', 'lastDuration', 'lastFpsAverage', 'lastFpsLow1Pct', 'lastGracefulShutdown', 'lastLinesAdded', 'lastLinesRemoved', 'lastModelUsage', 'lastSessionId', 'lastSessionMetrics', 'lastStartTime', 'lastToolDuration', 'lastTotalCacheCreationInputTokens', 'lastTotalCacheReadInputTokens', 'lastTotalInputTokens', 'lastTotalOutputTokens', 'lastTotalWebSearchRequests', 'lastVersionBase', 'mcpContextUris', 'mcpServers'] }]
+  },
+  {
     id: 'claude-code.accounts.loginFiles',
     group: 'claude-code',
     title: msg({ id: 'settings.advanced.claude-code.accounts.loginFiles.title', defaultMessage: 'Connections: login files', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),

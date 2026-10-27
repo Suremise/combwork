@@ -129,6 +129,18 @@ export interface UpdateRetry {
 /** A home folder's sign-in, as its CLI reports it (HI-980): `ok: false` when it couldn't be told, `error` in English. */
 export type ConnectionStatus = { ok: true; loggedIn: boolean; email?: string; orgId?: string; plan?: string | null } | { ok: false; error: string }
 
+/**
+ * A workspace folder a connection's CLI must trust (HI-1870), as the CLIs look trust up (probed with Claude Code 2.1.311
+ * and Codex 0.164.0): `root` is the real path of a Git project's main repository root (the parent of its common git
+ * folder, which covers the project, its slots and copies, all worktrees of it), or of a project without Git; null when
+ * Hive couldn't resolve it. `short`: Hive launches it by an 8.3 path, which Claude Code doesn't expand.
+ */
+export interface TrustTarget {
+  root: string | null
+  git: boolean
+  short: boolean
+}
+
 export interface CommandSpec {
   file: string
   args: string[]
@@ -374,6 +386,17 @@ export interface ProviderAdapter {
    * (a timeout, output it couldn't read), which isn't signed out.
    */
   accountStatus?(executable: string, env: NodeJS.ProcessEnv): Promise<ConnectionStatus>
+  /**
+   * Whether a connection's folder (`home`) has had the CLI's one-time first-run setup that Set Up answers (HI-1870), as
+   * the CLI's own files there say, read only; null when it can't be told. Absent: the CLI has none to tell.
+   */
+  connectionSetUp?(home: string): Promise<boolean | null>
+  /**
+   * Whether the CLI on a connection's folder (`home`) trusts each of a workspace's folders (HI-1870), as its own files
+   * there say, read only: true, false (not trusted, or no record), or null when it can't be told (a file it can't
+   * read, a folder Hive couldn't resolve). Absent: the CLI keeps no trust to tell.
+   */
+  connectionTrusts?(home: string, targets: readonly TrustTarget[]): Promise<(boolean | null)[]>
   /** Where a shared folder of an account (capabilities.connections.shared) links to: that folder of the CLI's own home. */
   accountSharedTarget?(name: string): string
   /** Whether a file in an account's folder is one that changes when the CLI signs in or out there: watched, never read. */
