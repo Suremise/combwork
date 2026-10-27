@@ -138,6 +138,22 @@ async function theForm(page, app, inv) {
     await lib.appReady(page)
     const notice = page.locator('.presets-notice')
     check('after the upgrade, the presets notice names the project', !!(await lib.until(async () => (await notice.count()) > 0 && (await notice.innerText()).includes('web'), HUNG_MS)), await page.locator('.main-area').innerText().catch(() => ''))
+    // Agents changing state replace the window's workspace each time; the notice reads main again only when what it
+    // shows can change (HI-1807: a dozen agents working read it about once a second). Each call is counted in main.
+    await app.evaluate(({ ipcMain }) => {
+      const handlers = ipcMain._invokeHandlers
+      const h = handlers.get('workflow:presetsNotice')
+      globalThis.__presetsCalls = 0
+      handlers.set('workflow:presetsNotice', (...x) => (globalThis.__presetsCalls++, h(...x)))
+    })
+    const status = (agentId, s) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'session-status', state: { provider: 'claude-code', runId: `wo-${agentId}`, projectPath: project, agentId, cwd: project, sessionId: '', status: s, runtime: { lifecycle: s === 'stopped' ? 'stopped' : 'running', maintenance: null, attention: null, composer: 'free' }, startedAt: new Date().toISOString(), launchSignature: '', unseen: false } })
+    const running = page.locator('.project-row', { hasText: 'web' }).locator('.agent-count')
+    for (const s of ['ready', 'working', 'waiting', 'working']) for (const a of ['b1', 'r1']) await status(a, s)
+    const twoShown = !!(await lib.until(async () => (await running.count()) === 1 && (await running.innerText()).trim() === '2', HUNG_MS))
+    for (const a of ['b1', 'r1']) await status(a, 'stopped')
+    const noneShown = !!(await lib.until(async () => (await running.count()) === 0, HUNG_MS))
+    const presetsCalls = await app.evaluate(() => globalThis.__presetsCalls)
+    check('agents changing state don’t read the presets notice again, and it stays', twoShown && noneShown && presetsCalls === 0 && (await notice.count()) === 1, `two running shown: ${twoShown}, then none: ${noneShown}, calls: ${presetsCalls}`)
     // The answer's board write held a while, and the workspace changed meanwhile (#1464): the notice's reload then reads
     // the board before the answer is on it, and must not show it again.
     await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = 'workflow:presetsNoticeSaid=3000*1' })
