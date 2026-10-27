@@ -148,6 +148,16 @@ describe('Codex: when a person must act', () => {
       mkdirSync(home, { recursive: true })
       writeFileSync(joinPath(home, 'config.toml'), "[projects.'C:\\work\\alpha']\ntrust_level = \"trusted\"\n\n[projects.'C:\\work\\beta']\ntrust_level = \"untrusted\"\n")
       expect(await codex.connectionTrusts(home, targets)).toEqual([true, true, false, true, null])
+      // A worktree project W of main repository R (HR3, HI-1871 round 1): Codex looks W's own entry up first.
+      const w = (folder: string) => ({ root: 'C:\\work\\alpha', git: true, short: false, folder })
+      writeFileSync(joinPath(home, 'config.toml'), "[projects.'C:\\work\\alpha']\ntrust_level = \"trusted\"\n\n[projects.'C:\\work\\alpha-wt']\ntrust_level = \"untrusted\"\n")
+      // R trusted, W's own entry untrusted: not trusted, and asked at W, not R.
+      expect(await codex.connectionTrusts(home, [w('C:\\work\\alpha-wt')])).toEqual([{ at: 'C:\\work\\alpha-wt' }])
+      // No entry for W: R's decides.
+      expect(await codex.connectionTrusts(home, [w('C:\\work\\alpha-wt2')])).toEqual([true])
+      // W's own entry trusted, R not: trusted.
+      writeFileSync(joinPath(home, 'config.toml'), "[projects.'c:\\WORK\\alpha-wt']\ntrust_level = \"trusted\"\n")
+      expect(await codex.connectionTrusts(home, [w('C:\\work\\alpha-wt')])).toEqual([true])
       // One it can't read: unknown, never untrusted.
       writeFileSync(joinPath(home, 'config.toml'), "[projects.'C:\\work\\alpha'\ntrust_level = \n")
       expect(await codex.connectionTrusts(home, targets)).toEqual([null, null, null, null, null])

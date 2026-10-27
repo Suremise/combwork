@@ -883,7 +883,7 @@ describe("a workspace's accounts", () => {
       const names = ['alpha', 'beta', 'gamma']
       const folders = names.map((n) => join(wsPath, n))
       // Each trust read held until the test answers it: how many projects it was asked about, and its answer.
-      let held: { home: string; projects: number; answer: (v: (boolean | null)[]) => void }[] = []
+      let held: { home: string; projects: number; answer: (v: (boolean | null | { at: string })[]) => void }[] = []
       let spy: ReturnType<typeof vi.spyOn>
       let a: Connection
       const row = () => run(() => accounts.accountsView()).connections.find((c) => c.id === a.id)!
@@ -969,6 +969,12 @@ describe("a workspace's accounts", () => {
         await vi.waitFor(() => expect(rowOf(a.id).trust).toEqual({ pending: [], unknown: false }), { timeout: HUNG_MS })
         for (const h of held) h.answer([true, true])
         await run(() => accounts.setAccountOn(other.id, false))
+      })
+
+      it("a CLI's reading that asks at another folder (Codex: a worktree project's own entry, HR3) is where Set Up goes", async () => {
+        const own = join(base, 'own-entry')
+        held[0].answer([{ at: own }, true])
+        await vi.waitFor(() => expect(row().trust?.pending).toEqual([{ project: 'alpha', folder: own }]), { timeout: HUNG_MS })
       })
 
       it('while its first read is held: Checking…, never done; refreshes mark it dirty, so one more read, not one each', async () => {

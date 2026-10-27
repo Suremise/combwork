@@ -140,11 +140,11 @@ export function AccountsSettings() {
       notify('error', tr(M.signInFailed), errorMessage(e))
     }
   }
-  // Main opens it in the first folder the CLI doesn't trust yet here (HI-1870), the one the row names first.
+  // Main opens it where the CLI's trust question covers the most (HI-1870, HI-1871), read as it opens: the hint names
+  // the place it says it used, never the one this window last showed (HI-1871 round 1).
   const setUp = async (id: string, provider: ProviderId): Promise<void> => {
-    const first = view?.connections.find((a) => a.id === id)?.trust?.setUpIn
-    const key = await setUpConnection(id)
-    if (key) setTerminal({ id, key, ended: false, provider, setUp: true, ...(first ? { in: first } : {}) })
+    const opened = await setUpConnection(id)
+    if (opened) setTerminal({ id, key: opened.key, ended: false, provider, setUp: true, ...(opened.in ? { in: opened.in } : {}) })
   }
   const rename = async (id: string, current: string, title = tr(M.renameTitle, { name: current })): Promise<void> => {
     const name = await prompt({ title, fieldLabel: tr(M.name), initial: current, confirmLabel: tr(M.renameConfirm), validate: (v) => (v.trim() ? null : tr(M.needName)) })

@@ -140,6 +140,8 @@
   "tips.conflictHunks.title": "Die Konflikte einer zurückgegebenen Karte sehen",
   "tips.connectionOrder.text": "Ziehe die Verbindungen jeder CLI in Einstellungen → Verbindungen in deine Reihenfolge: Neue Agenten verwenden die erste, die im Arbeitsbereich aktiv ist. Als Standard festlegen verschiebt eine nach oben, ohne sie einzuschalten; laufende Agenten behalten ihre.",
   "tips.connectionOrder.title": "Ordne deine Verbindungen",
+  "tips.connectionTrust.text": "Einrichten einer neuen Verbindung fragt Claude Code einmal, im Ordner des Arbeitsbereichs, ob es jedem Projekt darin vertraut. Codex-Agenten fragen nie: Jeder vertraut für diesen Start seinem eigenen Ordner (Einstellungen → Erweitert → Codex).",
+  "tips.connectionTrust.title": "Einem Arbeitsbereich mit einer Antwort vertrauen",
   "tips.connections.text": "Einstellungen → Verbindungen verwaltet mehrere Anmeldungen für Claude Code und Codex oder einen Server wie Ollama auf diesem PC. Jeder Arbeitsbereich wählt, welche eingeschaltet sind, neue Agenten verwenden die erste aktive in deiner Reihenfolge, und jeder Agent kann seine eigene nutzen: Wähle sie in den Agent-Einstellungen.",
   "tips.connections.title": "Agenten mit verschiedenen Anmeldungen ausführen",
   "tips.consoleRecording.text": "In der Entwicklerkonsole schreibt „Aufzeichnen“ in eine Datei, was die CLI eines Agenten an Hive sendet, geschwärzt, außer du hakst für diese Aufzeichnung Text an. „Diagnosedaten kopieren“ kann sie an einen Fehlerbericht anhängen.",

@@ -19,7 +19,7 @@ import { keptLaneOrder } from '../shared/laneBar'
 import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../shared/tips'
 import { allProviders } from './providers'
 import { providerService } from './providerService'
-import { accountsView, addAccount, connectionHomes, dismissConnectionsIntro, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, moveConnection, setAccountOn, setConnectionDefaults, setUpFolder, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
+import { accountsView, addAccount, connectionHomes, dismissConnectionsIntro, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, moveConnection, setAccountOn, setConnectionDefaults, setUpPlace, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
 import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setUpServerConnection } from './serverConnections'
 import { requireMasking } from './keyCoverage'
 import { resetMasking } from './keyStore'
@@ -1576,8 +1576,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       await refreshPathBeforeStart()
       // A sign-in connection's Set Up (HI-1826): the CLI on its folder, for the first-run screens its sign-in leaves.
       // Opened in the first folder of this workspace it doesn't trust yet, so the CLI asks there (HI-1870); else its own.
-      const folder = await setUpFolder(id)
-      return isServer(getAccount(id)) ? setUpServerConnection(id, folder) : setUpSignInConnection(id, folder)
+      const place = await setUpPlace(id)
+      const key = await (isServer(getAccount(id)) ? setUpServerConnection(id, place?.folder) : setUpSignInConnection(id, place?.folder))
+      // Where it opened, for its terminal's hint (HI-1871 round 1): the place used, not the one the window showed.
+      return { key, ...(place ? { in: place } : {}) }
     },
     'connections:resetMasking': async () => {
       await resetMasking()

@@ -193,6 +193,8 @@ const check = (name, ok, extra = '') => {
       return all.length > launchesBefore ? all.at(-1) : null
     }, HUNG_MS)
     check('…the CLI run there, on the connection', !!trustRun && path.resolve(trustRun.cwd).toLowerCase() === ws1Real.toLowerCase(), JSON.stringify(trustRun))
+    // The hint names the folder it actually opened in (HI-1871 round 1: main's answer, not the row's last view).
+    check('…its hint names the folder the CLI was started in', !!trustRun && (await page.locator('.account-signin [data-set-up-in]').innerText()).toLowerCase().includes(path.resolve(trustRun.cwd).toLowerCase()))
     const wsKey = ws1Real.replace(/\\/g, '/')
     await lib.until(async () => JSON.parse(fs.readFileSync(path.join(folder, '.claude.json'), 'utf8')).projects?.[wsKey]?.hasTrustDialogAccepted === true, HUNG_MS)
     await closeRunning(true)

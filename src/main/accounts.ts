@@ -20,7 +20,7 @@ import { connectionLoginChanged, forgetConnectionUsage, usageLogin } from './pla
 import { childEnv, hasPty, killPty, ptyGone } from './ptyHost'
 import { connectionsManaged, testHomeSeam } from './connectionSeam'
 import { provider } from './providers'
-import type { TrustTarget } from './providers/types'
+import type { TrustReading, TrustTarget } from './providers/types'
 import { git } from './git'
 import { withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
@@ -652,7 +652,7 @@ async function resolveTarget(p: { name: string; path: string }): Promise<Project
     // Not a repository (git says so): the folder itself. Anything else (a bare repository, a timeout, git missing)
     // can't be told, and Set Up never opens in a git folder.
     const notRepo = !!r && /not a git repository/i.test(r.err)
-    return { project: p.name, root: notRepo ? real : null, git: !notRepo && !!real, short }
+    return { project: p.name, root: notRepo ? real : null, git: !notRepo && !!real, short, folder: real }
   }
   const [gitDir, common, top] = r.out.trim().split(/\r?\n/)
   const same = (a?: string, b?: string): boolean => !!a && !!b && resolve(a).toLowerCase() === resolve(b).toLowerCase()
@@ -667,7 +667,7 @@ async function resolveTarget(p: { name: string; path: string }): Promise<Project
     const [itsCommon, itsTop] = check?.ok ? check.out.trim().split(/\r?\n/) : []
     if (same(itsCommon, common) && same(itsTop, listed)) tree = itsTop
   }
-  return { project: p.name, root: tree ? await realpath(tree).catch(() => null) : null, git: true, short }
+  return { project: p.name, root: tree ? await realpath(tree).catch(() => null) : null, git: true, short, folder: real }
 }
 
 const trustKey = (id: string, ws: string): string => `${id}|${ws.toLowerCase()}`
@@ -763,7 +763,12 @@ async function readTrustOnce(id: string, projects: Projects): Promise<TrustAnswe
   if (!projects.length) return { pending: [], unknown: false }
   const targets = await trustTargets(projects)
   const got = await read.call(provider(a.provider), accountFolder(id), targets).catch(() => targets.map(() => null))
-  return { pending: targets.flatMap((t, i) => (got[i] === false && t.root ? [{ project: t.project, folder: t.root }] : [])), unknown: got.some((x) => x === null) }
+  // Not trusted: asked at its root, or where the CLI's own reading says (Codex: the project's own folder's entry).
+  const askAt = (t: ProjectTarget, r: TrustReading): string | null => (r === false ? t.root : r && typeof r === 'object' ? r.at : null)
+  return { pending: targets.flatMap((t, i) => {
+    const at = askAt(t, got[i])
+    return at ? [{ project: t.project, folder: at }] : []
+  }), unknown: got.some((x) => x === null) }
 }
 
 /** A key's state gone (its connection removed, its workspace closed): its waiters told there is no answer. */
@@ -805,13 +810,21 @@ function pruneTrust(): void {
  * screens). Always a folder there is.
  */
 export async function setUpFolder(id: string): Promise<string | undefined> {
+  return (await setUpPlace(id))?.folder
+}
+
+/**
+ * Where a connection's Set Up opens, and what its terminal's hint says of it (HI-1871 round 1: the place actually
+ * used, read now, never the one the window last showed); undefined: its own folder (its first-run screens).
+ */
+export async function setUpPlace(id: string): Promise<ConnectionTrust['setUpIn']> {
   const a = getAccount(id)
   if (!a || !workspace.path || !onHere(a)) return undefined
   const st = requestTrust(id, workspace.path, projectsFor(a), true)
   const answer = await new Promise<TrustAnswer | null | 'cancelled'>((r) => st.waiters.push(r))
   // Removed, or its workspace closed, while Hive checked: Set Up opens nowhere (never its own folder instead).
   if (answer === 'cancelled') throw hiveError(msg({ id: 'main.accounts.setUpCancelled', defaultMessage: "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Hive checked its folders.", description: "An error opening a connection's Set Up (Settings → Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started." }), { name: a.name }, { kind: 'conflict' })
-  return answer ? setUpTarget(a, answer.pending)?.folder : undefined
+  return answer ? setUpTarget(a, answer.pending) : undefined
 }
 
 /**

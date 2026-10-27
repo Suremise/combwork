@@ -93,9 +93,10 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     check("with Hive's per-launch trust on (the default), a Codex connection on here needs no trust answer", !!(await lib.until(async () => JSON.stringify(await trustOf(work.id)) === JSON.stringify({ pending: [], unknown: false }), HUNG_MS)))
     await inv('advanced:set', 'codex.trust.perLaunch', false)
     check("off, it needs its trust of the project's repository root", !!(await lib.until(async () => JSON.stringify((await trustOf(work.id))?.pending) === JSON.stringify([{ project: 'alpha', folder: root }]), HUNG_MS)) && (await view(work.id))?.setUp === true)
-    const key = await inv('connections:setUp', work.id)
+    const { key, in: opened } = await inv('connections:setUp', work.id)
     const workToml = path.join(accountsRoot, work.id, 'config.toml')
     check('…its Set Up runs Codex in that folder, where its trust is answered (the fake records it)', !!(await lib.until(async () => fs.existsSync(workToml) && fs.readFileSync(workToml, 'utf8').includes(`[projects.'${root}']`), HUNG_MS)))
+    check('…and it says where it opened: the project’s folder', !!opened && opened.folder.toLowerCase() === root.toLowerCase(), JSON.stringify(opened))
     await inv('pty:kill', key)
     check('…read again as it ends: nothing pending', !!(await lib.until(async () => JSON.stringify(await trustOf(work.id)) === JSON.stringify({ pending: [], unknown: false }), HUNG_MS)))
     // Home: no agent here uses it yet (One has none of its own, so the first on, Work), so it counts nothing (HI-1871).

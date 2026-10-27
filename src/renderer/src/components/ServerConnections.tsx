@@ -460,8 +460,11 @@ export function MaskingBanner({ masking }: { masking?: { state: string; gap: boo
   )
 }
 
-/** Opens a connection's Set Up terminal (a server one's, or a sign-in one's: HI-1826); its key, or null when it couldn't be opened (said). */
-export async function setUpConnection(id: string): Promise<string | null> {
+/**
+ * Opens a connection's Set Up terminal (a server one's, or a sign-in one's: HI-1826): its key and where it opened
+ * (HI-1871), or null when it couldn't be opened (said).
+ */
+export async function setUpConnection(id: string): Promise<{ key: string; in?: { folder: string; project?: string; workspace?: true } } | null> {
   try {
     return await call('connections:setUp', id)
   } catch (e) {
