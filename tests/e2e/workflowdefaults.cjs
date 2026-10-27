@@ -1,6 +1,9 @@
 // Workflow defaults at Hive's and the workspace's level (#1422, SPEC §16.6.6): the Workflow section's editor in a level
 // mode, both in Settings → Version Control since HI-1768 (Hive defaults, then Workspace defaults (<name>)), each for None
-// or for Git, each with its own draft and Save (a save of one leaves the other's draft).
+// or for Git, each with its own draft and Save (a save of one leaves the other's draft). Since HI-1837 two tabs, each
+// showing only its own form: the arrow keys move between them, switching keeps each draft and marks a tab with one, the
+// tab last chosen is remembered, a search offers the tabs it finds, and "From Hive defaults" / "From the workspace" (a
+// project's options, the workspace's) open their tab.
 // A workspace default set there: Save… lists the project inheriting it, the project's options show "From the workspace"
 // and its next card starts under them (a card started before keeps its rules). A project's own value still wins. Hive's
 // default sits under the workspace's (From Hive defaults). A level that would make an inheriting project contradictory
@@ -76,14 +79,40 @@ const check = (name, ok, extra = '') => {
       db.close()
     }
 
-    // --- Settings → Version Control (HI-1768): Hive defaults, then Workspace defaults named after the workspace.
+    // --- Settings → Version Control (HI-1768, HI-1837): the tabs Hive defaults and Workspace defaults named after the workspace.
     await settingsSection('Version Control')
-    const partTitle = (id) => page.locator(`.setting[data-setting="${id}"] > .s-text > .s-title`).first().innerText().catch(() => '')
-    check('Settings → Version Control has both parts, in order, the workspace’s named after it', !!(await lib.until(async () => (await partTitle('workflow.defaults')).startsWith('Hive defaults') && (await partTitle('workflow.workspaceDefaults')).startsWith('Workspace defaults (workflowdefaults-ws)'), HUNG_MS)) && JSON.stringify(await page.locator('.settings-group[data-section="workflow"] > .setting').evaluateAll((els) => els.map((e) => e.getAttribute('data-setting')))) === JSON.stringify(['workflow.defaults', 'workflow.workspaceDefaults']), JSON.stringify([await partTitle('workflow.defaults'), await partTitle('workflow.workspaceDefaults')]))
-    // The old name still finds both parts (their tips say where they were).
-    await page.locator('.settings-top input.input').fill('workflow defaults')
-    check('a search for the old name, workflow defaults, finds both parts', !!(await lib.until(async () => (await page.locator('.setting[data-setting="workflow.defaults"]').count()) === 1 && (await page.locator('.setting[data-setting="workflow.workspaceDefaults"]').count()) === 1, HUNG_MS)))
-    await page.locator('.settings-top input.input').fill('')
+    const group = page.locator('.settings-group[data-section="workflow"]')
+    const tabs = () => group.locator('[role="tab"]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-setting-tab'), name: e.innerText.trim(), selected: e.getAttribute('aria-selected') === 'true' })))
+    const tab = (id) => group.locator(`[role="tab"][data-setting-tab="${id}"]`)
+    const selectedTab = async () => (await tabs()).find((t) => t.selected)?.id ?? null
+    // The parts shown: each tab panel on screen, and the editors visible in them.
+    const shownParts = () => group.evaluate((g) => ({ panels: [...g.querySelectorAll('[role="tabpanel"]')].filter((p) => p.checkVisibility()).map((p) => p.getAttribute('data-setting')), levels: [...g.querySelectorAll('.workflow-level')].filter((l) => l.checkVisibility()).map((l) => l.getAttribute('data-level')) }))
+    const configTab = () => JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).ui?.tabs?.['settings.workflow']
+    check('Settings → Version Control has two tabs, in order, the workspace’s named after it, Hive defaults first chosen', !!(await lib.until(async () => JSON.stringify(await tabs()) === JSON.stringify([{ id: 'workflow.defaults', name: 'Hive defaults', selected: true }, { id: 'workflow.workspaceDefaults', name: 'Workspace defaults (workflowdefaults-ws)', selected: false }]), HUNG_MS)), JSON.stringify(await tabs()))
+    check('…the intro line above them, saying the order', (await text(group.locator(':scope > p'))).includes('A project’s own options'), await text(group.locator(':scope > p')))
+    check('…and Hive defaults shows only its own form and line', !!(await lib.until(async () => JSON.stringify(await shownParts()) === JSON.stringify({ panels: ['workflow.defaults'], levels: ['global'] }), HUNG_MS)) && (await text(group.locator('[role="tabpanel"][data-setting="workflow.defaults"] > .s-text > .s-desc').first())).startsWith('For every workspace'), JSON.stringify(await shownParts()))
+    await shots('tabs-hive', group.locator('h2'))
+    // The keyboard: the selected tab is the one in the Tab order; an arrow selects and focuses the next.
+    await tab('workflow.defaults').focus()
+    await page.keyboard.press('ArrowRight')
+    const focusedTab = () => page.evaluate(() => document.activeElement?.getAttribute('data-setting-tab') ?? null)
+    check('ArrowRight selects and focuses Workspace defaults, its form alone shown', !!(await lib.until(async () => (await selectedTab()) === 'workflow.workspaceDefaults' && (await focusedTab()) === 'workflow.workspaceDefaults' && JSON.stringify(await shownParts()) === JSON.stringify({ panels: ['workflow.workspaceDefaults'], levels: ['workspace'] }), HUNG_MS)), JSON.stringify([await selectedTab(), await focusedTab(), await shownParts()]))
+    check('…with its own line', (await text(group.locator('[role="tabpanel"][data-setting="workflow.workspaceDefaults"] > .s-text > .s-desc').first())).startsWith('For this workspace’s projects'))
+    check('…the tabs in the Tab order: only the selected one', JSON.stringify(await group.locator('[role="tab"]').evaluateAll((els) => els.map((e) => e.tabIndex))) === JSON.stringify([-1, 0]))
+    await page.keyboard.press('Home')
+    check('Home goes back to Hive defaults', !!(await lib.until(async () => (await selectedTab()) === 'workflow.defaults' && (await focusedTab()) === 'workflow.defaults', HUNG_MS)))
+    await page.keyboard.press('End')
+    check('End to Workspace defaults, remembered in the settings', !!(await lib.until(async () => (await selectedTab()) === 'workflow.workspaceDefaults' && configTab() === 'workflow.workspaceDefaults', HUNG_MS)), String(configTab()))
+    await shots('tabs-workspace', group.locator('h2'))
+    // A search offers the tabs it finds: the old name both (their tips say where they were), one's own line only it.
+    const search = page.locator('.settings-top input.input')
+    await search.fill('workflow defaults')
+    check('a search for the old name, workflow defaults, offers both tabs', !!(await lib.until(async () => (await tabs()).map((t) => t.id).join() === 'workflow.defaults,workflow.workspaceDefaults', HUNG_MS)), JSON.stringify(await tabs()))
+    await search.fill('for every workspace')
+    check('a search only Hive defaults’ line has lands on it, the only tab offered', !!(await lib.until(async () => JSON.stringify(await tabs()) === JSON.stringify([{ id: 'workflow.defaults', name: 'Hive defaults', selected: true }]) && JSON.stringify(await shownParts()) === JSON.stringify({ panels: ['workflow.defaults'], levels: ['global'] }), HUNG_MS)), JSON.stringify([await tabs(), await shownParts()]))
+    check('…without changing the tab remembered', configTab() === 'workflow.workspaceDefaults')
+    await search.fill('')
+    check('cleared, the remembered tab is back', !!(await lib.until(async () => (await selectedTab()) === 'workflow.workspaceDefaults', HUNG_MS)))
     // The workspace's defaults: Git.
     const level = page.locator('.workflow-level[data-level="workspace"]')
     check('Workspace defaults: its editor, None · Git', !!(await lib.until(async () => (await level.count()) === 1 && (await level.locator('[data-platform="git"][aria-checked="true"]').count()) === 1, HUNG_MS)))
@@ -129,15 +158,22 @@ const check = (name, ok, extra = '') => {
     await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
     check('the project’s own value wins: Merge commit, Set for this project', !!(await lib.until(async () => (await projectRow('style').locator('select').inputValue()) === 'merge' && (await projectRow('style').innerText()).includes('Set for this project'), HUNG_MS)))
 
-    // --- Hive's defaults, under the workspace's: the same section's first part.
+    // --- Hive's defaults, under the workspace's: the section's other tab.
     await settingsSection('Version Control')
+    check('Settings opens Version Control on the tab last chosen, Workspace defaults', !!(await lib.until(async () => (await selectedTab()) === 'workflow.workspaceDefaults', HUNG_MS)), String(await selectedTab()))
     const hive = page.locator('.workflow-level[data-level="global"]')
     const hiveRow = (option) => hive.locator(`.workflow-option[data-option="${option}"]`)
-    check('Hive defaults: its editor', !!(await lib.until(async () => (await hiveRow('dependenciesDone').count()) === 1, HUNG_MS)))
-    // A draft in the workspace's part (not saved) stays through a save of Hive's (HR5's HI-1768 check), and is discarded after.
+    // A draft in the workspace's tab (not saved) stays through switching and a save of Hive's (HR5's HI-1768 check), its
+    // tab marked meanwhile, and is discarded after.
+    const unsaved = async () => group.locator('[role="tab"]').evaluateAll((els) => els.filter((e) => e.querySelector('[data-unsaved]')).map((e) => e.getAttribute('data-setting-tab')))
+    check('no tab marked unsaved yet', (await unsaved()).length === 0)
     await row('stopOwnRuns').locator('[role="switch"], input[type="checkbox"]').first().click()
-    check('a workspace draft: its Save on', !!(await lib.until(async () => await form.locator('[data-action="save"]').isEnabled(), HUNG_MS)))
+    check('a workspace draft: its Save on, its tab marked unsaved, named so for screen readers', !!(await lib.until(async () => (await form.locator('[data-action="save"]').isEnabled()) && (await unsaved()).join() === 'workflow.workspaceDefaults', HUNG_MS)) && (await tab('workflow.workspaceDefaults').getAttribute('aria-label')) === 'Workspace defaults (workflowdefaults-ws) (unsaved changes)', JSON.stringify(await unsaved()))
+    await tab('workflow.defaults').click()
+    check('Hive defaults: its editor alone, the workspace’s tab still marked', !!(await lib.until(async () => (await hiveRow('dependenciesDone').isVisible()) && JSON.stringify((await shownParts()).levels) === '["global"]', HUNG_MS)) && (await unsaved()).join() === 'workflow.workspaceDefaults')
+    await shots('tabs-unsaved', group.locator('h2'))
     await hiveRow('dependenciesDone').locator('[role="switch"], input[type="checkbox"]').first().click()
+    check('both drafts: both tabs marked', !!(await lib.until(async () => (await unsaved()).join() === 'workflow.defaults,workflow.workspaceDefaults', HUNG_MS)), JSON.stringify(await unsaved()))
     await hive.locator('[data-action="save"]').click()
     await dialog.waitFor({ timeout: HUNG_MS })
     await dialog.getByRole('button', { name: 'Save', exact: true }).click()
@@ -146,10 +182,12 @@ const check = (name, ok, extra = '') => {
       const f = await inv('workflow:form', alpha)
       return f.origins.dependenciesDone === 'global' ? f : null
     }, HUNG_MS)
-    check('…the workspace’s draft is still there, unsaved, after Hive’s save', (await form.locator('[data-action="save"]').isEnabled()) && wsJson().workflow?.git?.stopOwnRuns === undefined, JSON.stringify(wsJson().workflow?.git))
+    check('…Hive’s tab no longer marked once saved', !!(await lib.until(async () => (await unsaved()).join() === 'workflow.workspaceDefaults', HUNG_MS)), JSON.stringify(await unsaved()))
+    await tab('workflow.workspaceDefaults').click()
+    check('…the workspace’s draft is still there, unsaved, after switching back and Hive’s save', !!(await lib.until(async () => (await selectedTab()) === 'workflow.workspaceDefaults', HUNG_MS)) && (await form.locator('[data-action="save"]').isEnabled()) && wsJson().workflow?.git?.stopOwnRuns === undefined, JSON.stringify(wsJson().workflow?.git))
     await form.getByRole('button', { name: 'Discard Changes' }).click()
-    check('…and Discard Changes drops it, nothing written', !!(await lib.until(async () => !(await form.locator('[data-action="save"]').isEnabled()), HUNG_MS)) && wsJson().workflow?.git?.stopOwnRuns === undefined)
-    await shots('version-control', page.locator('.settings-group[data-section="workflow"] > h2'))
+    check('…and Discard Changes drops it, nothing written, its mark gone', !!(await lib.until(async () => !(await form.locator('[data-action="save"]').isEnabled()) && (await unsaved()).length === 0, HUNG_MS)) && wsJson().workflow?.git?.stopOwnRuns === undefined)
+    await tab('workflow.defaults').click()
     check('the project inherits Hive’s default, under the workspace’s (style still its own)', !!form2 && form2.options.dependenciesDone === true && form2.origins.style === 'project', JSON.stringify(form2?.origins))
     await shots('hive', hive.locator('.workflow-level-head'))
     // Hive's files copied into new slots (HI-1765), with Git's options: the default, .env*, until set here.
@@ -161,6 +199,7 @@ const check = (name, ok, extra = '') => {
     const copyOf = async (l) => ({ origin: await l.locator('.workflow-origin').getAttribute('data-origin').catch(() => ''), field: await l.locator('textarea').inputValue().catch(() => ''), text: await text(l) })
     await inv('slots:setLevelDefault', 'global', 'copy', 'changed.env')
     check('…following a change made elsewhere while it is open', !!(await lib.until(async () => { const c = await copyOf(hiveCopy); return c.origin === 'here' && c.field === 'changed.env' }, HUNG_MS)), JSON.stringify(await copyOf(hiveCopy)))
+    await tab('workflow.workspaceDefaults').click()
     const wsCopy = page.locator('[data-slot-default="copy"][data-level="workspace"]')
     check('the workspace’s copied files inherit it, From Hive defaults', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'global' && c.text.includes('changed.env') }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
     await inv('slots:setLevelDefault', 'global', 'copy', 'again.env')
@@ -196,6 +235,17 @@ const check = (name, ok, extra = '') => {
     check('…and inherits the default again once both are unset', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'default' && c.text.includes('.env*') }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
     // The workspace's level shows Hive's as what it inherits.
     check('the workspace’s level inherits it: From Hive defaults', !!(await lib.until(async () => (await row('dependenciesDone').innerText().catch(() => '')).includes('From Hive defaults'), HUNG_MS)))
+    // Its "From Hive defaults" opens Hive defaults' tab, where that value is set; and the copied files' too.
+    await row('dependenciesDone').locator('[data-origin-link="global"]').click()
+    check('…a link to Hive defaults’ tab', !!(await lib.until(async () => (await selectedTab()) === 'workflow.defaults' && (await hiveRow('dependenciesDone').isVisible()), HUNG_MS)), String(await selectedTab()))
+    await tab('workflow.workspaceDefaults').click()
+    await inv('slots:setLevelDefault', 'global', 'copy', 'link.env')
+    await wsCopy.locator('[data-origin-link="global"]').waitFor({ timeout: HUNG_MS })
+    await shots('origin-link', wsCopy)
+    await wsCopy.locator('[data-origin-link="global"]').click()
+    check('…the copied files’ From Hive defaults too', !!(await lib.until(async () => (await selectedTab()) === 'workflow.defaults', HUNG_MS)), String(await selectedTab()))
+    await inv('slots:setLevelDefault', 'global', 'copy', null)
+    await tab('workflow.workspaceDefaults').click()
 
     // --- A level that would make an inheriting project contradictory is refused, naming it.
     await inv('workflow:setOptions', alpha, { preset: null, options: { style: 'merge', finish: 'committed' } })
@@ -205,6 +255,14 @@ const check = (name, ok, extra = '') => {
     check('refused: alpha inherits it and would contradict, with the reason', !!(await lib.until(async () => (await text(problems)).includes('Project alpha inherits these options') && (await text(problems)).includes('needs everyone in the project folder'), HUNG_MS)), await text(problems))
     check('…nothing written', wsJson().workflow?.git?.folder === undefined)
     await shots('refused', problems)
+
+    // --- A project's "From the workspace" opens Settings on the workspace's tab, whichever was last chosen.
+    await tab('workflow.defaults').click()
+    await page.keyboard.press('Escape')
+    await page.getByText('alpha', { exact: true }).first().click()
+    await page.locator('.git-sections [data-section="workflow"]').click()
+    await projectRow('loopWaitHours').locator('[data-origin-link="workspace"]').click()
+    check('a project’s From the workspace opens Settings → Version Control on Workspace defaults', !!(await lib.until(async () => (await selectedTab()) === 'workflow.workspaceDefaults' && JSON.stringify((await shownParts()).levels) === '["workspace"]', HUNG_MS)), JSON.stringify([await selectedTab(), await shownParts()]))
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))
     await page.screenshot({ path: path.join(lib.WORK, 'workflowdefaults-failed.png') }).catch(() => {})

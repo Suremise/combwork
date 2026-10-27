@@ -11,6 +11,7 @@ import { cardLabelOf, openVersionControl, set as setStore, setActivity, useStore
 import { NumberField } from './NumberField'
 import { Icon } from './ui'
 import { ORIGIN_TEXT } from '../workflowOrigins'
+import { OriginText } from './OriginText'
 
 /**
  * The Version Control tab's Slots and copies group (#1445, SPEC §16.10.2, §16.10.5), Git only, beside the workflow
@@ -67,7 +68,7 @@ const T = {
 }
 
 /** Where an inherited slot option comes from (HI-1765), in the workflow options' words. */
-const copyOrigin = (o: SlotOptionOrigin) => (o === 'default' ? ORIGIN_TEXT.platform : ORIGIN_TEXT[o])
+const copyOrigin = (o: SlotOptionOrigin) => (o === 'default' ? 'platform' : o)
 
 /** A slot's line in the list: what it is lent to (or carries), in words. */
 function lentText(s: SlotView, agentName: (id: string) => string, card: (n: number) => string): string | null {
@@ -173,7 +174,13 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
               </div>
               <div className="s-desc">{tr(T.copyDesc)}</div>
               <div className="s-desc workflow-origin" data-origin={copyOwn === undefined ? (copyNow?.origin ?? 'default') : copyOwn.trim() ? 'project' : 'none'}>
-                {copyOwn === undefined ? `${tr(copyOrigin(copyNow?.origin ?? 'default'))}: ${copyInherited.trim() || tr(T.none)}` : tr(copyOwn.trim() ? T.setHere : T.setNone)}
+                {copyOwn === undefined ? (
+                  <>
+                    <OriginText origin={copyOrigin(copyNow?.origin ?? 'default')} />: {copyInherited.trim() || tr(T.none)}
+                  </>
+                ) : (
+                  tr(copyOwn.trim() ? T.setHere : T.setNone)
+                )}
                 {copyOwn !== undefined ? (
                   <button className="btn subtle small workflow-inherit" data-action="inherit-copy" onClick={() => void save('copy', null)}>
                     {tr(T.inherit)}
@@ -301,7 +308,13 @@ export function SlotCopyLevel({ level }: { level: WorkflowLevel }) {
         </div>
         <div className="s-desc">{tr(SLOT_COPY_TEXT.desc)}</div>
         <div className="s-desc workflow-origin" data-origin={own === undefined ? inherited.origin : own.trim() ? 'here' : 'none'}>
-          {own === undefined ? `${tr(copyOrigin(inherited.origin))}: ${inherited.value.trim() || tr(T.none)}` : tr(own.trim() ? ORIGIN_TEXT.here : T.levelNone)}
+          {own === undefined ? (
+            <>
+              <OriginText origin={copyOrigin(inherited.origin)} />: {inherited.value.trim() || tr(T.none)}
+            </>
+          ) : (
+            tr(own.trim() ? ORIGIN_TEXT.here : T.levelNone)
+          )}
           {own !== undefined ? (
             <button className="btn subtle small workflow-inherit" data-action="inherit-copy" onClick={() => void save(null)}>
               {tr(T.levelInherit)}

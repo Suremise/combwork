@@ -1185,6 +1185,7 @@
   "settings.workflow.hiveDefaults.desc": "For every workspace: what each project starts from unless its workspace or the project sets its own. Pick a preset, or set each option, for None or for Git.",
   "settings.workflow.hiveDefaults.tip": "Until 1.0’s settings tidy, Settings → Workflow defaults: nothing set there changed.",
   "settings.workflow.hiveDefaults.title": "Hive defaults",
+  "settings.workflow.tabs": "Workflow defaults",
   "settings.workflow.workspaceDefaults.desc": "For this workspace’s projects, over Hive defaults; a project sets its own in its Version Control tab.",
   "settings.workflow.workspaceDefaults.tip": "Until 1.0’s settings tidy, the workflow defaults in Settings → Workspace: nothing set there changed.",
   "settings.workflow.workspaceDefaults.title": "Workspace defaults",

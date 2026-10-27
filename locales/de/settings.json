@@ -1184,6 +1184,7 @@
   "settings.workflow.hiveDefaults.desc": "Für jeden Arbeitsbereich: womit jedes Projekt beginnt, wenn weder sein Arbeitsbereich noch das Projekt eigene Werte festlegt. Wähle eine Vorlage oder lege jede Option fest, für Keine oder für Git.",
   "settings.workflow.hiveDefaults.tip": "Bis zum Aufräumen der Einstellungen in 1.0: Einstellungen → Workflow-Standards; was dort festgelegt war, bleibt unverändert.",
   "settings.workflow.hiveDefaults.title": "Hive-Standards",
+  "settings.workflow.tabs": "Workflow-Standards",
   "settings.workflow.workspaceDefaults.desc": "Für die Projekte dieses Arbeitsbereichs, über den Hive-Standards; ein Projekt legt eigene in seinem Tab Versionsverwaltung fest.",
   "settings.workflow.workspaceDefaults.tip": "Bis zum Aufräumen der Einstellungen in 1.0: die Workflow-Standards unter Einstellungen → Arbeitsbereich; was dort festgelegt war, bleibt unverändert.",
   "settings.workflow.workspaceDefaults.title": "Arbeitsbereich-Standards",

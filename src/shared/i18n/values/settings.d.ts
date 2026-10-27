@@ -1186,6 +1186,7 @@ interface HiveMessageValues {
   'settings.workflow.hiveDefaults.desc': undefined
   'settings.workflow.hiveDefaults.tip': undefined
   'settings.workflow.hiveDefaults.title': undefined
+  'settings.workflow.tabs': undefined
   'settings.workflow.workspaceDefaults.desc': undefined
   'settings.workflow.workspaceDefaults.tip': undefined
   'settings.workflow.workspaceDefaults.title': undefined

@@ -1184,6 +1184,7 @@
   "settings.workflow.hiveDefaults.desc": "适用于所有工作区：除非工作区或项目设置了自己的值，否则每个项目都从这里开始。可为“无”或 Git 选择预设，或逐项设置。",
   "settings.workflow.hiveDefaults.tip": "在 1.0 整理设置之前，位于“设置”→“默认工作流程”；在那里设置的内容不会改变。",
   "settings.workflow.hiveDefaults.title": "Hive 默认值",
+  "settings.workflow.tabs": "默认工作流程",
   "settings.workflow.workspaceDefaults.desc": "适用于此工作区的项目，优先于 Hive 默认值；项目可在其“版本控制”标签页中设置自己的值。",
   "settings.workflow.workspaceDefaults.tip": "在 1.0 整理设置之前，位于“设置”→“工作区”中的工作流程默认值；在那里设置的内容不会改变。",
   "settings.workflow.workspaceDefaults.title": "工作区默认值",

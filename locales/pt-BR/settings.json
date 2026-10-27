@@ -1184,6 +1184,7 @@
   "settings.workflow.hiveDefaults.desc": "Para todos os espaços de trabalho: com o que cada projeto começa, a menos que o espaço de trabalho ou o próprio projeto defina os seus. Escolha um modelo ou defina cada opção, para Nenhum ou para Git.",
   "settings.workflow.hiveDefaults.tip": "Até a organização das configurações da 1.0: Configurações → Padrões do fluxo de trabalho; o que estava definido lá não muda.",
   "settings.workflow.hiveDefaults.title": "Padrões do Hive",
+  "settings.workflow.tabs": "Padrões do fluxo de trabalho",
   "settings.workflow.workspaceDefaults.desc": "Para os projetos deste espaço de trabalho, por cima dos padrões do Hive; um projeto define os próprios na aba Controle de versão dele.",
   "settings.workflow.workspaceDefaults.tip": "Até a organização das configurações da 1.0: os padrões de fluxo de trabalho em Configurações → Espaço de trabalho; o que estava definido lá não muda.",
   "settings.workflow.workspaceDefaults.title": "Padrões do espaço de trabalho",

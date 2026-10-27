@@ -251,6 +251,8 @@ describe('the settings catalog', () => {
     const drawn = new Set([...view.matchAll(/^\s+'([\w.:-]+)': (?:\(\)|\(\{)/gm)].map((m) => m[1]))
     // The Assistant's row for each provider ("With Claude Code") is drawn from one template.
     if (view.includes('[`assistant.provider:${p.id}`, () => <AssistantProviderDefaults')) for (const p of PROVIDERS) drawn.add(`assistant.provider:${p.id}`)
+    // Version Control's two levels are its tabs (HI-1837), each a WorkflowLevelForm.
+    if (view.includes('<WorkflowLevelForm level="global"') && view.includes('<WorkflowLevelForm level="workspace"')) drawn.add('workflow.defaults').add('workflow.workspaceDefaults')
     const custom = APP_SETTINGS_CATALOG.filter((e) => e.type === 'custom' && !e.provider && !e.hidden).map((e) => e.id)
     expect(custom.filter((id) => !drawn.has(id))).toEqual([])
     expect([...drawn].filter((id) => !ids.has(id))).toEqual([])

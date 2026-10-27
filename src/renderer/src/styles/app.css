@@ -1660,6 +1660,127 @@ textarea.input {
   font-size: 11px;
   margin-left: -2px;
 }
+/*
+ * A view's own tabs (HI-1837, components/Tabs.tsx): the project tabs' look, underlined in the accent, so a row that
+ * switches pages never reads as a segmented control picking a value (None · Git) beside it. Never wider than its row; in
+ * a short one (`fold`) the tabs not selected fold to their icons, and shorter still the row scrolls.
+ */
+.hive-tabs-row {
+  position: relative;
+  display: flex;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  align-self: stretch;
+}
+.hive-tabs {
+  display: flex;
+  align-items: stretch;
+  max-inline-size: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.hive-tabs > .tip-wrap {
+  flex-shrink: 0;
+}
+.hive-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  min-block-size: 30px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hive-tab:hover {
+  color: var(--fg-strong);
+}
+.hive-tab.active {
+  color: var(--fg-strong);
+}
+.hive-tab.active::after {
+  content: '';
+  position: absolute;
+  inset-inline: 4px;
+  inset-block-end: 0;
+  block-size: 2px;
+  background: var(--accent);
+}
+.hive-tab:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -3px;
+}
+.hive-tab .codicon {
+  font-size: 13px;
+  color: inherit;
+}
+.hive-tab-count {
+  padding: 0 5px;
+  border-radius: 8px;
+  font-size: 11px;
+  background: var(--bg-active);
+  color: var(--fg);
+}
+.hive-tab-unsaved {
+  display: block;
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.hive-tab.icon-only {
+  padding: 0 8px;
+}
+.hive-tab.icon-only .hive-tab-label {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* The tabs with every name, measured to choose between names and icons (Tabs' `fold`). */
+.hive-tabs-measure {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: max-content;
+  /* Every name's width, never capped by the row it measures for (which folding changes: it flickered). */
+  max-inline-size: none;
+  overflow: visible;
+  visibility: hidden;
+  pointer-events: none;
+}
+.hive-tabs-measure .hive-tab::after {
+  content: attr(data-label);
+}
+/* A tab's page not selected stays mounted (its draft kept) but never shows, whatever its own display. */
+[role='tabpanel'][hidden] {
+  display: none !important;
+}
+/* The tabs' line runs under the whole row, the selected tab's underline on it. */
+.workflow-defaults-tabs > .hive-tabs-row {
+  border-block-end: 1px solid var(--border-subtle);
+  margin-block-end: 4px;
+}
+/* "From Hive defaults", "From the workspace": a link to that tab of Settings → Version Control (HI-1837). */
+.workflow-origin-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--info);
+  font: inherit;
+  cursor: pointer;
+}
+.workflow-origin-link:hover {
+  text-decoration: underline;
+}
 
 /* ---------- Project header ---------- */
 .project-header {
@@ -12753,7 +12874,9 @@ button.progress-lane-why:focus-visible,
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 14px;
+  /* The sections' tabs (HI-1837) sit on the line under them. */
+  padding: 0 14px;
+  position: relative;
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
   min-width: 0;
@@ -12948,54 +13071,6 @@ button.progress-lane-why:focus-visible,
 }
 .git-head > .tip-wrap:has(> .git-head-status) {
   min-width: 0;
-}
-/*
- * The sections (#1461): never wider than the row, the status line giving way first. In a narrow tab they fold to their
- * icons, the selected one keeping its name; narrower still the row scrolls, with the selected section kept in view.
- */
-.git-sections {
-  max-inline-size: 100%;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-.git-sections button {
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-.git-sections.icons .tip-wrap {
-  flex-shrink: 0;
-}
-.git-sections.icons .tip-wrap + .tip-wrap > button {
-  border-inline-start: 1px solid var(--border);
-}
-.git-sections button.icon-only {
-  padding-inline: 7px;
-}
-/* The sections with every name, measured to choose between the two (VersionControl.tsx). */
-.git-head {
-  position: relative;
-}
-.git-sections-measure {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline-start: 0;
-  inline-size: max-content;
-  visibility: hidden;
-  pointer-events: none;
-}
-.git-sections-measure button {
-  white-space: nowrap;
-}
-.git-sections-measure button::after {
-  content: attr(data-label);
-}
-.git-sections button.icon-only .git-section-label {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 .git-body {
   flex: 1;

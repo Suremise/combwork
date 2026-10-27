@@ -4739,6 +4739,10 @@
     "defaultMessage": "Hive defaults",
     "description": "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)."
   },
+  "settings.workflow.tabs": {
+    "defaultMessage": "Workflow defaults",
+    "description": "Accessible name of Settings → Version Control's tabs: Hive defaults and the open workspace's (HI-1837)."
+  },
   "settings.workflow.workspaceDefaults.desc": {
     "defaultMessage": "For this workspace’s projects, over Hive defaults; a project sets its own in its Version Control tab.",
     "description": "What the setting \"Workspace defaults\" is, under its title (Settings → Version Control). Hive defaults and the Version Control tab: names as Hive shows them."
