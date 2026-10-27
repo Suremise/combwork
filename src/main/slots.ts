@@ -546,11 +546,9 @@ export class SlotStore {
     if ((req.card === undefined) === (req.lane === undefined)) throw new Error('a lease is for a card or a lane')
     try {
       return await this.conn.write((db) => {
-        const s = this.slotIn(db, slot)
-        if (!s || s.state !== 'lent' || s.op || s.job || s.warmError || openLeaseIn(db, this.project, s.name)) return null
-        const w = s.writer
-        if (!w || w.agent !== req.agent || w.run !== run || w.pid !== holder.pid || w.started !== holder.started) return null
-        if (this.dispatchOf(db, req.agent)) return null
+        if (this.writtenNotTakeableIn(db, slot, req.agent, run, holder)) return null
+        const s = this.slotIn(db, slot)!
+        const w = s.writer!
         const at = this.iso()
         const lease = this.insertLease(db, `l-${randomBytes(6).toString('hex')}`, s.name, req.card !== undefined ? 'card' : 'lane', req, at)
         db.prepare('UPDATE slots SET writer_lease = ?, used_at = ? WHERE project = ? AND name = ? AND writer_run = ?').run(lease.id, at, this.project, s.name, run)
@@ -561,6 +559,30 @@ export class SlotStore {
       if (constraintOf(e)) return null
       throw e
     }
+  }
+
+  /**
+   * Why takeWrittenSlot wouldn't take the slot now, in words for the start's wait (agent-facing), or null when it would:
+   * the same conditions, read without writing (HI-1787: a dry start advertised a slot another Hive's run held, which the
+   * real start then refused).
+   */
+  writtenNotTakeable(slot: string, agent: string, run: string, holder: { pid: number; started: number }): string | null {
+    return this.conn.read((db) => this.writtenNotTakeableIn(db, slot, agent, run, holder))
+  }
+
+  private writtenNotTakeableIn(db: DatabaseSync, slot: string, agent: string, run: string, holder: { pid: number; started: number }): string | null {
+    const s = this.slotIn(db, slot)
+    if (!s) return 'is gone' // i18n-ignore: agent-facing, a start's wait
+    if (s.op) return 'is being set up or changed' // i18n-ignore: agent-facing, a start's wait
+    if (s.job) return 'has a command of its own running' // i18n-ignore: agent-facing, a start's wait
+    if (s.warmError) return "couldn't be set up" // i18n-ignore: agent-facing, a start's wait
+    if (s.state !== 'lent') return `isn't ready (${s.state})` // i18n-ignore: agent-facing, a start's wait
+    if (openLeaseIn(db, this.project, s.name)) return 'is lent again' // i18n-ignore: agent-facing, a start's wait
+    const w = s.writer
+    if (!w || w.agent !== agent || w.run !== run) return 'has another run in it now' // i18n-ignore: agent-facing, a start's wait
+    if (w.pid !== holder.pid || w.started !== holder.started) return "is held by another Hive's run" // i18n-ignore: agent-facing, a start's wait
+    if (this.dispatchOf(db, agent)) return "can't be taken over while its agent holds another lease" // i18n-ignore: agent-facing, a start's wait
+    return null
   }
 
   /**
@@ -1229,6 +1251,11 @@ export class SlotPool {
   /** The slot an agent's own run still writes in, taken over by its next card or lane (HI-1762, SlotStore.takeWrittenSlot), held by this Hive. */
   async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string }, run: string, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
     return this.store.takeWrittenSlot(slot, req, run, await this.deps.holder.self(), also)
+  }
+
+  /** Why takeWrittenSlot wouldn't take it now (SlotStore.writtenNotTakeable), held by this Hive; null: it would. */
+  async writtenNotTakeable(slot: string, agent: string, run: string): Promise<string | null> {
+    return this.store.writtenNotTakeable(slot, agent, run, await this.deps.holder.self())
   }
 
   lastLease(name: string): SlotLease | null {

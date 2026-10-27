@@ -3451,8 +3451,9 @@ Whether a conversation may resume there is its **hold** (none: it may):
     begins on it, the writer moves to it and the run's conversations are rebound to it. The old lease's end then no
     longer owns the run (the fence above, and a card's plain end, which looks at the writer at the idle moment): it
     ends nothing. The slot moves to the new line as any lent slot does, once its builder is quiet. One agent, one slot:
-    that slot busy just then (an operation or job, not ready, or changed while taken) makes the start wait, looked at
-    once more, never lent a second slot; the window's dry start says the same. The same rule as a carried slot's
+    that slot busy just then (an operation or job, not ready, its run held by another Hive, or changed while taken)
+    makes the start wait, looked at once more, never lent a second slot; the window's dry start says the same, asking
+    the takeover's own conditions without writing (HI-1787). The same rule as a carried slot's
     takeover (§16.10.8).
   - **Off switch:** Settings → Advanced → **Lanes: let the builder finish when its lane ends** (`hive.lanes.gentleEnd`):
     off, it is stopped at its first idle moment, as before. A reviewer holds no lease, so a lane's end never stops it:

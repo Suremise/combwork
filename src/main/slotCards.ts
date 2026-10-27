@@ -434,16 +434,17 @@ function writtenSlotOf(projectPath: string, pool: SlotPool, builder: string): Sl
 /**
  * What a start does about the slot its builder's own run still writes in (HI-1762), keeping one agent to one slot:
  * `none` (there is none: lend as before), `lease` (taken over), `dry` (a dry start: it would be this one), or `wait`
- * (there is one, but it can't be taken over now: an operation or job on it, not ready, or it changed while it was taken;
- * looked at again once): the start waits for it, never lent a second slot meanwhile.
+ * (there is one, but it can't be taken over now: an operation or job on it, not ready, held by another Hive's run, or
+ * it changed while it was taken; looked at again once): the start waits for it, never lent a second slot meanwhile. A
+ * dry start and a real one ask the takeover's own conditions (SlotPool.writtenNotTakeable, HI-1787), so they agree.
  */
 async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string }, agentName: string, dry = false): Promise<{ none: true } | { lease: SlotLease } | { dry: Slot } | { wait: string }> {
-  const why = (s: Slot): string | null => (s.op ? 'is being set up or changed' : s.job ? 'has a command of its own running' : s.warmError ? "couldn't be set up" : s.state !== 'lent' ? `isn't ready (${s.state})` : null) // i18n-ignore: agent-facing, a start's wait
   const waitFor = (s: Slot, because: string): { wait: string } => ({ wait: `${agentName}'s own slot ${s.name}, its run still there, ${because}: this start waits for it rather than take a second slot` }) // i18n-ignore: agent-facing, a start's wait
   for (let tries = 0; tries < 2; tries++) {
     const slot = writtenSlotOf(projectPath, pool, builder)
     if (!slot) return { none: true }
-    const busy = why(slot)
+    // The takeover's own conditions, read (HI-1787): a dry start never advertises what the real one would refuse.
+    const busy = await pool.writtenNotTakeable(slot.name, builder, slot.writer!.run)
     if (busy) return waitFor(slot, busy)
     if (dry) return { dry: slot }
     const taken = await takeWritten(ws, projectPath, pool, builder, req, agentName)
