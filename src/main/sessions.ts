@@ -1636,11 +1636,30 @@ class SessionManager {
     const settled = w.spawned ? settleWriter(w.projectPath, run) : releaseWriter(w.projectPath, run).finally(() => w.done())
     // Kept until written: a quit waits for them before its workspaces close (HI-1801).
     this.writersSettling.add(settled)
-    void settled.finally(() => this.writersSettling.delete(settled))
+    this.writerSettlingOf.set(run, settled)
+    void settled.finally(() => {
+      this.writersSettling.delete(settled)
+      this.writerSettlingOf.delete(run)
+    })
   }
 
   /** Writer releases under way (settleWriterOf): each its write of the release, once its run's outcome is known. */
   private readonly writersSettling = new Set<Promise<void>>()
+  /** The same, by run: a start after a stop waits for the stopped run's (writerSettled). */
+  private readonly writerSettlingOf = new Map<string, Promise<void>>()
+
+  /**
+   * Once a run that has ended has its slot writer released (or found held), at most `timeoutMs` (HI-1867): a new
+   * conversation's start just after its stop found the slot still written by the run it stopped, its release waiting for
+   * its processes to be known to have ended, and was refused. None under way (released, or never a writer): at once.
+   */
+  private async writerSettled(run: string, timeoutMs: number): Promise<void> {
+    const settling = this.writerSettlingOf.get(run)
+    if (!settling) return
+    let timer: NodeJS.Timeout | undefined
+    await Promise.race([settling.catch(() => undefined), new Promise<void>((r) => (timer = setTimeout(r, timeoutMs)))])
+    clearTimeout(timer)
+  }
 
   /**
    * Once the slot writers of the runs that have ended are released (or found held), at most `timeoutMs` (HI-1801: Hive
@@ -3493,10 +3512,16 @@ class SessionManager {
     return null
   }
 
-  /** Stops a running agent to end its conversation (kept in the Sessions tab): whether it has stopped. */
+  /**
+   * Stops a running agent to end its conversation (kept in the Sessions tab): whether it has stopped. Stopped, its slot's
+   * writer released too (HI-1867), so the new conversation's start in that slot isn't refused as still written by it.
+   */
   private async endConversation(projectPath: string, agentId: string): Promise<boolean> {
+    const run = this.live.get(liveId(projectPath, agentId))?.state.runId
     await this.stopWhereAndWait((s) => s.projectPath.toLowerCase() === projectPath.toLowerCase() && (s as { agentId?: string }).agentId === agentId, 15_000)
-    return !this.live.has(liveId(projectPath, agentId))
+    if (this.live.has(liveId(projectPath, agentId))) return false
+    if (run) await this.writerSettled(run, 15_000)
+    return true
   }
 
   /** Turns a running agent's Plan mode on or off (providers where it is a toggle, e.g. Codex's Shift+Tab). */
