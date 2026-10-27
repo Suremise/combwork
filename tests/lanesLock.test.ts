@@ -5,6 +5,8 @@ import { existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+// @ts-expect-error: plain .mjs modules without types
+import { withLock } from './e2e/lanes.mjs'
 
 // The lock folder's mkdir refused `refusals` times with `code`, as Windows does while its last holder's removal ends.
 const refuse = vi.hoisted(() => ({ refusals: 0, code: 'EPERM', tried: 0 }))
@@ -22,8 +24,6 @@ vi.mock('fs', async (orig) => {
   }) as typeof m.mkdirSync
   return { ...m, mkdirSync, default: { ...m, mkdirSync } }
 })
-
-const { withLock } = await import('./e2e/lanes.mjs')
 
 describe("the e2e runners' claims lock (HI-1800)", () => {
   afterEach(() => {
