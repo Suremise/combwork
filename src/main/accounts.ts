@@ -636,6 +636,8 @@ export async function confirmAccount(id: string): Promise<{ observed: Connection
   for (let i = 0; i < CONFIRM_ROUNDS; i++) {
     const seen = changes.get(id) ?? 0
     observed = await checkAccount(id)
+    // What the watch saw before the answer came is compared with the login first (HI-1873), so it counts here.
+    await watched.get(id)?.comparing
     if ((changes.get(id) ?? 0) === seen) return { observed, fresh: true }
   }
   return { observed, fresh: false }
@@ -720,6 +722,12 @@ interface Watched {
   timer: NodeJS.Timeout | null
   retry: NodeJS.Timeout | null
   tries: number
+  /** The login as last seen (loginStamp): an event counts as a change only when it moved (HI-1873). Unset: not seen yet. */
+  stamp?: string
+  /** The comparisons, one at a time: the last one queued (confirm waits for it). */
+  comparing: Promise<void> | null
+  /** A comparison is queued and not started yet: it covers events until it starts. */
+  queued: boolean
 }
 const watched = new Map<string, Watched>()
 let rootWatch: FSWatcher | null = null
@@ -749,23 +757,87 @@ function changed(id: string): void {
   }, DEBOUNCE_MS)
 }
 
+/**
+ * What a change to an account's login moves, never reading a file: its folder's identity (made again or replaced) and
+ * each login file's id, size and write time. Not its access or change times: a CLI reading the login, or Codex's sandbox
+ * setting ACLs over the folder, moves those (HI-1873). A provider naming no login files: every event counts, as before.
+ */
+let unnamed = 0
+async function loginStamp(id: string): Promise<string> {
+  const a = getAccount(id)
+  const isLogin = a && provider(a.provider).accountLoginFile?.bind(provider(a.provider))
+  if (!isLogin) return `any:${++unnamed}`
+  const dir = accountFolder(id)
+  try {
+    const d = await lstat(dir, { bigint: true })
+    const parts = [`${d.isDirectory() ? 'dir' : 'other'}:${d.ino}`]
+    for (const name of (await readdir(dir)).filter(isLogin).sort()) {
+      const s = await lstat(join(dir, name), { bigint: true }).catch(() => null)
+      parts.push(s ? `${name}:${s.ino}:${s.size}:${s.mtimeNs}` : `${name}:gone`)
+    }
+    return parts.join('|')
+  } catch (e) {
+    return `error:${(e as NodeJS.ErrnoException).code ?? String(e)}`
+  }
+}
+
+/** The folder's identity, from a stamp: when it moves, the folder was made again or replaced, and is watched again. */
+const folderOf = (stamp: string | undefined): string | undefined => stamp?.split('|')[0]
+
+/**
+ * Something happened in or to an account's folder (its watch, or the accounts folder's): counted as a change only when
+ * the login moved since it was last seen. A busy folder (agents' logs and databases, Codex's sandbox) reports events
+ * all the time, some with no file name on Windows, and counting each kept every launch's check from settling (HI-1873).
+ * Compared one at a time; events before a queued comparison starts are covered by it.
+ */
+function noticed(id: string): void {
+  const w = watched.get(id)
+  if (!w || w.queued) return
+  w.queued = true
+  const run = (w.comparing ?? Promise.resolve()).then(async () => {
+    w.queued = false
+    if (watched.get(id) !== w) return
+    const stamp = await loginStamp(id)
+    if (watched.get(id) !== w || stamp === w.stamp) return
+    const moved = folderOf(stamp) !== folderOf(w.stamp)
+    w.stamp = stamp
+    if (moved) attach(id)
+    changed(id)
+  })
+  w.comparing = run
+  void run.finally(() => {
+    if (w.comparing === run) w.comparing = null
+  })
+}
+
+/** Whether an account's folder is watched now, its login seen (tests wait for it). */
+export const accountWatched = (id: string): boolean => !!watched.get(id)?.w
+
+/** An event in an account's folder (its watch's, or a test's): a login file's, or one with no name, is compared. */
+export function accountFolderEvent(id: string, name: string | Buffer | null): void {
+  const a = getAccount(id)
+  if (!a) return
+  const isLogin = provider(a.provider).accountLoginFile
+  // No name (some changes on Windows, a busy folder's above all): compared like a login file's.
+  if (typeof name !== 'string' || !isLogin || isLogin.call(provider(a.provider), name)) noticed(id)
+}
+
 function attach(id: string): void {
   const w = watched.get(id)
   if (!w) return
   w.w?.close()
   w.w = null
-  const a = getAccount(id)
-  if (!a) return
-  const adapter = provider(a.provider)
+  if (!getAccount(id)) return
   void assertRealFolder(accountFolder(id)).then(
-    () => {
+    async () => {
       if (watched.get(id) !== w) return
+      // The login as it is before the watch starts: what its events are compared with (a change after it is seen).
+      const stamp = await loginStamp(id)
+      if (watched.get(id) !== w || w.w) return
+      w.stamp = stamp
       try {
         const fw = watch(accountFolder(id), { persistent: false })
-        fw.on('change', (_kind, name) => {
-          // No name (some changes on Windows): checked anyway.
-          if (typeof name !== 'string' || !adapter.accountLoginFile || adapter.accountLoginFile(name)) changed(id)
-        })
+        fw.on('change', (_kind, name) => accountFolderEvent(id, name))
         fw.on('error', (e) => lost(id, e))
         w.w = fw
         w.tries = 0
@@ -820,11 +892,8 @@ function syncRoot(): void {
     rootWatch = watch(accountsRoot(), { persistent: false })
     rootWatch.on('change', (_kind, name) => {
       const ids = typeof name === 'string' ? [name] : [...watched.keys()]
-      for (const id of ids) {
-        if (!watched.has(id)) continue
-        attach(id)
-        changed(id)
-      }
+      // A folder's own events reach here too (its files written, made or deleted): only one made again counts (noticed).
+      for (const id of ids) if (watched.has(id)) noticed(id)
     })
     rootWatch.on('error', (e) => {
       log.warn(`the accounts folder's watch stopped: ${userText(String(e.message))}`)
@@ -845,7 +914,7 @@ export function syncWatches(): void {
   for (const id of [...watched.keys()]) if (!want.has(id)) unwatch(id)
   for (const id of want) {
     if (watched.has(id)) continue
-    watched.set(id, { w: null, timer: null, retry: null, tries: 0 })
+    watched.set(id, { w: null, timer: null, retry: null, tries: 0, comparing: null, queued: false })
     attach(id)
     void checkAccount(id)
   }

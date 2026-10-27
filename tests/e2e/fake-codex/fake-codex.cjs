@@ -3,7 +3,8 @@
 // in or spending tokens. It sends the hooks, in the order, and sets the terminal title the way Codex 0.160.0 did
 // (tests/hookStatus.test.ts has the sequences):
 // - `--version`, `login status` and the app server (hooks/list, account/read) answer as a signed-in Codex; in a
-//   connection's folder (HI-1757), `login` signs it in and account/read says who, signed out until then.
+//   connection's folder (HI-1757), `login` signs it in and account/read says who, signed out until then. With fake-busy
+//   there, every run in it writes there all the time, as Codex's databases do (HI-1873).
 // - It titles its terminal "<project>", and "[ ! ] Action Required | <project>" (blinking with "[ . ]") while a
 //   person must act: one title for everything asked. It sends SessionStart with the first prompt, as Codex does.
 // - Prompts, typed and sent with Enter:
@@ -85,6 +86,19 @@ if (args[0] === 'login' && inConnection && args[1] !== 'status') {
 if (args[0] === 'login') {
   console.log('Logged in using ChatGPT')
   process.exit(0)
+}
+// A busy connection (HI-1873): while fake-busy is in a connection's folder, each run there (an agent, and Hive's own
+// check's app server) writes at its top level as Codex's databases and logs do, in bursts, making and deleting a journal,
+// so Windows reports some of it with no file name. Its login file is never touched.
+if (inConnection) {
+  setInterval(() => {
+    if (!fs.existsSync(path.join(connectionHome, 'fake-busy'))) return
+    const wal = path.join(connectionHome, `logs_2.sqlite-wal-${process.pid}`)
+    for (let i = 0; i < 200; i++) fs.appendFileSync(wal, 'x')
+    const journal = path.join(connectionHome, `state_5.sqlite-journal-${process.pid}`)
+    fs.writeFileSync(journal, 'j')
+    fs.rmSync(journal, { force: true })
+  }, 500).unref()
 }
 if (args[0] === 'app-server') {
   // Hive asks how this version names and hashes its hooks (none), or who its connection's folder is signed in as. Its

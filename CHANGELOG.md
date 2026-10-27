@@ -143,6 +143,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **A Codex agent starts on a connection others are busy on.** Agents running on a connection write in its folder all the time (their databases and logs, Codex's sandbox), and Hive took that for the login changing, refusing a new agent there with *…'s login kept changing while Hive checked it*. Only a change to the login itself counts now, for Claude Code's connections too (HI-1873).
 - **The board no longer jumps down a moment after it opens.** The toolbar's *Workflow: Git · …* link came after the board was drawn, and in a narrower window it moved the toolbar onto two lines, shifting every column down under the pointer (a drag begun then could miss its card). The link now comes with the board's cards (HI-1852).
 - **An agent's refused request shows in the Progress panel at once.** A refusal changes only a card's record, not the card, and the window kept waiting for a change to the cards before reading it: the refused notch on the card's lane segment (with its reason in the hover) could be missing until something else changed. For you and a card's Work section read such changes at once too (HI-1859).
 - **A drag to Review with nothing committed says what you can do.** Its message named the card twice and told you to ask "the user" before committing, words meant for an agent. It now reads *HI-12 can't move to Review: Nothing is committed to review yet. Commit the card's work, then move it again.* Agents' refusals are unchanged (HI-1851).
