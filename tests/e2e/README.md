@@ -73,7 +73,7 @@ another commit, or from before an edit, is reported.
 **Windows** (#1253): no suite puts a window on the screen or takes the focus. A dev test copy is quiet itself
 (`testQuiet`: off screen, unfocusable, no notifications). A packaged Hive isn't, unless it is 1.0 with
 `HIVE_TEST_QUIET=1` (which `hiveEnv` sets); a released 0.9 can't be changed at all. So `lib.cjs`'s `_electron.launch`
-does it from outside for every packaged Hive a suite starts (`packaged`, `packaged-transcript`, `boardupgrade` and
+does it from outside for every packaged Hive a suite starts (`packaged`, `packaged-transcript`, `packaged-workers`, `boardupgrade` and
 `upgradelane`'s 0.9 from `HIVE_E2E_HIVE09` or the main checkout's `dist\win-unpacked`, `plan` with `HIVE_EXE`). It
 starts with `--hidden` (Hive makes its windows but shows none, as when started at sign-in). As soon as Playwright
 reaches its main process, `keepPackagedQuiet` moves its windows off screen, makes them unfocusable and keeps them off

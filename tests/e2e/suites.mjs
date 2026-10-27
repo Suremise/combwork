@@ -211,6 +211,7 @@ export const SUITES = [
   { name: 'packaged-mcp', needs: ['packaged'] },
   { name: 'packaged-progress', needs: ['packaged'] },
   { name: 'packaged-transcript', needs: ['packaged'] },
+  { name: 'packaged-workers', needs: ['packaged'] },
   { name: 'pages' },
   { name: 'pageswitch' },
   { name: 'paneheader' },

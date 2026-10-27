@@ -1,5 +1,4 @@
 import { app } from 'electron'
-import { existsSync } from 'original-fs'
 import { basename, join } from 'path'
 import { Worker } from 'worker_threads'
 import { msg, tr } from '../shared/i18n'
@@ -11,6 +10,7 @@ import { withFileLock } from './fsutil'
 import { git } from './git'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
+import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 import { REPO_LOCK_FILE } from './repoLockCore'
 
 const log = createLogger('repoLock')
@@ -50,7 +50,10 @@ class LockThread {
 
   private async transport(): Promise<(m: LockRequest) => void> {
     if (this.worker) return (m) => this.worker!.postMessage(m)
-    if (!this.inProcess && !existsSync(lockWorkerScript())) this.inProcess = (await import('./repoLockWorker')).handleRequest
+    if (!this.inProcess && !bundledScriptExists(lockWorkerScript())) {
+      workerHere('repository lock', "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
+      this.inProcess = (await import('./repoLockWorker')).handleRequest
+    }
     if (this.inProcess) {
       const run = this.inProcess
       const reply = (r: LockReply): void => this.reply(r)
@@ -62,6 +65,7 @@ class LockThread {
     }
     const w = new Worker(lockWorkerScript())
     this.worker = w
+    workerStarted('repository lock', w) // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
     w.on('message', (r: LockReply) => this.reply(r))
     const gone = (why: string): void => {
       if (this.worker !== w) return

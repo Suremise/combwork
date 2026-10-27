@@ -25,6 +25,7 @@ import { gpuDiagnostics, gpuThisRun } from './gpu'
 import { crashDumpLines, crashDumps, crashDumpsDir } from './exitLog'
 import { lastRunDiagnostics } from './lastRun'
 import { memoryDiagnostics } from './memory'
+import { workerThreadLines } from './workerThreads'
 
 /** How much of Hive's log a report carries. */
 const LOG_LINES = 50
@@ -150,7 +151,12 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     // The main process's memory (#1005): now, and the last lines logged, which the log's tail may not reach.
     '### Memory',
     '',
-    ...memoryDiagnostics(app.getPath('userData'))
+    ...memoryDiagnostics(app.getPath('userData')),
+    '',
+    // How each worker thread runs (HI-1880): an installed Hive ran their work on main's thread, unseen.
+    '### Worker threads',
+    '',
+    ...workerThreadLines()
   ].join('\n')
 
   // The log goes back further than what is open now: earlier workspaces and their projects are taken out too.

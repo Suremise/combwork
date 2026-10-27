@@ -1,4 +1,4 @@
-import { existsSync, statSync } from 'original-fs'
+import { statSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
 import { basename, join } from 'path'
 import { Worker } from 'worker_threads'
@@ -6,6 +6,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import { createLogger } from './logger'
 import { timedStep } from './stallWork'
 import { CLOSING, runCheckpoint, type CheckpointDone, type CheckpointReply, type CheckpointRequest } from './walCheckpointWorker'
+import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 
 /**
  * The WAL's checkpoints out of the commits (#1633). SQLite checkpoints a WAL database itself inside whichever COMMIT
@@ -259,9 +260,13 @@ class CheckpointThread {
   }
 
   private start(): Worker | null {
-    if (!existsSync(workerScript())) return null
+    if (!bundledScriptExists(workerScript())) {
+      workerHere('WAL checkpoints', "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
+      return null
+    }
     const w = new Worker(workerScript(), { workerData: this.state.buffer })
     this.worker = w
+    workerStarted('WAL checkpoints', w) // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
     w.on('message', (m: CheckpointReply) => {
       const call = this.calls.get(m.id)
       if (!call) return

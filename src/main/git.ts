@@ -1,7 +1,6 @@
 import { join, resolve, sep } from 'path'
 import { SHARE_ENV, Worker } from 'worker_threads'
 import { lstat, readFile, readlink } from 'original-fs/promises'
-import { existsSync } from 'original-fs'
 import { insideReal } from './fsutil'
 import { gitProblem, gitTool, noteGitMissing, noteGitRan } from './gitTool'
 import type { GitDiff, GitStatus } from '../shared/types'
@@ -11,6 +10,7 @@ import { msg, tr } from '../shared/i18n'
 import { hiveError } from './hiveError'
 import { createLogger } from './logger'
 import { runGit, type GitOutcome, type GitReply, type GitRequest, type RefsRequest } from './gitWorker'
+import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
 
 const log = createLogger('git')
@@ -106,9 +106,13 @@ class GitThread {
   private ensure(): Worker | null {
     if (this.worker) return this.worker
     const script = gitWorkerScript()
-    if (!existsSync(script)) return null
+    if (!bundledScriptExists(script)) {
+      workerHere('git', "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
+      return null
+    }
     const w = new Worker(script, { env: SHARE_ENV })
     this.worker = w
+    workerStarted('git', w) // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
     w.on('message', (r: GitReply) => {
       const c = this.calls.get(r.id)
       this.calls.delete(r.id)
