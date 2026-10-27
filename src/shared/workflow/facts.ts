@@ -364,6 +364,11 @@ export interface CardState {
   /** The seq of the cycle's Started (or Adopted); 0 before the first start. */
   cycle: number
   started: (StartedData & { seq: number; adopted: boolean }) | null
+  /**
+   * Every line it has started on (Started, Adopted), over its whole history, renames followed (HI-1823): a card back from
+   * Done may start again elsewhere (the project folder, another line), and its earlier line still holds its work.
+   */
+  lines: string[]
   submissions: Submission[]
   latest: Submission | null
   /** Reviewers who started a review, per submission id. */
@@ -432,6 +437,7 @@ export const emptyState = (): CardState => ({
   stage: 'todo',
   cycle: 0,
   started: null,
+  lines: [],
   submissions: [],
   latest: null,
   reviewing: {},
@@ -489,12 +495,13 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         // A new cycle: earlier submissions, verdicts and entries stay in history but don't count (§16.7.4).
         // A question at the round limit outlives the cycle: it waits for the user's answer (§16.11.4).
         const limit = s.requests.filter((r) => r.gate === ROUND_LIMIT_GATE)
-        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, rounds: s.rounds, moreRounds: s.moreRounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, lastSeq: s.lastSeq })
+        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, rounds: s.rounds, moreRounds: s.moreRounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, lastSeq: s.lastSeq, lines: s.lines })
         s.requests = limit
         for (const r of limit) s.made[r.request] = r
         s.cycle = f.seq
         s.lastHeadFact = f.seq
         s.started = { ...d, seq: f.seq, adopted: f.kind === 'Adopted' }
+        if (d.line) s.lines = addOnce(s.lines, d.line)
         s.head = d.head !== undefined ? d.head : d.base
         s.builders = addOnce(s.builders, d.builder)
         break
@@ -667,6 +674,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         // Its line is the new name from here on: reconciliation reads the branch by it, and never finds it gone (#1305).
         const d = f.data as FactData['LineRenamed']
         if (s.started?.line && s.started.line.toLowerCase() === d.from.toLowerCase()) s.started = { ...s.started, line: d.to }
+        s.lines = s.lines.map((l) => (l.toLowerCase() === d.from.toLowerCase() ? d.to : l))
         break
       }
       case 'FolderMoved': {

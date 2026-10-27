@@ -140,7 +140,7 @@ import type { TipsChange, TipsState } from './tips'
 import type { AdvancedState } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
-import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, CompareLines, GitComparison, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
+import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, CompareLines, GitComparison, LeftoverInfo, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -880,6 +880,8 @@ export interface HiveRequests {
   'git:diff': (root: string, file: string, base?: string) => GitDiff
   /** The Changes tab's branch comparison (HI-1824, read-only): what can be compared, two branches, one file of them. */
   'git:compareLines': (projectPath: string) => CompareLines
+  /** The Changes tab's leftover branches (HI-1823): every local branch, uncut, with its worktree and commits not in the target. */
+  'git:leftovers': (projectPath: string) => LeftoverInfo
   /** pinBase and pinHead: the commits an earlier page of this comparison returned, so its pages are of one state ('' for the tips now). */
   'git:compare': (projectPath: string, base: string, head: string, page?: number, pinBase?: string, pinHead?: string) => GitComparison
   'git:compareDiff': (projectPath: string, base: string, head: string, file: string, pinned?: { base: string; head: string } | null) => GitDiff

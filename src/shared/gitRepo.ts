@@ -241,6 +241,19 @@ export interface GitHistory {
   moreTags: number
 }
 
+/**
+ * Every local branch as the Changes tab's leftover branches read them (HI-1823): uncut, each with its worktree and its
+ * commits not in the target (0: merged, as git said; null: not counted or unknown, never taken for merged).
+ */
+export interface LeftoverInfo {
+  isRepo: boolean
+  branches: GitBranchRow[]
+  target: string | null
+  defaultBranch: string | null
+  /** Branches whose commits not in the target aren't known (past the ones counted, or a read that failed). */
+  uncounted: number
+}
+
 /** A local branch the Changes tab can compare (HI-1824), and the folder it is checked out in, if any. */
 export interface CompareBranch {
   name: string

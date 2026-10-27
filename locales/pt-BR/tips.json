@@ -226,6 +226,8 @@
   "tips.lanesLegend.title": "O que as cores de uma raia significam",
   "tips.language.text": "O Hive segue o idioma de exibição do Windows quando o tem. Configurações → Geral → Idioma escolhe outro; os idiomas traduzidos por IA são marcados, e melhorias são bem-vindas. Com os agentes, o Hive continua falando em inglês.",
   "tips.language.title": "O Hive no seu idioma",
+  "tips.leftoverBranches.text": "Controle de versão → Alterações lista as branches que sobraram: a de um cartão substituído ou arquivado, a de um agente de antes dos slots. Compare uma primeiro com sua branch de destino e depois use Excluir…; uma com commits próprios lista esses commits antes de sair.",
+  "tips.leftoverBranches.title": "Limpe as branches que nada usa",
   "tips.leftoverProcesses.text": "Um servidor de prévia ou um tail -f que um agente iniciou pode continuar rodando depois que ele para, prendendo a pasta do projeto ou uma porta. O Hive os lista no menu ⋯ do painel do agente e oferece encerrá-los; Configurações → Agentes e worktrees pode encerrá-los sempre.",
   "tips.leftoverProcesses.title": "Encerre o que um agente parado deixou rodando",
   "tips.licenceAudit.text": "Antes de uma versão, peça a um agente que audite as licenças do que seu projeto distribui. Ele as lê dos próprios arquivos, incluindo arquivos de terceiros e partes do instalador, e aponta para você tudo o que não estiver claro.",

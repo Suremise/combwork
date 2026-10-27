@@ -226,6 +226,8 @@
   "tips.lanesLegend.title": "Qué significan los colores de un carril",
   "tips.language.text": "Hive sigue el idioma de presentación de Windows cuando lo tiene. Configuración → General → Idioma elige otro; los idiomas traducidos por IA están marcados, y las mejoras son bienvenidas. A los agentes se les sigue hablando en inglés.",
   "tips.language.title": "Hive en tu idioma",
+  "tips.leftoverBranches.text": "Control de versiones → Cambios lista las ramas sobrantes: la de una tarjeta sustituida o archivada, la de un agente de antes de los slots. Compara una primero con tu rama de destino y luego usa Eliminar…; si tiene commits propios, los lista antes de borrarse.",
+  "tips.leftoverBranches.title": "Limpia las ramas que nada usa",
   "tips.leftoverProcesses.text": "Un servidor de vista previa o un tail -f que inició un agente pueden seguir en ejecución después de que se detenga, ocupando la carpeta del proyecto o un puerto. Hive los lista en el menú ⋯ del panel del agente y ofrece terminarlos; Configuración → Agentes y worktrees puede terminarlos siempre.",
   "tips.leftoverProcesses.title": "Termina lo que dejó en marcha un agente detenido",
   "tips.licenceAudit.text": "Antes de publicar una versión, pide a un agente que audite las licencias de lo que distribuye tu proyecto. Las lee de los propios archivos, incluidos los de terceros y las partes del instalador, y te señala lo que no esté claro.",

@@ -122,10 +122,10 @@ function inUse(project, name) {
   check('…the other "not made by Hive"', (await row(other).locator('[data-origin="other"]').innerText().catch(() => '')) === 'not made by Hive', await row(other).innerText().catch(() => ''))
   // The branch comparisons (HI-1824) come first, in a group of their own: these checks are of the folders after them.
   const all = await picker.locator('option').evaluateAll((os) => os.map((o) => ({ value: o.value, label: o.textContent ?? '' })))
-  const folders = all.filter((o) => !o.value.startsWith('compare:'))
+  const folders = all.filter((o) => !(o.value.startsWith('compare:') || o.value === 'leftovers'))
   const values = folders.map((o) => o.value)
   const labels = folders.map((o) => o.label)
-  check('the picker: Branches first, then Unused worktrees, then each unused one, then those in use, then the project folder last', all[0].value.startsWith('compare:') && all.findIndex((o) => !o.value.startsWith('compare:')) === all.length - folders.length, JSON.stringify(all.map((o) => o.value)))
+  check('the picker: Branches first, then Unused worktrees, then each unused one, then those in use, then the project folder last', all[0].value.startsWith('compare:') && all.findIndex((o) => !(o.value.startsWith('compare:') || o.value === 'leftovers')) === all.length - folders.length, JSON.stringify(all.map((o) => o.value)))
   check('…its folders: Unused worktrees first, then each unused one, then those in use, then the project folder last', values[0] === 'unused' && values[values.length - 1] === '' && values.indexOf(coder.id) > values.findIndex((v) => v.startsWith('unused:')) && values.filter((v) => v.startsWith('unused:')).length === 2, JSON.stringify(labels))
   check('…each unused one says who made it', labels.some((l) => l.startsWith('hive/b4 · was B4')) && labels.some((l) => l.startsWith('experiment · not made by Hive')), JSON.stringify(labels))
   check('…and Unused worktrees counts them', labels[0] === 'Unused worktrees (2)', labels[0])

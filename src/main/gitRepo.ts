@@ -31,6 +31,7 @@ import {
   type GitRepoState,
   type GitRepoSummary,
   type GitWorktreeRow,
+  type LeftoverInfo,
   type BranchAt,
   type BranchDrops,
   type GitRemoteBranchRow,
@@ -287,6 +288,37 @@ export async function repoInfo(root: string, workTarget?: string | null): Promis
   const shownRemote = remoteRows.slice(0, BRANCHES_SHOWN)
   if (targets.target) await measure(root, targets.target, shown, shownRemote)
   return { summary, branches: shown, remoteBranches: remoteBranches.slice(0, BRANCHES_SHOWN), remotes: remoteList, worktrees, identity: id, target: targets.target, defaultBranch: targets.defaultBranch, remoteRows: shownRemote }
+}
+
+/**
+ * Every local branch, for the Changes tab's leftover branches (HI-1823): never cut at BRANCHES_SHOWN as `repoInfo`'s
+ * are, so none is left out. Each with the worktree it is checked out in and its commits not in the target as `measure`
+ * counts them: 0 only when git said it is merged, a count for the first COUNTED unmerged ones, null for the rest and
+ * for any it couldn't read (`uncounted` says how many). No remote work, no identity.
+ */
+export async function leftoverInfo(root: string, workTarget: string | null): Promise<LeftoverInfo> {
+  const summary = await repoSummary(root)
+  if (!summary.isRepo) return { isRepo: false, branches: [], target: null, defaultBranch: null, uncounted: 0 }
+  // The whole ref, its name read off it (HR1's round 1): `refname:short` says `heads/x` where a tag is also called x, a
+  // name no worktree, card, count or action would match.
+  const fields = ['%(refname)', '%(objectname:short)', '%(committerdate:unix)', '%(contents:subject)', '%(objectname)']
+  const [refs, wts, targets, sym] = await Promise.all([git(root, ['for-each-ref', '--sort=-committerdate', `--format=${fields.join('%00')}`, 'refs/heads']), git(root, ['worktree', 'list', '--porcelain']), branchTargets(root, workTarget), git(root, ['symbolic-ref', '-q', 'HEAD'])])
+  if (!refs.ok) throw commandFailed('git for-each-ref', refs) // i18n-ignore: a git command, as it is
+  // The folder's branch by its whole ref too (`--short` is as ambiguous); 1 is a detached HEAD, anything else unknown.
+  if (!sym.ok && sym.code !== 1) throw commandFailed('git symbolic-ref', sym) // i18n-ignore: a git command, as it is
+  const current = sym.ok && sym.out.trim().startsWith('refs/heads/') ? sym.out.trim().slice('refs/heads/'.length) : null
+  // A worktree list git couldn't give: no branch is known to be free of one, so none is offered (main checks again too).
+  if (!wts.ok) throw commandFailed('git worktree list', wts) // i18n-ignore: a git command, as it is
+  const worktrees = parseWorktrees(wts.out)
+  const branches: GitBranchRow[] = []
+  for (const line of refs.out.split('\n')) {
+    const f = line.split('\0')
+    if (f.length < 5 || !f[0].startsWith('refs/heads/')) continue
+    const name = f[0].slice('refs/heads/'.length)
+    branches.push({ name, current: name === current, upstream: null, ahead: 0, behind: 0, gone: false, worktree: worktrees.find((w) => w.branch === name)?.path ?? null, commit: f[1], date: Number(f[2]) * 1000, subject: f[3], sha: f[4] })
+  }
+  if (targets.target) await measure(root, targets.target, branches, [])
+  return { isRepo: true, branches, target: targets.target, defaultBranch: targets.defaultBranch, uncounted: branches.filter((b) => b.toTarget == null).length }
 }
 
 /** The unmerged branches whose commits are counted, at most (a count is a git run each): the rest show as not merged. */
@@ -898,7 +930,9 @@ const B = {
 function cardLines(projectPath: string): Set<string> {
   const ws = workspaceOf(projectPath)
   if (!ws.path) return new Set()
-  return new Set(workBadges(ws).filter((b) => b.line && !b.noCode && b.stage !== 'done').map((b) => b.line!))
+  // Every line an open card has started on, earlier cycles' too (HI-1823: one back from Done that started again elsewhere
+  // still has its work there).
+  return new Set(workBadges(ws).filter((b) => !b.noCode && b.stage !== 'done').flatMap((b) => [...(b.line ? [b.line] : []), ...(b.lines ?? [])]))
 }
 
 const kept = (why: string, branch: string, target = ''): Text => withValues(B.kept, { why, branch, target })

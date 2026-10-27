@@ -907,6 +907,14 @@
     "defaultMessage": "Hive in your language",
     "description": "A tip's title."
   },
+  "tips.leftoverBranches.text": {
+    "defaultMessage": "Version Control → Changes lists leftover branches: a superseded or archived card’s, an agent’s from before slots. Compare one with your target first, then Delete… it; one with commits of its own lists them before it goes.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.leftoverBranches.title": {
+    "defaultMessage": "Clean up branches nothing uses",
+    "description": "A tip's title."
+  },
   "tips.leftoverProcesses.text": {
     "defaultMessage": "A preview server or a tail -f an agent started can keep running after it stops, holding the project's folder or a port. Hive lists them in the ⋯ menu on the agent's pane and offers to end them; Settings → Agents can end them every time.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
