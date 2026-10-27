@@ -54,6 +54,7 @@ import type { QueueView } from '@shared/workflow/queue'
 import type { KeptReturn } from '@shared/progressQueue'
 import type { SessionAction } from './util'
 import { storeUpdated } from './pageMarks'
+import { keepSame } from '@shared/keepSame'
 
 export type Activity = 'projects' | 'overview' | 'performance' | 'board' | 'notes' | 'skills' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
 export type { ProjectTab } from '@shared/projectTabs'
@@ -666,10 +667,39 @@ setInstalledCheck((id) => {
   return !i ? null : i.found ? true : i.checking ? null : false
 })
 
+/** The store's parts set kept the same where they are equal (keepSame). */
+const KEPT_SAME = ['workspace', 'tasks', 'boardState', 'projectKeys', 'movedCardNames'] as const satisfies readonly (keyof State)[]
+
+/** How long agents' states wait to be shown together (HI-1806): a dozen agents send dozens a second. */
+const LIVE_BATCH_MS = 100
+/** Agents' states not shown yet (applyLiveState), by projectKey, the newest of each. */
+const pendingLive = new Map<string, LiveSessionState>()
+let liveTimer: ReturnType<typeof setTimeout> | null = null
+
 /** Sets the store, noting which of its parts changed (HI-1775): a long task's line in hive.log names the updates made in it. */
 export const set: typeof useStore.setState = ((partial: Parameters<typeof useStore.setState>[0], replace?: boolean) => {
-  const before = useStore.getState()
-  useStore.setState(partial as never, replace as never)
+  let before = useStore.getState()
+  let update = typeof partial === 'function' ? partial(before) : partial
+  // A workspace set (main's newer report, a change made here): the agents' states waiting are older, so shown first.
+  if (pendingLive.size && update && 'workspace' in update) {
+    flushLiveStates()
+    before = useStore.getState()
+    if (typeof partial === 'function') update = partial(before)
+  }
+  if (replace || !update) useStore.setState(update as never, replace as never)
+  else {
+    // Parts main sends again whole (HI-1806: a workspace with one agent's state changed, the board after each change):
+    // the parts unchanged stay the objects the window has, so only what shows a changed one renders again, and a part
+    // the same throughout changes nothing.
+    const rest: Partial<State> = { ...update }
+    for (const k of KEPT_SAME) {
+      if (!(k in rest) || !rest[k] || !before[k]) continue
+      const kept = keepSame(before[k], rest[k])
+      if (kept === before[k]) delete rest[k]
+      else (rest as Record<string, unknown>)[k] = kept
+    }
+    if (Object.keys(rest).length) useStore.setState(rest as never)
+  }
   const after = useStore.getState()
   // The parts it changed (an update by a function too): what re-renders their readers.
   if (after !== before) storeUpdated(Object.keys(after).filter((k) => after[k as keyof State] !== before[k as keyof State]))
@@ -1147,30 +1177,61 @@ export function showInOverview(path: string, agentId: string, target: 'history' 
   set((s) => ({ projectTabs: { ...s.projectTabs, [path]: 'overview' }, overviewJump: { project: path, agentId, at: Date.now(), target } }))
 }
 
+/**
+ * Each project's name by its path in lower case: with useShallow, what reads only the names stays still while the
+ * projects' agents change state (HI-1806).
+ */
+export function projectNames(projects: readonly ProjectInfo[] | undefined): Record<string, string> {
+  return Object.fromEntries((projects ?? []).map((p) => [p.path.toLowerCase(), p.name]))
+}
+
+/**
+ * Shows an agent's new state (a session-status event): with the others that came within LIVE_BATCH_MS, in one update of
+ * the store (HI-1806), so a dozen agents changing state render the window a few times a second, not dozens.
+ */
 export function applyLiveState(state: LiveSessionState): void {
-  set((s) => {
-    if (!s.workspace) return {}
-    const agentId = state.agentId
-    const live = state.status === 'stopped' ? null : state
-    const projects = s.workspace.projects.map((p) => {
-      if (p.path.toLowerCase() !== state.projectPath.toLowerCase()) return p
-      const known = p.agents.some((a) => a.id === agentId)
-      const agents = known
-        ? p.agents.map((a) => (a.id === agentId ? { ...a, live, restartNeeded: live ? a.restartNeeded : false } : a))
-        : live
-          ? [...p.agents, { id: agentId, name: state.agentName ?? 'Agent', live, restartNeeded: false, resume: null, place: { folder: state.cwd, is: 'project' as const, name: null, branch: null } }] // i18n-ignore: a stand-in agent name until the project's own list arrives
-          : p.agents
-      const primary = agents.find((a) => a.live)
-      return { ...p, agents, live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, active: live ? true : p.active }
-    })
-    // The Hive Assistant's one agent.
-    const a = s.workspace.assistant
-    const assistant =
-      a && a.path.toLowerCase() === state.projectPath.toLowerCase()
-        ? { ...a, live, agents: a.agents.map((x) => (x.id === agentId ? { ...x, live, restartNeeded: live ? x.restartNeeded : false } : x)) }
-        : a
-    return { workspace: { ...s.workspace, projects, assistant } }
+  pendingLive.set(projectKey(state.projectPath, state.agentId), state)
+  liveTimer ??= setTimeout(flushLiveStates, LIVE_BATCH_MS)
+}
+
+/** An agent's state as last told, shown yet or not. */
+export function liveStateOf(projectPath: string, agentId: string): LiveSessionState | null | undefined {
+  const pending = pendingLive.get(projectKey(projectPath, agentId))
+  if (pending) return pending.status === 'stopped' ? null : pending
+  return findProject(get(), projectPath)?.agents.find((a) => a.id === agentId)?.live
+}
+
+/** Shows the agents' states waiting (applyLiveState) now; also before the workspace is set, which they are older than. */
+export function flushLiveStates(): void {
+  if (liveTimer) clearTimeout(liveTimer)
+  liveTimer = null
+  if (!pendingLive.size) return
+  const states = [...pendingLive.values()]
+  pendingLive.clear()
+  set((s) => (s.workspace ? { workspace: states.reduce(withLiveState, s.workspace) } : {}))
+}
+
+function withLiveState(workspace: WorkspaceInfo, state: LiveSessionState): WorkspaceInfo {
+  const agentId = state.agentId
+  const live = state.status === 'stopped' ? null : state
+  const projects = workspace.projects.map((p) => {
+    if (p.path.toLowerCase() !== state.projectPath.toLowerCase()) return p
+    const known = p.agents.some((a) => a.id === agentId)
+    const agents = known
+      ? p.agents.map((a) => (a.id === agentId ? { ...a, live, restartNeeded: live ? a.restartNeeded : false } : a))
+      : live
+        ? [...p.agents, { id: agentId, name: state.agentName ?? 'Agent', live, restartNeeded: false, resume: null, place: { folder: state.cwd, is: 'project' as const, name: null, branch: null } }] // i18n-ignore: a stand-in agent name until the project's own list arrives
+        : p.agents
+    const primary = agents.find((a) => a.live)
+    return { ...p, agents, live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, active: live ? true : p.active }
   })
+  // The Hive Assistant's one agent.
+  const a = workspace.assistant
+  const assistant =
+    a && a.path.toLowerCase() === state.projectPath.toLowerCase()
+      ? { ...a, live, agents: a.agents.map((x) => (x.id === agentId ? { ...x, live, restartNeeded: live ? x.restartNeeded : false } : x)) }
+      : a
+  return { ...workspace, projects, assistant }
 }
 
 export function pushToast(t: ToastMessage): void {

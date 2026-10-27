@@ -47,6 +47,8 @@ export const EVERYTHING = [
   'src/shared/commitWatch.ts',
   'src/renderer/src/App.tsx',
   'src/renderer/src/store.ts',
+  // The store's every update of the workspace and the board (HI-1806).
+  'src/shared/keepSame.ts',
   'src/renderer/src/actions.ts',
   'src/renderer/src/api.ts',
   'src/renderer/src/util.ts',

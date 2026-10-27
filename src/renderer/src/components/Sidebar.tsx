@@ -563,20 +563,20 @@ function ProjectsPanel() {
 // ---------------------------------------------------------------------------
 
 function NotesPanel() {
-  const workspace = useStore((s) => s.workspace)
+  // Its path only (HI-1806): the workspace's every change would render the panel again.
+  const wsPath = useStore((s) => s.workspace?.path)
   const version = useStore((s) => s.notesVersion)
   const selected = useStore((s) => s.selectedNote)
   const [tree, setTree] = useState<NoteFile[]>([])
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ handovers: true })
   const menu = useContextMenu()
 
-  const wsPath = workspace?.path
   const load = useCallback(() => {
     if (wsPath) void call('notes:tree').then(setTree)
   }, [wsPath])
   useEffect(load, [load, version])
 
-  if (!workspace) {
+  if (!wsPath) {
     return (
       <>
         <div className="pane-header">{tr(M.sharedNotes)}</div>
@@ -585,7 +585,7 @@ function NotesPanel() {
     )
   }
 
-  const notesFile = workspaceNotesPath(workspace.path)
+  const notesFile = workspaceNotesPath(wsPath)
   // The pinned row is the note: the tree lists the others.
   const others = tree.filter((n) => n.isDir || n.relPath.toLowerCase() !== WORKSPACE_NOTES_PATH.toLowerCase())
 
@@ -663,7 +663,7 @@ function NotesPanel() {
           <IconButton icon="new-file" title={tr(M.newNoteButton)} onClick={() => void create(false)} />
           <IconButton icon="new-folder" title={tr(M.newFolderButton)} onClick={() => void create(true)} />
           <IconButton icon="refresh" title={tr(M.refresh)} onClick={load} />
-          <IconButton icon="folder-opened" title={tr(M.openFolder)} onClick={() => void call('app:openPath', `${workspace.path}\\.hive\\shared`)} />
+          <IconButton icon="folder-opened" title={tr(M.openFolder)} onClick={() => void call('app:openPath', `${wsPath}\\.hive\\shared`)} />
         </div>
       </div>
       <div className="pane-body">
@@ -686,11 +686,12 @@ function NotesPanel() {
 const NO_SKILLS: SkillInfo[] = []
 
 function SkillsPanel() {
-  const workspace = useStore((s) => s.workspace)
+  // Whether one is open, and its path (HI-1806): the workspace's every change would render the panel again.
+  const workspace = useStore((s) => !!s.workspace)
   const version = useStore((s) => s.skillsVersion)
   const selectedSkill = useStore((s) => s.selectedSkill)
   // This workspace's skills: another workspace's (opened in this window before) never show here.
-  const wsPath = workspace?.path ?? ''
+  const wsPath = useStore((s) => s.workspace?.path ?? '')
   const loaded = useScopedLoad<SkillInfo[]>(wsPath)
   const skills = loaded.data ?? NO_SKILLS
   const error = loaded.error

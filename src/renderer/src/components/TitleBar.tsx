@@ -131,7 +131,8 @@ export function TitleBar() {
   const [recentOpen, setRecentOpen] = useState(false)
   // Right-click on a recent workspace: Remove from Recent (#144). Outside the menu, so it stays when the menu closes.
   const recentMenu = useContextMenu()
-  const workspace = useStore((s) => s.workspace)
+  // Its name only (HI-1806): the workspace's every change would render the title bar again.
+  const workspaceName = useStore((s) => s.workspace?.name)
   const selected = useStore((s) => s.selectedProject)
   const recent = useStore((s) => s.recent)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -165,7 +166,7 @@ export function TitleBar() {
   const appName = useStore((s) => nameOf(!s.appInfo || s.appInfo.isPackaged))
   const pinned = useStore((s) => s.alwaysOnTop)
   const pinKey = commandKeybinding('view.alwaysOnTop')
-  const title = [selected ? basename(selected) : null, workspace?.name, appName].filter(Boolean).join(' — ')
+  const title = [selected ? basename(selected) : null, workspaceName, appName].filter(Boolean).join(' — ')
   useTaskbarCount(title)
   const barRef = useRef<HTMLDivElement>(null)
   const menubarRef = useRef<HTMLDivElement>(null)

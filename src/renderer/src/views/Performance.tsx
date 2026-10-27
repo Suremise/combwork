@@ -13,6 +13,7 @@ import { Icon, IconButton, InfoTip, LoadFailed, StaleNote, Tooltip } from '../co
 import { CellLines, DataTable, type DataColumn } from '../components/DataTable'
 import { notify, set, setActivity, useLanguage, useStore } from '../store'
 import { useScopedLoad } from '../scopedLoad'
+import { useShallow } from 'zustand/react/shallow'
 import { cx, formatBytes, formatTokens, timeAgo } from '../util'
 import { ComparePanel } from './PerformanceCompare'
 import { AntivirusLine } from '../components/Antivirus'
@@ -212,33 +213,38 @@ const ROLE_LABEL: Record<PerfRole, Msg> = {
   viewer: msg({ id: 'performance.role.viewer', defaultMessage: 'Viewer apps', description: "A choice of the Performance page's Who filter: viewer apps' work." })
 }
 
+const NO_NAMES: string[] = []
+
 /** The activity bar's Performance view: the workspace, with the sidebar's (or the page's) project filter. */
 export function PerformanceView() {
-  const workspace = useStore((s) => s.workspace)
+  // Its path and project names (HI-1806): the workspace's every change (an agent's state) would render the page again.
+  const workspacePath = useStore((s) => s.workspace?.path)
+  const projects = useStore(useShallow((s) => s.workspace?.projects.map((p) => p.name) ?? NO_NAMES))
   const filters = useStore((s) => s.perfWorkspace)
   const activity = useStore((s) => s.activity)
   const setFilters = useCallback((f: Partial<PerfFilters>) => set((s) => ({ perfWorkspace: { ...s.perfWorkspace, ...f } })), [])
-  if (!workspace) return <div className="empty-state">{tr(M.noWorkspace)}</div>
+  if (!workspacePath) return <div className="empty-state">{tr(M.noWorkspace)}</div>
   // A project filter that isn't one of this workspace's projects (from before a switch): all of it.
-  const projects = workspace.projects.map((p) => p.name)
   const project = filters.project && filters.project !== WORKSPACE_OWN && !projects.some((n) => n.toLowerCase() === filters.project.toLowerCase()) ? '' : filters.project
   const scope: MetricsScope = project && project !== WORKSPACE_OWN ? { kind: 'project', project } : { kind: 'workspace' }
-  return <PerformancePage key={workspace.path} workspacePath={workspace.path} scope={scope} filters={{ ...filters, project }} setFilters={setFilters} projects={projects} active={activity === 'performance'} />
+  return <PerformancePage key={workspacePath} workspacePath={workspacePath} scope={scope} filters={{ ...filters, project }} setFilters={setFilters} projects={projects} active={activity === 'performance'} />
 }
 
 /** A project's Performance tab: fixed to that project (no workspace or other-project choice). */
 export function PerformanceTab({ project }: { project: ProjectInfo }) {
-  const workspace = useStore((s) => s.workspace)
+  const workspacePath = useStore((s) => s.workspace?.path)
   const filters = useStore((s) => s.perfProjects[project.path] ?? DEFAULT_PERF_FILTERS)
   const shown = useStore((s) => s.activity === 'projects' && s.selectedProject === project.path)
   const setFilters = useCallback((f: Partial<PerfFilters>) => set((s) => ({ perfProjects: { ...s.perfProjects, [project.path]: { ...(s.perfProjects[project.path] ?? DEFAULT_PERF_FILTERS), ...f, project: '' } } })), [project.path])
-  if (!workspace) return null
-  return <PerformancePage key={`${workspace.path}|${project.path}`} workspacePath={workspace.path} scope={{ kind: 'project', project: project.name }} filters={{ ...filters, project: '' }} setFilters={setFilters} active={shown} />
+  if (!workspacePath) return null
+  return <PerformancePage key={`${workspacePath}|${project.path}`} workspacePath={workspacePath} scope={{ kind: 'project', project: project.name }} filters={{ ...filters, project: '' }} setFilters={setFilters} active={shown} />
 }
 
 /** The Performance view's sidebar: what to look at (the whole workspace, its own work, or one project). */
 export function PerformancePanel() {
-  const workspace = useStore((s) => s.workspace)
+  // Whether one is open, and its project names (HI-1806): not the agents' states.
+  const workspace = useStore((s) => !!s.workspace)
+  const names = useStore(useShallow((s) => s.workspace?.projects.map((p) => p.name) ?? NO_NAMES))
   const project = useStore((s) => s.perfWorkspace.project)
   const pick = (p: string): void => set((s) => ({ perfWorkspace: { ...s.perfWorkspace, project: p } }))
   const row = (value: string, icon: string, label: string, tip: string) => (
@@ -261,7 +267,7 @@ export function PerformancePanel() {
             {row('', 'root-folder', tr(M.whole), tr(M.wholeTip))}
             {row(WORKSPACE_OWN, 'hubot', tr(M.own), tr(M.ownTip))}
             <div className="section-header">{tr(M.projects)}</div>
-            {workspace.projects.map((p) => row(p.name, 'folder', p.name, tr(M.projectTip, { project: p.name })))}
+            {names.map((name) => row(name, 'folder', name, tr(M.projectTip, { project: name })))}
           </>
         )}
       </div>

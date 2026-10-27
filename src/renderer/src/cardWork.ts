@@ -3,6 +3,7 @@ import type { WorkBadge, WorkView } from '@shared/workflow/workView'
 import { makeBadgeSource, NO_BADGES } from '@shared/workflow/badgeSource'
 import { useScopedLoad } from './scopedLoad'
 import { useStore } from './store'
+import { useShallow } from 'zustand/react/shallow'
 
 // A card's work (#1223) in the window: read from its facts in main (`tasks:work`, `tasks:workBadges`) and read again
 // each time the board is (a tasks-changed event, which a fact written in the board's change also gives, observed ones
@@ -32,11 +33,12 @@ export function useWorkBadges(): Map<number, WorkBadge> {
   const ws = useStore((s) => s.workspace?.path ?? '')
   const tasks = useStore((s) => s.tasks)
   // A project's workflow written, or the projects read again (their version control recorded): its cards' old rules
-  // marks may have changed (#1421).
+  // marks may have changed (#1421). The projects as read, not their agents' states (HI-1806): an agent's turn asked them
+  // all again. The store keeps each part that didn't change the same object (keepSame).
   const workflow = useStore((s) => s.workflowVersion)
-  const projects = useStore((s) => s.workspace?.projects)
+  const projects = useStore(useShallow((s) => (s.workspace?.projects ?? []).flatMap((p) => [p.path, p.config, p.platform, p.isGitRepo, p.branch])))
   useEffect(() => {
-    if (ws) badgeSource.ask(ws, [tasks, workflow, projects])
+    if (ws) badgeSource.ask(ws, [tasks, workflow, ...projects])
   }, [ws, tasks, workflow, projects])
   const shown = useSyncExternalStore(badgeSource.subscribe, badgeSource.get)
   return shown.ws === ws ? shown.badges : NO_BADGES

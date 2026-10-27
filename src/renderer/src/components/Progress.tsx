@@ -7,8 +7,9 @@ import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { attempt, selectProject } from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
-import { cardLabelOf, findProject, flashPane, get, notify, projectKey, revealAgent, set, setAssistantOpen, setProgressFilter, setProgressOpen, useDateStyle, useLanguage, useProgressFilter, useProgressOpen, useStore } from '../store'
+import { cardLabelOf, findProject, flashPane, get, notify, projectKey, projectNames, revealAgent, set, setAssistantOpen, setProgressFilter, setProgressOpen, useDateStyle, useLanguage, useProgressFilter, useProgressOpen, useStore } from '../store'
 import { useNow } from '../usage'
+import { useShallow } from 'zustand/react/shallow'
 import { cx, formatKeybinding, timeAgo } from '../util'
 import { AssistantMark } from './AssistantMark'
 import { ProviderIcon } from './ProviderIcon'
@@ -116,10 +117,12 @@ export function ProgressPanel() {
   const queues = useQueuesKept()
   const lanes = useLanes()
   const chosen = useProgressFilter()
-  const workspace = useStore((s) => s.workspace)
+  // Its path and its projects' names (HI-1806): the workspace's every change (an agent's state) would render the panel again.
+  const wsPath = useStore((s) => s.workspace?.path ?? null)
+  const names = useStore(useShallow((s) => projectNames(s.workspace?.projects)))
   const focused = useStore((s) => s.windowFocused)
   // The tab shown (#1309), kept per workspace; Pulse unless the user chose another.
-  const tabKey = workspace ? `progress-tab:${workspace.path.toLowerCase()}` : null
+  const tabKey = wsPath ? `progress-tab:${wsPath.toLowerCase()}` : null
   const tab = tabAt(useStore((s) => (tabKey ? s.panes[tabKey] : undefined)))
   const setTab = (next: ProgressTab): void => {
     if (!tabKey) return
@@ -129,7 +132,7 @@ export function ProgressPanel() {
   }
   const [runsFilter, setRunsFilter] = useState<RunsFilter>(NO_RUNS_FILTER)
   // Another workspace: its own filters, from none.
-  useEffect(() => setRunsFilter(NO_RUNS_FILTER), [workspace?.path])
+  useEffect(() => setRunsFilter(NO_RUNS_FILTER), [wsPath])
   // The Runs tab asked for with a filter (#1446: what a lane waits for, from its row): shown, and the ask cleared.
   const runsShow = useStore((s) => s.runsShow)
   useEffect(() => {
@@ -183,7 +186,7 @@ export function ProgressPanel() {
   if (!on) return null
   const announcer = <QueueAnnouncer views={queues} runs={runs} />
   // The filter (#251): one project's runs (and one agent's), or all; offered when the runs span more than one project.
-  const nameOf = (p: string): string => workspace?.projects.find((x) => x.path.toLowerCase() === p.toLowerCase())?.name ?? p.split(/[\\/]/).pop() ?? p
+  const nameOf = (p: string): string => names[p.toLowerCase()] ?? p.split(/[\\/]/).pop() ?? p
   const choices = filterChoices(runs, nameOf, tr, queueProjects)
   const shown = filterRuns(runs, filter)
   const filterName = filter === SHOW_ALL ? null : `${choices.find((c) => c.value === filter.project)?.label ?? ''}${filter.agent ? ` · ${(shown[0] ? runAgentName(shown[0], tr) : '')}` : ''}`
@@ -211,7 +214,7 @@ export function ProgressPanel() {
   const kb = commandKeybinding('progress.toggle')
   const badges = tabBadges(merging, shown, shownLanes.length, queuedCount(shownQueue))
   const failures = unresolvedFailures(shown)
-  const multi = (workspace?.projects.length ?? 0) > 1
+  const multi = Object.keys(names).length > 1
   const pulseQueues = shownQueue.filter(onPulseLine)
 
   return (

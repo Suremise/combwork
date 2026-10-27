@@ -48,7 +48,8 @@ const M = {
 }
 
 export function AssistantSidePanel() {
-  const workspace = useStore((s) => s.workspace)
+  // Its path only (HI-1806): the workspace's every change would render the panel again.
+  const wsPath = useStore((s) => s.workspace?.path)
   const a = useStore((s) => s.workspace?.assistant ?? null)
   const section = useStore((s) => s.assistantSection)
   return (
@@ -61,7 +62,7 @@ export function AssistantSidePanel() {
         </div>
       </div>
       <div className="pane-body">
-        {!workspace || !a ? (
+        {!wsPath || !a ? (
           <div className="pane-empty">{tr(M.noWorkspace)}</div>
         ) : (
           <>
@@ -73,7 +74,7 @@ export function AssistantSidePanel() {
                 <>
                   <IconButton icon="add" title={tr(M.newMode)} onClick={() => void createMode()} />
                   <IconButton icon="refresh" title={tr(M.refresh)} onClick={() => set((s) => ({ modesVersion: s.modesVersion + 1 }))} />
-                  <IconButton icon="folder-opened" title={tr(M.openFolder)} onClick={() => void call('app:openPath', `${workspace.path}\\.hive\\modes`)} />
+                  <IconButton icon="folder-opened" title={tr(M.openFolder)} onClick={() => void call('app:openPath', `${wsPath}\\.hive\\modes`)} />
                 </>
               }
             >

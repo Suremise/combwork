@@ -33,7 +33,7 @@ import { ProgressPanel, progressRunsChanged } from './components/Progress'
 import { queueBoardChanged, queueChangedEvent } from './queueSource'
 import { AssistantMain } from './components/AssistantView'
 import { loadAssistantChanges } from './assistantUndo'
-import { agentOnScreen, applyLeftovers, applyLiveState, assistantOnLeft, assistantWasOpen, clearStartFailure, filesListeners, findProject, get, loadTasks, noteAgentAdded, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
+import { agentOnScreen, applyLeftovers, applyLiveState, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, filesListeners, findProject, get, loadTasks, noteAgentAdded, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
 import { DocsView, McpView, NotesView, SkillView, WelcomeView } from './views/OtherViews'
 import { TemplatesView } from './components/Templates'
 import { ProjectView } from './views/ProjectView'
@@ -112,7 +112,8 @@ function handleEvent(e: HiveEvent): void {
       const path = findProject(get(), e.state.projectPath)?.path ?? e.state.projectPath
       // A new session (or its worktree setup) gets a fresh terminal. The setup command and Claude Code share one.
       const key = projectKey(path, e.state.agentId)
-      const prev = findProject(get(), path)?.agents.find((a) => a.id === e.state.agentId)?.live
+      // As last told, a state not shown yet too (applyLiveState shows them a few times a second, HI-1806).
+      const prev = liveStateOf(path, e.state.agentId)
       if (e.state.status === 'starting' && !prev?.settingUp) set((s) => ({ sessionEpoch: { ...s.sessionEpoch, [key]: (s.sessionEpoch[key] ?? 0) + 1 } }))
       // A new launch: the last one's failure no longer applies.
       if (e.state.status === 'starting') clearStartFailure(path, e.state.agentId)
@@ -334,7 +335,8 @@ function scheduleTasksLoad(): void {
 export function App() {
   // In a new language, every component renders again (#767): App's render renders them all.
   useLanguage()
-  const workspace = useStore((s) => s.workspace)
+  // Whether one is open, not the workspace itself: its every change would render the whole window again (HI-1806).
+  const workspace = useStore((s) => !!s.workspace)
   useAntivirusOffer()
   const assistantLeft = useStore(assistantOnLeft)
   const activity = useStore((s) => s.activity)
