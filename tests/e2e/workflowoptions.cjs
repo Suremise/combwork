@@ -177,7 +177,8 @@ async function theForm(page, app, inv) {
     check('the sections are tabs: ArrowRight selects and focuses Changes, its page labelled by it', !!(await lib.until(async () => (await page.locator('.git-sections [aria-selected="true"]').getAttribute('data-section')) === 'changes' && (await focusedSection()) === 'changes' && (await panelFor()) === 'changes', HUNG_MS)), JSON.stringify([await focusedSection(), await panelFor()]))
     check('…only the selected section in the Tab order', JSON.stringify(await sectionTabs.evaluateAll((els) => els.filter((e) => e.tabIndex === 0).map((e) => e.getAttribute('data-section')))) === '["changes"]')
     await page.keyboard.press('ArrowLeft')
-    check('…ArrowLeft back to Workflow', !!(await lib.until(async () => (await workflowTab.getAttribute('aria-selected')) === 'true' && (await focusedSection()) === 'workflow' && (await panelFor()) === 'workflow', HUNG_MS)))
+    // Its form read again (it remounts with the section), so the shots show it, not the page before its read answers.
+    check('…ArrowLeft back to Workflow, its form shown again', !!(await lib.until(async () => (await workflowTab.getAttribute('aria-selected')) === 'true' && (await focusedSection()) === 'workflow' && (await panelFor()) === 'workflow' && (await section.locator('.workflow-group[data-group="review"]').isVisible().catch(() => false)), HUNG_MS)))
     await themes('section-tabs', page.locator('.git-head'))
     check('the notice is gone, and answered for good',!!(await lib.until(async () => (await notice.count()) === 0 && (await inv('workflow:presetsNotice')) === null, HUNG_MS)), `notice shown: ${await notice.count()}, presetsNotice: ${JSON.stringify(await inv('workflow:presetsNotice'))}`)
     await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
