@@ -120,7 +120,8 @@ import { metricsHandle, recordLaunch } from './metrics'
 import { headerOf } from './revisions'
 import { utf8Bytes } from '../shared/metrics'
 import { cardNamesOf, scopeOfHost } from './projectKeys'
-import { inWorkspace, workspace, workspaceFor, workspaceOf, type SessionsFile } from './workspace'
+import { inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService, type SessionsFile } from './workspace'
+import { ServerMarks } from './serverMarks'
 import { usageHistory, type StoredUsage } from './usageHistory'
 import { journalSettingsOf } from './journalService'
 import { endAgentToken, newAgentToken } from './agentTokens'
@@ -246,8 +247,15 @@ export function stopWaitMs(timeoutMs: number, graces: (number | undefined)[]): n
 interface LiveSession {
   state: LiveSessionState
   adapter: ProviderAdapter
-  /** The session whose record was saved with `serverRan` (HI-1772): let go from serverSessions once the run exits. */
-  serverRanSaved?: string
+  /**
+   * The conversations this run marked as on a server connection (HI-1772, HI-1829): read without their CLI's cost
+   * reports while the run is live (/clear or /new: each one it moved through). Let go with the run.
+   */
+  serverSids?: Set<string>
+  /** Those whose record was saved with `serverRan`: its record decides once the run is over. */
+  serverSaved?: Set<string>
+  /** Those the CLI started (recordSession wrote, or tried to write, their record): a record to keep once it is over. */
+  serverRecorded?: Set<string>
   /** Its conversation ran only on servers on this PC (HI-1772), as its record says: free. */
   costFree?: boolean
   /** The terminal as rendered, for an adapter that reads it (its footer's mode, or a menu to pick from: #396). */
@@ -557,10 +565,13 @@ interface UsageSeen {
 }
 const usageSeen = new Map<string, UsageSeen>()
 /**
- * Sessions launched on a server connection in this run (HI-1772), so every read of their usage leaves the CLI's cost
- * reports out; their records keep it (`serverRan`) for later runs and the history's ingest.
+ * Sessions on a server connection (HI-1772) are read without their CLI's cost reports: while a live run marked them
+ * (its `serverSids`), then by their record (`serverRan`). One whose record couldn't be saved is kept here, bounded and
+ * failing closed past its bound (HI-1829, serverMarks.ts).
  */
-const serverSessions = new Set<string>()
+const serverMarks = new ServerMarks((line, host) => log.warn(host ? `${line}: ${userText(host)}` : line))
+/** For tests (HI-1829): the unsaved markers' state. */
+export const serverMarksForTests = (): ServerMarks => serverMarks
 /** Transcripts main keeps the latest usage of (the worker keeps more: Settings → Sessions → Usage cache size). */
 const MAX_USAGE_SEEN = 200
 /** A session listing this slow is logged with where its time went (#1646). */
@@ -914,6 +925,8 @@ const CARRY_ON_PROMPT = 'Your last turn stopped because your sign-in had expired
 
 class SessionManager {
   private live = new Map<string, LiveSession>()
+  /** Server markers of runs that have ended, held until their record says so or they are kept (HI-1829: serverRunEnding). */
+  private readonly serverEnding = new Map<string, number>()
   /**
    * CLIs whose sign-in was refused, until signed in again (#309): the user is told once per CLI and expiry (agents
    * stopping later only show it), and the CLI's own check runs again meanwhile, to notice the sign-in.
@@ -2203,7 +2216,7 @@ class SessionManager {
     // provider turned off while this launch was being prepared, it must not start a process.
     if (l.stopRequested || this.live.get(id) !== l || this.starting.get(id)?.cancelled || !workspaceFor(projectPath) || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
     state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}), ...(conn.server ? { server: { models: conn.server.models, local: conn.server.local } } : {}) } : undefined
-    if (conn?.server && state.sessionId) serverSessions.add(state.sessionId)
+    if (conn?.server && state.sessionId) (l.serverSids ??= new Set()).add(state.sessionId)
     if (!isProviderEnabled(config.settings, adapter.id)) throw hiveError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name })
     l.startAllowed?.()
     const cmd = adapter.buildCommand(info.path, ctx)
@@ -2295,11 +2308,10 @@ class SessionManager {
       onExit: (code, output) => {
         screen?.dispose()
         // A server connection's key stays masked until what its exit left (its last output) is handled (HI-1772).
-        void Promise.resolve(this.onExit(projectPath, agent.id, state.runId, code, output)).finally(() => {
-          // Its record says it ran on a server (saved): no longer kept in memory once no live run has it (HI-1772).
-          const sid = l.serverRanSaved
-          if (sid && !this.liveStates().some((s) => s.sessionId === sid)) serverSessions.delete(sid)
-        })
+        // Its server markers go with the run (HI-1829): those its record has, at once; the rest are held from now (before
+        // onExit takes it out of live) until their record says so, or kept if it can't.
+        const ending = this.serverRunEnding(l)
+        void Promise.resolve(this.onExit(projectPath, agent.id, state.runId, code, output)).finally(() => this.serverRunEnded(projectPath, ending))
       }
     })
     // Its process runs now (spawnPty returned, not thrown): its slot's writer is the run's processes' to settle (#1434).
@@ -2345,7 +2357,10 @@ class SessionManager {
     const { state } = l
     const sessionId = state.sessionId
     // On a server connection (HI-1772), this conversation's usage leaves the CLI's cost reports out from now on.
-    if (state.launchedConnection?.server && sessionId) serverSessions.add(sessionId)
+    if (state.launchedConnection?.server && sessionId) {
+      ;(l.serverSids ??= new Set()).add(sessionId)
+      ;(l.serverRecorded ??= new Set()).add(sessionId)
+    }
     // A new conversation began with this launch, or (one the CLI switched to) now: its record says so, and the footer
     // names it by the record's time, as the Sessions tab does (#630: a minute apart when recorded after a minute's turn).
     state.sessionCreatedAt ??= state.startedAt
@@ -2379,11 +2394,14 @@ class SessionManager {
       ...(state.launchedConnection?.server?.local ? { serverLocal: true as const } : { notLocal: true as const })
     }, { createdAt: state.sessionCreatedAt })
     // Its record says it ran on a server (HI-1772, now or in an earlier run): its reads leave the CLI's cost reports out
-    // while it runs; once it exits, its record says so (serverRanSaved: only once that write succeeded).
+    // while it runs; once it exits, its record says so (serverSaved: only once that write succeeded).
     if (rec.serverRan && sessionId) {
-      serverSessions.add(sessionId)
-      l.serverRanSaved = sessionId
+      ;(l.serverSids ??= new Set()).add(sessionId)
+      ;(l.serverSaved ??= new Set()).add(sessionId)
+      serverMarks.saved(projectPath, sessionId)
     }
+    // A record of this host saved: those whose record couldn't be saved before are tried again (HI-1829).
+    void this.saveServerMarks(projectPath)
     // Free as the conversation's record says (this run's flag merged with earlier runs'), never by this run alone.
     l.costFree = !!rec.serverLocal && !rec.notLocal
     // The footer follows at once (and liveCost keeps it so): a conversation switched to that ran elsewhere isn't free.
@@ -5590,15 +5608,78 @@ class SessionManager {
    * its last read stopped, or (not read in this run: a session resumed after a restart) from its session's saved state in
    * the history of `projectPath`, its host. Unchanged since main last had it, answered here without asking the worker.
    */
+  /**
+   * Whether a session is marked as on a server connection (HI-1772, HI-1829): by a live run of it (any host: a session
+   * can move between agents), or kept as one whose record couldn't be saved (serverMarks.ts).
+   */
+  private serverMarked(projectPath: string, sessionId: string): boolean {
+    for (const l of this.live.values()) if (l.serverSids?.has(sessionId)) return true
+    return !!this.serverEnding.get(sessionId) || serverMarks.ignoresReports(projectPath, sessionId)
+  }
+
+  /**
+   * A run ending (HI-1829), at once as its process exits, before anything awaits or takes it out of live: its markers
+   * that its record doesn't say yet are held (`serverEnding`, by id: a count, for two runs of one conversation ending
+   * together) until serverRunEnded has saved or kept each, so no read between sees one without them. Those its record
+   * says go now.
+   */
+  private serverRunEnding(l: LiveSession): { unsaved: string[]; started: Set<string> } {
+    const unsaved = [...(l.serverSids ?? [])].filter((sid) => !l.serverSaved?.has(sid))
+    const started = l.serverRecorded ?? new Set<string>()
+    for (const sid of unsaved) this.serverEnding.set(sid, (this.serverEnding.get(sid) ?? 0) + 1)
+    l.serverSids = l.serverSaved = l.serverRecorded = undefined
+    return { unsaved, started }
+  }
+
+  /**
+   * A run ended (HI-1829): each marker held for it is saved now: one the CLI started gets a record if its own write
+   * failed; one it never started (marked before the spawn) only if it has a record from an earlier run. One that can't be
+   * saved is kept (serverMarks.ts) before its hold goes, so it is never read without one.
+   */
+  private async serverRunEnded(projectPath: string, ending: { unsaved: string[]; started: Set<string> }): Promise<void> {
+    for (const sid of ending.unsaved) {
+      try {
+        if ((await this.saveServerRan(projectPath, sid, ending.started.has(sid))) === 'failed') serverMarks.add(projectPath, sid)
+      } finally {
+        const n = (this.serverEnding.get(sid) ?? 1) - 1
+        if (n > 0) this.serverEnding.set(sid, n)
+        else this.serverEnding.delete(sid)
+      }
+    }
+  }
+
+  /** A host's sessions whose server record couldn't be saved, tried again a few at a time; each saved is let go. */
+  private async saveServerMarks(projectPath: string): Promise<void> {
+    for (const sid of serverMarks.pending(projectPath).slice(0, 4)) if ((await this.saveServerRan(projectPath, sid, true)) === 'saved') serverMarks.saved(projectPath, sid)
+  }
+
+  /** Writes `serverRan` into a session's record (made, with `create`, if it has none): none when it has none to write. */
+  private async saveServerRan(projectPath: string, sessionId: string, create: boolean): Promise<'saved' | 'none' | 'failed'> {
+    try {
+      const had = await workspace.mutateSessions(projectPath, (f) => {
+        const rec = f.sessions.find((x) => x.id === sessionId)
+        if (rec && !rec.serverRan) rec.serverRan = true
+        return !!rec
+      })
+      if (had) return 'saved'
+      if (!create) return 'none'
+      await workspace.upsertSession(projectPath, { id: sessionId, serverRan: true })
+      return 'saved'
+    } catch (e) {
+      log.warn(`Could not save that ${sessionId} ran on a server connection`, e)
+      return 'failed'
+    }
+  }
+
   /** A running session's cost policy (HI-1772): on a server connection now, or its record says it ran on one. */
   private costPolicy(l: LiveSession): { reportsIgnored: boolean; costFree: boolean } {
-    return { reportsIgnored: !!l.state.launchedConnection?.server || (!!l.state.sessionId && serverSessions.has(l.state.sessionId)), costFree: !!l.costFree }
+    return { reportsIgnored: !!l.state.launchedConnection?.server || (!!l.state.sessionId && this.serverMarked(l.state.projectPath, l.state.sessionId)), costFree: !!l.costFree }
   }
 
   private async usageFor(projectPath: string, path: string, sessionId: string, provider: ProviderId, o: { noWait?: boolean; reportsIgnored?: boolean; costFree?: boolean } = {}): Promise<SessionUsage | null> {
     const costFree = !!o.costFree
     // A session that ran on a server connection (HI-1772): read without its CLI's cost reports.
-    const reportsIgnored = !!o.reportsIgnored || serverSessions.has(sessionId)
+    const reportsIgnored = !!o.reportsIgnored || this.serverMarked(projectPath, sessionId)
     try {
       const s = await stat(path)
       const seen = usageSeen.get(path)
@@ -6559,6 +6640,8 @@ class SessionManager {
         )
       })
     await (expected ? this.whileCleaning(projectPath, sessionId, remove) : this.whileReserved(projectPath, sessionId, remove))
+    // Gone: nothing reads it again, so a server marker kept for it goes too (HI-1829).
+    serverMarks.deleted(projectPath, sessionId)
     for (const a of projectAgents(await workspace.projectConfig(projectPath))) {
       if (a.lastSessionId === sessionId) await workspace.updateAgent(projectPath, a.id, { lastSessionId: undefined }).catch(() => undefined)
     }
@@ -6665,7 +6748,9 @@ class SessionManager {
     assertSessionId(sessionId)
     const src = await this.providerTranscript(projectPath, sessionId)
     const provider = src?.provider ?? 'claude-code'
-    const usage = src ? await this.usageFor(projectPath, src.path, sessionId, provider) : null
+    // As its record says, if it has one (HI-1829): a conversation that ran on a server is never read Claude-priced.
+    const rec = await workspace.sessionRecord(projectPath, sessionId).catch(() => undefined)
+    const usage = src ? await this.usageFor(projectPath, src.path, sessionId, provider, { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal }) : null
     // A sub-session (a Codex guardian review, say) stays one: never an agent's session to resume.
     const sub = src ? (await providerAdapter(provider).listSessions(projectPath).catch(() => [])).find((e) => e.id === sessionId)?.sub : undefined
     await workspace.upsertSession(projectPath, {
@@ -6683,4 +6768,6 @@ class SessionManager {
 }
 
 export const sessions = new SessionManager()
+// A workspace closing (HI-1829): its server markers whose records couldn't be saved can't be kept for its reopening.
+WorkspaceService.closingListeners.add((path) => serverMarks.closing(path))
 onLanguageChange(() => sessions.relabel())
