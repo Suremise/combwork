@@ -123,7 +123,7 @@ describe("the override scenarios' checks count every move of the card, by number
 
 describe('the submit scenarios count a question about committing, never a notice (HI-1618, HR5 round 1)', () => {
   type Obs = { hiveCalls?: unknown[]; tools?: { name: string; input: string }[]; finalReply?: string; status?: string; column?: string; submitted?: boolean }
-  const call = (tool: string, args: unknown, ok = true, error?: string) => ({ tool, args: JSON.stringify(args), ok, ...(error ? { error } : {}) })
+  const call = (name: string, args: unknown, ok = true, error?: string) => ({ tool: name, args: JSON.stringify(args), ok, ...(error ? { error } : {}) })
   const refusal = call('hive_submit', { card: '#1', summary: 's' }, false, 'AL-1: nothing committed to review. (submit.empty)')
   const statusNotice = call('hive_notify', { title: 'Status', message: 'The work remains uncommitted.' })
   /** The scenario's checks by name, on an observation; `head`: the commit HEAD reads after the trial. */
