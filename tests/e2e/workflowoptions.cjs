@@ -1,7 +1,7 @@
 // The Version Control tab's Workflow section (#1418; P4's plain form #1278 before it): after an upgrade from 0.9 the
 // one-time presets notice names the project, and Choose… opens its tab at Workflow. The options are in groups (Review,
-// Checks, Merging, Where cards are built, Stages, Shown here, set elsewhere; None: Review, Checks, The work, Stages,
-// elsewhere), each worded as an outcome with one sentence on what it does and where its value comes from. Each preset
+// Checks, Merging, Where cards are built, Card loops, Stages; None: Review, Checks, The work, Card loops, Stages; File
+// locks and Card loops options since HI-1766, File locks shown with slots too), each worded as an outcome with one sentence on what it does and where its value comes from. Each preset
 // (and All off) previews what it sets and why, marking what it would change, before Use fills the form: Pair (the agent
 // merges), Pair (Hive merges, G9's checks and install), Team (#1361's note). A contradiction shows its reason under both
 // rows as it is chosen and keeps Save off; those the form can't reach are refused when pasted, as a save is. Save… lists
@@ -149,10 +149,10 @@ async function theForm(page, app, inv) {
     await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
 
     // --- The form as the upgrade left it: in groups, no preset, each option worded as an outcome with its origin.
-    check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'review', 'checks', 'merging', 'where', 'slots', 'stages', 'elsewhere']), JSON.stringify(await groups()))
+    check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'review', 'checks', 'merging', 'where', 'slots', 'loops', 'stages']), JSON.stringify(await groups()))
     const inGroup = async (g) => section.locator(`.workflow-group[data-group="${g}"] .workflow-option`).evaluateAll((els) => els.map((e) => e.getAttribute('data-option')))
-    const layout = { review: await inGroup('review'), checks: await inGroup('checks'), merging: await inGroup('merging'), where: await inGroup('where'), stages: await inGroup('stages') }
-    check('each group has its options (G4 and G17 in Review, G17 with a reviewer agent; G9 and G8 hidden while the agent doesn’t merge through Hive; G15 only with slots)', JSON.stringify(layout) === JSON.stringify({ review: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'], checks: ['preChecks'], merging: ['finish', 'style', 'target', 'dependenciesDone'], where: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning'], stages: ['stageNames'] }), JSON.stringify(layout))
+    const layout = { review: await inGroup('review'), checks: await inGroup('checks'), merging: await inGroup('merging'), where: await inGroup('where'), loops: await inGroup('loops'), stages: await inGroup('stages') }
+    check('each group has its options (G4 and G17 in Review, G17 with a reviewer agent; G9 and G8 hidden while the agent doesn’t merge through Hive; G15 only with slots)', JSON.stringify(layout) === JSON.stringify({ review: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'], checks: ['preChecks'], merging: ['finish', 'style', 'target', 'dependenciesDone'], where: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'], loops: ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes'], stages: ['stageNames'] }), JSON.stringify(layout))
     check('no Version control row: the header has the choice', (await section.locator('.workflow-platform').count()) === 0)
     check('no preset chosen', (await section.locator('.workflow-preset-now').innerText()).trim() === 'No preset chosen')
     check('every preset is offered, with All off', JSON.stringify(await section.locator('.workflow-choice').evaluateAll((els) => els.map((e) => e.getAttribute('data-choice')))) === JSON.stringify(['solo', 'pairAgent', 'pair', 'team', 'allOff']))
@@ -160,9 +160,11 @@ async function theForm(page, app, inv) {
     check('G1 in a shared folder reads “Work is reviewed before it’s done”', (await row('review').innerText()).startsWith('Work is reviewed before it’s done'), await row('review').innerText())
     check('G4 says what each value does', (await row('sameness').innerText()).includes('a pass carries over to a clean rebase or squash of the same change; with Exact revision only, any new revision makes it stale'), await row('sameness').innerText())
     check('the shared-folder warning shows with everyone in the project folder', (await row('sharedFolderWarning').count()) === 1)
-    check('Shown here, set elsewhere: the card loops’ rounds and wait, with a link', (await section.locator('.workflow-group[data-group="elsewhere"]').innerText()).includes('Rounds and wait'))
+    // Card loops (HI-1766): options of their own, from the defaults; File locks with them.
+    check('Card loops: the defaults, Default as their origin', (await row('loopRounds').locator('input').getAttribute('placeholder')) === '10' && (await row('loopWaitHours').locator('input').getAttribute('placeholder')) === '6 hours' && (await row('loopStepWaitMinutes').locator('input').getAttribute('placeholder')) === '30 minutes' && (await row('loopRounds').locator('.workflow-origin').innerText()).includes('Default'), await section.locator('.workflow-group[data-group="loops"]').innerText())
+    check('File locks: Block, with what it applies to', (await row('fileLocks').locator('select').inputValue()) === 'block' && (await row('fileLocks').locator('[data-note="file-locks"]').innerText()) === 'Applies to agents working in the same folder, outside a slot.')
     await themes('groups-top', section.locator('.workflow-group[data-group="review"]'))
-    await themes('groups-end', section.locator('.workflow-group[data-group="elsewhere"]'))
+    await themes('groups-end', section.locator('.workflow-group[data-group="loops"]'))
 
     // --- A preset's preview: what it sets and why, what it would change; Use fills the form.
     await choice('pairAgent').click()
@@ -281,6 +283,9 @@ async function theForm(page, app, inv) {
     await row('style').locator('select').selectOption('rebase')
     await themes('rebase', row('style'))
     await themes('hivemerges', row('mergeChecks'))
+    // File locks (HI-1766) stays with each card in a slot: agents can still share the project folder outside one.
+    check('File locks is shown with slots too, saying where it applies', (await row('folder').locator('select').inputValue()) === 'slots' && (await row('fileLocks').locator('[data-note="file-locks"]').count()) === 1)
+    await themes('filelocks-slots', row('fileLocks'))
     await row('mergeInstall').locator('select').selectOption('always')
     await saveAll()
     check('saved: Hive merges, the merge checks, the install and the push after merging, in project.json', !!(await lib.until(async () => saved().finish === 'hiveMerges' && JSON.stringify(saved().mergeChecks) === JSON.stringify(['typecheck', 'lint']) && saved().mergeInstall === 'always' && saved().pushTarget === true && saved().style === 'rebase', HUNG_MS)), JSON.stringify(saved()))
@@ -400,11 +405,14 @@ async function theForm(page, app, inv) {
     await page.getByText('notes', { exact: true }).first().click()
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
     await workflowTab.click()
-    check('None’s groups, in order', !!(await lib.until(async () => JSON.stringify(await groups()) === JSON.stringify(['presets', 'review', 'checks', 'work', 'stages', 'elsewhere']), HUNG_MS)), JSON.stringify(await groups()))
+    check('None’s groups, in order', !!(await lib.until(async () => JSON.stringify(await groups()) === JSON.stringify(['presets', 'review', 'checks', 'work', 'loops', 'stages']), HUNG_MS)), JSON.stringify(await groups()))
     const noneLayout = { review: await inGroup('review'), checks: await inGroup('checks'), work: await inGroup('work') }
-    check('…N1, N2 in Review, N3 in Checks, N4 and N6 in The work; N7 shown elsewhere', JSON.stringify(noneLayout) === JSON.stringify({ review: ['review', 'noSelfReview'], checks: ['preChecks'], work: ['excluded', 'dependenciesDone'] }) && (await section.locator('.workflow-group[data-group="elsewhere"]').innerText()).includes('File locks'), JSON.stringify(noneLayout))
+    check('…N1, N2 in Review, N3 in Checks, N4, N6 and N7 (File locks) in The work', JSON.stringify(noneLayout) === JSON.stringify({ review: ['review', 'noSelfReview'], checks: ['preChecks'], work: ['excluded', 'dependenciesDone', 'fileLocks'] }), JSON.stringify(noneLayout))
+    check('…and Card loops, as Git’s', JSON.stringify(await inGroup('loops')) === JSON.stringify(['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes']))
     check('…N1 reads “Who checks the work before it’s done”', (await row('review').innerText()).startsWith('Who checks the work before it’s done'))
     await themes('none', section.locator('.workflow-group[data-group="review"]'))
+    check('…its Card loops from the defaults, Default as their origin', (await row('loopWakes').locator('.workflow-origin').innerText()).includes('Default') && (await row('fileLocks').locator('.workflow-origin').innerText()).includes('Default'))
+    await themes('none-loops', section.locator('.workflow-group[data-group="loops"]'))
     const noneBase = { hiveWorkflow: 1, platform: 'none', preset: null, options: {} }
     const merging = await pasteIn({ ...noneBase, options: { finish: 'hiveMerges' } })
     check('None: a merge pasted is refused, merging needs Git', !!(await lib.until(async () => (await merging.innerText()).includes('Merging needs Git'), HUNG_MS)), await merging.innerText())

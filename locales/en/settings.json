@@ -1076,8 +1076,8 @@
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive: Hive tells a busy agent what has arrived in its inbox each time one of its tool calls ends."
   },
   "settings.advanced.hive.inbox.idleWakes.desc": {
-    "defaultMessage": "When something arrives in an idle agent's inbox, Hive types one short line into its terminal saying so, which wakes it. Card loops' wakes (Project Settings → Card loops → Wake reviewers and builders) and card watches' are such wakes. Turned off, nothing is typed for anything waiting: it stays in the inbox, the agent's pane shows how many, and its Deliver Now types the line once. A card started on an agent, or a task given to it now, is still typed. A project can set its own in Project Settings → Sessions.",
-    "description": "What the advanced setting \"Wake an idle agent\" does (Settings → Advanced, under Hive). Project Settings → Card loops → Wake reviewers and builders names a setting and Project Settings → Sessions a section, Deliver Now a menu item: use their names as Hive shows them."
+    "defaultMessage": "When something arrives in an idle agent's inbox, Hive types one short line into its terminal saying so, which wakes it. Card loops' wakes (the workflow option Wake reviewers and builders) and card watches' are such wakes. Turned off, nothing is typed for anything waiting: it stays in the inbox, the agent's pane shows how many, and its Deliver Now types the line once. A card started on an agent, or a task given to it now, is still typed. A project can set its own in Project Settings → Sessions.",
+    "description": "What the advanced setting \"Wake an idle agent\" does (Settings → Advanced, under Hive). Wake reviewers and builders names a workflow option and Project Settings → Sessions a section, Deliver Now a menu item: use their names as Hive shows them."
   },
   "settings.advanced.hive.inbox.idleWakes.title": {
     "defaultMessage": "Wake an idle agent",
@@ -1815,18 +1815,6 @@
     "defaultMessage": "Count background tasks for up to",
     "description": "A setting's title (Settings → Agents)."
   },
-  "settings.agents.fileLocks.desc": {
-    "defaultMessage": "What happens when an agent tries to edit a file another agent in the same folder is editing.",
-    "description": "What the setting \"File locks\" does, under its title (Settings → Agents)."
-  },
-  "settings.agents.fileLocks.tip": {
-    "defaultMessage": "An agent claims a file when it edits it and releases it when its turn ends (or after 15 minutes). Agents in their own worktrees never collide. Edits made through shell commands are not covered.",
-    "description": "The last paragraph of the info tip of the setting \"File locks\" (Settings → Agents), under a line per mode."
-  },
-  "settings.agents.fileLocks.title": {
-    "defaultMessage": "File locks",
-    "description": "A setting's title (Settings → Agents)."
-  },
   "settings.agents.leftoverProcesses.desc": {
     "defaultMessage": "What Hive does with processes an agent started that are still running when it stops, such as a preview server or a tail -f.",
     "description": "What the setting \"Processes left running\" does, under its title (Settings → Agents)."
@@ -2342,10 +2330,6 @@
   "settings.fallback.valueCell": {
     "defaultMessage": "{column} {n}",
     "description": "The name, for screen readers, of a box in a fallback list: the column and the row's number."
-  },
-  "settings.fileLocks.modeLine": {
-    "defaultMessage": "{mode}: {what}",
-    "description": "A line of the File locks setting's info tip: a mode's name and what it does."
   },
   "settings.general.closeToTray.desc": {
     "defaultMessage": "Closing the window keeps Hive running in the system tray so sessions continue.",
@@ -3091,6 +3075,10 @@
     "defaultMessage": "Settings → {assistant} → With {provider} → {title}",
     "description": "Where a field of the Assistant's settings with a provider is. {assistant} is the Assistant section's name, {provider} a coding agent's name."
   },
+  "settings.path.level": {
+    "defaultMessage": "Settings → {section} → {part} → {title}",
+    "description": "Where a workflow default is: Settings, its section (Version Control), its part (Hive defaults or Workspace defaults) and its title."
+  },
   "settings.path.project": {
     "defaultMessage": "Project Settings → {section} → {title}",
     "description": "Where a project's setting is: Project Settings, its section and its title."
@@ -3098,6 +3086,10 @@
   "settings.path.settings": {
     "defaultMessage": "Settings → {section} → {title}",
     "description": "Where a setting is: Settings, its section and its title. Settings is the name of the Settings view."
+  },
+  "settings.path.versionControl": {
+    "defaultMessage": "Version Control → Workflow → {title}",
+    "description": "Where a project's workflow option is: the project's Version Control tab, its Workflow section, and the option's title (glossary 2.1)."
   },
   "settings.permissionModes.modeLine": {
     "defaultMessage": "{mode}: {what}",
@@ -3227,18 +3219,6 @@
     "defaultMessage": "Default provider",
     "description": "A setting's title (Project Settings → General)."
   },
-  "settings.project.fileLocks.desc": {
-    "defaultMessage": "What happens when an agent tries to edit a file another agent in this project's folder is editing. Inherit uses Settings → Agents → File locks.",
-    "description": "What the setting \"File locks\" does, under its title (Project Settings → Agents)."
-  },
-  "settings.project.fileLocks.tip": {
-    "defaultMessage": "Applies to agents sharing a folder (agents in their own worktrees never collide). An agent claims a file when it edits it and releases it when its turn ends. Edits made through shell commands are not covered.",
-    "description": "The last paragraph of the info tip of the setting \"File locks\" (Project Settings → Agents), under a line per mode."
-  },
-  "settings.project.fileLocks.title": {
-    "defaultMessage": "File locks",
-    "description": "A setting's title (Project Settings → Agents)."
-  },
   "settings.project.inboxCheckpoints.desc": {
     "defaultMessage": "Hive tells a working agent of what arrives in its inbox at the end of its next tool call. Off: it isn't told until its turn ends or it is idle; nothing is lost.",
     "description": "What the setting \"Tell a working agent at the end of a tool\" does, under its title (Project Settings → Sessions)."
@@ -3290,54 +3270,6 @@
   "settings.project.keybindings.title": {
     "defaultMessage": "Shortcuts",
     "description": "A setting's title (Project Settings → Keyboard Shortcuts)."
-  },
-  "settings.project.loopRounds.desc": {
-    "defaultMessage": "How many rounds a card gets in this project's card loops before its agents stop and ask you, when you don't say. Empty inherits Settings → Workspace → Card loop rounds.",
-    "description": "What the setting \"Rounds\" does, under its title (Project Settings → Card loops)."
-  },
-  "settings.project.loopRounds.tip": {
-    "defaultMessage": "Saying \"rounds: 5\" when you start a loop still wins.",
-    "description": "The info tip of the setting \"Rounds\" (Project Settings → Card loops): more on what it does and when it applies."
-  },
-  "settings.project.loopRounds.title": {
-    "defaultMessage": "Rounds",
-    "description": "A setting's title (Project Settings → Card loops)."
-  },
-  "settings.project.loopStepWaitMinutes.desc": {
-    "defaultMessage": "How many minutes a card loop's builder waits for its reviewer to check a design it posted before it goes ahead as posted. Empty is 30.",
-    "description": "What the setting \"Design check wait (minutes)\" does, under its title (Project Settings → Card loops). A design: the plan a builder posts on its card for its reviewer to check before building."
-  },
-  "settings.project.loopStepWaitMinutes.tip": {
-    "defaultMessage": "A design left unchecked longer than this shows its card as stalled. Up to 4 hours.",
-    "description": "The info tip of the setting \"Design check wait (minutes)\" (Project Settings → Card loops): more on what it does and when it applies."
-  },
-  "settings.project.loopStepWaitMinutes.title": {
-    "defaultMessage": "Design check wait (minutes)",
-    "description": "A setting's title (Project Settings → Card loops)."
-  },
-  "settings.project.loopWaitHours.desc": {
-    "defaultMessage": "How many hours an agent in this project's card loops waits with no change before it tells you, when you don't say. Empty inherits Settings → Workspace → Card loop wait.",
-    "description": "What the setting \"Wait (hours)\" does, under its title (Project Settings → Card loops)."
-  },
-  "settings.project.loopWaitHours.tip": {
-    "defaultMessage": "Saying \"wait: 2h\" when you start a loop still wins. Up to a day.",
-    "description": "The info tip of the setting \"Wait (hours)\" (Project Settings → Card loops): more on what it does and when it applies."
-  },
-  "settings.project.loopWaitHours.title": {
-    "defaultMessage": "Wait (hours)",
-    "description": "A setting's title (Project Settings → Card loops)."
-  },
-  "settings.project.loopWakes.desc": {
-    "defaultMessage": "When a card with a reviewer arrives in Review, Hive wakes the reviewer; when the review gives its verdict, Hive wakes the card's builder. Off: only the agents' own card watches wake them.",
-    "description": "What the setting \"Wake reviewers and builders\" does, under its title (Project Settings → Card loops)."
-  },
-  "settings.project.loopWakes.tip": {
-    "defaultMessage": "A card's reviewer is the reviewer of a lane with the card, else the agent that last reviewed it: cards nobody reviews never wake anyone. An agent is only woken while it is idle, never by its own change, and not when its own card watch already tells it. These are idle wakes: with Sessions → Wake an idle agent off, none is typed, and the wake waits in the agent's inbox. It also ends an agent's card watch that can no longer fire: on a card merged (Done) since, or whose lane ended or was abandoned.",
-    "description": "The info tip of the setting \"Wake reviewers and builders\" (Project Settings → Card loops): more on what it does and when it applies."
-  },
-  "settings.project.loopWakes.title": {
-    "defaultMessage": "Wake reviewers and builders",
-    "description": "A setting's title (Project Settings → Card loops)."
   },
   "settings.project.metadata.desc": {
     "defaultMessage": "Stored in the project's .hive/project.json (excluded from git). Changes apply to new sessions; restart a running session to apply them.",
@@ -3391,10 +3323,6 @@
     "defaultMessage": "Warn when a transcript is over",
     "description": "A setting's title (Project Settings → Sessions)."
   },
-  "settings.project.workflow.moved": {
-    "defaultMessage": "Who reviews, which checks pass first and who merges: they are set in the project’s Version Control tab, under Workflow.",
-    "description": "What the setting \"Workflow options\" is, under its title (Project Settings → Workflow), beside its Open Version Control button. Version Control (the tab) and Workflow (its section): glossary 2.1."
-  },
   "settings.project.workflow.platform.desc": {
     "defaultMessage": "None or Git, from the next card: Git only where a Git repository is found and no other version control is. Each keeps its own workflow options.",
     "description": "What the setting \"Version control\" does (the project’s Version Control tab): switching applies from the next card; cards started keep their rules. None and Git: glossary 2.1."
@@ -3410,10 +3338,6 @@
   "settings.project.workflow.platform.title": {
     "defaultMessage": "Version control",
     "description": "A setting's title (the project's Version Control tab): None or Git (glossary 2.1)."
-  },
-  "settings.project.workflow.title": {
-    "defaultMessage": "Workflow options",
-    "description": "A setting's title (Project Settings → Workflow): the project's workflow options (glossary 2.1), a form of their own."
   },
   "settings.project.worktreeSetup.desc": {
     "defaultMessage": "Runs in a new worktree before its agent's first session, e.g. npm install. Its output shows in the agent's pane.",
@@ -3496,7 +3420,7 @@
     "description": "A section of Project Settings, in its list on the left."
   },
   "settings.projectSection.agents.desc": {
-    "defaultMessage": "The project’s agents, the settings of each CLI they run, and file locks between agents sharing a folder.",
+    "defaultMessage": "The project’s agents and the settings of each CLI they run.",
     "description": "Under the heading of the section \"Agents\" of Project Settings: what it holds."
   },
   "settings.projectSection.agents.label": {
@@ -3519,14 +3443,6 @@
     "defaultMessage": "Keyboard Shortcuts",
     "description": "A section of Project Settings, in its list on the left."
   },
-  "settings.projectSection.loops.desc": {
-    "defaultMessage": "How Hive helps agents that work through cards as builder and reviewer in this project.",
-    "description": "Under the heading of the section \"Card loops\" of Project Settings: what it holds."
-  },
-  "settings.projectSection.loops.label": {
-    "defaultMessage": "Card loops",
-    "description": "A section of Project Settings, in its list on the left."
-  },
   "settings.projectSection.provider.desc": {
     "defaultMessage": "Model, effort and permissions for this project’s {provider} agents. Agents can override these for themselves.",
     "description": "Under the heading of a provider's section of Project Settings: what it holds. {provider} is a coding agent's name."
@@ -3546,14 +3462,6 @@
   "settings.projectSection.storage.label": {
     "defaultMessage": "Storage",
     "description": "A section of Project Settings, in its list on the left."
-  },
-  "settings.projectSection.workflow.desc": {
-    "defaultMessage": "How work moves from Todo to Done in this project: who reviews it, which checks pass first, who merges it and where cards are built. A change applies from the next card.",
-    "description": "Under the heading of the section \"Workflow\" of Project Settings: what it holds."
-  },
-  "settings.projectSection.workflow.label": {
-    "defaultMessage": "Workflow",
-    "description": "A section of Project Settings, in its list on the left (glossary 2.1: workflow)."
   },
   "settings.provider.allowBackgroundSessions.desc": {
     "defaultMessage": "Let {provider}'s agent view move a session into its own background service. Applies to sessions started afterwards.",
@@ -3940,7 +3848,7 @@
     "description": "A section of Settings, in its list on the left."
   },
   "settings.section.agents.desc": {
-    "defaultMessage": "Defaults for every project’s agents: file locks between agents sharing a folder (projects can override them), how long background tasks count, and processes agents leave running.",
+    "defaultMessage": "Defaults for every project’s agents: how long background tasks count, and processes agents leave running.",
     "description": "Under the heading of the section \"Agents\" of Settings: what it holds."
   },
   "settings.section.agents.label": {
@@ -4024,15 +3932,15 @@
     "description": "A section of Settings, in its list on the left."
   },
   "settings.section.workflow.desc": {
-    "defaultMessage": "The workflow options every project starts from, in every workspace. A workspace’s defaults (Settings → Workspace) and a project’s own options (its Version Control tab) win over them.",
-    "description": "Under the heading of the section \"Workflow defaults\" of Settings: what it holds. Version Control is the tab’s name (glossary 2.1)."
+    "defaultMessage": "The workflow options projects start from: Hive defaults, for every workspace, and the open workspace’s over them. A project’s own options, in its Version Control tab, win over both.",
+    "description": "Under the heading of the section \"Version Control\" of Settings: what it holds. Hive defaults and the Version Control tab: names as Hive shows them (glossary 2.1)."
   },
   "settings.section.workflow.label": {
-    "defaultMessage": "Workflow defaults",
-    "description": "A section of Settings, in its list on the left: the workflow options every project inherits unless its workspace or itself sets them (glossary 2.1: workflow)."
+    "defaultMessage": "Version Control",
+    "description": "A section of Settings, in its list on the left: the workflow options projects start from, Hive’s and the open workspace’s (HI-1768). Named as a project’s Version Control tab (glossary 2.1)."
   },
   "settings.section.workspace.desc": {
-    "defaultMessage": "The open workspace's card loops, its projects that Hive leaves out (hidden, or removed from Hive with their handovers and cards packed into the folder), and how much Hive keeps for each project.",
+    "defaultMessage": "The open workspace's own: its projects that Hive leaves out (hidden, or removed from Hive with their handovers and cards packed into the folder), how much Hive keeps for each project, and antivirus scanning. Its workflow defaults are in Version Control.",
     "description": "Under the heading of the section \"Workspace\" of Settings: what it holds."
   },
   "settings.section.workspace.label": {
@@ -4459,13 +4367,33 @@
     "defaultMessage": "{name}'s token",
     "description": "The name, for screen readers, of a viewer token's box. {name} is the token's name."
   },
-  "settings.workflow.defaults.desc": {
-    "defaultMessage": "Pick a preset, or set each option, for None or for Git. Each shows where its value comes from.",
-    "description": "What the setting \"Hive’s workflow defaults\" does, under its title (Settings → Workflow defaults). None and Git: glossary 2.1."
+  "settings.workflow.hiveDefaults.desc": {
+    "defaultMessage": "For every workspace: what each project starts from unless its workspace or the project sets its own. Pick a preset, or set each option, for None or for Git.",
+    "description": "What the setting \"Hive defaults\" is, under its title (Settings → Version Control). None and Git: glossary 2.1."
   },
-  "settings.workflow.defaults.title": {
-    "defaultMessage": "Hive’s workflow defaults",
-    "description": "A setting's title (Settings → Workflow defaults): the workflow options every project inherits (glossary 2.1: workflow)."
+  "settings.workflow.hiveDefaults.tip": {
+    "defaultMessage": "Until 1.0’s settings tidy, Settings → Workflow defaults: nothing set there changed.",
+    "description": "The info tip of \"Hive defaults\" (Settings → Version Control): its old place, so a search for its old name finds it. Workflow defaults was the old section’s name: translate it as that section was."
+  },
+  "settings.workflow.hiveDefaults.title": {
+    "defaultMessage": "Hive defaults",
+    "description": "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)."
+  },
+  "settings.workflow.workspaceDefaults.desc": {
+    "defaultMessage": "For this workspace’s projects, over Hive defaults; a project sets its own in its Version Control tab.",
+    "description": "What the setting \"Workspace defaults\" is, under its title (Settings → Version Control). Hive defaults and the Version Control tab: names as Hive shows them."
+  },
+  "settings.workflow.workspaceDefaults.tip": {
+    "defaultMessage": "Until 1.0’s settings tidy, the workflow defaults in Settings → Workspace: nothing set there changed.",
+    "description": "The info tip of \"Workspace defaults\" (Settings → Version Control): its old place, so a search for it finds it."
+  },
+  "settings.workflow.workspaceDefaults.title": {
+    "defaultMessage": "Workspace defaults",
+    "description": "A setting's title (Settings → Version Control): the workflow options the open workspace's projects start from, over Hive defaults (HI-1768). The window shows the workspace's name beside it."
+  },
+  "settings.workflow.workspaceDefaultsNamed": {
+    "defaultMessage": "Workspace defaults ({workspace})",
+    "description": "The title of the part of Settings → Version Control holding the open workspace’s workflow defaults; {workspace} is its name."
   },
   "settings.workspace.antivirus.desc": {
     "defaultMessage": "Whether Microsoft Defender scans the workspace's folders as Hive's work changes them (builds, tests, git, worktrees), and the exclusions Hive can add for them, with your consent.",
@@ -4491,30 +4419,6 @@
     "defaultMessage": "Hidden and removed projects",
     "description": "A setting's title (Settings → Workspace)."
   },
-  "settings.workspace.loopRounds.desc": {
-    "defaultMessage": "How many rounds a card gets in a card loop (a build and its review each) before its agents stop and ask you, when you don't say. Projects can set their own.",
-    "description": "What the setting \"Card loop rounds\" does, under its title (Settings → Workspace)."
-  },
-  "settings.workspace.loopRounds.tip": {
-    "defaultMessage": "Saying \"rounds: 5\" when you start a loop still wins. Agents read this when they register the loop (its lane), so a change applies to loops started afterwards.",
-    "description": "The info tip of the setting \"Card loop rounds\" (Settings → Workspace): more on what it does and when it applies."
-  },
-  "settings.workspace.loopRounds.title": {
-    "defaultMessage": "Card loop rounds",
-    "description": "A setting's title (Settings → Workspace)."
-  },
-  "settings.workspace.loopWaitHours.desc": {
-    "defaultMessage": "How many hours an agent in a card loop waits with no change before it tells you, when you don't say. Projects can set their own.",
-    "description": "What the setting \"Card loop wait\" does, under its title (Settings → Workspace)."
-  },
-  "settings.workspace.loopWaitHours.tip": {
-    "defaultMessage": "Saying \"wait: 2h\" when you start a loop still wins. Up to a day. Agents read this when they register the loop (its lane), so a change applies to loops started afterwards.",
-    "description": "The info tip of the setting \"Card loop wait\" (Settings → Workspace): more on what it does and when it applies."
-  },
-  "settings.workspace.loopWaitHours.title": {
-    "defaultMessage": "Card loop wait",
-    "description": "A setting's title (Settings → Workspace)."
-  },
   "settings.workspace.storage.desc": {
     "defaultMessage": "What Hive keeps for each of the workspace's projects (the biggest first) and the Hive Assistant: transcript backups, archived sessions, attachments and worktrees. Storage opens a project's page, with Clean Up… and Purge…; Purge… here removes everything Hive keeps for the sessions of the whole workspace.",
     "description": "What the setting \"Storage\" does, under its title (Settings → Workspace). Clean Up… and Purge… are buttons: use their names as translated there."
@@ -4526,13 +4430,5 @@
   "settings.workspace.storage.title": {
     "defaultMessage": "Storage",
     "description": "A setting's title (Settings → Workspace)."
-  },
-  "settings.workspace.workflowDefaults.desc": {
-    "defaultMessage": "The workflow options this workspace’s projects start from, over Hive’s (Settings → Workflow defaults). A project’s own options win over them.",
-    "description": "What the setting \"Workflow defaults\" does, under its title (Settings → Workspace)."
-  },
-  "settings.workspace.workflowDefaults.title": {
-    "defaultMessage": "Workflow defaults",
-    "description": "A setting's title (Settings → Workspace): the workflow options this workspace's projects inherit (glossary 2.1: workflow)."
   }
 }

@@ -112,6 +112,14 @@ function setState(e: RestartEntry, state: RestartState, why?: string): void {
   e.changedAt = new Date().toISOString()
   if (why) e.why = why
   else delete e.why
+  for (const l of entryListeners) l(e.projectPath, e.agentId)
+}
+
+/** Told each change of an entry's state (HI-1746: a card's placement waiting for this run's resume of its builder). */
+const entryListeners = new Set<(projectPath: string, agentId: string) => void>()
+export function onResumeEntry(listener: (projectPath: string, agentId: string) => void): () => void {
+  entryListeners.add(listener)
+  return () => entryListeners.delete(listener)
 }
 
 const entryOf = (key: string): RestartEntry | undefined => record?.entries.find((e) => agentKey(e) === key)
@@ -492,7 +500,8 @@ async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancel
   const check = (ws: WorkspaceService): string | null => {
     const agent = ws.info()?.projects.find((p) => samePlace(p.path, e.projectPath))?.agents.find((a) => a.id === e.agentId)
     if (!agent) return 'removed'
-    if (sessions.liveFor(e.projectPath, e.agentId)) return 'running'
+    // A start of it under way (a card's placement resuming it, HI-1746) counts too: its own start would be refused.
+    if (sessions.liveFor(e.projectPath, e.agentId) || sessions.pendingStart(e.projectPath, e.agentId)) return 'running'
     if (agent.lastSessionId && agent.lastSessionId !== e.sessionId) return 'movedOn'
     return null
   }

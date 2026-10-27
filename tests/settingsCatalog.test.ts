@@ -143,7 +143,7 @@ describe('the settings catalog', () => {
   it("marks what the Assistant can't change: permissions, what runs, the Agent API, its own settings", () => {
     const ro = (id: string) => !!entry(id).sensitive
     for (const id of ['agentApi.enabled', 'agentApi.port', 'agentApi.allowSessionInput', 'agentApi.provideHiveMcp', 'assistant.control', 'assistant.typingPause', 'claude-code.defaultPermissionMode', 'claude-code.enableDangerousMode', 'claude-code.executablePath', 'codex.extraArgs', 'project.claude-code.permissionMode', 'project.codex.extraArgs', 'project.worktreeSetup', 'claude-code.allowBackgroundSessions']) expect(ro(id), id).toBe(true)
-    for (const id of ['general.progressPanel', 'sessions.transcriptWarnMB', 'agents.fileLocks', 'claude-code.defaultModel', 'project.compactSuggestTokens', 'assistant.panelSide', 'assistant.compactSuggestTokens']) expect(ro(id), id).toBe(false)
+    for (const id of ['general.progressPanel', 'sessions.transcriptWarnMB', 'workflow.git.fileLocks', 'claude-code.defaultModel', 'project.compactSuggestTokens', 'assistant.panelSide', 'assistant.compactSuggestTokens']) expect(ro(id), id).toBe(false)
     expect(entry('assistant.control').readOnly).toMatch(/only the user can change it, in Settings → Assistant → Control/)
   })
 

@@ -3,7 +3,7 @@
 // works and is typed once it is idle; an agent whose own watch tells it gets one line, not two (a builder waiting for
 // Passed alone still hears of a failed verdict); a wake waiting while the lane's reviewer changes goes to the new one;
 // one waiting while its round is reviewed and failed is dropped;
-// a card nobody reviews wakes no one; a project that turned it off (Project Settings → Card loops) wakes no one. Each wake is noted on its
+// a card nobody reviews wakes no one; a project that turned it off (its workflow option Wake reviewers and builders, HI-1766) wakes no one. Each wake is noted on its
 // card. #1475: a blocked lane card's news (its builder's comment) wakes a lane watch, and a lane abandoned ends its
 // reviewer's card watch, leaving it idle for a new conversation. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -178,15 +178,15 @@ const check = (name, ok, extra = '') => {
   check('a card with no reviewer wakes no one', wakes('Reviewer').length === 3, JSON.stringify(wakes('Reviewer').slice(3)))
 
   // Turned off for the project: a lane card arriving in Review wakes no one.
-  await inv('project:updateConfig', alpha, { loopWakes: false })
+  await lib.setOwnOptions(inv, alpha, { loopWakes: false })
   await say(builder.id, `boardmove ${c3} review`)
   await until(async () => (await card(c3))?.column === 'review', 10000)
   await lib.sleep(3000) // A fixed wait on purpose: this checks that nothing comes.
-  check('turned off in Project Settings: no one is woken', wakes('Reviewer').length === 3 && wakes('Other').length === 1 && !(await said(c3)).some((x) => x.startsWith('Hive: Woke')), JSON.stringify({ wakes: [...wakes('Reviewer').slice(3), ...wakes('Other').slice(1)], history: await said(c3) }))
+  check('turned off in its options: no one is woken', wakes('Reviewer').length === 3 && wakes('Other').length === 1 && !(await said(c3)).some((x) => x.startsWith('Hive: Woke')), JSON.stringify({ wakes: [...wakes('Reviewer').slice(3), ...wakes('Other').slice(1)], history: await said(c3) }))
 
   // #1475, on again: a blocked card's news wakes a lane watch, and a lane abandoned ends its reviewer's card watch, which
   // leaves it idle for the next lane's prompt in a new conversation.
-  await inv('project:updateConfig', alpha, { loopWakes: true })
+  await lib.setOwnOptions(inv, alpha, { loopWakes: undefined })
   await until(() => idle(builder.id), 15000)
   const c7 = await newCard('Seventh')
   const n7 = await named(c7)

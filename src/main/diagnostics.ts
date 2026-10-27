@@ -129,7 +129,7 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     '',
     '### Settings',
     '',
-    `- File locks: ${s.agents.fileLocks}; background task limit: ${s.agents.backgroundTaskMinutes} min; leftover processes: ${s.agents.leftoverProcesses}`,
+    `- Background task limit: ${s.agents.backgroundTaskMinutes} min; leftover processes: ${s.agents.leftoverProcesses}`,
     `- Agents' processes: ${process.platform !== 'win32' ? 'not tracked (Windows only)' : trackingProblem() ? `not tracked: ${trackingProblem()}` : 'tracked'}${trackingLost() ? `; earlier, ${trackingLost()}` : ''}`,
     `- Confirm before quitting: ${s.general.confirmOnQuit}; close to tray: ${s.general.closeToTray ? 'on' : 'off'}; minimise to tray: ${s.general.minimizeToTray ? 'on' : 'off'}; keep the PC awake: ${s.general.keepAwake}`,
     `- Transcript backups: ${s.sessions.backupTranscripts ? 'on' : 'off'}; cache TTL: ${s.sessions.cacheTtl}; Overview refresh: ${s.sessions.overviewRefresh}`,

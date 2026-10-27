@@ -6,7 +6,7 @@
 
 import type { PlatformId } from '../platform/descriptors'
 import type { ProjectConfig } from '../types'
-import type { PresetId } from './options'
+import { PREFERENCE_OPTIONS, type PresetId } from './options'
 import { agentWorkflowRole, reviewsWork, type WorkflowRole } from './roles'
 
 /**
@@ -18,7 +18,8 @@ export function asksPreset(cfg: Pick<ProjectConfig, 'workflow' | 'platform'>, pl
   if (cfg.platform === undefined) return false
   const wf = cfg.workflow
   if (!wf || wf.platform !== platform) return true
-  return !wf.preset && !Object.keys(wf.options ?? {}).length && !wf.presetAsked
+  // Card loops and file locks (HI-1766) aren't a way of working: a project with only those has chosen none.
+  return !wf.preset && !Object.keys(wf.options ?? {}).some((k) => !(PREFERENCE_OPTIONS as readonly string[]).includes(k)) && !wf.presetAsked
 }
 
 /**

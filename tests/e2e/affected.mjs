@@ -140,7 +140,9 @@ export const AREAS = [
   // Cost per card and per lane (#602): the holds, the minutes the parsers give, the card's line, the lane's hover, Performance's Cards.
   { paths: ['src/main/cardCosts.ts', 'src/shared/cardCosts.ts', 'src/shared/usageTimeline.ts', 'src/renderer/src/components/CardCost.tsx', 'src/renderer/src/views/PerformanceCards.tsx', 'src/main/providers/claude/usage.ts', 'src/main/providers/codex/rollout.ts', 'src/main/providers/copilot/events.ts'], suites: ['cardcost', 'unpricedcost', 'overview'] },
   { paths: ['src/main/metrics.ts', 'src/main/metricsUsage.ts', 'src/shared/metrics.ts', 'src/shared/metricsView.ts', 'src/renderer/src/views/Performance.tsx'], suites: ['performance', 'perfcompare', 'bridgereport', 'perftable', 'cardcost'] },
-  { paths: ['src/main/branchWatch.ts', 'src/main/git.ts', 'src/main/gitWorker.ts', 'src/main/worktrees.ts'], suites: ['unmerged', 'agents', 'changes', 'paneheader', 'claude-real', 'wsmove', 'wtrecreate', 'removeall', 'gitmissing', 'unusedwt', 'changespicker', 'gitview', 'isolatedcheck', 'p6rules', 'queuecard'] },
+  { paths: ['src/main/branchWatch.ts', 'src/main/git.ts', 'src/main/worktrees.ts'], suites: ['unmerged', 'agents', 'changes', 'paneheader', 'claude-real', 'wsmove', 'wtrecreate', 'removeall', 'gitmissing', 'unusedwt', 'changespicker', 'gitview'] },
+  // git.ts's processes, started off main's thread (HI-1783): git.ts's suites.
+  { paths: ['src/main/gitWorker.ts'], suites: ['unmerged', 'agents', 'changes', 'paneheader', 'claude-real', 'wsmove', 'wtrecreate', 'removeall', 'gitmissing', 'unusedwt', 'changespicker', 'gitview'] },
   // Git missing or too old (#346): Agent Setup's Git row, the status bar and every git-dependent screen.
   { paths: ['src/main/gitTool.ts', 'src/shared/gitTool.ts'], suites: ['gitmissing', 'providers'] },
   // The Git view (#607): the Git tab's sections and the status bar's item.
@@ -281,7 +283,7 @@ export const AREAS = [
   { paths: ['src/main/providerService.ts', 'src/main/taskKeys.ts'], suites: ['providers', 'codex-setup', 'startfail', 'models', 'testedclis', 'freshpath', 'providerdetect'] },
   { paths: ['src/main/keySteps.ts'], suites: ['codex', 'codex-setup'] },
   { paths: ['src/main/rendererWatch.ts'], suites: ['rendercrash', 'windowhealth'] },
-  { paths: ['src/shared/windowHealth.ts', 'src/renderer/src/windowHealth.ts'], suites: ['windowhealth'] },
+  { paths: ['src/shared/windowHealth.ts', 'src/renderer/src/windowHealth.ts', 'src/renderer/src/pageMarks.ts'], suites: ['windowhealth'] },
   // Why Hive stopped (#985): crash dumps and a log line for every way out; the updater and install-folder checks end the app through it.
   // Hive closing unexpectedly (#984): the running marker, the notice, Resume All and the setting; a merge left half done is told in it.
   { paths: ['src/main/lastRun.ts', 'src/shared/unexpectedClose.ts', 'src/main/mergeSlotHost.ts', 'src/main/mergeSlots.ts', 'tests/e2e/unexpectedclose.cjs', 'tests/e2e/unexpectedclose-leftovers.cjs'], suites: ['unexpectedclose', 'unexpectedclose-leftovers', 'restartresume'] },
@@ -388,6 +390,7 @@ export const AREAS = [
   { paths: ['src/renderer/src/views/OtherViews.tsx'], suites: ['about', 'skills', 'drafts', 'windows', 'recent', 'welcomefit'] },
   { paths: ['tests/e2e/slotoptions.cjs', 'src/renderer/src/components/SlotsAndCopies.tsx', 'src/main/slotSettings.ts','src/main/workflow/slotsUpToDateStep.ts', 'src/main/workflow/optionsForm.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'src/shared/workflow/options.ts', 'src/shared/workflow/optionTexts.ts'], suites: ['slotoptions'] },
   { paths: ['src/shared/slotDefaults.ts', 'src/renderer/src/workflowOrigins.ts'], suites: ['slotoptions', 'workflowdefaults'] },
+  { paths: ['src/shared/loopLimits.ts', 'src/shared/workflow/preferences.ts', 'src/main/workflow/preferences.ts'], suites: ['workflowoptions', 'workflowdefaults', 'cardloop', 'loopwakes', 'p7settings'] },
   { paths: ['src/main/workflow/optionsForm.ts', 'src/main/workflow/rulesets.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'src/shared/workflow/options.ts', 'src/shared/workflow/optionTexts.ts', 'tests/e2e/workflowoptions.cjs'], suites: ['workflowoptions', 'assistantsettings', 'workflowdefaults'] },
   { paths: ['src/main/workflow/levels.ts', 'src/renderer/src/views/SettingsView.tsx'], suites: ['workflowdefaults', 'workflowoptions', 'assistantsettings'] },
   { paths: ['src/renderer/src/boardStages.ts', 'src/renderer/src/components/BoardWorkflow.tsx', 'src/renderer/src/components/Board.tsx', 'src/shared/workflow/stages.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/boardstages.cjs'], suites: ['boardstages'] },

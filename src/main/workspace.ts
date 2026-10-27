@@ -10,9 +10,9 @@ import type { BrowserWindow } from 'electron'
 import chokidar, { type FSWatcher } from 'chokidar'
 import { ASSISTANT_DIR, ASSISTANT_NAME, LEGACY_MODES_DIR, MODES_DIR, assistantProjectConfig } from '../shared/assistant'
 import { DEFAULT_PROJECT_CONFIG, DEFAULT_WORKSPACE_CONFIG, HIVE_DIR, mergeDefaults, migrateProjectConfig, projectAgents, withLegacyProjectFields, withoutSkillSwitches } from '../shared/defaults'
+import { migrateWorkspacePreferences } from '../shared/workflow/preferences'
 import { settlePlacements } from '../shared/paneCells'
 import { migratedProjectMcp, migratedWorkspaceMcp } from '../shared/agentMcp'
-import { LANE_MAX_ROUNDS, LOOP_WAIT_MAX_HOURS } from '../shared/lanes'
 import { advancedDef, checkAdvanced } from '../shared/advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { HiveError, hiveError } from './hiveError'
@@ -34,6 +34,7 @@ import type { ProjectPlatform } from '../shared/platform/descriptors'
 import { gitProblem } from './gitTool'
 import { duplicateAgentNames, suggestAgentName } from '../shared/agentNames'
 import { NO_PROJECT_IDS, isProjectId, settleProjectIds, type ProjectIdEntry, type ProjectIdIndex } from '../shared/projectIds'
+import { migrateProjectPreferences } from '../shared/workflow/preferences'
 
 const log = createLogger('workspace')
 
@@ -373,7 +374,7 @@ export class WorkspaceService {
     }
     const fresh = !existsSync(join(abs, HIVE_DIR))
     await this.ensureWorkspaceStructure()
-    this.wsConfig = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), withoutSkillSwitches(await readKeptJson(join(this.hiveDir, 'workspace.json'), {})))
+    this.wsConfig = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), migrateWorkspacePreferences(withoutSkillSwitches(await readKeptJson(join(this.hiveDir, 'workspace.json'), {}))))
     const last = this.wsConfig.lastPath
     this.movedFrom = last && resolve(last).toLowerCase() !== abs.toLowerCase() ? resolve(last) : null
     config.update((c) => {
@@ -719,7 +720,7 @@ export class WorkspaceService {
     const text = await readFile(file, 'utf8').catch(() => '')
     // Hive's own save, or a save started meanwhile (its settings are newer), or another workspace opened since.
     if (text === this.configWritten || this.configSaves || generation !== this.generation) return
-    this.wsConfig = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), withoutSkillSwitches(await readKeptJson(file, {})))
+    this.wsConfig = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), migrateWorkspacePreferences(withoutSkillSwitches(await readKeptJson(file, {}))))
     this.emit({ type: 'skills-changed' })
     this.scheduleRefresh()
   }
@@ -905,20 +906,6 @@ export class WorkspaceService {
   hiddenProjects(): (HiddenProject & { present: boolean })[] {
     if (!this.path) return []
     return (this.wsConfig.hiddenProjects ?? []).map((h) => ({ ...h, present: existsSync(join(this.path!, h.name)) }))
-  }
-
-  /**
-   * Sets the workspace's card-loop rounds and wait in hours (#412, Settings → Workspace): a value given replaces its own,
-   * one left out stays. Saved in workspace.json; the window hears of it as a workspace change.
-   */
-  async setLoops(patch: { rounds?: number; waitHours?: number }): Promise<void> {
-    if (!this.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
-    const whole = (v: unknown, max: number): boolean => v === undefined || (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= max)
-    if (!whole(patch.rounds, LANE_MAX_ROUNDS)) throw hiveError(msg({ id: 'service.workspace.loopRounds', defaultMessage: 'Card loop rounds take a whole number from 1 to {max}.', description: "An error in Settings → Workspace: a card loop's rounds (how many reviews a card gets before the user is asked) must be a whole number from 1 to {max}." }), { max: LANE_MAX_ROUNDS })
-    if (!whole(patch.waitHours, LOOP_WAIT_MAX_HOURS)) throw hiveError(msg({ id: 'service.workspace.loopWait', defaultMessage: 'Card loop wait takes a whole number of hours from 1 to {max}.', description: "An error in Settings → Workspace: a card loop's wait (hours with no change before the user is told) must be a whole number from 1 to {max}." }), { max: LOOP_WAIT_MAX_HOURS })
-    this.wsConfig.loops = { ...this.wsConfig.loops, ...(patch.rounds !== undefined ? { rounds: patch.rounds } : {}), ...(patch.waitHours !== undefined ? { waitHours: patch.waitHours } : {}) }
-    await this.saveWorkspaceConfig()
-    this.scheduleRefresh()
   }
 
   /** Sets the workspace's own value of an advanced setting a workspace can set (#367), or removes it (null: Hive's again). */
@@ -1182,6 +1169,10 @@ export class WorkspaceService {
         // The agents changed: each layout's pane placement takes in those added and lets go of those removed (#762), so
         // every agent keeps its cell (not one worked out again from the order on each read).
         if ('agents' in patch && updated.placement) updated = { ...updated, placement: settlePlacements(updated.placement, projectAgents(updated).map((a) => a.id)) }
+        // Card loops and file locks from before HI-1766 (HR5's round 1): once the project has workflow options, any old
+        // keys left move into them in this same write (a value there wins) and go, so none can come back after it; a
+        // patch that consumed them (LEGACY_CONSUMED) leaves nothing to move.
+        updated = migrateProjectPreferences(updated)
         // The view (HI-1749) to this user's UI state, saved a moment later and on quit; project.json only for a change of
         // the config, written without the view (one from before moves out as it is written).
         this.keepView(projectPath, updated)

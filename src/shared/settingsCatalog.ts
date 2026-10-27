@@ -13,7 +13,7 @@
  */
 import type { AppSettings, ProjectConfig, ProviderId, WorkflowLevel, WorkspaceConfig } from './types'
 import type { PlatformId } from './platform/descriptors'
-import { LANE_MAX_ROUNDS, LOOP_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_HOURS, LOOP_WAIT_MAX_HOURS, loopDefaults } from './lanes'
+import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from './loopLimits'
 import { DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, FILE_LOCK_MODES, SLOT_COPY_DEFAULT } from './defaults'
 import { SLOT_COPY_TEXT } from './slotDefaults'
 import { PRICES_CHECKED } from './prices'
@@ -26,6 +26,7 @@ import { writeWorkflow } from './workflow/projectWorkflow'
 import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
 import { AUTO_PROVIDER, DEFAULT_PROJECT_PROVIDER, PROVIDERS, dangerModes, defaultProviderSettings, modeOption, permissionLabel, projectProviderConfig, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
+import { LEGACY_CONSUMED, ownOrLegacy } from './workflow/preferences'
 
 /** Where a setting lives: Hive's own (Settings), a provider's page in Settings, the open workspace, or one project (Project Settings). */
 export type SettingScope = 'app' | 'provider' | 'workspace' | 'project'
@@ -237,10 +238,10 @@ export const SETTINGS_SECTIONS: SettingsSectionInfo<SettingsSection>[] = [
   sectionInfo('notifications', msg({ id: 'settings.section.notifications.label', defaultMessage: 'Notifications', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.notifications.desc', defaultMessage: 'Chimes and desktop notifications when agents finish or need you.', description: 'Under the heading of the section "Notifications" of Settings: what it holds.' })),
   sectionInfo('sessions', msg({ id: 'settings.section.sessions.label', defaultMessage: 'Sessions', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.sessions.desc', defaultMessage: 'Transcript backups, cache estimates and session behaviour.', description: 'Under the heading of the section "Sessions" of Settings: what it holds.' })),
   sectionInfo('assistant', msg({ id: 'settings.section.assistant.label', defaultMessage: 'Assistant', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.assistant.desc', defaultMessage: "The Hive Assistant's defaults: the side panel's overseer of each workspace (Ctrl+Alt+I). Each workspace can change them in the panel's Assistant Settings.", description: 'Under the heading of the section "Assistant" of Settings: what it holds.' })),
-  sectionInfo('workspace', msg({ id: 'settings.section.workspace.label', defaultMessage: 'Workspace', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.workspace.desc', defaultMessage: "The open workspace's card loops, its projects that Hive leaves out (hidden, or removed from Hive with their handovers and cards packed into the folder), and how much Hive keeps for each project.", description: 'Under the heading of the section "Workspace" of Settings: what it holds.' })),
+  sectionInfo('workspace', msg({ id: 'settings.section.workspace.label', defaultMessage: 'Workspace', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.workspace.desc', defaultMessage: "The open workspace's own: its projects that Hive leaves out (hidden, or removed from Hive with their handovers and cards packed into the folder), how much Hive keeps for each project, and antivirus scanning. Its workflow defaults are in Version Control.", description: 'Under the heading of the section "Workspace" of Settings: what it holds.' })),
   sectionInfo('board', msg({ id: 'settings.section.board.label', defaultMessage: 'Board', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.board.desc', defaultMessage: "The task board's colours and housekeeping, the same in every workspace.", description: 'Under the heading of the section "Board" of Settings: what it holds.' })),
-  sectionInfo('workflow', msg({ id: 'settings.section.workflow.label', defaultMessage: 'Workflow defaults', description: 'A section of Settings, in its list on the left: the workflow options every project inherits unless its workspace or itself sets them (glossary 2.1: workflow).' }), msg({ id: 'settings.section.workflow.desc', defaultMessage: 'The workflow options every project starts from, in every workspace. A workspace’s defaults (Settings → Workspace) and a project’s own options (its Version Control tab) win over them.', description: 'Under the heading of the section "Workflow defaults" of Settings: what it holds. Version Control is the tab’s name (glossary 2.1).' })),
-  sectionInfo('agents', msg({ id: 'settings.section.agents.label', defaultMessage: 'Agents', description: 'A section of Settings, in its list on the left: defaults for every project’s agents.' }), msg({ id: 'settings.section.agents.desc', defaultMessage: 'Defaults for every project’s agents: file locks between agents sharing a folder (projects can override them), how long background tasks count, and processes agents leave running.', description: 'Under the heading of the section "Agents" of Settings: what it holds.' })),
+  sectionInfo('workflow', msg({ id: 'settings.section.workflow.label', defaultMessage: 'Version Control', description: 'A section of Settings, in its list on the left: the workflow options projects start from, Hive’s and the open workspace’s (HI-1768). Named as a project’s Version Control tab (glossary 2.1).' }), msg({ id: 'settings.section.workflow.desc', defaultMessage: 'The workflow options projects start from: Hive defaults, for every workspace, and the open workspace’s over them. A project’s own options, in its Version Control tab, win over both.', description: 'Under the heading of the section "Version Control" of Settings: what it holds. Hive defaults and the Version Control tab: names as Hive shows them (glossary 2.1).' })),
+  sectionInfo('agents', msg({ id: 'settings.section.agents.label', defaultMessage: 'Agents', description: 'A section of Settings, in its list on the left: defaults for every project’s agents.' }), msg({ id: 'settings.section.agents.desc', defaultMessage: 'Defaults for every project’s agents: how long background tasks count, and processes agents leave running.', description: 'Under the heading of the section "Agents" of Settings: what it holds.' })),
   sectionInfo('keybindings', msg({ id: 'settings.section.keybindings.label', defaultMessage: 'Keyboard Shortcuts', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.keybindings.desc', defaultMessage: 'Change, remove or add shortcuts for any command. Projects can set their own for project and session commands (Project Settings → Keyboard Shortcuts).', description: 'Under the heading of the section "Keyboard Shortcuts" of Settings: what it holds.' })),
   sectionInfo('agentApi', msg({ id: 'settings.section.agentApi.label', defaultMessage: 'Agent API', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.agentApi.desc', defaultMessage: 'Local API and built-in MCP server that let agents interact with Hive.', description: 'Under the heading of the section "Agent API" of Settings: what it holds.' })),
   sectionInfo('advanced', msg({ id: 'settings.section.advanced.label', defaultMessage: 'Advanced', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.advanced.desc', defaultMessage: 'Developer features, the details Hive relies on that a CLI update can break (advanced.json), logs, data and resetting Hive.', description: 'Under the heading of the section "Advanced" of Settings: what it holds.' }))
@@ -330,28 +331,6 @@ const APP_ROWS: Row[] = [
   // Workspace
   {
     section: 'workspace',
-    key: 'loopRounds',
-    title: msg({ id: 'settings.workspace.loopRounds.title', defaultMessage: 'Card loop rounds', description: "A setting's title (Settings → Workspace)." }),
-    desc: msg({ id: 'settings.workspace.loopRounds.desc', defaultMessage: "How many rounds a card gets in a card loop (a build and its review each) before its agents stop and ask you, when you don't say. Projects can set their own.", description: 'What the setting "Card loop rounds" does, under its title (Settings → Workspace).' }),
-    tip: msg({ id: 'settings.workspace.loopRounds.tip', defaultMessage: 'Saying "rounds: 5" when you start a loop still wins. Agents read this when they register the loop (its lane), so a change applies to loops started afterwards.', description: 'The info tip of the setting "Card loop rounds" (Settings → Workspace): more on what it does and when it applies.' }),
-    type: 'number',
-    min: 1,
-    max: LANE_MAX_ROUNDS,
-    step: 1
-  },
-  {
-    section: 'workspace',
-    key: 'loopWaitHours',
-    title: msg({ id: 'settings.workspace.loopWaitHours.title', defaultMessage: 'Card loop wait', description: "A setting's title (Settings → Workspace)." }),
-    desc: msg({ id: 'settings.workspace.loopWaitHours.desc', defaultMessage: "How many hours an agent in a card loop waits with no change before it tells you, when you don't say. Projects can set their own.", description: 'What the setting "Card loop wait" does, under its title (Settings → Workspace).' }),
-    tip: msg({ id: 'settings.workspace.loopWaitHours.tip', defaultMessage: 'Saying "wait: 2h" when you start a loop still wins. Up to a day. Agents read this when they register the loop (its lane), so a change applies to loops started afterwards.', description: 'The info tip of the setting "Card loop wait" (Settings → Workspace): more on what it does and when it applies.' }),
-    type: 'number',
-    min: 1,
-    max: LOOP_WAIT_MAX_HOURS,
-    step: 1
-  },
-  {
-    section: 'workspace',
     key: 'hiddenProjects',
     title: msg({ id: 'settings.workspace.hiddenProjects.title', defaultMessage: 'Hidden and removed projects', description: "A setting's title (Settings → Workspace)." }),
     desc: msg({ id: 'settings.workspace.hiddenProjects.desc', defaultMessage: 'Restore one to bring it back with its cards (and, for a removed one, the handovers packed into its folder). A folder that has left the workspace can be forgotten.', description: 'What the setting "Hidden and removed projects" does, under its title (Settings → Workspace).' }),
@@ -378,36 +357,24 @@ const APP_ROWS: Row[] = [
     wide: true
   },
   {
-    section: 'workspace',
-    key: 'workflowDefaults',
-    title: msg({ id: 'settings.workspace.workflowDefaults.title', defaultMessage: 'Workflow defaults', description: "A setting's title (Settings → Workspace): the workflow options this workspace's projects inherit (glossary 2.1: workflow)." }),
-    desc: msg({ id: 'settings.workspace.workflowDefaults.desc', defaultMessage: 'The workflow options this workspace’s projects start from, over Hive’s (Settings → Workflow defaults). A project’s own options win over them.', description: 'What the setting "Workflow defaults" does, under its title (Settings → Workspace).' }),
+    section: 'workflow',
+    key: 'defaults',
+    title: msg({ id: 'settings.workflow.hiveDefaults.title', defaultMessage: 'Hive defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)." }),
+    desc: msg({ id: 'settings.workflow.hiveDefaults.desc', defaultMessage: 'For every workspace: what each project starts from unless its workspace or the project sets its own. Pick a preset, or set each option, for None or for Git.', description: 'What the setting "Hive defaults" is, under its title (Settings → Version Control). None and Git: glossary 2.1.' }),
+    tip: msg({ id: 'settings.workflow.hiveDefaults.tip', defaultMessage: 'Until 1.0’s settings tidy, Settings → Workflow defaults: nothing set there changed.', description: 'The info tip of "Hive defaults" (Settings → Version Control): its old place, so a search for its old name finds it. Workflow defaults was the old section’s name: translate it as that section was.' }),
     type: 'custom',
     wide: true
   },
   {
     section: 'workflow',
-    key: 'defaults',
-    title: msg({ id: 'settings.workflow.defaults.title', defaultMessage: 'Hive’s workflow defaults', description: "A setting's title (Settings → Workflow defaults): the workflow options every project inherits (glossary 2.1: workflow)." }),
-    desc: msg({ id: 'settings.workflow.defaults.desc', defaultMessage: 'Pick a preset, or set each option, for None or for Git. Each shows where its value comes from.', description: 'What the setting "Hive’s workflow defaults" does, under its title (Settings → Workflow defaults). None and Git: glossary 2.1.' }),
+    key: 'workspaceDefaults',
+    title: msg({ id: 'settings.workflow.workspaceDefaults.title', defaultMessage: 'Workspace defaults', description: "A setting's title (Settings → Version Control): the workflow options the open workspace's projects start from, over Hive defaults (HI-1768). The window shows the workspace's name beside it." }),
+    desc: msg({ id: 'settings.workflow.workspaceDefaults.desc', defaultMessage: 'For this workspace’s projects, over Hive defaults; a project sets its own in its Version Control tab.', description: 'What the setting "Workspace defaults" is, under its title (Settings → Version Control). Hive defaults and the Version Control tab: names as Hive shows them.' }),
+    tip: msg({ id: 'settings.workflow.workspaceDefaults.tip', defaultMessage: 'Until 1.0’s settings tidy, the workflow defaults in Settings → Workspace: nothing set there changed.', description: 'The info tip of "Workspace defaults" (Settings → Version Control): its old place, so a search for it finds it.' }),
     type: 'custom',
     wide: true
   },
   // Agents
-  {
-    section: 'agents',
-    key: 'fileLocks',
-    title: msg({ id: 'settings.agents.fileLocks.title', defaultMessage: 'File locks', description: "A setting's title (Settings → Agents)." }),
-    desc: msg({ id: 'settings.agents.fileLocks.desc', defaultMessage: 'What happens when an agent tries to edit a file another agent in the same folder is editing.', description: 'What the setting "File locks" does, under its title (Settings → Agents).' }),
-    // A line per mode, then a paragraph: messages keep no line breaks (extraction folds them), so the lines are parts.
-    tip: linesOf([
-      ...FILE_LOCK_MODES.map((m) => withValues(msg({ id: 'settings.fileLocks.modeLine', defaultMessage: '{mode}: {what}', description: 'A line of the File locks setting\'s info tip: a mode\'s name and what it does.' }), { mode: m.text.label, what: m.text.description })),
-      '',
-      msg({ id: 'settings.agents.fileLocks.tip', defaultMessage: 'An agent claims a file when it edits it and releases it when its turn ends (or after 15 minutes). Agents in their own worktrees never collide. Edits made through shell commands are not covered.', description: 'The last paragraph of the info tip of the setting "File locks" (Settings → Agents), under a line per mode.' })
-    ]),
-    type: 'select',
-    options: FILE_LOCK_MODES.map((m) => ({ value: m.value, label: m.text.label }))
-  },
   { section: 'board', key: 'archiveDoneDays', title: msg({ id: 'settings.board.archiveDoneDays.title', defaultMessage: 'Archive Done cards after', description: "A setting's title (Settings → Board)." }), desc: msg({ id: 'settings.board.archiveDoneDays.desc', defaultMessage: 'Days a card stays in Done before Hive archives it.', description: 'What the setting "Archive Done cards after" does, under its title (Settings → Board).' }), tip: msg({ id: 'settings.board.archiveDoneDays.tip', defaultMessage: "Counted from when the card last went into Done (or was brought back from the archive), not from its last change. An archived card is kept: the board's Archived list shows it, and you can bring it back. Hive checks when a workspace opens and every hour.", description: 'The info tip of the setting "Archive Done cards after" (Settings → Board): more on what it does and when it applies.' }), type: 'number', min: 1, max: 365, step: 1, off: msg({ id: 'settings.board.archiveDoneDays.off', defaultMessage: 'Never', description: 'The Off box of the number setting "Archive Done cards after" (Settings → Board): ticked, the setting is off (0).' }) },
   { section: 'board', key: 'columnColors', title: msg({ id: 'settings.board.columnColors.title', defaultMessage: 'Colour columns', description: "A setting's title (Settings → Board)." }), desc: msg({ id: 'settings.board.columnColors.desc', defaultMessage: "Give each column's heading its colour and tint its cards with it.", description: 'What the setting "Colour columns" does, under its title (Settings → Board).' }), tip: msg({ id: 'settings.board.columnColors.tip', defaultMessage: 'A card takes the colour of the column it is in. Blocked, stalled and finished cards keep their red, amber and green edge, and their text, over the tint.', description: 'The info tip of the setting "Colour columns" (Settings → Board): more on what it does and when it applies.' }), type: 'boolean' },
   { section: 'board', key: 'colors', title: msg({ id: 'settings.board.colors.title', defaultMessage: 'Column colours', description: "A setting's title (Settings → Board)." }), desc: msg({ id: 'settings.board.colors.desc', defaultMessage: 'Pick the colour of each column.', description: 'What the setting "Column colours" does, under its title (Settings → Board).' }), tip: msg({ id: 'settings.board.colors.tip', defaultMessage: 'The tint on cards is a light mix of the colour with the theme, so it works in light and dark themes. Reset puts back the default.', description: 'The info tip of the setting "Column colours" (Settings → Board): more on what it does and when it applies.' }), type: 'custom' },
@@ -717,7 +684,7 @@ function providerRows(p: ProviderDescriptor): Row[] {
 /** Project Settings' sections, in order (the view adds their icons). */
 export const PROJECT_SETTINGS_SECTIONS: SettingsSectionInfo[] = [
   sectionInfo('general', msg({ id: 'settings.projectSection.general.label', defaultMessage: 'General', description: 'A section of Project Settings, in its list on the left: the project’s key and its default provider.' }), msg({ id: 'settings.projectSection.general.desc', defaultMessage: 'The project’s key, which names its cards, and the provider its new agents use.', description: 'Under the heading of the section "General" of Project Settings: what it holds.' })),
-  sectionInfo('agents', msg({ id: 'settings.projectSection.agents.label', defaultMessage: 'Agents', description: 'A section of Project Settings, in its list on the left: the project’s agents, with each CLI’s settings under it.' }), msg({ id: 'settings.projectSection.agents.desc', defaultMessage: 'The project’s agents, the settings of each CLI they run, and file locks between agents sharing a folder.', description: 'Under the heading of the section "Agents" of Project Settings: what it holds.' })),
+  sectionInfo('agents', msg({ id: 'settings.projectSection.agents.label', defaultMessage: 'Agents', description: 'A section of Project Settings, in its list on the left: the project’s agents, with each CLI’s settings under it.' }), msg({ id: 'settings.projectSection.agents.desc', defaultMessage: 'The project’s agents and the settings of each CLI they run.', description: 'Under the heading of the section "Agents" of Project Settings: what it holds.' })),
   ...PROVIDERS.map((p) =>
     sectionInfo(
       `provider:${p.id}`,
@@ -727,8 +694,6 @@ export const PROJECT_SETTINGS_SECTIONS: SettingsSectionInfo[] = [
     )
   ),
   sectionInfo('sessions', msg({ id: 'settings.projectSection.sessions.label', defaultMessage: 'Sessions', description: 'A section of Project Settings, in its list on the left.' }), msg({ id: 'settings.projectSection.sessions.desc', defaultMessage: 'Compacting and notifications for this project.', description: 'Under the heading of the section "Sessions" of Project Settings: what it holds.' })),
-  sectionInfo('loops', msg({ id: 'settings.projectSection.loops.label', defaultMessage: 'Card loops', description: 'A section of Project Settings, in its list on the left.' }), msg({ id: 'settings.projectSection.loops.desc', defaultMessage: 'How Hive helps agents that work through cards as builder and reviewer in this project.', description: 'Under the heading of the section "Card loops" of Project Settings: what it holds.' })),
-  sectionInfo('workflow', msg({ id: 'settings.projectSection.workflow.label', defaultMessage: 'Workflow', description: 'A section of Project Settings, in its list on the left (glossary 2.1: workflow).' }), msg({ id: 'settings.projectSection.workflow.desc', defaultMessage: 'How work moves from Todo to Done in this project: who reviews it, which checks pass first, who merges it and where cards are built. A change applies from the next card.', description: 'Under the heading of the section "Workflow" of Project Settings: what it holds.' })),
   sectionInfo('storage', msg({ id: 'settings.projectSection.storage.label', defaultMessage: 'Storage', description: 'A section of Project Settings, in its list on the left.' }), msg({ id: 'settings.projectSection.storage.desc', defaultMessage: 'What Hive keeps for this project: transcript backups, archived sessions, attachments and the agents’ worktrees. Clean Up… moves old backups and attachments to the Recycle Bin; Purge… removes everything Hive keeps for its sessions.', description: 'Under the heading of the section "Storage" of Project Settings: what it holds. Clean Up… and Purge… are buttons: use their names as translated there.' })),
   sectionInfo('keys', msg({ id: 'settings.projectSection.keys.label', defaultMessage: 'Keyboard Shortcuts', description: 'A section of Project Settings, in its list on the left.' }), msg({ id: 'settings.projectSection.keys.desc', defaultMessage: 'Shortcuts for project and session commands while this project is selected, over the global ones.', description: 'Under the heading of the section "Keyboard Shortcuts" of Project Settings: what it holds.' })),
   sectionInfo('advanced', msg({ id: 'settings.projectSection.advanced.label', defaultMessage: 'Advanced', description: 'A section of Project Settings, in its list on the left.' }), msg({ id: 'settings.projectSection.advanced.desc', defaultMessage: 'Where the settings are stored, and resetting them.', description: 'Under the heading of the section "Advanced" of Project Settings: what it holds.' }))
@@ -796,7 +761,13 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('sharedFolderWarning', 'boolean'),
     option('reviewerMode', 'select', [['lane', V.reviewerMode.lane], ['pool', V.reviewerMode.pool]]),
     option('excluded', 'custom'),
-    option('stageNames', 'custom')
+    option('stageNames', 'custom'),
+    // Card loops and file locks (HI-1766): preferences, not rules.
+    option('fileLocks', 'select', FILE_LOCK_MODES.map((m) => [m.value, m.text.label])),
+    option('loopWakes', 'boolean'),
+    { ...option('loopRounds', 'number'), min: 1, max: LANE_MAX_ROUNDS, step: 1 },
+    { ...option('loopWaitHours', 'number'), min: 1, max: LOOP_WAIT_MAX_HOURS, step: 1 },
+    { ...option('loopStepWaitMinutes', 'number'), min: 1, max: LOOP_STEP_WAIT_MAX_MINUTES, step: 5 }
   ]
   // A level's rows are its platform's options (and their check commands), never another platform's.
   return platform ? rows.filter((r) => r.workflow === 'commands' || FORM_GROUPS[platform].some((g) => g.options.includes(r.workflow!))) : rows
@@ -827,13 +798,12 @@ function slotCopyRow(section: string, key: string, level: WorkflowLevel | 'proje
 }
 
 /**
- * Project Settings → Workflow (#1278): one row, a link to the form in the Version Control tab (#1416), and each option a
- * row of its own for the Assistant's settings tool (`project.workflow.<option>`), not drawn apart. Contradictions are
- * refused when saved; every option is offered since P7 (#1445).
+ * A project's workflow options (#1278), each a hidden row of the Assistant's settings tool (`project.workflow.<option>`),
+ * set in the project's Version Control tab (Project Settings' Workflow section, a link to it, went with HI-1766).
+ * Contradictions are refused when saved; every option is offered since P7 (#1445).
  */
 function workflowRows(): Row[] {
   return [
-    { section: 'workflow', key: 'workflow', title: msg({ id: 'settings.project.workflow.title', defaultMessage: 'Workflow options', description: "A setting's title (Project Settings → Workflow): the project's workflow options (glossary 2.1), a form of their own." }), desc: msg({ id: 'settings.project.workflow.moved', defaultMessage: 'Who reviews, which checks pass first and who merges: they are set in the project’s Version Control tab, under Workflow.', description: 'What the setting "Workflow options" is, under its title (Project Settings → Workflow), beside its Open Version Control button. Version Control (the tab) and Workflow (its section): glossary 2.1.' }), type: 'custom' },
     // The version control (#1419): the Assistant's settings tool switches it as the tab does, after the same checks.
     { section: 'workflow', key: PLATFORM_SETTING_KEY, title: msg({ id: 'settings.project.workflow.platform.title', defaultMessage: 'Version control', description: "A setting's title (the project's Version Control tab): None or Git (glossary 2.1)." }), desc: msg({ id: 'settings.project.workflow.platform.desc', defaultMessage: 'None or Git, from the next card: Git only where a Git repository is found and no other version control is. Each keeps its own workflow options.', description: 'What the setting "Version control" does (the project’s Version Control tab): switching applies from the next card; cards started keep their rules. None and Git: glossary 2.1.' }), type: 'select', options: [{ value: 'none', label: msg({ id: 'settings.project.workflow.platform.none', defaultMessage: 'None', description: 'A value of the setting "Version control": no version control (glossary 2.1: None).' }) }, { value: 'git', label: msg({ id: 'settings.project.workflow.platform.git', defaultMessage: 'Git', description: 'A value of the setting "Version control": Git (glossary 2.1: keep).' }) }], hidden: true },
     ...optionRows((key) => ({ section: 'workflow', key: `workflow.${key}` }))
@@ -876,34 +846,10 @@ const PROJECT_ROWS: Row[] = [
     type: 'select',
     options: ON_OFF
   },
-  {
-    section: 'loops',
-    key: 'loopWakes',
-    title: msg({ id: 'settings.project.loopWakes.title', defaultMessage: 'Wake reviewers and builders', description: "A setting's title (Project Settings → Card loops)." }),
-    desc: msg({ id: 'settings.project.loopWakes.desc', defaultMessage: "When a card with a reviewer arrives in Review, Hive wakes the reviewer; when the review gives its verdict, Hive wakes the card's builder. Off: only the agents' own card watches wake them.", description: 'What the setting "Wake reviewers and builders" does, under its title (Project Settings → Card loops).' }),
-    tip: msg({ id: 'settings.project.loopWakes.tip', defaultMessage: "A card's reviewer is the reviewer of a lane with the card, else the agent that last reviewed it: cards nobody reviews never wake anyone. An agent is only woken while it is idle, never by its own change, and not when its own card watch already tells it. These are idle wakes: with Sessions → Wake an idle agent off, none is typed, and the wake waits in the agent's inbox. It also ends an agent's card watch that can no longer fire: on a card merged (Done) since, or whose lane ended or was abandoned.", description: 'The info tip of the setting "Wake reviewers and builders" (Project Settings → Card loops): more on what it does and when it applies.' }),
-    type: 'boolean'
-  },
-  { section: 'loops', key: 'loopRounds', title: msg({ id: 'settings.project.loopRounds.title', defaultMessage: 'Rounds', description: "A setting's title (Project Settings → Card loops)." }), desc: msg({ id: 'settings.project.loopRounds.desc', defaultMessage: "How many rounds a card gets in this project's card loops before its agents stop and ask you, when you don't say. Empty inherits Settings → Workspace → Card loop rounds.", description: 'What the setting "Rounds" does, under its title (Project Settings → Card loops).' }), tip: msg({ id: 'settings.project.loopRounds.tip', defaultMessage: 'Saying "rounds: 5" when you start a loop still wins.', description: 'The info tip of the setting "Rounds" (Project Settings → Card loops): more on what it does and when it applies.' }), type: 'number', min: 1, max: LANE_MAX_ROUNDS, step: 1 },
-  { section: 'loops', key: 'loopWaitHours', title: msg({ id: 'settings.project.loopWaitHours.title', defaultMessage: 'Wait (hours)', description: "A setting's title (Project Settings → Card loops)." }), desc: msg({ id: 'settings.project.loopWaitHours.desc', defaultMessage: "How many hours an agent in this project's card loops waits with no change before it tells you, when you don't say. Empty inherits Settings → Workspace → Card loop wait.", description: 'What the setting "Wait (hours)" does, under its title (Project Settings → Card loops).' }), tip: msg({ id: 'settings.project.loopWaitHours.tip', defaultMessage: 'Saying "wait: 2h" when you start a loop still wins. Up to a day.', description: 'The info tip of the setting "Wait (hours)" (Project Settings → Card loops): more on what it does and when it applies.' }), type: 'number', min: 1, max: LOOP_WAIT_MAX_HOURS, step: 1 },
-  { section: 'loops', key: 'loopStepWaitMinutes', title: msg({ id: 'settings.project.loopStepWaitMinutes.title', defaultMessage: 'Design check wait (minutes)', description: "A setting's title (Project Settings → Card loops)." }), desc: msg({ id: 'settings.project.loopStepWaitMinutes.desc', defaultMessage: "How many minutes a card loop's builder waits for its reviewer to check a design it posted before it goes ahead as posted. Empty is 30.", description: 'What the setting "Design check wait (minutes)" does, under its title (Project Settings → Card loops). A design: the plan a builder posts on its card for its reviewer to check before building.' }), tip: msg({ id: 'settings.project.loopStepWaitMinutes.tip', defaultMessage: 'A design left unchecked longer than this shows its card as stalled. Up to 4 hours.', description: 'The info tip of the setting "Design check wait (minutes)" (Project Settings → Card loops): more on what it does and when it applies.' }), type: 'number', min: 1, max: LOOP_STEP_WAIT_MAX_MINUTES, step: 5 },
   ...workflowRows(),
   { section: 'storage', key: 'storage', title: msg({ id: 'settings.project.storage.title', defaultMessage: 'What Hive keeps', description: "A setting's title (Project Settings → Storage)." }), desc: msg({ id: 'settings.project.storage.desc', defaultMessage: 'Measured in the background; Refresh measures again. The coding agents’ own transcripts (in ~/.claude, ~/.codex and ~/.copilot) aren’t counted, and Clean Up… and Purge… never touch them.', description: 'What the setting "What Hive keeps" does, under its title (Project Settings → Storage). Clean Up… and Purge… are buttons: use their names as translated there.' }), type: 'custom', wide: true },
   { section: 'keys', key: 'keybindings', title: msg({ id: 'settings.project.keybindings.title', defaultMessage: 'Shortcuts', description: "A setting's title (Project Settings → Keyboard Shortcuts)." }), desc: msg({ id: 'settings.project.keybindings.desc', defaultMessage: 'Change one to give this project its own; Reset returns it to the global shortcut. Stored in the project’s .hive folder, which is not committed.', description: 'What the setting "Shortcuts" does, under its title (Project Settings → Keyboard Shortcuts).' }), type: 'custom', wide: true },
   { section: 'agents', key: 'agents', title: msg({ id: 'settings.project.agents.title', defaultMessage: 'Agents', description: "A setting's title (Project Settings → Agents)." }), desc: msg({ id: 'settings.project.agents.desc', defaultMessage: "Up to 12 agents can work on the project at once (up to 24 with Settings → Advanced → Agents per project), each in the project folder or a slot. Agents without their own settings use this project's.", description: 'What the setting "Agents" does, under its title (Project Settings → Agents).' }), type: 'custom', wide: true },
-  {
-    section: 'agents',
-    key: 'fileLocks',
-    title: msg({ id: 'settings.project.fileLocks.title', defaultMessage: 'File locks', description: "A setting's title (Project Settings → Agents)." }),
-    desc: msg({ id: 'settings.project.fileLocks.desc', defaultMessage: "What happens when an agent tries to edit a file another agent in this project's folder is editing. Inherit uses Settings → Agents → File locks.", description: 'What the setting "File locks" does, under its title (Project Settings → Agents).' }),
-    tip: linesOf([
-      ...FILE_LOCK_MODES.map((m) => withValues(msg({ id: 'settings.fileLocks.modeLine', defaultMessage: '{mode}: {what}', description: 'A line of the File locks setting\'s info tip: a mode\'s name and what it does.' }), { mode: m.text.label, what: m.text.description })),
-      '',
-      msg({ id: 'settings.project.fileLocks.tip', defaultMessage: 'Applies to agents sharing a folder (agents in their own worktrees never collide). An agent claims a file when it edits it and releases it when its turn ends. Edits made through shell commands are not covered.', description: 'The last paragraph of the info tip of the setting "File locks" (Project Settings → Agents), under a line per mode.' })
-    ]),
-    type: 'select',
-    options: [INHERIT, ...FILE_LOCK_MODES.map((m): RowOption => ({ value: m.value, label: m.text.label }))]
-  },
   // The project's own copied files (HI-1765: its slots.copy, as Version Control → Slots and copies sets it), for the Assistant's tool.
   slotCopyRow('workflow', 'slotCopy', 'project'),
   { section: 'agents', key: 'worktreeSetup', title: msg({ id: 'settings.project.worktreeSetup.title', defaultMessage: 'Setup command', description: "A setting's title (Project Settings → Agents)." }), desc: msg({ id: 'settings.project.worktreeSetup.desc', defaultMessage: "Runs in a new worktree before its agent's first session, e.g. npm install. Its output shows in the agent's pane.", description: 'What the setting "Setup command" does, under its title (Project Settings → Agents).' }), tip: msg({ id: 'settings.project.worktreeSetup.tip', defaultMessage: 'Runs with cmd.exe in the worktree folder. If it fails, the pane offers to retry or to start the agent without it.', description: 'The info tip of the setting "Setup command" (Project Settings → Agents): more on what it does and when it applies.' }), type: 'text', placeholder: 'npm install', hidden: true }, // i18n-ignore: a command, not text
@@ -923,9 +869,8 @@ const ACTIONS = new Set([
   'sessions.usageCacheClear',
   'sessions.resetPerformance',
   'workspace.hiddenProjects',
-  'project.workflow',
   'workflow.defaults',
-  'workspace.workflowDefaults',
+  'workflow.workspaceDefaults',
   'workspace.storage',
   'workspace.antivirus',
   'agentApi.status',
@@ -1025,13 +970,11 @@ const HELPS: Record<string, string> = {
   'assistant.compactSuggestTokens': "The Assistant's own conversation gets long and slow: a lower threshold suggests compacting it sooner.", // i18n-ignore: the Assistant's tools (English)
   'assistant.panelSide': 'Windows notifications or other apps cover the right of the screen.', // i18n-ignore: the Assistant's tools (English)
   'board.archiveDoneDays': 'The Done column has grown long with finished cards.', // i18n-ignore: the Assistant's tools (English)
-  'agents.fileLocks': 'Several agents work in the same project folder and edit the same files.', // i18n-ignore: the Assistant's tools (English)
   'workflow.git.slotCopy': "New slots and review copies miss git-ignored files such as .env, so agents' builds or tests fail there.", // i18n-ignore: the Assistant's tools (English)
   'agents.leftoverProcesses': "A folder can't be renamed or deleted (in use), or a port is taken, after its agents have stopped: processes they started are still running.", // i18n-ignore: the Assistant's tools (English)
   'agents.backgroundTaskMinutes': "Agents' background tasks (long test runs) count as finished too soon, or a dev server keeps an agent waiting long after its work is done.", // i18n-ignore: the Assistant's tools (English)
   'project.compactSuggestTokens': "One project's conversations run much longer than others'.", // i18n-ignore: the Assistant's tools (English)
   'project.transcriptWarnMB': "One project's conversations grow much bigger than others'.", // i18n-ignore: the Assistant's tools (English)
-  'project.fileLocks': "This project's agents share its folder and edit the same files.", // i18n-ignore: the Assistant's tools (English)
   'project.slotCopy': 'New slots and review copies of this project miss git-ignored files its builds need.', // i18n-ignore: the Assistant's tools (English)
   ...Object.fromEntries(PROVIDERS.filter((p) => p.capabilities.contextLimit).map((p) => [`${p.id}.use200kContext`, `${p.name} conversations get slow and costly as they grow: a 200K window makes ${p.name} compact sooner.`])) // i18n-ignore: the Assistant's tools (English)
 }
@@ -1054,20 +997,13 @@ const DOCS: Record<string, string> = {
 }
 const DOCS_BY_ID: Record<string, string> = {
   'project.key': 'project-keys', // i18n-ignore: a user guide heading's id (#1535)
-  'project.workflow': 'workflow-options', // i18n-ignore: a user guide heading's id (#1535)
   'workflow.defaults': 'workflow-defaults', // i18n-ignore: a user guide heading's id (#1535)
-  'workspace.workflowDefaults': 'workflow-defaults', // i18n-ignore: a user guide heading's id (#1535)
+  'workflow.workspaceDefaults': 'workflow-defaults', // i18n-ignore: a user guide heading's id (#1535)
   'project.inboxCheckpoints': 'messages-and-the-inbox', // i18n-ignore: a user guide heading's id (#1535)
   'project.inboxStopContinuation': 'messages-and-the-inbox', // i18n-ignore: a user guide heading's id (#1535)
   'project.inboxIdleWakes': 'messages-and-the-inbox', // i18n-ignore: a user guide heading's id (#1535)
   'notifications.suggestFreshStart': 'starting-fresh', // i18n-ignore: a user guide heading's id (#1535)
   'project.suggestFreshStart': 'starting-fresh', // i18n-ignore: a user guide heading's id (#1535)
-  'project.loopWakes': 'card-loops', // i18n-ignore: a user guide heading's id (#1535)
-  'project.loopRounds': 'card-loops', // i18n-ignore: a user guide heading's id (#1535)
-  'project.loopWaitHours': 'card-loops', // i18n-ignore: a user guide heading's id (#1535)
-  'project.loopStepWaitMinutes': 'card-loops', // i18n-ignore: a user guide heading's id (#1535)
-  'workspace.loopRounds': 'card-loops', // i18n-ignore: a user guide heading's id (#1535)
-  'workspace.loopWaitHours': 'card-loops', // i18n-ignore: a user guide heading's id (#1535)
   'general.progressPanel': 'progress-panel', // i18n-ignore: a user guide heading's id (#1535)
   'general.progressCommands': 'progress-panel', // i18n-ignore: a user guide heading's id (#1535)
   'general.keepAwake': 'sleep-and-shutdown', // i18n-ignore: a user guide heading's id (#1535)
@@ -1085,21 +1021,34 @@ const DOCS_BY_ID: Record<string, string> = {
 }
 
 /** Where a setting is, in English (the tools name it so) or as the user sees it: "Settings → Sessions → Suggest compacting above". */
-function settingPathOf(e: Pick<SettingEntry, 'section' | 'assistantProvider' | 'text'>, scope: SettingScope, say: (t: TextPart) => string): string {
+function settingPathOf(e: Pick<SettingEntry, 'section' | 'assistantProvider' | 'text' | 'workflowLevel' | 'slotLevel'>, scope: SettingScope, say: (t: TextPart) => string): string {
   const where = (list: SettingsSectionInfo[]): string => {
     const found = list.find((x) => x.id === e.section)
     return found ? say(found.text.label) : e.section
   }
   const title = say(e.text.title)
+  // A project's workflow options are its Version Control tab's (HI-1766), not a section of Project Settings.
+  if (scope === 'project' && e.section === 'workflow') return say(withValues(PATHS.versionControl, { title }))
+  // A level's default (HI-1768): Settings → Version Control, its part (Hive defaults or Workspace defaults).
+  const level = e.workflowLevel?.level ?? (e.slotLevel === 'global' || e.slotLevel === 'workspace' ? e.slotLevel : null)
+  if (level) return say(withValues(PATHS.level, { section: say(SETTINGS_SECTIONS.find((x) => x.id === 'workflow')!.text.label), part: say(level === 'global' ? LEVEL_PART.global : LEVEL_PART.workspace), title }))
   if (scope === 'project') return say(withValues(PATHS.project, { section: where(PROJECT_SETTINGS_SECTIONS), title }))
   if (e.assistantProvider) return say(withValues(PATHS.assistant, { assistant: where(SETTINGS_SECTIONS.filter((x) => x.id === 'assistant')), provider: providerDescriptor(e.assistantProvider).name, title }))
   return say(withValues(PATHS.settings, { section: where(SETTINGS_SECTIONS), title }))
+}
+
+/** Settings → Version Control's two parts (HI-1768), as a level default's path names them. */
+const LEVEL_PART = {
+  global: msg({ id: 'settings.workflow.hiveDefaults.title', defaultMessage: 'Hive defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)." }),
+  workspace: msg({ id: 'settings.workflow.workspaceDefaults.title', defaultMessage: 'Workspace defaults', description: "A setting's title (Settings → Version Control): the workflow options the open workspace's projects start from, over Hive defaults (HI-1768). The window shows the workspace's name beside it." })
 }
 
 /** A setting's path, by its parts. */
 const PATHS = {
   settings: msg({ id: 'settings.path.settings', defaultMessage: 'Settings → {section} → {title}', description: 'Where a setting is: Settings, its section and its title. Settings is the name of the Settings view.' }),
   project: msg({ id: 'settings.path.project', defaultMessage: 'Project Settings → {section} → {title}', description: "Where a project's setting is: Project Settings, its section and its title." }),
+  level: msg({ id: 'settings.path.level', defaultMessage: 'Settings → {section} → {part} → {title}', description: 'Where a workflow default is: Settings, its section (Version Control), its part (Hive defaults or Workspace defaults) and its title.' }),
+  versionControl: msg({ id: 'settings.path.versionControl', defaultMessage: 'Version Control → Workflow → {title}', description: "Where a project's workflow option is: the project's Version Control tab, its Workflow section, and the option's title (glossary 2.1)." }),
   assistant: msg({ id: 'settings.path.assistant', defaultMessage: 'Settings → {assistant} → With {provider} → {title}', description: "Where a field of the Assistant's settings with a provider is. {assistant} is the Assistant section's name, {provider} a coding agent's name." })
 }
 
@@ -1132,7 +1081,7 @@ function entry(row: Row, id: string, scope: SettingScope, docs: string): Setting
     ...(value ? { value } : {}),
     ...(sensitive && !action ? { sensitive: true, readOnly: `${sensitive[1]}: only the user can change it, in ${path}.` } : readOnly ? { readOnly: `${readOnly[1]}: the user changes them in ${path}.` } : {}), // i18n-ignore: the Assistant's tools (English)
     ...(restart ? { restart } : {}),
-    ...((scope === 'project' && !action && row.key !== 'worktreeSetup' && row.key !== 'loopWakes') || row.advanced?.scope === 'workspace' ? { inherits: true } : {})
+    ...((scope === 'project' && !action && row.key !== 'worktreeSetup') || row.advanced?.scope === 'workspace' ? { inherits: true } : {})
   }
 }
 
@@ -1166,7 +1115,7 @@ export function settingEntry(id: string): SettingEntry | undefined {
  * advanced value (#367) is advanced.json's override (`advanced`: its values) or the default, or the workspace's own (null:
  * Settings → Advanced's).
  */
-export function settingValue(e: SettingEntry, settings: AppSettings, project?: ProjectConfig | null, ws?: Pick<WorkspaceConfig, 'loops' | 'advanced' | 'workflow' | 'slotDefaults'> | null, advanced?: Record<string, unknown> | null): unknown {
+export function settingValue(e: SettingEntry, settings: AppSettings, project?: ProjectConfig | null, ws?: Pick<WorkspaceConfig, 'advanced' | 'workflow' | 'slotDefaults'> | null, advanced?: Record<string, unknown> | null): unknown {
   if (e.action) return undefined
   if (e.advanced) return e.advanced.scope === 'workspace' ? (ws?.advanced?.[e.advanced.id] ?? null) : (advanced?.[e.advanced.id] ?? advancedDef(e.advanced.id)?.default)
   // A level's workflow default (#1422): its own value, or inherit.
@@ -1175,12 +1124,11 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
   if (e.slotLevel === 'global') return settings.slotDefaults?.copy ?? 'inherit'
   if (e.slotLevel === 'workspace') return ws?.slotDefaults?.copy ?? 'inherit'
   if (e.slotLevel === 'project') return project ? (project.slots?.copy ?? project.worktreeCopy ?? 'inherit') : undefined
-  // A workspace's own (workspace.json): its card loops' rounds and wait (#412).
-  if (e.scope === 'workspace') return loopDefaults(ws)[e.key === 'loopRounds' ? 'rounds' : 'waitHours']
   if (e.scope === 'project') {
     if (!project) return undefined
     // The project's own value of a workflow option, or inherit (#1278: the workspace's, then Hive's, then all-off).
-    if (e.workflow) return project.workflow?.options?.[e.workflow] ?? 'inherit'
+    // With no options yet, its card loops and file locks from before HI-1766, as the form and the runtime read them.
+    if (e.workflow) return ownOrLegacy(project as ProjectConfig & Record<string, unknown>)[e.workflow] ?? 'inherit'
     if (e.key === PLATFORM_SETTING_KEY) return project.platform ?? project.workflow?.platform ?? null
     if (e.provider) return (projectProviderConfig(project, e.provider) as unknown as Record<string, unknown>)[e.key] ?? 'inherit'
     return (project as unknown as Record<string, unknown>)[e.key]
@@ -1200,7 +1148,6 @@ export function settingDefault(e: SettingEntry): unknown {
   if (e.action) return undefined
   if (e.advanced) return e.advanced.scope === 'workspace' ? null : advancedDef(e.advanced.id)?.default
   if (e.workflowLevel || e.slotLevel) return 'inherit'
-  if (e.scope === 'workspace') return e.key === 'loopRounds' ? LOOP_ROUNDS : LOOP_WAIT_HOURS
   // A project's provider settings inherit, but its Extra arguments are added to Hive's: empty (DEFAULT_PROJECT_PROVIDER).
   if (e.scope === 'project') return e.provider ? (DEFAULT_PROJECT_PROVIDER as unknown as Record<string, unknown>)[e.key] : e.workflow ? 'inherit' : (DEFAULT_PROJECT_CONFIG as unknown as Record<string, unknown>)[e.key]
   if (e.assistantProvider) return ''
@@ -1366,6 +1313,7 @@ function checkWorkflowValue(e: SettingEntry, kind: NonNullable<ReturnType<typeof
     v = e.workflow === 'reviewers' && hit ? Number(hit.value) : hit?.value
   } else if (kind === 'boolean') v = raw === 'on' || raw === 'true' ? true : raw === 'off' || raw === 'false' ? false : raw
   else if (kind === 'text' && typeof raw === 'string') v = raw.trim()
+  else if (kind === 'number' && typeof raw === 'string' && raw.trim()) v = Number(raw.trim())
   // A stage's name (N5) is kept trimmed (#1417).
   if (e.workflow === 'stageNames' && v && typeof v === 'object' && !Array.isArray(v)) v = Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'string' ? x.trim() : x]))
   if (v !== undefined && v !== 'inherit' && takesOption(e.workflow!, v)) return { value: v }
@@ -1384,7 +1332,7 @@ export function workflowTakes(e: SettingEntry, kind: ReturnType<typeof settingKi
     stageNames: 'an object of stage id → the name the user gives it, e.g. {"active": "Building"} (ids: hold, todo, active, review, approved, merging, done; names are for the user, agents keep the ids; each at most 24 characters, unique, applies at once)' // i18n-ignore: the Assistant's tools (English)
   }
   const choices = (settingOptions(e) ?? []).filter((o) => o.value !== 'inherit').map((o) => o.value)
-  const what = kind === 'boolean' ? 'true or false' : kind === 'select' ? `one of: ${choices.join(', ')}` : kind === 'text' ? `a branch name ("" for the repository's default branch)` : (shapes[e.workflow!] ?? 'a value') // i18n-ignore: the Assistant's tools (English)
+  const what = kind === 'number' ? `a whole number from ${e.min ?? 1} to ${e.max}` : kind === 'boolean' ? 'true or false' : kind === 'select' ? `one of: ${choices.join(', ')}` : kind === 'text' ? `a branch name ("" for the repository's default branch)` : (shapes[e.workflow!] ?? 'a value') // i18n-ignore: the Assistant's tools (English)
   return `${what}, or null to inherit` // i18n-ignore: the Assistant's tools (English)
 }
 
@@ -1401,7 +1349,7 @@ export function effortTakes(e: SettingEntry, levels: { value: string }[]): strin
 export function settingPatch(
   e: SettingEntry,
   value: unknown
-): { settings: Record<string, unknown> } | { project: (cfg: ProjectConfig) => Partial<ProjectConfig> } | { workspace: { rounds?: number; waitHours?: number } } | { workflowLevel: { level: WorkflowLevel; platform: PlatformId; key: OptionKey; value: unknown } } | { slotLevel: { level: WorkflowLevel; key: 'copy'; value: string | null } } | { advanced: { id: string; scope: 'app' | 'workspace'; value: unknown } } | { prices: { provider: ProviderId; value: Record<string, unknown> } } | { fallback: { provider: ProviderId; kind: 'models' | 'efforts'; list: unknown[] | null } } {
+): { settings: Record<string, unknown> } | { project: (cfg: ProjectConfig) => Partial<ProjectConfig> } | { workflowLevel: { level: WorkflowLevel; platform: PlatformId; key: OptionKey; value: unknown } } | { slotLevel: { level: WorkflowLevel; key: 'copy'; value: string | null } } | { advanced: { id: string; scope: 'app' | 'workspace'; value: unknown } } | { prices: { provider: ProviderId; value: Record<string, unknown> } } | { fallback: { provider: ProviderId; kind: 'models' | 'efforts'; list: unknown[] | null } } {
   if (e.advanced) return { advanced: { ...e.advanced, value } }
   // A level's default (#1422): one option (null: inherit), saved as the editor saves the level.
   if (e.workflowLevel && e.workflow) return { workflowLevel: { ...e.workflowLevel, key: e.workflow, value } }
@@ -1423,10 +1371,11 @@ export function settingPatch(
     const key = e.workflow
     return {
       project: (cfg) => {
-        const options: Record<string, unknown> = { ...cfg.workflow?.options }
+        // From the options as they read (the old keys of a project with none yet among them), which then go.
+        const options: Record<string, unknown> = ownOrLegacy(cfg as ProjectConfig & Record<string, unknown>)
         if (value === null) delete options[key]
         else options[key] = value
-        return { workflow: writeWorkflow(cfg.workflow, { platform: (cfg.workflow?.platform ?? cfg.platform)!, preset: cfg.workflow?.preset ?? null, options }) }
+        return { workflow: writeWorkflow(cfg.workflow, { platform: (cfg.workflow?.platform ?? cfg.platform)!, preset: cfg.workflow?.preset ?? null, options }), ...LEGACY_CONSUMED }
       }
     }
   }
@@ -1435,7 +1384,6 @@ export function settingPatch(
     if (provider) return { project: (cfg) => ({ providers: { ...cfg.providers, [provider]: { ...projectProviderConfig(cfg, provider), [e.key]: value } } }) }
     return { project: () => ({ [e.key]: value }) as Partial<ProjectConfig> }
   }
-  if (e.scope === 'workspace') return { workspace: { [e.key === 'loopRounds' ? 'rounds' : 'waitHours']: value as number } }
   if (e.assistantProvider) return { settings: { assistant: { providers: { [e.assistantProvider]: { [fieldKey(e)]: value } } } } }
   if (e.id === 'providers.defaultProvider') return { settings: { defaultProvider: value } }
   if (e.provider && e.key === 'prices') return { prices: { provider: e.provider, value: value as Record<string, unknown> } }

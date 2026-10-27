@@ -9,6 +9,7 @@ import { msg, tr as trNow, type Msg } from './i18n'
 import type { Tr } from './tasks'
 import { samePath } from './movePaths'
 import { legacyWorktree } from './agentFolders'
+import { migrateGlobalFileLocks, migrateProjectPreferences } from './workflow/preferences'
 
 export const HIVE_DIR = '.hive'
 
@@ -115,7 +116,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
     providers: Object.fromEntries(PROVIDERS.map((p) => [p.id, { model: '', effort: '', permissionMode: '', extraArgs: '', use200kContext: '' }]))
   },
   agents: {
-    fileLocks: 'block',
     backgroundTaskMinutes: 60,
     leftoverProcesses: 'ask'
   },
@@ -161,13 +161,8 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   transcriptWarnMB: null,
   agents: [],
   layout: 'auto',
-  fileLocks: 'inherit',
   worktreeCopy: null,
-  worktreeSetup: '',
-  loopWakes: true,
-  loopRounds: null,
-  loopWaitHours: null,
-  loopStepWaitMinutes: null
+  worktreeSetup: ''
 }
 
 /** The transcript viewer loads this many items at a time (the latest first, earlier ones as you scroll up). */
@@ -589,6 +584,8 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
     }
   }
   migrateAgentsWorktreeSettings(cfg)
+  // HI-1766: Settings → Agents → File locks is Hive's workflow default.
+  migrateGlobalFileLocks(cfg.settings)
   if (raw && (raw.version ?? 1) < 5 && cfg.settings.sessions.transcriptWarnMB === 50) {
     // 50 MB was the default up to 0.3.x (saved into every config); long transcripts slow things well before that.
     // Anyone who wants 50 sets it again.
@@ -726,7 +723,8 @@ export function migrateProjectConfig(raw: Record<string, any>): Record<string, a
     // Until 0.9.3 the Hive Assistant's mode was its persona (#1084).
     out = { ...out, agents: out.agents.map((a: unknown) => (a && typeof a === 'object' && 'persona' in a ? withMode(a as Record<string, unknown>) : a)) }
   }
-  return out
+  // HI-1766: Card loops and File locks are the project's workflow options.
+  return migrateProjectPreferences(out)
 }
 
 /** A record from before 0.9.3 (an agent, a session) with its `persona` as its `mode` (#1084). */

@@ -40,6 +40,7 @@ import { workspace, workspaceFor, type WorkspaceService } from './workspace'
 import { trash } from './trash'
 import { journalFact } from './journalService'
 import { cardRef } from '../shared/projectKeys'
+import { projectPreferences } from './workflow/preferences'
 
 const log = createLogger('tasks')
 
@@ -1091,7 +1092,8 @@ async function laneReviewerAsks(ws: WorkspaceService, card: TaskCard, patch: Tas
   if (!self || !card.project || !ws.path || said.length || patch.column !== undefined || patch.review !== undefined) return false
   if (card.archived || card.column !== 'review' || card.review || !card.agent || card.agent === self.agentId) return false
   if (FactStore.forBoard(ws, { project: card.project, key: '' }).card(card.number).reviewer !== self.agentId) return false
-  return (await ws.projectConfig(join(ws.path, card.project)).catch(() => null))?.loopWakes !== false
+  const path = join(ws.path, card.project)
+  return projectPreferences(ws, path, await ws.projectConfig(path).catch(() => null)).loopWakes
 }
 
 /** A message within a history line's values: a CLI's sentence (providerMessage) or the workflow's (a request's, #1266). */

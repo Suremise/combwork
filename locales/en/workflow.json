@@ -99,10 +99,6 @@
     "defaultMessage": "Add Check",
     "description": "A button under the checks of “Checks pass before review”."
   },
-  "workflow.form.agentsSection": {
-    "defaultMessage": "Agents",
-    "description": "A link to the section \"Agents\" of Project Settings: use its name as translated there."
-  },
   "workflow.form.allOff": {
     "defaultMessage": "All off",
     "description": "A choice beside the presets in the Workflow section: every rule off (SPEC §16.6.4)."
@@ -171,20 +167,16 @@
     "defaultMessage": "Discard Changes",
     "description": "The button dropping unsaved changes to the workflow options."
   },
-  "workflow.form.fileLocks": {
-    "defaultMessage": "File locks",
-    "description": "A read-only row of Project Settings → Workflow for a project without version control (glossary 2.6, N7)."
-  },
-  "workflow.form.fileLocksValue": {
-    "defaultMessage": "As set for the project’s agents",
-    "description": "The value of the read-only row \"File locks\" in Project Settings → Workflow: its own setting decides."
+  "workflow.form.fileLocksNote": {
+    "defaultMessage": "Applies to agents working in the same folder, outside a slot.",
+    "description": "Under the workflow option “File locks”: a slot is a folder Hive lends to a card or its lane (glossary 2.5: slot), so agents in different slots never share a file."
   },
   "workflow.form.folders": {
     "defaultMessage": "Folders and files, separated by commas",
     "description": "The placeholder of the field “What the work is” (folders and files left out)."
   },
   "workflow.form.from.global": {
-    "defaultMessage": "From Hive’s settings",
+    "defaultMessage": "From Hive defaults",
     "description": "Where a workflow option’s value comes from: Hive’s own default."
   },
   "workflow.form.from.here": {
@@ -226,6 +218,10 @@
   "workflow.form.heirs": {
     "defaultMessage": "{n, plural, one {This project inherits the change:} other {These # projects inherit the change:}}",
     "description": "In the dialog before saving workflow defaults, above the projects that use them (they don’t set the changed options themselves)."
+  },
+  "workflow.form.hoursValue": {
+    "defaultMessage": "{n, plural, one {# hour} other {# hours}}",
+    "description": "The value of the workflow option “Wait (hours)” (Card loops) in words, as in the Inherit box and a preset preview."
   },
   "workflow.form.identity": {
     "defaultMessage": "Commits as {name} <{email}>.",
@@ -303,17 +299,13 @@
     "defaultMessage": "Couldn’t read the workflow options: {error}",
     "description": "An error showing Project Settings → Workflow. {error} says why."
   },
-  "workflow.form.loops": {
-    "defaultMessage": "Rounds and wait",
-    "description": "A read-only row of Project Settings → Workflow: the card loops’ rounds and wait."
+  "workflow.form.loopsReadNote": {
+    "defaultMessage": "Read when a loop starts: a loop already running keeps its own, and one started with its own (“rounds: 5, wait: 2h”) keeps those.",
+    "description": "Under the workflow options “Rounds” and “Wait (hours)” (Card loops), when a change applies. “rounds: 5, wait: 2h” is what the user types to an agent: keep it in English."
   },
-  "workflow.form.loopsSection": {
-    "defaultMessage": "Card loops",
-    "description": "A link to the section \"Card loops\" of Project Settings: use its name as translated there."
-  },
-  "workflow.form.loopsValue": {
-    "defaultMessage": "{rounds, plural, one {# round} other {# rounds}}, wait {hours, plural, one {# hour} other {# hours}}",
-    "description": "The value of the read-only row \"Rounds and wait\" of Project Settings → Workflow."
+  "workflow.form.minutesValue": {
+    "defaultMessage": "{n, plural, one {# minute} other {# minutes}}",
+    "description": "The value of the workflow option “Design check wait (minutes)” (Card loops) in words, as in the Inherit box."
   },
   "workflow.form.neverOff.fileLocks": {
     "defaultMessage": "File locks, while their own setting has them on.",
@@ -374,10 +366,6 @@
   "workflow.form.openAdvanced": {
     "defaultMessage": "Open Advanced",
     "description": "A button beside the note that workflow rules aren’t enforced: opens Settings → Advanced."
-  },
-  "workflow.form.ownedPrefix": {
-    "defaultMessage": "Its own setting decides:",
-    "description": "Before the link to where a read-only row of Project Settings → Workflow is set."
   },
   "workflow.form.paste": {
     "defaultMessage": "Paste JSON…",
@@ -459,6 +447,10 @@
     "defaultMessage": "Custom, started from {preset}",
     "description": "Project Settings → Workflow: the options were changed after a preset was chosen. {preset} is its name."
   },
+  "workflow.form.stepWaitNote": {
+    "defaultMessage": "A design left unchecked longer shows its card as stalled; one already posted keeps its wait.",
+    "description": "Under the workflow option “Design check wait (minutes)” (Card loops), when a change applies."
+  },
   "workflow.form.use": {
     "defaultMessage": "Use {preset}",
     "description": "A button in a preset’s preview: fills the form with it (saved only with Save…). {preset} is its name."
@@ -467,9 +459,9 @@
     "defaultMessage": "Checks",
     "description": "A heading of the Workflow section: the options about the checks that must pass (glossary 2.3: checks)."
   },
-  "workflow.group.elsewhere": {
-    "defaultMessage": "Shown here, set elsewhere",
-    "description": "A heading of the Workflow section: settings shown for reference, each changed where its link leads."
+  "workflow.group.loops": {
+    "defaultMessage": "Card loops",
+    "description": "A heading of the Workflow section: how card loops run, a builder and a reviewer taking cards in turn (glossary: card loop)."
   },
   "workflow.group.merging": {
     "defaultMessage": "Merging",
@@ -579,6 +571,14 @@
     "defaultMessage": "What the work is",
     "description": "A workflow option for a project without version control (glossary 2.6, N4)."
   },
+  "workflow.option.fileLocks.desc": {
+    "defaultMessage": "What happens when an agent tries to edit a file another agent in the same folder is editing.",
+    "description": "What the workflow option “File locks” does."
+  },
+  "workflow.option.fileLocks.title": {
+    "defaultMessage": "File locks",
+    "description": "A workflow option (glossary 2.6, N7): what happens when two agents in the same folder edit the same file."
+  },
   "workflow.option.finish.desc": {
     "defaultMessage": "When a card is done: once Hive’s merge queue has merged it, once its agent has merged it and Hive finds the work in the target branch, once it is committed, or whenever it is moved there.",
     "description": "What the workflow option “Who merges” does (glossary 2.1: merge queue)."
@@ -602,6 +602,38 @@
   "workflow.option.identity.title": {
     "defaultMessage": "Commits use the project’s identity",
     "description": "A workflow option (glossary 2.6, G12)."
+  },
+  "workflow.option.loopRounds.desc": {
+    "defaultMessage": "How many rounds a card gets in a card loop (a build and its review each) before its agents stop and ask you, when the loop doesn’t say.",
+    "description": "What the workflow option “Rounds” does (Card loops)."
+  },
+  "workflow.option.loopRounds.title": {
+    "defaultMessage": "Rounds",
+    "description": "A workflow option, under Card loops: how many rounds (a build and its review) a card gets before its agents ask you."
+  },
+  "workflow.option.loopStepWaitMinutes.desc": {
+    "defaultMessage": "How many minutes, up to 4 hours, a card loop’s builder waits for its reviewer to check a design it posted before it goes ahead as posted.",
+    "description": "What the workflow option “Design check wait (minutes)” does (Card loops). A design: the plan a builder posts on its card before building."
+  },
+  "workflow.option.loopStepWaitMinutes.title": {
+    "defaultMessage": "Design check wait (minutes)",
+    "description": "A workflow option, under Card loops: how long a builder waits for its reviewer to check a design it posted."
+  },
+  "workflow.option.loopWaitHours.desc": {
+    "defaultMessage": "How many hours, up to a day, an agent in a card loop waits with no change before it tells you, when the loop doesn’t say.",
+    "description": "What the workflow option “Wait (hours)” does (Card loops)."
+  },
+  "workflow.option.loopWaitHours.title": {
+    "defaultMessage": "Wait (hours)",
+    "description": "A workflow option, under Card loops: how many hours an agent in a card loop waits with no change before it tells you."
+  },
+  "workflow.option.loopWakes.desc": {
+    "defaultMessage": "When a card with a reviewer arrives in Review, Hive wakes the reviewer, and on the review’s verdict the card’s builder; off, only the agents’ own card watches wake them.",
+    "description": "What the workflow option “Wake reviewers and builders” does."
+  },
+  "workflow.option.loopWakes.title": {
+    "defaultMessage": "Wake reviewers and builders",
+    "description": "A workflow option, under Card loops: Hive wakes the agents of a card loop for its handoffs (glossary: card loop)."
   },
   "workflow.option.mergeChecks.desc": {
     "defaultMessage": "Hive’s merge queue runs these named commands on the card’s work merged with the target branch, and moves the target only once each one has passed.",

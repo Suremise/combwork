@@ -11,6 +11,7 @@ import { loopReviewerOf } from './loopReviewer'
 import { sessions } from './sessions'
 import { allTasks, liveCardHeads } from './tasks'
 import { workspaceOf } from './workspace'
+import { projectPreferences } from './workflow/preferences'
 
 const log = createLogger('loops')
 
@@ -159,9 +160,9 @@ async function owedNow(loop: Loop): Promise<number[]> {
   const project = basename(loop.projectPath)
   const inPlay = cardsInPlay(await liveCardHeads(ws), project, loop.agentId, loop.cards)
   if (!inPlay.length) return []
-  // The project's loop wakes (Project Settings → Card loops: loopWakes.ts' wakesOn, read as it reads it), and an inbox
+  // The project's loop wakes (its workflow option, HI-1766: loopWakes.ts' wakesOn, read as it reads it), and an inbox
   // to receive them (deliveries are refused without one).
-  const wakes = agentReadsInbox(loop.projectPath, loop.agentId) && (await ws.projectConfig(loop.projectPath).catch(() => null))?.loopWakes !== false
+  const wakes = agentReadsInbox(loop.projectPath, loop.agentId) && projectPreferences(ws, loop.projectPath, await ws.projectConfig(loop.projectPath).catch(() => null)).loopWakes
   if (!wakes) return inPlay
   const cards = await allTasks(ws, { numbers: inPlay })
   const reviewers = new Map<number, string | null>()

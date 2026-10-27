@@ -1229,6 +1229,52 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     expect(line.what).toBe('Notified you that it needs you: AL-1 is approved: OK to merge?')
   })
 
+  it("a card's slot notices (a preparation that failed, a placement waiting or giving up) are lines in its history, in English and in German (HI-1796)", async () => {
+    const { w, alpha } = await open()
+    fake(alpha, { b1: 'working', r1: 'working' })
+    const c = await newCard(w)
+    await settled()
+    const { lastActionId, noteRequestsSince } = await import('../src/main/workflowNotices')
+    const { SLOT_NOTICES, workflowText } = await import('../src/shared/workflow/texts')
+    const { setLanguage } = await import('../src/shared/i18n')
+    // As slotCards.ts writes them (prepare's failure, place's waits): the notify action's English and its message.
+    const written = [
+      workflowText(SLOT_NOTICES.notPrepared, { slot: 'slot-a', card: 'AL-1', why: 'git checkout failed (test)' }),
+      workflowText(SLOT_NOTICES.resumeHeld, { card: 'AL-1', agent: 'B1', slot: 'slot-a', why: 'its slot holds other work now' }),
+      workflowText(SLOT_NOTICES.resumeFailed, { card: 'AL-1', agent: 'B1', slot: 'slot-a', why: "its CLI couldn't start (test)" })
+    ]
+    for (const shown of written) {
+      await store.boardWrite(w, async () => {
+        const after = lastActionId(w)
+        FactStore.forBoard(w, { project: 'alpha', key: 'alpha' }).tx((tx) => tx.action(c, 'notify', { text: 'the English (test)', shown }, null))
+        await noteRequestsSince(w, after)
+      })
+    }
+    const lines = async () => (await inWorkspace(w, () => tasks.getTask(c, w))).history.filter((h) => h.whatText?.id === 'tasks.history.notified')
+    expect((await lines()).map((l) => l.whatText!.values!.why)).toEqual(written)
+    expect((await lines()).map((l) => l.what)).toEqual([
+      "Notified you that it needs you: Hive couldn't get slot-a ready for AL-1: git checkout failed (test)",
+      "Notified you that it needs you: Hive can't give AL-1 to B1 yet: B1's conversation in slot-a can't resume now (its slot holds other work now). Hive gives it AL-1 once it can.",
+      "Notified you that it needs you: Hive couldn't resume B1's conversation in slot-a for AL-1 (three tries): its CLI couldn't start (test). Resume B1 from Sessions, or start it fresh, and Hive gives it AL-1."
+    ])
+    // Shown in the window's language, as its history shows a line (Board.tsx's storedLine): German, from its catalogue.
+    const { storedLineText } = await import('../src/shared/taskHistory')
+    const { tr } = await import('../src/shared/i18n')
+    const { providerMessage } = await import('../src/shared/providers')
+    const { workflowMessage } = await import('../src/shared/workflow/texts')
+    const de = join(__dirname, '..', 'locales', 'de')
+    const { readdirSync } = await import('fs')
+    setLanguage('de', Object.assign({}, ...readdirSync(de).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(de, f), 'utf8')))))
+    try {
+      const german = (await lines()).map((l) => storedLineText(l.whatText, (m, values) => tr(m, values), (id) => providerMessage(id) ?? workflowMessage(id)))
+      expect(german[0]).toContain('Hive konnte slot-a nicht für AL-1 vorbereiten: git checkout failed (test)')
+      expect(german[1]).toContain('Hive kann B1 die Karte AL-1 noch nicht geben')
+      expect(german[2]).toContain('Hive konnte die Unterhaltung von B1 in slot-a für AL-1 nicht fortsetzen (drei Versuche)')
+    } finally {
+      setLanguage('en', {})
+    }
+  })
+
   it("a stall's detail is in its history line, kept after the stall has cleared and a restart", async () => {
     const { w, ws, alpha } = await open()
     const st = fake(alpha, { b1: 'working', r1: 'working' })

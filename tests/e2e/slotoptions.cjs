@@ -6,7 +6,7 @@
 // - the setup script set in Slots and copies is the one the next warming run uses (a marker file in the slot), and the
 //   slots list shows the lent slot with its card; the copies' size saves; two fields saved while the first save is slow
 //   (HIVE_TEST_SLOW_IPC) both stay, with another window's change; the setup emptied is "none", and Inherit undoes it;
-// - the copied files inherit Hive's slot default, then the workspace's (set to none in Settings → Workspace), then the
+// - the copied files inherit Hive's slot default, then the workspace's (set to none in its Workspace defaults, Settings → Version Control), then the
 //   default, each saying where it comes from (HI-1765); Project Settings opens on General, with no slot rows;
 // - a project saved by a P6 build with Pair (G15 stored Off, the one-time step not run yet) reads as Pair, not Custom,
 //   after the next start, with G15 On.
@@ -195,16 +195,17 @@ function board(sql, ...args) {
     await slotsGroup.locator('[data-action="inherit-setup"]').click()
     await until(async () => !('setup' in (projectJson().slots ?? {})), HUNG_MS)
     // The copied files (HI-1765): the project's own back to inherited, from Hive's slot default (Settings → Workflow
-    // defaults), then the workspace's set to none in Settings → Workspace, over Hive's; the project's own none over both.
+    // defaults), then the workspace's set to none in its Workspace defaults (Settings → Version Control), over Hive's; the project's own none over both.
     await inv('slots:setLevelDefault', 'global', 'copy', '.env*\nconfig/hive.json')
     const copyOrigin = slotsGroup.locator('[data-slot-option="copy"] .workflow-origin')
     await slotsGroup.locator('[data-action="inherit-copy"]').click()
-    check('the copied files inherit Hive’s slot default, From Hive’s settings', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/hive.json'), HUNG_MS)), `${JSON.stringify(projectJson().slots)} ${await copyOrigin.innerText().catch(() => '')}`)
+    check('the copied files inherit Hive’s slot default, From Hive defaults', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/hive.json'), HUNG_MS)), `${JSON.stringify(projectJson().slots)} ${await copyOrigin.innerText().catch(() => '')}`)
     await shot('copy-global', slotsGroup.locator('[data-slot-option="copy"]'))
     await page.keyboard.press('Control+,')
-    await page.locator('.settings-nav .row', { hasText: 'Workspace' }).first().click()
+    // The workspace's part of Settings → Version Control (HI-1768).
+    await page.locator('.settings-nav .row', { hasText: 'Version Control' }).first().click()
     const wsCopy = page.locator('[data-slot-default="copy"][data-level="workspace"]')
-    check('Settings → Workspace has the copied files, inheriting Hive’s', !!(await until(async () => (await wsCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'global' && (await wsCopy.innerText()).includes('config/hive.json'), HUNG_MS)), await wsCopy.innerText().catch(() => ''))
+    check('Settings → Version Control’s Workspace defaults have the copied files, inheriting Hive’s', !!(await until(async () => (await wsCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'global' && (await wsCopy.innerText()).includes('config/hive.json'), HUNG_MS)), await wsCopy.innerText().catch(() => ''))
     const wsJson = () => JSON.parse(fs.readFileSync(path.join(fx.ws, '.hive', 'workspace.json'), 'utf8'))
     await wsCopy.locator('[data-action="none-copy"]').click()
     check('…set to none there, saved in workspace.json', !!(await until(async () => wsJson().slotDefaults?.copy === '' && (await wsCopy.locator('.workflow-origin').getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(wsJson().slotDefaults))

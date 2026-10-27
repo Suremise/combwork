@@ -122,7 +122,14 @@ export const RULE_NAMES: Record<string, Msg> = {
   'done.contained': msg({ id: 'workflow.rule.done.contained', defaultMessage: 'Hive checks the merge', description: 'A rule of the workflow, named where a move skips or can\'t check it: a card is done only when its work is in its target (glossary 2.6: G5).' })
 }
 
-const BY_ID = new Map<string, Msg>([...Object.values(FOR_YOU), FOR_YOU_KIND, ROUND_CHOICE, ...Object.values(UNREADABLE), ...Object.values(MOVE_NAMES), ...Object.values(RULE_NAMES)].map((m) => [m.id, m]))
+/** A card's slot notices, shown on the card as its notify action's text (HI-1796: a preparation that failed; HI-1746: a placement waiting or giving up). */
+export const SLOT_NOTICES = {
+  notPrepared: msg({ id: 'service.slots.notPrepared', defaultMessage: "Hive couldn't get {slot} ready for {card}: {why}", description: "A notice: a card was started in a slot (a worktree Hive lends to a card or a lane), and Hive couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English." }),
+  resumeHeld: msg({ id: 'service.slots.resumeHeld', defaultMessage: "Hive can't give {card} to {agent} yet: {agent}'s conversation in {slot} can't resume now ({why}). Hive gives it {card} once it can.", description: "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Hive hasn't handed the card to it yet; the agent's last conversation, in that slot, can't be resumed now, and Hive never starts a new conversation instead. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the reason, in English." }),
+  resumeFailed: msg({ id: 'service.slots.resumeFailed', defaultMessage: "Hive couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Hive gives it {card}.", description: "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Hive's resumes of the agent's last conversation there failed three times, so it stopped trying. Once the user resumes the agent, or starts it, Hive hands it the card. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the last failure's reason, in English." })
+}
+
+const BY_ID = new Map<string, Msg>([...Object.values(FOR_YOU), FOR_YOU_KIND, ROUND_CHOICE, ...Object.values(UNREADABLE), ...Object.values(MOVE_NAMES), ...Object.values(RULE_NAMES), ...Object.values(SLOT_NOTICES)].map((m) => [m.id, m]))
 
 /** The workflow's message of an id: null for one this Hive doesn't know (a record from a newer one). */
 export const workflowMessage = (id: string): Msg | null => BY_ID.get(id) ?? null

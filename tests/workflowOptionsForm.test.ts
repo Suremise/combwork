@@ -297,11 +297,11 @@ describe('the next card starts under the saved options (#1278, S19)', () => {
 })
 
 describe("the Version Control tab's Workflow section (#1418)", () => {
-  // Every option of SPEC §16.6.1 and §16.6.2 by its id: its row (null: not offered before slots, P7; elsewhere: shown,
-  // set elsewhere). A missing row fails here, not first at the phase's acceptance.
+  // Every option of SPEC §16.6.1 and §16.6.2 by its id: its row (null: not offered before slots, P7; N7 an option of its own
+  // since HI-1766). A missing row fails here, not first at the phase's acceptance.
   const SPEC: Record<'git' | 'none', Record<string, string | null>> = {
     git: { G1: 'review', G1b: 'reviewers', G2: 'noSelfReview', G3: 'preChecks', G4: 'sameness', G5: 'finish', G6: 'style', G7: 'target', G8: 'strict', G9: 'mergeChecks', G10: 'okBefore', G11: 'folder', G12: 'identity', G13: 'stopOwnRuns', G14: 'dependenciesDone', G15: null, G16: 'sharedFolderWarning', G17: null },
-    none: { N1: 'review', N2: 'noSelfReview', N3: 'preChecks', N4: 'excluded', N5: 'stageNames', N6: 'dependenciesDone', N7: 'elsewhere' }
+    none: { N1: 'review', N2: 'noSelfReview', N3: 'preChecks', N4: 'excluded', N5: 'stageNames', N6: 'dependenciesDone', N7: 'fileLocks' }
   }
   const sentences = (m: Parameters<typeof englishText>[0]): number => englishText(m).split(/[.!?](?:\s|$)/).filter((s) => s.trim()).length
 
@@ -310,8 +310,7 @@ describe("the Version Control tab's Workflow section (#1418)", () => {
       const rows = FORM_GROUPS[platform].flatMap((g) => g.options)
       for (const [id, key] of Object.entries(SPEC[platform])) {
         if (key === null) continue
-        if (key === 'elsewhere') expect(FORM_GROUPS[platform].map((g) => g.id), id).toContain('elsewhere')
-        else expect(rows, `${platform} ${id}`).toContain(key)
+        expect(rows, `${platform} ${id}`).toContain(key)
       }
       for (const key of rows) {
         const t = OPTION_TEXT[key]

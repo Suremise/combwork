@@ -7,7 +7,8 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import type { HiveEvent, TaskCard } from '../src/shared/types'
-import { allDone, keptLanes, laneLine, laneNextText, laneView, listedLanes, loopDefaults, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_KEEP_MS, MAX_LANES, type LaneRecord } from '../src/shared/lanes'
+import { preferencesOf } from '../src/shared/workflow/preferences'
+import { allDone, keptLanes, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_KEEP_MS, MAX_LANES, type LaneRecord } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
 import { storeDocs } from './storeDocs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -245,12 +246,18 @@ describe('which lanes are listed and kept', () => {
   })
 })
 
-describe("a card loop's rounds and wait when the request doesn't say (#412)", () => {
-  it("the project's, else the workspace's, else 10 rounds and 6 hours; values out of range are left out", () => {
-    expect(loopDefaults()).toEqual({ rounds: 10, waitHours: 6 })
-    expect(loopDefaults({ loops: { rounds: 4 } })).toEqual({ rounds: 4, waitHours: 6 })
-    expect(loopDefaults({ loops: { rounds: 4, waitHours: 2 } }, { loopRounds: 7, loopWaitHours: null })).toEqual({ rounds: 7, waitHours: 2 })
-    expect(loopDefaults({ loops: { rounds: 0, waitHours: 25 } }, { loopRounds: 2.5, loopWaitHours: -1 })).toEqual({ rounds: 10, waitHours: 6 })
+describe("a card loop's rounds and wait when the request doesn't say (#412, HI-1766: workflow options)", () => {
+  it("the project's, else the workspace's, else Hive's, else 10 rounds and 6 hours; values out of range are passed over", () => {
+    const of = (levels: Parameters<typeof preferencesOf>[1]) => {
+      const v = preferencesOf('git', levels).values
+      return { rounds: v.loopRounds, waitHours: v.loopWaitHours }
+    }
+    expect(of({})).toEqual({ rounds: 10, waitHours: 6 })
+    expect(of({ workspace: { git: { loopRounds: 4 } } })).toEqual({ rounds: 4, waitHours: 6 })
+    expect(of({ global: { git: { loopWaitHours: 2 } }, workspace: { git: { loopRounds: 4 } }, project: { loopRounds: 7 } })).toEqual({ rounds: 7, waitHours: 2 })
+    // Another platform's defaults don't apply.
+    expect(of({ workspace: { none: { loopRounds: 4 } } })).toEqual({ rounds: 10, waitHours: 6 })
+    expect(of({ workspace: { git: { loopRounds: 0, loopWaitHours: 25 } }, project: { loopRounds: 2.5, loopWaitHours: -1 } as never })).toEqual({ rounds: 10, waitHours: 6 })
   })
 })
 
@@ -305,24 +312,32 @@ describe('the lanes service', () => {
     await lanes.endLane(w, c.lane.id, { abandoned: true })
   })
 
-  it("a lane started without rounds or wait takes the project's settings, else the workspace's; given ones win (#412)", async () => {
+  it("a lane started without rounds or wait takes the project's workflow options as they resolve, else the workspace's; given ones win, and a lane keeps what it started with (#412, HI-1766)", async () => {
     // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).
     await rulesOff()
+    const alpha = join(wsPath, 'alpha')
+    const platform = w.info()!.projects.find((p) => p.name === 'alpha')!.platform?.id ?? 'none'
+    const wasWorkflow = (await w.projectConfig(alpha)).workflow
     const [c1, c2, c3] = [await make('L1'), await make('L2'), await make('L3')]
-    const plain = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number], by: 'B2 (alpha)' })
-    expect([plain.lane.rounds, plain.lane.waitMinutes]).toEqual([10, 360])
-    await w.setLoops({ rounds: 6, waitHours: 3 })
-    const ws = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c2.number], by: 'B2 (alpha)' })
-    expect([ws.lane.rounds, ws.lane.waitMinutes]).toEqual([6, 180])
-    await w.updateProjectConfig(join(wsPath, 'alpha'), { loopRounds: 8 })
-    const proj = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c3.number], by: 'B2 (alpha)' })
-    expect([proj.lane.rounds, proj.lane.waitMinutes]).toEqual([8, 180])
-    const given = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c3.number], rounds: 3, waitMinutes: 60, by: 'B2 (alpha)' })
-    expect([given.lane.rounds, given.lane.waitMinutes]).toEqual([3, 60])
-    await expect(w.setLoops({ rounds: 0 })).rejects.toThrow(/whole number from 1 to 50/)
-    await w.updateProjectConfig(join(wsPath, 'alpha'), { loopRounds: null })
-    await w.setLoops({ rounds: 10, waitHours: 6 })
-    await lanes.endLane(w, given.lane.id, { abandoned: true })
+    try {
+      const plain = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number], by: 'B2 (alpha)' })
+      expect([plain.lane.rounds, plain.lane.waitMinutes]).toEqual([10, 360])
+      await w.saveWorkspaceConfigWith((c) => ({ workflow: { ...c.workflow, [platform]: { ...c.workflow?.[platform], loopRounds: 6, loopWaitHours: 3 } } }))
+      const ws = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c2.number], by: 'B2 (alpha)' })
+      expect([ws.lane.rounds, ws.lane.waitMinutes]).toEqual([6, 180])
+      await w.mutateProjectConfig(alpha, (c) => ({ workflow: { platform, preset: null, ...c.workflow, options: { ...(c.workflow?.platform === platform ? c.workflow.options : {}), loopRounds: 8 } } }))
+      const proj = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c3.number], by: 'B2 (alpha)' })
+      expect([proj.lane.rounds, proj.lane.waitMinutes]).toEqual([8, 180])
+      // The lanes started before keep what they started with.
+      const listed = await lanes.listLanes(w, { all: true })
+      expect(listed.find((l) => l.id === ws.lane.id)).toMatchObject({ rounds: 6, waitMinutes: 180 })
+      const given = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c3.number], rounds: 3, waitMinutes: 60, by: 'B2 (alpha)' })
+      expect([given.lane.rounds, given.lane.waitMinutes]).toEqual([3, 60])
+      await lanes.endLane(w, given.lane.id, { abandoned: true })
+    } finally {
+      await w.mutateProjectConfig(alpha, () => ({ workflow: wasWorkflow }))
+      await w.saveWorkspaceConfigWith((c) => ({ workflow: { ...c.workflow, [platform]: {} } }))
+    }
   })
 
   it('a reviewer joins its builder’s lane, before or after the builder starts it', async () => {

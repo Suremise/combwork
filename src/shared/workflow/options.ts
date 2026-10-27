@@ -7,6 +7,8 @@
 
 import { msg, type Msg } from '../i18n/msg'
 import type { PlatformId } from '../platform/descriptors'
+import type { FileLockMode } from '../types'
+import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from '../loopLimits'
 import type { StageId } from './facts'
 import type { ReviewerMode } from './roles'
 
@@ -101,10 +103,40 @@ export interface WorkflowOptions {
    * once and never marks anything "old rules" (#1417). Checked by `stageNameProblems` (stages.ts) when saved.
    */
   stageNames?: Partial<Record<StageId, string>>
+  /**
+   * Card loops (HI-1766, before 1.0 Project Settings → Card loops and the workspace's): Hive wakes a card's reviewer and
+   * builder for its handoffs; a loop's rounds and wait when its lane doesn't say (read when the lane registers); the
+   * time a design or follow-up step waits for its reviewer. Preferences, not rules (`PREFERENCE_OPTIONS`): unset reads
+   * as `PREFERENCE_DEFAULTS` (preferences.ts).
+   */
+  loopWakes?: boolean
+  loopRounds?: number
+  loopWaitHours?: number
+  loopStepWaitMinutes?: number
+  /** File locks between agents in the same folder, outside a slot (HI-1766, before 1.0 Settings → Agents). */
+  fileLocks?: FileLockMode
 }
 
 /** The options that are names, not rules (#1417): left out of a ruleset, so changing them alone applies at once. */
 export const NAME_OPTIONS: readonly OptionKey[] = ['stageNames']
+
+/**
+ * How agents work together, not rules (HI-1766): left out of every ruleset (so a change applies at once and marks
+ * nothing "old rules"), never set by a preset or All off, never making the options Custom. A lane keeps the rounds and
+ * wait it registered with.
+ */
+export const PREFERENCE_OPTIONS = ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes', 'fileLocks'] as const satisfies readonly OptionKey[]
+export type PreferenceKey = (typeof PREFERENCE_OPTIONS)[number]
+
+/** The options no preset sets (names and preferences): a choice of preset keeps a project's or level's own. */
+export const UNPRESET_OPTIONS: readonly OptionKey[] = [...NAME_OPTIONS, ...PREFERENCE_OPTIONS]
+
+/** A preset's or All off's own options, with the draft's own names and preferences kept (HI-1766, #1417). */
+export function withUnpreset(chosen: Partial<WorkflowOptions>, own: Partial<WorkflowOptions>): Partial<WorkflowOptions> {
+  const kept = Object.fromEntries(UNPRESET_OPTIONS.filter((k) => own[k] !== undefined).map((k) => [k, own[k]]))
+  const fresh = Object.fromEntries(Object.entries(chosen).filter(([k]) => !UNPRESET_OPTIONS.includes(k as OptionKey)))
+  return { ...fresh, ...kept }
+}
 
 /**
  * The presets: Solo, Pair and Team (§16.6.3), and P4's Pair, in which the agent merges (`pairAgent`, §16.19.1), kept
@@ -331,6 +363,11 @@ const oneOf =
   (v: unknown): boolean =>
     typeof v === 'string' && (choices as readonly string[]).includes(v)
 const bool = (v: unknown): boolean => typeof v === 'boolean'
+/** A whole number from 1 to `max` (the card loops' limits, as before HI-1766). */
+const whole =
+  (max: number) =>
+  (v: unknown): boolean =>
+    typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= max
 
 /**
  * What each option takes: its type and, for a choice, one of its values (HR2's #1263 round 1: compiling checks only
@@ -361,7 +398,12 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   reviewerMode: oneOf<ReviewerMode>(['lane', 'pool']),
   excluded: strings,
   commands: (v) => isRecord(v) && Object.values(v).every((x) => typeof x === 'string'),
-  stageNames: (v) => isRecord(v) && Object.entries(v).every(([k, x]) => (STAGE_IDS as readonly string[]).includes(k) && typeof x === 'string')
+  stageNames: (v) => isRecord(v) && Object.entries(v).every(([k, x]) => (STAGE_IDS as readonly string[]).includes(k) && typeof x === 'string'),
+  loopWakes: bool,
+  loopRounds: whole(LANE_MAX_ROUNDS),
+  loopWaitHours: whole(LOOP_WAIT_MAX_HOURS),
+  loopStepWaitMinutes: whole(LOOP_STEP_WAIT_MAX_MINUTES),
+  fileLocks: oneOf<FileLockMode>(['off', 'warn', 'block', 'ask'])
 }
 
 /** The stage ids a project may name (N5), as stages.ts orders them (kept here so options.ts needs nothing of it). */
@@ -370,14 +412,17 @@ const STAGE_IDS: readonly StageId[] = ['hold', 'todo', 'active', 'review', 'appr
 /** Whether a value is one its option takes (false for anything that isn't an option). */
 export const takesOption = (key: string, v: unknown): boolean => Object.hasOwn(OPTION_TAKES, key) && OPTION_TAKES[key as OptionKey](v)
 
+/** Card loops' options (HI-1766), a group of their own for both platforms. */
+const LOOP_OPTIONS: OptionKey[] = ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes']
+
 /** The Workflow section's groups (#1418), each a heading with its options. */
-export type FormGroupId = 'review' | 'checks' | 'merging' | 'where' | 'work' | 'stages' | 'elsewhere'
+export type FormGroupId = 'review' | 'checks' | 'merging' | 'where' | 'work' | 'loops' | 'stages'
 
 /**
  * The Workflow section's groups for a platform, in order, and their options (SPEC §16.6.1, §16.6.2; #1418). Since P7
  * (#1445) Git's has every option: G17 beside G1b under Review, G15 under Where cards are built. The check commands
- * (`commands`) are edited with the checks that name them. "Shown here, set elsewhere" holds rows whose owner is another
- * setting (N7, Card loops). Some rows show only where they apply (`formShows`). The slot and copy options aren't workflow
+ * (`commands`) are edited with the checks that name them. File locks (N7) and Card loops are options of both since
+ * HI-1766. Some rows show only where they apply (`formShows`). The slot and copy options aren't workflow
  * options (project.json `slots` and `copies`): the tab's Slots and copies group, beside these.
  */
 export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionKey[] }[]> = {
@@ -385,26 +430,26 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
     { id: 'review', options: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'] },
     { id: 'checks', options: ['preChecks', 'mergeChecks', 'mergeInstall'] },
     { id: 'merging', options: ['finish', 'style', 'target', 'strict', 'pushTarget', 'commitMessage', 'dependenciesDone'] },
-    { id: 'where', options: ['folder', 'slotsUpToDate', 'identity', 'stopOwnRuns', 'sharedFolderWarning'] },
-    { id: 'stages', options: ['stageNames'] },
-    { id: 'elsewhere', options: [] }
+    { id: 'where', options: ['folder', 'slotsUpToDate', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'] },
+    { id: 'loops', options: LOOP_OPTIONS },
+    { id: 'stages', options: ['stageNames'] }
   ],
   none: [
     { id: 'review', options: ['review', 'noSelfReview'] },
     { id: 'checks', options: ['preChecks'] },
-    { id: 'work', options: ['excluded', 'dependenciesDone'] },
-    { id: 'stages', options: ['stageNames'] },
-    { id: 'elsewhere', options: [] }
+    { id: 'work', options: ['excluded', 'dependenciesDone', 'fileLocks'] },
+    { id: 'loops', options: LOOP_OPTIONS },
+    { id: 'stages', options: ['stageNames'] }
   ]
 }
 
 /**
- * The rule options the form edits for a platform, in its order (the names, N5, aren't rules: a preset leaves them, and
- * they never make the options Custom).
+ * The rule options the form edits for a platform, in its order (the names, N5, and the preferences, HI-1766, aren't rules:
+ * a preset leaves them, and they never make the options Custom).
  */
 export const FORM_OPTIONS: Record<PlatformId, OptionKey[]> = {
-  git: FORM_GROUPS.git.flatMap((g) => g.options).filter((k) => !NAME_OPTIONS.includes(k)),
-  none: FORM_GROUPS.none.flatMap((g) => g.options).filter((k) => !NAME_OPTIONS.includes(k))
+  git: FORM_GROUPS.git.flatMap((g) => g.options).filter((k) => !UNPRESET_OPTIONS.includes(k)),
+  none: FORM_GROUPS.none.flatMap((g) => g.options).filter((k) => !UNPRESET_OPTIONS.includes(k))
 }
 
 /**
