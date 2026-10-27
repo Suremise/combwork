@@ -731,8 +731,11 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
   // A retirement waiting for its slot's operation or job: looked at again later; none: its tries forgotten.
   if (busy) retireLater(ws, projectPath)
   else retiredNow(ws, projectPath)
-  if (!workflowEnforced() || ended(ws)) return
+  if (ended(ws)) return
+  // With the rules off nothing is placed: no placement is pending, so none keeps anything (HI-1804).
+  if (!workflowEnforced()) return void keepTracksOf(ws, projectPath, new Map())
   // 2. Each current cycle in a lease: prepared, then its builder placed.
+  const pending = new Map<number, string>()
   for (const l of pool.openLeases()) {
     const cards = l.kind === 'card' && l.card !== null ? [l.card] : l.kind === 'lane' && l.lane ? (lanes.get(l.lane)?.cards ?? []) : []
     for (const n of cards) {
@@ -740,9 +743,13 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
       const cycle = card ? cycleIn(wf.store.facts(n)) : null
       if (!card || !cycle || cycle.started.lease !== l.id || wf.state(card).stage !== 'active') continue
       if (cycle.prepared && cycle.placed) continue
+      pending.set(n, refOf(n, cycle, l))
       void ensure(ws, projectPath, wf, pool, n, cycle, l)
     }
   }
+  // What placements no longer pending kept (their card put back, Done, deleted; a cycle placed or replaced) is let go
+  // here, where retired cycles are passed over (HR4's HI-1804 round 1: a failed try's record outlived its card's return).
+  keepTracksOf(ws, projectPath, pending)
   // 3. Done cards' merged lines, from leases still open or ended within DELETE_WITHIN_MS.
   if (advanced.get(SLOTS_DELETE_MERGED) !== false) {
     const since = new Date(Date.now() - DELETE_WITHIN_MS).toISOString()
@@ -902,6 +909,20 @@ function trackOf(ws: WorkspaceService, projectPath: string, n: number, ref: stri
 function releaseTrack(ws: WorkspaceService, projectPath: string, n: number, ref: string): void {
   const all = tracks.get(ws.lifetime)
   if (all?.get(trackKey(projectPath, n))?.ref === ref) all.delete(trackKey(projectPath, n))
+}
+/**
+ * A project's records kept only for its pending placements (the slot pass's: card → its current cycle's ref); every
+ * other card's, or another cycle's, let go. A record is made only by a placement under way, so this never takes one a
+ * running placement still needs: its card is pending, at that ref.
+ */
+function keepTracksOf(ws: WorkspaceService, projectPath: string, pending: ReadonlyMap<number, string>): void {
+  const all = tracks.get(ws.lifetime)
+  if (!all) return
+  const prefix = `${projectPath.toLowerCase()}#`
+  for (const [key, t] of all) {
+    if (!key.startsWith(prefix)) continue
+    if (pending.get(Number(key.slice(prefix.length))) !== t.ref) all.delete(key)
+  }
 }
 /** Tests: the placements a workspace keeps something for, as card → its cycle's ref and what it keeps. */
 export const placementTracksForTests = (ws: WorkspaceService): Map<string, PlacementTrack> => new Map(tracks.get(ws.lifetime) ?? [])

@@ -666,6 +666,38 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
       expect(placedHow(e, n)).toEqual([])
     })
 
+    it("a failed try's record goes at the slot pass once its card is put back, without place running again (HR4's round 1)", async () => {
+      const { e, n, key, cycle, ws } = await owed()
+      state.conv = resume
+      state.starts = ['fails']
+      await expect(place(ws, e.project, e.wf, n, cycle, lease)).rejects.toThrow(/couldn't resume/)
+      expect(kept(ws, n)).toMatchObject({ failures: 1 })
+      // Put back: its lease ends, and the pass passes the card over (no placement pending for it).
+      moved(await e.wf.putBack(key, B1, { why: 'not now' }))
+      await settleSlotCards(ws, e.project)
+      expect(kept(ws, n)).toBeNull()
+      expect(state.calls).toEqual(['resume c1 with the card (fails)'])
+    })
+
+    it('a pending placement keeps its record through the passes while it waits, and loses it once its card is put back', async () => {
+      const { e, n, key, ws } = await owed()
+      state.conv = { is: 'held', hold: { is: 'draining', slot: 'slot-a' } }
+      const open = lease as { id: string; card: number }
+      state.pool = { openLeases: () => (e.wf.state(e.store.card(n)!).stage === 'active' ? [{ ...open, card: n }] : []), lease: () => ({ ...open, card: n }) }
+      // The pass starts its placement, which waits on the hold: told once, its record kept.
+      await settleSlotCards(ws, e.project)
+      await vi.waitFor(() => expect(kept(ws, n)?.told.has('draining')).toBe(true), { timeout: HUNG_MS })
+      await settleSlotCards(ws, e.project)
+      expect(kept(ws, n)?.told.has('draining')).toBe(true)
+      expect(notices(e)).toHaveLength(1)
+      // Put back: the next pass lets it go, and the waiting placement ends at its next look.
+      moved(await e.wf.putBack(key, B1, { why: 'not now' }))
+      await settleSlotCards(ws, e.project)
+      expect(kept(ws, n)).toBeNull()
+      status()
+      expect(placedHow(e, n)).toEqual([])
+    })
+
     it("a new cycle of the card starts afresh: the last cycle's tries and notices aren't its own", async () => {
       const { e, n, key, cycle, ws } = await owed()
       state.conv = resume
