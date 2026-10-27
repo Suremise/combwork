@@ -6,7 +6,7 @@
 // Windows ends the job's members. With no journal nothing is ever followed outside the job: a process that escapes it is
 // ended by the supervisor at once ("unowned"), unconfirmed, so a check that sees one fails and its connection stays held
 // until Hive restarts. The restart releases that hold without confirming the escaped branch ended: a known limit,
-// pending the Assistant's decision (HI-1757/r94; the durable recovery is parked as HI-1813).
+// accepted as a preview limit (the Assistant's answer to HI-1757/r94; the durable recovery is HI-1811, on hold).
 //
 // A failed or unconfirmed end is a failed check, never the answer the server gave, and holds the connection: no other
 // check, sign-in or removal of it, until a later check confirms the old end (in memory only: a restart releases it).

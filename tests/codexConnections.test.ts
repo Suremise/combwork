@@ -368,7 +368,7 @@ process.stdin.on('end', () => { if (!${!!o.stubborn}) { child.kill(); process.ex
     codexCheckSeams.afterAssign = undefined
     expect(await status(s.cmd, homeOf('a-escaped'))).toEqual(escaped)
     expect(await s.left()).toEqual([])
-    // A restart releases the hold: not a confirmation that the escaped branch ended (the limit pending in HI-1757/r94).
+    // A restart releases the hold: not a confirmation that the escaped branch ended (the preview limit accepted on HI-1757/r94).
     resetCodexChecksForTests()
     expect(codexCheckHeld(homeOf('a-escaped'))).toBe(false)
   }, 90_000)
