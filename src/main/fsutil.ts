@@ -215,33 +215,45 @@ export async function readKeptJson<T>(path: string, fallback: T, opts: KeptReadO
   }
 }
 
-/** Kept files read by their stat (readKeptJsonByStat): path (lower-cased) → the stat it was read at and what it parsed to. */
-const keptByStat = new Map<string, { mtimeMs: number; size: number; ino: number; value: unknown }>()
+/** Kept files read by their stat (readKeptJsonByStat): path (lower-cased) → the stat it was read at and what it gave. */
+const keptByStat = new Map<string, { mtimeMs: number; size: number; ino: number; derive: (v: never) => unknown; derived: unknown }>()
+
+/** Forgets what readKeptJsonByStat kept of a file: Hive is writing it. */
+const forgetKeptStat = (path: string): boolean => keptByStat.delete(path.toLowerCase())
+
+/**
+ * A file modified this close to a read is never kept by its stat: Windows' file times can be as coarse as the clock's
+ * 15.6 ms tick, so two writes of the same size in a row can share one (git's "racy" files, the same way).
+ */
+const KEPT_RACY_MS = 2000
 
 /**
  * readKeptJson for a file read often and changed seldom (HI-1814: project.json, read several times by each check's
- * resolve): read again only when its modified time, size or identity changed, else a copy of what it parsed to (a
- * caller may change what it is given). Stated before the read, so a change during it is a different stat next time:
- * never kept as current. Only a read that parsed is kept; anything else goes through readKeptJson, its recovery
- * included, each time, as before.
+ * resolve), with what `derive` makes of its value: one stat each read, and read and derived again only when the file's
+ * modified time, size or identity changed, else a copy of what it gave (a caller may change what it is given). The
+ * stat is taken before the read, so a change during it is a different stat next time, never kept as current; a file
+ * modified within KEPT_RACY_MS of the read is read in full each time until it has been left alone that long. Only a
+ * read that parsed is kept; anything else goes through readKeptJson, its recovery included, each time, as before.
  */
-export async function readKeptJsonByStat<T>(path: string, fallback: T, opts: KeptReadOptions = {}): Promise<T> {
+export async function readKeptJsonByStat<T, D>(path: string, fallback: T, derive: (value: T) => D, opts: KeptReadOptions = {}): Promise<D> {
   const key = path.toLowerCase()
+  const asked = Date.now()
   const st = await stat(path).catch(() => null)
   const kept = keptByStat.get(key)
-  if (st && kept && kept.mtimeMs === st.mtimeMs && kept.size === st.size && kept.ino === st.ino) return structuredClone(kept.value) as T
+  if (st && kept && kept.derive === derive && kept.mtimeMs === st.mtimeMs && kept.size === st.size && kept.ino === st.ino) return structuredClone(kept.derived) as D
   keptByStat.delete(key)
-  if (!st) return readKeptJson(path, fallback, opts)
+  if (!st) return derive(await readKeptJson(path, fallback, opts))
   const text = await readFile(path, 'utf8').catch(() => null)
-  let value: unknown
+  let value: T
   try {
     if (text === null) throw new Error('unreadable')
-    value = JSON.parse(text)
+    value = JSON.parse(text) as T
   } catch {
-    return readKeptJson(path, fallback, opts)
+    return derive(await readKeptJson(path, fallback, opts))
   }
-  keptByStat.set(key, { mtimeMs: st.mtimeMs, size: st.size, ino: st.ino, value })
-  return structuredClone(value) as T
+  const derived = derive(value)
+  if (st.mtimeMs < asked - KEPT_RACY_MS) keptByStat.set(key, { mtimeMs: st.mtimeMs, size: st.size, ino: st.ino, derive, derived: structuredClone(derived) })
+  return derived
 }
 
 /** The same, for reads at startup that must be synchronous (config.json). */
@@ -416,7 +428,8 @@ const backedUp = new Set<string>()
  */
 export async function writeKeptJson(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean } = {}): Promise<void> {
   const text = (opts.compact ? JSON.stringify(data) : JSON.stringify(data, null, 2)) + '\n'
-  await writeTextAtomic(path, text)
+  forgetKeptStat(path)
+  await writeTextAtomic(path, text).finally(() => forgetKeptStat(path))
   const k = path.toLowerCase()
   if (opts.bakOncePerRun && backedUp.has(k)) return
   await writeTextAtomic(`${path}.bak`, text).then(

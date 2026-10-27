@@ -49,23 +49,40 @@ describe('kept files', () => {
   })
 
   it('read by its stat (HI-1814): kept until the file changes, a copy each time, and a damaged one recovered as before', async () => {
+    type V = { n: number; list: string[] } | null
     const f = join(dir, 'stat.json')
+    let derived = 0
+    const derive = (v: V): V => (derived++, v)
+    const read = (fresh = false): Promise<V> => readKeptJsonByStat<V, V>(f, null, derive, fresh ? { unsettled: 'throw' } : {})
     await writeKeptJson(f, { n: 1, list: ['a'] })
-    const first = await readKeptJsonByStat<{ n: number; list: string[] }>(f, { n: 0, list: [] })
+    // Just written: read in full each time (a write of the same size could share its time).
+    expect(await read()).toEqual({ n: 1, list: ['a'] })
+    expect(await read()).toEqual({ n: 1, list: ['a'] })
+    expect(derived).toBe(2)
+    // Left alone a while: kept, derived once while the file is the same.
+    age(f)
+    const first = await read()
     expect(first).toEqual({ n: 1, list: ['a'] })
     // A caller changing what it was given changes nothing kept.
-    first.list.push('changed')
-    expect(await readKeptJsonByStat(f, null)).toEqual({ n: 1, list: ['a'] })
-    // Written again (Hive's write or anyone's), with the same size: its time and identity say so.
+    first!.list.push('changed')
+    expect(await read()).toEqual({ n: 1, list: ['a'] })
+    expect(await read(true)).toEqual({ n: 1, list: ['a'] })
+    expect(derived).toBe(3)
+    // Hive's own write is read at once.
     await writeKeptJson(f, { n: 2, list: ['b'] })
-    expect(await readKeptJsonByStat(f, null)).toEqual({ n: 2, list: ['b'] })
+    expect(await read()).toEqual({ n: 2, list: ['b'] })
+    age(f)
+    expect(await read()).toEqual({ n: 2, list: ['b'] })
+    // Anyone else's, of the same size twice in a row: its time says so, at once.
     writeFileSync(f, '{ "n": 3, "list": ["c"] }')
-    expect(await readKeptJsonByStat(f, null)).toEqual({ n: 3, list: ['c'] })
+    expect(await read()).toEqual({ n: 3, list: ['c'] })
+    writeFileSync(f, '{ "n": 4, "list": ["d"] }')
+    expect(await read()).toEqual({ n: 4, list: ['d'] })
     // Damaged: never kept, readKeptJson's recovery (the .bak) each time.
     writeFileSync(f, '{ "n": ')
     age(f)
-    expect(await readKeptJsonByStat(f, null)).toEqual({ n: 2, list: ['b'] })
-    expect(await readKeptJsonByStat(join(dir, 'stat-missing.json'), 7)).toBe(7)
+    expect(await read(true)).toEqual({ n: 2, list: ['b'] })
+    expect(await readKeptJsonByStat(join(dir, 'stat-missing.json'), 7, (v) => v)).toBe(7)
   })
 
   it('sets aside an empty file that was emptied a while ago', async () => {

@@ -436,7 +436,8 @@ once), each repository and folder watched once however many projects share it:
   never from watches inside `.git`: Windows won't rename a folder while a handle is open on anything inside it, so a
   watch there (or on any subfolder) stopped the project being renamed. A bare repository has one watch on its git dir.
   `HEAD`, `packed-refs`, `refs/heads`, `logs/HEAD` and `worktrees/<n>/{HEAD,gitdir,logs/HEAD}` count. A burst is read
-  once (150 ms quiet, at most 1 s), from the ref files with no git process (`linesOf`, `refSync`), and said to
+  once (150 ms quiet, at most 1 s), from the ref files with no git process (`repoRefs.ts`: in git's worker, one read at
+  a time, HI-1814; the first, as the repository is attached, at once on main), and said to
   subscribers as `lineMoved` (a branch; a target is a line, whose the subscriber's options say) and `folderMoved` (a
   working folder's HEAD). Only a repository's first read takes what it finds silently; every later read (its events, a
   rescan, a refresh's `follow`) says each move, so no move is taken in unsaid. Each read also compares each folder's `logs/HEAD` size, so a reflog entry whose event was lost
