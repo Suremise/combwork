@@ -5,7 +5,7 @@
 // lane's save and its delivery). A real workspace and board, rules on, a project not built in slots.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -15,7 +15,8 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
 const { deliveriesOf, readInbox } = await import('../src/main/deliveries')
-const { LANE_BRIEF_SOURCE, laneBriefRefreshForTests, settleLaneBriefs } = await import('../src/main/laneBriefs')
+const { LANE_BRIEF_SOURCE, laneBriefHoldsForTests, laneBriefRefreshForTests, settleLaneBriefs } = await import('../src/main/laneBriefs')
+const { sessions } = await import('../src/main/sessions')
 const { nextBrief } = await import('../src/shared/lanes')
 
 describe("a lane's brief as it changes (nextBrief)", () => {
@@ -154,6 +155,28 @@ describe("a lane's brief kept with the lane, and delivered outside slots (HI-179
     } finally {
       await disposeWorkspaceService(other)
     }
+  })
+
+  it("never offered into the builder's conversation running as the brief was given: its next conversation (or none running) gets it", async () => {
+    const a = await make('Not in a')
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'the Assistant', brief: 'For the next conversation.', briefNotIn: 'conv-old' })).lane
+    await settleLaneBriefs(w)
+    const d = (await deliveriesOf(project, 'b1')).find((x) => x.source === LANE_BRIEF_SOURCE && x.ref === `${l.id}:1`)!
+    expect(d.meta).toMatchObject({ notIn: 'conv-old' })
+    const running = vi.spyOn(sessions, 'liveFor')
+    try {
+      running.mockReturnValue({ sessionId: 'conv-old' } as never)
+      expect(laneBriefHoldsForTests(d, project, 'offer' as never)).toBe(false)
+      running.mockReturnValue({ sessionId: 'conv-new' } as never)
+      expect(laneBriefHoldsForTests(d, project, 'offer' as never)).toBe(true)
+      running.mockReturnValue(null)
+      expect(laneBriefHoldsForTests(d, project, 'offer' as never)).toBe(true)
+    } finally {
+      running.mockRestore()
+    }
+    // A brief given with no conversation running holds nowhere.
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a], by: 'the Assistant', brief: 'Changed.', briefNotIn: null })
+    expect((await lanes.rawLanes(w)).find((x) => x.id === l.id)?.brief).not.toHaveProperty('notIn')
   })
 
   it("one owed (saved, its delivery not yet made or not yet recorded) is made by the next look, once", async () => {

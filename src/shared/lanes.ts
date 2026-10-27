@@ -58,7 +58,7 @@ export interface LaneRecord {
    * of the lane's cards carries the text as it is then; outside slots it is delivered once per rev, and `out` is the rev
    * whose delivery has been made (the intent recorded: one owed is made by the next look, a crash between kept).
    */
-  brief?: { text: string | null; rev: number; out: number | null }
+  brief?: { text: string | null; rev: number; out: number | null; notIn?: string }
   /**
    * Reviewed by the project's reviewer pool (#1443, G17): no reviewer of its own (`reviewer` null); each card submitted is
    * given to the next free pooled reviewer. Kept with the lane (its row's `extra`).
@@ -77,14 +77,16 @@ export const LANE_BRIEF_MAX = 4000
 /**
  * A lane's brief after a start that gives `brief` (HI-1795): undefined keeps it as it is (a list change, a reviewer's
  * join); '' (or only spaces) clears it; a text replaces it. A change of text, or a clear, takes the next rev (never one
- * used before, a clear's included); the same text changes nothing, so nothing is given again.
+ * used before, a clear's included); the same text changes nothing, so nothing is given again. `notIn`: the builder's
+ * conversation running as it was given (outside slots, never offered into it: its next conversation gets it).
  */
-export function nextBrief(was: LaneRecord['brief'], brief: string | undefined): LaneRecord['brief'] {
+export function nextBrief(was: LaneRecord['brief'], brief: string | undefined, notIn?: string | null): LaneRecord['brief'] {
   if (brief === undefined) return was
   const text = brief.trim() ? brief.trim().slice(0, LANE_BRIEF_MAX) : null
-  if (!was) return text === null ? undefined : { text, rev: 1, out: null }
+  const from = notIn ? { notIn } : {}
+  if (!was) return text === null ? undefined : { text, rev: 1, out: null, ...from }
   if (was.text === text) return was
-  return { text, rev: was.rev + 1, out: was.out }
+  return { text, rev: was.rev + 1, out: was.out, ...from }
 }
 /** A lane's name, at most. */
 export const LANE_NAME_MAX = 80
@@ -335,7 +337,7 @@ export function readLane(v: unknown): LaneRecord | null {
     ...(pending ? { pending } : {}),
     ...(whole(v.inFlight, 1e9) ? { inFlight: v.inFlight as number } : {}),
     ...(isObj(v.slotWait) && time(v.slotWait.since) && typeof v.slotWait.note === 'string' ? { slotWait: { since: v.slotWait.since as string, note: (v.slotWait.note as string).slice(0, 4000) } } : {}),
-    ...(isObj(v.brief) && whole(v.brief.rev, 1e9) && (v.brief.text === null || typeof v.brief.text === 'string') && (v.brief.out === null || whole(v.brief.out, 1e9)) ? { brief: { text: v.brief.text === null ? null : (v.brief.text as string).slice(0, LANE_BRIEF_MAX), rev: v.brief.rev as number, out: v.brief.out as number | null } } : {}),
+    ...(isObj(v.brief) && whole(v.brief.rev, 1e9) && (v.brief.text === null || typeof v.brief.text === 'string') && (v.brief.out === null || whole(v.brief.out, 1e9)) ? { brief: { text: v.brief.text === null ? null : (v.brief.text as string).slice(0, LANE_BRIEF_MAX), rev: v.brief.rev as number, out: v.brief.out as number | null, ...(text(v.brief.notIn, 128) ? { notIn: v.brief.notIn as string } : {}) } } : {}),
     ...(v.pool === true && !reviewer ? { pool: true as const } : {})
   }
 }

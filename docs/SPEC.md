@@ -3568,7 +3568,8 @@ Whether a conversation may resume there is its **hold** (none: it may):
     (`lane-brief`, ref `<lane>:<rev>`, a `rebrief`), the lane recording the rev made (`out`) so one owed after a crash is
     made by the next look (`laneBriefs.ts`, on lanes written and as a workspace opens), never twice; a replaced or
     cleared brief's delivery not yet received is cancelled, and refreshed before it is offered, so it never arrives as the
-    current one.
+    current one. It is never offered into the builder's conversation running as it was given (`notIn`: the one a new
+    lane's start replaces), only to its next one, or to any while it wasn't running.
     **Its builder stopped** (HI-1746: Hive quit between the card's start and its placement), the placement resumes the
     builder's newest conversation of its provider bound to the card's lease (a handover or a takeover binds it there),
     the card's prompt that launch's own line (`BuilderPlaced` `how: 'resumed'`); a new conversation only when there is

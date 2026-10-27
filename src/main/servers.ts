@@ -1806,7 +1806,7 @@ route('POST', '/v1/lanes', async ({ body }) =>
       if (!reviewer) note = `No agent "${String(body.reviewer)}" in ${basename(p)}: the lane has no reviewer until one joins it.`
     }
     const start = async () => {
-      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, by: await laneBy() })
+      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: args.brief !== undefined ? (sessions.liveFor(p, builder)?.sessionId ?? null) : null, by: await laneBy() })
       // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
       const told = args.brief !== undefined ? await briefNote(ws, (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id) ?? { project: basename(p) }) : null
       if (args.brief !== undefined) await settleLaneBriefs(ws)

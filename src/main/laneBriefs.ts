@@ -4,7 +4,8 @@
 // placement, so it is delivered to the builder once per revision (source `lane-brief`, ref `<lane>:<rev>`): the lane
 // records the rev whose delivery has been made (`out`), so one owed (a crash between the lane's save and its delivery)
 // is made by the next look. A replaced or cleared brief's delivery not received yet is cancelled, and refreshed just
-// before it is offered, so it can never arrive as the current one. Agent-facing: English.
+// before it is offered, so it can never arrive as the current one; and it is never offered into the builder's conversation
+// running as it was given (`notIn`, the one a new lane's start replaces). Agent-facing: English.
 
 import { join } from 'path'
 import type { LaneRecord } from '../shared/lanes'
@@ -12,6 +13,7 @@ import { cancelDeliveries, createDelivery, deliveriesOf, registerSource, type De
 import { onHiveEvent } from './events'
 import { mutateLanes, onLanesWritten, rawLanes } from './lanes'
 import { createLogger, userText } from './logger'
+import { sessions } from './sessions'
 import { resolvedOf } from './workflow/rulesets'
 import { workflowEnforced } from './workflow/service'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
@@ -84,7 +86,7 @@ async function settleOnce(ws: WorkspaceService): Promise<void> {
     if (b.text) {
       const made = (await deliveriesOf(projectPath, lane.builder.id)).some((r) => r.source === LANE_BRIEF_SOURCE && r.ref === current)
       if (!made) {
-        await createDelivery(projectPath, { agentId: lane.builder.id, agentName: lane.builder.name, kind: 'rebrief', from: { kind: 'hive', name: 'Hive' }, body: briefText(lane, b.text), source: LANE_BRIEF_SOURCE, ref: current, meta: { lane: lane.id, rev: b.rev } }) // i18n-ignore: who a delivery is from, as agents read it
+        await createDelivery(projectPath, { agentId: lane.builder.id, agentName: lane.builder.name, kind: 'rebrief', from: { kind: 'hive', name: 'Hive' }, body: briefText(lane, b.text), source: LANE_BRIEF_SOURCE, ref: current, meta: { lane: lane.id, rev: b.rev, ...(b.notIn ? { notIn: b.notIn } : {}) } }) // i18n-ignore: who a delivery is from, as agents read it
         log.info(`Lane ${lane.id}'s brief (rev ${b.rev}) delivered to ${userText(lane.builder.name)}`)
       }
     }
@@ -105,11 +107,19 @@ const source: DeliverySource = {
     const lane = ws ? (await rawLanes(ws)).find((l) => l.id === id) : undefined
     if (!lane || lane.state !== 'active' || !lane.brief?.text || String(lane.brief.rev) !== rev) return { cancel: 'its lane brief is no longer current' } // i18n-ignore: why a delivery was cancelled, for the log
     return null
+  },
+  // Never into the builder's conversation running as the brief was given (the one a new lane's start replaces: its
+  // next one gets it); a builder not running then, or another conversation of it, is offered it.
+  holds: (r, host) => {
+    const notIn = r.meta?.notIn
+    if (typeof notIn !== 'string' || !notIn) return true
+    return sessions.liveFor(host, r.agentId)?.sessionId !== notIn
   }
 }
 
-/** Tests: the source's refresh, as the deliveries call it just before an offer. */
+/** Tests: the source's refresh and holds, as the deliveries call them before an offer. */
 export const laneBriefRefreshForTests = source.refresh!
+export const laneBriefHoldsForTests = source.holds!
 
 let stop: (() => void) | null = null
 /** Looks at each open workspace's briefs when lanes are written and as a workspace opens (index.ts, once). */

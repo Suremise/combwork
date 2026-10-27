@@ -604,6 +604,8 @@ export interface StartLane {
   name?: string | null
   /** The builder's brief (HI-1795, nextBrief): undefined keeps a running lane's; '' clears it. */
   brief?: string
+  /** The builder's conversation running as the brief is given (outside slots its delivery is never offered into it). */
+  briefNotIn?: string | null
   /** Who starts it, as the board names them. */
   by: string
 }
@@ -663,7 +665,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
         updatedAt: t
       })
       // Its brief under the same lock (HI-1795): kept unless the start gives one; a queued list change keeps it too.
-      const brief = nextBrief(was.brief, s.brief)
+      const brief = nextBrief(was.brief, s.brief, s.briefNotIn)
       if (brief) was.brief = brief
       if (pool) {
         was.pool = true
@@ -697,7 +699,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
       ...(ruleset ? { ruleset } : {}),
       ...(pool ? { pool: true as const } : {})
     }
-    const brief = nextBrief(undefined, s.brief)
+    const brief = nextBrief(undefined, s.brief, s.briefNotIn)
     if (brief) rec.brief = brief
     lanes.push(rec)
     also.push((db) => noteLaneIn(db, ws.path!, null, rec))

@@ -3173,7 +3173,8 @@ module.exports.SCENARIOS = [
       const toCoder = called(o, 'hive_prompt_agent').filter((x) => /coder/i.test(String(argsOf(x).agent ?? '')) && /docs/i.test(String(argsOf(x).text ?? argsOf(x).prompt ?? '')))
       const lane = (o.lanes ?? []).find((l) => l.builder?.name === 'Coder')
       return [
-        ['read the coordinate-agents skill', read(o, 'coordinate-agents'), o.skillsRead.join(',')],
+        // Both carry the rule (coordinate-agents, A new lane; run-lanes points there).
+        ['read the run-lanes or coordinate-agents skill', read(o, 'run-lanes') || read(o, 'coordinate-agents'), o.skillsRead.join(',')],
         ["started the lane with hive_lane start, the user's brief in its brief", !!briefed, starts.map((x) => x.args).join(' | ')],
         ["didn't send Coder its brief as a separate prompt (a slot's new conversation would lose it)", toCoder.length === 0, toCoder.map((x) => x.args).join(' | ')],
         ['the lane runs: Coder building, Implementer reviewing, both cards in order', !!lane && lane.reviewer?.name === 'Implementer' && (lane.cards ?? []).map((x) => x.number).join(',') === `${c.cards.p},${c.cards.q}`, JSON.stringify((o.lanes ?? []).map((l) => [l.builder?.name, l.reviewer?.name, l.cards?.map((x) => x.number)]))]
