@@ -158,6 +158,8 @@
   "settings.advanced.codex.accounts.readMethod.title": "连接：登录检查请求",
   "settings.advanced.codex.accounts.statusSeconds.desc": "Hive 等待 Codex 的应用服务器报告连接文件夹以谁的身份登录（`account/read`）的时长。超过后，该连接会显示“无法检查”，而不会显示为已退出登录。",
   "settings.advanced.codex.accounts.statusSeconds.title": "连接：登录检查超时",
+  "settings.advanced.codex.accounts.unelevatedSandbox.desc": "开启后，Hive 会在 Codex 的非管理员 Windows 沙盒中运行连接上的 Codex（其智能体、设置和检查），每次都传入 -c windows.sandbox=\"unelevated\"，除非该连接自己的 config.toml 选择了沙盒。不会向 Codex 的配置写入任何内容，Codex 自己文件夹（~/.codex）中的 Codex 仍按你的设置运行。好处：不再出现管理员（UAC）提示，设置一个 Codex 文件夹也不会再重置沙盒的共享密码（重置会让其他文件夹再次请求管理员权限）。代价：命令以你自己的账户运行，而不是独立的沙盒账户，其网络访问仅通过环境设置阻止，而不是通过防火墙。不变的是：在项目文件夹之外的写入仍会被拒绝，连接首次在某个项目中工作时，仍会对项目文件授予一次权限。仅限 Windows。",
+  "settings.advanced.codex.accounts.unelevatedSandbox.title": "连接：使用 Codex 的非管理员沙盒",
   "settings.advanced.codex.appServer.closeSeconds.desc": "Hive 拿到 Codex 应用服务器的回复（连接的登录检查、其钩子的检查）后，给它自行退出的时长。超过后，Hive 会结束它及它启动的所有进程。太短，Codex 会在退出途中被打断；太长，它的进程会多留一会儿。",
   "settings.advanced.codex.appServer.closeSeconds.title": "应用服务器：关闭时间",
   "settings.advanced.codex.exit.command.desc": "通道结束且其回合结束后，Hive 在 Codex 中输入并按 Enter 以结束它的命令，使它自行退出而不是被强制结束。若有误，Codex 不会因此结束，并会在退出宽限期后被强制结束。",

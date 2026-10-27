@@ -391,6 +391,8 @@ export interface ProviderAdapter {
    * the CLI's own files there say, read only; null when it can't be told. Absent: the CLI has none to tell.
    */
   connectionSetUp?(home: string): Promise<boolean | null>
+  /** The arguments the CLI takes in a connection's Set Up on its folder (`home`), as its launches there do (HI-1893). Absent: none. */
+  connectionSetUpArgs?(home: string): string[]
   /**
    * Whether the CLI on a connection's folder (`home`) trusts each of a workspace's folders (HI-1870), as its own files
    * there say, read only: true, false (not trusted, or no record), or null when it can't be told (a file it can't

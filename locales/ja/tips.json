@@ -127,6 +127,8 @@
   "tips.cliOwnMode.title": "モードをCLI自身の設定に任せる",
   "tips.closeWindow.text": "複数のウィンドウを開いているとき、「ファイル」→「ウィンドウを閉じる」（{key}）はXボタンと同じく、このウィンドウだけを閉じます。「Hiveを終了（すべてのウィンドウ）」はすべてのウィンドウを閉じ、すべてのエージェントを停止します。",
   "tips.closeWindow.title": "1つのウィンドウを閉じる、またはすべて閉じる",
+  "tips.codexSandboxConnections.text": "Codex接続が何度も管理者権限を求めますか？ 接続ごとの管理者サンドボックスのセットアップが、ほかの接続のものをリセットするためです。「設定」→「詳細」→「Codex」→「接続：Codexの管理者権限なしのサンドボックスを使う」をオンにすると、すべて管理者権限なしで動きます。その代わり、別のサンドボックス用アカウントは使われません。",
+  "tips.codexSandboxConnections.title": "複数のCodex接続で管理者の確認をなくす",
   "tips.commandName": "「{command}」",
   "tips.compactFocus.text": "「コンパクト化」は会話を要約し、以降のメッセージのコストを下げます。焦点を指定すれば（「APIの決定事項は残し、テスト出力は捨てる」）、エージェントは大事なものを残します。{key}",
   "tips.compactFocus.title": "焦点を指定してコンパクト化",

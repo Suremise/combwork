@@ -127,6 +127,8 @@
   "tips.cliOwnMode.title": "Laisse la configuration de la CLI choisir le mode",
   "tips.closeWindow.text": "Avec plusieurs fenêtres ouvertes, Fichier → Fermer la fenêtre ({key}) ferme seulement celle-ci, comme son X. Quitter Hive (toutes les fenêtres) ferme toutes les fenêtres et arrête tous leurs agents.",
   "tips.closeWindow.title": "Fermer une fenêtre, ou toutes",
+  "tips.codexSandboxConnections.text": "Tes connexions Codex redemandent sans cesse l’autorisation d’administrateur ? La configuration du bac à sable administrateur de chacune réinitialise celle des autres. Paramètres → Avancé → Codex → Connexions : utiliser le bac à sable de Codex sans droits d’administrateur les fait toutes tourner sans, au prix des comptes de bac à sable distincts.",
+  "tips.codexSandboxConnections.title": "Plusieurs connexions Codex sans demandes d’administrateur",
   "tips.commandName": "« {command} »",
   "tips.compactFocus.text": "Compacter résume la conversation pour que chaque message suivant coûte moins cher. Donne-lui un objectif (« garde les décisions sur l’API, laisse tomber la sortie des tests ») et l’agent garde ce qui compte. {key}",
   "tips.compactFocus.title": "Compacter avec un objectif",

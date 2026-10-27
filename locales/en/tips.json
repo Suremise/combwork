@@ -511,6 +511,14 @@
     "defaultMessage": "Close one window, or all of them",
     "description": "A tip's title."
   },
+  "tips.codexSandboxConnections.text": {
+    "defaultMessage": "Codex connections keep asking for Administrator permission? Each one's admin sandbox setup resets the others'. Settings → Advanced → Codex → Connections: use Codex's non-admin sandbox runs them all without it, at the cost of separate sandbox accounts.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Connections: use Codex's non-admin sandbox is an advanced setting's title). Codex is a product's name."
+  },
+  "tips.codexSandboxConnections.title": {
+    "defaultMessage": "Several Codex connections, no admin prompts",
+    "description": "A tip's title. Codex is a product's name."
+  },
   "tips.commandName": {
     "defaultMessage": "“{command}”",
     "description": "A command's name in a tip's text, where its shortcut would be when it has none. Use your language's quotation marks."

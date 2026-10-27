@@ -127,6 +127,8 @@
   "tips.cliOwnMode.title": "Deja que la configuración de la CLI elija el modo",
   "tips.closeWindow.text": "Con varias ventanas abiertas, Archivo → Cerrar la ventana ({key}) cierra solo esta, como su X. Salir de Hive (todas las ventanas) cierra todas las ventanas y detiene todos sus agentes.",
   "tips.closeWindow.title": "Cierra una ventana, o todas",
+  "tips.codexSandboxConnections.text": "¿Tus conexiones de Codex piden permiso de administrador una y otra vez? La configuración del sandbox de administrador de cada una restablece la de las demás. Configuración → Avanzado → Codex → Conexiones: usar el sandbox de Codex sin permisos de administrador las ejecuta todas sin él, a costa de las cuentas de sandbox independientes.",
+  "tips.codexSandboxConnections.title": "Varias conexiones de Codex sin avisos de administrador",
   "tips.commandName": "“{command}”",
   "tips.compactFocus.text": "Compactar resume la conversación para que cada mensaje posterior cueste menos. Dale un enfoque (“conserva las decisiones de la API, descarta la salida de las pruebas”) y el agente conserva lo importante. {key}",
   "tips.compactFocus.title": "Compacta con un enfoque",

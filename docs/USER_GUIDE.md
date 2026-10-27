@@ -108,6 +108,14 @@ Each Claude Code or Codex agent, and the Assistant, runs on a **connection**: a 
 - **A project's own model, effort and context move onto its agents** once, the first time it opens with connections: each agent without its own gets the project's, and an agent with its own keeps it. Nothing is lost.
 - **Settings a connection can't use** (an effort its model doesn't take) stay on the agent, aren't passed to the CLI, and are listed once at the top of Settings → Connections until you **Dismiss** them. Change them in the agent's Agent Settings.
 
+#### Codex's sandbox on connections <a id="codex-sandbox-on-connections"></a>
+
+A Codex connection runs its commands in the Windows sandbox you set up for Codex on this PC ([Codex's Windows sandbox](#codexs-windows-sandbox)), unless the connection's own Codex settings choose one. A few things are worth knowing:
+
+- **Codex's sandbox protects writes, not reads of secrets.** A command Codex runs can't change files outside the project's folders, but it can read files: every connection's login file, and those of your own `~/.codex` and `~/.claude`, with either sandbox.
+- **Several Codex connections on one PC.** With the default (admin) sandbox, each connection's sandbox setup resets the password of the sandbox's shared accounts, so the other connections ask for Administrator permission again (a known Codex issue, openai/codex #40627). To avoid it, turn on **Settings → Advanced → Codex → Connections: use Codex's non-admin sandbox**. Hive then passes Codex's non-admin sandbox to every Codex it runs on a connection (its agents, its Set Up and its checks), without changing Codex's config files; your own `~/.codex` stays as you set it up. It needs no Administrator permission, but commands run under your own account rather than separate sandbox accounts, and their internet access is blocked by environment settings only, not by the firewall. Writes outside the project's folders are still refused. A connection whose own config chooses a sandbox keeps its own.
+- **The first time per project.** The first time a Codex connection works in a project, Codex grants its sandbox permissions over the project's files, once for each connection. On a large project (one with `node_modules`, say) this can take a while, and Codex may seem slow to start its first commands (openai/codex #48593). Hive runs one Set Up per connection at a time.
+
 #### The order of connections <a id="connection-order"></a>
 
 Each CLI's connections have an **order**, the same in every workspace. New agents use the first one in the order that's on in the workspace, so turning connections on and off never means choosing a new default.

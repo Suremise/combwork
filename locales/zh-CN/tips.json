@@ -127,6 +127,8 @@
   "tips.cliOwnMode.title": "让 CLI 自身的配置选择模式",
   "tips.closeWindow.text": "打开多个窗口时，“文件”→“关闭窗口”（{key}）只关闭当前窗口，与点击窗口的 X 相同。“退出 Hive（所有窗口）”会关闭所有窗口并停止其中的所有智能体。",
   "tips.closeWindow.title": "关闭一个窗口，或全部关闭",
+  "tips.codexSandboxConnections.text": "Codex 连接总是请求管理员权限？每个连接的管理员沙盒设置都会重置其他连接的设置。“设置”→“高级”→“Codex”→“连接：使用 Codex 的非管理员沙盒”可让它们都无需管理员权限运行，代价是不再使用独立的沙盒账户。",
+  "tips.codexSandboxConnections.title": "多个 Codex 连接，无需管理员提示",
   "tips.commandName": "“{command}”",
   "tips.compactFocus.text": "压缩会总结对话，让之后的每条消息都更省钱。给它一个重点（“保留 API 相关的决定，去掉测试输出”），智能体就会留下重要的内容。{key}",
   "tips.compactFocus.title": "带重点压缩",

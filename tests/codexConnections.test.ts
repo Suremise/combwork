@@ -233,6 +233,21 @@ if (args[0] === 'app-server') {
     }
     for (const c of calls.filter((x) => x.args[0] !== '--version')) expect(c.args.join(' '), JSON.stringify(c.args)).toContain(CONNECTION_STORE.join(' '))
   })
+  it("with Advanced's non-admin sandbox on (HI-1893): the hooks' check and the prompt's render pass it too", async () => {
+    const conn = join(base, 'profile', 'accounts', 'a-preflight-unelevated')
+    mkdirSync(conn, { recursive: true })
+    const cwd = join(base, 'preflight-project-unelevated')
+    mkdirSync(cwd, { recursive: true })
+    await advanced.set('codex.accounts.unelevatedSandbox', true)
+    try {
+      await codex.prepareLaunch({ projectPath: cwd, agentId: 'a-1', executable: cmd, cwd, workspacePath: cwd, runId: 'r-pre-u', sessionId: '00000000-0000-4000-8000-000000000002', resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: join(cwd, 'auth.txt'), privateDir: cwd, guidance: 'Hive guidance', env: withoutAccountEnv(codex, { ...baseEnv(), CODEX_HOME: conn }), allowBackgroundSessions: false, use200kContext: false, connectionHome: conn } as never)
+    } finally {
+      await advanced.set('codex.accounts.unelevatedSandbox', false)
+    }
+    const calls = readFileSync(log, 'utf8').trim().split(/\r?\n/).map((l) => JSON.parse(l)).filter((c) => c.home === conn && c.args[0] !== '--version')
+    expect(calls.length).toBeGreaterThan(0)
+    for (const c of calls) expect(c.args.includes('windows.sandbox="unelevated"'), JSON.stringify(c.args)).toBe(process.platform === 'win32')
+  })
 })
 
 describe("Codex's checks owned from before they run until their end is confirmed (round 4: s91, s93)", () => {
@@ -308,6 +323,33 @@ process.stdin.on('end', () => { if (!${!!o.stubborn}) { child.kill(); process.ex
     expect(await status(s.cmd, homeOf('a-willing'))).toEqual(ID)
     expect(await s.left()).toEqual([])
     expect(codexCheckHeld(homeOf('a-willing'))).toBe(false)
+  }, 60_000)
+
+  it("with Advanced's non-admin sandbox on (HI-1893): the status check passes it, with the connection's login store", async () => {
+    const argsLog = join(base, 'status-args.json')
+    const cmd = fakeCli('status-args-cli', `
+require('fs').writeFileSync(${JSON.stringify(argsLog)}, JSON.stringify(process.argv.slice(2)))
+let buf = ''
+process.stdin.on('data', (d) => {
+  buf += d
+  let i
+  while ((i = buf.indexOf('\\n')) >= 0) {
+    const m = JSON.parse(buf.slice(0, i)); buf = buf.slice(i + 1)
+    if (m.id === 1) process.stdout.write(JSON.stringify({ id: 1, result: {} }) + '\\n')
+    else if (m.id === 2) process.stdout.write(JSON.stringify({ id: 2, result: { account: null } }) + '\\n')
+  }
+})
+process.stdin.on('end', () => process.exit(0))
+`)
+    await advanced.set('codex.accounts.unelevatedSandbox', true)
+    try {
+      expect(await status(cmd, homeOf('a-status-args'))).toEqual({ ok: true, loggedIn: false })
+    } finally {
+      await advanced.set('codex.accounts.unelevatedSandbox', false)
+    }
+    const args = JSON.parse(readFileSync(argsLog, 'utf8')) as string[]
+    expect(args.join(' ')).toContain(CONNECTION_STORE.join(' '))
+    expect(args.includes('windows.sandbox="unelevated"')).toBe(process.platform === 'win32')
   }, 60_000)
 
   it('one that ignores its stdin closing, behind a .cmd launcher: its job ends it and its child; the identity only then', async () => {
@@ -456,6 +498,32 @@ describe('a Codex launch on a connection', () => {
     const { args } = codex.buildCommand(ctx.executable, ctx)
     expect(args.join(' ')).not.toContain('cli_auth_credentials_store')
     expect(sandboxArg(args)).toBeUndefined()
+  })
+  it("Advanced's non-admin sandbox (HI-1893): on, every launch on a connection and its Set Up pass it over the PC's; never on Codex's own home, nor over the connection's own; off, the PC's again", async () => {
+    writeFileSync(join(home, 'config.toml'), '[windows]\nsandbox = "elevated"\n')
+    const win = process.platform === 'win32'
+    try {
+      expect(sandboxArg(codex.buildCommand(ctx.executable, { ...ctx, connectionHome: conn }).args)).toBe(win ? 'windows.sandbox="elevated"' : undefined)
+      await advanced.set('codex.accounts.unelevatedSandbox', true)
+      expect(sandboxArg(codex.buildCommand(ctx.executable, { ...ctx, connectionHome: conn }).args)).toBe(win ? 'windows.sandbox="unelevated"' : undefined)
+      expect(codex.connectionSetUpArgs(conn)).toEqual([...CONNECTION_STORE, ...(win ? ['-c', 'windows.sandbox="unelevated"'] : [])])
+      expect(await codex.connectionSetUp(conn)).toBe(true)
+      // Codex's own home: as it is configured, nothing passed.
+      expect(sandboxArg(codex.buildCommand(ctx.executable, ctx).args)).toBeUndefined()
+      // The connection's own choice wins.
+      writeFileSync(join(conn, 'config.toml'), '[windows]\nsandbox = "elevated"\n')
+      expect(sandboxArg(codex.buildCommand(ctx.executable, { ...ctx, connectionHome: conn }).args)).toBeUndefined()
+      expect(codex.connectionSetUpArgs(conn)).toEqual(CONNECTION_STORE)
+      rmSync(join(conn, 'config.toml'))
+      // Nothing is written to either config.
+      expect(readFileSync(join(home, 'config.toml'), 'utf8')).toBe('[windows]\nsandbox = "elevated"\n')
+      expect(existsSync(join(conn, 'config.toml'))).toBe(false)
+      await advanced.set('codex.accounts.unelevatedSandbox', false)
+      expect(sandboxArg(codex.buildCommand(ctx.executable, { ...ctx, connectionHome: conn }).args)).toBe(win ? 'windows.sandbox="elevated"' : undefined)
+    } finally {
+      await advanced.set('codex.accounts.unelevatedSandbox', false)
+      writeFileSync(join(home, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
+    }
   })
   it("signs in with Codex's own login, kept in the connection's folder", () => {
     expect(codex.accountLoginCommand('C:\\bin\\codex.exe').args).toEqual(['login', ...CONNECTION_STORE])

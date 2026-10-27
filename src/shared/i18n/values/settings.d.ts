@@ -160,6 +160,8 @@ interface HiveMessageValues {
   'settings.advanced.codex.accounts.readMethod.title': undefined
   'settings.advanced.codex.accounts.statusSeconds.desc': undefined
   'settings.advanced.codex.accounts.statusSeconds.title': undefined
+  'settings.advanced.codex.accounts.unelevatedSandbox.desc': undefined
+  'settings.advanced.codex.accounts.unelevatedSandbox.title': undefined
   'settings.advanced.codex.appServer.closeSeconds.desc': undefined
   'settings.advanced.codex.appServer.closeSeconds.title': undefined
   'settings.advanced.codex.exit.command.desc': undefined

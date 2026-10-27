@@ -158,6 +158,8 @@
   "settings.advanced.codex.accounts.readMethod.title": "接続：サインイン確認のリクエスト",
   "settings.advanced.codex.accounts.statusSeconds.desc": "Codexのアプリサーバーが接続のフォルダーのサインイン先を答える（`account/read`）まで、Hiveが待つ時間です。これを過ぎると、接続は「確認できませんでした」と表示されます（サインアウトとは表示されません）。",
   "settings.advanced.codex.accounts.statusSeconds.title": "接続：サインイン確認のタイムアウト",
+  "settings.advanced.codex.accounts.unelevatedSandbox.desc": "オンにすると、Hiveは接続上のCodex（そのエージェント、セットアップ、チェック）を、Codexの管理者権限なしのWindowsサンドボックスで実行し、毎回 -c windows.sandbox=\"unelevated\" を渡します。ただし、接続自身のconfig.tomlでサンドボックスが選ばれている場合はそちらを使います。Codexの設定には何も書き込まず、Codex自身のフォルダー（~/.codex）のCodexはあなたの設定どおりに動きます。得られること：管理者（UAC）の確認が出なくなり、あるCodexフォルダーのセットアップでサンドボックスの共有パスワードがリセットされることもなくなります（リセットされると、ほかのフォルダーが再び管理者権限を求めます）。失うこと：コマンドは別のサンドボックス用アカウントではなくあなたのアカウントで実行され、ネットワークはファイアウォールではなく環境設定だけでブロックされます。変わらないこと：プロジェクトのフォルダー外への書き込みは引き続き拒否され、接続がプロジェクトで初めて作業するときには、プロジェクトのファイルに対する権限の付与が一度行われます。Windowsのみ。",
+  "settings.advanced.codex.accounts.unelevatedSandbox.title": "接続：Codexの管理者権限なしのサンドボックスを使う",
   "settings.advanced.codex.appServer.closeSeconds.desc": "Hiveが応答（接続のサインイン確認、そのフックの確認）を受け取ったあと、Codexのアプリサーバーが自分で終了するまで待つ時間です。これを過ぎると、Hiveはそれが起動したものすべてとともに終了させます。短すぎるとCodexが終了する途中で打ち切られ、長すぎるとそのプロセスが少し長く残ります。",
   "settings.advanced.codex.appServer.closeSeconds.title": "アプリサーバー：終了までの時間",
   "settings.advanced.codex.exit.command.desc": "レーンが終わり、そのターンが終わったときにCodexを終了させるため、HiveがCodexに入力してEnterを押すコマンドです。強制終了ではなく自分で終了させるためのものです。間違っているとCodexはこれで終了せず、終了の猶予のあとで強制終了されます。",
