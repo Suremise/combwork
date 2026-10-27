@@ -25,8 +25,8 @@ vi.mock('../src/main/sessions', () => ({
 /** The project's lanes as kept, and each agent's watch, as lanes.ts and watches.ts give them. */
 let lanesNow: { id: string; project: string; state: string; builder: { id: string }; reviewer?: { id: string } | null }[] = []
 const watching = new Map<string, { label: string } | 'unknown'>()
-// Only watchKnown, never the original module (HI-1786): loading it from this factory loads slotsApp inside it
-// (cardStall → reviewCopies → copiesApp, since HI-1764), and slotsApp's import('./watches') then gets the original.
+// Only watchKnown, never the original module (HI-1786): were slotsApp loaded from inside this factory (as it was through
+// cardStall → reviewCopies until HI-1785), its import('./watches') would get the original, not this.
 vi.mock('../src/main/watches', () => ({ watchKnown: (_p: string, agent: string) => watching.get(agent) ?? null }))
 /** The project's cards in flight its agent builds or reviews, as the board's query finds them (none: undefined). */
 let inFlight: { number: number } | undefined

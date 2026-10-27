@@ -21,6 +21,7 @@
 
 import { advanced } from './advanced'
 import { leaveMessage } from './agentMessages'
+import { setReviewCopyWaitReason } from './cardStall'
 import { copiesFor, setReviewCopyHooks } from './copiesApp'
 import { copiesDirOf, copyRefusalText, FIRST_WAIT_MS, type CopyLease, type CopyPool } from './copies'
 import { samePlace } from './fsutil'
@@ -291,6 +292,9 @@ export function reviewCopyWaitReason(c: { number: number; key?: string; column: 
   }
   return null
 }
+
+// Given to cardStall as this loads, rather than imported by it (HI-1785).
+setReviewCopyWaitReason(reviewCopyWaitReason)
 
 /** Why review copies are off now (agent-facing): either switch in Settings → Advanced. Null while both are on. */
 function reviewCopiesOff(): string | null {
