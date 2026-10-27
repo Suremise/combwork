@@ -4,7 +4,7 @@ import type { DayUsage, SessionUsage, TranscriptItem, TranscriptTool, UsageToken
 import { addTokens, emptyDay, localDay } from '../../../shared/usageDays'
 import { TimelineBuilder, pendingRows, secondOf, spreadTokens, type PendingRequest } from '../../../shared/usageTimeline'
 import { isSessionId } from '../../../shared/defaults'
-import { placeMatcher } from '../../fsutil'
+import { placeMatcher } from '../../places'
 import { COPILOT } from '../../../shared/copilot'
 import { formatToolInput } from '../claude/conversation'
 import { NOTICE_TEXT, firstLine, noticeOf, shortPath, type NewItem } from '../conversation'

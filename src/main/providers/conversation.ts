@@ -4,7 +4,7 @@ import { msg, tr } from '../../shared/i18n'
 import { isAbsolute } from 'path'
 import { formatDateTime } from '../../shared/dates'
 import { formatTokens } from '../../shared/units'
-import { relativeInside } from '../fsutil'
+import { relativeInside } from '../places'
 
 /**
  * The provider-neutral side of transcripts: the viewer's items are the same for every provider, so

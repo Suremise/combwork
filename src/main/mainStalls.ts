@@ -1,12 +1,12 @@
 import { monitorEventLoopDelay } from 'perf_hooks'
 import { join } from 'path'
 import { Worker } from 'worker_threads'
-import { existsSync } from 'original-fs'
 import { app, powerMonitor } from 'electron'
 import { createLogger } from './logger'
 import { ended, running, stallClock, type Work } from './stallWork'
 import { pausedAlongside, slowProbe, WATCHDOG_SLOTS } from './stallWatchdog'
 import { threadPoolSize } from './threadPool'
+import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 
 export { beginWork, stallClock, timedStep } from './stallWork'
 
@@ -201,10 +201,12 @@ let watchdog: Float64Array | null = null
 /** Starts the watchdog thread beside main (its script beside main's, as the other workers'); none in unit tests. */
 function startWatchdog(): void {
   const script = join(__dirname, 'stall-watchdog.js')
-  if (!existsSync(script)) return
+  if (!bundledScriptExists(script)) return workerHere('stall watchdog', "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
   const ticks = new Float64Array(new SharedArrayBuffer(WATCHDOG_SLOTS * Float64Array.BYTES_PER_ELEMENT))
   try {
     const w = new Worker(script, { workerData: ticks.buffer })
+    // It only ticks: running once it has.
+    workerStarted('stall watchdog', w, () => ticks[0] > 0) // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
     w.on('error', (e) => log.warn('the stall watchdog thread ended', e))
     w.on('exit', () => void (watchdog = null))
     w.unref()

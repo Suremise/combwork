@@ -1,10 +1,11 @@
 import { app } from 'electron'
-import { existsSync, mkdirSync } from 'original-fs'
+import { mkdirSync } from 'original-fs'
 import { basename, join } from 'path'
 import { isMainThread, Worker } from 'worker_threads'
 import { maskKeys } from './keyMatcher'
 import { appendLog, BUSY, LOG_STATE_SLOTS, STOP, WRITTEN, type LogBatch } from './logWriter'
 import { noteStep, stallClock } from './stallWork'
+import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 
 type Level = 'debug' | 'info' | 'warn' | 'error'
 
@@ -68,13 +69,15 @@ function writerThread(): Worker | null {
     return null
   }
   // Tests (unpackaged builds): HIVE_TEST_LOG_DIRECT=1 writes here, as before; HIVE_TEST_SLOW_LOG_MS holds each write.
-  if ((unpackaged() && process.env.HIVE_TEST_LOG_DIRECT === '1' && !forTests) || !existsSync(script)) {
+  if ((unpackaged() && process.env.HIVE_TEST_LOG_DIRECT === '1' && !forTests) || !bundledScriptExists(script)) {
+    workerHere('log writer', bundledScriptExists(script) ? 'HIVE_TEST_LOG_DIRECT' : "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
     here = true
     return null
   }
   try {
     const slowMs = forTests?.slowMs ?? ((unpackaged() && Number(process.env.HIVE_TEST_SLOW_LOG_MS)) || 0)
     const w = new Worker(script, { workerData: { state: shared.buffer, slowMs } })
+    workerStarted('log writer', w) // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
     w.on('message', (n: number) => {
       while (sent.length && sent[0].seq <= n) sentBytes -= sent.shift()!.text.length
     })

@@ -20,6 +20,7 @@ import type { IngestJob, IngestResult, KeptJob, ReadResult, ReadSeed, WorkerRepl
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
 import { isAdmitted, ownerOf, refusedOpen } from './openingFence'
 import { realPath } from './fsutil'
+import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 
 const log = createLogger('usage')
 
@@ -222,8 +223,9 @@ class UsageHistory {
     if (this.worker) return (m) => this.worker!.postMessage(m)
     if (this.inProcess) return (m) => this.runInProcess(m)
     const file = workerScript()
-    if (!existsSync(file)) {
+    if (!bundledScriptExists(file)) {
       // Unit tests (no build): the worker's code runs here.
+      workerHere('usage history', "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
       const { handleRequest, logInProcess, closeAll } = await import('./usageWorker')
       logInProcess((m) => this.reply(m))
       this.closeInProcess = closeAll
@@ -232,6 +234,7 @@ class UsageHistory {
     }
     const w = new Worker(file)
     this.worker = w
+    workerStarted('usage history', w) // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
     w.on('message', (m: WorkerReply) => this.reply(m))
     const gone = (why: string): void => {
       if (this.worker !== w) return

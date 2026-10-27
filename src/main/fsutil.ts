@@ -1,4 +1,4 @@
-import { closeSync, constants, existsSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statSync, writeFileSync, writeSync, type Dirent, type Stats } from 'original-fs'
+import { closeSync, constants, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, rmSync, statSync, writeFileSync, writeSync, type Dirent, type Stats } from 'original-fs'
 import { copyFile, link, lstat, mkdir, open, opendir, readFile, readlink, rename, writeFile, stat, symlink, cp, rm, utimes } from 'original-fs/promises'
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'path'
 import { createHash } from 'crypto'
@@ -9,6 +9,9 @@ import { withValues } from '../shared/advanced'
 import { HiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { timedStep } from './stallWork'
+import { placeKey, realPath, relativeInside } from './places'
+
+export { placeKey, placeMatcher, realPath, relativeInside, samePlace } from './places'
 
 const log = createLogger('files')
 
@@ -310,58 +313,6 @@ function readKeptJsonSyncNow<T>(path: string, fallback: T): T {
   }
 }
 
-/**
- * The real location of a path, following symlinks and junctions (for a path that doesn't exist yet, its
- * nearest existing folder's real location plus the rest).
- */
-export function realPath(p: string): string {
-  let head = resolve(p)
-  const rest: string[] = []
-  for (;;) {
-    try {
-      return rest.length ? join(realpathSync.native(head), ...rest.reverse()) : realpathSync.native(head)
-    } catch {
-      const up = dirname(head)
-      if (up === head) return resolve(p)
-      rest.push(head.slice(up.length).replace(/^[\\/]/, ''))
-      head = up
-    }
-  }
-}
-
-/**
- * A path's key for telling whether two paths are the same place: its real location (`realPath`), lower-cased. Git lists
- * worktrees by their real, long names, so a path Hive was given or saved as an 8.3 short name (C:\Users\RUNNER~1\…),
- * through a junction or a symlink only matches git's by this (#389). One that can't be resolved keys as written.
- */
-export const placeKey = (p: string): string => realPath(p).toLowerCase()
-
-/**
- * Whether two paths are the same place (`placeKey`). Spelt the same, they are, with no look at the disk (HI-1783: a
- * check's resolve compared its folders this way, a realpath each on main's thread, a few ms apiece).
- */
-export const samePlace = (a: string, b: string): boolean => resolve(a).toLowerCase() === resolve(b).toLowerCase() || placeKey(a) === placeKey(b)
-
-/**
- * A test for whether a path is the place `folder` is, for matching the cwd a CLI recorded with Hive's spelling of a
- * folder (#493): the same spelling, or else the same real location (`placeKey`), each other spelling resolved once.
- */
-export function placeMatcher(folder: string): (p: string) => boolean {
-  const spelt = resolve(folder).toLowerCase()
-  let key: string | undefined
-  const seen = new Map<string, boolean>()
-  return (p) => {
-    const s = resolve(p).toLowerCase()
-    if (s === spelt) return true
-    let same = seen.get(s)
-    if (same === undefined) {
-      same = placeKey(p) === (key ??= placeKey(folder))
-      seen.set(s, same)
-    }
-    return same
-  }
-}
-
 /** Whether `outer` is `inner` or a folder containing it, by real paths (`placeKey`). */
 export function containsPlace(outer: string, inner: string): boolean {
   const x = placeKey(outer).replace(/[\\/]$/, '')
@@ -377,16 +328,6 @@ export function containsPlace(outer: string, inner: string): boolean {
 export function placeRelative(from: string, to: string): string {
   return relativeInside(from, to) ?? relative(from, to)
 }
-
-/** `to` relative to `from` when it is inside it (or is it: ''), by spelling or else by real locations (`placeRelative`); else null. */
-export function relativeInside(from: string, to: string): string | null {
-  const rel = relative(from, to)
-  if (!leavesFolder(rel)) return rel
-  const real = relative(realPath(from), realPath(to))
-  return leavesFolder(real) ? null : real
-}
-
-const leavesFolder = (rel: string): boolean => rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)
 
 /**
  * Whether a path is inside an .asar archive (`…\app.asar\icon.png`). Such a path isn't a file on disk, and Electron's
