@@ -3,7 +3,7 @@ import { join } from 'path'
 import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
-import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, readLanes, running, type LaneAgent, type LaneCardFacts, type LaneChange, type LaneRecord } from '../shared/lanes'
+import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, type LaneAgent, type LaneCardFacts, type LaneChange, type LaneRecord } from '../shared/lanes'
 import type { HiveErrorKind, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { reviewingNow } from '../shared/workflow/reviewerPool'
 import { withValues, type Text } from '../shared/advanced'
@@ -13,7 +13,7 @@ import { onHiveEvent } from './events'
 import { readFile } from 'original-fs/promises'
 import { placeKey, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readTable, saveTable } from './storeTables'
-import { boardOpen, boardWrite, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
+import { boardOpen, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { onAction } from './workflow/actionWorker'
 import { foldCard, forYou } from '../shared/workflow/facts'
@@ -433,7 +433,10 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   const current = recorded.length ? await rulesetsNow(ws) : new Map<string, string>()
   // And their own stages, which a lane under old rules keeps (HR4's #1421 round 1).
   const stagesOf = ws.path ? rulesetStages(ws, recorded) : new Map<string, null>()
-  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null))
+  // Each running lane's cards' owner lanes (HI-1821): a card given to no agent is the lane's that owns it.
+  const owned = ws.path ? cardOwnersNow(ws, [...new Set(lanes.filter(running).flatMap((l) => l.cards))]) : new Map<number, { lane: string | null }>()
+  const owners = new Map([...owned].map(([n, o]) => [n, o.lane]))
+  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners))
 }
 
 /** A running lane's slot, and whether it waits for one (Start Lane… found none free, `slotWait`, and it has none yet). */
@@ -502,13 +505,44 @@ const stillAllDone = (ws: WorkspaceService, l: LaneRecord, cards: readonly numbe
   if (!(places.includes('done') && places.every((c) => c === 'done' || c === 'gone'))) throw new StaleLane(`lane ${l.id}: its cards moved on`) // i18n-ignore: internal, caught and retried (never shown)
 }
 
-/** Checked under the board's lock (#1270): none of the lane's cards is in flight now, else its queued list waits. */
+/**
+ * Checked under the board's lock (#1270): none of the lane's own cards is in flight now, else its queued list waits. A
+ * card held elsewhere isn't the lane's (HI-1821, as its view reads it: another agent's, or given to none and another
+ * lane's by cardOwnersNow).
+ */
 const stillBetweenCards = (ws: WorkspaceService, l: LaneRecord, cards: readonly number[]) => (): void => {
-  if (placesOf(ws, l, cards).some((c) => c === 'doing' || c === 'review' || c === 'passed')) throw new StaleLane(`lane ${l.id}: a card is in flight again`) // i18n-ignore: as above
+  const places = cardPlacesNow(ws, cards)
+  const owners = cardOwnersNow(ws, cards)
+  const flying = cards.some((n) => {
+    const c = places.get(n)
+    const o = owners.get(n)
+    const own = o?.agent ? o.agent === l.builder.id : !o?.lane || o.lane === l.id
+    return !!c && !c.archived && same(c.project, l.project) && FLYING.has(c.column) && own
+  })
+  if (flying) throw new StaleLane(`lane ${l.id}: a card is in flight again`) // i18n-ignore: as above
 }
 
-/** A lane's card in flight: started, not Done (in Doing, Review or Passed), the first such in the lane's order; null: none. */
-const inFlight = (v: LaneInfo): number | null => v.cards.find((c) => c.column === 'doing' || c.column === 'review' || c.column === 'passed')?.number ?? null
+const FLYING: ReadonlySet<string> = new Set(['doing', 'review', 'passed'])
+
+/** A lane's own cards in flight: started, not Done (in Doing, Review or Passed), and not another agent's (HI-1821). */
+const flyingCards = (v: LaneInfo): number[] => v.cards.filter((c) => FLYING.has(c.column) && !c.elsewhere).map((c) => c.number)
+
+/** A lane's card in flight, the first such in the lane's order; null: none. */
+const inFlight = (v: LaneInfo): number | null => flyingCards(v)[0] ?? null
+
+/**
+ * How a lane's list change (`was` to `cards`) goes (#1270): `behind`, the card in flight it is queued after, or null when
+ * it applies at once, and then `check`, the cards none of which may be in flight for its builder as it saves
+ * (stillBetweenCards). A change that only takes cards out (the list as it was, less some, in its order) and keeps every
+ * card in flight applies at once, checked against the cards it takes out (HI-1821: a card moved to another lane leaves
+ * at once); any other waits for the lane's card in flight.
+ */
+function listChange(v: LaneInfo, was: readonly number[], cards: readonly number[]): { behind: number | null; check: number[] } {
+  const flying = flyingCards(v)
+  const removal = sameList(was.filter((n) => cards.includes(n)), cards)
+  if (removal && flying.every((n) => cards.includes(n))) return { behind: null, check: was.filter((n) => !cards.includes(n)) }
+  return { behind: flying[0] ?? null, check: [...was] }
+}
 
 const sameList = (a: readonly number[], b: readonly number[]): boolean => a.length === b.length && a.every((n, i) => n === b[i])
 
@@ -591,6 +625,25 @@ async function agentIn(ws: WorkspaceService, project: string, id: string): Promi
   return a ? { id: a.id, name: a.name } : null
 }
 
+/**
+ * A card in two lanes (HI-1821): the open cards (not Done, archived or gone) of a builder's start that another builder's
+ * running lane of the project lists, or has in its queued list, as a warning for the start's reply; null: none. The
+ * card's agent decides whose it is (a lane never takes another agent's card); the other lane gives it up with its own
+ * start without it, which applies at once while it isn't in flight there.
+ */
+function sharedCards(ws: WorkspaceService, lanes: readonly LaneRecord[], project: string, builder: string, cards: readonly number[]): string | null {
+  const others = lanes.filter((l) => running(l) && same(l.project, project) && l.builder.id !== builder)
+  const listed = others.flatMap((l) => cards.filter((n) => l.cards.includes(n) || !!l.pending?.includes(n)).map((n) => ({ n, l })))
+  if (!listed.length) return null
+  const places = cardPlacesNow(ws, listed.map((x) => x.n))
+  const shared = listed.filter(({ n, l }) => {
+    const c = places.get(n)
+    return !!c && !c.archived && same(c.project, l.project) && c.column !== 'done'
+  })
+  if (!shared.length) return null
+  return withCardNames(ws, () => `Warning: ${shared.map(({ n, l }) => `${cardRef(n)} is also in ${l.builder.name}'s lane (${l.id})`).join('; ')}. A card belongs to one lane: take it out of the other (its builder's hive_lane start without it applies at once while it isn't in flight there), or out of this one.`) // i18n-ignore: hive_lane's reply (agents)
+}
+
 export interface StartLane {
   project: string
   /** The builder's and reviewer's agent ids (reviewer null: none yet; undefined: keep a running lane's). */
@@ -633,12 +686,14 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const ruleset = await rulesetNow(ws, s.project)
   const ended: EndedLane[] = []
   let queuedAfter: number | null = null
+  let shared: string | null = null
   // One decision a save (HR6's #1270 round 2): a change applied at once is saved only while none of the lane's cards is
   // in flight, checked under the board's lock; a card started meanwhile makes it decide again, and queue it.
   const decide = () => mutate(ws, async (lanes, checks, also) => {
     queuedAfter = null
     ended.length = 0
     const was = lanes.find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
+    shared = sharedCards(ws, lanes, s.project, builder.id, s.cards)
     // As it was under this lock, for the Assistant's change (#1282): recorded with the save, in its transaction.
     const before = was ? laneValues(was) : null
     const t = now()
@@ -647,12 +702,12 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     if (was && (was.cards.some((n) => s.cards.includes(n)) || on)) {
       // Hive owns the list (#1270, §16.11.1): a change while a card is in flight is queued for the next card boundary,
       // never refused; between cards it applies now. With rules off, at once, as before.
-      const flying = on && !sameList(was.cards, s.cards) ? inFlight((await views(ws, [was]))[0]) : null
-      if (flying !== null) {
-        queuedAfter = flying
+      const change = on && !sameList(was.cards, s.cards) ? listChange((await views(ws, [was]))[0], was.cards, s.cards) : null
+      if (change && change.behind !== null) {
+        queuedAfter = change.behind
         was.pending = [...s.cards]
       } else {
-        if (on && !sameList(was.cards, s.cards)) checks.push(stillBetweenCards(ws, was, [...was.cards]))
+        if (change) checks.push(stillBetweenCards(ws, was, change.check))
         was.cards = s.cards
         delete was.pending
       }
@@ -722,7 +777,8 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   if (r.replaced) laneFact(ws, r.replaced)
   if (r.did === 'started') laneFact(ws, r.rec)
   tellEnded(ws, ended)
-  const note = queuedAfter !== null ? withCardNames(ws, () => `The list change is queued: it applies once ${cardRef(queuedAfter!)} is Done, and you are told then.`) : undefined // i18n-ignore: hive_lane's reply (agents)
+  const queued = queuedAfter !== null ? withCardNames(ws, () => `The list change is queued: it applies once ${cardRef(queuedAfter!)} is Done, and you are told then.`) : null // i18n-ignore: hive_lane's reply (agents)
+  const note = [queued, shared].filter(Boolean).join(' ') || undefined
   return { lane, did: r.did, replaced: replaced ?? null, ...(note ? { note } : {}) }
 }
 
@@ -790,10 +846,10 @@ export async function restoreLane(ws: WorkspaceService, id: string, back: readon
         const cards = v.old as number[]
         if (sameList(l.cards, cards)) delete l.pending
         else {
-          const flying = on ? inFlight((await views(ws, [l]))[0]) : null
-          if (flying !== null) l.pending = [...cards]
+          const change = on ? listChange((await views(ws, [l]))[0], l.cards, cards) : null
+          if (change && change.behind !== null) l.pending = [...cards]
           else {
-            if (on) checks.push(stillBetweenCards(ws, l, [...l.cards]))
+            if (change) checks.push(stillBetweenCards(ws, l, change.check))
             l.cards = [...cards]
             delete l.pending
           }
@@ -885,7 +941,8 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
 export async function laneNext(ws: WorkspaceService, project: string, agentId: string): Promise<{ lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneInfo['status'] }> {
   const lane = await laneOf(ws, project, agentId)
   if (!lane) throw new LaneError(404, 'No running lane of yours: start one with hive_lane start, or ask the user') // i18n-ignore: hive_lane's refusal (agents)
-  const open = lane.cards.filter((c) => c.column !== 'done' && c.column !== 'gone')
+  // Another agent's card is never the lane's next (HI-1821).
+  const open = lane.cards.filter(ownOpen)
   const pauses = lane.state === 'paused' ? lane.status : null
   if (pauses) return { lane, next: null, waits: pauses }
   const flying = open.find((c) => c.column === 'doing' || c.column === 'review')

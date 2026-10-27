@@ -3172,6 +3172,12 @@ export interface LaneCard {
   reviewing: boolean
   /** At its round limit, waiting for the user's answer (For you, §16.11.4): its lane pauses on it. */
   roundLimit?: boolean
+  /**
+   * Held elsewhere (HI-1821), an open card that isn't the lane's own: the id of the agent it is given to on the board
+   * (not the lane's builder), or, given to none, of the running lane that owns it (another lane listing it: the one whose
+   * builder has it, else the newest). Its lane shows it but never takes it, waits on it or keys a queued list change to it.
+   */
+  elsewhere?: string
 }
 
 export interface LaneInfo {

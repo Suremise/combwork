@@ -90,7 +90,10 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
   beforeAll(async () => {
     mkdirSync(join(project, '.hive'), { recursive: true })
     writeFileSync(join(project, 'a.txt'), 'a\n')
-    writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
+    writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'b2', name: 'B2' }, { id: 'r1', name: 'R1' }] }))
+    // Another project, for a card moved there and back (HI-1821).
+    mkdirSync(join(wsPath, 'beta', '.hive'), { recursive: true })
+    writeFileSync(join(wsPath, 'beta', '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'c1', name: 'C1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     lanes.startLanes()
@@ -441,5 +444,152 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a], by: 'B1 (alpha)' })).lane
     const done = await lanes.endLane(w, l.id, { project: 'alpha', agent: 'b1', mergeCommit: 'abc1234' })
     expect([done.state, done.mergeCommit]).toEqual(['ended', 'abc1234'])
+  })
+
+  // HI-1821: cards moved from B1's lane to B2's. B2's start listing cards B1's lane still has warns, B1's change leaves
+  // them at once (its own card in flight kept), and B1's lane goes on to its own next card.
+  it("a card moved from lane A to lane B: B's start warns while A lists it, A's change applies at once, A goes on to its own card (HI-1821)", async () => {
+    const [a1, x, y, a2, a3] = [await make('Moved a1'), await make('Moved x'), await make('Moved y'), await make('Moved a2'), await make('Moved a3')]
+    const la = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a1, x, y, a2], by: 'Assistant' })).lane
+    await move(a1, 'doing')
+    const lb = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [x, y], by: 'Assistant' }))
+    expect(lb.note).toMatch(new RegExp(`^Warning: #${x} is also in B1's lane \\(${la.id}\\); #${y} is also in B1's lane`))
+    expect(facts().card(x).lane).toBe(lb.lane.id)
+    // Only cards taken out, A1 in flight kept: at once, not queued after A1.
+    const r = await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a1, a2], by: 'Assistant' })
+    expect([r.lane.id, r.lane.cards.map((c) => c.number), r.lane.queued, r.note]).toEqual([la.id, [a1, a2], null, undefined])
+    expect((await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [x, y], by: 'Assistant' })).note).toBeUndefined()
+    // A change that adds a card while A1 is in flight still waits for A1 (#1270), never for B2's cards.
+    await run(() => tasks.updateTask(x, { column: 'doing', agent: 'b2' }, user))
+    const added = await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a1, a2, a3], by: 'Assistant' })
+    expect(added.note).toMatch(new RegExp(`queued: it applies once #${a1} is Done`))
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a1, a2], by: 'Assistant' })
+    await move(a1, 'done')
+    const wf = (await workflowFor(w, project))!
+    expect(await store.boardWrite(w, async () => wf.start(`#${a2}`, agentActor('b1')))).toMatchObject({ ok: true })
+    await vi.waitFor(async () => expect((await lanes.laneNext(w, 'alpha', 'b1')).next).toMatchObject({ card: a2, carryOn: true }), { timeout: HUNG_MS })
+    for (const l of [la, lb.lane]) await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
+  // HI-1821, as it was seen: a lane listing a card another agent has (from before one lane a card) takes, waits on and keys
+  // its queued change to none of it.
+  it("a lane never takes, waits on or queues behind a card another agent has (HI-1821)", async () => {
+    const [x, a1, z, a2, a3] = [await make('Held x'), await make('Held a1'), await make('Held z'), await make('Held a2'), await make('Held a3')]
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [x, a1, z, a2], by: 'Assistant' })).lane
+    await run(() => tasks.updateTask(x, { column: 'doing', agent: 'b2' }, user))
+    await run(() => tasks.updateTask(z, { column: 'review', agent: 'b2' }, user))
+    const seen = await lane(l.id)
+    expect([seen.cards.find((c) => c.number === x)?.elsewhere, seen.current, seen.state, seen.status]).toEqual(['b2', a1, 'active', null])
+    expect((await lanes.laneNext(w, 'alpha', 'b1')).next).toMatchObject({ card: a1, carryOn: false })
+    // B2's cards in flight don't hold A's list: a change between A's own cards applies at once.
+    const r = await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [x, a1, z, a2, a3], by: 'Assistant' })
+    expect([r.lane.queued, r.note]).toEqual([null, undefined])
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [x, a1, z, a2], by: 'Assistant' })
+    const wf = (await workflowFor(w, project))!
+    expect(await store.boardWrite(w, async () => wf.start(`#${a1}`, agentActor('b1')))).toMatchObject({ ok: true })
+    // A1 in flight: a change is queued after A1, B2's X before it in the list never.
+    expect((await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [x, a1, a2, z], by: 'Assistant' })).note).toMatch(new RegExp(`queued: it applies once #${a1} is Done`))
+    await move(a1, 'done')
+    await vi.waitFor(async () => expect((await lane(l.id)).queued).toBeNull(), { timeout: HUNG_MS })
+    // Its next own card starts though B2's Z is before it in the list.
+    expect(await store.boardWrite(w, async () => wf.start(`#${a2}`, agentActor('b1')))).toMatchObject({ ok: true })
+    await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
+  // HI-1821 as reported: HB3's lane [HI-1771, HI-1757, HI-1758, HI-1782], the middle two moved to HB6's lane.
+  it("the reported sequence: the moved cards leave at once; a queued change keeps its own card as anchor through Review and Approved; then the lane's own next card (HI-1821)", async () => {
+    const [own1, x1, x2, own2, extra] = [await make('Seq 1771'), await make('Seq 1757'), await make('Seq 1758'), await make('Seq 1782'), await make('Seq extra')]
+    const la = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [own1, x1, x2, own2], by: 'Assistant' })).lane
+    await move(own1, 'doing')
+    // 04:45: the Assistant re-runs the start without them, the lane's own card in flight: at once.
+    const r = await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [own1, own2], by: 'Assistant' })
+    expect([r.lane.cards.map((c) => c.number), r.lane.queued, r.note]).toEqual([[own1, own2], null, undefined])
+    const lb = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [x1, x2], by: 'Assistant' })
+    expect(lb.note).toBeUndefined()
+    await run(() => tasks.updateTask(x1, { column: 'doing', agent: 'b2' }, user))
+    await run(() => tasks.updateTask(x2, { agent: 'b2', blocked: 'Asked the user' }, user))
+    // A change that adds a card waits for its own card, never B2's, through Review and Approved.
+    expect((await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [own1, own2, extra], by: 'Assistant' })).note).toMatch(new RegExp(`queued: it applies once #${own1} is Done`))
+    await move(own1, 'review')
+    expect([(await lane(la.id)).queued, (await lane(la.id)).status?.card]).toEqual([[own1, own2, extra], own1])
+    await move(own1, 'passed')
+    expect([(await lane(la.id)).queued, (await lane(la.id)).status?.card]).toEqual([[own1, own2, extra], own1])
+    await move(own1, 'done')
+    await vi.waitFor(async () => expect((await lane(la.id)).cards.map((c) => c.number)).toEqual([own1, own2, extra]), { timeout: HUNG_MS })
+    const now = await lane(la.id)
+    expect([now.queued, now.current, now.state, now.status]).toEqual([null, own2, 'active', null])
+    expect((await lanes.laneNext(w, 'alpha', 'b1')).next).toMatchObject({ card: own2, carryOn: false })
+    const wf = (await workflowFor(w, project))!
+    expect(await store.boardWrite(w, async () => wf.start(`#${own2}`, agentActor('b1')))).toMatchObject({ ok: true })
+    for (const l of [la, lb.lane]) await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
+  it('a card given to no agent that two lanes list is the newer lane’s, the holder’s once given; the other lane skips it, the runtime too (HI-1821)', async () => {
+    const [u, a1] = [await make('Shared u'), await make('Shared a1')]
+    const la = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [u, a1], by: 'Assistant' })).lane
+    const lb = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [u], by: 'Assistant' })
+    expect(lb.note).toMatch(new RegExp(`^Warning: #${u} is also in B1's lane \\(${la.id}\\)`))
+    const seenA = await lane(la.id)
+    expect([seenA.cards.find((c) => c.number === u)?.elsewhere, seenA.current]).toEqual([lb.lane.id, a1])
+    expect([(await lane(lb.lane.id)).cards[0].elsewhere, (await lane(lb.lane.id)).current]).toEqual([undefined, u])
+    expect(facts().card(u).lane).toBe(lb.lane.id)
+    expect((await lanes.laneNext(w, 'alpha', 'b1')).next).toMatchObject({ card: a1 })
+    const wf = (await workflowFor(w, project))!
+    expect(await store.boardWrite(w, async () => wf.start(`#${a1}`, agentActor('b1')))).toMatchObject({ ok: true })
+    // Given to B1: B1's lane's (the holder's lane), B2's skips it.
+    await run(() => tasks.updateTask(u, { agent: 'b1' }, user))
+    expect(facts().card(u).lane).toBe(la.id)
+    expect([(await lane(la.id)).cards[0].elsewhere, (await lane(lb.lane.id)).cards[0].elsewhere]).toEqual([undefined, 'b1'])
+    for (const l of [la, lb.lane]) await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
+  it('two lanes started at once with one card: the lanes’ lock orders them, the second’s reply warns from the first’s stored row, and the view and runtime name one owner (HI-1821)', async () => {
+    const u = await make('Race u')
+    const [r1, r2] = await Promise.all([lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [u], by: 'Assistant' }), lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [u], by: 'Assistant' })])
+    const warned = [r1, r2].filter((r) => (r.note ?? '').startsWith('Warning: '))
+    expect(warned).toHaveLength(1)
+    const first = warned[0] === r1 ? r2 : r1
+    expect(warned[0].note).toContain(`is also in ${first === r1 ? 'B1' : 'B2'}'s lane (${first.lane.id})`)
+    // One owner, the same for the view and the runtime: the other lane marks the card held by it.
+    const owner = facts().card(u).lane
+    const other = owner === r1.lane.id ? r2.lane.id : r1.lane.id
+    expect([owner === r1.lane.id || owner === r2.lane.id, (await lane(owner!)).cards[0].elsewhere, (await lane(other)).cards[0].elsewhere]).toEqual([true, undefined, owner])
+    for (const r of [r1, r2]) await lanes.endLane(w, r.lane.id, { abandoned: true })
+  })
+
+  // HR4's round 1: a card moved to another project, listed by a newer lane there, and moved back (leaving its agent) is
+  // its project's lane's, never the other project's, for the view, the runtime and the check under the board's lock.
+  it('a card moved to another project and back is its own project’s lane’s, though a newer lane there still lists it (HI-1821)', async () => {
+    const [u, a1] = [await make('Away u'), await make('Away a1')]
+    const b1 = (await run(() => tasks.createTask({ title: 'Beta b1', project: 'beta' }, user))).number
+    const la = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [u, a1], by: 'Assistant' })).lane
+    await run(() => tasks.updateTask(u, { project: 'beta' }, user))
+    const lb = (await lanes.startLane(w, { project: 'beta', builder: 'c1', cards: [u, b1], by: 'Assistant' })).lane
+    await run(() => tasks.updateTask(u, { project: 'alpha' }, user))
+    const seen = await lane(la.id)
+    expect([seen.cards[0].elsewhere, seen.current, facts().card(u).lane]).toEqual([undefined, u, la.id])
+    expect((await lanes.laneNext(w, 'alpha', 'b1')).next).toMatchObject({ card: u })
+    // Under the board's lock: U started (given to no agent) while a change is decided reads as the lane's own card in
+    // flight, so the change is queued after it.
+    const real = w.projectConfig.bind(w)
+    const change = new AsyncLocalStorage<true>()
+    let started = false
+    const spy = vi.spyOn(w, 'projectConfig').mockImplementation(async (p) => {
+      if (!started && change.getStore() && (new Error().stack ?? '').includes('namesOf')) {
+        started = true
+        await run(() => tasks.updateTask(u, { column: 'doing' }, user))
+      }
+      return real(p)
+    })
+    let r: Awaited<ReturnType<typeof lanes.startLane>>
+    try {
+      r = await change.run(true, () => lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a1, u], by: 'Assistant' }))
+    } finally {
+      spy.mockRestore()
+    }
+    expect(started).toBe(true)
+    expect([r.lane.cards.map((c) => c.number), r.lane.queued]).toEqual([[u, a1], [a1, u]])
+    expect(r.note).toMatch(new RegExp(`queued: it applies once #${u} is Done`))
+    for (const l of [la, lb]) await lanes.endLane(w, l.id, { abandoned: true })
   })
 })
