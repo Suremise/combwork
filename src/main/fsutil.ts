@@ -439,15 +439,17 @@ const backedUp = new Set<string>()
 
 /**
  * Saves a kept file and its .bak copy. `compact`: JSON without spaces; `bakOncePerRun`: the .bak only at the first save
- * of the run (#1111: config.json, saved often, then costs one write a save, not two).
+ * of the run (#1111: config.json, saved often, then costs one write a save, not two). `existing`: its folder isn't made,
+ * so a file whose folder went (moved or deleted) fails with ENOENT rather than bringing the folder back (HI-1817).
  */
-export async function writeKeptJson(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean } = {}): Promise<void> {
+export async function writeKeptJson(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean } = {}): Promise<void> {
   const text = (opts.compact ? JSON.stringify(data) : JSON.stringify(data, null, 2)) + '\n'
+  const write = { mkdir: !opts.existing }
   forgetKeptStat(path)
-  await writeTextAtomic(path, text).finally(() => forgetKeptStat(path))
+  await writeTextAtomic(path, text, write).finally(() => forgetKeptStat(path))
   const k = path.toLowerCase()
   if (opts.bakOncePerRun && backedUp.has(k)) return
-  await writeTextAtomic(`${path}.bak`, text).then(
+  await writeTextAtomic(`${path}.bak`, text, write).then(
     () => void backedUp.add(k),
     () => undefined
   )
@@ -463,10 +465,11 @@ let tmpCounter = 0
 /**
  * Each write has its own temp file, so two writes to one file at the same time can't mix their
  * contents; the last rename wins with a complete file. Windows briefly refuses a rename while
- * another process (or another rename) holds the target, so that is retried.
+ * another process (or another rename) holds the target, so that is retried. `mkdir: false` writes only into a folder
+ * that is there (ENOENT otherwise).
  */
-export async function writeTextAtomic(path: string, text: string): Promise<void> {
-  await mkdir(dirname(path), { recursive: true })
+export async function writeTextAtomic(path: string, text: string, opts: { mkdir?: boolean } = {}): Promise<void> {
+  if (opts.mkdir !== false) await mkdir(dirname(path), { recursive: true })
   const tmp = `${path}.${process.pid}-${++tmpCounter}.tmp`
   // A write that fails, while the temp file is written (a full disk) or renamed (retries given up, EPERM included),
   // removes it, so failed saves leave nothing behind (#1016). A crash part way still can: sweepLeftovers removes those.
