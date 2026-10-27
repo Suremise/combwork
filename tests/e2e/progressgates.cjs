@@ -236,6 +236,12 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
   }
 
   // --- In another language: Hive started again in German, the same lane.
+  // The lane's agents were working: Hive offers to resume them (its restart record), in a notice over the lane's
+  // segments (HI-1809: the hover timed out under it). Answered Don't Resume, below, until the record is gone (nothing
+  // left to offer) and no offer shows.
+  const restartRecord = path.join(userData, 'restart.json')
+  const offered = fs.existsSync(restartRecord)
+  console.log(`INFO restart record before the restart: ${offered ? 'yes' : 'no'}`)
   const de = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off', HIVE_LANG: 'de' }) })
   try {
     const page = await de.firstWindow()
@@ -244,6 +250,15 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     await lib.appReady(page)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     if (!(await page.evaluate((n) => document.title.includes(n), path.basename(ws)))) await lib.openWorkspace(inv, page, ws)
+    if (offered) {
+      const deMain = JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', 'de', 'main.json'), 'utf8'))
+      const dontResume = page.locator('.toast').getByRole('button', { name: deMain['main.restart.dismiss'], exact: true })
+      const answered = await until(async () => {
+        if (await dontResume.count()) await dontResume.first().click().catch(() => undefined)
+        return !fs.existsSync(restartRecord) && (await dontResume.count()) === 0
+      })
+      check("de: the offer to resume the lane's agents answered Don't Resume, and gone", !!answered, String(fs.existsSync(restartRecord)))
+    }
     if (!(await until(async () => (await page.locator('.progress-panel').count()) === 1, 5000))) await page.locator('.progress-rail').click()
     const seg = page.locator('.progress-lane .lane-seg.todo').first()
     const label = async () => (await seg.getAttribute('aria-label').catch(() => null)) ?? ''
