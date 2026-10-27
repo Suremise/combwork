@@ -60,18 +60,21 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
   const settings = useStore((s) => s.settings)
   const idBase = useId()
   // Filtering (Settings' search, this list's filter, either Modified only): each tab counts its matches; the tab shown is
-  // the remembered one while it has some, else the first that has; a tab clicked meanwhile narrows to it, unremembered.
+  // the remembered one while it has some, else the first that has; a tab clicked meanwhile narrows to it, unremembered,
+  // for that filter only: changed (more typed, a link's query), the list chooses again (HR5's HI-1839 round 1).
   const filtering = words.length > 0 || modifiedOnly
-  const [filterTab, setFilterTab] = useState<AdvancedGroup | null>(null)
+  const filterKey = `${words.join(' ')}|${modifiedOnly}`
+  const [clicked, setClicked] = useState<{ key: string; tab: AdvancedGroup } | null>(null)
+  const filterTab = filtering && clicked?.key === filterKey ? clicked.tab : null
   useEffect(() => {
-    if (!filtering) setFilterTab(null)
-  }, [filtering])
+    setClicked((c) => (c && c.key !== filterKey ? null : c))
+  }, [filterKey])
   const remembered = useRememberedTab<AdvancedGroup>(TABS_KEY, GROUPS, 'hive')
   const count = (g: AdvancedGroup): number => shown.filter((r) => r.def.group === g).length
   // A value's own id searched for opens its group's tab, whatever is remembered.
   const exact = ADVANCED_DEFS.find((d) => words.length === 1 && d.id.toLowerCase() === words[0])?.group
   const tab: AdvancedGroup = !filtering ? remembered : (filterTab ?? exact ?? (count(remembered) ? remembered : (GROUPS.find((g) => count(g) > 0) ?? remembered)))
-  const choose = (g: AdvancedGroup): void => (filtering ? setFilterTab(g) : chooseTab(TABS_KEY, g))
+  const choose = (g: AdvancedGroup): void => (filtering ? setClicked({ key: filterKey, tab: g }) : chooseTab(TABS_KEY, g))
   if (!state) return null
   return (
     <div className="advanced-list">

@@ -209,6 +209,17 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await tab(none.id).click()
     check(`…a tab without matches (${none.label}) is chosen, saying it has none`, !!(await lib.until(async () => (await selectedTab()) === none.id && (await visibleIds()).length === 0 && (await list.locator(`[role="tabpanel"][data-group="${none.id}"] .empty-state`).innerText().catch(() => '')) === `No settings of ${none.label} match.`, HUNG_MS)), JSON.stringify(await tabs()))
     check('…and isn’t remembered', configTab() === 'codex', String(configTab()))
+    // That choice holds for its filter only (HR5's HI-1839 round 1): the list's own filter changed without clearing
+    // anything chooses again, as does a changed search for a value's id.
+    await list.getByLabel('Filter advanced settings').fill('codex')
+    check('…the list’s filter changed: a tab with matches again (Codex), not the one clicked', !!(await lib.until(async () => (await selectedTab()) === 'codex' && (await visibleIds()).length === 1, HUNG_MS)), JSON.stringify([await selectedTab(), await visibleIds()]))
+    await list.getByLabel('Filter advanced settings').fill('')
+    await tab(none.id).click()
+    await lib.until(async () => (await selectedTab()) === none.id, HUNG_MS)
+    await search.fill('claude-code.trust.prompt')
+    check('…the search changed to a value’s id: its tab, Claude Code, not the one clicked', !!(await lib.until(async () => (await selectedTab()) === 'claude-code' && JSON.stringify(await visibleIds()) === '["claude-code.trust.prompt"]', HUNG_MS)), JSON.stringify([await selectedTab(), await visibleIds()]))
+    await search.fill('trust question')
+    check('…and back to the first search: chosen again, not the old click', !!(await lib.until(async () => (await selectedTab()) === 'codex', HUNG_MS)), String(await selectedTab()))
     await search.fill('')
     check('cleared: the remembered tab, Codex, is back, no counts', !!(await lib.until(async () => (await selectedTab()) === 'codex' && (await tabs()).every((t) => t.count === null), HUNG_MS)), JSON.stringify(await tabs()))
     // Settings' search, the list's own filter and both Modified only together; cleared, the remembered tab again.
