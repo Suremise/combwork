@@ -439,6 +439,12 @@ interface State {
 
   /** The workspace's task board (archived cards too), and the board view's filters. */
   tasks: TaskCard[]
+  /**
+   * Bumped by each read of the board (HI-1859): a change that writes only a card's facts (an agent's refusal) leaves
+   * `tasks` the same object (keepSame, HI-1806), so what is made from the facts (the work badges, a card's work) reads
+   * again on this.
+   */
+  boardReads: number
   /** Whether the board is read-only and why, and its kept 0.9 copy (#1207): read with the board. */
   boardState: BoardState | null
   /**
@@ -629,6 +635,7 @@ export const useStore = create<State>(() => ({
   filesRoot: {},
 
   tasks: [],
+  boardReads: 0,
   boardState: null,
   boardStages: null,
   projectKeys: [],
@@ -1444,7 +1451,7 @@ async function readTasks(): Promise<void> {
     if (mine !== tasksLoad) return
     const tasks = board.take(cards, { ws: get().workspace?.path ?? null, whole: fullArchive > 0 })
     if (tasks === 'again') return void loadTasks()
-    if (tasks) set({ tasks, boardState, projectKeys, movedCardNames, ...(stages ? { boardStages: { for: stagesFor, byPath: stages } } : {}) })
+    if (tasks) set({ tasks, boardReads: get().boardReads + 1, boardState, projectKeys, movedCardNames, ...(stages ? { boardStages: { for: stagesFor, byPath: stages } } : {}) })
   } catch {
     // The workspace closed meanwhile.
   }
