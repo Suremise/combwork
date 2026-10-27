@@ -3,7 +3,8 @@
 // its tile (Tiles) say "Stopped · {time}". Resume takes the stopped look away from the accepted click (the start held a
 // moment, so the window between is seen), before the session runs. A lane's end's quit says "its lane ended", the CLI
 // crashing "its CLI exited with code 1", and a failed start keeps its failed bar. Screenshots in both themes, Panes and
-// Tiles. The fake Claude Code; dev build, throwaway profile and workspace.
+// Tiles. The fake Claude Code; throwaway profile and workspace. Dev build only: a lane's end's quit is the test copies'
+// slots:test channel, and the held and refused starts their IPC test seams, which a packaged Hive refuses.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
