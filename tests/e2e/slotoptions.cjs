@@ -174,6 +174,26 @@ function board(sql, ...args) {
     check('an inherited setup is set to none with Set to none', !!(await until(async () => projectJson().slots?.setup === '' && (await setupOrigin.getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(projectJson().slots))
     await slotsGroup.locator('[data-action="inherit-setup"]').click()
     check('…and inherits again', !!(await until(async () => !('setup' in (projectJson().slots ?? {})) && (await setupOrigin.getAttribute('data-origin')) === 'worktreeSetup', HUNG_MS)), JSON.stringify(projectJson().slots))
+    // Focused, untouched, Enter (HR5's HI-1765 round 2): the field takes a value set elsewhere, and Enter saves nothing.
+    // The next save is made to fail (HIVE_TEST_FAIL_IPC, once): the probe's own save after it fails only if Enter sent none.
+    await setupField.focus()
+    await inv('slots:setSetting', fx.alpha, 'setup', 'npm ci --elsewhere')
+    check('a focused, untouched field takes a value set elsewhere', !!(await until(async () => (await setupField.inputValue()) === 'npm ci --elsewhere', HUNG_MS)), await setupField.inputValue())
+    await app.evaluate(() => {
+      process.env.HIVE_TEST_FAIL_IPC = 'slots:setSetting*1'
+    })
+    await setupField.press('Enter')
+    const probe = await page.evaluate((p) => window.hive.invoke('slots:setSetting', p, 'setup', 'npm ci --elsewhere').then(() => 'saved', () => 'failed'), fx.alpha)
+    await app.evaluate(() => {
+      delete process.env.HIVE_TEST_FAIL_IPC
+    })
+    check('…and Enter saves nothing', probe === 'failed' && projectJson().slots?.setup === 'npm ci --elsewhere', `${probe} ${JSON.stringify(projectJson().slots)}`)
+    // Typed, Enter: saved.
+    await setupField.fill('npm ci --typed')
+    await setupField.press('Enter')
+    check('a typed value is saved with Enter', !!(await until(() => projectJson().slots?.setup === 'npm ci --typed', HUNG_MS)), JSON.stringify(projectJson().slots))
+    await slotsGroup.locator('[data-action="inherit-setup"]').click()
+    await until(async () => !('setup' in (projectJson().slots ?? {})), HUNG_MS)
     // The copied files (HI-1765): the project's own back to inherited, from Hive's slot default (Settings → Workflow
     // defaults), then the workspace's set to none in Settings → Workspace, over Hive's; the project's own none over both.
     await inv('slots:setLevelDefault', 'global', 'copy', '.env*\nconfig/hive.json')

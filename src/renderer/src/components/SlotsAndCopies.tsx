@@ -323,15 +323,21 @@ export function SlotCopyLevel({ level }: { level: WorkflowLevel }) {
 /** A field taken when it loses focus or on Enter (a script, a list of patterns). */
 function Field({ value, placeholder, onCommit, multiline }: { value: string; placeholder: string; onCommit: (v: string) => void; multiline?: boolean }) {
   const [text, setText] = useState(value)
-  // A value changed elsewhere shows at once, but not over text being typed: that is committed (or not) as it leaves.
-  const editing = useRef(false)
+  // A value changed elsewhere shows at once, but not over text the user typed since the last commit: only typing is
+  // theirs (HR5's round 2: a field merely focused takes the new value, and leaving it saves nothing).
+  const typed = useRef(false)
   useEffect(() => {
-    if (!editing.current) setText(value)
+    if (!typed.current) setText(value)
   }, [value])
-  const leave = (): void => {
-    editing.current = false
-    if (text !== value) onCommit(text)
+  const type = (v: string): void => {
+    typed.current = true
+    setText(v)
   }
-  if (multiline) return <textarea className="input mono" rows={3} value={text} placeholder={placeholder} onFocus={() => (editing.current = true)} onChange={(e) => setText(e.target.value)} onBlur={leave} />
-  return <input className="input mono" value={text} placeholder={placeholder} onFocus={() => (editing.current = true)} onChange={(e) => setText(e.target.value)} onBlur={leave} onKeyDown={(e) => e.key === 'Enter' && text !== value && onCommit(text)} />
+  const commit = (): void => {
+    // Untyped, the text is already the latest value (or one just committed, on its way).
+    if (typed.current && text !== value) onCommit(text)
+    typed.current = false
+  }
+  if (multiline) return <textarea className="input mono" rows={3} value={text} placeholder={placeholder} onChange={(e) => type(e.target.value)} onBlur={commit} />
+  return <input className="input mono" value={text} placeholder={placeholder} onChange={(e) => type(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && commit()} />
 }
