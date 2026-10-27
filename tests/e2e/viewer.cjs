@@ -16,6 +16,8 @@ const path = require('path')
 const { createHash } = require('crypto')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 30000
+// The Agent API's version as the code under test has it (servers.ts), not a copy here that lags the next bump (HI-1847).
+const API_VERSION = Number(/export const API_VERSION = (\d+)/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'main', 'servers.ts'), 'utf8'))[1])
 
 const userData = path.join(lib.WORK, 'viewer-profile')
 const ws = path.join(lib.WORK, 'viewer-ws')
@@ -110,7 +112,7 @@ function stream(token) {
 
   // --- Discovery: the address, never a token.
   const found = await lib.until(readDiscovery, HUNG_MS)
-  check('the discovery file names the running API', found?.app === 'Hive' && found.url === BASE && found.port === PORT && found.api === 9 && typeof found.pid === 'number', JSON.stringify(found))
+  check('the discovery file names the running API', found?.app === 'Hive' && found.url === BASE && found.port === PORT && found.api === API_VERSION && typeof found.pid === 'number', JSON.stringify({ found, API_VERSION }))
   const discoveryText = fs.readFileSync(discovery, 'utf8')
   check('…and holds no token', !/token"\s*:/i.test(discoveryText) && !discoveryText.includes(apiToken), discoveryText)
   check('its health check answers', (await fetch(`${found.url}/v1/health`).then((r) => r.json())).ok === true)
@@ -131,7 +133,7 @@ function stream(token) {
   const viewer = made.token
   const as = (method, route, body) => api(method, route, body, viewer)
   const status = await as('GET', '/v1/status')
-  check('GET /v1/status says who it is: a read-only viewer of the workspace', status.status === 200 && status.body.caller?.role === 'viewer' && status.body.caller.name === 'Apiary' && status.body.caller.readOnly === true && status.body.api?.version === 9, JSON.stringify(status.body?.caller))
+  check('GET /v1/status says who it is: a read-only viewer of the workspace', status.status === 200 && status.body.caller?.role === 'viewer' && status.body.caller.name === 'Apiary' && status.body.caller.readOnly === true && status.body.api?.version === API_VERSION, JSON.stringify({ caller: status.body?.caller, api: status.body?.api, API_VERSION }))
 
   // --- An agent, for the merge slot, its activity and its own token's stream.
   await page.keyboard.press('Escape')
