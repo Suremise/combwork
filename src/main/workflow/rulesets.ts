@@ -174,11 +174,23 @@ export async function rulesetsNow(ws: Pick<WorkspaceService, 'config' | 'info' |
   for (const p of ws.info()?.projects ?? []) {
     if (!p.platform) continue
     try {
-      const c = compile(resolvedOf(ws, p.path, p.platform.id, await ws.projectConfig(p.path)).options)
-      if (c.ok) out.set(p.name.toLowerCase(), c.ruleset.id)
+      const cfg = await ws.projectConfig(p.path)
+      // Kept by what it is made from (HI-1780: every board change asks, and options resolved and compiled again cost
+      // about 2 ms a project): the platform and the three levels of options.
+      const key = JSON.stringify([p.platform.id, config.settings.workflow ?? null, ws.config.workflow ?? null, cfg.workflow?.options ?? null])
+      const was = rulesetIds.get(p.path.toLowerCase())
+      let id = was?.key === key ? was.id : undefined
+      if (id === undefined) {
+        const c = compile(resolvedOf(ws, p.path, p.platform.id, cfg).options)
+        id = c.ok ? c.ruleset.id : null
+        rulesetIds.set(p.path.toLowerCase(), { key, id })
+      }
+      if (id) out.set(p.name.toLowerCase(), id)
     } catch (e) {
       log.warn(`the ruleset now of ${userText(p.name)}`, e)
     }
   }
   return out
 }
+/** Each project's ruleset id now (null: its options don't compile), by its path, with what it was made from. */
+const rulesetIds = new Map<string, { key: string; id: string | null }>()
