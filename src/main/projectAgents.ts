@@ -42,6 +42,7 @@ const log = createLogger('agents')
  * for the Agent API (`notReused`), the window's language for the window (`notReusedText`, the Add Agent dialog's look).
  */
 const M = {
+  stopForProvider: msg({ id: 'worktrees.agent.stopForProvider', defaultMessage: 'Stop the agent before changing its provider.', description: "An error: an agent's provider (its coding-agent CLI) can't change while it runs." }),
   noAgent: msg({ id: 'worktrees.agent.gone', defaultMessage: 'That agent no longer exists.', description: 'An error: the agent being changed was removed meanwhile.' }),
   badLayout: msg({ id: 'worktrees.agent.badPlacement', defaultMessage: "The panes can't be placed like that in this layout.", description: "An error: saving where the user put the agents' panes in a layout (dragging a pane to another cell) was given a layout or places Hive doesn't know." }),
   sharedTree: msg({ id: 'worktrees.agent.sharedTree', defaultMessage: 'Another agent already works in that worktree.', description: 'An error: an agent was to be added in a worktree another agent of the project already works in.' }),
@@ -382,7 +383,7 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
     const current = agents.find((a) => a.id === agentId)
     if (!isKnownProvider(patch.provider)) throw hiveError(M.unknownProvider, { provider: patch.provider }, { kind: 'invalid' })
     if (current && agentProvider(current, cfg, config.settings) !== patch.provider) {
-      if (sessions.liveFor(projectPath, agentId)) throw hiveError(msg({ id: 'worktrees.agent.stopForProvider', defaultMessage: 'Stop the agent before changing its provider.', description: "An error: an agent's provider (its coding-agent CLI) can't change while it runs." }), undefined, { kind: 'conflict' })
+      if (sessions.liveFor(projectPath, agentId)) throw hiveError(M.stopForProvider, undefined, { kind: 'conflict' })
       // Model, effort, mode and context belong to the old provider, and its conversations can't be resumed by the new one.
       Object.assign(clean, { model: patch.model || undefined, effort: patch.effort || undefined, permissionMode: patch.permissionMode || undefined, use200kContext: typeof use200kContext === 'boolean' ? use200kContext : undefined, lastSessionId: undefined, connection: connection || undefined })
     }
@@ -401,6 +402,8 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   const check = (current: AgentDef): void => {
     opts.check?.(current)
     const was = agentProvider(current, cfg, config.settings)
+    // A change of CLI only while it is stopped, as it is now: one started while this write waited keeps everything.
+    if (patch.provider !== undefined && patch.provider !== was && sessions.liveFor(projectPath, agentId)) throw hiveError(M.stopForProvider, undefined, { kind: 'conflict' })
     if (patch.provider !== undefined && beforeCli !== null && was !== beforeCli) throw hiveError(msg({ id: 'worktrees.agent.providerChangedMeanwhile', defaultMessage: "{agent}'s provider was changed meanwhile: nothing was changed. Try again.", description: "An error saving an agent's settings (HI-1771): its provider (coding agent CLI) was changed by something else while this change was being saved, so nothing was saved. {agent} is its name." }), { agent: current.name }, { kind: 'conflict' })
     const cli = clean.provider ?? was
     const kept = clean.connection === current.connection && cli === was

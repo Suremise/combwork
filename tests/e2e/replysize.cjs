@@ -709,6 +709,9 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
   measure('hive_project_status (connections)', tool('hive_project_status', { project: 'beta' }, 'assistant'), 3500)
   await inv('connections:setOn', max.id, false)
   await inv('advanced:set', 'hive.accounts.preview', false)
+  // The preview off: an empty connection (the default, as documented) still reaches the API, which refuses it.
+  const emptyOff = tool('hive_add_agent', { project: 'beta', name: 'Emptied', connection: '' }, 'assistant')
+  check('with Connections off, hive_add_agent with an empty connection is refused, nothing added', emptyOff.isError && /Connections are a preview/.test(emptyOff.text), emptyOff.text)
 
   // A request that began in this workspace and ends after the window opened another: counted nowhere (not the next).
   const nextWs = path.join(lib.WORK, 'replysize-next-ws')

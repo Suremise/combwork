@@ -1031,6 +1031,40 @@ describe('the Agent API and connections (HI-1771)', () => {
     }
   })
 
+  it('a change of CLI racing a start (by provider alone, and by a connection on another CLI): refused under the lock, the agent unchanged', async () => {
+    const p = join(wsPath, 'api1')
+    const file = join(p, '.hive', 'project.json')
+    const caps = providerDescriptor('codex').capabilities as { connections?: unknown }
+    caps.connections = { homeEnv: 'CODEX_HOME', shared: [] }
+    const enabled = config.settings.providers.codex.enabled
+    config.settings.providers.codex.enabled = true
+    try {
+      config.update((cfg) => void (cfg.connections = [...(cfg.connections ?? []).filter((x) => x.id !== 'a-codex02'), { id: 'a-codex02', provider: 'codex', kind: 'signIn', name: 'ChatGPT 2', createdAt: '' }]))
+      await w.saveWorkspaceConfigWith((cfg) => ({ connections: { ...cfg.connections, codex: { on: ['a-codex02'], default: 'a-codex02' } } }))
+      const before = (await w.projectConfig(p)).agents[0]
+      expect(before.provider).toBe('claude-code')
+      for (const patch of [{ provider: 'codex' as const }, { provider: 'codex' as const, connection: 'a-codex02' }]) {
+        let release!: () => void
+        const held = withFileLock(file, () => new Promise<void>((r) => (release = r)))
+        const saving = here(() => updateAgent(p, 'k', patch))
+        await vi.waitFor(() => expect(fileLockDepth(file)).toBe(2), { timeout: HUNG_MS })
+        // It starts (on Claude Code) while the change waits on the project's lock.
+        const live = vi.spyOn(sessions, 'liveFor').mockReturnValue({} as never)
+        try {
+          release()
+          await held
+          expect(await outcome(saving)).toMatch(/Stop the agent before changing its provider/)
+        } finally {
+          live.mockRestore()
+        }
+        expect((await w.projectConfig(p)).agents[0]).toEqual(before)
+      }
+    } finally {
+      delete caps.connections
+      config.settings.providers.codex.enabled = enabled
+    }
+  })
+
   it('a change of CLI decided from the agent read before the write: changed meanwhile, refused whole', async () => {
     const p = join(wsPath, 'api1')
     const file = join(p, '.hive', 'project.json')
