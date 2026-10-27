@@ -957,7 +957,7 @@ export interface HiveRequests {
   /** Reads a server connection's models from its server (`request`: this reading's id, for cancelling it and telling a stale reply). */
   'connections:readModels': (id: string, request: string) => ServerModelsRead
   'connections:cancelModels': (id: string, request: string) => void
-  /** Opens the CLI on a server connection, for its first-run screens; returns the terminal's key. */
+  /** Opens the CLI on a connection (a server one, or a sign-in one: HI-1826), for its first-run screens; returns the terminal's key. */
   'connections:setUp': (id: string) => string
   /** Reset Masking Data (the user confirmed it): fingerprints made again from the keys saved now; masking strict for good after. */
   'connections:resetMasking': () => void

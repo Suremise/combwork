@@ -9,7 +9,7 @@ import { confirm, notify, prompt, useStore } from '../store'
 import { Icon, Switch } from './ui'
 import { timeAgo } from '../util'
 import { TerminalView } from './TerminalView'
-import { AddConnectionDialog, hasServers, MaskingBanner, ServerConnectionDetail, setUpHint, setUpServer } from './ServerConnections'
+import { AddConnectionDialog, hasServers, MaskingBanner, ServerConnectionDetail, setUpConnection, setUpHint, setUpLabel } from './ServerConnections'
 
 /**
  * Settings → Accounts (HI-980): Hive's accounts, each a CLI login in a folder of its own, signed in through the CLI's
@@ -92,6 +92,9 @@ export function AccountsSettings() {
   const affected = (projects ?? []).flatMap((p) => p.agents).filter((a) => a.restartNeeded && a.live?.launchedConnection && !a.live.switchPending).length
   const dups = duplicateLogins(view.connections)
   const nameOf = (id: string): string => view.connections.find((a) => a.id === id)?.name ?? id
+  // The connection an ended sign-in terminal signed in, offered its Set Up (HI-1826).
+  const after = terminal?.ended && !terminal.setUp ? view.connections.find((a) => a.id === terminal.id) : undefined
+  const signedInAfter = after && after.kind !== 'server' && !after.leftover && accountState(after) === 'signedIn' ? after : undefined
   const act = async (title: ReturnType<typeof msg>, fn: () => Promise<unknown>): Promise<void> => {
     try {
       await fn()
@@ -108,7 +111,7 @@ export function AccountsSettings() {
     }
   }
   const setUp = async (id: string, provider: ProviderId): Promise<void> => {
-    const key = await setUpServer(id)
+    const key = await setUpConnection(id)
     if (key) setTerminal({ id, key, ended: false, setUp: provider })
   }
   const add = async (provider: ProviderId): Promise<void> => {
@@ -192,6 +195,8 @@ export function AccountsSettings() {
                     {isDefault ? <span className="account-default">{tr(M.isDefault)}</span> : <button className="btn subtle" disabled={!wsPath || !!a.leftover} onClick={() => void act(M.changeFailed, () => call('connections:setDefault', a.id))}>{tr(M.makeDefault)}</button>}
                     {!server && state === 'changed' && <button className="btn subtle" onClick={() => void keep(a.id, a.name, o?.email)}>{tr(M.keep)}</button>}
                     {!server && !a.leftover && <button className="btn" onClick={() => void signIn(a.id)}>{tr(state === 'signedOut' || state === 'changed' ? M.signInAgain : M.signIn)}</button>}
+                    {/* Its first-run screens, which a browser sign-in leaves unanswered (HI-1826). */}
+                    {!server && !a.leftover && state === 'signedIn' && <button className="btn subtle" data-set-up onClick={() => void setUp(a.id, a.provider)}>{setUpLabel()}</button>}
                     <button className="btn subtle" disabled={!!a.leftover} onClick={() => void rename(a.id, a.name)}>{tr(M.rename)}</button>
                     <button className="btn subtle" onClick={() => void remove(a.id, a.name)}>{tr(M.remove)}</button>
                   </div>
@@ -211,7 +216,13 @@ export function AccountsSettings() {
           <div className="task-terminal">
             <TerminalView ptyKey={terminal.key} visible onExit={() => setTerminal((t) => (t?.key === terminal.key ? { ...t, ended: true } : t))} />
           </div>
-          {terminal.ended && <button className="btn" onClick={() => setTerminal(null)}>{tr(M.close)}</button>}
+          {terminal.ended && (
+            <div className="flex">
+              {/* Set Up after Sign In (HI-1826): the CLI's first-run screens, answered once here rather than in an agent's pane. */}
+              {!terminal.setUp && signedInAfter && <button className="btn primary" data-set-up-after onClick={() => void setUp(signedInAfter.id, signedInAfter.provider)}>{setUpLabel()}</button>}
+              <button className="btn" onClick={() => setTerminal(null)}>{tr(M.close)}</button>
+            </div>
+          )}
         </div>
       )}
     </div>

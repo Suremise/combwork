@@ -1,6 +1,7 @@
 // Settings → Connections (HI-980: sign-in connections, the section's id still 'accounts'; staged behind Settings → Advanced → Connections (preview)): hidden while the preview is off;
 // Add Account… makes the account's folder (its projects\ a junction to the CLI home's) and opens its sign-in in Hive's
-// terminal, nothing typed into it; once it ends, the row says who it is signed in as. Turned on, it is this workspace's
+// terminal, nothing typed into it; once it ends, the row says who it is signed in as, and Set Up (HI-1826) runs the CLI
+// itself on the folder for its first-run screens. Turned on, it is this workspace's
 // default. A login changed in its folder while Settings is closed (as a /login in a pane would) is found by its watch
 // and shown as changed, with Keep the New Login. Two accounts on one login are flagged. A second window's workspace keeps
 // its own choice. Remove deletes the folder for good, the conversations it linked to untouched. The fake Claude Code
@@ -91,7 +92,23 @@ const check = (name, ok, extra = '') => {
     check('once the sign-in ends, it is signed in as that login, taken on as its own', !!signed, JSON.stringify((await list()).connections))
     check('…and its row says so', !!(await lib.until(async () => /Signed in/.test(await row('Personal').innerText().catch(() => '')) && /one@example\.com · max/.test(await row('Personal').innerText().catch(() => '')), HUNG_MS)))
     await shots('signed-in')
-    await page.locator('.account-signin .btn', { hasText: 'Close' }).click().catch(() => undefined)
+
+    // --- Set Up (HI-1826): a browser sign-in leaves Claude Code's first-run screens unanswered, so Set Up is offered
+    // under the ended sign-in and on the row; it runs the CLI itself on the folder, answered by the user (nothing typed).
+    check('the sign-in ended, Set Up is offered beside Close', !!(await lib.until(async () => (await page.locator('.account-signin [data-set-up-after]').count()) === 1, HUNG_MS)))
+    check('…and on its row, signed in', (await row('Personal').locator('[data-set-up]').count()) === 1)
+    const launches = path.join(folder, 'fake-launches.jsonl')
+    const before = fs.existsSync(launches) ? fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).length : 0
+    await page.locator('.account-signin [data-set-up-after]').click()
+    const ran = await lib.until(async () => {
+      const all = fs.existsSync(launches) ? fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
+      return all.length > before ? all.at(-1) : null
+    }, HUNG_MS)
+    check('Set Up runs the CLI itself in the connection’s folder (its launch logged there)', !!ran && path.resolve(ran.cwd).toLowerCase() === path.resolve(folder).toLowerCase(), JSON.stringify(ran))
+    check('…in the terminal, with the setup hint', !!(await lib.until(async () => /asks a few setup questions/.test(await page.locator('.account-signin .hint').innerText().catch(() => '')), HUNG_MS)))
+    await shots('set-up')
+    await inv('pty:kill', `task:claude-code:login:${personal.id}`)
+    await page.locator('.account-signin .btn', { hasText: 'Close' }).click({ timeout: HUNG_MS }).catch(() => undefined)
 
     // --- On in this workspace: its default.
     await row('Personal').getByRole('switch').click()
