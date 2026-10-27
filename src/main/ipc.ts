@@ -88,6 +88,7 @@ import { mayHandOverNow } from './handOverCheck'
 import { transcripts } from './transcripts'
 import * as skills from './skills'
 import * as storage from './storage'
+import { cardCleanupPreview, cleanUpCardAttachments, cleanUpSoon } from './cardAttachmentCleanup'
 import { antivirusStatus, antivirusSuggestion, applyAntivirus, dismissAntivirus, moveDefenderPlan, prepareAntivirus } from './antivirus'
 import { agentsMemory, allLeftovers, endAgentProcess, leftoversSettled, projectLaunches, settleLeftovers } from './agentProcesses'
 import { cardWork, forYou, workBadges } from './workflow/cardWork'
@@ -370,6 +371,8 @@ function boardSteps(ws: WorkspaceService, upgraded = false, after?: AfterOpen): 
       .then(() => sayKeysOnce(ws))
       .then(() => tasks.archiveOldDone(ws))
       .catch((e) => log.warn('archiving old Done cards', e))
+      // Then archived cards' attachments past their project's days (HI-1842), in the background: not waited for.
+      .then(() => void cleanUpSoon(ws))
   )
   // The cards' actions a crash or a close left pending (#1215, SPEC §16.4.5): run once, in the order written.
   void timed('pending card actions', runActions(ws)) // i18n-ignore: a part of a log line's timing
@@ -1001,6 +1004,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'antivirus:dismiss': () => dismissAntivirus(),
     'storage:cleanupPreview': (p, opts) => storage.cleanupPreview(p, opts),
     'storage:cleanup': (p, opts, listed) => storage.cleanup(p, opts, listed),
+    'storage:cardCleanupPreview': (p) => cardCleanupPreview(workspace.assertProject(p)),
+    'storage:cardCleanup': (p, cards) => cleanUpCardAttachments(workspace.assertProject(p), { only: Array.isArray(cards) ? cards.filter((n): n is number => Number.isInteger(n)) : [] }),
     'storage:purgePreview': (target) => storage.purgePreview(target),
     'storage:purge': (previewId, listed, permanent) => storage.purge(previewId, listed, permanent === true),
     'session:clearUsageCache': () => sessions.forgetUsageCache(),

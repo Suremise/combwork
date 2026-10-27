@@ -851,6 +851,22 @@ const PROJECT_ROWS: Row[] = [
   },
   ...workflowRows(),
   { section: 'storage', key: 'storage', title: msg({ id: 'settings.project.storage.title', defaultMessage: 'What Hive keeps', description: "A setting's title (Project Settings → Storage)." }), desc: msg({ id: 'settings.project.storage.desc', defaultMessage: 'Measured in the background; Refresh measures again. The coding agents’ own transcripts (in ~/.claude, ~/.codex and ~/.copilot) aren’t counted, and Clean Up… and Purge… never touch them.', description: 'What the setting "What Hive keeps" does, under its title (Project Settings → Storage). Clean Up… and Purge… are buttons: use their names as translated there.' }), type: 'custom', wide: true },
+  // Archived cards' attachments, removed some days after archiving (HI-1842, shared/cardCleanup.ts).
+  {
+    section: 'storage',
+    key: 'cardAttachmentCleanup',
+    title: msg({ id: 'settings.project.cardAttachmentCleanup.title', defaultMessage: "Remove archived cards' attachments", description: "A setting's title (Project Settings → Storage): when the files kept with this project's archived cards (screenshots, logs) go to the Recycle Bin." }),
+    desc: msg({ id: 'settings.project.cardAttachmentCleanup.desc', defaultMessage: "Files kept with this project's cards go to the Recycle Bin this long after a card is archived. Open and Done cards keep theirs.", description: 'What the setting "Remove archived cards\' attachments" does, under its title (Project Settings → Storage).' }),
+    tip: msg({ id: 'settings.project.cardAttachmentCleanup.tip', defaultMessage: "Hive looks when the workspace opens and once a day. Bringing a card back from the archive in time keeps its files. Afterwards the card says when they were removed, and its links to them show as removed. Cards archived because their project was hidden or removed keep theirs.", description: 'The info tip of the setting "Remove archived cards\' attachments" (Project Settings → Storage): more on what it does and when it applies.' }),
+    type: 'select',
+    options: [
+      { value: 'off', label: msg({ id: 'settings.project.cardAttachmentCleanup.option.off', defaultMessage: 'Never', description: 'A choice of the setting "Remove archived cards\' attachments" (Project Settings → Storage): archived cards keep their files.' }) },
+      { value: '3', label: msg({ id: 'settings.project.cardAttachmentCleanup.option.3', defaultMessage: '3 days after archiving', description: 'A choice of the setting "Remove archived cards\' attachments" (Project Settings → Storage): 3 days after the card was archived.' }) },
+      { value: '7', label: msg({ id: 'settings.project.cardAttachmentCleanup.option.7', defaultMessage: '7 days after archiving', description: 'A choice of the setting "Remove archived cards\' attachments" (Project Settings → Storage): 7 days after the card was archived.' }) },
+      { value: '30', label: msg({ id: 'settings.project.cardAttachmentCleanup.option.30', defaultMessage: '30 days after archiving', description: 'A choice of the setting "Remove archived cards\' attachments" (Project Settings → Storage): 30 days after the card was archived.' }) },
+      { value: '90', label: msg({ id: 'settings.project.cardAttachmentCleanup.option.90', defaultMessage: '90 days after archiving', description: 'A choice of the setting "Remove archived cards\' attachments" (Project Settings → Storage): 90 days after the card was archived.' }) }
+    ]
+  },
   { section: 'keys', key: 'keybindings', title: msg({ id: 'settings.project.keybindings.title', defaultMessage: 'Shortcuts', description: "A setting's title (Project Settings → Keyboard Shortcuts)." }), desc: msg({ id: 'settings.project.keybindings.desc', defaultMessage: 'Change one to give this project its own; Reset returns it to the global shortcut. Stored in the project’s .hive folder, which is not committed.', description: 'What the setting "Shortcuts" does, under its title (Project Settings → Keyboard Shortcuts).' }), type: 'custom', wide: true },
   { section: 'agents', key: 'agents', title: msg({ id: 'settings.project.agents.title', defaultMessage: 'Agents', description: "A setting's title (Project Settings → Agents)." }), desc: msg({ id: 'settings.project.agents.desc', defaultMessage: "Up to 12 agents can work on the project at once (up to 24 with Settings → Advanced → Agents per project), each in the project folder or a slot. Agents without their own settings use this project's.", description: 'What the setting "Agents" does, under its title (Project Settings → Agents).' }), type: 'custom', wide: true },
   // The project's own copied files (HI-1765: its slots.copy, as Version Control → Slots and copies sets it), for the Assistant's tool.
@@ -976,6 +992,7 @@ const HELPS: Record<string, string> = {
   'agents.backgroundTaskMinutes': "Agents' background tasks (long test runs) count as finished too soon, or a dev server keeps an agent waiting long after its work is done.", // i18n-ignore: the Assistant's tools (English)
   'project.compactSuggestTokens': "One project's conversations run much longer than others'.", // i18n-ignore: the Assistant's tools (English)
   'project.transcriptWarnMB': "One project's conversations grow much bigger than others'.", // i18n-ignore: the Assistant's tools (English)
+  'project.cardAttachmentCleanup': "A project's archived cards keep screenshots and logs that take a lot of disk space: fewer days removes them sooner.", // i18n-ignore: the Assistant's tools (English)
   'project.slotCopy': 'New slots and review copies of this project miss git-ignored files its builds need.', // i18n-ignore: the Assistant's tools (English)
   ...Object.fromEntries(PROVIDERS.filter((p) => p.capabilities.contextLimit).map((p) => [`${p.id}.use200kContext`, `${p.name} conversations get slow and costly as they grow: a 200K window makes ${p.name} compact sooner.`])) // i18n-ignore: the Assistant's tools (English)
 }

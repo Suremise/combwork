@@ -96,6 +96,7 @@ interface HiveMessageValues {
   'tasks.history.archivedRemoved': { project: string | number }
   'tasks.history.assistantAskUntold': { agent: string | number }
   'tasks.history.assistantAsked': { text: string | number }
+  'tasks.history.attachmentsCleaned': { n: number; names: string | number; days: number }
   'tasks.history.backWithBatch': { label: string | number }
   'tasks.history.blocked': { reason: string | number }
   'tasks.history.context': { refs: string | number }

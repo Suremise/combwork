@@ -94,6 +94,7 @@
   "tasks.history.archivedRemoved": "Archivée : le projet {project} a été retiré de Hive",
   "tasks.history.assistantAskUntold": "L'Assistant Hive n'a pas pu être informé de la demande de {agent} sur cette carte : lis-la dans les commentaires de la carte et occupe-t'en toi-même si besoin",
   "tasks.history.assistantAsked": "Demandé à l’Assistant Hive : « {text} »",
+  "tasks.history.attachmentsCleaned": "{n, plural, one {# pièce jointe retirée} many {# pièces jointes retirées} other {# pièces jointes retirées}} ({names}) : ce projet retire les pièces jointes des cartes archivées {days, plural, one {# jour} many {# jours} other {# jours}} après leur archivage (Paramètres du projet → Stockage). {n, plural, one {Elle est} many {Elles sont} other {Elles sont}} dans la Corbeille.",
   "tasks.history.backWithBatch": "Restaurée avec son lot ({label})",
   "tasks.history.blocked": "Bloquée : {reason}",
   "tasks.history.context": "À lire d’abord : {refs}",

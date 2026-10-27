@@ -379,6 +379,10 @@
     "defaultMessage": "Asked the Hive Assistant: \"{text}\"",
     "description": "A line in a card's history (HI-1866): an agent (named beside it) asked the Hive Assistant for something only it or the user can do on the card (put a card On Hold, move it past its rules on the user's answer); {text} is what it asked (cut short). The request went to the Assistant's inbox."
   },
+  "tasks.history.attachmentsCleaned": {
+    "defaultMessage": "{n, plural, one {Removed # attachment} other {Removed # attachments}} ({names}): this project removes archived cards' attachments {days, plural, one {# day} other {# days}} after archiving (Project Settings → Storage). {n, plural, one {It is} other {They are}} in the Recycle Bin.",
+    "description": "A comment Hive writes on an archived card when it removes the files kept with it: {n} how many, {names} their names (a list), {days} the project's setting (days after the card was archived). Project Settings → Storage is where the setting is: use its translated name."
+  },
   "tasks.history.backWithBatch": {
     "defaultMessage": "Brought back with its batch ({label})",
     "description": "A line in a card's history: the user undid an Archive All, which brought this card back; {label} is the batch's name (\"All in Done\")."

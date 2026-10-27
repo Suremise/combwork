@@ -63,6 +63,12 @@ export const HISTORY = {
   archivedDone: msg({ id: 'tasks.history.archivedDone', defaultMessage: 'Archived after {days, plural, one {# day} other {# days}} in Done', description: "A line in a card's history: Hive archived the card on its own, because it had been in the Done column for {days} days (Settings → Board)." }),
   archivedHidden: msg({ id: 'tasks.history.archivedHidden', defaultMessage: 'Archived: {project} was hidden', description: "A line in a card's history: the card was archived because the user hid its project {project} (its folder name) from Hive." }),
   archivedRemoved: msg({ id: 'tasks.history.archivedRemoved', defaultMessage: 'Archived: {project} was removed from Hive', description: "A line in a card's history: the card was archived because the user removed its project {project} (its folder name) from Hive." }),
+  // HI-1842: Hive's comment on an archived card whose attachments its project's clean-up removed (Project Settings → Storage).
+  attachmentsCleaned: msg({
+    id: 'tasks.history.attachmentsCleaned',
+    defaultMessage: "{n, plural, one {Removed # attachment} other {Removed # attachments}} ({names}): this project removes archived cards' attachments {days, plural, one {# day} other {# days}} after archiving (Project Settings → Storage). {n, plural, one {It is} other {They are}} in the Recycle Bin.",
+    description: "A comment Hive writes on an archived card when it removes the files kept with it: {n} how many, {names} their names (a list), {days} the project's setting (days after the card was archived). Project Settings → Storage is where the setting is: use its translated name."
+  }),
   restored: msg({ id: 'tasks.history.restored', defaultMessage: 'Brought back: {project} was restored', description: "A line in a card's history: the card came back onto the board because the user restored its project {project} (its folder name)." }),
   imported: msg({ id: 'tasks.history.imported', defaultMessage: 'Brought back with {project} (it was #{was})', description: "A line in a card's history: the card came back with its removed project {project} (its folder name), under a new number; {was} was its number before." }),
   repaired: msg({ id: 'tasks.history.repaired', defaultMessage: 'Project: {from} → {to} (renamed or moved)', description: "A line in a card's history, by Repair: the card was given to the project {to}, the new name of its project {from} (folder names), which was renamed or moved." }),

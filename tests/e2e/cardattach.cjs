@@ -5,7 +5,8 @@
 // project. A session's file is copied to a card from the Attachments tab (Attach to a card, the menu a pane's chip uses
 // too). The tab's two tabs (HI-1841): Pane attachments and Card attachments, each its count and its own kind filters,
 // remembered; the card dialog's Show in Attachments opening Card attachments at its card, whatever its filter, without
-// changing the tab remembered; Pane attachments when the cards keep no files yet. Screenshots in both themes. Dev build, throwaway
+// changing the tab remembered; Pane attachments when the cards keep no files yet. Archived cards' attachments cleaned up
+// (HI-1842): Project Settings → Storage's choice, Clean Up Now's list and its removal, open and Done cards kept. Screenshots in both themes. Dev build, throwaway
 // profile and workspace (two plain-folder projects).
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -39,7 +40,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   fs.writeFileSync(sessionFile, lib.samplePng(48, 32))
   // The fake Claude Code, for the Assistant's session (its token, for a refused change).
   const cenv = lib.fakeClaude(userData, claudeHome, [alpha, beta, ws])
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', ...cenv }, viewport: { width: 1400, height: 900 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', HIVE_TEST_DAY_MS: '300', ...cenv }, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await inv('settings:update', { agentApi: { enabled: true } })
@@ -276,6 +277,46 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     const denied = await post({ title: 'Not allowed', project: 'alpha', attachments: [shot] }, asToken)
     check("the Assistant's change refused at Look copies nothing and leaves nothing", denied.status === 403 && staged().length === 0 && (await inv('tasks:list')).length === before, JSON.stringify({ status: denied.status, staged: staged() }))
     await inv('session:stop', assistantHome, 'assistant').catch(() => undefined)
+    // --- Archived cards' attachments cleaned up (HI-1842): Project Settings → Storage's choice (here 3 days, a day being
+    // HIVE_TEST_DAY_MS long), then Clean Up Now lists the archived card once it is due and sends its files to the suite's
+    // trash, with Hive's comment on it; an open card and a Done card keep theirs.
+    const cleanupFile = (name) => {
+      const f = path.join(alpha, 'docs', name)
+      fs.writeFileSync(f, lib.samplePng(40, 24))
+      return f
+    }
+    const archivedCard = await inv('tasks:create', { title: 'Archived card with a screenshot', project: 'alpha' })
+    const openCard = await inv('tasks:create', { title: 'Open card with a screenshot', project: 'alpha' })
+    const doneCard = await inv('tasks:create', { title: 'Done card with a screenshot', project: 'alpha', column: 'done' })
+    for (const [c, name] of [[archivedCard, 'archived-shot.png'], [openCard, 'open-shot.png'], [doneCard, 'done-shot.png']]) await patchCard(c.number, { attachments: [cleanupFile(name)] })
+    const readCardJson = async (num) => (await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${num}`, { headers: { Authorization: `Bearer ${token}` } })).json().catch(() => null)
+    const keptOf = async (c) => (await readCardJson(c.number))?.attachments ?? []
+    const archivedFiles = await keptOf(archivedCard)
+    await inv('tasks:archive', archivedCard.number, true)
+    await lib.openProjectSettings(page)
+    await page.locator('.settings-nav .row', { hasText: 'Storage' }).click()
+    const choice = page.locator('select[data-setting="cardAttachmentCleanup"]')
+    await choice.waitFor({ timeout: HUNG_MS })
+    check("Storage offers Remove archived cards' attachments, 30 days after archiving by default", (await choice.inputValue()) === '30' && (await choice.locator('option').allInnerTexts()).join('|') === 'Never|3 days after archiving|7 days after archiving|30 days after archiving|90 days after archiving', (await choice.locator('option').allInnerTexts()).join('|'))
+    await choice.selectOption('3')
+    check('…chosen 3 days, kept in project.json', !!(await until(async () => lib.projectConfig(userData, alpha)?.cardAttachmentCleanup === '3')), JSON.stringify(lib.projectConfig(userData, alpha)?.cardAttachmentCleanup))
+    check('…once it is due, the archived card is listed, and only it', !!(await until(async () => JSON.stringify((await inv('storage:cardCleanupPreview', alpha)).map((i) => i.card)) === JSON.stringify([archivedCard.number]))), JSON.stringify(await inv('storage:cardCleanupPreview', alpha)))
+    await page.locator('.card-cleanup-setting button', { hasText: 'Clean Up Now' }).click()
+    const cleanupDialog = page.locator('.dialog[role="dialog"]', { hasText: 'Clean Up Card Attachments' })
+    check('Clean Up Now lists the card with its file and size', !!(await until(async () => /Archived card with a screenshot/.test(await cleanupDialog.innerText().catch(() => '')) && /1 file/.test(await cleanupDialog.innerText().catch(() => '')))), await cleanupDialog.innerText().catch(() => ''))
+    for (const theme of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme } })
+      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
+      await cleanupDialog.screenshot({ path: path.join(shots, `cardattach-cleanup-${theme}.png`) })
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+    await cleanupDialog.getByRole('button', { name: /^Move 1 file/ }).click()
+    check('…its file goes to the Recycle Bin (the suite’s trash), its row with it', !!(await until(async () => archivedFiles.length === 1 && lib.trashed(path.basename(archivedFiles[0].path)).length === 1 && !fs.existsSync(archivedFiles[0].path) && (await keptOf(archivedCard)).length === 0)), JSON.stringify(archivedFiles))
+    const cleaned = await readCardJson(archivedCard.number)
+    check("…and Hive's comment on it says how many and which", (cleaned?.comments?.at(-1)?.text ?? '').startsWith("Removed 1 attachment (archived-shot.png): this project removes archived cards' attachments 3 days after archiving") && cleaned.comments.at(-1).by === 'Hive' && cleaned.archived === true, cleaned?.comments?.at(-1)?.text)
+    check('an open card and a Done card keep theirs', (await keptOf(openCard)).length === 1 && (await keptOf(doneCard)).length === 1 && fs.existsSync((await keptOf(openCard))[0].path))
+    await page.screenshot({ path: path.join(shots, 'cardattach-cleanup-storage.png') })
+
     // Storage: a row of their own.
     const storage = await inv('storage:project', alpha, true).catch(() => null)
     check('Storage counts card attachments on their own row', !storage || storage.cardAttachments > 0, JSON.stringify(storage && { attachments: storage.attachments, cards: storage.cardAttachments }))

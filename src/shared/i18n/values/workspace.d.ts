@@ -458,6 +458,16 @@ interface HiveMessageValues {
   'workspace.storage.beforeCompression': { size: string | number }
   'workspace.storage.cancel': undefined
   'workspace.storage.cardAttachments': undefined
+  'workspace.storage.cardCleanup.archived': undefined
+  'workspace.storage.cardCleanup.card': undefined
+  'workspace.storage.cardCleanup.done': { files: number; size: string | number; cards: number }
+  'workspace.storage.cardCleanup.files': { count: number }
+  'workspace.storage.cardCleanup.intro': { days: number }
+  'workspace.storage.cardCleanup.move': { count: number; size: string | number }
+  'workspace.storage.cardCleanup.none': undefined
+  'workspace.storage.cardCleanup.now': undefined
+  'workspace.storage.cardCleanup.off': undefined
+  'workspace.storage.cardCleanup.title': { name: string | number }
   'workspace.storage.cleanUp': undefined
   'workspace.storage.copies': undefined
   'workspace.storage.deletedSession': { id: string | number }

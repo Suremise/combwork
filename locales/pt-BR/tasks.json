@@ -94,6 +94,7 @@
   "tasks.history.archivedRemoved": "Arquivado: o projeto {project} foi removido do Hive",
   "tasks.history.assistantAskUntold": "Não foi possível avisar o Assistente do Hive do pedido de {agent} neste cartão: leia-o nos comentários do cartão e cuide disso você mesmo, se for preciso",
   "tasks.history.assistantAsked": "Pediu ao Assistente do Hive: “{text}”",
+  "tasks.history.attachmentsCleaned": "{n, plural, one {# anexo removido} other {# anexos removidos}} ({names}): este projeto remove os anexos dos cartões arquivados {days, plural, one {# dia} other {# dias}} depois de arquivá-los (Configurações do projeto → Armazenamento). {n, plural, one {Ele está} other {Eles estão}} na Lixeira.",
   "tasks.history.backWithBatch": "Trazido de volta com o lote ({label})",
   "tasks.history.blocked": "Bloqueado: {reason}",
   "tasks.history.context": "Ler primeiro: {refs}",

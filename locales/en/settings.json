@@ -3651,6 +3651,38 @@
     "defaultMessage": "Agents",
     "description": "A setting's title (Project Settings → Agents)."
   },
+  "settings.project.cardAttachmentCleanup.desc": {
+    "defaultMessage": "Files kept with this project's cards go to the Recycle Bin this long after a card is archived. Open and Done cards keep theirs.",
+    "description": "What the setting \"Remove archived cards' attachments\" does, under its title (Project Settings → Storage)."
+  },
+  "settings.project.cardAttachmentCleanup.option.3": {
+    "defaultMessage": "3 days after archiving",
+    "description": "A choice of the setting \"Remove archived cards' attachments\" (Project Settings → Storage): 3 days after the card was archived."
+  },
+  "settings.project.cardAttachmentCleanup.option.30": {
+    "defaultMessage": "30 days after archiving",
+    "description": "A choice of the setting \"Remove archived cards' attachments\" (Project Settings → Storage): 30 days after the card was archived."
+  },
+  "settings.project.cardAttachmentCleanup.option.7": {
+    "defaultMessage": "7 days after archiving",
+    "description": "A choice of the setting \"Remove archived cards' attachments\" (Project Settings → Storage): 7 days after the card was archived."
+  },
+  "settings.project.cardAttachmentCleanup.option.90": {
+    "defaultMessage": "90 days after archiving",
+    "description": "A choice of the setting \"Remove archived cards' attachments\" (Project Settings → Storage): 90 days after the card was archived."
+  },
+  "settings.project.cardAttachmentCleanup.option.off": {
+    "defaultMessage": "Never",
+    "description": "A choice of the setting \"Remove archived cards' attachments\" (Project Settings → Storage): archived cards keep their files."
+  },
+  "settings.project.cardAttachmentCleanup.tip": {
+    "defaultMessage": "Hive looks when the workspace opens and once a day. Bringing a card back from the archive in time keeps its files. Afterwards the card says when they were removed, and its links to them show as removed. Cards archived because their project was hidden or removed keep theirs.",
+    "description": "The info tip of the setting \"Remove archived cards' attachments\" (Project Settings → Storage): more on what it does and when it applies."
+  },
+  "settings.project.cardAttachmentCleanup.title": {
+    "defaultMessage": "Remove archived cards' attachments",
+    "description": "A setting's title (Project Settings → Storage): when the files kept with this project's archived cards (screenshots, logs) go to the Recycle Bin."
+  },
   "settings.project.chime.desc": {
     "defaultMessage": "Play a sound when an agent in this project finishes or needs input.",
     "description": "What the setting \"Completion chime\" does, under its title (Project Settings → Sessions)."

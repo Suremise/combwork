@@ -94,6 +94,7 @@
   "tasks.history.archivedRemoved": "Archiviert: {project} wurde aus Hive entfernt",
   "tasks.history.assistantAskUntold": "Der Hive-Assistent konnte nicht über die Bitte von {agent} zu dieser Karte informiert werden: lies sie in den Kommentaren der Karte und kümmere dich selbst darum, falls nötig",
   "tasks.history.assistantAsked": "Den Hive-Assistenten gebeten: „{text}“",
+  "tasks.history.attachmentsCleaned": "{n, plural, one {# Anhang entfernt} other {# Anhänge entfernt}} ({names}): Dieses Projekt entfernt die Anhänge archivierter Karten {days, plural, one {# Tag} other {# Tage}} nach dem Archivieren (Projekteinstellungen → Speicher). {n, plural, one {Er liegt} other {Sie liegen}} im Papierkorb.",
   "tasks.history.backWithBatch": "Mit dem Stapel zurückgeholt ({label})",
   "tasks.history.blocked": "Blockiert: {reason}",
   "tasks.history.context": "Zuerst lesen: {refs}",

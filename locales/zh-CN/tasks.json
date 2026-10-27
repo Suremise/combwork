@@ -94,6 +94,7 @@
   "tasks.history.archivedRemoved": "已归档：{project} 已从 Hive 中移除",
   "tasks.history.assistantAskUntold": "无法把 {agent} 在这张卡片上的请求告知 Hive 助手：请在卡片评论中查看，如有需要请自行处理",
   "tasks.history.assistantAsked": "向 Hive 助手提出请求：“{text}”",
+  "tasks.history.attachmentsCleaned": "已删除 {n, plural, other {# 个附件}}（{names}）：本项目会在卡片归档 {days, plural, other {# 天}}后删除已归档卡片的附件（“项目设置”→“存储”）。{n, plural, other {它们}}在回收站中。",
   "tasks.history.backWithBatch": "随所在批次一起恢复（{label}）",
   "tasks.history.blocked": "受阻：{reason}",
   "tasks.history.context": "先读：{refs}",

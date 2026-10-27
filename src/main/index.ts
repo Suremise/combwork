@@ -42,6 +42,7 @@ import { config } from './config'
 import { loadCoverage, startCoverage, startCoverageEarly } from './keyCoverage'
 import { closeConsoleWindows, sendToConsoles } from './consoleWindow'
 import { allTasks, archiveOldDone, endExitedReviews } from './tasks'
+import { cleanUpEverywhere } from './cardAttachmentCleanup'
 import { agentCardText } from '../shared/agentTable'
 import { emit, emitTo, onHiveEvent, toast } from './events'
 import { advanced, bindAdvancedSettings, mcpAdvancedEnv } from './advanced'
@@ -728,6 +729,9 @@ async function offerRestoredLeftovers(): Promise<void> {
   }
 }
 
+/** Archived cards' attachments past their project's days (HI-1842), once a day (also on open: ipc.ts). */
+const CARD_CLEANUP_EVERY_MS = 86_400_000
+
 /** Archives Done cards past Settings → Board's days in every open workspace (also on open: ipc.ts). */
 function archiveOldDoneEverywhere(): void {
   for (const w of openWorkspaces()) void archiveOldDone(w).catch((e) => log.warn('archiving old Done cards', e))
@@ -891,6 +895,7 @@ app.whenReady().then(async () => {
   // A replace that gave up because the file was held says which processes had it open (HI-1749).
   renameDiagnostics.holders = fileHolders
   setInterval(archiveOldDoneEverywhere, 3_600_000).unref()
+  setInterval(cleanUpEverywhere, CARD_CLEANUP_EVERY_MS).unref()
 
   workspace.setLiveProvider((p, cfg, scope) => sessions.liveInfo(p, cfg, scope))
   sessions.apiEnv = apiEnv

@@ -1827,6 +1827,46 @@
     "defaultMessage": "Card attachments",
     "description": "Storage (HI-1700): files kept with cards (.hive/attachments/cards). Clean Up and Purge never remove them."
   },
+  "workspace.storage.cardCleanup.archived": {
+    "defaultMessage": "Archived",
+    "description": "The Clean Up Now dialog's table: the column of when each card was archived (\"3 weeks ago\")."
+  },
+  "workspace.storage.cardCleanup.card": {
+    "defaultMessage": "Card",
+    "description": "The Clean Up Now dialog's table: the column of archived cards (key and title)."
+  },
+  "workspace.storage.cardCleanup.done": {
+    "defaultMessage": "Moved {files, plural, one {# file} other {# files}} ({size}) of {cards, plural, one {# archived card} other {# archived cards}} to the Recycle Bin",
+    "description": "A notice after Clean Up Now (Project Settings → Storage): {size} like \"12 MB\"."
+  },
+  "workspace.storage.cardCleanup.files": {
+    "defaultMessage": "{count, plural, one {# file} other {# files}}",
+    "description": "The Clean Up Now dialog's table: how many files a card keeps."
+  },
+  "workspace.storage.cardCleanup.intro": {
+    "defaultMessage": "The files kept with these cards, archived {days, plural, one {# day} other {# days}} ago or more, go to the Recycle Bin. Each card gets a comment saying so. Open and Done cards keep theirs.",
+    "description": "The Clean Up Now dialog (Project Settings → Storage), at the top: {days} is the project's setting."
+  },
+  "workspace.storage.cardCleanup.move": {
+    "defaultMessage": "Move {count, plural, one {# file} other {# files}} ({size}) to the Recycle Bin",
+    "description": "The Clean Up Now dialog's button ({size}: \"12 MB\")."
+  },
+  "workspace.storage.cardCleanup.none": {
+    "defaultMessage": "No archived card is due yet.",
+    "description": "The Clean Up Now dialog when no archived card has been archived long enough."
+  },
+  "workspace.storage.cardCleanup.now": {
+    "defaultMessage": "Clean Up Now…",
+    "description": "Project Settings → Storage, beside the setting \"Remove archived cards' attachments\": opens a dialog listing what it would remove now, to remove it at once."
+  },
+  "workspace.storage.cardCleanup.off": {
+    "defaultMessage": "Choose a number of days first.",
+    "description": "The tooltip of \"Clean Up Now…\" (Project Settings → Storage) while the setting is Never: there is nothing it would remove."
+  },
+  "workspace.storage.cardCleanup.title": {
+    "defaultMessage": "Clean Up Card Attachments: {name}",
+    "description": "The dialog of Clean Up Now (Project Settings → Storage): {name} is the project."
+  },
   "workspace.storage.cleanUp": {
     "defaultMessage": "Clean Up…",
     "description": "Storage: opens the Clean Up dialog."

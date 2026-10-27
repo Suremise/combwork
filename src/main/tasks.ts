@@ -23,7 +23,7 @@ import { FactStore } from './workflow/factStore'
 import { gitStep } from './platform/git'
 import type { CardKind } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
-import { linkToComment, moveCardFolder, publish, trashCardFolder, type Staging } from './cardAttachments'
+import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCardFolder, type Staging } from './cardAttachments'
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT } from '../shared/workflow/stages'
@@ -2263,6 +2263,25 @@ export async function commentAsHive(n: number, said: string | StoredText, ws: Wo
     await saveCard(ws, n, card)
     changed(ws)
     return true
+  })
+}
+
+/**
+ * The clean-up of an archived card's attachments (HI-1842, cardAttachmentCleanup.ts): its files to the Recycle Bin and their
+ * rows, with a comment of Hive's saying how many, which and why, in one change. Only while the card, as it is in the
+ * change, is still due (`due`: archived long enough, not brought back meanwhile). Null when it isn't, or has none.
+ */
+export async function cleanUpAttachments(n: number, days: number, due: (card: TaskCard) => boolean, ws: WorkspaceService = workspace): Promise<{ files: number; bytes: number } | null> {
+  return boardLock(ws, async () => {
+    const card = await getTask(n, ws)
+    if (!due(card)) return null
+    const gone = await removeCardAttachments(ws, n)
+    if (!gone.length) return null
+    const said = storedText(HISTORY.attachmentsCleaned, { n: gone.length, names: gone.map((f) => f.name).join(', '), days })
+    addComment(card, BY.hive, englishSaid(said), said)
+    await saveCard(ws, n, card)
+    changed(ws)
+    return { files: gone.length, bytes: gone.reduce((t, f) => t + f.size, 0) }
   })
 }
 

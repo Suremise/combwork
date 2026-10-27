@@ -456,6 +456,40 @@ export async function removeCardAttachment(ws: WorkspaceService, card: number, i
 }
 
 /**
+ * Removes every attachment of a card (the clean-up's, HI-1842), in the change running here (or one of its own): one
+ * record for them all, each file renamed into the cards' trash, their rows deleted; once it commits, to the Recycle Bin.
+ * Undone, the files are renamed back. Returns what went (their names and sizes); nothing when the card has none.
+ */
+export async function removeCardAttachments(ws: WorkspaceService, card: number): Promise<{ id: string; name: string; size: number }[]> {
+  return boardWrite(ws, async () => {
+    const found = boardWriteOp(ws, (db) => {
+      const c = db.prepare('SELECT project FROM cards WHERE number = ?').get(card) as { project: string | null } | undefined // i18n-ignore: SQL
+      return c ? { host: cardHost(ws, c.project), rows: db.prepare(`SELECT ${COLUMNS} FROM card_attachments WHERE card = ?`).all(card) as Row[] } : null // i18n-ignore: SQL
+    })
+    if (!found?.rows.length) return []
+    const folder = cardFolder(found.host, card)
+    const there = (await Promise.all(found.rows.map(async (r) => ((await exists(join(folder, r.file))) ? r : null)))).filter((r): r is Row => !!r)
+    if (there.length) {
+      const dir = await ownCardsFolder(found.host, TRASH, randomBytes(6).toString('hex'))
+      await writeOp(dir, { kind: 'remove', card, files: there.map((r) => ({ id: r.id, file: r.file })) })
+      const moved: Row[] = []
+      onBoardUndone(ws, async () => {
+        for (const r of moved) await rename(join(dir, r.file), join(folder, r.file))
+        await rm(dir, { recursive: true, force: true })
+      })
+      for (const r of there) {
+        await rename(join(folder, r.file), join(dir, r.file))
+        moved.push(r)
+      }
+      afterBoardWrite(ws, () => void finishTrash(dir).catch((e) => log.warn("sending a card's cleaned-up attachments to the Recycle Bin", e)))
+    }
+    boardWriteOp(ws, (db) => db.prepare('DELETE FROM card_attachments WHERE card = ?').run(card)) // i18n-ignore: SQL
+    boardChanged(ws)
+    return found.rows.sort(newest).map((r) => ({ id: r.id, name: r.name, size: r.size }))
+  })
+}
+
+/**
  * A card about to be deleted, in the change that deletes it: its folder (if any) renamed into the cards' trash with its
  * record; once the change commits, to the Recycle Bin; undone, renamed back. Throws if it can't be moved (the card stays).
  */
