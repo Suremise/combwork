@@ -139,6 +139,8 @@
   "settings.advanced.codex.accounts.readMethod.title": "接続：サインイン確認のリクエスト",
   "settings.advanced.codex.accounts.statusSeconds.desc": "Codexのアプリサーバーが接続のフォルダーのサインイン先を答える（`account/read`）まで、Hiveが待つ時間です。これを過ぎると、接続は「確認できませんでした」と表示されます（サインアウトとは表示されません）。",
   "settings.advanced.codex.accounts.statusSeconds.title": "接続：サインイン確認のタイムアウト",
+  "settings.advanced.codex.appServer.closeSeconds.desc": "Hiveが応答（接続のサインイン確認、そのフックの確認）を受け取ったあと、Codexのアプリサーバーが自分で終了するまで待つ時間です。これを過ぎると、Hiveはそれが起動したものすべてとともに終了させます。短すぎるとCodexが終了する途中で打ち切られ、長すぎるとそのプロセスが少し長く残ります。",
+  "settings.advanced.codex.appServer.closeSeconds.title": "アプリサーバー：終了までの時間",
   "settings.advanced.codex.exit.command.desc": "レーンが終わり、そのターンが終わったときにCodexを終了させるため、HiveがCodexに入力してEnterを押すコマンドです。強制終了ではなく自分で終了させるためのものです。間違っているとCodexはこれで終了せず、終了の猶予のあとで強制終了されます。",
   "settings.advanced.codex.exit.command.title": "レーンの終了：終了コマンド",
   "settings.advanced.codex.exit.graceSeconds.desc": "レーンの終了時に終了コマンドを入力してから、強制終了するまで、Codexが自分で終了するのをHiveが待つ時間です。記録したときは{took, plural, other {#秒}}かかりました。",

@@ -139,6 +139,8 @@
   "settings.advanced.codex.accounts.readMethod.title": "Connexions : requête d’identité",
   "settings.advanced.codex.accounts.statusSeconds.desc": "Le temps que Hive laisse au serveur d’application de Codex pour dire quelle identité utilise le dossier d’une connexion (`account/read`). Passé ce délai, la connexion affiche « Vérification impossible », jamais « Déconnectée ».",
   "settings.advanced.codex.accounts.statusSeconds.title": "Connexions : délai de vérification des identifiants",
+  "settings.advanced.codex.appServer.closeSeconds.desc": "Le temps laissé au serveur d’application de Codex pour s’arrêter de lui-même une fois que Hive a sa réponse (la vérification de l’identité d’une connexion, celle de ses hooks). Passé ce délai, Hive l’arrête avec tout ce qu’il a lancé. Trop court, Codex est interrompu pendant qu’il s’arrête ; trop long, ses processus restent un peu plus longtemps.",
+  "settings.advanced.codex.appServer.closeSeconds.title": "Serveur d’application : délai de fermeture",
   "settings.advanced.codex.exit.command.desc": "Ce que Hive tape dans Codex, puis Entrée, pour le fermer une fois son couloir terminé et son tour fini, afin qu'il quitte de lui-même au lieu d'être tué. Si elle est fausse, Codex n'est pas fermé par elle et il est tué après le délai de sortie.",
   "settings.advanced.codex.exit.command.title": "Fin du couloir : commande de sortie",
   "settings.advanced.codex.exit.graceSeconds.desc": "Combien de temps Hive laisse Codex quitter de lui-même après avoir tapé sa commande de sortie à la fin d'un couloir, avant de le tuer. Lors de l'enregistrement, cela a pris {took, plural, one {# seconde} other {# secondes}}.",

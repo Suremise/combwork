@@ -139,6 +139,8 @@
   "settings.advanced.codex.accounts.readMethod.title": "Verbindungen: Anmeldeanfrage",
   "settings.advanced.codex.accounts.statusSeconds.desc": "Wie lange Hive dem App-Server von Codex Zeit gibt, um zu sagen, als wer der Ordner einer Verbindung angemeldet ist (`account/read`). Danach zeigt die Verbindung „Prüfung fehlgeschlagen“, nie „Abgemeldet“.",
   "settings.advanced.codex.accounts.statusSeconds.title": "Verbindungen: Timeout der Anmeldeprüfung",
+  "settings.advanced.codex.appServer.closeSeconds.desc": "Wie lange der App-Server von Codex Zeit bekommt, sich selbst zu beenden, sobald Hive seine Antwort hat (die Anmeldeprüfung einer Verbindung, die Prüfung ihrer Hooks). Danach beendet Hive ihn mit allem, was er gestartet hat. Ist sie zu kurz, wird Codex beim Beenden abgeschnitten; ist sie zu lang, bleiben seine Prozesse etwas länger.",
+  "settings.advanced.codex.appServer.closeSeconds.title": "App-Server: Zeit zum Beenden",
   "settings.advanced.codex.exit.command.desc": "Was Hive in Codex eingibt, gefolgt von der Eingabetaste, um es zu beenden, sobald seine Lane geendet hat und sein Zug vorbei ist, damit es sich selbst beendet, statt abgebrochen zu werden. Ist er falsch, beendet er Codex nicht, und es wird nach der Frist zum Beenden abgebrochen.",
   "settings.advanced.codex.exit.command.title": "Ende der Lane: Befehl zum Beenden",
   "settings.advanced.codex.exit.graceSeconds.desc": "Wie lange Hive Codex Zeit gibt, sich selbst zu beenden, nachdem es am Ende einer Lane seinen Befehl zum Beenden eingegeben hat, bevor Hive es abbricht. Bei der Aufzeichnung dauerte es {took, plural, one {# Sekunde} other {# Sekunden}}.",

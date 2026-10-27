@@ -141,6 +141,8 @@ interface HiveMessageValues {
   'settings.advanced.codex.accounts.readMethod.title': undefined
   'settings.advanced.codex.accounts.statusSeconds.desc': undefined
   'settings.advanced.codex.accounts.statusSeconds.title': undefined
+  'settings.advanced.codex.appServer.closeSeconds.desc': undefined
+  'settings.advanced.codex.appServer.closeSeconds.title': undefined
   'settings.advanced.codex.exit.command.desc': undefined
   'settings.advanced.codex.exit.command.title': undefined
   'settings.advanced.codex.exit.graceSeconds.desc': { took: number }

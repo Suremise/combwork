@@ -139,6 +139,8 @@
   "settings.advanced.codex.accounts.readMethod.title": "Conexões: solicitação de login",
   "settings.advanced.codex.accounts.statusSeconds.desc": "Quanto tempo o Hive dá ao servidor de aplicativo do Codex para dizer com quem a pasta de uma conexão está conectada (`account/read`). Passado esse tempo, a conexão mostra “Não foi possível verificar”, nunca desconectada.",
   "settings.advanced.codex.accounts.statusSeconds.title": "Conexões: tempo limite da verificação de login",
+  "settings.advanced.codex.appServer.closeSeconds.desc": "Quanto tempo o servidor de aplicativo do Codex tem para terminar sozinho depois que o Hive tem a resposta dele (a verificação de login de uma conexão, a dos hooks dela). Passado esse tempo, o Hive o encerra com tudo o que ele iniciou. Se for curto demais, o Codex é interrompido enquanto termina; se for longo demais, os processos dele ficam um pouco mais.",
+  "settings.advanced.codex.appServer.closeSeconds.title": "Servidor de aplicativo: tempo para fechar",
   "settings.advanced.codex.exit.command.desc": "O que o Hive digita no Codex, seguido de Enter, para encerrá-lo quando a raia terminou e o turno acabou, para que ele saia sozinho em vez de ser encerrado à força. Se estiver errado, o Codex não é encerrado por ele e é encerrado à força após o prazo de saída.",
   "settings.advanced.codex.exit.command.title": "Fim da raia: comando de saída",
   "settings.advanced.codex.exit.graceSeconds.desc": "Quanto tempo o Hive dá ao Codex para sair sozinho depois de digitar o comando de saída no fim de uma raia, antes de encerrá-lo à força. Na gravação, levou {took, plural, one {# segundo} other {# segundos}}.",

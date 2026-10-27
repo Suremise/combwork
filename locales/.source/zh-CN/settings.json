@@ -139,6 +139,8 @@
   "settings.advanced.codex.accounts.readMethod.title": "Connections: sign-in request",
   "settings.advanced.codex.accounts.statusSeconds.desc": "How long Hive gives Codex's app server to say who a connection's folder is signed in as (`account/read`). Past it, the connection shows \"Couldn't check\", never signed out.",
   "settings.advanced.codex.accounts.statusSeconds.title": "Connections: sign-in check timeout",
+  "settings.advanced.codex.appServer.closeSeconds.desc": "How long Codex's app server gets to end by itself once Hive has its answer (a connection's sign-in check, its hooks' check). Past it, Hive ends it with everything it started. Too short, Codex is cut off as it ends; too long, its processes stay a little longer.",
+  "settings.advanced.codex.appServer.closeSeconds.title": "App server: time to close",
   "settings.advanced.codex.exit.command.desc": "What Hive types into Codex, then Enter, to end it once its lane has ended and its turn is over, so it exits by itself rather than being killed. Wrong, Codex isn't ended by it and is killed after the exit grace.",
   "settings.advanced.codex.exit.command.title": "Lane's end: exit command",
   "settings.advanced.codex.exit.graceSeconds.desc": "How long Hive gives Codex to exit by itself after typing its exit command at a lane's end, before killing it. It took {took, plural, one {# second} other {# seconds}} when recorded.",

@@ -1,6 +1,6 @@
 import { createHash } from 'crypto'
 import { msg, tr } from '../../../shared/i18n'
-import { spawn } from 'child_process'
+import { spawn, type ChildProcess } from 'child_process'
 import { homedir, tmpdir } from 'os'
 import { basename, join, resolve } from 'path'
 import { readdir, stat } from 'original-fs/promises'
@@ -214,8 +214,8 @@ function hookOverrides(url: string, authFile: string, hashes?: Record<string, st
 }
 
 /** Asks Codex (its app server) for the keys and hashes of the given hooks. */
-async function hooksFromCodex(executable: string, hookArgs: string[], cwd: string): Promise<Record<string, string> | null> {
-  const result = await askAppServer(executable, hookArgs, cwd, 'hooks/list', { cwds: [cwd] })
+async function hooksFromCodex(executable: string, hookArgs: string[], cwd: string, env?: NodeJS.ProcessEnv): Promise<Record<string, string> | null> {
+  const result = await askAppServer(executable, hookArgs, cwd, 'hooks/list', { cwds: [cwd] }, env)
   const out: Record<string, string> = {}
   for (const entry of result?.data ?? []) for (const h of entry.hooks ?? []) if (h.key && h.currentHash) out[h.key] = h.currentHash
   return Object.keys(out).length ? out : null
@@ -256,6 +256,19 @@ export function codexAccountStatus(answer: { ok: true; result: any } | { ok: fal
 
 /** The store Codex keeps a connection's login in (HI-1757): its own folder, whatever Codex's default store is. */
 export const CONNECTION_STORE = ['-c', 'cli_auth_credentials_store="file"']
+
+/**
+ * The overrides every Codex a launch on a connection runs takes (HI-1757): the session and its preflights alike (its
+ * hook check, its prompt render), each also in the launch's own environment. None on Codex's own home.
+ */
+export function launchConnectionArgs(ctx: Pick<LaunchContext, 'connectionHome'>): string[] {
+  if (!ctx.connectionHome) return []
+  const args = [...CONNECTION_STORE]
+  const own = configOf(ctx.connectionHome).windows?.sandbox
+  const pc = userConfig().windows?.sandbox
+  if (process.platform === 'win32' && !own && typeof pc === 'string' && /^[\w-]{1,24}$/.test(pc)) args.push('-c', `windows.sandbox=${toToml(pc)}`)
+  return args
+}
 
 /**
  * The developer_instructions Codex itself would give a session started with `args` (the agent's Extra arguments) in
@@ -326,33 +339,80 @@ function askAppServer(executable: string, args: string[], cwd: string, method: s
 }
 
 /** How long a closed app server gets to end by itself (0.164.0 ends in about 0.2 s once its stdin closes) before it is ended. */
-const APP_SERVER_CLOSE_MS = 3000
+/** How long an ended tree gets to close before Hive gives up waiting on it (it says so in the log). */
+const TREE_END_MS = 10_000
+
+/** Whether a process has ended (its exit seen); Node keeps its handle until then, so its pid is still its own. */
+const ended = (p: ChildProcess): boolean => p.exitCode !== null || p.signalCode !== null
+
+/** The processes started here that have closed (their exit and stdio): noted from their start (watchClose). */
+const closedProcesses = new WeakSet<ChildProcess>()
+function watchClose<T extends ChildProcess>(p: T): T {
+  p.once('close', () => closedProcesses.add(p))
+  return p
+}
+
+/** Resolves once the process has closed (its exit and stdio), or after `ms`: true when it closed. */
+function closedWithin(p: ChildProcess, ms: number): Promise<boolean> {
+  if (closedProcesses.has(p)) return Promise.resolve(true)
+  return new Promise((resolveP) => {
+    const t = setTimeout(() => resolveP(false), ms)
+    p.once('close', () => (clearTimeout(t), resolveP(true)))
+  })
+}
+
+/**
+ * Ends a process and everything under it (HI-1757 round 1: a .cmd launcher, a server that ignores its stdin closing, and
+ * what it started), without holding main's thread: Windows' taskkill /T /F on its pid, asked while Node still holds its
+ * handle (so the pid is its own and its tree is what it started, #655), else SIGKILL. Resolves once it has closed, or
+ * after TREE_END_MS (logged): true when it closed.
+ */
+async function endProcessTree(p: ChildProcess): Promise<boolean> {
+  if (ended(p)) return true
+  if (process.platform === 'win32' && p.pid) {
+    await new Promise<void>((resolveP) => {
+      const k = spawn('taskkill.exe', ['/pid', String(p.pid), '/t', '/f'], { windowsHide: true, stdio: 'ignore' })
+      const t = setTimeout(() => (k.kill(), resolveP()), TREE_END_MS)
+      k.on('error', () => (clearTimeout(t), resolveP()))
+      k.on('close', () => (clearTimeout(t), resolveP()))
+    })
+  } else p.kill('SIGKILL')
+  const closed = await closedWithin(p, TREE_END_MS)
+  if (!closed) log.warn(`Codex's app server (pid ${p.pid}) didn't end in ${TREE_END_MS / 1000} s after it was ended with what it started`)
+  return closed
+}
+
+/**
+ * Closes an app server Hive is done with (HI-1757): its stdin ended, which ends it with what it started (0.164.0 ends in
+ * about 0.2 s, its git and console host with it); still there after `codex.appServer.closeSeconds`, its whole tree is
+ * ended (endProcessTree). Resolves once it has closed, so it is never left behind unowned.
+ */
+async function closeAppServer(p: ChildProcess): Promise<void> {
+  try {
+    p.stdin?.end()
+  } catch {
+    // Already closed.
+  }
+  if (await closedWithin(p, advanced.number('codex.appServer.closeSeconds') * 1000)) return
+  await endProcessTree(p)
+}
 
 /**
  * One request's answer from Codex's app server: its result, its error (`ok: false`, `error` its message), or none
- * (`error` says why: it didn't start, ended, or took past `timeoutMs`). The server is closed on every outcome: its stdin
- * ended, which ends it with what it started (HI-1757: 0.164.0's git and console host), then ended if it is still there.
+ * (`error` says why: it didn't start, ended, or took past `timeoutMs`). The server is closed on every outcome
+ * (closeAppServer) before the answer is given.
  */
 function appServerAnswer(executable: string, args: string[], cwd: string, method: string, params: unknown, env: NodeJS.ProcessEnv | undefined, timeoutMs: number): Promise<{ ok: true; result: any } | { ok: false; error: string }> {
   return new Promise((resolveP) => {
     const s = toSpawnable(executable, ['app-server', ...args])
-    const p = spawn(s.file, s.args, { cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'], ...(env ? { env } : {}) })
+    const p = watchClose(spawn(s.file, s.args, { cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'], ...(env ? { env } : {}) }))
     let buf = ''
     let over = false
     const done = (v: { ok: true; result: any } | { ok: false; error: string }): void => {
       if (over) return
       over = true
       clearTimeout(timer)
-      try {
-        p.stdin.end()
-      } catch {
-        // Already closed.
-      }
-      if (p.exitCode === null && p.signalCode === null) {
-        const kill = setTimeout(() => p.kill(), APP_SERVER_CLOSE_MS)
-        p.once('close', () => clearTimeout(kill))
-      }
-      resolveP(v)
+      void closeAppServer(p).finally(() => resolveP(v))
     }
     const timer = setTimeout(() => done({ ok: false, error: `no answer in ${Math.round(timeoutMs / 1000)} s` }), timeoutMs) // i18n-ignore: for the log
     p.stdin.on('error', () => undefined)
@@ -798,7 +858,7 @@ export class CodexAdapter implements ProviderAdapter {
     // launch Hive adds some to, with its own arguments, folder and environment (no cache: only Codex knows what they
     // depend on). Unreadable, buildCommand never puts anything in their place (developerOverride).
     if ([ctx.guidance, ctx.instructions, ctx.notes].some((t) => t && t.trim())) {
-      const theirs = await developerInstructionsFromCodex(ctx.executable, ctx.cwd, ctx.extraArgs, ctx.env)
+      const theirs = await developerInstructionsFromCodex(ctx.executable, ctx.cwd, [...launchConnectionArgs(ctx), ...ctx.extraArgs], ctx.env)
       if (theirs === null) log.warn("Codex couldn't render the session's prompt to say which developer_instructions apply; Hive leaves them as they are")
       keepBounded(this.developerByRun, ctx.runId, theirs)
     }
@@ -851,13 +911,14 @@ export class CodexAdapter implements ProviderAdapter {
 
   /** Which hook hashes to trust for this launch (hashesByRun): Hive's own, unless this Codex version hashes differently. */
   private async checkHookHashes(ctx: LaunchContext): Promise<void> {
-    const version = (await run(ctx.executable, ['--version'], 10000)).stdout.match(/(\d+\.\d+\.\d+[\w.-]*)/)?.[1] ?? 'unknown'
+    // In the launch's own environment, with its connection's overrides (HI-1757 round 1): its CODEX_HOME, never Hive's.
+    const version = (await run(ctx.executable, ['--version'], 10000, ctx.env)).stdout.match(/(\d+\.\d+\.\d+[\w.-]*)/)?.[1] ?? 'unknown'
     // Hooks only (without the trust records), to ask Codex what it calls and hashes them.
-    const hooksOnly = hookOverrides(ctx.hookUrl, ctx.hookAuthFile).slice(0, -2)
+    const hooksOnly = [...launchConnectionArgs(ctx), ...hookOverrides(ctx.hookUrl, ctx.hookAuthFile).slice(0, -2)]
     const known = this.hashCheck.get(version)
     if (known === true) return
     if (this.unreachable.has(version)) return
-    const theirs = await hooksFromCodex(ctx.executable, hooksOnly, ctx.cwd)
+    const theirs = await hooksFromCodex(ctx.executable, hooksOnly, ctx.cwd, ctx.env)
     // Codex couldn't be asked: Hive's own hashes are the best guess. Don't wait for it again this run.
     if (!theirs) {
       this.unreachable.add(version)
@@ -896,12 +957,7 @@ export class CodexAdapter implements ProviderAdapter {
     for (const d of ctx.extraDirs ?? []) args.push('--add-dir', d)
     // On a connection (HI-1757): its login kept in its own folder, and the Windows sandbox this PC has (set up once, in
     // ~/.codex's config: its accounts are the machine's), unless the connection's own config names one.
-    if (ctx.connectionHome) {
-      args.push(...CONNECTION_STORE)
-      const own = configOf(ctx.connectionHome).windows?.sandbox
-      const pc = userConfig().windows?.sandbox
-      if (process.platform === 'win32' && !own && typeof pc === 'string' && /^[\w-]{1,24}$/.test(pc)) args.push('-c', `windows.sandbox=${toToml(pc)}`)
-    }
+    args.push(...launchConnectionArgs(ctx))
     const files = [join(ctx.connectionHome ?? codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
     const developer = this.developerOverride(ctx)
     const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveHiveTools'), trusted: ctx.trustedHiveTools }

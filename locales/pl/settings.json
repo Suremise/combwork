@@ -139,6 +139,8 @@
   "settings.advanced.codex.accounts.readMethod.title": "Połączenia: zapytanie o logowanie",
   "settings.advanced.codex.accounts.statusSeconds.desc": "Ile czasu Hive daje serwerowi aplikacji Codex na podanie, na kogo zalogowany jest folder połączenia (`account/read`). Po tym czasie połączenie pokazuje „Nie udało się sprawdzić”, nigdy wylogowanie.",
   "settings.advanced.codex.accounts.statusSeconds.title": "Połączenia: limit czasu sprawdzania logowania",
+  "settings.advanced.codex.appServer.closeSeconds.desc": "Ile czasu serwer aplikacji Codex ma na samodzielne zakończenie, gdy Hive ma już jego odpowiedź (sprawdzenie logowania połączenia, sprawdzenie jego hooków). Po tym czasie Hive kończy go razem ze wszystkim, co uruchomił. Jeśli jest za krótki, Codex zostaje przerwany w trakcie kończenia; jeśli za długi, jego procesy pozostają nieco dłużej.",
+  "settings.advanced.codex.appServer.closeSeconds.title": "Serwer aplikacji: czas na zamknięcie",
   "settings.advanced.codex.exit.command.desc": "To, co Hive wpisuje w Codex, a potem Enter, aby go zamknąć, gdy jego tor się skończył i jego tura dobiegła końca, tak by zakończył się sam zamiast zostać zabity. Jeśli jest błędne, nie zamyka ono Codex i jest on zabijany po upływie czasu na wyjście.",
   "settings.advanced.codex.exit.command.title": "Koniec toru: polecenie wyjścia",
   "settings.advanced.codex.exit.graceSeconds.desc": "Ile czasu Hive daje Codex na zakończenie się samemu po wpisaniu polecenia wyjścia na końcu toru, zanim go zabije. Podczas nagrania zajęło to {took, plural, one {# sekundę} few {# sekundy} many {# sekund} other {# sekundy}}.",

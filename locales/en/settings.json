@@ -559,6 +559,14 @@
     "defaultMessage": "Connections: sign-in check timeout",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.codex.appServer.closeSeconds.desc": {
+    "defaultMessage": "How long Codex's app server gets to end by itself once Hive has its answer (a connection's sign-in check, its hooks' check). Past it, Hive ends it with everything it started. Too short, Codex is cut off as it ends; too long, its processes stay a little longer.",
+    "description": "What the advanced setting \"App server: time to close\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.appServer.closeSeconds.title": {
+    "defaultMessage": "App server: time to close",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.codex.exit.command.desc": {
     "defaultMessage": "What Hive types into Codex, then Enter, to end it once its lane has ended and its turn is over, so it exits by itself rather than being killed. Wrong, Codex isn't ended by it and is killed after the exit grace.",
     "description": "What the advanced setting \"Lane's end: exit command\" is for, and what goes wrong when it is wrong (Settings → Advanced). A lane is a card loop."
