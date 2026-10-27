@@ -1,4 +1,4 @@
-import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Children, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { AttachmentContent, FileEntry, ProjectInfo, SessionAttachment, SessionAttachmentGroup } from '@shared/types'
 import { ATTACHMENT_KIND_ICON, ATTACHMENT_KINDS, attachmentLabel, type AttachmentKind } from '@shared/attachments'
 import { providerDescriptor } from '@shared/providers'
@@ -11,8 +11,9 @@ import { discardDrafts, draftsUnder, FILES_TEXT, FileView, hasDraft, moveDrafts,
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { pasteIntoTerminal } from '../components/TerminalView'
 import { Icon, IconButton, InfoTip, LoadFailed, Modal, SearchInput, StaleNote, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
-import { cardLabelOf, confirm, filesListeners, focusedAgentId, get, notify, openInSessionsTab, projectKey, set, setProjectTab, showAgent, useDateStyle, useStore } from '../store'
+import { cardLabelOf, chooseTab, confirm, filesListeners, useRememberedTab, focusedAgentId, get, notify, openInSessionsTab, projectKey, set, setProjectTab, showAgent, useDateStyle, useStore } from '../store'
 import { attachToCardMenu, CardAttachmentSection, useProjectCardAttachments } from '../components/CardAttachments'
+import { TabPanel, Tabs } from '../components/Tabs'
 import { useScopedLoad } from '../scopedLoad'
 import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
 import { cx, formatBytes, formatKeybinding, HIVE_FILES_MIME, IMAGE_EXT, imageUrl, quotePath, timeAgo } from '../util'
@@ -117,8 +118,13 @@ const M = {
   descAssistant: msg({ id: 'files.attachments.descAssistant', defaultMessage: 'Files pasted or dropped into the Assistant, by conversation.', description: "Under the Hive Assistant's Attachments heading." }),
   desc: msg({ id: 'files.attachments.desc', defaultMessage: "Files kept with this project's cards, and files pasted or dropped into its agents' sessions.", description: "Under a project's Attachments heading (HI-1700: cards' files, then sessions')." }),
   totalWithCards: msg({ id: 'files.attachments.totalWithCards', defaultMessage: '{total, plural, one {# file} other {# files}} · {cards, number} on cards, {sessions, number} in {groups, plural, one {# session} other {# sessions}}', description: "Beside a project's Attachments heading when its cards keep files too (HI-1700): how many files in all, how many on cards, and how many in how many sessions." }),
-  sessionsHeading: msg({ id: 'files.attachments.sessionsHeading', defaultMessage: 'Sessions ({n, number})', description: "A section of a project's Attachments tab (HI-1700), after Cards: the files pasted or dropped into its agents' sessions, and how many ({n})." }),
-  sessionsKept: msg({ id: 'files.attachments.sessionsKept', defaultMessage: 'Kept with their session: Clean Up and Purge can remove them with it.', description: "Under the Sessions heading of a project's Attachments tab (HI-1700)." }),
+  sessionsKept: msg({ id: 'files.attachments.sessionsKept', defaultMessage: 'Kept with their session: Clean Up and Purge can remove them with it.', description: "Atop a project's Attachments tab's Pane attachments (HI-1700, HI-1841): the files pasted or dropped into sessions." }),
+  tabs: msg({ id: 'files.attachments.tabs', defaultMessage: 'Attachments', description: "Accessible name of a project's Attachments tab's two tabs (HI-1841): Pane attachments and Card attachments." }),
+  paneTab: msg({ id: 'files.attachments.paneTab', defaultMessage: 'Pane attachments', description: "A tab of a project's Attachments tab (HI-1841): the files pasted or dropped into its agents' panes (sessions), by conversation." }),
+  cardTab: msg({ id: 'files.attachments.cardTab', defaultMessage: 'Card attachments', description: "A tab of a project's Attachments tab (HI-1841): the files kept with the project's cards, by card." }),
+  paneEmpty: msg({ id: 'files.attachments.paneEmpty', defaultMessage: 'Nothing pasted or dropped into a pane yet.', description: "Pane attachments (a tab of a project's Attachments tab, HI-1841) with no files." }),
+  cardEmpty: msg({ id: 'files.attachments.cardEmpty', defaultMessage: "No files kept with this project's cards yet. Paste or drop files into a card's description or a comment.", description: "Card attachments (a tab of a project's Attachments tab, HI-1841) with no files." }),
+  cardFailed: msg({ id: 'files.attachments.cardFailed', defaultMessage: "The cards' attachments couldn't be read.", description: "Card attachments (a tab of a project's Attachments tab, HI-1841) when reading them failed." }),
   show: msg({ id: 'files.attachments.filters', defaultMessage: 'Show', description: "Accessible name of the Attachments tab's filter buttons (All, Images, PDFs…)." }),
   all: msg({ id: 'files.attachments.all', defaultMessage: 'All', description: 'Attachments filter: every kind. Followed by a count.' }),
   archivedHeading: msg({ id: 'files.attachments.archived', defaultMessage: '{host, select, assistant {Archived conversations} other {Archived sessions}}', description: "Heading over the archived sessions' attachments." }),
@@ -983,6 +989,19 @@ const dayKey = (iso: string): string => new Date(iso).toDateString()
  * conversation): what was pasted or dropped into sessions, with filters by kind. Clicking a group's name opens that
  * session's transcript.
  */
+/** The Attachments tab's two tabs (HI-1841): what was pasted or dropped into panes, and what is kept with cards. */
+type AttachTab = 'pane' | 'card'
+const ATTACH_TABS: AttachTab[] = ['pane', 'card']
+const ATTACH_TABS_KEY = 'attachments'
+const NO_KINDS: Record<AttachTab, AttachmentKind | null> = { pane: null, card: null }
+
+/** How many of each kind a list of groups has: a filter is offered for each kind present. */
+const kindCounts = (groups: { attachments: { kind: AttachmentKind }[] }[]): Map<AttachmentKind, number> => {
+  const c = new Map<AttachmentKind, number>()
+  for (const g of groups) for (const a of g.attachments) c.set(a.kind, (c.get(a.kind) ?? 0) + 1)
+  return c
+}
+
 export function AttachmentsTab({ project: owner, assistant = false }: { project: ProjectInfo; assistant?: boolean }) {
   useStore((s) => s.focusedAgent[owner.path])
   useDateStyle()
@@ -995,16 +1014,35 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
   const all = loaded.data
   const error = loaded.error
   const [viewing, setViewing] = useState<SessionAttachment | null>(null)
-  const [filter, setFilter] = useState<AttachmentKind | null>(null)
-  // What is open in the viewer, and the filter, are the last project's.
+  // Each tab's own kind filter (HI-1841).
+  const [filters, setFilters] = useState<Record<AttachTab, AttachmentKind | null>>(NO_KINDS)
+  // The tab shown when it isn't the remembered one: a link's (kept after its jump), or Pane attachments while the
+  // project has no card attachments; for this project only. A click on a tab clears it and is remembered.
+  const [shownTab, setShownTab] = useState<{ project: string; tab: AttachTab } | null>(null)
+  // What is open in the viewer, and the filters, are the last project's.
   useEffect(() => {
     setViewing(null)
-    setFilter(null)
+    setFilters(NO_KINDS)
   }, [project.path])
   const menu = useContextMenu()
-  // The project's cards' attachments (HI-1700), a section of their own above the sessions'.
+  const tabsId = useId()
+  // The project's cards' attachments (HI-1700), Card attachments' (HI-1841); the Assistant has none, and no tabs.
   const cardFiles = useProjectCardAttachments(assistant ? null : project.path)
   const cardCount = cardFiles.groups.reduce((n, g) => n + g.attachments.length, 0)
+  const remembered = useRememberedTab<AttachTab>(ATTACH_TABS_KEY, ATTACH_TABS, 'pane')
+  const tab: AttachTab = assistant ? 'pane' : shownTab?.project === project.path ? shownTab.tab : remembered
+  const chooseAttachTab = (t: AttachTab): void => {
+    setShownTab(null)
+    chooseTab(ATTACH_TABS_KEY, t)
+  }
+  // Opening on Card attachments with none yet: Pane attachments, once the cards' files have been read (never while they
+  // load or failed); a click on Card attachments afterwards stays there.
+  const fellBack = useRef<string | null>(null)
+  useEffect(() => {
+    if (assistant || !cardFiles.loaded || fellBack.current === project.path) return
+    fellBack.current = project.path
+    if (remembered === 'card' && !cardCount) setShownTab((t) => (t?.project === project.path ? t : { project: project.path, tab: 'pane' }))
+  }, [assistant, cardFiles.loaded, cardCount, remembered, project.path])
 
   const { load: loadScoped } = loaded
   const load = useCallback(() => {
@@ -1016,17 +1054,17 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
     if (dirs.some((d) => d === '.hive' || d.startsWith('.hive/attachments'))) load()
   })
 
-  // How many of each kind there are: a filter is offered for each kind present.
-  const counts = useMemo(() => {
-    const c = new Map<AttachmentKind, number>()
-    for (const g of [...(all ?? []), ...cardFiles.groups]) for (const a of g.attachments) c.set(a.kind, (c.get(a.kind) ?? 0) + 1)
-    return c
-  }, [all, cardFiles.groups])
+  // How many of each kind the tab shown has: a filter is offered for each kind present, counting only its own files.
+  const counts = useMemo(() => kindCounts(tab === 'card' ? cardFiles.groups : (all ?? [])), [tab, all, cardFiles.groups])
+  const filter = filters[tab]
+  const setFilter = (k: AttachmentKind | null): void => setFilters((f) => ({ ...f, [tab]: k }))
   // A filter whose kind is all gone shows everything again.
   const shownKind = filter && counts.get(filter) ? filter : null
+  // Pane attachments' filter, for its groups and the viewer (whose files are Pane attachments' only).
+  const paneKind = tab === 'pane' ? shownKind : filters.pane
   const groups = useMemo(
-    () => (all ?? []).map((g) => ({ ...g, attachments: g.attachments.filter((a) => !shownKind || a.kind === shownKind) })).filter((g) => g.attachments.length),
-    [all, shownKind]
+    () => (all ?? []).map((g) => ({ ...g, attachments: g.attachments.filter((a) => !paneKind || a.kind === paneKind) })).filter((g) => g.attachments.length),
+    [all, paneKind]
   )
   // Same order as on screen: current sessions first, archived last.
   const flat = useMemo(() => [...groups.filter((g) => !g.archived), ...groups.filter((g) => g.archived)].flatMap((g) => g.attachments), [groups])
@@ -1049,7 +1087,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
     const ok = await confirm({
       title: tr(M.groupDeleteTitle, { count: n }),
       message: tr(M.groupDeleteMessage, { count: n, name: g.name ?? g.sessionId.slice(0, 8) }),
-      detail: tr(M.groupDeleteDetail, { filtered: shownKind ? 'yes' : 'no', host }),
+      detail: tr(M.groupDeleteDetail, { filtered: paneKind ? 'yes' : 'no', host }),
       confirmLabel: tr(M.trashButton),
       danger: true
     })
@@ -1090,8 +1128,32 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
     running(a) ? { label: tr(M.delete), icon: 'trash', disabled: true, detail: tr(M.running, { host }) } : { label: tr(M.delete), icon: 'trash', danger: true, onClick: () => void remove(a) }
   ]
 
+  // A link's jump (HI-1841), for this project only: its tab shown (and kept), that tab's filter back to All so its target
+  // shows, and once the target is drawn, scrolled to and flashed; then the jump is done. A target that isn't there once
+  // the files are read (no attachments in that session) leaves the tab shown.
+  const jump = useStore((s) => s.attachmentsJump)
+  const pageRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (assistant || !jump || jump.project !== project.path) return
+    setShownTab({ project: project.path, tab: jump.tab })
+    setFilters((f) => (f[jump.tab] ? { ...f, [jump.tab]: null } : f))
+  }, [assistant, jump, project.path])
+  useEffect(() => {
+    if (assistant || !jump || jump.project !== project.path || tab !== jump.tab) return
+    const sel = jump.tab === 'card' ? `[data-card="${jump.card}"]` : `[data-session="${CSS.escape(jump.session)}"]`
+    const target = pageRef.current?.querySelector<HTMLElement>(`[role="tabpanel"][data-tab-panel="${jump.tab}"] ${sel}`)
+    const read = jump.tab === 'card' ? cardFiles.loaded || cardFiles.failed : !!all
+    if (!target && !read) return
+    if (target) {
+      target.scrollIntoView({ block: 'start' })
+      target.classList.add('jumped')
+      window.setTimeout(() => target.classList.remove('jumped'), 1500)
+    }
+    set({ attachmentsJump: null })
+  })
+
   if (!all) return error ? <LoadFailed what={tr(M.attachmentsLoadTarget)} error={error} onRetry={load} /> : <div className="empty-state"><Icon name="loading" spin />{tr(M.loading)}</div>
-  if (!all.length && !error && !cardCount) {
+  if (!all.length && !error && !cardCount && cardFiles.loaded) {
     return (
       <div className="empty-state" style={{ paddingTop: '15vh' }}>
         <Icon name="attach" />
@@ -1110,7 +1172,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
     const [first, last] = [Math.min(...times), Math.max(...times)]
     const oneDay = daysAgo(first, new Date(last)) === 0
     return (
-      <section key={g.sessionId} className="image-group">
+      <section key={g.sessionId} className="image-group" data-session={g.sessionId}>
         <div className="image-group-head">
           <Icon name="comment-discussion" />
           <Tooltip content={tr(M.openTranscript, { host })}>
@@ -1169,7 +1231,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
   }
 
   return (
-    <div className="scroll-page images-page">
+    <div className="scroll-page images-page" ref={pageRef}>
       <div className="images-toolbar">
         <h2>{tr(M.attachments)}</h2>
         <InfoTip text={tr(assistant ? M.infoAssistant : M.info)} />
@@ -1179,10 +1241,11 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
         <IconButton icon="folder-opened" title={tr(M.openFolder)} onClick={() => void call('app:openPath', `${project.path}\\.hive\\attachments`)} />
       </div>
       <p className="hint images-desc">{tr(assistant ? M.descAssistant : M.desc)}</p>
+      {!assistant && <Tabs<AttachTab> idBase={`${tabsId}-attach`} className="attachment-tabs" label={tr(M.tabs)} value={tab} onChange={chooseAttachTab} items={[{ id: 'pane', label: tr(M.paneTab), icon: 'comment-discussion', count: total }, { id: 'card', label: tr(M.cardTab), icon: 'checklist', count: cardCount }]} />}
       {counts.size > 1 && (
         <div className="attachment-filters" role="group" aria-label={tr(M.show)}>
           <button className={cx('attachment-filter', !shownKind && 'selected')} aria-pressed={!shownKind} onClick={() => setFilter(null)}>
-            {tr(M.all)} <span className="faint">{total}</span>
+            {tr(M.all)} <span className="faint">{tab === 'card' ? cardCount : total}</span>
           </button>
           {ATTACHMENT_KINDS.filter((k) => counts.get(k)).map((k) => (
             <button key={k} className={cx('attachment-filter', shownKind === k && 'selected')} aria-pressed={shownKind === k} data-kind={k} onClick={() => setFilter(shownKind === k ? null : k)}>
@@ -1191,26 +1254,26 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
           ))}
         </div>
       )}
-      {error && <StaleNote what={tr(M.attachmentsRefreshTarget)} error={error} at={loaded.at} onRetry={load} />}
-      <CardAttachmentSection groups={cardFiles.groups} kind={shownKind} reload={cardFiles.reload} />
-      {/* Beside the cards' section (HI-1700), the sessions' has a heading of its own. */}
-      {!assistant && cardCount > 0 && groups.length > 0 && (
-        <>
-          <h3 className="images-archived" data-section="session-attachments">
-            <Icon name="comment-discussion" /> {tr(M.sessionsHeading, { n: total })}
-          </h3>
-          <p className="hint">{tr(M.sessionsKept)}</p>
-        </>
+      {/* Each tab its own page (HI-1841); the Assistant's view has Pane attachments alone, without tabs. */}
+      {!assistant && (
+        <TabPanel idBase={`${tabsId}-attach`} id="card" selected={tab === 'card'} data-tab-panel="card">
+          {cardCount ? <CardAttachmentSection groups={cardFiles.groups} kind={tab === 'card' ? shownKind : filters.card} reload={cardFiles.reload} /> : <div className="empty-state attachment-tab-empty">{cardFiles.loaded ? tr(M.cardEmpty) : cardFiles.failed ? tr(M.cardFailed) : <Icon name="loading" spin />}</div>}
+        </TabPanel>
       )}
-      {current.map(renderGroup)}
-      {archived.length > 0 && (
-        <>
-          <h3 className="images-archived">
-            <Icon name="archive" /> {tr(M.archivedHeading, { host })}
-          </h3>
-          {archived.map(renderGroup)}
-        </>
-      )}
+      <PanePanel assistant={assistant} idBase={`${tabsId}-attach`} selected={tab === 'pane'}>
+        {error && <StaleNote what={tr(M.attachmentsRefreshTarget)} error={error} at={loaded.at} onRetry={load} />}
+        {!assistant && !all.length && <div className="empty-state attachment-tab-empty">{tr(M.paneEmpty)}</div>}
+        {!assistant && all.length > 0 && <p className="hint">{tr(M.sessionsKept)}</p>}
+        {current.map(renderGroup)}
+        {archived.length > 0 && (
+          <>
+            <h3 className="images-archived">
+              <Icon name="archive" /> {tr(M.archivedHeading, { host })}
+            </h3>
+            {archived.map(renderGroup)}
+          </>
+        )}
+      </PanePanel>
       {viewing && (
         <AttachmentViewer
           host={project.path}
@@ -1230,6 +1293,16 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
       )}
       {menu.element}
     </div>
+  )
+}
+
+/** Pane attachments' page: a tab's panel in a project, the page itself in the Assistant's view (no tabs). */
+function PanePanel({ assistant, idBase, selected, children }: { assistant: boolean; idBase: string; selected: boolean; children: React.ReactNode }) {
+  if (assistant) return <>{children}</>
+  return (
+    <TabPanel idBase={idBase} id="pane" selected={selected} data-tab-panel="pane">
+      {children}
+    </TabPanel>
   )
 }
 

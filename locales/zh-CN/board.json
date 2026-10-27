@@ -65,6 +65,7 @@
   "board.attach.removeTitle": "要从 {card} 移除 {name} 吗？",
   "board.attach.removed": "{name}（已移除）",
   "board.attach.show": "在文件夹中显示",
+  "board.attach.showInTab": "在“附件”中显示",
   "board.attach.toCard": "附加到 {card}",
   "board.attach.tooLarge": "{name} 超过 {max}，即卡片单个文件可保留的上限（“设置”→“高级”→“卡片附件：最大文件”）。",
   "board.attach.tooMuch": "描述和评论合计，一次最多可保存 {files, number} 个文件、{total}。",

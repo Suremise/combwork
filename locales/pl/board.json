@@ -65,6 +65,7 @@
   "board.attach.removeTitle": "Usunąć {name} z {card}?",
   "board.attach.removed": "{name} (usunięty)",
   "board.attach.show": "Pokaż w folderze",
+  "board.attach.showInTab": "Pokaż w Załącznikach",
   "board.attach.toCard": "Dołącz do {card}",
   "board.attach.tooLarge": "{name} przekracza {max}, najwięcej, ile karta przechowuje w jednym pliku (Ustawienia → Zaawansowane → Załączniki kart: największy plik).",
   "board.attach.tooMuch": "Naraz można zapisać najwyżej {files, number} plików i {total}, opis i komentarz razem.",

@@ -1793,7 +1793,8 @@ textarea.input {
 /* The tabs' line runs under the whole row, the selected tab's underline on it. */
 .workflow-defaults-tabs > .hive-tabs-row,
 .kb-editor > .hive-tabs-row,
-.advanced-list > .hive-tabs-row {
+.advanced-list > .hive-tabs-row,
+.images-page > .hive-tabs-row {
   border-block-end: 1px solid var(--border-subtle);
   margin-block-end: 4px;
 }
@@ -4635,6 +4636,31 @@ h2.section#unused-worktrees {
 }
 .image-group {
   margin: 18px 0 8px;
+}
+/* A link's target in the Attachments tab (HI-1841: a card's or a session's files), outlined a moment. */
+.image-group.jumped {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.attachment-tab-empty {
+  padding-block: 32px;
+}
+/* Show in Attachments, beside the card dialog's Attachments heading (HI-1841). */
+.card-attachments-show {
+  margin-inline-start: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--info);
+  font: inherit;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+.card-attachments-show:hover {
+  text-decoration: underline;
 }
 .image-group-head {
   display: flex;

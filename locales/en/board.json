@@ -263,6 +263,10 @@
     "defaultMessage": "Show in Folder",
     "description": "A card attachment's action (HI-1700): shows the file in File Explorer."
   },
+  "board.attach.showInTab": {
+    "defaultMessage": "Show in Attachments",
+    "description": "A link beside the card dialog's Attachments heading (HI-1841): opens the project's Attachments tab on Card attachments, at this card's files."
+  },
   "board.attach.toCard": {
     "defaultMessage": "Attach to {card}",
     "description": "A menu entry (HI-1700): copies a session's attachment to the card {card} (its key, such as AM-12) that the agent works on or reviews."

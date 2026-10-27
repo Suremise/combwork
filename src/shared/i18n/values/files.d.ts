@@ -2,13 +2,15 @@
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
   'files.attach.cardArchived': undefined
-  'files.attach.cardsHeading': { n: number }
   'files.attach.cardsKept': undefined
   'files.attach.openCard': { card: string | number }
   'files.attach.toCard': undefined
   'files.attachments.all': undefined
   'files.attachments.archived': { host: string }
   'files.attachments.archivedBadge': undefined
+  'files.attachments.cardEmpty': undefined
+  'files.attachments.cardFailed': undefined
+  'files.attachments.cardTab': undefined
   'files.attachments.copyImage': undefined
   'files.attachments.copyImageFailed': undefined
   'files.attachments.deleteDetail': undefined
@@ -36,11 +38,13 @@ interface HiveMessageValues {
   'files.attachments.noneHintAssistant': undefined
   'files.attachments.openFolder': undefined
   'files.attachments.openTranscript': { host: string }
+  'files.attachments.paneEmpty': undefined
+  'files.attachments.paneTab': undefined
   'files.attachments.refreshTarget': undefined
   'files.attachments.running': { host: string }
   'files.attachments.runningBadge': undefined
-  'files.attachments.sessionsHeading': { n: number }
   'files.attachments.sessionsKept': undefined
+  'files.attachments.tabs': undefined
   'files.attachments.title': undefined
   'files.attachments.total': { host: string; total: number; groups: number }
   'files.attachments.totalWithCards': { total: number; cards: number; sessions: number; groups: number }

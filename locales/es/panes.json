@@ -164,6 +164,7 @@
   "panes.session.renameFailed": "No se pudo cambiar el nombre",
   "panes.session.renameItem": "Cambiar nombre de la sesión…",
   "panes.session.renameTitle": "Cambiar el nombre de la sesión",
+  "panes.session.showAttachments": "Mostrar los adjuntos de la sesión",
   "panes.session.starting": "{kind, select, resume {Reanudando…} other {Iniciando…}}",
   "panes.tab.failed": "no se pudo iniciar: {why}",
   "panes.tab.mcp": "Servidores MCP: {servers}",

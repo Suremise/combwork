@@ -3,7 +3,9 @@
 // in the project's .hive/attachments/cards/<number>, and listed by path in the card's JSON (the Agent API, as
 // hive_read_task reads it). It stays through a move to Doing, archiving and back, and moves with the card to another
 // project. A session's file is copied to a card from the Attachments tab (Attach to a card, the menu a pane's chip uses
-// too), and the tab's Cards section lists the project's card files. Screenshots in both themes. Dev build, throwaway
+// too). The tab's two tabs (HI-1841): Pane attachments and Card attachments, each its count and its own kind filters,
+// remembered; the card dialog's Show in Attachments opening Card attachments at its card, whatever its filter, without
+// changing the tab remembered; Pane attachments when the cards keep no files yet. Screenshots in both themes. Dev build, throwaway
 // profile and workspace (two plain-folder projects).
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -148,13 +150,25 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     check('a move to another project takes it along', moved.length === 1 && moved[0].path.toLowerCase().startsWith(path.join(beta, '.hive', 'attachments', 'cards').toLowerCase()) && fs.existsSync(moved[0].path), JSON.stringify(moved.map((x) => x.path)))
     check('…and the old folder goes', !!(await until(async () => !fs.existsSync(path.join(alpha, '.hive', 'attachments', 'cards', String(n))))))
 
-    // --- A session's file copied to a card from the Attachments tab; the tab's Cards section.
+    // --- A session's file copied to a card from the Attachments tab; its tabs (HI-1841).
     const other = await inv('tasks:create', { title: 'Session shot belongs here', project: 'alpha' })
     await page.locator('.activity-btn[aria-label="Projects"]').click()
     await page.locator('.project-row', { hasText: 'alpha' }).first().click()
     await page.keyboard.press('Alt+7')
-    const tile = page.locator('.images-page .image-group .thumb').filter({ has: page.locator('img[alt$="session-shot.png"]') })
-    check('the Attachments tab shows the session file', !!(await until(async () => (await tile.count()) === 1)))
+    const attachTabs = () => page.locator('.attachment-tabs [role="tab"]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-tab'), label: e.querySelector('.hive-tab-label').textContent.trim(), count: Number((e.querySelector('.hive-tab-count')?.textContent ?? '-1').replace(/\D/g, '')), selected: e.getAttribute('aria-selected') === 'true' })))
+    const attachTab = (id) => page.locator(`.attachment-tabs [role="tab"][data-tab="${id}"]`)
+    const selectedAttach = async () => (await attachTabs()).find((t) => t.selected)?.id ?? null
+    // The session's file in Pane attachments (the card's copy, in Card attachments, has the same name).
+    const tile = page.locator('.images-page [role="tabpanel"][data-tab-panel="pane"] .image-group .thumb').filter({ has: page.locator('img[alt$="session-shot.png"]') })
+    check('the Attachments tab shows the session file on Pane attachments', !!(await until(async () => (await tile.count()) === 1 && (await tile.isVisible()))))
+    check('…two tabs, Pane attachments (1) and Card attachments (0), Pane attachments first', !!(await until(async () => JSON.stringify(await attachTabs()) === JSON.stringify([{ id: 'pane', label: 'Pane attachments', count: 1, selected: true }, { id: 'card', label: 'Card attachments', count: 0, selected: false }]))), JSON.stringify(await attachTabs()))
+    await attachTab('card').click()
+    check('…a click on the empty Card attachments stays there, saying it has none', !!(await until(async () => (await selectedAttach()) === 'card' && (await page.locator('[role="tabpanel"][data-tab-panel="card"] .attachment-tab-empty').isVisible()))))
+    // Card attachments remembered, alpha's cards keeping none: opened again, Pane attachments, once they are read.
+    await page.keyboard.press('Alt+1')
+    await until(async () => (await page.locator('.images-page').count()) === 0)
+    await page.keyboard.press('Alt+7')
+    check('…opened again with Card remembered and no card files: Pane attachments', !!(await until(async () => (await selectedAttach()) === 'pane' && (await tile.isVisible()))), String(await selectedAttach()))
     // The menu lists the cards the window has: opened again until it has the one just made.
     const otherLabel = await lib.cardLabel(inv, other.number)
     const entry = page.locator('.menu-item', { hasText: otherLabel }).first()
@@ -172,14 +186,45 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     })
     check("Attach to a card copies a session's file to the card", !!copied && fs.existsSync(sessionFile), JSON.stringify(copied))
     const section = page.locator('[data-section="card-attachments"]')
-    check("the tab's Cards section lists it under its card", !!(await until(async () => (await section.locator(`[data-card="${other.number}"] .thumb`).count()) === 1)))
-    check('…the sessions under a heading of their own, Sessions (1)', (await page.locator('[data-section="session-attachments"]').innerText().catch(() => '')).toLowerCase().includes('sessions (1)'), await page.locator('[data-section="session-attachments"]').innerText().catch(() => ''))
+    check('Card attachments counts it, Pane attachments its session file', !!(await until(async () => JSON.stringify((await attachTabs()).map((t) => t.count)) === '[1,1]')), JSON.stringify(await attachTabs()))
+    check('…Pane attachments shows only the session’s file, not the card’s', (await tile.isVisible()) && !(await section.isVisible().catch(() => false)))
+    await attachTab('card').click()
+    check('Card attachments lists it under its card, and only it', !!(await until(async () => (await section.locator(`[data-card="${other.number}"] .thumb`).isVisible()) && !(await tile.isVisible()))))
+    check('…remembered', !!(await until(() => JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).ui?.tabs?.attachments === 'card')))
     check("…and the tab's total counts both", (await page.locator('.images-toolbar .faint').first().innerText()).includes('1 on cards, 1 in 1 session'), await page.locator('.images-toolbar .faint').first().innerText())
+    // Each tab its own kind filters, counting its own files: a text file on the card, the session's image alone.
+    const notes = path.join(alpha, 'docs', 'notes.txt')
+    fs.mkdirSync(path.dirname(notes), { recursive: true })
+    fs.writeFileSync(notes, 'notes\n')
+    const patched = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${other.number}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ attachments: [notes] }) })
+    check('a text file added to the card', patched.ok && !!(await until(async () => (await inv('cards:attachments', other.number)).length === 2)), String(patched.status))
+    const filterCounts = () => page.locator('.attachment-filters .attachment-filter').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-kind') ?? 'all'}:${e.querySelector('.faint')?.textContent.trim()}`).join())
+    check('Card attachments’ filters count its own files: all 2, an image and a text file', !!(await until(async () => (await filterCounts()) === 'all:2,image:1,text:1')), await filterCounts())
+    await page.locator('.attachment-filter[data-kind="text"]').click()
+    check('…its Text filter shows the text file alone', !!(await until(async () => (await section.locator('.thumb').count()) === 1 && (await section.locator('.thumb[data-kind="text"]').count()) === 1)))
+    await attachTab('pane').click()
+    check('Pane attachments has no filters to offer (one kind), its file shown whatever Card’s filter is', !!(await until(async () => (await selectedAttach()) === 'pane' && (await page.locator('.attachment-filters').count()) === 0 && (await tile.isVisible()))))
+    await attachTab('card').click()
+    check('…and Card’s filter kept for its tab', !!(await until(async () => (await page.locator('.attachment-filter[data-kind="text"]').getAttribute('aria-pressed')) === 'true')))
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
       await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
       await page.locator('.images-page').screenshot({ path: path.join(shots, `cardattach-tab-${theme}.png`) })
     }
+    // The card dialog's Show in Attachments: Card attachments at its card, its filter back to All so the image shows too,
+    // without changing the tab remembered (Pane attachments, chosen now).
+    await attachTab('pane').click()
+    await until(async () => JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).ui?.tabs?.attachments === 'pane')
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+    await showBoard(page)
+    await openByTitle(page, other.number)
+    const show = page.locator('[data-action="show-in-attachments"]')
+    await show.waitFor({ timeout: 15000 })
+    await show.click()
+    const target = section.locator(`[data-card="${other.number}"]`)
+    check('Show in Attachments opens Card attachments at its card, both its files shown (its filter back to All)', !!(await until(async () => (await selectedAttach()) === 'card' && (await target.isVisible()) && (await target.locator('.thumb').count()) === 2)), JSON.stringify([await selectedAttach(), await target.locator('.thumb').count()]))
+    check('…without changing the tab remembered', JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).ui?.tabs?.attachments === 'pane')
+    check('…the dialog closed, the card’s files in view', (await page.locator('[data-action="show-in-attachments"]').count()) === 0 && (await target.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.top < window.innerHeight })))
     // --- The Agent API: nothing is copied before the destination is allowed (HR4's HI-1700 round 1, finding 3).
     const post = async (body, bearer = token) => {
       const r = await fetch(`http://127.0.0.1:${PORT}/v1/tasks`, { method: 'POST', headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

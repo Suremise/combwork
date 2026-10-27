@@ -67,6 +67,7 @@ interface HiveMessageValues {
   'board.attach.removeTitle': { name: string | number; card: string | number }
   'board.attach.removed': { name: string | number }
   'board.attach.show': undefined
+  'board.attach.showInTab': undefined
   'board.attach.toCard': { card: string | number }
   'board.attach.tooLarge': { name: string | number; max: string | number }
   'board.attach.tooMuch': { files: number; total: string | number }

@@ -3,10 +3,6 @@
     "defaultMessage": "Archived",
     "description": "A badge on a card in the Attachments tab's Cards section (HI-1700): the card is archived (its files are kept)."
   },
-  "files.attach.cardsHeading": {
-    "defaultMessage": "Cards ({n, number})",
-    "description": "A section of a project's Attachments tab (HI-1700): files kept with the project's cards, and how many ({n}); the sessions' attachments follow."
-  },
   "files.attach.cardsKept": {
     "defaultMessage": "Kept with the card until it is deleted: Clean Up and Purge don't remove them.",
     "description": "Under the Cards heading of a project's Attachments tab (HI-1700)."
@@ -30,6 +26,18 @@
   "files.attachments.archivedBadge": {
     "defaultMessage": "archived",
     "description": "Badge beside an archived session's name in the Attachments tab."
+  },
+  "files.attachments.cardEmpty": {
+    "defaultMessage": "No files kept with this project's cards yet. Paste or drop files into a card's description or a comment.",
+    "description": "Card attachments (a tab of a project's Attachments tab, HI-1841) with no files."
+  },
+  "files.attachments.cardFailed": {
+    "defaultMessage": "The cards' attachments couldn't be read.",
+    "description": "Card attachments (a tab of a project's Attachments tab, HI-1841) when reading them failed."
+  },
+  "files.attachments.cardTab": {
+    "defaultMessage": "Card attachments",
+    "description": "A tab of a project's Attachments tab (HI-1841): the files kept with the project's cards, by card."
   },
   "files.attachments.copyImage": {
     "defaultMessage": "Copy Image",
@@ -139,6 +147,14 @@
     "defaultMessage": "{host, select, assistant {Open this conversation's transcript} other {Open this session's transcript}}",
     "description": "Tooltip on a session's name in the Attachments tab. {host} is assistant for the Hive Assistant's conversations."
   },
+  "files.attachments.paneEmpty": {
+    "defaultMessage": "Nothing pasted or dropped into a pane yet.",
+    "description": "Pane attachments (a tab of a project's Attachments tab, HI-1841) with no files."
+  },
+  "files.attachments.paneTab": {
+    "defaultMessage": "Pane attachments",
+    "description": "A tab of a project's Attachments tab (HI-1841): the files pasted or dropped into its agents' panes (sessions), by conversation."
+  },
   "files.attachments.refreshTarget": {
     "defaultMessage": "the attachments",
     "description": "What could not be refreshed while the attachments shown stay on screen: shown in \"Could not refresh {what}; last updated …\", with Retry."
@@ -151,13 +167,13 @@
     "defaultMessage": "Running",
     "description": "Badge beside a session's name in the Attachments tab: it is running now."
   },
-  "files.attachments.sessionsHeading": {
-    "defaultMessage": "Sessions ({n, number})",
-    "description": "A section of a project's Attachments tab (HI-1700), after Cards: the files pasted or dropped into its agents' sessions, and how many ({n})."
-  },
   "files.attachments.sessionsKept": {
     "defaultMessage": "Kept with their session: Clean Up and Purge can remove them with it.",
-    "description": "Under the Sessions heading of a project's Attachments tab (HI-1700)."
+    "description": "Atop a project's Attachments tab's Pane attachments (HI-1700, HI-1841): the files pasted or dropped into sessions."
+  },
+  "files.attachments.tabs": {
+    "defaultMessage": "Attachments",
+    "description": "Accessible name of a project's Attachments tab's two tabs (HI-1841): Pane attachments and Card attachments."
   },
   "files.attachments.title": {
     "defaultMessage": "Attachments",

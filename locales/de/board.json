@@ -65,6 +65,7 @@
   "board.attach.removeTitle": "{name} von {card} entfernen?",
   "board.attach.removed": "{name} (entfernt)",
   "board.attach.show": "Im Ordner anzeigen",
+  "board.attach.showInTab": "In „Anhänge“ zeigen",
   "board.attach.toCard": "An {card} anhängen",
   "board.attach.tooLarge": "{name} ist größer als {max}, das Höchste, was eine Karte in einer Datei behält (Einstellungen → Erweitert → Karten-Anhänge: größte Datei).",
   "board.attach.tooMuch": "Höchstens {files, number} Dateien und {total} können auf einmal gespeichert werden, Beschreibung und Kommentar zusammen.",

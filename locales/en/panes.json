@@ -659,6 +659,10 @@
     "defaultMessage": "Rename session",
     "description": "Title of the dialog renaming an agent's session (from its footer)."
   },
+  "panes.session.showAttachments": {
+    "defaultMessage": "Show Session's Attachments",
+    "description": "Menu item (an agent's menu, HI-1841): opens the project's Attachments tab on Pane attachments, at the files pasted or dropped into this running session."
+  },
   "panes.session.starting": {
     "defaultMessage": "{kind, select, resume {Resuming…} other {Starting…}}",
     "description": "A start (other) or Resume (resume) button's label while the agent's session starts, from the click until it runs (it shows a spinner and takes no clicks). Keep it short."

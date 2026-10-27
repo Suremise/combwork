@@ -65,6 +65,8 @@
   "tips.assistantWaits.title": "L’Assistant te prévient quand un agent a fini",
   "tips.attachFiles.text": "Dépose un PDF, un journal ou n’importe quel fichier sur le terminal d’un agent : Hive en garde une copie avec la session et colle son chemin. Une puce montre ce qui est joint, et indique quand la CLI de l’agent ne lit pas elle-même ce type de fichier, pour que l’agent l’ouvre par son chemin.",
   "tips.attachFiles.title": "Joindre n’importe quel fichier à un prompt",
+  "tips.attachmentsTabs.text": "L’onglet Pièces jointes a Pièces jointes des volets et Pièces jointes des cartes. Afficher dans Pièces jointes, à côté des pièces jointes d’une carte, ouvre Pièces jointes des cartes sur cette carte ; Afficher les pièces jointes de la session, dans le menu ⋯ d’un agent, ouvre Pièces jointes des volets sur sa session.",
+  "tips.attachmentsTabs.title": "Aller aux fichiers d’une carte ou d’une session",
   "tips.backupRetention.text": "Hive compresse ses sauvegardes des transcriptions dès qu’une session se termine, et Stockage montre ce qu’elles contiennent. Pour laisser partir les anciennes, règle Paramètres → Sessions → Conserver les sauvegardes des transcriptions : seules les copies des sessions que la CLI possède encore vont dans la Corbeille.",
   "tips.backupRetention.title": "Des sauvegardes plus légères, qui peuvent expirer",
   "tips.banners.text": "Pendant que tu utilises Hive, un agent qui termine ou a besoin de toi apparaît en bannière dans la fenêtre, pas en notification Windows par-dessus l’Assistant. Paramètres → Notifications choisit où elle s’affiche, pour quels espaces de travail et combien de temps.",

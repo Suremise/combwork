@@ -179,6 +179,7 @@
   "panes.session.renameFailed": "Could not rename",
   "panes.session.renameItem": "Rename Session…",
   "panes.session.renameTitle": "Rename session",
+  "panes.session.showAttachments": "Show Session's Attachments",
   "panes.session.starting": "{kind, select, resume {Resuming…} other {Starting…}}",
   "panes.session.tip": "{session}\nRunning since {since}\nSession {id}\nClick to read it in the Sessions tab; right-click to rename it.",
   "panes.tab.failed": "failed to start: {why}",
