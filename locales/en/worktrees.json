@@ -31,6 +31,10 @@
     "defaultMessage": "Agents aren’t pinned to worktrees in 1.0: slots are lent per card or lane.",
     "description": "An error: an agent was to be added in a worktree of its own (a new or an existing one), which 1.0 doesn't do: Hive lends a working folder (a slot) to each card or lane instead (glossary 2.5: slot, lane)."
   },
+  "worktrees.agent.providerChangedMeanwhile": {
+    "defaultMessage": "{agent}'s provider was changed meanwhile: nothing was changed. Try again.",
+    "description": "An error saving an agent's settings (HI-1771): its provider (coding agent CLI) was changed by something else while this change was being saved, so nothing was saved. {agent} is its name."
+  },
   "worktrees.agent.removing": {
     "defaultMessage": "That worktree is already being removed or merged.",
     "description": "An error: the worktree is being removed or merged by another action right now."

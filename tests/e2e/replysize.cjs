@@ -696,6 +696,20 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
   check('merge slot: released in a line', /^Released the merge slot for main\.$/.test(measure('hive_merge_slot (release)', slot({ action: 'release' }), 120)), texts['hive_merge_slot (release)'])
   check("merge slot: agents have the tool, the Assistant doesn't", !!toolDescription('hive_merge_slot') && !toolDescription('hive_merge_slot', 'assistant'))
 
+  // Connections (HI-1771, with the preview on; last, as a connection on changes how this workspace's agents start): an
+  // agent added on one by name, the providers listing those on here, the status with each agent's connection.
+  await inv('advanced:set', 'hive.accounts.preview', true)
+  const max = await inv('connections:add', 'claude-code', 'Max')
+  await inv('connections:setOn', max.id, true)
+  const linked = measure('hive_add_agent (connection)', tool('hive_add_agent', { project: 'beta', name: 'Linked', connection: 'Max' }, 'assistant'), 400)
+  check('a new agent on a connection: its line names it', /^Added Linked \(id a-\w+\) to beta: claude-code on Max, in the project folder, stopped\.$/.test(linked), linked)
+  // The providers' JSON (about 9,200 characters) with a connection on here: about 60 more.
+  measure('hive_list_providers (connections)', tool('hive_list_providers', {}, 'assistant'), 9500)
+  // beta's status with Linked's connection and each agent's connection fields (about 3,040 characters).
+  measure('hive_project_status (connections)', tool('hive_project_status', { project: 'beta' }, 'assistant'), 3500)
+  await inv('connections:setOn', max.id, false)
+  await inv('advanced:set', 'hive.accounts.preview', false)
+
   // A request that began in this workspace and ends after the window opened another: counted nowhere (not the next).
   const nextWs = path.join(lib.WORK, 'replysize-next-ws')
   fs.rmSync(nextWs, { recursive: true, force: true })

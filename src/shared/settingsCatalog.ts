@@ -933,6 +933,8 @@ const ACTIONS = new Set([
   'project.reset',
   'project.slotOptions',
   ...PROVIDERS.map((p) => `${p.id}.status`),
+  // A note where a CLI's model, effort and context went with Connections on (HI-1770): no value of its own.
+  ...PROVIDERS.map((p) => `${p.id}.movedToConnections`),
   // The Assistant's "With <provider>" rows: their fields are entries of their own (assistant.<provider>.<key>).
   ...PROVIDERS.map((p) => `assistant.provider:${p.id}`)
 ])

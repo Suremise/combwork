@@ -224,7 +224,7 @@ With `handover` (the default), `from` must be running and idle: it is asked to w
 
 These read-only calls are open to every caller:
 
-`GET /v1/providers` — the coding-agent providers: whether each is turned on and installed (`enabled`, `installed`, `version`, `problem`), whether it's the default, and the `models`, `efforts` and `modes` an agent can use, and whether its agents can take `context200k`. `models` are the ones the installed CLI reports (else the fallback list in Settings), and `efforts` the effort fallback list: a model may take fewer levels.
+`GET /v1/providers` — the coding-agent providers: whether each is turned on and installed (`enabled`, `installed`, `version`, `problem`), whether it's the default, and the `models`, `efforts` and `modes` an agent can use, and whether its agents can take `context200k`. `models` are the ones the installed CLI reports (else the fallback list in Settings), and `efforts` the effort fallback list: a model may take fewer levels. With Connections on (below), a CLI that has them lists `connections`: those on in the caller's workspace (`id`, `name`, `default`), what an agent's `connection` can name.
 
 Each agent's `folder` (#1451) is where it works now (its running session's folder, else where a new conversation of its would start), short: a slot's name, `project` for the project folder, `home: <name>` for a retired home, or the path of a 0.9 worktree not migrated yet; `slot` the slot's name while it is in one, and `branch` that slot's line (the card last started there; a carried slot's own branch), else null. No agent has a worktree of its own in 1.0.
 
@@ -243,6 +243,27 @@ With `"wake": true` it is an **agent watch** (#416), for an agent's or the Assis
 ```
 
 Returns `{ "timedOut": false, "waitedSeconds": 41, "agents": [{ "project": "web", "agent": "Agent 2", "status": "finished", "statusMessage": null, "backgroundTasks": 0 }] }`.
+
+### Connections (preview) <a id="connections-preview"></a>
+
+From api.version 10 (HI-1771), with **Settings → Advanced → Connections (preview)** on. With it off, every call or field here is refused (`409`, "Connections are a preview…"). A **connection** is a CLI plus where it gets its models (for now, a Claude Code sign-in Hive keeps). Each workspace chooses which connections are on and the default for each CLI; an agent can have its own.
+
+`GET /v1/connections` and `GET /v1/connections/{id or name}` — the connections, as the caller may see them. None ever includes a token, a key, where a login is kept, a connection's settings or its defaults.
+
+| Caller | Sees |
+|---|---|
+| A project agent | Only those on in its own workspace: `id`, `name`, `cli`, `kind`, `signedIn`. Asking after another one, by id or name, is `404` |
+| The workspace token, the Hive Assistant | Every connection, with the same fields and `on` and `default` (in the caller's workspace), `email` and `plan` |
+
+Both list `defaults` too: each CLI's default connection in the caller's workspace (its id, or null).
+
+**An agent's connection** (`connection` on `POST` and `PATCH /v1/projects/{name}/agents…`, the Assistant's) is an id, or a name: a name binds only when it is unique among those on in the workspace (two share it: `409`, use its id; none: `404`). Saving it checks it is on in the workspace for the agent's CLI (`409` otherwise), in the same write as the rest of the change.
+
+- **`provider` and `connection` together** must agree (`409` otherwise). **`connection` alone** sets the agent's CLI: on another CLI than the agent's, it is that change of CLI (refused while it runs; its model, effort, mode, context and last session are cleared).
+- **`provider` alone** keeps its meaning: no connection of its own, so the agent follows that CLI's default connection in the workspace, and is refused a start while none is on. Never the CLI's own home.
+- **Left out**, a PATCH keeps the saved connection; `null` or `""` clears it.
+
+**Status:** each agent of `GET /v1/projects/{name}` has `connection` (the one chosen: `{ id, name, problem? }`, where `problem` is `missing`, `otherCli` or `off` when it can't be used now, and `name` is null for a project agent when it isn't on in its workspace; `null`: the workspace's default), `launchedConnection` (the one its run is on: `{ id, name, note? }`, or null) and `switchPending` while it switches at its next safe point.
 
 ### Deliveries and the inbox
 
@@ -264,8 +285,8 @@ The changes below are the Assistant's only: other callers get `403`.
 |---|---|---|
 | `POST /v1/projects` `{ "name" }` | Control agents and create projects | Creates a project folder in the workspace and turns it on |
 | `POST /v1/projects/{name}/activate` | Control agents | Turns a project on (other callers: no restriction, as before) |
-| `POST /v1/projects/{name}/agents` | Control agents | Adds an agent: `name`, `provider`, `model`, `effort`, `mode`, `context200k` (`"on"` or `"off"`: a 200K context window instead of the model's 1M, for providers with `context200k`), `workflowRole` (`builder`, `reviewer` or `either`), `mcpServers` (only these of the project's MCP servers, by name; `[]` none; leave it out for all of them); `start` starts it, and `prompt` starts it on that task, given on the CLI's command line. It starts in the project folder: a card or lane it builds is lent a slot. `worktree`, `existingWorktree`, `branch` and `base` are refused (`400`: "Agents aren't pinned to worktrees in 1.0: slots are lent per card or lane.", #1451), never ignored |
-| `PATCH /v1/projects/{name}/agents/{agent}` | Control agents | Changes `name`, `provider`, `model`, `effort`, `mode`, `context200k` (empty clears an override) or `mcpServers` (only these of the project's MCP servers, `[]` none, `["*"]` all of them again; the `hive` server can't be named: it is always given) |
+| `POST /v1/projects/{name}/agents` | Control agents | Adds an agent: `name`, `provider`, `model`, `effort`, `mode`, `context200k` (`"on"` or `"off"`: a 200K context window instead of the model's 1M, for providers with `context200k`), `workflowRole` (`builder`, `reviewer` or `either`), `mcpServers` (only these of the project's MCP servers, by name; `[]` none; leave it out for all of them), `connection` (Connections, below); `start` starts it, and `prompt` starts it on that task, given on the CLI's command line. It starts in the project folder: a card or lane it builds is lent a slot. `worktree`, `existingWorktree`, `branch` and `base` are refused (`400`: "Agents aren't pinned to worktrees in 1.0: slots are lent per card or lane.", #1451), never ignored |
+| `PATCH /v1/projects/{name}/agents/{agent}` | Control agents | Changes `name`, `provider`, `connection` (Connections, below; `null` or `""` clears it, left out it stays), `model`, `effort`, `mode`, `context200k` (empty clears an override) or `mcpServers` (only these of the project's MCP servers, `[]` none, `["*"]` all of them again; the `hive` server can't be named: it is always given) |
 | `POST /v1/projects/{name}/agents/{agent}/start` | Control agents | Starts a stopped agent: a new conversation, or `resume: true` (its last) or a session id; `prompt` as above |
 | `POST /v1/projects/{name}/agents/{agent}/stop` | Control agents | Stops it. If it is working, waiting or starting, Hive asks the user in the Assistant's panel (with the optional `reason`) and the call waits for the answer: `409` if they say no |
 | `POST /v1/projects/{name}/agents/{agent}/prompt` `{ "text", "newConversation"? }` | Control agents | Gives an idle agent a task now: a `task` delivery (#649) given now or not at all, never queued. Its doorbell is typed (#650: its id, never its text); the agent reads the task with `hive_inbox` (received) and acks it once it has acted on it. To an agent with no inbox (the Agent API or its hive server off) only the user's own task goes, typed as their input; anyone else's is refused ("… has no inbox: turn on the Agent API"). Replies `{ ok, id }` (no `id` for a task typed as the user's). `409` while it is working, starting, waiting on its background tasks or waiting for the user, or when the user has just typed in its terminal (Settings → Assistant → Pause after you type). `"newConversation": true` (#437): the agent's conversation ends (it stays in the Sessions tab) and it starts in a new one on the task, as **Hand Over to…** itself does but with no handover; the same `409`s, and also while Hive is typing into it. If Settings → Assistant → Control is turned down, or the Assistant's session that asked ends, while the agent stops, no new conversation starts (`403`/`409`, saying the old one has ended). Replies `{ "ok": true, "newConversation": true }` |

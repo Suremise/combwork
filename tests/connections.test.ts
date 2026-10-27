@@ -5,13 +5,16 @@
 // load dialog's flagged agents, inherited versus pinned, a stale choice, one agent added). HI-1770: model, effort and
 // context from the connection (the resolver's layers, the Assistant's own), a project's own moved onto its agents once
 // (kept explicit values, a launch waiting on the move, interrupted, a later CLI), the notice from the move's record
-// (scoped to a workspace, dismissed for good) and connections' defaults (copied once, edited). In this file's temp folders
+// (scoped to a workspace, dismissed for good) and connections' defaults (copied once, edited). HI-1771: a connection named
+// in the Agent API (id, unique name, ambiguous, unknown), what each caller sees of them (never storage), and an agent's
+// change of connection (kept, cleared, a change of CLI resetting what was the old one's, decided again under the lock).
+// In this file's temp folders
 // only: the CLI is never run (its status is faked) and nothing signs in.
 import { mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { resolveConnection, type ConnectionsView } from '../src/shared/accounts'
+import { connectionRef, connectionsFor, connectionShown, resolveConnection, type ConnectionsView } from '../src/shared/accounts'
 import { connectionOf } from '../src/shared/connectionLabel'
 import type { Connection, LiveSessionState } from '../src/shared/types'
 import { ACCOUNTS_PREVIEW } from '../src/shared/advanced'
@@ -65,6 +68,9 @@ beforeAll(async () => {
   mkdirSync(join(wsPath, 'gamma', '.hive'), { recursive: true })
   writeFileSync(join(wsPath, 'gamma', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   // Projects whose own model, effort and context move onto their agents (HI-1770), each test its own.
+  // A project whose agents change connection (HI-1771).
+  mkdirSync(join(wsPath, 'api1', '.hive'), { recursive: true })
+  writeFileSync(join(wsPath, 'api1', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'k', name: 'Api K', provider: 'claude-code', model: 'opus', effort: 'high', use200kContext: true, lastSessionId: 's-1' }] }))
   for (const name of ['mv1', 'mv2', 'mv3', 'mv4', 'mv5', 'mv6', 'mv7', 'mv8']) {
     mkdirSync(join(wsPath, name, '.hive'), { recursive: true })
     writeFileSync(join(wsPath, name, '.hive', 'project.json'), JSON.stringify({ version: 2, providers: { 'claude-code': { model: 'haiku', effort: 'high', permissionMode: 'inherit', extraArgs: '', use200kContext: 'on' }, codex: { model: 'gpt-5', effort: 'low', permissionMode: 'inherit', extraArgs: '', use200kContext: 'inherit' } }, agents: [{ id: 'own', name: `${name} Own`, provider: 'claude-code', model: 'opus', use200kContext: false }, { id: 'none', name: `${name} None`, provider: 'claude-code' }, { id: 'cx', name: `${name} Codex`, provider: 'codex' }] }))
@@ -955,6 +961,93 @@ describe('model, effort and context from the connection (HI-1770)', () => {
     } finally {
       await advanced.set(ACCOUNTS_PREVIEW, true)
     }
+  })
+})
+
+describe('the Agent API and connections (HI-1771)', () => {
+  const c = (id: string, name: string, cli: Connection['provider'] = 'claude-code', extra: Partial<Connection> = {}): Connection => ({ id, provider: cli, name, createdAt: '', ...extra })
+
+  it('a reference: an exact id; else a name (any case) unique among those on here; ambiguous and unknown refused', () => {
+    const all = [c('a-1', 'Max'), c('a-2', 'max'), c('a-3', 'Work'), c('a-4', 'Hidden')]
+    expect(connectionRef('a-4', all, ['a-1'])).toEqual({ ok: true, id: 'a-4' })
+    expect(connectionRef('work', all, ['a-1', 'a-3'])).toEqual({ ok: true, id: 'a-3' })
+    expect(connectionRef('MAX', all, ['a-1', 'a-2'])).toEqual({ ok: false, why: 'ambiguous', ids: ['a-1', 'a-2'] })
+    // Only those on here count for a name: one of the two off, the other binds.
+    expect(connectionRef('max', all, ['a-2'])).toEqual({ ok: true, id: 'a-2' })
+    expect(connectionRef('Hidden', all, ['a-1'])).toEqual({ ok: false, why: 'unknown' })
+    expect(connectionRef('nothing', all, [])).toEqual({ ok: false, why: 'unknown' })
+  })
+
+  it('what each caller sees: a project agent only those on here, four fields; the token and the Assistant all, with on, default and identity; never storage', () => {
+    const all = [c('a-1', 'Max 1', 'claude-code', { accepted: { email: 'one@example.com', orgId: 'o' }, observed: { at: '', loggedIn: true, email: 'one@example.com', orgId: 'o', plan: 'max' }, defaults: { model: 'opus' }, defaultsFrom: 'cli' }), c('a-2', 'Elsewhere')]
+    const ws = { 'claude-code': { on: ['a-1'], default: 'a-1' } }
+    const narrow = connectionsFor(all, ws, false)
+    expect(narrow).toEqual([{ id: 'a-1', name: 'Max 1', cli: 'claude-code', kind: 'signIn', signedIn: true }])
+    const wide = connectionsFor(all, ws, true)
+    expect(wide).toEqual([
+      { id: 'a-1', name: 'Max 1', cli: 'claude-code', kind: 'signIn', signedIn: true, on: true, default: true, email: 'one@example.com', plan: 'max' },
+      { id: 'a-2', name: 'Elsewhere', cli: 'claude-code', kind: 'signIn', signedIn: false, on: false, default: false }
+    ])
+    // The detail projection is the same, per caller; nothing of where its login is kept, its settings or defaults.
+    for (const shown of [connectionShown(all[0], ws, true), connectionShown(all[0], ws, false), ...wide, ...narrow]) {
+      expect(Object.keys(shown).sort()).not.toEqual(expect.arrayContaining(['folder']))
+      expect(JSON.stringify(shown)).not.toMatch(/folder|accounts|defaults|observed|accepted|orgId|opus/)
+    }
+  })
+
+  it("a change of connection: kept when left out, cleared with null; on another CLI it is that change of CLI (what was the old one's cleared), refused while it runs", async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const p = join(wsPath, 'api1')
+    await here(() => updateAgent(p, 'k', { connection: a.id }))
+    // An unrelated change keeps it.
+    expect((await here(() => updateAgent(p, 'k', { role: 'notes' }))).connection).toBe(a.id)
+    expect((await here(() => updateAgent(p, 'k', { connection: null }))).connection).toBeUndefined()
+    // Codex given connections (a stand-in): one of its own, on here, picked for a Claude Code agent.
+    const caps = providerDescriptor('codex').capabilities as { connections?: unknown }
+    caps.connections = { homeEnv: 'CODEX_HOME', shared: [] }
+    const enabled = config.settings.providers.codex.enabled
+    config.settings.providers.codex.enabled = true
+    try {
+      config.update((cfg) => void (cfg.connections = [...(cfg.connections ?? []), { id: 'a-codex01', provider: 'codex', kind: 'signIn', name: 'ChatGPT', createdAt: '' }]))
+      await w.saveWorkspaceConfigWith((cfg) => ({ connections: { ...cfg.connections, codex: { on: ['a-codex01'], default: 'a-codex01' } } }))
+      // Running: refused, nothing changed.
+      const live = vi.spyOn(sessions, 'liveFor').mockReturnValue({} as never)
+      try {
+        expect(await outcome(here(() => updateAgent(p, 'k', { provider: 'codex', connection: 'a-codex01' })))).toMatch(/Stop the agent before changing its provider/)
+      } finally {
+        live.mockRestore()
+      }
+      expect((await w.projectConfig(p)).agents[0]).toMatchObject({ provider: 'claude-code', model: 'opus' })
+      const switched = await here(() => updateAgent(p, 'k', { provider: 'codex', connection: 'a-codex01' }))
+      expect(switched).toMatchObject({ provider: 'codex', connection: 'a-codex01' })
+      for (const k of ['model', 'effort', 'use200kContext', 'lastSessionId'] as const) expect(switched[k]).toBeUndefined()
+      // Back by provider alone: its codex connection is cleared too, never kept on Claude Code.
+      const back = await here(() => updateAgent(p, 'k', { provider: 'claude-code' }))
+      expect(back.provider).toBe('claude-code')
+      expect(back.connection).toBeUndefined()
+    } finally {
+      delete caps.connections
+      config.settings.providers.codex.enabled = enabled
+    }
+  })
+
+  it('a change of CLI decided from the agent read before the write: changed meanwhile, refused whole', async () => {
+    const p = join(wsPath, 'api1')
+    const file = join(p, '.hive', 'project.json')
+    let release!: () => void
+    const held = withFileLock(file, () => new Promise<void>((r) => (release = r)))
+    const saving = here(() => updateAgent(p, 'k', { provider: 'codex', model: 'gpt-5' }))
+    await vi.waitFor(() => expect(fileLockDepth(file)).toBe(2), { timeout: HUNG_MS })
+    // Meanwhile something else moves it to Codex (written while the change waits on the lock).
+    const raw = JSON.parse(readFileSync(file, 'utf8'))
+    raw.agents[0].provider = 'codex'
+    writeFileSync(file, JSON.stringify(raw))
+    release()
+    await held
+    expect(await outcome(saving)).toMatch(/provider was changed meanwhile: nothing was changed/)
+    expect((await w.projectConfig(p)).agents[0].model).not.toBe('gpt-5')
+    raw.agents[0].provider = 'claude-code'
+    writeFileSync(file, JSON.stringify(raw))
   })
 })
 

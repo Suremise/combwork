@@ -173,6 +173,8 @@ export const AREAS = [
   { paths: ['src/main/accounts.ts', 'src/shared/accounts.ts', 'src/renderer/src/components/AccountsSettings.tsx', 'tests/e2e/accounts.cjs'], suites: ['accounts', 'connections'] },
   // Launching on a connection (HI-1755): the launch step, the switch at a safe point, the seam, the Connection choice.
   { paths: ['src/main/connectionSeam.ts', 'src/main/connectionSwitch.ts', 'src/renderer/src/components/ConnectionChoice.tsx', 'tests/e2e/connections.cjs'], suites: ['connections', 'connectionrows'] },
+  // The Agent API and connections (HI-1771): references, visibility, the agent routes' connection, the status.
+  { paths: ['src/main/servers.ts', 'src/main/mcp/hive-mcp.ts', 'tests/e2e/connectionapi.cjs'], suites: ['connectionapi'] },
   // Model, effort and context belong to the connection (HI-1770): the resolver, the move, the defaults and the notice.
   { paths: ['src/shared/connectionDefaults.ts', 'src/main/connectionMoves.ts', 'src/renderer/src/components/ConnectionDefaults.tsx', 'tests/e2e/connectiondefaults.cjs'], suites: ['connectiondefaults', 'connections', 'context'] },
   // The agent rows and templates name connections (HI-1769).

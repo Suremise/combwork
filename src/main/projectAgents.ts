@@ -394,9 +394,14 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   const name = patch.name
   // Its connection (HI-1769), checked under the lock with the write: one that exists, is the CLI's it will run and is on
   // here. Only the one already saved, for the same CLI, may stay while it is off here (the default runs it meanwhile).
+  // Whether the patch changes its CLI was decided from the agent as read before the write (resetting what belongs to the
+  // old one): the agent as saved now must still be on that CLI, else the change is refused whole (HI-1771).
+  const before = agents.find((a) => a.id === agentId)
+  const beforeCli = before ? agentProvider(before, cfg, config.settings) : null
   const check = (current: AgentDef): void => {
     opts.check?.(current)
     const was = agentProvider(current, cfg, config.settings)
+    if (patch.provider !== undefined && beforeCli !== null && was !== beforeCli) throw hiveError(msg({ id: 'worktrees.agent.providerChangedMeanwhile', defaultMessage: "{agent}'s provider was changed meanwhile: nothing was changed. Try again.", description: "An error saving an agent's settings (HI-1771): its provider (coding agent CLI) was changed by something else while this change was being saved, so nothing was saved. {agent} is its name." }), { agent: current.name }, { kind: 'conflict' })
     const cli = clean.provider ?? was
     const kept = clean.connection === current.connection && cli === was
     if (clean.connection && !(kept && connectionProblem(clean.connection, cli, projectPath) === 'off')) assertConnectionHere(clean.connection, cli, projectPath, current.name)

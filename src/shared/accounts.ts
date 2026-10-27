@@ -112,3 +112,49 @@ export function resolveConnection(cfg: Pick<WorkspaceConfig, 'connections'> | nu
   }
   return ws?.default ? { ok: true, id: ws.default } : { ok: false, why: 'none' } // i18n-ignore: a reason's code, not text
 }
+
+/**
+ * A connection named in the Agent API (HI-1771): an exact id, else a name (any case) among those on in the caller's
+ * workspace (`onHere`): one, its id; several, ambiguous (use its id); none, unknown. A name binds only when unique.
+ */
+export type ConnectionRef = { ok: true; id: string } | { ok: false; why: 'ambiguous' | 'unknown'; ids?: string[] }
+
+export function connectionRef(ref: string, connections: readonly Connection[], onHere: readonly string[]): ConnectionRef {
+  const r = ref.trim()
+  if (connections.some((c) => c.id === r)) return { ok: true, id: r }
+  const named = connections.filter((c) => onHere.includes(c.id) && c.name.trim().toLowerCase() === r.toLowerCase())
+  if (named.length === 1) return { ok: true, id: named[0].id }
+  return named.length ? { ok: false, why: 'ambiguous', ids: named.map((c) => c.id) } : { ok: false, why: 'unknown' } // i18n-ignore: a reason's code, not text
+}
+
+/**
+ * What the Agent API shows of a connection (HI-1771), by who asks: never a token, a key, where its login is kept (its
+ * folder), its settings or its defaults. `wide` (the user's token, the Hive Assistant): with whether it is on and the
+ * default in the caller's workspace, and who it is signed in as; a project agent sees the four fields alone, and only
+ * for those on in its workspace (connectionsFor).
+ */
+export interface ConnectionShownApi {
+  id: string
+  name: string
+  cli: ProviderId
+  kind: 'signIn'
+  signedIn: boolean
+  on?: boolean
+  default?: boolean
+  email?: string
+  plan?: string
+}
+
+export function connectionShown(c: Connection, ws: Partial<Record<ProviderId, WorkspaceConnections>>, wide: boolean): ConnectionShownApi {
+  const state = accountState(c)
+  const base: ConnectionShownApi = { id: c.id, name: c.name, cli: c.provider, kind: c.kind ?? 'signIn', signedIn: state === 'signedIn' || state === 'changed' }
+  if (!wide) return base
+  const w = ws[c.provider]
+  const email = c.observed?.email ?? c.accepted?.email
+  return { ...base, on: !!w?.on.includes(c.id), default: w?.default === c.id, ...(email ? { email } : {}), ...(c.observed?.plan ? { plan: c.observed.plan } : {}) }
+}
+
+/** The connections a caller may see (HI-1771): `wide`, every one; else only those on in its workspace. */
+export function connectionsFor(connections: readonly Connection[], ws: Partial<Record<ProviderId, WorkspaceConnections>>, wide: boolean): ConnectionShownApi[] {
+  return connections.filter((c) => wide || !!ws[c.provider]?.on.includes(c.id)).map((c) => connectionShown(c, ws, wide))
+}

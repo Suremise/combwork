@@ -7,7 +7,7 @@ import { attachableSource, cardAttachments, cardHost, checkBatch, readCardAttach
 import { withAttachmentPaths, type CardAttachment } from '../shared/cardAttachments'
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
-import type { AgentApiInfo, AgentDef, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage } from '../shared/types'
+import type { AgentApiInfo, AgentDef, AgentInfo, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, WorkspaceConnections } from '../shared/types'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, defaultProviderPending, isKnownProvider, isProviderEnabled, offeredModes, projectDefaultProvider, providerDescriptor, providerName } from '../shared/providers'
 import type { SafeguardNote } from '../shared/safeguards'
@@ -83,6 +83,9 @@ import { startTask } from './taskStart'
 import { hiveSkills, listSkills, skillFiles, validSkillName } from './skills'
 import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
+import { connectionRef, connectionsFor, connectionShown, workspaceAccounts } from '../shared/accounts'
+import { connectionProblem, getAccount } from './accounts'
+import { connectionsOn } from './connectionSeam'
 import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
@@ -502,7 +505,9 @@ async function projectSummary(p: string) {
       mcpServers: mcpOn.filter((n) => agentGetsMcp(a, n)),
       mcpChoice: agentChoosesMcp(a) ? 'only' : 'all',
       // The guidance and skill revisions it launched with (compare with GET /v1/status's to spot an old launch).
-      launched: a.live?.launched ?? null
+      launched: a.live?.launched ?? null,
+      // Its connection (HI-1771, with Connections on): the one chosen (null: the default), the one its run is on, and a switch waiting.
+      ...agentConnectionFields(p, a, a.live?.provider ?? agentProvider(a, info.config, config.settings))
     })),
     // Its builder and reviewer pairs (#1531): its running lanes', then by name; empty without either.
     pairs: workflowPairs(info.agents, await lanes.listLanes(workspaceOf(p), { project: basename(p) }).catch(() => [])),
@@ -659,7 +664,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 9
+export const API_VERSION = 10
 
 /** Who Hive takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -874,6 +879,8 @@ route('GET', '/v1/providers', async () => {
   // Which is the default is only known once Hive has looked for the CLIs (#506).
   const known = await providerService.detected()
   const s = config.settings
+  const here = contextWorkspace()
+  const on = connectionsOn() && here ? workspaceConnections(here) : null
   return PROVIDERS.map((p) => {
     const info = providerService.info(p.id)
     return {
@@ -893,7 +900,9 @@ route('GET', '/v1/providers', async () => {
       efforts: fallbackEfforts(p.id, s),
       // Whether agents can be given context200k (a 200K window instead of the model's 1M).
       context200k: p.capabilities.contextLimit,
-      modes: offeredModes(p.id, s).map((m) => ({ value: m.value, label: m.label, description: m.description }))
+      modes: offeredModes(p.id, s).map((m) => ({ value: m.value, label: m.label, description: m.description })),
+      // Its connections on in the caller's workspace (HI-1771, with Connections on): what hive_add_agent's connection names.
+      ...(on && p.capabilities.connections ? { connections: (on[p.id]?.on ?? []).map((id: string) => ({ id, name: getAccount(id)?.name ?? id, default: on[p.id]?.default === id })) } : {})
     }
   })
 })
@@ -1096,6 +1105,84 @@ function agentSettings(body: any): { provider?: ProviderId; model?: string; effo
   return out
 }
 
+/** The refusal of anything about connections while they are off (the preview switch, until S8). */
+const CONNECTIONS_OFF = 'Connections are a preview: turn on Settings → Advanced → Connections (preview) first.' // i18n-ignore: an Agent API refusal (agents read it)
+
+/** A workspace's connections per CLI, as they apply (dropping ids gone or another CLI's). */
+function workspaceConnections(ws: WorkspaceService): Partial<Record<ProviderId, WorkspaceConnections>> {
+  const all = config.get().connections ?? []
+  return Object.fromEntries(PROVIDERS.flatMap((x) => (x.capabilities.connections ? [[x.id, workspaceAccounts(ws.config, x.id, all) ?? { on: [], default: null }]] : [])))
+}
+
+/**
+ * A request's `connection` (HI-1771): an id, or a name unique among those on in the project's workspace (several: 409,
+ * use its id; none: 404); null or "" clears it (the default again). With its CLI, for a call that names no provider.
+ * Refused while Connections are off. Saving it checks it again (on here, for the agent's CLI) with the write.
+ */
+function connectionArg(body: any, projectPath: string): { connection: string | null; cli?: ProviderId } | undefined {
+  const v = body?.connection
+  if (v === undefined) return undefined
+  if (!connectionsOn()) throw new HttpError(409, CONNECTIONS_OFF)
+  if (v === null || v === '') return { connection: null }
+  const all = config.get().connections ?? []
+  const onHere = Object.values(workspaceConnections(workspaceOf(projectPath))).flatMap((w) => w?.on ?? [])
+  const r = connectionRef(String(v), all, onHere)
+  if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, `Several connections are named "${v}": use its id (${r.ids!.join(', ')}).`) : new HttpError(404, `No connection named "${v}" is on in this workspace, and none has that id. GET /v1/connections lists them.`)
+  return { connection: r.id, cli: all.find((c) => c.id === r.id)!.provider }
+}
+
+/**
+ * The provider a request asks for with its connection (HI-1771): the one named, which must be the connection's CLI's
+ * (409 otherwise), else the connection's CLI (a connection on another CLI than the agent's is that change of CLI).
+ */
+function providerWith(set: { provider?: ProviderId }, conn: { cli?: ProviderId } | undefined): ProviderId | undefined {
+  if (conn?.cli && set.provider && set.provider !== conn.cli) throw new HttpError(409, `That connection is for ${PROVIDERS.find((x) => x.id === conn.cli)?.name ?? conn.cli}, not ${PROVIDERS.find((x) => x.id === set.provider)?.name ?? set.provider}: name one of its own, or leave out provider.`)
+  return set.provider ?? conn?.cli
+}
+
+/**
+ * An agent row's connection fields (HI-1771), with Connections on and a CLI with them: `connection`, the one chosen as
+ * saved (its id, its name, and `problem` when it can't be used now: removed, another CLI's, or off here), or null for
+ * the default; `launchedConnection`, the one its run is on; `switchPending`. A project agent is never told the name of
+ * one that isn't on in its workspace.
+ */
+function agentConnectionFields(p: string, a: AgentInfo, cli: ProviderId): Record<string, unknown> {
+  if (!connectionsOn() || !PROVIDERS.find((x) => x.id === cli)?.capabilities.connections) return {}
+  const problem = a.connection ? connectionProblem(a.connection, cli, p) : null
+  const name = a.connection && (!problem || !agentCaller()) ? (getAccount(a.connection)?.name ?? null) : null
+  return {
+    connection: a.connection ? { id: a.connection, name, ...(problem ? { problem } : {}) } : null,
+    launchedConnection: a.live?.launchedConnection ? { id: a.live.launchedConnection.id, name: a.live.launchedConnection.name, ...(a.live.launchedConnection.note ? { note: a.live.launchedConnection.note } : {}) } : null,
+    ...(a.live?.switchPending ? { switchPending: true } : {})
+  }
+}
+
+/**
+ * Hive's connections as the caller may see them (HI-1771): a project agent only those on in its workspace (id, name, CLI,
+ * kind, signed in); the user's token and the Assistant all of them, with on and default here, and who each is signed in
+ * as. Never a token, a key, where a login is kept, its settings or defaults.
+ */
+route('GET', '/v1/connections', async () => {
+  if (!connectionsOn()) throw new HttpError(409, CONNECTIONS_OFF)
+  const ws = workspaceConnections(requireWorkspace())
+  const defaults = Object.fromEntries(Object.entries(ws).map(([cli, w]) => [cli, w?.default ?? null]))
+  return { connections: connectionsFor(config.get().connections ?? [], ws, !agentCaller()), defaults }
+})
+
+route('GET', '/v1/connections/:ref', async ({ params }) => {
+  if (!connectionsOn()) throw new HttpError(409, CONNECTIONS_OFF)
+  const ws = workspaceConnections(requireWorkspace())
+  const all = config.get().connections ?? []
+  const onHere = Object.values(ws).flatMap((w) => w?.on ?? [])
+  const ref = decodeURIComponent(params[0] ?? '')
+  const r = connectionRef(ref, all, onHere)
+  // A project agent asking after one not on in its workspace, by id or by name: as if there were none.
+  const c = r.ok ? all.find((x) => x.id === r.id) : undefined
+  if (r.ok === false && r.why === 'ambiguous') throw new HttpError(409, `Several connections are named "${ref}": use its id (${r.ids!.join(', ')}).`)
+  if (!c || (agentCaller() && !onHere.includes(c.id))) throw new HttpError(404, `No connection named "${ref}" is on in this workspace, and none has that id.`)
+  return connectionShown(c, ws, !agentCaller())
+})
+
 /** A workflowRole argument (#1430): builder, reviewer or either. */
 function workflowRoleArg(v: unknown): WorkflowRole {
   if (isWorkflowRole(v)) return v
@@ -1110,9 +1197,11 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
   const project = basename(p)
   return assistantChange('agents', `add an agent to ${project}`, { kind: 'add-agent', project }, async () => {
     const set = agentSettings(body)
+    const conn = connectionArg(body, p)
+    const named = providerWith(set, conn)
     const cfg = await workspace.projectConfig(p)
-    if (!set.provider && defaultProviderPending(cfg, config.settings)) await providerService.settle()
-    const provider = set.provider ?? projectDefaultProvider(cfg, config.settings)
+    if (!named && defaultProviderPending(cfg, config.settings)) await providerService.settle()
+    const provider = named ?? projectDefaultProvider(cfg, config.settings)
     if (!isProviderEnabled(config.settings, provider)) throw new HttpError(409, `${PROVIDERS.find((x) => x.id === provider)?.name ?? provider} is turned off in Settings → Providers.`)
     // 1.0 (#1451): no agent has a worktree of its own (slots are lent per card or lane): the old arguments are refused.
     if (body?.worktree || body?.existingWorktree || body?.branch || body?.base || (body?.location && body.location !== 'project')) throw new HttpError(400, NOT_PINNED)
@@ -1123,7 +1212,8 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
       ...set,
       use200kContext: set.use200kContext ?? undefined,
       mcpServers: set.mcpServers ?? undefined,
-      provider
+      provider,
+      ...(conn?.connection ? { connection: conn.connection } : {})
     })
     // The view stays where the user has it; the new agent is marked for them.
     emit({ type: 'agent-added', projectPath: p, agentId: def.id })
@@ -1157,7 +1247,10 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
     // What of its settings changed, for undo (#1282): as saved when the change was made, under the project's lock.
     let was: AgentDef | undefined
     const role = body?.workflowRole !== undefined ? { workflowRole: workflowRoleArg(body.workflowRole) } : {}
-    const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...agentSettings(body), ...role }, { check: (current) => void (was = structuredClone(current)) })
+    const set = agentSettings(body)
+    const conn = connectionArg(body, p)
+    const provider = providerWith(set, conn)
+    const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...set, ...(provider ? { provider } : {}), ...(conn ? { connection: conn.connection } : {}), ...role }, { check: (current) => void (was = structuredClone(current)) })
     if (was) await noteAgent(requireWorkspace(), basename(p), was, def)
     const live = sessions.liveFor(p, agentId)
     return { done: `Changed ${def.name}'s settings in ${basename(p)}${live ? ' (it applies them when restarted)' : ''}`, act: { agent: actAgent(def) }, result: def }

@@ -9,6 +9,7 @@ interface HiveMessageValues {
   'worktrees.agent.nameTaken': { name: string | number }
   'worktrees.agent.noTree': undefined
   'worktrees.agent.notPinned': undefined
+  'worktrees.agent.providerChangedMeanwhile': { agent: string | number }
   'worktrees.agent.removing': undefined
   'worktrees.agent.roleTooLong': { max: string | number }
   'worktrees.agent.sharedTree': undefined
