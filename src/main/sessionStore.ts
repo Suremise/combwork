@@ -7,7 +7,7 @@ import { placeKey, readKeptJson, writeKeptJson } from './fsutil'
 import { createLogger, userText } from './logger'
 import { keepAsBackup, openTable, readStore, rowKeys, storeValue, withStoreLock, writeStore, type StoreData, type StoreRow } from './storeRows'
 import { transaction, type Db } from './db'
-import { addSessionRecords, countSessions, readDeleted, readDeletedUsage, readSessionRecord, readSessionRecords, removeSessionRecords, writeSessionRecords } from './schema/sessionDeliveryTables'
+import { addSessionRecords, countSessions, readDeleted, readDeletedUsage, readSessionRecord, readSessionRecords, removeSessionRecords, sessionTexts, writeSessionRecords } from './schema/sessionDeliveryTables'
 import { withMode } from '../shared/defaults'
 import { timedStep } from './stallWork'
 
@@ -89,9 +89,9 @@ function filed(sessions: unknown[], deleted: () => string[], usage: () => Kept[]
   return f
 }
 
-/** A host's records in its tables (on `db`: the reader, or a change's writer). */
-const fromTables = (db: ReturnType<typeof workspaceDb>['reader'], scope: string): SessionsFile =>
-  filed(readSessionRecords(db, scope), () => readDeleted(db, scope), () => readDeletedUsage(db, scope) as unknown as Kept[])
+/** A host's records in its tables (on `db`: the reader, or a change's writer; `saved`: its records, when already read there). */
+const fromTables = (db: ReturnType<typeof workspaceDb>['reader'], scope: string, saved = readSessionRecords(db, scope)): SessionsFile =>
+  filed(saved, () => readDeleted(db, scope), () => readDeletedUsage(db, scope) as unknown as Kept[])
 
 // ---------------------------------------------------------------------------
 // 0.9's rows (store_rows), read while the workspace's upgrade to 1.0 waits.
@@ -239,14 +239,23 @@ export async function changeSessions<T>(place: SessionsPlace, fn: (f: SessionsFi
 /** changeSessions' save, its host opened. */
 function saveSessions<T>(place: SessionsPlace, fn: (f: SessionsFile) => T): Promise<T> {
   return writeStore(place.workspace, 'sessions', place.scope, (db) => {
-    const f = fromTables(db, place.scope)
+    // The records read once (HI-1803): their texts as saved taken before `fn` changes them in place (and before
+    // recordOf's upgrade of an old record, so that upgrade is written), what the write compares with.
+    const saved = readSessionRecords(db, place.scope)
+    const had = sessionTexts(place.scope, saved)
+    const f = fromTables(db, place.scope, saved)
     const result = fn(f)
     const used = lazyLists.get(f)!
-    writeSessionRecords(db, place.scope, {
-      sessions: f.sessions as unknown as Record<string, unknown>[],
-      ...(used.deleted ? { deleted: f.deleted ?? [] } : {}),
-      ...(used.usage ? { deletedUsage: (f.deletedUsage ?? []) as unknown as Record<string, unknown>[] } : {})
-    })
+    writeSessionRecords(
+      db,
+      place.scope,
+      {
+        sessions: f.sessions as unknown as Record<string, unknown>[],
+        ...(used.deleted ? { deleted: f.deleted ?? [] } : {}),
+        ...(used.usage ? { deletedUsage: (f.deletedUsage ?? []) as unknown as Record<string, unknown>[] } : {})
+      },
+      had
+    )
     return result
   })
 }

@@ -155,6 +155,31 @@ describe('changes', () => {
     expect(f.sessions[1].lastActiveAt).toBe('2026-10-19T11:00:00.000Z')
   })
 
+  it("read the host's records once: what they write is compared with that read, not a second (HI-1803)", async () => {
+    const p = join(wsPath, 'gamma')
+    await run(() => workspace.sessionsFile(p))
+    const db = workspaceDb(wsPath).writer
+    const prepare = vi.spyOn(db, 'prepare')
+    try {
+      await run(() => workspace.upsertSession(p, { id: 's3', lastActiveAt: '2026-10-19T12:00:00.000Z' }))
+      expect(prepare.mock.calls.filter(([sql]) => String(sql).startsWith('SELECT * FROM sessions WHERE host = ?'))).toHaveLength(1)
+    } finally {
+      prepare.mockRestore()
+    }
+    expect((await run(() => workspace.sessionsFile(p))).sessions.find((s) => s.id === 's3')?.lastActiveAt).toBe('2026-10-19T12:00:00.000Z')
+  })
+
+  it("a record saved with the Assistant's mode as its persona (#1084) is saved with its mode by the next change, as before", async () => {
+    const p = join(wsPath, 'gamma')
+    await run(() => workspace.mutateSessions(p, (f) => void f.sessions.push({ ...rec('old1'), persona: 'planner' } as unknown as SessionRecord)))
+    const saved = () => workspaceDb(wsPath).reader.prepare("SELECT mode, extra FROM sessions WHERE host = ? AND id = 'old1'").get(idOf(p)) as { mode: string | null; extra: string | null }
+    expect(saved().mode).toBeNull()
+    expect(saved().extra).toContain('"persona":"planner"')
+    await run(() => workspace.upsertSession(p, { id: 'other1' }))
+    expect(saved()).toEqual({ mode: 'planner', extra: null })
+    expect((await run(() => workspace.sessionsFile(p))).sessions.find((s) => s.id === 'old1')?.mode).toBe('planner')
+  })
+
   it('a deleted session that runs again leaves the deleted lists, as before', async () => {
     const p = join(wsPath, 'gamma')
     await run(() => workspace.upsertSession(p, { id: 'gone1' }))
