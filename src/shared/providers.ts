@@ -154,7 +154,19 @@ export interface ProviderCapabilities {
    * `setUp` (HI-1870): what the CLI's one-time first-run setup on a connection is, said above its Set Up terminal and on
    * a connection that still needs it.
    */
-  connections?: { homeEnv: string; shared: readonly string[]; userHome: string; orgs: boolean; setUp: Msg; server?: ServerCaps }
+  connections?: {
+    homeEnv: string
+    shared: readonly string[]
+    userHome: string
+    orgs: boolean
+    setUp: Msg
+    /**
+     * HI-1871: the CLI's trust of a folder covers the folders inside it (measured: Claude Code 2.1.311), so Set Up asks
+     * it once, in the workspace's folder, for every project there. Absent: once per project (Codex: its main root).
+     */
+    trustInherits?: true
+    server?: ServerCaps
+  }
 }
 
 /**

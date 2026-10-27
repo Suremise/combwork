@@ -140,6 +140,8 @@
   "tips.conflictHunks.title": "Zobacz konflikty zwróconej karty",
   "tips.connectionOrder.text": "Przeciągnij połączenia każdego CLI w swojej kolejności w Ustawienia → Połączenia: nowi agenci używają pierwszego włączonego w obszarze roboczym. Ustaw jako domyślne przenosi je na górę bez włączania; działający agenci zachowują swoje.",
   "tips.connectionOrder.title": "Uporządkuj swoje połączenia",
+  "tips.connectionTrust.text": "Skonfiguruj nowe połączenie pyta Claude Code raz, w folderze obszaru roboczego, czy zaufać każdemu projektowi w nim. Agenci Codex nigdy nie pytają: każdy ufa własnemu folderowi na to uruchomienie (Ustawienia → Zaawansowane → Codex).",
+  "tips.connectionTrust.title": "Zaufaj obszarowi roboczemu jedną odpowiedzią",
   "tips.connections.text": "Ustawienia → Połączenia przechowuje kilka logowań Claude Code i Codex albo serwer, taki jak Ollama na tym PC. Każdy obszar roboczy wybiera, które są włączone, nowi agenci używają pierwszego włączonego w Twojej kolejności, a każdy agent może mieć własne: wybierz je w Ustawieniach agenta.",
   "tips.connections.title": "Uruchamiaj agentów na różnych logowaniach",
   "tips.consoleRecording.text": "W konsoli deweloperskiej Nagrywaj zapisuje do pliku to, co CLI agenta wysyła do Hive, z ukrytymi danymi, chyba że zaznaczysz tekst dla tego nagrania; Kopiuj diagnostykę może je dołączyć do zgłoszenia błędu.",

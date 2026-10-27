@@ -12,6 +12,11 @@ import type { Connection, ProviderId, WorkspaceConnections, WorkspaceConfig } fr
 export interface ConnectionTrust {
   pending: { project: string; folder: string }[]
   unknown: boolean
+  /**
+   * Where Set Up asks the trust question next (HI-1871): the workspace's folder (`workspace`), which covers every
+   * project in it for a CLI whose trust is inherited, else the first pending project's main root.
+   */
+  setUpIn?: { folder: string; project?: string; workspace?: true }
   /** Its answer for the workspace's current projects isn't in yet (HI-1870 round 3): shown as Checking…, never set up. */
   checking?: true
 }

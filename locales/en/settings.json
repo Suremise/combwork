@@ -231,6 +231,10 @@
     "defaultMessage": "It opens in {project}'s folder, {folder}: answer {cli}'s question to trust it.",
     "description": "Above a connection's Set Up terminal when it opens in a project's folder its coding agent CLI ({cli}) doesn't trust yet (HI-1870): {project} is the project's name, {folder} the folder."
   },
+  "settings.accounts.setUpInWorkspace": {
+    "defaultMessage": "It opens in this workspace's folder, {folder}: answer {cli}'s question to trust it, and every project in it with it.",
+    "description": "Above a connection's Set Up terminal when it opens in the open workspace's folder (HI-1871): the coding agent CLI ({cli}) asks once whether to trust that folder, and trusting it covers every project inside it. {folder} is the folder."
+  },
   "settings.accounts.setUpNeeded": {
     "defaultMessage": "Needs set up",
     "description": "A connection's state (Settings → Connections, HI-1870): its CLI's one-time first-run setup (Set Up, a button beside it) hasn't been done in its folder yet."
@@ -865,6 +869,14 @@
   },
   "settings.advanced.codex.title.items.title": {
     "defaultMessage": "Terminal title items",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.codex.trust.perLaunch.desc": {
+    "defaultMessage": "Each Codex agent is started with its own folder (its project, slot or review copy) trusted for that launch, so Codex doesn't ask whether to trust it. Nothing is written to Codex's files. Off, Codex asks once per project on each connection, and Set Up walks you through them.",
+    "description": "What the advanced setting \"Trust Hive's folders on each launch\" is for, and what happens when it is off (Settings → Advanced, HI-1871). A slot and a review copy are folders Hive lends to agents."
+  },
+  "settings.advanced.codex.trust.perLaunch.title": {
+    "defaultMessage": "Trust Hive's folders on each launch",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.codex.trust.prompt.desc": {

@@ -958,7 +958,8 @@ export interface HiveRequests {
   'connections:readModels': (id: string, request: string) => ServerModelsRead
   'connections:cancelModels': (id: string, request: string) => void
   /** Opens the CLI on a connection (a server one, or a sign-in one: HI-1826), for its first-run screens; returns the terminal's key. */
-  'connections:setUp': (id: string) => string
+  /** Its terminal's key, and where it opened (HI-1871: a workspace folder or a project's; absent, its own folder). */
+  'connections:setUp': (id: string) => { key: string; in?: { folder: string; project?: string; workspace?: true } }
   /** Reset Masking Data (the user confirmed it): fingerprints made again from the keys saved now; masking strict for good after. */
   'connections:resetMasking': () => void
   /** Takes on the login an account is now signed in as (its change answered). */

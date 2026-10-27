@@ -85,17 +85,23 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     await inv('connections:setOn', home.id, true)
     check('the first turned on is the default', (await inv('connections:list')).workspace.codex?.default === work.id)
 
-    // --- Set up for this workspace (HI-1870): Codex's trust of the project's repository root, read from the connection's
-    // config.toml (Hive writes none). Its sandbox is the PC's, passed on, so only trust is pending; Set Up opens there.
+    // --- Set up for this workspace. Hive's per-launch trust (HI-1871, Darren: on by default) gives each launch its own
+    // folder trusted, so nothing is pending; with it off (Advanced), Codex's trust of the project's repository root is
+    // read from the connection's config.toml (Hive writes none) and Set Up opens there (HI-1870).
     const root = fs.realpathSync.native(alpha)
     const trustOf = async (id) => (await view(id))?.trust ?? null
-    check("on here, a Codex connection needs its trust of the project's repository root", !!(await lib.until(async () => JSON.stringify((await trustOf(work.id))?.pending) === JSON.stringify([{ project: 'alpha', folder: root }]), HUNG_MS)) && (await view(work.id))?.setUp === true)
-    const key = await inv('connections:setUp', work.id)
+    check("with Hive's per-launch trust on (the default), a Codex connection on here needs no trust answer", !!(await lib.until(async () => JSON.stringify(await trustOf(work.id)) === JSON.stringify({ pending: [], unknown: false }), HUNG_MS)))
+    await inv('advanced:set', 'codex.trust.perLaunch', false)
+    check("off, it needs its trust of the project's repository root", !!(await lib.until(async () => JSON.stringify((await trustOf(work.id))?.pending) === JSON.stringify([{ project: 'alpha', folder: root }]), HUNG_MS)) && (await view(work.id))?.setUp === true)
+    const { key, in: opened } = await inv('connections:setUp', work.id)
     const workToml = path.join(accountsRoot, work.id, 'config.toml')
     check('…its Set Up runs Codex in that folder, where its trust is answered (the fake records it)', !!(await lib.until(async () => fs.existsSync(workToml) && fs.readFileSync(workToml, 'utf8').includes(`[projects.'${root}']`), HUNG_MS)))
+    check('…and it says where it opened: the project’s folder', !!opened && opened.folder.toLowerCase() === root.toLowerCase(), JSON.stringify(opened))
     await inv('pty:kill', key)
     check('…read again as it ends: nothing pending', !!(await lib.until(async () => JSON.stringify(await trustOf(work.id)) === JSON.stringify({ pending: [], unknown: false }), HUNG_MS)))
-    check('…the other connection still needs it (each its own)', (await trustOf(home.id))?.pending.length === 1)
+    // Home: no agent here uses it yet (One has none of its own, so the first on, Work), so it counts nothing (HI-1871).
+    check('…the other connection, which no agent here would use, counts no project', JSON.stringify(await trustOf(home.id)) === JSON.stringify({ pending: [], unknown: false }))
+    await inv('advanced:set', 'codex.trust.perLaunch', null)
 
     // --- Two agents at once: One on the default (Work), Two on its own choice (Home).
     await inv('agents:update', alpha, 'a-two', { connection: home.id })
@@ -107,6 +113,7 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     check("…each with its connection's folder as CODEX_HOME", launchedIn(work.id).every((l) => l.home === path.join(accountsRoot, work.id)) && launchedIn(home.id).every((l) => l.home === path.join(accountsRoot, home.id)))
     check('…its login kept in that folder (the file store)', all.every((l) => l.args.join(' ').includes('cli_auth_credentials_store="file"')))
     // Home has none of its own, so the PC's is passed on; Work has its own since its Set Up (HI-1870), so none is.
+    check("…each with its own folder trusted for that launch (Hive's per-launch trust, HI-1871), written nowhere", all.every((l) => l.args.some((a) => a.startsWith('projects=') && a.includes('trust_level="trusted"'))) && !(fs.existsSync(path.join(accountsRoot, home.id, 'config.toml')) && fs.readFileSync(path.join(accountsRoot, home.id, 'config.toml'), 'utf8').includes('[projects.')))
     check("…the PC's Windows sandbox passed on where the connection has none of its own", launchedIn(home.id).every((l) => l.args.includes('windows.sandbox="unelevated"')) && launchedIn(work.id).every((l) => !l.args.some((x) => x.startsWith('windows.sandbox='))))
     check("…and never the token in Hive's environment", all.every((l) => l.loginVars.length === 0), JSON.stringify(all.map((l) => l.loginVars)))
     check('…and its run says so', (await live('a-one'))?.launchedConnection?.id === work.id && (await live('a-two'))?.launchedConnection?.id === home.id)

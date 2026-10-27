@@ -66,6 +66,7 @@ const M = {
   notTrusted: msg({ id: 'settings.accounts.notTrusted', defaultMessage: 'Not trusted yet in this workspace: {projects}', description: "Under a connection that needs set up (Settings → Connections, HI-1870): the projects of the open workspace whose folders its coding agent CLI hasn't been told to trust yet ({projects}: their names, listed). Set Up asks the CLI's trust question for each in turn." }),
   moreProjects: msg({ id: 'settings.accounts.moreProjects', defaultMessage: '{n, plural, one {# more} other {# more}}', description: 'The last item of that list when it names only the first projects: how many more there are.' }),
   setUpIn: msg({ id: 'settings.accounts.setUpIn', defaultMessage: "It opens in {project}'s folder, {folder}: answer {cli}'s question to trust it.", description: "Above a connection's Set Up terminal when it opens in a project's folder its coding agent CLI ({cli}) doesn't trust yet (HI-1870): {project} is the project's name, {folder} the folder." }),
+  setUpInWorkspace: msg({ id: 'settings.accounts.setUpInWorkspace', defaultMessage: "It opens in this workspace's folder, {folder}: answer {cli}'s question to trust it, and every project in it with it.", description: "Above a connection's Set Up terminal when it opens in the open workspace's folder (HI-1871): the coding agent CLI ({cli}) asks once whether to trust that folder, and trusting it covers every project inside it. {folder} is the folder." }),
   setUpChecking: msg({ id: 'settings.accounts.setUpChecking', defaultMessage: 'Checking…', description: "A connection's state (Settings → Connections, HI-1870): Hive is still reading whether its coding agent CLI trusts the open workspace's project folders, so it doesn't say yet whether it is set up." }),
   setUpNeeded: msg({ id: 'settings.accounts.setUpNeeded', defaultMessage: 'Needs set up', description: "A connection's state (Settings → Connections, HI-1870): its CLI's one-time first-run setup (Set Up, a button beside it) hasn't been done in its folder yet." }),
   setUpDone: msg({ id: 'settings.accounts.setUpDone', defaultMessage: 'Set up', description: "A connection's state (Settings → Connections, HI-1870): its CLI's one-time first-run setup is done. An adjective (\"is set up\"), not the button." }),
@@ -89,7 +90,7 @@ export function AccountsSettings() {
   const settings = useStore((s) => s.settings)
   const withoutConnections = enabledProviders(settings).filter((p) => !p.capabilities.connections)
   const [view, setView] = useState<ConnectionsView | null>(null)
-  const [terminal, setTerminal] = useState<{ id: string; key: string; ended: boolean; provider: ProviderId; setUp?: boolean; in?: { project: string; folder: string } } | null>(null)
+  const [terminal, setTerminal] = useState<{ id: string; key: string; ended: boolean; provider: ProviderId; setUp?: boolean; in?: { folder: string; project?: string; workspace?: true } } | null>(null)
   // Add a Connection's dialog (HI-1772), which asks its CLI first (HI-1870).
   const [adding, setAdding] = useState(false)
   // A connection being dragged to another place in its CLI's order (HI-1875), and the row it would drop on.
@@ -103,9 +104,11 @@ export function AccountsSettings() {
   // Each account checked again as the section is shown; read again whenever main says they changed.
   useEffect(() => load(true), [load, wsPath])
   useEffect(() => load(false), [load, changed])
-  // The workspace's projects changed (one added, moved): its connections' trust of them is read again (HI-1870).
-  const projectPaths = (projects ?? []).map((p) => p.path).join('|')
-  useEffect(() => load(false), [load, projectPaths])
+  // The workspace's projects changed (one added, moved), or which agent runs on which CLI or connection: the projects
+  // each connection would be used in, and so its trust of them, are read again (HI-1870; HI-1871).
+  const projectsKey = (projects ?? []).map((p) => `${p.path}:${p.agents.map((a) => `${a.id}=${a.provider ?? ''}/${a.connection ?? ''}`).join(',')}`).join('|')
+  const assistantKey = useStore((s) => (s.workspace?.assistant?.agents ?? []).map((a) => `${a.provider ?? ''}`).join(','))
+  useEffect(() => load(false), [load, projectsKey, assistantKey])
 
   if (!view) return <div className="faint">{tr(M.loading)}</div>
   // Agents running on a connection other than the one chosen for them now (HI-1755), not yet waiting to switch.
@@ -137,11 +140,11 @@ export function AccountsSettings() {
       notify('error', tr(M.signInFailed), errorMessage(e))
     }
   }
-  // Main opens it in the first folder the CLI doesn't trust yet here (HI-1870), the one the row names first.
+  // Main opens it where the CLI's trust question covers the most (HI-1870, HI-1871), read as it opens: the hint names
+  // the place it says it used, never the one this window last showed (HI-1871 round 1).
   const setUp = async (id: string, provider: ProviderId): Promise<void> => {
-    const first = view?.connections.find((a) => a.id === id)?.trust?.pending[0]
-    const key = await setUpConnection(id)
-    if (key) setTerminal({ id, key, ended: false, provider, setUp: true, ...(first ? { in: first } : {}) })
+    const opened = await setUpConnection(id)
+    if (opened) setTerminal({ id, key: opened.key, ended: false, provider, setUp: true, ...(opened.in ? { in: opened.in } : {}) })
   }
   const rename = async (id: string, current: string, title = tr(M.renameTitle, { name: current })): Promise<void> => {
     const name = await prompt({ title, fieldLabel: tr(M.name), initial: current, confirmLabel: tr(M.renameConfirm), validate: (v) => (v.trim() ? null : tr(M.needName)) })
@@ -287,7 +290,8 @@ export function AccountsSettings() {
                       </div>
                     </>
                   )}
-                  {needsSetUp && <div className="account-setup-note hint" data-set-up-note>{setUpHint(a.provider)}</div>}
+                  {/* Said once: above its Set Up terminal while that is open (the Assistant, HI-1871). */}
+                  {needsSetUp && !(terminal?.setUp && terminal.id === a.id) && <div className="account-setup-note hint" data-set-up-note>{setUpHint(a.provider)}</div>}
                   {needsSetUp && pending.length > 0 && <div className="account-setup-note hint" data-not-trusted>{tr(M.notTrusted, { projects: fmt.list([...pending.slice(0, 3).map((x) => x.project), ...(pending.length > 3 ? [tr(M.moreProjects, { n: pending.length - 3 })] : [])]) })}</div>}
                   {state === 'changed' && a.accepted && o?.email && <div className="account-warning" data-warning="changed"><Icon name="warning" /> {tr(M.changedTo, { now: o.email, was: a.accepted.email })}</div>}
                   {same && <div className="account-warning" data-warning="duplicate"><Icon name="warning" /> {tr(M.sameLogin, { names: fmt.list(same.map(nameOf)) })}</div>}
@@ -323,7 +327,11 @@ export function AccountsSettings() {
       {terminal && (
         <div className="account-signin">
           <p className="hint">{terminal.setUp ? setUpHint(terminal.provider) : tr(M.signingIn)}</p>
-          {terminal.in && <p className="hint" data-set-up-in>{tr(M.setUpIn, { project: terminal.in.project, folder: terminal.in.folder, cli: providerDescriptor(terminal.provider).name })}</p>}
+          {terminal.in && (
+            <p className="hint" data-set-up-in>
+              {terminal.in.workspace ? tr(M.setUpInWorkspace, { folder: terminal.in.folder, cli: providerDescriptor(terminal.provider).name }) : tr(M.setUpIn, { project: terminal.in.project ?? '', folder: terminal.in.folder, cli: providerDescriptor(terminal.provider).name })}
+            </p>
+          )}
           <div className="task-terminal">
             <TerminalView ptyKey={terminal.key} visible onExit={() => setTerminal((t) => (t?.key === terminal.key ? { ...t, ended: true } : t))} />
           </div>

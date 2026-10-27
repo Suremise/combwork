@@ -6,6 +6,7 @@ What the CLIs really show, for the unit tests (`tests/advanced*.test.ts`) that c
 |---|---|---|
 | `trust-claude-2.1.296.txt` | Claude Code 2.1.296 | The folder trust question (`Yes, I trust this folder`) |
 | `trust-codex-0.162.1.txt` | Codex 0.162.1 | The folder trust question (`Trust this folder? …`) |
+| `trust-perlaunch-codex-0.164.0.txt` | Codex 0.164.0 | Its trust given only per launch (`-c projects={'<folder>'={trust_level="trusted"}}`, HI-1871): no question in that folder or a subfolder of it, the question in another repository; the test home's config.toml unchanged. A summary of the probes' results (their screens weren't kept), paths replaced with `C:\work\…` |
 | `trust-copilot-1.0.95.txt` | GitHub Copilot CLI 1.0.95 | The folder trust question (`Do you trust the files in this folder?`) |
 | `fullaccess-codex-0.162.1.txt` | Codex 0.162.1 | Its own warning after Full Access is picked in `/permissions` (`Enable full access?`, with `1. Yes, continue anyway` and `2. Cancel`), at the pane's size (141 columns) and with some of the screen's earlier output under it (#1014) |
 | `ready-copilot-1.0.95.txt` | GitHub Copilot CLI 1.0.95 | At its prompt after answering Yes, with the footer (`· / commands ·`) |

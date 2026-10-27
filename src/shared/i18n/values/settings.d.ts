@@ -59,6 +59,7 @@ interface HiveMessageValues {
   'settings.accounts.setUpChecking': undefined
   'settings.accounts.setUpDone': undefined
   'settings.accounts.setUpIn': { project: string | number; folder: string | number; cli: string | number }
+  'settings.accounts.setUpInWorkspace': { folder: string | number; cli: string | number }
   'settings.accounts.setUpNeeded': undefined
   'settings.accounts.signIn': undefined
   'settings.accounts.signInAgain': undefined
@@ -218,6 +219,8 @@ interface HiveMessageValues {
   'settings.advanced.codex.subagent.threadField.title': undefined
   'settings.advanced.codex.title.items.desc': undefined
   'settings.advanced.codex.title.items.title': undefined
+  'settings.advanced.codex.trust.perLaunch.desc': undefined
+  'settings.advanced.codex.trust.perLaunch.title': undefined
   'settings.advanced.codex.trust.prompt.desc': undefined
   'settings.advanced.codex.trust.prompt.title': undefined
   'settings.advanced.codex.turnScreen.working.desc': undefined

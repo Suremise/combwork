@@ -1409,6 +1409,16 @@ const SOURCES: readonly AdvancedSource[] = [
   ),
   // Codex
   {
+    id: 'codex.trust.perLaunch',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.trust.perLaunch.title', defaultMessage: "Trust Hive's folders on each launch", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.trust.perLaunch.desc', defaultMessage: "Each Codex agent is started with its own folder (its project, slot or review copy) trusted for that launch, so Codex doesn't ask whether to trust it. Nothing is written to Codex's files. Off, Codex asks once per project on each connection, and Set Up walks you through them.", description: 'What the advanced setting "Trust Hive\'s folders on each launch" is for, and what happens when it is off (Settings → Advanced, HI-1871). A slot and a review copy are folders Hive lends to agents.' }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/trust-perlaunch-codex-0.164.0.txt`, version: '0.164.0', text: 'no trust question: at its prompt', shows: 'Codex started in a repository trusted only by a -c projects table for that launch, asking nothing and writing nothing' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
     id: 'codex.trust.prompt',
     group: 'codex',
     title: msg({ id: 'settings.advanced.codex.trust.prompt.title', defaultMessage: 'Trust question', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
