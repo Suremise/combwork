@@ -3,7 +3,7 @@ import { AsyncLocalStorage } from 'async_hooks'
 import { randomBytes, timingSafeEqual } from 'crypto'
 import { app } from 'electron'
 import { basename, dirname, join, resolve as resolvePath } from 'path'
-import { attachableSource, cardAttachments, cardHost, checkBatch, stage as stageFiles, type AttachCaller } from './cardAttachments'
+import { attachableSource, cardAttachments, cardHost, checkBatch, readCardAttachment, stage as stageFiles, type AttachCaller } from './cardAttachments'
 import { withAttachmentPaths, type CardAttachment } from '../shared/cardAttachments'
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
@@ -2598,6 +2598,33 @@ route('POST', '/v1/tasks/reorder', async ({ body }) => {
 
 // Only a card's newest comment (its author, time and whole text), for "check the latest comment": the card's
 // description, earlier comments and history stay out of the reply. A card without comments gives comment null.
+// A card's attachment, read through Hive (HI-1751: the document tools refuse `.hive`, so a reviewer couldn't read the
+// builder's evidence): a page of its text, or its kind and path for an image or a binary file. Only a card the caller may
+// read (its scope, as GET /v1/tasks/:n), from that card's own folder.
+route('GET', '/v1/tasks/:n/attachments/:name', async ({ params, query }) => {
+  requireWorkspace()
+  const c = await tasks.readTask(taskNumber(params[0]), await taskActor())
+  let name: string
+  try {
+    name = decodeURIComponent(params[1] ?? '')
+  } catch {
+    throw new HttpError(400, "The attachment's name isn't a valid path segment: give it as hive_read_task lists it")
+  }
+  const r = await readCardAttachment(workspace, { number: c.number, project: c.project ?? null }, name, query.get('offset'))
+  if (!('problem' in r)) return r
+  const card = c.key ?? `#${c.number}`
+  const choices = r.choices?.length ? `: ${r.choices.join(', ')}` : ''
+  const why = {
+    unknown: `${card} has no attachment called "${name}"${choices || ' (it has none)'}`,
+    ambiguous: `Several of ${card}'s attachments are called "${name}": name one by its file${choices}`,
+    missing: `${card}'s attachment "${name}" is listed, but its file is gone`,
+    outside: `${card}'s attachment "${name}" isn't where its card keeps it, so it isn't read`,
+    changed: `${card} or its attachment "${name}" changed while it was read: read the card again`,
+    offset: `offset is a byte of the file: a whole number from 0 to ${r.size ?? 0}`
+  }[r.problem] // i18n-ignore: agent-facing
+  throw new HttpError(r.problem === 'unknown' || r.problem === 'missing' ? 404 : r.problem === 'offset' || r.problem === 'outside' ? 400 : 409, why, r.choices?.length ? { choices: r.choices } : undefined)
+})
+
 route('GET', '/v1/tasks/:n/comments/latest', async ({ params, query }) => {
   requireWorkspace()
   const r = await tasks.latestComment(taskNumber(params[0]), await taskActor())

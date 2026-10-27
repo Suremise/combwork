@@ -24,6 +24,7 @@ export const ASSISTANT_READ_TOOLS = [
   'hive_list_providers',
   'hive_list_tasks',
   'hive_read_task',
+  'hive_read_attachment',
   'hive_wait_for_tasks',
   'hive_inbox',
   // Offered only while Settings → Agent API lets agents read the developer console (#636).

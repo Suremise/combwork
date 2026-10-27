@@ -43,6 +43,7 @@ export const SUITES = [
   { name: 'assistantside' },
   { name: 'assistantundo' },
   { name: 'atlasmerge' },
+  { name: 'attachread' },
   { name: 'attention' },
   { name: 'automode' },
   { name: 'background' },
