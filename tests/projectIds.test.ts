@@ -475,6 +475,9 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
       holding = false
       release()
       await older
+      // HI-1817: the older read gave `gone` an id after it had moved, making its folder again; the root watch's read then
+      // listed it, and under load settled before this check.
+      expect(existsSync(gone)).toBe(false)
       expect(w.projectIdsNow().byPath.has(gone.toLowerCase())).toBe(false)
       expect(w.projectIdsNow().byPath.size).toBe(1)
     } finally {

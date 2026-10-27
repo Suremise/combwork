@@ -891,6 +891,11 @@ export class WorkspaceService {
     const { keep, fresh } = settleProjectIds(entries)
     for (const p of fresh) {
       if (gen !== this.generation) break
+      // A later listing has settled: this read's ids won't stand, so it gives none (HI-1817: giving one makes the
+      // project's folder, so a read held past a move brought the moved folder back, and the root watch then listed it).
+      if (ticket.listing < this.idsSettled) break
+      // Gone since it was listed (moved or deleted): giving it an id would make it again.
+      if (!existsSync(join(p, HIVE_DIR, 'project.json'))) continue
       // In project.json's lock, against the file as it is then: an id of its own given meanwhile stays.
       const taken = new Set(keep.values())
       const cfg = await this.mutateProjectConfig(p, (c) => (isProjectId(c.id) && !taken.has(c.id) ? {} : { id: `p-${randomBytes(6).toString('hex')}` })).catch((e) => {
