@@ -241,6 +241,23 @@ describe('plan usage per connection (HI-1756)', () => {
     expect(config.get().connectionPlanUsage![MAX1.id].limits[0].usedPercent).toBe(10)
   })
 
+  // HI-1882: Codex's login check gives an email and a plan, no organisation, so no Codex launch had a login and every
+  // report from its rollouts was dropped (no Codex-1 in the status bar).
+  it("a Codex connection's login is its email alone, and its rollout's rate limits are kept as that connection's", () => {
+    // Accepted as accounts.ts keeps a Codex login (acceptable(…, false): an empty organisation), observed with none.
+    const codex = { email: 'me@example.com', orgId: '' }
+    expect(usageLogin(codex)).toMatch(/^[0-9a-f]{16}$/)
+    expect(usageLogin({ email: 'ME@example.com' })).toBe(usageLogin(codex))
+    expect(usageLogin(codex)).not.toBe(usageLogin({ ...codex, orgId: 'org-1' }))
+    expect(usageLogin({ orgId: 'org-1' })).toBeNull()
+    const id = 'a-5d629d1e'
+    config.get().connections = [...config.get().connections!, { id, provider: 'codex', name: 'Codex-1', createdAt: '2026-10-27T00:00:00Z', accepted: codex, observed: { at: '2026-10-27T00:00:00Z', loggedIn: true, email: codex.email, plan: 'prolite' } }]
+    const report = rolloutPlanUsage({ primary: { used_percent: 57, window_minutes: 10080, resets_at: Math.floor(Date.parse(WEEK_RESETS) / 1000) }, plan_type: 'prolite' }, new Date().toISOString())!
+    reportPlanUsage('codex', report, 'HR3', { id, name: 'Codex-1', login: usageLogin(codex)! })
+    expect(config.get().connectionPlanUsage![id]).toMatchObject({ plan: 'prolite', login: usageLogin(codex), limits: [{ id: 'w10080', usedPercent: 57, reportedBy: 'HR3' }] })
+    expect(events.filter((e) => e.type === 'plan-usage').map((e) => [e.provider, e.connection])).toEqual([['codex', id]])
+  })
+
   it('a connection removed takes its usage and warnings with it, and leaves the others', () => {
     reportPlanUsage('claude-code', usage(96), 'HB1', MAX1)
     reportPlanUsage('claude-code', usage(90), 'HB2', MAX2)
