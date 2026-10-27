@@ -1859,8 +1859,25 @@ export class SlotPool {
  * Whether no process holds a folder (its working folder, or a file open in it): Windows refuses to rename a folder then.
  * Renamed aside and back at once; a folder that can't be put back is retried, and left aside (and logged) only if that
  * keeps failing, which nothing holding it can cause (it couldn't have been renamed).
+ *
+ * One check per folder at a time (HI-1753): a caller while one runs waits for its answer and shares it. Windows renames
+ * a folder through a handle opened by its path, so two checks that opened it before either renamed it both "succeed":
+ * the second moves it on from the first's aside name to its own, and the first can't put it back (ENOENT, logged five
+ * times on 26 Oct when several isolated checks' leases each looked at the pool's returning copies at once).
  */
-export async function quiet(folder: string): Promise<boolean> {
+export function quiet(folder: string): Promise<boolean> {
+  const key = folder.toLowerCase()
+  const going = quieting.get(key)
+  if (going) return going
+  const check = quietOnce(folder).finally(() => quieting.delete(key))
+  quieting.set(key, check)
+  return check
+}
+
+/** The quiet checks under way, by folder (lower-cased). */
+const quieting = new Map<string, Promise<boolean>>()
+
+async function quietOnce(folder: string): Promise<boolean> {
   const aside = `${folder}.hive-quiet-${randomBytes(3).toString('hex')}`
   try {
     await rename(folder, aside)
