@@ -1,8 +1,9 @@
 // Workflow defaults at Hive's and the workspace's level (#1422, SPEC §16.6.6): the Workflow section's editor in a level
-// mode, in Settings → Workspace (the workspace's) and Settings → Workflow defaults (Hive's), each for None or for Git.
+// mode, both in Settings → Version Control since HI-1768 (Hive defaults, then Workspace defaults (<name>)), each for None
+// or for Git, each with its own draft and Save (a save of one leaves the other's draft).
 // A workspace default set there: Save… lists the project inheriting it, the project's options show "From the workspace"
 // and its next card starts under them (a card started before keeps its rules). A project's own value still wins. Hive's
-// default sits under the workspace's (From Hive's settings). A level that would make an inheriting project contradictory
+// default sits under the workspace's (From Hive defaults). A level that would make an inheriting project contradictory
 // is refused, naming the project, and nothing is written. Screenshots in both themes. Dev build, throwaway profile and
 // workspace; no CLI is started, and the Assistant is off.
 const lib = require('./lib.cjs')
@@ -75,10 +76,17 @@ const check = (name, ok, extra = '') => {
       db.close()
     }
 
-    // --- The workspace's defaults: Settings → Workspace → Workflow defaults, Git.
-    await settingsSection('Workspace')
+    // --- Settings → Version Control (HI-1768): Hive defaults, then Workspace defaults named after the workspace.
+    await settingsSection('Version Control')
+    const partTitle = (id) => page.locator(`.setting[data-setting="${id}"] > .s-text > .s-title`).first().innerText().catch(() => '')
+    check('Settings → Version Control has both parts, in order, the workspace’s named after it', !!(await lib.until(async () => (await partTitle('workflow.defaults')).startsWith('Hive defaults') && (await partTitle('workflow.workspaceDefaults')).startsWith('Workspace defaults (workflowdefaults-ws)'), HUNG_MS)) && JSON.stringify(await page.locator('.settings-group[data-section="workflow"] > .setting').evaluateAll((els) => els.map((e) => e.getAttribute('data-setting')))) === JSON.stringify(['workflow.defaults', 'workflow.workspaceDefaults']), JSON.stringify([await partTitle('workflow.defaults'), await partTitle('workflow.workspaceDefaults')]))
+    // The old name still finds both parts (their tips say where they were).
+    await page.locator('.settings-top input.input').fill('workflow defaults')
+    check('a search for the old name, workflow defaults, finds both parts', !!(await lib.until(async () => (await page.locator('.setting[data-setting="workflow.defaults"]').count()) === 1 && (await page.locator('.setting[data-setting="workflow.workspaceDefaults"]').count()) === 1, HUNG_MS)))
+    await page.locator('.settings-top input.input').fill('')
+    // The workspace's defaults: Git.
     const level = page.locator('.workflow-level[data-level="workspace"]')
-    check('Settings → Workspace has the workspace’s workflow defaults, None · Git', !!(await lib.until(async () => (await level.count()) === 1 && (await level.locator('[data-platform="git"][aria-checked="true"]').count()) === 1, HUNG_MS)))
+    check('Workspace defaults: its editor, None · Git', !!(await lib.until(async () => (await level.count()) === 1 && (await level.locator('[data-platform="git"][aria-checked="true"]').count()) === 1, HUNG_MS)))
     const form = level.locator('.workflow-form')
     const row = (option) => form.locator(`.workflow-option[data-option="${option}"]`)
     check('the editor’s groups, Inherit relative to Hive’s level (every option Default here)', !!(await lib.until(async () => (await row('style').count()) === 1, HUNG_MS)) && (await row('style').innerText()).includes('Default') && (await form.locator('.workflow-group[data-group="elsewhere"]').count()) === 0)
@@ -121,11 +129,14 @@ const check = (name, ok, extra = '') => {
     await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
     check('the project’s own value wins: Merge commit, Set for this project', !!(await lib.until(async () => (await projectRow('style').locator('select').inputValue()) === 'merge' && (await projectRow('style').innerText()).includes('Set for this project'), HUNG_MS)))
 
-    // --- Hive's defaults, under the workspace's: Settings → Workflow defaults.
-    await settingsSection('Workflow defaults')
+    // --- Hive's defaults, under the workspace's: the same section's first part.
+    await settingsSection('Version Control')
     const hive = page.locator('.workflow-level[data-level="global"]')
     const hiveRow = (option) => hive.locator(`.workflow-option[data-option="${option}"]`)
-    check('Settings → Workflow defaults has Hive’s', !!(await lib.until(async () => (await hiveRow('dependenciesDone').count()) === 1, HUNG_MS)))
+    check('Hive defaults: its editor', !!(await lib.until(async () => (await hiveRow('dependenciesDone').count()) === 1, HUNG_MS)))
+    // A draft in the workspace's part (not saved) stays through a save of Hive's (HR5's HI-1768 check), and is discarded after.
+    await row('stopOwnRuns').locator('[role="switch"], input[type="checkbox"]').first().click()
+    check('a workspace draft: its Save on', !!(await lib.until(async () => await form.locator('[data-action="save"]').isEnabled(), HUNG_MS)))
     await hiveRow('dependenciesDone').locator('[role="switch"], input[type="checkbox"]').first().click()
     await hive.locator('[data-action="save"]').click()
     await dialog.waitFor({ timeout: HUNG_MS })
@@ -135,6 +146,10 @@ const check = (name, ok, extra = '') => {
       const f = await inv('workflow:form', alpha)
       return f.origins.dependenciesDone === 'global' ? f : null
     }, HUNG_MS)
+    check('…the workspace’s draft is still there, unsaved, after Hive’s save', (await form.locator('[data-action="save"]').isEnabled()) && wsJson().workflow?.git?.stopOwnRuns === undefined, JSON.stringify(wsJson().workflow?.git))
+    await form.getByRole('button', { name: 'Discard Changes' }).click()
+    check('…and Discard Changes drops it, nothing written', !!(await lib.until(async () => !(await form.locator('[data-action="save"]').isEnabled()), HUNG_MS)) && wsJson().workflow?.git?.stopOwnRuns === undefined)
+    await shots('version-control', page.locator('.settings-group[data-section="workflow"] > h2'))
     check('the project inherits Hive’s default, under the workspace’s (style still its own)', !!form2 && form2.options.dependenciesDone === true && form2.origins.style === 'project', JSON.stringify(form2?.origins))
     await shots('hive', hive.locator('.workflow-level-head'))
     // Hive's files copied into new slots (HI-1765), with Git's options: the default, .env*, until set here.
@@ -146,9 +161,8 @@ const check = (name, ok, extra = '') => {
     const copyOf = async (l) => ({ origin: await l.locator('.workflow-origin').getAttribute('data-origin').catch(() => ''), field: await l.locator('textarea').inputValue().catch(() => ''), text: await text(l) })
     await inv('slots:setLevelDefault', 'global', 'copy', 'changed.env')
     check('…following a change made elsewhere while it is open', !!(await lib.until(async () => { const c = await copyOf(hiveCopy); return c.origin === 'here' && c.field === 'changed.env' }, HUNG_MS)), JSON.stringify(await copyOf(hiveCopy)))
-    await page.locator('.settings-nav .row', { hasText: 'Workspace' }).first().click()
     const wsCopy = page.locator('[data-slot-default="copy"][data-level="workspace"]')
-    check('the workspace’s copied files inherit it, From Hive’s settings', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'global' && c.text.includes('changed.env') }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
+    check('the workspace’s copied files inherit it, From Hive defaults', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'global' && c.text.includes('changed.env') }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
     await inv('slots:setLevelDefault', 'global', 'copy', 'again.env')
     check('…following Hive’s changing while it is open', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'global' && c.text.includes('again.env') }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
     await inv('slots:setLevelDefault', 'workspace', 'copy', 'ws.env')
@@ -181,8 +195,7 @@ const check = (name, ok, extra = '') => {
     await inv('slots:setLevelDefault', 'global', 'copy', null)
     check('…and inherits the default again once both are unset', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'default' && c.text.includes('.env*') }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
     // The workspace's level shows Hive's as what it inherits.
-    await page.locator('.settings-nav .row', { hasText: 'Workspace' }).first().click()
-    check('the workspace’s level inherits it: From Hive’s settings', !!(await lib.until(async () => (await row('dependenciesDone').innerText().catch(() => '')).includes('From Hive’s settings'), HUNG_MS)))
+    check('the workspace’s level inherits it: From Hive defaults', !!(await lib.until(async () => (await row('dependenciesDone').innerText().catch(() => '')).includes('From Hive defaults'), HUNG_MS)))
 
     // --- A level that would make an inheriting project contradictory is refused, naming it.
     await inv('workflow:setOptions', alpha, { preset: null, options: { style: 'merge', finish: 'committed' } })

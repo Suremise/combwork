@@ -43,7 +43,7 @@
   "workflow.form.discard": "Descartar cambios",
   "workflow.form.fileLocksNote": "Se aplica a los agentes que trabajan en la misma carpeta, fuera de un slot.",
   "workflow.form.folders": "Carpetas y archivos, separados por comas",
-  "workflow.form.from.global": "De la configuración de Hive",
+  "workflow.form.from.global": "De los valores predeterminados de Hive",
   "workflow.form.from.here": "Configurado aquí",
   "workflow.form.from.platform": "Predeterminado",
   "workflow.form.from.preset": "Del ajuste predefinido",

@@ -43,7 +43,7 @@
   "workflow.form.discard": "変更を破棄",
   "workflow.form.fileLocksNote": "スロットの外で同じフォルダーを使って作業するエージェントに適用されます。",
   "workflow.form.folders": "フォルダーとファイル（カンマ区切り）",
-  "workflow.form.from.global": "Hiveの設定から",
+  "workflow.form.from.global": "Hiveの既定値から",
   "workflow.form.from.here": "ここで設定",
   "workflow.form.from.platform": "既定",
   "workflow.form.from.preset": "プリセットから",

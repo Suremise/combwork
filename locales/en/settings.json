@@ -3075,6 +3075,10 @@
     "defaultMessage": "Settings → {assistant} → With {provider} → {title}",
     "description": "Where a field of the Assistant's settings with a provider is. {assistant} is the Assistant section's name, {provider} a coding agent's name."
   },
+  "settings.path.level": {
+    "defaultMessage": "Settings → {section} → {part} → {title}",
+    "description": "Where a workflow default is: Settings, its section (Version Control), its part (Hive defaults or Workspace defaults) and its title."
+  },
   "settings.path.project": {
     "defaultMessage": "Project Settings → {section} → {title}",
     "description": "Where a project's setting is: Project Settings, its section and its title."
@@ -3928,15 +3932,15 @@
     "description": "A section of Settings, in its list on the left."
   },
   "settings.section.workflow.desc": {
-    "defaultMessage": "The workflow options every project starts from, in every workspace. A workspace’s defaults (Settings → Workspace) and a project’s own options (its Version Control tab) win over them.",
-    "description": "Under the heading of the section \"Workflow defaults\" of Settings: what it holds. Version Control is the tab’s name (glossary 2.1)."
+    "defaultMessage": "The workflow options projects start from: Hive defaults, for every workspace, and the open workspace’s over them. A project’s own options, in its Version Control tab, win over both.",
+    "description": "Under the heading of the section \"Version Control\" of Settings: what it holds. Hive defaults and the Version Control tab: names as Hive shows them (glossary 2.1)."
   },
   "settings.section.workflow.label": {
-    "defaultMessage": "Workflow defaults",
-    "description": "A section of Settings, in its list on the left: the workflow options every project inherits unless its workspace or itself sets them (glossary 2.1: workflow)."
+    "defaultMessage": "Version Control",
+    "description": "A section of Settings, in its list on the left: the workflow options projects start from, Hive’s and the open workspace’s (HI-1768). Named as a project’s Version Control tab (glossary 2.1)."
   },
   "settings.section.workspace.desc": {
-    "defaultMessage": "The open workspace's card loops, its projects that Hive leaves out (hidden, or removed from Hive with their handovers and cards packed into the folder), and how much Hive keeps for each project.",
+    "defaultMessage": "The open workspace's own: its projects that Hive leaves out (hidden, or removed from Hive with their handovers and cards packed into the folder), how much Hive keeps for each project, and antivirus scanning. Its workflow defaults are in Version Control.",
     "description": "Under the heading of the section \"Workspace\" of Settings: what it holds."
   },
   "settings.section.workspace.label": {
@@ -4363,13 +4367,33 @@
     "defaultMessage": "{name}'s token",
     "description": "The name, for screen readers, of a viewer token's box. {name} is the token's name."
   },
-  "settings.workflow.defaults.desc": {
-    "defaultMessage": "Pick a preset, or set each option, for None or for Git. Each shows where its value comes from.",
-    "description": "What the setting \"Hive’s workflow defaults\" does, under its title (Settings → Workflow defaults). None and Git: glossary 2.1."
+  "settings.workflow.hiveDefaults.desc": {
+    "defaultMessage": "For every workspace: what each project starts from unless its workspace or the project sets its own. Pick a preset, or set each option, for None or for Git.",
+    "description": "What the setting \"Hive defaults\" is, under its title (Settings → Version Control). None and Git: glossary 2.1."
   },
-  "settings.workflow.defaults.title": {
-    "defaultMessage": "Hive’s workflow defaults",
-    "description": "A setting's title (Settings → Workflow defaults): the workflow options every project inherits (glossary 2.1: workflow)."
+  "settings.workflow.hiveDefaults.tip": {
+    "defaultMessage": "Until 1.0’s settings tidy, Settings → Workflow defaults: nothing set there changed.",
+    "description": "The info tip of \"Hive defaults\" (Settings → Version Control): its old place, so a search for its old name finds it. Workflow defaults was the old section’s name: translate it as that section was."
+  },
+  "settings.workflow.hiveDefaults.title": {
+    "defaultMessage": "Hive defaults",
+    "description": "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)."
+  },
+  "settings.workflow.workspaceDefaults.desc": {
+    "defaultMessage": "For this workspace’s projects, over Hive defaults; a project sets its own in its Version Control tab.",
+    "description": "What the setting \"Workspace defaults\" is, under its title (Settings → Version Control). Hive defaults and the Version Control tab: names as Hive shows them."
+  },
+  "settings.workflow.workspaceDefaults.tip": {
+    "defaultMessage": "Until 1.0’s settings tidy, the workflow defaults in Settings → Workspace: nothing set there changed.",
+    "description": "The info tip of \"Workspace defaults\" (Settings → Version Control): its old place, so a search for it finds it."
+  },
+  "settings.workflow.workspaceDefaults.title": {
+    "defaultMessage": "Workspace defaults",
+    "description": "A setting's title (Settings → Version Control): the workflow options the open workspace's projects start from, over Hive defaults (HI-1768). The window shows the workspace's name beside it."
+  },
+  "settings.workflow.workspaceDefaultsNamed": {
+    "defaultMessage": "Workspace defaults ({workspace})",
+    "description": "The title of the part of Settings → Version Control holding the open workspace’s workflow defaults; {workspace} is its name."
   },
   "settings.workspace.antivirus.desc": {
     "defaultMessage": "Whether Microsoft Defender scans the workspace's folders as Hive's work changes them (builds, tests, git, worktrees), and the exclusions Hive can add for them, with your consent.",
@@ -4406,13 +4430,5 @@
   "settings.workspace.storage.title": {
     "defaultMessage": "Storage",
     "description": "A setting's title (Settings → Workspace)."
-  },
-  "settings.workspace.workflowDefaults.desc": {
-    "defaultMessage": "The workflow options this workspace’s projects start from, over Hive’s (Settings → Workflow defaults). A project’s own options win over them.",
-    "description": "What the setting \"Workflow defaults\" does, under its title (Settings → Workspace)."
-  },
-  "settings.workspace.workflowDefaults.title": {
-    "defaultMessage": "Workflow defaults",
-    "description": "A setting's title (Settings → Workspace): the workflow options this workspace's projects inherit (glossary 2.1: workflow)."
   }
 }

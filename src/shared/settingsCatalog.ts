@@ -238,9 +238,9 @@ export const SETTINGS_SECTIONS: SettingsSectionInfo<SettingsSection>[] = [
   sectionInfo('notifications', msg({ id: 'settings.section.notifications.label', defaultMessage: 'Notifications', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.notifications.desc', defaultMessage: 'Chimes and desktop notifications when agents finish or need you.', description: 'Under the heading of the section "Notifications" of Settings: what it holds.' })),
   sectionInfo('sessions', msg({ id: 'settings.section.sessions.label', defaultMessage: 'Sessions', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.sessions.desc', defaultMessage: 'Transcript backups, cache estimates and session behaviour.', description: 'Under the heading of the section "Sessions" of Settings: what it holds.' })),
   sectionInfo('assistant', msg({ id: 'settings.section.assistant.label', defaultMessage: 'Assistant', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.assistant.desc', defaultMessage: "The Hive Assistant's defaults: the side panel's overseer of each workspace (Ctrl+Alt+I). Each workspace can change them in the panel's Assistant Settings.", description: 'Under the heading of the section "Assistant" of Settings: what it holds.' })),
-  sectionInfo('workspace', msg({ id: 'settings.section.workspace.label', defaultMessage: 'Workspace', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.workspace.desc', defaultMessage: "The open workspace's card loops, its projects that Hive leaves out (hidden, or removed from Hive with their handovers and cards packed into the folder), and how much Hive keeps for each project.", description: 'Under the heading of the section "Workspace" of Settings: what it holds.' })),
+  sectionInfo('workspace', msg({ id: 'settings.section.workspace.label', defaultMessage: 'Workspace', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.workspace.desc', defaultMessage: "The open workspace's own: its projects that Hive leaves out (hidden, or removed from Hive with their handovers and cards packed into the folder), how much Hive keeps for each project, and antivirus scanning. Its workflow defaults are in Version Control.", description: 'Under the heading of the section "Workspace" of Settings: what it holds.' })),
   sectionInfo('board', msg({ id: 'settings.section.board.label', defaultMessage: 'Board', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.board.desc', defaultMessage: "The task board's colours and housekeeping, the same in every workspace.", description: 'Under the heading of the section "Board" of Settings: what it holds.' })),
-  sectionInfo('workflow', msg({ id: 'settings.section.workflow.label', defaultMessage: 'Workflow defaults', description: 'A section of Settings, in its list on the left: the workflow options every project inherits unless its workspace or itself sets them (glossary 2.1: workflow).' }), msg({ id: 'settings.section.workflow.desc', defaultMessage: 'The workflow options every project starts from, in every workspace. A workspace’s defaults (Settings → Workspace) and a project’s own options (its Version Control tab) win over them.', description: 'Under the heading of the section "Workflow defaults" of Settings: what it holds. Version Control is the tab’s name (glossary 2.1).' })),
+  sectionInfo('workflow', msg({ id: 'settings.section.workflow.label', defaultMessage: 'Version Control', description: 'A section of Settings, in its list on the left: the workflow options projects start from, Hive’s and the open workspace’s (HI-1768). Named as a project’s Version Control tab (glossary 2.1).' }), msg({ id: 'settings.section.workflow.desc', defaultMessage: 'The workflow options projects start from: Hive defaults, for every workspace, and the open workspace’s over them. A project’s own options, in its Version Control tab, win over both.', description: 'Under the heading of the section "Version Control" of Settings: what it holds. Hive defaults and the Version Control tab: names as Hive shows them (glossary 2.1).' })),
   sectionInfo('agents', msg({ id: 'settings.section.agents.label', defaultMessage: 'Agents', description: 'A section of Settings, in its list on the left: defaults for every project’s agents.' }), msg({ id: 'settings.section.agents.desc', defaultMessage: 'Defaults for every project’s agents: how long background tasks count, and processes agents leave running.', description: 'Under the heading of the section "Agents" of Settings: what it holds.' })),
   sectionInfo('keybindings', msg({ id: 'settings.section.keybindings.label', defaultMessage: 'Keyboard Shortcuts', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.keybindings.desc', defaultMessage: 'Change, remove or add shortcuts for any command. Projects can set their own for project and session commands (Project Settings → Keyboard Shortcuts).', description: 'Under the heading of the section "Keyboard Shortcuts" of Settings: what it holds.' })),
   sectionInfo('agentApi', msg({ id: 'settings.section.agentApi.label', defaultMessage: 'Agent API', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.agentApi.desc', defaultMessage: 'Local API and built-in MCP server that let agents interact with Hive.', description: 'Under the heading of the section "Agent API" of Settings: what it holds.' })),
@@ -357,18 +357,20 @@ const APP_ROWS: Row[] = [
     wide: true
   },
   {
-    section: 'workspace',
-    key: 'workflowDefaults',
-    title: msg({ id: 'settings.workspace.workflowDefaults.title', defaultMessage: 'Workflow defaults', description: "A setting's title (Settings → Workspace): the workflow options this workspace's projects inherit (glossary 2.1: workflow)." }),
-    desc: msg({ id: 'settings.workspace.workflowDefaults.desc', defaultMessage: 'The workflow options this workspace’s projects start from, over Hive’s (Settings → Workflow defaults). A project’s own options win over them.', description: 'What the setting "Workflow defaults" does, under its title (Settings → Workspace).' }),
+    section: 'workflow',
+    key: 'defaults',
+    title: msg({ id: 'settings.workflow.hiveDefaults.title', defaultMessage: 'Hive defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)." }),
+    desc: msg({ id: 'settings.workflow.hiveDefaults.desc', defaultMessage: 'For every workspace: what each project starts from unless its workspace or the project sets its own. Pick a preset, or set each option, for None or for Git.', description: 'What the setting "Hive defaults" is, under its title (Settings → Version Control). None and Git: glossary 2.1.' }),
+    tip: msg({ id: 'settings.workflow.hiveDefaults.tip', defaultMessage: 'Until 1.0’s settings tidy, Settings → Workflow defaults: nothing set there changed.', description: 'The info tip of "Hive defaults" (Settings → Version Control): its old place, so a search for its old name finds it. Workflow defaults was the old section’s name: translate it as that section was.' }),
     type: 'custom',
     wide: true
   },
   {
     section: 'workflow',
-    key: 'defaults',
-    title: msg({ id: 'settings.workflow.defaults.title', defaultMessage: 'Hive’s workflow defaults', description: "A setting's title (Settings → Workflow defaults): the workflow options every project inherits (glossary 2.1: workflow)." }),
-    desc: msg({ id: 'settings.workflow.defaults.desc', defaultMessage: 'Pick a preset, or set each option, for None or for Git. Each shows where its value comes from.', description: 'What the setting "Hive’s workflow defaults" does, under its title (Settings → Workflow defaults). None and Git: glossary 2.1.' }),
+    key: 'workspaceDefaults',
+    title: msg({ id: 'settings.workflow.workspaceDefaults.title', defaultMessage: 'Workspace defaults', description: "A setting's title (Settings → Version Control): the workflow options the open workspace's projects start from, over Hive defaults (HI-1768). The window shows the workspace's name beside it." }),
+    desc: msg({ id: 'settings.workflow.workspaceDefaults.desc', defaultMessage: 'For this workspace’s projects, over Hive defaults; a project sets its own in its Version Control tab.', description: 'What the setting "Workspace defaults" is, under its title (Settings → Version Control). Hive defaults and the Version Control tab: names as Hive shows them.' }),
+    tip: msg({ id: 'settings.workflow.workspaceDefaults.tip', defaultMessage: 'Until 1.0’s settings tidy, the workflow defaults in Settings → Workspace: nothing set there changed.', description: 'The info tip of "Workspace defaults" (Settings → Version Control): its old place, so a search for it finds it.' }),
     type: 'custom',
     wide: true
   },
@@ -868,7 +870,7 @@ const ACTIONS = new Set([
   'sessions.resetPerformance',
   'workspace.hiddenProjects',
   'workflow.defaults',
-  'workspace.workflowDefaults',
+  'workflow.workspaceDefaults',
   'workspace.storage',
   'workspace.antivirus',
   'agentApi.status',
@@ -996,7 +998,7 @@ const DOCS: Record<string, string> = {
 const DOCS_BY_ID: Record<string, string> = {
   'project.key': 'project-keys', // i18n-ignore: a user guide heading's id (#1535)
   'workflow.defaults': 'workflow-defaults', // i18n-ignore: a user guide heading's id (#1535)
-  'workspace.workflowDefaults': 'workflow-defaults', // i18n-ignore: a user guide heading's id (#1535)
+  'workflow.workspaceDefaults': 'workflow-defaults', // i18n-ignore: a user guide heading's id (#1535)
   'project.inboxCheckpoints': 'messages-and-the-inbox', // i18n-ignore: a user guide heading's id (#1535)
   'project.inboxStopContinuation': 'messages-and-the-inbox', // i18n-ignore: a user guide heading's id (#1535)
   'project.inboxIdleWakes': 'messages-and-the-inbox', // i18n-ignore: a user guide heading's id (#1535)
@@ -1019,7 +1021,7 @@ const DOCS_BY_ID: Record<string, string> = {
 }
 
 /** Where a setting is, in English (the tools name it so) or as the user sees it: "Settings → Sessions → Suggest compacting above". */
-function settingPathOf(e: Pick<SettingEntry, 'section' | 'assistantProvider' | 'text'>, scope: SettingScope, say: (t: TextPart) => string): string {
+function settingPathOf(e: Pick<SettingEntry, 'section' | 'assistantProvider' | 'text' | 'workflowLevel' | 'slotLevel'>, scope: SettingScope, say: (t: TextPart) => string): string {
   const where = (list: SettingsSectionInfo[]): string => {
     const found = list.find((x) => x.id === e.section)
     return found ? say(found.text.label) : e.section
@@ -1027,15 +1029,25 @@ function settingPathOf(e: Pick<SettingEntry, 'section' | 'assistantProvider' | '
   const title = say(e.text.title)
   // A project's workflow options are its Version Control tab's (HI-1766), not a section of Project Settings.
   if (scope === 'project' && e.section === 'workflow') return say(withValues(PATHS.versionControl, { title }))
+  // A level's default (HI-1768): Settings → Version Control, its part (Hive defaults or Workspace defaults).
+  const level = e.workflowLevel?.level ?? (e.slotLevel === 'global' || e.slotLevel === 'workspace' ? e.slotLevel : null)
+  if (level) return say(withValues(PATHS.level, { section: say(SETTINGS_SECTIONS.find((x) => x.id === 'workflow')!.text.label), part: say(level === 'global' ? LEVEL_PART.global : LEVEL_PART.workspace), title }))
   if (scope === 'project') return say(withValues(PATHS.project, { section: where(PROJECT_SETTINGS_SECTIONS), title }))
   if (e.assistantProvider) return say(withValues(PATHS.assistant, { assistant: where(SETTINGS_SECTIONS.filter((x) => x.id === 'assistant')), provider: providerDescriptor(e.assistantProvider).name, title }))
   return say(withValues(PATHS.settings, { section: where(SETTINGS_SECTIONS), title }))
+}
+
+/** Settings → Version Control's two parts (HI-1768), as a level default's path names them. */
+const LEVEL_PART = {
+  global: msg({ id: 'settings.workflow.hiveDefaults.title', defaultMessage: 'Hive defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)." }),
+  workspace: msg({ id: 'settings.workflow.workspaceDefaults.title', defaultMessage: 'Workspace defaults', description: "A setting's title (Settings → Version Control): the workflow options the open workspace's projects start from, over Hive defaults (HI-1768). The window shows the workspace's name beside it." })
 }
 
 /** A setting's path, by its parts. */
 const PATHS = {
   settings: msg({ id: 'settings.path.settings', defaultMessage: 'Settings → {section} → {title}', description: 'Where a setting is: Settings, its section and its title. Settings is the name of the Settings view.' }),
   project: msg({ id: 'settings.path.project', defaultMessage: 'Project Settings → {section} → {title}', description: "Where a project's setting is: Project Settings, its section and its title." }),
+  level: msg({ id: 'settings.path.level', defaultMessage: 'Settings → {section} → {part} → {title}', description: 'Where a workflow default is: Settings, its section (Version Control), its part (Hive defaults or Workspace defaults) and its title.' }),
   versionControl: msg({ id: 'settings.path.versionControl', defaultMessage: 'Version Control → Workflow → {title}', description: "Where a project's workflow option is: the project's Version Control tab, its Workflow section, and the option's title (glossary 2.1)." }),
   assistant: msg({ id: 'settings.path.assistant', defaultMessage: 'Settings → {assistant} → With {provider} → {title}', description: "Where a field of the Assistant's settings with a provider is. {assistant} is the Assistant section's name, {provider} a coding agent's name." })
 }

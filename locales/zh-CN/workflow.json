@@ -43,7 +43,7 @@
   "workflow.form.discard": "放弃更改",
   "workflow.form.fileLocksNote": "适用于在同一文件夹中、不在槽位里工作的智能体。",
   "workflow.form.folders": "文件夹和文件，用逗号分隔",
-  "workflow.form.from.global": "来自 Hive 的设置",
+  "workflow.form.from.global": "来自 Hive 默认值",
   "workflow.form.from.here": "在此设置",
   "workflow.form.from.platform": "默认",
   "workflow.form.from.preset": "来自预设",
