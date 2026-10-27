@@ -16,6 +16,7 @@ const { _electron } = require('playwright-core')
 const { execFileSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
+const { shellStderrFile } = require('./fake-claude/shellStderr.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 60000
 
@@ -264,8 +265,12 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
     steer('wait')
     const holding = shell(b1.id, `hive-progress --check quick --isolated --card "${keyA}"`)
     check('B1 holds copy-1', !!(await until(() => starts().length === 4, HUNG_MS)))
+    // B2's check refused a copy (it says so), not just its turn begun: B1 freeing it before B2 first asks would leave
+    // B2 nothing to wait for (HI-1816).
+    const b2Stderr = shellStderrFile(claudeHome, (await live(b2.id))?.agentName)
+    fs.writeFileSync(b2Stderr, '')
     const waiting = shell(b2.id, `hive-progress --check quick --isolated --card "${keyB}"`)
-    check('…B2\'s check waits: nothing of it runs while copy-1 is out', !!(await until(async () => (await live(b2.id))?.status === 'working', HUNG_MS)) && starts().length === 4)
+    check('…B2\'s check waits: nothing of it runs while copy-1 is out', !!(await until(() => fs.existsSync(b2Stderr) && /waiting for a check copy/.test(fs.readFileSync(b2Stderr, 'utf8')), HUNG_MS)) && starts().length === 4, fs.existsSync(b2Stderr) ? fs.readFileSync(b2Stderr, 'utf8') : 'no stderr file')
     fs.writeFileSync(go, 'go')
     const held = await holding
     const waited = await waiting
