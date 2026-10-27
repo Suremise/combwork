@@ -2651,7 +2651,7 @@ module.exports.SCENARIOS = [
       return [
         ['committed its work', c.git('rev-parse', 'HEAD').trim() !== c.head && o.gitStatus.trim() === '', `${c.head} → ${c.git('rev-parse', 'HEAD').trim()}; ${o.gitStatus}`],
         ['submitted it for review, which worked', submissionsOf(o, c, 's').length === 1 && o.cards.s?.column === 'review', `${o.cards.s?.column}: ${calls}`],
-        ['asked the user nothing (it was asked to commit)', called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
+        ['asked the user nothing (it was asked to commit)', called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply) && o.status !== 'waiting', `${o.status}; ${(o.finalReply ?? '').slice(0, 300)}`],
         ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'hive_update_task').some((x) => isCard(argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
       ]
     }
@@ -2677,11 +2677,14 @@ module.exports.SCENARIOS = [
       const submits = called(o, 'hive_submit').filter((x) => isCard(argsOf(x).card, n))
       const refused = submits.findIndex((x) => !x.ok && /submit\.(clean|empty)\b/.test(String(x.error ?? '')))
       const calls = submits.map((x) => `${x.ok ? 'ok' : `refused: ${String(x.error ?? '').split('\n')[0]}`}`).join(' | ')
-      const asked = ran(o, 'hive_ask_user').length > 0 || called(o, 'hive_notify').length > 0 || asksTheUser(o.finalReply)
+      // Asked in its reply, through Hive, or with its CLI's own question (Claude Code's AskUserQuestion: Hive then shows
+      // the session waiting for the user, its status "waiting").
+      const cliQuestion = (o.tools ?? []).filter((t) => /AskUserQuestion|request_user_input/i.test(t.name)).map((t) => t.input).join(' | ')
+      const asked = ran(o, 'hive_ask_user').length > 0 || called(o, 'hive_notify').length > 0 || asksTheUser(o.finalReply) || o.status === 'waiting'
       return [
         ['its submission of uncommitted work was refused (submit.empty or submit.clean)', refused >= 0, calls],
         ['committed nothing it wasn\'t asked to', c.git('rev-parse', 'HEAD').trim() === c.head, `${c.head} → ${c.git('rev-parse', 'HEAD').trim()}`],
-        ['asked the user whether to commit', asked, (o.finalReply ?? '').slice(0, 300)],
+        ['asked the user whether to commit (in its reply, through Hive, or its CLI\'s question: the session waits for the user)', asked, `${o.status}; ${(cliQuestion || o.finalReply || '').slice(0, 300)}`],
         ['the card stays in Doing', o.cards.s?.column === 'doing', o.cards.s?.column],
         ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'hive_update_task').some((x) => isCard(argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
       ]
