@@ -477,11 +477,11 @@ describe('key coverage: every saved key masked for good (round 2)', () => {
 describe("reading a server's models (when asked)", () => {
   let srv: Server
   let port = 0
-  const seen: { url: string; auth?: string }[] = []
+  const seen: { url: string; auth?: string; encoding?: string }[] = []
   let reply: (res: ServerResponse, url: string) => void = (res) => res.end()
   beforeAll(async () => {
     srv = createServer((req, res) => {
-      seen.push({ url: req.url ?? '', ...(req.headers.authorization ? { auth: req.headers.authorization } : {}) })
+      seen.push({ url: req.url ?? '', ...(req.headers.authorization ? { auth: req.headers.authorization } : {}), encoding: req.headers['accept-encoding'] })
       reply(res, req.url ?? '')
     })
     await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()))
@@ -500,7 +500,7 @@ describe("reading a server's models (when asked)", () => {
     reply = json({ data: [{ id: 'kept' }, { id: 'new' }] })
     const r = await servers.readServerModels(a.id, 'r1')
     expect(r).toEqual({ ok: true, models: [{ id: 'kept', as: ['opus'] }, { id: 'new' }], dropped: ['gone'] })
-    expect(seen).toEqual([{ url: '/v1/models', auth: `Bearer ${KEY}` }])
+    expect(seen).toEqual([{ url: '/v1/models', auth: `Bearer ${KEY}`, encoding: 'identity' }])
     expect(accounts.getAccount(a.id)!.server).toMatchObject({ modelsFrom: 'listed', models: [{ id: 'kept', as: ['opus'] }, { id: 'new' }] })
   })
 
@@ -527,6 +527,12 @@ describe("reading a server's models (when asked)", () => {
       res.end(`{"data":[${'{"id":"m"},'.repeat(120_000)}{"id":"z"}]}`)
     }
     expect(await servers.readServerModels(a.id, 'r')).toEqual({ ok: false, why: 'tooBig' })
+    // Asked unencoded, and an encoded reply refused unread: no network reply reaches Node's Brotli decoder (HI-1836, #1582).
+    reply = (res) => {
+      res.writeHead(200, { 'content-type': 'application/json', 'content-encoding': 'br' })
+      res.end('\x1b\x00garbage')
+    }
+    expect(await servers.readServerModels(a.id, 'r')).toEqual({ ok: false, why: 'shape' })
     // None of it kept, nor the server's text anywhere.
     expect(accounts.getAccount(a.id)!.server!.models.map((m) => m.id)).toEqual(['kept', 'gone'])
   })

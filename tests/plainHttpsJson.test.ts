@@ -3,7 +3,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http'
 import type { AddressInfo } from 'net'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { plainHttpsJson } from '../src/main/plainHttpsJson'
+import { plainHttpGet, plainHttpsJson } from '../src/main/plainHttpsJson'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
@@ -109,6 +109,55 @@ describe('plainHttpsJson', () => {
 
   it('refuses a URL that isn’t http(s)', async () => {
     await expect(plainHttpsJson('file:///C:/x.json')).rejects.toThrow(/Not an http/)
+  })
+})
+
+describe('plainHttpGet (HI-1836)', () => {
+  it('asks for an unencoded reply with the caller’s headers, and gives its status and text', async () => {
+    routes.set('/get', (_req, res) => res.writeHead(200).end('{"data":[]}'))
+    expect(await plainHttpGet(`${base}/get`, { headers: { Authorization: 'Bearer k', 'Accept-Encoding': 'br' } })).toEqual({ status: 200, text: '{"data":[]}' })
+    const req = seen.filter((r) => r.url === '/get').at(-1)!
+    expect(req.headers['accept-encoding']).toBe('identity')
+    expect(req.headers.authorization).toBe('Bearer k')
+  })
+
+  it('follows no redirect: a 3xx comes back as its status, and nothing else is asked', async () => {
+    routes.set('/go', (_req, res) => res.writeHead(302, { Location: '/get' }).end())
+    const before = seen.length
+    expect(await plainHttpGet(`${base}/go`)).toEqual({ status: 302, text: '' })
+    expect(seen.slice(before).map((r) => r.url)).toEqual(['/go'])
+  })
+
+  it('gives another status without reading its body', async () => {
+    routes.set('/denied', (_req, res) => res.writeHead(401).end('{"error":"secret detail"}'))
+    expect(await plainHttpGet(`${base}/denied`)).toEqual({ status: 401, text: '' })
+  })
+
+  it.each(['br', 'gzip'])('refuses a reply encoded %s, unread', async (encoding) => {
+    routes.set(`/get-${encoding}`, (_req, res) => res.writeHead(200, { 'Content-Encoding': encoding }).end('\x1b\x00garbage'))
+    expect(await plainHttpGet(`${base}/get-${encoding}`)).toEqual({ status: 200, text: '', refused: 'encoded' })
+  })
+
+  it('stops reading a body over the limit', async () => {
+    routes.set('/get-big', (_req, res) => res.writeHead(200).end('x'.repeat(4096)))
+    expect(await plainHttpGet(`${base}/get-big`, { maxBytes: 1024 })).toEqual({ status: 200, text: '', refused: 'tooBig' })
+  })
+
+  it('rejects when its signal ends it, before or during the reply', async () => {
+    const early = new AbortController()
+    early.abort()
+    await expect(plainHttpGet(`${base}/get`, { signal: early.signal })).rejects.toThrow(/Aborted/)
+    let asked!: () => void
+    const isAsked = new Promise<void>((r) => (asked = r))
+    routes.set('/get-hang', (_req, res) => {
+      res.writeHead(200).write('{"data":')
+      asked()
+    })
+    const late = new AbortController()
+    const call = plainHttpGet(`${base}/get-hang`, { signal: late.signal })
+    await isAsked
+    late.abort()
+    await expect(call).rejects.toThrow(/Aborted/)
   })
 })
 

@@ -108,6 +108,84 @@ export function plainHttpsJson(url: string, opts: PlainJsonOptions = {}): Promis
   })
 }
 
+export interface PlainGetOptions {
+  headers?: Record<string, string>
+  /** The most the body may be, in bytes. */
+  maxBytes?: number
+  /** Ends the call (the caller's deadline, or a newer call): it rejects. */
+  signal?: AbortSignal
+}
+
+/** A reply as plainHttpGet read it: `text` only for a 2xx whose body was read whole and unencoded. */
+export interface PlainReply {
+  status: number
+  /** A 2xx reply's body; '' for any other status (not read). */
+  text: string
+  /** Why a 2xx reply's body wasn't read: over maxBytes, or encoded (refused, never decoded). */
+  refused?: 'tooBig' | 'encoded'
+}
+
+/**
+ * One GET, as plainHttpsJson asks (unencoded, with Node's http or https rather than fetch: #1582), that follows no
+ * redirect: a 3xx comes back as its status. For a caller that tells failures apart by status (a server connection's
+ * model listing, HI-1836). Rejects only when there is no reply (unreachable, the signal, a reply cut short).
+ */
+export function plainHttpGet(url: string, opts: PlainGetOptions = {}): Promise<PlainReply> {
+  const { maxBytes = 4 * 1024 * 1024, signal } = opts
+  const own = Object.entries(opts.headers ?? {}).filter(([k]) => k.toLowerCase() !== 'accept-encoding')
+  const headers = { ...DEFAULT_HEADERS, ...Object.fromEntries(own), 'Accept-Encoding': 'identity' }
+  return new Promise((resolve, reject) => {
+    let req: ReturnType<typeof httpsRequest> | null = null
+    let done = false
+    const onAbort = (): void => fail(new Error('Aborted'))
+    function finish(): boolean {
+      if (done) return false
+      done = true
+      signal?.removeEventListener('abort', onAbort)
+      return true
+    }
+    function fail(e: Error): void {
+      if (!finish()) return
+      req?.destroy()
+      reject(e)
+    }
+    function settle(reply: PlainReply, res: IncomingMessage): void {
+      if (!finish()) return
+      res.destroy()
+      resolve(reply)
+    }
+    if (signal?.aborted) return reject(new Error('Aborted'))
+    signal?.addEventListener('abort', onAbort)
+    try {
+      const target = new URL(url)
+      if (target.protocol !== 'https:' && target.protocol !== 'http:') return fail(new Error(`Not an http(s) URL: ${target.protocol}`))
+      const send = target.protocol === 'https:' ? httpsRequest : httpRequest
+      req = send(target, { method: 'GET', headers }, (res) => {
+        if (done) return void res.destroy()
+        const status = res.statusCode ?? 0
+        if (status < 200 || status >= 300) return settle({ status, text: '' }, res)
+        if (encodingOf(res)) return settle({ status, text: '', refused: 'encoded' }, res)
+        const chunks: Buffer[] = []
+        let size = 0
+        res.on('data', (c: Buffer) => {
+          size += c.length
+          if (size > maxBytes) return settle({ status, text: '', refused: 'tooBig' }, res)
+          chunks.push(c)
+        })
+        res.on('end', () => {
+          if (finish()) resolve({ status, text: Buffer.concat(chunks).toString('utf8') })
+        })
+        res.on('error', fail)
+        res.on('aborted', () => fail(new Error('Reply cut short')))
+      })
+      req.on('error', fail)
+      req.end()
+    } catch (e) {
+      fail(e as Error)
+    }
+  })
+}
+
 /** The reply's Content-Encoding, or '' when there is none (or `identity`). */
 function encodingOf(res: IncomingMessage): string {
   const raw = res.headers['content-encoding']
