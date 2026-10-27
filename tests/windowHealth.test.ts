@@ -37,6 +37,16 @@ describe("a window's health in hive.log (HI-1775)", () => {
     expect(cleanWhere({ view: 'board', panels: ['a', 7, 'b'], project: 3 })).toEqual({ view: 'board', project: null, tab: null, dialog: null, panels: ['a', 'b'] })
   })
 
+  it("names where each task ran, not where the window is by the time it's reported; the window's own place stays its own", () => {
+    const entry = {} as never
+    lines.length = 0
+    const board = { ...where, dialog: null, panels: [] }
+    const perf = { view: 'performance', project: 'alpha', tab: null, dialog: null, panels: [] }
+    // The board's tasks, reported once the window shows Performance.
+    noteLongTasks(entry, [{ ...task(800), where: board }, { ...task(300), where: perf }], perf, 200_000)
+    expect(lines).toEqual(["The window's page was busy for 800 ms (view board, project <alpha>); 2 long task(s), 1100 ms in all; the longest: 800 ms; others in view performance, project <alpha>"])
+  })
+
   it('writes one line for a burst, names its longest and where, and counts what it held back in the next', () => {
     const entry = {} as never
     lines.length = 0

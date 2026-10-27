@@ -27,6 +27,8 @@ export interface LongTask {
   scripts: string[]
   /** What arrived from main just before and during it (replies, events, terminal output): most likely what it handled. */
   during: string[]
+  /** Where the window was when it ran (the window may have moved on by the time it is reported). */
+  where?: WindowWhere | null
 }
 
 /** Tasks this long or longer are reported. */
@@ -61,9 +63,9 @@ export function cleanTasks(raw: unknown): LongTask[] {
   const text = (s: unknown): string => String(s).slice(0, 200)
   return raw.slice(0, MAX_TASKS).flatMap((t): LongTask[] => {
     if (!t || typeof t !== 'object') return []
-    const { at, ms, kind, scripts, during } = t as Record<string, unknown>
+    const { at, ms, kind, scripts, during, where } = t as Record<string, unknown>
     if (typeof at !== 'number' || typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) return []
-    return [{ at, ms, kind: kind === 'frame' ? 'frame' : 'task', scripts: Array.isArray(scripts) ? scripts.slice(0, MAX_SCRIPTS).map(text) : [], during: Array.isArray(during) ? during.slice(0, MAX_DURING).map(text) : [] }]
+    return [{ at, ms, kind: kind === 'frame' ? 'frame' : 'task', scripts: Array.isArray(scripts) ? scripts.slice(0, MAX_SCRIPTS).map(text) : [], during: Array.isArray(during) ? during.slice(0, MAX_DURING).map(text) : [], where: cleanWhere(where) }]
   })
 }
 

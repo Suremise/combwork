@@ -31,10 +31,27 @@ export function whereNow(): WindowWhere {
   return { view: s.activity, project: project?.name ?? null, tab: s.activity === 'projects' && s.selectedProject ? (s.projectTabs[s.selectedProject] ?? null) : null, dialog: dialogs.at(-1)?.title ?? null, panels }
 }
 
+/**
+ * Where the window was lately, from when (performance.now()): a long task's line names where it was when the task ran,
+ * not where the window is by the time the report goes (HR1's HI-1775 round 1: a board task, then Performance shown).
+ */
+const history: { at: number; where: WindowWhere; said: string }[] = []
+/** Where the window was at `t` (performance.now()): the last place it had moved to by then. */
+export function whereAt(t: number): WindowWhere {
+  for (let i = history.length - 1; i >= 0; i--) if (history[i].at <= t) return history[i].where
+  return history[0]?.where ?? whereNow()
+}
+
 let whereTimer: ReturnType<typeof setTimeout> | null = null
 let saidWhere = ''
-/** Where the window is changed: told to main a moment later (several changes at once, one call), only when it differs. */
+/** Where the window is changed: kept with its time at once, and told to main a moment later (several changes, one call), when it differs. */
 function whereChanged(): void {
+  const now = whereNow()
+  const key = JSON.stringify(now)
+  if (history.at(-1)?.said !== key) {
+    history.push({ at: performance.now(), where: now, said: key })
+    if (history.length > 50) history.shift()
+  }
   if (whereTimer) return
   whereTimer = setTimeout(() => {
     whereTimer = null
@@ -115,7 +132,8 @@ export function startWindowHealth(): void {
       // next task, so those just before count too): what it was most likely doing. Read now, as its entry comes (the
       // rings are short: under load they turn over in seconds).
       const during = [...marksBetween(at - 50, at + e.duration), ...(bridge()?.arrivals?.(at - 50, at + e.duration) ?? [])].slice(0, MAX_DURING)
-      const task: LongTask = { at: Math.round(at), ms: e.duration, kind: 'task', scripts: [], during }
+      // Where the window was as it began: its own place, kept with it.
+      const task: LongTask = { at: Math.round(at), ms: e.duration, kind: 'task', scripts: [], during, where: whereAt(from) }
       taskEnded(task, () => {
         const scripts = scriptsAt(from, to)
         if (scripts.length) Object.assign(task, { kind: 'frame', scripts })
