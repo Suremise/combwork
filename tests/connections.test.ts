@@ -45,7 +45,7 @@ const { addAgent, updateAgent } = await import('../src/main/projectAgents')
 const templates = await import('../src/main/templates')
 const { TEMPLATE_VERSION } = await import('../src/shared/templates')
 const { fileLockDepth, withFileLock } = await import('../src/main/fsutil')
-const { listSkills, invalidateSkillCache } = await import('../src/main/skills')
+const { listSkills, invalidateSkillCache, machineSkillCacheSize } = await import('../src/main/skills')
 
 const status = new Map<string, () => Promise<{ ok: true; loggedIn: boolean; email?: string; orgId?: string } | { ok: false; error: string }>>()
 const signedIn = (email: string) => async () => ({ ok: true as const, loggedIn: true, email, orgId: 'org-1' })
@@ -522,6 +522,33 @@ describe('a choice saved while starting: the last look at its own choice, skills
       expect((await names(w)).some((p) => p.includes('private-b'))).toBe(true)
     } finally {
       await disposeWorkspaceService(w2)
+    }
+  })
+
+  it('machine skills: many sets of homes in turn keep only a few cached, expired ones let go, the current set right (HI-1782)', async () => {
+    invalidateSkillCache()
+    const names = async () => (await here(() => listSkills())).filter((s) => s.level === 'machine').map((s) => s.name)
+    // Each connection turned on makes a set of homes not asked for before.
+    for (let i = 0; i < 12; i++) {
+      const c = await accounts.addAccount('claude-code', `Cycle ${i}`)
+      const dir = join(accounts.accountFolder(c.id), 'skills', `cycle-${i}`)
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, 'SKILL.md'), `---\nname: cycle-${i}\ndescription: cycle ${i}\n---\n`)
+      await here(() => accounts.setAccountOn(c.id, true))
+      const got = await names()
+      for (let j = 0; j <= i; j++) expect(got).toContain(`cycle-${j}`)
+      expect(machineSkillCacheSize()).toBeLessThanOrEqual(8)
+    }
+    expect(machineSkillCacheSize()).toBe(8)
+    // Past the freshness window, a lookup lets every expired set go and keeps only the current one.
+    const now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 31_000)
+    try {
+      const got = await names()
+      expect(got).toEqual(expect.arrayContaining(Array.from({ length: 12 }, (_, j) => `cycle-${j}`)))
+      expect(machineSkillCacheSize()).toBe(1)
+    } finally {
+      clock.mockRestore()
     }
   })
 
