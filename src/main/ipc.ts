@@ -19,7 +19,8 @@ import { keptLaneOrder } from '../shared/laneBar'
 import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../shared/tips'
 import { allProviders } from './providers'
 import { providerService } from './providerService'
-import { accountsView, addAccount, connectionHomes, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, signInAccount } from './accounts'
+import { accountsView, addAccount, connectionHomes, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, setConnectionDefaults, signInAccount } from './accounts'
+import { dismissMovedNotice, movedNotice } from './connectionMoves'
 import { config } from './config'
 import { clearRecent, recentChanged, recentFor, removeRecent } from './recentWorkspaces'
 import { emit, emitTo, onHiveEvent } from './events'
@@ -1524,6 +1525,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'connections:setDefault': (id) => setAccountDefault(id),
     'connections:setAssistant': (provider, id) => setAssistantConnection(provider, id),
     'connections:switchAffected': () => sessions.switchAffected(workspace.path!),
+    'connections:setDefaults': (id, patch) => setConnectionDefaults(id, patch),
+    'connections:notice': () => movedNotice(workspace),
+    'connections:dismissNotice': (keys) => dismissMovedNotice(workspace, Array.isArray(keys) ? keys.filter((k) => typeof k === 'string') : []),
     'session:switchConnection': (p, agentId) => sessions.switchAtSafePoint(p, agentId),
 
     'api:info': () => apiInfo(),

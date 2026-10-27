@@ -150,6 +150,7 @@
   "session.start.closing": "Hive zatrzymuje agentów tego obszaru roboczego, więc żaden nie może się teraz uruchomić.",
   "session.start.couldNot": "Nie udało się uruchomić agenta {agent}",
   "session.start.fenced": "{why}, więc agenci projektu nie mogą się teraz uruchomić.",
+  "session.start.moveFailed": "Nie udało się przenieść ustawień modelu projektu {project} do jego agentów: {error}. Uruchom go jeszcze raz.",
   "session.start.openIn": "Tę rozmowę ma już otwartą {agent}. Agent może wznowić tylko sesję, której nie prowadzi żaden inny agent.",
   "session.start.otherFolder": "Ta sesja działała w folderze {folder}. Wznów ją agentem, który pracuje w tym folderze.",
   "session.start.projectRunning": "W tym projekcie już działa sesja. Najpierw ją zatrzymaj.",

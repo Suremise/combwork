@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import type { LiveSessionState, ProviderId } from '@shared/types'
-import type { ConnectionsView } from '@shared/accounts'
+import type { Connection, LiveSessionState, ProviderId } from '@shared/types'
+import { resolveConnection, type ConnectionsView } from '@shared/accounts'
 import { providerDescriptor } from '@shared/providers'
 import { ACCOUNTS_PREVIEW } from '@shared/advanced'
 import { msg, tr } from '@shared/i18n'
@@ -56,6 +56,17 @@ export function useConnections(): ConnectionsView | null {
     }
   }, [key])
   return view
+}
+
+/**
+ * The connection a choice would start on (HI-1770), for its defaults: undefined where connections don't apply (the
+ * preview off, a CLI without them), null when none can be used.
+ */
+export function useLaunchConnection(own: string | undefined, provider: ProviderId): Connection | null | undefined {
+  const view = useConnections()
+  if (!view?.preview || !view.providers.includes(provider)) return undefined
+  const r = resolveConnection({ connections: view.workspace }, provider, own || undefined, view.connections)
+  return r.ok ? (view.connections.find((c) => c.id === r.id) ?? null) : null
 }
 
 /**

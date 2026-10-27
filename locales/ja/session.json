@@ -150,6 +150,7 @@
   "session.start.closing": "Hiveがこのワークスペースのエージェントを停止しているため、今は起動できません。",
   "session.start.couldNot": "{agent}を起動できませんでした",
   "session.start.fenced": "{why}。そのため、今はエージェントを起動できません。",
+  "session.start.moveFailed": "Hiveは{project}のモデル設定をそのエージェントに移せませんでした：{error}。もう一度起動してください。",
   "session.start.openIn": "この会話はすでに{agent}で開かれています。エージェントが再開できるのは、ほかのエージェントが実行していないセッションだけです。",
   "session.start.otherFolder": "このセッションは{folder}で実行されました。そのフォルダーで作業するエージェントで再開してください。",
   "session.start.projectRunning": "このプロジェクトのセッションはすでに実行中です。先に停止してください。",

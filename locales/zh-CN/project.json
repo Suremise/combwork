@@ -1,5 +1,6 @@
 {
   "project.agents.add": "添加智能体",
+  "project.agents.connectionSettings": "连接的默认设置（{model}）",
   "project.agents.merge": "合并…",
   "project.agents.off": "{provider}（已关闭）",
   "project.agents.own200k": "{on, select, yes {200K 上下文：开} other {200K 上下文：关}}",

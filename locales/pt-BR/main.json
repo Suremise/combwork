@@ -42,6 +42,7 @@
   "main.connections.launch.offNoDefault": "A conexão do agente {agent}, {name}, está desativada neste espaço de trabalho, e nenhuma outra conexão do {cli} está ativada. Ative uma em Configurações → Conexões.",
   "main.connections.launch.otherProvider": "A conexão escolhida para o agente {agent} é de outra CLI. Escolha uma conexão do {cli} nas Configurações do agente dele.",
   "main.connections.launch.signedOut": "A conexão {name} está desconectada. Faça login nela de novo em Configurações → Conexões e depois inicie o agente {agent}.",
+  "main.connections.moveFailed": "O Hive não conseguiu mover as configurações de modelo de {project} para seus agentes",
   "main.console.noWorkspace": "Abra um espaço de trabalho primeiro: o console do desenvolvedor mostra os agentes de um espaço de trabalho e o trabalho do Hive nele.",
   "main.console.title": "Console do desenvolvedor — {workspace}",
   "main.corrupt.damaged": "O arquivo {file} estava danificado",

@@ -18,7 +18,7 @@ import { instructionsStarter } from '@shared/projectTabs'
 import { EffortPicker, ModelPicker } from '../components/ModelPicker'
 import { effortText, runsAsName } from '@shared/models'
 import { PROJECT_KEY_DESC, PROJECT_SETTINGS_SECTIONS, settingEntry, shownSetting, type SettingsSectionInfo } from '@shared/settingsCatalog'
-import { shownText } from '@shared/advanced'
+import { ACCOUNTS_PREVIEW, shownText } from '@shared/advanced'
 import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_STEP_WAIT_MINUTES, LOOP_WAIT_MAX_HOURS, loopDefaults } from '@shared/lanes'
 import { NumberField } from '../components/NumberField'
 import { StorageView } from '../components/Storage'
@@ -32,7 +32,8 @@ import { DiffView } from '../components/Editors'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
 import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Switch, Tooltip } from '../components/ui'
-import { ConnectionMark } from '../components/ConnectionChoice'
+import { ConnectionMark, useConnections } from '../components/ConnectionChoice'
+import { resolveConnection } from '@shared/accounts'
 import { languageFor } from '../monacoLang'
 import { useScopedLoad } from '../scopedLoad'
 import { oneAtATime, withinTime } from '@shared/coalesce'
@@ -281,6 +282,7 @@ const S = {
   own200k: msg({ id: 'project.agents.own200k', defaultMessage: '{on, select, yes {200K context on} other {200K context off}}', description: "One of an agent's own settings, in a list. Keep 200K." }),
   ownMcp: msg({ id: 'project.agents.ownMcp', defaultMessage: 'MCP servers {servers}', description: "One of an agent's own settings, in a list: which MCP servers it gets." }),
   ownSettings: msg({ id: 'project.agents.ownSettings', defaultMessage: 'Own settings: {settings}', description: "Under an agent: the settings it sets for itself, as a list." }),
+  connectionSettings: msg({ id: 'project.agents.connectionSettings', defaultMessage: "Its connection's defaults ({model})", description: "Under an agent with no model, effort or context of its own, with Connections on (HI-1770): it runs with its connection's defaults. {model} is the model it runs." }),
   projectSettings: msg({ id: 'project.agents.projectSettings', defaultMessage: 'Project settings ({model})', description: "Under an agent that uses the project's settings. {model} is the model it runs." }),
   agentSettings: msg({ id: 'project.agents.settings', defaultMessage: 'Agent settings…', description: "Tooltip on an agent's settings button." }),
   merge: msg({ id: 'project.agents.merge', defaultMessage: 'Merge…', description: "Tooltip on a worktree agent's merge button." }),
@@ -1691,6 +1693,13 @@ function DraftInput({ value, onCommit, ...rest }: { value: string; onCommit: (v:
 
 function AgentList({ project }: { project: ProjectInfo }) {
   const settings = useStore((s) => s.settings)
+  // The connection each would start on (HI-1770): with Connections on, its defaults are what an agent without its own runs.
+  const connections = useConnections()
+  const launchConnection = (a: ProjectInfo['agents'][number], provider: ProviderId) => {
+    if (!connections?.preview || !connections.providers.includes(provider)) return undefined
+    const r = resolveConnection({ connections: connections.workspace }, provider, a.connection, connections.connections)
+    return r.ok ? (connections.connections.find((c) => c.id === r.id) ?? null) : null
+  }
   const limit = useAgentLimit()
   const providers = useStore((s) => s.providers)
   const cfg = project.config
@@ -1698,7 +1707,8 @@ function AgentList({ project }: { project: ProjectInfo }) {
     <div className="agent-list">
       {project.agents.map((a) => {
         const provider = agentProviderOf(project, a)
-        const model = effectiveModelLabel(provider, a.model || projectProviderConfig(cfg, provider).model, providerSettings(settings, provider).defaultModel, providers[provider])
+        const conn = launchConnection(a, provider)
+        const model = conn !== undefined ? effectiveModelLabel(provider, a.model || conn?.defaults?.model, '', providers[provider]) : effectiveModelLabel(provider, a.model || projectProviderConfig(cfg, provider).model, providerSettings(settings, provider).defaultModel, providers[provider])
         const overrides = [
           a.model && tr(S.ownModel, { model: modelLabel(a.model, provider) }),
           a.effort && tr(S.ownEffort, { effort: a.effort }),
@@ -1735,7 +1745,7 @@ function AgentList({ project }: { project: ProjectInfo }) {
                 )}
               </div>
               <div className="faint small">
-                {overrides.length ? tr(S.ownSettings, { settings: fmt.list(overrides, 'unit') }) : tr(S.projectSettings, { model })}
+                {overrides.length ? tr(S.ownSettings, { settings: fmt.list(overrides, 'unit') }) : tr(conn !== undefined ? S.connectionSettings : S.projectSettings, { model })}
                 {awayFromProject(a) && <> · {agentFolder(a)}</>}
               </div>
             </div>
@@ -1803,6 +1813,8 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
   // Its sections and rows are formatted here: a change of language shows them in it at once.
   useLanguage()
   const settings = useStore((s) => s.settings)
+  // With Connections on, a CLI with them has no project model, effort or context (HI-1770: each connection's, and the agents' own).
+  const connectionsShown = useStore((s) => s.advanced?.values[ACCOUNTS_PREVIEW] === true)
   const installs = useStore((s) => s.providers)
   const [section, setSection] = useState<ProjectSection>('agents')
   const [query, setQuery] = useState('')
@@ -1948,7 +1960,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
         </select>
       )
     },
-    ...PROVIDERS.flatMap((p) => providerDefs(p.id)),
+    ...PROVIDERS.flatMap((p) => providerDefs(p.id).filter((d) => !(connectionsShown && p.capabilities.connections && /\.(model|effort|use200kContext)$/.test(d.key)))),
     {
       section: 'sessions',
       key: 'compactSuggestTokens',

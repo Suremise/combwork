@@ -24,6 +24,7 @@ import { Readable } from 'stream'
 import type { AppInfo, McpServerDef, QuitChoice, QuitScope, QuitSession, TaskCard, WindowState } from '../shared/types'
 import { providerService } from './providerService'
 import { initConnections } from './accounts'
+import { initConnectionMoves } from './connectionMoves'
 import { checkGit } from './gitTool'
 import { handoverSession, hiveInstructions, withJournal, withLatestHandover, wrapsLongCommands } from '../shared/hiveGuidance'
 import { handoversFor } from './notes'
@@ -1020,6 +1021,7 @@ app.whenReady().then(async () => {
   providerService.onSignedIn((p) => sessions.signedInAgain(p, true))
   // Connections (HI-980, HI-1755): new workspaces' defaults and the watches on their logins.
   initConnections()
+  initConnectionMoves()
 
   // Hook auth files of an earlier run of Hive: their tokens died with it (#345).
   await clearHookAuth()

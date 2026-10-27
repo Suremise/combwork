@@ -603,6 +603,10 @@
     "defaultMessage": "{why}, so its agents can't start now.",
     "description": "Starting an agent is refused while something changes its project. {why} says what, as a sentence without its full stop (\"This project is being removed\")."
   },
+  "session.start.moveFailed": {
+    "defaultMessage": "Hive couldn't move {project}'s model settings to its agents: {error}. Start it again.",
+    "description": "Starting an agent is refused (HI-1770): moving its project's own model, effort and context settings onto the project's agents (connections now hold the defaults) failed. {project} is the project's name, {error} why (often in English). It is tried again at the next start."
+  },
   "session.start.openIn": {
     "defaultMessage": "This conversation is already open in {agent}. An agent can only resume a session no other agent is running.",
     "description": "Resuming a conversation is refused: another agent is running it. {agent} is that agent's name."

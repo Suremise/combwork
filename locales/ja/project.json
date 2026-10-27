@@ -1,5 +1,6 @@
 {
   "project.agents.add": "エージェントを追加",
+  "project.agents.connectionSettings": "接続の既定（{model}）",
   "project.agents.merge": "マージ…",
   "project.agents.off": "{provider}（オフ）",
   "project.agents.own200k": "{on, select, yes {200Kコンテキスト：オン} other {200Kコンテキスト：オフ}}",

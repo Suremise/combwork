@@ -4,7 +4,7 @@ import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
 import { ASSISTANT_OTHER_MCP, COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
-import { capturedText, hiveError, HiveError, shownError } from './hiveError'
+import { capturedText, errorText, hiveError, HiveError, shownError } from './hiveError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
 import { overridesNow } from './advancedValues'
@@ -28,7 +28,7 @@ import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderF
 import { slotEnv } from './slots'
 import { copiesDirOf, grantsCopies } from './copies'
 import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
-import { agentLaunchSettings, canSwitchModeLive, defaultProviderPending, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
+import { agentLaunchSettings, agentProvider, canSwitchModeLive, defaultProviderPending, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
 import { resolvedModel } from '../shared/models'
 import type {
@@ -63,8 +63,9 @@ import type {
 } from '../shared/types'
 import { provider as providerAdapter, allProviders } from './providers'
 import { runSwitch, type SwitchOp } from './connectionSwitch'
-import { connectionsOn } from './connectionSeam'
 import { checkAccount, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
+import { connectionLayerFor, effortUsable, ensureMoved } from './connectionMoves'
+import { assistantOwn } from '../shared/connectionDefaults'
 import { resolveConnection } from '../shared/accounts'
 import { recacheEstimate } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
@@ -144,6 +145,7 @@ const log = createLogger('sessions')
 const M = {
   assistantCliOwn: msg({ id: 'session.mode.assistantCliOwn', defaultMessage: "The Assistant can't use the CLI's own setting: its Control setting relies on knowing the mode it runs in. Choose one of the CLI's modes.", description: "Switching the Hive Assistant to the permission choice \"The CLI's own setting\" is refused. Control is the name of an Assistant setting." }),
   noSession: msg({ id: 'session.error.noSession', defaultMessage: 'No session is running for this agent.', description: "An action on an agent's session is refused: the agent isn't running." }),
+  moveFailed: msg({ id: 'session.start.moveFailed', defaultMessage: "Hive couldn't move {project}'s model settings to its agents: {error}. Start it again.", description: "Starting an agent is refused (HI-1770): moving its project's own model, effort and context settings onto the project's agents (connections now hold the defaults) failed. {project} is the project's name, {error} why (often in English). It is tried again at the next start." }),
   stoppedBeforeStart: msg({ id: 'session.error.stoppedBeforeStart', defaultMessage: 'The agent was stopped before it had started.', description: "Starting an agent failed: it was stopped (or its workspace closed) while it was starting." }),
   stoppedBeforePrompt: msg({ id: 'session.error.stoppedBeforePrompt', defaultMessage: 'The agent stopped before the prompt was sent.', description: 'Typing a prompt into an agent failed: it stopped or restarted meanwhile.' }),
   typingBusy: msg({ id: 'session.error.typingBusy', defaultMessage: 'Hive is already typing a prompt into this agent; it is busy.', description: 'An action on an agent is refused: Hive is typing a prompt into it now.' }),
@@ -1297,8 +1299,29 @@ class SessionManager {
 
   private async effectiveHere(projectPath: string, agent: AgentDef | undefined, reads: LaunchReads, readPc?: ProjectConfig): Promise<EffectiveSettings> {
     const s = config.settings
-    const pc = readPc ?? (await workspace.projectConfig(projectPath))
+    let pc = readPc ?? (await workspace.projectConfig(projectPath))
     const assistant = workspace.isAssistantHome(projectPath)
+    // Where its model, effort and context come from (HI-1770), decided once for this resolution: Connections turned on or
+    // off while it reads the rest takes effect at the next, so the move, the agent read and the layer always agree.
+    const movedCli = agentProvider(agent ?? projectAgents(pc)[0], pc, s)
+    const layered = connectionLayerFor(movedCli)
+    if (layered && !assistant) {
+      // The project's own moved onto its agents first (once, under the project's lock), so nothing launches with the
+      // project's unread and not yet its agents'.
+      if (!pc.migrations?.connections1?.[movedCli]) {
+        try {
+          await ensureMoved(projectPath, movedCli)
+        } catch (e) {
+          throw hiveError(M.moveFailed, { project: basename(projectPath), error: errorText(e) })
+        }
+        pc = await workspace.projectConfig(projectPath)
+      }
+      // The agent as saved now, whoever made the move (a start may hold one read before it): only its provider as
+      // given is kept (a run's own, pinProvider).
+      const was = agent
+      const fresh = was && projectAgents(pc).find((a) => a.id === was.id)
+      if (was && fresh) agent = { ...fresh, provider: was.provider ?? fresh.provider }
+    }
     // Every Hive skill for its audience (SKILL.md's metadata.audience) reaches the session: project agents get those for
     // agents, unless the workspace or the project switched one off (#1431, Skills → Delivered to agents); the Assistant
     // gets those for it.
@@ -1333,13 +1356,18 @@ class SessionManager {
     // Its instructions name only the skills the session gets (#1431).
     if (hive) mcpServers.hive = skillsOff.length ? { ...hive, env: { ...hive.env, HIVE_SKILLS_OFF: skillsOff.sort().join(',') } } : hive
 
-    const l = agentLaunchSettings(forAgent, pc, s)
+    // The connection it would launch on (HI-1755): a change of choice asks for a restart.
+    const cli = agentProvider(forAgent, pc, s)
+    const wanted = assistant ? workspace.config.assistantConnection?.[cli] : forAgent?.connection
+    const choice = layered && cli === movedCli ? resolveConnection(workspace.config, cli, wanted, config.get().connections ?? []) : null
+    const connection = choice ? (choice.ok ? choice.id : `!${choice.why}`) : null
+    // Model, effort and context (HI-1770): with connections, its own, else its connection's defaults (never the project's
+    // or the CLI's; none when no connection can be used). The Assistant's own are its agent's, else Settings → Assistant's.
+    const conn = choice?.ok ? ((config.get().connections ?? []).find((c) => c.id === choice.id) ?? null) : null
+    const own = choice && assistant ? assistantOwn(forAgent, s.assistant?.providers?.[cli]) : forAgent
+    const l = agentLaunchSettings(own, pc, s, choice ? { kind: 'connection', conn } : { kind: 'legacy' })
     const extraArgs = l.extraArgs.flatMap((a) => splitArgs(a))
     const chime = pc.chime === 'inherit' ? s.notifications.chimeEnabled : pc.chime === 'on'
-    // The connection it would launch on (HI-1755): a change of choice asks for a restart.
-    const wanted = assistant ? workspace.config.assistantConnection?.[l.provider] : forAgent?.connection
-    const choice = providerDescriptor(l.provider).capabilities.connections && connectionsOn() ? resolveConnection(workspace.config, l.provider, wanted, config.get().connections ?? []) : null
-    const connection = choice ? (choice.ok ? choice.id : `!${choice.why}`) : null
     return { provider: l.provider, skills, skillHashes, skillProblems, mcpServers, model: l.model, effort: l.effort, permissionMode: l.permissionMode, extraArgs, use200kContext: l.use200kContext, chime, connection }
   }
 
@@ -2030,7 +2058,8 @@ class SessionManager {
       skills: eff.skills,
       mcpServers: eff.mcpServers,
       model: eff.model,
-      effort: eff.effort,
+      // An effort the model that runs doesn't take (HI-1770: one moved onto it, or a connection's default) is kept, not used.
+      effort: eff.effort && eff.connection && !eff.connection.startsWith('!') && !effortUsable(adapter.id, eff.model, conn, eff.effort) ? null : eff.effort,
       permissionMode: mode,
       extraArgs: eff.extraArgs,
       use200kContext: eff.use200kContext,

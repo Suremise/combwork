@@ -246,6 +246,7 @@
   "agents.name.empty": "Gib einen Namen ein.",
   "agents.name.taken": "Im Projekt {project} gibt es schon einen Agenten namens „{agent}“. Agentennamen sind im ganzen Arbeitsbereich eindeutig: Versuch es mit „{suggestion}“.",
   "agents.name.tooLong": "Ein Name hat höchstens {max} Zeichen.",
+  "agents.overrides.connectionDefault": "Standard der Verbindung",
   "agents.overrides.context": "200K-Kontext verwenden (statt 1M)",
   "agents.overrides.effort": "Aufwand",
   "agents.overrides.inherited": "{whose} ({value})",
