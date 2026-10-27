@@ -37,7 +37,8 @@ vi.mock('../src/main/lanes', () => ({
     state.recorded.push(s)
     state.calls.push('record')
     state.afterRecord?.()
-    return { lane: { id: 'lane-1', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' } }, did: 'started', replaced: null }
+    // Its rounds as recorded (HI-1805: what its agents' briefs say, whatever today's default).
+    return { lane: { id: 'lane-1', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, rounds: 3 }, did: 'started', replaced: null }
   },
   rawLanes: async () => {
     await state.lanesHeld
@@ -149,7 +150,7 @@ describe('Start lane… in main (#1280)', () => {
 })
 
 describe('a lane waiting for a slot, started as Hive quits (#1628)', () => {
-  const waiting = (): void => void (state.lanes = [{ id: 'lane-1', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1] }])
+  const waiting = (): void => void (state.lanes = [{ id: 'lane-1', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1], rounds: 3 }])
 
   it('quitting while its lane is read: nothing is started, and it keeps waiting (false)', async () => {
     waiting()
@@ -176,5 +177,31 @@ describe('a lane waiting for a slot, started as Hive quits (#1628)', () => {
     waiting()
     expect(await startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => false)).toBe(true)
     expect(state.calls).toEqual(['start b1', 'start r1'])
+  })
+})
+
+describe("a lane's briefs say its own rounds, as recorded, never today's default (HI-1805)", () => {
+  /** Today's default for the project's platform (git): 10 rounds, changed since the lane was recorded with 3. */
+  const withDefault = async <T>(fn: () => Promise<T>): Promise<T> => {
+    const cfg = (ws as { config: Record<string, unknown> }).config
+    cfg.workflow = { git: { loopRounds: 10 } }
+    try {
+      return await fn()
+    } finally {
+      delete cfg.workflow
+    }
+  }
+  const roundsIn = (): string[] => state.briefs.map((b) => /rounds: (\d+)/.exec(b)?.[1] ?? 'none')
+
+  it('a lane waiting for a slot, its default changed meanwhile: both briefs say the rounds it was recorded with', async () => {
+    state.lanes = [{ id: 'lane-1', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1], rounds: 3 }]
+    expect(await withDefault(() => startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => false))).toBe(true)
+    expect(state.calls).toEqual(['start b1', 'start r1'])
+    expect(roundsIn()).toEqual(['3', '3'])
+  })
+
+  it("Start Lane… from the window: the lane's recorded rounds, not the default read again", async () => {
+    await withDefault(() => startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b1', reviewer: 'r1', cards: [1] }))
+    expect(roundsIn()).toEqual(['3', '3'])
   })
 })
