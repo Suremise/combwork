@@ -61,6 +61,7 @@
   "service.git.failed": "{command} failed: {why}",
   "service.git.outside": "Path is outside the project",
   "service.git.tooLarge": "File is too large to diff ({kb, number} KB).",
+  "service.gitCompare.noBranch": "There's no branch {branch} here any more.",
   "service.gitRepo.addFailed": "Couldn't add {remote}: {why}",
   "service.gitRepo.added": "Added {remote}.",
   "service.gitRepo.alreadyOn": "Already on {branch}.",

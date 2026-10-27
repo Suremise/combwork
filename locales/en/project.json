@@ -396,8 +396,8 @@
     "description": "Tooltip on the button that opens the changed file."
   },
   "project.changes.pickerTip": {
-    "defaultMessage": "Unused worktrees, a worktree an agent works in, or the project folder",
-    "description": "Tooltip on the Changes tab's folder picker."
+    "defaultMessage": "Two branches compared, unused worktrees, a worktree an agent works in, or the project folder",
+    "description": "Tooltip on the Changes tab's picker."
   },
   "project.changes.projectFolder": {
     "defaultMessage": "Project folder · {branch}",
@@ -550,6 +550,118 @@
   "project.compaction.unknownTime": {
     "defaultMessage": "unknown time",
     "description": "In \"Open the … compaction of {when}…\" when its time is not known."
+  },
+  "project.compare.about": {
+    "defaultMessage": "What {head} changes since it left {base}: its commits that {base} hasn’t, and the files they change. Read from git, nothing checked out.",
+    "description": "The sentence at the top of the Changes tab's comparison of two branches."
+  },
+  "project.compare.base": {
+    "defaultMessage": "Against",
+    "description": "A label in the Changes tab's comparison: the branch it is compared with."
+  },
+  "project.compare.binary": {
+    "defaultMessage": "A binary file: its changes can’t be shown.",
+    "description": "In place of a file's diff in the Changes tab's comparison: the file isn't text."
+  },
+  "project.compare.commitTip": {
+    "defaultMessage": "{hash}\n{author} <{email}>\n{when}",
+    "description": "Tooltip on a commit in the Changes tab's comparison: its whole hash, its author and when."
+  },
+  "project.compare.commits": {
+    "defaultMessage": "Commits",
+    "description": "A switch in the Changes tab's comparison: each side's commits."
+  },
+  "project.compare.counts": {
+    "defaultMessage": "{head} has {ahead, plural, one {# commit} other {# commits}} {base} hasn’t; {base} has {behind, plural, one {# commit} other {# commits}} {head} hasn’t.",
+    "description": "The line under the branches in the Changes tab's comparison: how many commits each has that the other hasn't."
+  },
+  "project.compare.cut": {
+    "defaultMessage": "Only the first {shown, number} of {total, number} files are listed.",
+    "description": "Under the Changes tab's comparison's files when there are more than Hive lists."
+  },
+  "project.compare.diffFailed": {
+    "defaultMessage": "Couldn't show this file's changes: {error}",
+    "description": "An error in the Changes tab's comparison: a file's diff couldn't be read."
+  },
+  "project.compare.files": {
+    "defaultMessage": "Files",
+    "description": "A switch in the Changes tab's comparison: the changed files."
+  },
+  "project.compare.group": {
+    "defaultMessage": "Branches (compared, nothing checked out)",
+    "description": "A group of the Changes tab's picker: comparisons of two branches, read without checking anything out."
+  },
+  "project.compare.head": {
+    "defaultMessage": "Branch",
+    "description": "A label in the Changes tab's comparison: the branch whose changes are shown."
+  },
+  "project.compare.inline": {
+    "defaultMessage": "Inline",
+    "description": "A button in the Changes tab's comparison: shows a diff in one column."
+  },
+  "project.compare.load": {
+    "defaultMessage": "the comparison",
+    "description": "What couldn't be read, in an error in the Changes tab: the comparison of two branches."
+  },
+  "project.compare.loading": {
+    "defaultMessage": "Comparing {head} with {base}…",
+    "description": "While the Changes tab compares two branches."
+  },
+  "project.compare.loadingDiff": {
+    "defaultMessage": "Loading the diff…",
+    "description": "While a file's diff in the Changes tab's comparison is read."
+  },
+  "project.compare.moreFiles": {
+    "defaultMessage": "Show more ({shown, number} of {total, number})",
+    "description": "A button under the Changes tab's comparison's files: lists more of them."
+  },
+  "project.compare.noFiles": {
+    "defaultMessage": "{head} changes no files since it left {base}.",
+    "description": "The Changes tab's comparison when the branch changes nothing."
+  },
+  "project.compare.none": {
+    "defaultMessage": "None.",
+    "description": "Under a heading of the Changes tab's comparison's commits: there are none."
+  },
+  "project.compare.onlyHead": {
+    "defaultMessage": "On {head}, not on {base}",
+    "description": "A heading in the Changes tab's comparison: the commits the branch {head} has that {base} hasn't."
+  },
+  "project.compare.option": {
+    "defaultMessage": "{head} ↔ {base}{slot, select, none {} other { · {slot}}}{card, select, none {} other { · {card}}}",
+    "description": "A comparison in the Changes tab's picker: the branch {head} against {base}. {slot} is the slot it is checked out in and {card} the card working there (each none when there is none)."
+  },
+  "project.compare.parted": {
+    "defaultMessage": "They parted at {commit}.",
+    "description": "In the Changes tab's comparison: the commit where the two branches' histories split."
+  },
+  "project.compare.refresh": {
+    "defaultMessage": "Compare again",
+    "description": "A button in the Changes tab's comparison: reads both branches again."
+  },
+  "project.compare.retry": {
+    "defaultMessage": "Try again",
+    "description": "A button after an error in the Changes tab."
+  },
+  "project.compare.selectFile": {
+    "defaultMessage": "Select a file to see what {head} changed in it.",
+    "description": "The Changes tab's comparison with no file chosen."
+  },
+  "project.compare.sideBySide": {
+    "defaultMessage": "Side by side",
+    "description": "A button in the Changes tab's comparison: shows a diff as two columns."
+  },
+  "project.compare.status": {
+    "defaultMessage": "{status, select, M {Modified} A {Added} D {Deleted} T {Type changed} other {{status}}}: {path}",
+    "description": "Tooltip on a file in the Changes tab's comparison: how the branch changed it."
+  },
+  "project.compare.swap": {
+    "defaultMessage": "Swap the branches",
+    "description": "A button in the Changes tab's comparison: compares the other way round."
+  },
+  "project.compare.unrelated": {
+    "defaultMessage": "They share no history: the files are {base} against {head}.",
+    "description": "In the Changes tab's comparison: the two branches have no commit in common."
   },
   "project.cost.belowCent": {
     "defaultMessage": "< {cent}",

@@ -523,6 +523,14 @@
     "defaultMessage": "Read a compaction where it happened",
     "description": "A tip's title."
   },
+  "tips.compareBranches.text": {
+    "defaultMessage": "Version Control → Changes compares any two local branches without checking anything out: pick one under Branches to see the commits each has that the other hasn't, the files it changes, and each file's diff.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.compareBranches.title": {
+    "defaultMessage": "Compare two branches, such as 1.0.0 with main",
+    "description": "A tip's title."
+  },
   "tips.conflictHunks.text": {
     "defaultMessage": "When the merge queue sends a card back for a conflict, its Work section lists the files: click one to see its conflicts, the target's side and the card's under their names, as the queue's test merge had them.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

@@ -15,7 +15,7 @@ import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
 
 const log = createLogger('git')
 
-const MAX_DIFF_BYTES = 2 * 1024 * 1024
+export const MAX_DIFF_BYTES = 2 * 1024 * 1024
 
 export interface GitResult {
   out: string
@@ -164,11 +164,15 @@ export async function gitReading(cwd: string, args: string[]): Promise<GitResult
 const M = {
   failed: msg({ id: 'service.git.failed', defaultMessage: '{command} failed: {why}', description: "An error in the Changes tab: a git command ({command}, as it is: \"git status\") failed; {why} is git's own first line, or why git can't run." }),
   exitCode: msg({ id: 'service.git.exitCode', defaultMessage: 'exit code {code}', description: 'Why a git command failed when git said nothing: the number it exited with.' }),
-  outside: msg({ id: 'service.git.outside', defaultMessage: 'Path is outside the project', description: "An error showing a file's changes: its path leads out of the project." })
+  outside: msg({ id: 'service.git.outside', defaultMessage: 'Path is outside the project', description: "An error showing a file's changes: its path leads out of the project." }),
+  tooLarge: msg({ id: 'service.git.tooLarge', defaultMessage: 'File is too large to diff ({kb, number} KB).', description: "Shown in place of a file's changes in the Changes tab: the file is too large ({kb} KB) to compare." })
 }
 
+/** Shown in place of a file's diff when it is over MAX_DIFF_BYTES. */
+export const tooLargeDiff = (path: string, bytes: number): GitDiff => ({ path, original: '', modified: tr(M.tooLarge, { kb: Math.round(bytes / 1024) }), binary: true })
+
 /** Why a git command failed, for an error the window shows: git missing, else git's own first line. `command` is the git command, as it is. */
-function failure(command: string, r: GitResult): Error {
+export function failure(command: string, r: GitResult): Error {
   return hiveError(M.failed, { command, why: gitProblemData(gitTool()) ?? (r.err.split(/\r?\n/)[0] || withValues(M.exitCode, { code: r.code })) })
 }
 
@@ -258,7 +262,7 @@ async function workingStatus(projectPath: string): Promise<{ status: GitStatus; 
   return { status, inWorktree }
 }
 
-function isBinary(buf: Buffer): boolean {
+export function isBinary(buf: Buffer): boolean {
   const n = Math.min(buf.length, 8000)
   for (let i = 0; i < n; i++) if (buf[i] === 0) return true
   return false
@@ -278,7 +282,7 @@ export async function gitDiff(projectPath: string, file: string, base?: string):
     else {
       // Nor a file reached through a linked folder that leads outside.
       if (!insideReal(abs, [projectPath])) throw Object.assign(hiveError(M.outside), { outside: true })
-      if (s.size > MAX_DIFF_BYTES) return { path: file, original: '', modified: tr(msg({ id: 'service.git.tooLarge', defaultMessage: 'File is too large to diff ({kb, number} KB).', description: "Shown in place of a file's changes in the Changes tab: the file is too large ({kb} KB) to compare." }), { kb: Math.round(s.size / 1024) }), binary: true }
+      if (s.size > MAX_DIFF_BYTES) return tooLargeDiff(file, s.size)
       modified = await readFile(abs)
     }
   } catch (e) {

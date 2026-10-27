@@ -6728,6 +6728,33 @@ button.agent-place:hover {
   height: 24px;
   font-size: 12px;
 }
+/* The Changes tab's comparison (HI-1824): the two branches, a swap between them, and Files / Commits. */
+.compare-sides {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 0 10px 8px 14px;
+}
+.compare-side {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  gap: 2px;
+}
+.compare-view {
+  margin: 0 10px 8px 14px;
+}
+.compare-more {
+  margin: 6px 14px;
+}
+.compare-commits {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 16px 16px;
+}
 .agent-form {
   display: grid;
   /* minmax(0, …): a select's longest option mustn't widen the column past the dialog's edge. */

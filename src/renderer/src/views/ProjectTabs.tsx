@@ -28,6 +28,7 @@ import * as actions from '../actions'
 import { call, errorMessage } from '../api'
 import { DocEditor } from '../components/DocEditor'
 import { DiffView } from '../components/Editors'
+import { COMPARE_ROOT, CompareGroup, ComparePage, compareRoot, parseCompareRoot, useCompareLines } from '../components/ChangesCompare'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
 import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Switch, Tooltip } from '../components/ui'
@@ -163,7 +164,7 @@ const C = {
   gitStatus: msg({ id: 'project.changes.status', defaultMessage: '{status, select, M {Modified} A {Added} D {Deleted} R {Renamed} C {Copied} U {Conflict} untracked {Untracked} other {{status}}}', description: "A changed file's git status, in its tooltip in the Changes list." }),
   staged: msg({ id: 'project.changes.staged', defaultMessage: '{status} (staged): {path}', description: "Tooltip on a changed file that is staged. {status} is its status, such as Modified." }),
   unstaged: msg({ id: 'project.changes.unstaged', defaultMessage: '{status}: {path}', description: 'Tooltip on a changed file. {status} is its status, such as Modified.' }),
-  pickerTip: msg({ id: 'project.changes.pickerTip', defaultMessage: 'Unused worktrees, a worktree an agent works in, or the project folder', description: "Tooltip on the Changes tab's folder picker." }),
+  pickerTip: msg({ id: 'project.changes.pickerTip', defaultMessage: 'Two branches compared, unused worktrees, a worktree an agent works in, or the project folder', description: "Tooltip on the Changes tab's picker." }),
   unusedGroup: msg({ id: 'project.changes.unusedGroup', defaultMessage: 'Unused worktrees (no agent works in them)', description: "A group of the Changes tab's folder picker." }),
   unusedLooking: msg({ id: 'project.changes.unusedLooking', defaultMessage: 'Unused worktrees (looking…)', description: "The picker's entry for all unused worktrees while Hive lists them." }),
   unusedCount: msg({ id: 'project.changes.unusedCount', defaultMessage: 'Unused worktrees ({count})', description: "The picker's entry for all unused worktrees." }),
@@ -969,7 +970,7 @@ function ChangesSplit({ listWidth, children }: { listWidth: number; children: Re
  * Whose changes the Changes tab shows (#476): the unused worktrees first (all, or one, each with who made it), then the
  * worktrees agents work in, then the project folder, last (agents working in the folder itself, and you).
  */
-function ChangesPicker({ project, value, onChange, unused, looking, listed }: { project: ProjectInfo; value: string; onChange: (id: string) => void; unused: UnusedWorktree[]; looking: boolean; listed: boolean }) {
+function ChangesPicker({ project, value, onChange, unused, looking, listed, compare }: { project: ProjectInfo; value: string; onChange: (id: string) => void; unused: UnusedWorktree[]; looking: boolean; listed: boolean; compare: ReturnType<typeof useCompareLines> }) {
   // The folders agents work in (#1569): a slot, the slot kept for one, or a 0.9 worktree, each once; a free slot's
   // changes are under the unused worktrees.
   const inUse = project.agents.flatMap((a) => { const own = workFolderOf(a); return own ? [{ a, own }] : [] }).filter((x, i, all) => all.findIndex((y) => samePath(y.own.path, x.own.path)) === i)
@@ -977,6 +978,7 @@ function ChangesPicker({ project, value, onChange, unused, looking, listed }: { 
     <div className="root-row">
       <Tooltip content={tr(C.pickerTip)}>
         <select className="select root-select changes-picker" value={value} onChange={(e) => onChange(e.target.value)}>
+          {compare.lines && compare.lines.branches.length > 1 && <CompareGroup project={project} lines={compare.lines} value={value} />}
           <optgroup label={tr(C.unusedGroup)}>
             <option value={UNUSED_ROOT}>{looking ? tr(C.unusedLooking) : listed ? tr(C.unusedCount, { count: unused.length }) : tr(C.unusedFailed)}</option>
             {unused
@@ -1026,7 +1028,12 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   // until one succeeds (only a list that came back empty means the project folder).
   const hasWorktrees = owner.agents.some((a) => workFolderOf(a)) || unusedList.length > 0
   const resolving = !hasWorktrees && !unusedData
-  const shownId = rootId ?? (hasWorktrees || resolving ? UNUSED_ROOT : '')
+  // Two branches compared (HI-1824): by default the project's integration line against main, when it has one; until the
+  // branches are read, nothing is chosen for it.
+  const compare = useCompareLines(owner)
+  const integration = compare.lines?.integration && compare.lines.main ? compareRoot(compare.lines.main, compare.lines.integration) : null
+  const shownId = rootId ?? integration ?? (!compare.known ? COMPARE_ROOT : hasWorktrees || resolving ? UNUSED_ROOT : '')
+  const compared = parseCompareRoot(shownId)
   const listingUnused = shownId === UNUSED_ROOT
   const spare = shownId.startsWith(`${UNUSED_ROOT}:`) ? (unusedList.find((w) => unusedRoot(w.path) === shownId && (w.branch || w.slot)) ?? null) : null
   // An agent's folder's changes (its slot, the slot kept for it or its 0.9 worktree, #1569) are everything on its branch
@@ -1090,7 +1097,10 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
     }
   }, [file, root, base, status, key, diffTry])
   const choose = (id: string): void => set((s) => ({ changesRoot: { ...s.changesRoot, [owner.path]: id } }))
-  const selector = hasWorktrees || shownId ? <ChangesPicker project={owner} value={shownId} onChange={choose} unused={unusedList} looking={unusedLoading && !unusedData} listed={!!unusedData} /> : null
+  const selector = hasWorktrees || shownId || (compare.lines?.branches.length ?? 0) > 1 ? <ChangesPicker project={owner} value={shownId} onChange={choose} unused={unusedList} looking={unusedLoading && !unusedData} listed={!!unusedData} compare={compare} /> : null
+  if (shownId === COMPARE_ROOT) return <div className="empty-state"><Icon name="loading" spin />{tr(M.loading)}</div>
+  if (compared) return <ComparePage project={owner} base={compared.base} head={compared.head} lines={compare.lines} selector={selector} listWidth={listWidth} onPick={(b, h) => choose(compareRoot(b, h))} />
+
   // Not "not a git repository": git can't run, so Hive can't tell (#346). Whichever page is shown.
   const gitMissing = (problem: string, retry: () => void): React.ReactNode => (
     <div className="empty-state changes-git-missing" style={{ paddingTop: '15vh' }}>

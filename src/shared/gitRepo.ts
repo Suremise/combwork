@@ -241,6 +241,54 @@ export interface GitHistory {
   moreTags: number
 }
 
+/** A local branch the Changes tab can compare (HI-1824), and the folder it is checked out in, if any. */
+export interface CompareBranch {
+  name: string
+  folder: string | null
+}
+
+/** What the Changes tab can compare (HI-1824): the local branches, the main line, and the project's integration line. */
+export interface CompareLines {
+  isRepo: boolean
+  /** Git can't run (#346): nothing else is known. */
+  gitProblem?: string
+  /** By name. */
+  branches: CompareBranch[]
+  /** The repository's default branch, when it is a local branch. */
+  main: string | null
+  /** The project's target (G7) when it is a local branch other than main: the comparison shown by default. */
+  integration: string | null
+}
+
+/** A file `head` changes since it left `base`, as git's name-status letter. */
+export interface CompareFile {
+  path: string
+  status: string
+}
+
+/** Two branches compared (HI-1824): read-only, nothing checked out. */
+export interface GitComparison {
+  base: string
+  head: string
+  /** Where head left base; null when they share no history (the files are then base's tip against head's). */
+  mergeBase: string | null
+  /** Head's commits base hasn't, and base's head hasn't. */
+  ahead: number
+  behind: number
+  /** A page of each side's commits, newest first (COMPARE_COMMITS a page). */
+  aheadCommits: GitCommitRow[]
+  behindCommits: GitCommitRow[]
+  page: number
+  pages: number
+  /** The files head changes since it left base, by path, at most COMPARE_FILES; `filesTotal` counts them all. */
+  files: CompareFile[]
+  filesTotal: number
+}
+
+/** The Changes tab's comparison: commits a page, and files listed at most (HI-1824). */
+export const COMPARE_COMMITS = 50
+export const COMPARE_FILES = 5000
+
 /** Git → History's commits a page (#1643). */
 export const HISTORY_COMMITS = 20
 export const HISTORY_TAGS = 50

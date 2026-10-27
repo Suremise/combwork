@@ -247,6 +247,10 @@
     "defaultMessage": "File is too large to diff ({kb, number} KB).",
     "description": "Shown in place of a file's changes in the Changes tab: the file is too large ({kb} KB) to compare."
   },
+  "service.gitCompare.noBranch": {
+    "defaultMessage": "There's no branch {branch} here any more.",
+    "description": "An error comparing two branches in the Changes tab: the branch {branch} was deleted or renamed since the list was read."
+  },
   "service.gitRepo.addFailed": {
     "defaultMessage": "Couldn't add {remote}: {why}",
     "description": "An error adding the remote {remote} in the Git view; {why} is git's own words."

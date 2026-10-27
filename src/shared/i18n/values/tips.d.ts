@@ -132,6 +132,8 @@ interface HiveMessageValues {
   'tips.compactSidebar.title': undefined
   'tips.compactionHistory.text': undefined
   'tips.compactionHistory.title': undefined
+  'tips.compareBranches.text': undefined
+  'tips.compareBranches.title': undefined
   'tips.conflictHunks.text': undefined
   'tips.conflictHunks.title': undefined
   'tips.consoleRecording.text': undefined

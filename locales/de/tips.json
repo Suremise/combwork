@@ -130,6 +130,8 @@
   "tips.compactSidebar.title": "Eine kompakte Projektliste",
   "tips.compactionHistory.text": "Der Komprimierungsverlauf in der Übersicht blättert, filtert und sortiert die Komprimierungen einer langen Sitzung; klicke auf eine, um sie im Transkript zu lesen, mit der Zusammenfassung, mit der der Agent weitergemacht hat.",
   "tips.compactionHistory.title": "Eine Komprimierung dort lesen, wo sie passiert ist",
+  "tips.compareBranches.text": "Versionsverwaltung → Änderungen vergleicht zwei beliebige lokale Branches, ohne etwas auszuchecken: Wählen Sie einen unter „Branches“, um die Commits zu sehen, die jeder hat und der andere nicht, die Dateien, die er ändert, und den Diff jeder Datei.",
+  "tips.compareBranches.title": "Zwei Branches vergleichen, etwa 1.0.0 mit main",
   "tips.conflictHunks.text": "Schickt die Merge-Warteschlange eine Karte wegen eines Konflikts zurück, listet ihr Abschnitt Arbeit die Dateien: Klicke auf eine, um ihre Konflikte zu sehen, die Seite des Ziels und die der Karte unter ihren Namen, so wie der Test-Merge der Warteschlange sie hatte.",
   "tips.conflictHunks.title": "Die Konflikte einer zurückgegebenen Karte sehen",
   "tips.consoleRecording.text": "In der Entwicklerkonsole schreibt „Aufzeichnen“ in eine Datei, was die CLI eines Agenten an Hive sendet, geschwärzt, außer du hakst für diese Aufzeichnung Text an. „Diagnosedaten kopieren“ kann sie an einen Fehlerbericht anhängen.",

@@ -28,6 +28,7 @@ import { setPinned } from './pin'
 import { presentWindow } from './testQuiet'
 import { insideArchive, insideReal, isFile, samePlace, writeTextAtomic, writeTextUnlessChanged } from './fsutil'
 import { gitDiff, gitStatus } from './git'
+import { compareBranches, compareDiff, compareLines } from './gitCompare'
 import { initCheck, initRepo } from './gitInit'
 import { addRemote, branchDrops, branchUpdatePlan, createBranch, createTag, deleteBranches, deleteRemoteBranches, fetchAll, pull, push, pushToRemote, remoteTracking, removeRemote, renameRemote, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, setUpstream, switchBranch, updateBranch, workTargetOf } from './gitRepo'
 import { checkGit, gitTool } from './gitTool'
@@ -1465,6 +1466,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     // An unused worktree too (#400): read only, as the Changes tab opens it.
     'git:status': (root, base) => gitStatus(workspace.assertChangesRoot(root), base),
     'git:diff': (root, f, base) => gitDiff(workspace.assertChangesRoot(root), f, base),
+    'git:compareLines': async (p) => {
+      p = workspace.assertProject(p)
+      return compareLines(p, await workTargetOf(p))
+    },
+    'git:compare': (p, base, head, page) => compareBranches(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), Number(page) || 1),
+    'git:compareDiff': (p, base, head, f) => compareDiff(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), String(f ?? '')),
     // The file of the diff shown (#495): in the folder the Changes tab shows, which may be an unused worktree outside the
     // workspace that file IPC (guardFile) doesn't reach; inside it by its real location too, so a link can't lead out.
     'changes:openFile': (root, f) => {
