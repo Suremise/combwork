@@ -14,6 +14,7 @@ import { gitFixText, gitProblemText } from '@shared/gitTool'
 import * as actions from '../actions'
 import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
 import { call, errorMessage } from '../api'
+import { projectMergeChoice } from '../mergeChoice'
 import { agentProviderOf, bumpUnused, confirm, focusAfterRemoving, notify, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
 import { msg, tr, tRich } from '@shared/i18n'
 import { confirmDangerousMode } from './PermissionMode'
@@ -901,14 +902,21 @@ const QUEUE_LOOKUP_FAILED = msg({ id: 'agents.mergeDialog.queueLookupFailed', de
 export function MergeDialog() {
   useLanguage()
   const target = useStore((s) => s.mergeFor)
-  const settings = useStore((s) => s.settings)
   const project = useStore((s) => s.workspace?.projects.find((p) => p.path === s.mergeFor?.project) ?? null)
   const found = project?.agents.find((a) => a.id === target?.agentId) ?? null
   const [status, setStatus] = useState<AgentBranchStatus | null>(null)
   /** Why the branch couldn't be read (git missing, say, #346): shown instead of a merge that can't be checked. */
   const [readError, setReadError] = useState<string | null>(null)
   const gitTool = useStore((s) => s.gitTool)
-  const [squash, setSquash] = useState(true)
+  const [squash, setSquash] = useState(false)
+  // Whether the user has picked a merge style in this opening (a click on the one shown too, which changes nothing): the
+  // project's, read after, never overrides it.
+  const chosenStyle = useRef(false)
+  const [styleRead, setStyleRead] = useState(false)
+  const chooseSquash = (v: boolean): void => {
+    chosenStyle.current = true
+    setSquash(v)
+  }
   const [message, setMessage] = useState('')
   const [cleanup, setCleanup] = useState(false)
   const [moveBranch, setMoveBranch] = useState(true)
@@ -934,13 +942,25 @@ export function MergeDialog() {
     setResult(null)
     setBusy(false)
     if (!target || !agent?.tree) return
-    setSquash((settings?.agents.mergeStyle ?? 'merge') === 'squash')
+    // The project's own merge style (HI-1765), once read: a merge commit until then, and never over the user's choice.
+    chosenStyle.current = false
+    setSquash(false)
+    setStyleRead(false)
+    let live = true
+    void projectMergeChoice(target.project).then((style) => {
+      if (!live) return
+      setStyleRead(true)
+      if (!chosenStyle.current) setSquash(style === 'squash')
+    })
     setMessage(unused ? `Work from ${unused.branch}` : `${agent.name}: work from ${agent.tree.branch}`) // i18n-ignore: a commit message, kept in git's history (English, as agents read it)
     setCleanup(false)
     setMoveBranch(true)
     void (unused ? call('worktrees:unusedBranchStatus', target.project, unused.path) : call('agents:branchStatus', target.project, target.agentId))
       .then(setStatus)
       .catch((e) => setReadError(errorMessage(e)))
+    return () => {
+      live = false
+    }
     // Reset when the dialog opens for another agent or worktree.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target?.project, target?.agentId, target?.worktree?.path])
@@ -1152,16 +1172,16 @@ export function MergeDialog() {
               <Icon name="warning" /> {tr(msg({ id: 'agents.mergeDialog.uncommitted', defaultMessage: "{files, plural, one {# file in the worktree isn't committed} other {# files in the worktree aren't committed}}, and Hive merges only committed work. Commit or stash {files, plural, one {it} other {them}} in the worktree, then merge.", description: "The Merge dialog when the worktree has uncommitted files ({files}: how many): Merge is off until they are committed or stashed (git stash) in the worktree." }), { files: status.dirty })}
             </div>
           )}
-          <div className="choice-list">
+          <div className="choice-list" data-merge-style={styleRead ? 'read' : 'reading'}>
             <label className={cx('choice', !squash && 'selected')}>
-              <input type="radio" checked={!squash} onChange={() => setSquash(false)} />
+              <input type="radio" checked={!squash} onClick={() => chooseSquash(false)} onChange={() => chooseSquash(false)} />
               <div>
                 <strong>{tr(MERGE)}</strong>
                 <div className="faint">{unused ? tr(msg({ id: 'agents.mergeDialog.mergeNoteUnused', defaultMessage: 'Keeps its commits and their messages, plus a merge commit.', description: "Under the Merge choice (a git merge) for an unused worktree's branch." })) : tr(msg({ id: 'agents.mergeDialog.mergeNote', defaultMessage: "Keeps the agent's commits and their messages, plus a merge commit. Its next merge brings only what is new.", description: "Under the Merge choice (a git merge) for an agent's work." }))}</div>
               </div>
             </label>
             <label className={cx('choice', squash && 'selected')}>
-              <input type="radio" checked={squash} onChange={() => setSquash(true)} />
+              <input type="radio" checked={squash} onClick={() => chooseSquash(true)} onChange={() => chooseSquash(true)} />
               <div>
                 <strong>{tr(msg({ id: 'agents.mergeDialog.squash', defaultMessage: 'Squash', description: 'A choice in the Merge dialog: one commit with all the work (a git squash merge). Keep it short.' }))}</strong>
                 <div className="faint">{unused ? tr(msg({ id: 'agents.mergeDialog.squashNoteUnused', defaultMessage: 'One commit with everything on it, with the message below.', description: "Under the Squash choice for an unused worktree's branch." })) : tr(msg({ id: 'agents.mergeDialog.squashNote', defaultMessage: 'One commit with everything the agent did, with the message below.', description: "Under the Squash choice for an agent's work." }))}</div>

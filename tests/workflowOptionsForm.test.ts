@@ -935,10 +935,10 @@ describe('G15 and G17 in the form (#1445)', () => {
     expect(lane.own).toMatchObject({ reviewers: 2, reviewerMode: 'lane' })
   })
 
-  it("the scripts' origins: a slot's setup, archive and copied files fall back to Agents & Worktrees' (before 1.0's), else none", () => {
-    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: '.env*' }, 'global')).toEqual({ setup: 'npm install', archive: '', copy: '.env*' })
-    expect(slotOptionsOf({ worktreeSetup: '', worktreeCopy: null }, '.env')).toEqual({ setup: '', archive: '', copy: '.env' })
-    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: '.env*', slots: { setup: 'npm ci', archive: 'node done.js', copy: 'a.json' } }, 'global')).toEqual({ setup: 'npm ci', archive: 'node done.js', copy: 'a.json' })
+  it("the scripts' origins: a slot's setup, archive and copied files fall back to the project's from before 1.0, then the levels', else none", () => {
+    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: '.env*' }, { global: { copy: 'global' } })).toEqual({ setup: 'npm install', archive: '', copy: '.env*' })
+    expect(slotOptionsOf({ worktreeSetup: '', worktreeCopy: null }, { global: { copy: '.env' } })).toEqual({ setup: '', archive: '', copy: '.env' })
+    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: '.env*', slots: { setup: 'npm ci', archive: 'node done.js', copy: 'a.json' } }, { global: { copy: 'global' } })).toEqual({ setup: 'npm ci', archive: 'node done.js', copy: 'a.json' })
   })
 })
 
@@ -1087,17 +1087,47 @@ describe("Slots and copies: one setting saved at a time (#1445, HR5's round 1)",
     await w.mutateProjectConfig(repo, () => ({ worktreeSetup: 'npm ci', worktreeCopy: '.env' }))
     await setSlotSetting(w, repo, 'setup', '')
     await setSlotSetting(w, repo, 'copy', '')
-    expect(slotOptionsOf(await w.projectConfig(repo), '*.local')).toMatchObject({ setup: '', copy: '' })
+    expect(slotOptionsOf(await w.projectConfig(repo), { global: { copy: '*.local' } })).toMatchObject({ setup: '', copy: '' })
     await setSlotSetting(w, repo, 'setup', null)
     await setSlotSetting(w, repo, 'copy', null)
     expect((await w.projectConfig(repo)).slots).toEqual({})
-    expect(slotOptionsOf(await w.projectConfig(repo), '*.local')).toMatchObject({ setup: 'npm ci', copy: '.env' })
-    // With nothing set anywhere, the copy falls back to the settings' patterns.
-    await w.mutateProjectConfig(repo, () => ({ worktreeCopy: undefined }))
-    expect(slotOptionsOf(await w.projectConfig(repo), '*.local').copy).toBe('*.local')
+    // The setup falls back to the old command; the copy's Inherit takes the project's old worktreeCopy too (HI-1765: that
+    // is its own), so it inherits the levels above.
+    expect((await w.projectConfig(repo)).worktreeCopy).toBeNull()
+    expect(slotOptionsOf(await w.projectConfig(repo), { global: { copy: '*.local' } })).toMatchObject({ setup: 'npm ci', copy: '*.local' })
     await setSlotSetting(w, repo, 'copiesSize', 3)
     await setSlotSetting(w, repo, 'copiesSize', null)
     expect((await w.projectConfig(repo)).copies).toEqual({})
+  })
+
+  it("Hive's and the workspace's copied files (HI-1765): set, none or inherit at each level, the project's own winning, each with its origin", async () => {
+    const { setSlotDefault, slotLevelForm, projectSlotCopy, setSlotSetting } = await import('../src/main/slotSettings')
+    const saved = config.settings.slotDefaults
+    try {
+      const { w, repo } = await workspace({})
+      await setSlotDefault(w, 'global', 'copy', null)
+      expect(slotLevelForm(w, 'global')).toEqual({ own: {}, inherited: { copy: { value: '.env*', origin: 'default' } } })
+      expect(await projectSlotCopy(w, repo)).toEqual({ value: '.env*', origin: 'default' })
+      await setSlotDefault(w, 'global', 'copy', 'hive.env')
+      expect(await projectSlotCopy(w, repo)).toEqual({ value: 'hive.env', origin: 'global' })
+      expect(slotLevelForm(w, 'workspace')).toEqual({ own: {}, inherited: { copy: { value: 'hive.env', origin: 'global' } } })
+      // The workspace's none (an empty value) is kept over Hive's, in workspace.json.
+      await setSlotDefault(w, 'workspace', 'copy', '')
+      expect(await projectSlotCopy(w, repo)).toEqual({ value: '', origin: 'workspace' })
+      expect(JSON.parse(readFileSync(join(w.path!, '.hive', 'workspace.json'), 'utf8')).slotDefaults).toEqual({ copy: '' })
+      // The project's own wins over both; its Inherit gives the workspace's back.
+      await setSlotSetting(w, repo, 'copy', 'p.env')
+      expect(await projectSlotCopy(w, repo)).toEqual({ value: 'p.env', origin: 'project' })
+      await setSlotSetting(w, repo, 'copy', null)
+      await setSlotDefault(w, 'workspace', 'copy', null)
+      expect(await projectSlotCopy(w, repo)).toEqual({ value: 'hive.env', origin: 'global' })
+      expect(slotLevelForm(w, 'workspace').own).toEqual({})
+      // A level or key that isn't one is refused.
+      await expect(setSlotDefault(w, 'project' as never, 'copy', 'x')).rejects.toThrow()
+      await expect(setSlotDefault(w, 'global', 'setup' as never, 'x')).rejects.toThrow()
+    } finally {
+      config.settings.slotDefaults = saved
+    }
   })
 
   it('refuses a key or value it has no setting for, and changes nothing', async () => {

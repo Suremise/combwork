@@ -450,14 +450,6 @@ interface HiveMessageValues {
   'settings.agents.leftoverProcesses.option.end': undefined
   'settings.agents.leftoverProcesses.tip': undefined
   'settings.agents.leftoverProcesses.title': undefined
-  'settings.agents.mergeStyle.desc': undefined
-  'settings.agents.mergeStyle.option.merge': undefined
-  'settings.agents.mergeStyle.option.squash': undefined
-  'settings.agents.mergeStyle.tip': undefined
-  'settings.agents.mergeStyle.title': undefined
-  'settings.agents.worktreeCopy.desc': undefined
-  'settings.agents.worktreeCopy.tip': undefined
-  'settings.agents.worktreeCopy.title': undefined
   'settings.api.listening': { url: string | number }
   'settings.api.off': undefined
   'settings.appearance.terminalCursorBlink.desc': undefined
@@ -835,8 +827,6 @@ interface HiveMessageValues {
   'settings.project.metadata.title': undefined
   'settings.project.reset.desc': undefined
   'settings.project.reset.title': undefined
-  'settings.project.slotOptions.desc': undefined
-  'settings.project.slotOptions.title': undefined
   'settings.project.storage.desc': undefined
   'settings.project.storage.title': undefined
   'settings.project.suggestFreshStart.desc': undefined
@@ -852,9 +842,6 @@ interface HiveMessageValues {
   'settings.project.workflow.platform.none': undefined
   'settings.project.workflow.platform.title': undefined
   'settings.project.workflow.title': undefined
-  'settings.project.worktreeCopy.desc': undefined
-  'settings.project.worktreeCopy.tip': undefined
-  'settings.project.worktreeCopy.title': undefined
   'settings.project.worktreeSetup.desc': undefined
   'settings.project.worktreeSetup.tip': undefined
   'settings.project.worktreeSetup.title': undefined
@@ -877,6 +864,8 @@ interface HiveMessageValues {
   'settings.projectSection.advanced.label': undefined
   'settings.projectSection.agents.desc': undefined
   'settings.projectSection.agents.label': undefined
+  'settings.projectSection.general.desc': undefined
+  'settings.projectSection.general.label': undefined
   'settings.projectSection.keys.desc': undefined
   'settings.projectSection.keys.label': undefined
   'settings.projectSection.loops.desc': undefined
@@ -1069,6 +1058,8 @@ interface HiveMessageValues {
   'settings.sessions.usageCacheSize.desc': undefined
   'settings.sessions.usageCacheSize.tip': { min: number; max: number }
   'settings.sessions.usageCacheSize.title': undefined
+  'settings.slotCopy.desc': undefined
+  'settings.slotCopy.title': undefined
   'settings.token.copied': undefined
   'settings.token.copy': undefined
   'settings.token.hide': undefined

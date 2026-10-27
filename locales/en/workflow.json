@@ -100,8 +100,8 @@
     "description": "A button under the checks of “Checks pass before review”."
   },
   "workflow.form.agentsSection": {
-    "defaultMessage": "Agents & Worktrees",
-    "description": "A link to the section \"Agents & Worktrees\" of Project Settings: use its name as translated there."
+    "defaultMessage": "Agents",
+    "description": "A link to the section \"Agents\" of Project Settings: use its name as translated there."
   },
   "workflow.form.allOff": {
     "defaultMessage": "All off",
@@ -1459,13 +1459,9 @@
     "defaultMessage": "These are saved as you change them, apart from the options above.",
     "description": "Under the heading “Slots and copies”: its settings save at once, unlike the workflow options, which are saved with Save…."
   },
-  "workflow.slots.fromCopy": {
-    "defaultMessage": "From Agents & Worktrees’ files to copy",
-    "description": "Where the setting “Files copied into new slots” comes from while it isn’t set: Agents & Worktrees’ list of files to copy into new worktrees (its name as translated there)."
-  },
   "workflow.slots.fromSetup": {
-    "defaultMessage": "From Agents & Worktrees’ setup command",
-    "description": "Where the setting “Setup script” comes from while it isn’t set: the project’s setup command of Project Settings → Agents & Worktrees (its name as translated there)."
+    "defaultMessage": "From the project’s setup command before 1.0",
+    "description": "Where the setting “Setup script” comes from while it isn’t set: the setup command the project had for agents’ worktrees before Hive 1.0."
   },
   "workflow.slots.heading": {
     "defaultMessage": "Slots and copies",
@@ -1481,7 +1477,7 @@
   },
   "workflow.slots.inherit": {
     "defaultMessage": "Inherit",
-    "description": "A button beside a slot setting set for this project: stop setting it here, and use Agents & Worktrees’ value again."
+    "description": "A button beside a slot setting set for this project: stop setting it here, and use the inherited value again (the workspace’s, Hive’s or the default)."
   },
   "workflow.slots.lentCard": {
     "defaultMessage": "{agent}, for {card}",
@@ -1490,6 +1486,14 @@
   "workflow.slots.lentLane": {
     "defaultMessage": "{agent}, for a lane",
     "description": "What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for its lane (glossary: lane)."
+  },
+  "workflow.slots.levelInherit": {
+    "defaultMessage": "Inherit",
+    "description": "A button beside a slot default set at this level (Settings → Workflow defaults or Settings → Workspace): stop setting it here, and use the inherited value (Hive’s, or the default)."
+  },
+  "workflow.slots.levelNone": {
+    "defaultMessage": "Set here: none",
+    "description": "Where a slot default’s value comes from, in Settings → Workflow defaults or Settings → Workspace: this level sets it to nothing (no files are copied), over the value it would inherit."
   },
   "workflow.slots.noSlots": {
     "defaultMessage": "No slots yet: one is made when a card starts.",
@@ -1533,7 +1537,7 @@
   },
   "workflow.slots.setNone": {
     "defaultMessage": "Set for this project: none",
-    "description": "Where a slot setting’s value comes from: this project sets it to nothing (no script runs, no files are copied), over Agents & Worktrees’ value."
+    "description": "Where a slot setting’s value comes from: this project sets it to nothing (no script runs, no files are copied), over the value it would inherit."
   },
   "workflow.slots.setup": {
     "defaultMessage": "Setup script",
@@ -1569,7 +1573,7 @@
   },
   "workflow.slots.useNone": {
     "defaultMessage": "Set to none",
-    "description": "A button beside a slot setting this project inherits from Agents & Worktrees: set it to nothing for this project (no script runs, no files are copied)."
+    "description": "A button beside a slot setting this project inherits (from the workspace, Hive’s settings or before 1.0): set it to nothing for this project (no script runs, no files are copied)."
   },
   "workflow.stage.active": {
     "defaultMessage": "Active",

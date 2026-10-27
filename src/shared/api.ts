@@ -125,6 +125,7 @@ import type {
   WorkspaceInfo
 } from './types'
 import type { PlatformId } from './platform/descriptors'
+import type { SlotLevelForm, SlotOptionOrigin } from './slotDefaults'
 import type { MetricsQuery, MetricsReport } from './metrics'
 import type { Fact } from './workflow/facts'
 import type { CommitMessage, WorkflowOptions } from './workflow/options'
@@ -357,6 +358,12 @@ export interface HiveRequests {
   'slots:list': (projectPath: string) => SlotView[]
   /** One setting of the Version Control tab's Slots and copies (#1445): set, or with null removed, under the project's lock. */
   'slots:setSetting': (projectPath: string, key: 'setup' | 'archive' | 'copy' | 'copiesSize', value: string | number | null) => { slots: SlotOptions; copies: { size?: number } }
+  /** A project's copied files as they inherit (HI-1765: its own, its workspace's, Hive's, the default), and where they come from. */
+  'slots:copyOf': (projectPath: string) => { value: string; origin: SlotOptionOrigin }
+  /** Hive's or the workspace's slot defaults (HI-1765: Settings → Workflow defaults, Git), with what each inherits. */
+  'slots:levelForm': (level: WorkflowLevel) => SlotLevelForm
+  /** Sets one of a level's slot defaults (an empty string: none), or with null removes it, so it inherits. */
+  'slots:setLevelDefault': (level: WorkflowLevel, key: 'copy', value: string | null) => SlotLevelForm
   /** Ends an agent's carried lease (#1441, Release Slot… in its menu): its adopted worktree stops being its own. Whether it did. */
   'slots:releaseCarried': (projectPath: string, agentId: string) => boolean
   /** A slot's writer as Release Slot… shows it (#1506): its holder, whether its run is live, what is listed of its processes. Null: none. */

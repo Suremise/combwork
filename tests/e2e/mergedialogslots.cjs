@@ -6,6 +6,8 @@
 // - a card started by B2 in its own worktree (fake Claude Code, by its token) and submitted, in Review: its line in the
 //   dialog says it is that card's work, with a link to the card, and Merge asks first; once confirmed the merge is
 //   observed outside the rules (Integrated, by outside, with the rules it skipped) and the card is Done.
+// - both dialogs start from the project's merge style (HI-1765): Squash when it squashes, a merge commit when it
+//   merges or rebases, and a choice made before the style is read (held by HIVE_TEST_SLOW_IPC) stays.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 // Dev build only (#1578): slot-a is lent through slots:test, and B2 is a 0.9 worktree agent on purpose (the Merge
 // dialog on an agent's branch); a packaged build refuses both test channels.
@@ -66,9 +68,35 @@ const git = (cwd, args) => lib.git(cwd, ['-c', `user.name=${fx.identity.name}`, 
     check("the slot's Worktrees row names its lease", !!(await until(async () => (await text(wtRow)).includes('slot-a: B1 on #101'), HUNG_MS)), await text(wtRow))
     await shoot(page, '1-branches-slots')
 
+    // --- The dialogs start from the project's own merge style (HI-1765): squash, or a merge commit for merge, rebase.
+    const setStyle = (style) => inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { finish: 'agentMerges', target: 'main', style }) })
+    // The style a dialog shows once it has read the project's (null until then).
+    const styleShown = async (d) => ((await d.locator('.choice-list[data-merge-style="read"]').count()) === 1 ? ((await d.locator('.choice-list input[type="radio"]').nth(1).isChecked()) ? 'squash' : 'merge') : null)
+    const dialog = page.locator('.dialog', { has: page.locator('[data-branch-merge]') })
+    await setStyle('squash')
+    await row(slotLine).locator('[data-action="merge-branch"]').click()
+    check('Merge a branch starts on Squash for a project that squashes', !!(await until(async () => (await styleShown(dialog)) === 'squash', HUNG_MS)), String(await styleShown(dialog)))
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await until(async () => (await dialog.count()) === 0, HUNG_MS)
+    // The project's style read late: Merge chosen before it arrives stays chosen.
+    await h.app.evaluate(() => {
+      process.env.HIVE_TEST_SLOW_IPC = 'workflow:form=2000*1'
+    })
+    await row(slotLine).locator('[data-action="merge-branch"]').click()
+    await until(async () => (await dialog.locator('.choice-list[data-merge-style="reading"]').count()) === 1, HUNG_MS)
+    await dialog.locator('.choice-list label.choice').first().click()
+    check('…and Merge chosen before the style is read stays chosen', !!(await until(async () => (await styleShown(dialog)) !== null, HUNG_MS)) && (await styleShown(dialog)) === 'merge', String(await styleShown(dialog)))
+    await h.app.evaluate(() => {
+      delete process.env.HIVE_TEST_SLOW_IPC
+    })
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await until(async () => (await dialog.count()) === 0, HUNG_MS)
+    await setStyle('rebase')
+
     // --- Merge a branch on the slot's line: into main.
     await row(slotLine).locator('[data-action="merge-branch"]').click()
-    const dialog = page.locator('.dialog', { has: page.locator('[data-branch-merge]') })
+    check('…a merge commit for a project that rebases', !!(await until(async () => (await styleShown(dialog)) === 'merge', HUNG_MS)), String(await styleShown(dialog)))
+    await setStyle('merge')
     check('⑂ opens Merge a branch on that line, into main', !!(await until(async () => (await dialog.locator('select[data-pick="branch"]').inputValue().catch(() => '')) === slotLine, HUNG_MS)) && (await dialog.locator('select[data-pick="target"]').inputValue()) === 'main', await text(dialog))
     check('…listed under "Cards\' lines", with its slot', (await dialog.locator('optgroup[label="Cards\' lines"] option', { hasText: `${slotLine} (in slot-a)` }).count()) === 1)
     check('…"Merges 1 commit from … into main"', !!(await until(async () => (await text(dialog)).includes(`Merges 1 commit from ${slotLine} into main.`), HUNG_MS)), await text(dialog))
@@ -112,9 +140,14 @@ const git = (cwd, args) => lib.git(cwd, ['-c', `user.name=${fx.identity.name}`, 
     await picker.selectOption(b2.id)
     const mergeAgent = page.locator('[data-action="merge-agent"]')
     await until(async () => (await mergeAgent.count()) === 1 && (await mergeAgent.isEnabled()), HUNG_MS)
+    await setStyle('squash')
     await mergeAgent.click()
     const older = page.locator('.dialog', { has: page.locator(`[data-line-card="${n}"]`) })
     check(`the older Merge dialog says the line is ${key}'s work`, !!(await until(async () => (await older.count()) === 1, HUNG_MS)), await text(page.locator('.dialog').last()))
+    check('…starting on Squash for a project that squashes (HI-1765)', !!(await until(async () => (await styleShown(older)) === 'squash', HUNG_MS)), String(await styleShown(older)))
+    await shoot(older, '3b-older-squash')
+    await older.locator('.choice-list label.choice').first().click()
+    await setStyle('merge')
     await until(async () => (await older.locator('[data-action="merge"]').isEnabled().catch(() => false)), HUNG_MS)
     await older.locator('[data-action="merge"]').click()
     const ask = page.locator('.dialog', { hasText: `Merge ${key}'s work outside its card?` })

@@ -91,7 +91,7 @@
   "content.templates.needsIt": "{problem, select, unknown {Ta wersja Hive nie zna agenta programistycznego „{provider}” (zaktualizuj Hive): potrzebuje go agent {agent}.} off {Dostawca {provider} jest wyłączony (Ustawienia → Dostawcy): potrzebuje go agent {agent}.} other {Dostawca {provider} nie jest zainstalowany (Konfiguracja agentów): potrzebuje go agent {agent}.}}",
   "content.templates.noAgents": "Ten projekt nie ma agentów do zapisania.",
   "content.templates.noFile": "Tego pliku nie ma.",
-  "content.templates.noKey": "Hive nie mógł odczytać klucza projektu {project}, a nazwy agentów tego szablonu są z niego tworzone. Spróbuj ponownie lub sprawdź klucz w Ustawieniach projektu → Agenci i worktree.",
+  "content.templates.noKey": "Hive nie mógł odczytać klucza projektu {project}, a nazwy agentów tego szablonu są z niego tworzone. Spróbuj ponownie lub sprawdź klucz w Ustawieniach projektu → Ogólne.",
   "content.templates.noKeySave": "Hive nie mógł odczytać klucza projektu {project}, więc nazw nie da się z nim zapisać. Spróbuj ponownie lub zapisz bez opcji „Używaj klucza projektu w nazwach”.",
   "content.templates.noWorkspace": "Najpierw otwórz obszar roboczy.",
   "content.templates.nothing": "{problem} Nic nie zmieniono.",

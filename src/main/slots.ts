@@ -52,7 +52,8 @@ import * as G from './platform/git'
 import { isUnknown } from './platform/types'
 import { copyIgnored, listWorktrees } from './worktrees'
 import { cardRef } from '../shared/projectKeys'
-import type { ProjectConfig } from '../shared/types'
+import type { AppSettings, ProjectConfig, WorkspaceConfig } from '../shared/types'
+import { slotCopyOf, type SlotLevels } from '../shared/slotDefaults'
 
 const log = createLogger('slots')
 
@@ -221,16 +222,19 @@ export async function lockHash(folder: string): Promise<string | null> {
 }
 
 /**
- * A project's slot options now: project.json's `slots`, else today's worktree setup and copy (Settings → Agents &
- * Worktrees edits those until #1445's Version Control tab), `copyDefault` the settings' copy patterns it inherits.
+ * A project's slot options now: project.json's `slots`, else its setup from before 1.0 (`worktreeSetup`); its copy as it
+ * inherits (shared/slotDefaults.ts: the project's, its workspace's, Hive's, the default; HI-1765), `levels` those above.
  */
-export function slotOptionsOf(cfg: Pick<ProjectConfig, 'slots' | 'worktreeSetup' | 'worktreeCopy'>, copyDefault: string): SlotOptionsNow {
+export function slotOptionsOf(cfg: Pick<ProjectConfig, 'slots' | 'worktreeSetup' | 'worktreeCopy'>, levels: SlotLevels): SlotOptionsNow {
   return {
     setup: cfg.slots?.setup ?? cfg.worktreeSetup ?? '',
     archive: cfg.slots?.archive ?? '',
-    copy: cfg.slots?.copy ?? cfg.worktreeCopy ?? copyDefault ?? ''
+    copy: slotCopyOf(cfg, levels).value
   }
 }
+
+/** The slot defaults above a workspace's projects (HI-1765): Hive's (`settings`), and that workspace's own, as they are now. */
+export const slotLevelsOf = (settings: Pick<AppSettings, 'slotDefaults'>, ws: { config: WorkspaceConfig }): SlotLevels => ({ global: settings.slotDefaults, workspace: ws.config.slotDefaults })
 
 // --- The store.
 

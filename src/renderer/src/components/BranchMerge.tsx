@@ -1,9 +1,10 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { AgentBranchStatus, MergeBranch, MergeBranchList, MergeResult } from '@shared/types'
 import type { BranchQueueCard } from '@shared/workflow/queue'
 import { msg, tr, tRich } from '@shared/i18n'
 import * as actions from '../actions'
 import { call, errorMessage } from '../api'
+import { projectMergeChoice } from '../mergeChoice'
 import { confirm, notify, set, useLanguage, useStore } from '../store'
 import { cx } from '../util'
 import { MergeSlotNote, projectSlots, useMergeSlots } from './MergeSlots'
@@ -109,7 +110,6 @@ export function BranchMergeDialog() {
   useLanguage()
   const open = useStore((s) => s.branchMergeFor)
   const project = useStore((s) => s.workspace?.projects.find((p) => p.path === s.branchMergeFor?.project) ?? null)
-  const settings = useStore((s) => s.settings)
   const [list, setList] = useState<MergeBranchList | null>(null)
   const [listError, setListError] = useState<string | null>(null)
   const [branch, setBranch] = useState('')
@@ -117,7 +117,15 @@ export function BranchMergeDialog() {
   const [status, setStatus] = useState<AgentBranchStatus | null>(null)
   const [readError, setReadError] = useState<string | null>(null)
   const [cards, setCards] = useState<{ queue: BranchQueueCard | null; line: MergeBranch['card'] | null } | null>(null)
-  const [squash, setSquash] = useState(true)
+  const [squash, setSquash] = useState(false)
+  // Whether the user has picked a merge style in this opening (a click on the one shown too, which changes nothing): the
+  // project's, read after, never overrides it.
+  const chosenStyle = useRef(false)
+  const [styleRead, setStyleRead] = useState(false)
+  const chooseSquash = (v: boolean): void => {
+    chosenStyle.current = true
+    setSquash(v)
+  }
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<MergeResult | null>(null)
@@ -131,7 +139,15 @@ export function BranchMergeDialog() {
     setBusy(false)
     if (!open) return
     let live = true
-    setSquash((settings?.agents.mergeStyle ?? 'merge') === 'squash')
+    // The project's own merge style (HI-1765), once read: a merge commit until then, and never over the user's choice.
+    chosenStyle.current = false
+    setSquash(false)
+    setStyleRead(false)
+    void projectMergeChoice(open.project).then((style) => {
+      if (!live) return
+      setStyleRead(true)
+      if (!chosenStyle.current) setSquash(style === 'squash')
+    })
     void call('worktrees:mergeBranches', open.project).then(
       (l) => {
         if (!live) return
@@ -306,16 +322,16 @@ export function BranchMergeDialog() {
                   </div>
                 )}
                 <MergeSlotNote slot={slot} />
-                <div className="choice-list">
+                <div className="choice-list" data-merge-style={styleRead ? 'read' : 'reading'}>
                   <label className={cx('choice', !squash && 'selected')}>
-                    <input type="radio" checked={!squash} onChange={() => setSquash(false)} />
+                    <input type="radio" checked={!squash} onClick={() => chooseSquash(false)} onChange={() => chooseSquash(false)} />
                     <div>
                       <strong>{tr(M.merge)}</strong>
                       <div className="faint">{tr(M.mergeNote)}</div>
                     </div>
                   </label>
                   <label className={cx('choice', squash && 'selected')}>
-                    <input type="radio" checked={squash} onChange={() => setSquash(true)} />
+                    <input type="radio" checked={squash} onClick={() => chooseSquash(true)} onChange={() => chooseSquash(true)} />
                     <div>
                       <strong>{tr(M.squash)}</strong>
                       <div className="faint">{tr(M.squashNote)}</div>

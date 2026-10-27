@@ -6,7 +6,8 @@
 // - the setup script set in Slots and copies is the one the next warming run uses (a marker file in the slot), and the
 //   slots list shows the lent slot with its card; the copies' size saves; two fields saved while the first save is slow
 //   (HIVE_TEST_SLOW_IPC) both stay, with another window's change; the setup emptied is "none", and Inherit undoes it;
-// - Project Settings → Agents & Worktrees points to the group;
+// - the copied files inherit Hive's slot default, then the workspace's (set to none in Settings → Workspace), then the
+//   default, each saying where it comes from (HI-1765); Project Settings opens on General, with no slot rows;
 // - a project saved by a P6 build with Pair (G15 stored Off, the one-time step not run yet) reads as Pair, not Custom,
 //   after the next start, with G15 On.
 // Screenshots of the Slots and copies group and the G11/G15/G17 rows, light and dark, in English and German.
@@ -157,7 +158,7 @@ function board(sql, ...args) {
     await app.evaluate(() => {
       delete process.env.HIVE_TEST_SLOW_IPC
     })
-    // Emptied, the setup script is this project's "none" over Agents & Worktrees' value; Inherit uses that again.
+    // Emptied, the setup script is this project's "none" over its setup command from before 1.0; Inherit uses that again.
     await inv('project:updateConfig', fx.alpha, { worktreeSetup: 'npm ci --old' })
     const setupOrigin = slotsGroup.locator('[data-slot-option="setup"] .workflow-origin')
     await until(async () => (await setupField.inputValue()) === 'npm ci --other-window', HUNG_MS)
@@ -166,29 +167,52 @@ function board(sql, ...args) {
     check('emptied, the setup script is set to none, over the old setup', !!(await until(async () => projectJson().slots?.setup === '' && (await setupOrigin.getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(projectJson().slots))
     await shot('slots-none', slotsGroup)
     await slotsGroup.locator('[data-action="inherit-setup"]').click()
-    check('Inherit uses Agents & Worktrees’ setup again', !!(await until(async () => projectJson().slots && !('setup' in projectJson().slots) && (await setupOrigin.getAttribute('data-origin')) === 'worktreeSetup' && (await setupOrigin.innerText()).includes('npm ci --old'), HUNG_MS)), JSON.stringify(projectJson().slots))
+    check('Inherit uses the old setup command again', !!(await until(async () => projectJson().slots && !('setup' in projectJson().slots) && (await setupOrigin.getAttribute('data-origin')) === 'worktreeSetup' && (await setupOrigin.innerText()).includes('npm ci --old'), HUNG_MS)), JSON.stringify(projectJson().slots))
     check('…with no Inherit button left', (await slotsGroup.locator('[data-action="inherit-setup"]').count()) === 0)
     // From an inherited value straight to none, with no value of the project's first (HR5's round 2), then back.
     await slotsGroup.locator('[data-action="none-setup"]').click()
     check('an inherited setup is set to none with Set to none', !!(await until(async () => projectJson().slots?.setup === '' && (await setupOrigin.getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(projectJson().slots))
     await slotsGroup.locator('[data-action="inherit-setup"]').click()
     check('…and inherits again', !!(await until(async () => !('setup' in (projectJson().slots ?? {})) && (await setupOrigin.getAttribute('data-origin')) === 'worktreeSetup', HUNG_MS)), JSON.stringify(projectJson().slots))
-    // The copied files: the project's own back to inherited, where nothing but Hive's own default (Agents & Worktrees) is set.
-    const hiveCopy = (await inv('settings:get')).agents.worktreeCopy
+    // The copied files (HI-1765): the project's own back to inherited, from Hive's slot default (Settings → Workflow
+    // defaults), then the workspace's set to none in Settings → Workspace, over Hive's; the project's own none over both.
+    await inv('slots:setLevelDefault', 'global', 'copy', '.env*\nconfig/hive.json')
     const copyOrigin = slotsGroup.locator('[data-slot-option="copy"] .workflow-origin')
     await slotsGroup.locator('[data-action="inherit-copy"]').click()
-    check('the copied files inherit Hive’s default', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'worktreeCopy' && (await copyOrigin.innerText()).includes(hiveCopy.trim().split('\n')[0]), HUNG_MS)), `${JSON.stringify(projectJson().slots)} ${JSON.stringify(hiveCopy)}`)
+    check('the copied files inherit Hive’s slot default, From Hive’s settings', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/hive.json'), HUNG_MS)), `${JSON.stringify(projectJson().slots)} ${await copyOrigin.innerText().catch(() => '')}`)
+    await shot('copy-global', slotsGroup.locator('[data-slot-option="copy"]'))
+    await page.keyboard.press('Control+,')
+    await page.locator('.settings-nav .row', { hasText: 'Workspace' }).first().click()
+    const wsCopy = page.locator('[data-slot-default="copy"][data-level="workspace"]')
+    check('Settings → Workspace has the copied files, inheriting Hive’s', !!(await until(async () => (await wsCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'global' && (await wsCopy.innerText()).includes('config/hive.json'), HUNG_MS)), await wsCopy.innerText().catch(() => ''))
+    const wsJson = () => JSON.parse(fs.readFileSync(path.join(fx.ws, '.hive', 'workspace.json'), 'utf8'))
+    await wsCopy.locator('[data-action="none-copy"]').click()
+    check('…set to none there, saved in workspace.json', !!(await until(async () => wsJson().slotDefaults?.copy === '' && (await wsCopy.locator('.workflow-origin').getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(wsJson().slotDefaults))
+    await shot('copy-workspace-none', wsCopy)
+    await page.keyboard.press('Escape')
+    await openWorkflow(fx.alpha)
+    check('the project then inherits the workspace’s none, From the workspace', !!(await until(async () => (await copyOrigin.getAttribute('data-origin').catch(() => '')) === 'workspace' && (await copyOrigin.innerText()).includes('None'), HUNG_MS)), await copyOrigin.innerText().catch(() => ''))
+    await inv('slots:setLevelDefault', 'workspace', 'copy', null)
+    // Hive's level changing tells the window, which reads the project's copied files again (the workspace's now unset).
+    await inv('slots:setLevelDefault', 'global', 'copy', '.env*\nconfig/again.json')
+    check('…and Hive’s again once the workspace’s is unset', !!(await until(async () => (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/again.json'), HUNG_MS)), await copyOrigin.innerText().catch(() => ''))
     await slotsGroup.locator('[data-action="none-copy"]').click()
     check('…are set to none from there with Set to none', !!(await until(async () => projectJson().slots?.copy === '' && (await copyOrigin.getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(projectJson().slots))
     await shot('copy-none', slotsGroup)
     await slotsGroup.locator('[data-action="inherit-copy"]').click()
-    check('…and inherit it again', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'worktreeCopy', HUNG_MS)), JSON.stringify(projectJson().slots))
+    check('…and inherit it again', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'global', HUNG_MS)), JSON.stringify(projectJson().slots))
+    await inv('slots:setLevelDefault', 'global', 'copy', null)
+    check('…and the default, .env*, with no level setting one', !!(await until(async () => (await copyOrigin.getAttribute('data-origin')) === 'default' && (await copyOrigin.innerText()).includes('.env*'), HUNG_MS)), await copyOrigin.innerText().catch(() => ''))
     check('Reviewers review in review copies shows Advanced’s switch', (await slotsGroup.locator('[data-slot-option="reviewCopies"] [data-value]').getAttribute('data-value')) === 'on')
     await shot('slots-group', slotsGroup)
 
-    // --- Project Settings → Agents & Worktrees points to the group.
+    // --- Project Settings: General first, and no slot rows or link (HI-1765).
     await lib.openProjectSettings(page)
-    check('Agents & Worktrees has a line with Open Version Control, not the setup and copy rows', !!(await until(async () => (await page.locator('[data-action="open-slot-options"]').count()) === 1, HUNG_MS)) && (await page.locator('.setting', { hasText: 'Setup command' }).count()) === 0)
+    check('Project Settings opens on General, with no Slots and copies line or setup and copy rows', !!(await until(async () => (await page.locator('.settings-nav .row.selected .label').innerText().catch(() => '')) === 'General', HUNG_MS)) && (await page.locator('[data-action="open-slot-options"]').count()) === 0 && (await page.locator('.setting', { hasText: 'Setup command' }).count()) === 0 && (await page.locator('.setting', { hasText: 'Copy into new worktrees' }).count()) === 0)
+    await shot('project-general', page.locator('.settings-content'))
+    await page.locator('.settings-nav .row', { hasText: /^\s*Agents\s*$/ }).first().click()
+    check('…and Agents lists the agents, in the project folder or a slot', !!(await until(async () => (await page.locator('.agent-list-row').count()) === 2, HUNG_MS)))
+    await shot('project-agents', page.locator('.settings-content'))
 
     // --- German.
     const lang = (await inv('app:info')).language

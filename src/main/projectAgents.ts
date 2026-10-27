@@ -9,6 +9,8 @@ import { cleanMcpServers } from '../shared/agentMcp'
 import { isWorkflowRole, type WorkflowRole } from '../shared/workflow/roles'
 import type { AddAgentOptions, AddedAgent, AgentBranchStatus, AgentDef, AgentPatch, MergeResult, ProjectConfig, ProjectGitInfo, RemovedAgent, SessionLayout, WorktreeCheck, WorktreeMatch } from '../shared/types'
 import { config } from './config'
+import { slotLevelsOf } from './slots'
+import { slotCopyOf } from '../shared/slotDefaults'
 import { toast } from './events'
 import { placeKey, samePlace } from './fsutil'
 import { withRepoLock } from './repoLock'
@@ -285,7 +287,7 @@ export async function addLegacyAgent(projectPath: string, opts: AddAgentOptions)
     const { branch, path: dest, newSpace } = await newWorktreePlace(projectPath, name, opts.branch)
     await wt.createWorktree(projectPath, dest, branch, base)
     if (newSpace) await recordSpace(projectPath, newSpace)
-    await wt.copyIgnored(projectPath, dest, cfg.worktreeCopy ?? config.settings.agents.worktreeCopy)
+    await wt.copyIgnored(projectPath, dest, slotCopyOf(cfg, slotLevelsOf(config.settings, workspaceOf(projectPath))).value)
     tree = { path: dest, branch, base }
   }
   const def = await addAgent(projectPath, { ...opts, location: 'project', branch: undefined, base: undefined, worktreePath: undefined, reuseWorktree: undefined })

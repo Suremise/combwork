@@ -9,6 +9,7 @@ import { checkOptions, problemText, workflowChanged } from './workflow/rulesets'
 import { checkPlatformSwitch, oldRulesLine, setPlatform } from './workflow/platformSwitch'
 import { englishError, HiveError } from './hiveError'
 import { levelOwn, setLevelOptions } from './workflow/levels'
+import { setSlotDefault } from './slotSettings'
 import { workflowWrite } from './workflow/writes'
 import { withRepoLocks } from './repoLock'
 import { problemEnglish, WorkflowRefused } from './workflow/optionsForm'
@@ -72,7 +73,9 @@ function takesText(e: SettingEntry, project: ProjectConfig | null): string {
   if (def) return `${advancedTakes(def)} null: ${e.advanced?.scope === 'workspace' ? "Settings → Advanced's value" : "Hive's default"}.`
   const kind = settingKind(e)
   if (e.workflow) return workflowTakes(e, kind)
-  const inherit = e.scope === 'project' && e.inherits && (kind === 'number' || e.key === 'worktreeCopy') ? ', or null to inherit' : ''
+  // A slot default (HI-1765): patterns, "" for none, null to inherit.
+  if (e.slotLevel) return 'glob patterns, comma separated or one per line ("" for none), or null to inherit'
+  const inherit = e.scope === 'project' && e.inherits && kind === 'number' ? ', or null to inherit' : ''
   switch (kind) {
     case 'boolean':
       return 'true or false'
@@ -133,7 +136,7 @@ export function settingRows(opts: { query?: string; scope?: SettingScope; projec
       const value = settingValue(e, config.settings, opts.project?.config, workspace.config, advanced.overrides())
       const def = settingDefault(e)
       const changed = JSON.stringify(value) !== JSON.stringify(def)
-      return { row: { id: e.id, title: e.title, value: settingValueText(e, value), ...(changed ? { default: settingValueText(e, def) } : {}), desc: firstSentence(e.desc), ...(e.readOnly ? { readOnly: true as const } : {}) }, advanced: !!e.advanced, level: !!e.workflowLevel, changed }
+      return { row: { id: e.id, title: e.title, value: settingValueText(e, value), ...(changed ? { default: settingValueText(e, def) } : {}), desc: firstSentence(e.desc), ...(e.readOnly ? { readOnly: true as const } : {}) }, advanced: !!e.advanced, level: !!e.workflowLevel || (!!e.slotLevel && e.slotLevel !== 'project'), changed }
     })
   // Advanced settings (#367) and the workflow defaults at Hive's and the workspace's level (#1422) only when a query asks
   // or one was changed: the rest are one line each, so a plain listing stays lean.
@@ -270,6 +273,13 @@ export async function applySetting(
       if (err instanceof WorkflowRefused) throw new SettingRefused(400, `These workflow defaults can't be saved: ${err.problems.map(problemEnglish).join(' ')} Change the other options first, or tell the user.`)
       throw err
     }
+    return { old, new: settingValue(e, config.settings, null, workspace.config) }
+  }
+  if ('slotLevel' in change) {
+    // A level's slot default (HI-1765), saved as Settings saves it: Hive's at once, the workspace's in its save queue.
+    const old = settingValue(e, config.settings, null, workspace.config)
+    guard?.(old)
+    await setSlotDefault(workspace, change.slotLevel.level, change.slotLevel.key, change.slotLevel.value)
     return { old, new: settingValue(e, config.settings, null, workspace.config) }
   }
   if ('workspace' in change) {

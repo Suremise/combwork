@@ -91,7 +91,7 @@
   "content.templates.needsIt": "{problem, select, unknown {Esta versión de Hive no conoce el agente de programación “{provider}” (actualiza Hive): el agente {agent} lo necesita.} off {{provider} está desactivado (Configuración → Proveedores): el agente {agent} lo necesita.} other {{provider} no está instalado (Configuración de agentes): el agente {agent} lo necesita.}}",
   "content.templates.noAgents": "Este proyecto no tiene agentes que guardar.",
   "content.templates.noFile": "Ese archivo ya no está.",
-  "content.templates.noKey": "Hive no pudo leer la clave de {project}, y los nombres de agente de esta plantilla se forman a partir de ella. Inténtalo de nuevo o revisa la clave en Configuración del proyecto → Agentes y worktrees.",
+  "content.templates.noKey": "Hive no pudo leer la clave de {project}, y los nombres de agente de esta plantilla se forman a partir de ella. Inténtalo de nuevo o revisa la clave en Configuración del proyecto → General.",
   "content.templates.noKeySave": "Hive no pudo leer la clave de {project}, así que los nombres no se pueden guardar con ella. Inténtalo de nuevo o guarda sin “Usar la clave del proyecto en los nombres”.",
   "content.templates.noWorkspace": "Abre primero un espacio de trabajo.",
   "content.templates.nothing": "{problem} No se cambió nada.",

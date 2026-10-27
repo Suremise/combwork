@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { CopyView, ProjectInfo, SlotView } from '@shared/types'
+import type { CopyView, ProjectInfo, SlotView, WorkflowLevel } from '@shared/types'
+import { SLOT_COPY_TEXT, type SlotLevelForm, type SlotOptionOrigin } from '@shared/slotDefaults'
 import { COPIES_REVIEW } from '@shared/advanced'
 import { reviewsWork, agentWorkflowRole } from '@shared/workflow/roles'
 import { msg, tr } from '@shared/i18n'
@@ -9,13 +10,14 @@ import { useAdvancedValue } from '../advanced'
 import { cardLabelOf, openVersionControl, set as setStore, setActivity, useStore } from '../store'
 import { NumberField } from './NumberField'
 import { Icon } from './ui'
+import { ORIGIN_TEXT } from '../workflowOrigins'
 
 /**
  * The Version Control tab's Slots and copies group (#1445, SPEC §16.10.2, §16.10.5), Git only, beside the workflow
  * options: these aren't rules but the project's slot and copy settings (project.json `slots` and `copies`), each saved
  * as it is changed. With cards built in slots (G11): the setup and archive scripts and the files copied into a new slot,
- * each showing where its value comes from when unset (Agents & Worktrees' setup command and copied files, as before
- * 1.0), and the slots in use or ready. With any G11: the review and check copies' pool size and whether reviewers review
+ * each showing where its value comes from when unset (the setup command from before 1.0; the copied files as they
+ * inherit, HI-1765: the workspace's, Hive's, the default), and the slots in use or ready. With any G11: the review and check copies' pool size and whether reviewers review
  * in them (Settings → Advanced's switch).
  */
 
@@ -28,12 +30,11 @@ const T = {
   archiveDesc: msg({ id: 'workflow.slots.archiveDesc', defaultMessage: 'Runs in a slot before Hive removes it. If it fails, the slot is kept.', description: 'What the setting “Archive script” does (glossary 2.5: slot).' }),
   copy: msg({ id: 'workflow.slots.copy', defaultMessage: 'Files copied into new slots', description: 'A setting under “Slots and copies”: the git-ignored files copied from the project folder into each new slot.' }),
   copyDesc: msg({ id: 'workflow.slots.copyDesc', defaultMessage: 'Git-ignored files copied from the project folder into each new slot, one pattern per line, such as .env files.', description: 'What the setting “Files copied into new slots” does (glossary 2.5: slot).' }),
-  fromSetup: msg({ id: 'workflow.slots.fromSetup', defaultMessage: 'From Agents & Worktrees’ setup command', description: 'Where the setting “Setup script” comes from while it isn’t set: the project’s setup command of Project Settings → Agents & Worktrees (its name as translated there).' }),
-  fromCopy: msg({ id: 'workflow.slots.fromCopy', defaultMessage: 'From Agents & Worktrees’ files to copy', description: 'Where the setting “Files copied into new slots” comes from while it isn’t set: Agents & Worktrees’ list of files to copy into new worktrees (its name as translated there).' }),
+  fromSetup: msg({ id: 'workflow.slots.fromSetup', defaultMessage: 'From the project’s setup command before 1.0', description: 'Where the setting “Setup script” comes from while it isn’t set: the setup command the project had for agents’ worktrees before Hive 1.0.' }),
   none: msg({ id: 'workflow.slots.none', defaultMessage: 'None', description: 'A slot script that isn’t set: nothing runs.' }),
-  setNone: msg({ id: 'workflow.slots.setNone', defaultMessage: 'Set for this project: none', description: 'Where a slot setting’s value comes from: this project sets it to nothing (no script runs, no files are copied), over Agents & Worktrees’ value.' }),
-  toNone: msg({ id: 'workflow.slots.useNone', defaultMessage: 'Set to none', description: 'A button beside a slot setting this project inherits from Agents & Worktrees: set it to nothing for this project (no script runs, no files are copied).' }),
-  inherit: msg({ id: 'workflow.slots.inherit', defaultMessage: 'Inherit', description: 'A button beside a slot setting set for this project: stop setting it here, and use Agents & Worktrees’ value again.' }),
+  setNone: msg({ id: 'workflow.slots.setNone', defaultMessage: 'Set for this project: none', description: 'Where a slot setting’s value comes from: this project sets it to nothing (no script runs, no files are copied), over the value it would inherit.' }),
+  toNone: msg({ id: 'workflow.slots.useNone', defaultMessage: 'Set to none', description: 'A button beside a slot setting this project inherits (from the workspace, Hive’s settings or before 1.0): set it to nothing for this project (no script runs, no files are copied).' }),
+  inherit: msg({ id: 'workflow.slots.inherit', defaultMessage: 'Inherit', description: 'A button beside a slot setting set for this project: stop setting it here, and use the inherited value again (the workspace’s, Hive’s or the default).' }),
   setHere: msg({ id: 'workflow.slots.setHere', defaultMessage: 'Set for this project', description: 'Where a slot setting’s value comes from: set in this project.' }),
   inUse: msg({ id: 'workflow.slots.inUse', defaultMessage: 'Slots in use and ready', description: 'A read-only list under “Slots and copies”: the project’s slots, what each is lent to, and those ready (glossary 2.5: slot).' }),
   noSlots: msg({ id: 'workflow.slots.noSlots', defaultMessage: 'No slots yet: one is made when a card starts.', description: 'Under “Slots in use and ready” when the project has no slot yet.' }),
@@ -59,8 +60,14 @@ const T = {
   off: msg({ id: 'workflow.slots.off', defaultMessage: 'Off', description: 'A setting’s value: off.' }),
   held: msg({ id: 'workflow.slots.held', defaultMessage: "Held by {agent}'s ended session", description: "In the list of slots (Version Control → Slots and copies): the agent's ({agent}) last session there has ended, but Hive doesn't know that everything it started has, so nothing else uses the slot until it is released (#1506)." }),
   release: msg({ id: 'workflow.slots.release', defaultMessage: 'Release…', description: 'A button beside a held slot in the list of slots: asks, then frees it for other work (#1506).' }),
-  openAdvanced: msg({ id: 'workflow.slots.openAdvanced', defaultMessage: 'Open Advanced', description: 'A button beside “Reviewers review in review copies”: opens Settings → Advanced.' })
+  openAdvanced: msg({ id: 'workflow.slots.openAdvanced', defaultMessage: 'Open Advanced', description: 'A button beside “Reviewers review in review copies”: opens Settings → Advanced.' }),
+  saveFailed: msg({ id: 'workflow.slots.saveFailed', defaultMessage: 'Couldn’t save the slot settings', description: 'An error saving a setting under “Slots and copies”.' }),
+  levelNone: msg({ id: 'workflow.slots.levelNone', defaultMessage: 'Set here: none', description: 'Where a slot default’s value comes from, in Settings → Workflow defaults or Settings → Workspace: this level sets it to nothing (no files are copied), over the value it would inherit.' }),
+  levelInherit: msg({ id: 'workflow.slots.levelInherit', defaultMessage: 'Inherit', description: 'A button beside a slot default set at this level (Settings → Workflow defaults or Settings → Workspace): stop setting it here, and use the inherited value (Hive’s, or the default).' })
 }
+
+/** Where an inherited slot option comes from (HI-1765), in the workflow options' words. */
+const copyOrigin = (o: SlotOptionOrigin) => (o === 'default' ? ORIGIN_TEXT.platform : ORIGIN_TEXT[o])
 
 /** A slot's line in the list: what it is lent to (or carries), in words. */
 function lentText(s: SlotView, agentName: (id: string) => string, card: (n: number) => string): string | null {
@@ -72,24 +79,28 @@ function lentText(s: SlotView, agentName: (id: string) => string, card: (n: numb
 }
 
 export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots: boolean }) {
-  const settings = useStore((s) => s.settings)
   const tasks = useStore((s) => s.tasks)
   const reviewOn = useAdvancedValue<boolean>(COPIES_REVIEW) !== false
   const cfg = project.config
   const [list, setList] = useState<SlotView[] | null>(null)
   const [copies, setCopies] = useState<CopyView[] | null>(null)
+  const [copyNow, setCopyNow] = useState<{ value: string; origin: SlotOptionOrigin } | null>(null)
   const reload = useCallback(() => {
     void call('slots:list', project.path).then(setList, () => setList([]))
     void call('copies:list', project.path).then(setCopies, () => setCopies([]))
+    void call('slots:copyOf', project.path).then(setCopyNow, () => setCopyNow(null))
   }, [project.path])
-  useEffect(reload, [reload, project.config])
+  // Hive's slot defaults are the settings' (a change there reaches every project's tab); the workspace's come with it.
+  const levels = useStore((s) => s.settings?.slotDefaults)
+  const wsLevels = useStore((s) => s.workspace?.config.slotDefaults)
+  useEffect(reload, [reload, project.config, levels, wsLevels])
   // Each setting saved on its own, one key under the project's lock in main (HR5's round 1: never the whole `slots` as this
   // window last read it), and each field's saves in the order made. A save that fails shows what is stored again.
   const queues = useRef(new Map<string, Promise<void>>())
   const [shown, setShown] = useState(0)
   const save = (key: 'setup' | 'archive' | 'copy' | 'copiesSize', value: string | number | null): Promise<void> => {
     const next = (queues.current.get(key) ?? Promise.resolve()).then(async () => {
-      const done = await actions.attempt(tr(msg({ id: 'workflow.slots.saveFailed', defaultMessage: 'Couldn’t save the slot settings', description: 'An error saving a setting under “Slots and copies”.' })), () => call('slots:setSetting', project.path, key, value))
+      const done = await actions.attempt(tr(T.saveFailed), () => call('slots:setSetting', project.path, key, value))
       await actions.refreshWorkspace()
       if (!done) setShown((x) => x + 1)
     })
@@ -98,7 +109,7 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
   }
   /**
    * A field's text as the project's own value. The setup script and copied files: emptied, it is "none" (nothing runs, no
-   * file is copied, over Agents & Worktrees' value). An inherited one has Set to none (HR5's round 2: an empty field over an inherited value
+   * file is copied, over the inherited value). An inherited one has Set to none (HR5's round 2: an empty field over an inherited value
    * isn't a change), and one set here Inherit. The archive script has nothing to inherit.
    */
   const setSlot = (key: 'setup' | 'archive' | 'copy', v: string): Promise<void> => save(key, key === 'archive' && !v.trim() ? null : v)
@@ -108,8 +119,10 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
   const agentName = (id: string): string => project.agents.find((a) => a.id === id)?.name ?? id
   const card = (n: number): string => cardLabelOf({ tasks }, n)
   const setupOwn = cfg.slots?.setup
-  const copyOwn = cfg.slots?.copy
-  const copyInherited = cfg.worktreeCopy ?? settings?.agents.worktreeCopy ?? ''
+  // The project's own copy: its slots.copy, else its worktreeCopy from before 1.0 (HI-1765); what it inherits otherwise,
+  // and from where, is main's (slots:copyOf, the one resolver).
+  const copyOwn = cfg.slots?.copy ?? cfg.worktreeCopy ?? undefined
+  const copyInherited = copyNow && copyNow.origin !== 'project' ? copyNow.value : ''
   return (
     <section className="workflow-group workflow-slots" data-group="slots">
       <h3 className="workflow-group-h">{tr(T.heading)}</h3>
@@ -159,8 +172,8 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                 {tr(T.copy)}
               </div>
               <div className="s-desc">{tr(T.copyDesc)}</div>
-              <div className="s-desc workflow-origin" data-origin={copyOwn === undefined ? 'worktreeCopy' : copyOwn.trim() ? 'project' : 'none'}>
-                {copyOwn === undefined ? `${tr(T.fromCopy)}: ${copyInherited.trim() || tr(T.none)}` : tr(copyOwn.trim() ? T.setHere : T.setNone)}
+              <div className="s-desc workflow-origin" data-origin={copyOwn === undefined ? (copyNow?.origin ?? 'default') : copyOwn.trim() ? 'project' : 'none'}>
+                {copyOwn === undefined ? `${tr(copyOrigin(copyNow?.origin ?? 'default'))}: ${copyInherited.trim() || tr(T.none)}` : tr(copyOwn.trim() ? T.setHere : T.setNone)}
                 {copyOwn !== undefined ? (
                   <button className="btn subtle small workflow-inherit" data-action="inherit-copy" onClick={() => void save('copy', null)}>
                     {tr(T.inherit)}
@@ -238,6 +251,63 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
         </div>
       </div>
     </section>
+  )
+}
+
+/**
+ * A level's copied files (HI-1765), in Settings → Workflow defaults (Git: Hive's) and Settings → Workspace's workflow
+ * defaults: its own patterns, none, or inherit (the workspace's: Hive's; Hive's: the default), saved as it is changed.
+ * Its projects inherit it in Version Control → Slots and copies.
+ */
+export function SlotCopyLevel({ level }: { level: WorkflowLevel }) {
+  const workspacePath = useStore((s) => s.workspace?.path ?? '')
+  const [form, setForm] = useState<SlotLevelForm | null>(null)
+  const [shown, setShown] = useState(0)
+  useEffect(() => {
+    let live = true
+    void call('slots:levelForm', level).then(
+      (f) => live && setForm(f),
+      () => live && setForm(null)
+    )
+    return () => {
+      live = false
+    }
+  }, [level, workspacePath])
+  const save = async (value: string | null): Promise<void> => {
+    const next = await actions.attempt(tr(T.saveFailed), () => call('slots:setLevelDefault', level, 'copy', value))
+    if (next) setForm(next)
+    else setShown((x) => x + 1)
+    // The projects' tabs read it again: Hive's comes with the settings, the workspace's with the workspace.
+    if (level === 'workspace') await actions.refreshWorkspace()
+  }
+  if (!form) return null
+  const own = form.own.copy
+  const inherited = form.inherited.copy
+  return (
+    <div className="setting" data-slot-default="copy" data-level={level}>
+      <div className="s-text">
+        <div className="s-title">
+          {own !== undefined && <span className="modified" />}
+          {tr(SLOT_COPY_TEXT.title)}
+        </div>
+        <div className="s-desc">{tr(SLOT_COPY_TEXT.desc)}</div>
+        <div className="s-desc workflow-origin" data-origin={own === undefined ? inherited.origin : own.trim() ? 'here' : 'none'}>
+          {own === undefined ? `${tr(copyOrigin(inherited.origin))}: ${inherited.value.trim() || tr(T.none)}` : tr(own.trim() ? ORIGIN_TEXT.here : T.levelNone)}
+          {own !== undefined ? (
+            <button className="btn subtle small workflow-inherit" data-action="inherit-copy" onClick={() => void save(null)}>
+              {tr(T.levelInherit)}
+            </button>
+          ) : (
+            <button className="btn subtle small workflow-inherit" data-action="none-copy" onClick={() => void save('')}>
+              {tr(T.toNone)}
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="s-control">
+        <Field key={`copy-${shown}`} multiline value={own ?? ''} placeholder={own !== undefined ? tr(T.none) : inherited.value} onCommit={(v) => void save(v)} />
+      </div>
+    </div>
   )
 }
 

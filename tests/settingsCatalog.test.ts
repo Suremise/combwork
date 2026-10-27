@@ -86,7 +86,9 @@ describe('the settings catalog', () => {
   })
 
   it("describes every field of a project's settings", () => {
-    const missing = Object.keys(DEFAULT_PROJECT_CONFIG).filter((k) => !PROJECT_INTERNAL.has(k) && k !== 'providers' && !ids.has(`project.${k}`))
+    // A project's copied files from before 1.0 (worktreeCopy) are read and set as project.slotCopy (HI-1765).
+    const rowOf: Record<string, string> = { worktreeCopy: 'slotCopy' }
+    const missing = Object.keys(DEFAULT_PROJECT_CONFIG).filter((k) => !PROJECT_INTERNAL.has(k) && k !== 'providers' && !ids.has(`project.${rowOf[k] ?? k}`))
     for (const p of PROVIDERS) for (const k of ['model', 'effort', 'permissionMode', 'extraArgs', ...(p.capabilities.contextLimit ? ['use200kContext'] : [])]) if (!ids.has(`project.${p.id}.${k}`)) missing.push(`project.${p.id}.${k}`)
     expect(missing).toEqual([])
   })
@@ -119,7 +121,12 @@ describe('the settings catalog', () => {
     expect(v('project.transcriptWarnMB', null)).toEqual({ value: null })
     expect(v('project.chime', 'inherit')).toEqual({ value: 'inherit' })
     expect(v('project.claude-code.model', '')).toEqual({ value: 'inherit' })
-    expect(v('agents.worktreeCopy', 'a\nb')).toHaveProperty('error')
+    // The copied files (HI-1765), at each level and a project's: patterns over lines, "" its none, null inherits; other text one line.
+    expect(v('workflow.git.slotCopy', 'a\nb')).toEqual({ value: 'a\nb' })
+    expect(v('workspace.workflow.git.slotCopy', '')).toEqual({ value: '' })
+    expect(v('project.slotCopy', null)).toEqual({ value: null })
+    expect(v('workspace.workflow.git.slotCopy', 'inherit')).toEqual({ value: null })
+    expect(v('project.worktreeSetup', 'a\nb')).toHaveProperty('error')
     // Not values: a button, a table.
     expect(v('advanced.reset', true)).toHaveProperty('error')
     expect(v('board.colors', {})).toHaveProperty('error')

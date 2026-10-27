@@ -12,7 +12,8 @@ import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { agentProviderOf, cardLabelOf, confirm, notify, openProjectSettings, openVersionControl, set as setStore, setActivity, useStore } from '../store'
 import { cx } from '../util'
-import { SlotsAndCopies } from './SlotsAndCopies'
+import { SlotCopyLevel, SlotsAndCopies } from './SlotsAndCopies'
+import { ORIGIN_TEXT } from '../workflowOrigins'
 import { providerDescriptor } from '@shared/providers'
 import { agentWorkflowRole, reviewsWork } from '@shared/workflow/roles'
 import { Icon, Switch, Tooltip } from './ui'
@@ -47,14 +48,7 @@ const T = {
     folderGit: msg({ id: 'workflow.form.neverOff.folderGit', defaultMessage: 'No branch switch, pull or other git that changes the folder while an agent works there.', description: 'A protection that stays on with every rule off.' }),
     queue: msg({ id: 'workflow.form.neverOff.queue', defaultMessage: 'The merge queue moves a target branch only if nothing else moved it meanwhile.', description: 'A protection that stays on with every rule off (glossary 2.1: merge queue).' })
   },
-  from: {
-    preset: msg({ id: 'workflow.form.from.preset', defaultMessage: 'From the preset', description: 'Where a workflow option’s value comes from: the preset chosen.' }),
-    project: msg({ id: 'workflow.form.from.project', defaultMessage: 'Set for this project', description: 'Where a workflow option’s value comes from: set in this project.' }),
-    workspace: msg({ id: 'workflow.form.from.workspace', defaultMessage: 'From the workspace', description: 'Where a workflow option’s value comes from: the workspace’s default.' }),
-    global: msg({ id: 'workflow.form.from.global', defaultMessage: 'From Hive’s settings', description: 'Where a workflow option’s value comes from: Hive’s own default.' }),
-    platform: msg({ id: 'workflow.form.from.platform', defaultMessage: 'Default', description: 'Where a workflow option’s value comes from: nobody set it (every rule off).' }),
-    here: msg({ id: 'workflow.form.from.here', defaultMessage: 'Set here', description: 'Where a workflow default’s value comes from, in Settings → Workflow defaults or Settings → Workspace: set at this level.' })
-  } satisfies Record<WorkflowOptionOrigin | 'preset' | 'here', ReturnType<typeof msg>>,
+  from: ORIGIN_TEXT,
   inherit: msg({ id: 'workflow.form.inherit', defaultMessage: 'Inherit', description: 'A button beside a workflow option set for this project: stop setting it here, and use the workspace’s or Hive’s value.' }),
   inheritTip: msg({ id: 'workflow.form.inheritTip', defaultMessage: 'Use the inherited value: {value}', description: 'The tooltip of the Inherit button of a workflow option. {value} is the value it would have.' }),
   on: msg({ id: 'workflow.form.on', defaultMessage: 'On', description: 'A workflow option’s value: on.' }),
@@ -77,7 +71,7 @@ const T = {
   stageName: msg({ id: 'workflow.form.stageName', defaultMessage: 'Name of the stage {stage}', description: 'Accessible name of a stage’s name box under “Stage names” (glossary 2.2: stage). {stage} is its default name.' }),
   stageNamesValue: msg({ id: 'workflow.form.stageNamesValue', defaultMessage: '{n, plural, =0 {The default names} one {# stage renamed} other {# stages renamed}}', description: 'A value of “Stage names” in the list of what changes before saving workflow options, and in a preset’s preview (glossary 2.2: stage).' }),
   fileLocks: msg({ id: 'workflow.form.fileLocks', defaultMessage: 'File locks', description: 'A read-only row of Project Settings → Workflow for a project without version control (glossary 2.6, N7).' }),
-  agentsSection: msg({ id: 'workflow.form.agentsSection', defaultMessage: 'Agents & Worktrees', description: 'A link to the section "Agents & Worktrees" of Project Settings: use its name as translated there.' }),
+  agentsSection: msg({ id: 'workflow.form.agentsSection', defaultMessage: 'Agents', description: 'A link to the section "Agents" of Project Settings: use its name as translated there.' }),
   loops: msg({ id: 'workflow.form.loops', defaultMessage: 'Rounds and wait', description: 'A read-only row of Project Settings → Workflow: the card loops’ rounds and wait.' }),
   loopsValue: msg({ id: 'workflow.form.loopsValue', defaultMessage: '{rounds, plural, one {# round} other {# rounds}}, wait {hours, plural, one {# hour} other {# hours}}', description: 'The value of the read-only row "Rounds and wait" of Project Settings → Workflow.' }),
   loopsSection: msg({ id: 'workflow.form.loopsSection', defaultMessage: 'Card loops', description: 'A link to the section "Card loops" of Project Settings: use its name as translated there.' }),
@@ -602,6 +596,7 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
             </section>
             {/* A Git project's slots and copies, after where cards are built (a level has none: they're a project's). */}
             {g.id === 'where' && project && <SlotsAndCopies project={project} slots={effective.folder === 'slots'} />}
+            {g.id === 'where' && !project && source.level && platform === 'git' && <SlotCopyLevel level={source.level} />}
           </Fragment>
         )
       })}

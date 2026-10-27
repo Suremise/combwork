@@ -284,12 +284,18 @@ describe('providers migration', () => {
     expect(load({ version: 3, ...assistant({ 'claude-code': { model: 'sonnet', effort: 'low', permissionMode: '', extraArgs: '' } }) }).settings.assistant.providers['claude-code']).toMatchObject({ model: 'sonnet', effort: 'low' })
     expect(DEFAULT_SETTINGS.assistant.providers['claude-code']).toMatchObject({ model: '', effort: '' })
   })
-  it('moves a saved Squash merge style to Merge once, then keeps the choice', () => {
-    const style = (raw: Record<string, unknown>) => load(raw).settings.agents.mergeStyle
-    expect(DEFAULT_SETTINGS.agents.mergeStyle).toBe('merge')
-    expect(style({ version: 3, settings: { agents: { mergeStyle: 'squash' } } })).toBe('merge')
-    expect(style({ version: 2, settings: { agents: { mergeStyle: 'squash' } } })).toBe('merge')
-    expect(style({ version: 4, settings: { agents: { mergeStyle: 'squash' } } })).toBe('squash')
+  it("drops Agents & Worktrees' merge style and moves its copy patterns to Hive's slot default, once (HI-1765)", () => {
+    const agents = (raw: Record<string, unknown>) => load(raw).settings.agents as Record<string, unknown>
+    const slots = (raw: Record<string, unknown>) => load(raw).settings.slotDefaults
+    expect(agents({ version: 8, settings: { agents: { mergeStyle: 'squash', worktreeCopy: 'a.env' } } })).not.toHaveProperty('mergeStyle')
+    expect(agents({ version: 8, settings: { agents: { worktreeCopy: 'a.env' } } })).not.toHaveProperty('worktreeCopy')
+    // A chosen value moves over, an empty one (none) too; the old default, saved into every config, doesn't.
+    expect(slots({ version: 8, settings: { agents: { worktreeCopy: 'a.env, b.json' } } })).toEqual({ copy: 'a.env, b.json' })
+    expect(slots({ version: 8, settings: { agents: { worktreeCopy: '' } } })).toEqual({ copy: '' })
+    expect(slots({ version: 8, settings: { agents: { worktreeCopy: '.env*' } } })).toBeUndefined()
+    // A slot default already set stays: the old key never restores itself over it.
+    expect(slots({ version: 8, settings: { slotDefaults: { copy: 'new.env' }, agents: { worktreeCopy: 'old.env' } } })).toEqual({ copy: 'new.env' })
+    expect(slots({ version: 8, settings: { agents: {} } })).toBeUndefined()
   })
   it('moves the old 50 MB transcript warning default to 20 MB once, keeping any other choice', () => {
     const warn = (raw: Record<string, unknown>) => load(raw).settings.sessions.transcriptWarnMB

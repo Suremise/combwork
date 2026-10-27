@@ -129,6 +129,10 @@ const check = (name, ok, extra = '') => {
     }, HUNG_MS)
     check('the project inherits Hive’s default, under the workspace’s (style still its own)', !!form2 && form2.options.dependenciesDone === true && form2.origins.style === 'project', JSON.stringify(form2?.origins))
     await shots('hive', hive.locator('.workflow-level-head'))
+    // Hive's files copied into new slots (HI-1765), with Git's options: the default, .env*, until set here.
+    const hiveCopy = hive.locator('[data-slot-default="copy"][data-level="global"]')
+    check('Hive’s level has the files copied into new slots, at the default, .env*', !!(await lib.until(async () => (await hiveCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'default' && (await text(hiveCopy)).includes('.env*'), HUNG_MS)), await text(hiveCopy))
+    await shots('hive-copy', hiveCopy)
     // The workspace's level shows Hive's as what it inherits.
     await page.locator('.settings-nav .row', { hasText: 'Workspace' }).first().click()
     check('the workspace’s level inherits it: From Hive’s settings', !!(await lib.until(async () => (await row('dependenciesDone').innerText().catch(() => '')).includes('From Hive’s settings'), HUNG_MS)))

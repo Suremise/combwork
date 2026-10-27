@@ -102,3 +102,20 @@ describe('extra arguments with a bare "--" (#523)', () => {
     }
   })
 })
+
+describe("the settings tools on the copied files, Hive's slot default (HI-1765)", () => {
+  it('sets patterns, none and inherit, saved as Settings saves the level, the old and new values said', async () => {
+    const e = settingEntry('workflow.git.slotCopy')!
+    const was = config.settings.slotDefaults
+    try {
+      config.settings.slotDefaults = undefined
+      expect(await applySetting(e, '.env*\nconfig/local.json', null)).toEqual({ old: 'inherit', new: '.env*\nconfig/local.json' })
+      expect(config.settings.slotDefaults).toEqual({ copy: '.env*\nconfig/local.json' })
+      expect(await applySetting(e, '', null)).toEqual({ old: '.env*\nconfig/local.json', new: '' })
+      expect(await applySetting(e, null, null)).toEqual({ old: '', new: 'inherit' })
+      expect(config.settings.slotDefaults).toEqual({})
+    } finally {
+      config.settings.slotDefaults = was
+    }
+  })
+})
