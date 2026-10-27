@@ -510,9 +510,11 @@ export async function cardsNow(ws: WorkspaceService, numbers: readonly number[])
       out.set(n, was.card.blockedBy.length || was.card.links.length ? withoutGone(was.card, there) : was.card)
       continue
     }
-    // Read at its revision or after: a write since raises it again, so the next look reads it again.
+    // Read at its revision or after: a write since raises it again (it is below the mark), so the next look reads it
+    // again. A card at the mark keeps its revision through another write, so it isn't kept: read each time until a
+    // later change moves the mark past it.
     const card = await getTask(n, ws).catch(unreadable)
-    if (card) kept.cards.set(n, { at, card })
+    if (card && rev < revs.mark) kept.cards.set(n, { at, card })
     else kept.cards.delete(n)
     out.set(n, card)
   }

@@ -17,7 +17,7 @@ const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { config } = await import('../src/main/config')
 const { optionsFor, workflowFor } = await import('../src/main/workflow/service')
-const { resolveOptions } = await import('../src/main/workflow/rulesets')
+const { resolveOptions, rulesetsNow } = await import('../src/main/workflow/rulesets')
 const { allOff } = await import('../src/shared/workflow/options')
 const { observer } = await import('../src/main/platform/observe')
 const { isUnknown } = await import('../src/main/platform/types')
@@ -277,5 +277,21 @@ describe("a project's options, resolved (#1263, SPEC §16.6.6)", () => {
     } finally {
       delete config.settings.workflow
     }
+  })
+})
+
+describe("each project's ruleset now (HI-1780: kept by what it is made from)", () => {
+  it('is the same while its options are, another once they change, and the first again once they change back', async () => {
+    let options: Record<string, unknown> = { ...allOff('git') }
+    const ws = { config: { workflow: undefined }, info: () => ({ projects: [{ name: 'Kept', path: join(base, 'kept-ruleset'), platform: { id: 'git' } }] }), projectConfig: async () => ({ workflow: { options } }) } as never
+    const first = (await rulesetsNow(ws)).get('kept')
+    expect(first).toBeTruthy()
+    expect((await rulesetsNow(ws)).get('kept')).toBe(first)
+    options = { ...allOff('git'), preChecks: ['test'] }
+    const changed = (await rulesetsNow(ws)).get('kept')
+    expect(changed).toBeTruthy()
+    expect(changed).not.toBe(first)
+    options = { ...allOff('git') }
+    expect((await rulesetsNow(ws)).get('kept')).toBe(first)
   })
 })

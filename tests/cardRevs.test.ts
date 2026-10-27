@@ -257,3 +257,61 @@ describe("the usage history's card holds, kept and read again for the cards a ch
     await same()
   })
 })
+
+describe('cards kept until they change, as getTask reads them (HI-1780)', () => {
+  const now = (numbers: number[]): ReturnType<typeof tasks.cardsNow> => run(() => tasks.cardsNow(w, numbers))
+  const fresh = (n: number): Promise<unknown> => run(() => tasks.getTask(n, w))
+
+  it("give each card as getTask does, the same object until it changes, and a link to a card gone since left out", async () => {
+    const x = (await run(() => tasks.createTask({ title: 'X', project: 'alpha' }, user))).number
+    const y = (await run(() => tasks.createTask({ title: 'Y', project: 'alpha' }, user))).number
+    const z = (await run(() => tasks.createTask({ title: 'Z', project: 'alpha' }, user))).number
+    const first = await now([x, y])
+    expect(first.get(x)).toEqual(await fresh(x))
+    expect(first.get(y)).toEqual(await fresh(y))
+    // Y changes: Y read again, X the very same.
+    await run(() => tasks.commentTask(y, 'changed', user))
+    const second = await now([x, y])
+    expect(second.get(x)).toBe(first.get(x))
+    expect(second.get(y)).not.toBe(first.get(y))
+    expect(second.get(y)).toEqual(await fresh(y))
+    // X links to Z; Z deleted by another connection (as Delete permanently leaves the board): X no longer links to it.
+    await run(() => tasks.updateTask(x, { links: [z] }, user))
+    expect((await now([x])).get(x)!.links).toEqual([z])
+    const db = other()
+    db.exec(`PRAGMA foreign_keys = ON; DELETE FROM cards WHERE number = ${z}`)
+    db.close()
+    expect((await now([x])).get(x)).toEqual(await fresh(x))
+    expect((await now([x])).get(x)!.links).toEqual([])
+    // Not on the board: null.
+    expect((await now([z])).get(z)).toBeNull()
+  })
+
+  it('give the newest card as it is after each change, though a card at the mark keeps its revision through them', async () => {
+    const x = (await run(() => tasks.createTask({ title: 'Newest', project: 'alpha' }, user))).number
+    await run(() => tasks.commentTask(x, 'first', user))
+    const db = other()
+    const at = rev(db, x)
+    expect((await now([x])).get(x)!.comments.map((c) => c.text)).toContain('first')
+    await run(() => tasks.commentTask(x, 'second', user))
+    // Still at the mark: its revision didn't move, and it is read as it is all the same.
+    expect(rev(db, x)).toBe(at)
+    db.close()
+    expect((await now([x])).get(x)).toEqual(await fresh(x))
+    expect((await now([x])).get(x)!.comments.map((c) => c.text)).toContain('second')
+  })
+
+  it("are read again once a card's key changes, and after the board is opened again", async () => {
+    const x = (await run(() => tasks.createTask({ title: 'Keyed', project: 'alpha' }, user))).number
+    const first = (await now([x])).get(x)!
+    const { changeProjectKey } = await import('../src/main/projectKeys')
+    await run(() => changeProjectKey(w, join(wsPath, 'alpha'), 'KQ'))
+    const keyed = (await now([x])).get(x)!
+    expect(keyed.key).not.toBe(first.key)
+    expect(keyed).toEqual(await fresh(x))
+    store.closeBoard(wsPath)
+    const reopened = (await now([x])).get(x)!
+    expect(reopened).not.toBe(keyed)
+    expect(reopened).toEqual(await fresh(x))
+  })
+})
