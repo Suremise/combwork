@@ -3,6 +3,7 @@
 // worker's reads are held until the test lets each go, so the order is the test's, not the machine's.
 import { execFileSync } from 'child_process'
 import { writeFileSync } from 'fs'
+import { createRequire } from 'module'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readRepoRefs, type RepoRefs } from '../src/main/platform/repoRefs'
@@ -21,7 +22,10 @@ const { Observer } = await import('../src/main/platform/observe')
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 10000
 
-const run = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+// The run's allowlisted environment and test git config for every git child (never this process's environment).
+const { gitEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { gitEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }
+
+const run = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, env: gitEnv() }).trim()
 
 /** A repository on main with one commit. */
 function repo(): string {
