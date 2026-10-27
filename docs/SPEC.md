@@ -1788,7 +1788,9 @@ shows as "Moved to Active"; Archive All's reasons and Start's refusals say Activ
 **Built [#1420]:** the board's columns are stages (`src/renderer/src/boardStages.ts`, laid out from each project's
 stages and each card's stage from its facts). The stages come with the board's cards (`board:stages`, read with them
 when a workflow was written or the projects changed since), so every column is there in the board's first paint and
-none is added after it (HI-1682); a board opened before that read shows its frame without columns. Each category in its fixed order shows its stages as columns: those the shown
+none is added after it (HI-1682); a board opened before that read shows its frame without columns. The toolbar's
+workflow link ("Workflow: Git · …") comes in the same read (each project's `workflow:form`, HI-1852): arriving after
+the first paint, it could wrap the toolbar in a narrower window and move every column down. Each category in its fixed order shows its stages as columns: those the shown
 projects' current options produce, and any a card of theirs is in (a card under old rules keeps its stage shown).
 On Hold, Todo, Active and Done always show; Review and Approved only with a stage, or all six while Settings →
 Advanced → *Workflow rules are enforced* is off (cards move freely then). Approved with Merging is two columns

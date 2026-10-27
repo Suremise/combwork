@@ -135,6 +135,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **The board no longer jumps down a moment after it opens.** The toolbar's *Workflow: Git · …* link came after the board was drawn, and in a narrower window it moved the toolbar onto two lines, shifting every column down under the pointer (a drag begun then could miss its card). The link now comes with the board's cards (HI-1852).
 - **An agent's refused request shows in the Progress panel at once.** A refusal changes only a card's record, not the card, and the window kept waiting for a change to the cards before reading it: the refused notch on the card's lane segment (with its reason in the hover) could be missing until something else changed. For you and a card's Work section read such changes at once too (HI-1859).
 - **A drag to Review with nothing committed says what you can do.** Its message named the card twice and told you to ask "the user" before committing, words meant for an agent. It now reads *HI-12 can't move to Review: Nothing is committed to review yet. Commit the card's work, then move it again.* Agents' refusals are unchanged (HI-1851).
 - **Set Up for signed-in connections.** A connection signed in through Claude Code's browser sign-in still has Claude Code's first-run questions (its look, its notes) to answer, which its first agent met in its pane. Once the sign-in ends, **Set Up** (beside Close, or on the connection's row in Settings → Connections) opens Claude Code on the connection so you answer them there first (HI-1826).
