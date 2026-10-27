@@ -1,8 +1,9 @@
 import { randomBytes } from 'crypto'
 import { join } from 'path'
+import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
-import { allDone, isFrozen, loopDefaults, keptLanes, laneView, listedLanes, readLanes, running, type LaneAgent, type LaneCardFacts, type LaneChange, type LaneRecord } from '../shared/lanes'
+import { allDone, isFrozen, keptLanes, laneView, listedLanes, readLanes, running, type LaneAgent, type LaneCardFacts, type LaneChange, type LaneRecord } from '../shared/lanes'
 import type { HiveErrorKind, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { reviewingNow } from '../shared/workflow/reviewerPool'
 import { withValues, type Text } from '../shared/advanced'
@@ -596,9 +597,10 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   if (reviewer && s.pool) throw new LaneError(400, 'A lane reviewed by the pool has no reviewer of its own') // i18n-ignore: hive_lane's refusal, which only agents get
   // A named reviewer makes it one reviewer per lane; the pool, none of its own (#1443).
   const pool = s.pool ? true : reviewer ? false : undefined
-  // Rounds and wait the start doesn't give: the project's, else the workspace's (#412).
-  const project = ws.path ? await ws.projectConfig(join(ws.path, s.project)).catch(() => null) : null
-  const defaults = loopDefaults(ws.config, project)
+  // Rounds and wait the start doesn't give (#412): the project's workflow options as they resolve now (HI-1766).
+  const projectPath = ws.path ? join(ws.path, s.project) : s.project
+  const prefs = projectPreferences(ws, projectPath, ws.path ? await ws.projectConfig(projectPath).catch(() => null) : null)
+  const defaults = { rounds: prefs.loopRounds, waitHours: prefs.loopWaitHours }
   const on = await enforced()
   const ruleset = await rulesetNow(ws, s.project)
   const ended: EndedLane[] = []

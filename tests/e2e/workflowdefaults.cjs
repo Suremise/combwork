@@ -26,7 +26,10 @@ const check = (name, ok, extra = '') => {
   lib.gitProject(alpha)
   // A Git project that sets no workflow option itself: it inherits every one.
   fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], workflow: { platform: 'git', preset: null, options: {} } }))
+  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], workflow: { platform: 'git', preset: null, options: {} }, loopRounds: 8, fileLocks: 'warn', loopWakes: true }))
+  // Saved by a build from before HI-1766: the workspace's Card loop wait (3 h); the project's own rounds and file locks above.
+  fs.mkdirSync(path.join(ws, '.hive'), { recursive: true })
+  fs.writeFileSync(path.join(ws, '.hive', 'workspace.json'), JSON.stringify({ loops: { waitHours: 3 } }))
 
   const { app, page } = await lib.launch({ userData, viewport: { width: 1400, height: 950 } })
   try {
@@ -101,6 +104,11 @@ const check = (name, ok, extra = '') => {
     const project = page.locator('.workflow-form')
     const projectRow = (option) => project.locator(`.workflow-option[data-option="${option}"]`)
     check('the project shows the workspace’s value, From the workspace', !!(await lib.until(async () => (await projectRow('style').locator('select').inputValue().catch(() => '')) === 'squash' && (await projectRow('style').innerText()).includes('From the workspace'), HUNG_MS)), await text(projectRow('style')))
+    // The settings from before HI-1766 kept, as options: the project's own rounds and file locks, the workspace's wait.
+    const loopsOrigin = async (k) => projectRow(k).locator('.workflow-origin').innerText().catch(() => '')
+    check('the project’s old rounds and file locks are its own options, the workspace’s old wait its default', (await projectRow('loopRounds').locator('input').inputValue()) === '8' && (await loopsOrigin('loopRounds')).includes('Set for this project') && (await projectRow('fileLocks').locator('select').inputValue()) === 'warn' && (await projectRow('loopWaitHours').locator('input').getAttribute('placeholder')) === '3 hours' && (await loopsOrigin('loopWaitHours')).includes('From the workspace'), JSON.stringify([await loopsOrigin('loopRounds'), await loopsOrigin('loopWaitHours')]))
+    check('…and the old keys are gone from the files once saved', !('loops' in wsJson()))
+    await shots('migrated', projectRow('loopRounds'))
     const after = await startCard('After the default')
     check('its next card starts under the new options (another ruleset)', !!after && after !== before, `${before} → ${after}`)
     check('the card started before keeps its ruleset', (await inv('tasks:facts', 1)).find((f) => f.kind === 'Started')?.ruleset === before)

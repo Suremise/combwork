@@ -133,6 +133,7 @@ import { attachmentName, attachmentsDir, freeName, ownAttachmentsFolder } from '
 import { attachmentKind } from '../shared/attachments'
 import { replyStart } from '../shared/tiles'
 import { observer } from './platform/observe'
+import { projectPreferences } from './workflow/preferences'
 
 const log = createLogger('sessions')
 
@@ -4515,10 +4516,14 @@ class SessionManager {
   // File locks
   // -------------------------------------------------------------------------
 
+  /**
+   * The project's file locks (its workflow option, HI-1766), as its workspace last read it: Hive's, the workspace's or its
+   * own. The Assistant's home isn't a project and shares no folder: off.
+   */
   private lockMode(projectPath: string): FileLockMode {
-    const p = workspaceOf(projectPath).info()?.projects.find((x) => x.path.toLowerCase() === projectPath.toLowerCase())
-    const own = p?.config.fileLocks
-    return own && own !== 'inherit' ? own : config.settings.agents.fileLocks
+    const ws = workspaceOf(projectPath)
+    if (ws.isAssistantHome(projectPath)) return 'off'
+    return projectPreferences(ws, projectPath).fileLocks
   }
 
   /**

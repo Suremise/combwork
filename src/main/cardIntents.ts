@@ -10,7 +10,8 @@ import { workflowFor } from './workflow/service'
 import { workspace } from './workspace'
 import { hiveError } from './hiveError'
 import { msg } from '../shared/i18n'
-import { loopStepWaitMinutes } from '../shared/lanes'
+import { LOOP_STEP_WAIT_MINUTES } from '../shared/lanes'
+import { projectPreferences } from './workflow/preferences'
 import { loopReviewerOf } from './loopReviewer'
 import { cardRef } from '../shared/projectKeys'
 
@@ -71,9 +72,10 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   const wf = ws.path && before.project ? await workflowFor(ws, join(ws.path, before.project)) : null
   if (!wf) throw hiveError(M.noWorkflow, { card: cardRef(ref.n) }, { kind: 'conflict' })
   const who = actorOf(actor)
-  // How long a design waits for its check (#1382): the project's Card loops → Design check wait, read before the write.
+  // How long a design waits for its check (#1382): the project's workflow option Design check wait (HI-1766), read
+  // before the write; a step already waiting keeps the until it recorded.
   const cfg = (intent.kind === 'loopStep' || intent.kind === 'start') && ws.path ? await ws.projectConfig(join(ws.path, before.project)).catch(() => null) : null
-  const stepWait = loopStepWaitMinutes(cfg)
+  const stepWait = ws.path ? projectPreferences(ws, join(ws.path, before.project), cfg).loopStepWaitMinutes : LOOP_STEP_WAIT_MINUTES
   // A design's reviewer (#1382): the one rule loop wakes deliver by (loopReviewer.ts), read inside the step's own board
   // change (the runtime's prepare), where an agent's removal, published under the same lock, can't come between.
   const designReviewer = async (): Promise<string | null> => {

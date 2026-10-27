@@ -287,13 +287,6 @@ export async function applySetting(
     })
     return { old, new: at(saved) }
   }
-  if ('workspace' in change) {
-    // The workspace's own (workspace.json), with nothing awaited between the guard and the change.
-    const old = settingValue(e, config.settings, null, workspace.config)
-    guard?.(old)
-    await workspace.setLoops(change.workspace)
-    return { old, new: settingValue(e, config.settings, null, workspace.config) }
-  }
   // Hive's own settings change at once, with nothing awaited between the guard and the change.
   const current = (): unknown => settingValue(e, config.settings, null, null, advanced.overrides())
   if ('settings' in change) {

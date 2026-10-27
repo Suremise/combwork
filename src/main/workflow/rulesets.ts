@@ -6,7 +6,8 @@
 
 import { createLogger, userText } from '../logger'
 import { compile } from '../../shared/workflow/compile'
-import { allOff, contradictions, CONTRADICTIONS, NAME_OPTIONS, ownsTarget, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, contradictions, CONTRADICTIONS, NAME_OPTIONS, ownsTarget, PREFERENCE_OPTIONS, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
+import { PREFERENCE_DEFAULTS } from '../../shared/workflow/preferences'
 import { detect } from '../platform/registry'
 import { stageNameProblems, stageNameProblemText, type StageNameProblem } from '../../shared/workflow/stages'
 import { englishText, type Text } from '../../shared/advanced'
@@ -42,8 +43,8 @@ const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 /** Whether a value is one its option takes. */
 const fits = (key: keyof WorkflowOptions, v: unknown): boolean => takesOption(key, v)
 
-/** Every option a level may set: the platform's (all-off's keys) and the names (N5), which all-off leaves unset. */
-const optionKeys = (base: WorkflowOptions): string[] => [...Object.keys(base).filter((k) => k !== 'platform'), ...NAME_OPTIONS]
+/** Every option a level may set: the platform's (all-off's keys), and the names (N5) and preferences (HI-1766), which all-off leaves unset. */
+const optionKeys = (base: WorkflowOptions): string[] => [...new Set([...Object.keys(base).filter((k) => k !== 'platform'), ...NAME_OPTIONS, ...PREFERENCE_OPTIONS])]
 
 /** The options a level sets for a platform, or why they can't be read. */
 function levelOf(raw: unknown, platform: PlatformId, known: Set<string>): { set: Partial<WorkflowOptions> } | { bad: string } {
@@ -69,7 +70,8 @@ function levelOf(raw: unknown, platform: PlatformId, known: Set<string>): { set:
  * can't be read, or options that contradict each other, fall back to the platform's all-off (`invalid` says why).
  */
 export function resolveOptions(platform: PlatformId, levels: OptionLevels): ResolvedOptions {
-  const base = allOff(platform)
+  // The preferences' defaults under every level (HI-1766): all-off and the presets leave them unset.
+  const base: WorkflowOptions = { ...PREFERENCE_DEFAULTS, ...allOff(platform) }
   const known = new Set(optionKeys(base))
   const allPlatform = (): Record<keyof WorkflowOptions, OptionOrigin> => Object.fromEntries(['platform', ...known].map((k) => [k, 'platform'])) as Record<keyof WorkflowOptions, OptionOrigin>
   const origins = allPlatform()

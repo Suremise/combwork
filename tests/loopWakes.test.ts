@@ -409,7 +409,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await disposeWorkspaceService(w)
   })
 
-  it('is off for a project that turned it off (Project Settings → Card loops)', async () => {
+  it('is off for a project that turned it off before HI-1766, with no workflow options: its old key is read as its own', async () => {
     await loopWakes.clearLoopWakes()
     const { w, alpha } = await open({ loopWakes: false })
     const st = fake(alpha)
@@ -420,6 +420,23 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     expect(loopWakes.pendingLoopWakes()).toEqual([])
     expect(st.typed).toEqual([])
     expect(JSON.parse(readFileSync(join(alpha, '.hive', 'project.json'), 'utf8')).loopWakes).toBe(false)
+    await disposeWorkspaceService(w)
+  })
+
+  it("follows the workflow option (HI-1766): the workspace's default off reaches its projects, a project's own on wins", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open({ workflow: { platform: 'none', preset: null, options: {} } })
+    await w.saveWorkspaceConfigWith(() => ({ workflow: { none: { loopWakes: false }, git: { loopWakes: false } } }))
+    expect(await loopWakes.wakesOn(w, alpha)).toBe(false)
+    const st = fake(alpha)
+    const c = await newCard(w)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+    await settled()
+    expect(loopWakes.pendingLoopWakes()).toEqual([])
+    expect(st.typed).toEqual([])
+    await w.mutateProjectConfig(alpha, (cfg) => ({ workflow: { ...cfg.workflow!, options: { ...cfg.workflow!.options, loopWakes: true } } }))
+    expect(await loopWakes.wakesOn(w, alpha)).toBe(true)
     await disposeWorkspaceService(w)
   })
 

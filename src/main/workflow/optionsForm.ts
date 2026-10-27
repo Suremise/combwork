@@ -40,6 +40,7 @@ import { isUnknown } from '../platform/types'
 import { workflowWrite } from './writes'
 import { withRepoLocks } from '../repoLock'
 import { exitBy } from '../exitLog'
+import { legacyPreferences } from '../../shared/workflow/preferences'
 
 const log = createLogger('workflow')
 
@@ -60,7 +61,8 @@ function projectOf(ws: WorkspaceService, projectPath: string): { path: string; n
 const levelsOf = (ws: WorkspaceService, own: Partial<WorkflowOptions> | null, folder?: string): OptionLevels => ({ global: config.settings.workflow, workspace: ws.config.workflow, project: own, ...(folder ? { folder } : {}) })
 
 /** The options the project sets itself, for its platform (a project's options for another platform don't apply). */
-const ownOf = (cfg: { workflow?: { platform: PlatformId; options: Partial<WorkflowOptions> } }, platform: PlatformId): Partial<WorkflowOptions> => (cfg.workflow?.platform === platform ? cfg.workflow.options : {})
+// A project with no options yet shows its card loops and file locks from before HI-1766 as its own (they're read so).
+const ownOf = (cfg: Pick<ProjectConfig, 'workflow'>, platform: PlatformId): Partial<WorkflowOptions> => (cfg.workflow?.platform === platform ? cfg.workflow.options : cfg.workflow ? {} : legacyPreferences(cfg))
 
 /**
  * What a preset fills in from the project (OP-24: suggested from its scripts, never guessed silently, and shown in the

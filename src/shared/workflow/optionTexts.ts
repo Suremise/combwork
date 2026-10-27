@@ -115,6 +115,26 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   stageNames: {
     title: msg({ id: 'workflow.option.stageNames.title', defaultMessage: 'Stage names', description: 'A workflow option (glossary 2.6, N5; glossary 2.2: stage): your own names for the board’s stages.' }),
     desc: msg({ id: 'workflow.option.stageNames.desc', defaultMessage: 'Rename any stage the board shows: a name changes no rule and applies at once.', description: 'What the workflow option “Stage names” does (glossary 2.2: stage).' })
+  },
+  fileLocks: {
+    title: msg({ id: 'workflow.option.fileLocks.title', defaultMessage: 'File locks', description: 'A workflow option (glossary 2.6, N7): what happens when two agents in the same folder edit the same file.' }),
+    desc: msg({ id: 'workflow.option.fileLocks.desc', defaultMessage: 'What happens when an agent tries to edit a file another agent in the same folder is editing.', description: 'What the workflow option “File locks” does.' })
+  },
+  loopWakes: {
+    title: msg({ id: 'workflow.option.loopWakes.title', defaultMessage: 'Wake reviewers and builders', description: 'A workflow option, under Card loops: Hive wakes the agents of a card loop for its handoffs (glossary: card loop).' }),
+    desc: msg({ id: 'workflow.option.loopWakes.desc', defaultMessage: 'When a card with a reviewer arrives in Review, Hive wakes the reviewer, and on the review’s verdict the card’s builder; off, only the agents’ own card watches wake them.', description: 'What the workflow option “Wake reviewers and builders” does.' })
+  },
+  loopRounds: {
+    title: msg({ id: 'workflow.option.loopRounds.title', defaultMessage: 'Rounds', description: 'A workflow option, under Card loops: how many rounds (a build and its review) a card gets before its agents ask you.' }),
+    desc: msg({ id: 'workflow.option.loopRounds.desc', defaultMessage: 'How many rounds a card gets in a card loop (a build and its review each) before its agents stop and ask you, when the loop doesn’t say.', description: 'What the workflow option “Rounds” does (Card loops).' })
+  },
+  loopWaitHours: {
+    title: msg({ id: 'workflow.option.loopWaitHours.title', defaultMessage: 'Wait (hours)', description: 'A workflow option, under Card loops: how many hours an agent in a card loop waits with no change before it tells you.' }),
+    desc: msg({ id: 'workflow.option.loopWaitHours.desc', defaultMessage: 'How many hours, up to a day, an agent in a card loop waits with no change before it tells you, when the loop doesn’t say.', description: 'What the workflow option “Wait (hours)” does (Card loops).' })
+  },
+  loopStepWaitMinutes: {
+    title: msg({ id: 'workflow.option.loopStepWaitMinutes.title', defaultMessage: 'Design check wait (minutes)', description: 'A workflow option, under Card loops: how long a builder waits for its reviewer to check a design it posted.' }),
+    desc: msg({ id: 'workflow.option.loopStepWaitMinutes.desc', defaultMessage: 'How many minutes, up to 4 hours, a card loop’s builder waits for its reviewer to check a design it posted before it goes ahead as posted.', description: 'What the workflow option “Design check wait (minutes)” does (Card loops). A design: the plan a builder posts on its card before building.' })
   }
 }
 
@@ -197,8 +217,8 @@ export const GROUP_TEXT: Record<FormGroupId, Msg> = {
   merging: msg({ id: 'workflow.group.merging', defaultMessage: 'Merging', description: 'A heading of the Workflow section (Git): the options about how and where work is merged.' }),
   where: msg({ id: 'workflow.group.where', defaultMessage: 'Where cards are built', description: 'A heading of the Workflow section (Git): the options about the folders cards are built in and the commits made there (glossary 2.6, G11).' }),
   work: msg({ id: 'workflow.group.work', defaultMessage: 'The work', description: 'A heading of the Workflow section for a project without version control: what a card’s work is, and when cards start.' }),
-  stages: msg({ id: 'workflow.group.stages', defaultMessage: 'Stages', description: 'A heading of the Workflow section: the names of the board’s stages (glossary 2.2: stage).' }),
-  elsewhere: msg({ id: 'workflow.group.elsewhere', defaultMessage: 'Shown here, set elsewhere', description: 'A heading of the Workflow section: settings shown for reference, each changed where its link leads.' })
+  loops: msg({ id: 'workflow.group.loops', defaultMessage: 'Card loops', description: 'A heading of the Workflow section: how card loops run, a builder and a reviewer taking cards in turn (glossary: card loop).' }),
+  stages: msg({ id: 'workflow.group.stages', defaultMessage: 'Stages', description: 'A heading of the Workflow section: the names of the board’s stages (glossary 2.2: stage).' })
 }
 
 /**

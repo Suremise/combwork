@@ -227,8 +227,6 @@ interface HiveMessageValues {
   'service.workspace.folderExists': { name: string | number }
   'service.workspace.holdsOpen': { workspace: string | number; folder: string | number; name: string | number }
   'service.workspace.insideOpen': { folder: string | number; workspace: string | number }
-  'service.workspace.loopRounds': { max: string | number }
-  'service.workspace.loopWait': { max: string | number }
   'service.workspace.nameIn': { name: string | number; projects: string | number }
   'service.workspace.namesShared': undefined
   'service.workspace.none': undefined

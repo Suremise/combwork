@@ -260,8 +260,6 @@ export interface AppSettings {
   /** The Hive Assistant's defaults (each workspace's Assistant Settings can override them). */
   assistant: AssistantSettings
   agents: {
-    /** Per-file locks between agents working in the same folder. */
-    fileLocks: FileLockMode
     /** How long a background task an agent started counts as running if it never reports its end, in minutes. */
     backgroundTaskMinutes: number
     /** What to do with processes an agent leaves running when it stops: offer to end them, or end them (#507). */
@@ -756,8 +754,6 @@ export interface WorkspaceConfig {
   skillDelivery?: SkillDeliveryChoice
   /** Project folders Hive leaves out (Hide, or Remove from Hive while the folder is still in the workspace), by folder name. */
   hiddenProjects?: HiddenProject[]
-  /** Card loops' rounds and wait in hours when a request doesn't say (#412, Settings → Workspace); absent: 10 and 6. */
-  loops?: { rounds?: number; waitHours?: number }
   /** Agent names two projects share from before names were unique (#702), lower case: each said once, while it lasts. */
   flaggedAgentNames?: string[]
   /** The workspace's own advanced values (#367: Settings → Advanced, This workspace), for those a workspace can set. */
@@ -1346,7 +1342,11 @@ export interface ProjectConfig {
    * the same write as its change, so a later run can tell it from a choice the user made since, after a failure too.
    */
   stepsDone?: string[]
-  fileLocks: Inherit<FileLockMode>
+  /**
+   * From before HI-1766 (Project Settings → Agents → File locks): kept, with the old Card loops keys below, only while the
+   * project has no workflow options to hold them (shared/workflow/preferences.ts); read as its own until then.
+   */
+  fileLocks?: Inherit<FileLockMode>
   /** Overrides settings.agents.worktreeCopy; null inherits. */
   worktreeCopy: string | null
   /** Command run in a new worktree before its agent's first session, e.g. "npm install". */
@@ -1359,13 +1359,11 @@ export interface ProjectConfig {
   slots?: SlotOptions
   /** The project's review and check copies (#1435): how many it keeps (left out: the larger of 2 and its reviewers plus one). */
   copies?: { size?: number }
-  /** Hive wakes a card loop's reviewer when a card arrives in Review, and its builder on a verdict (#405). */
-  loopWakes: boolean
-  /** Card loops' rounds and wait in hours for this project (#412); null inherits the workspace's. */
-  loopRounds: number | null
-  loopWaitHours: number | null
-  /** How long a builder waits for its reviewer's check of a design before it goes ahead as posted (#1382); null: LOOP_STEP_WAIT_MINUTES. */
-  loopStepWaitMinutes: number | null
+  /** From before HI-1766 (Project Settings → Card loops): see `fileLocks`. */
+  loopWakes?: boolean
+  loopRounds?: number | null
+  loopWaitHours?: number | null
+  loopStepWaitMinutes?: number | null
 }
 
 /** One of a project's slots as the window reads it (#1429, slots.ts): its state and its open lease, if any. */

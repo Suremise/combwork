@@ -225,8 +225,6 @@
   "service.workspace.folderExists": "「{name}」という名前のフォルダーがすでにあります",
   "service.workspace.holdsOpen": "別のウィンドウで開いているワークスペース{workspace}が{folder}の中にあります。{name}をワークスペースとして開くには、先にそれを閉じてください。",
   "service.workspace.insideOpen": "{folder}は、別のウィンドウで開いているワークスペース{workspace}の中にあります。先にそのワークスペースを閉じるか、そちらからこのフォルダーのプロジェクトを開いてください。",
-  "service.workspace.loopRounds": "カードループのラウンド数には、1～{max}の整数を指定してください。",
-  "service.workspace.loopWait": "カードループの待機時間には、1～{max}の整数（時間）を指定してください。",
   "service.workspace.nameIn": "{name}は{projects}にあります",
   "service.workspace.namesShared": "エージェント名が重複しています",
   "service.workspace.none": "ワークスペースが開かれていません",

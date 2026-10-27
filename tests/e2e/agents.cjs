@@ -165,13 +165,14 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   await sleep(400)
   p = await project()
   check('locked files published', JSON.stringify(p.agents.find((a) => a.id === a1.id).live.lockedFiles) === '["app.txt"]', JSON.stringify(p.agents.find((a) => a.id === a1.id).live.lockedFiles))
-  await inv('project:updateConfig', proj, { fileLocks: 'ask' }); await inv('workspace:refresh')
+  // File locks is the project's workflow option (HI-1766).
+  await lib.setOwnOptions(inv, proj, { fileLocks: 'ask' }); await inv('workspace:refresh')
   r = await pre(l2.sessionId)
   check('ask mode asks', r.hookSpecificOutput?.permissionDecision === 'ask')
-  await inv('project:updateConfig', proj, { fileLocks: 'warn' }); await inv('workspace:refresh')
+  await lib.setOwnOptions(inv, proj, { fileLocks: 'warn' }); await inv('workspace:refresh')
   r = await pre(l2.sessionId)
   check('warn mode adds context', !!r.hookSpecificOutput?.additionalContext && !r.hookSpecificOutput.permissionDecision)
-  await inv('project:updateConfig', proj, { fileLocks: 'inherit' }); await inv('workspace:refresh')
+  await lib.setOwnOptions(inv, proj, { fileLocks: undefined }); await inv('workspace:refresh')
   // Agent 1's turn ends: its claims are released
   await hook({ session_id: l1.sessionId, hook_event_name: 'Stop' }); await sleep(300)
   r = await pre(l2.sessionId)

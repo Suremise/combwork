@@ -10,7 +10,7 @@ import { agentChoosesMcp, agentGetsMcp, agentMcpText, serverOnIn } from '@shared
 import { gitFixText, gitProblemText } from '@shared/gitTool'
 import { UnusedHeading, UnusedWorkNotice, UnusedWorktreesLine, UnusedWorktreesSection, useUnusedWorktrees } from '../components/UnusedWorktrees'
 import { PERIODS, activeIn, costText, dailyTotals, moneyLabel, periodFrom, sumUsage, type DayTotal, type Period, type Totals } from '@shared/usageTotals'
-import { FILE_LOCK_MODES, contextPercent, turnPushedCompaction, effectiveModelLabel, mergeBlocked, modelLabel } from '@shared/defaults'
+import { contextPercent, turnPushedCompaction, effectiveModelLabel, mergeBlocked, modelLabel } from '@shared/defaults'
 import { useAdvancedValue, useAgentLimit } from '../advanced'
 import { INBOX_PROJECT_KEY, INBOX_SWITCHES, INBOX_SWITCH_ID, type InboxSwitch } from '@shared/inboxSwitches'
 import { PROVIDERS, contextLines, defaultProviderLabel, isProviderEnabled, modeDescription, offeredModes, permissionLabel, projectDefaultProvider, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
@@ -19,7 +19,6 @@ import { EffortPicker, ModelPicker } from '../components/ModelPicker'
 import { effortText, runsAsName } from '@shared/models'
 import { PROJECT_KEY_DESC, PROJECT_SETTINGS_SECTIONS, settingEntry, shownSetting, type SettingsSectionInfo } from '@shared/settingsCatalog'
 import { ACCOUNTS_PREVIEW, shownText } from '@shared/advanced'
-import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_STEP_WAIT_MINUTES, LOOP_WAIT_MAX_HOURS, loopDefaults } from '@shared/lanes'
 import { NumberField } from '../components/NumberField'
 import { StorageView } from '../components/Storage'
 import { TaskStrip } from '../components/Board'
@@ -39,7 +38,7 @@ import { useScopedLoad } from '../scopedLoad'
 import { oneAtATime, withinTime } from '@shared/coalesce'
 import { addSkill, deleteSkill, DeliveredSwitch, editInWorkspace, otherLocal, SKILL_LEVEL_TIP, SkillDetail, SkillRow } from '../components/Skills'
 import { CHANGES_ABOUT, unusedName, unusedPickerLabel } from '@shared/unusedWorktrees'
-import { agentProviderOf, confirm, notify, projectKeyOf, openInSessionsTab, openVersionControl, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
+import { agentProviderOf, confirm, notify, projectKeyOf, openInSessionsTab, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
 import { rememberProjectPref } from '../projectPrefs'
 import { keyProblemText } from '../projectKeys'
 import { HiveVcsNotice } from '../components/HiveVcsNotice'
@@ -302,13 +301,6 @@ const S = {
   compactAbove: msg({ id: 'project.settings.compactAbove', defaultMessage: 'Suggest compacting above', description: 'Accessible name of the number box of tokens above which compacting is suggested.' }),
   neverChoice: msg({ id: 'project.settings.neverChoice', defaultMessage: 'Never', description: 'A choice: the warning or suggestion is off.' }),
   warnOver: msg({ id: 'project.settings.warnOver', defaultMessage: 'Warn when a transcript is over', description: 'Accessible name of the number box of megabytes above which a transcript is flagged.' }),
-  wake: msg({ id: 'project.settings.wake', defaultMessage: 'Wake reviewers and builders', description: "Accessible name of the card-loop wakes switch." }),
-  openVersionControl: msg({ id: 'project.settings.openVersionControl', defaultMessage: 'Open Version Control', description: 'A button in Project Settings → Workflow: shows the project’s Version Control tab at its Workflow section, where the workflow options are (glossary 2.1: Version Control).' }),
-  rounds: msg({ id: 'project.settings.rounds', defaultMessage: 'Rounds', description: 'Accessible name of the card-loop rounds box.' }),
-  waitHours: msg({ id: 'project.settings.waitHours', defaultMessage: 'Wait (hours)', description: "Accessible name of the card-loop wait box." }),
-  stepWait: msg({ id: 'project.settings.stepWait', defaultMessage: 'Design check wait (minutes)', description: "Accessible name of the card-loop design check wait box (#1382): how long a builder waits for its reviewer to check a design." }),
-  stepWaitDefault: msg({ id: 'project.settings.stepWaitDefault', defaultMessage: 'Default ({count, number} min)', description: 'Placeholder of the empty design check wait box: empty uses the default, {count} minutes.' }),
-  hours: msg({ id: 'project.settings.hours', defaultMessage: '{count} h', description: 'Hours, short, as in "Inherit (6 h)".' }),
   openHive: msg({ id: 'project.settings.openHive', defaultMessage: 'Open .hive folder', description: "Button: opens the project's .hive folder. Keep .hive." }),
   resetTitle: msg({ id: 'project.settings.resetTitle', defaultMessage: 'Reset project settings?', description: 'Title of the confirmation before resetting the project settings.' }),
   resetMessage: msg({ id: 'project.settings.resetMessage', defaultMessage: "The default provider, each provider’s model, effort, permission mode, context and extra arguments, the chime, the fresh-start suggestion, the compact threshold, the transcript size warning, file locks, worktree setup and the card-loop rounds and wait go back to Inherit, and loop wakes back on. Agents and skill and MCP opt-outs are kept.", description: 'The confirmation before resetting the project settings.' }),
@@ -1655,9 +1647,9 @@ function SettingRow({ title, desc, tip, children, modified }: { title: string; d
   )
 }
 
-type ProjectSection = 'general' | 'agents' | 'sessions' | 'loops' | 'workflow' | 'storage' | 'keys' | 'advanced' | `provider:${string}`
+type ProjectSection = 'general' | 'agents' | 'sessions' | 'storage' | 'keys' | 'advanced' | `provider:${string}`
 
-const PROJECT_SECTION_ICONS: Record<string, string> = { general: 'settings-gear', agents: 'organization', sessions: 'history', loops: 'sync', workflow: 'git-pull-request', storage: 'database', keys: 'keyboard', advanced: 'tools' }
+const PROJECT_SECTION_ICONS: Record<string, string> = { general: 'settings-gear', agents: 'organization', sessions: 'history', storage: 'database', keys: 'keyboard', advanced: 'tools' }
 
 // Each section's label and description are shown from its messages (text), in the window's language when it renders;
 // label and desc stay the catalogue's English, for the Assistant's tools.
@@ -1827,8 +1819,6 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
     set({ projectSettingsJump: null })
   }, [jump, project.path])
   const cfg = project.config
-  // The workspace's card-loop rounds and wait (Settings → Workspace), which this project inherits (#412).
-  const workspaceLoops = loopDefaults({ loops: useStore((s) => s.workspace?.config.loops) })
   // Its key, for Project key's example (#1221).
   const ownKey = useStore((s) => projectKeyOf(s, project.path))
   // Settings → Advanced's inbox switches, which this project's Inherit follows (#1432).
@@ -1841,12 +1831,6 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
   const update = async (patch: Partial<ProjectConfig>): Promise<void> => {
     await actions.attempt(tr(S.saveFailed), () => call('project:updateConfig', project.path, patch))
     await actions.refreshWorkspace()
-  }
-  const lockMode = cfg.fileLocks === 'inherit' ? settings.agents.fileLocks : cfg.fileLocks
-  /** A file lock mode's name or what it does, in the window's language (#861); its id if it isn't one. */
-  const lockShown = (mode: string, part: 'label' | 'description'): string => {
-    const m = FILE_LOCK_MODES.find((x) => x.value === mode)
-    return m ? tr(m.text[part]) : mode
   }
   const globalDefault = defaultProviderLabel(settings, tr)
   const globalCompact = settings.sessions.compactSuggestTokens ? fmt.number(settings.sessions.compactSuggestTokens) : tr(S.never)
@@ -2042,44 +2026,6 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       }
     }),
     {
-      section: 'loops',
-      key: 'loopWakes',
-      ...rowText('project.loopWakes'),
-      modified: !cfg.loopWakes,
-      render: () => <Switch checked={cfg.loopWakes} label={tr(S.wake)} onChange={(v) => void update({ loopWakes: v })} />
-    },
-    {
-      section: 'loops',
-      key: 'loopRounds',
-      ...rowText('project.loopRounds'),
-      modified: cfg.loopRounds !== null,
-      render: () => <NumberField value={cfg.loopRounds} min={1} max={LANE_MAX_ROUNDS} step={1} label={tr(S.rounds)} inherit={inherit(workspaceLoops.rounds)} onCommit={(v) => update({ loopRounds: v })} />
-    },
-    {
-      section: 'loops',
-      key: 'loopWaitHours',
-      ...rowText('project.loopWaitHours'),
-      modified: cfg.loopWaitHours !== null,
-      render: () => <NumberField value={cfg.loopWaitHours} min={1} max={LOOP_WAIT_MAX_HOURS} step={1} label={tr(S.waitHours)} inherit={inherit(tr(S.hours, { count: workspaceLoops.waitHours }))} onCommit={(v) => update({ loopWaitHours: v })} />
-    },
-    {
-      section: 'loops',
-      key: 'loopStepWaitMinutes',
-      ...rowText('project.loopStepWaitMinutes'),
-      modified: cfg.loopStepWaitMinutes !== null,
-      render: () => <NumberField value={cfg.loopStepWaitMinutes} min={1} max={LOOP_STEP_WAIT_MAX_MINUTES} step={5} label={tr(S.stepWait)} inherit={tr(S.stepWaitDefault, { count: LOOP_STEP_WAIT_MINUTES })} onCommit={(v) => update({ loopStepWaitMinutes: v })} />
-    },
-    {
-      section: 'workflow',
-      key: 'workflow',
-      ...rowText('project.workflow'),
-      render: () => (
-        <button className="btn" data-action="open-version-control" onClick={() => openVersionControl(project.path, 'workflow')}>
-          <Icon name="source-control" /> {tr(S.openVersionControl)}
-        </button>
-      )
-    },
-    {
       section: 'storage',
       key: 'storage',
       ...rowText('project.storage'),
@@ -2099,23 +2045,6 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       ...rowText('project.agents'),
       wide: true,
       render: () => <AgentList project={project} />
-    },
-    {
-      section: 'agents',
-      key: 'fileLocks',
-      ...rowText('project.fileLocks'),
-      desc: tr(S.now, { desc: rowText('project.fileLocks').desc, current: lockShown(lockMode, 'description') }),
-      modified: cfg.fileLocks !== 'inherit',
-      render: () => (
-        <select className="select" value={cfg.fileLocks} onChange={(e) => void update({ fileLocks: e.target.value as ProjectConfig['fileLocks'] })}>
-          <option value="inherit">{inherit(lockShown(settings.agents.fileLocks, 'label'))}</option>
-          {FILE_LOCK_MODES.map((m) => (
-            <option key={m.value} value={m.value}>
-              {tr(m.text.label)}
-            </option>
-          ))}
-        </select>
-      )
     },
     {
       section: 'advanced',

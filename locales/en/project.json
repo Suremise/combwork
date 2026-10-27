@@ -1087,10 +1087,6 @@
     "defaultMessage": "Global settings",
     "description": "Link: opens Settings."
   },
-  "project.settings.hours": {
-    "defaultMessage": "{count} h",
-    "description": "Hours, short, as in \"Inherit (6 h)\"."
-  },
   "project.settings.inherit": {
     "defaultMessage": "Inherit ({value})",
     "description": "The choice that takes the global (or workspace) setting. {value} is what that is now."
@@ -1139,10 +1135,6 @@
     "defaultMessage": "Open .hive folder",
     "description": "Button: opens the project's .hive folder. Keep .hive."
   },
-  "project.settings.openVersionControl": {
-    "defaultMessage": "Open Version Control",
-    "description": "A button in Project Settings → Workflow: shows the project’s Version Control tab at its Workflow section, where the workflow options are (glossary 2.1: Version Control)."
-  },
   "project.settings.overrides": {
     "defaultMessage": "Overrides the global default",
     "description": "Tooltip on the mark beside a project setting that is not Inherit."
@@ -1167,10 +1159,6 @@
     "defaultMessage": "Reset project settings?",
     "description": "Title of the confirmation before resetting the project settings."
   },
-  "project.settings.rounds": {
-    "defaultMessage": "Rounds",
-    "description": "Accessible name of the card-loop rounds box."
-  },
   "project.settings.saveFailed": {
     "defaultMessage": "Could not save project settings",
     "description": "Title of an error notification."
@@ -1182,22 +1170,6 @@
   "project.settings.sessionsIn": {
     "defaultMessage": "Sessions in {project} will run every command, edit and network call without asking.",
     "description": "The confirmation before choosing a no-guardrails permission mode for a project's sessions ({project}: the project's name)."
-  },
-  "project.settings.stepWait": {
-    "defaultMessage": "Design check wait (minutes)",
-    "description": "Accessible name of the card-loop design check wait box (#1382): how long a builder waits for its reviewer to check a design."
-  },
-  "project.settings.stepWaitDefault": {
-    "defaultMessage": "Default ({count, number} min)",
-    "description": "Placeholder of the empty design check wait box: empty uses the default, {count} minutes."
-  },
-  "project.settings.waitHours": {
-    "defaultMessage": "Wait (hours)",
-    "description": "Accessible name of the card-loop wait box."
-  },
-  "project.settings.wake": {
-    "defaultMessage": "Wake reviewers and builders",
-    "description": "Accessible name of the card-loop wakes switch."
   },
   "project.settings.warnOver": {
     "defaultMessage": "Warn when a transcript is over",

@@ -289,8 +289,6 @@ export interface HiveRequests {
   /** Clears the recent workspaces, keeping those open in a window now (#144). */
   'workspace:clearRecent': () => RecentWorkspace[]
   'workspace:refresh': () => WorkspaceInfo | null
-  /** Settings → Workspace → Card loop rounds and wait (#412): the values given change, the rest stay. */
-  'workspace:setLoops': (patch: { rounds?: number; waitHours?: number }) => WorkspaceInfo | null
   /** What Repair… would do for a moved workspace or project (#146), with the user's choices; null when nothing moved. */
   'workspace:movePlan': (opts?: MoveOptions) => MovePlan | null
   /** Repairs it (refused while agents run): worktrees, session folders, the CLIs' per-path data (copied), Open Recent. */
