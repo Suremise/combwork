@@ -660,6 +660,52 @@ describe('a card by intent (#1267)', () => {
     }
     expect(rule).toBe('card.plainNumber')
   })
+
+  // HI-1832 (HR4's round 1): a follow-up in Review is the card's agent's on the board now, read where it writes.
+  it("a follow-up in Review: its line on the card, no move, no round; given to another while it gathers, the old builder is refused and the new one may", async () => {
+    const { w, repo, wt } = await workspace()
+    const card = await create(w)
+    await act(w, card, builder, { kind: 'start' })
+    commit(wt, 'b.txt')
+    await act(w, card, builder, { kind: 'submit', summary: 'Round 1 ready' })
+    await act(w, card, reviewer, { kind: 'startReview' })
+    const head = commit(wt, 'asked.txt')
+    // The user gives the card to Other while the builder's follow-up gathers (after its reads, before its write).
+    const wf = (await service.workflowFor(w, repo))!
+    let given = false
+    const hooks = wf.cfg.hooks
+    wf.cfg.hooks = {
+      ...hooks,
+      beforeWrite: async (move) => {
+        if (move !== 'submit' || given) return
+        given = true
+        await inWorkspace(w, () => tasks.updateTask(card, { agent: 'a3' }, user))
+      }
+    }
+    const spy = vi.spyOn(service, 'workflowFor').mockImplementation(async () => wf)
+    try {
+      expect(await refused(act(w, card, builder, { kind: 'submit', summary: 'The change asked for', followUp: true }))).toBe('submit.followUpNotBuilder')
+    } finally {
+      spy.mockRestore()
+      wf.cfg.hooks = hooks
+    }
+    expect(given).toBe(true)
+    expect(facts(w, card).filter((f) => f.kind === 'Submitted')).toHaveLength(1)
+    const now = await inWorkspace(w, () => tasks.getTask(card))
+    expect([now.column, now.agent]).toEqual(['review', 'a3'])
+    // Its agent now submits it: still in Review and its, the same round, its line in the history; the review isn't stopped.
+    const done = await act(w, card, other, { kind: 'submit', summary: 'The change asked for', followUp: true })
+    expect(done.done).toMatchObject({ from: 'review', to: 'review', data: { followUp: true, revision: head } })
+    expect([done.card.column, done.card.agent, done.card.review?.agent]).toEqual(['review', 'a3', 'a2'])
+    expect(done.card.history.at(-1)?.whatText).toEqual({ id: 'tasks.history.followUpSubmitted', values: { revision: head.slice(0, 7) } })
+    expect(done.card.history.some((h) => h.what.startsWith('Given to Reviewer'))).toBe(false)
+    const s = foldCard(facts(w, card))
+    expect([s.stage, s.rounds, s.latest?.followUp, s.latest?.revision]).toEqual(['review', 0, true, head])
+    // The reviewer's verdict needs its review started again, on the follow-up.
+    expect(await refused(act(w, card, reviewer, { kind: 'verdict', pass: true, comment: 'ok' }))).toBe('verdict.reviewing')
+    await act(w, card, reviewer, { kind: 'startReview' })
+    expect((await act(w, card, reviewer, { kind: 'verdict', pass: true, comment: 'ok' })).done).toMatchObject({ from: 'review', to: 'approved' })
+  })
 })
 
 describe("the intents' routes and tools (#1267)", () => {

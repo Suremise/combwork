@@ -9,6 +9,7 @@ import { reconcile } from '../../src/main/workflow/reconcile'
 import { runCheck, blocks } from '../../src/main/workflow/checks'
 import { isRefusal } from '../../src/main/workflow/runtime'
 import type { FactData } from '../../src/shared/workflow/facts'
+import { workspaceDb } from '../../src/main/boardStore'
 
 let env: Env | null = null
 afterEach(() => {
@@ -907,6 +908,29 @@ describe('a follow-up submitted in Review (HI-1832): the revision under review m
     moved(await e.wf.submit(card.key, B1, { summary: 'round 2', followUp: true }))
     expect(e.wf.state(card).latest).toMatchObject({ round: 2 })
     expect(e.wf.state(card).latest?.followUp).toBeUndefined()
+  })
+
+  it("its builder is the card's agent on the board now (HR4's round 1): given to another while it gathers, the old one is refused and the new one may; given to nobody, its cycle's builder", async () => {
+    const e = pair()
+    const { card } = await inReview(e)
+    const giveTo = (agent: string | null) => workspaceDb(e.home).writer.prepare('UPDATE cards SET agent = ? WHERE number = ?').run(agent, card.id)
+    giveTo('B1')
+    e.wf.cfg.hooks = {
+      beforeWrite: async (move) => {
+        if (move !== 'submit') return
+        e.wf.cfg.hooks = {}
+        giveTo('B2')
+      }
+    }
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'the old builder', followUp: true }), 'submit.followUpNotBuilder')
+    expect(e.wf.state(card).submissions).toHaveLength(1)
+    moved(await e.wf.submit(card.key, B2, { summary: 'its builder now', followUp: true }))
+    expect(e.wf.state(card).latest).toMatchObject({ followUp: true, by: 'B2' })
+    // Given to nobody: B2 isn't its cycle's builder (B1 is).
+    giveTo(null)
+    commit(e.wf.state(card).started!.folder as string, { 'src/again.txt': 'again\n' }, 'again')
+    refusedBy(await e.wf.submit(card.key, B2, { summary: 'not now', followUp: true }), 'submit.followUpNotBuilder')
+    moved(await e.wf.submit(card.key, B1, { summary: 'its cycle builder', followUp: true }))
   })
 
   it('a verdict while the follow-up is on its way refuses it where it writes', async () => {

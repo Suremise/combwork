@@ -2280,7 +2280,7 @@ folder (the folder's line is the target); G10 is hidden when R includes you; Q =
 | Active | **put back** (builder) | — | Todo · `releaseSlot` |
 | Active | **submit** (builder) | `submit.notDuplicate`, `submit.ready`, `submit.clean`, `submit.trailer`, `submit.identity`, `submit.checksPassed`, `submit.ownRunsStopped`, `submit.decisionsReceived` (K = no-code: only the last two and `notDuplicate`) | R ≠ none: **Review** · `recordSubmitted`, `prepareReviewCopy`, then `wakeReviewer` (R = agent…) or `askUser(approve)` (R = you). R = none: **Finish** (below). |
 | Review | **start review** (reviewer) | `review.notAuthor`, `review.decisionsReceived` | Review · `ReviewStarted` |
-| Review | **submit** with `followUp` (its builder; HI-1832), unstale | as Active's submit, and `submit.followUpNotBuilder` (another agent's), read again in the write | Review (no move) · `recordSubmitted` (`followUp`, the same round), `prepareReviewCopy`, wake the reviewer to start again; a plain submit there is `move.notFromHere` (its builder told of `followUp`) |
+| Review | **submit** with `followUp` (its builder; HI-1832), unstale | as Active's submit, and `submit.followUpNotBuilder` (an agent other than the card's agent on the board now, or, given to nobody, its cycle's builder), read again in the write | Review (no move) · `recordSubmitted` (`followUp`, the same round), `prepareReviewCopy`, wake the reviewer to start again; a plain submit there is `move.notFromHere` (its builder told of `followUp`) |
 | Review | **verdict pass** | `verdict.reviewing`, `verdict.currentSubmission`, `review.notAuthor`, `review.decisionsReceived` | passes on this submission (or the same change) < Q: Review ("1 of 2 passed"). ≥ Q and R = agent then you: Review · `askUser(approve)`. Else **Finish**. |
 | Review | **verdict fail** | the same | Active · wake the builder; a round (§16.11.4) |
 | Review | **user approves** (R = you, or agent then you after the quorum) | `approval.given` | **Finish** |
@@ -2496,8 +2496,10 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   submitted as a follow-up, else a failing verdict so its builder submits the head; either runs its checks, the user's
   gates and a review copy as any submission). **A follow-up submitted in Review** (HI-1832, the Assistant's card after
   HI-1772, 27 Oct, where HR3 moved the card to Doing to have a follow-up reviewed, which gave it to HR3 and ended HB3's
-  watch): `hive_submit` with `followUp`, its builder's (`submit.followUpNotBuilder` for another agent, checked again in
-  the write; the same revision `submit.notDuplicate`), makes the commit the revision under review: a `Submitted` fact
+  watch): `hive_submit` with `followUp`, its builder's: the card's agent on the board when the write decides (a card
+  given to another in Review keeps its `Started`: HR4's round 1), given to nobody its cycle's builder, the user or the
+  Assistant either way (`submit.followUpNotBuilder` otherwise, checked in the write; the same revision
+  `submit.notDuplicate`), makes the commit the revision under review: a `Submitted` fact
   (`followUp`, the same round), its pin and `prepareReviewCopy`, no move, no one reassigned, the board's line "Follow-up
   submitted for review at <commit>", and the reviewer woken (a `review` loop wake due until it starts again or gives a
   verdict, though it is already reviewing). The earlier submission's review doesn't carry: a verdict on it is refused

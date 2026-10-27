@@ -1170,10 +1170,13 @@ export class Workflow {
       // Every refusal before anything is written: an override never commits without its move.
       if (from === 'review' && !g.s.stale && !followUp) return { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: 'submit', moves: this.movesFrom(from, g.r).join(', ') } } as GuardRefusal
       // Read again under the transaction: still in Review, unstale, and the agent its builder now (not when the call began).
+      // Its builder is the agent the board gives it to now (a card given to another in Review keeps its Started: HR4's
+      // HI-1832 round 1); given to nobody, its cycle's builder. The user and the Assistant may either way.
       if (followUp) {
         const now = w.state()
         if (w.current !== 'review' || now.stale) return { rule: 'move.notFromHere', values: { card: card.key, stage: w.current, move: 'submit', moves: this.movesFrom(w.current, g.r, now).join(', ') } } as GuardRefusal
-        if (agent && agent !== now.started?.builder) return { rule: 'submit.followUpNotBuilder', values: { card: card.key } } as GuardRefusal
+        const owner = this.store.cardAgent(card.id) ?? now.started?.builder ?? null
+        if (agent && agent !== owner) return { rule: 'submit.followUpNotBuilder', values: { card: card.key } } as GuardRefusal
       }
       const ins = this.submitInputs(g)
       const bad = args.drag ? this.across(w, 'submit', 'review', ins, args.drag, g.only) : this.check(w, 'submit', ins, g.only)
