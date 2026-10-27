@@ -4135,7 +4135,8 @@ where it ran) and counts for a card's submission only if all of these hold; othe
   Writes anywhere in the tracked tree count, not just the card's files: its checks can depend on any of them. A write
   is the run's by the file's own times, not when its event came in (HI-1767): a check copy's reset or the target merged
   in just before the start, whose events came in after it under load, isn't (its file last written before the start,
-  100 ms of clock slack aside); a deleted file is timed by its folder's;
+  100 ms of clock slack aside); a link by its own and its target's, the later; a file shown gone (ENOENT, ENOTDIR) by
+  its folder's; one that can't be read counts;
 - **None:** `hive-progress --check <name> --card AM-12` computes the card's current revision from its declared paths
   when the run starts and when it ends (§16.3.3); the run counts for a submission whose revision is that same value
   (same paths, same contents), and the watcher saw no write to a deliverable in between. So the builder declares its
