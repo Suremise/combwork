@@ -37,6 +37,11 @@ export const foundKey = (d: Detection): string => (d.other ? `other:${d.other}` 
  * `found`: what detection found when the user last switched (#1419): while the folder shows that still, the user chose
  * this platform knowing it (None for a Git folder), so nothing is offered until the folder changes.
  */
+/** A project's platform's id, as projectPlatform gives it: its recorded one, its folder looked at only when it has none (HI-1783: a check's every resolve asks). */
+export function platformIdOf(folder: string, recorded: unknown): PlatformId {
+  return isPlatformId(recorded) ? recorded : detect(folder).platform
+}
+
 export function projectPlatform(folder: string, recorded: unknown, found?: unknown): ProjectPlatform {
   const detected = detect(folder)
   const valid = isPlatformId(recorded)
