@@ -27,6 +27,8 @@ export interface TabItem<T extends string = string> {
    * tooltip and part of its accessible name.
    */
   muted?: string
+  /** A short word after the label, such as "off" (a CLI turned off). */
+  tag?: string
   /** Its tooltip (else its name, when folded to its icon; else why it is dimmed). */
   tip?: React.ReactNode
   /** Attributes the tab's button carries too (`data-section` for the tests and links that knew the old row). */
@@ -97,6 +99,7 @@ export function Tabs<T extends string>({ items, value, onChange, label, fold, re
               <button type="button" role="tab" id={tabIds(base, x.id).tab} aria-controls={tabIds(base, x.id).panel} aria-selected={selected} {...(x.unsaved || x.muted ? { 'aria-label': name } : {})} tabIndex={selected ? 0 : -1} data-tab={x.id} {...(x.muted ? { 'data-muted': '' } : {})} {...x.attrs} className={cx('hive-tab', selected && 'active', folded && 'icon-only', x.muted && 'muted')} onClick={() => onChange(x.id)}>
                 {tabIcon(x.icon)}
                 <span className="hive-tab-label">{x.label}</span>
+                {x.tag && <span className="hive-tab-tag">{x.tag}</span>}
                 {x.count !== undefined && <span className="hive-tab-count">{fmt.number(x.count)}</span>}
                 {x.unsaved && (
                   <Tooltip content={tr(T.unsaved)}>
@@ -114,6 +117,7 @@ export function Tabs<T extends string>({ items, value, onChange, label, fold, re
           {items.map((x) => (
             <span key={x.id} className="hive-tab" data-label={x.label}>
               {tabIcon(x.icon)}
+              {x.tag && <span className="hive-tab-tag">{x.tag}</span>}
               {x.count !== undefined && <span className="hive-tab-count">{fmt.number(x.count)}</span>}
               {x.unsaved && <span className="hive-tab-unsaved" />}
             </span>

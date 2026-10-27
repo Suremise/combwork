@@ -432,6 +432,7 @@
   "settings.advancedList.noMatch": "没有匹配的高级设置。",
   "settings.advancedList.noMatchHere": "没有匹配的 {group} 设置。",
   "settings.advancedList.notValid": "值无效，Hive 改用默认值：{problem}",
+  "settings.advancedList.off": "已关闭",
   "settings.advancedList.open": "打开 advanced.json",
   "settings.advancedList.openFailed": "无法打开 advanced.json",
   "settings.advancedList.reset": "重置为默认值（{value}）",

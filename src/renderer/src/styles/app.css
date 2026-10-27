@@ -1759,6 +1759,18 @@ textarea.input {
 .hive-tab.muted .hive-tab-icon {
   opacity: 0.6;
 }
+.hive-tab.muted.active:not(:hover) .hive-tab-label {
+  color: var(--fg-muted);
+}
+/* A short mark after a tab's name ("off"). */
+.hive-tab-tag {
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--fg-muted);
+}
 /* The tabs with every name, measured to choose between names and icons (Tabs' `fold`). */
 .hive-tabs-measure {
   position: absolute;

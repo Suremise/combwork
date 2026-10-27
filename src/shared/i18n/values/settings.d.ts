@@ -434,6 +434,7 @@ interface HiveMessageValues {
   'settings.advancedList.noMatch': undefined
   'settings.advancedList.noMatchHere': { group: string | number }
   'settings.advancedList.notValid': { problem: string | number }
+  'settings.advancedList.off': undefined
   'settings.advancedList.open': undefined
   'settings.advancedList.openFailed': undefined
   'settings.advancedList.reset': { value: string | number }

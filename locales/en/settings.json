@@ -1731,6 +1731,10 @@
     "defaultMessage": "Not valid, so Hive uses the default: {problem}",
     "description": "Under an advanced value that isn't valid. {problem} says why."
   },
+  "settings.advancedList.off": {
+    "defaultMessage": "off",
+    "description": "A short mark on the tab of a CLI turned off in Settings → Advanced (beside its name, such as Codex). Lower case, one short word."
+  },
   "settings.advancedList.open": {
     "defaultMessage": "Open advanced.json",
     "description": "Button above Settings → Advanced's list: opens the file the values are kept in. advanced.json is a file name: keep it."

@@ -432,6 +432,7 @@
   "settings.advancedList.noMatch": "Keine erweiterten Einstellungen gefunden.",
   "settings.advancedList.noMatchHere": "Keine Einstellungen von {group} passen.",
   "settings.advancedList.notValid": "Ungültig, daher verwendet Hive den Standard: {problem}",
+  "settings.advancedList.off": "aus",
   "settings.advancedList.open": "advanced.json öffnen",
   "settings.advancedList.openFailed": "advanced.json konnte nicht geöffnet werden",
   "settings.advancedList.reset": "Auf Standard zurücksetzen ({value})",

@@ -73,6 +73,10 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     if (muted) {
       await tab(muted.id).click()
       check('a dimmed tab is chosen as any other, its values there', !!(await lib.until(async () => (await selectedTab()) === muted.id && (await visibleIds()).length > 0, HUNG_MS)))
+      // Visibly off (the Assistant's screenshot review): an "off" mark on the tab, and a line atop its values.
+      const offNote = list.locator(`[role="tabpanel"][data-group="${muted.id}"] [data-note="cli-off"]`)
+      check('…marked off on its tab, and its values headed by a line saying it is turned off', (await tab(muted.id).locator('.hive-tab-tag').innerText()).trim() === 'off' && (await offNote.isVisible()) && (await offNote.innerText()).includes(`${muted.label} is turned off: these settings apply once you turn it on`), await offNote.innerText().catch(() => ''))
+      check('…a CLI turned on has neither', (await list.locator('.advanced-tabs [role="tab"]:not([data-muted]) .hive-tab-tag').count()) === 0 && (await list.locator('[role="tabpanel"][data-note="cli-off"], [role="tabpanel"] [data-note="cli-off"]').count()) === t0.filter((t) => t.muted).length)
       await list.locator('.advanced-tabs').scrollIntoViewIfNeeded()
       for (const theme of ['dark', 'light']) {
         await page.evaluate((th) => document.documentElement.setAttribute('data-theme', th), theme)

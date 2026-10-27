@@ -26,6 +26,7 @@ import { TabPanel, Tabs } from './Tabs'
 const T = {
   tabs: msg({ id: 'settings.advancedList.tabs', defaultMessage: 'Hive and the CLIs', description: "Accessible name of Settings → Advanced's tabs: Hive, then one per CLI (Claude Code, Codex, GitHub Copilot)." }),
   cliOff: msg({ id: 'settings.advancedList.cliOff', defaultMessage: '{cli} is turned off: these settings apply once you turn it on', description: "Tooltip of a dimmed tab of Settings → Advanced, and part of its name for screen readers: the CLI is turned off in Settings → Providers. {cli} is its name." }),
+  off: msg({ id: 'settings.advancedList.off', defaultMessage: 'off', description: "A short mark on the tab of a CLI turned off in Settings → Advanced (beside its name, such as Codex). Lower case, one short word." }),
   noMatchHere: msg({ id: 'settings.advancedList.noMatchHere', defaultMessage: 'No settings of {group} match.', description: "A tab of Settings → Advanced with none of the filtered values: {group} is Hive or the CLI's name." })
 }
 
@@ -99,13 +100,18 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
         label={tr(T.tabs)}
         value={tab}
         onChange={choose}
-        items={GROUPS.map((g) => ({ id: g, label: groupName(g), icon: isCli(g) ? <ProviderIcon provider={g} /> : <HiveMark className="tab-hex" />, ...(filtering ? { count: count(g) } : {}), ...(isCli(g) && !isProviderEnabled(settings, g) ? { muted: tr(T.cliOff, { cli: groupName(g) }) } : {}) }))}
+        items={GROUPS.map((g) => ({ id: g, label: groupName(g), icon: isCli(g) ? <ProviderIcon provider={g} /> : <HiveMark className="tab-hex" />, ...(filtering ? { count: count(g) } : {}), ...(isCli(g) && !isProviderEnabled(settings, g) ? { muted: tr(T.cliOff, { cli: groupName(g) }), tag: tr(T.off) } : {}) }))}
       />
       {/* Every group's rows stay mounted, the tab shown alone visible: a value being typed is never lost to a switch. */}
       {GROUPS.map((g) => {
         const list = shown.filter((r) => r.def.group === g)
         return (
           <TabPanel key={g} idBase={idBase} id={g} selected={g === tab} className="advanced-group" data-group={g}>
+            {isCli(g) && !isProviderEnabled(settings, g) && (
+              <div className="advanced-note" data-note="cli-off">
+                <Icon name="circle-slash" /> {tr(T.cliOff, { cli: groupName(g) })}
+              </div>
+            )}
             {list.map((r) => (
               <AdvancedItem key={r.def.id} row={r} cli={cliFacing(r.def) ? (state.cli[r.def.group as ProviderId] ?? null) : null} workspace={hasWorkspace} restartDue={r.def.applies === 'restart' && !!state.atStart && r.def.id in state.atStart && state.atStart[r.def.id] !== r.value} />
             ))}

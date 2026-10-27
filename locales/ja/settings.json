@@ -432,6 +432,7 @@
   "settings.advancedList.noMatch": "一致する詳細設定はありません。",
   "settings.advancedList.noMatchHere": "{group} の設定で一致するものはありません。",
   "settings.advancedList.notValid": "無効なため、既定値を使います：{problem}",
+  "settings.advancedList.off": "オフ",
   "settings.advancedList.open": "advanced.jsonを開く",
   "settings.advancedList.openFailed": "advanced.jsonを開けませんでした",
   "settings.advancedList.reset": "既定値に戻す（{value}）",

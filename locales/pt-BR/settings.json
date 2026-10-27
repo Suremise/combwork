@@ -432,6 +432,7 @@
   "settings.advancedList.noMatch": "Nenhuma configuração avançada corresponde.",
   "settings.advancedList.noMatchHere": "Nenhuma configuração de {group} corresponde.",
   "settings.advancedList.notValid": "Inválido, então o Hive usa o padrão: {problem}",
+  "settings.advancedList.off": "desativado",
   "settings.advancedList.open": "Abrir advanced.json",
   "settings.advancedList.openFailed": "Não foi possível abrir advanced.json",
   "settings.advancedList.reset": "Restaurar padrão ({value})",
