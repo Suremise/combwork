@@ -15,9 +15,11 @@ import { emit, onHiveEvent } from './events'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { connectionLoginChanged, forgetConnectionUsage, usageLogin } from './planUsage'
-import { childEnv, hasPty } from './ptyHost'
+import { childEnv, hasPty, killPty, ptyGone } from './ptyHost'
 import { connectionsManaged, testHomeSeam } from './connectionSeam'
 import { provider } from './providers'
+import type { TrustTarget } from './providers/types'
+import { git } from './git'
 import { withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
 import { openWorkspaces, setNewWorkspaceExtras, workspace, workspaceOf } from './workspace'
@@ -499,19 +501,37 @@ export function renameAccount(id: string, name: string): void {
   changeAccount(id, (a) => (a.name = n))
 }
 
+/** How long Remove waits for a sign-in or Set Up terminal it closed to end (HI-1870): a bound for a hung kill. */
+const TERMINAL_GONE_MS = 15_000
+
 /**
- * Removes an account: refused while anything runs on it (its agents, a launch, its sign-in). Its folder goes for good
- * (removeFolder); the account stays listed, saying what's left, until that succeeds.
+ * Removes an account: refused while anything runs on it (its agents, a launch, its sign-in). With `closeTerminal`
+ * (HI-1870: the user said yes to closing it), its sign-in or Set Up terminal is ended first rather than refused; agents
+ * on it still refuse. Its folder goes for good (removeFolder); the account stays listed, saying what's left, until that
+ * succeeds.
  */
-export async function removeAccount(id: string): Promise<void> {
+export async function removeAccount(id: string, opts: { closeTerminal?: boolean } = {}): Promise<void> {
   const a = mustGet(id)
-  const inUse = (): boolean => sessionsOn(id) || (claims.get(id) ?? 0) > 0 || loginsOpen.has(id) || hasPty(loginKey(a))
+  const running = (): boolean => sessionsOn(id) || (claims.get(id) ?? 0) > 0
+  const terminalOpen = (): boolean => loginsOpen.has(id) || hasPty(loginKey(a))
+  const RUNNING = msg({ id: 'main.accounts.running', defaultMessage: '{name} has agents running on it: stop them, then remove it.', description: 'An error removing a connection ({name}, its name in Settings → Connections): agents run on it, or one is starting.' })
   const IN_USE = msg({ id: 'main.accounts.inUse', defaultMessage: '{name} is in use: stop the agents on it and close its sign-in, then remove it.', description: 'An error removing a connection ({name}, its name in Settings → Connections): agents run on it, or its sign-in terminal is open.' })
-  if (inUse()) throw hiveError(IN_USE, { name: a.name }, { kind: 'conflict' })
+  const refuse = (): void => {
+    if (running()) throw hiveError(RUNNING, { name: a.name }, { kind: 'conflict' })
+    if (terminalOpen()) throw hiveError(IN_USE, { name: a.name }, { kind: 'conflict' })
+  }
+  if (running()) refuse()
+  if (opts.closeTerminal && hasPty(loginKey(a))) {
+    // Waited on before the kill (its exit can't be missed); a kill that fails or never ends it is refused below, as open.
+    const gone = ptyGone(loginKey(a), TERMINAL_GONE_MS)
+    killPty(loginKey(a))
+    await gone
+  }
+  refuse()
   assertNotHeld(a)
   await locked(id, async () => {
     // Asked again under the lock: a launch or sign-in may have started while it waited.
-    if (inUse()) throw hiveError(IN_USE, { name: a.name }, { kind: 'conflict' })
+    refuse()
     assertNotHeld(a)
     // A server connection's key goes first (HI-1772): if that fails, nothing else is removed, the row still shows its
     // key, and Remove tries again; a later failure leaves no key behind.
@@ -540,6 +560,8 @@ export async function removeAccount(id: string): Promise<void> {
       for (const [p, v] of Object.entries(c.lastUsedConnection ?? {})) if (v === id) delete c.lastUsedConnection![p as ProviderId]
     })
     forgetConnectionUsage(id)
+    setUpRead.delete(id)
+    for (const k of [...trustRead.keys()]) if (k.startsWith(`${id}|`)) trustRead.delete(k)
     log.info(`account ${id} removed`)
     syncWatches()
   })
@@ -568,8 +590,124 @@ const inFlight = new Map<string, { now: Promise<ConnectionObserved | null>; next
 /** Per account: how many changes its watch has seen (confirm checks again while it moves). */
 const changes = new Map<string, number>()
 
+/**
+ * Per connection, whether its CLI's first-run setup is done in its folder (HI-1870: Set Up), as last read from the
+ * CLI's own files (connectionSetUp); null, can't be told. Read again at each check, as Settings shows, and as a Set Up
+ * ends; never kept, so a folder set up elsewhere (an agent's pane) shows as done at the next read.
+ */
+const setUpRead = new Map<string, boolean | null>()
+
+/** The longest git may take to list a project's worktrees for the trust check (HI-1870): unknown past it. */
+const GIT_TRUST_MS = 10_000
+
+/** A project's folder for the trust check (HI-1870): its name, where Set Up opens, and how the CLIs look it up. */
+interface ProjectTarget extends TrustTarget {
+  project: string
+}
+
+/**
+ * The folders a workspace's projects need trusted (HI-1870), one per project: a Git project's main repository root
+ * (`git rev-parse --git-common-dir`'s parent, real path), which covers the project and every slot, copy and worktree
+ * made from it (probed: Claude Code 2.1.311, Codex 0.164.0; a worktree's own entry covers only itself), or a project
+ * without Git's own real path. Read off main's thread (git's worker, async file calls).
+ */
+export async function trustTargets(projects: readonly { name: string; path: string }[]): Promise<ProjectTarget[]> {
+  return Promise.all(
+    projects.map(async (p): Promise<ProjectTarget> => {
+      const real = await realpath(p.path).catch(() => null)
+      // An 8.3 path (a `~N` part its long form doesn't have): Claude Code doesn't expand it.
+      const short = /~\d/.test(p.path) && !!real && real.toLowerCase() !== resolve(p.path).toLowerCase()
+      const run = (cwd: string, args: string[]) => git(cwd, args, undefined, undefined, { timeout: GIT_TRUST_MS }).catch(() => null)
+      const r = await run(p.path, ['rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir', '--show-toplevel'])
+      if (!r?.ok) {
+        // Not a repository (git says so): the folder itself. Anything else (a bare repository, a timeout, git missing)
+        // can't be told, and Set Up never opens in a git folder.
+        const notRepo = !!r && /not a git repository/i.test(r.err)
+        return { project: p.name, root: notRepo ? real : null, git: !notRepo && !!real, short }
+      }
+      const [gitDir, common, top] = r.out.trim().split(/\r?\n/)
+      const same = (a?: string, b?: string): boolean => !!a && !!b && resolve(a).toLowerCase() === resolve(b).toLowerCase()
+      // In the main working tree (its git folder the common one, wherever that is kept): its top level.
+      let tree: string | undefined = same(gitDir, common) ? top : undefined
+      if (!tree) {
+        // A linked worktree: the main working tree, as git lists it first, checked to be one (not a git folder).
+        const worktrees = await run(p.path, ['worktree', 'list', '--porcelain'])
+        const first = worktrees?.ok ? worktrees.out.split(/\r?\n\r?\n/)[0].split(/\r?\n/) : []
+        const listed = first.includes('bare') ? undefined : first.find((l) => l.startsWith('worktree '))?.slice('worktree '.length)
+        const check = listed ? await run(listed, ['rev-parse', '--path-format=absolute', '--git-common-dir', '--show-toplevel']) : null
+        const [itsCommon, itsTop] = check?.ok ? check.out.trim().split(/\r?\n/) : []
+        if (same(itsCommon, common) && same(itsTop, listed)) tree = itsTop
+      }
+      return { project: p.name, root: tree ? await realpath(tree).catch(() => null) : null, git: true, short }
+    })
+  )
+}
+
+/** Per connection and workspace (`<id>|<workspace>`): its projects' trust as last read, with what it was read for. */
+const trustRead = new Map<string, { projects: { name: string; path: string }[]; sig: string; pending: { project: string; folder: string }[]; unknown: boolean }>()
+const trustKey = (id: string, ws: string): string => `${id}|${ws.toLowerCase()}`
+
+/** Reads a connection's trust of a workspace's projects again (HI-1870), telling the windows when it changed. */
+async function readTrust(id: string, ws: string, projects: { name: string; path: string }[]): Promise<{ pending: { project: string; folder: string }[]; unknown: boolean } | null> {
+  const a = getAccount(id)
+  const read = a && provider(a.provider).connectionTrusts
+  if (!a || !read) return null
+  const gen = generation(id)
+  const targets = await trustTargets(projects)
+  const got = await read.call(provider(a.provider), accountFolder(id), targets).catch(() => targets.map(() => null))
+  const pending = targets.flatMap((t, i) => (got[i] === false && t.root ? [{ project: t.project, folder: t.root }] : []))
+  const now = { projects, sig: JSON.stringify(projects), pending, unknown: got.some((x) => x === null) }
+  if (generation(id) !== gen || !getAccount(id)) return null
+  const was = trustRead.get(trustKey(id, ws))
+  trustRead.set(trustKey(id, ws), now)
+  if (!was || JSON.stringify([was.pending, was.unknown]) !== JSON.stringify([now.pending, now.unknown])) emit({ type: 'connections-changed' })
+  return now
+}
+
+/** Every workspace a connection's trust was read for, read again (a Set Up or sign-in ended, a check). */
+function rereadTrust(id: string): void {
+  for (const [k, v] of trustRead) if (k.startsWith(`${id}|`)) void readTrust(id, k.slice(id.length + 1), v.projects)
+}
+
+/**
+ * Where a connection's Set Up opens (HI-1870): the first folder of this window's workspace it doesn't trust yet, read
+ * now, so the CLI asks its trust question there; none, its own folder (its first-run screens). Always a folder there is.
+ */
+export async function setUpFolder(id: string): Promise<string | undefined> {
+  const a = getAccount(id)
+  if (!a || !workspace.path || !onHere(a)) return undefined
+  const t = await readTrust(id, workspace.path, projectsHere())
+  return t?.pending[0]?.folder
+}
+
+/** Whether a connection is on in this window's workspace: its trust of the workspace's folders counts then. */
+const onHere = (a: Connection): boolean => !!workspace.path && !!workspaceAccounts(workspace.config, a.provider, list())?.on.includes(a.id)
+
+/** This window's workspace's projects, by name and folder. */
+const projectsHere = (): { name: string; path: string }[] => (workspace.info()?.projects ?? []).map((p) => ({ name: p.name, path: p.path }))
+
+/** Reads a connection's set-up state again, telling the windows when it changed. */
+export async function readSetUp(id: string): Promise<void> {
+  rereadTrust(id)
+  const a = getAccount(id)
+  if (!a) return
+  const read = provider(a.provider).connectionSetUp
+  if (!read) return
+  const gen = generation(id)
+  let now: boolean | null
+  try {
+    now = await read.call(provider(a.provider), accountFolder(id))
+  } catch {
+    now = null
+  }
+  if (generation(id) !== gen || !getAccount(id) || setUpRead.get(id) === now) return
+  setUpRead.set(id, now)
+  emit({ type: 'connections-changed' })
+}
+
 /** Reads the folder's sign-in from the CLI, and keeps it as `observed` unless the account was removed meanwhile. */
 async function checkOnce(id: string): Promise<ConnectionObserved | null> {
+  void readSetUp(id)
   const a = getAccount(id)
   // A server connection has no sign-in to check (HI-1772).
   if (!a || isServer(a)) return null
@@ -655,11 +793,11 @@ export function signInAccount(id: string): Promise<string> {
  * Hive types nothing and writes none of its files. The terminal is the sign-in's (one of the two at a time), and once it
  * ends the account is checked as after a sign-in. Returns the terminal's key.
  */
-export function setUpSignInConnection(id: string): Promise<string> {
-  return openLoginTerminal(id, true)
+export function setUpSignInConnection(id: string, folder?: string): Promise<string> {
+  return openLoginTerminal(id, true, folder)
 }
 
-async function openLoginTerminal(id: string, setUp: boolean): Promise<string> {
+async function openLoginTerminal(id: string, setUp: boolean, folder?: string): Promise<string> {
   // A server connection has no sign-in: its Set Up opens the CLI instead (serverConnections.ts).
   if (isServer(mustGet(id))) throw hiveError(NO_ACCOUNT, undefined, { kind: 'invalid' })
   // Started under the account's lock, so never while it is being removed: the account checked still there (a removal
@@ -681,7 +819,7 @@ async function openLoginTerminal(id: string, setUp: boolean): Promise<string> {
           // Only a good, signed-in answer is taken on, and only when none is yet; a different one is a change to answer.
           if (ok && !getAccount(id)?.accepted) changeAccount(id, (x) => (x.accepted = ok))
         })
-      }, setUp ? { env: {}, cwd: accountFolder(id) } : undefined)
+      }, setUp ? { env: {}, cwd: folder ?? accountFolder(id) } : undefined)
     } catch (e) {
       loginsOpen.delete(id)
       throw e
@@ -865,7 +1003,16 @@ export function stopAccountWatches(): void {
 /** What Settings → Accounts shows for the asking window's workspace; each account checked again as it is shown. */
 export function accountsView(check = false): ConnectionsView {
   const all = list()
-  if (check) for (const a of all) if (!isServer(a)) void checkAccount(a.id)
+  if (check) for (const a of all) void (isServer(a) ? readSetUp(a.id) : checkAccount(a.id))
+  // One not read yet (just added): its set-up state read once, a few files, its answer telling the windows (HI-1870).
+  else for (const a of all) if (!setUpRead.has(a.id)) void readSetUp(a.id)
+  // Its trust of this workspace's folders (HI-1870), for each connection on here: read as shown, and when its projects changed.
+  const here = workspace.path ? projectsHere() : []
+  if (workspace.path) for (const a of all) if (onHere(a) && (check || trustRead.get(trustKey(a.id, workspace.path))?.sig !== JSON.stringify(here))) void readTrust(a.id, workspace.path, here)
+  const trustOf = (a: Connection): { trust?: { pending: { project: string; folder: string }[]; unknown: boolean } } => {
+    const t = workspace.path && onHere(a) ? trustRead.get(trustKey(a.id, workspace.path)) : undefined
+    return t ? { trust: { pending: t.pending, unknown: t.unknown } } : {}
+  }
   void loadKeys()
   const providers = PROVIDERS.filter((p) => !!p.capabilities.connections && isProviderEnabled(config.settings, p.id)).map((p) => p.id)
   const cfg = workspace.path ? workspace.config : null
@@ -881,7 +1028,7 @@ export function accountsView(check = false): ConnectionsView {
     return k && k.origin === originOf(a.server?.baseUrl ?? '') ? { key: { last4: k.last4, at: k.at } } : {}
   }
   const intro = !config.get().ui.connectionsIntroShown && !all.length ? providers.filter((p) => !testHome.includes(p)) : []
-  return { ...(intro.length ? { intro } : {}), providers, connections: all.map((a) => ({ ...shownServer(a), signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a) })), workspace: ws, testHome, masking: coverageView() }
+  return { ...(intro.length ? { intro } : {}), providers, connections: all.map((a) => ({ ...shownServer(a), signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a), ...(setUpRead.has(a.id) ? { setUp: setUpRead.get(a.id) } : {}), ...trustOf(a) })), workspace: ws, testHome, masking: coverageView() }
 }
 
 /** Dismisses the one-time notice that agents run on connections (HI-1774), in every window. */

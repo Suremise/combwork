@@ -5,12 +5,33 @@ import type { Connection, ProviderId, WorkspaceConnections, WorkspaceConfig } fr
  * workspace's choice of them per provider. Pure, for main and the window alike.
  */
 
+/**
+ * A connection's trust of the asking window's workspace's folders (HI-1870), for one on there: the projects whose folder
+ * (its main repository root) its CLI doesn't trust yet, where Set Up opens; `unknown`, some couldn't be told.
+ */
+export interface ConnectionTrust {
+  pending: { project: string; folder: string }[]
+  unknown: boolean
+}
+
+/**
+ * Whether a connection is set up (HI-1870), one rule wherever it shows: its CLI's first-run setup done (`setUp`) and,
+ * where it is on, the workspace's folders trusted (`trust`). Anything definitely not done wins (`needed`), then
+ * anything that can't be told (`unknown`: neither said), else `done`.
+ */
+export function connectionReadiness(c: { setUp?: boolean | null; trust?: ConnectionTrust }): 'needed' | 'unknown' | 'done' {
+  if (c.setUp === false || (c.trust?.pending.length ?? 0) > 0) return 'needed'
+  if (c.setUp == null || c.trust?.unknown) return 'unknown'
+  return 'done'
+}
+
 /** What Settings → Accounts shows (accounts:list): the connections, and the asking window's workspace's choice of them. */
 export interface ConnectionsView {
   /** The providers that can have connections (capabilities.connections) and are on in Settings. */
   providers: ProviderId[]
   /** `key`: a server connection's key is set (HI-1772), its last 4 characters and when; never the key. */
-  connections: (Connection & { signingIn: boolean; folder: string; key?: { last4: string; at: string } })[]
+  /** `setUp` (HI-1870): its CLI's first-run setup done in its folder, as last read; null, can't be told; absent, not read yet. */
+  connections: (Connection & { signingIn: boolean; folder: string; key?: { last4: string; at: string }; setUp?: boolean | null; trust?: ConnectionTrust })[]
   /** Per provider, as it applies (workspaceAccounts); absent: not set up in this workspace. */
   workspace: Partial<Record<ProviderId, WorkspaceConnections>>
   /** Providers a test copy runs on its CLI test home where nothing is on (the test seam, HI-1755): no setup is asked for. */

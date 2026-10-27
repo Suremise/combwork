@@ -3,7 +3,7 @@ import type { ServerCaps, ServerListing } from '../shared/providers'
 import { providerDescriptor } from '../shared/providers'
 import { msg, type Msg } from '../shared/i18n'
 import { keepListedRemote, keyProblem, listedIds, listedRemote, listingUrl, mergeListed, parseBaseUrl, type BaseUrlProblem, type ServerModelsRead } from '../shared/serverConnection'
-import { accountFolder, addAccount, connectionInternals, connectionReadyAgain, effectiveModels, getAccount, isServer, loginKey, serverEnv } from './accounts'
+import { accountFolder, addAccount, connectionInternals, connectionReadyAgain, effectiveModels, getAccount, isServer, loginKey, readSetUp, serverEnv } from './accounts'
 import { hasPty } from './ptyHost'
 import { emit } from './events'
 import { hiveError } from './hiveError'
@@ -277,7 +277,7 @@ export async function readServerModels(id: string, request: string): Promise<Lis
  * (its theme, its notes) in its own way before an agent starts on it: Hive types nothing and writes none of its files.
  * The key (if any) is masked while the terminal is open. Returns the terminal's key.
  */
-export async function setUpServerConnection(id: string): Promise<string> {
+export async function setUpServerConnection(id: string, folder?: string): Promise<string> {
   serverOf(id)
   return locked(id, async () => {
     const { a, server, caps } = serverOf(id)
@@ -288,6 +288,7 @@ export async function setUpServerConnection(id: string): Promise<string> {
     const got = await withKey(id, b.origin)
     if (!got && !b.local) throw hiveError(msg({ id: 'main.server.setUp.noKey', defaultMessage: '{name} has no key yet. Add its key first, then set it up.', description: "An error opening Set Up for a server connection ({name}, its name in Settings → Connections): its server needs an API key and none is saved." }), { name: a.name }, { kind: 'conflict' })
     const homeEnv = providerDescriptor(a.provider).capabilities.connections!.homeEnv
-    return providerService.runAccountLogin(a.provider, id, { [homeEnv]: accountFolder(id) }, () => undefined, { env: serverEnv(caps, server, got?.key ?? null), cwd: accountFolder(id) })
+    // Once it ends, its set-up state is read again (HI-1870).
+    return providerService.runAccountLogin(a.provider, id, { [homeEnv]: accountFolder(id) }, () => void readSetUp(id), { env: serverEnv(caps, server, got?.key ?? null), cwd: folder ?? accountFolder(id) })
   })
 }

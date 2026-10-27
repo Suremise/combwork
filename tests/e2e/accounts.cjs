@@ -15,6 +15,7 @@ const HUNG_MS = 20000
 
 const userData = path.join(lib.WORK, 'accounts-profile')
 const home = path.join(lib.WORK, 'accounts-claude-home')
+const codexHome = path.join(lib.WORK, 'accounts-codex-home')
 const ws1 = path.join(lib.WORK, 'accounts-ws1')
 const ws2 = path.join(lib.WORK, 'accounts-ws2')
 const accountsRoot = path.join(userData, 'accounts')
@@ -29,12 +30,22 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws1, ws2]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(userData, { recursive: true })
   const env = lib.fakeClaude(userData, home, [])
+  // Codex on too (HI-1870: one list, Add asking which CLI), the fake, on a home of the suite's own with no sandbox set up.
+  fs.rmSync(codexHome, { recursive: true, force: true })
+  fs.mkdirSync(codexHome, { recursive: true })
+  lib.enableProviders(userData, ['claude-code', 'codex'])
+  const cfgFile = path.join(userData, 'config.json')
+  const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
+  cfg.settings.providers.codex.executablePath = path.join(__dirname, 'fake-codex', 'fake-codex.cmd')
+  fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
+  env.CODEX_HOME = codexHome
   fs.mkdirSync(path.dirname(conversation), { recursive: true })
   fs.writeFileSync(conversation, '{"kept":true}\n')
   for (const w of [ws1, ws2]) fs.mkdirSync(path.join(w, 'alpha'), { recursive: true })
-  const loginAs = (email) => {
+  // `hold`: the fake's sign-in waits (for a browser that never comes) until its terminal is closed.
+  const loginAs = (email, hold = false) => {
     fs.mkdirSync(accountsRoot, { recursive: true })
-    fs.writeFileSync(path.join(accountsRoot, 'fake-login-as.json'), JSON.stringify({ email, orgId: 'org-1' }))
+    fs.writeFileSync(path.join(accountsRoot, 'fake-login-as.json'), JSON.stringify({ email, orgId: 'org-1', plan: 'plus', ...(hold ? { hold } : {}) }))
   }
 
   const { app, page } = await lib.launch({ userData, env, viewport: { width: 1400, height: 950 } })
@@ -66,6 +77,29 @@ const check = (name, ok, extra = '') => {
       await field.fill(text)
       await page.locator('.dialog .dialog-footer .btn.primary').click()
     }
+    // Add a Connection… (HI-1870): one button for every CLI, its dialog asking which first.
+    const addVia = async (cli, name) => {
+      await page.locator('[data-add]').click()
+      await page.locator(`[data-cli-choice="${cli}"]`).check({ timeout: HUNG_MS })
+      await page.locator('#conn-name').fill(name)
+      await page.locator('[data-add-connection]').click()
+    }
+    const terminalOpen = async (id) => (await list()).connections.find((a) => a.id === id)?.signingIn === true
+    // Close under a terminal whose CLI still runs: asks first (HI-1870); `yes` false cancels.
+    const closeRunning = async (yes) => {
+      await page.locator('.account-signin [data-close-terminal]').click()
+      const ask = page.locator('.dialog', { hasText: 'Close the terminal?' })
+      await ask.waitFor({ timeout: HUNG_MS })
+      await ask.locator(yes ? '.dialog-footer .btn.danger' : '.dialog-footer .btn.subtle').click()
+      return lib.until(async () => (await ask.count()) === 0, HUNG_MS)
+    }
+    // An ended sign-in's terminal (it offers Set Up once ended): its Close hides it, asking nothing.
+    const closeEnded = async () => {
+      if (!(await page.locator('.account-signin').count())) return
+      await page.locator('.account-signin [data-set-up-after]').waitFor({ timeout: HUNG_MS })
+      await page.locator('.account-signin [data-close-terminal]').click()
+      check('an ended terminal’s Close hides it without asking', !!(await lib.until(async () => (await page.locator('.account-signin').count()) === 0, HUNG_MS)) && (await page.locator('.dialog', { hasText: 'Close the terminal?' }).count()) === 0)
+    }
 
     // --- Always there (S8, HI-1774: no preview switch any more).
     await openSettings()
@@ -73,10 +107,19 @@ const check = (name, ok, extra = '') => {
     await nav.click()
     check('…with no connections yet', !!(await lib.until(async () => (await page.getByText('No connections yet').count()) === 1, HUNG_MS)))
 
-    // --- Add Account…: the folder and junction, then its sign-in in Hive's terminal.
+    // --- Add a Connection… (HI-1870): one button, its dialog asking which CLI first, each with its icon.
+    check('one Add a Connection… for every CLI', (await page.locator('[data-add]').count()) === 1 && /Add a Connection…/.test(await page.locator('[data-add]').innerText()))
     loginAs('one@example.com')
-    await page.locator('[data-add="claude-code"]').click()
-    await fillPrompt('Personal')
+    await page.locator('[data-add]').click()
+    const choice = (cli) => page.locator('.dialog .conn-cli-choice', { has: page.locator(`[data-cli-choice="${cli}"]`) })
+    check('…asking which CLI first, each with its icon', !!(await lib.until(async () => (await choice('claude-code').locator('.provider-icon').count()) === 1 && (await choice('codex').locator('.provider-icon').count()) === 1, HUNG_MS)))
+    check('…Claude Code chosen first, with where it gets its model', (await page.locator('[data-cli-choice="claude-code"]').isChecked()) && (await page.locator('[data-from="server"]').count()) === 1)
+    await page.locator('[data-cli-choice="codex"]').check()
+    check('…Codex, which has no servers, without it', !!(await lib.until(async () => (await page.locator('[data-from="server"]').count()) === 0, HUNG_MS)))
+    await page.locator('[data-cli-choice="claude-code"]').check()
+    await page.locator('#conn-name').fill('Personal')
+    await shots('add')
+    await page.locator('[data-add-connection]').click()
     const personal = await lib.until(async () => (await list()).connections.find((a) => a.name === 'Personal') ?? null, HUNG_MS)
     check('Add Account… adds it', !!personal)
     const folder = personal ? path.join(accountsRoot, personal.id) : ''
@@ -88,6 +131,9 @@ const check = (name, ok, extra = '') => {
     }, HUNG_MS)
     check('once the sign-in ends, it is signed in as that login, taken on as its own', !!signed, JSON.stringify((await list()).connections))
     check('…and its row says so', !!(await lib.until(async () => /Signed in/.test(await row('Personal').innerText().catch(() => '')) && /one@example\.com · max/.test(await row('Personal').innerText().catch(() => '')), HUNG_MS)))
+    check('…with its CLI and its icon', (await row('Personal').locator('.account-cli .provider-icon').count()) === 1 && /Claude Code/.test(await row('Personal').locator('.account-cli').innerText()))
+    // A browser sign-in leaves the first-run screens unanswered (its .claude.json without the onboarding field): said.
+    check('…and that it needs set up, Set Up primary, with what it is for', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1, HUNG_MS)) && (await row('Personal').locator('[data-set-up].primary').count()) === 1 && /first-run questions/.test(await row('Personal').locator('[data-set-up-note]').innerText().catch(() => '')))
     await shots('signed-in')
 
     // --- Set Up (HI-1826): a browser sign-in leaves Claude Code's first-run screens unanswered, so Set Up is offered
@@ -102,15 +148,48 @@ const check = (name, ok, extra = '') => {
       return all.length > before ? all.at(-1) : null
     }, HUNG_MS)
     check('Set Up runs the CLI itself in the connection’s folder (its launch logged there)', !!ran && path.resolve(ran.cwd).toLowerCase() === path.resolve(folder).toLowerCase(), JSON.stringify(ran))
-    check('…in the terminal, with the setup hint', !!(await lib.until(async () => /asks a few setup questions/.test(await page.locator('.account-signin .hint').innerText().catch(() => '')), HUNG_MS)))
+    check('…in the terminal, with the setup hint', !!(await lib.until(async () => /first-run questions/.test(await page.locator('.account-signin .hint').innerText().catch(() => '')), HUNG_MS)))
     await shots('set-up')
-    await inv('pty:kill', `task:claude-code:login:${personal.id}`)
-    await page.locator('.account-signin .btn', { hasText: 'Close' }).click({ timeout: HUNG_MS }).catch(() => undefined)
+    // --- Close is always there (HI-1870): with the CLI still running it asks; cancelled, nothing changes.
+    check('Close is offered while the CLI still runs', (await page.locator('.account-signin [data-close-terminal]').count()) === 1 && (await terminalOpen(personal.id)))
+    check('…asks first; cancelled, the terminal stays, its CLI running', !!(await closeRunning(false)) && (await page.locator('.account-signin .task-terminal').count()) === 1 && (await terminalOpen(personal.id)))
+    await page.locator('.account-signin [data-close-terminal]').click()
+    await page.locator('.dialog', { hasText: 'Close the terminal?' }).waitFor({ timeout: HUNG_MS })
+    await shots('close-running')
+    await page.locator('.dialog .dialog-footer .btn.danger').click()
+    check('…confirmed, it ends the CLI and hides the terminal', !!(await lib.until(async () => (await page.locator('.account-signin').count()) === 0 && !(await terminalOpen(personal.id)), HUNG_MS)))
+    // Its screens were answered (the fake does at once, in .claude.json): read as its Set Up ends, the row says it is set up.
+    check('…and, its screens answered, its row says it is set up, Set Up no longer primary', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)) && (await row('Personal').locator('[data-set-up].primary').count()) === 0 && (await row('Personal').locator('[data-set-up-note]').count()) === 0)
+    await shots('set-up-done')
 
     // --- On in this workspace: its default.
     await row('Personal').getByRole('switch').click()
     check('turned on here, it is this workspace’s default (workspace.json)', !!(await lib.until(async () => JSON.stringify(wsJson(ws1)) === JSON.stringify({ 'claude-code': { on: [personal.id], default: personal.id } }), HUNG_MS)), JSON.stringify(wsJson(ws1)))
     check('…and its row says so', !!(await lib.until(async () => (await row('Personal').locator('.account-default').count()) === 1, HUNG_MS)))
+
+    // --- Set up for this workspace (HI-1870): on here, its CLI must trust the workspace's folders too, read from its
+    // .claude.json (never written by Hive). Set Up opens where it doesn't yet, and the fake records the trust answered.
+    const alpha1 = fs.realpathSync.native(path.join(ws1, 'alpha'))
+    const trustOf = async (invoke, id) => (await invoke('connections:list')).connections.find((a) => a.id === id)?.trust ?? null
+    check('on in a workspace whose project it doesn’t trust, it needs set up again, naming the project', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1 && /Not trusted yet in this workspace: alpha/.test(await row('Personal').locator('[data-not-trusted]').innerText().catch(() => '')), HUNG_MS)) && (await row('Personal').locator('[data-set-up].primary').count()) === 1)
+    await shots('not-trusted')
+    const launchesBefore = fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).length
+    await row('Personal').locator('[data-set-up]').click()
+    check('…its Set Up opens in that project’s folder, saying so', !!(await lib.until(async () => /alpha's folder/.test(await page.locator('.account-signin [data-set-up-in]').innerText().catch(() => '')), HUNG_MS)))
+    const trustRun = await lib.until(async () => {
+      const all = fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
+      return all.length > launchesBefore ? all.at(-1) : null
+    }, HUNG_MS)
+    check('…the CLI run there, on the connection', !!trustRun && path.resolve(trustRun.cwd).toLowerCase() === alpha1.toLowerCase(), JSON.stringify(trustRun))
+    await closeRunning(true)
+    check('…its trust answered (the fake records it), the row says it is set up', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)) && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }))
+    // A project added afterwards: needed again, for it alone.
+    fs.mkdirSync(path.join(ws1, 'gamma'), { recursive: true })
+    await inv('workspace:refresh')
+    check('a project added later brings Needs set up back, for it alone', !!(await lib.until(async () => JSON.stringify((await trustOf(inv, personal.id))?.pending.map((p) => p.project)) === '["gamma"]' && (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1, HUNG_MS)))
+    fs.rmSync(path.join(ws1, 'gamma'), { recursive: true, force: true })
+    await inv('workspace:refresh')
+    check('…and set up again once it is gone', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
 
     // --- Rename: the name only.
     await row('Personal').getByRole('button', { name: 'Rename…' }).click()
@@ -121,7 +200,9 @@ const check = (name, ok, extra = '') => {
     await page.keyboard.press('Escape')
     await page.locator('.activity-btn[aria-label="Task Board"]').click()
     fs.writeFileSync(path.join(folder, 'fake-account.json'), JSON.stringify({ email: 'two@example.com', orgId: 'org-1' }))
-    fs.writeFileSync(path.join(folder, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: 'two@example.com' } }))
+    // As a /login changes it: its account, the rest of the file (its onboarding, its trusted folders) kept.
+    const claudeJson = path.join(folder, '.claude.json')
+    fs.writeFileSync(claudeJson, JSON.stringify({ ...JSON.parse(fs.readFileSync(claudeJson, 'utf8')), oauthAccount: { emailAddress: 'two@example.com' } }))
     const changed = await lib.until(async () => {
       const a = (await list()).connections.find((x) => x.id === personal.id)
       return a?.observed?.email === 'two@example.com' ? a : null
@@ -137,8 +218,7 @@ const check = (name, ok, extra = '') => {
 
     // --- A second account on the same login: both flagged.
     loginAs('two@example.com')
-    await page.locator('[data-add="claude-code"]').click()
-    await fillPrompt('Work')
+    await addVia('claude-code', 'Work')
     const work = await lib.until(async () => (await list()).connections.find((a) => a.name === 'Work' && a.observed?.loggedIn) ?? null, HUNG_MS)
     check('a second account signs in', !!work)
     check('two accounts on one login are both flagged', !!(await lib.until(async () => (await page.locator('[data-warning="duplicate"]').count()) === 2, HUNG_MS)))
@@ -153,6 +233,13 @@ const check = (name, ok, extra = '') => {
     await lib.openWorkspace(invOn(p2), p2, ws2)
     // A new workspace starts with the last account chosen as a default (Darren, 26 Oct): Personal.
     check('a new workspace starts with the last-used account on, as its default', JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [personal.id], default: personal.id } }), JSON.stringify(wsJson(ws2)))
+    // One connection, two workspaces (HI-1870): set up for the first one's folders, not yet for this one's.
+    const alpha2 = fs.realpathSync.native(path.join(ws2, 'alpha'))
+    check('one connection in two workspaces: each window says its own (here alpha untrusted, set up in the first)', !!(await lib.until(async () => JSON.stringify((await trustOf(invOn(p2), personal.id))?.pending) === JSON.stringify([{ project: 'alpha', folder: alpha2 }]), HUNG_MS)) && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }), JSON.stringify([await trustOf(invOn(p2), personal.id), await trustOf(inv, personal.id), alpha2]))
+    await invOn(p2)('connections:setOn', personal.id, false)
+    check('…off there, its trust there no longer counts', !!(await lib.until(async () => (await trustOf(invOn(p2), personal.id)) === null, HUNG_MS)))
+    await invOn(p2)('connections:setOn', personal.id, true)
+    check('…turned on there again, it needs set up there again', !!(await lib.until(async () => (await trustOf(invOn(p2), personal.id))?.pending.length === 1, HUNG_MS)))
     await invOn(p2)('connections:setOn', personal.id, false)
     await invOn(p2)('connections:setOn', work.id, true)
     check('a second window’s workspace has Work on, as its default', !!(await lib.until(async () => JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [work.id], default: work.id } }), HUNG_MS)), JSON.stringify(wsJson(ws2)))
@@ -161,6 +248,38 @@ const check = (name, ok, extra = '') => {
     await invOn(p2)('connections:setOn', work.id, false)
     check('turned all off there, it stays off (no default)', !!(await lib.until(async () => JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [], default: null } }), HUNG_MS)))
     await p2.close()
+
+    // --- A Codex connection in the same list (HI-1870), its Set Up the one-time Windows sandbox, said the same way.
+    await closeEnded()
+    loginAs('codex@example.com')
+    await addVia('codex', 'ChatGPT')
+    const gpt = await lib.until(async () => (await list()).connections.find((a) => a.name === 'ChatGPT' && a.observed?.loggedIn) ?? null, HUNG_MS)
+    check('a Codex connection signs in', !!gpt, JSON.stringify((await list()).connections.map((a) => [a.name, a.observed])))
+    check('…in the same list, grouped after Claude Code’s, with its own CLI and icon', !!(await lib.until(async () => JSON.stringify(await page.locator('.account-row').evaluateAll((rs) => rs.map((r) => r.getAttribute('data-cli')))) === JSON.stringify(['claude-code', 'claude-code', 'codex']), HUNG_MS)) && (await row('ChatGPT').locator('.account-cli .provider-icon').count()) === 1)
+    check('…needing set up, said as for Claude Code, naming the sandbox', !!(await lib.until(async () => (await row('ChatGPT').locator('[data-set-up-state="needed"]').count()) === 1, HUNG_MS)) && (await row('ChatGPT').locator('[data-set-up].primary').count()) === 1 && /Windows sandbox/.test(await row('ChatGPT').locator('[data-set-up-note]').innerText().catch(() => '')))
+    await closeEnded()
+    await shots('codex-needs-set-up')
+    await row('ChatGPT').locator('[data-set-up]').click()
+    check('…its Set Up says what it is for', !!(await lib.until(async () => /Windows sandbox/.test(await page.locator('.account-signin .hint').innerText().catch(() => '')), HUNG_MS)))
+    const gptToml = path.join(accountsRoot, gpt?.id ?? '', 'config.toml')
+    await lib.until(async () => fs.existsSync(gptToml) && /sandbox/.test(fs.readFileSync(gptToml, 'utf8')), HUNG_MS)
+    check('…closed while Codex runs (asked, confirmed), its row then says it is set up', !!(await closeRunning(true)) && !!(await lib.until(async () => (await row('ChatGPT').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
+    await shots('codex-set-up')
+
+    // --- A sign-in still waiting for its browser: Close asks, and Remove offers to close it (HI-1870).
+    loginAs('held@example.com', true)
+    await addVia('claude-code', 'Held')
+    const held = await lib.until(async () => (await list()).connections.find((a) => a.name === 'Held') ?? null, HUNG_MS)
+    check('a sign-in still waiting has its terminal open, with Close', !!held && !!(await lib.until(async () => terminalOpen(held.id), HUNG_MS)) && (await page.locator('.account-signin [data-close-terminal]').count()) === 1)
+    check('…Close asks first, and ends it once confirmed, the connection kept, not signed in', !!(await closeRunning(true)) && !!(await lib.until(async () => !(await terminalOpen(held.id)) && (await page.locator('.account-signin').count()) === 0, HUNG_MS)) && !!(await list()).connections.find((a) => a.id === held.id && !a.accepted))
+    await row('Held').getByRole('button', { name: 'Sign In' }).click()
+    await lib.until(async () => terminalOpen(held.id), HUNG_MS)
+    await row('Held').getByRole('button', { name: 'Remove…' }).click()
+    const askOpen = page.locator('.dialog', { hasText: 'Close its terminal and remove Held?' })
+    check('Remove with its sign-in open asks to close its terminal and remove it', !!(await lib.until(async () => (await askOpen.count()) === 1, HUNG_MS)) && /Close Terminal and Remove/.test(await askOpen.locator('.dialog-footer .btn.danger').innerText()))
+    await shots('remove-open')
+    await askOpen.locator('.dialog-footer .btn.danger').click()
+    check('…confirmed, the terminal is ended and the connection removed, its folder gone', !!(await lib.until(async () => !(await list()).connections.some((a) => a.id === held.id) && !fs.existsSync(path.join(accountsRoot, held.id)) && (await page.locator('.account-signin').count()) === 0, HUNG_MS)))
 
     // --- Remove: the folder for good, the conversations kept.
     const workFolder = path.join(accountsRoot, work.id)

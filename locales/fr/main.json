@@ -12,6 +12,7 @@
   "main.accounts.notFound": "Cette connexion n’existe pas.",
   "main.accounts.nothingToKeep": "Hive n’a pu vérifier aucune identité pour la connexion {name} : il n’y a donc rien à garder.",
   "main.accounts.removeFailed": "La connexion {name} n’a pas été retirée : {error}. Rien n’a été touché hors de son dossier ; « Retirer » réessaie.",
+  "main.accounts.running": "Des agents tournent sur la connexion {name} : arrête-les, puis retire-la.",
   "main.antivirus.allExcluded": "Tous les dossiers que Hive peut proposer sont déjà exclus.",
   "main.antivirus.changed": "L’espace de travail a changé depuis la question : rien n’a été modifié.",
   "main.antivirus.closed": "L’espace de travail a été fermé entre-temps.",

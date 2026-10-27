@@ -51,6 +51,10 @@
     "defaultMessage": "{name} wasn't removed: {error}. Nothing outside its folder was touched; Remove tries again.",
     "description": "An error removing a connection ({name}): its folder couldn't all be deleted. {error} is the reason, in English."
   },
+  "main.accounts.running": {
+    "defaultMessage": "{name} has agents running on it: stop them, then remove it.",
+    "description": "An error removing a connection ({name}, its name in Settings → Connections): agents run on it, or one is starting."
+  },
   "main.antivirus.allExcluded": {
     "defaultMessage": "Every folder Hive may offer is already excluded.",
     "description": "An error in Settings → Workspace → Antivirus scanning: nothing to add."

@@ -12,6 +12,7 @@
   "main.accounts.notFound": "There is no such connection.",
   "main.accounts.nothingToKeep": "{name} isn't signed in as anyone Hive could check, so there's no login to keep.",
   "main.accounts.removeFailed": "{name} wasn't removed: {error}. Nothing outside its folder was touched; Remove tries again.",
+  "main.accounts.running": "{name} has agents running on it: stop them, then remove it.",
   "main.antivirus.allExcluded": "Every folder Hive may offer is already excluded.",
   "main.antivirus.changed": "The workspace changed since you were asked: nothing was changed.",
   "main.antivirus.closed": "The workspace closed meanwhile.",

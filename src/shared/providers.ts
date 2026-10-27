@@ -150,7 +150,11 @@ export interface ProviderCapabilities {
    * (`.claude`), which a test home is never (the test seam), and `orgs` whether its sign-in names an organisation, which
    * an identity then needs to be taken on (false: its email alone, HI-1757). Absent: the CLI has no accounts in Hive.
    */
-  connections?: { homeEnv: string; shared: readonly string[]; userHome: string; orgs: boolean; server?: ServerCaps }
+  /**
+   * `setUp` (HI-1870): what the CLI's one-time first-run setup on a connection is, said above its Set Up terminal and on
+   * a connection that still needs it.
+   */
+  connections?: { homeEnv: string; shared: readonly string[]; userHome: string; orgs: boolean; setUp: Msg; server?: ServerCaps }
 }
 
 /**

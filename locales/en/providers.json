@@ -91,6 +91,10 @@
     "defaultMessage": "it's over Claude Code's 2 MiB limit",
     "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: why Hive couldn't read a settings file (providers.autoCompact.unreadable). 2 MiB is the size limit: keep it."
   },
+  "providers.claude.connections.setUp": {
+    "defaultMessage": "Set Up runs Claude Code on this connection for its one-time first-run questions (its look, its notes) and to trust this workspace's folders. Answer them in the terminal.",
+    "description": "Settings → Connections, above a Claude Code connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button."
+  },
   "providers.claude.hint.args": {
     "defaultMessage": "Claude Code refused an argument: check Extra arguments in Agent Settings and Settings → Claude Code.",
     "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Agent Setup and Settings → … are Hive's names: use them as shown."
@@ -110,6 +114,10 @@
   "providers.cmdTooLong": {
     "defaultMessage": "{file} has to run through cmd.exe, which takes a command line of at most {max, number} characters, and this launch needs about {length, number}. Set the CLI's path in Settings to its .exe (or install the standalone CLI), which has no such limit.",
     "description": "Starting an agent is refused: its CLI is a .cmd or .bat launcher, and cmd.exe can't take a command line this long. {file} is the launcher's file name; {max} and {length} are numbers of characters. Keep cmd.exe and .exe as they are."
+  },
+  "providers.codex.connections.setUp": {
+    "defaultMessage": "Set Up runs Codex on this connection so you can choose its Windows sandbox, which its commands run in, and trust this workspace's folders. Answer in the terminal; Windows may ask for Administrator permission.",
+    "description": "Settings → Connections, above a Codex connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button."
   },
   "providers.codex.developerUnread.agentMessage": {
     "defaultMessage": "Codex couldn't say which developer_instructions this session gets, so Hive leaves yours as they are and adds none of its guidance this time: the agent has Hive's tools without it. Restart the agent to try again.",

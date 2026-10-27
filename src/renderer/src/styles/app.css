@@ -4231,6 +4231,33 @@ h2.section#unused-worktrees {
 }
 .account-name {
   font-weight: 600;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+/* Each row's CLI (HI-1870): one list for every CLI, so each says its own. */
+.account-cli {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  font-weight: normal;
+  font-size: 12px;
+}
+.account-setup-note {
+  margin: 2px 0 0;
+  font-size: 12px;
+}
+.account-setup-state {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.account-setup-state.needed .codicon {
+  color: var(--warning);
+}
+.account-setup-state.done .codicon {
+  color: var(--success);
 }
 .account-state {
   display: flex;

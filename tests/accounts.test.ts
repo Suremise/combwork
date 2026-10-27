@@ -6,9 +6,30 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, sym
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { accountState, duplicateLogins, switchedOn, workspaceAccounts } from '../src/shared/accounts'
+import { accountState, connectionReadiness, duplicateLogins, switchedOn, workspaceAccounts } from '../src/shared/accounts'
 import type { Connection } from '../src/shared/types'
 import { tempDir } from './tempDir'
+
+/**
+ * The terminals (HI-1870): which are open, by key, and what closing one does. `endsOnKill` (the default) ends it as a
+ * kill does, its exit run; off, a kill that never ends it. `gone` is ptyGone's answer, the bound passed.
+ */
+const terminals = vi.hoisted(() => ({ open: new Set<string>(), killed: [] as string[], endsOnKill: true, onKill: (_key: string): void => undefined, beforeGone: async (): Promise<void> => undefined }))
+vi.mock('../src/main/ptyHost', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../src/main/ptyHost')>()
+  return {
+    ...real,
+    hasPty: (key: string) => terminals.open.has(key),
+    killPty: (key: string) => {
+      terminals.killed.push(key)
+      if (terminals.endsOnKill) terminals.onKill(key)
+    },
+    ptyGone: async (key: string) => {
+      await terminals.beforeGone()
+      return !terminals.open.has(key)
+    }
+  }
+})
 
 const base = tempDir('hive-accounts-')
 const home = join(base, 'claude-home')
@@ -50,13 +71,18 @@ beforeAll(async () => {
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never
   vi.spyOn(providerService, 'runAccountLogin').mockImplementation((_p, id, _env, onExit, setUp) => {
+    const key = `task:claude-code:login:${id}`
     setUps.set(id, setUp)
+    terminals.open.add(key)
     logins.set(id, (code) => {
       logins.delete(id)
+      terminals.open.delete(key)
       onExit(code)
     })
-    return `task:claude-code:login:${id}`
+    return key
   })
+  // A kill ends the terminal, its exit run, as node-pty's does.
+  terminals.onKill = (key) => logins.get(key.split(':').at(-1)!)?.(1)
   vi.spyOn(provider('claude-code'), 'accountStatus').mockImplementation(async (_exe, env) => {
     const dir = env.CLAUDE_CONFIG_DIR!
     asked.push(dir)
@@ -274,10 +300,10 @@ describe('removing an account', () => {
   it('is refused while a launch holds it, its sessions run, or its sign-in is open', async () => {
     const a = await accounts.addAccount('claude-code', 'Busy')
     const release = await accounts.claimAccount(a.id)
-    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/Busy is in use/)
+    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/Busy has agents running on it/)
     release()
     accounts.setAccountSessions((id) => id === a.id)
-    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/Busy is in use/)
+    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/Busy has agents running on it/)
     accounts.setAccountSessions(() => false)
     // Its sign-in open (the terminal not ended yet).
     await accounts.signInAccount(a.id)
@@ -286,6 +312,72 @@ describe('removing an account', () => {
     logins.get(a.id)!(0)
     await accounts.removeAccount(a.id)
     expect(accounts.getAccount(a.id)).toBeUndefined()
+  })
+
+  describe('with its sign-in or Set Up terminal open, the user saying to close it (HI-1870)', () => {
+    afterEach(() => {
+      terminals.killed.length = 0
+      terminals.endsOnKill = true
+      terminals.beforeGone = async () => undefined
+      accounts.setAccountSessions(() => false)
+    })
+
+    it('ends the terminal, waits for its end, then removes it; without being told to, still refused', async () => {
+      const a = await accounts.addAccount('claude-code', 'Open')
+      await accounts.setUpSignInConnection(a.id)
+      expect(await outcome(accounts.removeAccount(a.id))).toMatch(/Open is in use/)
+      expect(terminals.killed).toEqual([])
+      await accounts.removeAccount(a.id, { closeTerminal: true })
+      expect(terminals.killed).toEqual([`task:claude-code:login:${a.id}`])
+      expect(logins.has(a.id)).toBe(false)
+      expect(accounts.getAccount(a.id)).toBeUndefined()
+      expect(existsSync(folderOf(a))).toBe(false)
+    })
+
+    it('agents running on it still refuse, and its terminal is left open', async () => {
+      const a = await accounts.addAccount('claude-code', 'Running')
+      await accounts.signInAccount(a.id)
+      accounts.setAccountSessions((id) => id === a.id)
+      expect(await outcome(accounts.removeAccount(a.id, { closeTerminal: true }))).toMatch(/Running has agents running on it/)
+      expect(terminals.killed).toEqual([])
+      expect(logins.has(a.id)).toBe(true)
+      expect(accounts.getAccount(a.id)).toBeDefined()
+      logins.get(a.id)!(0)
+    })
+
+    it('a kill that never ends it is refused, the connection and its folder kept', async () => {
+      const a = await accounts.addAccount('claude-code', 'Stuck')
+      await accounts.signInAccount(a.id)
+      terminals.endsOnKill = false
+      expect(await outcome(accounts.removeAccount(a.id, { closeTerminal: true }))).toMatch(/Stuck is in use/)
+      expect(terminals.killed).toHaveLength(1)
+      expect(accounts.getAccount(a.id)).toBeDefined()
+      expect(existsSync(folderOf(a))).toBe(true)
+      logins.get(a.id)!(0)
+    })
+
+    it('an agent or a sign-in started while it waited for the terminal to end is still refused (checked again after)', async () => {
+      const a = await accounts.addAccount('claude-code', 'Gap')
+      await accounts.signInAccount(a.id)
+      terminals.beforeGone = async () => accounts.setAccountSessions((id) => id === a.id)
+      expect(await outcome(accounts.removeAccount(a.id, { closeTerminal: true }))).toMatch(/Gap has agents running on it/)
+      expect(accounts.getAccount(a.id)).toBeDefined()
+      accounts.setAccountSessions(() => false)
+      await accounts.signInAccount(a.id)
+      terminals.beforeGone = async () => void (await accounts.signInAccount(a.id))
+      expect(await outcome(accounts.removeAccount(a.id, { closeTerminal: true }))).toMatch(/Gap is in use/)
+      expect(accounts.getAccount(a.id)).toBeDefined()
+      logins.get(a.id)!(0)
+    })
+
+    it('a terminal already ended removes as usual, nothing killed', async () => {
+      const a = await accounts.addAccount('claude-code', 'Ended')
+      await accounts.signInAccount(a.id)
+      logins.get(a.id)!(0)
+      await accounts.removeAccount(a.id, { closeTerminal: true })
+      expect(terminals.killed).toEqual([])
+      expect(accounts.getAccount(a.id)).toBeUndefined()
+    })
   })
 
   it('a sign-in or launch asked for once removal has begun is never started: the account is gone by its turn', async () => {
@@ -347,6 +439,142 @@ describe("a sign-in connection's Set Up (HI-1826)", () => {
     config.update((c) => c.connections!.push({ id: 'acc-server1', provider: 'claude-code', name: 'Server', kind: 'server' } as Connection))
     expect(await outcome(accounts.setUpSignInConnection('acc-server1'))).not.toBe('ok')
     expect(logins.has('acc-server1')).toBe(false)
+  })
+})
+
+describe("whether a connection's first-run setup is done (HI-1870: Needs set up)", () => {
+  const ONBOARDING = join(__dirname, 'fixtures', 'advanced', 'onboarding-claude-2.1.311.jsonl')
+  const [onboarded, fresh] = readFileSync(ONBOARDING, 'utf8').trim().split(/\r?\n/)
+  const setUpOf = (dir: string) => provider('claude-code').connectionSetUp!(dir)
+  const folder = (name: string, claudeJson?: string): string => {
+    const dir = join(base, 'setup', name)
+    mkdirSync(dir, { recursive: true })
+    if (claudeJson !== undefined) writeFileSync(join(dir, '.claude.json'), claudeJson)
+    return dir
+  }
+
+  it("Claude Code: done in the recorded onboarded home, not in a new one (its sign-in check run there), nor with no .claude.json yet", async () => {
+    expect(await setUpOf(folder('onboarded', onboarded))).toBe(true)
+    expect(await setUpOf(folder('fresh', fresh))).toBe(false)
+    expect(await setUpOf(folder('none'))).toBe(false)
+  })
+
+  it("can't be told from a file it can't read (not JSON): unknown, never done or not", async () => {
+    expect(await setUpOf(folder('broken', '{"hasCompletedOnboarding": tru'))).toBeNull()
+  })
+
+  it('reads the field Settings → Advanced names', async () => {
+    const dir = folder('renamed', JSON.stringify({ onboardedAt: true }))
+    expect(await setUpOf(dir)).toBe(false)
+    await advanced.set('claude-code.accounts.onboardedField', 'onboardedAt')
+    try {
+      expect(await setUpOf(dir)).toBe(true)
+    } finally {
+      await advanced.set('claude-code.accounts.onboardedField', null)
+    }
+  })
+
+  it("is in the connections' list once read, again as Settings shows it, and gone with the connection", async () => {
+    const a = await accounts.addAccount('claude-code', 'Fresh one')
+    accounts.accountsView(true)
+    await vi.waitFor(() => expect(accounts.accountsView().connections.find((c) => c.id === a.id)?.setUp).toBe(false), { timeout: HUNG_MS })
+    writeFileSync(join(folderOf(a), '.claude.json'), onboarded)
+    accounts.accountsView(true)
+    await vi.waitFor(() => expect(accounts.accountsView().connections.find((c) => c.id === a.id)?.setUp).toBe(true), { timeout: HUNG_MS })
+    await accounts.removeAccount(a.id)
+    const again = await accounts.addAccount('claude-code', 'Fresh one')
+    expect(accounts.accountsView().connections.find((c) => c.id === again.id)).not.toHaveProperty('setUp')
+  })
+})
+
+describe("whether a connection trusts a workspace's folders (HI-1870)", () => {
+  const TRUST = join(__dirname, 'fixtures', 'advanced', 'trust-entry-claude-2.1.311.json')
+  const trustsOf = (dir: string, targets: { root: string | null; git: boolean; short: boolean }[]) => provider('claude-code').connectionTrusts!(dir, targets)
+  const trustHome = (name: string, claudeJson?: string): string => {
+    const dir = join(base, 'trust', name)
+    mkdirSync(dir, { recursive: true })
+    if (claudeJson !== undefined) writeFileSync(join(dir, '.claude.json'), claudeJson)
+    return dir
+  }
+  const t = (root: string | null, short = false) => ({ root, git: true, short })
+
+  it("Claude Code: the recorded entry's folder and its subfolders; not another case, not an 8.3 path (unknown), as 2.1.311 looked them up", async () => {
+    // The recorded entry (C:/work/alpha), and the entry Claude Code writes itself for a subfolder it ran in (false).
+    const j = JSON.parse(readFileSync(TRUST, 'utf8'))
+    j.projects['C:/work/alpha/child'] = { hasTrustDialogAccepted: false }
+    const dir = trustHome('claude', JSON.stringify(j))
+    expect(await trustsOf(dir, [t('C:\\work\\alpha'), t('C:\\work\\alpha\\child'), t('C:\\work\\beta'), t('C:\\WORK\\ALPHA'), t('C:\\work\\alpha', true), t(null)])).toEqual([true, true, false, false, null, null])
+  })
+
+  it("Claude Code: no .claude.json yet is untrusted; one it can't read is unknown", async () => {
+    expect(await trustsOf(trustHome('none'),[t('C:\\work\\alpha')])).toEqual([false])
+    expect(await trustsOf(trustHome('broken','{"projects": {'), [t('C:\\work\\alpha')])).toEqual([null])
+  })
+
+  it('Claude Code: reads the field Settings → Advanced names', async () => {
+    const dir = trustHome('renamed',JSON.stringify({ projects: { 'C:/work/alpha': { trustedNow: true } } }))
+    expect(await trustsOf(dir, [t('C:\\work\\alpha')])).toEqual([false])
+    await advanced.set('claude-code.accounts.trustField', 'trustedNow')
+    try {
+      expect(await trustsOf(dir, [t('C:\\work\\alpha')])).toEqual([true])
+    } finally {
+      await advanced.set('claude-code.accounts.trustField', null)
+    }
+  })
+
+  it("finds each project's folder as the CLIs look it up: a worktree project's main repository root, which covers its slots", async () => {
+    const { execFileSync } = await import('child_process')
+    const { realpathSync } = await import('fs')
+    const g = (cwd: string, ...a: string[]): void => void execFileSync('git', a, { cwd })
+    const repo = join(base, 'trust-git', 'alpha')
+    mkdirSync(repo, { recursive: true })
+    g(repo, 'init', '-q')
+    g(repo, '-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '--allow-empty', '-m', 'x')
+    const asProject = join(base, 'trust-git', 'alpha-wt')
+    g(repo, 'worktree', 'add', '-q', '--detach', asProject)
+    const slot = join(base, 'trust-git.worktrees', 'alpha-wt', 'slot-a')
+    g(asProject, 'worktree', 'add', '-q', '--detach', slot)
+    const plain = join(base, 'trust-git', 'notes')
+    mkdirSync(plain, { recursive: true })
+    // Its git folder kept elsewhere (`--separate-git-dir`): the working tree is still the root. A bare one has none.
+    const separate = join(base, 'trust-git', 'separate')
+    mkdirSync(join(base, 'trust-git-meta'), { recursive: true })
+    g(join(base, 'trust-git'), 'init', '-q', '--separate-git-dir', join(base, 'trust-git-meta', 'separate.git'), separate)
+    const bare = join(base, 'trust-git', 'bare.git')
+    g(join(base, 'trust-git'), 'init', '-q', '--bare', bare)
+    const got = await accounts.trustTargets([
+      { name: 'alpha', path: repo },
+      { name: 'alpha-wt', path: asProject },
+      { name: 'slot', path: slot },
+      { name: 'notes', path: plain },
+      { name: 'separate', path: separate },
+      { name: 'bare', path: bare },
+      { name: 'gone', path: join(base, 'trust-git', 'gone') }
+    ])
+    const root = realpathSync.native(repo)
+    expect(got.map((x) => [x.project, x.root, x.git])).toEqual([
+      ['alpha', root, true],
+      ['alpha-wt', root, true],
+      ['slot', root, true],
+      ['notes', realpathSync.native(plain), false],
+      ['separate', realpathSync.native(separate), true],
+      ['bare', null, true],
+      ['gone', null, false]
+    ])
+  })
+})
+
+describe("whether a connection is set up (connectionReadiness, HI-1870)", () => {
+  it('anything definitely not done wins, then anything unknown, else done', () => {
+    const none = { pending: [], unknown: false }
+    const pending = { pending: [{ project: 'alpha', folder: 'C:\\w\\alpha' }], unknown: false }
+    expect(connectionReadiness({ setUp: true })).toBe('done')
+    expect(connectionReadiness({ setUp: true, trust: none })).toBe('done')
+    expect(connectionReadiness({ setUp: false, trust: { ...none, unknown: true } })).toBe('needed')
+    expect(connectionReadiness({ setUp: null, trust: pending })).toBe('needed')
+    expect(connectionReadiness({ setUp: true, trust: { ...none, unknown: true } })).toBe('unknown')
+    expect(connectionReadiness({ setUp: null })).toBe('unknown')
+    expect(connectionReadiness({})).toBe('unknown')
   })
 })
 

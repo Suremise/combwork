@@ -179,6 +179,8 @@ if (args[0] === 'auth' && accountFolder) {
       // The default identity.
     }
     console.log('Opening the browser to sign in… (the fake opens none)')
+    // `hold` (HI-1870): waits for the browser that never comes, until its terminal is closed, signing nothing in.
+    if (as.hold) return void setInterval(() => undefined, 60_000)
     fs.writeFileSync(file, JSON.stringify(as))
     fs.writeFileSync(path.join(accountHome, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: as.email } }))
     console.log(`Signed in as ${as.email}`)
@@ -289,6 +291,25 @@ function runMode() {
 // A server connection's (HI-1772): its ANTHROPIC_* variables too, a dummy key among them (a disposable test log).
 const launchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('CLAUDE_CODE_') || k.startsWith('ANTHROPIC_') || k.startsWith('HIVE_API_TOKEN') || k === 'HIVE_AGENT' || k === 'CLAUDE_CONFIG_DIR'))
 fs.appendFileSync(path.join(home, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), sessionId, pid: process.pid, parent: process.ppid, opts, env: launchEnv }) + '\n')
+// In a connection's folder (HI-1870: its Set Up, or an agent's first launch there): its first-run screens answered at
+// once, as Claude Code records them in the folder's .claude.json (tests/fixtures/advanced/onboarding-claude-2.1.311.jsonl).
+if (accountFolder) {
+  const file = path.join(accountHome, '.claude.json')
+  let j = {}
+  try {
+    j = JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch {
+    // None yet.
+  }
+  // Run in a folder outside its own (HI-1870: Set Up opened where it isn't trusted yet): its trust question answered Yes,
+  // recorded under the folder's real path as Claude Code does (forward slashes; tests/fixtures/advanced/trust-entry-*).
+  const cwd = fs.realpathSync.native(process.cwd())
+  const here = path.relative(accountHome, cwd).startsWith('..') ? cwd.replace(/\\/g, '/') : null
+  const projects = j.projects ?? {}
+  if (j.hasCompletedOnboarding !== true || (here && projects[here]?.hasTrustDialogAccepted !== true)) {
+    fs.writeFileSync(file, JSON.stringify({ ...j, hasCompletedOnboarding: true, ...(here ? { projects: { ...projects, [here]: { ...projects[here], hasTrustDialogAccepted: true } } } : {}) }))
+  }
+}
 // How it ended, in fake-exits.jsonl in its home (#551): its own exit with the code, or an error it didn't catch (then
 // exit 1, as Node would). A launch with no line there was ended by Ctrl+C, its console closing or a kill.
 const exitLog = (entry) => {

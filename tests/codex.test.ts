@@ -101,6 +101,58 @@ describe('Codex: when a person must act', () => {
     }
   })
 
+  it("says a connection's folder is set up (HI-1870) when its launches run in a Windows sandbox: its own, or this PC's passed on", async () => {
+    const { mkdirSync, rmSync, writeFileSync } = await import('fs')
+    const pc = tempDir('hive-codex-pc-')
+    const conn = tempDir('hive-codex-conn-')
+    const before = process.env.CODEX_HOME
+    process.env.CODEX_HOME = pc
+    try {
+      const { codex, launchConnectionArgs } = await import('../src/main/providers/codex/adapter')
+      const sandboxed = (): boolean => launchConnectionArgs({ connectionHome: conn }).some((a) => a.startsWith('windows.sandbox='))
+      if (process.platform !== 'win32') return void expect(await codex.connectionSetUp(conn)).toBe(true)
+      // Neither: Codex asks for its sandbox setup there.
+      expect(await codex.connectionSetUp(conn)).toBe(false)
+      // This PC's, which its launches are given.
+      writeFileSync(joinPath(pc, 'config.toml'), '[windows]\nsandbox = "elevated"\n')
+      expect(sandboxed()).toBe(true)
+      expect(await codex.connectionSetUp(conn)).toBe(true)
+      // One the launches wouldn't pass on isn't counted.
+      writeFileSync(joinPath(pc, 'config.toml'), '[windows]\nsandbox = "not a kind"\n')
+      expect(sandboxed()).toBe(false)
+      expect(await codex.connectionSetUp(conn)).toBe(false)
+      // Its own, as its Set Up writes it.
+      mkdirSync(conn, { recursive: true })
+      writeFileSync(joinPath(conn, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
+      expect(await codex.connectionSetUp(conn)).toBe(true)
+    } finally {
+      if (before === undefined) delete process.env.CODEX_HOME
+      else process.env.CODEX_HOME = before
+      rmSync(pc, { recursive: true, force: true })
+      rmSync(conn, { recursive: true, force: true })
+    }
+  })
+
+  it("reads a connection's trust of a workspace's folders as Codex 0.164.0 looked it up (HI-1870): the main root, any letter case", async () => {
+    const { mkdirSync, rmSync, writeFileSync } = await import('fs')
+    const { codex } = await import('../src/main/providers/codex/adapter')
+    const home = tempDir('hive-codex-trust-')
+    try {
+      const t = (root: string | null, git = true) => ({ root, git, short: false })
+      const targets = [t('C:\\work\\alpha'), t('c:\\WORK\\Alpha'), t('C:\\work\\beta'), t('C:\\work\\notes', false), t(null)]
+      // No config.toml yet: nothing trusted (a folder without Git needs none: Codex asks only in a repository).
+      expect(await codex.connectionTrusts(home, targets)).toEqual([false, false, false, true, null])
+      mkdirSync(home, { recursive: true })
+      writeFileSync(joinPath(home, 'config.toml'), "[projects.'C:\\work\\alpha']\ntrust_level = \"trusted\"\n\n[projects.'C:\\work\\beta']\ntrust_level = \"untrusted\"\n")
+      expect(await codex.connectionTrusts(home, targets)).toEqual([true, true, false, true, null])
+      // One it can't read: unknown, never untrusted.
+      writeFileSync(joinPath(home, 'config.toml'), "[projects.'C:\\work\\alpha'\ntrust_level = \n")
+      expect(await codex.connectionTrusts(home, targets)).toEqual([null, null, null, null, null])
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
   it('passes the first task after "--", so extra arguments ending in --image keep it (#523)', async () => {
     const { rmSync } = await import('fs')
     const home = tempDir('hive-codex-home-')

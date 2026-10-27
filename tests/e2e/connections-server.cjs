@@ -82,7 +82,7 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     await page.keyboard.press('Control+,')
     await page.locator('.settings-nav').waitFor({ timeout: HUNG_MS })
     await page.locator('.settings-nav .row[data-section="accounts"]').click()
-    await page.locator('[data-add="claude-code"]').click()
+    await page.locator('[data-add]').click()
     await page.locator('[data-from="server"]').waitFor({ timeout: HUNG_MS })
     check('Add Connection asks where it gets its model', (await page.locator('[data-from="signIn"]').count()) === 1)
     await page.locator('[data-from="server"]').check()
@@ -96,6 +96,8 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     check('added as a server connection, with its key', !!ds && ds.key.last4 === KEY.slice(-4))
     check('…its row shows its host and the key by its last 4 characters only', !!(await lib.until(async () => (await row('DeepSeek').innerText().catch(() => '')).includes(`api.deepseek.com · Key …${KEY.slice(-4)}`), HUNG_MS)))
     check('…and nothing in the window holds the key', !(await page.content()).includes(KEY) && !JSON.stringify(await list()).includes(KEY))
+    // A new server connection's folder has had none of Claude Code's first-run screens (HI-1870): said, Set Up primary.
+    check('…it needs set up, said on its row with the primary Set Up and what Set Up is for', !!(await lib.until(async () => (await row('DeepSeek').locator('[data-set-up-state="needed"]').count()) === 1, HUNG_MS)) && (await row('DeepSeek').locator('[data-set-up].primary').count()) === 1 && /first-run questions/.test(await row('DeepSeek').locator('[data-set-up-note]').innerText().catch(() => '')))
     await shots('row')
 
     // --- An agent on it: the server's variables, in its own folder.
@@ -153,7 +155,7 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     await shots('local')
 
     // --- Ollama's preset (HI-1773): its Claude Code guide, and its recommended context length as advice.
-    await page.locator('[data-add="claude-code"]').click()
+    await page.locator('[data-add]').click()
     await page.locator('[data-from="server"]').check()
     await page.locator('#conn-preset').selectOption('ollama')
     check("the Ollama preset recommends Ollama's context length, as advice", !!(await lib.until(async () => (await page.locator('[data-context-advice]').innerText().catch(() => '')).includes('Ollama recommends a context length of 64,000 tokens or more for Claude Code'), HUNG_MS)))

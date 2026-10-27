@@ -19,7 +19,7 @@ import { keptLaneOrder } from '../shared/laneBar'
 import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../shared/tips'
 import { allProviders } from './providers'
 import { providerService } from './providerService'
-import { accountsView, addAccount, connectionHomes, dismissConnectionsIntro, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, setConnectionDefaults, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
+import { accountsView, addAccount, connectionHomes, dismissConnectionsIntro, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, setConnectionDefaults, setUpFolder, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
 import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setUpServerConnection } from './serverConnections'
 import { requireMasking } from './keyCoverage'
 import { resetMasking } from './keyStore'
@@ -1560,7 +1560,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'connections:list': (check) => accountsView(check === true),
     'connections:add': (id, name) => addAccount(id, name),
     'connections:rename': (id, name) => renameAccount(id, name),
-    'connections:remove': (id) => removeAccount(id),
+    'connections:remove': (id, opts) => removeAccount(id, { closeTerminal: opts?.closeTerminal === true }),
     'connections:signIn': async (id) => {
       await refreshPathBeforeStart()
       return signInAccount(id)
@@ -1575,7 +1575,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'connections:setUp': async (id) => {
       await refreshPathBeforeStart()
       // A sign-in connection's Set Up (HI-1826): the CLI on its folder, for the first-run screens its sign-in leaves.
-      return isServer(getAccount(id)) ? setUpServerConnection(id) : setUpSignInConnection(id)
+      // Opened in the first folder of this workspace it doesn't trust yet, so the CLI asks there (HI-1870); else its own.
+      const folder = await setUpFolder(id)
+      return isServer(getAccount(id)) ? setUpServerConnection(id, folder) : setUpSignInConnection(id, folder)
     },
     'connections:resetMasking': async () => {
       await resetMasking()

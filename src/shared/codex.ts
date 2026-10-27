@@ -139,7 +139,13 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     // Each connection a CODEX_HOME of its own (HI-1757), its rollouts shared with the others through sessions\ and
     // archived_sessions\ (resume reads the rollout alone); its memory, thread names and prompt history stay its own.
     // Its sign-in names an email and plan, no organisation.
-    connections: { homeEnv: 'CODEX_HOME', shared: ['sessions', 'archived_sessions'], userHome: '.codex', orgs: false }
+    connections: {
+      homeEnv: 'CODEX_HOME',
+      shared: ['sessions', 'archived_sessions'],
+      userHome: '.codex',
+      orgs: false,
+      setUp: msg({ id: 'providers.codex.connections.setUp', defaultMessage: "Set Up runs Codex on this connection so you can choose its Windows sandbox, which its commands run in, and trust this workspace's folders. Answer in the terminal; Windows may ask for Administrator permission.", description: "Settings → Connections, above a Codex connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button." })
+    }
   },
   // Ctrl+T opens Codex's transcript view; Ctrl+G its external editor.
   reservedKeys: ['MOD+T', 'MOD+G'],
