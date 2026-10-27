@@ -5,7 +5,8 @@
 // and the job by name, asked again across every await). Kill on close is the guarantee: if Hive or its supervisor ends,
 // Windows ends the job's members. With no journal nothing is ever followed outside the job: a process that escapes it is
 // ended by the supervisor at once ("unowned"), unconfirmed, so a check that sees one fails and its connection stays held
-// until Hive restarts (the design check's s93, the Assistant's simplify call; the durable recovery is parked).
+// until Hive restarts. The restart releases that hold without confirming the escaped branch ended: a known limit,
+// pending the Assistant's decision (HI-1757/r94; the durable recovery is parked as HI-1813).
 //
 // A failed or unconfirmed end is a failed check, never the answer the server gave, and holds the connection: no other
 // check, sign-in or removal of it, until a later check confirms the old end (in memory only: a restart releases it).
