@@ -257,3 +257,127 @@ describe("the usage history's card holds, kept and read again for the cards a ch
     await same()
   })
 })
+
+describe('cards kept until they change, as getTask reads them (HI-1780)', () => {
+  const now = (numbers: number[]): ReturnType<typeof tasks.cardsNow> => run(() => tasks.cardsNow(w, numbers))
+  const fresh = (n: number): Promise<unknown> => run(() => tasks.getTask(n, w))
+
+  it("give each card as getTask does, the same object until it changes, and a link to a card gone since left out", async () => {
+    const x = (await run(() => tasks.createTask({ title: 'X', project: 'alpha' }, user))).number
+    const y = (await run(() => tasks.createTask({ title: 'Y', project: 'alpha' }, user))).number
+    const z = (await run(() => tasks.createTask({ title: 'Z', project: 'alpha' }, user))).number
+    const first = await now([x, y])
+    expect(first.get(x)).toEqual(await fresh(x))
+    expect(first.get(y)).toEqual(await fresh(y))
+    // Y changes: Y read again, X the very same.
+    await run(() => tasks.commentTask(y, 'changed', user))
+    const second = await now([x, y])
+    expect(second.get(x)).toBe(first.get(x))
+    expect(second.get(y)).not.toBe(first.get(y))
+    expect(second.get(y)).toEqual(await fresh(y))
+    // X links to Z; Z deleted by another connection (as Delete permanently leaves the board): X no longer links to it.
+    await run(() => tasks.updateTask(x, { links: [z] }, user))
+    expect((await now([x])).get(x)!.links).toEqual([z])
+    const db = other()
+    db.exec(`PRAGMA foreign_keys = ON; DELETE FROM cards WHERE number = ${z}`)
+    db.close()
+    expect((await now([x])).get(x)).toEqual(await fresh(x))
+    expect((await now([x])).get(x)!.links).toEqual([])
+    // Not on the board: null.
+    expect((await now([z])).get(z)).toBeNull()
+  })
+
+  it('give the newest card as it is after each change, though a card at the mark keeps its revision through them', async () => {
+    const x = (await run(() => tasks.createTask({ title: 'Newest', project: 'alpha' }, user))).number
+    await run(() => tasks.commentTask(x, 'first', user))
+    const db = other()
+    const at = rev(db, x)
+    expect((await now([x])).get(x)!.comments.map((m) => m.text)).toContain('first')
+    await run(() => tasks.commentTask(x, 'second', user))
+    // Still at the mark: its revision didn't move, and it is read as it is all the same.
+    expect(rev(db, x)).toBe(at)
+    db.close()
+    expect((await now([x])).get(x)).toEqual(await fresh(x))
+    expect((await now([x])).get(x)!.comments.map((m) => m.text)).toContain('second')
+  })
+
+  it("are read again once a card's key changes, and after the board is opened again", async () => {
+    const x = (await run(() => tasks.createTask({ title: 'Keyed', project: 'alpha' }, user))).number
+    const first = (await now([x])).get(x)!
+    const { changeProjectKey } = await import('../src/main/projectKeys')
+    await run(() => changeProjectKey(w, join(wsPath, 'alpha'), 'KQ'))
+    const keyed = (await now([x])).get(x)!
+    expect(keyed.key).not.toBe(first.key)
+    expect(keyed).toEqual(await fresh(x))
+    store.closeBoard(wsPath)
+    const reopened = (await now([x])).get(x)!
+    expect(reopened).not.toBe(keyed)
+    expect(reopened).toEqual(await fresh(x))
+  })
+})
+
+describe("decision notices' live cards with decisions, kept and read again for the cards a change touched (HI-1789)", () => {
+  type Live = { cards: import('../src/shared/types').TaskCard[]; generations: Map<number, number> }
+  // What a decision notice reads of a card (boardStore's DECISION_FIELDS): all that is kept of it.
+  const notice = (t: import('../src/shared/types').TaskCard) => ({ number: t.number, project: t.project, column: t.column, agent: t.agent, agentName: t.agentName, review: t.review, blocked: t.blocked, history: t.history, decisions: t.decisions })
+  const kept = (): Promise<Live> => run(() => tasks.liveDecisionCards(w))
+  // A whole read, as decision notices read it before: every live card in full, those with decisions kept.
+  const whole = async (): Promise<Live> => {
+    const all = await run(() => tasks.allTasksSeen(w, { archived: false }))
+    const cards = all.cards.filter((x) => x.decisions?.length)
+    return { cards, generations: new Map(cards.map((x) => [x.number, all.generations.get(x.number) ?? 0])) }
+  }
+  const same = async (): Promise<Live> => {
+    const got = await kept()
+    const all = await whole()
+    expect(got.cards.map(notice)).toEqual(all.cards.map(notice))
+    expect(got.generations).toEqual(all.generations)
+    return got
+  }
+
+  it('are the live cards with decisions a whole read gives, with their generations, through decisions, comments, new, archived and deleted cards', async () => {
+    const d = (await run(() => tasks.createTask({ title: 'Decided', project: 'alpha' }, user))).number
+    const e = (await run(() => tasks.createTask({ title: 'Decided too', project: 'alpha' }, user))).number
+    await run(() => tasks.updateTask(d, { decision: 'Keep it small.' }, user))
+    await run(() => tasks.updateTask(e, { decision: 'Use the old API.' }, user))
+    const first = await same()
+    expect(first.cards.map((x) => x.number)).toEqual(expect.arrayContaining([d, e]))
+    expect(first.generations.get(d)).toBeGreaterThan(0)
+    // Nothing of a card but what a notice reads: no comments.
+    await run(() => tasks.commentTask(d, 'a comment', user))
+    expect((await same()).cards.find((x) => x.number === d)!.comments).toEqual([])
+    // Comments on a card without decisions, A, at the mark (a read is inclusive: the card at the mark is read again):
+    // every kept card the same object.
+    await run(() => tasks.commentTask(a, 'no decision', user))
+    const before = await kept()
+    await run(() => tasks.commentTask(a, 'still no decision', user))
+    const after = await same()
+    for (const x of after.cards) expect(x).toBe(before.cards.find((y) => y.number === x.number))
+    // A second decision: that card read again, its generation moved.
+    await run(() => tasks.updateTask(d, { decision: 'And keep it fast.' }, user))
+    const second = await same()
+    expect(second.generations.get(d)).toBeGreaterThan(first.generations.get(d)!)
+    // A card without decisions given one; a card archived leaves; another connection removes a card's decisions, and
+    // deletes a card.
+    await run(() => tasks.updateTask(b, { decision: 'Now decided.' }, user))
+    expect((await same()).cards.some((x) => x.number === b)).toBe(true)
+    await run(() => tasks.archiveTask(e, true))
+    expect((await same()).cards.some((x) => x.number === e)).toBe(false)
+    const db = other()
+    db.exec(`DELETE FROM card_decisions WHERE card = ${b}`)
+    db.exec(`PRAGMA foreign_keys = ON; DELETE FROM cards WHERE number = ${d}`)
+    db.close()
+    const left = await same()
+    expect(left.cards.some((x) => x.number === b || x.number === d)).toBe(false)
+  })
+
+  it('are read whole again after the board is opened again', async () => {
+    const x = (await run(() => tasks.createTask({ title: 'Decided, reopened', project: 'alpha' }, user))).number
+    await run(() => tasks.updateTask(x, { decision: 'Before the reopen.' }, user))
+    const first = await same()
+    store.closeBoard(wsPath)
+    await run(() => tasks.commentTask(a, 'reopened', user))
+    const reopened = await same()
+    expect(reopened.cards.find((t) => t.number === x)).not.toBe(first.cards.find((t) => t.number === x))
+  })
+})

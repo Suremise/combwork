@@ -19,6 +19,7 @@ import type { CheckBracket, FinishInputs, HeadMove, LineNow, PlatformAdapter, Ru
 import * as G from './git'
 import { observer, type Disposable, type ObserveEvent } from './observe'
 import { UNREADABLE } from '../../shared/workflow/texts'
+import { samePath } from '../../shared/movePaths'
 import { isUnknown, unknown, type Containment, type Maybe, type Unknown } from './types'
 
 /** A file's or folder's size and time, for a fingerprint ("gone" when it isn't there). */
@@ -282,7 +283,10 @@ export class GitPlatform implements PlatformAdapter {
   async runRevision(card: CardRecord, s: CardState, folder: string | null, named: string | null): Promise<RunRevision> {
     const known = (v: Maybe<string | null>): string | null => (isUnknown(v) ? null : v)
     const revision = known(await this.revisionNow(card, s))
-    const tested = folder ? known(await G.head(folder)) : null
+    // Run in the card's own folder (its slot), what's checked out is the head just read as its revision: read once
+    // (HI-1783: each git process was main's to start).
+    const own = card.kind !== 'no-code' && this.wf.ownLine(s) && folder !== null && samePath(folder, this.wf.folderOf(s))
+    const tested = own ? revision : folder ? known(await G.head(folder)) : null
     return { revision, tested, testedIs: 'checkout', ...(named !== null ? { named: folder ? known(await G.resolve(folder, named)) : null } : {}) }
   }
 

@@ -1466,6 +1466,37 @@ export function cardChanges(ws: WorkspaceService, since: number | null): CardCha
   })
 }
 
+/** What a decision notice reads of a card (decisionNotices.ts): where it is, whose, its review and block, its history and decisions. */
+const DECISION_FIELDS = ['project', 'projectId', 'column', 'agent', 'agentName', 'review', 'blocked', 'history', 'decisions']
+
+/**
+ * The live cards at revision `since` or above (every live card when null): their numbers, and DECISION_FIELDS of those
+ * with decisions, with the board's mark and its opening, from one snapshot (HI-1789). Nothing else of any card is read:
+ * no comments or description, and nothing of the cards unchanged (cardChanges reads every card's number and key). Null
+ * on a board with no revisions (a 0.9 board waiting for its upgrade).
+ */
+export function decisionChanges(ws: WorkspaceService, since: number | null): { generation: number; mark: number; changed: number[]; docs: { number: number; doc: Record<string, unknown> }[] } | null {
+  return readSnapshot(ws, (b, db) => {
+    if (b.legacy) return null
+    const mark = (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g // i18n-ignore: SQL
+    // By the revision's index alone (archived picked here: a condition on it, or an ORDER BY, can make SQLite take
+    // another index or scan every card), then the decided ones by number.
+    const changed = (since === null ? db.prepare('SELECT number, archived FROM cards WHERE archived = 0').all() : db.prepare('SELECT number, archived FROM cards WHERE rev >= ?').all(since)) as { number: number; archived: number }[] // i18n-ignore: SQL
+    const numbers = changed.filter((r) => r.archived === 0).map((r) => r.number)
+    const decided = numbers.length ? (db.prepare('SELECT DISTINCT card FROM card_decisions WHERE card IN (SELECT value FROM json_each(?))').all(JSON.stringify(numbers)) as { card: number }[]).map((r) => r.card) : [] // i18n-ignore: SQL
+    const docs = decided.length ? cardFields(db, DECISION_FIELDS, { numbers: decided, parts: ['history', 'decisions'] }).map(({ r, fields }) => ({ number: r.card.number, doc: fields })) : []
+    return { generation: b.generation, mark, changed: numbers, docs }
+  })
+}
+
+/** Which of these cards are on the board (with `live`, and not archived). */
+export function cardsOnBoard(ws: WorkspaceService, numbers: readonly number[], o: { live?: boolean } = {}): Set<number> {
+  if (!numbers.length) return new Set()
+  const { db } = readConn(ws)
+  const rows = db.prepare(`SELECT number FROM cards WHERE number IN (SELECT value FROM json_each(?))${o.live ? ' AND archived = 0' : ''}`).all(JSON.stringify([...new Set(numbers)])) as { number: number }[] // i18n-ignore: SQL
+  return new Set(rows.map((r) => r.number))
+}
+
 /** Which opening of the workspace's board is open now (Board.generation), opening it if it isn't. */
 export function boardGeneration(ws: WorkspaceService): number {
   return readConn(ws).b.generation
@@ -1505,6 +1536,22 @@ export function holdChanges(ws: WorkspaceService, since: number | null): { gener
     const mark = (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g // i18n-ignore: SQL
     const numbers = (db.prepare('SELECT number FROM cards ORDER BY number').all() as { number: number }[]).map((r) => r.number) // i18n-ignore: SQL
     return { generation: b.generation, mark, numbers, docs: holdRows(db, since === null ? {} : { where: 'rev >= ?', args: [since] }) }
+  })
+}
+
+/**
+ * These cards' revisions (CARD_REVS_STEP), the board's mark and its opening, from one snapshot; a card not on the board
+ * has none. A write raises a card's revision only while it is below the mark (a card at the mark keeps it), so a card
+ * read at the mark may change without its revision moving: only one read below the mark is known to be the card until
+ * its revision moves. Null on a board with no revisions (a 0.9 board waiting for its upgrade). What a read kept per
+ * card checks itself against (HI-1780).
+ */
+export function cardRevs(ws: WorkspaceService, numbers: readonly number[]): { generation: number; mark: number; revs: Map<number, number> } | null {
+  return readSnapshot(ws, (b, db) => {
+    if (b.legacy) return null
+    const mark = (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g // i18n-ignore: SQL
+    const rows = numbers.length ? (db.prepare('SELECT number, rev FROM cards WHERE number IN (SELECT value FROM json_each(?))').all(JSON.stringify(numbers)) as { number: number; rev: number }[]) : [] // i18n-ignore: SQL
+    return { generation: b.generation, mark, revs: new Map(rows.map((r) => [r.number, r.rev])) }
   })
 }
 
