@@ -336,6 +336,7 @@ interface HiveMessageValues {
   'performance.routes.route': undefined
   'performance.routes.sent': undefined
   'performance.routes.tip': undefined
+  'performance.routes.waits': undefined
   'performance.safeguards.agent': undefined
   'performance.safeguards.empty': undefined
   'performance.safeguards.heading': undefined
@@ -381,6 +382,8 @@ interface HiveMessageValues {
   'performance.trend.notRecordedLegend': undefined
   'performance.trend.slot': { when: string | number; detail: string | number }
   'performance.trend.succeeded': undefined
+  'performance.trend.waits': { waits: number }
+  'performance.trend.waitsLegend': undefined
   'performance.unknown': undefined
   'performance.updated': { when: string | number }
   'performance.usage.allUnreadable': undefined

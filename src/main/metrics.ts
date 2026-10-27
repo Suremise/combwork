@@ -146,7 +146,7 @@ const TOOLS = new Set<string>([...HIVE_TOOLS, START_VIEW_METRIC])
 const PROVIDER_IDS = new Set<string>(PROVIDERS.map((p) => p.id))
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 const ROLES = new Set(['agent', 'assistant', 'api', 'viewer', 'unknown'])
-const OUTCOMES = new Set(['ok', 'client-error', 'denied', 'server-error', 'cancelled'])
+const OUTCOMES = new Set(['ok', 'client-error', 'denied', 'server-error', 'cancelled', 'waiting'])
 const OTHER = '(other)'
 const inSet = (set: Set<string>, v: unknown): string => (typeof v === 'string' && set.has(v) ? v : OTHER)
 /** The longest project label kept as it is; a longer name gets a bounded label of its own (projectLabel). */
@@ -878,6 +878,17 @@ function series<T>(b: Bucket, owner: string, map: Record<string, T>, key: string
 // Recording. Each one is cheap and never throws: metrics must not break a request or a launch.
 // ---------------------------------------------------------------------------
 
+/**
+ * How an Agent API request ended: cancelled if its reply wasn't finished (the client went away), waiting if it answered
+ * with a wait (HI-1831: resolve's 409 while no check copy is free, which says to ask again), else by its status.
+ */
+export function apiOutcome(r: { finished: boolean; status: number; waiting: boolean }): MetricOutcome {
+  if (!r.finished) return 'cancelled'
+  if (r.waiting) return 'waiting'
+  const s = r.status
+  return s < 400 ? 'ok' : s === 401 || s === 403 ? 'denied' : s < 500 ? 'client-error' : 'server-error'
+}
+
 export function recordApi(h: MetricsHandle | null, project: string | null, r: { route: string; method: string; role: ApiSeries['role']; outcome: MetricOutcome; requestBytes: number; responseBytes: number; ms: number }): void {
   try {
     const at = bucketOf(h)
@@ -1065,7 +1076,7 @@ function trendOf(inRange: Bucket[], from: number, to: number, parts: (b: Bucket)
   const start = to - first > slots * step ? Math.floor((to - (slots - 1) * step) / step) * step : first
   const points: TrendPoint[] = Array.from({ length: slots }, (_, i) => {
     const a = start + i * step
-    return { start: new Date(a).toISOString(), observedMs: overlap(observed, Math.max(a, from), Math.min(a + step, to)), requests: 0, failed: 0, cancelled: 0, requestBytes: 0, responseBytes: 0, toolCalls: 0, toolChars: 0, launches: 0, guidanceBytes: 0 }
+    return { start: new Date(a).toISOString(), observedMs: overlap(observed, Math.max(a, from), Math.min(a + step, to)), requests: 0, failed: 0, cancelled: 0, waits: 0, requestBytes: 0, responseBytes: 0, toolCalls: 0, toolChars: 0, launches: 0, guidanceBytes: 0 }
   })
   for (const b of inRange) {
     const pt = points[Math.floor((b.start - start) / step)]
@@ -1073,7 +1084,8 @@ function trendOf(inRange: Bucket[], from: number, to: number, parts: (b: Bucket)
     for (const part of parts(b)) {
       for (const a of Object.values(part.api)) {
         pt.requests += a.count
-        if (a.outcome !== 'ok') pt.failed += a.count
+        if (a.outcome === 'waiting') pt.waits += a.count
+        else if (a.outcome !== 'ok') pt.failed += a.count
         if (a.outcome === 'cancelled') pt.cancelled += a.count
         pt.requestBytes += a.requestBytes
         pt.responseBytes += a.responseBytes
