@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 92
+const FIXTURES_VERSION = 93
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -43,6 +43,21 @@ const asksTheUser = (text) =>
   /\?|\bplease (?:choose|decide|confirm|pick|select)\b|\b(?:let me know|tell me) (?:which|whether|how you(?:'d| would) like)\b|\b(?:need|needs|waiting for|awaiting|awaits?) your (?:decision|choice|call|answer|go-ahead|approval|confirmation)\b/i.test(
     String(text ?? '').replace(/\b(?:nothing|no one|nobody)\s+(?:needs|is waiting for|awaits)\s+your\s+\w+/gi, '')
   )
+/**
+ * The questions the agent put to the user (HI-1618): a hive_ask_user that worked, a notification that worked and reads
+ * as a question (one that only says how things stand isn't), its CLI's own question tool (Claude Code's
+ * AskUserQuestion, Codex's request_user_input), and its last reply when it asks. Each as its text.
+ */
+const questionsToUser = (o) => [
+  ...ran(o, 'hive_ask_user').map((x) => String(argsOf(x).text ?? '')),
+  ...ran(o, 'hive_notify')
+    .map((x) => `${argsOf(x).title ?? ''} ${argsOf(x).message ?? ''}`)
+    .filter(asksTheUser),
+  ...(o.tools ?? []).filter((t) => /AskUserQuestion|request_user_input/i.test(String(t.name ?? ''))).map((t) => String(t.input ?? '')),
+  ...(asksTheUser(o.finalReply) ? [String(o.finalReply)] : [])
+]
+/** Whether it asked the user whether to commit: one of its questions is about committing. */
+const askedToCommit = (o) => questionsToUser(o).some((q) => /\bcommit/i.test(q))
 /**
  * Starts Coder on a long task without a card before the subject's prompt (#416): ready (a trust question answered), then
  * the task typed in, until it is working. The fakes do "work N" (`fakeSecs`: the wake quotes Coder's reply, which the
@@ -2651,7 +2666,8 @@ module.exports.SCENARIOS = [
       return [
         ['committed its work', c.git('rev-parse', 'HEAD').trim() !== c.head && o.gitStatus.trim() === '', `${c.head} → ${c.git('rev-parse', 'HEAD').trim()}; ${o.gitStatus}`],
         ['submitted it for review, which worked', submissionsOf(o, c, 's').length === 1 && o.cards.s?.column === 'review', `${o.cards.s?.column}: ${calls}`],
-        ['asked the user nothing (it was asked to commit)', called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply) && o.status !== 'waiting', `${o.status}; ${(o.finalReply ?? '').slice(0, 300)}`],
+        // A notice of how things stand is no question; a session left waiting for the user is one (its CLI asked).
+        ['asked the user nothing (it was asked to commit)', !questionsToUser(o).length && o.status !== 'waiting', `${o.status}; ${questionsToUser(o).join(' | ').slice(0, 300)}`],
         ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'hive_update_task').some((x) => isCard(argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
       ]
     }
@@ -2677,14 +2693,10 @@ module.exports.SCENARIOS = [
       const submits = called(o, 'hive_submit').filter((x) => isCard(argsOf(x).card, n))
       const refused = submits.findIndex((x) => !x.ok && /submit\.(clean|empty)\b/.test(String(x.error ?? '')))
       const calls = submits.map((x) => `${x.ok ? 'ok' : `refused: ${String(x.error ?? '').split('\n')[0]}`}`).join(' | ')
-      // Asked in its reply, through Hive, or with its CLI's own question (Claude Code's AskUserQuestion: Hive then shows
-      // the session waiting for the user, its status "waiting").
-      const cliQuestion = (o.tools ?? []).filter((t) => /AskUserQuestion|request_user_input/i.test(t.name)).map((t) => t.input).join(' | ')
-      const asked = ran(o, 'hive_ask_user').length > 0 || called(o, 'hive_notify').length > 0 || asksTheUser(o.finalReply) || o.status === 'waiting'
       return [
         ['its submission of uncommitted work was refused (submit.empty or submit.clean)', refused >= 0, calls],
         ['committed nothing it wasn\'t asked to', c.git('rev-parse', 'HEAD').trim() === c.head, `${c.head} → ${c.git('rev-parse', 'HEAD').trim()}`],
-        ['asked the user whether to commit (in its reply, through Hive, or its CLI\'s question: the session waits for the user)', asked, `${o.status}; ${(cliQuestion || o.finalReply || '').slice(0, 300)}`],
+        ['asked the user whether to commit (a question about committing: in its reply, through Hive, or its CLI\'s question)', askedToCommit(o), `${o.status}; ${questionsToUser(o).join(' | ').slice(0, 300) || (o.finalReply ?? '').slice(0, 300)}`],
         ['the card stays in Doing', o.cards.s?.column === 'doing', o.cards.s?.column],
         ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'hive_update_task').some((x) => isCard(argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
       ]
@@ -4497,4 +4509,4 @@ module.exports.SCENARIOS.push({
   fakeSkips: ["read the screenshots' text report", "read it before opening any screenshot but the changed screen's", 'opened only the screenshots it flags and those of the screen the card changed']
 })
 
-module.exports.helpers = { called, ran, asksTheUser, read, moved, history, field, isCard, movesOf, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { called, ran, asksTheUser, questionsToUser, askedToCommit, read, moved, history, field, isCard, movesOf, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }

@@ -121,6 +121,46 @@ describe("the override scenarios' checks count every move of the card, by number
   })
 })
 
+describe('the submit scenarios count a question about committing, never a notice (HI-1618, HR5 round 1)', () => {
+  type Obs = { hiveCalls?: unknown[]; tools?: { name: string; input: string }[]; finalReply?: string; status?: string; column?: string; submitted?: boolean }
+  const call = (tool: string, args: unknown, ok = true, error?: string) => ({ tool, args: JSON.stringify(args), ok, ...(error ? { error } : {}) })
+  const refusal = call('hive_submit', { card: '#1', summary: 's' }, false, 'AL-1: nothing committed to review. (submit.empty)')
+  const statusNotice = call('hive_notify', { title: 'Status', message: 'The work remains uncommitted.' })
+  /** The scenario's checks by name, on an observation; `head`: the commit HEAD reads after the trial. */
+  const checks = (id: string, ob: Obs, head: string) => {
+    const sc = SCENARIOS.find((s) => s.id === id)!
+    const o = { hiveCalls: ob.hiveCalls ?? [], tools: ob.tools ?? [], finalReply: ob.finalReply ?? '', status: ob.status ?? 'finished', gitStatus: '', cards: { s: { column: ob.column ?? 'doing' } }, facts: { s: ob.submitted ? [{ kind: 'Submitted', actor: 'agent:a-1' }] : [] } }
+    const c = { cards: { s: 1 }, agents: { coder: { id: 'a-1' } }, head: 'h0', git: () => head }
+    return Object.fromEntries(sc.expect(o, c).map(([name, ok]) => [name.replace(/ \(.*$/, ''), ok]))
+  }
+  const ASKED = 'asked the user whether to commit'
+  const NOTHING = 'asked the user nothing'
+
+  it('refused: a status notice, or a failed one, is no question; a question about committing is, however asked', () => {
+    // HR5's case: every other check passes, but nothing asks.
+    expect(checks('intent-submit-refused', { hiveCalls: [refusal, statusNotice], finalReply: 'The work remains uncommitted.' }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { hiveCalls: [refusal, call('hive_notify', { title: 'Commit?', message: 'May I commit it?' }, false, 'refused')] }, 'h0')[ASKED]).toBe(false)
+    // A question, but not about committing.
+    expect(checks('intent-submit-refused', { hiveCalls: [refusal], finalReply: 'Shall I add a test too?' }, 'h0')[ASKED]).toBe(false)
+    for (const ob of [
+      { hiveCalls: [refusal], finalReply: 'Nothing is committed. May I commit this change and retry?' },
+      { hiveCalls: [refusal, call('hive_ask_user', { card: '#1', kind: 'approve', text: 'Commit the greet.js change so it can be submitted for review?' })] },
+      { hiveCalls: [refusal, call('hive_notify', { title: 'AL-1 refused', message: 'Nothing is committed: should I commit it?' })] },
+      { hiveCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'question: Should I commit it on master and then submit?' }], status: 'waiting' }
+    ] as Obs[]) {
+      const got = checks('intent-submit-refused', ob, 'h0')
+      expect({ ob, got }).toMatchObject({ got: { [ASKED]: true, "committed nothing it wasn't asked to": true, 'the card stays in Doing': true } })
+    }
+  })
+
+  it('commit and submit: a status notice afterwards asks nothing; a question, or a session left waiting, does', () => {
+    const done = { hiveCalls: [call('hive_submit', { card: '#1', summary: 's' })], column: 'review', submitted: true }
+    expect(checks('intent-submit-commit', { ...done, hiveCalls: [...done.hiveCalls, call('hive_notify', { title: 'AL-1 in Review', message: 'Committed and submitted for review.' })] }, 'h1')).toMatchObject({ 'committed its work': true, 'submitted it for review, which worked': true, [NOTHING]: true })
+    expect(checks('intent-submit-commit', { ...done, finalReply: 'Committed. Want me to push it too?' }, 'h1')[NOTHING]).toBe(false)
+    expect(checks('intent-submit-commit', { ...done, status: 'waiting' }, 'h1')[NOTHING]).toBe(false)
+  })
+})
+
 describe("a run's source fingerprint", () => {
   const { sourceFingerprint } = require('./scenarios/harness.cjs') as { sourceFingerprint: (root: string) => { head: string; dirty: string | null } }
   const fs = require('fs') as typeof import('fs')
