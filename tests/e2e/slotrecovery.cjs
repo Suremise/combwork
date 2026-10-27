@@ -131,8 +131,12 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
     await inv('advanced:set', 'hive.agents.perProject', 3)
     const lane4 = await inv('lanes:start', alpha, { builder: b4.id, reviewer: r1.id, cards: [c4], note: 'Keep it small.' })
     check('4. the lane waits for a slot, its agents not started', !!lane4.waitingForSlot && lane4.started.length === 0 && !(await live(b4.id)), JSON.stringify(lane4))
+    // An ordinary quit with B3 running in slot-c (card 3's): its run's writer released before Hive quit (HI-1801), so
+    // the next start finds no slot held by the run that quit, and B3 can start there again.
     await h.app.close().catch(() => {})
     await start(null)
+    const held = (await inv('slots:list', alpha)).filter((s) => s.writer)
+    check('4. …restarted after a quit: no slot still held by a run of the Hive that quit (HI-1801)', held.length === 0, JSON.stringify(held))
     const waiting = await until(async () => ((await lane(lane4.lane.id))?.status?.reason === 'slot' ? lane(lane4.lane.id) : null), HUNG_MS)
     check("4. …restarted: still 'waiting for a slot', paused", waiting?.state === 'paused', JSON.stringify(waiting?.status))
     // The rules off: card 3 put back frees a slot, but nothing is lent to the lane.

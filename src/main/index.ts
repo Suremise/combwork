@@ -632,6 +632,8 @@ async function quitNow(tellUser: boolean): Promise<void> {
   await recordClosing(reason).catch((e) => log.warn('recording the agents as Hive closes', e))
   await sessions.stopAllAndWait(3000)
   await quitLeftovers()
+  // The stopped runs' slot writers released before the workspaces close (HI-1801): their outcomes are known by now.
+  await sessions.writersSettled(3000)
   // The merge queues' runners: their processes ended and their leases given up, so another Hive can run them at once.
   await releaseQueueRunners()
   await slotsQuiet
