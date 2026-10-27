@@ -53,6 +53,13 @@ export interface LaneRecord {
    */
   slotWait?: { since: string; note: string }
   /**
+   * The lane's brief for its builder (HI-1795: `hive_lane start`'s `brief`), kept with the lane (its row's `extra`).
+   * `text` null: cleared. `rev` goes up at each change of text and each clear, never reused. In slots, every placement
+   * of the lane's cards carries the text as it is then; outside slots it is delivered once per rev, and `out` is the rev
+   * whose delivery has been made (the intent recorded: one owed is made by the next look, a crash between kept).
+   */
+  brief?: { text: string | null; rev: number; out: number | null; notIn?: string }
+  /**
    * Reviewed by the project's reviewer pool (#1443, G17): no reviewer of its own (`reviewer` null); each card submitted is
    * given to the next free pooled reviewer. Kept with the lane (its row's `extra`).
    */
@@ -63,6 +70,26 @@ export interface LaneRecord {
 // the project's workflow options since HI-1766 (workflow/preferences.ts); a prompt's own values win over them.
 import { LANE_MAX_CARDS, LANE_MAX_ROUNDS, LANE_MAX_WAIT_MINUTES } from './loopLimits'
 export { LANE_MAX_CARDS, LANE_MAX_ROUNDS, LANE_MAX_WAIT_MINUTES, LOOP_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_STEP_WAIT_MINUTES, LOOP_WAIT_HOURS, LOOP_WAIT_MAX_HOURS } from './loopLimits'
+
+/** The longest brief a lane keeps for its builder (HI-1795), in characters. */
+export const LANE_BRIEF_MAX = 4000
+
+/**
+ * A lane's brief after a start that gives `brief` (HI-1795): undefined keeps it as it is (a list change, a reviewer's
+ * join); '' (or only spaces) clears it; a text replaces it. A change of text, or a clear, takes the next rev (never one
+ * used before, a clear's included); the same text changes nothing, so nothing is given again. `notIn` (a new lane's
+ * only): the builder's conversation running as its lane began, which outside slots its brief is never offered into (the
+ * next one gets it); an edit keeps the one its lane began with and never takes another, so an edited brief reaches the
+ * lane's working conversation.
+ */
+export function nextBrief(was: LaneRecord['brief'], brief: string | undefined, notIn?: string | null): LaneRecord['brief'] {
+  if (brief === undefined) return was
+  const text = brief.trim() ? brief.trim().slice(0, LANE_BRIEF_MAX) : null
+  if (!was) return text === null ? undefined : { text, rev: 1, out: null, ...(notIn ? { notIn } : {}) }
+  if (was.text === text) return was
+  // An edit keeps the exclusion its lane began with (HR4's HI-1795 round 2): never one of the lane's working conversation.
+  return { text, rev: was.rev + 1, out: was.out, ...(was.notIn ? { notIn: was.notIn } : {}) }
+}
 /** A lane's name, at most. */
 export const LANE_NAME_MAX = 80
 /** An ended lane stays listed this long (unless its builder starts another), and is kept in the file this long. */
@@ -312,6 +339,7 @@ export function readLane(v: unknown): LaneRecord | null {
     ...(pending ? { pending } : {}),
     ...(whole(v.inFlight, 1e9) ? { inFlight: v.inFlight as number } : {}),
     ...(isObj(v.slotWait) && time(v.slotWait.since) && typeof v.slotWait.note === 'string' ? { slotWait: { since: v.slotWait.since as string, note: (v.slotWait.note as string).slice(0, 4000) } } : {}),
+    ...(isObj(v.brief) && whole(v.brief.rev, 1e9) && (v.brief.text === null || typeof v.brief.text === 'string') && (v.brief.out === null || whole(v.brief.out, 1e9)) ? { brief: { text: v.brief.text === null ? null : (v.brief.text as string).slice(0, LANE_BRIEF_MAX), rev: v.brief.rev as number, out: v.brief.out as number | null, ...(text(v.brief.notIn, 128) ? { notIn: v.brief.notIn as string } : {}) } } : {}),
     ...(v.pool === true && !reviewer ? { pool: true as const } : {})
   }
 }

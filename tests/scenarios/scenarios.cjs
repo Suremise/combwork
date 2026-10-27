@@ -3154,6 +3154,34 @@ module.exports.SCENARIOS = [
     fakeSkips: ['started the card with hive_start_task, which worked', 'then followed it with a wait or a watch (hive_wait_for_agents, or hive_wait_for_tasks on its card), which worked', 'the agent did it: the card handed on (in Review, or past it by its submission) and the file is there']
   },
   {
+    id: 'assistant-lane-brief',
+    title: "The Assistant starting a lane with the user's brief for its builder (HI-1795): gives it in hive_lane start's brief, never as a separate prompt to the builder",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await setWorkflow(c, { ...PAIR, target: c.git('branch', '--show-current').trim() }, 'pair')
+      await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'builder' })
+      await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'reviewer' })
+      await c.card('p', { title: 'Greeting says Hi', description: 'greet.js adds a second line, the comment "// Hi", at its end.' })
+      await c.card('q', { title: 'Greeting says Bye', description: 'greet.js adds a third line, the comment "// Bye", at its end.' })
+    },
+    prompt: (c) => `Start a card loop in alpha with Coder building and Implementer reviewing, cards #${c.cards.p} then #${c.cards.q}. Coder's brief: do #${c.cards.p} first, and never touch the docs folder.`,
+    fake: (c) => `skill coordinate-agents then hive hive_lane {"action":"start","project":"alpha","builder":"Coder","reviewer":"Implementer","cards":[${c.cards.p},${c.cards.q}],"brief":"Do #${c.cards.p} first, and never touch the docs folder."}`,
+    expect: (o, c) => {
+      const starts = ran(o, 'hive_lane').filter((x) => field(x.args, 'action', 'start'))
+      const briefed = starts.find((x) => /docs/i.test(String(argsOf(x).brief ?? '')))
+      const toCoder = called(o, 'hive_prompt_agent').filter((x) => /coder/i.test(String(argsOf(x).agent ?? '')) && /docs/i.test(String(argsOf(x).text ?? argsOf(x).prompt ?? '')))
+      const lane = (o.lanes ?? []).find((l) => l.builder?.name === 'Coder')
+      return [
+        // Both carry the rule (coordinate-agents, A new lane; run-lanes points there).
+        ['read the run-lanes or coordinate-agents skill', read(o, 'run-lanes') || read(o, 'coordinate-agents'), o.skillsRead.join(',')],
+        ["started the lane with hive_lane start, the user's brief in its brief", !!briefed, starts.map((x) => x.args).join(' | ')],
+        ["didn't send Coder its brief as a separate prompt (a slot's new conversation would lose it)", toCoder.length === 0, toCoder.map((x) => x.args).join(' | ')],
+        ['the lane runs: Coder building, Implementer reviewing, both cards in order', !!lane && lane.reviewer?.name === 'Implementer' && (lane.cards ?? []).map((x) => x.number).join(',') === `${c.cards.p},${c.cards.q}`, JSON.stringify((o.lanes ?? []).map((l) => [l.builder?.name, l.reviewer?.name, l.cards?.map((x) => x.number)]))]
+      ]
+    }
+  },
+  {
     id: 'assistant-agent-watch',
     title: "The Assistant asked to say when an agent is done with work that has no card: an agent watch, not a polling loop (#416)",
     role: 'assistant',

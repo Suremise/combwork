@@ -3,7 +3,7 @@ import { join } from 'path'
 import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
-import { allDone, isFrozen, keptLanes, laneView, listedLanes, readLanes, running, type LaneAgent, type LaneCardFacts, type LaneChange, type LaneRecord } from '../shared/lanes'
+import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, readLanes, running, type LaneAgent, type LaneCardFacts, type LaneChange, type LaneRecord } from '../shared/lanes'
 import type { HiveErrorKind, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { reviewingNow } from '../shared/workflow/reviewerPool'
 import { withValues, type Text } from '../shared/advanced'
@@ -448,6 +448,11 @@ function slotView(ws: WorkspaceService, l: LaneRecord): { slot: string | null; w
  * A lane's wait for a slot (#1438): set as Start Lane… finds none free (with the user's note for its agents' briefs),
  * cleared once it has one and its agents start (null). A lane not running is left as it is.
  */
+/** A change of the lanes under their lock, in one save (laneBriefs.ts: a brief's delivery recorded, HI-1795). */
+export async function mutateLanes(ws: WorkspaceService, fn: (lanes: LaneRecord[]) => void): Promise<void> {
+  await mutate(ws, (lanes) => fn(lanes))
+}
+
 export async function setLaneSlotWait(ws: WorkspaceService, id: string, wait: LaneRecord['slotWait'] | null): Promise<void> {
   await mutate(ws, (lanes) => {
     const l = lanes.find((x) => x.id === id)
@@ -597,6 +602,10 @@ export interface StartLane {
   rounds?: number
   waitMinutes?: number
   name?: string | null
+  /** The builder's brief (HI-1795, nextBrief): undefined keeps a running lane's; '' clears it. */
+  brief?: string
+  /** The builder's conversation running as a new lane is started with a brief (outside slots, never offered into it). */
+  briefNotIn?: string | null
   /** Who starts it, as the board names them. */
   by: string
 }
@@ -655,6 +664,10 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
         ...(s.name !== undefined && s.name !== null ? { name: s.name } : {}),
         updatedAt: t
       })
+      // Its brief under the same lock (HI-1795): kept unless the start gives one; a queued list change keeps it too.
+      // An edit of a running lane: its working conversation is never excluded (only a new lane's earlier one is).
+      const brief = nextBrief(was.brief, s.brief)
+      if (brief) was.brief = brief
       if (pool) {
         was.pool = true
         was.reviewer = null
@@ -687,6 +700,8 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
       ...(ruleset ? { ruleset } : {}),
       ...(pool ? { pool: true as const } : {})
     }
+    const brief = nextBrief(undefined, s.brief, s.briefNotIn)
+    if (brief) rec.brief = brief
     lanes.push(rec)
     also.push((db) => noteLaneIn(db, ws.path!, null, rec))
     return { rec, did: 'started' as const, replaced }

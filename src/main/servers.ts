@@ -59,7 +59,8 @@ import { listMcp } from './mcp'
 import { assertInShared, createHandover, handoversFor, NoteConflict, notesTree, readNote, writeNote } from './notes'
 import { mergeSlots, slotTestEvent } from './mergeSlotHost'
 import * as lanes from './lanes'
-import { laneCards, laneName, laneNumber } from '../shared/lanes'
+import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber } from '../shared/lanes'
+import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
 import { writePty } from './ptyHost'
 import { isResuming } from './restartResume'
@@ -1819,8 +1820,8 @@ function laneProject(v: unknown): string {
 }
 
 /** A lane's numbers and texts from a request body (undefined: not given). */
-function laneArgs(body: any): { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null } {
-  const out: { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null } = {}
+function laneArgs(body: any): { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null; brief?: string } {
+  const out: { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null; brief?: string } = {}
   if (body?.cards !== undefined) {
     const c = laneCards(cardRefsIn(body.cards))
     if (typeof c === 'string') throw new HttpError(400, c)
@@ -1833,6 +1834,12 @@ function laneArgs(body: any): { cards?: number[]; rounds?: number; waitMinutes?:
     out[k] = v
   }
   if (body?.name !== undefined) out.name = laneName(body.name)
+  // The builder's brief (HI-1795): text, or '' to clear it; left out, a running lane keeps its own.
+  if (body?.brief !== undefined) {
+    if (typeof body.brief !== 'string') throw new HttpError(400, "brief must be text ('' clears it)")
+    if (body.brief.length > LANE_BRIEF_MAX) throw new HttpError(400, `brief is at most ${LANE_BRIEF_MAX} characters`)
+    out.brief = body.brief
+  }
   return out
 }
 
@@ -1892,8 +1899,12 @@ route('POST', '/v1/lanes', async ({ body }) =>
       if (!reviewer) note = `No agent "${String(body.reviewer)}" in ${basename(p)}: the lane has no reviewer until one joins it.`
     }
     const start = async () => {
-      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, by: await laneBy() })
-      return note ? { ...r, note } : r
+      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: args.brief !== undefined ? (sessions.liveFor(p, builder)?.sessionId ?? null) : null, by: await laneBy() })
+      // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
+      const told = args.brief !== undefined ? await briefNote(ws, (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id) ?? { project: basename(p) }) : null
+      if (args.brief !== undefined) await settleLaneBriefs(ws)
+      const notes = [note, told].filter(Boolean).join(' ')
+      return notes ? { ...r, note: notes } : r
     }
     if (!assistantCaller()) return start()
     const builderAct = await knownAgent(basename(p), builder)
