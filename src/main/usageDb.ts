@@ -248,6 +248,12 @@ export function cursorOf(db: DatabaseSync, scope: string, session: string): Curs
   }
 }
 
+/** A session's locality facts set (HI-1772): each only ever set, never cleared; nothing else of it changed. */
+export function markLocality(db: DatabaseSync, scope: string, session: string, o: { serverLocal: boolean; notLocal: boolean }): void {
+  if (o.serverLocal) db.prepare('UPDATE usage_sessions SET server_local = 1 WHERE scope = ? AND session = ?').run(scope, session) // i18n-ignore: SQL
+  if (o.notLocal) db.prepare('UPDATE usage_sessions SET not_local = 1 WHERE scope = ? AND session = ?').run(scope, session) // i18n-ignore: SQL
+}
+
 /** Who a session was, as its record has it. */
 export interface SessionMeta {
   scope: string

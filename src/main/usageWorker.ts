@@ -7,7 +7,7 @@ import { baselineOfRows, baselineOfUsage, baselineAsFree, baselineWithoutReports
 import { openDb, type Db } from './db'
 import { readAdvancedFrom, valuesReader } from './advancedValues'
 import type { DatabaseSync } from 'node:sqlite'
-import { baselineOf, cardRows, cursorOf, getMeta, replaceRows, sessionIds, setMeta, storedSession, storedSessions, storedTimelines, updateMeta, USAGE_MIGRATIONS, writeSession, type SessionMeta, type SessionWrite } from './usageDb'
+import { baselineOf, cardRows, cursorOf, getMeta, markLocality, replaceRows, sessionIds, setMeta, storedSession, storedSessions, storedTimelines, updateMeta, USAGE_MIGRATIONS, writeSession, type SessionMeta, type SessionWrite } from './usageDb'
 import { isGz, readTranscript } from './transcriptFiles'
 import { withoutCostReports } from '../shared/usageDays'
 import { newUsageParser, parserShape, restoreParser, saveParser, type RawUsageParser } from './usageParsers'
@@ -330,6 +330,9 @@ async function ingest(file: string, job: IngestJob): Promise<IngestResult> {
   const changed = turned || (!!cur && serverLocal && !notLocal) !== wasFree
   const unchanged = (): IngestResult => {
     if (changed) return stripStored(db, job, { serverLocal, notLocal })
+    // Its locality as the job says it, kept for good even when nothing else changed (HI-1772 round 3 follow-up): a
+    // later stale job then meets the stored disqualifier.
+    if (cur && ((job.serverLocal && !cur.serverLocal) || (job.notLocal && !cur.notLocal))) markLocality(db, job.scope, job.session, { serverLocal: !!job.serverLocal, notLocal: !!job.notLocal })
     updateMeta(db, job, job.external ? 'external' : 'transcript')
     reshare(db, job, cur)
     return { status: 'unchanged' }

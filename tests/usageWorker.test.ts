@@ -485,6 +485,30 @@ describe('the usage worker reading a transcript for main', () => {
     await r.close()
     await t.close()
   })
+
+  it('a locality fact on an unchanged file is kept (HI-1772 follow-up): history from before the flags, notLocal, then a stale local job, across a reopen', async () => {
+    const h = await setup()
+    const line = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'qwen3:8b', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
+    writeFileSync(h.transcript, prompt(0) + line(1))
+    const settings = { providers: { ...DEFAULT_SETTINGS.providers, 'claude-code': { ...DEFAULT_SETTINGS.providers['claude-code'], prices: { 'qwen3:8b': { input: 1000, cachedInput: 0, output: 1000 } } } } }
+    // Recorded with no locality at all (as a history from before this change).
+    expect((await h.ingest({ reportsIgnored: true })).status).toBe('written')
+    // The same file, unchanged: a run elsewhere is told; nothing to read, but the fact is kept.
+    expect((await h.ingest({ reportsIgnored: true, notLocal: true })).status).toBe('unchanged')
+    // A stale local-only job after it: the stored disqualifier stands.
+    expect((await h.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    const priced = async () => {
+      const st = (await h.stored())!
+      return usageFromRows(st.summary, st.rows, settings)
+    }
+    expect((await priced()).costFree).toBeUndefined()
+    expect((await priced()).costUsd).toBeGreaterThan(0)
+    // Reopened (the history's file closed and read again): the same.
+    await h.close()
+    expect((await h.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    expect((await priced()).costFree).toBeUndefined()
+    await h.close()
+  })
 })
 
 describe('the usage worker as main starts it (HI-1729)', () => {
