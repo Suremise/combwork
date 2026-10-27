@@ -46,16 +46,22 @@ describe.runIf(process.platform === 'win32')('a launch held at its gate', () => 
   const env: Record<string, string> = {}
   for (const [k, v] of Object.entries(process.env)) if (v !== undefined && !k.startsWith('HIVE_')) env[k] = v
   // A stand-in CLI: the moment it runs, it notes that it ran and starts a detached, hidden server (its pid noted);
-  // then it prints its arguments and exits with 7 a moment later.
+  // then it prints its arguments and exits with 7 a moment later. With --stay, it notes its own pid instead, starts
+  // nothing and runs until ended, as a CLI does.
   const cli = join(dir, 'cli.cjs')
   writeFileSync(
     cli,
     `const { spawn } = require('child_process'), fs = require('fs')
 const [ran, server] = process.argv.slice(2, 4)
 fs.writeFileSync(ran, String(Date.now()))
-spawn(process.execPath, ['-e', "require('fs').writeFileSync(process.argv[1], String(process.pid)); setTimeout(() => {}, 120000)", server], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
-console.log('ARGS ' + JSON.stringify(process.argv.slice(4)))
-setTimeout(() => process.exit(7), 1500)
+if (process.argv[4] === '--stay') {
+  fs.writeFileSync(server, String(process.pid))
+  setInterval(() => {}, 1000)
+} else {
+  spawn(process.execPath, ['-e', "require('fs').writeFileSync(process.argv[1], String(process.pid)); setTimeout(() => {}, 120000)", server], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+  console.log('ARGS ' + JSON.stringify(process.argv.slice(4)))
+  setTimeout(() => process.exit(7), 1500)
+}
 `
   )
   afterAll(async () => {
@@ -113,6 +119,53 @@ setTimeout(() => process.exit(7), 1500)
     const failed = await launch('failed', () => Promise.reject(new Error('the tracker broke')))
     expect(failed.ranAt).toBe(0)
     expect(failed.output.replace(/\s+/g, ' ')).toContain('the tracker broke')
+  }, 60000)
+
+  it('ends a CLI that outlives its gate, rather than leaving it in the job (HI-1819)', async () => {
+    const { trackLaunch, launchEnded } = await import('../src/main/agentProcesses')
+    const { spawnPty } = await import('../src/main/ptyHost')
+    // Hive quitting just after a launch: its CLI, started as the console closed, missed the close and ran on with no
+    // terminal, kept as a leftover that held its slot. Here the gate is ended under its running CLI the same way.
+    const ran = join(dir, 'orphan-ran.txt')
+    const cliPid = join(dir, 'orphan-pid.txt')
+    let gatePid = 0
+    const exited = new Promise<void>((resolve) => {
+      spawnPty('gate-orphan', {
+        file: process.execPath,
+        args: [cli, ran, cliPid, '--stay'],
+        cwd: dir,
+        env,
+        track: (pid, cancelled) => {
+          gatePid = pid
+          return trackLaunch({ runId: 'gate5', projectPath: dir, agentId: 'g5', agentName: 'Orphan', gated: true }, pid, cancelled).then((t): GateWord => (t.tracked ? { go: true } : { go: false, reason: t.reason }))
+        },
+        onExit: () => resolve()
+      })
+    })
+    await vi.waitFor(() => expect(existsSync(cliPid) && Number(readFileSync(cliPid, 'utf8')) > 0).toBe(true), { timeout: 30_000, interval: 50 })
+    const pid = Number(readFileSync(cliPid, 'utf8'))
+    process.kill(gatePid)
+    await exited
+    expect(alive(pid)).toBe(true)
+    // Its launch ends with nothing left: the CLI is ended, not listed to keep.
+    expect(await launchEnded('gate5')).toBeNull()
+    expect(alive(pid)).toBe(false)
+  }, 60000)
+
+  it('never runs the CLI once its terminal is being killed, whatever word comes after (HI-1819)', async () => {
+    const ran = join(dir, 'stopped-ran.txt')
+    const gate = launchGate(process.execPath, [cli, ran, join(dir, 'stopped-server.txt')], env)
+    let output = ''
+    const proc = pty.spawn(gate.file, gate.args, { cols: 120, rows: 30, cwd: dir, env: gate.env, useConptyDll: false })
+    proc.onData((d) => (output += d))
+    // killPty tells the gate first; tracking says go only after.
+    gate.stop('its terminal was closed before it started')
+    gate.open(Promise.resolve({ go: true }))
+    const code = await new Promise<number>((resolve) => proc.onExit(({ exitCode }) => resolve(exitCode)))
+    gate.close()
+    expect(existsSync(ran)).toBe(false)
+    expect(code).toBe(1)
+    expect(plain(output).replace(/\s+/g, ' ')).toContain(`Error: Hive didn't start ${program}: its terminal was closed before it started`)
   }, 60000)
 
   it('never runs the CLI when the pipe closes without a word', async () => {

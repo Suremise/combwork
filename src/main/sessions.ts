@@ -1858,7 +1858,7 @@ class SessionManager {
           env: childEnv(),
           quietExit: true,
           // What the setup command starts is the launch's too (an `npm install` left running).
-          ...(tracked ? { track: (pid: number, cancelled: AbortSignal) => trackLaunch({ runId, projectPath, agentId, agentName: agent.name }, pid, cancelled).then((r) => this.launchWord(r)) } : {}),
+          ...(tracked ? { track: (pid: number, cancelled: AbortSignal) => trackLaunch({ runId, projectPath, agentId, agentName: agent.name, gated: true }, pid, cancelled).then((r) => this.launchWord(r)) } : {}),
           onExit: (code) => void this.afterSetup(projectPath, agentId, code, { sessionId, name: sessionName, resume: !!opts.resumeId })
         })
         // Its setup's process runs now (spawnPty returned, not thrown): its slot's writer is the run's processes' to settle.
@@ -2288,7 +2288,7 @@ class SessionManager {
         ? {
             track: (pid: number, cancelled: AbortSignal) => {
               state.pid = pid
-              return trackLaunch({ runId: state.runId, projectPath, agentId: agent.id, agentName: agent.name }, pid, cancelled).then((r) => this.launchWord(r))
+              return trackLaunch({ runId: state.runId, projectPath, agentId: agent.id, agentName: agent.name, gated: true }, pid, cancelled).then((r) => this.launchWord(r))
             }
           }
         : {}),
