@@ -82,6 +82,11 @@ export interface SubmittedData {
   sameRevision: boolean
   summary: string
   note?: string
+  /**
+   * A follow-up submitted while the card was in Review (HI-1832): a commit its reviewer asked for, made the revision under
+   * review with no round counted and no one reassigned; the reviewer starts its review again on it.
+   */
+  followUp?: boolean
   /** None: the card's declared paths. */
   paths?: string[]
   /** Shared folder: the card's commits, in order. */

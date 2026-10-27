@@ -129,6 +129,7 @@ export const SUITES = [
   { name: 'filelinks' },
   { name: 'files' },
   { name: 'flightrecorder' },
+  { name: 'followupsubmit' },
   { name: 'footerfit' },
   { name: 'foryou' },
   { name: 'freshpath' },

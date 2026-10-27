@@ -589,11 +589,13 @@ export class Workflow {
    * its builder's move while the card waits in Review (it waits for the verdict). Null for the user, or where the
    * stage's own intents are the agent's next step.
    */
-  private sideOf(card: CardRecord, actor: Actor, move: string, stage: unknown): { whose: 'reviewer' | 'builder'; back?: 'yes' | 'no' } | null {
+  private sideOf(card: CardRecord, actor: Actor, move: string, stage: unknown): { whose: 'reviewer' | 'builder' | 'builderSubmit'; back?: 'yes' | 'no' } | null {
     const agent = agentOf(actor)
     if (!agent || typeof stage !== 'string') return null
     const builds = this.state(card).builders.includes(agent)
     if (REVIEW_MOVES.has(move) && stage !== 'review' && !builds) return { whose: 'reviewer', back: stage === 'todo' || stage === 'active' ? 'yes' : 'no' }
+    // A submission again (HI-1832): a change its reviewer asked for goes in as a follow-up.
+    if (move === 'submit' && stage === 'review' && builds) return { whose: 'builderSubmit' }
     if (!REVIEW_MOVES.has(move) && stage === 'review' && builds) return { whose: 'builder' }
     return null
   }
@@ -1114,9 +1116,10 @@ export class Workflow {
 
   /**
    * submit (§16.8.1): the card's revision with its endpoints, keys and files → Review, or Finish without review, or
-   * back into the merge queue after a transient failure (`requeue.allowed`).
+   * back into the merge queue after a transient failure (`requeue.allowed`). `followUp` (HI-1832): from Review, its
+   * builder's commit the reviewer asked for, made the revision under review: no round, no move, no one reassigned.
    */
-  async submit(ref: unknown, actor: Actor, args: { summary: string; revision?: string; note?: string; paths?: string[]; drag?: Drag }): Promise<Reply> {
+  async submit(ref: unknown, actor: Actor, args: { summary: string; revision?: string; note?: string; paths?: string[]; drag?: Drag; followUp?: boolean }): Promise<Reply> {
     const card0 = this.resolve(ref, actor)
     if (isRefusal(card0)) return card0
     let card = card0
@@ -1159,22 +1162,33 @@ export class Workflow {
     await this.cfg.hooks?.beforeWrite?.('submit')
     if (await this.revalidate(g.card, g.s, g.o, g.before)) return this.regather(card, () => this.submit(ref, actor, args))
     let ahead: CardRecord[] | null = null
+    // A follow-up (HI-1832): only from Review, unstale, and never a drag (the user's moves); elsewhere an ordinary submission.
+    const followUp = !!args.followUp && !args.drag && from === 'review' && !g.s.stale
     const out = await this.write(card, g.r, actor, (w) => {
       const changed = this.stillAt(w, g.s, 'submit') ?? this.evidenceChanged(w, g.o, g.before, g.card)
       if (changed) return changed
       // Every refusal before anything is written: an override never commits without its move.
-      if (from === 'review' && !g.s.stale) return { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: 'submit', moves: this.movesFrom(from, g.r).join(', ') } } as GuardRefusal
+      if (from === 'review' && !g.s.stale && !followUp) return { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: 'submit', moves: this.movesFrom(from, g.r).join(', ') } } as GuardRefusal
+      // Read again under the transaction: still in Review, unstale, and the agent its builder now (not when the call began).
+      // Its builder is the agent the board gives it to now (a card given to another in Review keeps its Started: HR4's
+      // HI-1832 round 1); given to nobody, its cycle's builder. The user and the Assistant may either way.
+      if (followUp) {
+        const now = w.state()
+        if (w.current !== 'review' || now.stale) return { rule: 'move.notFromHere', values: { card: card.key, stage: w.current, move: 'submit', moves: this.movesFrom(w.current, g.r, now).join(', ') } } as GuardRefusal
+        const owner = this.store.cardAgent(card.id) ?? now.started?.builder ?? null
+        if (agent && agent !== owner) return { rule: 'submit.followUpNotBuilder', values: { card: card.key } } as GuardRefusal
+      }
       const ins = this.submitInputs(g)
       const bad = args.drag ? this.across(w, 'submit', 'review', ins, args.drag, g.only) : this.check(w, 'submit', ins, g.only)
       if (bad) return bad
       // Ahead of earlier cards of its lane nobody has started (#1410): it goes before them, so its reviewer takes it next.
-      ahead = this.enforced() && !args.drag && g.o.review !== 'none' ? this.laneReorder(w, card) : null
-      this.applySubmit(w, g, args, w.written.some((f) => f.kind === 'Override') ? 'override' : 'intent', ahead)
+      ahead = this.enforced() && !args.drag && !followUp && g.o.review !== 'none' ? this.laneReorder(w, card) : null
+      this.applySubmit(w, g, { ...args, followUp }, w.written.some((f) => f.kind === 'Override') ? 'override' : 'intent', ahead)
       return null
     })
     if (out) return this.refuse(card, actor, 'submit', out)
     const reordered = ahead as CardRecord[] | null
-    return this.ok(card, from, this.state(card).stage, { revision: g.revision, base: g.base, files: g.files.length, ...(reordered ? { lane: `moved ahead of ${reordered.map((c) => c.key).join(', ')} (not started); its reviewer is told` } : {}) }, g.warnings) // i18n-ignore: an intent's reply, agent-facing
+    return this.ok(card, from, this.state(card).stage, { revision: g.revision, base: g.base, files: g.files.length, ...(followUp ? { followUp: true } : {}), ...(reordered ? { lane: `moved ahead of ${reordered.map((c) => c.key).join(', ')} (not started); its reviewer is told` } : {}) }, g.warnings) // i18n-ignore: an intent's reply, agent-facing
   }
 
   /**
@@ -1266,7 +1280,7 @@ export class Workflow {
   }
 
   /** A submission's facts and actions, in its write: `Submitted`, its pin, then Review (its reviewer woken or the user asked) or Finish. */
-  private applySubmit(w: Write, g: SubmitGathered, args: { summary: string; note?: string }, cause: FactData['Moved']['cause'], ahead: CardRecord[] | null = null): void {
+  private applySubmit(w: Write, g: SubmitGathered, args: { summary: string; note?: string; followUp?: boolean }, cause: FactData['Moved']['cause'], ahead: CardRecord[] | null = null): void {
     if (g.setPaths) this.store.updateCard(g.card.id, { paths: g.setPaths })
     const st = w.state()
     const sub = w.fact('Submitted', { // i18n-ignore: a fact's kind and codes, not text
@@ -1280,6 +1294,7 @@ export class Workflow {
       sameRevision: g.earlier,
       summary: args.summary,
       ...(args.note ? { note: args.note } : {}),
+      ...(args.followUp ? { followUp: true } : {}),
       ...(g.paths ? { paths: g.paths } : {}),
       ...(g.commits ? { commits: g.commits } : {}),
       ...(g.warnings.length ? { warnings: g.warnings } : {})
@@ -1294,6 +1309,8 @@ export class Workflow {
     // A lane reviewed by the pool (#1443, G17): the pool's pass gives the submission to a free pooled reviewer and wakes
     // it, so no lane reviewer is woken here.
     if (reviewerAgent(g.o.review) && g.card.reviewerPool) w.action('assignReviewer', { submission: sub.seq })
+    // A follow-up (HI-1832): the card stays in Review, so no arrival wakes its reviewer; told what to do, its words kept.
+    else if (reviewerAgent(g.o.review) && args.followUp) this.wake(w, this.reviewerOf(g.card), `${g.card.key}: follow-up submitted for review at ${(g.revision ?? '').slice(0, 7)} (submission ${sub.seq}). Start your review again (hive_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused`, 'review') // i18n-ignore: a wake, agent-facing
     else if (reviewerAgent(g.o.review) && ahead) {
       const keys = ahead.map((c) => c.key).join(', ')
       this.wake(w, this.reviewerOf(g.card), `${g.card.key} is in Review ahead of ${keys}, earlier in its lane, which nobody has started: Hive moved it before them in the lane. Review ${g.card.key} now; the lane goes on to ${ahead[0].key} after it`, 'review') // i18n-ignore: a wake, agent-facing

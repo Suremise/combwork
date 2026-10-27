@@ -103,6 +103,7 @@
   "tasks.history.decisionsTold": "Agent {agent} über {count, plural, one {# neue Entscheidung} other {# neue Entscheidungen}} informiert",
   "tasks.history.dependsOn": "Hängt ab von {cards}",
   "tasks.history.description": "Beschreibung geändert",
+  "tasks.history.followUpSubmitted": "Nachbesserung zum Review eingereicht bei {revision}",
   "tasks.history.fromOlder": "Aus einer älteren Version von Hive hinzugefügt, wo sie als #{was} erstellt wurde",
   "tasks.history.given": "Agent {agent} zugewiesen",
   "tasks.history.imported": "Mit {project} zurückgeholt (war #{was})",

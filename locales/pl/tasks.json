@@ -103,6 +103,7 @@
   "tasks.history.decisionsTold": "Poinformowano agenta {agent} o {count, plural, one {# nowej decyzji} few {# nowych decyzjach} many {# nowych decyzjach} other {# nowej decyzji}}",
   "tasks.history.dependsOn": "Zależy od: {cards}",
   "tasks.history.description": "Zmieniono opis",
+  "tasks.history.followUpSubmitted": "Poprawka przekazana do recenzji w {revision}",
   "tasks.history.fromOlder": "Dodana ze starszego Hive, gdzie utworzono ją jako #{was}",
   "tasks.history.given": "Przekazano agentowi {agent}",
   "tasks.history.imported": "Przywrócono z projektem {project} (wcześniej #{was})",

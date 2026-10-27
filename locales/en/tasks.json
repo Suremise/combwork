@@ -415,6 +415,10 @@
     "defaultMessage": "Changed the description",
     "description": "A line in a card's history: the card's description was edited."
   },
+  "tasks.history.followUpSubmitted": {
+    "defaultMessage": "Follow-up submitted for review at {revision}",
+    "description": "A line in a card's history (HI-1832): while the card was in Review, its builder submitted a change its reviewer asked for (a follow-up), which its reviewer reviews now, with no new round. {revision} is a commit's short hash (keep it as it is)."
+  },
   "tasks.history.fromOlder": {
     "defaultMessage": "Added from an older Hive, where it was made as #{was}",
     "description": "A line in a card's history, by Repair: the card was made in an older version of Hive (which saved it after the board moved to its database), set aside, and the user added it to the board from Review…; {was} is the number it had there (it keeps it when no card here has it)."

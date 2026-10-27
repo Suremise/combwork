@@ -103,6 +103,7 @@
   "tasks.history.decisionsTold": "Told {agent} of {count, plural, one {# new decision} other {# new decisions}}",
   "tasks.history.dependsOn": "Depends on {cards}",
   "tasks.history.description": "Changed the description",
+  "tasks.history.followUpSubmitted": "Follow-up submitted for review at {revision}",
   "tasks.history.fromOlder": "Added from an older Hive, where it was made as #{was}",
   "tasks.history.given": "Given to {agent}",
   "tasks.history.imported": "Brought back with {project} (it was #{was})",
