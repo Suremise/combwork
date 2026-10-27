@@ -49,15 +49,15 @@ const check = (n, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}
   check('meter coloured at 86%', (await page.locator('.card', { hasText: '5-hour limit' }).locator('.meter.caution').count()) === 1)
   await page.screenshot({ path: path.join(shots, '2-overview.png') })
 
-  // Global model picker.
+  // The model picker: Settings → Assistant's for Claude Code (Claude Code has no default model of its own since
+  // HI-1774: each connection's, whose picker is this same one).
   await page.locator('.activity-btn[aria-label="Settings"]').click()
-  await sleep(600)
-  await page.locator('.settings-nav').getByText('Claude Code').click()
-  await sleep(400)
-  await page.getByText('Default model', { exact: true }).first().scrollIntoViewIfNeeded()
-  const picker = page.locator('.setting', { hasText: 'Default model' }).locator('.model-picker').first()
+  await page.locator('.settings-nav .row', { hasText: 'Assistant' }).first().click()
+  const picker = page.locator('.assistant-defaults').first().locator('.model-picker').first()
+  await picker.waitFor({ timeout: HUNG_MS })
+  await picker.scrollIntoViewIfNeeded()
   const groups = await picker.locator('optgroup').evaluateAll((els) => els.map((e) => e.label))
-  const savedModel = () => inv('settings:get').then((s) => s.providers['claude-code'].defaultModel)
+  const savedModel = () => inv('settings:get').then((s) => s.assistant.providers['claude-code'].model)
   // The models Claude Code reports for this version and account (#125), else Hive's fallback list.
   const catalog = (await inv('provider:info'))['claude-code']?.catalog
   const offered = (await picker.locator('select option').evaluateAll((os) => os.map((o) => o.value))).filter((v) => v && v !== 'custom')
@@ -83,12 +83,12 @@ const check = (n, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}
   await picker.locator('select').selectOption('custom')
   check('the custom model box says how to ask for 1M ([1m])', !!(await lib.until(async () => /\[1m\]/.test((await picker.locator('input.input').getAttribute('placeholder', { timeout: 1000 }).catch(() => '')) ?? ''), HUNG_MS)))
   await picker.locator('input.input').fill('claude-sonnet-9-9'); await picker.locator('input.input').press('Enter')
-  check('custom model ID saved', !!(await lib.until(async () => (await inv('settings:get')).providers['claude-code'].defaultModel === 'claude-sonnet-9-9', HUNG_MS)))
+  check('custom model ID saved', !!(await lib.until(async () => (await savedModel()) === 'claude-sonnet-9-9', HUNG_MS)))
   // Saved before the reset below: a save still on its way would land after it and undo it.
   await picker.locator('select').selectOption(first)
   check(`${first} saved again after the custom ID`, !!(await lib.until(async () => (await savedModel()) === first, HUNG_MS)), await savedModel())
   await page.screenshot({ path: path.join(shots, '3-settings.png') })
-  await inv('settings:update', { providers: { 'claude-code': { defaultModel: '', defaultEffort: 'high' } } })
+  await inv('settings:update', { assistant: { providers: { 'claude-code': { model: '' } } } })
 
   // Project picker and effort in the header.
   await page.locator('.activity-btn[aria-label="Projects"]').click()
@@ -96,12 +96,14 @@ const check = (n, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}
   await page.getByText('demo', { exact: true }).first().click()
   await lib.openProjectSettings(page)
   await page.locator('.settings-nav .row', { hasText: 'Claude Code' }).click(); await sleep(300)
-  const pp = page.locator('.setting', { hasText: 'Model' }).locator('.model-picker').first()
-  check('project picker offers Inherit', !!(await lib.until(async () => ((await pp.locator('option').first().textContent({ timeout: 1000 }).catch(() => '')) ?? '').startsWith('Inherit'), HUNG_MS)))
+  await lib.until(async () => (await page.locator('.setting', { hasText: 'Extra arguments' }).count()) >= 1, HUNG_MS)
+  check('Project Settings → Claude Code has no model picker (each connection and agent has its own, HI-1774)', (await page.locator('.setting .model-picker').count()) === 0)
   await page.screenshot({ path: path.join(shots, '4-project-settings.png') })
 
   // Real session: the status line reaches Hive and prints nothing.
   const agent = await lib.soloAgent(inv, proj)
+  // Its own effort (Claude Code has no default effort of its own since HI-1774).
+  await inv('agents:update', proj, agent.id, { effort: 'high' })
   await inv('workspace:refresh')
   await page.locator('.tab', { hasText: 'Session' }).first().click(); await sleep(800)
   // The model's name: Claude Code's default model, by its name once Claude Code has said which it is (#125).

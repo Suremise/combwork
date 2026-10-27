@@ -76,7 +76,8 @@ const check = (name, ok, extra = '') => {
     await lib.acceptClaudeTrust(inv, proj, agent.id, 30000)
     check('Claude Code starts in the project', !!(await ready(proj, agent.id)), (await live(proj, agent.id))?.status)
   })
-  await inv('project:updateConfig', proj, { providers: { 'claude-code': { effort: 'low' } } })
+  // The agent's own effort (a project's isn't read for a CLI with connections, HI-1774).
+  await inv('agents:update', proj, agent.id, { effort: 'low' })
   await inv('workspace:refresh')
   const restart = page.getByRole('button', { name: 'Restart session' })
   check('a new effort offers Restart session', !!(await lib.until(async () => (await restart.count()) > 0, 10000)))
