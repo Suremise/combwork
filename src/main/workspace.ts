@@ -140,7 +140,7 @@ export interface ProjectSeen {
 }
 
 /** For unit tests (#1382): an agent leaving the project, its change about to wait for the board's lock. */
-export const configTestHooks: { beforeBoardRetry?: (projectPath: string) => void } = {}
+export const configTestHooks: { beforeBoardRetry?: (projectPath: string) => void; beforeConfigWrite?: (projectPath: string) => Promise<void> } = {}
 
 /** What a project.json gives (kept by its stat, HI-1814): its config over the defaults, and the view fields it still has. */
 const projectFileConfig = (raw: Record<string, unknown>): { cfg: ProjectConfig; viewKeys: string[] } => ({
@@ -891,15 +891,15 @@ export class WorkspaceService {
     const { keep, fresh } = settleProjectIds(entries)
     for (const p of fresh) {
       if (gen !== this.generation) break
-      // A later listing has settled: this read's ids won't stand, so it gives none (HI-1817: giving one makes the
-      // project's folder, so a read held past a move brought the moved folder back, and the root watch then listed it).
+      // A later listing has settled: this read's ids won't stand, so it gives none (HI-1817: a read held past a move gave
+      // the moved project one, making its folder again, and the root watch then listed it).
       if (ticket.listing < this.idsSettled) break
-      // Gone since it was listed (moved or deleted): giving it an id would make it again.
-      if (!existsSync(join(p, HIVE_DIR, 'project.json'))) continue
-      // In project.json's lock, against the file as it is then: an id of its own given meanwhile stays.
+      // In project.json's lock, against the file as it is then: an id of its own given meanwhile stays, none is given once
+      // a later listing has settled, and a project gone since it was listed (moved or deleted) isn't made again.
       const taken = new Set(keep.values())
-      const cfg = await this.mutateProjectConfig(p, (c) => (isProjectId(c.id) && !taken.has(c.id) ? {} : { id: `p-${randomBytes(6).toString('hex')}` })).catch((e) => {
-        log.warn(`giving ${userText(basename(p))} its project id`, e)
+      const give = (c: ProjectConfig): Partial<ProjectConfig> => (ticket.listing < this.idsSettled || (isProjectId(c.id) && !taken.has(c.id)) ? {} : { id: `p-${randomBytes(6).toString('hex')}` })
+      const cfg = await this.mutateProjectConfig(p, give, { existing: true }).catch((e: NodeJS.ErrnoException) => {
+        if (e?.code !== 'ENOENT') log.warn(`giving ${userText(basename(p))} its project id`, e)
         return null
       })
       if (cfg?.id) keep.set(p.toLowerCase(), cfg.id)
@@ -1190,9 +1190,11 @@ export class WorkspaceService {
    * project.json still being saved by something else (an editor) is read again a few times, and then the change is
    * refused (KeptFileBusy, #1600): never written over that save with the value from before it.
    */
-  async mutateProjectConfig(projectPath: string, fn: (cfg: ProjectConfig) => Partial<ProjectConfig>): Promise<ProjectConfig> {
+  async mutateProjectConfig(projectPath: string, fn: (cfg: ProjectConfig) => Partial<ProjectConfig>, opts: { existing?: boolean } = {}): Promise<ProjectConfig> {
     const gen = this.generation
-    await this.ensureProject(projectPath)
+    // `existing`: a change to a project.json that is there, never one making the project (HI-1817: a project moved out
+    // meanwhile fails with ENOENT, its folder not made again).
+    if (!opts.existing) await this.ensureProject(projectPath)
     const file = join(projectPath, HIVE_DIR, 'project.json')
     let ticket = 0
     // The board an agent leaving publishes under: this workspace's, for one of its projects (the Assistant's home has none).
@@ -1200,6 +1202,7 @@ export class WorkspaceService {
     const publish = (): Promise<ProjectConfig | null> =>
       retryWhileSaving(() => withFileLock(file, async () => {
         const cfg = await this.projectConfig(projectPath, { unsettled: 'throw' })
+        if (opts.existing && !existsSync(file)) throw Object.assign(new Error('the project is gone'), { code: 'ENOENT' })
         const had = projectAgents(cfg).map((a) => a.id)
         const patch = fn(cfg)
         let updated = { ...cfg, ...patch }
@@ -1220,7 +1223,10 @@ export class WorkspaceService {
         // The view (HI-1749) to this user's UI state, saved a moment later and on quit; project.json only for a change of
         // the config, written without the view (one from before moves out as it is written).
         this.keepView(projectPath, updated)
-        if (changesConfig(patch)) await writeKeptJson(file, withLegacyProjectFields(withoutView(updated)))
+        if (changesConfig(patch)) {
+          await configTestHooks.beforeConfigWrite?.(projectPath)
+          await writeKeptJson(file, withLegacyProjectFields(withoutView(updated)), { existing: opts.existing })
+        }
         // As it is written: a read begun before now may have found the config from before.
         ticket = ++this.rootTickets
         // Kept only for the workspace it was asked in (#1498): one that closed (or gave way to another) meanwhile keeps
