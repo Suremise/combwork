@@ -92,6 +92,8 @@
   "tasks.history.archivedHidden": "Archiviert: {project} wurde ausgeblendet",
   "tasks.history.archivedInBatch": "Archiviert in einem Stapel von {n, number} ({label})",
   "tasks.history.archivedRemoved": "Archiviert: {project} wurde aus Hive entfernt",
+  "tasks.history.assistantAskUntold": "Der Hive-Assistent konnte nicht über die Bitte von {agent} zu dieser Karte informiert werden: lies sie in den Kommentaren der Karte und kümmere dich selbst darum, falls nötig",
+  "tasks.history.assistantAsked": "Den Hive-Assistenten gebeten: „{text}“",
   "tasks.history.backWithBatch": "Mit dem Stapel zurückgeholt ({label})",
   "tasks.history.blocked": "Blockiert: {reason}",
   "tasks.history.context": "Zuerst lesen: {refs}",

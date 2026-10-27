@@ -94,6 +94,8 @@ interface HiveMessageValues {
   'tasks.history.archivedHidden': { project: string | number }
   'tasks.history.archivedInBatch': { n: number; label: string | number }
   'tasks.history.archivedRemoved': { project: string | number }
+  'tasks.history.assistantAskUntold': { agent: string | number }
+  'tasks.history.assistantAsked': { text: string | number }
   'tasks.history.backWithBatch': { label: string | number }
   'tasks.history.blocked': { reason: string | number }
   'tasks.history.context': { refs: string | number }

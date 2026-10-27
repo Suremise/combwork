@@ -111,6 +111,14 @@
     "defaultMessage": "Ask the Hive Assistant",
     "description": "A tip's title."
   },
+  "tips.assistantAgentRequests.text": {
+    "defaultMessage": "An agent that needs something only the Assistant or you can do on a card, such as parking a card On Hold on your answer, asks the Assistant directly instead of leaving a comment. The request wakes it, and it acts only within its Control and what you decided.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands (On Hold, a board column; Control, a setting): keep them as Hive shows them."
+  },
+  "tips.assistantAgentRequests.title": {
+    "defaultMessage": "Agents can ask the Assistant",
+    "description": "A tip's title."
+  },
   "tips.assistantBatch.text": {
     "defaultMessage": "The Assistant can move or label up to {cards, plural, one {# card} other {# cards}} in one step, each card still listed on its own.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {cards} is how many cards one step can change (100)."

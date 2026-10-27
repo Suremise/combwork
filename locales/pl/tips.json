@@ -27,6 +27,8 @@
   "tips.archiveNew.title": "Zarchiwizuj i zacznij nową",
   "tips.assistant.text": "Panel po prawej czuwa nad obszarem roboczym: zapytaj, co robią agenci, ile co kosztuje, albo poproś o plan. {key}",
   "tips.assistant.title": "Zapytaj Hive Assistant",
+  "tips.assistantAgentRequests.text": "Agent, który na karcie potrzebuje czegoś, co może zrobić tylko Asystent lub Ty, na przykład przenieść kartę do Wstrzymane zgodnie z Twoją odpowiedzią, prosi Asystenta bezpośrednio, zamiast zostawiać komentarz. Prośba go budzi, a on działa tylko w ramach swojej Kontroli i Twoich decyzji.",
+  "tips.assistantAgentRequests.title": "Agenci mogą poprosić Asystenta",
   "tips.assistantBatch.text": "Asystent może przenieść lub oznaczyć etykietą do {cards, plural, one {# karty} few {# kart} many {# kart} other {# karty}} w jednym kroku, a każda karta i tak jest wymieniona osobno.",
   "tips.assistantBatch.title": "Wiele kart w jednym kroku",
   "tips.assistantCompact.text": "Asystent zwykle pracuje z większym kontekstem niż Twoi agenci, więc jego przycisk Kompaktuj zmienia kolor na pomarańczowy później: domyślnie powyżej {tokens, plural, one {# tokena} few {# tokenów} many {# tokenów} other {# tokena}}. Zmienisz to w Ustawienia → Asystent → Wyróżnij Kompaktuj powyżej, a Nigdy wyłącza wyróżnianie.",

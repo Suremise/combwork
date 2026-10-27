@@ -92,6 +92,8 @@
   "tasks.history.archivedHidden": "Archived: {project} was hidden",
   "tasks.history.archivedInBatch": "Archived in a batch of {n, number} ({label})",
   "tasks.history.archivedRemoved": "Archived: {project} was removed from Hive",
+  "tasks.history.assistantAskUntold": "The Hive Assistant couldn't be told of {agent}'s request on this card: read it in the card's comments and act on it yourself if it needs doing",
+  "tasks.history.assistantAsked": "Asked the Hive Assistant: \"{text}\"",
   "tasks.history.backWithBatch": "Brought back with its batch ({label})",
   "tasks.history.blocked": "Blocked: {reason}",
   "tasks.history.context": "Read first: {refs}",

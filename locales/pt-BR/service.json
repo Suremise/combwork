@@ -9,6 +9,7 @@
   "service.advanced.notValues": "O campo \"values\" do advanced.json deve ser um objeto de configuração → valor.",
   "service.advanced.unknown": "Não há nenhuma configuração avançada “{id}”.",
   "service.answerRelay.title": "{card}: ninguém mais tem sua resposta",
+  "service.assistantAsk.title": "{card}: o Assistente do Hive não recebeu o pedido de um agente",
   "service.attachments.badFolder": "Não é um nome de pasta de sessão.",
   "service.attachments.badRecord": "{file} não é um registro de arquivos movidos",
   "service.attachments.notOwn": "{folder} é um link ou não é uma pasta do próprio projeto, então o Hive não guarda anexos nela.",

@@ -92,6 +92,8 @@
   "tasks.history.archivedHidden": "Archivada: se ocultó el proyecto {project}",
   "tasks.history.archivedInBatch": "Archivada en un lote de {n, number} ({label})",
   "tasks.history.archivedRemoved": "Archivada: se quitó el proyecto {project} de Hive",
+  "tasks.history.assistantAskUntold": "No se pudo avisar al Asistente de Hive de la petición de {agent} sobre esta tarjeta: léela en los comentarios de la tarjeta y encárgate tú si hace falta",
+  "tasks.history.assistantAsked": "Pidió al Asistente de Hive: “{text}”",
   "tasks.history.backWithBatch": "Devuelta con su lote ({label})",
   "tasks.history.blocked": "Bloqueada: {reason}",
   "tasks.history.context": "Leer primero: {refs}",
