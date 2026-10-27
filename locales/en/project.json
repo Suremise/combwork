@@ -555,6 +555,10 @@
     "defaultMessage": "< {cent}",
     "description": "A cost under one cent. {cent} is one cent in dollars, such as \"$0.01\"."
   },
+  "project.cost.freeLocal": {
+    "defaultMessage": "free (local)",
+    "description": "The cost of sessions run only on a model server on this PC (Ollama, for example): nothing (HI-1772). Lower case, short: it stands where a cost such as \"$1.20\" would."
+  },
   "project.cost.tip": {
     "defaultMessage": "What this work would have cost at API prices: reported by the provider where it does (Claude Code), else estimated by Hive from token counts and the prices in Settings → the provider. On a subscription you are not charged this; it shows how heavy the work was.",
     "description": "The (i) beside API-equivalent cost in the Overview."
@@ -566,6 +570,10 @@
   "project.cost.unpriced": {
     "defaultMessage": "Hive has no API price for {model}, so it can't estimate this session's cost. Add one in Settings → {provider} → API prices.",
     "description": "Tooltip on a cost shown as Unknown. {model} is the model; {provider} the provider (Claude Code, Codex…). Settings → {provider} → API prices is where prices are set: name it as Settings does."
+  },
+  "project.cost.withFree": {
+    "defaultMessage": "{cost} + free (local)",
+    "description": "A total cost (\"$1.20\") that also covers sessions run only on a model server on this PC (Ollama, for example), which cost nothing (HI-1772)."
   },
   "project.empty.addAgent": {
     "defaultMessage": "Add an agent to work on {project}: Add Agent adds a {provider} agent with its default settings (▾ to choose another provider, a worktree or settings). New Session adds one and starts it.",

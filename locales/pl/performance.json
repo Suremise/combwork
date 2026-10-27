@@ -390,6 +390,7 @@
   "performance.usage.contextMax": "maks. {max}{hasWindow, select, yes { z {window}} other {}}",
   "performance.usage.contextTip": "Kontekst ostatniego żądania w {sessions, plural, one {# sesji} few {# sesjach} many {# sesjach} other {# sesji}}: średnio {avg}, najwięcej {max}{hasWindow, select, yes { przy oknie {window}} other {}}.",
   "performance.usage.cost": "Koszt",
+  "performance.usage.costFree": "{n, plural, one {+ # bezpłatna (lokalna)} few {+ # bezpłatne (lokalne)} many {+ # bezpłatnych (lokalnych)} other {+ # bezpłatnej (lokalnej)}}",
   "performance.usage.costUnknown": "+ nieznane: {n, number}",
   "performance.usage.empty": "Brak użycia dostawców.",
   "performance.usage.heading": "Użycie dostawców",

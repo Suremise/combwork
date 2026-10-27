@@ -390,6 +390,7 @@
   "performance.usage.contextMax": "最大 {max}{hasWindow, select, yes { / {window}} other {}}",
   "performance.usage.contextTip": "最后一次请求的上下文，共 {sessions, plural, other {# 个会话}}：平均 {avg}，最大 {max}{hasWindow, select, yes {（窗口为 {window}）} other {}}。",
   "performance.usage.cost": "费用",
+  "performance.usage.costFree": "{n, plural, other {+ {n, number} 个免费（本地）}}",
   "performance.usage.costUnknown": "+ {n, number} 个未知",
   "performance.usage.empty": "没有提供方用量。",
   "performance.usage.heading": "提供方用量",

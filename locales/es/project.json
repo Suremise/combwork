@@ -331,5 +331,7 @@
   "project.tabs.tip": "{tab} ({key})",
   "project.limit.tipConnection": "Cuánto se ha usado de la cuota {window, select, fiveHour {de 5 horas} weekly {semanal} other {{label}}} del plan en {name}, en todas sus sesiones (no solo en Hive).",
   "project.limit.noneConnection": "Sus límites aparecen después del siguiente mensaje en una sesión en {name}.",
-  "project.limit.noConnections": "No hay ninguna conexión de {provider} activada en este espacio de trabajo. Activa una en Configuración → Conexiones para ver aquí sus límites de plan."
+  "project.limit.noConnections": "No hay ninguna conexión de {provider} activada en este espacio de trabajo. Activa una en Configuración → Conexiones para ver aquí sus límites de plan.",
+  "project.cost.freeLocal": "gratis (local)",
+  "project.cost.withFree": "{cost} + gratis (local)"
 }

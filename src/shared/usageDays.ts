@@ -100,6 +100,16 @@ export function withoutCostReports<T extends SessionUsage>(raw: T): T {
 }
 
 /**
+ * A free session's usage (HI-1772: it ran only on servers on this PC): a known $0, its days too, whatever prices are set;
+ * its tokens as they are.
+ */
+export function withCostFree<T extends SessionUsage>(raw: T): T {
+  const out = { ...withoutCostReports(raw), costUsd: 0, costEstimated: false, costFree: true as const }
+  if (out.days) out.days = Object.fromEntries(Object.entries(out.days).map(([d, u]) => [d, { ...u, costUsd: 0, costEstimated: false }]))
+  return out
+}
+
+/**
  * A session's usage with costs from the current prices: the provider's report, else (or on top, for what came after
  * it) Hive's estimate; or, when the user chose their own prices over the report (usesOwnPrices, #436), Hive's estimate
  * alone wherever it has a price. Then each day's share (withDayCosts).

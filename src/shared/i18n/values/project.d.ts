@@ -140,9 +140,11 @@ interface HiveMessageValues {
   'project.compaction.turnAdded': { output: string | number }
   'project.compaction.unknownTime': undefined
   'project.cost.belowCent': { cent: string | number }
+  'project.cost.freeLocal': undefined
   'project.cost.tip': undefined
   'project.cost.unknown': undefined
   'project.cost.unpriced': { model: string | number; provider: string | number }
+  'project.cost.withFree': { cost: string | number }
   'project.empty.addAgent': { project: string | number; provider: string | number }
   'project.empty.allSessions': undefined
   'project.empty.markActive': undefined

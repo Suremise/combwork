@@ -155,6 +155,8 @@ export interface ProviderUsageSummary {
   costEstimated: number
   /** Sessions whose cost isn't known (no price for the model, or no usage reported). */
   costUnknown: number
+  /** Sessions run only on servers on this PC (HI-1772): free, $0 known (in neither costEstimated nor costUnknown). */
+  costFree?: number
   /**
    * Context is a snapshot (each session's last request), not a sum: of the sessions that reported one, how many, their
    * average and largest, and the largest context window reported (null: none was).

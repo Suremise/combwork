@@ -1783,6 +1783,9 @@ export interface SessionRecord {
    * as a Claude model, so they are never counted (`withoutCostReports`): Hive's estimate by the real model id only.
    */
   serverRan?: true
+  /** A run of it was on a server on this PC; one ran anywhere else (HI-1772): each kept once set. Free: the first alone. */
+  serverLocal?: true
+  notLocal?: true
   id: string
   /** The provider that ran it ("claude-code", "codex"). The field name predates providers. */
   agent: ProviderId
@@ -2031,11 +2034,13 @@ export interface LiveSessionState {
     note?: 'offFallback' | 'unknownLogin' | 'loginChanged'
     /** Who it launched as (HI-1756: its plan usage is that login's), as plan usage keeps a login (a hash); absent: unknown. */
     login?: string
-    /** A server connection's (HI-1772): its models as launched, so the footer shows the real model and what it stands in for. */
-    server?: { models: ServerModel[] }
+    /** A server connection's (HI-1772): its models as launched, so the footer shows the real model and what it stands in for, and whether its server is on this PC. */
+    server?: { models: ServerModel[]; local?: boolean }
   }
   /** A switch to the connection it would launch on now waits for its turn to be over (HI-1755). */
   switchPending?: boolean
+  /** Its conversation ran only on servers on this PC (HI-1772): free, its cost a known $0, shown as "free (local)". */
+  costFree?: boolean
   /**
    * What it was given at launch (GET /v1/projects/{name}): Hive's guidance revision, the content hash of each Hive skill's
    * copy it reads, and why a skill isn't as asked for (a folder of the user's has its name, an old copy kept while in use).
@@ -2507,6 +2512,11 @@ export interface SessionUsage {
    * Hive adds its estimate for them to the reported cost.
    */
   costUnreported?: Pick<SessionUsage, 'inputTokens' | 'outputTokens' | 'cacheWriteTokens' | 'cacheReadTokens'>
+  /**
+   * It ran only on servers on this PC (HI-1772, Darren 27 Oct): free, its cost a known $0, shown as "free (local)"; its
+   * tokens counted as any session's.
+   */
+  costFree?: true
   /** The session's usage by local day (YYYY-MM-DD in this computer's time zone), for periods (see usageDays.ts). */
   days?: Record<string, DayUsage>
   /** From the parser: each cost report's increase and the tokens it covered by day. Hive turns them into day costs and removes them. */

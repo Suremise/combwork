@@ -327,6 +327,19 @@ export function rowsWithoutReports(rows: LedgerRow[]): LedgerRow[] {
   return rows.map((r) => (r.fixedEstimated || (r.fixedUsd === 0 && tokenSum(r.covered) === 0) ? r : { ...r, fixedUsd: 0, fixedEstimated: false, covered: ZERO() }))
 }
 
+/**
+ * Rows of a free session (HI-1772: it ran only on servers on this PC): each a known $0 charge covering all its tokens,
+ * so every cost made from them (the history, card costs, metrics) is $0 known, never unpriced; its counts kept.
+ */
+export function rowsAsFree(rows: LedgerRow[]): LedgerRow[] {
+  return rows.map((r) => ({ ...r, fixedUsd: 0, fixedEstimated: false, covered: { inputTokens: r.inputTokens, outputTokens: r.outputTokens, cacheWriteTokens: r.cacheWriteTokens, cacheReadTokens: r.cacheReadTokens } }))
+}
+
+/** A free session's baseline (HI-1772): each day a known $0 covering its tokens. */
+export function baselineAsFree(days: BaselineDay[]): BaselineDay[] {
+  return days.map((d) => ({ ...d, costUsd: 0, costEstimated: false, covered: { inputTokens: d.inputTokens, outputTokens: d.outputTokens, cacheWriteTokens: d.cacheWriteTokens, cacheReadTokens: d.cacheReadTokens } }))
+}
+
 /** A baseline without the CLI's reported charges (HI-1772), its counts kept. */
 export function baselineWithoutReports(days: BaselineDay[]): BaselineDay[] {
   return days.map((d) => (d.costEstimated || (d.costUsd === null && tokenSum(d.covered) === 0) ? d : { ...d, costUsd: null, costEstimated: false, covered: ZERO() }))

@@ -28,7 +28,7 @@ import { useLiveUsage, useLiveUsageState } from '../usage'
 import { commandKeybinding } from '../commands'
 import { cx, formatKeybinding, formatTokens, sessionLabel, timeAgo } from '../util'
 import { formatSize } from '@shared/units'
-import { moneyLabel } from '@shared/usageTotals'
+import { FREE_LOCAL, moneyLabel } from '@shared/usageTotals'
 import { TerminalView } from './TerminalView'
 import { focusTileAfter, TilePager } from './AgentTiles'
 import { offerTip } from '../tips'
@@ -1588,7 +1588,19 @@ export function PaneFooter({
         </Tooltip>
       )
     })
-  if (cost !== null && cost > 0)
+  // Free (HI-1772, Darren 27 Oct): its conversation ran only on servers on this PC.
+  if (live?.costFree)
+    right.push({
+      key: 'cost',
+      node: (
+        <Tooltip key="cost" content={tr(msg({ id: 'panes.footer.costFreeTip', defaultMessage: "This conversation runs only on a server on this PC, so it costs nothing. Its tokens are still counted.", description: "Hover of a pane footer's \"free (local)\" cost: the agent's connection is a model server on the user's own computer (Ollama, for example)." }))}>
+          <span className="pane-foot-item foot-cost" data-cost="free">
+            {tr(FREE_LOCAL)}
+          </span>
+        </Tooltip>
+      )
+    })
+  else if (cost !== null && cost > 0)
     right.push({
       key: 'cost',
       node: (

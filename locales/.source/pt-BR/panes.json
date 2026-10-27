@@ -55,6 +55,7 @@
   "panes.footer.connectionUnknown": "Hive couldn't check who this connection is signed in as when it started.",
   "panes.footer.costClick": "Click to see this session's details in the Overview",
   "panes.footer.costEstimated": "API-equivalent cost of this session, estimated by Hive from its tokens",
+  "panes.footer.costFreeTip": "This conversation runs only on a server on this PC, so it costs nothing. Its tokens are still counted.",
   "panes.footer.costReported": "API-equivalent cost of this session, as the provider reports it",
   "panes.footer.ctx": "{tokens} ctx",
   "panes.footer.ctxValue": "ctx {value}",

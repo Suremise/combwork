@@ -53,6 +53,7 @@
   "panes.footer.connectionUnknown": "启动时 Hive 无法检查此连接以谁的身份登录。",
   "panes.footer.costClick": "点击在“概览”中查看此会话的详情",
   "panes.footer.costEstimated": "此会话按 API 价格计的费用，由 Hive 根据其 Token 估算",
+  "panes.footer.costFreeTip": "此对话只在这台电脑上的服务器上运行，因此不产生费用。其令牌仍会计数。",
   "panes.footer.costReported": "此会话按 API 价格计的费用，由提供方报告",
   "panes.footer.ctxValue": "上下文：{value}",
   "panes.footer.handOverWhen": "{when, select, now {把它交接给新对话：点击打开“交接给…”，并选择该智能体自己。} other {它可以在完成后交接给新对话：工作、合并或在卡片循环的卡片上时不行。}}",

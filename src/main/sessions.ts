@@ -70,7 +70,7 @@ import { resolveConnection } from '../shared/accounts'
 import { recacheEstimate, withoutAccountEnv, withServerEnv } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
 import { usesOwnPrices } from '../shared/prices'
-import { priceUsage } from '../shared/usageDays'
+import { priceUsage, withCostFree } from '../shared/usageDays'
 import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchSkill, ProviderAdapter, SkillDelivery } from './providers/types'
 import { providerService } from './providerService'
 import { config } from './config'
@@ -248,6 +248,8 @@ interface LiveSession {
   adapter: ProviderAdapter
   /** The session whose record was saved with `serverRan` (HI-1772): let go from serverSessions once the run exits. */
   serverRanSaved?: string
+  /** Its conversation ran only on servers on this PC (HI-1772), as its record says: free. */
+  costFree?: boolean
   /** The terminal as rendered, for an adapter that reads it (its footer's mode, or a menu to pick from: #396). */
   screen?: TerminalScreen | null
   /** The size refreshes given so far, for a CLI that needs them (capabilities.startupSizeRefresh, #486). */
@@ -547,8 +549,9 @@ interface UsageSeen {
   mtime: number
   /** The worker's result, before costs, which follow the prices in the settings. */
   raw: SessionUsage
-  /** Read without its CLI's cost reports (HI-1772): a read asking otherwise isn't this one. */
+  /** Read without its CLI's cost reports, priced as free (HI-1772): a read asking otherwise isn't this one. */
   reportsIgnored: boolean
+  costFree: boolean
   /** Worked out from raw (with costs); null until asked for again after a price change. */
   usage: SessionUsage | null
 }
@@ -1476,9 +1479,10 @@ class SessionManager {
    * A result with costs from the current prices: the provider's report, else (or on top) Hive's estimate, and each day's
    * share. Without its timeline (usageTimeline has it): it stays in the cache, never in the usage passed on.
    */
-  private priced(raw: SessionUsage): SessionUsage {
+  private priced(raw: SessionUsage, costFree = false): SessionUsage {
     const { timeline: _timeline, ...usage } = raw
-    return priceUsage(usage, config.settings)
+    // Free (HI-1772): a known $0, whatever prices the user set; its tokens as read.
+    return costFree ? withCostFree(usage) : priceUsage(usage, config.settings)
   }
 
   /**
@@ -2198,7 +2202,7 @@ class SessionManager {
     // Checked after the last await, just before spawning: stopped, its workspace closed or switched, or the
     // provider turned off while this launch was being prepared, it must not start a process.
     if (l.stopRequested || this.live.get(id) !== l || this.starting.get(id)?.cancelled || !workspaceFor(projectPath) || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
-    state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}), ...(conn.server ? { server: { models: conn.server.models } } : {}) } : undefined
+    state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}), ...(conn.server ? { server: { models: conn.server.models, local: conn.server.local } } : {}) } : undefined
     if (conn?.server && state.sessionId) serverSessions.add(state.sessionId)
     if (!isProviderEnabled(config.settings, adapter.id)) throw hiveError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name })
     l.startAllowed?.()
@@ -2370,7 +2374,9 @@ class SessionManager {
       // The connection its latest run launched on (HI-1755), id and name as then: what it actually ran on.
       ...(state.launchedConnection ? { connection: { id: state.launchedConnection.id, name: state.launchedConnection.name } } : {}),
       // On a server connection (HI-1772), kept once set: its CLI's cost reports are never counted for it.
-      ...(state.launchedConnection?.server ? { serverRan: true as const } : {})
+      ...(state.launchedConnection?.server ? { serverRan: true as const } : {}),
+      // Free (HI-1772, Darren 27 Oct) only while every run of it was on a server on this PC: kept once set, each.
+      ...(state.launchedConnection?.server?.local ? { serverLocal: true as const } : { notLocal: true as const })
     }, { createdAt: state.sessionCreatedAt })
     // Its record says it ran on a server (HI-1772, now or in an earlier run): its reads leave the CLI's cost reports out
     // while it runs; once it exits, its record says so (serverRanSaved: only once that write succeeded).
@@ -2378,6 +2384,8 @@ class SessionManager {
       serverSessions.add(sessionId)
       l.serverRanSaved = sessionId
     }
+    // Free as the conversation's record says (this run's flag merged with earlier runs'), never by this run alone.
+    l.costFree = !!rec.serverLocal && !rec.notLocal
     // The conversation it was meant for has it: one the CLI moves to later (/clear, /new) wasn't handed over.
     l.handedOverFrom = undefined
     // Started in a slot: bound to the lease it started under (a conversation the CLI moves to later, too).
@@ -3895,6 +3903,14 @@ class SessionManager {
     // On a server connection (HI-1772) the CLI's report prices its server's model as a Claude model: never used, only
     // Hive's estimate by the real model's id (unpriced unless the user priced it).
     const onServer = !!l.state.launchedConnection?.server
+    // Free (HI-1772): only on servers on this PC, the conversation's record says: a known $0, shown as free (local).
+    if (l.costFree) {
+      if (!l.state.costFree) {
+        l.state.costFree = true
+        this.emitState(l.state)
+      }
+      return this.setLiveCost(l, 0, false)
+    }
     const own = onServer || usesOwnPrices(l.state.provider, config.settings)
     if (l.adapter.descriptor.capabilities.reportsCost && !own) return this.setLiveCost(l, l.reportedCost, false)
     if (!force && Date.now() - (l.costAt ?? 0) <= COST_INTERVAL_MS) return
@@ -5568,29 +5584,30 @@ class SessionManager {
    * the history of `projectPath`, its host. Unchanged since main last had it, answered here without asking the worker.
    */
   /** A running session's cost policy (HI-1772): on a server connection now, or its record says it ran on one. */
-  private costPolicy(l: LiveSession): { reportsIgnored: boolean } {
-    return { reportsIgnored: !!l.state.launchedConnection?.server || (!!l.state.sessionId && serverSessions.has(l.state.sessionId)) }
+  private costPolicy(l: LiveSession): { reportsIgnored: boolean; costFree: boolean } {
+    return { reportsIgnored: !!l.state.launchedConnection?.server || (!!l.state.sessionId && serverSessions.has(l.state.sessionId)), costFree: !!l.costFree }
   }
 
-  private async usageFor(projectPath: string, path: string, sessionId: string, provider: ProviderId, o: { noWait?: boolean; reportsIgnored?: boolean } = {}): Promise<SessionUsage | null> {
+  private async usageFor(projectPath: string, path: string, sessionId: string, provider: ProviderId, o: { noWait?: boolean; reportsIgnored?: boolean; costFree?: boolean } = {}): Promise<SessionUsage | null> {
+    const costFree = !!o.costFree
     // A session that ran on a server connection (HI-1772): read without its CLI's cost reports.
     const reportsIgnored = !!o.reportsIgnored || serverSessions.has(sessionId)
     try {
       const s = await stat(path)
       const seen = usageSeen.get(path)
-      if (seen && seen.mtime === s.mtimeMs && seen.size === s.size && seen.sessionId === sessionId && seen.provider === provider && seen.reportsIgnored === reportsIgnored) {
+      if (seen && seen.mtime === s.mtimeMs && seen.size === s.size && seen.sessionId === sessionId && seen.provider === provider && seen.reportsIgnored === reportsIgnored && seen.costFree === costFree) {
         // Most recently used last: the oldest go first when there are too many.
         usageSeen.delete(path)
         usageSeen.set(path, seen)
         // Unchanged since it was read: priced again after a price change, not read.
-        return (seen.usage ??= this.priced(seen.raw))
+        return (seen.usage ??= this.priced(seen.raw, costFree))
       }
-      const r = await usageHistory.read(projectPath, path, sessionId, provider, { ...o, reportsIgnored })
+      const r = await usageHistory.read(projectPath, path, sessionId, provider, { noWait: o.noWait, reportsIgnored: reportsIgnored || costFree })
       if (!r) return null
       this.checkUnderstood(provider, r.usage, r.size)
       // The title the CLI's own index gives it (Codex's, Copilot's), which the worker's parsers can't read.
       const raw = this.titled(r.usage)
-      const c: UsageSeen = { sessionId, provider, size: r.size, mtime: r.mtime, raw, usage: this.priced(raw), reportsIgnored }
+      const c: UsageSeen = { sessionId, provider, size: r.size, mtime: r.mtime, raw, usage: this.priced(raw, costFree), reportsIgnored, costFree }
       usageSeen.delete(path)
       usageSeen.set(path, c)
       if (usageSeen.size > MAX_USAGE_SEEN) usageSeen.delete(usageSeen.keys().next().value!)
@@ -5799,7 +5816,7 @@ class SessionManager {
     if (running && ctx?.stored) {
       // As its pane has it; unchanged since the last read, the worker isn't asked at all (usageFor).
       const p = await this.anyTranscript(projectPath, sessionId, ctx)
-      if (p) usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx), { reportsIgnored: !!rec?.serverRan })
+      if (p) usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx), { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal })
     }
     if (!usage && (!running || ctx?.stored)) {
       const stored = (ctx?.stored ?? (await usageHistory.storedUsage(projectPath).catch(() => null)))?.get(sessionId)
@@ -5814,7 +5831,7 @@ class SessionManager {
     if (!usage) {
       const p = await this.anyTranscript(projectPath, sessionId, ctx)
       if (!p) return rec?.keptUsage ?? null
-      usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx), { ...o, reportsIgnored: !!rec?.serverRan })
+      usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx), { ...o, reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal })
       if (usage && rec && !running) void usageHistory.ingest(projectPath, sessionId, { priority: 2, keepState: 'no' }).catch(() => undefined)
     }
     if (usage) usage = withScreenStopsIn(usage, rec?.screenStops)

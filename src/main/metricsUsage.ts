@@ -64,7 +64,7 @@ export async function providerUsage(w: WorkspaceService, f: UsageFilter, from: n
         const t = at ? Date.parse(at) : NaN
         if (!Number.isFinite(t) || t < from || t >= to) continue
         const key = `${it.provider} ${role}`
-        const s = by.get(key) ?? { provider: it.provider, role, sessions: 0, running: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0, unknown: 0, requests: 0, compactions: 0, safeguardStops: 0, costUsd: 0, costEstimated: 0, costUnknown: 0, contextSessions: 0, contextAvgTokens: 0, contextMaxTokens: 0, contextWindow: null, contextSum: 0 }
+        const s = by.get(key) ?? { provider: it.provider, role, sessions: 0, running: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0, unknown: 0, requests: 0, compactions: 0, safeguardStops: 0, costUsd: 0, costEstimated: 0, costUnknown: 0, costFree: 0, contextSessions: 0, contextAvgTokens: 0, contextMaxTokens: 0, contextWindow: null, contextSum: 0 }
         by.set(key, s)
         s.sessions++
         if (running.has(it.id)) s.running++
@@ -92,7 +92,9 @@ export async function providerUsage(w: WorkspaceService, f: UsageFilter, from: n
           g.stops += stops
           guards.set(k, g)
         }
-        if (u.costUsd === null) s.costUnknown++
+        // Free (HI-1772): $0 known, counted apart.
+        if (u.costFree) s.costFree = (s.costFree ?? 0) + 1
+        else if (u.costUsd === null) s.costUnknown++
         else {
           s.costUsd += u.costUsd
           if (u.costEstimated) s.costEstimated++

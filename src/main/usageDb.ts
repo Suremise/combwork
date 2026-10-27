@@ -182,6 +182,13 @@ export const USAGE_MIGRATIONS: Migration[] = [
     name: 'usage-reports-ignored',
     // A session that ran on a server connection (HI-1772): its CLI's cost reports never counted. Set once, never cleared.
     up: (db) => db.exec('ALTER TABLE usage_sessions ADD COLUMN reports_ignored INTEGER NOT NULL DEFAULT 0') // i18n-ignore: SQL
+  },
+  {
+    version: 3,
+    name: 'usage-cost-free',
+    // Free (HI-1772, Darren 27 Oct): a session that ran only on servers on this PC. Each set once, never cleared:
+    // server_local (a run on one), not_local (a run anywhere else, which wins for good).
+    up: (db) => db.exec('ALTER TABLE usage_sessions ADD COLUMN server_local INTEGER NOT NULL DEFAULT 0; ALTER TABLE usage_sessions ADD COLUMN not_local INTEGER NOT NULL DEFAULT 0') // i18n-ignore: SQL
   }
 ]
 
@@ -211,10 +218,13 @@ export interface Cursor {
   holdsKey: string | null
   /** Its CLI's cost reports aren't counted (HI-1772: it ran on a server connection): set once, never cleared. */
   reportsIgnored: boolean
+  /** A run of it was on a server on this PC; one was anywhere else (HI-1772): each set once, never cleared. */
+  serverLocal: boolean
+  notLocal: boolean
 }
 
 export function cursorOf(db: DatabaseSync, scope: string, session: string): Cursor | null {
-  const s = db.prepare('SELECT path, size, mtime, offset, state, state_offset, state_shape, state_version, state_check, state_at, source, holds_key, reports_ignored FROM usage_sessions WHERE scope = ? AND session = ?').get(scope, session) as Record<string, unknown> | undefined // i18n-ignore: SQL
+  const s = db.prepare('SELECT path, size, mtime, offset, state, state_offset, state_shape, state_version, state_check, state_at, source, holds_key, reports_ignored, server_local, not_local FROM usage_sessions WHERE scope = ? AND session = ?').get(scope, session) as Record<string, unknown> | undefined // i18n-ignore: SQL
   if (!s) return null
   const sums = db.prepare('SELECT coalesce(sum(requests), 0) AS q, coalesce(sum(input + output + cache_write + cache_read), 0) AS t FROM usage_rows WHERE scope = ? AND session = ?').get(scope, session) as { q: number; t: number } // i18n-ignore: SQL
   return {
@@ -232,7 +242,9 @@ export function cursorOf(db: DatabaseSync, scope: string, session: string): Curs
     tokens: sums.t,
     source: s.source as string,
     holdsKey: (s.holds_key as string | null) ?? null,
-    reportsIgnored: s.reports_ignored === 1
+    reportsIgnored: s.reports_ignored === 1,
+    serverLocal: s.server_local === 1,
+    notLocal: s.not_local === 1
   }
 }
 
@@ -268,6 +280,9 @@ export interface SessionWrite extends SessionMeta {
   baseline: BaselineDay[] | null
   /** Written without its CLI's cost reports (HI-1772): the session is marked so for good. */
   reportsIgnored?: boolean
+  /** A run on a server on this PC, or anywhere else (HI-1772): each marks the session for good. */
+  serverLocal?: boolean
+  notLocal?: boolean
 }
 
 /**
@@ -305,6 +320,8 @@ export function writeSession(db: DatabaseSync, w: SessionWrite, expect: { offset
     )
     // One way (HI-1772): a write that ignores the CLI's cost reports marks the session so; none ever unmarks it.
     if (w.reportsIgnored) db.prepare('UPDATE usage_sessions SET reports_ignored = 1 WHERE scope = ? AND session = ?').run(w.scope, w.session) // i18n-ignore: SQL
+    if (w.serverLocal) db.prepare('UPDATE usage_sessions SET server_local = 1 WHERE scope = ? AND session = ?').run(w.scope, w.session) // i18n-ignore: SQL
+    if (w.notLocal) db.prepare('UPDATE usage_sessions SET not_local = 1 WHERE scope = ? AND session = ?').run(w.scope, w.session) // i18n-ignore: SQL
     if (w.state === 'clear') clearState(db, w.scope, w.session)
     else if (w.state) db.prepare('UPDATE usage_sessions SET state = ?, state_offset = ?, state_shape = ?, state_version = ?, state_check = ?, state_at = ? WHERE scope = ? AND session = ?').run(w.state.data, w.state.offset, w.state.shape, w.state.version, w.state.check, at, w.scope, w.session) // i18n-ignore: SQL
     return true
@@ -509,7 +526,9 @@ function summaryOf(s: Rec, compactions: CompactionEvent[], guards: Rec[]): Usage
     lastPrompt: (s.last_prompt as string | null) ?? null,
     ...(Object.keys(stops).length ? { safeguards: stops } : {}),
     ...(Object.keys(asked).length ? { safeguardsAsked: asked } : {}),
-    ...(premium !== null ? { premiumRequests: premium } : {})
+    ...(premium !== null ? { premiumRequests: premium } : {}),
+    // Free (HI-1772): it ran only on servers on this PC.
+    ...(s.server_local === 1 && s.not_local !== 1 ? { costFree: true as const } : {})
   } as UsageSummary
 }
 

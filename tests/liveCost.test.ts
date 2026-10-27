@@ -188,4 +188,26 @@ describe('a session that ran on a server connection (HI-1772)', () => {
     expect(cost(l).costUsd).not.toBe(12)
     expect(cost(l).costUsd).not.toBe(9)
   })
+
+  it('free (Darren 27 Oct): a known $0 whatever prices are set, its tokens as read; the cache answers only the policy asked', async () => {
+    // A price for its model: free overrides it.
+    config.settings.providers = { ...DEFAULT_SETTINGS.providers, 'claude-code': { ...DEFAULT_SETTINGS.providers['claude-code'], prices: { 'deepseek-flash': { input: 5, cachedInput: 0, output: 0 } } } }
+    sessions.clearUsageCache()
+    type Free = (projectPath: string, path: string, sessionId: string, provider: string, o?: { reportsIgnored?: boolean; costFree?: boolean }) => Promise<{ costUsd: number | null; costFree?: true; inputTokens: number } | null>
+    const read = (o?: { reportsIgnored?: boolean; costFree?: boolean }) => (sessions as unknown as { usageFor: Free }).usageFor(project, serverTranscript, 'server-session', 'claude-code', o)
+    expect(await read({ reportsIgnored: true })).toMatchObject({ costUsd: 5, inputTokens: 1_000_000 })
+    expect(await read({ reportsIgnored: true, costFree: true })).toMatchObject({ costUsd: 0, costFree: true, inputTokens: 1_000_000 })
+    expect((await read({ reportsIgnored: true }))?.costFree).toBeUndefined()
+  })
+
+  it('a live session whose conversation ran only on servers on this PC: free (local), $0, whatever the CLI reports', async () => {
+    choose('reported')
+    const l = idle() as Live & { costFree?: boolean }
+    l.state.launchedConnection = { id: 'a-ollama', name: 'Ollama', server: { models: [], local: true } }
+    l.costFree = true
+    manager.applyDetails(l, { costUsd: 12 })
+    await sessions.repriceLive()
+    expect(l.state.costFree).toBe(true)
+    expect(cost(l).costUsd).toBe(0)
+  })
 })

@@ -936,7 +936,7 @@ export interface LaunchConnection {
    * that launch's environment only and never kept), its models for the footer, and its key's use for masking, ended
    * by whoever holds the launch once its process is gone (or it never started).
    */
-  server?: { env: Record<string, string>; models: ServerModel[] }
+  server?: { env: Record<string, string>; models: ServerModel[]; local: boolean }
   /**
    * Asked at the last moment, with the agent's (or the Assistant's) choice as saved then: whether that choice, resolved
    * again with its workspace's connections as they are now, is still this connection, and it is still there.
@@ -991,7 +991,7 @@ async function serverPart(a: Connection, caps: ServerCaps, agentName: string): P
   if (!a.server || !b.ok) throw hiveError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
   const got = await withKey(a.id, b.origin)
   if (!got && !b.local) throw hiveError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
-  return { part: { env: serverEnv(caps, a.server, got?.key ?? null), models: a.server.models }, keyV: got?.v ?? null, origin: b.origin }
+  return { part: { env: serverEnv(caps, a.server, got?.key ?? null), models: a.server.models, local: b.local }, keyV: got?.v ?? null, origin: b.origin }
 }
 
 /**

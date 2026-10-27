@@ -55,6 +55,7 @@ interface HiveMessageValues {
   'panes.footer.connectionUnknown': undefined
   'panes.footer.costClick': undefined
   'panes.footer.costEstimated': undefined
+  'panes.footer.costFreeTip': undefined
   'panes.footer.costReported': undefined
   'panes.footer.ctxValue': { value: string | number }
   'panes.footer.handOverWhen': { when: string }

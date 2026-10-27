@@ -3,7 +3,7 @@ import { createHash } from 'crypto'
 import { open, stat } from 'original-fs/promises'
 import { dirname, join } from 'path'
 import type { AppSettings, ProviderId, SessionUsage } from '../shared/types'
-import { baselineOfRows, baselineOfUsage, baselineWithoutReports, dominates, ledgerRows, mergeBaselines, reshareRows, rowsWithoutReports, sessionRows, summaryOf, unknownOnCards, type SessionHold } from '../shared/usageLedger'
+import { baselineOfRows, baselineOfUsage, baselineAsFree, baselineWithoutReports, dominates, ledgerRows, mergeBaselines, reshareRows, rowsAsFree, rowsWithoutReports, sessionRows, summaryOf, unknownOnCards, type SessionHold } from '../shared/usageLedger'
 import { openDb, type Db } from './db'
 import { readAdvancedFrom, valuesReader } from './advancedValues'
 import type { DatabaseSync } from 'node:sqlite'
@@ -38,6 +38,9 @@ export interface IngestJob extends SessionMeta {
   holdsKey: string | null
   /** A run of it was on a server connection (HI-1772: SessionRecord.serverRan): its CLI's cost reports aren't counted. */
   reportsIgnored?: boolean
+  /** A run of it was on a server on this PC; one was anywhere else (HI-1772: its record's): free is the first alone. */
+  serverLocal?: boolean
+  notLocal?: boolean
 }
 
 export interface KeptJob extends SessionMeta {
@@ -319,8 +322,14 @@ async function ingest(file: string, job: IngestJob): Promise<IngestResult> {
   // it was (re-read, or its stored rows stripped when there is nothing to read).
   const ignore = !!job.reportsIgnored || !!cur?.reportsIgnored
   const turned = ignore && !!cur && !cur.reportsIgnored
+  // Free (HI-1772): a run on a server on this PC and never one anywhere else, each kept once set (the job's or the
+  // history's: a stale job can't make a session free again). Changed just now: re-read, as above.
+  const serverLocal = !!job.serverLocal || !!cur?.serverLocal
+  const notLocal = !!job.notLocal || !!cur?.notLocal
+  const wasFree = !!cur && cur.serverLocal && !cur.notLocal
+  const changed = turned || (!!cur && serverLocal && !notLocal) !== wasFree
   const unchanged = (): IngestResult => {
-    if (turned) return stripStored(db, job)
+    if (changed) return stripStored(db, job, { serverLocal, notLocal })
     updateMeta(db, job, job.external ? 'external' : 'transcript')
     reshare(db, job, cur)
     return { status: 'unchanged' }
@@ -337,7 +346,7 @@ async function ingest(file: string, job: IngestJob): Promise<IngestResult> {
   }
   if (!st.isFile()) return cur ? unchanged() : { status: 'missing' }
   const samePath = !!cur?.path && cur.path.toLowerCase() === job.path.toLowerCase()
-  if (!turned && cur && samePath && cur.size === st.size && cur.mtime === st.mtimeMs) return unchanged()
+  if (!changed && cur && samePath && cur.size === st.size && cur.mtime === st.mtimeMs) return unchanged()
   // The parser this run read the file with (a running session's footer, an earlier job), when it is at least as far on as
   // the saved state; else the saved state taken up (takeUp), else a new parser from the start.
   let parser: RawUsageParser | null = null
@@ -388,6 +397,15 @@ async function ingest(file: string, job: IngestJob): Promise<IngestResult> {
     grew = true
     log('info', `usage history: ${job.session} read less of something than recorded: what was recorded is kept beside it`, job.path)
   }
+  // Free (HI-1772): every row and day a known $0 covering its tokens; counted as any session's.
+  const local = { serverLocal: serverLocal || !!now?.serverLocal, notLocal: notLocal || !!now?.notLocal }
+  if (local.serverLocal && !local.notLocal) {
+    rows = rowsAsFree(rows)
+    if (baseline.length) {
+      baseline = baselineAsFree(baseline)
+      grew = true
+    }
+  }
   const due = !isGz(job.path) && (job.keepState === 'now' || (job.keepState === 'running' && (!now?.stateAt || Date.now() - Date.parse(now.stateAt) >= STATE_EVERY_MS)))
   const w: SessionWrite = {
     ...job,
@@ -403,21 +421,25 @@ async function ingest(file: string, job: IngestJob): Promise<IngestResult> {
     rows,
     holdsKey: job.holdsKey,
     baseline: grew ? baseline : null,
-    ...(ignoreNow ? { reportsIgnored: true } : {})
+    ...(ignoreNow ? { reportsIgnored: true } : {}),
+    ...(local.serverLocal ? { serverLocal: true } : {}),
+    ...(local.notLocal ? { notLocal: true } : {})
   }
   const ok = writeSession(db, w, now ? { offset: now.offset, path: now.path } : null)
   return { status: ok ? 'written' : 'busy', requests: raw.requests }
 }
 
 /**
- * A recorded session marked as ignoring its CLI's cost reports (HI-1772) with nothing to read again (its transcript
- * gone, or unchanged): its stored rows and baseline written again without those charges, counts and cards as they were.
+ * A recorded session whose pricing changed (HI-1772: its CLI's cost reports no longer counted, or it became free or
+ * stopped being free) with nothing to read again (its transcript gone, or unchanged): its stored rows and baseline
+ * written again without those charges, as a known $0 while free, counts and cards as they were.
  */
-function stripStored(db: DatabaseSync, job: IngestJob): IngestResult {
+function stripStored(db: DatabaseSync, job: IngestJob, local: { serverLocal: boolean; notLocal: boolean }): IngestResult {
   const now = cursorOf(db, job.scope, job.session)
   const stored = now ? storedSession(db, job.scope, job.session) : null
   if (!now || !stored) return { status: 'missing' }
   const timeline = storedTimelines(db, job.scope).find((s) => s.session === job.session)?.timeline ?? null
+  const free = (local.serverLocal || now.serverLocal) && !(local.notLocal || now.notLocal)
   const w: SessionWrite = {
     ...job,
     source: now.source === 'external' ? 'external' : 'transcript',
@@ -428,10 +450,12 @@ function stripStored(db: DatabaseSync, job: IngestJob): IngestResult {
     state: null,
     summary: stored.summary,
     timeline: timeline ? { ...timeline, reports: [], rows: timeline.rows.map((r) => (r[6] >= 0 ? (Object.assign([...r], { 6: -1 }) as typeof r) : r)) } : null,
-    rows: rowsWithoutReports(stored.rows),
+    rows: free ? rowsAsFree(stored.rows) : rowsWithoutReports(stored.rows),
     holdsKey: now.holdsKey,
-    baseline: baselineWithoutReports(baselineOf(db, job.scope, job.session)),
-    reportsIgnored: true
+    baseline: free ? baselineAsFree(baselineOf(db, job.scope, job.session)) : baselineWithoutReports(baselineOf(db, job.scope, job.session)),
+    reportsIgnored: true,
+    ...(local.serverLocal ? { serverLocal: true } : {}),
+    ...(local.notLocal ? { notLocal: true } : {})
   }
   return { status: writeSession(db, w, { offset: now.offset, path: now.path }) ? 'written' : 'busy' }
 }

@@ -1563,6 +1563,10 @@
     "defaultMessage": "Cost",
     "description": "Column header of the Provider usage table: what the usage cost."
   },
+  "performance.usage.costFree": {
+    "defaultMessage": "{n, plural, one {+ # free (local)} other {+ # free (local)}}",
+    "description": "Under a cost: how many sessions ran only on a model server on this PC (Ollama, for example), so cost nothing (HI-1772). Lower case."
+  },
   "performance.usage.costUnknown": {
     "defaultMessage": "+ {n, number} unknown",
     "description": "Under a cost: how many sessions' cost is unknown. Lower case."

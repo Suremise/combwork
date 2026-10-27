@@ -435,7 +435,7 @@ class UsageHistory {
       if (!rec) return null
       const path = o.path && existsSync(o.path) ? o.path : await sessions.anyTranscript(projectPath, sessionId, ctx).catch(() => null)
       const { holds, holdsKey } = await this.holdsFor(ws, run, projectPath, rec)
-      const job: IngestJob = { ...metaOf(scope, rec), path, holds, holdsKey, keepState: o.keepState, ...(rec.serverRan ? { reportsIgnored: true } : {}) }
+      const job: IngestJob = { ...metaOf(scope, rec), path, holds, holdsKey, keepState: o.keepState, ...(rec.serverRan ? { reportsIgnored: true } : {}), ...(rec.serverLocal ? { serverLocal: true } : {}), ...(rec.notLocal ? { notLocal: true } : {}) }
       return { type: 'ingest', file: usageFile(workspace), job }
     })
   }

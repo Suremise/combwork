@@ -450,6 +450,41 @@ describe('the usage worker reading a transcript for main', () => {
     await g.close()
     await t.close()
   })
+
+  it('free (HI-1772, Darren 27 Oct): only on servers on this PC, a known $0 whatever prices are set; a run anywhere else ends it for good', async () => {
+    const t = await setup()
+    // A local model, priced by the user (a price local-only sessions never use), and Claude Code's report beside it.
+    const local = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'qwen3:8b', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
+    writeFileSync(t.transcript, prompt(0) + local(1) + JSON.stringify({ type: 'cost-state', timestamp: new Date(T0 + 2000).toISOString(), totalCostUSD: 3 }) + '\n')
+    const settings = { providers: { ...DEFAULT_SETTINGS.providers, 'claude-code': { ...DEFAULT_SETTINGS.providers['claude-code'], prices: { 'qwen3:8b': { input: 1000, cachedInput: 0, output: 1000 } } } } }
+    const usage = async () => {
+      const st = (await t.stored())!
+      return usageFromRows(st.summary, st.rows, settings)
+    }
+    // Local only: free, $0 known, its tokens counted.
+    expect((await t.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('written')
+    expect(await usage()).toMatchObject({ costUsd: 0, costFree: true, outputTokens: 100 })
+    // Unchanged, the same again.
+    expect((await t.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    // A run elsewhere (a remote server, a sign-in): not free from now on; the user's price for its model then applies.
+    expect((await t.ingest({ reportsIgnored: true, notLocal: true })).status).toBe('written')
+    const after = await usage()
+    expect(after.costFree).toBeUndefined()
+    expect(after.costUsd).toBeGreaterThan(0)
+    expect(after.outputTokens).toBe(100)
+    // A stale job from before (local alone) never makes it free again.
+    expect((await t.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    expect((await usage()).costFree).toBeUndefined()
+    // Remote first, then local: never free.
+    const r = await setup()
+    writeFileSync(r.transcript, readFileSync(t.transcript, 'utf8'))
+    expect((await r.ingest({ reportsIgnored: true, notLocal: true })).status).toBe('written')
+    expect((await r.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    const rs = (await r.stored())!
+    expect(usageFromRows(rs.summary, rs.rows, settings).costFree).toBeUndefined()
+    await r.close()
+    await t.close()
+  })
 })
 
 describe('the usage worker as main starts it (HI-1729)', () => {
