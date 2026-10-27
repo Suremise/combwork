@@ -7,6 +7,7 @@
   "worktrees.agent.nameTaken": "已有名为“{name}”的智能体。",
   "worktrees.agent.noTree": "此智能体在项目文件夹中工作，而不是在工作树中。",
   "worktrees.agent.notPinned": "在 1.0 中，智能体不再绑定到工作树：槽位按卡片或通道借出。",
+  "worktrees.agent.providerChangedMeanwhile": "{agent} 的提供方在此期间已被更改：未做任何更改。请重试。",
   "worktrees.agent.removing": "该工作树已在删除或合并中。",
   "worktrees.agent.roleTooLong": "角色最多 {max} 个字符。",
   "worktrees.agent.sharedTree": "已有另一个智能体在该工作树中工作。",

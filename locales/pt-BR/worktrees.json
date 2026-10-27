@@ -7,6 +7,7 @@
   "worktrees.agent.nameTaken": "Já existe um agente chamado “{name}”.",
   "worktrees.agent.noTree": "Este agente trabalha na pasta do projeto, não em um worktree.",
   "worktrees.agent.notPinned": "Na 1.0, os agentes não ficam presos a worktrees: os slots são emprestados por cartão ou por raia.",
+  "worktrees.agent.providerChangedMeanwhile": "O provedor do agente {agent} foi trocado nesse meio-tempo: nada foi alterado. Tente de novo.",
   "worktrees.agent.removing": "Esse worktree já está sendo removido ou mesclado.",
   "worktrees.agent.roleTooLong": "Uma função tem no máximo {max} caracteres.",
   "worktrees.agent.sharedTree": "Outro agente já trabalha nesse worktree.",

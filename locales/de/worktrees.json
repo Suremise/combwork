@@ -7,6 +7,7 @@
   "worktrees.agent.nameTaken": "Es gibt schon einen Agenten namens „{name}“.",
   "worktrees.agent.noTree": "Dieser Agent arbeitet im Projektordner, nicht in einem Worktree.",
   "worktrees.agent.notPinned": "Agenten sind in 1.0 nicht an Worktrees gebunden: Slots werden pro Karte oder Lane verliehen.",
+  "worktrees.agent.providerChangedMeanwhile": "Der Anbieter von {agent} wurde inzwischen geändert: Es wurde nichts geändert. Versuche es noch einmal.",
   "worktrees.agent.removing": "Dieser Worktree wird bereits entfernt oder gemergt.",
   "worktrees.agent.roleTooLong": "Eine Rolle hat höchstens {max} Zeichen.",
   "worktrees.agent.sharedTree": "In diesem Worktree arbeitet schon ein anderer Agent.",

@@ -126,7 +126,8 @@ const settingsArgs = {
   effort: { type: 'string', description: 'Effort level (hive_list_providers). Empty follows the project.' },
   mode: { type: 'string', description: 'Permission mode (hive_list_providers). Empty follows the project.' },
   context200k: { type: 'string', enum: ['on', 'off', ''], description: "Use a 200K context window instead of the model's 1M one, for providers with context200k (hive_list_providers). Empty follows the project." },
-  mcpServers: { type: 'array', items: { type: 'string' }, description: "Only these of the project's MCP servers (names), [] none, [\"*\"] all (the default). The hive server is always given." }
+  mcpServers: { type: 'array', items: { type: 'string' }, description: "Only these of the project's MCP servers (names), [] none, [\"*\"] all (the default). The hive server is always given." },
+  connection: { type: 'string', description: "With Connections on: the connection it runs on, by id or name (hive_list_providers lists those on here); its CLI is the provider. Empty: its CLI's default connection. A name two share is refused: use the id." }
 }
 const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either'], description: 'Its side in the workflow: builds cards, reviews them, or either (never its own). Default: guessed from its name.' }
 const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/agents/${enc(a.agent || '')}`
@@ -378,7 +379,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_list_providers',
-    description: 'The coding-agent providers: whether each is on and installed, and the models, effort levels and permission modes to use when adding or changing agents (JSON).',
+    description: 'The coding-agent providers: whether each is on and installed, and the models, effort levels, permission modes and (with Connections on) the connections on here to use when adding or changing agents (JSON).',
     inputSchema: { type: 'object', properties: {} },
     run: () => api('GET', '/v1/providers')
   },
@@ -444,20 +445,21 @@ const tools: Tool[] = [
     },
     run: async (a) => {
       // 0.9's worktree arguments are passed on, not dropped, so the Agent API refuses them (#1451) and nothing is added.
-      const r = (await api('POST', `/v1/projects/${proj(a)}/agents`, { name: a.name, workflowRole: a.workflowRole, provider: a.provider, model: a.model, effort: a.effort, mode: a.mode, context200k: a.context200k, mcpServers: a.mcpServers, start: a.start, prompt: a.prompt, ...legacyWorktreeArgs(a) })) as {
+      const r = (await api('POST', `/v1/projects/${proj(a)}/agents`, { name: a.name, workflowRole: a.workflowRole, provider: a.provider, model: a.model, effort: a.effort, mode: a.mode, context200k: a.context200k, mcpServers: a.mcpServers, connection: a.connection, start: a.start, prompt: a.prompt, ...legacyWorktreeArgs(a) })) as {
         agent: { id: string; name: string }
-        project: { name: string; agents: { id: string; provider: string; status: string; folder?: string }[] }
+        project: { name: string; agents: { id: string; provider: string; status: string; folder?: string; connection?: { name: string | null } | null }[] }
       }
       const now = r.project.agents.find((x) => x.id === r.agent.id)
       const where = !now?.folder || now.folder === 'project' ? 'the project folder' : now.folder
-      return `Added ${r.agent.name} (id ${r.agent.id}) to ${r.project.name}: ${now?.provider ?? 'its provider'}, in ${where}, ${now?.status ?? 'stopped'}.`
+      const on = now?.connection?.name ? ` on ${now.connection.name}` : ''
+      return `Added ${r.agent.name} (id ${r.agent.id}) to ${r.project.name}: ${now?.provider ?? 'its provider'}${on}, in ${where}, ${now?.status ?? 'stopped'}.`
     }
   },
   {
     name: 'hive_update_agent',
-    description: "Change an agent's name, role in the workflow, provider, model, effort, permission mode, 200K context or MCP servers. A running agent takes the change when restarted; its provider changes only while it is stopped.",
+    description: "Change an agent's name, role in the workflow, provider, connection, model, effort, permission mode, 200K context or MCP servers. A running agent takes the change when restarted; its provider (or a connection of another CLI) changes only while it is stopped.",
     inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, name: { type: 'string' }, workflowRole: workflowRoleArg, ...settingsArgs }, required: ['project', 'agent'] },
-    run: (a) => api('PATCH', agentPath(a), { name: a.name, workflowRole: a.workflowRole, provider: a.provider, model: a.model, effort: a.effort, mode: a.mode, context200k: a.context200k, mcpServers: a.mcpServers })
+    run: (a) => api('PATCH', agentPath(a), { name: a.name, workflowRole: a.workflowRole, provider: a.provider, model: a.model, effort: a.effort, mode: a.mode, context200k: a.context200k, mcpServers: a.mcpServers, connection: a.connection })
   },
   {
     name: 'hive_start_agent',

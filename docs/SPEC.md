@@ -838,6 +838,14 @@ The design across every surface is HI-1755's design note and addendum. The decis
   - The project's own values stay in project.json, unread with Connections on, so turning them off behaves as before; S8 removes them. The Assistant's home is never moved.
 - **The notice** of moved values the agent's connection can't use is worked out from the moves' records when shown (`connections:notice`, the asking window's workspace only), so a stop between the move and anything else loses nothing. Dismissed entries are kept app-wide (`ui.connectionsNoticeDismissed`, by project and entry id), so they stay dismissed; a later CLI's entries are new.
 
+**The Agent API and hive tools take a connection** (S4, HI-1771; api.version 10; AGENT_API.md "Connections (preview)"):
+- **`connection`** on adding and changing agents (the Assistant's `POST`/`PATCH /v1/projects/{name}/agents…`, hive_add_agent and hive_update_agent): an id, or a name unique among those on in the workspace (`connectionRef`; two sharing it: 409, use its id; none: 404). Saving checks it with the write (on here for the agent's CLI).
+  - **With `provider`:** they must agree (409). **Alone:** its CLI is the agent's, and on another CLI it is that change of CLI (refused while running; model, effort, mode, context, last session and the old connection cleared). Whether the CLI changes is decided again against the agent as saved under the lock (changed meanwhile: refused whole).
+  - **Left out:** kept. **`null` or `""`:** cleared (the CLI's default). **`provider` alone:** no connection of its own (the CLI's default; starts refused while none is on).
+- **Status:** each agent row has `connection` (the one chosen, `{ id, name, problem? }`, or null), `launchedConnection` and `switchPending`. A project agent isn't told the name of one not on in its workspace.
+- **`GET /v1/connections`, `GET /v1/connections/{ref}`** (`connectionsFor`, `connectionShown`): a project agent sees only those on in its workspace (`id`, `name`, `cli`, `kind`, `signedIn`; another one is 404 by id or name); the workspace token and the Assistant see every one, with `on`, `default`, `email` and `plan`. Nobody sees a token, a key, where a login is kept, its settings or defaults; `details=true` widens nothing. hive_list_providers lists each CLI's connections on here.
+- **Off** (the preview): the routes and the field are refused (409).
+
 **The rows and templates name connections** (S2, HI-1769):
 - **One rule for every row** (`connectionOf`, `src/shared/connectionLabel.ts`), the launch's own (`resolveConnection`), so the window and a start never disagree:
   - its own choice on here: its name;
