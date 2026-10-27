@@ -17,6 +17,9 @@ describe('endReason', () => {
   it('a stop asked without a cause is just stopped, never "by you"', () => {
     expect(endReason({ ...base, stopRequested: true, code: 1 })).toBe('stopped')
   })
+  it('a cause left from a stop called off never names a later exit: the CLI crashing is crashed', () => {
+    expect(endReason({ ...base, stopRequested: false, cause: 'lane', code: 1 })).toBe('crashed')
+  })
   it('the CLI ending by itself: exited with 0, crashed otherwise', () => {
     expect(endReason({ ...base, code: 0 })).toBe('exited')
     expect(endReason({ ...base, code: 1 })).toBe('crashed')

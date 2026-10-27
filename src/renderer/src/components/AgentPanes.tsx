@@ -1280,8 +1280,9 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
           <StateMark state="stalled" label={tr(msg({ id: 'panes.header.failed', defaultMessage: 'Failed to start', description: "A pane's status: the agent's last launch failed." }))} />
         </Tooltip>
       ) : (
-        <Tooltip content={tr(AGENT_STATE_LABEL[state])}>
-          <StateMark state={state} />
+        // A stopped agent's own mark is grey (HI-1881), from the same end as its status: its state is still idle.
+        <Tooltip content={end ? stoppedLine(end) : tr(AGENT_STATE_LABEL[state])}>
+          <StateMark state={state} className={end ? 'stopped' : undefined} label={end ? stoppedLabel(end) : undefined} />
         </Tooltip>
       )}
       {/* Its provider is in the name's tooltip (the header showed its icon before #977), with everything its tab in the

@@ -21,14 +21,14 @@ export interface SessionEnd {
 
 /**
  * Why a run ended, or null for a launch that failed (it keeps its own failed presentation). Hive shutting down comes
- * first, then the stop's cause (a stop asked without one is `stopped`), then the CLI's own exit: 0 is `exited`, any
+ * first, then a stop asked for, by its cause (none: `stopped`), then the CLI's own exit: 0 is `exited`, any
  * other code `crashed`. A stop is never "by you" unless its caller said so.
  */
 export function endReason(o: { failed: boolean; shuttingDown: boolean; stopRequested: boolean; cause?: StopCause; code: number }): EndWhy | null {
   if (o.failed) return null
   if (o.shuttingDown) return 'quit'
-  if (o.cause) return o.cause
-  if (o.stopRequested) return 'stopped'
+  // A cause only while a stop is asked for: one left from a stop called off never names a later exit.
+  if (o.stopRequested) return o.cause ?? 'stopped'
   return o.code === 0 ? 'exited' : 'crashed'
 }
 

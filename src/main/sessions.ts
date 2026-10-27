@@ -2516,7 +2516,7 @@ class SessionManager {
    * or the fence is; 'sent': typed (or already ending). `force` (the caller's deadline): `ready` isn't asked, and a
    * prompt that can't be typed into is killed rather than typed over; input arriving while it types still stops it.
    */
-  async quit(projectPath: string, agentId: string, runId: string, o: { fenced: () => boolean; why: string; force?: boolean; ready?: () => string | null }): Promise<'sent' | 'held' | 'gone'> {
+  async quit(projectPath: string, agentId: string, runId: string, o: { fenced: () => boolean; why: string; force?: boolean; ready?: () => string | null; cause?: StopCause }): Promise<'sent' | 'held' | 'gone'> {
     const { fenced, why, force = false } = o
     const id = liveId(projectPath, agentId)
     const key = this.key(projectPath, agentId)
@@ -2532,8 +2532,8 @@ class SessionManager {
       if (held && !force) return 'held'
       log.info(`${label}: killed (${why}${held ? `; ${held}` : ', its CLI has no exit command'})`)
       l.stopRequested = true
-      // A lane's end (HI-1706): its pane says so (HI-1881).
-      l.stopCause = 'lane'
+      // Who asked, as its caller says (HI-1881: a lane's end says lane; a switch of connection, nothing).
+      l.stopCause = o.cause
       l.ending = true
       killPty(key)
       return 'sent'
@@ -2551,7 +2551,7 @@ class SessionManager {
     }
     // Ending from here: its exit is a stop asked for (not a crash), and Stop meanwhile kills it at once (endProcess).
     l.stopRequested = true
-    l.stopCause = 'lane'
+    l.stopCause = o.cause
     l.ending = true
     try {
       if (line) {
@@ -2568,6 +2568,8 @@ class SessionManager {
       if (this.live.get(id) === l) {
         l.stopRequested = false
         l.ending = false
+        // Not stopping after all: a later exit is its own (HR5's HI-1881 round 1), not this quit's cause.
+        l.stopCause = undefined
       }
       log.info(`${label}: its exit command wasn't typed (${why}): ${(e as Error).message}`)
       return same() ? 'held' : 'gone'
@@ -2621,7 +2623,7 @@ class SessionManager {
    * Stops the sessions matching `which` (e.g. one window's workspace) and waits for them as stopAllAndWait
    * does. Starts in progress for matching projects are cancelled and waited for too.
    */
-  async stopWhereAndWait(which: (s: { projectPath: string }) => boolean, timeoutMs = 3000): Promise<void> {
+  async stopWhereAndWait(which: (s: { projectPath: string }) => boolean, timeoutMs = 3000, cause?: StopCause): Promise<void> {
     const pending = [...this.starting.values()].filter((p) => which(p))
     for (const p of pending) p.cancelled = true
     const chosen = [...this.live.entries()].filter(([, l]) => which(l.state))
@@ -2637,8 +2639,8 @@ class SessionManager {
     )
     for (const [, l] of chosen) {
       l.stopRequested = true
-      // Its workspace closing (HI-1881); Hive quitting says so itself (endReason).
-      l.stopCause ??= 'closed'
+      // Who asked, as its caller says (HI-1881: a workspace closing says closed); Hive quitting says so itself (endReason).
+      if (cause) l.stopCause ??= cause
       this.endProcess(l)
     }
     const waitMs = stopWaitMs(timeoutMs, chosen.map(([, l]) => l.adapter.exitKeys?.graceMs))
@@ -3692,6 +3694,13 @@ class SessionManager {
   }
 
   private async onExit(projectPath: string, agentId: string, runId: string, code: number, output = ''): Promise<void> {
+    // When and how it ended, as it ended (HR5's HI-1881 round 1): not after the bookkeeping below, which can take a
+    // while (the time would drift, and a quit begun meanwhile would relabel it).
+    const exitAt = new Date().toISOString()
+    const shutting = this.shuttingDown
+    const atExit = this.live.get(liveId(projectPath, agentId))
+    const stopAsked = !!atExit?.stopRequested
+    const causeAtExit = atExit?.stopCause
     const id = liveId(projectPath, agentId)
     const l = this.live.get(id)
     const sessionId = l?.state.sessionId ?? ''
@@ -3758,8 +3767,8 @@ class SessionManager {
       }
     }
     // Why and when it ended, for its pane (HI-1881): none for a launch that failed (its failed bar says so).
-    const why = l ? endReason({ failed: !!failure, shuttingDown: this.shuttingDown, stopRequested: !!l.stopRequested, cause: l.stopCause, code }) : null
-    const ended: SessionEnd | undefined = l && why ? { runId, startedAt: l.state.startedAt, at: new Date().toISOString(), why, ...(why === 'crashed' ? { code } : {}) } : undefined
+    const why = l ? endReason({ failed: !!failure, shuttingDown: shutting, stopRequested: stopAsked, cause: causeAtExit, code }) : null
+    const ended: SessionEnd | undefined = l && why ? { runId, startedAt: l.state.startedAt, at: exitAt, why, ...(why === 'crashed' ? { code } : {}) } : undefined
     emit({ type: 'session-exit', projectPath, agentId, sessionId, exitCode: code, ...(failure ? { failure } : {}), ...(ended ? { ended } : {}) })
     // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
     devConsole.capture([sessionSourceId(projectPath, agentId)], () => ({ kind: 'exit', name: 'exit', provider: l?.state.provider, raw: { exitCode: code }, made: { failedStart: !!failure, stopRequested: !!l?.stopRequested }, summary: `exited with code ${code}${failure ? ' before it started' : ''}` }))

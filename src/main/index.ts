@@ -535,7 +535,7 @@ async function stopWorkspaceAgents(from: BrowserWindow, scope: 'workspace' | 'sw
   // Also cancels agents still starting (not listed: they have no session yet). No new one starts until the
   // workspace has closed or switched (ipc clears the flag).
   e.ws.closing = true
-  await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000)
+  await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000, 'closed')
   return true
 }
 
@@ -556,7 +556,7 @@ async function requestCloseWindow(e: HiveWindow, done: AlreadyAsked = {}): Promi
     if (choice === 'cancel') return
   }
   e.ws.closing = true
-  await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000)
+  await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000, 'closed')
   saveWindowsWithout(e)
   e.closing = true
   e.win.close()

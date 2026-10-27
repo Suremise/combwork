@@ -73,6 +73,10 @@ const check = (name, ok, extra = '') => {
     check('…with Resume and New Session on it', (await bar.getByRole('button', { name: /Resume/ }).count()) === 1 && (await bar.getByRole('button', { name: 'New Session' }).count()) === 1)
     check('…its terminal dimmed', !!(await lib.until(() => host.evaluate((h) => h.classList.contains('dimmed') && Number(getComputedStyle(h.querySelector('.terminal-mount')).opacity) < 0.8), HUNG_MS)))
     check('…its header says Stopped · {time}', /^Stopped · \S+/.test(await text(status)) && (await status.getAttribute('data-stopped')) === 'you', await text(status))
+    // Its own mark grey, not the idle ring's colour (the Assistant's screenshot review): still idle, as it counts.
+    const headerMark = header.locator('.state-mark').first()
+    const grey = (mark) => mark.evaluate((m) => m.classList.contains('stopped') && m.classList.contains('idle') && getComputedStyle(m).borderTopColor === getComputedStyle(document.querySelector('.pane-status.stopped'), '::before').backgroundColor).catch(() => false)
+    check('…its own mark in its header grey (still idle)', !!(await lib.until(() => grey(headerMark), HUNG_MS)), await headerMark.getAttribute('class'))
     // Its scrollback is still selected and copied (a page clipboard: never the real one).
     await page.evaluate(() => { window.__copied = null; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText: async () => '', writeText: async (t) => { window.__copied = t } } }) })
     const box = await host.boundingBox()
@@ -91,6 +95,8 @@ const check = (name, ok, extra = '') => {
     await page.locator('.view-switch [data-view="tiles"]').click()
     const tileStatus = page.locator(`.agent-tile[data-agent="${agent.id}"] .tile-status`)
     check('its tile says Stopped · {time}', !!(await lib.until(async () => /^Stopped · \S+/.test(await text(tileStatus)), HUNG_MS)), await text(tileStatus))
+    const tileMark = page.locator(`.agent-tile[data-agent="${agent.id}"] .state-mark`).first()
+    check('…its mark there grey too', !!(await lib.until(() => tileMark.evaluate((m) => m.classList.contains('stopped') && m.classList.contains('idle')), HUNG_MS)), await tileMark.getAttribute('class'))
     await shots('tiles')
     await page.locator('.view-switch [data-view="panes"]').click()
     await lib.until(async () => (await bar.count()) === 1, HUNG_MS)
@@ -98,7 +104,7 @@ const check = (name, ok, extra = '') => {
     // --- Resume: the stopped look goes from the accepted click, before the session runs (its start held a moment).
     await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = 'session:start=2500*1,session:resume=2500*1' })
     await bar.getByRole('button', { name: /Resume/ }).click()
-    const notStopped = async () => (await host.evaluate((h) => h.classList.contains('dimmed'))) === false && !/Stopped/.test(await text(status)) && (await page.locator('.agent-pane .session-ended.stopped').count()) === 0
+    const notStopped = async () => (await host.evaluate((h) => h.classList.contains('dimmed'))) === false && !/Stopped/.test(await text(status)) && (await page.locator('.agent-pane .session-ended.stopped').count()) === 0 && (await header.locator('.state-mark.stopped').count()) === 0
     check('Resume: at once, no dimming, no Stopped label or bar, while it starts', !!(await lib.until(async () => !(await live()) && (await notStopped()), HUNG_MS)), JSON.stringify([await text(status), await text(bar)]))
     await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
     await lib.acceptClaudeTrust(inv, proj, agent.id).catch(() => {})

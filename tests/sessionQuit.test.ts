@@ -31,14 +31,14 @@ const { copilot } = await import('../src/main/providers/copilot/adapter')
 const { config } = await import('../src/main/config')
 
 const P = join(base, 'alpha')
-type Priv = { live: Map<string, { state: Record<string, unknown>; adapter: unknown; ending?: boolean; stopRequested?: boolean }>; runs: Map<string, string>; noteUserInput: (key: string, data: string) => void; userInput: Map<string, unknown> }
+type Priv = { live: Map<string, { state: Record<string, unknown>; adapter: unknown; ending?: boolean; stopRequested?: boolean; stopCause?: string }>; runs: Map<string, string>; noteUserInput: (key: string, data: string) => void; userInput: Map<string, unknown> }
 const priv = sessions as unknown as Priv
 let n = 0
 /** A live session of the agent (a stand-in for its launch), at its prompt. */
 function live(adapter: unknown = claudeCode) {
   const agentId = `b${++n}`
   const state = { provider: 'claude-code', runId: `run-${n}`, projectPath: P, agentId, agentName: `B${n}`, cwd: P, status: 'ready', startedAt: new Date().toISOString() }
-  const l: { state: typeof state; adapter: unknown; ending?: boolean; stopRequested?: boolean; prompts?: number } = { state, adapter }
+  const l: { state: typeof state; adapter: unknown; ending?: boolean; stopRequested?: boolean; stopCause?: string; prompts?: number } = { state, adapter }
   priv.live.set(`${P.toLowerCase()}#${agentId}`, l)
   priv.runs.set(state.runId, `${P.toLowerCase()}#${agentId}`)
   const key = `session:${P.toLowerCase()}#${agentId}`
@@ -209,5 +209,46 @@ describe("a lane's builder ended by its CLI's own exit", () => {
     const a = live()
     expect(await sessions.quit(P, a.agentId, 'run-old', { fenced: () => true, why: 'its lane ended' })).toBe('gone')
     expect(a.typed()).toBe('')
+  })
+})
+
+describe("a stop's cause is its caller's (HI-1881, HR5's round 1)", () => {
+  it("a lane's end says lane; another caller of quit (a switch of connection) says nothing, so a stop shows as stopped", async () => {
+    const a = live()
+    expect(await sessions.quit(P, a.agentId, a.run, { fenced: () => true, why: 'its lane ended', cause: 'lane' })).toBe('sent')
+    expect(a.l.stopCause).toBe('lane')
+    const b = live()
+    expect(await sessions.quit(P, b.agentId, b.run, { fenced: () => true, why: 'a switch of connection' })).toBe('sent')
+    expect(b.l.stopRequested).toBe(true)
+    expect(b.l.stopCause).toBeUndefined()
+  })
+
+  it("a quit called off (a turn began while it typed) leaves no cause behind: a later exit is the CLI's own", async () => {
+    vi.useFakeTimers()
+    try {
+      const a = live()
+      onWrite = (key) => {
+        if (key !== a.key) return
+        onWrite = null
+        a.l.prompts = (a.l.prompts ?? 0) + 1
+      }
+      const r = sessions.quit(P, a.agentId, a.run, { fenced: () => true, why: 'its lane ended', cause: 'lane' })
+      await vi.advanceTimersByTimeAsync(3000)
+      expect(await r).toBe('held')
+      expect(a.l.stopRequested).toBe(false)
+      expect(a.l.stopCause).toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stopping where a caller chose labels the stop only with the cause it gave (a workspace closing), never by itself', async () => {
+    const a = live()
+    await sessions.stopWhereAndWait((s) => (s as { agentId?: string }).agentId === a.agentId, 50)
+    expect(a.l.stopRequested).toBe(true)
+    expect(a.l.stopCause).toBeUndefined()
+    const b = live()
+    await sessions.stopWhereAndWait((s) => (s as { agentId?: string }).agentId === b.agentId, 50, 'closed')
+    expect(b.l.stopCause).toBe('closed')
   })
 })

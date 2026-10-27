@@ -1232,6 +1232,8 @@ kbd {
 .state-mark.stalled { width: 8px; height: 8px; margin: 0.5px; background: var(--state-stalled); border-radius: 1px; }
 .state-mark.working { background: var(--state-working); border-radius: 50%; animation: pulse 1.2s ease-in-out infinite; }
 .state-mark.idle { border: 2px solid var(--state-idle); border-radius: 50%; }
+/* A stopped agent's own mark (HI-1881): still idle, its ring grey as its status's dot. */
+.state-mark.idle.stopped { border-color: var(--fg-faint); }
 @media (prefers-reduced-motion: reduce) {
   .state-mark.working { animation: none; }
 }

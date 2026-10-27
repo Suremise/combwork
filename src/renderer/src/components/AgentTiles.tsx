@@ -192,6 +192,8 @@ function Tile({ project, a, state, tabStop, movable, onFocus, onMenu }: { projec
   const settings = useStore((s) => s.settings)
   const flash = useStore((s) => s.paneFlash)
   const status = useStatus(project, a)
+  // Stopped (HI-1881): its own mark grey, as its pane's header has it.
+  const stoppedEnd = useStoppedEnd(project.path, a)
   const usage = useLiveUsage(project, a.id)
   const now = useNow()
   const live = a.live
@@ -256,7 +258,7 @@ function Tile({ project, a, state, tabStop, movable, onFocus, onMenu }: { projec
         </span>
       )}
       <span className="tile-head">
-        <StateMark state={state} />
+        <StateMark state={state} className={stoppedEnd ? 'stopped' : undefined} label={stoppedEnd ? stoppedLabel(stoppedEnd) : undefined} />
         <span className="tile-name">{a.name}</span>
         <span className="tile-provider">{providerName(agentProviderOf(project, a))}</span>
       </span>
@@ -575,6 +577,8 @@ function StripItem({ project, a, state, active, drag }: { project: ProjectInfo; 
     else if (document.activeElement !== ref.current) ref.current?.focus()
   })
   const status = useStatus(project, a)
+  // Stopped (HI-1881): its own mark grey, as its pane's header has it.
+  const stoppedEnd = useStoppedEnd(project.path, a)
   const cards = useRowCards(project, a.id)
   const [nameRef, clipped] = useClipped<HTMLSpanElement>()
   const shown = cards[0]?.card.number
@@ -605,7 +609,7 @@ function StripItem({ project, a, state, active, drag }: { project: ProjectInfo; 
             }
           : {})}
       >
-        <StateMark state={state} />
+        <StateMark state={state} className={stoppedEnd ? 'stopped' : undefined} label={stoppedEnd ? stoppedLabel(stoppedEnd) : undefined} />
         {/* Its name in full on hover when it is cut short. */}
         <Tooltip content={clipped ? a.name : null} block>
           <span ref={nameRef} className="tile-strip-name">
