@@ -2,7 +2,6 @@ import { basename } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import { laneBrief, type LaneRole } from '../shared/laneBrief'
-import { projectPreferences } from './workflow/preferences'
 import { cardLabel } from '../shared/projectKeys'
 import type { LaneInfo, LaneStartInfo, LaneStartRequest, LaneStartResult } from '../shared/types'
 import { deliveriesOf, launchWith } from './deliveries'
@@ -99,10 +98,10 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
         await setLaneSlotWait(ws, recorded.lane.id, { since: new Date().toISOString(), note: req.note ?? '' })
         return { lane: recorded.lane as LaneInfo, started: [], waitingForSlot: got.waiting }
       }
-      const brief = briefFor(ws, projectPath, cfg, project, cards, builder, reviewer, pooled, options, where, got.slot, req.note ?? '')
+      const brief = briefFor(recorded.lane.rounds, project, cards, builder, reviewer, pooled, options, where, got.slot, req.note ?? '')
       return { lane: recorded.lane as LaneInfo, started: await launchAgents(ws, projectPath, recorded.lane.id, builder, reviewer, brief), slot: got.slot }
     }
-    const brief = briefFor(ws, projectPath, cfg, project, cards, builder, reviewer, pooled, options, where, null, req.note ?? '')
+    const brief = briefFor(recorded.lane.rounds, project, cards, builder, reviewer, pooled, options, where, null, req.note ?? '')
     return { lane: recorded.lane as LaneInfo, started: await launchAgents(ws, projectPath, recorded.lane.id, builder, reviewer, brief) }
   } finally {
     starting.delete(key)
@@ -135,9 +134,11 @@ export async function laneStartInfo(ws: WorkspaceService, projectPath: string): 
   return { pool: poolOf(cfg, options)?.map((a) => ({ id: a.id, name: a.name })) ?? null }
 }
 
-/** The brief of a lane's builder or reviewer: the cards, where the builder works (its slot, or folder), the rules, the note. */
-function briefFor(ws: WorkspaceService, projectPath: string, cfg: ProjectConfig, project: string, cards: { key: string; title: string }[], builder: AgentDef, reviewer: AgentDef | null, pool: string[] | null, options: WorkflowOptions | null, where: { legacy: { path: string; branch: string } | null }, slot: string | null, note: string): (role: LaneRole) => string {
-  const rounds = projectPreferences(ws, projectPath, cfg).loopRounds
+/**
+ * The brief of a lane's builder or reviewer: the cards, where the builder works (its slot, or folder), the rules, the note,
+ * and the lane's own rounds as it was recorded (HI-1805: never today's default, which may have changed since).
+ */
+function briefFor(rounds: number, project: string, cards: { key: string; title: string }[], builder: AgentDef, reviewer: AgentDef | null, pool: string[] | null, options: WorkflowOptions | null, where: { legacy: { path: string; branch: string } | null }, slot: string | null, note: string): (role: LaneRole) => string {
   const input = { project, cards: cards.map(({ key, title }) => ({ key, title })), builder: { name: builder.name, folder: where.legacy?.path ?? null, branch: where.legacy?.branch ?? null, slot }, reviewer: reviewer ? { name: reviewer.name } : null, pool, options, rounds, note }
   return (role) => laneBrief(input, role)
 }
@@ -237,7 +238,7 @@ export async function startWaitingLane(ws: WorkspaceService, projectPath: string
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
   const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
-  const brief = briefFor(ws, projectPath, cfg, basename(projectPath), cards, builder, reviewer, pooled, options, { legacy: null }, slot, lane.slotWait?.note ?? '')
+  const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, { legacy: null }, slot, lane.slotWait?.note ?? '')
   const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, over)
   if (over()) return false
   log.info(`Lane ${laneId} got ${userText(slot)}: ${started.map((s) => `${userText(s.name)} ${s.how}`).join(', ')}`)
