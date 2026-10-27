@@ -3,7 +3,8 @@ import { projectAgents } from '../shared/defaults'
 import { agentRuntime } from '../shared/runtime'
 import { columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, type LaneOrderView } from '../shared/tasks'
 import type { TaskCard } from '../shared/types'
-import { loopStepWaitMinutes } from '../shared/lanes'
+import { LOOP_STEP_WAIT_MINUTES } from '../shared/lanes'
+import { projectPreferences } from './workflow/preferences'
 import { queueReturnOf, staleApprovalOf } from './queueReturn'
 import { isResuming } from './restartResume'
 import { sessions } from './sessions'
@@ -106,9 +107,9 @@ function liveOf(wsPath: string): { name: string; project: string; agentId: strin
 /**
  * Why a card is stalled, given its agent as it is now (null: removed; its name and whether it runs), its workspace's
  * folder, its running lane (none: no lane's deadlock is looked for), and how long a design waits for its check
- * (stepWaitMs: its project's Card loops → Design check wait).
+ * (stepWaitMs: its project's workflow option Design check wait, HI-1766).
  */
-export function cardStall(c: TaskCard, agentNow: { name: string; running: boolean } | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = loopStepWaitMinutes() * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null): string | null {
+export function cardStall(c: TaskCard, agentNow: { name: string; running: boolean } | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null): string | null {
   const live = wsPath ? liveOf(wsPath) : []
   const watchers = live.filter((a) => a.cards.length)
   const builder = (returned || stale) && c.agent && c.project ? live.find((a) => a.agentId === c.agent && a.project.toLowerCase() === c.project!.toLowerCase()) : undefined
@@ -140,10 +141,11 @@ export const laneOrderView = (l: { builder: { id: string }; reviewer: { id: stri
   })
 })
 
-/** How long a card's design waits for its check (#1382), from its project's settings: read only for a card with one waiting. */
+/** How long a card's design waits for its check (#1382), from its project's options: read only for a card with one waiting. */
 export async function stepWaitOf(ws: WorkspaceService, c: TaskCard): Promise<number | undefined> {
   if (c.column !== 'doing' || !c.project || !ws.path || !pendingDesign(c)) return undefined
-  return loopStepWaitMinutes(await ws.projectConfig(join(ws.path, c.project)).catch(() => null)) * 60_000
+  const path = join(ws.path, c.project)
+  return projectPreferences(ws, path, await ws.projectConfig(path).catch(() => null)).loopStepWaitMinutes * 60_000
 }
 
 /**

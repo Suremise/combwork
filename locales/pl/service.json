@@ -227,8 +227,6 @@
   "service.workspace.folderExists": "Folder o nazwie „{name}” już istnieje",
   "service.workspace.holdsOpen": "Obszar roboczy {workspace}, otwarty w innym oknie, leży w folderze {folder}. Najpierw go zamknij, aby otworzyć {name} jako obszar roboczy.",
   "service.workspace.insideOpen": "{folder} leży w obszarze roboczym {workspace}, który jest otwarty w innym oknie. Najpierw zamknij tamten obszar roboczy albo otwórz projekty tego folderu stamtąd.",
-  "service.workspace.loopRounds": "Liczba rund pętli kart musi być liczbą całkowitą od 1 do {max}.",
-  "service.workspace.loopWait": "Czas oczekiwania pętli kart musi być całkowitą liczbą godzin od 1 do {max}.",
   "service.workspace.nameIn": "{name} jest w projektach: {projects}",
   "service.workspace.namesShared": "Agenci mają wspólne nazwy",
   "service.workspace.none": "Żaden obszar roboczy nie jest otwarty",

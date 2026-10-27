@@ -714,10 +714,6 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return recentFor(workspace.path)
     },
     'workspace:refresh': async () => (workspace.path ? workspace.refresh() : null),
-    'workspace:setLoops': async (patch) => {
-      await workspace.setLoops({ ...(patch?.rounds !== undefined ? { rounds: patch.rounds } : {}), ...(patch?.waitHours !== undefined ? { waitHours: patch.waitHours } : {}) })
-      return workspace.refresh()
-    },
     'workspace:movePlan': (opts) => movePlan(currentWorkspace(), moveOptions(opts)),
     'workspace:moveRepair': (opts) => repairMove(currentWorkspace(), moveOptions(opts)),
     'workspace:moveDefender': async () => {

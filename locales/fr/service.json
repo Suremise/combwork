@@ -227,8 +227,6 @@
   "service.workspace.folderExists": "Un dossier nommé « {name} » existe déjà",
   "service.workspace.holdsOpen": "L’espace de travail {workspace}, ouvert dans une autre fenêtre, se trouve dans {folder}. Ferme-le d’abord pour ouvrir {name} comme espace de travail.",
   "service.workspace.insideOpen": "{folder} se trouve dans l’espace de travail {workspace}, ouvert dans une autre fenêtre. Ferme d’abord cet espace de travail, ou ouvre les projets de ce dossier depuis celui-ci.",
-  "service.workspace.loopRounds": "Les tours des boucles de cartes doivent être un nombre entier de 1 à {max}.",
-  "service.workspace.loopWait": "L’attente des boucles de cartes doit être un nombre entier d’heures de 1 à {max}.",
   "service.workspace.nameIn": "{name} est dans les projets {projects}",
   "service.workspace.namesShared": "Des agents partagent un nom",
   "service.workspace.none": "Aucun espace de travail n’est ouvert",

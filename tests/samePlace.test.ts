@@ -221,8 +221,9 @@ describe('places by real path (#455)', () => {
     }
     const edit = (st: Record<string, unknown>) =>
       inWorkspace(w, async () => sessions.preToolUse(st.runId as string, { hook_event_name: 'PreToolUse', session_id: st.sessionId, cwd: proj, tool_name: 'apply_patch', tool_input: { command: '*** Begin Patch\n*** Update File: a.txt\n@@\n+x\n*** End Patch' } }))
-    const was = config.settings.agents.fileLocks
-    config.settings.agents.fileLocks = 'warn'
+    // File locks as Hive's workflow default (HI-1766), for either platform the project is detected as.
+    const was = config.settings.workflow
+    config.settings.workflow = { none: { fileLocks: 'warn' }, git: { fileLocks: 'warn' } }
     try {
       const holder = running('lh', named)
       const editor = running('le', proj)
@@ -231,7 +232,7 @@ describe('places by real path (#455)', () => {
       const reply = JSON.stringify(await edit(editor))
       expect(reply).toContain('is also editing a.txt right now')
     } finally {
-      config.settings.agents.fileLocks = was
+      config.settings.workflow = was
       for (const id of ['lh', 'le']) {
         s.live.delete(`${proj.toLowerCase()}#${id}`)
         s.runs.delete(`run-${id}`)

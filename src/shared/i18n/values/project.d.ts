@@ -276,7 +276,6 @@ interface HiveMessageValues {
   'project.session.whoseTip': undefined
   'project.settings.compactAbove': undefined
   'project.settings.global': undefined
-  'project.settings.hours': { count: string | number }
   'project.settings.inherit': { value: string | number }
   'project.settings.inheritList': { value: string | number }
   'project.settings.megabytes': { count: number }
@@ -289,21 +288,15 @@ interface HiveMessageValues {
   'project.settings.on': undefined
   'project.settings.onLower': undefined
   'project.settings.openHive': undefined
-  'project.settings.openVersionControl': undefined
   'project.settings.overrides': undefined
   'project.settings.providerDefault': { provider: string | number }
   'project.settings.reset': undefined
   'project.settings.resetButton': undefined
   'project.settings.resetMessage': undefined
   'project.settings.resetTitle': undefined
-  'project.settings.rounds': undefined
   'project.settings.saveFailed': undefined
   'project.settings.search': { project: string | number }
   'project.settings.sessionsIn': { project: string | number }
-  'project.settings.stepWait': undefined
-  'project.settings.stepWaitDefault': { count: number }
-  'project.settings.waitHours': undefined
-  'project.settings.wake': undefined
   'project.settings.warnOver': undefined
   'project.skills.addLocal': { provider: string | number }
   'project.skills.assistantOnly': { count: number }

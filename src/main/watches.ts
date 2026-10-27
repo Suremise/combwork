@@ -31,6 +31,7 @@ import { inFlightNow as writerInFlight, onLineComing, settled as writerSettled }
 import { readyFor } from './readiness'
 import { cardNamesOf, withCardNames } from './projectKeys'
 import { namedBy } from '../shared/projectKeys'
+import { projectPreferences } from './workflow/preferences'
 
 /**
  * Wake-on-change watches (#128): an agent registers what it waits for on the board (hive_wait_for_tasks with wake), ends
@@ -2204,7 +2205,7 @@ async function releaseContexts(store: Store, recs: readonly WatchRecord[]): Prom
   const loopWakesIn = (projectPath: string): Promise<boolean> => {
     const k = resolve(projectPath).toLowerCase()
     let p = wakes.get(k)
-    if (!p) wakes.set(k, (p = store.ws.projectConfig(projectPath).then((c) => c.loopWakes !== false, () => true)))
+    if (!p) wakes.set(k, (p = store.ws.projectConfig(projectPath).then((c) => projectPreferences(store.ws, projectPath, c).loopWakes, () => projectPreferences(store.ws, projectPath).loopWakes)))
     return p
   }
   return async (rec) => (rec.on && Object.keys(rec.on).length ? { lanes, loopWakes: await loopWakesIn(rec.projectPath) } : NO_CONTEXT)

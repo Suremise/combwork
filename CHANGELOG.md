@@ -125,6 +125,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 - **Copy buttons** beside every command Agent Setup shows, whose install notes are now in your language (#1204).
 - **1.0's text reviewed in every language:** about 2,000 translations corrected against the 1.0 glossary (#1126).
 - **Tidier settings for 1.0.** The files copied into new slots and review copies are now a Git workflow default (Settings → Workflow defaults, and the workspace's), inherited by each project, which can still set its own in Version Control → Slots and copies, where it says where the value comes from. The merge dialogs start from the project's merge style, so the global **Default merge style** is gone. Settings' **Agents & Worktrees** is now **Agents**, and Project Settings splits it into **General** (project key, default provider) and **Agents** (HI-1765).
+- **Card loops and file locks are workflow options.** Wake reviewers and builders, a loop's rounds and wait, the design check wait and File locks are set in Version Control → Workflow, for projects with or without Git, and inherited from the workspace's and Hive's workflow defaults, each saying where its value comes from. They aren't rules: no preset changes them, and a change applies once saved. Your values from Settings → Workspace, Settings → Agents and Project Settings → Card loops move over; those sections, and Project Settings → Workflow, are gone (HI-1766).
 - **Even spacing between sections** in the side panels, and plain buttons with an outline (#1304, #1306).
 
 ### Fixes

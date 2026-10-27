@@ -227,8 +227,6 @@
   "service.workspace.folderExists": "已存在名为“{name}”的文件夹",
   "service.workspace.holdsOpen": "在另一个窗口中打开的工作区 {workspace} 位于 {folder} 内。请先关闭它，再将 {name} 作为工作区打开。",
   "service.workspace.insideOpen": "{folder} 位于工作区 {workspace} 内，而该工作区已在另一个窗口中打开。请先关闭那个工作区，或从那里打开此文件夹中的项目。",
-  "service.workspace.loopRounds": "卡片循环轮次须为 1 到 {max} 之间的整数。",
-  "service.workspace.loopWait": "卡片循环等待时间须为 1 到 {max} 之间的整数小时数。",
   "service.workspace.nameIn": "{name} 同时存在于 {projects}",
   "service.workspace.namesShared": "智能体名称重复",
   "service.workspace.none": "未打开工作区",

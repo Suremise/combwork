@@ -19,6 +19,7 @@ import { isWaiting, type DeliveryRecord } from '../shared/deliveries'
 import { workspaceFor, type WorkspaceService } from './workspace'
 import { scopeOfHost, withCardNames } from './projectKeys'
 import { queueReturnOf } from './queueReturn'
+import { projectPreferences } from './workflow/preferences'
 
 /**
  * Hive's loop wakes (#405): a card loop's routine handoffs, delivered by Hive whether or not the agent set a card watch.
@@ -83,9 +84,9 @@ export async function settled(): Promise<void> {
 
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
 
-/** Whether a project lets Hive wake its loops' agents (Project Settings → Card loops; on unless turned off). */
+/** Whether a project lets Hive wake its loops' agents (its workflow option Wake reviewers and builders, HI-1766: on unless off). */
 export async function wakesOn(ws: WorkspaceService, projectPath: string): Promise<boolean> {
-  return (await ws.projectConfig(projectPath).catch(() => null))?.loopWakes !== false
+  return projectPreferences(ws, projectPath, await ws.projectConfig(projectPath).catch(() => null)).loopWakes
 }
 
 /** A card's reviewer's id: loopReviewerOf, the one rule a design's answer is checked by too (#1382). Null: none (no wakes). */

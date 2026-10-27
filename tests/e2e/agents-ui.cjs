@@ -138,8 +138,9 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await page.locator('.settings-nav .row', { hasText: /^\s*Agents\s*$/ }).first().click()
   check('project settings lists agents', !!(await lib.until(async () => (await page.locator('.agent-list-row').count()) === 2, HUNG_MS)))
   await page.screenshot({ path: path.join(scratch, 'ui-4-projsettings.png') })
-  await page.locator('.settings-top input').fill('lock'); await sleep(300)
-  check('search finds file locks', await page.locator('.setting', { hasText: 'File locks' }).count() === 1)
+  // File locks is a workflow option since HI-1766 (Version Control → Workflow): not here.
+  await page.locator('.settings-top input').fill('lock')
+  check('search finds no file locks here', (await page.locator('.setting', { hasText: 'File locks' }).count()) === 0)
 
   // Files tab root selector
   await page.locator('.tabs .tab', { hasText: 'Files' }).click(); await sleep(600)
@@ -150,7 +151,8 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   // Global settings
   await page.evaluate(() => document.querySelector('[aria-label="Settings"]')?.click()); await sleep(600)
   await page.locator('.settings-nav .row', { hasText: /^\s*Agents\s*$/ }).first().click()
-  check('global agents settings', !!(await lib.until(async () => (await page.locator('.setting', { hasText: 'File locks' }).count()) === 1, HUNG_MS)))
+  check('global agents settings', !!(await lib.until(async () => (await page.locator('.setting', { hasText: 'Count background tasks for up to' }).count()) === 1, HUNG_MS)))
+  check('…without File locks, a workflow option since HI-1766', (await page.locator('.setting', { hasText: 'File locks' }).count()) === 0)
   check('…with no Default merge style or Copy into new worktrees (HI-1765)', (await page.locator('.setting', { hasText: 'Default merge style' }).count()) === 0 && (await page.locator('.setting', { hasText: 'Copy into new worktrees' }).count()) === 0)
   await page.screenshot({ path: path.join(scratch, 'ui-6-global.png') })
 

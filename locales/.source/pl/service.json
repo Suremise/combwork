@@ -227,8 +227,6 @@
   "service.workspace.folderExists": "A folder named \"{name}\" already exists",
   "service.workspace.holdsOpen": "The workspace {workspace}, open in another window, is inside {folder}. Close it first to open {name} as a workspace.",
   "service.workspace.insideOpen": "{folder} is inside the workspace {workspace}, which is open in another window. Close that workspace first, or open this folder's projects from there.",
-  "service.workspace.loopRounds": "Card loop rounds take a whole number from 1 to {max}.",
-  "service.workspace.loopWait": "Card loop wait takes a whole number of hours from 1 to {max}.",
   "service.workspace.nameIn": "{name} is in {projects}",
   "service.workspace.namesShared": "Agents share names",
   "service.workspace.none": "No workspace is open",

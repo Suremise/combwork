@@ -1056,8 +1056,8 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.hive.inbox.idleWakes.title', defaultMessage: 'Wake an idle agent', description: "An advanced setting's title (Settings → Advanced), listed under Hive: Hive types a short line into an idle agent's terminal to tell it something has arrived in its inbox." }),
     desc: msg({
       id: 'settings.advanced.hive.inbox.idleWakes.desc',
-      defaultMessage: "When something arrives in an idle agent's inbox, Hive types one short line into its terminal saying so, which wakes it. Card loops' wakes (Project Settings → Card loops → Wake reviewers and builders) and card watches' are such wakes. Turned off, nothing is typed for anything waiting: it stays in the inbox, the agent's pane shows how many, and its Deliver Now types the line once. A card started on an agent, or a task given to it now, is still typed. A project can set its own in Project Settings → Sessions.",
-      description: 'What the advanced setting "Wake an idle agent" does (Settings → Advanced, under Hive). Project Settings → Card loops → Wake reviewers and builders names a setting and Project Settings → Sessions a section, Deliver Now a menu item: use their names as Hive shows them.'
+      defaultMessage: "When something arrives in an idle agent's inbox, Hive types one short line into its terminal saying so, which wakes it. Card loops' wakes (the workflow option Wake reviewers and builders) and card watches' are such wakes. Turned off, nothing is typed for anything waiting: it stays in the inbox, the agent's pane shows how many, and its Deliver Now types the line once. A card started on an agent, or a task given to it now, is still typed. A project can set its own in Project Settings → Sessions.",
+      description: 'What the advanced setting "Wake an idle agent" does (Settings → Advanced, under Hive). Wake reviewers and builders names a workflow option and Project Settings → Sessions a section, Deliver Now a menu item: use their names as Hive shows them.'
     }),
     kind: 'boolean',
     default: true,

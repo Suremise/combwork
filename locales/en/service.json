@@ -911,14 +911,6 @@
     "defaultMessage": "{folder} is inside the workspace {workspace}, which is open in another window. Close that workspace first, or open this folder's projects from there.",
     "description": "An error opening a workspace: the folder {folder} is inside {workspace}, the workspace of another Hive window (a workspace inside another would share its projects)."
   },
-  "service.workspace.loopRounds": {
-    "defaultMessage": "Card loop rounds take a whole number from 1 to {max}.",
-    "description": "An error in Settings → Workspace: a card loop's rounds (how many reviews a card gets before the user is asked) must be a whole number from 1 to {max}."
-  },
-  "service.workspace.loopWait": {
-    "defaultMessage": "Card loop wait takes a whole number of hours from 1 to {max}.",
-    "description": "An error in Settings → Workspace: a card loop's wait (hours with no change before the user is told) must be a whole number from 1 to {max}."
-  },
   "service.workspace.nameIn": {
     "defaultMessage": "{name} is in {projects}",
     "description": "Part of the notice that agents of several projects share a name: {name} is the name, {projects} the projects (a list, in the language's way: \"alpha and beta\")."

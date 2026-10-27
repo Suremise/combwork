@@ -227,8 +227,6 @@
   "service.workspace.folderExists": "Ein Ordner namens „{name}“ existiert bereits",
   "service.workspace.holdsOpen": "Der Arbeitsbereich {workspace}, der in einem anderen Fenster geöffnet ist, liegt in {folder}. Schließe ihn zuerst, um {name} als Arbeitsbereich zu öffnen.",
   "service.workspace.insideOpen": "{folder} liegt im Arbeitsbereich {workspace}, der in einem anderen Fenster geöffnet ist. Schließe diesen Arbeitsbereich zuerst oder öffne die Projekte dieses Ordners von dort.",
-  "service.workspace.loopRounds": "Runden einer Kartenschleife: eine ganze Zahl von 1 bis {max}.",
-  "service.workspace.loopWait": "Wartezeit einer Kartenschleife: eine ganze Zahl von Stunden von 1 bis {max}.",
   "service.workspace.nameIn": "{name} ist in {projects}",
   "service.workspace.namesShared": "Agenten mit gleichen Namen",
   "service.workspace.none": "Kein Arbeitsbereich geöffnet",

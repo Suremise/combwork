@@ -227,8 +227,6 @@
   "service.workspace.folderExists": "Já existe uma pasta chamada “{name}”",
   "service.workspace.holdsOpen": "O espaço de trabalho {workspace}, aberto em outra janela, está dentro de {folder}. Feche-o primeiro para abrir {name} como espaço de trabalho.",
   "service.workspace.insideOpen": "A pasta {folder} está dentro do espaço de trabalho {workspace}, que está aberto em outra janela. Feche esse espaço de trabalho primeiro ou abra os projetos desta pasta a partir dele.",
-  "service.workspace.loopRounds": "As rodadas do ciclo de cartões aceitam um número inteiro de 1 a {max}.",
-  "service.workspace.loopWait": "A espera do ciclo de cartões aceita um número inteiro de horas de 1 a {max}.",
   "service.workspace.nameIn": "{name} está em {projects}",
   "service.workspace.namesShared": "Agentes com nomes iguais",
   "service.workspace.none": "Nenhum espaço de trabalho aberto",

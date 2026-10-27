@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 94
+const FIXTURES_VERSION = 95
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -2298,7 +2298,7 @@ module.exports.SCENARIOS = [
     }
   },
   ...[
-    // #412: the workspace's Card loop rounds and wait are 7 and 3 h; a loop started without saying takes them, one that
+    // #412: the workspace's Card loops Rounds and Wait (its workflow defaults since HI-1766) are 7 and 3 h; a loop started without saying takes them, one that
     // says its own (3, 1 h) keeps those.
     { id: 'card-loop-lane-defaults', said: '', rounds: 7, wait: 180, title: "A card loop builder told no rounds or wait (#412): its lane takes the workspace's settings, and it waits that long" },
     { id: 'card-loop-lane-override', said: ' Rounds: 3. Wait: 1h.', rounds: 3, wait: 60, title: "A card loop builder told its rounds and wait (#412): they win over the workspace's settings" }
@@ -2308,7 +2308,11 @@ module.exports.SCENARIOS = [
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       await pairInProject(c)
-      await c.inv('workspace:setLoops', { rounds: 7, waitHours: 3 })
+      // The workspace's workflow defaults (HI-1766: Card loops are workflow options), for either version control.
+      for (const platform of ['none', 'git']) {
+        const form = await c.inv('workflow:levelForm', 'workspace', platform)
+        await c.inv('workflow:setLevel', 'workspace', platform, { preset: null, options: { ...form.own, loopRounds: 7, loopWaitHours: 3 }, base: { preset: null, options: form.own } })
+      }
       await c.card('a', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>" instead of "Hello, <name>".', agent: 'coder' })
       await c.card('b', { title: 'Greeting trims the name', description: 'greet.js trims spaces around the name.', agent: 'coder' })
     },

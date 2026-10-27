@@ -104,6 +104,8 @@ const check = (name, ok, extra = '') => {
   // The reviewer joins the builder's lane first (#483): Hive makes the lane, which the builder's own start then updates.
   // Then it waits for c1 to arrive in Review: watching, never idle.
   const lane = (body) => `hive hive_lane ${JSON.stringify(body)}`
+  // The project's own Card loops rounds and wait (workflow options since HI-1766): the lane the join makes takes them.
+  await lib.setOwnOptions(inv, alpha, { loopRounds: 7, loopWaitHours: 5 })
   await say(reviewer.id, `${lane({ action: 'join', builder: 'Builder', cards: [c1, c2] })} then ${wait(c1, { column: 'review' })}`)
   const watching = await until(async () => (await live(reviewer.id))?.status === 'watching', HUNG_MS)
   const st = await live(reviewer.id)
@@ -176,6 +178,7 @@ const check = (name, ok, extra = '') => {
 
   const joined = (await api('GET', '/v1/lanes')).body?.[0]
   check('the reviewer joining made the lane (#483): the builder, the reviewer, the cards in order', joined?.builder?.name === 'Builder' && joined?.reviewer?.name === 'Reviewer' && joined?.cards?.map((c) => c.number).join() === `${c1},${c2}` && joined?.state === 'active' && joined?.current === c1, JSON.stringify(joined))
+  check('…with the project’s own rounds and wait, as its workflow options resolve (HI-1766)', joined?.rounds === 7 && joined?.waitMinutes === 300, JSON.stringify({ rounds: joined?.rounds, waitMinutes: joined?.waitMinutes }))
   // The builder registers its lane (the same one, now with its rounds and wait), works c1, watching for its verdict
   // before moving it to Review; then the loop runs by itself.
   await say(builder.id, `${lane({ action: 'start', cards: [c1, c2], reviewer: 'Reviewer', rounds: 3, waitMinutes: 240, name: 'two cards' })} then ${built(c1)}`)

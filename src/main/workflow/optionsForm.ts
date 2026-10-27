@@ -40,6 +40,7 @@ import { isUnknown } from '../platform/types'
 import { workflowWrite } from './writes'
 import { withRepoLocks } from '../repoLock'
 import { exitBy } from '../exitLog'
+import { LEGACY_CONSUMED, legacyPreferences } from '../../shared/workflow/preferences'
 
 const log = createLogger('workflow')
 
@@ -60,7 +61,8 @@ function projectOf(ws: WorkspaceService, projectPath: string): { path: string; n
 const levelsOf = (ws: WorkspaceService, own: Partial<WorkflowOptions> | null, folder?: string): OptionLevels => ({ global: config.settings.workflow, workspace: ws.config.workflow, project: own, ...(folder ? { folder } : {}) })
 
 /** The options the project sets itself, for its platform (a project's options for another platform don't apply). */
-const ownOf = (cfg: { workflow?: { platform: PlatformId; options: Partial<WorkflowOptions> } }, platform: PlatformId): Partial<WorkflowOptions> => (cfg.workflow?.platform === platform ? cfg.workflow.options : {})
+// A project with no options yet shows its card loops and file locks from before HI-1766 as its own (they're read so).
+const ownOf = (cfg: Pick<ProjectConfig, 'workflow'>, platform: PlatformId): Partial<WorkflowOptions> => (cfg.workflow?.platform === platform ? cfg.workflow.options : cfg.workflow ? {} : legacyPreferences(cfg))
 
 /**
  * What a preset fills in from the project (OP-24: suggested from its scripts, never guessed silently, and shown in the
@@ -295,7 +297,7 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
   const plan = planOptions(ws, project, cfg, change, asking && !!o.answer)
   let target = change.options.target ?? ''
   if (!plan.chosen) {
-    await ws.mutateProjectConfig(project.path, (c) => ({ workflow: planOptions(ws, project, c, change, false).workflow }))
+    await ws.mutateProjectConfig(project.path, (c) => ({ workflow: planOptions(ws, project, c, change, false).workflow, ...LEGACY_CONSUMED }))
     if (!namesOnly(plan.changed) && o.applyTo?.length && plan.changed.length) await applyToInFlight(ws, project, [...new Set(o.applyTo)], plan.changed)
   } else {
     const store = FactStore.forBoard(ws, { project: project.name, key: project.name })
@@ -377,9 +379,10 @@ async function settleLocked(ws: WorkspaceService, project: { path: string; name:
   const rec = mergeChoiceOf(ws, project.name)
   if (!rec?.pending) return
   await ws.mutateProjectConfig(project.path, (c) => {
-    if (workflow) return { workflow }
+    // The options as the form had them, the old keys among them (ownOf): consumed with them (HR5's HI-1766 round 1).
+    if (workflow) return { workflow, ...LEGACY_CONSUMED }
     const own = ownOf(c, project.platform)
-    return { workflow: writeWorkflow(c.workflow, { platform: project.platform, preset: c.workflow?.platform === project.platform ? c.workflow.preset : null, options: { ...own, style: rec.style, commitMessage: rec.commitMessage } }) }
+    return { workflow: writeWorkflow(c.workflow, { platform: project.platform, preset: c.workflow?.platform === project.platform ? c.workflow.preset : null, options: { ...own, style: rec.style, commitMessage: rec.commitMessage } }), ...LEGACY_CONSUMED }
   })
   await boardWrite(ws, async () => {
     const now = mergeChoiceOf(ws, project.name)

@@ -387,6 +387,7 @@ export const AREAS = [
   { paths: ['src/renderer/src/views/OtherViews.tsx'], suites: ['about', 'skills', 'drafts', 'windows', 'recent', 'welcomefit'] },
   { paths: ['tests/e2e/slotoptions.cjs', 'src/renderer/src/components/SlotsAndCopies.tsx', 'src/main/slotSettings.ts','src/main/workflow/slotsUpToDateStep.ts', 'src/main/workflow/optionsForm.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'src/shared/workflow/options.ts', 'src/shared/workflow/optionTexts.ts'], suites: ['slotoptions'] },
   { paths: ['src/shared/slotDefaults.ts', 'src/renderer/src/workflowOrigins.ts'], suites: ['slotoptions', 'workflowdefaults'] },
+  { paths: ['src/shared/loopLimits.ts', 'src/shared/workflow/preferences.ts', 'src/main/workflow/preferences.ts'], suites: ['workflowoptions', 'workflowdefaults', 'cardloop', 'loopwakes', 'p7settings'] },
   { paths: ['src/main/workflow/optionsForm.ts', 'src/main/workflow/rulesets.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'src/shared/workflow/options.ts', 'src/shared/workflow/optionTexts.ts', 'tests/e2e/workflowoptions.cjs'], suites: ['workflowoptions', 'assistantsettings', 'workflowdefaults'] },
   { paths: ['src/main/workflow/levels.ts', 'src/renderer/src/views/SettingsView.tsx'], suites: ['workflowdefaults', 'workflowoptions', 'assistantsettings'] },
   { paths: ['src/renderer/src/boardStages.ts', 'src/renderer/src/components/BoardWorkflow.tsx', 'src/renderer/src/components/Board.tsx', 'src/shared/workflow/stages.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/boardstages.cjs'], suites: ['boardstages'] },
