@@ -89,6 +89,8 @@ import { cardWork, forYou, workBadges } from './workflow/cardWork'
 import { contextWorkspace, currentWorkspace, inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
 import { ensureHiveExcluded, trackedHiveFiles, untrackHive, vcsOf } from './hiveVcs'
 import { hiveWindows, windowForPath, windowOf, windowShowing } from './windows'
+import { noteLongTasks, noteWhere } from './rendererWatch'
+import { cleanTasks, cleanWhere } from '../shared/windowHealth'
 import { setTitleBarBackdrops, setTitleBarColors } from './titleBar'
 import { showWindow } from './tray'
 import { resetMetrics } from './metrics'
@@ -527,6 +529,17 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'window:setTitleBarColors': (color, symbolColor) => setTitleBarColors(win(), { color, symbolColor }),
     'window:setBackdrops': (count) => setTitleBarBackdrops(win(), count),
+    // The page's health in hive.log (HI-1775): where it is, and its long tasks.
+    'window:where': (where) => {
+      const wc = senderStore.getStore()
+      const entry = wc ? windowOf(wc) : null
+      if (entry) noteWhere(entry, cleanWhere(where))
+    },
+    'window:longTasks': (list, where) => {
+      const wc = senderStore.getStore()
+      const entry = wc ? windowOf(wc) : null
+      if (entry) noteLongTasks(entry, cleanTasks(list), cleanWhere(where))
+    },
 
     'settings:get': () => config.settings,
     // Show developer features is kept in advanced.json too: written there first, or refused (#367).

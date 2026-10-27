@@ -332,6 +332,7 @@ export const SUITES = [
   { name: 'wakeuntaken' },
   { name: 'watchrelease' },
   { name: 'welcomefit' },
+  { name: 'windowhealth' },
   { name: 'windows' },
   { name: 'workflowdefaults' },
   { name: 'workflowoptions' },

@@ -145,6 +145,7 @@ import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devCon
 import type { Osc52Refusal } from './osc52'
 import type { ForYouAnswer, ForYouSummary, WorkBadge, WorkView } from './workflow/workView'
 import type { BranchQueueCard, QueueRecent, QueueResumed, QueueView } from './workflow/queue'
+import type { LongTask, WindowWhere } from './windowHealth'
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 export type SettingsPatch = DeepPartial<AppSettings>
@@ -206,6 +207,10 @@ export interface HiveRequests {
   'window:setTitleBarColors': (color: string, symbolColor: string) => void
   /** How many backdrops (dialogs, nested or not, the command palette) are up in this window: dims the window buttons to match. */
   'window:setBackdrops': (count: number) => void
+  /** Where this window is (its view, project, tab, dialog, panels), as it changes: what its long-task and hang lines in hive.log name (HI-1775). */
+  'window:where': (where: WindowWhere) => void
+  /** The page's long tasks just ended, and where it was: logged in hive.log, rate-limited (HI-1775). */
+  'window:longTasks': (tasks: LongTask[], where: WindowWhere) => void
   /** The taskbar button's badge: a PNG (base64) drawn at `scale`, or none at 0. */
   'window:setBadge': (count: number, png: string | null, scale: number) => void
   /** Always on Top for this window, remembered for its workspace (pin.ts). Returns the window's state now. */
