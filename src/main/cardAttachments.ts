@@ -827,7 +827,7 @@ export async function readCardAttachment(ws: WorkspaceService, card: { number: n
       return binary('binary')
     }
     if (!still()) return { problem: 'changed' }
-    const content = from === 0 && text.startsWith('﻿') ? text.slice(1) : text
+    const content = from === 0 && text.startsWith('\uFEFF') ? text.slice(1) : text
     return { ...head, kind: 'text', offset: from, content, ...(from + end < size ? { next: from + end } : {}) }
   } finally {
     await fh.close()

@@ -114,7 +114,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
     const replies = async (p, id) => {
       const s = await live(p, id)
       const items = s?.sessionId ? ((await inv('transcript:read', p, s.sessionId).catch(() => null))?.items ?? []) : []
-      return items.filter((i) => i.kind === 'tool' && /hive_read_attachment$/.test(i.tool.name)).map((i) => i.tool.result ?? '')
+      return items.filter((i) => i.kind === 'tool' && i.tool.name.endsWith('hive_read_attachment')).map((i) => i.tool.result ?? '')
     }
     const ask = async (p, id, args) => {
       const before = (await replies(p, id)).length
@@ -151,9 +151,9 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
     // --- R1 (Codex) starts its review of A: a review copy; then reads the evidence through Hive.
     const codexToken = async () => {
       const run = (await live(alpha, r1.id))?.runId
-      const l = await until(() => lines(path.join(codexHome, 'fake-launches.jsonl')).findLast((x) => x.args.some((y) => run && y.includes(run))), HUNG_MS)
+      const launch = await until(() => lines(path.join(codexHome, 'fake-launches.jsonl')).findLast((l) => l.args.some((y) => run && y.includes(run))), HUNG_MS)
       const { fromCodexTable } = require('./fake-bridge.cjs')
-      return JSON.parse(fs.readFileSync(fromCodexTable(l.args.find((y) => y.startsWith('mcp_servers.hive=')).slice('mcp_servers.hive='.length)).env.HIVE_API_TOKEN_FILE, 'utf8')).token
+      return JSON.parse(fs.readFileSync(fromCodexTable(launch.args.find((y) => y.startsWith('mcp_servers.hive=')).slice('mcp_servers.hive='.length)).env.HIVE_API_TOKEN_FILE, 'utf8')).token
     }
     const startReview = async (token, n) => {
       const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${n}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ review: 'start', reply: 'short' }) })

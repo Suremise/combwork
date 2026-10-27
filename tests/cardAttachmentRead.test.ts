@@ -99,7 +99,7 @@ describe("a card's attachment read through Hive (HI-1751)", () => {
 
   it('a byte-order mark left out of the first page; the end of the file: empty, no next; offsets not a byte of it refused, for text and binary alike', async () => {
     const { w } = await workspace()
-    const c = await cardWith(w, { 'bom.txt': '﻿hello\n', 'shot.png': Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 1, 2]) })
+    const c = await cardWith(w, { 'bom.txt': '\uFEFFhello\n', 'shot.png': Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 1, 2]) })
     expect(await read(w, c, 'bom.txt')).toMatchObject({ content: 'hello\n', size: 9 })
     const end = await read(w, c, 'bom.txt', '9')
     expect(end).toMatchObject({ kind: 'text', offset: 9, content: '' })
