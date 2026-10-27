@@ -29,6 +29,8 @@ const { providerService } = await import('../src/main/providerService')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { runSwitch } = await import('../src/main/connectionSwitch')
 const { authScope } = await import('../src/main/sessions')
+const { updateAgent } = await import('../src/main/projectAgents')
+const { listSkills, invalidateSkillCache } = await import('../src/main/skills')
 
 const status = new Map<string, () => Promise<{ ok: true; loggedIn: boolean; email?: string; orgId?: string } | { ok: false; error: string }>>()
 const signedIn = (email: string) => async () => ({ ok: true as const, loggedIn: true, email, orgId: 'org-1' })
@@ -45,7 +47,8 @@ beforeAll(async () => {
   await advanced.set(ACCOUNTS_PREVIEW, true)
   mkdirSync(join(home, 'projects'), { recursive: true })
   mkdirSync(join(userHome, '.claude'), { recursive: true })
-  mkdirSync(wsPath, { recursive: true })
+  mkdirSync(join(wsPath, 'alpha', '.hive'), { recursive: true })
+  writeFileSync(join(wsPath, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }] }))
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never
   vi.spyOn(provider('claude-code'), 'accountStatus').mockImplementation(async (_exe, env) => {
@@ -336,6 +339,97 @@ describe('a switch at the next safe point (runSwitch)', () => {
     expect(await op.done).toBe('gone')
     expect(a.quits).toEqual([])
     expect(a.resumes).toBe(0)
+  })
+})
+
+describe('round 1: a choice saved during a launch, skills per workspace, the switch off', () => {
+  /** A launch held at its login check until released (the check's answer then: signed in). */
+  async function heldLaunch(a: Connection, wanted: string | null) {
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    status.set(accounts.accountFolder(a.id), async () => {
+      await held
+      return { ok: true, loggedIn: true, email: a.accepted?.email ?? 'x@example.com', orgId: 'org-1' }
+    })
+    const launching = accounts.connectionForLaunch({ provider: 'claude-code', workspaceConfig: w.config, wanted, agentName: 'One', selection: accounts.selectionGeneration() })
+    await vi.waitFor(() => expect(provider('claude-code').accountStatus).toHaveBeenCalled(), { timeout: HUNG_MS })
+    return { release, launching }
+  }
+
+  it("an agent's own choice saved during its launch: the launch is out of date (stillValid false), whatever was chosen", async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const b = await signedInConnection('Work', 'work@example.com')
+    await here(() => updateAgent(join(wsPath, 'alpha'), 'a-one', { connection: a.id }))
+    const { release, launching } = await heldLaunch(a, a.id)
+    // Its saved choice changes from Personal to Work while its launch waits on the check.
+    await here(() => updateAgent(join(wsPath, 'alpha'), 'a-one', { connection: b.id }))
+    release()
+    const c = (await launching)!
+    expect(c.id).toBe(a.id)
+    expect(c.stillValid()).toBe(false)
+    c.release()
+    // Nothing still holds it.
+    await accounts.removeAccount(a.id)
+  })
+
+  it("the Assistant's own choice saved during its launch: out of date too", async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const b = await signedInConnection('Work', 'work@example.com')
+    const { release, launching } = await heldLaunch(a, null)
+    await here(() => accounts.setAssistantConnection('claude-code', b.id))
+    release()
+    const c = (await launching)!
+    expect(c.stillValid()).toBe(false)
+    c.release()
+  })
+
+  it("machine skills: each workspace's own connections' only; a connection turned on shows its skills at once, the cache warm", async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const b = await accounts.addAccount('claude-code', 'Work')
+    for (const [conn, name] of [[a, 'shared-skill'], [b, 'private-b'], [b, 'shared-skill']] as const) {
+      const dir = join(accounts.accountFolder(conn.id), 'skills', name)
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, 'SKILL.md'), `---\nname: ${name}\ndescription: ${name} of ${conn.name}\n---\n`)
+    }
+    // A second workspace with Work alone on.
+    const ws2Path = join(base, 'ws2')
+    mkdirSync(ws2Path, { recursive: true })
+    const w2 = createWorkspaceService()
+    await w2.open(ws2Path)
+    try {
+      await inWorkspace(w2, () => accounts.setAccountOn(b.id, true))
+      invalidateSkillCache()
+      const names = async (ws: typeof w) => (await inWorkspace(ws, () => listSkills())).filter((s) => s.level === 'machine').map((s) => s.path)
+      const inA = await names(w)
+      expect(inA.some((p) => p.includes('private-b'))).toBe(false)
+      expect(inA.some((p) => p.startsWith(accounts.accountFolder(a.id)))).toBe(true)
+      const inB = await names(w2)
+      expect(inB.some((p) => p.includes('private-b'))).toBe(true)
+      expect(inB.some((p) => p.startsWith(accounts.accountFolder(a.id)))).toBe(false)
+      // Work turned on in the first workspace too: its skills there at once (no stale cache).
+      await here(() => accounts.setAccountOn(b.id, true))
+      expect((await names(w)).some((p) => p.includes('private-b'))).toBe(true)
+    } finally {
+      await disposeWorkspaceService(w2)
+    }
+  })
+
+  it('the switch off: every action refused, nothing made, and the view checks nothing', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    await advanced.set(ACCOUNTS_PREVIEW, false)
+    try {
+      const before = (provider('claude-code').accountStatus as unknown as { mock: { calls: unknown[] } }).mock.calls.length
+      expect(await outcome(accounts.addAccount('claude-code', 'No'))).toMatch(/Connections are a preview/)
+      expect((config.get().connections ?? []).map((c) => c.name)).toEqual(['Personal'])
+      for (const act of [() => Promise.resolve().then(() => accounts.renameAccount(a.id, 'X')), () => accounts.removeAccount(a.id), () => accounts.signInAccount(a.id), () => Promise.resolve().then(() => accounts.keepNewLogin(a.id)), () => here(() => accounts.setAccountOn(a.id, false)), () => here(() => accounts.setAccountDefault(a.id)), () => here(() => accounts.setAssistantConnection('claude-code', a.id)), () => accounts.claimAccount(a.id)])
+        expect(await outcome(act())).toMatch(/Connections are a preview/)
+      expect(here(() => accounts.accountsView(true))).toMatchObject({ preview: false, connections: [] })
+      expect((provider('claude-code').accountStatus as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(before)
+      // And a launch takes the way before connections.
+      expect(await launch()).toBeNull()
+    } finally {
+      await advanced.set(ACCOUNTS_PREVIEW, true)
+    }
   })
 })
 

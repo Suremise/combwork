@@ -3,7 +3,7 @@ import { mkdir, readFile, rm, writeFile } from 'original-fs/promises'
 import { existsSync, type Dirent } from 'original-fs'
 import { unzipSync } from 'fflate'
 import yaml from 'js-yaml'
-import type { ProviderId, SkillAudience, SkillInfo, SkillTarget } from '../shared/types'
+import type { ProviderId, SkillAudience, SkillInfo, SkillTarget, WorkspaceConfig } from '../shared/types'
 import { allProviders, provider } from './providers'
 import { connectionHomes } from './accounts'
 import { bundledDir, bundledIds, bundledStatus, restoreBundled } from './bundled'
@@ -13,7 +13,7 @@ import { msg, type Msg } from '../shared/i18n'
 import { hiveError } from './hiveError'
 import { createLogger } from './logger'
 import { headerOf, SKILL_HEAD_MAX } from './revisions'
-import { workspace } from './workspace'
+import { workspace, workspaceOf } from './workspace'
 import { trash } from './trash'
 
 const log = createLogger('skills')
@@ -174,14 +174,19 @@ async function findSkills(root: string, level: SkillInfo['level'], maxDepth: num
   return out
 }
 
-let machineCache: { at: number; skills: SkillInfo[] } | null = null
+/** Machine skills read lately, by the homes they were read from (HI-1755: each workspace's connections' own). */
+const machineCache = new Map<string, { at: number; skills: SkillInfo[] }>()
 
-/** Skills each provider's CLI loads from the user's profile and its installed plugins. */
-async function machineSkills(): Promise<SkillInfo[]> {
-  if (machineCache && Date.now() - machineCache.at < 30_000) return machineCache.skills
+/**
+ * Skills each provider's CLI loads from the user's profile and its installed plugins: for a CLI with connections, those
+ * of the connections on in the asking workspace (`cfg`; HI-1755), never another workspace's; else the CLI's own home.
+ */
+async function machineSkills(cfg: WorkspaceConfig | null): Promise<SkillInfo[]> {
+  const homes: [ReturnType<typeof provider>, string | undefined][] = allProviders().flatMap((x) => connectionHomes(x.id, cfg)?.map((h): [typeof x, string | undefined] => [x, h.home]) ?? [[x, undefined]])
+  const key = JSON.stringify(homes.map(([p, h]) => [p.id, h ?? '']))
+  const cached = machineCache.get(key)
+  if (cached && Date.now() - cached.at < 30_000) return cached.skills
   const all: SkillInfo[] = []
-  // Each connection's home on in an open workspace (HI-1755: its own skills and plugins), else the CLI's own home.
-  const homes: [ReturnType<typeof provider>, string | undefined][] = allProviders().flatMap((x) => connectionHomes(x.id)?.map((h): [typeof x, string | undefined] => [x, h.home]) ?? [[x, undefined]])
   for (const [p, home] of homes) {
     const roots = p.skillRoots(home)
     const skills: SkillInfo[] = []
@@ -203,7 +208,7 @@ async function machineSkills(): Promise<SkillInfo[]> {
       all.push({ ...s, provider: p.id })
     }
   }
-  machineCache = { at: Date.now(), skills: all }
+  machineCache.set(key, { at: Date.now(), skills: all })
   return all
 }
 
@@ -315,13 +320,15 @@ export async function localSkills(projectPath: string): Promise<SkillInfo[]> {
 
 /** Every skill: the workspace's Hive skills, each provider's user and plugin skills, and the project's local skills if given. */
 export async function listSkills(projectPath?: string): Promise<SkillInfo[]> {
-  const out = [...(await hiveSkills()), ...(await machineSkills())]
+  // The asking workspace's: the project's, else the current work's (HI-1755: its connections' skills only).
+  const ws = projectPath ? workspaceOf(projectPath) : workspace
+  const out = [...(await hiveSkills()), ...(await machineSkills(ws.path ? ws.config : null))]
   if (projectPath) out.push(...(await localSkills(projectPath)))
   return out
 }
 
 export function invalidateSkillCache(): void {
-  machineCache = null
+  machineCache.clear()
 }
 
 export function validSkillName(name: string): boolean {

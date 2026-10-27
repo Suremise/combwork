@@ -95,8 +95,14 @@ function changeAccount(id: string, fn: (a: Connection) => void): void {
 // Refusals, in the user's language.
 // ---------------------------------------------------------------------------
 
+const PREVIEW_OFF = msg({ id: 'main.accounts.previewOff', defaultMessage: 'Connections are a preview: turn on Settings → Advanced → Connections (preview) first.', description: 'An error: something about connections was asked while their preview switch is off. Settings → Advanced → Connections (preview) names a setting: use its name as Hive shows it.' })
 const NO_NAME = msg({ id: 'main.accounts.noName', defaultMessage: 'Give the connection a name.', description: 'An error adding or renaming a connection in Settings → Connections: its name is empty.' })
 const NO_ACCOUNT = msg({ id: 'main.accounts.notFound', defaultMessage: 'There is no such connection.', description: 'An error: a connection named by its id is not in Settings → Connections (removed meanwhile).' })
+
+/** Refuses an action on connections while they are off (the preview switch, until S8): nothing is made or changed. */
+function assertOn(): void {
+  if (!connectionsOn()) throw hiveError(PREVIEW_OFF, undefined, { kind: 'forbidden' })
+}
 
 function mustGet(id: string): Connection {
   const a = getAccount(id)
@@ -138,6 +144,7 @@ const claims = new Map<string, number>()
  * refused while one is held. Returns its release.
  */
 export async function claimAccount(id: string): Promise<() => void> {
+  assertOn()
   await locked(id, async () => {
     await assertUsable(mustGet(id))
     claims.set(id, (claims.get(id) ?? 0) + 1)
@@ -374,6 +381,7 @@ export async function finishLeftoverRemovals(): Promise<void> {
 
 /** Adds an account, its folder and junctions made and checked; then the window offers its Sign in. */
 export async function addAccount(id: ProviderId, name: string): Promise<Connection> {
+  assertOn()
   support(id)
   const n = name.trim()
   if (!n) throw hiveError(NO_NAME, undefined, { kind: 'invalid' })
@@ -395,6 +403,7 @@ export async function addAccount(id: ProviderId, name: string): Promise<Connecti
 }
 
 export function renameAccount(id: string, name: string): void {
+  assertOn()
   mustGet(id)
   const n = name.trim()
   if (!n) throw hiveError(NO_NAME, undefined, { kind: 'invalid' })
@@ -406,6 +415,7 @@ export function renameAccount(id: string, name: string): void {
  * (removeFolder); the account stays listed, saying what's left, until that succeeds.
  */
 export async function removeAccount(id: string): Promise<void> {
+  assertOn()
   const a = mustGet(id)
   const inUse = (): boolean => sessionsOn(id) || (claims.get(id) ?? 0) > 0 || loginsOpen.has(id) || hasPty(loginKey(a))
   const IN_USE = msg({ id: 'main.accounts.inUse', defaultMessage: '{name} is in use: stop the agents on it and close its sign-in, then remove it.', description: 'An error removing a connection ({name}, its name in Settings → Connections): agents run on it, or its sign-in terminal is open.' })
@@ -534,6 +544,7 @@ export async function confirmAccount(id: string): Promise<{ observed: Connection
  * checked; its first good login becomes the one accepted. Returns the terminal's key.
  */
 export async function signInAccount(id: string): Promise<string> {
+  assertOn()
   mustGet(id)
   // Started under the account's lock, so never while it is being removed: the account checked still there (a removal
   // before it wins), and its folder still the one Hive made (a folder replaced by a link would take the CLI's login
@@ -577,6 +588,7 @@ async function assertUsable(a: Connection): Promise<void> {
 
 /** Keeps the login an account is now signed in as (its change answered): refused without a good one to keep. */
 export function keepNewLogin(id: string): void {
+  assertOn()
   const a = mustGet(id)
   const ok = acceptable(a.observed)
   if (!ok) throw hiveError(msg({ id: 'main.accounts.nothingToKeep', defaultMessage: "{name} isn't signed in as anyone Hive could check, so there's no login to keep.", description: "An error: Keep the new login was asked for a connection ({name}) whose latest check didn't find it signed in." }), { name: a.name }, { kind: 'conflict' })
@@ -734,6 +746,8 @@ export function stopAccountWatches(): void {
 
 /** What Settings → Accounts shows for the asking window's workspace; each account checked again as it is shown. */
 export function accountsView(check = false): ConnectionsView {
+  // Off (the preview switch, until S8): nothing is listed, and nothing is checked.
+  if (!connectionsOn()) return { preview: false, providers: [], connections: [], workspace: {}, testHome: [] }
   const all = list()
   if (check) for (const a of all) void checkAccount(a.id)
   const providers = PROVIDERS.filter((p) => !!p.capabilities.connections && isProviderEnabled(config.settings, p.id)).map((p) => p.id)
@@ -744,8 +758,6 @@ export function accountsView(check = false): ConnectionsView {
     if (w) ws[p] = w
   }
   const testHome = providers.filter((p) => !connectionsManaged(p))
-  // Off (the preview switch, until S8): nothing about connections is shown.
-  if (!connectionsOn()) return { preview: false, providers: [], connections: [], workspace: {}, testHome: [] }
   return { preview: true, providers, connections: all.map((a) => ({ ...a, signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id) })), workspace: ws, testHome }
 }
 
@@ -758,6 +770,7 @@ async function saveChoice(fn: (cfg: WorkspaceConfig) => WorkspaceConfig['connect
 
 /** Turns an account on or off in the asking window's workspace (on, with no default yet: it becomes the default). */
 export async function setAccountOn(id: string, on: boolean): Promise<void> {
+  assertOn()
   const a = mustGet(id)
   let chosen: string | null = null
   await saveChoice((c) => {
@@ -770,6 +783,7 @@ export async function setAccountOn(id: string, on: boolean): Promise<void> {
 
 /** Makes an account the asking window's workspace's default for its provider (turning it on if it isn't). */
 export async function setAccountDefault(id: string): Promise<void> {
+  assertOn()
   const a = mustGet(id)
   await saveChoice((c) => {
     const cur = workspaceAccounts(c, a.provider, list())
@@ -781,11 +795,13 @@ export async function setAccountDefault(id: string): Promise<void> {
 
 /** The Assistant's own connection for a provider in the asking window's workspace (HI-1755); null: the default. */
 export async function setAssistantConnection(id: ProviderId, connection: string | null): Promise<void> {
+  assertOn()
   if (connection) {
     const a = mustGet(connection)
     if (a.provider !== id) throw hiveError(NO_ACCOUNT, undefined, { kind: 'invalid' })
   }
   await workspace.saveWorkspaceConfigWith((c) => ({ assistantConnection: { ...c.assistantConnection, [id]: connection } }))
+  choiceChanged()
   emit({ type: 'connections-changed' })
 }
 
@@ -808,6 +824,16 @@ export function newWorkspaceAccounts(): WorkspaceConfig['connections'] | undefin
 // ---------------------------------------------------------------------------
 // Launching on a connection (HI-1755).
 // ---------------------------------------------------------------------------
+
+/**
+ * Moves on whenever an agent's or the Assistant's own choice of connection is saved (choiceChanged): a launch taken
+ * before it is out of date (stillValid), whatever the new choice is.
+ */
+let selections = 0
+export const selectionGeneration = (): number => selections
+export function choiceChanged(): void {
+  selections++
+}
 
 /** A launch's connection: its folder given as the CLI's home, held (claimed) until the launch ends either way. */
 export interface LaunchConnection {
@@ -845,7 +871,9 @@ const LAUNCH = {
  * afresh: signed out, still changing, or its folder unusable refuse; a check that couldn't tell goes ahead, noted. The
  * caller releases it however the launch ends, and asks stillValid() again before its process starts.
  */
-export async function connectionForLaunch(o: { provider: ProviderId; workspaceConfig: WorkspaceConfig | null; wanted: string | null | undefined; agentName: string }): Promise<LaunchConnection | null> {
+export async function connectionForLaunch(o: { provider: ProviderId; workspaceConfig: WorkspaceConfig | null; wanted: string | null | undefined; agentName: string; selection?: number }): Promise<LaunchConnection | null> {
+  // The selection as the caller read its choice (taken now when it didn't say).
+  const selection = o.selection ?? selectionGeneration()
   const caps = providerDescriptor(o.provider).capabilities.connections
   // Connections off (the preview switch, until S8): everything launches as before.
   if (!caps || !connectionsOn()) return null
@@ -876,7 +904,7 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
       homeEnv: caps.homeEnv,
       ...(note ? { note } : {}),
       release,
-      stillValid: () => generation(id) === gen && !!getAccount(id) && (() => {
+      stillValid: () => selectionGeneration() === selection && generation(id) === gen && !!getAccount(id) && (() => {
         const now = choose()
         return now.ok && now.id === id
       })()

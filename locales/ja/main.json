@@ -9,6 +9,7 @@
   "main.accounts.noProvider": "Hiveでは{cli}のサインイン接続はまだ使えません。",
   "main.accounts.notFound": "その接続はありません。",
   "main.accounts.nothingToKeep": "{name}はHiveが確認できるログインでサインインしていないため、残すログインがありません。",
+  "main.accounts.previewOff": "接続はプレビュー機能です。先に「設定」→「詳細」→「接続（プレビュー）」をオンにしてください。",
   "main.accounts.removeFailed": "{name}を削除できませんでした：{error}。フォルダーの外には何も変更していません。「削除」でもう一度試せます。",
   "main.antivirus.allExcluded": "Hiveが提案できるフォルダーはすべて除外済みです。",
   "main.antivirus.changed": "確認後にワークスペースが変わったため、何も変更していません。",

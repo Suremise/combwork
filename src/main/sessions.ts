@@ -64,7 +64,7 @@ import type {
 import { provider as providerAdapter, allProviders } from './providers'
 import { runSwitch, type SwitchOp } from './connectionSwitch'
 import { connectionsOn } from './connectionSeam'
-import { checkAccount, connectionForLaunch, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
+import { checkAccount, connectionForLaunch, onConnectionSignedIn, selectionGeneration, setAccountSessions, type LaunchConnection } from './accounts'
 import { resolveConnection } from '../shared/accounts'
 import { recacheEstimate } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
@@ -1836,7 +1836,12 @@ class SessionManager {
     this.followConnections()
     const ws = workspaceOf(projectPath)
     const assistant = workspace.isAssistantHome(projectPath)
-    const conn = await connectionForLaunch({ provider: l.adapter.id, workspaceConfig: ws.path ? ws.config : null, wanted: assistant ? ws.config.assistantConnection?.[l.adapter.id] : agent.connection, agentName: agent.name })
+    // Its choice as saved now (not as it was when its start began), and the selection it was read at: a choice saved
+    // during the launch makes it out of date (stillValid), so it never spawns on a connection no longer chosen.
+    const saved = assistant ? null : projectAgents(await ws.projectConfig(projectPath)).find((a) => a.id === agent.id)
+    const selection = selectionGeneration()
+    const wanted = assistant ? ws.config.assistantConnection?.[l.adapter.id] : (saved ?? agent).connection
+    const conn = await connectionForLaunch({ provider: l.adapter.id, workspaceConfig: ws.path ? ws.config : null, wanted, agentName: agent.name, selection })
     times?.mark('connection')
     try {
       await this.launchOn(projectPath, agent, opts, times, conn)

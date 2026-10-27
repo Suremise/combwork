@@ -11,6 +11,7 @@ interface HiveMessageValues {
   'main.accounts.noProvider': { cli: string | number }
   'main.accounts.notFound': undefined
   'main.accounts.nothingToKeep': { name: string | number }
+  'main.accounts.previewOff': undefined
   'main.accounts.removeFailed': { name: string | number; error: string | number }
   'main.antivirus.allExcluded': undefined
   'main.antivirus.changed': undefined
