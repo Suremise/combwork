@@ -53,6 +53,7 @@
   "settings.accounts.renameConfirm": "Renomear",
   "settings.accounts.renameTitle": "Renomear a conexão {name}",
   "settings.accounts.sameLogin": "Conectada com o mesmo login de outra conexão: {names}",
+  "settings.accounts.setUpChecking": "Verificando…",
   "settings.accounts.setUpDone": "Configurada",
   "settings.accounts.setUpIn": "Ele abre na pasta de {project}, {folder}: responda à pergunta do {cli} para confiar nela.",
   "settings.accounts.setUpNeeded": "Precisa ser configurada",

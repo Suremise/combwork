@@ -55,6 +55,7 @@ interface HiveMessageValues {
   'settings.accounts.renameConfirm': undefined
   'settings.accounts.renameTitle': { name: string | number }
   'settings.accounts.sameLogin': { names: string | number }
+  'settings.accounts.setUpChecking': undefined
   'settings.accounts.setUpDone': undefined
   'settings.accounts.setUpIn': { project: string | number; folder: string | number; cli: string | number }
   'settings.accounts.setUpNeeded': undefined

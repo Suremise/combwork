@@ -53,6 +53,7 @@
   "settings.accounts.renameConfirm": "Zmień nazwę",
   "settings.accounts.renameTitle": "Zmień nazwę połączenia {name}",
   "settings.accounts.sameLogin": "Zalogowane tymi samymi danymi co inne połączenie: {names}",
+  "settings.accounts.setUpChecking": "Sprawdzanie…",
   "settings.accounts.setUpDone": "Skonfigurowane",
   "settings.accounts.setUpIn": "Otwiera się w folderze projektu {project}, {folder}: odpowiedz na pytanie {cli}, aby mu zaufać.",
   "settings.accounts.setUpNeeded": "Wymaga konfiguracji",

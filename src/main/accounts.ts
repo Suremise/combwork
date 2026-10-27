@@ -561,7 +561,7 @@ export async function removeAccount(id: string, opts: { closeTerminal?: boolean 
     })
     forgetConnectionUsage(id)
     setUpRead.delete(id)
-    for (const k of [...trustRead.keys()]) if (k.startsWith(`${id}|`)) trustRead.delete(k)
+    for (const k of [...trustState.keys()]) if (k.startsWith(`${id}|`)) dropTrust(k)
     log.info(`account ${id} removed`)
     syncWatches()
   })
@@ -668,100 +668,125 @@ async function resolveTarget(p: { name: string; path: string }): Promise<Project
   return { project: p.name, root: tree ? await realpath(tree).catch(() => null) : null, git: true, short }
 }
 
-/** Per connection and workspace (`<id>|<workspace>`): its projects' trust as last read, with what it was read for. */
-const trustRead = new Map<string, { projects: { name: string; path: string }[]; sig: string; pending: { project: string; folder: string }[]; unknown: boolean }>()
 const trustKey = (id: string, ws: string): string => `${id}|${ws.toLowerCase()}`
 
 type TrustAnswer = { pending: { project: string; folder: string }[]; unknown: boolean }
+type Projects = { name: string; path: string }[]
 
 /**
- * Per connection and workspace: the trust read under way (its project set) and one queued after it (`fresh`: asked for
- * once something changed meanwhile, a terminal ended). A refresh for the same set joins them; another set starts its own.
+ * A connection's trust of one workspace's projects (HI-1870 round 3), per `<id>|<workspace>`. At most one read runs; a
+ * request meanwhile only marks it `dirty` (nothing is queued). `gen` moves when the project set asked for changes, the
+ * connection's own generation moves, or one of its terminals ends; a read's answer is kept only if `gen` is still the
+ * one it started at, and a read ending dirty, or with `gen` moved, reads once more for the projects wanted now.
  */
-const trustInFlight = new Map<string, { sig: string; now: Promise<TrustAnswer | null>; next?: Promise<TrustAnswer | null> }>()
-/** Per connection and workspace, the latest read started: an older one's answer is dropped, never written over it. */
-const trustSeq = new Map<string, number>()
-let trustSeqs = 0
+interface TrustState {
+  gen: number
+  sig: string
+  projects: Projects
+  /** The connection's own generation when `gen` last moved (removed or made again: everything older is stale). */
+  conn: number
+  running: boolean
+  dirty: boolean
+  result?: { gen: number; answer: TrustAnswer }
+  /** Callers waiting for a current answer (Set Up's folder): resolved once idle with one, or with null when it goes. */
+  waiters: ((a: TrustAnswer | null) => void)[]
+}
+const trustState = new Map<string, TrustState>()
 
-/**
- * Reads a connection's trust of a workspace's projects (HI-1870), telling the windows when it changed. Coalesced: one
- * read per connection, workspace and project set at a time; `fresh` waits for one begun after the call (the one under
- * way may have read the files before the change).
- */
-function readTrust(id: string, ws: string, projects: { name: string; path: string }[], fresh = false): Promise<TrustAnswer | null> {
+/** Asks for a connection's trust of a workspace's projects; `changed`: something may have changed it (a terminal ended). */
+function requestTrust(id: string, ws: string, projects: Projects, mayHaveChanged = false): TrustState {
   const key = trustKey(id, ws)
   const sig = JSON.stringify(projects)
-  const f = trustInFlight.get(key)
-  if (f && f.sig === sig) {
-    if (!fresh) return f.next ?? f.now
-    f.next ??= f.now.catch(() => null).then(() => startTrust(key, id, projects))
-    return f.next
+  const conn = generation(id)
+  let st = trustState.get(key)
+  if (!st) {
+    st = { gen: 0, sig, projects, conn, running: false, dirty: false, waiters: [] }
+    trustState.set(key, st)
   }
-  return startTrust(key, id, projects)
+  if (st.sig !== sig || st.conn !== conn || mayHaveChanged) {
+    st.gen++
+    st.sig = sig
+    st.projects = projects
+    st.conn = conn
+  }
+  if (st.running) st.dirty = true
+  else void runTrust(key, id, st)
+  return st
 }
 
-function startTrust(key: string, id: string, projects: { name: string; path: string }[]): Promise<TrustAnswer | null> {
-  const sig = JSON.stringify(projects)
-  const seq = ++trustSeqs
-  trustSeq.set(key, seq)
-  const now = readTrustOnce(key, id, projects, seq)
-  // A read queued after this one (`next`, set by readTrust) starts once it ends and takes its place here.
-  trustInFlight.set(key, { sig, now })
-  void now.catch(() => null).then(() => {
-    const f = trustInFlight.get(key)
-    if (f?.now === now && !f.next) trustInFlight.delete(key)
-  })
-  return now
+/** The one read of a key: its answer kept only while its generation is current, then once more if it went stale. */
+async function runTrust(key: string, id: string, st: TrustState): Promise<void> {
+  st.running = true
+  st.dirty = false
+  const gen = st.gen
+  const answer = await readTrustOnce(id, st.projects).catch(() => null)
+  st.running = false
+  // Removed meanwhile, or the workspace closed: its state is gone, and its waiters were told.
+  if (trustState.get(key) !== st) return
+  if (!getAccount(id) || st.conn !== generation(id)) return dropTrust(key)
+  const current = gen === st.gen
+  if (current && answer) {
+    const was = st.result
+    st.result = { gen, answer }
+    if (!was || JSON.stringify(was.answer) !== JSON.stringify(answer)) emit({ type: 'connections-changed' })
+  }
+  if (st.dirty || !current) return void runTrust(key, id, st)
+  for (const w of st.waiters.splice(0)) w(st.result?.gen === st.gen ? st.result.answer : null)
 }
 
-async function readTrustOnce(key: string, id: string, projects: { name: string; path: string }[], seq: number): Promise<TrustAnswer | null> {
+/** One reading of a connection's trust of these projects, through its adapter. */
+async function readTrustOnce(id: string, projects: Projects): Promise<TrustAnswer | null> {
   const a = getAccount(id)
   const read = a && provider(a.provider).connectionTrusts
   if (!a || !read) return null
-  const gen = generation(id)
   const targets = await trustTargets(projects)
   const got = await read.call(provider(a.provider), accountFolder(id), targets).catch(() => targets.map(() => null))
-  const pending = targets.flatMap((t, i) => (got[i] === false && t.root ? [{ project: t.project, folder: t.root }] : []))
-  const now = { projects, sig: JSON.stringify(projects), pending, unknown: got.some((x) => x === null) }
-  // Removed meanwhile, or a newer read started (another project set, or one asked for after a change): dropped.
-  if (generation(id) !== gen || !getAccount(id) || trustSeq.get(key) !== seq) return null
-  const was = trustRead.get(key)
-  trustRead.set(key, now)
-  if (!was || JSON.stringify([was.sig, was.pending, was.unknown]) !== JSON.stringify([now.sig, now.pending, now.unknown])) emit({ type: 'connections-changed' })
-  return { pending, unknown: now.unknown }
+  return { pending: targets.flatMap((t, i) => (got[i] === false && t.root ? [{ project: t.project, folder: t.root }] : [])), unknown: got.some((x) => x === null) }
 }
 
-/** Every workspace a connection's trust was read for, read again, once each (its Sign In or Set Up terminal ended). */
+/** A key's state gone (its connection removed, its workspace closed): its waiters told there is no answer. */
+function dropTrust(key: string): void {
+  const st = trustState.get(key)
+  if (!st) return
+  trustState.delete(key)
+  for (const w of st.waiters.splice(0)) w(null)
+}
+
+/** Every workspace a connection's trust was read for, read again: one of its terminals ended (it may have changed). */
 export function rereadTrust(id: string): void {
-  for (const [k, v] of trustRead) if (k.startsWith(`${id}|`)) void readTrust(id, k.slice(id.length + 1), v.projects, true)
+  for (const [k, st] of trustState) if (k.startsWith(`${id}|`)) requestTrust(id, k.slice(id.length + 1), st.projects, true)
 }
 
 /**
- * A connection's trust of this window's workspace as the view shows it (HI-1870 round 1): its answer for the current
- * project set; else, while that is read, unknown, keeping the projects already found untrusted that are still here (a
- * definite not-done). Never `done` from an answer for another set, nor before one.
+ * A connection's trust of this window's workspace as the view shows it (HI-1870 round 3): its answer while current;
+ * else `checking`, keeping the projects already found untrusted that are still here (a definite not-done). Never done
+ * from an answer for another set of projects, nor before one.
  */
-function trustShown(id: string, ws: string, here: { name: string; path: string }[]): TrustAnswer {
-  const t = trustRead.get(trustKey(id, ws))
-  if (t && t.sig === JSON.stringify(here)) return { pending: t.pending, unknown: t.unknown }
-  return { pending: (t?.pending ?? []).filter((p) => here.some((h) => h.name === p.project)), unknown: true }
+function trustShown(id: string, ws: string, here: Projects): TrustAnswer & { checking?: true } {
+  const st = trustState.get(trustKey(id, ws))
+  const r = st?.result
+  // A refresh of the same set leaves its generation (and so its answer) current while it reads again.
+  if (st && r && r.gen === st.gen && st.sig === JSON.stringify(here)) return r.answer
+  return { pending: (r?.answer.pending ?? []).filter((p) => here.some((h) => h.name === p.project)), unknown: true, checking: true }
 }
 
 /** Forgets trust read for workspaces no window has open any more. */
 function pruneTrust(): void {
   const open = new Set(openWorkspaces().map((w) => w.path!.toLowerCase()))
-  for (const k of [...trustRead.keys()]) if (!open.has(k.slice(k.indexOf('|') + 1))) trustRead.delete(k)
+  for (const k of [...trustState.keys()]) if (!open.has(k.slice(k.indexOf('|') + 1))) dropTrust(k)
 }
 
 /**
  * Where a connection's Set Up opens (HI-1870): the first folder of this window's workspace it doesn't trust yet, read
- * now, so the CLI asks its trust question there; none, its own folder (its first-run screens). Always a folder there is.
+ * now (once a current answer is in), so the CLI asks its trust question there; none, its own folder (its first-run
+ * screens). Always a folder there is.
  */
 export async function setUpFolder(id: string): Promise<string | undefined> {
   const a = getAccount(id)
   if (!a || !workspace.path || !onHere(a)) return undefined
-  const t = await readTrust(id, workspace.path, projectsHere(), true)
-  return t?.pending[0]?.folder
+  const st = requestTrust(id, workspace.path, projectsHere(), true)
+  const answer = await new Promise<TrustAnswer | null>((r) => st.waiters.push(r))
+  return answer?.pending[0]?.folder
 }
 
 /** Whether a connection is on in this window's workspace: its trust of the workspace's folders counts then. */
@@ -1095,8 +1120,8 @@ export function accountsView(check = false): ConnectionsView {
   const here = workspace.path ? projectsHere() : []
   pruneTrust()
   // Read when shown (a refresh joins the read under way), or when this set of projects hasn't been read yet.
-  if (workspace.path) for (const a of all) if (onHere(a) && (check || trustRead.get(trustKey(a.id, workspace.path))?.sig !== JSON.stringify(here))) void readTrust(a.id, workspace.path, here)
-  const trustOf = (a: Connection): { trust?: TrustAnswer } => (workspace.path && onHere(a) && provider(a.provider).connectionTrusts ? { trust: trustShown(a.id, workspace.path, here) } : {})
+  if (workspace.path) for (const a of all) if (onHere(a) && (check || trustState.get(trustKey(a.id, workspace.path))?.sig !== JSON.stringify(here))) requestTrust(a.id, workspace.path, here)
+  const trustOf = (a: Connection): { trust?: TrustAnswer & { checking?: true } } => (workspace.path && onHere(a) && provider(a.provider).connectionTrusts ? { trust: trustShown(a.id, workspace.path, here) } : {})
   void loadKeys()
   const providers = PROVIDERS.filter((p) => !!p.capabilities.connections && isProviderEnabled(config.settings, p.id)).map((p) => p.id)
   const cfg = workspace.path ? workspace.config : null

@@ -12,6 +12,8 @@ import type { Connection, ProviderId, WorkspaceConnections, WorkspaceConfig } fr
 export interface ConnectionTrust {
   pending: { project: string; folder: string }[]
   unknown: boolean
+  /** Its answer for the workspace's current projects isn't in yet (HI-1870 round 3): shown as Checking…, never set up. */
+  checking?: true
 }
 
 /**

@@ -53,6 +53,7 @@
   "settings.accounts.renameConfirm": "名前を変更",
   "settings.accounts.renameTitle": "{name}の名前を変更",
   "settings.accounts.sameLogin": "別の接続と同じログインでサインインしています：{names}",
+  "settings.accounts.setUpChecking": "確認中…",
   "settings.accounts.setUpDone": "セットアップ済み",
   "settings.accounts.setUpIn": "{project}のフォルダー（{folder}）で開きます。{cli}の質問に答えて信頼してください。",
   "settings.accounts.setUpNeeded": "セットアップが必要",

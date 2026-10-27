@@ -53,6 +53,7 @@
   "settings.accounts.renameConfirm": "Cambiar nombre",
   "settings.accounts.renameTitle": "Cambiar el nombre de la conexión {name}",
   "settings.accounts.sameLogin": "Con el mismo inicio de sesión que otra conexión: {names}",
+  "settings.accounts.setUpChecking": "Comprobando…",
   "settings.accounts.setUpDone": "Configurada",
   "settings.accounts.setUpIn": "Se abre en la carpeta de {project}, {folder}: responde la pregunta de {cli} para confiar en ella.",
   "settings.accounts.setUpNeeded": "Falta configurarla",

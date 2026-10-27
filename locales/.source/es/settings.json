@@ -58,6 +58,7 @@
   "settings.accounts.renameConfirm": "Rename",
   "settings.accounts.renameTitle": "Rename {name}",
   "settings.accounts.sameLogin": "Signed in to the same login as another connection: {names}",
+  "settings.accounts.setUpChecking": "Checking…",
   "settings.accounts.setUpDone": "Set up",
   "settings.accounts.setUpIn": "It opens in {project}'s folder, {folder}: answer {cli}'s question to trust it.",
   "settings.accounts.setUpNeeded": "Needs set up",

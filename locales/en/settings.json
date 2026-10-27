@@ -215,6 +215,10 @@
     "defaultMessage": "Signed in to the same login as another connection: {names}",
     "description": "A warning on a connection (Settings → Connections): other connections are signed in as the same login. {names} is their names, listed."
   },
+  "settings.accounts.setUpChecking": {
+    "defaultMessage": "Checking…",
+    "description": "A connection's state (Settings → Connections, HI-1870): Hive is still reading whether its coding agent CLI trusts the open workspace's project folders, so it doesn't say yet whether it is set up."
+  },
   "settings.accounts.setUpDone": {
     "defaultMessage": "Set up",
     "description": "A connection's state (Settings → Connections, HI-1870): its CLI's one-time first-run setup is done. An adjective (\"is set up\"), not the button."

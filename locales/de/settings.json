@@ -53,6 +53,7 @@
   "settings.accounts.renameConfirm": "Umbenennen",
   "settings.accounts.renameTitle": "Verbindung {name} umbenennen",
   "settings.accounts.sameLogin": "Mit derselben Anmeldung wie eine andere Verbindung angemeldet: {names}",
+  "settings.accounts.setUpChecking": "Wird geprüft…",
   "settings.accounts.setUpDone": "Eingerichtet",
   "settings.accounts.setUpIn": "Es öffnet sich im Ordner von {project}, {folder}: Beantworte die Frage von {cli}, um ihm zu vertrauen.",
   "settings.accounts.setUpNeeded": "Einrichtung nötig",
