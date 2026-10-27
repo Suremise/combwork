@@ -26,7 +26,6 @@ interface HiveMessageValues {
   'workflow.forYou.roundLimit': { card: string | number; rounds: number }
   'workflow.forYouKind': { kind: string }
   'workflow.form.addCheck': undefined
-  'workflow.form.agentsSection': undefined
   'workflow.form.allOff': undefined
   'workflow.form.allOffSummary': undefined
   'workflow.form.appliesNow': undefined
@@ -44,8 +43,7 @@ interface HiveMessageValues {
   'workflow.form.copy': undefined
   'workflow.form.defaultBranch': undefined
   'workflow.form.discard': undefined
-  'workflow.form.fileLocks': undefined
-  'workflow.form.fileLocksValue': undefined
+  'workflow.form.fileLocksNote': undefined
   'workflow.form.folders': undefined
   'workflow.form.from.global': undefined
   'workflow.form.from.here': undefined
@@ -58,6 +56,7 @@ interface HiveMessageValues {
   'workflow.form.heirElsewhere': { project: string | number; workspace: string | number; options: string | number }
   'workflow.form.heirLanes': { n: number }
   'workflow.form.heirs': { n: number }
+  'workflow.form.hoursValue': { n: number }
   'workflow.form.identity': { name: string | number; email: string | number }
   'workflow.form.identityValue': { name: string | number; email: string | number }
   'workflow.form.inFlight': { n: number }
@@ -77,9 +76,8 @@ interface HiveMessageValues {
   'workflow.form.levelNone': undefined
   'workflow.form.levelPlatform': undefined
   'workflow.form.loadFailed': { error: string | number }
-  'workflow.form.loops': undefined
-  'workflow.form.loopsSection': undefined
-  'workflow.form.loopsValue': { rounds: number; hours: number }
+  'workflow.form.loopsReadNote': undefined
+  'workflow.form.minutesValue': { n: number }
   'workflow.form.neverOff.fileLocks': undefined
   'workflow.form.neverOff.folderGit': undefined
   'workflow.form.neverOff.indexLock': undefined
@@ -95,7 +93,6 @@ interface HiveMessageValues {
   'workflow.form.off': undefined
   'workflow.form.on': undefined
   'workflow.form.openAdvanced': undefined
-  'workflow.form.ownedPrefix': undefined
   'workflow.form.paste': undefined
   'workflow.form.pasteApply': undefined
   'workflow.form.pasteBad': undefined
@@ -116,9 +113,10 @@ interface HiveMessageValues {
   'workflow.form.stageName': { stage: string | number }
   'workflow.form.stageNamesValue': { n: number }
   'workflow.form.startedFrom': { preset: string | number }
+  'workflow.form.stepWaitNote': undefined
   'workflow.form.use': { preset: string | number }
   'workflow.group.checks': undefined
-  'workflow.group.elsewhere': undefined
+  'workflow.group.loops': undefined
   'workflow.group.merging': undefined
   'workflow.group.review': undefined
   'workflow.group.stages': undefined
@@ -146,12 +144,22 @@ interface HiveMessageValues {
   'workflow.option.dependenciesDone.title': undefined
   'workflow.option.excluded.desc': undefined
   'workflow.option.excluded.title': undefined
+  'workflow.option.fileLocks.desc': undefined
+  'workflow.option.fileLocks.title': undefined
   'workflow.option.finish.desc': undefined
   'workflow.option.finish.title': undefined
   'workflow.option.folder.desc': undefined
   'workflow.option.folder.title': undefined
   'workflow.option.identity.desc': undefined
   'workflow.option.identity.title': undefined
+  'workflow.option.loopRounds.desc': undefined
+  'workflow.option.loopRounds.title': undefined
+  'workflow.option.loopStepWaitMinutes.desc': undefined
+  'workflow.option.loopStepWaitMinutes.title': undefined
+  'workflow.option.loopWaitHours.desc': undefined
+  'workflow.option.loopWaitHours.title': undefined
+  'workflow.option.loopWakes.desc': undefined
+  'workflow.option.loopWakes.title': undefined
   'workflow.option.mergeChecks.desc': undefined
   'workflow.option.mergeChecks.title': undefined
   'workflow.option.mergeInstall.desc': undefined
@@ -366,7 +374,6 @@ interface HiveMessageValues {
   'workflow.slots.copy': undefined
   'workflow.slots.copyDesc': undefined
   'workflow.slots.desc': undefined
-  'workflow.slots.fromCopy': undefined
   'workflow.slots.fromSetup': undefined
   'workflow.slots.heading': undefined
   'workflow.slots.held': { agent: string | number }
@@ -374,6 +381,8 @@ interface HiveMessageValues {
   'workflow.slots.inherit': undefined
   'workflow.slots.lentCard': { agent: string | number; card: string | number }
   'workflow.slots.lentLane': { agent: string | number }
+  'workflow.slots.levelInherit': undefined
+  'workflow.slots.levelNone': undefined
   'workflow.slots.noSlots': undefined
   'workflow.slots.none': undefined
   'workflow.slots.off': undefined

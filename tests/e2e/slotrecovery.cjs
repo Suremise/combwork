@@ -5,7 +5,9 @@
 // 2. `inPrepare`: the line checked out, its `SlotPrepared` not written: the restart records it (nothing switched twice);
 // 3. `inPlacement`: the placement claimed, nothing delivered: the restart takes the claim over and gives the card once;
 // 4. a lane started from the window with no slot free waits through a restart ("waiting for a slot", kept with the lane),
-//    starts nothing while the rules are off, and starts once a slot is free with them back on: its builder's brief once.
+//    starts nothing while the rules are off, and starts once a slot is free with them back on: its builder's brief once;
+// 5. a placement owed as Hive is quit, its builder's conversation bound to the card's lease (HI-1746: its slot taken
+//    over by its next card): the next start resumes that conversation there with the card, never a new one.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -64,7 +66,8 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
   const tokenOf = async (id) => {
     if (!(await live(id))) await inv('session:start', alpha, { agentId: id })
     const sessionId = await until(async () => (await live(id))?.sessionId, HUNG_MS)
-    const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
+    // Its latest launch's (a resumed conversation's earlier launches' files are gone).
+    const launch = await until(() => launches().filter((l) => l.sessionId === sessionId && l.opts['--mcp-config'] && fs.existsSync(l.opts['--mcp-config'])).at(-1), HUNG_MS)
     const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
     return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
   }
@@ -128,8 +131,12 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
     await inv('advanced:set', 'hive.agents.perProject', 3)
     const lane4 = await inv('lanes:start', alpha, { builder: b4.id, reviewer: r1.id, cards: [c4], note: 'Keep it small.' })
     check('4. the lane waits for a slot, its agents not started', !!lane4.waitingForSlot && lane4.started.length === 0 && !(await live(b4.id)), JSON.stringify(lane4))
+    // An ordinary quit with B3 running in slot-c (card 3's): its run's writer released before Hive quit (HI-1801), so
+    // the next start finds no slot held by the run that quit, and B3 can start there again.
     await h.app.close().catch(() => {})
     await start(null)
+    const held = (await inv('slots:list', alpha)).filter((s) => s.writer)
+    check('4. …restarted after a quit: no slot still held by a run of the Hive that quit (HI-1801)', held.length === 0, JSON.stringify(held))
     const waiting = await until(async () => ((await lane(lane4.lane.id))?.status?.reason === 'slot' ? lane(lane4.lane.id) : null), HUNG_MS)
     check("4. …restarted: still 'waiting for a slot', paused", waiting?.state === 'paused', JSON.stringify(waiting?.status))
     // The rules off: card 3 put back frees a slot, but nothing is lent to the lane.
@@ -150,6 +157,42 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
     check('4. …R1 starts too', !!(await until(async () => !!(await live(r1.id)), HUNG_MS)))
     const sessionsOf = async (id) => (await inv('session:list', alpha)).filter((s) => s.agentId === id)
     check("4. …started once: one conversation of B4's, the lane waiting no more", (await sessionsOf(b4.id)).length === 1 && !!(await until(async () => (await lane(lane4.lane.id))?.status?.reason !== 'slot', HUNG_MS)), JSON.stringify((await sessionsOf(b4.id)).length))
+
+    // --- 5. A placement owed at a restart, the builder's conversation bound to the card's lease (HI-1746). B2 builds card 5
+    // in a slot (its conversation there, under card 5's lease); in its turn, it puts card 5 back and starts card 6, which
+    // takes its slot over (HI-1762: the conversation rebound to card 6's lease), so card 6's placement waits for the turn
+    // to end; Hive is quit then. The next start resumes that conversation there with card 6, once, never a new one.
+    const [c5, c6] = [await create('Recover five'), await create('Recover six')]
+    const pb2 = await intent(await tokenOf(b2.id), c2, 'put-back', { why: 'making room' })
+    check('5. card 2 put back', pb2.status === 200, JSON.stringify(pb2.body))
+    check('5. …B2 stopped once its turn is over', !!(await until(async () => !(await live(b2.id)), HUNG_MS)))
+    check('5. …its slot free again', !!(await until(async () => (await inv('slots:list', alpha)).some((s) => !s.lease && !s.writer && s.state === 'ready'), HUNG_MS)), JSON.stringify(await inv('slots:list', alpha)))
+    const s5 = await intent(await tokenOf(b2.id), c5, 'start')
+    const st5 = await until(() => slotOf(c5), HUNG_MS)
+    check('5. B2 starts card 5 in a slot, placed there', s5.status === 200 && !!(await until(async () => (await count(c5, 'BuilderPlaced')) === 1 && same((await live(b2.id))?.cwd, st5.folder) && ['ready', 'finished'].includes((await live(b2.id))?.status), HUNG_MS)), JSON.stringify({ s5: s5.body, live: await live(b2.id) }))
+    const b2Conv = await live(b2.id)
+    check("5. …its conversation there recorded under card 5's lease", !!(await until(async () => (await sessionsOf(b2.id)).find((s) => s.id === b2Conv?.sessionId && same(s.cwd, st5.folder) && !!s.lease), HUNG_MS)), JSON.stringify((await sessionsOf(b2.id)).map((s) => ({ id: s.id, cwd: s.cwd, lease: s.lease }))))
+    const tb2 = await tokenOf(b2.id)
+    // In a turn (until a file the test never makes): card 5's end doesn't stop it, card 6's start takes its slot over, and
+    // card 6's placement waits for that turn to end.
+    await lib.typeLine(inv, lib.ptyKey(alpha, b2.id), home, null, 'holduntil slotrecovery-5-never', { live: () => live(b2.id) })
+    check('5. …in its turn', !!(await until(async () => (await live(b2.id))?.status === 'working', HUNG_MS)))
+    const pb5 = await intent(tb2, c5, 'put-back', { why: 'starting another' })
+    check('5. card 5 put back', pb5.status === 200, JSON.stringify(pb5.body))
+    const s6 = await intent(tb2, c6, 'start')
+    check('5. B2 starts card 6: its own slot taken over', s6.status === 200 && same(s6.body?.data?.folder, st5.folder), JSON.stringify(s6.body))
+    const lease6 = await until(async () => (await inv('slots:list', alpha)).find((s) => s.lease?.card === c6 && same(s.folder, st5.folder))?.lease?.id, HUNG_MS)
+    check('5. …its conversation rebound to card 6', !!lease6 && !!(await until(async () => (await sessionsOf(b2.id)).find((s) => s.id === b2Conv.sessionId && s.lease === lease6), HUNG_MS)), JSON.stringify((await sessionsOf(b2.id)).map((s) => ({ id: s.id, lease: s.lease }))))
+    // Its slot's preparation and its placement both wait for that turn to end.
+    check("5. …card 6's placement owed (B2's turn not over)", (await count(c6, 'BuilderPlaced')) === 0 && (await live(b2.id))?.status === 'working', JSON.stringify(await kinds(c6)))
+    // Hive quit with the placement owed; the next start places it.
+    await h.app.close().catch(() => {})
+    await start(null)
+    const placed6 = await until(async () => (await facts(c6)).find((f) => f.kind === 'BuilderPlaced'), HUNG_MS)
+    check('5. …restarted: B2 placed by resuming its conversation, not a new one', placed6?.data?.how === 'resumed', JSON.stringify(placed6?.data))
+    check('5. …running there in that same conversation', !!(await until(async () => same((await live(b2.id))?.cwd, st5.folder) && (await live(b2.id))?.sessionId === b2Conv.sessionId, HUNG_MS)), JSON.stringify(await live(b2.id)))
+    const resumed = await until(() => launches().find((l) => l.opts['--resume'] === b2Conv.sessionId), HUNG_MS)
+    check('5. …its launch resumed it (--resume), and placed it once', !!resumed && (await count(c6, 'BuilderPlaced')) === 1, JSON.stringify(launches().filter((l) => l.sessionId === b2Conv.sessionId).map((l) => l.opts['--resume'] ?? l.opts['--session-id'])))
   } catch (e) {
     check('no exception', false, e?.stack ?? String(e))
   } finally {

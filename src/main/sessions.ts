@@ -67,7 +67,7 @@ import { checkAccount, launchOnChosen, onConnectionSignedIn, setAccountSessions,
 import { connectionLayerFor, effortUsable, ensureMoved } from './connectionMoves'
 import { assistantOwn } from '../shared/connectionDefaults'
 import { resolveConnection } from '../shared/accounts'
-import { recacheEstimate } from './providers/common'
+import { recacheEstimate, withoutAccountEnv } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage } from '../shared/usageDays'
@@ -133,6 +133,7 @@ import { attachmentName, attachmentsDir, freeName, ownAttachmentsFolder } from '
 import { attachmentKind } from '../shared/attachments'
 import { replyStart } from '../shared/tiles'
 import { observer } from './platform/observe'
+import { projectPreferences } from './workflow/preferences'
 
 const log = createLogger('sessions')
 
@@ -486,6 +487,8 @@ interface PendingStart {
   runId: string
   /** Settles when the start has finished or given up. */
   done: Promise<unknown>
+  /** The start itself: its state, or why it failed or gave up (HI-1746: what a start that joins it reports). */
+  outcome: Promise<LiveSessionState>
 }
 
 export interface ListContext {
@@ -1514,12 +1517,13 @@ class SessionManager {
     // Two terminals on one conversation would both append to its transcript.
     if (opts.resumeId && [...this.starting.values()].some((p) => p.resumeId === opts.resumeId)) throw hiveError(msg({ id: 'session.start.beingOpened', defaultMessage: 'This conversation is already being opened in another agent.', description: 'Resuming a conversation is refused: another agent is starting on it now.' }), undefined, { kind: 'conflict' })
     if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw hiveError(msg({ id: 'session.start.cleaning', defaultMessage: "Hive is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Hive is moving or removing its files." }))
-    const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve(), runId: randomBytes(12).toString('hex') }
+    const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve(), outcome: Promise.resolve(null as never), runId: randomBytes(12).toString('hex') }
     this.starting.set(id, pending)
     // A start that takes over a second says where the time went (#1177: a resume waited ~45 s after an upgrade).
     const times = new StepTimes()
     const run = this.startReserved(projectPath, agentId, id, opts, times)
     pending.done = run.catch(() => undefined)
+    pending.outcome = run
     try {
       return await run
     } catch (e) {
@@ -1616,8 +1620,27 @@ class SessionManager {
     if (!w) return
     this.writers.delete(run)
     // Its claim's tracked work (which a closing pool awaits) ends once its release is written, when nothing of it ran.
-    if (w.spawned) void settleWriter(w.projectPath, run)
-    else void releaseWriter(w.projectPath, run).finally(() => w.done())
+    const settled = w.spawned ? settleWriter(w.projectPath, run) : releaseWriter(w.projectPath, run).finally(() => w.done())
+    // Kept until written: a quit waits for them before its workspaces close (HI-1801).
+    this.writersSettling.add(settled)
+    void settled.finally(() => this.writersSettling.delete(settled))
+  }
+
+  /** Writer releases under way (settleWriterOf): each its write of the release, once its run's outcome is known. */
+  private readonly writersSettling = new Set<Promise<void>>()
+
+  /**
+   * Once the slot writers of the runs that have ended are released (or found held), at most `timeoutMs` (HI-1801: Hive
+   * quitting closed the workspace before a stopped run's release was written, its outcome known only after the
+   * leftovers' look, so the next start found the slot held by a Hive that had gone). Hive's quit, after the leftovers.
+   */
+  async writersSettled(timeoutMs: number): Promise<void> {
+    const all = (async () => {
+      while (this.writersSettling.size) await Promise.allSettled([...this.writersSettling])
+    })()
+    let timer: NodeJS.Timeout | undefined
+    await Promise.race([all, new Promise<void>((r) => (timer = setTimeout(r, timeoutMs)))])
+    clearTimeout(timer)
   }
 
   /** A process of a run holding a slot's writer has spawned (#1434): its exit settles it, and its claim's tracked work ends. */
@@ -1647,6 +1670,55 @@ class SessionManager {
     const agent = projectAgents(cfg).find((a) => a.id === agentId)
     const rec = agent ? await workspace.sessionRecord(projectPath, sessionId) : undefined
     return agent && rec ? resumeHold(await folderFacts(projectPath), folderAgent(agent), rec) : null
+  }
+
+  /** A start of the agent under way (HI-1746): the conversation it resumes (null: a new one) and its outcome. */
+  pendingStart(projectPath: string, agentId: string): { resumeId: string | null; outcome: Promise<LiveSessionState> } | null {
+    const p = this.starting.get(liveId(projectPath, agentId))
+    return p ? { resumeId: p.resumeId ?? null, outcome: p.outcome } : null
+  }
+
+  /**
+   * A resume of `sessionId` refused because the agent is running or starting (HI-1746: Resume All while Hive resumes
+   * that same conversation for a card): 'running' when the agent runs that conversation now, or once a start of it
+   * under way has finished (its failure or cancellation thrown); 'other' when it runs or starts anything else, or nothing.
+   */
+  async joinResume(projectPath: string, agentId: string, sessionId: string): Promise<'running' | 'other'> {
+    projectPath = workspace.assertSessionHost(projectPath)
+    // A start under way first (HR4's round 1): its live state is there before its launch has run, so it is joined by its
+    // outcome, never by that state; then the run it started, still the agent's, in that conversation.
+    const p = this.pendingStart(projectPath, agentId)
+    if (p) {
+      if (p.resumeId !== sessionId) return 'other'
+      const started = await p.outcome
+      const now = this.live.get(liveId(projectPath, agentId))?.state
+      return now?.runId === started.runId && now.sessionId === sessionId ? 'running' : 'other'
+    }
+    return this.live.get(liveId(projectPath, agentId))?.state.sessionId === sessionId ? 'running' : 'other'
+  }
+
+  /**
+   * The conversation a card's placement resumes for its stopped builder (HI-1746): the agent's newest record of its
+   * provider bound to the card's lease, chosen first; then whether it can resume: `held` (resumeHold's, never passed
+   * over for an older one or a new conversation), or `none` only when there is no such record or its transcript is gone.
+   * A read that fails throws (unknown: the placement tries again).
+   */
+  async leaseConversation(projectPath: string, agentId: string, lease: string): Promise<{ is: 'none' } | { is: 'resume'; id: string; name: string } | { is: 'held'; hold: ResumeHold }> {
+    const cfg = await workspace.projectConfig(projectPath)
+    const agent = projectAgents(cfg).find((a) => a.id === agentId)
+    if (!agent) return { is: 'none' }
+    const provider = agentLaunchSettings(agent, cfg, config.settings).provider
+    const rec = (await workspace.sessionsFile(projectPath)).sessions
+      .filter((r) => r.agentId === agentId && r.lease === lease && !r.archived && !r.sub && recordProvider(r) === provider)
+      .sort((x, y) => (y.lastActiveAt ?? '').localeCompare(x.lastActiveAt ?? ''))[0]
+    if (!rec) return { is: 'none' }
+    // A provider this version doesn't know: nothing it could resume. A lookup that fails throws (unknown: tried again).
+    const adapter = allProviders().find((p) => p.id === provider)
+    if (!adapter) return { is: 'none' }
+    const transcript = await adapter.transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath)
+    if (!transcript) return { is: 'none' }
+    const hold = resumeHold(await folderFacts(projectPath), folderAgent(agent), rec)
+    return hold ? { is: 'held', hold } : { is: 'resume', id: rec.id, name: rec.name }
   }
 
   /** Throws if the start was cancelled while it awaited something (the agent stopped, its workspace closed). */
@@ -2077,7 +2149,9 @@ class SessionManager {
       trustedHiveTools: workspace.isAssistantHome(projectPath) ? assistantTools(config.settings.assistant?.control, config.settings.assistant?.changeSettings === true, journalSettingsOf(workspaceOf(projectPath)).enabled) : undefined,
       initialPrompt: l.initialPrompt,
       allowBackgroundSessions: providerSettings(config.settings, adapter.id).allowBackgroundSessions,
-      env: withBinOnPath(childEnv({
+      ...(conn ? { connectionHome: conn.folder } : {}),
+      // On a connection, without the variables its CLI would read as a login in its place (HI-1757).
+      env: withBinOnPath(withoutAccountEnv(conn ? adapter : null, childEnv({
         HIVE_HOOK_TOKEN: hookAuth.token,
         HIVE_PROJECT: basename(projectPath),
         HIVE_PROJECT_PATH: projectPath,
@@ -2092,7 +2166,7 @@ class SessionManager {
         ...(conn ? { [conn.homeEnv]: conn.folder } : {}),
         // Not for the Assistant: it reaches the API through its hive tools, with its own token.
         ...(workspace.isAssistantHome(projectPath) ? {} : this.apiEnv(projectPath, agent.id))
-      }), this.binDir)
+      })), this.binDir)
     }
     const delivered = await adapter.prepareLaunch(ctx)
     times?.mark('prepareLaunch')
@@ -2114,7 +2188,7 @@ class SessionManager {
     // Checked after the last await, just before spawning: stopped, its workspace closed or switched, or the
     // provider turned off while this launch was being prepared, it must not start a process.
     if (l.stopRequested || this.live.get(id) !== l || this.starting.get(id)?.cancelled || !workspaceFor(projectPath) || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
-    state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}) } : undefined
+    state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}) } : undefined
     if (!isProviderEnabled(config.settings, adapter.id)) throw hiveError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name })
     l.startAllowed?.()
     const cmd = adapter.buildCommand(info.path, ctx)
@@ -4476,7 +4550,8 @@ class SessionManager {
     const answered = (d.stopsAnswered ?? []).map(Date.parse).filter((t) => t >= started)
     if (answered.length) l.stopsAnswered = [...(l.stopsAnswered ?? []), ...answered].slice(-STOPS_KEPT)
     if (d.turnEnded || answered.length) this.reconcileTurn(l)
-    if (d.planUsage) reportPlanUsage(l.state.provider, d.planUsage, l.state.agentName ?? l.state.agentId)
+    // The connection it launched on (HI-1756): its usage is that login's.
+    if (d.planUsage) reportPlanUsage(l.state.provider, d.planUsage, l.state.agentName ?? l.state.agentId, l.state.launchedConnection)
     const learn = l.defaultEffort
     const learnModel = d.modelId ?? learn?.model
     if (learn && d.effort && learnModel) {
@@ -4515,10 +4590,14 @@ class SessionManager {
   // File locks
   // -------------------------------------------------------------------------
 
+  /**
+   * The project's file locks (its workflow option, HI-1766), as its workspace last read it: Hive's, the workspace's or its
+   * own. The Assistant's home isn't a project and shares no folder: off.
+   */
   private lockMode(projectPath: string): FileLockMode {
-    const p = workspaceOf(projectPath).info()?.projects.find((x) => x.path.toLowerCase() === projectPath.toLowerCase())
-    const own = p?.config.fileLocks
-    return own && own !== 'inherit' ? own : config.settings.agents.fileLocks
+    const ws = workspaceOf(projectPath)
+    if (ws.isAssistantHome(projectPath)) return 'off'
+    return projectPreferences(ws, projectPath).fileLocks
   }
 
   /**

@@ -263,7 +263,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
     // --add-dir (2.1.309).
     extraDirs: true,
     // Each account a folder of its own (HI-980), its transcripts and memory shared with the others through projects\.
-    connections: { homeEnv: 'CLAUDE_CONFIG_DIR', shared: ['projects'] }
+    connections: { homeEnv: 'CLAUDE_CONFIG_DIR', shared: ['projects'], userHome: '.claude', orgs: true }
   },
   reservedKeys: ['MOD+B', 'MOD+K', 'MOD+O', 'MOD+R', 'MOD+T', 'MOD+G'],
   instructionsFile: 'CLAUDE.md',

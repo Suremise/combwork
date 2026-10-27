@@ -126,15 +126,21 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   // Only committed work is merged (#1347): the dialog counts the uncommitted files, and Merge is off until they are committed.
   check('merge dialog counts uncommitted files', await page.locator('.dialog', { hasText: "1 file in the worktree isn't committed" }).count() === 1)
   check('…and Merge is off', await page.locator('.dialog').getByRole('button', { name: 'Merge', exact: true }).isDisabled())
+  // No workflow, so no merge style of the project's (HI-1765): a merge commit.
+  check('…starting on a merge commit for a project with no workflow', !!(await lib.until(async () => (await page.locator('.dialog .choice-list[data-merge-style="read"]').count()) === 1, HUNG_MS)) && (await page.locator('.dialog .choice-list input[type="radio"]').first().isChecked()))
   await page.keyboard.press('Escape'); await sleep(300)
 
-  // Project settings → Agents & Worktrees
+  // Project settings: General (opened first: key and provider), then Agents (HI-1765)
   await lib.openProjectSettings(page)
-  await page.locator('.settings-nav .row', { hasText: 'Agents & Worktrees' }).click(); await sleep(500)
+  check('project settings open on General, with the key and the default provider', !!(await lib.until(async () => (await page.locator('.settings-nav .row.selected .label').innerText().catch(() => '')) === 'General' && (await page.locator('.setting', { hasText: 'Project key' }).count()) === 1 && (await page.locator('.setting', { hasText: 'Default provider' }).count()) === 1, HUNG_MS)))
+  check('…and no Slots and copies row', (await page.locator('[data-action="open-slot-options"]').count()) === 0)
+  await page.screenshot({ path: path.join(scratch, 'ui-4-projgeneral.png') })
+  await page.locator('.settings-nav .row', { hasText: /^\s*Agents\s*$/ }).first().click()
+  check('project settings lists agents', !!(await lib.until(async () => (await page.locator('.agent-list-row').count()) === 2, HUNG_MS)))
   await page.screenshot({ path: path.join(scratch, 'ui-4-projsettings.png') })
-  check('project settings lists agents', await page.locator('.agent-list-row').count() === 2)
-  await page.locator('.settings-top input').fill('lock'); await sleep(300)
-  check('search finds file locks', await page.locator('.setting', { hasText: 'File locks' }).count() === 1)
+  // File locks is a workflow option since HI-1766 (Version Control → Workflow): not here.
+  await page.locator('.settings-top input').fill('lock')
+  check('search finds no file locks here', (await page.locator('.setting', { hasText: 'File locks' }).count()) === 0)
 
   // Files tab root selector
   await page.locator('.tabs .tab', { hasText: 'Files' }).click(); await sleep(600)
@@ -144,9 +150,11 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
 
   // Global settings
   await page.evaluate(() => document.querySelector('[aria-label="Settings"]')?.click()); await sleep(600)
-  await page.locator('.settings-nav .row', { hasText: 'Agents & Worktrees' }).click(); await sleep(400)
+  await page.locator('.settings-nav .row', { hasText: /^\s*Agents\s*$/ }).first().click()
+  check('global agents settings', !!(await lib.until(async () => (await page.locator('.setting', { hasText: 'Count background tasks for up to' }).count()) === 1, HUNG_MS)))
+  check('…without File locks, a workflow option since HI-1766', (await page.locator('.setting', { hasText: 'File locks' }).count()) === 0)
+  check('…with no Default merge style or Copy into new worktrees (HI-1765)', (await page.locator('.setting', { hasText: 'Default merge style' }).count()) === 0 && (await page.locator('.setting', { hasText: 'Copy into new worktrees' }).count()) === 0)
   await page.screenshot({ path: path.join(scratch, 'ui-6-global.png') })
-  check('global agents settings', await page.locator('.setting', { hasText: 'Default merge style' }).count() === 1)
 
   // Adding with the dialog (#1442): the agent works in the project folder, with nothing sent for a worktree.
   // (Back from Settings to the project's Session tab, where Add Agent is.)

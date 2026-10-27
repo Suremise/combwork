@@ -22,7 +22,7 @@ Suggest a setting when what you see matches its "when it helps" line. Some signa
 - A transcript in the tens of MB (`transcriptMB` in `hive_agent_activity`), or an agent that types slowly: `sessions.transcriptWarnMB` (and a handover to a new conversation now).
 - Big contexts for long stretches (`hive_session_usage`): `sessions.compactSuggestTokens`, or Use 200K context for the provider.
 - Several agents in one project folder editing the same files: `agents.fileLocks`, or building each card in a slot of its own (the project's Version Control tab, Where cards are built).
-- New slots or worktrees whose builds fail for a missing `.env` or local config: `agents.worktreeCopy` (or the project's).
+- New slots or review copies whose builds fail for a missing `.env` or local config: `workflow.git.slotCopy` (Hive's), `workspace.workflow.git.slotCopy` or the project's `project.slotCopy`.
 - Long runs that stopped while the user was away: `general.keepAwake`.
 - Long test runs the user can't follow: `general.progressPanel` and `general.progressCommands`.
 - The chime or banners interrupting the user, or agents waiting unnoticed: `notifications.*`.

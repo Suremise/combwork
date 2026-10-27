@@ -135,7 +135,11 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     bracketedPaste: false,
     enterOnceDrawn: true,
     // --add-dir, added to the writable roots of its own config (0.163.0: tests/fixtures/advanced/writable-roots-codex-0.163.0.json).
-    extraDirs: true
+    extraDirs: true,
+    // Each connection a CODEX_HOME of its own (HI-1757), its rollouts shared with the others through sessions\ and
+    // archived_sessions\ (resume reads the rollout alone); its memory, thread names and prompt history stay its own.
+    // Its sign-in names an email and plan, no organisation.
+    connections: { homeEnv: 'CODEX_HOME', shared: ['sessions', 'archived_sessions'], userHome: '.codex', orgs: false }
   },
   // Ctrl+T opens Codex's transcript view; Ctrl+G its external editor.
   reservedKeys: ['MOD+T', 'MOD+G'],

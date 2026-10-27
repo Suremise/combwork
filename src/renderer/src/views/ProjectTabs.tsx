@@ -3,14 +3,14 @@ import { AssistantMark } from '../components/AssistantMark'
 import { CardChip, WatchedCardChip, WatchedCardChips } from '../components/CardChip'
 import { cardsWait } from '../components/watchLine'
 import { KeybindingsEditor } from '../components/Keybindings'
-import type { CompactionEvent, GitDiff, GitStatus, McpServerInfo, MemorySource, PlanLimit, ProjectConfig, ProjectInfo, ProviderId, SessionListItem, SessionUsage, SkillInfo, UnusedWorktree } from '@shared/types'
+import type { CompactionEvent, GitDiff, GitStatus, McpServerInfo, MemorySource, PlanLimit, PlanUsage, ProjectConfig, ProjectInfo, ProviderId, SessionListItem, SessionUsage, SkillInfo, UnusedWorktree } from '@shared/types'
 import { unpricedModel, unpricedText, usesOwnPrices } from '@shared/prices'
 import { formatDateTime, formatDayLabel } from '@shared/dates'
 import { agentChoosesMcp, agentGetsMcp, agentMcpText, serverOnIn } from '@shared/agentMcp'
 import { gitFixText, gitProblemText } from '@shared/gitTool'
 import { UnusedHeading, UnusedWorkNotice, UnusedWorktreesLine, UnusedWorktreesSection, useUnusedWorktrees } from '../components/UnusedWorktrees'
 import { PERIODS, activeIn, costText, dailyTotals, moneyLabel, periodFrom, sumUsage, type DayTotal, type Period, type Totals } from '@shared/usageTotals'
-import { FILE_LOCK_MODES, contextPercent, turnPushedCompaction, effectiveModelLabel, mergeBlocked, modelLabel } from '@shared/defaults'
+import { contextPercent, turnPushedCompaction, effectiveModelLabel, mergeBlocked, modelLabel } from '@shared/defaults'
 import { useAdvancedValue, useAgentLimit } from '../advanced'
 import { INBOX_PROJECT_KEY, INBOX_SWITCHES, INBOX_SWITCH_ID, type InboxSwitch } from '@shared/inboxSwitches'
 import { PROVIDERS, contextLines, defaultProviderLabel, isProviderEnabled, modeDescription, offeredModes, permissionLabel, projectDefaultProvider, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
@@ -19,7 +19,6 @@ import { EffortPicker, ModelPicker } from '../components/ModelPicker'
 import { effortText, runsAsName } from '@shared/models'
 import { PROJECT_KEY_DESC, PROJECT_SETTINGS_SECTIONS, settingEntry, shownSetting, type SettingsSectionInfo } from '@shared/settingsCatalog'
 import { ACCOUNTS_PREVIEW, shownText } from '@shared/advanced'
-import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_STEP_WAIT_MINUTES, LOOP_WAIT_MAX_HOURS, loopDefaults } from '@shared/lanes'
 import { NumberField } from '../components/NumberField'
 import { StorageView } from '../components/Storage'
 import { TaskStrip } from '../components/Board'
@@ -33,13 +32,14 @@ import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
 import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Switch, Tooltip } from '../components/ui'
 import { ConnectionMark, useConnections } from '../components/ConnectionChoice'
+import { useConnectionsInUse } from '../connectionUsage'
 import { resolveConnection } from '@shared/accounts'
 import { languageFor } from '../monacoLang'
 import { useScopedLoad } from '../scopedLoad'
 import { oneAtATime, withinTime } from '@shared/coalesce'
 import { addSkill, deleteSkill, DeliveredSwitch, editInWorkspace, otherLocal, SKILL_LEVEL_TIP, SkillDetail, SkillRow } from '../components/Skills'
 import { CHANGES_ABOUT, unusedName, unusedPickerLabel } from '@shared/unusedWorktrees'
-import { agentProviderOf, confirm, notify, projectKeyOf, openInSessionsTab, openVersionControl, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
+import { agentProviderOf, confirm, notify, projectKeyOf, openInSessionsTab, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
 import { rememberProjectPref } from '../projectPrefs'
 import { keyProblemText } from '../projectKeys'
 import { HiveVcsNotice } from '../components/HiveVcsNotice'
@@ -153,6 +153,9 @@ const M = {
   limitResets: msg({ id: 'project.limit.resets', defaultMessage: 'used · resets {when}', description: 'Under a plan limit\'s percent. {when} is when it resets: "in 2 h 5 min", or a day and time.' }),
   limitTip: msg({ id: 'project.limit.tip', defaultMessage: "How much of your plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used, across all your {provider} sessions (not just Hive).", description: 'The (i) beside a plan limit.' }),
   planLimits: msg({ id: 'project.limit.heading', defaultMessage: '{plan, select, none {Plan limits, account-wide, as of {when}} other {Plan limits ({plan}), account-wide, as of {when}}}', description: "Above the plan limits. {plan} is the plan's name (none when unknown); {when} how long ago they were reported." }),
+  limitTipConnection: msg({ id: 'project.limit.tipConnection', defaultMessage: "How much of the plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used on {name}, across all its sessions (not just Hive's).", description: 'The (i) beside a plan limit of one connection (HI-1756): {name} is the connection, a sign-in the user named ("Max 1").' }),
+  noConnectionLimits: msg({ id: 'project.limit.noneConnection', defaultMessage: 'Its limits appear after the next message in a session on {name}.', description: 'Under a connection ({name}: "Max 1", a sign-in the user named) in the plan limits (HI-1756), before any of its limits were reported.' }),
+  noConnectionsOn: msg({ id: 'project.limit.noConnections', defaultMessage: 'No {provider} connection is on in this workspace. Turn one on in Settings → Connections to see its plan limits here.', description: 'In place of the plan limits (HI-1756) when the workspace has no connection on for the coding agent ({provider}). Settings → Connections names a section.' }),
   noLimits: msg({ id: 'project.limit.none', defaultMessage: "{provider} reports your plan’s limits while a session runs; they appear here after the next message in any {provider} session. Accounts that use an API key have no plan limits.", description: 'In place of the plan limits before any were reported.' })
 }
 
@@ -302,13 +305,6 @@ const S = {
   compactAbove: msg({ id: 'project.settings.compactAbove', defaultMessage: 'Suggest compacting above', description: 'Accessible name of the number box of tokens above which compacting is suggested.' }),
   neverChoice: msg({ id: 'project.settings.neverChoice', defaultMessage: 'Never', description: 'A choice: the warning or suggestion is off.' }),
   warnOver: msg({ id: 'project.settings.warnOver', defaultMessage: 'Warn when a transcript is over', description: 'Accessible name of the number box of megabytes above which a transcript is flagged.' }),
-  wake: msg({ id: 'project.settings.wake', defaultMessage: 'Wake reviewers and builders', description: "Accessible name of the card-loop wakes switch." }),
-  openVersionControl: msg({ id: 'project.settings.openVersionControl', defaultMessage: 'Open Version Control', description: 'A button in Project Settings → Workflow: shows the project’s Version Control tab at its Workflow section, where the workflow options are (glossary 2.1: Version Control).' }),
-  rounds: msg({ id: 'project.settings.rounds', defaultMessage: 'Rounds', description: 'Accessible name of the card-loop rounds box.' }),
-  waitHours: msg({ id: 'project.settings.waitHours', defaultMessage: 'Wait (hours)', description: "Accessible name of the card-loop wait box." }),
-  stepWait: msg({ id: 'project.settings.stepWait', defaultMessage: 'Design check wait (minutes)', description: "Accessible name of the card-loop design check wait box (#1382): how long a builder waits for its reviewer to check a design." }),
-  stepWaitDefault: msg({ id: 'project.settings.stepWaitDefault', defaultMessage: 'Default ({count, number} min)', description: 'Placeholder of the empty design check wait box: empty uses the default, {count} minutes.' }),
-  hours: msg({ id: 'project.settings.hours', defaultMessage: '{count} h', description: 'Hours, short, as in "Inherit (6 h)".' }),
   openHive: msg({ id: 'project.settings.openHive', defaultMessage: 'Open .hive folder', description: "Button: opens the project's .hive folder. Keep .hive." }),
   resetTitle: msg({ id: 'project.settings.resetTitle', defaultMessage: 'Reset project settings?', description: 'Title of the confirmation before resetting the project settings.' }),
   resetMessage: msg({ id: 'project.settings.resetMessage', defaultMessage: "The default provider, each provider’s model, effort, permission mode, context and extra arguments, the chime, the fresh-start suggestion, the compact threshold, the transcript size warning, file locks, worktree setup and the card-loop rounds and wait go back to Inherit, and loop wakes back on. Agents and skill and MCP opt-outs are kept.", description: 'The confirmation before resetting the project settings.' }),
@@ -893,15 +889,49 @@ function SessionDetails({ project, items }: { project: ProjectInfo; items: Sessi
   )
 }
 
-/** One provider's subscription limits (account-wide), as its sessions last reported them. */
+/**
+ * One provider's subscription limits (account-wide), as its sessions last reported them. With connections (HI-1756,
+ * the preview on), a CLI that has them lists each of its connections on in this workspace or in use by its sessions,
+ * named, each that login's own limits.
+ */
 export function PlanLimits({ provider }: { provider: ProviderId }) {
   const kept = useStore((s) => s.planUsage[provider])
+  const byConnection = useStore((s) => s.connectionPlanUsage)
+  const view = useConnections()
+  const inUse = useConnectionsInUse()
   const now = useNow(60000)
+  const p = providerDescriptor(provider)
+  if (view?.preview && view.providers.includes(provider)) {
+    const ids = [...new Set([...(view.workspace[provider]?.on ?? []), ...inUse.filter((c) => c.provider === provider).map((c) => c.id)])]
+    if (!ids.length) return <p className="hint">{tr(M.noConnectionsOn, { provider: p.name })}</p>
+    return (
+      <>
+        {ids.map((id) => {
+          const c = view.connections.find((x) => x.id === id)
+          const name = c?.name ?? inUse.find((x) => x.id === id)?.name ?? id
+          const email = c?.observed?.email ?? c?.accepted?.email
+          return (
+            <div key={id} className="plan-connection-limits" data-plan-connection={id}>
+              <div className="plan-connection-name">
+                <strong>{name}</strong>
+                {email && <span className="faint"> {email}</span>}
+              </div>
+              <LimitCards kept={byConnection[id]} now={now} tip={(l) => tr(M.limitTipConnection, { window: limitWindow(l), label: l.label, name })} none={tr(M.noConnectionLimits, { name })} />
+            </div>
+          )
+        })}
+      </>
+    )
+  }
+  return <LimitCards kept={kept} now={now} tip={(l) => tr(M.limitTip, { window: limitWindow(l), label: l.label, provider: providerName(provider) })} none={tr(M.noLimits, { provider: p.name })} />
+}
+
+/** A CLI's or a connection's limits as cards, or `none` before any is current. */
+function LimitCards({ kept, now, tip, none }: { kept: PlanUsage | undefined; now: number; tip: (l: PlanLimit) => string; none: string }) {
   // A limit whose reset has passed with no new report isn't shown as it was (#383).
   const usage = kept && { ...kept, limits: kept.limits.filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now) }
-  const p = providerDescriptor(provider)
-  const card = (id: ProviderId, l: PlanLimit): React.ReactNode => (
-    <Card key={l.id} title={tr(M.limitTitle, { window: limitWindow(l), label: `${l.label.charAt(0).toUpperCase()}${l.label.slice(1)}` })} value={fmt.percent(l.usedPercent / 100)} sub={l.resetsAt ? tr(M.limitResets, { when: resetsIn(l.resetsAt) }) : tr(M.limitUsed)} tip={tr(M.limitTip, { window: limitWindow(l), label: l.label, provider: providerName(id) })} accent={l.usedPercent >= 80}>
+  const card = (l: PlanLimit): React.ReactNode => (
+    <Card key={l.id} title={tr(M.limitTitle, { window: limitWindow(l), label: `${l.label.charAt(0).toUpperCase()}${l.label.slice(1)}` })} value={fmt.percent(l.usedPercent / 100)} sub={l.resetsAt ? tr(M.limitResets, { when: resetsIn(l.resetsAt) }) : tr(M.limitUsed)} tip={tip(l)} accent={l.usedPercent >= 80}>
       <div className={cx('meter', l.usedPercent >= 95 ? 'danger' : l.usedPercent >= 80 && 'caution')}>
         <div style={{ width: `${Math.min(100, l.usedPercent)}%` }} />
       </div>
@@ -912,10 +942,10 @@ export function PlanLimits({ provider }: { provider: ProviderId }) {
       <div className="faint small overview-plan">
         {tr(M.planLimits, { plan: usage.plan || 'none', when: timeAgo(usage.updatedAt) })}
       </div>
-      <div className="cards">{usage.limits.map((l) => card(provider, l))}</div>
+      <div className="cards">{usage.limits.map(card)}</div>
     </>
   ) : (
-    <p className="hint">{tr(M.noLimits, { provider: p.name })}</p>
+    <p className="hint">{none}</p>
   )
 }
 
@@ -1655,9 +1685,9 @@ function SettingRow({ title, desc, tip, children, modified }: { title: string; d
   )
 }
 
-type ProjectSection = 'agents' | 'sessions' | 'loops' | 'workflow' | 'storage' | 'keys' | 'advanced' | `provider:${string}`
+type ProjectSection = 'general' | 'agents' | 'sessions' | 'storage' | 'keys' | 'advanced' | `provider:${string}`
 
-const PROJECT_SECTION_ICONS: Record<string, string> = { agents: 'organization', sessions: 'history', loops: 'sync', workflow: 'git-pull-request', storage: 'database', keys: 'keyboard', advanced: 'tools' }
+const PROJECT_SECTION_ICONS: Record<string, string> = { general: 'settings-gear', agents: 'organization', sessions: 'history', storage: 'database', keys: 'keyboard', advanced: 'tools' }
 
 // Each section's label and description are shown from its messages (text), in the window's language when it renders;
 // label and desc stay the catalogue's English, for the Assistant's tools.
@@ -1816,7 +1846,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
   // With Connections on, a CLI with them has no project model, effort or context (HI-1770: each connection's, and the agents' own).
   const connectionsShown = useStore((s) => s.advanced?.values[ACCOUNTS_PREVIEW] === true)
   const installs = useStore((s) => s.providers)
-  const [section, setSection] = useState<ProjectSection>('agents')
+  const [section, setSection] = useState<ProjectSection>('general')
   const [query, setQuery] = useState('')
   // Opened on a section from elsewhere (Settings → Workspace's Storage links).
   const jump = useStore((s) => s.projectSettingsJump)
@@ -1827,8 +1857,6 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
     set({ projectSettingsJump: null })
   }, [jump, project.path])
   const cfg = project.config
-  // The workspace's card-loop rounds and wait (Settings → Workspace), which this project inherits (#412).
-  const workspaceLoops = loopDefaults({ loops: useStore((s) => s.workspace?.config.loops) })
   // Its key, for Project key's example (#1221).
   const ownKey = useStore((s) => projectKeyOf(s, project.path))
   // Settings → Advanced's inbox switches, which this project's Inherit follows (#1432).
@@ -1841,12 +1869,6 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
   const update = async (patch: Partial<ProjectConfig>): Promise<void> => {
     await actions.attempt(tr(S.saveFailed), () => call('project:updateConfig', project.path, patch))
     await actions.refreshWorkspace()
-  }
-  const lockMode = cfg.fileLocks === 'inherit' ? settings.agents.fileLocks : cfg.fileLocks
-  /** A file lock mode's name or what it does, in the window's language (#861); its id if it isn't one. */
-  const lockShown = (mode: string, part: 'label' | 'description'): string => {
-    const m = FILE_LOCK_MODES.find((x) => x.value === mode)
-    return m ? tr(m.text[part]) : mode
   }
   const globalDefault = defaultProviderLabel(settings, tr)
   const globalCompact = settings.sessions.compactSuggestTokens ? fmt.number(settings.sessions.compactSuggestTokens) : tr(S.never)
@@ -1937,7 +1959,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
 
   const defs: ProjectSettingDef[] = [
     {
-      section: 'agents',
+      section: 'general',
       key: 'key',
       ...rowText('project.key'),
       // Its example in this project's own key.
@@ -1945,7 +1967,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       render: () => <ProjectKeyField project={project} />
     },
     {
-      section: 'agents',
+      section: 'general',
       key: 'defaultProvider',
       ...rowText('project.defaultProvider'),
       modified: cfg.defaultProvider !== 'inherit',
@@ -2042,44 +2064,6 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       }
     }),
     {
-      section: 'loops',
-      key: 'loopWakes',
-      ...rowText('project.loopWakes'),
-      modified: !cfg.loopWakes,
-      render: () => <Switch checked={cfg.loopWakes} label={tr(S.wake)} onChange={(v) => void update({ loopWakes: v })} />
-    },
-    {
-      section: 'loops',
-      key: 'loopRounds',
-      ...rowText('project.loopRounds'),
-      modified: cfg.loopRounds !== null,
-      render: () => <NumberField value={cfg.loopRounds} min={1} max={LANE_MAX_ROUNDS} step={1} label={tr(S.rounds)} inherit={inherit(workspaceLoops.rounds)} onCommit={(v) => update({ loopRounds: v })} />
-    },
-    {
-      section: 'loops',
-      key: 'loopWaitHours',
-      ...rowText('project.loopWaitHours'),
-      modified: cfg.loopWaitHours !== null,
-      render: () => <NumberField value={cfg.loopWaitHours} min={1} max={LOOP_WAIT_MAX_HOURS} step={1} label={tr(S.waitHours)} inherit={inherit(tr(S.hours, { count: workspaceLoops.waitHours }))} onCommit={(v) => update({ loopWaitHours: v })} />
-    },
-    {
-      section: 'loops',
-      key: 'loopStepWaitMinutes',
-      ...rowText('project.loopStepWaitMinutes'),
-      modified: cfg.loopStepWaitMinutes !== null,
-      render: () => <NumberField value={cfg.loopStepWaitMinutes} min={1} max={LOOP_STEP_WAIT_MAX_MINUTES} step={5} label={tr(S.stepWait)} inherit={tr(S.stepWaitDefault, { count: LOOP_STEP_WAIT_MINUTES })} onCommit={(v) => update({ loopStepWaitMinutes: v })} />
-    },
-    {
-      section: 'workflow',
-      key: 'workflow',
-      ...rowText('project.workflow'),
-      render: () => (
-        <button className="btn" data-action="open-version-control" onClick={() => openVersionControl(project.path, 'workflow')}>
-          <Icon name="source-control" /> {tr(S.openVersionControl)}
-        </button>
-      )
-    },
-    {
       section: 'storage',
       key: 'storage',
       ...rowText('project.storage'),
@@ -2099,35 +2083,6 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       ...rowText('project.agents'),
       wide: true,
       render: () => <AgentList project={project} />
-    },
-    {
-      section: 'agents',
-      key: 'fileLocks',
-      ...rowText('project.fileLocks'),
-      desc: tr(S.now, { desc: rowText('project.fileLocks').desc, current: lockShown(lockMode, 'description') }),
-      modified: cfg.fileLocks !== 'inherit',
-      render: () => (
-        <select className="select" value={cfg.fileLocks} onChange={(e) => void update({ fileLocks: e.target.value as ProjectConfig['fileLocks'] })}>
-          <option value="inherit">{inherit(lockShown(settings.agents.fileLocks, 'label'))}</option>
-          {FILE_LOCK_MODES.map((m) => (
-            <option key={m.value} value={m.value}>
-              {tr(m.text.label)}
-            </option>
-          ))}
-        </select>
-      )
-    },
-    {
-      // The setup command and copied files are the Version Control tab's Slots and copies since #1445 (their rows stay
-      // for the Assistant's settings tool).
-      section: 'agents',
-      key: 'slotOptions',
-      ...rowText('project.slotOptions'),
-      render: () => (
-        <button className="btn" data-action="open-slot-options" onClick={() => openVersionControl(project.path, 'workflow')}>
-          <Icon name="source-control" /> {tr(S.openVersionControl)}
-        </button>
-      )
     },
     {
       section: 'advanced',

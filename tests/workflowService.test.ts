@@ -7,6 +7,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { PREFERENCE_DEFAULTS } from '../src/shared/workflow/preferences'
 
 const base = tempDir('hive-wfservice-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -17,7 +18,7 @@ const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { config } = await import('../src/main/config')
 const { optionsFor, workflowFor } = await import('../src/main/workflow/service')
-const { resolveOptions } = await import('../src/main/workflow/rulesets')
+const { resolveOptions, rulesetsNow } = await import('../src/main/workflow/rulesets')
 const { allOff } = await import('../src/shared/workflow/options')
 const { observer } = await import('../src/main/platform/observe')
 const { isUnknown } = await import('../src/main/platform/types')
@@ -212,6 +213,9 @@ describe('None: a workspace closed or switched while its hashes sync (#1263)', (
   })
 })
 
+// Resolved options have the preferences' defaults under every level (HI-1766): all-off leaves them unset.
+const resolvedOff = (p: 'git' | 'none') => ({ ...PREFERENCE_DEFAULTS, ...allOff(p) })
+
 describe("a project's options, resolved (#1263, SPEC §16.6.6)", () => {
   it('global → workspace → project, each level inheriting what it leaves unset, with each origin', () => {
     const r = resolveOptions('git', {
@@ -220,15 +224,15 @@ describe("a project's options, resolved (#1263, SPEC §16.6.6)", () => {
       project: { platform: 'git', preChecks: ['test'] }
     })
     expect(r.invalid).toBeNull()
-    expect(r.options).toEqual({ ...allOff('git'), stopOwnRuns: true, dependenciesDone: false, preChecks: ['test'] })
+    expect(r.options).toEqual({ ...resolvedOff('git'), stopOwnRuns: true, dependenciesDone: false, preChecks: ['test'] })
     expect(r.origins).toMatchObject({ stopOwnRuns: 'global', dependenciesDone: 'workspace', preChecks: 'project', review: 'platform', finish: 'platform' })
     // Nothing set anywhere: the platform's all-off.
-    expect(resolveOptions('none', {})).toMatchObject({ options: allOff('none'), invalid: null })
+    expect(resolveOptions('none', {})).toMatchObject({ options: resolvedOff('none'), invalid: null })
   })
 
   it('an unknown option, a value of the wrong type, another platform or a contradiction falls back to all-off', () => {
     const off = (r: ReturnType<typeof resolveOptions>) => {
-      expect(r.options).toEqual(allOff('git'))
+      expect(r.options).toEqual(resolvedOff('git'))
       expect(Object.values(r.origins).every((o) => o === 'platform')).toBe(true)
       return r.invalid
     }
@@ -241,7 +245,7 @@ describe("a project's options, resolved (#1263, SPEC §16.6.6)", () => {
 
   it("a choice an option doesn't have falls back to all-off, at every level (HR2's round 1)", () => {
     const off = (r: ReturnType<typeof resolveOptions>, why: RegExp) => {
-      expect(r.options).toEqual(allOff('git'))
+      expect(r.options).toEqual(resolvedOff('git'))
       expect(r.invalid).toMatch(why)
     }
     off(resolveOptions('git', { project: { finish: 'typo' } as never }), /project options: finish/)
@@ -269,7 +273,7 @@ describe("a project's options, resolved (#1263, SPEC §16.6.6)", () => {
       // A bad option in project.json: all off, never a throw.
       writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [], workflow: { platform: 'git', preset: null, options: { review: 'agent', noSelfReview: false } } }))
       expect(await workflowFor(w, repo)).toBe(wf)
-      expect(wf.cfg.options()).toEqual(allOff('git'))
+      expect(wf.cfg.options()).toEqual(resolvedOff('git'))
       expect((await optionsFor(w, repo))!.invalid).toMatch(/selfReview/)
       // Unset at the project: the workspace's and the global defaults show through.
       writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
@@ -277,5 +281,21 @@ describe("a project's options, resolved (#1263, SPEC §16.6.6)", () => {
     } finally {
       delete config.settings.workflow
     }
+  })
+})
+
+describe("each project's ruleset now (HI-1780: kept by what it is made from)", () => {
+  it('is the same while its options are, another once they change, and the first again once they change back', async () => {
+    let options: Record<string, unknown> = { ...allOff('git') }
+    const ws = { config: { workflow: undefined }, info: () => ({ projects: [{ name: 'Kept', path: join(base, 'kept-ruleset'), platform: { id: 'git' } }] }), projectConfig: async () => ({ workflow: { options } }) } as never
+    const first = (await rulesetsNow(ws)).get('kept')
+    expect(first).toBeTruthy()
+    expect((await rulesetsNow(ws)).get('kept')).toBe(first)
+    options = { ...allOff('git'), preChecks: ['test'] }
+    const changed = (await rulesetsNow(ws)).get('kept')
+    expect(changed).toBeTruthy()
+    expect(changed).not.toBe(first)
+    options = { ...allOff('git') }
+    expect((await rulesetsNow(ws)).get('kept')).toBe(first)
   })
 })

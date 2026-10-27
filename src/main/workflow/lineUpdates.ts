@@ -25,6 +25,7 @@ import { isUnknown } from '../platform/types'
 import { LINE_GATE } from '../../shared/workflow/facts'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
 import { openWorkspaces, type WorkspaceService } from '../workspace'
+import { factHeadsOf } from './cardWork'
 import type { LineBehind, Workflow } from './runtime'
 
 const log = createLogger('workflow')
@@ -78,11 +79,30 @@ export async function updateLines(ws: WorkspaceService): Promise<void> {
   for (const project of await ws.listProjectPaths()) {
     const wf = workflowEnforced() && alive() ? await workflowFor(ws, project).catch(() => null) : null
     if (!wf) continue
-    for (const id of wf.store.runningLanes()) {
+    // Whether each running lane's card is Done, kept by its facts' head and stage (HI-1780: each board change looks at
+    // every running lane's cards up to its next one, each folded again before).
+    const lanes = wf.store.runningLanes()
+    const heads = factHeadsOf(
+      ws,
+      lanes.flatMap((id) => {
+        const l = wf.lane(id)
+        return l && !l.ended ? wf.laneNow(l).cards : []
+      })
+    )
+    const kept = keptDone(ws)
+    const done = (n: number): boolean => {
+      const at = `${heads.get(n) ?? ''}\n${wf.store.card(n).stage ?? ''}`
+      const was = kept.get(n)
+      if (was?.at === at) return was.done
+      const d = wf.laneDone(n)
+      kept.set(n, { at, done: d })
+      return d
+    }
+    for (const id of lanes) {
       seen.add(id)
       try {
         // Each lane's look one git step (#1376).
-        const r = await gitStep(() => laneLine(wf, project, id, () => alive() && workflowEnforced()))
+        const r = await gitStep(() => laneLine(wf, project, id, () => alive() && workflowEnforced(), done))
         if (r === null) {
           if (mine.delete(id)) moved = true
         } else if (mine.get(id) !== r) {
@@ -101,12 +121,20 @@ export async function updateLines(ws: WorkspaceService): Promise<void> {
   if (moved && alive()) for (const fn of told) fn(ws)
 }
 
+/** Each workspace's lane cards' Done, by card, with the facts' head and stage it was folded from; opened again, afresh. */
+const doneOf = new WeakMap<WorkspaceService, { path: string | null; life: unknown; cards: Map<number, { at: string; done: boolean }> }>()
+function keptDone(ws: WorkspaceService): Map<number, { at: string; done: boolean }> {
+  let c = doneOf.get(ws)
+  if (!c || c.path !== ws.path || c.life !== ws.lifetime) doneOf.set(ws, (c = { path: ws.path, life: ws.lifetime, cards: new Map() }))
+  return c.cards
+}
+
 /** A lane's builder's line, between its cards: what was done, and the card that waits meanwhile (null: none waits here). */
-async function laneLine(wf: Workflow, project: string, id: string, on: () => boolean): Promise<number | null> {
+async function laneLine(wf: Workflow, project: string, id: string, on: () => boolean, done: (n: number) => boolean = (n) => wf.laneDone(n)): Promise<number | null> {
   const l = wf.lane(id)
   if (!l || l.ended) return null
   // The lane's next card: the first not Done, and only before it starts (between cards).
-  const nextId = wf.laneNow(l).cards.find((c) => !wf.laneDone(c))
+  const nextId = wf.laneNow(l).cards.find((c) => !done(c))
   if (nextId === undefined) return null
   const next = wf.store.card(nextId)
   const s = wf.state(next)

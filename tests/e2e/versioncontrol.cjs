@@ -107,14 +107,12 @@ function board(sql, ...args) {
     check('the link opens Workflow, with the options form', !!(await lib.until(async () => (await selected()) === 'workflow' && (await page.locator('[data-vc-workflow] .workflow-form').count()) === 1, HUNG_MS)))
     await shots('git-workflow', page.locator('.vc-view'))
 
-    // --- Project Settings → Workflow: no form, Open Version Control.
+    // --- Project Settings has no Workflow section (HI-1766: it was only a link here) and no Card loops (options here now).
     await page.locator('.git-sections [data-section="history"]').click()
     await lib.openProjectSettings(page)
-    await page.locator('.settings-nav .row', { hasText: 'Workflow' }).click()
-    const open = page.locator('[data-action="open-version-control"]')
-    check('Project Settings → Workflow has Open Version Control and no form', !!(await lib.until(async () => (await open.count()) === 1, HUNG_MS)) && (await page.locator('.tab-body .workflow-form').count()) === 0)
-    await open.click()
-    check('Open Version Control lands on Workflow', !!(await lib.until(async () => (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1 && (await selected()) === 'workflow', HUNG_MS)))
+    const nav = page.locator('.settings-nav .row')
+    check('Project Settings has neither a Workflow nor a Card loops section', !!(await lib.until(async () => (await nav.count()) > 0, HUNG_MS)) && (await nav.filter({ hasText: /^\s*(Workflow|Card loops)\s*$/ }).count()) === 0 && (await page.locator('.tab-body .workflow-form').count()) === 0, (await nav.allInnerTexts()).join(' | '))
+    await vcTab.click()
 
     // --- A None project: Workflow only, and Initialise repository… under the header.
     await page.getByText('plain', { exact: true }).first().click()

@@ -3,7 +3,8 @@ import type { AgentInfo, ArchiveBatch, BoardColumnId, BoardFold, ProjectInfo, Pr
 import { BUSY, BY_TEXT, storedLineText } from '@shared/taskHistory'
 import { gitProblemText } from '@shared/gitTool'
 import { agentRuntime, hooksMissingText } from '@shared/runtime'
-import { loopStepWaitMinutes } from '@shared/lanes'
+import { LOOP_STEP_WAIT_MINUTES } from '@shared/lanes'
+import { projectInfoPreferences } from '@shared/workflow/preferences'
 import { COLUMN_TEXT, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, cardMatches, newSinceStart, archivedAt, columnColor, columnName, laneOrderWaitReason, loopStepWait, loopStepWaitReason, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stalledReason, taskOverview, type BoardFoldChange, type LaneOrderView } from '@shared/tasks'
 import { enabledProviders, isProviderEnabled, projectDefaultProvider, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
@@ -121,7 +122,9 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
     const order = laneOrderWaitReason(c, lane, watchers, Date.now(), tr)
     if (order) return { text: order, kind: 'lane-order' }
     const project = cardAgent(projects, c).project
-    const bound = loopStepWaitMinutes(project?.config) * 60_000
+    // The project's Design check wait (its workflow option, HI-1766), over Hive's and the workspace's.
+    const st = get()
+    const bound = (project ? projectInfoPreferences(project, st.settings?.workflow, st.workspace?.config.workflow).loopStepWaitMinutes : LOOP_STEP_WAIT_MINUTES) * 60_000
     const step = loopStepWaitReason(c, watchers, bound, Date.now(), tr)
     return step ? { text: step, kind: loopStepWait(c, watchers, bound)?.step === 'followUp' ? 'follow-up' : 'loop-step' } : null
   }

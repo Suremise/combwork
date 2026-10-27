@@ -1,0 +1,3 @@
+codex app-server -c cli_auth_credentials_store="file", in a new empty CODEX_HOME, an allowlisted environment, after initialize:
+children while running: conhost.exe, git.exe
+after stdin closed: exited by itself in 198 ms (code 0)

@@ -46,6 +46,8 @@ export default defineConfig({
           'usage-worker': resolve(__dirname, 'src/main/usageWorker.ts'),
           // The repository lock's worker thread (HI-1680).
           'repo-lock-worker': resolve(__dirname, 'src/main/repoLockWorker.ts'),
+          // Git's worker thread, which starts its processes (HI-1783).
+          'git-worker': resolve(__dirname, 'src/main/gitWorker.ts'),
           // The stall watchdog's thread (HI-1692).
           'stall-watchdog': resolve(__dirname, 'src/main/stallWatchdog.ts'),
           // The log's writer thread (HI-1730).

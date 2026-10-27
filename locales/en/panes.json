@@ -183,6 +183,10 @@
     "defaultMessage": "Its login changed since it was added: see Settings → Connections.",
     "description": "Added to the hover of a pane footer's connection: the connection is signed in as another login than the one it was added with. Settings → Connections names a section."
   },
+  "panes.footer.connectionEmail": {
+    "defaultMessage": "Signed in as {email}.",
+    "description": "Added to the hover of a pane footer's connection (HI-1756): the login the connection is signed in as ({email}: its email address)."
+  },
   "panes.footer.connectionOff": {
     "defaultMessage": "The connection chosen for it is off in this workspace, so it runs on the workspace's default.",
     "description": "Added to the hover of a pane footer's connection: the agent's own connection is off in this workspace, so the default runs it."

@@ -3,6 +3,10 @@
     "defaultMessage": "Hive won't link a connection to {target}: it isn't one of {cli}'s own folders.",
     "description": "An error adding a connection: the folder a connection's shared folder would link to ({target}, a path) isn't in the coding agent CLI's ({cli}) own folder."
   },
+  "main.accounts.checkHeld": {
+    "defaultMessage": "{name} is being checked: Hive is still making sure {cli}'s check of it has ended. Try again in a moment.",
+    "description": "An error signing in or removing a connection ({name}, its name in Settings → Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held."
+  },
   "main.accounts.folderNotUsable": {
     "defaultMessage": "{name}'s folder isn't the one Hive made (it is missing, or was moved or replaced), so nothing was started on it. Remove the connection and add it again.",
     "description": "An error signing a connection in or starting on it ({name}, its name): its folder is missing or isn't the one Hive made."
@@ -778,6 +782,10 @@
   "main.plan.used": {
     "defaultMessage": "{share, number, ::percent} of your {provider} {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used",
     "description": "A notice: how much of a plan's usage limit is used ({share}: \"85%\"). {provider} is the coding agent. The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it)."
+  },
+  "main.plan.usedOn": {
+    "defaultMessage": "{share, number, ::percent} of the {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used on {connection}",
+    "description": "A notice (HI-1756): how much of a plan's usage limit is used ({share}: \"85%\") on one connection, a sign-in the user named ({connection}: \"Max 1\"). The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it)."
   },
   "main.quit.closed": {
     "defaultMessage": "Hive has closed",

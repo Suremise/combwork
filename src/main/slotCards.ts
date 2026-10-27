@@ -23,14 +23,14 @@
 // waits.
 
 import { projectAgents } from '../shared/defaults'
-import { msg } from '../shared/i18n'
 import { taskPrompt } from '../shared/tasks'
 import { agentWorkflowRole, buildsWork } from '../shared/workflow/roles'
-import { workflowText } from '../shared/workflow/texts'
+import { SLOT_NOTICES, workflowText } from '../shared/workflow/texts'
 import type { Fact, FactData, StartedData, StageId } from '../shared/workflow/facts'
 import { SLOTS_DELETE_MERGED, SLOTS_RENAME_ADOPTED } from '../shared/advanced'
 import { basename } from 'path'
-import type { AgentDef, LaneSlotInfo } from '../shared/types'
+import type { AgentDef, LaneSlotInfo, LiveSessionState } from '../shared/types'
+import type { ResumeHold } from '../shared/agentFolders'
 import type { LaneRecord } from '../shared/lanes'
 import { app } from 'electron'
 import type { DatabaseSync } from 'node:sqlite'
@@ -42,17 +42,20 @@ import { deliveriesOf, deliverNow, launchWith } from './deliveries'
 import { onHiveEvent } from './events'
 import { changingFolder } from './folderFence'
 import { samePlace } from './fsutil'
+import { samePath } from '../shared/movePaths'
 import { git } from './git'
 import { lanesWaitingForSlot, onLanesWritten, rawLanes, setLaneSlots, setLaneSlotWait } from './lanes'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
 import { withRepoLock } from './repoLock'
+import { isResuming, onResumeEntry } from './restartResume'
 import { sessions } from './sessions'
 import { holder, poolFor, setSlotFreed } from './slotsApp'
 import { quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool } from './slots'
 import { carriedOf, keptFor, keptGoing } from './slotMigration'
 import { getTask } from './tasks'
+import { HiveError } from './hiveError'
 import { onAction } from './workflow/actionWorker'
 import { agentBusy } from './workflow/lineUpdates'
 import { withoutWriteFence, type CardRecord } from './workflow/factStore'
@@ -63,10 +66,6 @@ import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace
 import { cardAttachments } from './cardAttachments'
 
 const log = createLogger('slots')
-
-const M = {
-  notPrepared: msg({ id: 'service.slots.notPrepared', defaultMessage: "Hive couldn't get {slot} ready for {card}: {why}", description: "A notice: a card was started in a slot (a worktree Hive lends to a card or a lane), and Hive couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English." })
-}
 
 /** What a placement's delivery is made from: its identity is the card's cycle and lease, so it is made once. */
 const PLACEMENT = 'slot-placement'
@@ -132,7 +131,15 @@ export function cycleIn(facts: readonly Fact[]): Cycle | null {
     if (f.kind === 'SlotPrepared' && (f.data as FactData['SlotPrepared']).lease === started.lease) c.prepared = f.data as FactData['SlotPrepared']
     else if (f.kind === 'PlacementClaimed' && (f.data as FactData['PlacementClaimed']).lease === started.lease) c.claimed = { ...(f.data as FactData['PlacementClaimed']), seq: f.seq }
     else if (f.kind === 'BuilderPlaced' && (f.data as FactData['BuilderPlaced']).lease === started.lease) c.placed = true
-    else if (f.kind === 'LineDeleting') c.deleting = f.data as FactData['LineDeleting']
+    // Repair's move and a line's rename, as the card's state follows them (facts.ts, #1343, #1305; HI-1791: a preparation
+    // after Repair fenced the folder from before the move).
+    else if (f.kind === 'FolderMoved') {
+      const d = f.data as FactData['FolderMoved']
+      if (samePath(c.started.folder, d.from)) c.started = { ...c.started, folder: d.to }
+    } else if (f.kind === 'LineRenamed') {
+      const d = f.data as FactData['LineRenamed']
+      if (c.started.line && c.started.line.toLowerCase() === d.from.toLowerCase()) c.started = { ...c.started, line: d.to }
+    } else if (f.kind === 'LineDeleting') c.deleting = f.data as FactData['LineDeleting']
     else if (f.kind === 'LineDeleteUndone') c.deleting = null
     else if (f.kind === 'LineDeleted') {
       c.deleted = true
@@ -582,11 +589,16 @@ function until(projectPath: string, agentId: string, ok: () => boolean, over: ()
     const off = onHiveEvent((e) => {
       if ((e.type === 'session-status' && e.state.agentId === agentId && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
     })
+    // A restart resume of the agent settling (HI-1746: a placement waits while one will bring it back).
+    const offEntry = onResumeEntry((p, a) => {
+      if (a === agentId && p.toLowerCase() === projectPath.toLowerCase()) look()
+    })
     const timer = setInterval(look, 30_000)
     timer.unref?.()
     const finish = (v: boolean): void => {
       settled = true
       off()
+      offEntry()
       clearInterval(timer)
       resolve(v)
     }
@@ -719,8 +731,11 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
   // A retirement waiting for its slot's operation or job: looked at again later; none: its tries forgotten.
   if (busy) retireLater(ws, projectPath)
   else retiredNow(ws, projectPath)
-  if (!workflowEnforced() || ended(ws)) return
+  if (ended(ws)) return
+  // With the rules off nothing is placed: no placement is pending, so none keeps anything (HI-1804).
+  if (!workflowEnforced()) return void keepTracksOf(ws, projectPath, new Map())
   // 2. Each current cycle in a lease: prepared, then its builder placed.
+  const pending = new Map<number, string>()
   for (const l of pool.openLeases()) {
     const cards = l.kind === 'card' && l.card !== null ? [l.card] : l.kind === 'lane' && l.lane ? (lanes.get(l.lane)?.cards ?? []) : []
     for (const n of cards) {
@@ -728,9 +743,13 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
       const cycle = card ? cycleIn(wf.store.facts(n)) : null
       if (!card || !cycle || cycle.started.lease !== l.id || wf.state(card).stage !== 'active') continue
       if (cycle.prepared && cycle.placed) continue
+      pending.set(n, refOf(n, cycle, l))
       void ensure(ws, projectPath, wf, pool, n, cycle, l)
     }
   }
+  // What placements no longer pending kept (their card put back, Done, deleted; a cycle placed or replaced) is let go
+  // here, where retired cycles are passed over (HR4's HI-1804 round 1: a failed try's record outlived its card's return).
+  keepTracksOf(ws, projectPath, pending)
   // 3. Done cards' merged lines, from leases still open or ended within DELETE_WITHIN_MS.
   if (advanced.get(SLOTS_DELETE_MERGED) !== false) {
     const since = new Date(Date.now() - DELETE_WITHIN_MS).toISOString()
@@ -820,7 +839,7 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
       log.warn(`Slot ${userText(st.slot)} couldn't be prepared for #${n}: ${userText(r.error)}`)
       await wf.write(card.card, null, 'hive', (w) => {
         const english = `Hive couldn't get ${st.slot} ready for ${card.card.key}: ${r.error}` // i18n-ignore: agent-facing, and the notice's English
-        w.action('notify', { text: english, shown: workflowText(M.notPrepared, { slot: st.slot, card: card.card.key, why: r.error }) })
+        w.action('notify', { text: english, shown: workflowText(SLOT_NOTICES.notPrepared, { slot: st.slot, card: card.card.key, why: r.error }) })
         wf.wake(w, st.builder, english)
       })
       return null
@@ -842,64 +861,251 @@ const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired
  * running, it is started in the slot, where that delivery is offered. One that ended without being given (cancelled,
  * refused, expired, stale) is made again, as is one whose making failed (a refusal, a launch that couldn't start: it
  * throws, nothing is recorded, and the pass tries again).
+ *
+ * Its builder stopped (HI-1746: Hive quit between the card's start and its placement), the placement resumes the
+ * builder's newest conversation bound to the card's lease (sessions.leaseConversation), the card's prompt that launch's
+ * own line; a new conversation only when there is none, or its transcript is gone. Never meanwhile:
+ * - while this run's restart resume will bring the builder back (isResuming): it waits, then types it in (`typed`);
+ * - while that conversation is held (resumeHold): it waits, the card told once, never an older or a new conversation;
+ * - after RESUME_TRIES failed resumes of it: the card told, and it waits for the builder to run (the user's Resume, a
+ *   start by hand), then types it in. A Hive started again tries again.
+ * A start of the builder by another (the restart queue, the window's Resume All) wins over its own: refused, its
+ * delivery not given, it is tried again and finds the builder running, so the card's prompt is given once.
  */
 export async function place(ws: WorkspaceService, projectPath: string, first: Workflow, n: number, cycle: Cycle, l: SlotLease): Promise<void> {
+  const gone = (): boolean => !workflowEnforced() || ended(ws) || !current(first, n, cycle.seq, l.id)
+  while ((await placeOnce(ws, projectPath, first, n, cycle, l)) === 'wait') {
+    if (!(await nextLook(projectPath, l.agent, gone))) break
+  }
+  // Placed, or its cycle obsolete or gone: what it kept is let go (HI-1804). A throw keeps it for ensure's next try.
+  releaseTrack(ws, projectPath, n, refOf(n, cycle, l))
+}
+
+/** Resumes of a placement's conversation tried before it stops and tells the card (HI-1746). */
+const RESUME_TRIES = 3
+
+/**
+ * What a placement keeps between its looks and its tries (HI-1746): its failed resumes, whether they reached
+ * RESUME_TRIES, and the holds it told its card about (so it tells each once). One per card in a workspace's lifetime,
+ * for its current cycle (`ref`: a new cycle's replaces it), let go once its placement ends (HI-1804); the workspace's
+ * own, so a workspace that closed takes them with it.
+ */
+interface PlacementTrack {
+  ref: string
+  failures: number
+  gaveUp: boolean
+  told: Set<string>
+}
+const tracks = new WeakMap<object, Map<string, PlacementTrack>>()
+const refOf = (n: number, cycle: Cycle, l: SlotLease): string => `${n}:${cycle.seq}:${l.id}`
+const trackKey = (projectPath: string, n: number): string => `${projectPath.toLowerCase()}#${n}`
+function trackOf(ws: WorkspaceService, projectPath: string, n: number, ref: string): PlacementTrack {
+  let all = tracks.get(ws.lifetime)
+  if (!all) tracks.set(ws.lifetime, (all = new Map()))
+  let t = all.get(trackKey(projectPath, n))
+  if (!t || t.ref !== ref) all.set(trackKey(projectPath, n), (t = { ref, failures: 0, gaveUp: false, told: new Set() }))
+  return t
+}
+function releaseTrack(ws: WorkspaceService, projectPath: string, n: number, ref: string): void {
+  const all = tracks.get(ws.lifetime)
+  if (all?.get(trackKey(projectPath, n))?.ref === ref) all.delete(trackKey(projectPath, n))
+}
+/**
+ * A project's records kept only for its pending placements (the slot pass's: card → its current cycle's ref); every
+ * other card's, or another cycle's, let go. A record is made only by a placement under way, so this never takes one a
+ * running placement still needs: its card is pending, at that ref.
+ */
+function keepTracksOf(ws: WorkspaceService, projectPath: string, pending: ReadonlyMap<number, string>): void {
+  const all = tracks.get(ws.lifetime)
+  if (!all) return
+  const prefix = `${projectPath.toLowerCase()}#`
+  for (const [key, t] of all) {
+    if (!key.startsWith(prefix)) continue
+    if (pending.get(Number(key.slice(prefix.length))) !== t.ref) all.delete(key)
+  }
+}
+/** Tests: the placements a workspace keeps something for, as card → its cycle's ref and what it keeps. */
+export const placementTracksForTests = (ws: WorkspaceService): Map<string, PlacementTrack> => new Map(tracks.get(ws.lifetime) ?? [])
+
+/** Told each slot freed (a run's writer released), by its project's folder: a waiting placement looks again. */
+const slotFreed = new Set<(projectPath: string) => void>()
+
+/**
+ * Resolves at the next change that may matter to a waiting placement: its builder's status, a run, its restart resume, a
+ * slot of its project freed, or within 30 s; false once `over`.
+ */
+function nextLook(projectPath: string, agentId: string, over: () => boolean): Promise<boolean> {
+  return new Promise((resolve) => {
+    const same = (p: string, a: string): boolean => a === agentId && p.toLowerCase() === projectPath.toLowerCase()
+    const freed = (p: string): void => {
+      if (p.toLowerCase() === projectPath.toLowerCase()) finish()
+    }
+    slotFreed.add(freed)
+    const finish = (): void => {
+      off()
+      offEntry()
+      slotFreed.delete(freed)
+      clearTimeout(timer)
+      resolve(!over())
+    }
+    const off = onHiveEvent((e) => {
+      if ((e.type === 'session-status' && same(e.state.projectPath, e.state.agentId)) || e.type === 'progress-changed') finish()
+    })
+    const offEntry = onResumeEntry((p, a) => {
+      if (same(p, a)) finish()
+    })
+    const timer = setTimeout(finish, 30_000)
+    timer.unref?.()
+  })
+}
+
+async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workflow, n: number, cycle: Cycle, l: SlotLease): Promise<'done' | 'wait'> {
   let wf = first
   const agentId = l.agent
   const gone = (): boolean => !workflowEnforced() || ended(ws) || !current(wf, n, cycle.seq, l.id)
   const offer = offered.get(offerKey(projectPath, n))
   if (offer) await offer.ready
-  if (!(await until(projectPath, agentId, () => quiet(projectPath, agentId), gone))) return
+  // Quiet, and not about to be resumed by this run's restart record (HI-1746): it is woken as that resume settles.
+  if (!(await until(projectPath, agentId, () => quiet(projectPath, agentId) && !isResuming(projectPath, agentId), gone))) return 'done'
   wf = (await workflowFor(ws, projectPath).catch(() => null)) ?? wf
   const now = current(wf, n, cycle.seq, l.id)
-  if (!now || now.cycle.placed) return
+  if (!now || now.cycle.placed) return 'done'
   const me = await holder.self()
   const claim = now.cycle.claimed
   const mine = !!claim && claim.pid === me.pid && claim.started === me.started
-  if (claim && !mine && (await holder.alive(claim.pid, claim.started)) !== false) return
+  if (claim && !mine && (await holder.alive(claim.pid, claim.started)) !== false) return 'done'
   const took = await wf.write(now.card, null, 'hive', (w) => {
     const c = cycleIn(w.tx.facts(n))
     if (!c || c.seq !== cycle.seq || c.placed || (c.claimed?.seq ?? null) !== (claim?.seq ?? null)) return false
     if (!mine) w.fact('PlacementClaimed', { lease: l.id, pid: me.pid, started: me.started }) // i18n-ignore: a fact's kind and codes, not text
     return true
   })
-  if (!took) return
+  if (!took) return 'done'
   await crashAt('inPlacement')
   const agent = projectAgents(await ws.projectConfig(projectPath)).find((a) => a.id === agentId)
   const card = await getTask(n, ws).catch(() => null)
-  if (!agent || !card) return
+  if (!agent || !card) return 'done'
   wf = (await workflowFor(ws, projectPath).catch(() => null)) ?? wf
-  const ref = `${n}:${cycle.seq}:${l.id}`
+  const ref = refOf(n, cycle, l)
+  const track = trackOf(ws, projectPath, n, ref)
   const made = (await deliveriesOf(projectPath, agentId)).find((r) => r.source === PLACEMENT && r.ref === ref && !NOT_GIVEN.has(r.state))
-  if (gone() || !quiet(projectPath, agentId)) return
+  // Its builder stopped: the conversation it resumes, chosen before anything else (a read that fails throws: tried again).
+  const conv = sessions.liveFor(projectPath, agentId) ? null : await sessions.leaseConversation(projectPath, agentId, l.id)
+  if (gone()) return 'done'
+  // Busy again, or about to be resumed, meanwhile: it waits (its tries and notices kept, HI-1804).
+  if (!quiet(projectPath, agentId) || isResuming(projectPath, agentId)) return 'wait'
   const st = sessions.liveFor(projectPath, agentId)
   const there = !!st && samePlace(st.cwd, cycle.started.folder)
-  let how: FactData['BuilderPlaced']['how'] = there ? 'typed' : st ? 'newConversation' : 'started'
-  let delivery: string | null
-  if (made) {
-    delivery = made.id
-    // On its way, its agent not running: started in its slot (no prompt of its own), where the delivery is offered.
-    if (!st && (made.state === 'queued' || made.state === 'offered' || made.state === 'uncertain')) {
-      log.info(`Starting ${userText(agent.name)} in ${userText(cycle.started.slot)} for #${n}'s delivery ${made.id} (${made.state})`)
-      await sessions.start(projectPath, { agentId })
-      how = 'started'
+  if (!st && conv?.is === 'held') {
+    const told = conv.hold.is
+    log.info(`#${n} waits for ${userText(agent.name)}'s conversation in ${userText(cycle.started.slot)}: held (${conv.hold.is})`)
+    if (!track.told.has(told)) {
+      track.told.add(told)
+      await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: holdWords(conv.hold) }), `Hive can't give ${card.key ?? `#${n}`} to ${agent.name} yet: its conversation in ${cycle.started.slot} can't resume now (${holdWords(conv.hold)}).`) // i18n-ignore: agent-facing, and the notice's English
     }
-  } else {
-    const prompt = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? taskPrompt(card, !!sessions.hiveMcp(projectPath), { from: 'todo', attachments: await cardAttachments(ws, n) })
-    const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: n, body: prompt, source: PLACEMENT, ref } // i18n-ignore: who a delivery is from, as agents read it
-    log.info(`Giving ${userText(agent.name)} #${n} in ${userText(cycle.started.slot)} (${how})`)
-    // A refusal (NotGiven: its agent got busy) or a launch that couldn't start throws: nothing recorded, tried again.
-    const r = there
-      ? await deliverNow(projectPath, { ...nd, need: 'free', conversation: st!.sessionId || null })
-      : (await launchWith(projectPath, nd, (line) => (st ? sessions.newConversation(projectPath, agentId, line) : sessions.start(projectPath, { agentId, prompt: line })))).record
-    if (!r || NOT_GIVEN.has(r.state)) throw new Error(`#${n}'s delivery to ${agent.name} wasn't given (${r?.state ?? 'none made'})`) // i18n-ignore: an error for the log (the pass tries again)
-    delivery = r.id
-    offered.delete(offerKey(projectPath, n))
+    return 'wait'
+  }
+  // Its resumes gave up: it waits for the builder to run (the user's Resume, a start by hand), then the card is typed in.
+  if (!st && track.gaveUp) return 'wait'
+  const resumeId = !st && conv?.is === 'resume' ? conv.id : null
+  let how: FactData['BuilderPlaced']['how'] = there ? 'typed' : st ? 'newConversation' : resumeId ? 'resumed' : 'started'
+  /** The builder's launch here: its lease's conversation resumed, else a new one; a failed resume counted. */
+  const launch = async (line?: string): Promise<LiveSessionState> => {
+    if (!resumeId) return sessions.start(projectPath, line ? { agentId, prompt: line } : { agentId })
+    try {
+      const run = await sessions.start(projectPath, { agentId, resumeId, auto: true, ...(conv?.is === 'resume' && conv.name ? { name: conv.name } : {}), ...(line ? { prompt: line } : {}) })
+      track.failures = 0
+      return run
+    } catch (e) {
+      // Another start of it won (the restart queue, Resume All): not this resume's failure; the next look finds it running.
+      if (sessions.liveFor(projectPath, agentId) || sessions.pendingStart(projectPath, agentId)) throw e
+      // Its slot not ready for it yet (a crashed run's processes not known ended, a setup under way): a wait, not a try.
+      if (e instanceof HiveError && e.kind === 'conflict') {
+        log.info(`#${n} waits to resume ${userText(agent.name)}'s conversation in ${userText(cycle.started.slot)}: ${userText(e.message)}`)
+        const told = 'refused'
+        if (!track.told.has(told)) {
+          track.told.add(told)
+          await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: e.message }), `Hive can't give ${card.key ?? `#${n}`} to ${agent.name} yet: its conversation in ${cycle.started.slot} can't resume now (${e.message}).`) // i18n-ignore: agent-facing, and the notice's English
+        }
+        throw new Waits()
+      }
+      const tries = ++track.failures
+      if (tries >= RESUME_TRIES) {
+        track.gaveUp = true
+        track.failures = 0
+        const why = e instanceof Error ? e.message : String(e)
+        log.warn(`#${n}: ${userText(agent.name)}'s conversation in ${userText(cycle.started.slot)} didn't resume (${tries} tries): ${userText(why)}`)
+        await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeFailed, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why }), `Hive couldn't resume ${agent.name}'s conversation in ${cycle.started.slot} for ${card.key ?? `#${n}`} (three tries): ${why}. Resume ${agent.name} from Sessions, or start it fresh, and Hive gives it ${card.key ?? `#${n}`}.`) // i18n-ignore: agent-facing, and the notice's English
+        throw new GaveUp()
+      }
+      throw e
+    }
+  }
+  let delivery: string | null
+  try {
+    if (made) {
+      delivery = made.id
+      // On its way, its agent not running: started in its slot (no prompt of its own), where the delivery is offered.
+      if (!st && (made.state === 'queued' || made.state === 'offered' || made.state === 'uncertain')) {
+        log.info(`Starting ${userText(agent.name)} in ${userText(cycle.started.slot)} for #${n}'s delivery ${made.id} (${made.state}${resumeId ? ', its conversation resumed' : ''})`)
+        await launch()
+        how = resumeId ? 'resumed' : 'started'
+      }
+    } else {
+      const prompt = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? taskPrompt(card, !!sessions.hiveMcp(projectPath), { from: 'todo', attachments: await cardAttachments(ws, n) })
+      const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: n, body: prompt, source: PLACEMENT, ref } // i18n-ignore: who a delivery is from, as agents read it
+      log.info(`Giving ${userText(agent.name)} #${n} in ${userText(cycle.started.slot)} (${how})`)
+      // A refusal (NotGiven: its agent got busy) or a launch that couldn't start throws: nothing recorded, tried again.
+      const r = there
+        ? await deliverNow(projectPath, { ...nd, need: 'free', conversation: st!.sessionId || null })
+        : (await launchWith(projectPath, nd, (line) => (st ? sessions.newConversation(projectPath, agentId, line) : launch(line)))).record
+      if (!r || NOT_GIVEN.has(r.state)) throw new Error(`#${n}'s delivery to ${agent.name} wasn't given (${r?.state ?? 'none made'})`) // i18n-ignore: an error for the log (the pass tries again)
+      delivery = r.id
+      offered.delete(offerKey(projectPath, n))
+    }
+  } catch (e) {
+    if (e instanceof GaveUp || e instanceof Waits) return 'wait'
+    throw e
   }
   await wf.write(now.card, null, 'hive', (w) => {
     const c = cycleIn(w.tx.facts(n))
     if (c?.seq === cycle.seq && !c.placed) w.fact('BuilderPlaced', { lease: l.id, delivery, how }) // i18n-ignore: a fact's kind and codes, not text
   })
+  return 'done'
+}
+
+/** A placement's resumes reached RESUME_TRIES: told, and it waits for its builder to run. */
+class GaveUp extends Error {}
+/** A placement's resume refused for now (its slot not ready for it): it waits, the try not counted. */
+class Waits extends Error {}
+
+/** A placement's notice on its card, and its builder woken with the English (as a preparation's failure is). */
+async function tellCard(wf: Workflow, card: Parameters<Workflow['write']>[0], builder: string, shown: ReturnType<typeof workflowText>, english: string): Promise<void> {
+  await wf.write(card, null, 'hive', (w) => {
+    w.action('notify', { text: english, shown })
+    wf.wake(w, builder, english)
+  })
+}
+
+/** A resume's hold in a few English words, for a placement's notice and the log (agent-facing). */
+function holdWords(h: ResumeHold): string {
+  switch (h.is) {
+    case 'draining':
+      return 'its last session there is still ending' // i18n-ignore: agent-facing
+    case 'after':
+    case 'reused':
+      return `its slot ${h.slot} holds other work now` // i18n-ignore: agent-facing
+    case 'holds':
+      return `its agent keeps another slot (${h.slot})` // i18n-ignore: agent-facing
+    case 'changed':
+      return `its slot ${h.slot} changed since it ran` // i18n-ignore: agent-facing
+    case 'gone':
+      return `its slot ${h.slot} is gone` // i18n-ignore: agent-facing
+    case 'reviewer':
+      return 'its agent reviews now' // i18n-ignore: agent-facing
+    case 'byHand':
+      return `its slot ${h.slot} is free, for a Resume by hand` // i18n-ignore: agent-facing
+  }
 }
 
 // --- Merged lines.
@@ -1187,7 +1393,10 @@ export function startSlotCards(): void {
     return ws ? projectAgents(await ws.projectConfig(projectPath)).filter(builds).length : 0
   })
   setLaneSlots(laneSlot)
-  setSlotFreed((ws, project) => void settleSlotCards(ws, project))
+  setSlotFreed((ws, project) => {
+    for (const l of slotFreed) l(project)
+    void settleSlotCards(ws, project)
+  })
   const offLanes = onLanesWritten(() => void settleAll().catch((e) => log.warn("settling the lanes' slots", e)))
   // A workspace opening (Hive's start, a restart after a crash): what its cards are owed is done.
   const seen = new WeakSet<AbortSignal>()

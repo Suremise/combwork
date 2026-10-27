@@ -45,6 +45,7 @@
   "panes.footer.compactionHistory": "クリックするとコンパクト化の履歴を表示します",
   "panes.footer.compactions": "{n, plural, other {これまでに#回コンパクト化}}{over, select, yes {（コンパクト化を検討してください）} other {}}",
   "panes.footer.connectionChanged": "追加したときからログインが変わっています。「設定」→「接続」を確認してください。",
+  "panes.footer.connectionEmail": "{email}としてサインインしています。",
   "panes.footer.connectionOff": "選ばれた接続はこのワークスペースでは無効なため、ワークスペースの既定の接続で動いています。",
   "panes.footer.connectionSwitching": "ターンが終わると切り替わります",
   "panes.footer.connectionSwitchingTip": "ターンが終わると、いったん終了し、現在選ばれている接続で作業を続けます。",

@@ -1,5 +1,5 @@
-import { execFile } from 'child_process'
-import { resolve, sep } from 'path'
+import { join, resolve, sep } from 'path'
+import { SHARE_ENV, Worker } from 'worker_threads'
 import { lstat, readFile, readlink } from 'original-fs/promises'
 import { existsSync } from 'original-fs'
 import { insideReal } from './fsutil'
@@ -9,6 +9,10 @@ import { gitProblemData } from '../shared/gitTool'
 import { withValues } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { hiveError } from './hiveError'
+import { createLogger } from './logger'
+import { runGit, type GitOutcome, type GitReply, type GitRequest } from './gitWorker'
+
+const log = createLogger('git')
 
 const MAX_DIFF_BYTES = 2 * 1024 * 1024
 
@@ -44,23 +48,77 @@ export interface GitRunOptions {
 /** A seam for unit tests: told of each git command as it starts (#732 counts a template plan's and load's). */
 export const gitTestHooks: { started?: (cwd: string, args: readonly string[]) => void } = {}
 
-export function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1024, input?: string, opts: GitRunOptions = {}): Promise<GitResult> {
+export async function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1024, input?: string, opts: GitRunOptions = {}): Promise<GitResult> {
   gitTestHooks.started?.(cwd, args)
-  return new Promise((res) => {
-    const child = execFile('git', [...GIT_PREFIX, ...args], { cwd, windowsHide: true, maxBuffer, encoding: 'buffer', ...(opts.env ? { env: opts.env } : {}), ...(opts.timeout ? { timeout: opts.timeout } : {}) }, (err, stdout, stderr) => {
-      const buf = (stdout as unknown as Buffer) ?? Buffer.alloc(0)
-      const errCode = (err as { code?: unknown } | null)?.code
-      // Git didn't start. Node says ENOENT for a missing working folder too: that one is a failure, not a missing git.
-      const missing = (errCode === 'ENOENT' || errCode === 'EACCES' || errCode === 'EPERM' || errCode === 'UNKNOWN') && existsSync(cwd)
-      const code = err ? (typeof errCode === 'number' ? errCode : missing ? -1 : 1) : 0
-      if (missing) noteGitMissing()
-      // Git ran (whatever it answered): not one that didn't start for another reason (no working folder, output too big).
-      else if (!err || typeof errCode === 'number') noteGitRan()
-      res({ out: buf.toString('utf8'), ok: !err, buf, err: ((stderr as unknown as Buffer) ?? Buffer.alloc(0)).toString('utf8').trim(), code, ...(missing ? { missing } : {}), ...((err as { killed?: boolean } | null)?.killed && opts.timeout ? { timedOut: true } : {}) })
+  // Started off main's thread (HI-1783): gitWorker.ts runs it as this always did, and its outcome is read here.
+  const o = await thread.run({ cwd, args: [...GIT_PREFIX, ...args], maxBuffer, ...(input !== undefined ? { input } : {}), ...(opts.env ? { env: opts.env } : {}), ...(opts.timeout ? { timeout: opts.timeout } : {}) })
+  const buf = Buffer.from(o.stdout.buffer, o.stdout.byteOffset, o.stdout.byteLength)
+  const err = o.error
+  const errCode = err?.code
+  // Git didn't start. Node says ENOENT for a missing working folder too: that one is a failure, not a missing git.
+  const missing = (errCode === 'ENOENT' || errCode === 'EACCES' || errCode === 'EPERM' || errCode === 'UNKNOWN') && o.cwdExists
+  const code = err ? (typeof errCode === 'number' ? errCode : missing ? -1 : 1) : 0
+  if (missing) noteGitMissing()
+  // Git ran (whatever it answered): not one that didn't start for another reason (no working folder, output too big).
+  else if (!err || typeof errCode === 'number') noteGitRan()
+  return { out: buf.toString('utf8'), ok: !err, buf, err: Buffer.from(o.stderr.buffer, o.stderr.byteOffset, o.stderr.byteLength).toString('utf8').trim(), code, ...(missing ? { missing } : {}), ...(err?.killed && opts.timeout ? { timedOut: true } : {}) }
+}
+
+/**
+ * Where git's commands run (HI-1783): its worker thread (gitWorker.ts, a build entry beside main's script), started with
+ * the first; in this thread where there is no built script (unit tests), as before. A command under way when the worker
+ * ends is answered as one that couldn't start (its outcome unknown: never taken for git's answer); the next starts it again.
+ */
+class GitThread {
+  private worker: Worker | null = null
+  private calls = new Map<number, (o: GitOutcome) => void>()
+  private next = 0
+
+  run(m: Omit<GitRequest, 'id'>): Promise<GitOutcome> {
+    const w = this.ensure()
+    if (!w) return runGit(m)
+    const id = ++this.next
+    return new Promise((done) => {
+      this.calls.set(id, done)
+      w.postMessage({ ...m, id } satisfies GitRequest)
     })
-    // What the command reads (update-ref --stdin's transaction).
-    if (input !== undefined) child.stdin?.end(input)
-  })
+  }
+
+  private ensure(): Worker | null {
+    if (this.worker) return this.worker
+    const script = gitWorkerScript()
+    if (!existsSync(script)) return null
+    const w = new Worker(script, { env: SHARE_ENV })
+    this.worker = w
+    w.on('message', (r: GitReply) => {
+      const c = this.calls.get(r.id)
+      this.calls.delete(r.id)
+      c?.(r.outcome)
+    })
+    const gone = (why: string): void => {
+      if (this.worker !== w) return
+      this.worker = null
+      log.warn(`git's worker ended (${why}); it starts again with the next command`)
+      const lost: GitOutcome = { stdout: new Uint8Array(), stderr: Buffer.from(`Hive's git worker ended (${why})`), error: { code: 'ERR_GIT_WORKER', killed: false, signal: null }, cwdExists: true } // i18n-ignore: git's error text, for the log and the caller's message
+      for (const c of this.calls.values()) c(lost)
+      this.calls.clear()
+    }
+    w.on('error', (e: Error) => gone(e.message))
+    w.on('exit', (code) => gone(`exit code ${code}`)) // i18n-ignore: for the log
+    w.unref()
+    return w
+  }
+}
+
+/** The worker's script, beside main's (inside the asar, as the others' are); a test's build of it (`useGitWorker`). */
+let gitScriptForTests: string | null = null
+const gitWorkerScript = (): string => gitScriptForTests ?? join(__dirname, 'git-worker.js')
+let thread = new GitThread()
+
+/** Tests: git's worker from this script (a build of gitWorker.ts), or null for the default; a new thread. */
+export function useGitWorker(file: string | null): void {
+  gitScriptForTests = file
+  thread = new GitThread()
 }
 
 /** Git couldn't read the index for a moment (another git command, a user's `git add`, is rewriting it): worth trying again (#222). */

@@ -92,7 +92,7 @@ import { cardStages } from './boardStore'
 import { cardFacts, cardKind, cardReviewSkip, factRow } from './workflow/cardWork'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
-import { detect, projectPlatform } from './platform/registry'
+import { detect, platformIdOf } from './platform/registry'
 import { revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
 import { ASK_ACTIONS, ASK_ACTIONS_MAX, CATEGORY_STAGE, LOOP_STEPS, type AskAction, type ForYouKind } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
@@ -2755,7 +2755,7 @@ route('GET', '/v1/tasks/:n/facts', async ({ params, query }) => {
 async function platformOfCard(c: TaskCard): Promise<PlatformId> {
   try {
     const p = projectByName(c.project)
-    return projectPlatform(p, (await workspace.projectConfig(p)).platform).id
+    return platformIdOf(p, (await workspace.projectConfig(p)).platform)
   } catch {
     return detect(workspace.path!).platform
   }
@@ -3530,7 +3530,7 @@ async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: R
   if (link.card === null || !link.revision) throw new HttpError(400, "--isolated runs a check at its card's revision: name the card (--card), or work on one in Doing")
   const cfg = await ws.projectConfig(caller.projectPath).catch(() => null)
   // None has no check copies (OP-16): its remedy is running again once the deliverables are quiet.
-  if (projectPlatform(caller.projectPath, cfg?.platform).id !== 'git') throw new HttpError(400, "This project has no version control, so there are no check copies: run the check again without --isolated once nobody is changing the card's files")
+  if (platformIdOf(caller.projectPath, cfg?.platform) !== 'git') throw new HttpError(400, "This project has no version control, so there are no check copies: run the check again without --isolated once nobody is changing the card's files")
   // Leased and set up apart from this request (a first setup takes minutes): `wait` with a ticket to ask again with.
   const got = await isolatedRequest(ws, caller.projectPath, linkOwner(caller), { card: link.card, revision: link.revision, agent: caller.agentId }, ticket)
   if ('wait' in got) throw new HttpError(409, `waiting for ${got.wait}`, { wait: got.wait, ...(got.ticket ? { ticket: got.ticket } : {}) })

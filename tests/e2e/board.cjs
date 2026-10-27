@@ -403,7 +403,9 @@ const check = (name, ok, extra = '') => {
   check("the project's Tasks tab shows its cards", !!(await until(async () => (await page.locator('.board-view.in-tab .task-card').count()) === 2, 5000)))
 
   // Removing the agent asks about its open card; Move them back puts it in Todo with nobody.
+  // Project Settings opens on General; the agents are listed under Agents (HI-1765).
   await lib.openProjectSettings(page)
+  await page.locator('.tab-body .settings-nav .row').filter({ has: page.locator('.label', { hasText: /^Agents$/ }) }).click()
   await page.getByRole('button', { name: 'Remove agent…' }).first().click()
   await page.locator('.dialog .btn', { hasText: 'Remove' }).click()
   const ask = page.locator('.dialog', { hasText: 'open card' })

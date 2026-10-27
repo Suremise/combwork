@@ -3,7 +3,7 @@ import { HISTORY } from '../shared/taskHistory'
 import { workStartedAt } from '../shared/tasks'
 import type { TaskCard } from '../shared/types'
 import { onHiveEvent } from './events'
-import { allTasksSeen } from './tasks'
+import { liveDecisionCards } from './tasks'
 import type { WorkspaceService } from './workspace'
 import { cardRef } from '../shared/projectKeys'
 
@@ -33,7 +33,7 @@ export function noteCardRead(agent: { projectPath: string; agentId: string }, n:
 const readSeq = new Map<string, number>()
 export const cardReadsBy = (agent: { projectPath: string; agentId: string }): number => readSeq.get(keyOf(agent)) ?? 0
 
-// The board's live cards as last read, per workspace, until it changes: an agent's every board call shouldn't read every
+// The board's live cards with decisions as last read, per workspace, until it changes: an agent's every board call shouldn't read every
 // card, and never the archived ones (#1107: 945 of them, 13 MB, on a busy board), which have no decisions to tell.
 const boards = new Map<string, Promise<{ cards: TaskCard[]; generations: Map<number, number> }>>()
 let changes = 0
@@ -51,8 +51,9 @@ function board(ws: WorkspaceService): Promise<{ cards: TaskCard[]; generations: 
   let p = boards.get(key)
   if (!p) {
     const at = changes
-    // With each card's decision generation read with it (#1216): what a line tells, its receipt records.
-    p = allTasksSeen(ws, { archived: false })
+    // With each card's decision generation read with it (#1216): what a line tells, its receipt records. Only the cards
+    // changed since the last read are read again (HI-1789).
+    p = liveDecisionCards(ws)
     boards.set(key, p)
     // A read the board changed under isn't kept for the next call.
     void p.then(

@@ -10,9 +10,9 @@ import type { BrowserWindow } from 'electron'
 import chokidar, { type FSWatcher } from 'chokidar'
 import { ASSISTANT_DIR, ASSISTANT_NAME, LEGACY_MODES_DIR, MODES_DIR, assistantProjectConfig } from '../shared/assistant'
 import { DEFAULT_PROJECT_CONFIG, DEFAULT_WORKSPACE_CONFIG, HIVE_DIR, mergeDefaults, migrateProjectConfig, projectAgents, withLegacyProjectFields, withoutSkillSwitches } from '../shared/defaults'
+import { migrateWorkspacePreferences } from '../shared/workflow/preferences'
 import { settlePlacements } from '../shared/paneCells'
 import { migratedProjectMcp, migratedWorkspaceMcp } from '../shared/agentMcp'
-import { LANE_MAX_ROUNDS, LOOP_WAIT_MAX_HOURS } from '../shared/lanes'
 import { advancedDef, checkAdvanced } from '../shared/advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { HiveError, hiveError } from './hiveError'
@@ -34,6 +34,7 @@ import type { ProjectPlatform } from '../shared/platform/descriptors'
 import { gitProblem } from './gitTool'
 import { duplicateAgentNames, suggestAgentName } from '../shared/agentNames'
 import { NO_PROJECT_IDS, isProjectId, settleProjectIds, type ProjectIdEntry, type ProjectIdIndex } from '../shared/projectIds'
+import { migrateProjectPreferences } from '../shared/workflow/preferences'
 
 const log = createLogger('workspace')
 
@@ -150,6 +151,8 @@ export class WorkspaceService {
   private place: string | null = null
   private wsConfig: WorkspaceConfig = structuredClone(DEFAULT_WORKSPACE_CONFIG)
   private watcher: FSWatcher | null = null
+  /** .hive's own top, watched natively (watchHive). */
+  private hiveTop: RootWatcher | null = null
   private rootWatcher: RootWatcher | null = null
   private refreshTimer: NodeJS.Timeout | null = null
   /** The refresh scheduleRefresh has waiting, told once it has run (or was dropped): refreshesSettled waits for it. */
@@ -373,7 +376,7 @@ export class WorkspaceService {
     }
     const fresh = !existsSync(join(abs, HIVE_DIR))
     await this.ensureWorkspaceStructure()
-    this.wsConfig = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), withoutSkillSwitches(await readKeptJson(join(this.hiveDir, 'workspace.json'), {})))
+    this.wsConfig = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), migrateWorkspacePreferences(withoutSkillSwitches(await readKeptJson(join(this.hiveDir, 'workspace.json'), {}))))
     const last = this.wsConfig.lastPath
     this.movedFrom = last && resolve(last).toLowerCase() !== abs.toLowerCase() ? resolve(last) : null
     config.update((c) => {
@@ -506,6 +509,8 @@ export class WorkspaceService {
     while (this.scheduledRuns.size) await Promise.allSettled([...this.scheduledRuns])
     if (closing) closeBoard(closing, place)
     if (closing) closeJournal(join(closing, HIVE_DIR, ASSISTANT_DIR), place)
+    this.hiveTop?.close()
+    this.hiveTop = null
     await this.watcher?.close()
     this.watcher = null
     this.path = null
@@ -600,27 +605,55 @@ export class WorkspaceService {
     const assistantHome = this.assistantHome.toLowerCase()
     const mcpDir = this.mcpDir.toLowerCase() + sep
     const hiveDir = this.hiveDir.toLowerCase() + sep
-    this.watcher = chokidar.watch(this.hiveDir, {
-      depth: 5,
-      ignoreInitial: true,
-      // The Assistant's home changes with every launch; nothing in it is shown from the file system. In .hive/mcp only
-      // the definitions (<name>.json) are: a server's own folder (added from a .zip, #550) isn't watched, since a watched
-      // folder inside it would stop Windows moving the folder (Replace, Delete). The board is in its database (#1017),
-      // told by Hive's own writes: neither the database's files nor the cards' old folders and backups are watched.
-      ignored: (p: string) => {
-        const at = resolve(p).toLowerCase()
-        const top = at.startsWith(hiveDir) ? at.slice(hiveDir.length).split(sep)[0] : ''
-        return at === assistantHome || BOARD_FILES.test(top) || (at.startsWith(mcpDir) && (at.slice(mcpDir.length).includes(sep) || !at.endsWith('.json')))
+    // Only the folders whose files are shown (HI-1797): chokidar read .hive's own listing again, and filtered each entry,
+    // on every change at its top, and the board's database files there change with every board write. .hive itself is
+    // watched natively below, for workspace.json and for one of these folders appearing.
+    const folders = ['shared', 'skills', 'mcp', MODES_DIR, LEGACY_MODES_DIR]
+    const watched = new Set(folders.filter((f) => existsSync(join(this.hiveDir, f))))
+    this.watcher = chokidar.watch(
+      [...watched].map((f) => join(this.hiveDir, f)),
+      {
+        depth: 5,
+        ignoreInitial: true,
+        // The Assistant's home changes with every launch; nothing in it is shown from the file system. In .hive/mcp only
+        // the definitions (<name>.json) are: a server's own folder (added from a .zip, #550) isn't watched, since a watched
+        // folder inside it would stop Windows moving the folder (Replace, Delete). The board is in its database (#1017),
+        // told by Hive's own writes: neither the database's files nor the cards' old folders and backups are watched.
+        ignored: (p: string) => {
+          const at = resolve(p).toLowerCase()
+          const top = at.startsWith(hiveDir) ? at.slice(hiveDir.length).split(sep)[0] : ''
+          return at === assistantHome || BOARD_FILES.test(top) || (at.startsWith(mcpDir) && (at.slice(mcpDir.length).includes(sep) || !at.endsWith('.json')))
+        }
       }
-    })
-    this.watcher.on('all', (evt, p) => {
-      const rel = this.path ? p.slice(this.path.length + 1).replace(/\\/g, '/') : ''
+    )
+    const told = (rel: string): void => {
       if (rel.startsWith(`${HIVE_DIR}/shared`)) this.emit({ type: 'notes-changed' })
       else if (rel.startsWith(`${HIVE_DIR}/skills`) || rel.startsWith(`${HIVE_DIR}/mcp`)) this.emit({ type: 'skills-changed' })
       else if (rel.startsWith(`${HIVE_DIR}/${MODES_DIR}`) || rel.startsWith(`${HIVE_DIR}/${LEGACY_MODES_DIR}`)) this.emit({ type: 'modes-changed' })
       else if (rel === `${HIVE_DIR}/workspace.json`) void this.reloadConfig()
-    })
-    this.watcher.on('error', (e) => log.warn('watcher error', e))
+    }
+    const chokidarWatcher = this.watcher
+    chokidarWatcher.on('all', (evt, p) => told(this.path ? p.slice(this.path.length + 1).replace(/\\/g, '/') : ''))
+    chokidarWatcher.on('error', (e) => log.warn('watcher error', e))
+    // .hive's own top, natively: each event only a name compared (the database's files change at every write).
+    // workspace.json changed reads the config again; one of the folders above appearing is watched from then on, and
+    // tells its change (what is in it is new).
+    try {
+      const top = watch(this.hiveDir, (_evt, name) => {
+        if (this.watcher !== chokidarWatcher || !name) return
+        const n = String(name)
+        if (n === 'workspace.json') return void this.reloadConfig()
+        const f = folders.find((x) => x.toLowerCase() === n.toLowerCase())
+        if (!f || watched.has(f) || !existsSync(join(this.hiveDir, f))) return
+        watched.add(f)
+        chokidarWatcher.add(join(this.hiveDir, f))
+        told(`${HIVE_DIR}/${f}`)
+      })
+      top.on('error', (e) => log.warn('watcher error (.hive)', e))
+      this.hiveTop = top
+    } catch (e) {
+      log.warn('watching .hive', e)
+    }
   }
 
   private rootRetry: NodeJS.Timeout | null = null
@@ -719,7 +752,7 @@ export class WorkspaceService {
     const text = await readFile(file, 'utf8').catch(() => '')
     // Hive's own save, or a save started meanwhile (its settings are newer), or another workspace opened since.
     if (text === this.configWritten || this.configSaves || generation !== this.generation) return
-    this.wsConfig = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), withoutSkillSwitches(await readKeptJson(file, {})))
+    this.wsConfig = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), migrateWorkspacePreferences(withoutSkillSwitches(await readKeptJson(file, {}))))
     this.emit({ type: 'skills-changed' })
     this.scheduleRefresh()
   }
@@ -905,20 +938,6 @@ export class WorkspaceService {
   hiddenProjects(): (HiddenProject & { present: boolean })[] {
     if (!this.path) return []
     return (this.wsConfig.hiddenProjects ?? []).map((h) => ({ ...h, present: existsSync(join(this.path!, h.name)) }))
-  }
-
-  /**
-   * Sets the workspace's card-loop rounds and wait in hours (#412, Settings → Workspace): a value given replaces its own,
-   * one left out stays. Saved in workspace.json; the window hears of it as a workspace change.
-   */
-  async setLoops(patch: { rounds?: number; waitHours?: number }): Promise<void> {
-    if (!this.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
-    const whole = (v: unknown, max: number): boolean => v === undefined || (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= max)
-    if (!whole(patch.rounds, LANE_MAX_ROUNDS)) throw hiveError(msg({ id: 'service.workspace.loopRounds', defaultMessage: 'Card loop rounds take a whole number from 1 to {max}.', description: "An error in Settings → Workspace: a card loop's rounds (how many reviews a card gets before the user is asked) must be a whole number from 1 to {max}." }), { max: LANE_MAX_ROUNDS })
-    if (!whole(patch.waitHours, LOOP_WAIT_MAX_HOURS)) throw hiveError(msg({ id: 'service.workspace.loopWait', defaultMessage: 'Card loop wait takes a whole number of hours from 1 to {max}.', description: "An error in Settings → Workspace: a card loop's wait (hours with no change before the user is told) must be a whole number from 1 to {max}." }), { max: LOOP_WAIT_MAX_HOURS })
-    this.wsConfig.loops = { ...this.wsConfig.loops, ...(patch.rounds !== undefined ? { rounds: patch.rounds } : {}), ...(patch.waitHours !== undefined ? { waitHours: patch.waitHours } : {}) }
-    await this.saveWorkspaceConfig()
-    this.scheduleRefresh()
   }
 
   /** Sets the workspace's own value of an advanced setting a workspace can set (#367), or removes it (null: Hive's again). */
@@ -1182,6 +1201,10 @@ export class WorkspaceService {
         // The agents changed: each layout's pane placement takes in those added and lets go of those removed (#762), so
         // every agent keeps its cell (not one worked out again from the order on each read).
         if ('agents' in patch && updated.placement) updated = { ...updated, placement: settlePlacements(updated.placement, projectAgents(updated).map((a) => a.id)) }
+        // Card loops and file locks from before HI-1766 (HR5's round 1): once the project has workflow options, any old
+        // keys left move into them in this same write (a value there wins) and go, so none can come back after it; a
+        // patch that consumed them (LEGACY_CONSUMED) leaves nothing to move.
+        updated = migrateProjectPreferences(updated)
         // The view (HI-1749) to this user's UI state, saved a moment later and on quit; project.json only for a change of
         // the config, written without the view (one from before moves out as it is written).
         this.keepView(projectPath, updated)

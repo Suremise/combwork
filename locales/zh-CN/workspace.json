@@ -429,6 +429,7 @@
   "workspace.statusBar.apiOn": "Agent API 正在 {url} 上监听",
   "workspace.statusBar.asOf": "数据更新于 {when}。会话运行时会持续更新。",
   "workspace.statusBar.awakeTip": "在智能体完成之前，Windows 不会进入睡眠（屏幕仍可能关闭）。“设置”→“常规”→“智能体工作时保持电脑唤醒”。",
+  "workspace.statusBar.connectionLine": "{name}（{provider}{hasPlan, select, yes {，{plan} 套餐} other {}}）",
   "workspace.statusBar.git": "{hasVersion, select, yes {Git {version}} other {Git}}",
   "workspace.statusBar.gitOld": "Git {version} 低于 {min}：部分 git 功能无法使用。",
   "workspace.statusBar.gitProblem": "{problem}。{fix}",

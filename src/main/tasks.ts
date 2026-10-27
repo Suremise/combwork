@@ -31,7 +31,7 @@ import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, STAGE_CATEGORY, type AskAction
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
-import { afterBoardWrite, archiveBatchDocs, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
+import { afterBoardWrite, archiveBatchDocs, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, type CardQuery } from './boardStore'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
@@ -40,6 +40,7 @@ import { workspace, workspaceFor, type WorkspaceService } from './workspace'
 import { trash } from './trash'
 import { journalFact } from './journalService'
 import { cardRef } from '../shared/projectKeys'
+import { projectPreferences } from './workflow/preferences'
 
 const log = createLogger('tasks')
 
@@ -346,6 +347,48 @@ export async function boardHolds(ws: WorkspaceService): Promise<CardHolds[]> {
   return got.numbers.flatMap((n) => cards.get(n) ?? [])
 }
 
+/** Each workspace's live cards with decisions as liveDecisionCards last read them: the board's opening and project names then, its mark, each card with its decision generation. */
+const keptDecisions = new WeakMap<WorkspaceService, { path: string; stamp: string; mark: number; cards: Map<number, { card: TaskCard; generation: number }> }>()
+
+/**
+ * The live cards that have decisions, each with its decision generation read with it (#1216), with only what a
+ * decision notice reads of them (boardStore's DECISION_FIELDS: no title, description, comments, links or key): kept,
+ * and read again only for the cards a change touched (decisionChanges, HI-1789: decision notices read them on every
+ * hive tool reply after a board change, a dozen agents' changes a minute). Each read touches only those cards and the
+ * kept ones (still live), never the whole board. A decision's generation is recorded in the change that writes the
+ * card's decisions (recorder.ts), so it moves only with the card's revision. Read whole after the board was opened
+ * again or a project's name or id changed (a card's project is named by them); on a board waiting for its 1.0 upgrade,
+ * every live card in full, as allTasksSeen.
+ */
+export async function liveDecisionCards(ws: WorkspaceService): Promise<{ cards: TaskCard[]; generations: Map<number, number> }> {
+  const path = ws.path
+  if (!path) return { cards: [], generations: new Map() }
+  const ids = await ws.projectIds()
+  if (ws.path !== path) return { cards: [], generations: new Map() }
+  const was = keptDecisions.get(ws)
+  const names = JSON.stringify([...ids.byId])
+  const same = (generation: number): boolean => !!was && was.path === path && was.stamp === `${generation}:${names}`
+  // The changed cards, their generations and which kept cards are still live, from one snapshot: what a line tells, its receipt records.
+  const read = (since: number | null, kept: number[]) =>
+    boardRead(ws, () => {
+      const got = decisionChanges(ws, since)
+      return got && { ...got, live: cardsOnBoard(ws, kept, { live: true }), generations: decisionGenerations(ws, got.docs.map((d) => d.number)) }
+    })
+  let r = was && was.path === path ? read(was.mark, [...was.cards.keys()]) : read(null, [])
+  if (r && was && !same(r.generation)) r = read(null, [])
+  if (!r) return allTasksSeen(ws, { archived: false })
+  const cards = was && same(r.generation) ? was.cards : new Map<number, { card: TaskCard; generation: number }>()
+  // Archived or gone from the board since, or changed and without decisions now.
+  for (const n of cards.keys()) if (!r.live.has(n)) cards.delete(n)
+  for (const n of r.changed) cards.delete(n)
+  for (const { number, doc } of r.docs) {
+    const card = clean(doc, number, ids)
+    if (card.decisions?.length) cards.set(number, { card, generation: r.generations.get(number) ?? 0 })
+  }
+  keptDecisions.set(ws, { path, stamp: `${r.generation}:${names}`, mark: r.mark, cards })
+  return { cards: sortCards([...cards.values()].map((x) => x.card)), generations: new Map([...cards].map(([n, x]) => [n, x.generation])) }
+}
+
 /**
  * The cards given, with what their cost needs (#1210: number, title, project, column, holds, history, agent and reviewer; the rest as a
  * card without them has it): their comments, descriptions and decisions never read. In number order.
@@ -464,6 +507,66 @@ export async function getTask(n: number, ws: WorkspaceService = workspace): Prom
   if (!raw) throw unknownTask(n)
   return withoutGone(clean(raw, n, ids, cardKeys(ws, [n]).get(n)), (x) => hasCard(ws, x))
 }
+
+/**
+ * Cards as getTask reads them (null: not on the board; undefined: it couldn't be read now), kept (HI-1780: the lanes read every running lane's cards on each
+ * board change, three times): one is read in full again only once its revision (CARD_REVS_STEP: any write to its row or
+ * its parts), its key, the project names by id or the board's opening changed; a card one links to or waits for that
+ * is gone since leaves its lists, as getTask leaves it out. The same object is given until then: never change it. On a
+ * board waiting for its 1.0 upgrade (no revisions), each is read as getTask does.
+ */
+export async function cardsNow(ws: WorkspaceService, numbers: readonly number[]): Promise<Map<number, TaskCard | null | undefined>> {
+  const out = new Map<number, TaskCard | null | undefined>()
+  const path = ws.path
+  if (!path || !numbers.length) return out
+  const ids = await ws.projectIds()
+  if (ws.path !== path) return out
+  const wanted = [...new Set(numbers)]
+  const revs = cardRevs(ws, wanted)
+  if (!revs) {
+    for (const n of wanted) out.set(n, await getTask(n, ws).catch(unreadable))
+    return out
+  }
+  const keys = cardKeys(ws, wanted)
+  const names = JSON.stringify([...ids.byId])
+  let kept = keptCards.get(ws)
+  if (!kept || kept.path !== path || kept.generation !== revs.generation || kept.names !== names) keptCards.set(ws, (kept = { path, generation: revs.generation, names, cards: new Map() }))
+  // The cards the kept ones link to or wait for that are still on the board (one read of those alone).
+  let all: Set<number> | null = null
+  const there = (x: number): boolean => {
+    if (!all) {
+      const refs = [...kept!.cards.values()].flatMap(({ card }) => [...card.blockedBy, ...card.links])
+      all = new Set([...(cardRevs(ws, [...new Set(refs)])?.revs.keys() ?? [])])
+    }
+    return all.has(x)
+  }
+  for (const n of wanted) {
+    const rev = revs.revs.get(n)
+    if (rev === undefined) {
+      kept.cards.delete(n)
+      out.set(n, null)
+      continue
+    }
+    const at = `${rev}\n${keys.get(n) ?? ''}`
+    const was = kept.cards.get(n)
+    if (was?.at === at) {
+      out.set(n, was.card.blockedBy.length || was.card.links.length ? withoutGone(was.card, there) : was.card)
+      continue
+    }
+    // Read at its revision or after: a write since raises it again (it is below the mark), so the next look reads it
+    // again. A card at the mark keeps its revision through another write, so it isn't kept: read each time until a
+    // later change moves the mark past it.
+    const card = await getTask(n, ws).catch(unreadable)
+    if (card && rev < revs.mark) kept.cards.set(n, { at, card })
+    else kept.cards.delete(n)
+    out.set(n, card)
+  }
+  return out
+}
+/** A card read refused: null when there is no such card, undefined when it couldn't be read. */
+const unreadable = (e: Error): null | undefined => (e.message.startsWith('Unknown task') ? null : undefined)
+/** Each workspace's cards cardsNow read, with the revision and key each was read at, for an opening and project names. */
+const keptCards = new WeakMap<WorkspaceService, { path: string; generation: number; names: string; cards: Map<number, { at: string; card: TaskCard }> }>()
 
 /**
  * Saves a card (in a board change) with its project's id beside its name (#508). A card whose project the workspace doesn't
@@ -989,7 +1092,8 @@ async function laneReviewerAsks(ws: WorkspaceService, card: TaskCard, patch: Tas
   if (!self || !card.project || !ws.path || said.length || patch.column !== undefined || patch.review !== undefined) return false
   if (card.archived || card.column !== 'review' || card.review || !card.agent || card.agent === self.agentId) return false
   if (FactStore.forBoard(ws, { project: card.project, key: '' }).card(card.number).reviewer !== self.agentId) return false
-  return (await ws.projectConfig(join(ws.path, card.project)).catch(() => null))?.loopWakes !== false
+  const path = join(ws.path, card.project)
+  return projectPreferences(ws, path, await ws.projectConfig(path).catch(() => null)).loopWakes
 }
 
 /** A message within a history line's values: a CLI's sentence (providerMessage) or the workflow's (a request's, #1266). */

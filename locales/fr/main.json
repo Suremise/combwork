@@ -1,5 +1,6 @@
 {
   "main.accounts.badTarget": "Hive ne liera pas de connexion à {target} : ce n’est pas un des dossiers propres à {cli}.",
+  "main.accounts.checkHeld": "La connexion {name} est en cours de vérification : Hive s’assure encore que la vérification de {cli} est terminée. Réessaie dans un instant.",
   "main.accounts.folderNotUsable": "Le dossier de la connexion {name} n’est pas celui que Hive a créé (il manque, ou a été déplacé ou remplacé) : rien n’y a été lancé. Retire la connexion, puis ajoute-la à nouveau.",
   "main.accounts.inUse": "La connexion {name} est utilisée : arrête les agents qui l’utilisent et ferme son terminal d’identification, puis retire-la.",
   "main.accounts.leftover": "La connexion {name} n’est retirée qu’à moitié : retire-la d’abord à nouveau.",
@@ -194,6 +195,7 @@
   "main.plan.resetsAt": "Elle se réinitialise à {time}.",
   "main.plan.resetsOn": "Réinitialisation : {when}.",
   "main.plan.used": "Tu as utilisé {share, number, ::percent} de ta limite {provider} {window, select, hours {sur {hours, plural, one {# heure} many {# heures} other {# heures}}} weekly {hebdomadaire} other {{label}}}",
+  "main.plan.usedOn": "{share, number, ::percent} de la limite {window, select, hours {sur {hours, plural, one {# heure} many {# heures} other {# heures}}} weekly {hebdomadaire} other {{label}}} utilisés sur {connection}",
   "main.quit.closed": "Hive a été fermé",
   "main.quit.closedBody": "{n, plural, one {# session a été arrêtée. Reprends-la depuis Hive la prochaine fois ; rien n’a été perdu.} many {# sessions ont été arrêtées. Reprends-les depuis Hive la prochaine fois ; rien n’a été perdu.} other {# sessions ont été arrêtées. Reprends-les depuis Hive la prochaine fois ; rien n’a été perdu.}}",
   "main.quit.dialogTitle": "Quitter Hive",

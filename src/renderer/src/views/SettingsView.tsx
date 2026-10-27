@@ -1,7 +1,7 @@
 import { WorkflowLevelForm } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
 import { useEffect, useMemo, useState } from 'react'
-import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, ModelPrice, PermissionMode, ProviderId, TaskColumn, WorkspaceConfig } from '@shared/types'
+import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, ModelPrice, PermissionMode, ProviderId, TaskColumn } from '@shared/types'
 import { DEFAULT_COLUMN_COLORS, TASK_COLUMNS, columnColor, columnName } from '@shared/tasks'
 import { DEFAULT_MODE } from '@shared/assistant'
 import { PRICES_CHECKED, SHIPPED_PRICES, listedPriceModels, priceRows } from '@shared/prices'
@@ -59,8 +59,9 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'workspace.hiddenProjects': () => <HiddenProjectsList />,
   'workspace.storage': () => <WorkspaceStorageList />,
   'workspace.antivirus': () => <AntivirusPanel />,
-  'workspace.workflowDefaults': () => <WorkflowLevelForm level="workspace" />,
+  // Settings → Version Control's two parts (HI-1768): Hive defaults, then the open workspace's.
   'workflow.defaults': () => <WorkflowLevelForm level="global" />,
+  'workflow.workspaceDefaults': () => <WorkflowLevelForm level="workspace" />,
   'board.colors': () => <ColumnColors />,
   'assistant.provider': () => <AssistantProviderPicker />,
   'assistant.connection': () => <AssistantConnectionPicker />,
@@ -363,8 +364,8 @@ function GlobalModelPicker({ provider }: { provider: ProviderId }) {
   return <ModelPicker provider={provider} value={value} base={{ value: '', label: tr(msg({ id: 'settings.provider.cliDefault', defaultMessage: '{provider} default', description: "The first choice of a model or effort list: the CLI's own default. {provider} is its name." }), { provider: providerDescriptor(provider).name }) }} onChange={(v) => void update(def, v)} />
 }
 
-/** A row's value: Hive's settings, or the open workspace's own (Settings → Workspace's card loops, #412). */
-const getValue = (s: AppSettings, def: SettingDef, loops: WorkspaceConfig['loops']): unknown => settingValue(def, s, null, { loops })
+/** A row's value: Hive's settings. */
+const getValue = (s: AppSettings, def: SettingDef): unknown => settingValue(def, s, null)
 
 const defaultValue = (def: SettingDef): unknown => settingDefault(def)
 
@@ -393,10 +394,6 @@ async function update(def: SettingDef, value: unknown): Promise<void> {
   if (def.action) return
   const change = settingPatch(def, value)
   if ('settings' in change) return saveSettings(change.settings as SettingsPatch)
-  if ('workspace' in change) {
-    const info = await actions.attempt(tr(msg({ id: 'settings.saveFailed', defaultMessage: 'Could not save setting', description: "An error's title: saving a setting failed." })), () => call('workspace:setLoops', change.workspace))
-    if (info) set({ workspace: info })
-  }
 }
 
 /** Turns a provider on or off. Turning it off with agents running asks whether to stop them. */
@@ -432,9 +429,7 @@ export async function setProviderEnabled(provider: ProviderId, on: boolean): Pro
 }
 
 function Control({ def, settings }: { def: SettingDef; settings: AppSettings }) {
-  // The workspace's own values come from its config: shown again when it changes.
-  const loops = useStore((s) => s.workspace?.config.loops)
-  const value = getValue(settings, def, loops)
+  const value = getValue(settings, def)
   const [draft, setDraft] = useState(String(value ?? ''))
   useEffect(() => setDraft(String(value ?? '')), [value])
   switch (def.type) {
@@ -1030,6 +1025,9 @@ function ResetAll() {
   )
 }
 
+/** Settings → Version Control's workspace part with the open workspace's name (HI-1768). */
+const WORKSPACE_DEFAULTS_NAMED = msg({ id: 'settings.workflow.workspaceDefaultsNamed', defaultMessage: 'Workspace defaults ({workspace})', description: 'The title of the part of Settings → Version Control holding the open workspace’s workflow defaults; {workspace} is its name.' })
+
 export function SettingsView() {
   const settings = useStore((s) => s.settings)
   const section = useStore((s) => s.settingsSection) as Section
@@ -1038,8 +1036,9 @@ export function SettingsView() {
   const setModifiedOnly = (v: boolean): void => set({ settingsModifiedOnly: v })
   // Modified only lasts while Settings is shown, as it did.
   useEffect(() => () => set({ settingsModifiedOnly: false }), [])
-  const loops = useStore((s) => s.workspace?.config.loops)
   const advanced = useStore((s) => s.advanced)
+  // The open workspace (HI-1768): its defaults' part is named after it, and shown only while one is open.
+  const workspaceName = useStore((s) => s.workspace?.name ?? null)
   // Searching matches the text as shown, in the language shown.
   const shownLanguage = useLanguage()
   // Connections only with their preview on (HI-980, HI-1755; the switch goes in S8).
@@ -1051,14 +1050,15 @@ export function SettingsView() {
       if ((d.section === 'accounts' || d.id === 'assistant.connection' || d.key === 'movedToConnections') && !accountsShown) return false
       // With Connections on, a CLI with them has its model, effort and context on each connection (HI-1770).
       if (accountsShown && d.provider && d.section === `provider:${d.provider}` && MOVED_KEYS.has(d.key) && providerDescriptor(d.provider).capabilities.connections) return false
+      if (d.id === 'workflow.workspaceDefaults' && !workspaceName) return false
       if (d.id === 'advanced.values' && (q || modifiedOnly)) return advancedMatches(q, modifiedOnly, advanced)
       // Its English matches as well as what it shows: Settings can be searched in either.
       if (q && !`${d.title} ${d.desc} ${d.tip} ${d.key}${shownLanguage !== SOURCE_LANGUAGE ? ` ${Object.values(rowText(d)).join(' ')}` : ''}`.toLowerCase().includes(q)) return false
-      if (modifiedOnly && (d.type === 'custom' || getValue(settings!, d, loops) === defaultValue(d))) return false
+      if (modifiedOnly && (d.type === 'custom' || getValue(settings!, d) === defaultValue(d))) return false
       if (!q && !modifiedOnly && d.section !== section) return false
       return true
     })
-  }, [query, section, settings, modifiedOnly, loops, advanced, shownLanguage, accountsShown])
+  }, [query, section, settings, modifiedOnly, advanced, shownLanguage, accountsShown, workspaceName])
 
   if (!settings) return null
   const grouped = SECTIONS.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
@@ -1094,13 +1094,13 @@ export function SettingsView() {
               <h2>{sectionText(g).label}</h2>
               <p>{sectionText(g).desc}</p>
               {g.items.map((d) => {
-                const modified = (d.type !== 'custom' || ['defaultModel', 'defaultEffort', 'defaultProvider', 'modelFallback', 'effortFallback'].includes(d.key)) && getValue(settings, d, loops) !== defaultValue(d)
+                const modified = (d.type !== 'custom' || ['defaultModel', 'defaultEffort', 'defaultProvider', 'modelFallback', 'effortFallback'].includes(d.key)) && getValue(settings, d) !== defaultValue(d)
                 return (
                   d.wide ? (
                     <div key={`${d.section}.${d.key}`} className="setting wide" data-setting={d.id}>
                       <div className="s-text">
                         <div className="s-title">
-                          {rowText(d).title} <InfoTip text={<span style={{ whiteSpace: 'pre-line' }}>{rowText(d).tip}</span>} />
+                          {d.id === 'workflow.workspaceDefaults' && workspaceName ? tr(WORKSPACE_DEFAULTS_NAMED, { workspace: workspaceName }) : rowText(d).title} <InfoTip text={<span style={{ whiteSpace: 'pre-line' }}>{rowText(d).tip}</span>} />
                         </div>
                         {d.desc && <div className="s-desc">{rowText(d).desc}</div>}
                         {d.render?.()}

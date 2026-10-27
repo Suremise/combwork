@@ -9,6 +9,7 @@ import { msg, tr as trNow, type Msg } from './i18n'
 import type { Tr } from './tasks'
 import { samePath } from './movePaths'
 import { legacyWorktree } from './agentFolders'
+import { migrateGlobalFileLocks, migrateProjectPreferences } from './workflow/preferences'
 
 export const HIVE_DIR = '.hive'
 
@@ -115,9 +116,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
     providers: Object.fromEntries(PROVIDERS.map((p) => [p.id, { model: '', effort: '', permissionMode: '', extraArgs: '', use200kContext: '' }]))
   },
   agents: {
-    fileLocks: 'block',
-    worktreeCopy: '.env*',
-    mergeStyle: 'merge',
     backgroundTaskMinutes: 60,
     leftoverProcesses: 'ask'
   },
@@ -163,13 +161,8 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   transcriptWarnMB: null,
   agents: [],
   layout: 'auto',
-  fileLocks: 'inherit',
   worktreeCopy: null,
-  worktreeSetup: '',
-  loopWakes: true,
-  loopRounds: null,
-  loopWaitHours: null,
-  loopStepWaitMinutes: null
+  worktreeSetup: ''
 }
 
 /** The transcript viewer loads this many items at a time (the latest first, earlier ones as you scroll up). */
@@ -590,11 +583,9 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
       if (a.effort === old.effort) a.effort = ''
     }
   }
-  if (raw && (raw.version ?? 1) < 4 && cfg.settings.agents.mergeStyle === 'squash') {
-    // Squash was the default until 0.3 (saved into every config): merging keeps a long-lived agent's commits, so
-    // its next merge brings only what is new. Anyone who wants Squash chooses it again.
-    cfg.settings.agents.mergeStyle = 'merge'
-  }
+  migrateAgentsWorktreeSettings(cfg)
+  // HI-1766: Settings → Agents → File locks is Hive's workflow default.
+  migrateGlobalFileLocks(cfg.settings)
   if (raw && (raw.version ?? 1) < 5 && cfg.settings.sessions.transcriptWarnMB === 50) {
     // 50 MB was the default up to 0.3.x (saved into every config); long transcripts slow things well before that.
     // Anyone who wants 50 sets it again.
@@ -647,6 +638,24 @@ export function withLegacySettings(cfg: AppConfig): AppConfig & { settings: AppS
       }
     }
   }
+}
+
+/** Hive's own default for the git-ignored files copied into each new slot and review copy (HI-1765). */
+export const SLOT_COPY_DEFAULT = '.env*'
+
+/**
+ * Until 1.0's HI-1765, Settings → Agents & Worktrees had "Copy into new worktrees" (`agents.worktreeCopy`) and "Default
+ * merge style" (`agents.mergeStyle`). The copy is now Hive's slot default (`slotDefaults.copy`, a workflow default for
+ * Git): a value saved there moves over, unless the new one is already set or it is the old default (saved into every
+ * config, so nobody chose it: the built-in default stands). The merge style went: the merge dialogs follow each
+ * project's own. Both old keys are dropped on every load, so they can't come back.
+ */
+function migrateAgentsWorktreeSettings(cfg: AppConfig): void {
+  const agents = cfg.settings.agents as AppSettings['agents'] & { worktreeCopy?: unknown; mergeStyle?: unknown }
+  const old = agents.worktreeCopy
+  if (typeof old === 'string' && old !== SLOT_COPY_DEFAULT && cfg.settings.slotDefaults?.copy === undefined) cfg.settings.slotDefaults = { ...cfg.settings.slotDefaults, copy: old }
+  delete agents.worktreeCopy
+  delete agents.mergeStyle
 }
 
 /**
@@ -714,7 +723,8 @@ export function migrateProjectConfig(raw: Record<string, any>): Record<string, a
     // Until 0.9.3 the Hive Assistant's mode was its persona (#1084).
     out = { ...out, agents: out.agents.map((a: unknown) => (a && typeof a === 'object' && 'persona' in a ? withMode(a as Record<string, unknown>) : a)) }
   }
-  return out
+  // HI-1766: Card loops and File locks are the project's workflow options.
+  return migrateProjectPreferences(out)
 }
 
 /** A record from before 0.9.3 (an agent, a session) with its `persona` as its `mode` (#1084). */

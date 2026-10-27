@@ -45,6 +45,7 @@
   "panes.footer.compactionHistory": "Haz clic para ver el historial de compactaciones",
   "panes.footer.compactions": "{n, plural, one {# compactación hasta ahora} many {# compactaciones hasta ahora} other {# compactaciones hasta ahora}}{over, select, yes { — considera compactar} other {}}",
   "panes.footer.connectionChanged": "Su inicio de sesión cambió desde que se agregó: consulta Configuración → Conexiones.",
+  "panes.footer.connectionEmail": "Sesión iniciada como {email}.",
   "panes.footer.connectionOff": "La conexión elegida para él está desactivada en este espacio de trabajo, así que usa la predeterminada del espacio de trabajo.",
   "panes.footer.connectionSwitching": "cambia cuando termine su turno",
   "panes.footer.connectionSwitchingTip": "Cuando termine su turno, se detiene y continúa con la conexión elegida ahora para él.",

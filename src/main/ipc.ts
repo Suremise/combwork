@@ -89,6 +89,8 @@ import { cardWork, forYou, workBadges } from './workflow/cardWork'
 import { contextWorkspace, currentWorkspace, inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
 import { ensureHiveExcluded, trackedHiveFiles, untrackHive, vcsOf } from './hiveVcs'
 import { hiveWindows, windowForPath, windowOf, windowShowing } from './windows'
+import { noteLongTasks, noteWhere } from './rendererWatch'
+import { cleanTasks, cleanWhere } from '../shared/windowHealth'
 import { setTitleBarBackdrops, setTitleBarColors } from './titleBar'
 import { showWindow } from './tray'
 import { resetMetrics } from './metrics'
@@ -121,7 +123,7 @@ import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesetsNow } from './workflow/rulesets'
 import { poolFor, slotTest, slotViews } from './slotsApp'
-import { setSlotSetting } from './slotSettings'
+import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { copyViews, stopIsolated } from './copiesApp'
 import { branchQueueCard, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
@@ -448,6 +450,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
   const impl: Impl = {
     'app:info': () => getAppInfo(),
     'app:planUsage': () => config.get().planUsage,
+    'app:connectionPlanUsage': () => config.get().connectionPlanUsage ?? {},
     'app:quit': () => quitControl.quit(),
     'app:restart': () => quitControl.restart(),
     'app:quitDecision': (choice, dontAskAgain) => quitControl.decide(win(), choice, dontAskAgain),
@@ -526,6 +529,17 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'window:setTitleBarColors': (color, symbolColor) => setTitleBarColors(win(), { color, symbolColor }),
     'window:setBackdrops': (count) => setTitleBarBackdrops(win(), count),
+    // The page's health in hive.log (HI-1775): where it is, and its long tasks.
+    'window:where': (where) => {
+      const wc = senderStore.getStore()
+      const entry = wc ? windowOf(wc) : null
+      if (entry) noteWhere(entry, cleanWhere(where))
+    },
+    'window:longTasks': (list, where) => {
+      const wc = senderStore.getStore()
+      const entry = wc ? windowOf(wc) : null
+      if (entry) noteLongTasks(entry, cleanTasks(list), cleanWhere(where))
+    },
 
     'settings:get': () => config.settings,
     // Show developer features is kept in advanced.json too: written there first, or refused (#367).
@@ -713,10 +727,6 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return recentFor(workspace.path)
     },
     'workspace:refresh': async () => (workspace.path ? workspace.refresh() : null),
-    'workspace:setLoops': async (patch) => {
-      await workspace.setLoops({ ...(patch?.rounds !== undefined ? { rounds: patch.rounds } : {}), ...(patch?.waitHours !== undefined ? { waitHours: patch.waitHours } : {}) })
-      return workspace.refresh()
-    },
     'workspace:movePlan': (opts) => movePlan(currentWorkspace(), moveOptions(opts)),
     'workspace:moveRepair': (opts) => repairMove(currentWorkspace(), moveOptions(opts)),
     'workspace:moveDefender': async () => {
@@ -902,6 +912,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined, true),
     'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p))),
     'slots:setSetting': (p, key, value) => setSlotSetting(workspace, workspace.assertProject(p), key, value),
+    'slots:copyOf': (p) => projectSlotCopy(workspace, workspace.assertProject(p)),
+    'slots:levelForm': (level) => slotLevelForm(workspace, level),
+    'slots:setLevelDefault': async (level, key, value) => {
+      await setSlotDefault(workspace, level, key, value)
+      return slotLevelForm(workspace, level)
+    },
     'slots:releaseCarried': (p, agentId) => releaseCarried(workspace, workspace.assertProject(p), String(agentId)),
     'slots:heldWriter': (p, slot) => heldWriter(workspace.assertProject(p), String(slot)),
     'slots:releaseWriter': (p, slot, run, end) => releaseHeldWriter(workspace.assertProject(p), String(slot), String(run), { end: end === true }),
@@ -953,6 +969,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'session:start': (p, opts) => sessions.start(p, opts),
     'session:stop': (p, agentId) => sessions.stop(workspace.assertSessionHost(p), agentId),
     'session:carryOn': (p, agentId) => sessions.carryOn(workspace.assertProject(p), agentId),
+    'session:joinResume': (p, agentId, sessionId) => sessions.joinResume(p, agentId, sessionId),
     'session:markIdle': (p, agentId) => sessions.markIdle(workspace.assertSessionHost(p), agentId),
     'session:archive': (p, id, archived) => sessions.archive(p, id, archived),
     'session:rename': (p, id, name) => sessions.rename(p, id, name),

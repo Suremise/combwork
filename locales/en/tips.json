@@ -596,8 +596,8 @@
     "description": "A tip's title."
   },
   "tips.designCheck.text": {
-    "defaultMessage": "Ask a card loop’s builder for a design first: it posts it on the card, Hive wakes the reviewer to check it, and the answer wakes the builder. With no answer within the Design check wait (Project Settings → Card loops), it goes ahead as posted.",
-    "description": "A tip (#1382). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Design check wait, Project Settings, Card loops)."
+    "defaultMessage": "Ask a card loop’s builder for a design first: it posts it on the card, Hive wakes the reviewer to check it, and the answer wakes the builder. With no answer within the Design check wait (Version Control → Workflow → Card loops), it goes ahead as posted.",
+    "description": "A tip (#1382). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Design check wait, Version Control, Workflow, Card loops)."
   },
   "tips.designCheck.title": {
     "defaultMessage": "Have a design checked before the build",
@@ -916,7 +916,7 @@
     "description": "A tip's title."
   },
   "tips.loopDefaults.text": {
-    "defaultMessage": "Settings → Workspace → Card loop rounds and Card loop wait set what loops use when you don't say ({rounds, plural, one {# round} other {# rounds}} and {hours, plural, one {# hour} other {# hours}} to start with); a project can have its own. Saying \"rounds: 3\" when you start one still wins.",
+    "defaultMessage": "Rounds and Wait under Card loops in Settings → Version Control set what loops use when you don't say ({rounds, plural, one {# round} other {# rounds}} and {hours, plural, one {# hour} other {# hours}} to start with); a workspace and a project can set their own. Saying \"rounds: 3\" when you start one still wins.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {rounds} and {hours} are the defaults (10 and 6). \"rounds: 3\" is what the user types to an agent: keep it in English."
   },
   "tips.loopDefaults.title": {
@@ -932,7 +932,7 @@
     "description": "A tip's title."
   },
   "tips.loopWakes.text": {
-    "defaultMessage": "When a card arrives in Review, Hive wakes its reviewer, and on the verdict its builder, even if one forgot to wait. To drive reviews by hand, turn it off in the project's Settings → Card loops.",
+    "defaultMessage": "When a card arrives in Review, Hive wakes its reviewer, and on the verdict its builder, even if one forgot to wait. To drive reviews by hand, turn off Wake reviewers and builders in the project's Version Control → Workflow → Card loops.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.loopWakes.title": {
@@ -1728,7 +1728,7 @@
     "description": "A tip's title."
   },
   "tips.workflowDefaults.text": {
-    "defaultMessage": "Settings → Workflow defaults sets the options every project starts from, and Settings → Workspace the open workspace’s. A project’s own options still win, and saving lists the projects that inherit the change.",
+    "defaultMessage": "Settings → Version Control sets the options every project starts from: Hive defaults, for every workspace, and the open workspace’s over them. A project’s own options still win, and saving lists the projects that inherit the change.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: workflow)."
   },
   "tips.workflowDefaults.title": {

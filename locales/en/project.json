@@ -739,9 +739,17 @@
     "defaultMessage": "{plan, select, none {Plan limits, account-wide, as of {when}} other {Plan limits ({plan}), account-wide, as of {when}}}",
     "description": "Above the plan limits. {plan} is the plan's name (none when unknown); {when} how long ago they were reported."
   },
+  "project.limit.noConnections": {
+    "defaultMessage": "No {provider} connection is on in this workspace. Turn one on in Settings → Connections to see its plan limits here.",
+    "description": "In place of the plan limits (HI-1756) when the workspace has no connection on for the coding agent ({provider}). Settings → Connections names a section."
+  },
   "project.limit.none": {
     "defaultMessage": "{provider} reports your plan’s limits while a session runs; they appear here after the next message in any {provider} session. Accounts that use an API key have no plan limits.",
     "description": "In place of the plan limits before any were reported."
+  },
+  "project.limit.noneConnection": {
+    "defaultMessage": "Its limits appear after the next message in a session on {name}.",
+    "description": "Under a connection ({name}: \"Max 1\", a sign-in the user named) in the plan limits (HI-1756), before any of its limits were reported."
   },
   "project.limit.resets": {
     "defaultMessage": "used · resets {when}",
@@ -750,6 +758,10 @@
   "project.limit.tip": {
     "defaultMessage": "How much of your plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used, across all your {provider} sessions (not just Hive).",
     "description": "The (i) beside a plan limit."
+  },
+  "project.limit.tipConnection": {
+    "defaultMessage": "How much of the plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used on {name}, across all its sessions (not just Hive's).",
+    "description": "The (i) beside a plan limit of one connection (HI-1756): {name} is the connection, a sign-in the user named (\"Max 1\")."
   },
   "project.limit.title": {
     "defaultMessage": "{window, select, fiveHour {5-hour limit} weekly {Weekly limit} other {{label} limit}}",
@@ -1087,10 +1099,6 @@
     "defaultMessage": "Global settings",
     "description": "Link: opens Settings."
   },
-  "project.settings.hours": {
-    "defaultMessage": "{count} h",
-    "description": "Hours, short, as in \"Inherit (6 h)\"."
-  },
   "project.settings.inherit": {
     "defaultMessage": "Inherit ({value})",
     "description": "The choice that takes the global (or workspace) setting. {value} is what that is now."
@@ -1139,10 +1147,6 @@
     "defaultMessage": "Open .hive folder",
     "description": "Button: opens the project's .hive folder. Keep .hive."
   },
-  "project.settings.openVersionControl": {
-    "defaultMessage": "Open Version Control",
-    "description": "A button in Project Settings → Workflow: shows the project’s Version Control tab at its Workflow section, where the workflow options are (glossary 2.1: Version Control)."
-  },
   "project.settings.overrides": {
     "defaultMessage": "Overrides the global default",
     "description": "Tooltip on the mark beside a project setting that is not Inherit."
@@ -1167,10 +1171,6 @@
     "defaultMessage": "Reset project settings?",
     "description": "Title of the confirmation before resetting the project settings."
   },
-  "project.settings.rounds": {
-    "defaultMessage": "Rounds",
-    "description": "Accessible name of the card-loop rounds box."
-  },
   "project.settings.saveFailed": {
     "defaultMessage": "Could not save project settings",
     "description": "Title of an error notification."
@@ -1182,22 +1182,6 @@
   "project.settings.sessionsIn": {
     "defaultMessage": "Sessions in {project} will run every command, edit and network call without asking.",
     "description": "The confirmation before choosing a no-guardrails permission mode for a project's sessions ({project}: the project's name)."
-  },
-  "project.settings.stepWait": {
-    "defaultMessage": "Design check wait (minutes)",
-    "description": "Accessible name of the card-loop design check wait box (#1382): how long a builder waits for its reviewer to check a design."
-  },
-  "project.settings.stepWaitDefault": {
-    "defaultMessage": "Default ({count, number} min)",
-    "description": "Placeholder of the empty design check wait box: empty uses the default, {count} minutes."
-  },
-  "project.settings.waitHours": {
-    "defaultMessage": "Wait (hours)",
-    "description": "Accessible name of the card-loop wait box."
-  },
-  "project.settings.wake": {
-    "defaultMessage": "Wake reviewers and builders",
-    "description": "Accessible name of the card-loop wakes switch."
   },
   "project.settings.warnOver": {
     "defaultMessage": "Warn when a transcript is over",

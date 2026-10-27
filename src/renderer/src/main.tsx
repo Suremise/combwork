@@ -9,12 +9,16 @@ import { ConsoleApp } from './ConsoleApp'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { initLanguage } from './i18n'
 import './commitLoop'
+import { startWindowHealth } from './windowHealth'
 
 // The same page is the developer console's window when opened with #console (#637).
 const isConsole = location.hash === '#console'
 
 // The language first, so the first render is in it (#767).
 await initLanguage()
+
+// The window's long tasks and where it is, for hive.log (HI-1775): not the developer console's.
+if (!isConsole) startWindowHealth()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

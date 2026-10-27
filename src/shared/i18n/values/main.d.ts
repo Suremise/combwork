@@ -2,6 +2,7 @@
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
   'main.accounts.badTarget': { target: string | number; cli: string | number }
+  'main.accounts.checkHeld': { name: string | number; cli: string | number }
   'main.accounts.folderNotUsable': { name: string | number }
   'main.accounts.inUse': { name: string | number }
   'main.accounts.leftover': { name: string | number }
@@ -196,6 +197,7 @@ interface HiveMessageValues {
   'main.plan.resetsAt': { time: string | number }
   'main.plan.resetsOn': { when: string | number }
   'main.plan.used': { share: number; provider: string | number; window: string; hours: number; label: string | number }
+  'main.plan.usedOn': { share: number; window: string; hours: number; label: string | number; connection: string | number }
   'main.quit.closed': undefined
   'main.quit.closedBody': { n: number }
   'main.quit.dialogTitle': undefined

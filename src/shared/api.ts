@@ -127,6 +127,7 @@ import type {
   WorkspaceInfo
 } from './types'
 import type { PlatformId } from './platform/descriptors'
+import type { SlotLevelForm, SlotOptionOrigin } from './slotDefaults'
 import type { MetricsQuery, MetricsReport } from './metrics'
 import type { Fact } from './workflow/facts'
 import type { CommitMessage, WorkflowOptions } from './workflow/options'
@@ -144,6 +145,7 @@ import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devCon
 import type { Osc52Refusal } from './osc52'
 import type { ForYouAnswer, ForYouSummary, WorkBadge, WorkView } from './workflow/workView'
 import type { BranchQueueCard, QueueRecent, QueueResumed, QueueView } from './workflow/queue'
+import type { LongTask, WindowWhere } from './windowHealth'
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 export type SettingsPatch = DeepPartial<AppSettings>
@@ -156,6 +158,7 @@ export interface HiveRequests {
   'app:info': () => AppInfo
   /** The plan usage each provider last reported (e.g. 5-hour and weekly limits), by provider. */
   'app:planUsage': () => Record<ProviderId, PlanUsage>
+  'app:connectionPlanUsage': () => Record<string, PlanUsage>
   'app:quit': () => void
   /** Restarts Hive: quits as app:quit does (asking about running agents), then starts it again (#676). */
   'app:restart': () => void
@@ -204,6 +207,10 @@ export interface HiveRequests {
   'window:setTitleBarColors': (color: string, symbolColor: string) => void
   /** How many backdrops (dialogs, nested or not, the command palette) are up in this window: dims the window buttons to match. */
   'window:setBackdrops': (count: number) => void
+  /** Where this window is (its view, project, tab, dialog, panels), as it changes: what its long-task and hang lines in hive.log name (HI-1775). */
+  'window:where': (where: WindowWhere) => void
+  /** The page's long tasks just ended, and where it was: logged in hive.log, rate-limited (HI-1775). */
+  'window:longTasks': (tasks: LongTask[], where: WindowWhere) => void
   /** The taskbar button's badge: a PNG (base64) drawn at `scale`, or none at 0. */
   'window:setBadge': (count: number, png: string | null, scale: number) => void
   /** Always on Top for this window, remembered for its workspace (pin.ts). Returns the window's state now. */
@@ -288,8 +295,6 @@ export interface HiveRequests {
   /** Clears the recent workspaces, keeping those open in a window now (#144). */
   'workspace:clearRecent': () => RecentWorkspace[]
   'workspace:refresh': () => WorkspaceInfo | null
-  /** Settings → Workspace → Card loop rounds and wait (#412): the values given change, the rest stay. */
-  'workspace:setLoops': (patch: { rounds?: number; waitHours?: number }) => WorkspaceInfo | null
   /** What Repair… would do for a moved workspace or project (#146), with the user's choices; null when nothing moved. */
   'workspace:movePlan': (opts?: MoveOptions) => MovePlan | null
   /** Repairs it (refused while agents run): worktrees, session folders, the CLIs' per-path data (copied), Open Recent. */
@@ -359,6 +364,12 @@ export interface HiveRequests {
   'slots:list': (projectPath: string) => SlotView[]
   /** One setting of the Version Control tab's Slots and copies (#1445): set, or with null removed, under the project's lock. */
   'slots:setSetting': (projectPath: string, key: 'setup' | 'archive' | 'copy' | 'copiesSize', value: string | number | null) => { slots: SlotOptions; copies: { size?: number } }
+  /** A project's copied files as they inherit (HI-1765: its own, its workspace's, Hive's, the default), and where they come from. */
+  'slots:copyOf': (projectPath: string) => { value: string; origin: SlotOptionOrigin }
+  /** Hive's or the workspace's slot defaults (HI-1765: Settings → Workflow defaults, Git), with what each inherits. */
+  'slots:levelForm': (level: WorkflowLevel) => SlotLevelForm
+  /** Sets one of a level's slot defaults (an empty string: none), or with null removes it, so it inherits. */
+  'slots:setLevelDefault': (level: WorkflowLevel, key: 'copy', value: string | null) => SlotLevelForm
   /** Ends an agent's carried lease (#1441, Release Slot… in its menu): its adopted worktree stops being its own. Whether it did. */
   'slots:releaseCarried': (projectPath: string, agentId: string) => boolean
   /** A slot's writer as Release Slot… shows it (#1506): its holder, whether its run is live, what is listed of its processes. Null: none. */
@@ -496,6 +507,8 @@ export interface HiveRequests {
   'session:settleLeftovers': (projectPath: string, agentId: string, how: 'end' | 'keep') => number
   /** Types a short "carry on" into a running agent whose turn a refused sign-in stopped (Resume (n), #309). */
   'session:carryOn': (projectPath: string, agentId: string) => void
+  /** After a refused resume (Resume All): 'running' when the agent runs that conversation, or a start of it under way finished (its failure thrown); 'other' otherwise (HI-1746). */
+  'session:joinResume': (projectPath: string, agentId: string, sessionId: string) => 'running' | 'other'
   /** The user says an agent whose state is unknown (silent, no sign of its turn's end) is idle (#648). */
   'session:markIdle': (projectPath: string, agentId: string) => void
   'session:archive': (projectPath: string, sessionId: string, archived: boolean) => void
@@ -961,4 +974,9 @@ export interface HiveBridge {
   platform: string
   /** A test copy's window: React's commits are watched (HI-1387, renderer commitWatch.ts). */
   commitWatch: boolean
+  /**
+   * What arrived from main between two times (epoch ms): each call's reply, each event and terminal output, in words
+   * ("reply tasks:changes", "event tasks-changed ×3"): what a long task's line names as under way (HI-1775).
+   */
+  arrivals(from: number, to: number): string[]
 }

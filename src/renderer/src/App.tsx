@@ -210,8 +210,15 @@ function handleEvent(e: HiveEvent): void {
     case 'connections-changed':
       set((st) => ({ connectionsChanged: st.connectionsChanged + 1 }))
       break
+    case 'plan-usage-cleared':
+      set((st) => {
+        const { [e.connection]: _gone, ...rest } = st.connectionPlanUsage
+        return { connectionPlanUsage: rest }
+      })
+      break
     case 'plan-usage':
-      set((st) => ({ planUsage: { ...st.planUsage, [e.provider]: e.usage } }))
+      if (e.connection) set((st) => ({ connectionPlanUsage: { ...st.connectionPlanUsage, [e.connection!]: e.usage } }))
+      else set((st) => ({ planUsage: { ...st.planUsage, [e.provider]: e.usage } }))
       break
     case 'update-state':
       set({ update: e.state })
@@ -381,7 +388,7 @@ export function App() {
         if (early.active()) set((st) => ({ branchStatus: { ...Object.fromEntries(list.map((b) => [projectKey(b.projectPath, b.agentId), b.status])), ...st.branchStatus } }))
       })
       // A reloaded window picks up a quit dialog or pending quit that was already in progress.
-      const more = { planUsage: await call('app:planUsage'), update: await call('update:state'), keepAwake: await call('app:keepAwake'), windowCount: await call('window:count') }
+      const more = { planUsage: await call('app:planUsage'), connectionPlanUsage: await call('app:connectionPlanUsage'), update: await call('update:state'), keepAwake: await call('app:keepAwake'), windowCount: await call('window:count') }
       if (!early.active()) return
       set(more)
       const q = await call('app:quitState')

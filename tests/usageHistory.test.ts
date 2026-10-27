@@ -248,6 +248,29 @@ describe('the usage history of a workspace', () => {
     }
   })
 
+  it("a cost read's freshen reads a host's records once for all its running sessions, and records each (HI-1790)", async () => {
+    const ids = [newId(), newId(), newId()]
+    const live = (sessions as unknown as { live: Map<string, unknown> }).live
+    for (const [i, id] of ids.entries()) {
+      write(cliFile(id), transcript(id, [10 * (i + 1)]))
+      await run(() => workspace.upsertSession(p, { id, agent: 'claude-code', agentId: 'c1', name: `running ${i}`, lastActiveAt: new Date(T0).toISOString() }))
+      live.set(`${p.toLowerCase()}#run${i}`, { state: { sessionId: id, projectPath: p, provider: 'claude-code' } })
+    }
+    const records = vi.spyOn(w, 'sessionsFile')
+    cliLookup.mockClear()
+    try {
+      await run(() => usageHistory.freshen(w))
+      expect(records.mock.calls.filter(([host]) => host === p)).toHaveLength(1)
+      // The transcript looked up with the records read (not read again for each).
+      for (const id of ids) expect(cliLookup.mock.calls.find(([, sid]) => sid === id)?.[2]?.records.some((r) => r.id === id)).toBe(true)
+      const items = await run(() => sessions.usageItems(p))
+      expect(ids.map((id) => outputOf(items, id))).toEqual([10, 20, 30])
+    } finally {
+      records.mockRestore()
+      for (const i of ids.keys()) live.delete(`${p.toLowerCase()}#run${i}`)
+    }
+  })
+
   it('the Overview reads no transcript', async () => {
     const reads = vi.spyOn(sessions, 'anyTranscript')
     const usageFor = vi.spyOn(sessions as unknown as { usageFor: () => Promise<unknown> }, 'usageFor')

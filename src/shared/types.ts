@@ -149,6 +149,8 @@ export interface AppSettings {
   keybindings: KeybindingOverrides
   /** The global default workflow options (SPEC §16.6.6), under each workspace's and project's own; absent: all off. */
   workflow?: WorkflowDefaults
+  /** Hive's default slot options for Git projects (HI-1765), under each workspace's and project's own (`slots`). */
+  slotDefaults?: SlotDefaults
   updates: {
     checkAutomatically: boolean
     downloadAutomatically: boolean
@@ -258,12 +260,6 @@ export interface AppSettings {
   /** The Hive Assistant's defaults (each workspace's Assistant Settings can override them). */
   assistant: AssistantSettings
   agents: {
-    /** Per-file locks between agents working in the same folder. */
-    fileLocks: FileLockMode
-    /** Git-ignored files copied into new worktrees: glob patterns, one per line or comma separated. */
-    worktreeCopy: string
-    /** Default for merging a worktree agent's branch. */
-    mergeStyle: MergeStyle
     /** How long a background task an agent started counts as running if it never reports its end, in minutes. */
     backgroundTaskMinutes: number
     /** What to do with processes an agent leaves running when it stops: offer to end them, or end them (#507). */
@@ -618,8 +614,10 @@ export interface AppConfig {
   observedDefaultEffort?: Record<ProviderId, Record<string, EffortLevel>>
   /** Per provider: the last good model catalog its CLI gave, keyed by the CLI version, so pickers fill at once on start. */
   modelCatalogs?: Record<ProviderId, ModelCatalog>
-  /** Per provider: the plan usage it last reported (account-wide). */
+  /** Per provider: the plan usage it last reported (account-wide), from sessions not on a connection. */
   planUsage: Record<ProviderId, PlanUsage>
+  /** Per connection (its id, HI-1756): the plan usage its sessions last reported, that login's own limits. */
+  connectionPlanUsage?: Record<string, ConnectionPlanUsage>
   /** Highest warning shown per "provider:limit", and for which reset period. */
   planWarnings: Record<string, { resetsAt: string | null; level: number }>
   /** The CLI accounts Hive keeps (HI-980: Settings → Accounts), each a folder of its own, in the order Settings lists them. */
@@ -646,6 +644,9 @@ export interface PlanLimit {
 }
 
 /** Subscription limits a provider reported (e.g. a rolling 5-hour window and a weekly limit). */
+/** A connection's plan usage (HI-1756): the login it came from (planUsage.ts usageLogin), so another's never shows as its. */
+export type ConnectionPlanUsage = PlanUsage & { login?: string }
+
 export interface PlanUsage {
   provider: ProviderId
   /** The plan's name when the provider says (e.g. "plus"). */
@@ -758,8 +759,6 @@ export interface WorkspaceConfig {
   skillDelivery?: SkillDeliveryChoice
   /** Project folders Hive leaves out (Hide, or Remove from Hive while the folder is still in the workspace), by folder name. */
   hiddenProjects?: HiddenProject[]
-  /** Card loops' rounds and wait in hours when a request doesn't say (#412, Settings → Workspace); absent: 10 and 6. */
-  loops?: { rounds?: number; waitHours?: number }
   /** Agent names two projects share from before names were unique (#702), lower case: each said once, while it lasts. */
   flaggedAgentNames?: string[]
   /** The workspace's own advanced values (#367: Settings → Advanced, This workspace), for those a workspace can set. */
@@ -770,6 +769,17 @@ export interface WorkspaceConfig {
   journalSuggested?: boolean
   /** The workspace's default workflow options (SPEC §16.6.6), between the global ones and each project's own. */
   workflow?: WorkflowDefaults
+  /** The workspace's default slot options (HI-1765), between Hive's and each project's own. */
+  slotDefaults?: SlotDefaults
+}
+
+/**
+ * Slot options a level (Hive's, a workspace's) gives the Git projects under it (HI-1765). `copy`: the git-ignored files
+ * copied into each new slot and review copy, glob patterns, comma separated or one per line; left out, the level
+ * inherits; an empty string is none.
+ */
+export interface SlotDefaults {
+  copy?: string
 }
 
 /** A project folder Hive leaves out of the workspace, until it's restored in Settings → Workspace. */
@@ -1337,7 +1347,11 @@ export interface ProjectConfig {
    * the same write as its change, so a later run can tell it from a choice the user made since, after a failure too.
    */
   stepsDone?: string[]
-  fileLocks: Inherit<FileLockMode>
+  /**
+   * From before HI-1766 (Project Settings → Agents → File locks): kept, with the old Card loops keys below, only while the
+   * project has no workflow options to hold them (shared/workflow/preferences.ts); read as its own until then.
+   */
+  fileLocks?: Inherit<FileLockMode>
   /** Overrides settings.agents.worktreeCopy; null inherits. */
   worktreeCopy: string | null
   /** Command run in a new worktree before its agent's first session, e.g. "npm install". */
@@ -1350,13 +1364,11 @@ export interface ProjectConfig {
   slots?: SlotOptions
   /** The project's review and check copies (#1435): how many it keeps (left out: the larger of 2 and its reviewers plus one). */
   copies?: { size?: number }
-  /** Hive wakes a card loop's reviewer when a card arrives in Review, and its builder on a verdict (#405). */
-  loopWakes: boolean
-  /** Card loops' rounds and wait in hours for this project (#412); null inherits the workspace's. */
-  loopRounds: number | null
-  loopWaitHours: number | null
-  /** How long a builder waits for its reviewer's check of a design before it goes ahead as posted (#1382); null: LOOP_STEP_WAIT_MINUTES. */
-  loopStepWaitMinutes: number | null
+  /** From before HI-1766 (Project Settings → Card loops): see `fileLocks`. */
+  loopWakes?: boolean
+  loopRounds?: number | null
+  loopWaitHours?: number | null
+  loopStepWaitMinutes?: number | null
 }
 
 /** One of a project's slots as the window reads it (#1429, slots.ts): its state and its open lease, if any. */
@@ -1981,7 +1993,13 @@ export interface LiveSessionState {
    * The connection this run launched on (HI-1755), kept for the run whatever is chosen meanwhile; absent: a provider
    * without connections (or a test copy on its CLI test home). `note`: why it isn't the one chosen (its choice was off).
    */
-  launchedConnection?: { id: string; name: string; note?: 'offFallback' | 'unknownLogin' | 'loginChanged' }
+  launchedConnection?: {
+    id: string
+    name: string
+    note?: 'offFallback' | 'unknownLogin' | 'loginChanged'
+    /** Who it launched as (HI-1756: its plan usage is that login's), as plan usage keeps a login (a hash); absent: unknown. */
+    login?: string
+  }
   /** A switch to the connection it would launch on now waits for its turn to be over (HI-1755). */
   switchPending?: boolean
   /**
@@ -3094,7 +3112,8 @@ export type HiveEvent =
   | { type: 'agent-added'; projectPath: string; agentId: string }
   /** A worktree agent's unmerged work changed (null: git couldn't check it). */
   | { type: 'branch-status'; projectPath: string; agentId: string; status: AgentBranchStatus | null }
-  | { type: 'plan-usage'; provider: ProviderId; usage: PlanUsage }
+  | { type: 'plan-usage'; provider: ProviderId; usage: PlanUsage; connection?: string }
+  | { type: 'plan-usage-cleared'; connection: string }
   /** Hive's accounts changed (HI-980: one added, renamed, removed, checked, or a workspace's choice of them): read them again. */
   | { type: 'connections-changed' }
   | { type: 'window-state'; maximized: boolean; focused: boolean; alwaysOnTop: boolean }

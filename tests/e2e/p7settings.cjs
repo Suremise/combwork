@@ -1,8 +1,9 @@
 // P7's switches set in the window (#1563, tests/workflow/README.md's P7 table): Settings → Advanced's rows for the slots'
 // and copies' switches (Remove idle slots after a day, Delete a card's branch once it's merged, Rename adopted worktrees
 // to slot names, Copies: wait for one to be free, Remove Hive's skill copies when no agent works in the folder) each
-// changed there, written to advanced.json and read by the main process; and Project Settings → Card loops' Wake
-// reviewers and builders (loopWakes) turned off and on, in project.json. What each does is other suites' (slotswitches,
+// changed there, written to advanced.json and read by the main process; and the workflow option Wake reviewers and
+// builders (loopWakes, under Card loops in Version Control → Workflow since HI-1766) turned off and on with Save, in
+// project.json's options. What each does is other suites' (slotswitches,
 // slotscripts, copyquiet, skilldelivery, loopwakes). Dev build, throwaway profile and workspace; no agent runs.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -70,18 +71,28 @@ const values = () => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'ut
     }
     await page.screenshot({ path: at('2-copies.png') })
 
-    // --- Project Settings → Card loops: Wake reviewers and builders.
+    // --- Version Control → Workflow → Card loops: Wake reviewers and builders (HI-1766), saved with Save….
     await page.keyboard.press('Escape')
-    const own = async () => (await inv('workspace:refresh')).projects.find((x) => x.path.toLowerCase() === alpha.toLowerCase())?.config.loopWakes
+    const own = async () => (await inv('workflow:form', alpha)).own.loopWakes
     await page.getByText('alpha', { exact: true }).first().click()
-    await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: 'project.tab.settings', args: [] })
-    await page.locator('.settings-nav .row', { hasText: 'Card loops' }).first().click()
-    const wake = page.getByRole('switch', { name: 'Wake reviewers and builders' })
-    check('Project Settings → Card loops: Wake reviewers and builders, on', !!(await until(async () => (await wake.count()) === 1 && (await wake.getAttribute('aria-checked')) === 'true', HUNG_MS)) && (await own()) === true)
+    await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+    await page.locator('.git-sections [data-section="workflow"]').click().catch(() => {})
+    const wakeRow = page.locator('.workflow-form .workflow-group[data-group="loops"] .workflow-option[data-option="loopWakes"]')
+    const wake = wakeRow.getByRole('switch')
+    check('Card loops: Wake reviewers and builders, on, from the default', !!(await until(async () => (await wake.count()) === 1 && (await wake.getAttribute('aria-checked')) === 'true', HUNG_MS)) && (await own()) === undefined && (await wakeRow.locator('.workflow-origin').innerText()).includes('Default'), await wakeRow.innerText().catch(() => ''))
+    const save = async () => {
+      await page.locator('.workflow-form [data-action="save"]').click()
+      const dialog = page.locator('.dialog', { hasText: 'Save Workflow Options' })
+      await dialog.waitFor({ timeout: HUNG_MS })
+      await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+      await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+    }
     await wake.click()
-    check('…turned off in the window: loopWakes false in project.json', !!(await until(async () => (await own()) === false && (await wake.getAttribute('aria-checked')) === 'false', HUNG_MS)), JSON.stringify(await own()))
+    await save()
+    check('…turned off and saved: loopWakes false in the project’s options, set for this project', !!(await until(async () => (await own()) === false && (await wake.getAttribute('aria-checked')) === 'false' && (await wakeRow.locator('.workflow-origin').innerText()).includes('Set for this project'), HUNG_MS)), JSON.stringify(await own()))
     await page.screenshot({ path: at('3-loops.png') })
     await wake.click()
+    await save()
     check('…and on again', !!(await until(async () => (await own()) === true, HUNG_MS)))
   } catch (e) {
     check('no exception', false, e?.stack ?? String(e))

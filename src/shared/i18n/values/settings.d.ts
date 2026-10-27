@@ -127,6 +127,22 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.turnScreen.done.title': undefined
   'settings.advanced.claudeFooter.desc': { mode: string | number; footer: string | number }
   'settings.advanced.claudeFooter.title': { mode: string | number }
+  'settings.advanced.codex.accounts.accountField.desc': undefined
+  'settings.advanced.codex.accounts.accountField.title': undefined
+  'settings.advanced.codex.accounts.dropEnv.desc': undefined
+  'settings.advanced.codex.accounts.dropEnv.title': undefined
+  'settings.advanced.codex.accounts.emailField.desc': undefined
+  'settings.advanced.codex.accounts.emailField.title': undefined
+  'settings.advanced.codex.accounts.loginFiles.desc': undefined
+  'settings.advanced.codex.accounts.loginFiles.title': undefined
+  'settings.advanced.codex.accounts.planField.desc': undefined
+  'settings.advanced.codex.accounts.planField.title': undefined
+  'settings.advanced.codex.accounts.readMethod.desc': undefined
+  'settings.advanced.codex.accounts.readMethod.title': undefined
+  'settings.advanced.codex.accounts.statusSeconds.desc': undefined
+  'settings.advanced.codex.accounts.statusSeconds.title': undefined
+  'settings.advanced.codex.appServer.closeSeconds.desc': undefined
+  'settings.advanced.codex.appServer.closeSeconds.title': undefined
   'settings.advanced.codex.exit.command.desc': undefined
   'settings.advanced.codex.exit.command.title': undefined
   'settings.advanced.codex.exit.graceSeconds.desc': { took: number }
@@ -455,22 +471,11 @@ interface HiveMessageValues {
   'settings.agents.backgroundTaskMinutes.desc': undefined
   'settings.agents.backgroundTaskMinutes.tip': { min: number; max: number }
   'settings.agents.backgroundTaskMinutes.title': undefined
-  'settings.agents.fileLocks.desc': undefined
-  'settings.agents.fileLocks.tip': undefined
-  'settings.agents.fileLocks.title': undefined
   'settings.agents.leftoverProcesses.desc': undefined
   'settings.agents.leftoverProcesses.option.ask': undefined
   'settings.agents.leftoverProcesses.option.end': undefined
   'settings.agents.leftoverProcesses.tip': undefined
   'settings.agents.leftoverProcesses.title': undefined
-  'settings.agents.mergeStyle.desc': undefined
-  'settings.agents.mergeStyle.option.merge': undefined
-  'settings.agents.mergeStyle.option.squash': undefined
-  'settings.agents.mergeStyle.tip': undefined
-  'settings.agents.mergeStyle.title': undefined
-  'settings.agents.worktreeCopy.desc': undefined
-  'settings.agents.worktreeCopy.tip': undefined
-  'settings.agents.worktreeCopy.title': undefined
   'settings.api.listening': { url: string | number }
   'settings.api.off': undefined
   'settings.appearance.terminalCursorBlink.desc': undefined
@@ -595,7 +600,6 @@ interface HiveMessageValues {
   'settings.fallback.showLevels': { n: number }
   'settings.fallback.showModels': { n: number }
   'settings.fallback.valueCell': { column: string | number; n: string | number }
-  'settings.fileLocks.modeLine': { mode: string | number; what: string | number }
   'settings.general.closeToTray.desc': undefined
   'settings.general.closeToTray.tip': undefined
   'settings.general.closeToTray.title': undefined
@@ -782,8 +786,10 @@ interface HiveMessageValues {
   'settings.option.off': undefined
   'settings.option.on': undefined
   'settings.path.assistant': { assistant: string | number; provider: string | number; title: string | number }
+  'settings.path.level': { section: string | number; part: string | number; title: string | number }
   'settings.path.project': { section: string | number; title: string | number }
   'settings.path.settings': { section: string | number; title: string | number }
+  'settings.path.versionControl': { title: string | number }
   'settings.permissionModes.modeLine': { mode: string | number; what: string | number }
   'settings.prices.add': undefined
   'settings.prices.back': undefined
@@ -816,9 +822,6 @@ interface HiveMessageValues {
   'settings.project.defaultProvider.desc': undefined
   'settings.project.defaultProvider.tip': undefined
   'settings.project.defaultProvider.title': undefined
-  'settings.project.fileLocks.desc': undefined
-  'settings.project.fileLocks.tip': undefined
-  'settings.project.fileLocks.title': undefined
   'settings.project.inboxCheckpoints.desc': undefined
   'settings.project.inboxCheckpoints.tip': undefined
   'settings.project.inboxCheckpoints.title': undefined
@@ -832,24 +835,10 @@ interface HiveMessageValues {
   'settings.project.key.title': undefined
   'settings.project.keybindings.desc': undefined
   'settings.project.keybindings.title': undefined
-  'settings.project.loopRounds.desc': undefined
-  'settings.project.loopRounds.tip': undefined
-  'settings.project.loopRounds.title': undefined
-  'settings.project.loopStepWaitMinutes.desc': undefined
-  'settings.project.loopStepWaitMinutes.tip': undefined
-  'settings.project.loopStepWaitMinutes.title': undefined
-  'settings.project.loopWaitHours.desc': undefined
-  'settings.project.loopWaitHours.tip': undefined
-  'settings.project.loopWaitHours.title': undefined
-  'settings.project.loopWakes.desc': undefined
-  'settings.project.loopWakes.tip': undefined
-  'settings.project.loopWakes.title': undefined
   'settings.project.metadata.desc': undefined
   'settings.project.metadata.title': undefined
   'settings.project.reset.desc': undefined
   'settings.project.reset.title': undefined
-  'settings.project.slotOptions.desc': undefined
-  'settings.project.slotOptions.title': undefined
   'settings.project.storage.desc': undefined
   'settings.project.storage.title': undefined
   'settings.project.suggestFreshStart.desc': undefined
@@ -859,15 +848,10 @@ interface HiveMessageValues {
   'settings.project.transcriptWarnMB.off': undefined
   'settings.project.transcriptWarnMB.tip': undefined
   'settings.project.transcriptWarnMB.title': undefined
-  'settings.project.workflow.moved': undefined
   'settings.project.workflow.platform.desc': undefined
   'settings.project.workflow.platform.git': undefined
   'settings.project.workflow.platform.none': undefined
   'settings.project.workflow.platform.title': undefined
-  'settings.project.workflow.title': undefined
-  'settings.project.worktreeCopy.desc': undefined
-  'settings.project.worktreeCopy.tip': undefined
-  'settings.project.worktreeCopy.title': undefined
   'settings.project.worktreeSetup.desc': undefined
   'settings.project.worktreeSetup.tip': undefined
   'settings.project.worktreeSetup.title': undefined
@@ -890,17 +874,15 @@ interface HiveMessageValues {
   'settings.projectSection.advanced.label': undefined
   'settings.projectSection.agents.desc': undefined
   'settings.projectSection.agents.label': undefined
+  'settings.projectSection.general.desc': undefined
+  'settings.projectSection.general.label': undefined
   'settings.projectSection.keys.desc': undefined
   'settings.projectSection.keys.label': undefined
-  'settings.projectSection.loops.desc': undefined
-  'settings.projectSection.loops.label': undefined
   'settings.projectSection.provider.desc': { provider: string | number }
   'settings.projectSection.sessions.desc': undefined
   'settings.projectSection.sessions.label': undefined
   'settings.projectSection.storage.desc': undefined
   'settings.projectSection.storage.label': undefined
-  'settings.projectSection.workflow.desc': undefined
-  'settings.projectSection.workflow.label': undefined
   'settings.provider.allowBackgroundSessions.desc': { provider: string | number }
   'settings.provider.allowBackgroundSessions.tip': { provider: string | number; cli: string | number }
   'settings.provider.allowBackgroundSessions.title': undefined
@@ -1084,6 +1066,8 @@ interface HiveMessageValues {
   'settings.sessions.usageCacheSize.desc': undefined
   'settings.sessions.usageCacheSize.tip': { min: number; max: number }
   'settings.sessions.usageCacheSize.title': undefined
+  'settings.slotCopy.desc': undefined
+  'settings.slotCopy.title': undefined
   'settings.token.copied': undefined
   'settings.token.copy': undefined
   'settings.token.hide': undefined
@@ -1125,23 +1109,20 @@ interface HiveMessageValues {
   'settings.viewers.revokeTitle': { name: string | number }
   'settings.viewers.token': undefined
   'settings.viewers.tokenOf': { name: string | number }
-  'settings.workflow.defaults.desc': undefined
-  'settings.workflow.defaults.title': undefined
+  'settings.workflow.hiveDefaults.desc': undefined
+  'settings.workflow.hiveDefaults.tip': undefined
+  'settings.workflow.hiveDefaults.title': undefined
+  'settings.workflow.workspaceDefaults.desc': undefined
+  'settings.workflow.workspaceDefaults.tip': undefined
+  'settings.workflow.workspaceDefaults.title': undefined
+  'settings.workflow.workspaceDefaultsNamed': { workspace: string | number }
   'settings.workspace.antivirus.desc': undefined
   'settings.workspace.antivirus.tip': undefined
   'settings.workspace.antivirus.title': undefined
   'settings.workspace.hiddenProjects.desc': undefined
   'settings.workspace.hiddenProjects.tip': undefined
   'settings.workspace.hiddenProjects.title': undefined
-  'settings.workspace.loopRounds.desc': undefined
-  'settings.workspace.loopRounds.tip': undefined
-  'settings.workspace.loopRounds.title': undefined
-  'settings.workspace.loopWaitHours.desc': undefined
-  'settings.workspace.loopWaitHours.tip': undefined
-  'settings.workspace.loopWaitHours.title': undefined
   'settings.workspace.storage.desc': undefined
   'settings.workspace.storage.tip': undefined
   'settings.workspace.storage.title': undefined
-  'settings.workspace.workflowDefaults.desc': undefined
-  'settings.workspace.workflowDefaults.title': undefined
 }

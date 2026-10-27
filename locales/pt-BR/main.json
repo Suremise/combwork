@@ -1,5 +1,6 @@
 {
   "main.accounts.badTarget": "O Hive não vincula uma conexão a {target}: não é uma das pastas do próprio {cli}.",
+  "main.accounts.checkHeld": "A conexão {name} está sendo verificada: o Hive ainda está garantindo que a verificação do {cli} terminou. Tente de novo daqui a pouco.",
   "main.accounts.folderNotUsable": "A pasta da conexão {name} não é a que o Hive criou (está faltando, ou foi movida ou substituída), então nada foi iniciado nela. Remova a conexão e adicione-a de novo.",
   "main.accounts.inUse": "A conexão {name} está em uso: pare os agentes que rodam nela e feche o login dela, depois remova.",
   "main.accounts.leftover": "A conexão {name} foi removida só em parte: remova de novo primeiro.",
@@ -194,6 +195,7 @@
   "main.plan.resetsAt": "Ele é renovado às {time}.",
   "main.plan.resetsOn": "Ele é renovado em {when}.",
   "main.plan.used": "Usado: {share, number, ::percent} do seu limite {window, select, hours {de {hours, plural, one {# hora} other {# horas}}} weekly {semanal} other {{label}}} do {provider}",
+  "main.plan.usedOn": "Usado: {share, number, ::percent} do limite {window, select, hours {de {hours, plural, one {# hora} other {# horas}}} weekly {semanal} other {{label}}} em {connection}",
   "main.quit.closed": "O Hive foi fechado",
   "main.quit.closedBody": "{n, plural, one {# sessão foi parada. Retome-a no Hive na próxima vez; nada se perdeu.} other {# sessões foram paradas. Retome-as no Hive na próxima vez; nada se perdeu.}}",
   "main.quit.dialogTitle": "Sair do Hive",

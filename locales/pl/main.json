@@ -1,5 +1,6 @@
 {
   "main.accounts.badTarget": "Hive nie powiąże połączenia z {target}: to nie jest żaden z folderów {cli}.",
+  "main.accounts.checkHeld": "Połączenie {name} jest sprawdzane: Hive wciąż upewnia się, że sprawdzanie przez {cli} się zakończyło. Spróbuj ponownie za chwilę.",
   "main.accounts.folderNotUsable": "Folder połączenia {name} nie jest tym, który utworzył Hive (brakuje go albo został przeniesiony lub zastąpiony), więc nic w nim nie uruchomiono. Usuń połączenie i dodaj je ponownie.",
   "main.accounts.inUse": "Połączenie {name} jest w użyciu: zatrzymaj agentów, którzy na nim pracują, i zamknij jego logowanie, a potem je usuń.",
   "main.accounts.leftover": "Połączenie {name} jest usunięte tylko częściowo: najpierw usuń je jeszcze raz.",
@@ -194,6 +195,7 @@
   "main.plan.resetsAt": "Odnawia się o {time}.",
   "main.plan.resetsOn": "Termin odnowienia: {when}.",
   "main.plan.used": "Wykorzystano {share, number, ::percent} Twojego {window, select, hours {{hours, plural, one {#-godzinnego limitu} few {#-godzinnego limitu} many {#-godzinnego limitu} other {#-godzinnego limitu}}} weekly {tygodniowego limitu} other {limitu {label}}} w {provider}",
+  "main.plan.usedOn": "Wykorzystano {share, number, ::percent} {window, select, hours {{hours, plural, one {#-godzinnego limitu} few {#-godzinnego limitu} many {#-godzinnego limitu} other {#-godzinnego limitu}}} weekly {tygodniowego limitu} other {limitu {label}}} na połączeniu {connection}",
   "main.quit.closed": "Zamknięto Hive",
   "main.quit.closedBody": "{n, plural, one {Zatrzymano # sesję. Wznowisz ją w Hive następnym razem; nic nie przepadło.} few {Zatrzymano # sesje. Wznowisz je w Hive następnym razem; nic nie przepadło.} many {Zatrzymano # sesji. Wznowisz je w Hive następnym razem; nic nie przepadło.} other {Zatrzymano # sesji. Wznowisz je w Hive następnym razem; nic nie przepadło.}}",
   "main.quit.dialogTitle": "Zamknij Hive",

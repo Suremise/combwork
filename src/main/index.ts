@@ -59,6 +59,7 @@ import { startBranchWatch } from './branchWatch'
 import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { queueFolderNeeded, releaseQueueRunners } from './workflow/queueRunner'
+import { stopCodexChecks } from './codexChecks'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { poolFor, startSlots, stopSlots } from './slotsApp'
 import { setQueueNeed, setSlotPools } from './unusedWorktrees'
@@ -632,8 +633,13 @@ async function quitNow(tellUser: boolean): Promise<void> {
   await recordClosing(reason).catch((e) => log.warn('recording the agents as Hive closes', e))
   await sessions.stopAllAndWait(3000)
   await quitLeftovers()
+  // The stopped runs' slot writers released before the workspaces close (HI-1801): their outcomes are known by now.
+  await sessions.writersSettled(3000)
   // The merge queues' runners: their processes ended and their leases given up, so another Hive can run them at once.
   await releaseQueueRunners()
+  // Codex's checks (HI-1757): those under way settled, each held one's end tried once more (bounded); what is left ends
+  // with its job (kill on close) as Hive exits.
+  await stopCodexChecks().catch((e) => log.warn("ending Codex's checks as Hive closes", e))
   await slotsQuiet
   await usageHistory.stop()
   await progress.saveNow().catch(() => undefined)

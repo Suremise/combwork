@@ -32,6 +32,8 @@ const state = vi.hoisted(() => ({
   /** Git's `update-ref <ref> <head> ''` (putting a branch back) refused. */
   restoreFails: false,
   live: null as null | { cwd: string; sessionId: string },
+  /** The card's slot folder, where a start that wins runs the builder. */
+  slot: '',
   deliveries: [] as { id: string; source?: string; ref?: string; state: string }[],
   /** The next delivery or launch: given, or not (refused, or its launch failed: cancelled). */
   next: [] as ('given' | 'refused' | 'launchFails')[],
@@ -49,8 +51,17 @@ const state = vi.hoisted(() => ({
   /** The pool's own, over the stand-in's (a lend held, say). */
   pool: {} as Record<string, unknown>,
   /** The slots' log, as `<level> <line>`. */
-  logged: [] as string[]
+  logged: [] as string[],
+  /** The builder's conversation bound to the card's lease, as sessions.leaseConversation gives it (HI-1746). */
+  conv: { is: 'none' } as { is: 'none' } | { is: 'resume'; id: string; name: string } | { is: 'held'; hold: { is: string; slot: string } },
+  /** The next starts: fail (its resume couldn't start), or lose to another start (that start then runs the builder there). */
+  starts: [] as ('fails' | 'lost' | 'busy')[],
+  /** This run's restart record will resume the builder (restartResume.isResuming). */
+  resuming: false,
+  /** The conversation's lookup fails (its transcript can't be read now: unknown). */
+  convFails: false
 }))
+vi.mock('../src/main/restartResume', async (orig) => ({ ...(await orig<object>()), isResuming: () => state.resuming }))
 
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => state.enforced, agentRunsGoing: () => [], workflowFor: async () => state.wf }))
 vi.mock('../src/main/worktrees', async (orig) => {
@@ -125,11 +136,29 @@ vi.mock('../src/main/sessions', async (orig) => {
     // No run writes in a slot here (HI-1762's takeover of the slot an agent's own run still writes in finds none).
     runNow: () => null,
     hiveMcp: () => null,
-    start: async (_p: string, o: { prompt?: string }) => {
-      state.calls.push(o.prompt ? 'start with the card' : 'start')
+    start: async (_p: string, o: { prompt?: string; resumeId?: string }) => {
+      const name = `${o.resumeId ? `resume ${o.resumeId}` : 'start'}${o.prompt ? ' with the card' : ''}`
+      const how = state.starts.shift()
+      state.calls.push(how ? `${name} (${how})` : name)
+      if (how === 'fails') throw new Error("its conversation couldn't resume (test)")
+      if (how === 'busy') {
+        const { HiveError } = await vi.importActual<typeof import('../src/main/hiveError')>('../src/main/hiveError')
+        const text = 'slot-a still has another session in it (test)'
+        throw new HiveError({ shown: text, english: text }, { kind: 'conflict' })
+      }
+      if (how === 'lost') {
+        // Another start of it (the restart queue, Resume All) won: it runs there now, and this one is refused.
+        state.live = { cwd: state.slot, sessionId: o.resumeId ?? 'other' }
+        throw new Error('This agent is already running or starting. Stop it first.')
+      }
       return {}
     },
-    newConversation: async () => (state.calls.push('newConversation'), {})
+    newConversation: async () => (state.calls.push('newConversation'), {}),
+    leaseConversation: async () => {
+      if (state.convFails) throw new Error('EBUSY: the transcript folder is busy (test)')
+      return state.conv
+    },
+    pendingStart: () => null
   }
   return { ...actual, sessions: stub }
 })
@@ -158,20 +187,27 @@ vi.mock('../src/main/deliveries', async (orig) => {
         state.calls.push('launch failed')
         throw new Error("its CLI couldn't start (test)")
       }
-      return { record: r, launched: await start(nd.body) }
+      try {
+        return { record: r, launched: await start(nd.body) }
+      } catch (e) {
+        // As launchWith does: a launch that didn't start gives its delivery to nobody.
+        r.state = 'cancelled'
+        throw e
+      }
     }
   }
 })
 
+const { tellListeners } = await import('../src/main/events')
 const { withWriteFence } = await import('../src/main/workflow/factStore')
 const { LeaseLost } = await import('../src/main/workflow/queueRunner')
-const { cycleIn, deleteMergedLine, laneSlotIn, place, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
+const { cycleIn, deleteMergedLine, laneSlotIn, place, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
 
 let env: Env | null = null
 afterEach(() => {
   env?.close()
   env = null
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [] })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false })
 })
 
 /** A card started in a slot (a worktree on its line, under lease l-1), its change merged into main and reported: Done. */
@@ -404,6 +440,287 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
   })
 })
 
+describe("a slot that couldn't be prepared (HI-1796)", { timeout: 60_000 }, () => {
+  it("tells its card with the workflow's own message (so its history line can show it), once", async () => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    const card = e.wf.createCard({ title: 'Placed' })
+    const slot = join(tempDir('slot-'), 'slot-a')
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
+    moved(await e.wf.start(card.key, B1))
+    const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'card', card: card.id, lane: null, project: 'p', from: '', to: null, why: null, endRev: null }
+    let tries = 0
+    state.pool = { openLeases: () => [lease], lease: () => lease, prepare: async () => (tries++, { error: 'git checkout failed (test)' }) }
+    const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
+    await settleSlotCards(ws, e.project)
+    const notices = () => e.store.pendingActions().filter((a) => a.kind === 'notify')
+    await vi.waitFor(() => expect(notices()).toHaveLength(1), { timeout: HUNG_MS })
+    const shown = notices()[0].payload.shown as { id: string; values: Record<string, string> }
+    expect(shown).toEqual({ id: 'service.slots.notPrepared', values: { slot: 'slot-a', card: card.key, why: 'git checkout failed (test)' } })
+    // A message the workflow knows: what the card's history line and the window resolve it by.
+    const { workflowMessage } = await import('../src/shared/workflow/texts')
+    expect(workflowMessage(shown.id)?.id).toBe('service.slots.notPrepared')
+    // Not tried again, nor told again, by the next pass.
+    await settleSlotCards(ws, e.project)
+    expect(tries).toBe(1)
+    expect(notices()).toHaveLength(1)
+  })
+})
+
+describe("a placement owed at a restart resumes its builder's conversation (HI-1746)", { timeout: 60_000 }, () => {
+  async function owed(): Promise<{ e: Env; n: number; key: string; slot: string; cycle: NonNullable<ReturnType<typeof cycleIn>>; ws: never }> {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    const card = e.wf.createCard({ title: 'Placed' })
+    const slot = join(tempDir('slot-'), 'slot-a')
+    state.slot = slot
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
+    moved(await e.wf.start(card.key, B1))
+    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'hive/AM/x', revision: 'r' }))
+    const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
+    return { e, n: card.id, key: card.key, slot, cycle: cycleIn(e.store.facts(card.id))!, ws }
+  }
+  const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'card', card: 0, lane: null, project: 'p', from: '', to: null, why: null, endRev: null } as never
+  const placedHow = (e: Env, n: number): string[] => e.store.facts(n).filter((f) => f.kind === 'BuilderPlaced').map((f) => (f.data as { how: string }).how)
+  const notices = (e: Env): string[] => e.store.pendingActions().filter((a) => a.kind === 'notify').map((a) => String(a.payload.text))
+  /** The builder's status changing (what a waiting placement looks again at). */
+  const status = (): void => tellListeners({ type: 'session-status', state: { agentId: 'B1', projectPath: env!.project } as never })
+  const resume = { is: 'resume', id: 'c1', name: 'B1 · AM-1' } as const
+
+  it('its builder stopped, its conversation bound to the lease: that conversation resumed with the card, once', async () => {
+    const { e, n, cycle, ws } = await owed()
+    state.conv = resume
+    await place(ws, e.project, e.wf, n, cycle, lease)
+    expect(state.calls).toEqual(['resume c1 with the card'])
+    expect(placedHow(e, n)).toEqual(['resumed'])
+    expect(state.deliveries.map((d) => d.state)).toEqual(['offered'])
+  })
+
+  it("its conversation's lookup failing (unknown): nothing launched, tried again; resumed once it can be read", async () => {
+    const { e, n, cycle, ws } = await owed()
+    state.conv = resume
+    state.convFails = true
+    await expect(place(ws, e.project, e.wf, n, cycle, lease)).rejects.toThrow(/EBUSY/)
+    expect(state.calls).toEqual([])
+    expect(placedHow(e, n)).toEqual([])
+    state.convFails = false
+    await place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)
+    expect(state.calls).toEqual(['resume c1 with the card'])
+    expect(placedHow(e, n)).toEqual(['resumed'])
+  })
+
+  it('no conversation it can resume there (none bound, or its transcript gone): a new one in the slot, as before', async () => {
+    const { e, n, cycle, ws } = await owed()
+    await place(ws, e.project, e.wf, n, cycle, lease)
+    expect(state.calls).toEqual(['start with the card'])
+    expect(placedHow(e, n)).toEqual(['started'])
+  })
+
+  it('its conversation held: it waits, the card told once, never a new or an older conversation; resumed once it can', async () => {
+    const { e, n, cycle, ws } = await owed()
+    state.conv = { is: 'held', hold: { is: 'draining', slot: 'slot-a' } }
+    const placing = place(ws, e.project, e.wf, n, cycle, lease)
+    await vi.waitFor(() => expect(notices(e)).toHaveLength(1), { timeout: HUNG_MS })
+    expect(notices(e)[0]).toMatch(/can't give AM-\d+ to B1 yet: its conversation in slot-a can't resume now \(its last session there is still ending\)/)
+    // Looked at again, still held: not told again, and nothing launched.
+    status()
+    await vi.waitFor(() => expect(state.logged.filter((l) => /waits for .*B1.*'s conversation/.test(l)).length).toBeGreaterThanOrEqual(2), { timeout: HUNG_MS })
+    expect(notices(e)).toHaveLength(1)
+    expect(state.calls).toEqual([])
+    state.conv = resume
+    status()
+    await placing
+    expect(state.calls).toEqual(['resume c1 with the card'])
+    expect(placedHow(e, n)).toEqual(['resumed'])
+  })
+
+  it("this run's restart resume will bring it back: it waits, launches nothing, and types the card into the resumed conversation", async () => {
+    const { e, n, slot, cycle, ws } = await owed()
+    state.conv = resume
+    state.resuming = true
+    const placing = place(ws, e.project, e.wf, n, cycle, lease)
+    status()
+    expect(state.calls).toEqual([])
+    // The queue's resume: running in its slot, in that conversation.
+    state.live = { cwd: slot, sessionId: 'c1' }
+    state.resuming = false
+    status()
+    await placing
+    expect(state.calls).toEqual(['typed (given)'])
+    expect(placedHow(e, n)).toEqual(['typed'])
+  })
+
+  it("the restart resume failing or cancelled (the builder still stopped): it then resumes the conversation itself", async () => {
+    const { e, n, cycle, ws } = await owed()
+    state.conv = resume
+    state.resuming = true
+    const placing = place(ws, e.project, e.wf, n, cycle, lease)
+    status()
+    expect(state.calls).toEqual([])
+    state.resuming = false
+    status()
+    await placing
+    expect(state.calls).toEqual(['resume c1 with the card'])
+    expect(placedHow(e, n)).toEqual(['resumed'])
+  })
+
+  it('another start of it winning (Resume All, the restart queue): its own refused and not given; the next try types the card in, once', async () => {
+    const { e, n, cycle, ws } = await owed()
+    state.conv = resume
+    state.starts = ['lost']
+    await expect(place(ws, e.project, e.wf, n, cycle, lease)).rejects.toThrow(/already running or starting/)
+    expect(placedHow(e, n)).toEqual([])
+    await place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)
+    expect(state.calls).toEqual(['resume c1 with the card (lost)', 'typed (given)'])
+    expect(state.deliveries.map((d) => d.state)).toEqual(['cancelled', 'offered'])
+    expect(placedHow(e, n)).toEqual(['typed'])
+    expect(notices(e)).toEqual([])
+  })
+
+  it("its resume refused for now (a crashed run's processes still in its slot): a wait, told once, never a counted try; resumed once the slot is ready", async () => {
+    const { e, n, cycle, ws } = await owed()
+    state.conv = resume
+    state.starts = ['busy', 'busy', 'busy']
+    const placing = place(ws, e.project, e.wf, n, cycle, lease)
+    await vi.waitFor(() => expect(notices(e)).toHaveLength(1), { timeout: HUNG_MS })
+    expect(notices(e)[0]).toMatch(/can't give AM-\d+ to B1 yet: its conversation in slot-a can't resume now \(slot-a still has another session in it \(test\)\)/)
+    // Each look refused again: still a wait, not told again, never given up on.
+    for (const tries of [2, 3]) {
+      status()
+      await vi.waitFor(() => expect(state.calls).toHaveLength(tries), { timeout: HUNG_MS })
+    }
+    expect(notices(e)).toHaveLength(1)
+    // The slot ready: the next look resumes it.
+    status()
+    await placing
+    expect(state.calls).toEqual(['resume c1 with the card (busy)', 'resume c1 with the card (busy)', 'resume c1 with the card (busy)', 'resume c1 with the card'])
+    expect(placedHow(e, n)).toEqual(['resumed'])
+    expect(state.logged.some((l) => /didn't resume/.test(l))).toBe(false)
+  })
+
+  it('three failed resumes: the card told, never a new conversation; once its builder runs there (resumed by hand), the card typed in once', async () => {
+    const { e, n, slot, cycle, ws } = await owed()
+    state.conv = resume
+    state.starts = ['fails', 'fails', 'fails']
+    await expect(place(ws, e.project, e.wf, n, cycle, lease)).rejects.toThrow(/couldn't resume/)
+    await expect(place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)).rejects.toThrow(/couldn't resume/)
+    expect(notices(e)).toEqual([])
+    const placing = place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)
+    await vi.waitFor(() => expect(notices(e)).toHaveLength(1), { timeout: HUNG_MS })
+    expect(notices(e)[0]).toMatch(/couldn't resume B1's conversation in slot-a for AM-\d+ \(three tries\): its conversation couldn't resume \(test\)\. Resume B1 from Sessions/)
+    // A look while it is still stopped launches nothing more.
+    status()
+    await vi.waitFor(() => expect(state.logged.some((l) => /didn't resume \(3 tries\)/.test(l))).toBe(true), { timeout: HUNG_MS })
+    expect(state.calls).toEqual(['resume c1 with the card (fails)', 'resume c1 with the card (fails)', 'resume c1 with the card (fails)'])
+    // The user resumes it from Sessions: it runs in its slot, and the card is typed in.
+    state.live = { cwd: slot, sessionId: 'c1' }
+    status()
+    await placing
+    expect(state.calls.slice(3)).toEqual(['typed (given)'])
+    expect(placedHow(e, n)).toEqual(['typed'])
+  })
+
+  describe('what a placement keeps between its looks and tries (HI-1804)', () => {
+    const kept = (ws: never, n: number) => placementTracksForTests(ws).get(`${env!.project.toLowerCase()}#${n}`) ?? null
+
+    it('kept while it waits or is tried again (its tries, its cutoff, the holds it told), let go once it is placed', async () => {
+      const { e, n, slot, cycle, ws } = await owed()
+      state.conv = resume
+      // Two failed tries: kept across ensure's tries again (each a new call).
+      state.starts = ['fails', 'fails']
+      await expect(place(ws, e.project, e.wf, n, cycle, lease)).rejects.toThrow(/couldn't resume/)
+      await expect(place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)).rejects.toThrow(/couldn't resume/)
+      expect(kept(ws, n)).toMatchObject({ ref: `${n}:${cycle.seq}:l-1`, failures: 2, gaveUp: false })
+      // Held now: it waits, told once, and keeps that while it waits.
+      state.conv = { is: 'held', hold: { is: 'draining', slot: 'slot-a' } }
+      const placing = place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)
+      await vi.waitFor(() => expect(notices(e)).toHaveLength(1), { timeout: HUNG_MS })
+      expect(kept(ws, n)).toMatchObject({ failures: 2, told: new Set(['draining']) })
+      // Resumed by hand meanwhile: typed in, and what it kept let go.
+      state.live = { cwd: slot, sessionId: 'c1' }
+      status()
+      await placing
+      expect(placedHow(e, n)).toEqual(['typed'])
+      expect(kept(ws, n)).toBeNull()
+    })
+
+    it('let go once its placement is obsolete (the card moved on, the rules off) or its workspace ends', async () => {
+      const { e, n, cycle, ws } = await owed()
+      state.conv = resume
+      state.starts = ['fails']
+      await expect(place(ws, e.project, e.wf, n, cycle, lease)).rejects.toThrow(/couldn't resume/)
+      expect(kept(ws, n)).toMatchObject({ failures: 1 })
+      // The rules off before its next try: nothing to place, and nothing kept.
+      state.enforced = false
+      await place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)
+      expect(kept(ws, n)).toBeNull()
+      // Waiting on a hold when its workspace ends: the wait ends, and nothing is kept.
+      state.enforced = true
+      state.conv = { is: 'held', hold: { is: 'draining', slot: 'slot-a' } }
+      const placing = place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)
+      await vi.waitFor(() => expect(kept(ws, n)?.told.has('draining')).toBe(true), { timeout: HUNG_MS })
+      ;(ws as unknown as { lifetime: { aborted: boolean } }).lifetime.aborted = true
+      status()
+      await placing
+      expect(kept(ws, n)).toBeNull()
+      expect(placedHow(e, n)).toEqual([])
+    })
+
+    it("a failed try's record goes at the slot pass once its card is put back, without place running again (HR4's round 1)", async () => {
+      const { e, n, key, cycle, ws } = await owed()
+      state.conv = resume
+      state.starts = ['fails']
+      await expect(place(ws, e.project, e.wf, n, cycle, lease)).rejects.toThrow(/couldn't resume/)
+      expect(kept(ws, n)).toMatchObject({ failures: 1 })
+      // Put back: its lease ends, and the pass passes the card over (no placement pending for it).
+      moved(await e.wf.putBack(key, B1, { why: 'not now' }))
+      await settleSlotCards(ws, e.project)
+      expect(kept(ws, n)).toBeNull()
+      expect(state.calls).toEqual(['resume c1 with the card (fails)'])
+    })
+
+    it('a pending placement keeps its record through the passes while it waits, and loses it once its card is put back', async () => {
+      const { e, n, key, ws } = await owed()
+      state.conv = { is: 'held', hold: { is: 'draining', slot: 'slot-a' } }
+      const open = lease as { id: string; card: number }
+      state.pool = { openLeases: () => (e.wf.state(e.store.card(n)!).stage === 'active' ? [{ ...open, card: n }] : []), lease: () => ({ ...open, card: n }) }
+      // The pass starts its placement, which waits on the hold: told once, its record kept.
+      await settleSlotCards(ws, e.project)
+      await vi.waitFor(() => expect(kept(ws, n)?.told.has('draining')).toBe(true), { timeout: HUNG_MS })
+      await settleSlotCards(ws, e.project)
+      expect(kept(ws, n)?.told.has('draining')).toBe(true)
+      expect(notices(e)).toHaveLength(1)
+      // Put back: the next pass lets it go, and the waiting placement ends at its next look.
+      moved(await e.wf.putBack(key, B1, { why: 'not now' }))
+      await settleSlotCards(ws, e.project)
+      expect(kept(ws, n)).toBeNull()
+      status()
+      expect(placedHow(e, n)).toEqual([])
+    })
+
+    it("a new cycle of the card starts afresh: the last cycle's tries and notices aren't its own", async () => {
+      const { e, n, key, cycle, ws } = await owed()
+      state.conv = resume
+      state.starts = ['fails', 'fails']
+      await expect(place(ws, e.project, e.wf, n, cycle, lease)).rejects.toThrow(/couldn't resume/)
+      await expect(place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)).rejects.toThrow(/couldn't resume/)
+      expect(kept(ws, n)).toMatchObject({ failures: 2 })
+      // Started again (put back, started: a new cycle under a new lease, prepared).
+      moved(await e.wf.putBack(key, B1, { why: 'again' }))
+      e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: state.slot, lease: 'l-2', fresh: true })
+      moved(await e.wf.start(key, B1))
+      await e.wf.write(e.store.card(n)!, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-2', line: 'hive/AM/x', revision: 'r' }))
+      const again = cycleIn(e.store.facts(n))!
+      const lease2 = { ...(lease as object), id: 'l-2' } as never
+      // One failure on the new cycle is its first, not the old one's third: no cutoff, no notice.
+      state.starts = ['fails']
+      await expect(place(ws, e.project, e.wf, n, again, lease2)).rejects.toThrow(/couldn't resume/)
+      expect(kept(ws, n)).toMatchObject({ ref: `${n}:${again.seq}:l-2`, failures: 1, gaveUp: false })
+      expect(notices(e)).toEqual([])
+    })
+  })
+})
+
 describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
   // Each test quits: started again after it, as the next Hive's start does, so the other tests' passes run.
   afterEach(() => {
@@ -503,6 +820,10 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
     }
     expect(at('= quitSlotCards()')).toBeLessThan(at('sessions.stopAllAndWait('))
     expect(at('await slotsQuiet')).toBeLessThan(at('app.quit()'))
+    // The stopped runs' slot writers released once their outcomes are known (after the leftovers' look), before the
+    // workspaces close (HI-1801).
+    expect(at('await quitLeftovers()')).toBeLessThan(at('await sessions.writersSettled('))
+    expect(at('await sessions.writersSettled(')).toBeLessThan(at('app.quit()'))
     const willQuit = src.slice(src.indexOf("app.on('will-quit'"))
     expect(willQuit.indexOf('stopSlotCards()')).toBeLessThan(willQuit.indexOf('closeAllBoards()'))
   })
@@ -524,6 +845,18 @@ describe("a card's cycle in a slot (#1438)", () => {
     expect(cycleIn([...facts, f(6, 'LineDeleting', { line: 'x', revision: 'r' })])).toMatchObject({ deleting: { line: 'x' }, deleted: false })
     expect(cycleIn([...facts, f(6, 'LineDeleting', { line: 'x', revision: 'r' }), f(7, 'LineDeleteUndone', { line: 'x', revision: 'r', why: 'checkedOut' })])).toMatchObject({ deleting: null, deleted: false })
     expect(cycleIn([...facts, f(6, 'LineDeleting', { line: 'x', revision: 'r' }), f(7, 'LineDeleted', { line: 'x', revision: 'r', why: 'merged' })])).toMatchObject({ deleting: null, deleted: true })
+  })
+
+  it("follows Repair's move and its line's rename since its start, as the card's state does (HI-1791); a later start's own folder and line", () => {
+    const at = (folder: string, seq: number, lease = 'l-1') => f(seq, 'Started', { folder, line: 'hive/AM/AM-1-x', base: 'b', target: 'main', builder: 'B1', cardKind: 'code', slot: 'slot-a', lease })
+    const before = 'C:\\before\\ws.worktrees\\alpha\\slot-a'
+    const after = 'C:\\after\\ws.worktrees\\alpha\\slot-a'
+    const afterMove = [at(before, 1), f(2, 'FolderMoved', { from: before.toUpperCase(), to: after, why: 'repair' }), f(3, 'LineRenamed', { from: 'HIVE/AM/AM-1-x', to: 'hive/AM/AM-1-y', why: 'repair' })]
+    expect(cycleIn(afterMove)?.started).toMatchObject({ folder: after, line: 'hive/AM/AM-1-y', slot: 'slot-a', lease: 'l-1' })
+    // Another folder's move, or another line's rename, isn't its own.
+    expect(cycleIn([at(before, 1), f(2, 'FolderMoved', { from: 'C:\\elsewhere', to: after, why: 'repair' }), f(3, 'LineRenamed', { from: 'hive/AM/AM-2-z', to: 'hive/AM/AM-2-w', why: 'repair' })])?.started).toMatchObject({ folder: before, line: 'hive/AM/AM-1-x' })
+    // A move before its start was the last cycle's: its start names where it is.
+    expect(cycleIn([...afterMove, at(after, 4, 'l-2')])?.started).toMatchObject({ folder: after, line: 'hive/AM/AM-1-x', lease: 'l-2' })
   })
 })
 

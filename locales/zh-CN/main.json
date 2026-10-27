@@ -1,5 +1,6 @@
 {
   "main.accounts.badTarget": "Hive 不会把连接链接到 {target}：它不是 {cli} 自己的文件夹。",
+  "main.accounts.checkHeld": "{name} 正在检查中：Hive 仍在确认 {cli} 对它的检查已经结束。请稍后再试。",
   "main.accounts.folderNotUsable": "{name} 的文件夹不是 Hive 创建的那个（它不存在，或已被移动或替换），因此没有在其中启动任何内容。请删除该连接，然后重新添加。",
   "main.accounts.inUse": "{name} 正在使用中：请先停止使用它的智能体并关闭它的登录，然后再删除它。",
   "main.accounts.leftover": "{name} 只删除了一部分：请先再删除一次。",
@@ -194,6 +195,7 @@
   "main.plan.resetsAt": "将于 {time} 重置。",
   "main.plan.resetsOn": "将于 {when} 重置。",
   "main.plan.used": "{provider} {window, select, hours {{hours, plural, other {# 小时限额}}} weekly {每周限额} other {{label} 限额}}已用 {share, number, ::percent}",
+  "main.plan.usedOn": "{connection} 的{window, select, hours {{hours, plural, other {# 小时限额}}} weekly {每周限额} other {{label} 限额}}已用 {share, number, ::percent}",
   "main.quit.closed": "Hive 已关闭",
   "main.quit.closedBody": "{n, plural, other {已停止 # 个会话。下次可在 Hive 中恢复，不会丢失任何内容。}}",
   "main.quit.dialogTitle": "退出 Hive",

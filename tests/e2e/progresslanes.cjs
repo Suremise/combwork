@@ -686,6 +686,12 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
 
   // --- Hive restarted: the workspace's lanes chosen (five) are kept (#569).
   await app.close().catch(() => undefined)
+  // The lanes' agents were in running lanes: Hive offers to resume them (its restart record), in a notice that can cover
+  // the lane menu (HI-1809: Usual Order's click timed out under it). Answered Don't Resume, below, until the record is
+  // gone (nothing left to offer) and no offer shows.
+  const restartRecord = path.join(userData, 'restart.json')
+  const offered = fs.existsSync(restartRecord)
+  console.log(`INFO restart record before the restart: ${offered ? 'yes' : 'no'}`)
   const app2 = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page2 = await app2.firstWindow()
   page2.on('pageerror', (e) => check('no page errors after the restart', false, e.message))
@@ -693,6 +699,14 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await lib.appReady(page2)
   const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   if (!(await page2.evaluate((n) => document.title.includes(n), path.basename(ws)))) await lib.openWorkspace(inv2, page2, ws)
+  if (offered) {
+    const dontResume = page2.locator('.toast').getByRole('button', { name: "Don't Resume", exact: true })
+    const answered = await until(async () => {
+      if (await dontResume.count()) await dontResume.first().click().catch(() => undefined)
+      return !fs.existsSync(restartRecord) && (await dontResume.count()) === 0
+    }, 30000)
+    check("the offer to resume the lanes' agents answered Don't Resume, and gone", !!answered, String(fs.existsSync(restartRecord)))
+  }
   if (!(await until(async () => (await page2.locator('.progress-panel').count()) === 1, 5000))) await page2.locator('.progress-rail').click()
   const edge2 = page2.locator('.progress-lanes-edge')
   const rowsAfter = async () => {

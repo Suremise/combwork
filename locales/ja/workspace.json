@@ -429,6 +429,7 @@
   "workspace.statusBar.apiOn": "Agent APIは{url}で待ち受け中です",
   "workspace.statusBar.asOf": "{when}の情報です。セッションの実行中に更新されます。",
   "workspace.statusBar.awakeTip": "エージェントの作業が終わるまで、Windowsはスリープしません（画面はオフになることがあります）。「設定」→「全般」→「作業中はPCのスリープを防止」。",
+  "workspace.statusBar.connectionLine": "{name}（{provider}{hasPlan, select, yes {、{plan}プラン} other {}}）",
   "workspace.statusBar.git": "{hasVersion, select, yes {Git {version}} other {Git}}",
   "workspace.statusBar.gitOld": "Git {version}は{min}より古いため、gitの一部の機能が使えません。",
   "workspace.statusBar.gitProblem": "{problem}。{fix}",

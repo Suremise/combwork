@@ -1,5 +1,5 @@
 import { currentCard, laneCardState } from './laneBar'
-import type { LaneCard, LaneInfo, LaneSlotInfo, LaneState, LaneStatus, LaneWaitReason, ProjectConfig, TaskCard, WorkspaceConfig } from './types'
+import type { LaneCard, LaneInfo, LaneSlotInfo, LaneState, LaneStatus, LaneWaitReason, TaskCard } from './types'
 import type { StageId } from './workflow/facts'
 import { cardRef } from './projectKeys'
 
@@ -59,37 +59,10 @@ export interface LaneRecord {
   pool?: true
 }
 
-/** At most this many cards in a lane, rounds per card, and minutes of wait (a day, as a card watch's longest). */
-export const LANE_MAX_CARDS = 50
-export const LANE_MAX_ROUNDS = 50
-export const LANE_MAX_WAIT_MINUTES = 24 * 60
-
-/** Card loops' rounds and wait when nothing says otherwise (#412: Darren's Rounds 10, Wait 6h). */
-export const LOOP_ROUNDS = 10
-export const LOOP_WAIT_HOURS = 6
-/** The wait settings' range, in hours (a lane's wait is at most a day). */
-export const LOOP_WAIT_MAX_HOURS = LANE_MAX_WAIT_MINUTES / 60
-
-/**
- * A card loop's rounds and wait when its request doesn't say (#412): the project's (Project Settings → Card loops),
- * else the workspace's (Settings → Workspace → Card loops), else LOOP_ROUNDS and LOOP_WAIT_HOURS. A prompt's own values
- * win over all of them; lanes started without them get these.
- */
-export function loopDefaults(ws?: Pick<WorkspaceConfig, 'loops'> | null, project?: Partial<Pick<ProjectConfig, 'loopRounds' | 'loopWaitHours'>> | null): { rounds: number; waitHours: number } {
-  const ok = (v: unknown, max: number): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= max
-  const pick = (own: unknown, shared: unknown, def: number, max: number): number => (ok(own, max) ? own : ok(shared, max) ? shared : def)
-  return { rounds: pick(project?.loopRounds, ws?.loops?.rounds, LOOP_ROUNDS, LANE_MAX_ROUNDS), waitHours: pick(project?.loopWaitHours, ws?.loops?.waitHours, LOOP_WAIT_HOURS, LOOP_WAIT_MAX_HOURS) }
-}
-/**
- * How long a card loop's builder waits for its reviewer's check of a design it posted before it goes ahead as posted, and
- * a step left waiting longer is a stall (#1382): Project Settings → Card loops → Design check wait, in minutes.
- */
-export const LOOP_STEP_WAIT_MINUTES = 30
-export const LOOP_STEP_WAIT_MAX_MINUTES = 240
-export function loopStepWaitMinutes(project?: Partial<Pick<ProjectConfig, 'loopStepWaitMinutes'>> | null): number {
-  const v = project?.loopStepWaitMinutes
-  return typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= LOOP_STEP_WAIT_MAX_MINUTES ? v : LOOP_STEP_WAIT_MINUTES
-}
+// The limits and defaults (loopLimits.ts). A loop's rounds, wait and design check wait when its request doesn't say are
+// the project's workflow options since HI-1766 (workflow/preferences.ts); a prompt's own values win over them.
+import { LANE_MAX_CARDS, LANE_MAX_ROUNDS, LANE_MAX_WAIT_MINUTES } from './loopLimits'
+export { LANE_MAX_CARDS, LANE_MAX_ROUNDS, LANE_MAX_WAIT_MINUTES, LOOP_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_STEP_WAIT_MINUTES, LOOP_WAIT_HOURS, LOOP_WAIT_MAX_HOURS } from './loopLimits'
 /** A lane's name, at most. */
 export const LANE_NAME_MAX = 80
 /** An ended lane stays listed this long (unless its builder starts another), and is kept in the file this long. */

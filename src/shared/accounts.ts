@@ -56,9 +56,14 @@ export function duplicateLogins(connections: readonly Connection[]): Map<string,
   return out
 }
 
-/** The identity a successful check gives, to accept: only signed in, with both its email and organisation. */
-export function acceptable(o: Connection['observed']): { email: string; orgId: string } | null {
-  return o && !o.missing && o.loggedIn === true && o.email && o.orgId ? { email: o.email, orgId: o.orgId } : null
+/**
+ * The identity a successful check gives, to accept: only signed in, with its email and, for a CLI whose sign-in names
+ * one (`orgs`, its descriptor's connections.orgs: Claude Code's does, Codex's doesn't, HI-1757), its organisation.
+ */
+export function acceptable(o: Connection['observed'], orgs = true): { email: string; orgId: string } | null {
+  if (!o || o.missing || o.loggedIn !== true || !o.email) return null
+  if (orgs && !o.orgId) return null
+  return { email: o.email, orgId: o.orgId ?? '' }
 }
 
 /**

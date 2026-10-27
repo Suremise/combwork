@@ -19,7 +19,7 @@ import { boardWrite, cardDoc, hasCard, inBoardWrite } from '../boardStore'
 import { git } from '../git'
 import { getTask } from '../tasks'
 import type { WorkspaceService } from '../workspace'
-import { projectPlatform } from '../platform/registry'
+import { platformIdOf } from '../platform/registry'
 import * as G from '../platform/git'
 import { NoneAdapter } from '../platform/none'
 import { observer as appObserver, type FolderChanges } from '../platform/observe'
@@ -217,7 +217,7 @@ export async function bracketFor(ws: WorkspaceService, link: RunLink): Promise<B
   if (!c || c.archived || !c.project) return null
   const project = join(workspacePath, c.project)
   const cfg = (await ws.projectConfig(project).catch(() => null)) as (ProjectConfig & { workflow?: { options?: { commands?: Record<string, unknown>; excluded?: unknown } } }) | null
-  const platform = projectPlatform(project, cfg?.platform).id
+  const platform = platformIdOf(project, cfg?.platform)
   if (platform === 'git' && (!link.folder || !link.testedCheckout)) return null
   const options = cfg?.workflow?.options
   const commands = Object.fromEntries(Object.entries(options?.commands ?? {}).filter((e): e is [string, string] => typeof e[1] === 'string' && !!e[1].trim()).map(([k, v]) => [k, v.trim()]))

@@ -1,8 +1,9 @@
 import { randomBytes } from 'crypto'
 import { join } from 'path'
+import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
-import { allDone, isFrozen, loopDefaults, keptLanes, laneView, listedLanes, readLanes, running, type LaneAgent, type LaneCardFacts, type LaneChange, type LaneRecord } from '../shared/lanes'
+import { allDone, isFrozen, keptLanes, laneView, listedLanes, readLanes, running, type LaneAgent, type LaneCardFacts, type LaneChange, type LaneRecord } from '../shared/lanes'
 import type { HiveErrorKind, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { reviewingNow } from '../shared/workflow/reviewerPool'
 import { withValues, type Text } from '../shared/advanced'
@@ -20,12 +21,12 @@ import { createDelivery, offerNow } from './deliveries'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName } from '../shared/projectIds'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
-import { getTask, inScope } from './tasks'
+import { cardsNow, inScope } from './tasks'
 import { journalFact } from './journalService'
 import { openWorkspaces, type WorkspaceService } from './workspace'
 import { cardRef } from '../shared/projectKeys'
 import { withCardNames } from './projectKeys'
-import { roundLimitCards, rulesetStages } from './workflow/cardWork'
+import { factHeadsOf, roundLimitCards, rulesetStages } from './workflow/cardWork'
 import { rulesEnforced } from './workflow/recorder'
 import { rulesetsNow } from './workflow/rulesets'
 import { laneValues, noteLaneIn, sameValue, type FieldChange } from './assistantChanges'
@@ -326,17 +327,16 @@ function close(l: LaneRecord, state: 'ended' | 'abandoned', cards: readonly Lane
 
 /** The lane cards as the board has them now, each read once, as the lane's project sees them. */
 async function cardsOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promise<Map<string, Map<number, TaskCard | null>>> {
-  const reads = new Map<number, Promise<TaskCard | null>>()
   const out = new Map<string, Map<number, TaskCard | null>>()
+  // An ended lane reads as it was left: nothing to read. The others' cards in one read, each kept until it changes
+  // (HI-1780: cardsNow).
+  const cards = await cardsNow(ws, lanes.filter((l) => !isFrozen(l)).flatMap((l) => l.cards))
   for (const l of lanes) {
     const m = new Map<number, TaskCard | null>()
     out.set(l.id, m)
-    // An ended lane reads as it was left: nothing to read.
     if (isFrozen(l)) continue
     for (const n of l.cards) {
-      let r = reads.get(n)
-      if (!r) reads.set(n, (r = getTask(n, ws).catch(() => null)))
-      const card = await r
+      const card = cards.get(n) ?? null
       m.set(n, card && !card.archived && inScope(card, l.project) ? card : null)
     }
   }
@@ -373,6 +373,10 @@ export const lanesEnforced = enforced
 async function factsOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promise<Map<string, Map<number, LaneCardFacts> | null>> {
   const out = new Map<string, Map<number, LaneCardFacts> | null>()
   const on = await enforced()
+  // Each card's kept by its facts' head (HI-1780: every board change reads every running lane, and facts are only ever
+  // added): only a card with new facts is read and folded again.
+  const heads = on && ws.path ? factHeadsOf(ws, lanes.filter(running).flatMap((l) => l.cards)) : new Map<number, string>()
+  const kept = keptLaneFacts(ws)
   for (const l of lanes) {
     if (!on || !running(l) || !ws.path) {
       out.set(l.id, null)
@@ -382,12 +386,20 @@ async function factsOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Prom
       const store = FactStore.forBoard(ws, { project: l.project, key: l.project })
       const m = new Map<number, LaneCardFacts>()
       for (const n of l.cards) {
+        const key = heads.get(n) ?? ''
+        const was = kept.get(n)
+        if (was?.key === key) {
+          m.set(n, was.facts)
+          continue
+        }
         const all = store.facts(n)
         const s = foldCard(all)
         const asks = forYou(s)
         // Who reviewed and reviews it (#1446: a pool lane's hover names them).
         const last = s.verdicts.at(-1)
-        m.set(n, { stage: s.stage, forYou: asks.length > 0, ...(asks[0] ? { ask: asks[0].kind } : {}), stale: !!s.stale, rounds: s.rounds, lastVerdict: last ? { reviewer: last.reviewer, pass: last.pass } : null, reviewing: reviewingNow(all, () => true)?.reviewing ?? null })
+        const facts: LaneCardFacts = { stage: s.stage, forYou: asks.length > 0, ...(asks[0] ? { ask: asks[0].kind } : {}), stale: !!s.stale, rounds: s.rounds, lastVerdict: last ? { reviewer: last.reviewer, pass: last.pass } : null, reviewing: reviewingNow(all, () => true)?.reviewing ?? null }
+        kept.set(n, { key, facts })
+        m.set(n, facts)
       }
       out.set(l.id, m)
     } catch (e) {
@@ -396,6 +408,14 @@ async function factsOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Prom
     }
   }
   return out
+}
+
+/** Each workspace's lane cards' facts as factsOf read them, with their facts' head then; a workspace opened again starts afresh. */
+const laneFacts = new WeakMap<WorkspaceService, { path: string | null; life: unknown; cards: Map<number, { key: string; facts: LaneCardFacts }> }>()
+function keptLaneFacts(ws: WorkspaceService): Map<number, { key: string; facts: LaneCardFacts }> {
+  let c = laneFacts.get(ws)
+  if (!c || c.path !== ws.path || c.life !== ws.lifetime) laneFacts.set(ws, (c = { path: ws.path, life: ws.lifetime, cards: new Map() }))
+  return c.cards
 }
 
 /** Lanes as they read now. */
@@ -596,9 +616,10 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   if (reviewer && s.pool) throw new LaneError(400, 'A lane reviewed by the pool has no reviewer of its own') // i18n-ignore: hive_lane's refusal, which only agents get
   // A named reviewer makes it one reviewer per lane; the pool, none of its own (#1443).
   const pool = s.pool ? true : reviewer ? false : undefined
-  // Rounds and wait the start doesn't give: the project's, else the workspace's (#412).
-  const project = ws.path ? await ws.projectConfig(join(ws.path, s.project)).catch(() => null) : null
-  const defaults = loopDefaults(ws.config, project)
+  // Rounds and wait the start doesn't give (#412): the project's workflow options as they resolve now (HI-1766).
+  const projectPath = ws.path ? join(ws.path, s.project) : s.project
+  const prefs = projectPreferences(ws, projectPath, ws.path ? await ws.projectConfig(projectPath).catch(() => null) : null)
+  const defaults = { rounds: prefs.loopRounds, waitHours: prefs.loopWaitHours }
   const on = await enforced()
   const ruleset = await rulesetNow(ws, s.project)
   const ended: EndedLane[] = []
@@ -963,7 +984,7 @@ export async function refresh(ws: WorkspaceService): Promise<void> {
       return !!n && (!n.has(l.builder.id) || (!!l.reviewer && !n.has(l.reviewer.id)))
     })
     if (done.length || orphan.length) {
-      const cardsNow = new Map(live.map((l, i) => [l.id, vs[i].cards]))
+      const laneCardsNow = new Map(live.map((l, i) => [l.id, vs[i].cards]))
       const on = await enforced()
       const ended: EndedLane[] = []
       const closed: LaneRecord[] = []
@@ -979,8 +1000,8 @@ export async function refresh(ws: WorkspaceService): Promise<void> {
             // again: HR6's #1270 round 1, a card reopened meanwhile).
             if (decided && sameList(l.cards, decided.cards)) {
               checks.push(stillAllDone(ws, l, [...l.cards]))
-              endVerified(ws, l, cardsNow.get(l.id), on, ended)
-            } else if (orphan.some((d) => d.id === l.id)) close(l, 'abandoned', cardsNow.get(l.id))
+              endVerified(ws, l, laneCardsNow.get(l.id), on, ended)
+            } else if (orphan.some((d) => d.id === l.id)) close(l, 'abandoned', laneCardsNow.get(l.id))
             else continue
             closed.push(l)
           }

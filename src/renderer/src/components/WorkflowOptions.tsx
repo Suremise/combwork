@@ -1,18 +1,21 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { OwnWorkflowProblem, ProjectInfo, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
 import type { PlatformId } from '@shared/platform/descriptors'
-import { allOff, CONTRADICTIONS, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, isAllOff, liveContradictions, reviewerAgent, setOption, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
+import { allOff, CONTRADICTIONS, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, isAllOff, liveContradictions, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { GROUP_TEXT, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
-import { LOOP_ROUNDS, loopDefaults } from '@shared/lanes'
+import { FILE_LOCK_MODES } from '@shared/defaults'
+import { NumberField } from './NumberField'
+import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from '@shared/lanes'
 import { compile, mustCompile } from '@shared/workflow/compile'
 import { STAGE_TEXT, stageNameProblems, stageNameProblemText, type StageNames } from '@shared/workflow/stages'
 import type { StageId } from '@shared/workflow/facts'
 import { shownText } from '@shared/advanced'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { agentProviderOf, cardLabelOf, confirm, notify, openProjectSettings, openVersionControl, set as setStore, setActivity, useStore } from '../store'
+import { agentProviderOf, cardLabelOf, confirm, notify, openVersionControl, set as setStore, setActivity, useStore } from '../store'
 import { cx } from '../util'
-import { SlotsAndCopies } from './SlotsAndCopies'
+import { SlotCopyLevel, SlotsAndCopies } from './SlotsAndCopies'
+import { ORIGIN_TEXT } from '../workflowOrigins'
 import { providerDescriptor } from '@shared/providers'
 import { agentWorkflowRole, reviewsWork } from '@shared/workflow/roles'
 import { Icon, Switch, Tooltip } from './ui'
@@ -47,14 +50,7 @@ const T = {
     folderGit: msg({ id: 'workflow.form.neverOff.folderGit', defaultMessage: 'No branch switch, pull or other git that changes the folder while an agent works there.', description: 'A protection that stays on with every rule off.' }),
     queue: msg({ id: 'workflow.form.neverOff.queue', defaultMessage: 'The merge queue moves a target branch only if nothing else moved it meanwhile.', description: 'A protection that stays on with every rule off (glossary 2.1: merge queue).' })
   },
-  from: {
-    preset: msg({ id: 'workflow.form.from.preset', defaultMessage: 'From the preset', description: 'Where a workflow option’s value comes from: the preset chosen.' }),
-    project: msg({ id: 'workflow.form.from.project', defaultMessage: 'Set for this project', description: 'Where a workflow option’s value comes from: set in this project.' }),
-    workspace: msg({ id: 'workflow.form.from.workspace', defaultMessage: 'From the workspace', description: 'Where a workflow option’s value comes from: the workspace’s default.' }),
-    global: msg({ id: 'workflow.form.from.global', defaultMessage: 'From Hive’s settings', description: 'Where a workflow option’s value comes from: Hive’s own default.' }),
-    platform: msg({ id: 'workflow.form.from.platform', defaultMessage: 'Default', description: 'Where a workflow option’s value comes from: nobody set it (every rule off).' }),
-    here: msg({ id: 'workflow.form.from.here', defaultMessage: 'Set here', description: 'Where a workflow default’s value comes from, in Settings → Workflow defaults or Settings → Workspace: set at this level.' })
-  } satisfies Record<WorkflowOptionOrigin | 'preset' | 'here', ReturnType<typeof msg>>,
+  from: ORIGIN_TEXT,
   inherit: msg({ id: 'workflow.form.inherit', defaultMessage: 'Inherit', description: 'A button beside a workflow option set for this project: stop setting it here, and use the workspace’s or Hive’s value.' }),
   inheritTip: msg({ id: 'workflow.form.inheritTip', defaultMessage: 'Use the inherited value: {value}', description: 'The tooltip of the Inherit button of a workflow option. {value} is the value it would have.' }),
   on: msg({ id: 'workflow.form.on', defaultMessage: 'On', description: 'A workflow option’s value: on.' }),
@@ -76,11 +72,11 @@ const T = {
   readOnly: msg({ id: 'workflow.form.readOnly', defaultMessage: '{agents} can’t be given review copies by their coding agent, so they review the builder’s folder read-only.', description: 'Under “Reviewers” (G17) when some reviewing agents use a coding agent that Hive can’t give review copies (folders at the exact revision, glossary 2.5: review copy). {agents} is a list of agent names.' }),
   stageName: msg({ id: 'workflow.form.stageName', defaultMessage: 'Name of the stage {stage}', description: 'Accessible name of a stage’s name box under “Stage names” (glossary 2.2: stage). {stage} is its default name.' }),
   stageNamesValue: msg({ id: 'workflow.form.stageNamesValue', defaultMessage: '{n, plural, =0 {The default names} one {# stage renamed} other {# stages renamed}}', description: 'A value of “Stage names” in the list of what changes before saving workflow options, and in a preset’s preview (glossary 2.2: stage).' }),
-  fileLocks: msg({ id: 'workflow.form.fileLocks', defaultMessage: 'File locks', description: 'A read-only row of Project Settings → Workflow for a project without version control (glossary 2.6, N7).' }),
-  agentsSection: msg({ id: 'workflow.form.agentsSection', defaultMessage: 'Agents & Worktrees', description: 'A link to the section "Agents & Worktrees" of Project Settings: use its name as translated there.' }),
-  loops: msg({ id: 'workflow.form.loops', defaultMessage: 'Rounds and wait', description: 'A read-only row of Project Settings → Workflow: the card loops’ rounds and wait.' }),
-  loopsValue: msg({ id: 'workflow.form.loopsValue', defaultMessage: '{rounds, plural, one {# round} other {# rounds}}, wait {hours, plural, one {# hour} other {# hours}}', description: 'The value of the read-only row "Rounds and wait" of Project Settings → Workflow.' }),
-  loopsSection: msg({ id: 'workflow.form.loopsSection', defaultMessage: 'Card loops', description: 'A link to the section "Card loops" of Project Settings: use its name as translated there.' }),
+  fileLocksNote: msg({ id: 'workflow.form.fileLocksNote', defaultMessage: 'Applies to agents working in the same folder, outside a slot.', description: 'Under the workflow option “File locks”: a slot is a folder Hive lends to a card or its lane (glossary 2.5: slot), so agents in different slots never share a file.' }),
+  loopsReadNote: msg({ id: 'workflow.form.loopsReadNote', defaultMessage: 'Read when a loop starts: a loop already running keeps its own, and one started with its own (“rounds: 5, wait: 2h”) keeps those.', description: 'Under the workflow options “Rounds” and “Wait (hours)” (Card loops), when a change applies. “rounds: 5, wait: 2h” is what the user types to an agent: keep it in English.' }),
+  stepWaitNote: msg({ id: 'workflow.form.stepWaitNote', defaultMessage: 'A design left unchecked longer shows its card as stalled; one already posted keeps its wait.', description: 'Under the workflow option “Design check wait (minutes)” (Card loops), when a change applies.' }),
+  hoursValue: msg({ id: 'workflow.form.hoursValue', defaultMessage: '{n, plural, one {# hour} other {# hours}}', description: 'The value of the workflow option “Wait (hours)” (Card loops) in words, as in the Inherit box and a preset preview.' }),
+  minutesValue: msg({ id: 'workflow.form.minutesValue', defaultMessage: '{n, plural, one {# minute} other {# minutes}}', description: 'The value of the workflow option “Design check wait (minutes)” (Card loops) in words, as in the Inherit box.' }),
   notEnforced: msg({ id: 'workflow.form.notEnforced', defaultMessage: 'Workflow rules aren’t enforced (Settings → Advanced). These options are saved, and apply once the rules are enforced again.', description: 'A note atop Project Settings → Workflow while the switch "Workflow rules are enforced" is off.' }),
   invalid: msg({ id: 'workflow.form.invalid', defaultMessage: 'These options can’t be used, so every rule is off in this project:', description: 'A note atop Project Settings → Workflow: the saved options contradict each other or can’t be read; the reason follows.' }),
   save: msg({ id: 'workflow.form.save', defaultMessage: 'Save…', description: 'The button saving the workflow options (it shows what changes first).' }),
@@ -233,7 +229,6 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
   const [preview, setPreview] = useState<Choice | null>(null)
   const settings = useStore((s) => s.settings)
   const version = useStore((s) => s.workflowVersion)
-  const workspaceLoops = loopDefaults({ loops: useStore((s) => s.workspace?.config.loops) })
   /** The project shown now (a read's answer for another is dropped), the newest read's number, and the draft's edits. */
   const pathRef = useRef(source.key)
   pathRef.current = source.key
@@ -302,7 +297,7 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
     if (!prefill || source.level || prefill.path !== source.key || loaded?.for !== source.key) return
     setStore({ workflowPrefill: null })
     const p = loaded.form.presets.find((x) => x.id === prefill.preset)?.options
-    if (p) setDraft({ preset: prefill.preset, options: loaded.draft.options.stageNames ? { ...ownOptions(p), stageNames: loaded.draft.options.stageNames } : ownOptions(p) })
+    if (p) setDraft({ preset: prefill.preset, options: withUnpreset(ownOptions(p), loaded.draft.options) })
   }, [prefill, loaded, source])
 
   const effective = useMemo((): WorkflowOptions | null => (form && draft ? ({ ...form.inherited, ...draft.options, platform: form.platform } as WorkflowOptions) : null), [form, draft])
@@ -322,13 +317,12 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
     const { [key]: _gone, ...rest } = draft.options
     setDraft({ ...draft, options: rest })
   }
-  /** The options a choice fills in; the stage names (N5) aren't rules, so the project's stay (#1417). */
+  /** The options a choice fills in; the stage names (N5) and preferences (HI-1766) aren't rules, so the draft's own stay (#1417). */
   const choiceOptions = (c: Choice): WorkflowOptions | null => (c === 'allOff' ? allOff(platform) : presetOf(c))
   const choose = (c: Choice): void => {
     const p = choiceOptions(c)
     if (!p) return
-    const options = ownOptions(p)
-    setDraft({ preset: c === 'allOff' ? null : c, options: draft.options.stageNames ? { ...options, stageNames: draft.options.stageNames } : options })
+    setDraft({ preset: c === 'allOff' ? null : c, options: withUnpreset(ownOptions(p), draft.options) })
     setPreview(null)
   }
   const originOf = (key: OptionKey): WorkflowOptionOrigin | 'preset' | 'here' => {
@@ -466,6 +460,10 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
     // A reviewer whose CLI can't be given folders reviews the builder's folder read-only (§16.10.5).
     const readOnly = project?.agents.filter((a) => reviewsWork(agentWorkflowRole(a)) && !providerDescriptor(agentProviderOf(project, a)).capabilities.extraDirs) ?? []
     if (key === 'reviewerMode' && readOnly.length) return <div className="s-desc" data-note="read-only">{tr(T.readOnly, { agents: fmt.list(readOnly.map((a) => a.name)) })}</div>
+    // The preferences (HI-1766): where file locks apply, and when a change reaches a loop.
+    if (key === 'fileLocks') return <div className="s-desc" data-note="file-locks">{tr(T.fileLocksNote)}</div>
+    if (key === 'loopRounds' || key === 'loopWaitHours') return <div className="s-desc" data-note="loop-read">{tr(T.loopsReadNote)}</div>
+    if (key === 'loopStepWaitMinutes') return <div className="s-desc" data-note="step-wait">{tr(T.stepWaitNote)}</div>
     return null
   }
   const controlOf = (key: OptionKey): React.ReactNode => {
@@ -520,6 +518,18 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
       case 'dependenciesDone':
       case 'sharedFolderWarning':
         return <Switch checked={effective[key]} onChange={(v) => set(key, v)} />
+      // The preferences (HI-1766): resolved with their defaults, so the effective options always have them.
+      case 'loopWakes':
+        return <Switch checked={effective.loopWakes !== false} onChange={(v) => set('loopWakes', v)} />
+      case 'fileLocks':
+        return select('fileLocks', FILE_LOCK_MODES.map((m) => [m.value, tr(m.text.label)]))
+      case 'loopRounds':
+      case 'loopWaitHours':
+      case 'loopStepWaitMinutes': {
+        const max = key === 'loopRounds' ? LANE_MAX_ROUNDS : key === 'loopWaitHours' ? LOOP_WAIT_MAX_HOURS : LOOP_STEP_WAIT_MAX_MINUTES
+        // Empty inherits: the box shows the inherited value as its placeholder.
+        return <NumberField value={draft.options[key] ?? null} min={1} max={max} step={key === 'loopStepWaitMinutes' ? 5 : 1} label={tr(optionTitle(key, platform)!)} inherit={valueText(key, form.inherited[key])} onCommit={(v) => (v === null ? inheritKey(key) : set(key, v))} />
+      }
       case 'preChecks':
       case 'mergeChecks': {
         // One commands map for both lists (§16.13): the other list's commands are kept through this one's change.
@@ -536,8 +546,6 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
     }
   }
 
-  const rounds = project?.config.loopRounds ?? workspaceLoops.rounds ?? LOOP_ROUNDS
-  const hours = project?.config.loopWaitHours ?? workspaceLoops.waitHours
   const choices: Choice[] = [...form.presets.map((p) => p.id), 'allOff']
   const choiceName = (c: Choice): string => tr(c === 'allOff' ? T.allOff : PRESET_TEXT[c])
   const presetNow = draft.preset ? (custom ? tr(T.startedFrom, { preset: tr(PRESET_TEXT[draft.preset]) }) : tr(PRESET_TEXT[draft.preset])) : tr(T.noPreset)
@@ -579,19 +587,6 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
         {preview && shownChoice && <ChoicePreview choice={preview} name={choiceName(preview)} options={shownChoice} effective={effective} valueText={valueText} onUse={() => choose(preview)} onClose={() => setPreview(null)} />}
       </section>
       {FORM_GROUPS[platform].map((g) => {
-        if (g.id === 'elsewhere') {
-          // A project's settings owned elsewhere: a level has none.
-          if (!project) return null
-          return (
-            <section className="workflow-group" data-group={g.id} key={g.id}>
-              <h3 className="workflow-group-h">{tr(GROUP_TEXT[g.id])}</h3>
-              {platform === 'none' && (
-                <ReadOnlyRow title={tr(T.fileLocks)} value={tr(msg({ id: 'workflow.form.fileLocksValue', defaultMessage: 'As set for the project’s agents', description: 'The value of the read-only row "File locks" in Project Settings → Workflow: its own setting decides.' }))} where={tr(T.agentsSection)} open={() => openProjectSettings(project.path, 'agents')} />
-              )}
-              <ReadOnlyRow title={tr(T.loops)} value={tr(T.loopsValue, { rounds, hours })} where={tr(T.loopsSection)} open={() => openProjectSettings(project.path, 'loops')} />
-            </section>
-          )
-        }
         const rows = g.options.filter((k) => formShows(k, effective))
         if (!rows.length) return null
         return (
@@ -602,6 +597,7 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
             </section>
             {/* A Git project's slots and copies, after where cards are built (a level has none: they're a project's). */}
             {g.id === 'where' && project && <SlotsAndCopies project={project} slots={effective.folder === 'slots'} />}
+            {g.id === 'where' && !project && source.level && platform === 'git' && <SlotCopyLevel level={source.level} />}
           </Fragment>
         )
       })}
@@ -612,13 +608,15 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
           {problems.flatMap((p, i) => problemLines(p).map((line, j) => <div key={`${i}:${j}`}>{line}</div>))}
         </div>
       )}
+      {/* Discard Changes reads the form again too: a change elsewhere it skipped while the draft was unsaved (another level
+          saved meanwhile, HI-1768) shows at once. */}
       <div className="workflow-actions">
         <Tooltip content={blocked ? tr(T.saveBlocked) : null}>
           <button className="btn primary" data-action="save" disabled={!dirty || !settings || blocked} onClick={() => void save().catch((e) => notify('error', errorMessage(e)))}>
             {tr(T.save)}
           </button>
         </Tooltip>
-        <button className="btn" disabled={!dirty} onClick={() => (setDraft({ preset: form.preset, options: { ...form.own } }), setProblems([]))}>
+        <button className="btn" disabled={!dirty} onClick={() => (setDraft({ preset: form.preset, options: { ...form.own } }), setProblems([]), void load(true))}>
           {tr(T.discard)}
         </button>
         <span className="workflow-spacer" />
@@ -691,7 +689,13 @@ export function optionValueText(key: OptionKey, v: unknown, platform: PlatformId
     return id ? tr(T.identityValue, { name: id.name, email: id.email }) : tr(T.off)
   }
   if (key === 'stageNames') return tr(T.stageNamesValue, { n: Object.keys((v as StageNames | undefined) ?? {}).length })
-  if (key === 'reviewers') return fmt.number(v as number)
+  if (key === 'reviewers' || key === 'loopRounds') return fmt.number(v as number)
+  if (key === 'loopWaitHours') return tr(T.hoursValue, { n: v as number })
+  if (key === 'loopStepWaitMinutes') return tr(T.minutesValue, { n: v as number })
+  if (key === 'fileLocks') {
+    const mode = FILE_LOCK_MODES.find((m) => m.value === v)
+    return mode ? tr(mode.text.label) : String(v)
+  }
   if (key === 'commands') return Object.keys(v as Record<string, string>).length ? fmt.list(Object.entries(v as Record<string, string>).map(([name, command]) => `${name} (${command})`)) : tr(T.noneValue) // i18n-ignore: a check's name and command, shown as they are
   if (Array.isArray(v)) return v.length ? fmt.list(v.map(String)) : tr(T.noneValue)
   if (key === 'target') return (v as string) || tr(T.defaultBranch)
@@ -726,24 +730,6 @@ function StageNamesEditor({ options, onChange }: { options: WorkflowOptions; onC
       {stages.map((id) => (
         <DraftText key={id} value={names[id] ?? ''} placeholder={tr(STAGE_TEXT[id])} label={tr(T.stageName, { stage: tr(STAGE_TEXT[id]) })} onCommit={(v) => rename(id, v)} />
       ))}
-    </div>
-  )
-}
-
-/** A row whose setting lives elsewhere (file locks, card loops), shown with a link to it (#966: one owner per switch). */
-function ReadOnlyRow({ title, value, where, open }: { title: string; value: string; where: string; open: () => void }) {
-  return (
-    <div className="setting workflow-readonly">
-      <div className="s-text">
-        <div className="s-title">{title}</div>
-        <div className="s-desc">
-          {tr(msg({ id: 'workflow.form.ownedPrefix', defaultMessage: 'Its own setting decides:', description: 'Before the link to where a read-only row of Project Settings → Workflow is set.' }))}{' '}
-          <button className="link" onClick={open}>
-            {where}
-          </button>
-        </div>
-      </div>
-      <div className="s-control">{value}</div>
     </div>
   )
 }

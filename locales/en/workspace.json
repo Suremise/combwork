@@ -1723,6 +1723,10 @@
     "defaultMessage": "Windows won't sleep until the agents finish (the screen may still turn off). Settings → General → Keep the PC awake while agents work.",
     "description": "Tooltip on the status bar's keep-awake note. Keep the setting's path as Settings shows it."
   },
+  "workspace.statusBar.connectionLine": {
+    "defaultMessage": "{name} ({provider}{hasPlan, select, yes {, {plan} plan} other {}})",
+    "description": "The first line of a connection's plan limits tooltip in the status bar (HI-1756): the connection's name the user gave it ({name}: \"Max 1\"), its coding agent ({provider}: Claude Code) and its plan's name ({plan}: max, pro…)."
+  },
   "workspace.statusBar.git": {
     "defaultMessage": "{hasVersion, select, yes {Git {version}} other {Git}}",
     "description": "The status bar's Git warning. Usually kept as Git."

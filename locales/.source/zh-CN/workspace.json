@@ -429,6 +429,7 @@
   "workspace.statusBar.apiOn": "Agent API listening on {url}",
   "workspace.statusBar.asOf": "As of {when}. Updates while a session is running.",
   "workspace.statusBar.awakeTip": "Windows won't sleep until the agents finish (the screen may still turn off). Settings → General → Keep the PC awake while agents work.",
+  "workspace.statusBar.connectionLine": "{name} ({provider}{hasPlan, select, yes {, {plan} plan} other {}})",
   "workspace.statusBar.git": "{hasVersion, select, yes {Git {version}} other {Git}}",
   "workspace.statusBar.gitOld": "Git {version} is older than {min}: some git features don't work.",
   "workspace.statusBar.gitProblem": "{problem}. {fix}",
