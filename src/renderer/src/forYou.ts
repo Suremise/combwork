@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import type { ForYouItem, ForYouSummary } from '@shared/workflow/workView'
+import { keepSame } from '@shared/keepSame'
 import { useScopedLoad } from './scopedLoad'
 import { sharedRead } from './sharedRead'
 import { useStore } from './store'
@@ -10,8 +11,12 @@ import { useStore } from './store'
 
 const NONE: ForYouSummary = { items: [], count: 0 }
 
-/** The read for a workspace and board read, shared by every view showing For you (HI-1754). */
-const readForYou = sharedRead<ForYouSummary>(() => window.hive.invoke('tasks:forYou'))
+/**
+ * The read for a workspace and board read, shared by every view showing For you (HI-1754). What is the same as the last
+ * read stays the same objects (HI-1806): a card's chip renders again only when its own requests change.
+ */
+let lastRead: ForYouSummary = NONE
+const readForYou = sharedRead<ForYouSummary>(() => window.hive.invoke('tasks:forYou').then((s) => (lastRead = keepSame(lastRead, s))))
 
 /** The workspace's requests for the user, and by card; empty while loading. */
 export function useForYou(): { summary: ForYouSummary; byCard: Map<number, ForYouItem[]> } {

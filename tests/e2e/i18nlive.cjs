@@ -5,7 +5,8 @@
 // Project Settings opened in another language shows its sections (the list, the heading and its description) and its
 // rows in it, and follows a change of language while it is open (#793, E1's catalogue in lane C's view); its provider
 // section's permission mode row says what the mode does, and names its choices, in it too, their values the ids (#861). An
-// agent whose sign-in expired says how to sign in with its provider's message in the window's language (#847). The
+// agent whose sign-in expired says how to sign in with its provider's message in the window's language (#847). A card on
+// the Task Board, drawn only when what it shows changes, follows a change of language with the card unchanged (HI-1806). The
 // window is sent language-changed as main sends it, with a small catalogue of test translations. Throwaway profile and
 // workspace.
 const lib = require('./lib.cjs')
@@ -176,6 +177,18 @@ const check = (name, ok, extra = '') => {
     check('…its closed row follows a change of language', !!(await lib.until(async () => (await recentRow.innerText().catch(() => '')).startsWith('Skript'), HUNG_MS)), await recentRow.innerText().catch(() => ''))
     await speak('en', {})
     check('…and back', !!(await lib.until(async () => (await recentRow.innerText().catch(() => '')).startsWith('Script'), HUNG_MS)))
+
+    // A card on the Task Board, drawn only when what it shows changes (HI-1806), follows a change of language with the
+    // card itself unchanged: its fold button's name.
+    await inv('tasks:create', { title: 'A card in two languages', project: 'demo' })
+    await page.getByRole('button', { name: 'Task Board', exact: true }).first().click()
+    const fold = page.locator('.board .task-card').filter({ hasText: 'A card in two languages' }).locator('.task-fold')
+    const foldName = () => fold.first().evaluate((b) => b.getAttribute('aria-label') ?? b.getAttribute('title') ?? '').catch(() => '')
+    check('a card on the board says its fold in English', !!(await lib.until(async () => /^Collapse .* to one line$/.test(await foldName()), HUNG_MS)), await foldName())
+    await speak('de', { 'board.card.collapse': '{card} auf eine Zeile zuklappen' })
+    check('…and follows a change of language, the card unchanged', !!(await lib.until(async () => (await foldName()).endsWith('auf eine Zeile zuklappen'), HUNG_MS)), await foldName())
+    await speak('en', {})
+    check('…and back', !!(await lib.until(async () => /^Collapse .* to one line$/.test(await foldName()), HUNG_MS)))
   } catch (e) {
     check('the suite ran', false, String(e?.stack ?? e))
   } finally {

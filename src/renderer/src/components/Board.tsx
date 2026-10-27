@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { AgentInfo, ArchiveBatch, BoardColumnId, BoardFold, ProjectInfo, ProviderId, StoredText, TaskCard, TaskColumn, TaskDecision, TaskPatch, TaskStartTarget } from '@shared/types'
 import { BUSY, BY_TEXT, storedLineText } from '@shared/taskHistory'
 import { gitProblemText } from '@shared/gitTool'
@@ -9,7 +9,7 @@ import { COLUMN_TEXT, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBa
 import { enabledProviders, isProviderEnabled, projectDefaultProvider, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { NO_PROJECTS, agentProviderOf, cardHasActivity, cardLabelOf, choose, confirm, get, loadTasks, notify, openCardActivity, prompt, revealAgent, set, setProjectTab, showView, useDateStyle, useLanguage, useStore, wantFullArchive, type ArchiveAllRequest, type DoingRequest } from '../store'
+import { NO_PROJECTS, agentProviderOf, cardHasActivity, cardLabelOf, choose, confirm, findProject, get, loadTasks, notify, openCardActivity, prompt, revealAgent, set, setProjectTab, showView, useDateStyle, useLanguage, useStore, wantFullArchive, type ArchiveAllRequest, type DoingRequest } from '../store'
 import { cardLabel } from '@shared/projectKeys'
 import { cardNumberOf } from '../projectKeys'
 import { MARKDOWN_CARDS } from '../cardLinks'
@@ -106,21 +106,44 @@ export function cardStalled(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrd
 /** What a stalled card's hover says to do, by why it is stalled. */
 type StallKind = 'nobody' | 'not-watching' | 'wake-untaken' | 'review-silent' | 'review-wait' | 'review-verdict' | 'lane-order' | 'loop-step' | 'follow-up'
 
+/** The agents as every card's stall reads them: those that may loop on a card, and those watching cards. */
+function stallAgentsOf(projects: ProjectInfo[]) {
+  const loopers = projects.flatMap((p) => p.agents.map((a) => ({ name: a.name, project: p.name, notWatching: a.live?.notWatching, untaken: !!a.live?.untakenLine })))
+  const watchers = projects.flatMap((p) => p.agents.flatMap((a) => (a.live?.watch?.cards.length ? [{ name: a.name, project: p.name, agentId: a.id, cards: a.live.watch.cards, watchSince: a.live.watch.since, status: a.live.status, silentMinutes: agentRuntime(a.live).silentMinutes }] : [])))
+  return { loopers, watchers }
+}
+
+/**
+ * stallAgentsOf, worked out once for the projects as they are and reused for a second (HI-1806): the board and its
+ * sidebar read every card's stall each time an agent changes state, and made these lists again for each card. A
+ * watcher's silence is timed, so the lists are made again after the second.
+ */
+const stallAgents = new WeakMap<ProjectInfo[], { at: number; agents: ReturnType<typeof stallAgentsOf> }>()
+function stallAgentsNow(projects: ProjectInfo[]): ReturnType<typeof stallAgentsOf> {
+  const now = Date.now()
+  const had = stallAgents.get(projects)
+  if (had && now - had.at < 1000) return had.agents
+  const agents = stallAgentsOf(projects)
+  stallAgents.set(projects, { at: now, agents })
+  return agents
+}
+
 /** Why the card is stalled (cardStalled), in the window's language, and which kind of stall it is. */
 function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | null): { text: string; kind: StallKind } | null {
   const { agent } = cardAgent(projects, c)
   const nobody = stalledReason(c, agent ? { name: agent.name, running: !!agent.live } : null, tr)
   if (nobody) return { text: nobody, kind: 'nobody' }
-  const loopers = projects.flatMap((p) => p.agents.map((a) => ({ name: a.name, project: p.name, notWatching: a.live?.notWatching, untaken: !!a.live?.untakenLine })))
+  const { loopers, watchers } = stallAgentsNow(projects)
   const looping = notWatchingReason(c, loopers, tr)
   if (looping) return { text: looping, kind: notWatchingAgent(c, loopers)?.untaken ? 'wake-untaken' : 'not-watching' }
-  const watchers = projects.flatMap((p) => p.agents.flatMap((a) => (a.live?.watch?.cards.length ? [{ name: a.name, project: p.name, agentId: a.id, cards: a.live.watch.cards, watchSince: a.live.watch.since, status: a.live.status, silentMinutes: agentRuntime(a.live).silentMinutes }] : [])))
   const waiting = reviewWaitReason(c, watchers, Date.now(), tr)
   if (!waiting) {
     const verdict = reviewVerdictWaitReason(c, watchers, Date.now(), tr)
     if (verdict) return { text: verdict, kind: 'review-verdict' }
     const order = laneOrderWaitReason(c, lane, watchers, Date.now(), tr)
     if (order) return { text: order, kind: 'lane-order' }
+    // loopStepWait's own first tests, before the project's options are worked out for it (HI-1806: for every card).
+    if (c.archived || c.blocked || !c.agent || (c.column !== 'doing' && c.column !== 'review' && c.column !== 'passed')) return null
     const project = cardAgent(projects, c).project
     // The project's Design check wait (its workflow option, HI-1766), over Hive's and the workspace's.
     const st = get()
@@ -392,9 +415,8 @@ const WORKSPACE_CARD = msg({ id: 'board.card.workspace', defaultMessage: 'worksp
 const NOT_RUNNING = msg({ id: 'board.agent.notRunning', defaultMessage: 'Not running', description: "A card's agent's state, on the card: its session isn't running." })
 
 /** What the card's agent is doing (Doing cards), or who has it. */
-function AgentLine({ c, projects, live }: { c: TaskCard; projects: ProjectInfo[]; live: boolean }) {
+function AgentLine({ c, agent, projectPath, live }: { c: TaskCard; agent: AgentInfo | null; projectPath: string | null; live: boolean }) {
   if (!c.agent) return null
-  const { project, agent } = cardAgent(projects, c)
   const name = agent?.name ?? c.agentName ?? tr(ITS_AGENT)
   if (!agent) return <span className="task-agent faint">{tr(REMOVED_AGENT, { agent: name })}</span>
   const status = agent.live?.status ?? 'stopped'
@@ -407,6 +429,7 @@ function AgentLine({ c, projects, live }: { c: TaskCard; projects: ProjectInfo[]
         className={cx('task-agent', live && 'live')}
         onClick={(e) => {
           e.stopPropagation()
+          const project = projectPath ? findProject(get(), projectPath) : null
           if (!project) return
           selectProject(project.path)
           revealAgent(project, agent.id)
@@ -422,10 +445,8 @@ function AgentLine({ c, projects, live }: { c: TaskCard; projects: ProjectInfo[]
 }
 
 /** Who is reviewing the card now (TaskCard.review): click to show it; in amber when it has gone or isn't running. */
-function ReviewLine({ c, projects }: { c: TaskCard; projects: ProjectInfo[] }) {
+function ReviewLine({ c, reviewer, projectPath }: { c: TaskCard; reviewer: AgentInfo | null; projectPath: string | null }) {
   if (!c.review) return null
-  const project = c.project ? (projects.find((p) => p.name.toLowerCase() === c.project.toLowerCase()) ?? null) : null
-  const reviewer = project?.agents.find((a) => a.id === c.review!.agent) ?? null
   const name = reviewer?.name ?? c.review.agentName
   const stalled = reviewStalled(c, reviewer ? { name: reviewer.name, running: !!reviewer.live } : null, tr)
   const values = { agent: name, ago: timeAgo(c.review.since) }
@@ -439,6 +460,7 @@ function ReviewLine({ c, projects }: { c: TaskCard; projects: ProjectInfo[] }) {
       <div
         className={cx('task-review', stalled && 'stalled')}
         onClick={(e) => {
+          const project = projectPath ? findProject(get(), projectPath) : null
           if (!project || !reviewer) return
           e.stopPropagation()
           selectProject(project.path)
@@ -473,9 +495,8 @@ function Chevrons({ dir }: { dir: 'left' | 'right' }) {
 }
 
 /** A folded card's agent: a dot in its status's colour (Doing cards) or a plain one, with who and what in its tooltip. */
-function FoldedAgent({ c, projects }: { c: TaskCard; projects: ProjectInfo[] }) {
+function FoldedAgent({ c, agent }: { c: TaskCard; agent: AgentInfo | null }) {
   if (!c.agent) return null
-  const { agent } = cardAgent(projects, c)
   const name = agent?.name ?? c.agentName ?? tr(ITS_AGENT)
   const live = c.column === 'doing'
   const text = !agent ? tr(REMOVED_AGENT, { agent: name }) : tr(msg({ id: 'board.agent.folded', defaultMessage: '{agent}: {status}', description: "Tooltip on a folded card's agent dot: the agent's name and what it is doing ({status}: \"Working…\", \"Not running\")." }), { agent: name, status: agent.live ? statusText(agent.live) : tr(NOT_RUNNING) })
@@ -488,9 +509,28 @@ function FoldedAgent({ c, projects }: { c: TaskCard; projects: ProjectInfo[] }) 
   )
 }
 
-function CardTile({
+/**
+ * What a card shows of the agents (HI-1806): worked out by the board, so a tile renders again only when its own agent,
+ * reviewer or stall changes, not each time any agent in the workspace changes state.
+ */
+type TileAgents = { agent: AgentInfo | null; reviewer: AgentInfo | null; projectPath: string | null; stall: string | null; stallKind: StallKind | null }
+
+function tileAgents(projects: ProjectInfo[], c: TaskCard, lane: LaneOrderView | null | undefined): TileAgents {
+  const { project, agent } = cardAgent(projects, c)
+  const stall = cardStall(projects, c, lane)
+  const reviewer = c.review ? (project?.agents.find((a) => a.id === c.review!.agent) ?? null) : null
+  return { agent, reviewer, projectPath: project?.path ?? null, stall: stall?.text ?? null, stallKind: stall?.kind ?? null }
+}
+
+/** A card on the board, drawn again only when what it shows changes (HI-1806: each tile is many tooltips and messages). */
+const CardTile = memo(function CardTile({
   c,
-  projects,
+  agent,
+  reviewer,
+  projectPath,
+  stall: stalled,
+  stallKind,
+  column,
   showProject,
   folded,
   onDragStart,
@@ -499,15 +539,17 @@ function CardTile({
   work,
   forYou,
   stageNote = null
-}: {
+}: TileAgents & {
   c: TaskCard
-  projects: ProjectInfo[]
+  /** The board column it is shown in, for its drag. */
+  column: BoardColumnId
   showProject: boolean
   /** Its own project's name for its stage, where the column shows another (several projects naming it differently). */
   stageNote?: string | null
   /** Folded to one line (#170): its number, title, agent and any stalled or blocked marker. */
   folded: boolean
-  onDragStart: (e: React.DragEvent) => void
+  /** The same function on every render: one made afresh would draw every tile again. */
+  onDragStart: (e: React.DragEvent, c: TaskCard, column: BoardColumnId) => void
   dropHere: boolean
   /** Why the board takes no changes (it can't be dragged then), or null. */
   readOnly: string | null
@@ -517,14 +559,13 @@ function CardTile({
   forYou?: ForYouItem[]
 }) {
   const menu = useContextMenu()
-  const { agent } = cardAgent(projects, c)
+  // Memo, it isn't drawn again with the board (HI-1806): it follows a change of language and of date format itself.
+  useLanguage()
+  useDateStyle()
   // A Doing card whose agent has finished is waiting for someone to look: it shows like a finished agent.
   const finished = c.column === 'doing' && agent?.live?.status === 'finished'
-  // Read again each minute: a card waiting in Review becomes stalled with time (#521).
+  // Read again each minute: its reviewer line's "5 min ago" (the board works out its stall each minute too, #521).
   useNow(60_000)
-  const laneOf = useLaneOf()
-  const stall = cardStall(projects, c, laneOf(c))
-  const stalled = stall?.text ?? null
   const fold = (
     <IconButton
       icon={folded ? 'chevron-right' : 'chevron-down'}
@@ -542,7 +583,7 @@ function CardTile({
     draggable: !c.archived && !readOnly,
     // Why it doesn't drag (#1230 round 2).
     title: readOnly ?? undefined,
-    onDragStart,
+    onDragStart: (e: React.DragEvent) => onDragStart(e, c, column),
     onClick: () => set({ taskOpen: c.number }),
     onContextMenu: (e: React.MouseEvent) => menu.open(e, cardMenu(c, readOnly)),
     'data-task': c.number
@@ -573,7 +614,7 @@ function CardTile({
               </Tooltip>
             )}
             <ForYouChip items={forYou} />
-            <FoldedAgent c={c} projects={projects} />
+            <FoldedAgent c={c} agent={agent} />
           </div>
         </div>
         {menu.element}
@@ -620,15 +661,15 @@ function CardTile({
             </div>
           </Tooltip>
         )}
-        {stall && (
-          <Tooltip block content={stallHint(stall.kind)}>
+        {stalled && stallKind && (
+          <Tooltip block content={stallHint(stallKind)}>
             <div className="task-stalled">
               <Icon name="debug-pause" />
               <span className="task-note-text">{stalledText}</span>
             </div>
           </Tooltip>
         )}
-        <ReviewLine c={c} projects={projects} />
+        <ReviewLine c={c} reviewer={reviewer} projectPath={projectPath} />
         {(!!forYou?.length || work?.kind === 'no-code' || work?.kindProposed === 'no-code' || !!work?.reviewSkip || (work?.reviewSkipProposed ?? null) !== null) && (
           <div className="task-for-you-row">
             <ForYouChip items={forYou} />
@@ -665,12 +706,12 @@ function CardTile({
             )}
           </div>
         )}
-        <AgentLine c={c} projects={projects} live={c.column === 'doing'} />
+        <AgentLine c={c} agent={agent} projectPath={projectPath} live={c.column === 'doing'} />
       </div>
       {menu.element}
     </>
   )
-}
+})
 
 type DragState = { n: number; column: BoardColumnId; before: number | null }
 
@@ -724,6 +765,23 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
     const d = dropsNow.current
     return !d || d.n !== dragNow.current?.n || !d.columns || d.columns.has(column)
   }
+  // One function for every tile's drag start (HI-1806): one made afresh each render would draw every tile again.
+  const startDrag = useCallback((e: React.DragEvent, c: TaskCard, column: BoardColumnId): void => {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', cardLabel(c))
+    dragNow.current = { n: c.number, column, before: c.number }
+    showDrag(dragNow.current)
+    dropsNow.current = { n: c.number, columns: null }
+    void call('tasks:columns', c.number)
+      .then((cols) => {
+        if (dropsNow.current?.n === c.number) dropsNow.current = { n: c.number, columns: cols ? new Set(cols) : null }
+      })
+      .catch(() => undefined)
+  }, [])
+  // Each card's agents and stall (tileAgents), worked out again each minute too: a card waiting in Review becomes
+  // stalled with time (#521).
+  useNow(60_000)
+  const laneOf = useLaneOf()
   // The archived cards in full while they are shown (#1017): their search reads descriptions too.
   useEffect(() => (archived ? wantFullArchive() : undefined), [archived])
   const cards = useMemo(
@@ -947,7 +1005,8 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
                 <CardTile
                   key={c.number}
                   c={c}
-                  projects={projects}
+                  {...tileAgents(projects, c, laneOf(c))}
+                  column={col.id}
                   showProject={project === null}
                   stageNote={c.project ? ownStageName(shownProjects, c.project, stageOf(c), name, tr) : null}
                   folded={folded.has(c.number)}
@@ -955,17 +1014,7 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
                   readOnly={readOnly}
                   work={workBadges.get(c.number)}
                   forYou={forYou.get(c.number)}
-                  onDragStart={(e) => {
-                    e.dataTransfer.effectAllowed = 'move'
-                    e.dataTransfer.setData('text/plain', cardLabel(c))
-                    setDrag({ n: c.number, column: col.id, before: c.number })
-                    dropsNow.current = { n: c.number, columns: null }
-                    void call('tasks:columns', c.number)
-                      .then((cols) => {
-                        if (dropsNow.current?.n === c.number) dropsNow.current = { n: c.number, columns: cols ? new Set(cols) : null }
-                      })
-                      .catch(() => undefined)
-                  }}
+                  onDragStart={startDrag}
                 />
               ))}
               {drag?.column === col.id && drag.before === null && <div className="task-drop" />}
@@ -1546,12 +1595,13 @@ export function BoardView() {
   const query = useStore((s) => s.boardQuery)
   const archived = useStore((s) => s.boardArchived)
   const forYouOnly = useStore((s) => s.boardForYou)
-  const workspace = useStore((s) => s.workspace)
+  // Its path only (HI-1806): an agent's state changing renders the cards that show it, not the whole board.
+  const workspace = useStore((s) => s.workspace?.path ?? null)
   useLanguage()
   useEffect(() => {
     void loadTasks()
     loadBoardFold()
-  }, [workspace?.path])
+  }, [workspace])
   if (!workspace) return <div className="empty-state">{tr(msg({ id: 'board.view.noWorkspace', defaultMessage: 'Open a workspace to see its task board.', description: 'The Task Board view with no workspace open.' }))}</div>
   return (
     <div className="board-view">
