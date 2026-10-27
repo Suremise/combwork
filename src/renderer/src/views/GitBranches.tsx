@@ -21,7 +21,8 @@ import {
 import { BRANCH_GROUPS, busyLines, cleanupOffer, localGroup, localUse, remoteGroup, type BranchGroup, type CleanupOffer } from '@shared/branchCleanup'
 import { samePath } from '@shared/movePaths'
 import { call } from '../api'
-import { attempt } from '../actions'
+import { attempt, releaseHeldSlot } from '../actions'
+import { SLOT_HELD_TEXT } from '../components/SlotsAndCopies'
 import { bumpGit, cardLabelOf, choose, confirm, notify, prompt, set, showVersionControl, UNUSED_ROOT, useStore } from '../store'
 import { agentCard, branchCards, type BranchCard } from '@shared/branchCards'
 import { revisionShort } from '@shared/platform/descriptors'
@@ -649,6 +650,16 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                         <Icon name="repo" />
                         <span className="git-name">{slot ? leaseText(slot) : agent ? tr(M.agentWorktree, { agent: agent.name }) : tr(M.unusedWorktree)}</span>
                         <span className="faint">{w.branch ?? (w.head ? headText({ branch: null, head: w.head }) : '')}</span>
+                        {slot?.writer?.held && (
+                          <>
+                            <span className="faint" data-held={slot.writer.agent}>
+                              {tr(SLOT_HELD_TEXT.held, { agent: project.agents.find((a) => a.id === slot.writer!.agent)?.name ?? slot.writer.agent })}
+                            </span>
+                            <button className="btn small subtle" data-action="release-held" onClick={() => void releaseHeldSlot(project.path, slot.name).then(read.reload)}>
+                              {tr(SLOT_HELD_TEXT.release)}
+                            </button>
+                          </>
+                        )}
                         <BranchCards cards={agentsCard(w.path)} project={project} names={names} />
                         <span className="git-url faint">{w.path}</span>
                         <button

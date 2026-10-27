@@ -79,6 +79,9 @@ function lentText(s: SlotView, agentName: (id: string) => string, card: (n: numb
   return tr(T.lentLane, { agent: agentName(l.agent) })
 }
 
+/** A held slot's words and its Release… (HI-1886: the Worktrees list in Branches & remotes shows them too). */
+export const SLOT_HELD_TEXT = { held: T.held, release: T.release }
+
 export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots: boolean }) {
   const tasks = useStore((s) => s.tasks)
   const reviewOn = useAdvancedValue<boolean>(COPIES_REVIEW) !== false

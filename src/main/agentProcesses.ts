@@ -333,6 +333,18 @@ async function findLeftovers(runId: string): Promise<AgentLeftovers | null> {
   }
   await new Promise((r) => setTimeout(r, SETTLE_MS))
   running.delete(runId)
+  looking.set(runId, launch)
+  try {
+    return await lookAt(runId, launch)
+  } finally {
+    looking.delete(runId)
+  }
+}
+
+/** A launch being looked at as its CLI exits, its job listed: Hive quitting meanwhile keeps its record (HI-1886). */
+const looking = new Map<string, Launch>()
+
+async function lookAt(runId: string, launch: Launch): Promise<AgentLeftovers | null> {
   let list = await listJob(runId)
   // The gate waits for its CLI, so a CLI still running once the gate has exited lost its terminal (HI-1819): started as
   // the terminal was killed (Hive quitting just after a launch), after its console had ended what was attached to it.
@@ -488,7 +500,8 @@ export function leftoversOfRun(run: string): { processes: AgentProcess[]; more: 
  */
 export async function settleLeftovers(projectPath: string, agentId: string, how: 'end' | 'keep', run?: string): Promise<number> {
   const k = agentKey(projectPath, agentId)
-  const mine = [...left.values()].filter((l) => agentKey(l.projectPath, l.agentId) === k && (run === undefined || l.runId === run))
+  // A run's kept from before this start is listed as `restored:<run>` (#614).
+  const mine = [...left.values()].filter((l) => agentKey(l.projectPath, l.agentId) === k && (run === undefined || l.runId === run || l.runId === `restored:${run}`))
   if (!mine.length) return 0
   let done = 0
   let failed = 0
@@ -666,6 +679,14 @@ interface SavedLaunch {
 interface SavedLeftovers {
   version: 1
   launches: SavedLaunch[]
+  /**
+   * Launches whose CLI still ran, or was being looked at, as Hive quit (HI-1886): their jobs' whole membership as last
+   * listed, each process by id and start time. Never offered as leftovers: what a slot's writer of that run, its Hive
+   * gone, is settled by at a later start (`earlierRun`).
+   */
+  open?: SavedLaunch[]
+  /** Runs whose processes Hive saw end (their jobs empty), whose slot writers may not have been released (HI-1886). */
+  ended?: string[]
 }
 
 /** The latest write of the kept list (writes go one after another, the newest last). */
@@ -673,10 +694,29 @@ let saving: Promise<void> = Promise.resolve()
 /** Whether the kept list on disk may hold something (written with processes, or read with some at the start). */
 let keptAny = false
 
+/** Earlier runs' records (HI-1886) are kept until a writer of theirs is settled, at most this many of each. */
+const MAX_RUN_RECORDS = 100
+/** The records read at this start (kept forward until settled) and this run's own, read once before any write. */
+const records = { open: [] as SavedLaunch[], ended: [] as string[] }
+let recordsRead: Promise<void> | null = null
+function readRecords(): Promise<void> {
+  recordsRead ??= readJson<Partial<SavedLeftovers> | null>(savedFile(), null).then(
+    (saved) => {
+      const open = boundedSaved({ launches: Array.isArray(saved?.open) ? saved.open : [] }, MAX_RUN_RECORDS)
+      const ended = Array.isArray(saved?.ended) ? saved.ended.filter((r): r is string => typeof r === 'string' && r.length <= 100) : []
+      records.open = [...open, ...records.open].slice(-MAX_RUN_RECORDS)
+      records.ended = [...new Set([...ended, ...records.ended])].slice(-MAX_RUN_RECORDS)
+      if (records.open.length || records.ended.length) keptAny = true
+    },
+    () => undefined
+  )
+  return recordsRead
+}
+
 /**
  * Keeps what is listed now for the next start (#614): each launch apart, as listed (so within the bounds: bound runs
  * first), each process by id and start time (one whose start time couldn't be read can't be told from a later process
- * with its id, so it isn't kept).
+ * with its id, so it isn't kept). The earlier runs' records (HI-1886) go with it, read first so none is lost.
  */
 function persist(): void {
   const launches: SavedLaunch[] = []
@@ -684,11 +724,78 @@ function persist(): void {
     const processes = l.processes.filter((p) => p.created)
     if (processes.length) launches.push({ runId: l.runId, projectPath: l.projectPath, agentId: l.agentId, agentName: l.agentName, since: l.since, processes })
   }
-  // A Hive whose agents never left anything writes no file.
-  if (!launches.length && !keptAny) return
-  keptAny = launches.length > 0
-  const data: SavedLeftovers = { version: 1, launches }
-  saving = saving.then(() => writeJsonAtomic(savedFile(), data)).catch((e) => log.warn('could not keep the list of processes agents left running', e))
+  saving = saving
+    .then(() => readRecords())
+    .then(() => {
+      const any = launches.length > 0 || records.open.length > 0 || records.ended.length > 0
+      // A Hive whose agents never left anything writes no file.
+      if (!any && !keptAny) return
+      keptAny = any
+      const data: SavedLeftovers = { version: 1, launches, ...(records.open.length ? { open: records.open } : {}), ...(records.ended.length ? { ended: records.ended } : {}) }
+      return writeJsonAtomic(savedFile(), data)
+    })
+    .catch((e) => log.warn('could not keep the list of processes agents left running', e))
+}
+
+/**
+ * A run whose processes Hive saw end but whose slot writer couldn't be released (HI-1886: its workspace closed first):
+ * kept, so a later start settles that writer once this Hive has gone.
+ */
+export function keepRunEnded(run: string): void {
+  void readRecords().then(() => {
+    if (records.ended.includes(run)) return
+    records.ended = [...records.ended, run].slice(-MAX_RUN_RECORDS)
+    persist()
+  })
+}
+
+/**
+ * Hive quitting (HI-1886): the launches whose CLI hasn't been seen to exit, or is being looked at, kept with their jobs'
+ * whole membership as listed now (a launch with more than listed, or a process whose start time can't be read, isn't:
+ * its record couldn't prove anything ended), and the runs seen to end. What a slot's writer of theirs is settled by at
+ * a later start, once this Hive has gone (`earlierRun`). Before the kept list's last write.
+ */
+export async function recordOpenLaunches(): Promise<void> {
+  await readRecords()
+  const now: SavedLaunch[] = []
+  for (const l of [...running.values(), ...looking.values()]) {
+    if (now.some((x) => x.runId === l.runId)) continue
+    const list = await listJob(l.runId).catch(() => null)
+    if (!list || list.more || list.processes.some((p) => !p.created)) continue
+    if (!list.processes.length) {
+      records.ended.push(l.runId)
+      continue
+    }
+    now.push({ runId: l.runId, projectPath: l.projectPath, agentId: l.agentId, agentName: l.agentName, since: new Date().toISOString(), processes: list.processes.map((p) => ({ pid: p.pid, name: p.name, label: p.label, created: p.created })) })
+  }
+  const ended = [...outcomes].filter(([, o]) => o === 'ended').map(([r]) => r)
+  records.open = [...records.open, ...now].slice(-MAX_RUN_RECORDS)
+  records.ended = [...new Set([...records.ended, ...ended])].slice(-MAX_RUN_RECORDS)
+  if (now.length || ended.length) log.info(`Kept ${now.length} running launch(es) and ${ended.length} ended run(s) for their slot writers, as Hive quits`)
+  persist()
+}
+
+/**
+ * What this profile kept of an earlier Hive's run (HI-1886): that its processes were seen to end, or its launch's
+ * processes as last listed when Hive quit (each by id and start time); null when nothing was kept of it.
+ */
+export async function earlierRun(run: string): Promise<{ ended: true } | { processes: AgentProcess[] } | null> {
+  await readRecords()
+  if (records.ended.includes(run)) return { ended: true }
+  const l = records.open.find((x) => x.runId === run)
+  return l ? { processes: l.processes } : null
+}
+
+/** An earlier run's record is no longer needed: the slot writer it was kept for is settled (HI-1886). */
+export function forgetEarlierRun(run: string): void {
+  void readRecords().then(() => {
+    const open = records.open.filter((x) => x.runId !== run)
+    const ended = records.ended.filter((r) => r !== run)
+    if (open.length === records.open.length && ended.length === records.ended.length) return
+    records.open = open
+    records.ended = ended
+    persist()
+  })
 }
 
 /** Once the kept list is written (Hive quitting). */
@@ -721,7 +828,7 @@ async function endExactly(processes: AgentProcess[]): Promise<boolean> {
 }
 
 /** The kept launches that can be read, within the bounds as Hive keeps them: the newest, and each list cut. */
-function boundedSaved(saved: Partial<SavedLeftovers> | null): SavedLaunch[] {
+function boundedSaved(saved: Partial<SavedLeftovers> | null, max = MAX_JOBS): SavedLaunch[] {
   const valid = (Array.isArray(saved?.launches) ? saved.launches : [])
     .filter((l) => l && typeof l.runId === 'string' && typeof l.projectPath === 'string' && typeof l.agentId === 'string' && Array.isArray(l.processes))
     .map((l) => ({
@@ -737,7 +844,7 @@ function boundedSaved(saved: Partial<SavedLeftovers> | null): SavedLaunch[] {
   for (const l of valid.reverse()) {
     const k = agentKey(l.projectPath, l.agentId)
     const n = perAgent.get(k) ?? 0
-    if (n >= MAX_JOBS_PER_AGENT || kept.length >= MAX_JOBS) continue
+    if (n >= MAX_JOBS_PER_AGENT || kept.length >= max) continue
     perAgent.set(k, n + 1)
     kept.push(l)
   }

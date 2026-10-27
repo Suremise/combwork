@@ -980,10 +980,15 @@ export interface PoolDeps {
   ended?: (lease: SlotLease, slot: Slot) => void
   /**
    * Whether a writer's run is over and its processes are known to have ended (#1434): only then does a refresh clear it
-   * (a release that couldn't be written). A writer of a Hive that is gone is never cleared by a refresh: it stays held
-   * until the user releases the slot.
+   * (a release that couldn't be written). A writer of a Hive that is gone is cleared only as `writerGone` says.
    */
   writerOver?: (w: SlotWriter) => boolean | Promise<boolean>
+  /**
+   * Whether a writer of a Hive that has gone is settled (HI-1886): what was kept of its run shows its processes ended,
+   * or, its lease ended (`leaseEnded`), those still running were ended exactly. Otherwise it stays held until the user
+   * releases the slot. `cleared`: told once a refresh has cleared it.
+   */
+  writerGone?: { settles: (w: SlotWriter, leaseEnded: boolean) => boolean | Promise<boolean>; cleared: (run: string) => void }
   /** Removes Hive's own unchanged skill copies from a folder (skillCopies.ts removeCopiesIn), before a slot goes (#1500). */
   removeSkillCopies?: (folder: string) => Promise<unknown>
   /** A rename's steps (#1441); none: slots aren't renamed. */
@@ -1363,6 +1368,28 @@ export class SlotPool {
   }
 
   /**
+   * A slot's writer of a Hive that has gone, settled by what was kept of its run (HI-1886): cleared and drained when
+   * `writerGone` says so. True when it was settled.
+   */
+  private async settleGone(s: Slot): Promise<boolean> {
+    const w = s.writer
+    if (!w || !this.deps.writerGone || !(await this.deps.writerGone.settles(w, this.store.openLease(s.name)?.id !== w.lease))) return false
+    if (await this.store.clearWriter(s.name, w.run)) {
+      this.deps.writerGone.cleared(w.run)
+      await this.drained(s.name)
+    }
+    return true
+  }
+
+  /** The slots' writers of Hives that have gone, settled where they may be (HI-1886): as the pool is made, and hourly. */
+  async settleGoneWriters(): Promise<void> {
+    for (const s of this.store.slots()) {
+      if (this.closed) return
+      await this.settleGone(s)
+    }
+  }
+
+  /**
    * Brings the rows in step with what runs and what is on disk: an operation whose holder is gone is taken over and
    * recovered, a job left unsettled is settled again, an unleased slot left `lent` or `dirty` is looked at, a leased one
    * whose folder is gone is marked `gone`.
@@ -1376,6 +1403,7 @@ export class SlotPool {
         if (await this.store.clearWriter(s.name, s.writer.run)) await this.drained(s.name)
         continue
       }
+      if (await this.settleGone(s)) continue
       if (s.op) {
         if (await this.holderGone(s.op)) await this.recover(s)
         continue

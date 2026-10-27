@@ -3546,11 +3546,28 @@ Whether a conversation may resume there is its **hold** (none: it may):
     read leave it **held**. A run counts as having a process only once `spawnPty` has returned one.
   - While it is set the slot isn't lent, adopted, taken by hand or removed, and another start there is refused ("slot-b
     still has another session in it, or processes one left running there"); two at once give one writer.
-  - A writer whose Hive is gone is never taken over or cleared from a snapshot of its processes: it stays held until
-    the user releases the slot (#1506). A refresh clears only this Hive's own writer whose processes are proven ended
-    but whose release couldn't be written. Hive's quit therefore waits, after the leftovers' look that tells each
-    stopped run's outcome, for those releases to be written (at most 3 s, `sessions.writersSettled`) before its
-    workspaces close (HI-1801: a quit that closed them first left the slot held, and the next start there was refused).
+  - A writer whose Hive is gone is never taken over, nor cleared from a snapshot taken now: it is settled only by what
+    Hive kept of its run (HI-1886, `goneWriterSettles`), else it stays held until the user releases the slot (#1506).
+    A refresh clears this Hive's own writer whose processes are proven ended but whose release couldn't be written.
+    Hive's quit therefore waits, after the leftovers' look that tells each stopped run's outcome, for those releases
+    to be written (at most 3 s, `sessions.writersSettled`) before its workspaces close (HI-1801: a quit that closed
+    them first left the slot held, and the next start there was refused).
+  - **A gone Hive's writer settled by itself** (HI-1886: after a restart for an install, every builder's resume was
+    refused, its slot held by its own ended run, and a lane's slot stayed held after its lease had ended). What Hive
+    keeps of a run, in its profile's `leftovers.json`: the runs whose processes it saw end (`ended`, also each run
+    whose release couldn't be written, its workspace closed), and, as it quits, each launch whose CLI it hadn't yet
+    seen exit, with its job's whole membership as listed then (`open`; a launch listing more, or a process without a
+    start time, isn't kept: its record couldn't prove anything); and, Hive closing unexpectedly, the last run's marker
+    (its launch by run, agent and project; one with as many processes as a marker keeps may be cut, so it proves
+    nothing). Kept forward until the writer is settled, at most 100 of each; never offered as leftovers. When a
+    writer's Hive is known to have gone (`alive` false), its run's processes still running are those of its record
+    checked by id and start time: none, and it is cleared and drained; some, and they are ended exactly first only
+    when the lease it ran under has ended or its own agent is starting there (its restart resume), else it stays held.
+    What its run left running and was offered to the user (#614's restore, `restored:<run>`) is the user's: such a
+    writer stays held, and Release Slot… lists those processes. Nothing kept of the run, the host unable to tell, or
+    its Hive still running or unknown: held, as before. Settled as a start claims the slot (`claimPlace`), at each
+    pool's refresh (a lend), as a pool is made, and at the hourly tidy; a slot freed so tells the lanes waiting for one.
+    The Version Control tab's Worktrees list marks a held slot too (*Held by B1's ended session*, **Release…**).
   - **Release Slot…** (#1506, the user's recovery, `agentFolders.ts` `heldWriter`/`releaseHeldWriter`): a writer is
     *held* when its run isn't live in this Hive (its token ended: the session over and its leftovers kept, untracked
     or unreadable) and its Hive is this one or one known to have gone (`writerHeld`). The agent's ⋯ offers Release

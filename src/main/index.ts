@@ -78,7 +78,7 @@ import { setQueueLive, setRunsGoing, workflowFor } from './workflow/service'
 import { isOpenRun } from '../shared/progress'
 import { createLogger, userText, logsDir } from './logger'
 import { killAll } from './ptyHost'
-import { allLeftovers, closeProcessTracking, leftoversSaved, leftoversSettled, restoreLeftovers, settleAllLeftovers, settleLeftovers, warmProcessTracking } from './agentProcesses'
+import { allLeftovers, closeProcessTracking, leftoversSaved, leftoversSettled, recordOpenLaunches, restoreLeftovers, settleAllLeftovers, settleLeftovers, warmProcessTracking } from './agentProcesses'
 import { leftoversSummary } from '../shared/agentProcesses'
 import { installShims } from './progressReporters/shims'
 import { insideArchive, onCorruptFile, renameDiagnostics } from './fsutil'
@@ -703,6 +703,9 @@ async function quitLeftovers(): Promise<void> {
     // Not asked: left running, and still listed for the next start (#614).
     if (end || asking) await settleAllLeftovers(end ? 'end' : 'keep')
   }
+  // The launches not seen to end yet, and the runs that were (HI-1886): kept, so the next start settles their slot
+  // writers if their releases aren't written before Hive exits.
+  await recordOpenLaunches().catch((e) => log.warn("keeping the agents' launches for their slot writers as Hive quits", e))
   await leftoversSaved()
   closeProcessTracking()
 }
