@@ -25,7 +25,7 @@ import { listOf, shownText, withValues, type Text } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { capturedText, HiveError, hiveError, shownError } from './hiveError'
 import { providerService } from './providerService'
-import { assertConnectionHere } from './accounts'
+import { assertConnectionHere, connectionProblem } from './accounts'
 import { assertNameFree, withAgentNames, workspaceAgents } from './agentNames'
 import { sameAgentName } from '../shared/agentNames'
 import { chooseSpace, hiveBranch, reusableBranches, type BranchHome } from '../shared/hiveBranches'
@@ -392,13 +392,14 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   // an agent sharing its name from before names were unique keeps it while its other settings change, but only while it
   // still has that name. The Assistant's agent is never renamed.
   const name = patch.name
-  // A new choice of connection (HI-1769), checked under the lock with the write: on here for the CLI it will run. The one
-  // already saved may stay as it is (off here, the default runs it), unless its CLI changes.
+  // Its connection (HI-1769), checked under the lock with the write: one that exists, is the CLI's it will run and is on
+  // here. Only the one already saved, for the same CLI, may stay while it is off here (the default runs it meanwhile).
   const check = (current: AgentDef): void => {
     opts.check?.(current)
     const was = agentProvider(current, cfg, config.settings)
     const cli = clean.provider ?? was
-    if (clean.connection && (clean.connection !== current.connection || cli !== was)) assertConnectionHere(clean.connection, cli, projectPath, current.name)
+    const kept = clean.connection === current.connection && cli === was
+    if (clean.connection && !(kept && connectionProblem(clean.connection, cli, projectPath) === 'off')) assertConnectionHere(clean.connection, cli, projectPath, current.name)
   }
   const def =
     name !== undefined

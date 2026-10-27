@@ -83,6 +83,13 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check("…One's hover says it runs on Max 1 until it restarts, Max 2 chosen now", /Runs on Max 1 until it restarts\. Chosen now: Max 2/.test(tip), tip)
     await shots('agents')
 
+    // --- The preview turned off, then on again, with no connection changed between: the rows follow it at once.
+    const marks = () => page.locator('.agent-list-row .agent-connection').count()
+    await inv('advanced:set', 'hive.accounts.preview', false)
+    check('the preview off: no row names a connection, the CLI shown as before', !!(await lib.until(async () => (await marks()) === 0, HUNG_MS)) && /Claude Code/.test(await page.locator('.agent-list-row[data-agent="a-two"]').innerText()))
+    await inv('advanced:set', 'hive.accounts.preview', true)
+    check('…on again: the rows name their connections again', !!(await lib.until(async () => (await marks()) === 3, HUNG_MS)))
+
     await page.locator('.tabs .tab', { hasText: 'Overview' }).first().click()
     const running = page.locator(`.running-row .running-connection[data-connection="${max1.id}"][data-connection-other]`)
     check('the Overview: One runs on Max 1, marked ⟳', !!(await lib.until(async () => (await running.count()) === 1, HUNG_MS)))

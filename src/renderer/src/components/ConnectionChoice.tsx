@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { LiveSessionState, ProviderId } from '@shared/types'
 import type { ConnectionsView } from '@shared/accounts'
 import { providerDescriptor } from '@shared/providers'
+import { ACCOUNTS_PREVIEW } from '@shared/advanced'
 import { msg, tr } from '@shared/i18n'
 import { call } from '../api'
 import { useStore } from '../store'
@@ -24,7 +25,10 @@ const M = {
   none: msg({ id: 'connections.choice.none', defaultMessage: 'No {cli} connection is on in this workspace. Add one in Settings → Connections.', description: 'Under the choice of connection when the workspace has none on for the CLI ({cli}: "Claude Code"). Settings → Connections names a section.' })
 }
 
-/** The list as last read, by when it was asked (the workspace and its change count): one read for every row asking. */
+/**
+ * The list as last read, by when it was asked (the workspace, its change count and the preview switch: turned on or off,
+ * it is read again, so the rows, choices and the load dialog follow the switch at once): one read for every row asking.
+ */
 let listed: { key: string; view: Promise<ConnectionsView | null>; got?: ConnectionsView | null } | null = null
 function listFor(key: string): NonNullable<typeof listed> {
   if (listed?.key !== key) {
@@ -39,7 +43,8 @@ function listFor(key: string): NonNullable<typeof listed> {
 export function useConnections(): ConnectionsView | null {
   const changed = useStore((s) => s.connectionsChanged)
   const wsPath = useStore((s) => s.workspace?.path ?? null)
-  const key = `${wsPath ?? ''}\n${changed}`
+  const preview = useStore((s) => s.advanced?.values[ACCOUNTS_PREVIEW] === true)
+  const key = `${wsPath ?? ''}\n${changed}\n${preview}`
   const [view, setView] = useState<ConnectionsView | null>(() => listFor(key).got ?? null)
   useEffect(() => {
     let live = true

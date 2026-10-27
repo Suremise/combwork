@@ -617,6 +617,19 @@ describe('an agent’s own connection, checked with the write that saves it (HI-
     expect((await agentsOf(alpha)).find((x) => x.id === 'a-one')?.connection).toBeUndefined()
     await here(() => updateAgent(alpha, 'a-one', { role: null as unknown as string }))
   })
+
+  it('Agent Settings: the saved connection removed since, or now another CLI’s, is refused even unchanged', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const b = await signedInConnection('Work', 'work@example.com')
+    await here(() => updateAgent(alpha, 'a-one', { connection: a.id }))
+    await accounts.removeAccount(a.id)
+    expect(await outcome(here(() => updateAgent(alpha, 'a-one', { connection: a.id, role: 'unchanged choice' })))).toMatch(/no longer exists/)
+    await here(() => updateAgent(alpha, 'a-one', { connection: b.id }))
+    config.update((c) => void (c.connections = (c.connections ?? []).map((x) => (x.id === b.id ? { ...x, provider: 'codex' } : x))))
+    expect(await outcome(here(() => updateAgent(alpha, 'a-one', { connection: b.id, role: 'unchanged choice' })))).toMatch(/for another CLI/)
+    // Cleared, it saves (the default again).
+    await here(() => updateAgent(alpha, 'a-one', { connection: null, role: null as unknown as string }))
+  })
 })
 
 describe('templates’ connections (HI-1769)', () => {
