@@ -166,6 +166,8 @@
   "panes.session.renameTitle": "Renomear sessão",
   "panes.session.showAttachments": "Mostrar anexos da sessão",
   "panes.session.starting": "{kind, select, resume {Retomando…} other {Iniciando…}}",
+  "panes.stopped.label": "Parado · {time}",
+  "panes.stopped.line": "Parado · {time} · {why, select, you {parado por você} assistant {parado pelo Assistente} agent {parado por um agente} lane {sua raia terminou} closed {seu espaço de trabalho foi fechado} quit {o Hive foi encerrado} exited {sua CLI terminou} crashed {sua CLI terminou com o código {code}} other {parado}}",
   "panes.tab.failed": "falha ao iniciar: {why}",
   "panes.tab.mcp": "Servidores MCP: {servers}",
   "panes.tab.notRunning": "parado",

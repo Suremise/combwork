@@ -1,5 +1,6 @@
 // Types shared by the main process, preload bridge and renderer.
 
+import type { SessionEnd } from './sessionEnd'
 import type { JournalSettings } from './journal'
 import type { Text, TextPart } from './advanced'
 import type { AvOffer } from './antivirus'
@@ -3133,7 +3134,7 @@ export type HiveEvent =
   | { type: 'recent-changed' }
   | { type: 'session-status'; state: LiveSessionState }
   /** `failure`: the CLI exited before its session started (and nobody stopped it): why, for the agent's pane. */
-  | { type: 'session-exit'; projectPath: string; agentId: string; sessionId: string; exitCode: number; failure?: StartFailure }
+  | { type: 'session-exit'; projectPath: string; agentId: string; sessionId: string; exitCode: number; failure?: StartFailure; ended?: SessionEnd }
   /** What an agent's stopped launches left running changed (#507): found, ended, kept, or ended by themselves (no processes). */
   | { type: 'agent-leftovers'; leftovers: AgentLeftovers }
   | { type: 'toast'; toast: ToastMessage }

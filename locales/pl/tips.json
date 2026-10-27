@@ -396,6 +396,8 @@
   "tips.startFreshIdle.title": "Zaczynaj od nowa z bezczynnymi agentami po skończonej pracy",
   "tips.startNewAll.text": "Zacznij nową w menu Agenci w nagłówku projektu daje każdemu agentowi nową sesję po jednym pytaniu; Zarchiwizuj i zacznij nową najpierw archiwizuje stare sesje. Ich rozmowy zostają w zakładce Sesje.",
   "tips.startNewAll.title": "Świeże sesje dla każdego agenta",
+  "tips.stoppedPane.text": "Gdy sesja agenta się kończy, jego panel jest przyciemniony, a pasek mówi, kiedy i dlaczego (zatrzymany przez Ciebie, jego tor się zakończył, jego CLI zakończyło działanie…). Ostatnie wyjście zostaje czytelne, a Wznów lub Nowa sesja na pasku uruchamia go ponownie.",
+  "tips.stoppedPane.title": "Zatrzymany agent wygląda na zatrzymanego",
   "tips.storageCleanup.text": "Ustawienia projektu → Miejsce na dysku pokazuje, ile miejsca zajmują kopie zapasowe, archiwum, załączniki i worktree projektu. Wyczyść… przenosi stare załączniki i kopie zapasowe do Kosza i pokazuje dokładnie, co zostanie usunięte w pierwszej kolejności.",
   "tips.storageCleanup.title": "Zobacz, co przechowuje Hive, i posprzątaj",
   "tips.storagePurge.text": "Wyczyść całkowicie… w Ustawieniach projektu → Miejsce na dysku albo Wyczyść całkowicie pliki Hive… na sesji usuwa to, co Hive przechowuje dla sesji: kopie, załączniki, pozostałości. Najpierw wymienia pliki; pliki agentów i sumy użycia zostają.",

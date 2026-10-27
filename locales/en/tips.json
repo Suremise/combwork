@@ -1587,6 +1587,14 @@
     "defaultMessage": "Fresh sessions for every agent",
     "description": "A tip's title."
   },
+  "tips.stoppedPane.text": {
+    "defaultMessage": "When an agent's session ends, its pane is dimmed and its bar says when and why (stopped by you, its lane ended, its CLI exited…). Its last output stays readable, and Resume or New Session there starts it again.",
+    "description": "A tip (HI-1881). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.stoppedPane.title": {
+    "defaultMessage": "A stopped agent looks stopped",
+    "description": "A tip's title (HI-1881)."
+  },
   "tips.storageCleanup.text": {
     "defaultMessage": "Project Settings → Storage shows how much space a project's backups, archive, attachments and worktrees take. Clean Up… moves old attachments and backups to the Recycle Bin, and shows you exactly what goes first.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

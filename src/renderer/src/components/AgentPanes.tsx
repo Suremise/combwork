@@ -30,6 +30,7 @@ import { cx, formatKeybinding, formatTokens, sessionLabel, timeAgo } from '../ut
 import { formatSize } from '@shared/units'
 import { FREE_LOCAL, moneyLabel } from '@shared/usageTotals'
 import { TerminalView } from './TerminalView'
+import { stoppedLabel, stoppedLine, useStoppedEnd } from '../stopped'
 import { focusTileAfter, TilePager } from './AgentTiles'
 import { offerTip } from '../tips'
 import { chooseFocus } from '../deferredFocus'
@@ -83,6 +84,10 @@ export function usePanes(project: ProjectInfo | null): (string | null)[] {
 export function TerminalLayer({ visibleFor, panes }: { visibleFor: string | null; panes: (string | null)[] }) {
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   const epochs = useStore((s) => s.sessionEpoch)
+  // A stopped agent's terminal is dimmed (HI-1881): not while it starts again (from the accepted click), nor after a
+  // failed start (its failed bar says why).
+  const starting = useStore((s) => s.starting)
+  const failures = useStore((s) => s.startFailures)
   return (
     <>
       {projects.flatMap((p) =>
@@ -101,6 +106,7 @@ export function TerminalLayer({ visibleFor, panes }: { visibleFor: string | null
               provider={agentProviderOf(p, a)}
               autoFocus={i >= 0 && (panes.length === 1 || useStore.getState().focusedAgent[p.path] === a.id)}
               onFocus={() => focusAgent(p.path, a.id)}
+              dimmed={!a.live && !starting[startingKey(p.path, a.id)] && !failures[key]}
             />
           )
         })
@@ -1223,6 +1229,8 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
   const removing = useStore((s) => !!s.running[`removeAgent:${project.path}#${a.id}`])
   const startBlocked = useStartBlocked()
   const starting = useStarting(project.path, a.id)
+  // Its stopped run, as its pane's bar and its tile say it (HI-1881).
+  const end = useStoppedEnd(project.path, a)
   const cards = useAgentCards(project, a.id)
   const state = agentState(live, { blocked: cards.some((c) => !!c.blocked) })
   // For Compact… in ⋯: unavailable while the conversation is empty, recommended once its context passes the threshold.
@@ -1328,7 +1336,7 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
         </Tooltip>
       ) : (
         <SignInTip live={live}>
-          <span className={cx('faint', 'pane-status', !live && failure && 'failed', live?.status === 'signin' && 'signin')}>{live ? statusText(live) : failure ? tr(msg({ id: 'panes.header.failed', defaultMessage: 'Failed to start', description: "A pane's status: the agent's last launch failed." })) : tr(msg({ id: 'panes.header.notRunning', defaultMessage: 'Not running', description: "A pane's status: the agent's session isn't running." }))}</span>
+          <span className={cx('faint', 'pane-status', !live && failure && 'failed', live?.status === 'signin' && 'signin', !live && !failure && end && 'stopped')} {...(!live && !failure && end ? { 'data-stopped': end.why, title: stoppedLine(end) } : {})}>{live ? statusText(live) : failure ? tr(msg({ id: 'panes.header.failed', defaultMessage: 'Failed to start', description: "A pane's status: the agent's last launch failed." })) : end ? stoppedLabel(end) : tr(msg({ id: 'panes.header.notRunning', defaultMessage: 'Not running', description: "A pane's status: the agent's session isn't running." }))}</span>
         </SignInTip>
       )}
       {/* Short of room they give way with the status (app.css); under MARKS_FROM the safeguard's note is in ⋯ too. */}
@@ -1840,6 +1848,8 @@ function PaneBody({ project, a, hasTerminal, single, cell }: { project: ProjectI
   // Retry Setup and Start Without Setup: the one clicked shows it.
   const settingUp = startingNew && !starting.skipSetup
   const skippingSetup = startingNew && !!starting.skipSetup
+  // Why and when it stopped (HI-1881), while it shows as stopped (not running, starting or failed to start).
+  const end = useStoppedEnd(project.path, a)
   if (!a) {
     // A single empty pane is a project without agents: its "No agents yet" (SessionEmpty) shows, not covered (#227).
     if (single) return null
@@ -1850,13 +1860,18 @@ function PaneBody({ project, a, hasTerminal, single, cell }: { project: ProjectI
   if (a.live) return null
   if (hasTerminal && failure && !setupPending) return <StartFailedBar project={project} a={a} failure={failure} single={single} />
   if (hasTerminal) {
-    // The session ended: its output stays visible above this bar.
+    // The session ended: its output stays visible above this bar, dimmed (HI-1881), with why and when it stopped. From
+    // the accepted start of the next one, the bar says it starts and is no longer the stopped bar.
     return (
-      <div className={cx('session-ended', !single && 'compact')}>
-        <Icon name="debug-disconnect" />
+      <div className={cx('session-ended', !single && 'compact', !starting && !setupPending && 'stopped')} data-stopped={end?.why ?? (starting ? undefined : '')}>
+        <Icon name={starting ? 'loading' : 'debug-disconnect'} spin={!!starting} />
         <span className="grow">
           {setupPending
             ? tr(msg({ id: 'panes.body.setupFailed', defaultMessage: 'Setup did not finish.', description: "The bar under a worktree agent's ended session: its worktree setup command didn't finish." }))
+            : starting
+              ? startingLabel(starting)
+            : end
+              ? stoppedLine(end)
             : single
               ? tr(msg({ id: 'panes.body.endedLong', defaultMessage: 'The session has ended. Resume it, or start a new one.', description: "The bar under an agent's ended session (one pane)." }))
               : tr(msg({ id: 'panes.body.ended', defaultMessage: 'Session ended.', description: "The bar under an agent's ended session (several panes: short)." }))}

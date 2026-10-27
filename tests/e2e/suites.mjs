@@ -302,6 +302,7 @@ export const SUITES = [
   { name: 'startfail' },
   { name: 'startfresh' },
   { name: 'statemarks' },
+  { name: 'stoppedpane' },
   { name: 'stopswitch' },
   { name: 'storage' },
   { name: 'storageclose' },

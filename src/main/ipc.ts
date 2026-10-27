@@ -979,7 +979,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
 
     'session:list': (p, opts) => sessions.list(p, { own: opts?.own === true }),
     'session:start': (p, opts) => sessions.start(p, opts),
-    'session:stop': (p, agentId) => sessions.stop(workspace.assertSessionHost(p), agentId),
+    // From the window: the user's stop (HI-1881: its pane says "stopped by you").
+    'session:stop': (p, agentId) => sessions.stop(workspace.assertSessionHost(p), agentId, 'you'),
     'session:carryOn': (p, agentId) => sessions.carryOn(workspace.assertProject(p), agentId),
     'session:joinResume': (p, agentId, sessionId) => sessions.joinResume(p, agentId, sessionId),
     'session:markIdle': (p, agentId) => sessions.markIdle(workspace.assertSessionHost(p), agentId),

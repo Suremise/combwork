@@ -398,6 +398,8 @@ interface HiveMessageValues {
   'tips.startFreshIdle.title': undefined
   'tips.startNewAll.text': undefined
   'tips.startNewAll.title': undefined
+  'tips.stoppedPane.text': undefined
+  'tips.stoppedPane.title': undefined
   'tips.storageCleanup.text': undefined
   'tips.storageCleanup.title': undefined
   'tips.storagePurge.text': undefined

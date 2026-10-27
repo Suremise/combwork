@@ -166,6 +166,8 @@
   "panes.session.renameTitle": "Zmień nazwę sesji",
   "panes.session.showAttachments": "Pokaż załączniki sesji",
   "panes.session.starting": "{kind, select, resume {Wznawianie…} other {Uruchamianie…}}",
+  "panes.stopped.label": "Zatrzymany · {time}",
+  "panes.stopped.line": "Zatrzymany · {time} · {why, select, you {zatrzymany przez Ciebie} assistant {zatrzymany przez Asystenta} agent {zatrzymany przez agenta} lane {jego tor się zakończył} closed {jego obszar roboczy został zamknięty} quit {Hive zakończył działanie} exited {jego CLI zakończyło działanie} crashed {jego CLI zakończyło działanie z kodem {code}} other {zatrzymany}}",
   "panes.tab.failed": "błąd uruchomienia: {why}",
   "panes.tab.mcp": "Serwery MCP: {servers}",
   "panes.tab.notRunning": "nie działa",

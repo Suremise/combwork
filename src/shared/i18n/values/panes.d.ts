@@ -168,6 +168,8 @@ interface HiveMessageValues {
   'panes.session.renameTitle': undefined
   'panes.session.showAttachments': undefined
   'panes.session.starting': { kind: string }
+  'panes.stopped.label': { time: string | number }
+  'panes.stopped.line': { time: string | number; why: string; code: string | number }
   'panes.tab.failed': { why: string | number }
   'panes.tab.mcp': { servers: string | number }
   'panes.tab.notRunning': undefined

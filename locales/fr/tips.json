@@ -396,6 +396,8 @@
   "tips.startFreshIdle.title": "Faire repartir de zéro les agents inactifs une fois le travail terminé",
   "tips.startNewAll.text": "Nouvelle session, dans le menu Agents de l’en-tête du projet, donne à chaque agent une nouvelle session après une seule question ; Archiver et repartir archive d’abord les anciennes. Leurs conversations restent dans l’onglet Sessions.",
   "tips.startNewAll.title": "De nouvelles sessions pour tous les agents",
+  "tips.stoppedPane.text": "Quand la session d’un agent se termine, son volet est atténué et sa barre indique quand et pourquoi (arrêté par toi, son couloir est terminé, sa CLI s’est terminée…). Sa dernière sortie reste lisible, et Reprendre ou Nouvelle session le relance.",
+  "tips.stoppedPane.title": "Un agent arrêté a l’air arrêté",
   "tips.storageCleanup.text": "Paramètres du projet → Stockage montre la place que prennent les sauvegardes, l’archive, les pièces jointes et les worktrees d’un projet. Nettoyer… place les anciennes pièces jointes et sauvegardes dans la Corbeille, et te montre d’abord exactement ce qui part.",
   "tips.storageCleanup.title": "Voir ce que Hive conserve, et faire le ménage",
   "tips.storagePurge.text": "Purger… dans Paramètres du projet → Stockage, ou Purger les fichiers de Hive… sur une session, retire ce que Hive conserve pour les sessions : sauvegardes, pièces jointes, restes. Il liste d’abord chaque fichier ; ceux des agents et tes totaux restent.",

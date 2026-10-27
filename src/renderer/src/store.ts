@@ -55,6 +55,7 @@ import type { KeptReturn } from '@shared/progressQueue'
 import type { SessionAction } from './util'
 import { storeUpdated } from './pageMarks'
 import { keepSame } from '@shared/keepSame'
+import { newerEnd, type SessionEnd } from '@shared/sessionEnd'
 import { rememberTab, shownTab } from '@shared/tabs'
 
 export type Activity = 'projects' | 'overview' | 'performance' | 'board' | 'notes' | 'skills' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
@@ -218,6 +219,8 @@ interface State {
   branchStatus: Record<string, AgentBranchStatus | null>
   /** Agents whose CLI exited before its session started, by projectKey: why, until the next launch or ✕. */
   startFailures: Record<string, StartFailure>
+  /** Each agent's last ended run, why and when (HI-1881), by projectKey: what its stopped pane says; presentation only. */
+  sessionEnds: Record<string, SessionEnd>
   /** What agents' stopped launches left running, by projectKey (#507): until ended, kept, or they end. */
   leftovers: Record<string, AgentLeftovers>
   /** What the tips know (saved in the profile), the tip in the card, and whether Help → Tips… is open. */
@@ -520,6 +523,7 @@ export const useStore = create<State>(() => ({
   connectionPlanUsage: {},
   branchStatus: {},
   startFailures: {},
+  sessionEnds: {},
   leftovers: {},
   tips: EMPTY_TIPS_STATE,
   tipShown: null,
@@ -1239,6 +1243,8 @@ export function projectNames(projects: readonly ProjectInfo[] | undefined): Reco
  * times a second, not dozens, and one change on its own shows without waiting.
  */
 export function applyLiveState(state: LiveSessionState): void {
+  // A launch's state: any end kept for an older run no longer applies (HI-1881).
+  if (state.status !== 'stopped') noteRun(state.projectPath, state.agentId, state.runId)
   pendingLive.set(projectKey(state.projectPath, state.agentId), state)
   if (liveTimer) return
   flushLiveStates()
@@ -1252,6 +1258,47 @@ function liveWindowEnds(): void {
   flushLiveStates()
   liveTimer = setTimeout(liveWindowEnds, LIVE_BATCH_MS)
 }
+
+/** The run each agent's window last saw start (HI-1881), by projectKey: an exit of any other run is an older one's. */
+const lastRuns = new Map<string, string>()
+
+/** Notes the run an agent's live state is of (its latest launch); an end kept for another run no longer applies. */
+export function noteRun(projectPath: string, agentId: string, runId: string): void {
+  const key = projectKey(projectPath, agentId)
+  if (lastRuns.get(key) === runId) return
+  lastRuns.set(key, runId)
+  if (get().sessionEnds[key] && get().sessionEnds[key].runId !== runId)
+    set((s) => {
+      const { [key]: _, ...rest } = s.sessionEnds
+      return { sessionEnds: rest }
+    })
+}
+
+/** Keeps an ended run's why and when (HI-1881), unless it is an older run's than the latest the window saw start. */
+export function noteEnd(projectPath: string, agentId: string, end: SessionEnd): void {
+  const key = projectKey(projectPath, agentId)
+  const last = lastRuns.get(key)
+  if (last && last !== end.runId) return
+  set((s) => ({ sessionEnds: { ...s.sessionEnds, [key]: newerEnd(s.sessionEnds[key], end) } }))
+}
+
+/** Drops the ends of agents no longer in the window's workspace (their agent, project or workspace gone). */
+export function pruneEnds(keep: (key: string) => boolean): void {
+  const ends = get().sessionEnds
+  const gone = Object.keys(ends).filter((k) => !keep(k))
+  if (!gone.length) return
+  for (const k of gone) lastRuns.delete(k)
+  set((s) => ({ sessionEnds: Object.fromEntries(Object.entries(s.sessionEnds).filter(([k]) => keep(k))) }))
+}
+
+// Ends of agents gone from the workspace (removed, or their project or workspace) are dropped as it changes.
+useStore.subscribe((s, prev) => {
+  if (s.workspace === prev.workspace || !Object.keys(s.sessionEnds).length) return
+  const ws = s.workspace
+  const keys = new Set<string>()
+  for (const p of [...(ws?.projects ?? []), ...(ws?.assistant ? [ws.assistant] : [])]) for (const a of p.agents) keys.add(projectKey(p.path, a.id))
+  pruneEnds((k) => keys.has(k))
+})
 
 /** An agent's state as last told, shown yet or not. */
 export function liveStateOf(projectPath: string, agentId: string): LiveSessionState | null | undefined {

@@ -1,3 +1,4 @@
+import { endReason, type SessionEnd, type StopCause } from '../shared/sessionEnd'
 import type { ActivityTask } from '../shared/activity'
 import { maskText } from '../shared/redact'
 import { randomUUID, randomBytes } from 'crypto'
@@ -287,6 +288,8 @@ interface LiveSession {
   compacting?: Compaction
   /** The user stopped it (e.g. during its worktree setup), so an early exit isn't reported as a failure. */
   stopRequested?: boolean
+  /** Who asked it to stop, as its caller knew it (HI-1881: its pane says why); unset when the caller didn't say. */
+  stopCause?: StopCause
   /** Its CLI is being ended with its exit keys (endProcess): a second stop kills it at once. */
   ending?: boolean
   /** Terminal output tail, to see the CLI ready or asking something at the start. */
@@ -2457,8 +2460,11 @@ class SessionManager {
     await recordCards(workspaceOf(projectPath), projectPath, agent.id, sessionId, () => this.owns(l)).catch((e) => log.warn(`Could not record the cards of session ${sessionId}`, e))
   }
 
-  /** Stops one agent's session, or every agent of the project when agentId is omitted. */
-  stop(projectPath: string, agentId?: string): void {
+  /**
+   * Stops one agent's session, or every agent of the project when agentId is omitted. `cause`: who asked, when the
+   * caller knows (HI-1881); left out, the pane says just "stopped".
+   */
+  stop(projectPath: string, agentId?: string, cause?: StopCause): void {
     const agents = agentId ? [agentId] : this.projectStates(projectPath).map((s) => s.agentId)
     for (const a of agents) {
       // A switch of connection waiting for it ends with it (HI-1755): a stop is the user's.
@@ -2466,6 +2472,7 @@ class SessionManager {
       const l = this.live.get(liveId(projectPath, a))
       if (l) {
         l.stopRequested = true
+        if (cause) l.stopCause = cause
         this.endProcess(l)
       } else killPty(this.key(projectPath, a))
     }
@@ -2525,6 +2532,8 @@ class SessionManager {
       if (held && !force) return 'held'
       log.info(`${label}: killed (${why}${held ? `; ${held}` : ', its CLI has no exit command'})`)
       l.stopRequested = true
+      // A lane's end (HI-1706): its pane says so (HI-1881).
+      l.stopCause = 'lane'
       l.ending = true
       killPty(key)
       return 'sent'
@@ -2542,6 +2551,7 @@ class SessionManager {
     }
     // Ending from here: its exit is a stop asked for (not a crash), and Stop meanwhile kills it at once (endProcess).
     l.stopRequested = true
+    l.stopCause = 'lane'
     l.ending = true
     try {
       if (line) {
@@ -2627,6 +2637,8 @@ class SessionManager {
     )
     for (const [, l] of chosen) {
       l.stopRequested = true
+      // Its workspace closing (HI-1881); Hive quitting says so itself (endReason).
+      l.stopCause ??= 'closed'
       this.endProcess(l)
     }
     const waitMs = stopWaitMs(timeoutMs, chosen.map(([, l]) => l.adapter.exitKeys?.graceMs))
@@ -3745,7 +3757,10 @@ class SessionManager {
           .catch(() => undefined)
       }
     }
-    emit({ type: 'session-exit', projectPath, agentId, sessionId, exitCode: code, ...(failure ? { failure } : {}) })
+    // Why and when it ended, for its pane (HI-1881): none for a launch that failed (its failed bar says so).
+    const why = l ? endReason({ failed: !!failure, shuttingDown: this.shuttingDown, stopRequested: !!l.stopRequested, cause: l.stopCause, code }) : null
+    const ended: SessionEnd | undefined = l && why ? { runId, startedAt: l.state.startedAt, at: new Date().toISOString(), why, ...(why === 'crashed' ? { code } : {}) } : undefined
+    emit({ type: 'session-exit', projectPath, agentId, sessionId, exitCode: code, ...(failure ? { failure } : {}), ...(ended ? { ended } : {}) })
     // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
     devConsole.capture([sessionSourceId(projectPath, agentId)], () => ({ kind: 'exit', name: 'exit', provider: l?.state.provider, raw: { exitCode: code }, made: { failedStart: !!failure, stopRequested: !!l?.stopRequested }, summary: `exited with code ${code}${failure ? ' before it started' : ''}` }))
     this.exitWaiters.get(id)?.()

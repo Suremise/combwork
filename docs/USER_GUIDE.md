@@ -311,6 +311,8 @@ Hive sums up what each agent is doing in one of four states, each drawn with its
 - **● Working** (a dot that pulses, held still if Windows is set to show fewer animations): a turn, its start, a compaction or background tasks.
 - **○ Idle** (a ring): ready, finished, waiting on cards, or stopped.
 
+**A stopped agent's pane looks stopped.** When an agent's session ends, its last output stays in its pane, dimmed (still scrolled, selected and copied as ever), with a bar over its foot saying when it stopped and why: *Stopped · 20:46 · stopped by you* (or by the Assistant, by an agent, its lane ended, its workspace closed, Hive quit, its CLI exited, or exited with a code). **Resume** and **New Session** are on the bar. Its header and its tile in Tiles say *Stopped · 20:46* too. The moment you click Resume or New Session, the dimming and the label go. A pane Hive opens after a restart says only that the agent isn't running.
+
 The project header's state line uses them (*1 waiting · 2 working*), with the mark of the most urgent.
 
 ### The session toolbar <a id="the-session-toolbar"></a>

@@ -166,6 +166,8 @@
   "panes.session.renameTitle": "Renommer la session",
   "panes.session.showAttachments": "Afficher les pièces jointes de la session",
   "panes.session.starting": "{kind, select, resume {Reprise…} other {Démarrage…}}",
+  "panes.stopped.label": "Arrêté · {time}",
+  "panes.stopped.line": "Arrêté · {time} · {why, select, you {arrêté par toi} assistant {arrêté par l’Assistant} agent {arrêté par un agent} lane {son couloir est terminé} closed {son espace de travail a été fermé} quit {Hive a été quitté} exited {sa CLI s’est terminée} crashed {sa CLI s’est terminée avec le code {code}} other {arrêté}}",
   "panes.tab.failed": "échec du démarrage : {why}",
   "panes.tab.mcp": "Serveurs MCP : {servers}",
   "panes.tab.notRunning": "arrêté",

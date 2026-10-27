@@ -34,7 +34,7 @@ import { ProgressPanel, progressRunsChanged } from './components/Progress'
 import { queueBoardChanged, queueChangedEvent } from './queueSource'
 import { AssistantMain } from './components/AssistantView'
 import { loadAssistantChanges } from './assistantUndo'
-import { agentOnScreen, applyLeftovers, applyLiveState, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, filesListeners, findProject, get, loadTasks, noteAgentAdded, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
+import { agentOnScreen, applyLeftovers, applyLiveState, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
 import { DocsView, McpView, NotesView, SkillView, WelcomeView } from './views/OtherViews'
 import { TemplatesView } from './components/Templates'
 import { ProjectView } from './views/ProjectView'
@@ -127,6 +127,8 @@ function handleEvent(e: HiveEvent): void {
     }
     case 'session-exit': {
       set((s) => ({ usageVersion: { ...s.usageVersion, [e.projectPath]: (s.usageVersion[e.projectPath] ?? 0) + 1 } }))
+      // Why and when it ended, for its stopped pane (HI-1881); a failed launch has none (its failed bar says so).
+      if (e.ended) noteEnd(findProject(get(), e.projectPath)?.path ?? e.projectPath, e.agentId, e.ended)
       if (!e.failure) break
       const p = findProject(get(), e.projectPath)
       const path = p?.path ?? e.projectPath

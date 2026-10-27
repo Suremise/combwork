@@ -396,6 +396,8 @@
   "tips.startFreshIdle.title": "Start idle agents fresh when work is done",
   "tips.startNewAll.text": "Start New in the project header's Agents menu gives every agent a new session after one question; Archive and Start New archives their old ones first. Their conversations stay in the Sessions tab.",
   "tips.startNewAll.title": "Fresh sessions for every agent",
+  "tips.stoppedPane.text": "When an agent's session ends, its pane is dimmed and its bar says when and why (stopped by you, its lane ended, its CLI exited…). Its last output stays readable, and Resume or New Session there starts it again.",
+  "tips.stoppedPane.title": "A stopped agent looks stopped",
   "tips.storageCleanup.text": "Project Settings → Storage shows how much space a project's backups, archive, attachments and worktrees take. Clean Up… moves old attachments and backups to the Recycle Bin, and shows you exactly what goes first.",
   "tips.storageCleanup.title": "See what Hive keeps, and clean up",
   "tips.storagePurge.text": "Purge… in Project Settings → Storage, or Purge Hive's Files… on a session, removes everything Hive keeps for sessions: backups, attachments and leftovers. It lists every file first; the coding agents' own files and your usage totals stay.",
