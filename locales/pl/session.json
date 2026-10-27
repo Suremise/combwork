@@ -156,7 +156,7 @@
   "session.start.openIn": "Tę rozmowę ma już otwartą {agent}. Agent może wznowić tylko sesję, której nie prowadzi żaden inny agent.",
   "session.start.otherFolder": "Ta sesja działała w folderze {folder}. Wznów ją agentem, który pracuje w tym folderze.",
   "session.start.projectRunning": "W tym projekcie już działa sesja. Najpierw ją zatrzymaj.",
-  "session.start.providerMissing": "{resuming, select, yes {Do wznowienia tej rozmowy potrzebny jest {provider}. Zainstaluj go przez Pomoc → Konfiguracja agentów.} other {Do uruchomienia agenta {agent} potrzebny jest {provider}. Zainstaluj go przez Pomoc → Konfiguracja agentów.}}",
+  "session.start.providerMissing": "{resuming, select, yes {Do wznowienia tej rozmowy potrzebny jest {provider}. Zainstaluj go przez Pomoc → Konfiguracja dostawców.} other {Do uruchomienia agenta {agent} potrzebny jest {provider}. Zainstaluj go przez Pomoc → Konfiguracja dostawców.}}",
   "session.start.providerOff": "Dostawca {provider} jest wyłączony. {resuming, select, yes {Włącz go w sekcji Ustawienia → Dostawcy, by wznowić tę rozmowę.} other {Włącz go w sekcji Ustawienia → Dostawcy, by uruchomić agenta {agent}.}}",
   "session.start.removing": "Ten projekt jest usuwany",
   "session.start.repairing": "Hive naprawia ten przeniesiony obszar roboczy: uruchom agenta, gdy naprawa się zakończy.",

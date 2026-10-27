@@ -44,7 +44,7 @@ const M = {
   moreTip: msg({ id: 'project.tabs.moreTip', defaultMessage: "The project's {tabs}", description: "Tooltip on the project tabs' More ▾ button. {tabs} lists the tabs in its menu, such as Memory, Skills, Templates and MCP." }),
   tabTip: msg({ id: 'project.tabs.tip', defaultMessage: '{tab} ({key})', description: "A project tab's tooltip with its keyboard shortcut. {tab} is the tab's name, {key} the shortcut, such as Alt+4." }),
   providerOff: msg({ id: 'project.empty.providerOff', defaultMessage: '{provider} is turned off — Settings → Providers', description: "Warning on the Session tab when the agent's provider is turned off. Settings → Providers: name it as Settings does." }),
-  providerMissing: msg({ id: 'project.empty.providerMissing', defaultMessage: '{provider} is required — Help → Agent Setup', description: "Warning on the Session tab when the agent's CLI isn't installed. Help → Agent Setup is the menu item." }),
+  providerMissing: msg({ id: 'project.empty.providerMissing', defaultMessage: '{provider} is required — Help → Provider Setup', description: "Warning on the Session tab when the agent's CLI isn't installed. Help → Provider Setup is the menu item." }),
   sessionEnded: msg({ id: 'project.session.ended', defaultMessage: 'The session has ended. Resume it, or start a new one.', description: "Over an agent's terminal when its session has ended." }),
   resume: msg({ id: 'project.session.resume', defaultMessage: 'Resume', description: 'Button: resumes the last session.' }),
   newSession: msg({ id: 'project.session.new', defaultMessage: 'New Session', description: 'Button: starts a new session (adding an agent first when there is none).' }),

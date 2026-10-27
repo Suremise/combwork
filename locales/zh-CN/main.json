@@ -79,7 +79,7 @@
   "main.gitInit.fix.staged": "请检查 .gitignore 中是否有把 .hive 重新包含进来的规则",
   "main.gitInit.nested": "此文件夹位于 {root} 中的 git 仓库内。请确认你要在其中创建独立的仓库。",
   "main.gitInit.noEmail": "Git 没有可用于首次提交的邮箱：请输入一个。",
-  "main.gitInit.noGit": "{problem}：“配置智能体”中说明了解决方法。",
+  "main.gitInit.noGit": "{problem}：“配置提供方”中说明了解决方法。",
   "main.gitInit.noName": "Git 没有可用于首次提交的用户名：请输入一个。",
   "main.gitInit.otherVcs": "{vcs} 正在管理此文件夹（位于 {root}）：Hive 只在没有其他版本控制系统的地方创建 git 仓库。",
   "main.gitInit.step.commit": "{n, plural, other {提交了 # 个文件}}",

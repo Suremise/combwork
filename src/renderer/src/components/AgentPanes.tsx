@@ -1733,7 +1733,7 @@ function StartFailedBar({ project, a, failure, single }: { project: ProjectInfo;
         </button>
         {failure.fix === 'agent-setup' ? (
           <button className="btn small subtle" onClick={() => set({ setupOpen: agentProviderOf(project, a) })}>
-            {tr(msg({ id: 'panes.failed.setup', defaultMessage: 'Agent Setup…', description: "Button on the bar of an agent that failed to start: opens Agent Setup (installing or signing in to its CLI)." }))}
+            {tr(msg({ id: 'panes.failed.setup', defaultMessage: 'Provider Setup…', description: "Button on the bar of an agent that failed to start: opens Provider Setup (installing or signing in to its CLI)." }))}
           </button>
         ) : (
           <button className="btn small subtle" onClick={() => set({ agentSettingsFor: { project: project.path, agentId: a.id } })}>

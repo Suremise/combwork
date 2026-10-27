@@ -515,7 +515,7 @@ function ProviderStatus({ provider }: { provider: ProviderId }) {
         {tr(msg({ id: 'settings.provider.checkNow', defaultMessage: 'Check now', description: "Button on a provider's page: looks for its CLI and updates again." }))}
       </button>
       <button className="btn small primary" onClick={() => set({ setupOpen: provider })}>
-        {info.found ? tr(msg({ id: 'settings.provider.manage', defaultMessage: 'Manage', description: "Button on a provider's page: opens Agent Setup for the installed CLI." })) : tr(msg({ id: 'settings.provider.install', defaultMessage: 'Install', description: "Button on a provider's page: opens Agent Setup to install its CLI." }))}
+        {info.found ? tr(msg({ id: 'settings.provider.manage', defaultMessage: 'Manage', description: "Button on a provider's page: opens Provider Setup for the installed CLI." })) : tr(msg({ id: 'settings.provider.install', defaultMessage: 'Install', description: "Button on a provider's page: opens Provider Setup to install its CLI." }))}
       </button>
     </div>
   )

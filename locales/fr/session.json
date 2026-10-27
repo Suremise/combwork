@@ -156,7 +156,7 @@
   "session.start.openIn": "Cette conversation est déjà ouverte dans {agent}. Un agent ne peut reprendre qu’une session qu’aucun autre agent n’exécute.",
   "session.start.otherFolder": "Cette session a tourné dans {folder}. Reprends-la avec l’agent qui travaille dans ce dossier.",
   "session.start.projectRunning": "Une session tourne déjà pour ce projet. Arrête-la d’abord.",
-  "session.start.providerMissing": "{resuming, select, yes {{provider} est nécessaire pour reprendre cette conversation. Installe-le depuis Aide → Configuration des agents.} other {{provider} est nécessaire pour exécuter l’agent {agent}. Installe-le depuis Aide → Configuration des agents.}}",
+  "session.start.providerMissing": "{resuming, select, yes {{provider} est nécessaire pour reprendre cette conversation. Installe-le depuis Aide → Configuration des fournisseurs.} other {{provider} est nécessaire pour exécuter l’agent {agent}. Installe-le depuis Aide → Configuration des fournisseurs.}}",
   "session.start.providerOff": "Le fournisseur {provider} est désactivé. {resuming, select, yes {Active-le dans Paramètres → Fournisseurs pour reprendre cette conversation.} other {Active-le dans Paramètres → Fournisseurs pour exécuter l’agent {agent}.}}",
   "session.start.removing": "Ce projet est en cours de retrait",
   "session.start.repairing": "Hive répare cet espace de travail déplacé : démarre l’agent une fois la réparation terminée.",

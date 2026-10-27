@@ -693,7 +693,7 @@ describe('saving and loading templates', () => {
       const swapped = await run(() => templates.templatePlan(beta, 'hive', 'pair.json'))
       expect([swapped.blocked, swapped.create.map((a) => a.provider), swapped.swaps]).toEqual([[], ['claude-code', 'claude-code'], [{ index: 1, from: 'codex', to: 'claude-code', problem: 'notInstalled' }]])
       const mine = await run(() => templates.duplicateTemplate({ scope: 'hive', file: 'pair.json' }, { scope: 'workspace' }))
-      expect((await run(() => templates.templatePlan(beta, 'workspace', mine.file))).blocked).toEqual([expect.stringMatching(/Codex isn't installed \(Agent Setup\), needed by/)])
+      expect((await run(() => templates.templatePlan(beta, 'workspace', mine.file))).blocked).toEqual([expect.stringMatching(/Codex isn't installed \(Provider Setup\), needed by/)])
       await run(() => templates.deleteTemplate({ scope: 'workspace', file: mine.file }))
     } finally {
       providerService.info = info

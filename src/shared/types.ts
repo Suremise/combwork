@@ -2874,7 +2874,7 @@ export interface AgentInstallInfo {
   authMethod: string | null
   /** The account it is signed in as, when the CLI says without Hive reading a secret (Copilot, #452). */
   account?: string | null
-  /** Short notes Agent Setup shows under the sign-in (Copilot's Free plan runs Auto only). */
+  /** Short notes Provider Setup shows under the sign-in (Copilot's Free plan runs Auto only). */
   notes?: string[]
   checking?: boolean
   /** Candidates skipped because they belong to an editor extension rather than the standalone CLI. */
@@ -2919,7 +2919,7 @@ export interface ReadinessIssue {
   message: string
   /** Button: a provider task Hive runs in a terminal. */
   action?: { label: string; task: ProviderTask }
-  /** Shown in Agent Setup with the button: what the task will ask and how to choose (paragraphs, `code` allowed). */
+  /** Shown in Provider Setup with the button: what the task will ask and how to choose (paragraphs, `code` allowed). */
   detail?: string[]
 }
 

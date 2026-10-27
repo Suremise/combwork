@@ -216,7 +216,7 @@
     "description": "A command (the Help menu, the command palette), in the Help category. {app} is Hive's name."
   },
   "shell.command.help.agentSetup": {
-    "defaultMessage": "Agent Setup…",
+    "defaultMessage": "Provider Setup…",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category. The … says it opens a dialog first: keep it."
   },
   "shell.command.help.api": {
@@ -741,7 +741,7 @@
   },
   "shell.copyCode.copy": {
     "defaultMessage": "Copy {code}",
-    "description": "Tooltip of the small Copy button beside a command or path shown as code (Agent Setup, say): {code} is exactly what it copies."
+    "description": "Tooltip of the small Copy button beside a command or path shown as code (Provider Setup, say): {code} is exactly what it copies."
   },
   "shell.copyCode.label": {
     "defaultMessage": "Copy",
@@ -1065,11 +1065,11 @@
   },
   "shell.providers.setUp": {
     "defaultMessage": "Set up",
-    "description": "A provider's banner's button when Hive names no other action: opens Agent Setup."
+    "description": "A provider's banner's button when Hive names no other action: opens Provider Setup."
   },
   "shell.providers.setup": {
-    "defaultMessage": "Agent Setup",
-    "description": "The banner's button: opens Agent Setup."
+    "defaultMessage": "Provider Setup",
+    "description": "The banner's button: opens Provider Setup."
   },
   "shell.quit.action": {
     "defaultMessage": "{action, select, saveAndClose {Save and close} closeWorkspace {Close workspace} switchWorkspace {Switch workspace} closeWindow {Close window} saveAndQuit {Save and quit} other {Quit}}",
@@ -1205,127 +1205,127 @@
   },
   "shell.setup.checkAgain": {
     "defaultMessage": "Check again",
-    "description": "Agent Setup's button: looks for the CLI, git and updates again."
+    "description": "Provider Setup's button: looks for the CLI, git and updates again."
   },
   "shell.setup.connections": {
     "defaultMessage": "{n, plural, =0 {{cli} signs in per connection, and none is on in this workspace yet: add one and sign it in.} one {{cli} signs in per connection: # is on in this workspace.} other {{cli} signs in per connection: # are on in this workspace.}}",
-    "description": "Agent Setup, for a coding agent CLI ({cli}: \"Claude Code\") that signs in per connection (Settings → Connections) rather than here (HI-1774). {n} is how many of its connections are on in the open workspace."
+    "description": "Provider Setup, for a coding agent CLI ({cli}: \"Claude Code\") that signs in per connection (Settings → Connections) rather than here (HI-1774). {n} is how many of its connections are on in the open workspace."
   },
   "shell.setup.docs": {
     "defaultMessage": "{provider} docs",
-    "description": "Agent Setup's button: opens the coding agent's own documentation. {provider} is its name."
+    "description": "Provider Setup's button: opens the coding agent's own documentation. {provider} is its name."
   },
   "shell.setup.done": {
     "defaultMessage": "{what} You can close this window.",
-    "description": "Agent Setup after a task did its job. {what} says what happened."
+    "description": "Provider Setup after a task did its job. {what} says what happened."
   },
   "shell.setup.found": {
     "defaultMessage": "<b>{provider} {version}</b> <muted>— found via {source}</muted>",
-    "description": "Agent Setup: the CLI Hive found. {provider} is its name, {version} its version, {source} where it was found (PATH, an install folder); <b> is bold, <muted> greyed."
+    "description": "Provider Setup: the CLI Hive found. {provider} is its name, {version} its version, {source} where it was found (PATH, an install folder); <b> is bold, <muted> greyed."
   },
   "shell.setup.gitMissing": {
     "defaultMessage": "Git not found",
-    "description": "Agent Setup when Hive finds no git. Git is a name: keep it."
+    "description": "Provider Setup when Hive finds no git. Git is a name: keep it."
   },
   "shell.setup.gitOk": {
     "defaultMessage": "<b>Git {version}</b> <muted>— for worktrees, merging and the Version Control tab</muted>",
-    "description": "Agent Setup: the git Hive found. {version} is its version; <b> is bold, <muted> greyed. Git is a name: keep it."
+    "description": "Provider Setup: the git Hive found. {version} is its version; <b> is bold, <muted> greyed. Git is a name: keep it."
   },
   "shell.setup.gitOld": {
     "defaultMessage": "Git {version} is older than {min}",
-    "description": "Agent Setup when the git found is too old. {version} and {min} are version numbers."
+    "description": "Provider Setup when the git found is too old. {version} and {min} are version numbers."
   },
   "shell.setup.gitOldDetail": {
     "defaultMessage": "{why} Update Git for Windows to {min} or later, then Check again.",
-    "description": "Agent Setup, under a too old git. {why} says why (in English for now); Git for Windows is a product's name; Check again is the dialog's button."
+    "description": "Provider Setup, under a too old git. {why} says why (in English for now); Git for Windows is a product's name; Check again is the dialog's button."
   },
   "shell.setup.gitProblemDetail": {
     "defaultMessage": "{problem}: worktree agents, merging, the Version Control tab's Git sections and the unmerged counts don't work. {fix}",
-    "description": "Agent Setup under a git problem. {problem} and {fix} say what is wrong and what to do (in English for now)."
+    "description": "Provider Setup under a git problem. {problem} and {fix} say what is wrong and what to do (in English for now)."
   },
   "shell.setup.gitUnknown": {
     "defaultMessage": "Couldn't check Git",
-    "description": "Agent Setup when Hive couldn't run git to check it."
+    "description": "Provider Setup when Hive couldn't run git to check it."
   },
   "shell.setup.gitUnknownDetail": {
     "defaultMessage": "{error}. Hive needs Git {min} or later for worktrees, merging and the Version Control tab.",
-    "description": "Agent Setup when git couldn't be checked. {error} is the error, as given."
+    "description": "Provider Setup when git couldn't be checked. {error} is the error, as given."
   },
   "shell.setup.install": {
     "defaultMessage": "Install {provider}",
-    "description": "Agent Setup's button: installs the CLI. {provider} is its name."
+    "description": "Provider Setup's button: installs the CLI. {provider} is its name."
   },
   "shell.setup.installed": {
     "defaultMessage": "{provider} is installed and Hive has found it: agents you start now can use it, without restarting Hive (the installer's advice to restart your terminal is for terminals already open). Agents already running get the new PATH when they restart.",
-    "description": "Agent Setup, after an install found the coding agent's CLI. {provider} is its name; PATH is a Windows setting: keep it."
+    "description": "Provider Setup, after an install found the coding agent's CLI. {provider} is its name; PATH is a Windows setting: keep it."
   },
   "shell.setup.looking": {
     "defaultMessage": "Looking for {provider}…",
-    "description": "Agent Setup while Hive looks for a CLI. {provider} is its name."
+    "description": "Provider Setup while Hive looks for a CLI. {provider} is its name."
   },
   "shell.setup.lookingForGit": {
     "defaultMessage": "Looking for Git…",
-    "description": "Agent Setup while Hive looks for git."
+    "description": "Provider Setup while Hive looks for git."
   },
   "shell.setup.notFound": {
     "defaultMessage": "The install ended, but Hive can't find {provider}. If the installer reported an error, it's shown below; if it says it worked, Check again, or set {provider}'s path in Settings → {provider}.",
-    "description": "Agent Setup, after an install ended without Hive finding the CLI. {provider} is its name; Check again is the dialog's button."
+    "description": "Provider Setup, after an install ended without Hive finding the CLI. {provider} is its name; Check again is the dialog's button."
   },
   "shell.setup.notInstalled": {
     "defaultMessage": "{provider} is not installed",
-    "description": "Agent Setup when a CLI isn't installed. {provider} is its name."
+    "description": "Provider Setup when a CLI isn't installed. {provider} is its name."
   },
   "shell.setup.notInstalledDetail": {
     "defaultMessage": "Hive runs the standalone {provider} command-line tool in each project. It isn't bundled with Hive — install it with {company}'s official installer.",
-    "description": "Agent Setup, under \"<provider> is not installed\". {provider} is the coding agent's name, {company} its maker's."
+    "description": "Provider Setup, under \"<provider> is not installed\". {provider} is the coding agent's name, {company} its maker's."
   },
   "shell.setup.off": {
     "defaultMessage": "{provider} is turned off, so Hive doesn't run it. <on>Turn it on</on>",
-    "description": "Agent Setup for a provider that is turned off. {provider} is its name; <on> is a link that turns it on."
+    "description": "Provider Setup for a provider that is turned off. {provider} is its name; <on> is a link that turns it on."
   },
   "shell.setup.openConnections": {
     "defaultMessage": "Open Connections",
-    "description": "Agent Setup's button: opens Settings → Connections, where a coding agent CLI's connections are added and signed in."
+    "description": "Provider Setup's button: opens Settings → Connections, where a coding agent CLI's connections are added and signed in."
   },
   "shell.setup.rejected": {
     "defaultMessage": "{n, plural, one {Ignored a copy} other {Ignored copies}} bundled with an editor extension ({path}). Hive only uses the standalone CLI.",
-    "description": "Agent Setup when it found a CLI only inside an editor's extension. {n} is how many; {path} is where (one of them)."
+    "description": "Provider Setup when it found a CLI only inside an editor's extension. {n} is how many; {path} is where (one of them)."
   },
   "shell.setup.setUp": {
     "defaultMessage": "{provider} is set up.",
-    "description": "Agent Setup after a setup step. {provider} is the coding agent's name."
+    "description": "Provider Setup after a setup step. {provider} is the coding agent's name."
   },
   "shell.setup.signedIn": {
     "defaultMessage": "{provider} is signed in.",
-    "description": "Agent Setup after signing in. {provider} is the coding agent's name."
+    "description": "Provider Setup after signing in. {provider} is the coding agent's name."
   },
   "shell.setup.signedInAs": {
     "defaultMessage": "{account, select, none {Signed in} other {Signed in as {account}}}{method, select, none {} other { ({method})}}",
-    "description": "A badge in Agent Setup: the CLI is signed in. {account} is the account, {method} how it signed in (none: not known)."
+    "description": "A badge in Provider Setup: the CLI is signed in. {account} is the account, {method} how it signed in (none: not known)."
   },
   "shell.setup.startFailed": {
     "defaultMessage": "Could not start",
-    "description": "An error's title: Agent Setup couldn't start an install, an update or a sign-in."
+    "description": "An error's title: Provider Setup couldn't start an install, an update or a sign-in."
   },
   "shell.setup.tabOff": {
     "defaultMessage": "{provider}<faint> (off)</faint>",
-    "description": "A tab of Agent Setup for a provider that is turned off. {provider} is its name; <faint> is greyed."
+    "description": "A tab of Provider Setup for a provider that is turned off. {provider} is its name; <faint> is greyed."
   },
   "shell.setup.testedAt": {
     "defaultMessage": "Hive's tests ran against {version} on {date}",
-    "description": "Tooltip of Agent Setup's tested-version line. {version} is the CLI's version; {date} when Hive's tests ran."
+    "description": "Tooltip of Provider Setup's tested-version line. {version} is the CLI's version; {date} when Hive's tests ran."
   },
   "shell.setup.title": {
-    "defaultMessage": "Agent Setup",
-    "description": "The title of Help → Agent Setup."
+    "defaultMessage": "Provider Setup",
+    "description": "The title of Help → Provider Setup."
   },
   "shell.setup.upToDate": {
     "defaultMessage": "Up to date",
-    "description": "A badge in Agent Setup: the CLI is the newest version."
+    "description": "A badge in Provider Setup: the CLI is the newest version."
   },
   "shell.setup.updated": {
     "defaultMessage": "{provider} is up to date.",
-    "description": "Agent Setup after an update. {provider} is the coding agent's name."
+    "description": "Provider Setup after an update. {provider} is the coding agent's name."
   },
   "shell.shortcuts.copyPaste": {
     "defaultMessage": "Copy selection / paste",

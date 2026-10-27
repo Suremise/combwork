@@ -588,7 +588,7 @@
     "description": "A tip's title."
   },
   "tips.copilot.text": {
-    "defaultMessage": "Agents can use the GitHub Copilot CLI, Copilot Free included. Agent Setup installs it and says who it is signed in as: its own login or the GitHub CLI’s.",
+    "defaultMessage": "Agents can use the GitHub Copilot CLI, Copilot Free included. Provider Setup installs it and says who it is signed in as: its own login or the GitHub CLI’s.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.copilot.title": {
@@ -708,7 +708,7 @@
     "description": "A tip's title (#1630)."
   },
   "tips.gitCheck.text": {
-    "defaultMessage": "Help → Agent Setup… shows the git Hive found and its version. Worktree agents, merging and the Version Control tab’s Git sections need Git for Windows 2.38 or later.",
+    "defaultMessage": "Help → Provider Setup… shows the git Hive found and its version. Worktree agents, merging and the Version Control tab’s Git sections need Git for Windows 2.38 or later.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.gitCheck.title": {
@@ -1636,7 +1636,7 @@
     "description": "A tip's title."
   },
   "tips.testedClis.text": {
-    "defaultMessage": "Claude Code, Codex and Copilot update on their own. Agent Setup shows the version this Hive release was tested with next to the one you have, and says when yours is newer or older.",
+    "defaultMessage": "Claude Code, Codex and Copilot update on their own. Provider Setup shows the version this Hive release was tested with next to the one you have, and says when yours is newer or older.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.testedClis.title": {

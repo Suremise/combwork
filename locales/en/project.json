@@ -288,8 +288,8 @@
     "description": "Under Cache writes."
   },
   "project.changes.agentSetup": {
-    "defaultMessage": "Agent Setup",
-    "description": "Button: opens Agent Setup, which checks git and says how to fix it."
+    "defaultMessage": "Provider Setup",
+    "description": "Button: opens Provider Setup, which checks git and says how to fix it."
   },
   "project.changes.agentSlot": {
     "defaultMessage": "{agent} · {place}{known, select, yes { · {branch}} other {}}",
@@ -736,8 +736,8 @@
     "description": "Heading of the Session tab when the focused agent (of several) has no session running. {agent} is its name."
   },
   "project.empty.providerMissing": {
-    "defaultMessage": "{provider} is required — Help → Agent Setup",
-    "description": "Warning on the Session tab when the agent's CLI isn't installed. Help → Agent Setup is the menu item."
+    "defaultMessage": "{provider} is required — Help → Provider Setup",
+    "description": "Warning on the Session tab when the agent's CLI isn't installed. Help → Provider Setup is the menu item."
   },
   "project.empty.providerOff": {
     "defaultMessage": "{provider} is turned off — Settings → Providers",

@@ -42,7 +42,7 @@ Translate the meaning, not the words, and keep the result as short and plain.
   *Revisión*, *Aprobado* (Approved, was Passed), with *Fusionando* (Merging) inside Aprobado, and *Hecho*. In running
   text name the column (*en la columna Revisión*, *pasa a Hecho*) so a sentence never reads *en En curso*.
 - **Where things are:** paths through menus and settings keep Hive's arrows, with each name as Hive shows it in Spanish:
-  *Configuración → Proveedores*, *Ayuda → Configuración de agentes*.
+  *Configuración → Proveedores*, *Ayuda → Configuración de proveedores*.
 
 ## Grammar
 

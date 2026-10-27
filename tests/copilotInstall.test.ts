@@ -6,7 +6,7 @@ import { redactLog } from '../src/shared/redact'
 import { copilotCheckEnv, copilotReadiness, copilotSignIn, copilotUpdateCommand, copilotUpdateRetry, ignoredTokens, installKind, parseCopilotConfig, parseCopilotVersion, parseGhStatus, storedLogin } from '../src/main/providers/copilot/install'
 import { tempDir } from './tempDir'
 
-// Agent Setup's Copilot readiness (#452): which sign-in its agents get, from the CLI's config.json (login names only),
+// Provider Setup's Copilot readiness (#452): which sign-in its agents get, from the CLI's config.json (login names only),
 // the environment (set or not, never read) and `gh auth status` (account and state, never the token). CLI 1.0.93.
 
 /** A config.json as Copilot 1.0.93 writes it: a comment line, then JSON. */

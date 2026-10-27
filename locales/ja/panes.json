@@ -40,7 +40,7 @@
   "panes.empty.onPage": "ページ{page}",
   "panes.failed.dismiss": "閉じる（出力はターミナルに残ります）",
   "panes.failed.retry": "再試行",
-  "panes.failed.setup": "エージェントのセットアップ…",
+  "panes.failed.setup": "プロバイダーのセットアップ…",
   "panes.failed.title": "開始できませんでした：",
   "panes.footer.compactionHistory": "クリックするとコンパクト化の履歴を表示します",
   "panes.footer.compactions": "{n, plural, other {これまでに#回コンパクト化}}{over, select, yes {（コンパクト化を検討してください）} other {}}",

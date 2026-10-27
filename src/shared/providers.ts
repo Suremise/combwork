@@ -23,7 +23,7 @@ export interface ModeText {
   short?: Msg
 }
 
-/** A provider's notes in the window's words (Agent Setup, a pane's sign-in and safeguard notes). */
+/** A provider's notes in the window's words (Provider Setup, a pane's sign-in and safeguard notes). */
 export interface ProviderText {
   installNote: Msg
   extensionNote: Msg
@@ -258,9 +258,9 @@ export interface ProviderDescriptor {
    * `known` is what the CLI reported about the model (models.ts modelCaps), which replaces any guess.
    */
   modeCaveat?: (mode: PermissionMode, model: string, known?: ModeCaveatFacts, tr?: Tr) => string | null
-  /** Agent Setup: how the installer works and which accounts can sign in. */
+  /** Provider Setup: how the installer works and which accounts can sign in. */
   installNote: string
-  /** Agent Setup, when only an editor extension's copy was found: why Hive doesn't use it. */
+  /** Provider Setup, when only an editor extension's copy was found: why Hive doesn't use it. */
   extensionNote: string
   /** How to sign in again once its sign-in has expired, while agents wait (the needs sign-in status, #309). */
   signInHelp: string
@@ -503,14 +503,14 @@ export function defaultProviderWarning(
   const chosen = chosenDefaultProvider(cfg, settings)
   const say = (why: 'off' | 'missing' | 'noneOn' | 'noneInstalled', provider = ''): string =>
     tr
-      ? tr(msg({ id: 'agents.provider.warning', defaultMessage: "{why, select, off {{provider} is turned off — Settings → Providers} missing {{provider} isn't installed — Help → Agent Setup} noneOn {No coding agents are turned on — Settings → Providers} other {No coding agent CLI is installed — Help → Agent Setup}}", description: "A warning about a project's new agents' provider ({provider}: its name): turned off, not installed, none turned on, or no CLI installed. Settings → Providers and Help → Agent Setup are places in Hive where it is fixed." }), { why, provider })
+      ? tr(msg({ id: 'agents.provider.warning', defaultMessage: "{why, select, off {{provider} is turned off — Settings → Providers} missing {{provider} isn't installed — Help → Provider Setup} noneOn {No coding agents are turned on — Settings → Providers} other {No coding agent CLI is installed — Help → Provider Setup}}", description: "A warning about a project's new agents' provider ({provider}: its name): turned off, not installed, none turned on, or no CLI installed. Settings → Providers and Help → Provider Setup are places in Hive where it is fixed." }), { why, provider })
       : why === 'off'
         ? `${provider} is turned off — Settings → Providers` // i18n-ignore: English without tr (its caller in another area passes tr once converted)
         : why === 'missing'
-          ? `${provider} isn't installed — Help → Agent Setup` // i18n-ignore: English without tr
+          ? `${provider} isn't installed — Help → Provider Setup` // i18n-ignore: English without tr
           : why === 'noneOn'
             ? 'No coding agents are turned on — Settings → Providers' // i18n-ignore: English without tr
-            : 'No coding agent CLI is installed — Help → Agent Setup' // i18n-ignore: English without tr
+            : 'No coding agent CLI is installed — Help → Provider Setup' // i18n-ignore: English without tr
   if (chosen) {
     if (!isProviderEnabled(settings, chosen)) return { text: say('off', providerName(chosen)), fix: 'providers' }
     const i = info(chosen)
@@ -540,7 +540,7 @@ export function providersInUse(
 }
 
 /**
- * Which providers' problems Hive shows (the banner, the status bar, Agent Setup opening by itself): when none of the
+ * Which providers' problems Hive shows (the banner, the status bar, Provider Setup opening by itself): when none of the
  * providers turned on is installed, that alone (`noneInstalled`: one warning, not one per CLI); else those turned on and
  * in use (providersInUse). `info` is what Hive found. While it is still looking for one not found yet (at start),
  * nothing: Automatic's pick isn't known until then.
@@ -583,9 +583,9 @@ export function modeCaveat(provider: ProviderId, mode: PermissionMode | '' | nul
 
 /** Where Hive finds a CLI (AgentInstallInfo.source, as the adapters name it) in the window's words; PATH, npm and WinGet are names (#885). */
 const INSTALL_SOURCES: Record<string, Msg> = {
-  settings: msg({ id: 'agents.installSource.settings', defaultMessage: 'Settings', description: "Where Hive found a coding agent's CLI: the path set in Settings (the provider's page). Shown as \"found via Settings\" (Agent Setup), in Help → About and in Settings." }),
-  'native install': msg({ id: 'agents.installSource.native', defaultMessage: 'native install', description: "Where Hive found a coding agent's CLI: the folder its native installer puts it in. Shown as \"found via native install\" (Agent Setup), in Help → About and in Settings." }),
-  'standalone install': msg({ id: 'agents.installSource.standalone', defaultMessage: 'standalone install', description: "Where Hive found a coding agent's CLI: the folder its standalone installer puts it in. Shown as \"found via standalone install\" (Agent Setup), in Help → About and in Settings." })
+  settings: msg({ id: 'agents.installSource.settings', defaultMessage: 'Settings', description: "Where Hive found a coding agent's CLI: the path set in Settings (the provider's page). Shown as \"found via Settings\" (Provider Setup), in Help → About and in Settings." }),
+  'native install': msg({ id: 'agents.installSource.native', defaultMessage: 'native install', description: "Where Hive found a coding agent's CLI: the folder its native installer puts it in. Shown as \"found via native install\" (Provider Setup), in Help → About and in Settings." }),
+  'standalone install': msg({ id: 'agents.installSource.standalone', defaultMessage: 'standalone install', description: "Where Hive found a coding agent's CLI: the folder its standalone installer puts it in. Shown as \"found via standalone install\" (Provider Setup), in Help → About and in Settings." })
 }
 
 /** Where Hive found a CLI, as the window shows it: its source's words, else the source as it is (a name: PATH, npm, WinGet). */

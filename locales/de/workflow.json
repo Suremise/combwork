@@ -278,7 +278,7 @@
   "workflow.refused.paths.excluded.message": "{card}: {path} liegt in {folder}, das ein Projekt ohne Versionsverwaltung aus seiner Arbeit herauslässt.",
   "workflow.refused.paths.excluded.next": "Gib nur die Dateien der Arbeit außerhalb von {folder} an: Die Pfade einer Karte grenzen die Arbeit des Projekts ein, erweitern sie aber nie.",
   "workflow.refused.platform.unknown.message": "{card}: Hive konnte {what} nicht lesen, daher kann die Regel {rule} nicht geprüft werden.",
-  "workflow.refused.platform.unknown.next": "Prüfe die Agent-Einrichtung oder den Ordner und versuch es dann noch einmal.",
+  "workflow.refused.platform.unknown.next": "Prüfe die Anbieter-Einrichtung oder den Ordner und versuch es dann noch einmal.",
   "workflow.refused.platform.unknown.nextGone": "Das Git-Repository des Projekts ist weg: Bitte den Benutzer, es wiederherzustellen oder das Projekt in seinem Tab „Versionsverwaltung“ auf „Keine“ umzustellen (ab der nächsten Karte).",
   "workflow.refused.queue.advancing.message": "{card} wird gerade in {target} gemergt: Die Karte kann nicht mehr aus der Merge-Warteschlange entfernt werden.",
   "workflow.refused.queue.advancing.next": "Warte, bis der Merge fertig ist. Wenn die Änderung nicht gewollt ist, mache sie in {target} rückgängig.",

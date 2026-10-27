@@ -227,7 +227,7 @@ describe("Copilot: other tools' GitHub tokens (row 8)", () => {
 
   it('are left out on every path with the switch on, and kept on every path with it off, the sign-in shown as the sessions get it', async () => {
     const launch = (): Record<string, string> => copilot.buildCommand('C:\\bin\\copilot.exe', context({ env })).env!
-    // On: the session, the sign-in check and the catalogue (copilotEnv) leave them out; Agent Setup says so.
+    // On: the session, the sign-in check and the catalogue (copilotEnv) leave them out; Provider Setup says so.
     expect(launch().GH_TOKEN).toBeUndefined()
     expect(launch().github_token).toBeUndefined()
     expect(launch().COPILOT_GITHUB_TOKEN).toBe('c')
@@ -239,7 +239,7 @@ describe("Copilot: other tools' GitHub tokens (row 8)", () => {
     expect(launch()).toMatchObject({ GH_TOKEN: 'gho_x', github_token: 'ghp_y', COPILOT_GITHUB_TOKEN: 'c' })
     expect(copilotCheckEnv({ PATH: 'C:\\bin', GH_TOKEN: 'gho_x' }).GH_TOKEN).toBe('gho_x')
     expect(copilotEnv(env).GH_TOKEN).toBe('gho_x')
-    // Nothing is left out, so Agent Setup names none, and the sign-in shown is the token's, as the sessions get it.
+    // Nothing is left out, so Provider Setup names none, and the sign-in shown is the token's, as the sessions get it.
     expect(ignoredTokens({ GH_TOKEN: 'gho_x' })).toEqual([])
     expect(copilotSignIn(copilotCheckEnv({ GH_TOKEN: 'gho_x' }), null, null)).toMatchObject({ loggedIn: true, source: 'token', variable: 'GH_TOKEN' })
   })

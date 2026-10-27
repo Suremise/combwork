@@ -286,7 +286,7 @@
   "workflow.refused.paths.excluded.message": "{card}: {path} is in {folder}, which a project without version control leaves out of its work.",
   "workflow.refused.paths.excluded.next": "Declare only the files of the work, outside {folder}: a card's paths narrow the project's work, never widen it.",
   "workflow.refused.platform.unknown.message": "{card}: Hive couldn't read {what}, so the rule {rule} can't be checked.",
-  "workflow.refused.platform.unknown.next": "Check Agent Setup or the folder, then try again.",
+  "workflow.refused.platform.unknown.next": "Check Provider Setup or the folder, then try again.",
   "workflow.refused.platform.unknown.nextGone": "The project's Git repository is gone: ask the user to restore it, or to switch the project to None in its Version Control tab (from the next card).",
   "workflow.refused.queue.advancing.message": "{card} is being merged into {target} now: it can no longer be taken out of the merge queue.",
   "workflow.refused.queue.advancing.next": "Wait for the merge to finish. If the change isn't wanted, revert it in {target}.",

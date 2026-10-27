@@ -70,7 +70,7 @@ const listFailed = (): string => tr(msg({ id: 'actions.session.listFailed', defa
 
 /** Why a batch couldn't run an agent: its CLI is off or not installed (thrown, then listed in the batch's report). */
 const providerOff = (cli: string): string => tr(msg({ id: 'actions.batch.providerOff', defaultMessage: '{cli} is turned off in Settings → Providers.', description: "Why an agent couldn't start or resume in a batch (Resume All, Start New All): its CLI ({cli}) is turned off. Settings → Providers is where: use its translated names." }), { cli })
-const providerMissing = (cli: string): string => tr(msg({ id: 'actions.batch.providerMissing', defaultMessage: "{cli} isn't installed (Agent Setup).", description: "Why an agent couldn't start or resume in a batch: its CLI ({cli}) isn't installed. Agent Setup is a Help window: use its translated name." }), { cli })
+const providerMissing = (cli: string): string => tr(msg({ id: 'actions.batch.providerMissing', defaultMessage: "{cli} isn't installed (Provider Setup).", description: "Why an agent couldn't start or resume in a batch: its CLI ({cli}) isn't installed. Provider Setup is a Help window: use its translated name." }), { cli })
 
 /** A batch's report: each failure, then the agents it did ({done}: "Resumed: B1, B2"), one a line. */
 function batchReport(failed: readonly { name: string; error: string }[], doneLine: string | null, trail: readonly string[] = []): string {
@@ -311,7 +311,7 @@ async function ensureAgent(path: string, agentId: string, resumes?: ProviderId):
 /**
  * A provider once Hive has looked for the CLIs it depends on (#506), at most 20 s: at start, Automatic's pick (when
  * `auto` says it is used) and whether a CLI is installed aren't known yet, and deciding then would pick the wrong
- * provider or open Agent Setup. Null, said to the user, when Hive is still looking after that: nothing is decided from a guess.
+ * provider or open Provider Setup. Null, said to the user, when Hive is still looking after that: nothing is decided from a guess.
  */
 async function detectedProvider(resolve: () => ProviderId, auto: () => boolean): Promise<ProviderId | null> {
   const settled = (): boolean => {
@@ -1305,7 +1305,7 @@ export async function saveTemplate(path: string): Promise<void> {
 /**
  * Loads a template into a project: it replaces every agent, so it says first who goes and who comes. Refused, saying
  * why, while an agent runs, a worktree has uncommitted work or a provider it needs is off or not installed (with a way
- * into Agent Setup or Settings). `from`: the project a project's template is kept in, when it isn't this one (the Templates
+ * into Provider Setup or Settings). `from`: the project a project's template is kept in, when it isn't this one (the Templates
  * view loads any template into any project). A preset it suggests that the project's options didn't start from is
  * offered (#1436): ticked, the Version Control tab's Workflow section opens with it chosen, not saved, so what it changes
  * shows before anything is.
@@ -1322,7 +1322,7 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
       title: tr(msg({ id: 'actions.template.blockedTitle', defaultMessage: 'Can\'t load "{name}" yet', description: "Title of the message when a template ({name}) can't be loaded now (an agent runs, a provider is off…)." }), { name: plan.name }),
       message: tr(msg({ id: 'actions.template.blockedMessage', defaultMessage: "It can't be loaded into {project, select, none {this project} other {{project}}} yet:", description: "Above the reasons a template can't be loaded into a project ({project}; none when unknown)." }), { project: where ?? 'none' }),
       detail: plan.blocked.map((b) => `• ${b}`).join('\n'),
-      choices: [...(fix ? [{ label: tr(msg({ id: 'actions.template.openSetup', defaultMessage: 'Open Agent Setup', description: 'Button: opens Agent Setup (a Help window) to install a missing CLI.' })), value: 'setup' }] : []), { label: tr(msg({ id: 'actions.template.ok', defaultMessage: 'OK', description: "Button: closes the message that a template can't be loaded yet." })), value: 'ok' }]
+      choices: [...(fix ? [{ label: tr(msg({ id: 'actions.template.openSetup', defaultMessage: 'Open Provider Setup', description: 'Button: opens Provider Setup (a Help window) to install a missing CLI.' })), value: 'setup' }] : []), { label: tr(msg({ id: 'actions.template.ok', defaultMessage: 'OK', description: "Button: closes the message that a template can't be loaded yet." })), value: 'ok' }]
     })
     if (choice === 'setup' && fix) set({ setupOpen: fix })
     else if (off) notify('warning', tr(msg({ id: 'actions.template.providerOff', defaultMessage: 'A provider it needs is turned off', description: "A warning's title: a template needs a CLI that is turned off." })), tr(msg({ id: 'actions.template.providerOffMessage', defaultMessage: 'Turn it on in Settings → Providers, then load the template again.', description: 'Under the warning that a template needs a CLI that is turned off. Settings → Providers is where: use its translated names.' })), [{ label: openSettingsLabel(), command: 'settings.providers' }])
@@ -1666,8 +1666,8 @@ export async function refreshProviders(): Promise<void> {
   if (!enabled.length) return notify('info', tr(msg({ id: 'actions.providers.noneOn', defaultMessage: 'No providers are turned on', description: "A notification's title: no coding agent CLI is turned on in Settings." })), tr(msg({ id: 'actions.providers.noneOnMessage', defaultMessage: 'Turn on Claude Code or another provider in Settings → Providers.', description: 'Under the notification that no provider is on. Claude Code is a name; Settings → Providers is where: use its translated names.' })), [{ label: openSettingsLabel(), command: 'settings.providers' }])
   for (const info of enabled) {
     const name = providerName(info.provider)
-    if (!info.found) notify('warning', tr(msg({ id: 'actions.providers.notInstalled', defaultMessage: '{cli} not installed', description: "A warning's title: a coding agent CLI ({cli}: \"Codex\") isn't installed." }), { cli: name }), tr(msg({ id: 'actions.providers.notInstalledMessage', defaultMessage: 'Open Help → Agent Setup to install it.', description: "Under the warning that a CLI isn't installed. Help → Agent Setup is a menu command: use its translated names." })), [{ label: tr(msg({ id: 'actions.providers.agentSetup', defaultMessage: 'Agent Setup', description: "A notification's button: opens Agent Setup (a Help window). Keep it short." })), command: 'help.agentSetup' }])
-    else if (info.updateAvailable) notify('info', tr(msg({ id: 'actions.providers.updateTitle', defaultMessage: '{cli} {version} is available', description: "A notification's title: a newer version ({version}) of a CLI ({cli}) is out." }), { cli: name, version: info.latestVersion ?? '' }), tr(msg({ id: 'actions.providers.youHave', defaultMessage: 'You have {version}.', description: 'Under the notification that a newer CLI is out: the installed version ({version}).' }), { version: info.version ?? '' }), [{ label: tr(msg({ id: 'actions.providers.update', defaultMessage: 'Update', description: "A notification's button: opens Agent Setup to update the CLI. Keep it short." })), command: 'help.agentSetup', args: [info.provider] }])
+    if (!info.found) notify('warning', tr(msg({ id: 'actions.providers.notInstalled', defaultMessage: '{cli} not installed', description: "A warning's title: a coding agent CLI ({cli}: \"Codex\") isn't installed." }), { cli: name }), tr(msg({ id: 'actions.providers.notInstalledMessage', defaultMessage: 'Open Help → Provider Setup to install it.', description: "Under the warning that a CLI isn't installed. Help → Provider Setup is a menu command: use its translated names." })), [{ label: tr(msg({ id: 'actions.providers.agentSetup', defaultMessage: 'Provider Setup', description: "A notification's button: opens Provider Setup (a Help window). Keep it short." })), command: 'help.agentSetup' }])
+    else if (info.updateAvailable) notify('info', tr(msg({ id: 'actions.providers.updateTitle', defaultMessage: '{cli} {version} is available', description: "A notification's title: a newer version ({version}) of a CLI ({cli}) is out." }), { cli: name, version: info.latestVersion ?? '' }), tr(msg({ id: 'actions.providers.youHave', defaultMessage: 'You have {version}.', description: 'Under the notification that a newer CLI is out: the installed version ({version}).' }), { version: info.version ?? '' }), [{ label: tr(msg({ id: 'actions.providers.update', defaultMessage: 'Update', description: "A notification's button: opens Provider Setup to update the CLI. Keep it short." })), command: 'help.agentSetup', args: [info.provider] }])
     else notify('success', tr(msg({ id: 'actions.providers.upToDate', defaultMessage: '{cli} is up to date', description: "A notification's title: a CLI ({cli}) is the latest version." }), { cli: name }), tr(msg({ id: 'actions.providers.version', defaultMessage: 'Version {version}', description: 'Under the notification that a CLI is up to date: its version ({version}).' }), { version: info.version ?? '' }))
   }
 }

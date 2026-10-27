@@ -278,7 +278,7 @@
   "workflow.refused.paths.excluded.message": "{card}：{path}は{folder}の中にあります。バージョン管理のないプロジェクトでは、ここは作業に含まれません。",
   "workflow.refused.paths.excluded.next": "{folder}の外にある作業ファイルだけを宣言してください。カードのパスはプロジェクトの作業を絞り込むもので、広げることはありません。",
   "workflow.refused.platform.unknown.message": "{card}：Hiveは{what}を読み取れなかったため、ルール「{rule}」を確認できません。",
-  "workflow.refused.platform.unknown.next": "「エージェントのセットアップ」またはフォルダーを確認してから、もう一度試してください。",
+  "workflow.refused.platform.unknown.next": "「プロバイダーのセットアップ」またはフォルダーを確認してから、もう一度試してください。",
   "workflow.refused.platform.unknown.nextGone": "プロジェクトのGitリポジトリが見つかりません。ユーザーに復元を依頼するか、「バージョン管理」タブでプロジェクトを「なし」に切り替えるよう依頼してください（次のカードから適用）。",
   "workflow.refused.queue.advancing.message": "{card}は今{target}にマージされています。もうマージキューから外せません。",
   "workflow.refused.queue.advancing.next": "マージが終わるまで待ってください。変更が不要なら、{target}で元に戻してください。",

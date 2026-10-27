@@ -261,11 +261,11 @@
   },
   "agents.claude.extensionNote": {
     "defaultMessage": "You have the Claude Code extension for VS Code (or a similar editor). Hive doesn't use it — the extension's built-in copy moves with every extension update and can't be updated on its own. Install the CLI; your extension keeps working as before.",
-    "description": "Agent Setup → Claude Code, when only an editor extension was found: why Hive needs the standalone CLI."
+    "description": "Provider Setup → Claude Code, when only an editor extension was found: why Hive needs the standalone CLI."
   },
   "agents.claude.installNote": {
     "defaultMessage": "The installer runs `irm https://claude.ai/install.ps1 | iex` in PowerShell and installs to `%USERPROFILE%\\.local\\bin`. After installing, sign in with your Claude account (Pro, Max, Team or Enterprise) or an Anthropic Console account. If the CLI is installed somewhere else, set its path in Settings → Claude Code.",
-    "description": "Agent Setup → Claude Code: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Pro, Max, Team, Enterprise); Settings → Claude Code is a place in Hive's settings."
+    "description": "Provider Setup → Claude Code: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Pro, Max, Team, Enterprise); Settings → Claude Code is a place in Hive's settings."
   },
   "agents.claude.latestFable": {
     "defaultMessage": "Fable (latest)",
@@ -316,8 +316,8 @@
     "description": "What to do after Claude Code's safety classifier stopped a response (an agent's safeguard note). /feedback, /model and /config are commands: keep them."
   },
   "agents.claude.signInHelp": {
-    "defaultMessage": "Type /login in one of its agents’ terminals (that agent then carries on by itself), or use Help → Agent Setup → Claude Code → Sign in.",
-    "description": "How to sign in to Claude Code again after its sign-in expired (an agent's pane, a notification). /login is a command: keep it; Help → Agent Setup → Claude Code → Sign in is a menu path in Hive."
+    "defaultMessage": "Type /login in one of its agents’ terminals (that agent then carries on by itself), or use Help → Provider Setup → Claude Code → Sign in.",
+    "description": "How to sign in to Claude Code again after its sign-in expired (an agent's pane, a notification). /login is a command: keep it; Help → Provider Setup → Claude Code → Sign in is a menu path in Hive."
   },
   "agents.cliOwn.cliNote": {
     "defaultMessage": "Hive passed no mode, so the CLI's own screen shows the one it is in.",
@@ -353,7 +353,7 @@
   },
   "agents.codex.extensionNote": {
     "defaultMessage": "You have the Codex extension for VS Code (or a similar editor). Hive doesn't use it — the extension's built-in copy moves with every extension update. Install the CLI; your extension keeps working as before.",
-    "description": "Agent Setup → Codex, when only an editor extension was found: why Hive needs the standalone CLI."
+    "description": "Provider Setup → Codex, when only an editor extension was found: why Hive needs the standalone CLI."
   },
   "agents.codex.fullAccess": {
     "defaultMessage": "Full access",
@@ -365,7 +365,7 @@
   },
   "agents.codex.installNote": {
     "defaultMessage": "The installer runs `irm https://chatgpt.com/codex/install.ps1 | iex` in PowerShell and installs to `%LOCALAPPDATA%\\Programs\\OpenAI\\Codex`. After installing, sign in with your ChatGPT account (Plus, Pro, Business or Enterprise) or an API key, then set up its Windows sandbox once. If the CLI is installed somewhere else, set its path in Settings → Codex.",
-    "description": "Agent Setup → Codex: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Plus, Pro, Business, Enterprise); Settings → Codex is a place in Hive's settings."
+    "description": "Provider Setup → Codex: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Plus, Pro, Business, Enterprise); Settings → Codex is a place in Hive's settings."
   },
   "agents.codex.modelPlaceholder": {
     "defaultMessage": "Model ID, e.g. gpt-6-sol",
@@ -384,8 +384,8 @@
     "description": "What happens after Codex's safety check flags a request (an agent's safeguard note). Trusted Access for Cyber is the name of OpenAI's program: keep it."
   },
   "agents.codex.signInHelp": {
-    "defaultMessage": "Sign in again in Help → Agent Setup → Codex → Sign in (or run codex login in a terminal).",
-    "description": "How to sign in to Codex again after its sign-in expired (an agent's pane, a notification). Help → Agent Setup → Codex → Sign in is a menu path in Hive; codex login is a command: keep it."
+    "defaultMessage": "Sign in again in Help → Provider Setup → Codex → Sign in (or run codex login in a terminal).",
+    "description": "How to sign in to Codex again after its sign-in expired (an agent's pane, a notification). Help → Provider Setup → Codex → Sign in is a menu path in Hive; codex login is a command: keep it."
   },
   "agents.copilot.acceptEdits": {
     "defaultMessage": "Accept edits",
@@ -425,11 +425,11 @@
   },
   "agents.copilot.extensionNote": {
     "defaultMessage": "You have GitHub Copilot in VS Code (or a similar editor). Hive doesn't use the editor's copy — it moves with every extension update. Install the Copilot CLI; your extension keeps working as before.",
-    "description": "Agent Setup → GitHub Copilot, when only an editor extension was found: why Hive needs the standalone CLI."
+    "description": "Provider Setup → GitHub Copilot, when only an editor extension was found: why Hive needs the standalone CLI."
   },
   "agents.copilot.installNote": {
     "defaultMessage": "Install the GitHub Copilot CLI with WinGet (`winget install GitHub.Copilot`) or npm (`npm install -g @github/copilot`), then sign in once with `copilot login` in a terminal (or with the GitHub CLI, which Copilot also uses). Copilot Free runs the Auto model only; choosing a model needs a paid plan. If the CLI is installed somewhere else, set its path in Settings → GitHub Copilot.",
-    "description": "Agent Setup → GitHub Copilot: how to install it. Keep the commands in backticks exactly as they are; Copilot Free is a plan's name and Auto a model's; Settings → GitHub Copilot is a place in Hive's settings."
+    "description": "Provider Setup → GitHub Copilot: how to install it. Keep the commands in backticks exactly as they are; Copilot Free is a plan's name and Auto a model's; Settings → GitHub Copilot is a place in Hive's settings."
   },
   "agents.copilot.modelPlaceholder": {
     "defaultMessage": "Model ID, e.g. claude-sonnet-5.5 or auto",
@@ -448,8 +448,8 @@
     "description": "What GitHub Copilot's Plan mode does (the mode picker)."
   },
   "agents.copilot.signInHelp": {
-    "defaultMessage": "Sign in again: run copilot login in a terminal (Help → Agent Setup → GitHub Copilot shows how).",
-    "description": "How to sign in to GitHub Copilot again after its sign-in expired (an agent's pane, a notification). copilot login is a command: keep it; Help → Agent Setup → GitHub Copilot is a menu path in Hive."
+    "defaultMessage": "Sign in again: run copilot login in a terminal (Help → Provider Setup → GitHub Copilot shows how).",
+    "description": "How to sign in to GitHub Copilot again after its sign-in expired (an agent's pane, a notification). copilot login is a command: keep it; Help → Provider Setup → GitHub Copilot is a menu path in Hive."
   },
   "agents.dialog.busy": {
     "defaultMessage": "Busy. Choose it once it has finished.",
@@ -629,15 +629,15 @@
   },
   "agents.installSource.native": {
     "defaultMessage": "native install",
-    "description": "Where Hive found a coding agent's CLI: the folder its native installer puts it in. Shown as \"found via native install\" (Agent Setup), in Help → About and in Settings."
+    "description": "Where Hive found a coding agent's CLI: the folder its native installer puts it in. Shown as \"found via native install\" (Provider Setup), in Help → About and in Settings."
   },
   "agents.installSource.settings": {
     "defaultMessage": "Settings",
-    "description": "Where Hive found a coding agent's CLI: the path set in Settings (the provider's page). Shown as \"found via Settings\" (Agent Setup), in Help → About and in Settings."
+    "description": "Where Hive found a coding agent's CLI: the path set in Settings (the provider's page). Shown as \"found via Settings\" (Provider Setup), in Help → About and in Settings."
   },
   "agents.installSource.standalone": {
     "defaultMessage": "standalone install",
-    "description": "Where Hive found a coding agent's CLI: the folder its standalone installer puts it in. Shown as \"found via standalone install\" (Agent Setup), in Help → About and in Settings."
+    "description": "Where Hive found a coding agent's CLI: the folder its standalone installer puts it in. Shown as \"found via standalone install\" (Provider Setup), in Help → About and in Settings."
   },
   "agents.keys.clipboard": {
     "defaultMessage": "Ctrl+{key} is kept for copy, paste and undo.",
@@ -1248,8 +1248,8 @@
     "description": "A context tooltip: the last turn's input and output tokens, its thinking counted in the output."
   },
   "agents.provider.warning": {
-    "defaultMessage": "{why, select, off {{provider} is turned off — Settings → Providers} missing {{provider} isn't installed — Help → Agent Setup} noneOn {No coding agents are turned on — Settings → Providers} other {No coding agent CLI is installed — Help → Agent Setup}}",
-    "description": "A warning about a project's new agents' provider ({provider}: its name): turned off, not installed, none turned on, or no CLI installed. Settings → Providers and Help → Agent Setup are places in Hive where it is fixed."
+    "defaultMessage": "{why, select, off {{provider} is turned off — Settings → Providers} missing {{provider} isn't installed — Help → Provider Setup} noneOn {No coding agents are turned on — Settings → Providers} other {No coding agent CLI is installed — Help → Provider Setup}}",
+    "description": "A warning about a project's new agents' provider ({provider}: its name): turned off, not installed, none turned on, or no CLI installed. Settings → Providers and Help → Provider Setup are places in Hive where it is fixed."
   },
   "agents.resume.goneWorktree": {
     "defaultMessage": "It ran in a worktree no agent uses any more ({folder}). Add an agent for that worktree to resume it.",
@@ -1296,8 +1296,8 @@
     "description": "Why a session can't be resumed: its conversation's file is gone from the CLI ({cli}) and from Hive's backup."
   },
   "agents.resume.notInstalled": {
-    "defaultMessage": "{cli} isn't installed. Set it up in Agent Setup to resume it.",
-    "description": "Why a session can't be resumed: its CLI ({cli}) isn't installed. Agent Setup is a Help window: use its translated name."
+    "defaultMessage": "{cli} isn't installed. Set it up in Provider Setup to resume it.",
+    "description": "Why a session can't be resumed: its CLI ({cli}) isn't installed. Provider Setup is a Help window: use its translated name."
   },
   "agents.resume.providerOff": {
     "defaultMessage": "{cli} is turned off. Turn it on in Settings → Providers to resume it.",
@@ -1409,23 +1409,23 @@
   },
   "agents.tested.newer": {
     "defaultMessage": "This version came out after this Hive release was tested. Most updates work; if something behaves oddly, report it (Copy Diagnostics).",
-    "description": "Agent Setup: the installed CLI is newer than the one this Hive release was tested with. Copy Diagnostics is a Help command: use its translated name."
+    "description": "Provider Setup: the installed CLI is newer than the one this Hive release was tested with. Copy Diagnostics is a Help command: use its translated name."
   },
   "agents.tested.older": {
     "defaultMessage": "Older than tested; consider updating.",
-    "description": "Agent Setup: the installed CLI is older than the one this Hive release was tested with."
+    "description": "Provider Setup: the installed CLI is older than the one this Hive release was tested with."
   },
   "agents.tested.summary": {
     "defaultMessage": "Tested with {tested} · installed {installed}",
-    "description": "Agent Setup: the CLI version this Hive release was tested with ({tested}) and the one installed ({installed}), version numbers."
+    "description": "Provider Setup: the CLI version this Hive release was tested with ({tested}) and the one installed ({installed}), version numbers."
   },
   "agents.tested.summaryUnknown": {
     "defaultMessage": "Tested with {tested} · installed version unknown",
-    "description": "Agent Setup: the CLI version this Hive release was tested with ({tested}), and that the installed one's version isn't known."
+    "description": "Provider Setup: the CLI version this Hive release was tested with ({tested}), and that the installed one's version isn't known."
   },
   "agents.tested.unknown": {
     "defaultMessage": "Hive couldn't tell which version is installed, so it can't compare it with the tested one.",
-    "description": "Agent Setup: Hive couldn't read the installed CLI's version."
+    "description": "Provider Setup: Hive couldn't read the installed CLI's version."
   },
   "agents.workflowRole.builder": {
     "defaultMessage": "Builder",

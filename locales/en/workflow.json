@@ -1116,7 +1116,7 @@
     "description": "A refused move: a fact a rule needs could not be read (git missing, folder gone). {what} says what, {rule} the rule id."
   },
   "workflow.refused.platform.unknown.next": {
-    "defaultMessage": "Check Agent Setup or the folder, then try again.",
+    "defaultMessage": "Check Provider Setup or the folder, then try again.",
     "description": "The next step when Hive could not read what a rule needs."
   },
   "workflow.refused.platform.unknown.nextGone": {

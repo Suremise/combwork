@@ -79,7 +79,7 @@
   "main.gitInit.fix.staged": "prüfe die .gitignore auf eine Regel, die .hive zurückholt",
   "main.gitInit.nested": "Dieser Ordner liegt im Git-Repository in {root}. Bestätige, dass du darin ein eigenes Repository willst.",
   "main.gitInit.noEmail": "Git hat keine E-Mail-Adresse für den ersten Commit: Gib eine ein.",
-  "main.gitInit.noGit": "{problem}: Die Agent-Einrichtung zeigt, wie du das behebst.",
+  "main.gitInit.noGit": "{problem}: Die Anbieter-Einrichtung zeigt, wie du das behebst.",
   "main.gitInit.noName": "Git hat keinen Namen für den ersten Commit: Gib einen ein.",
   "main.gitInit.otherVcs": "{vcs} verwaltet diesen Ordner (in {root}): Hive legt ein Git-Repository nur dort an, wo kein anderes Versionskontrollsystem ist.",
   "main.gitInit.step.commit": "{n, plural, one {# Datei committet} other {# Dateien committet}}",

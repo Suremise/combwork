@@ -134,7 +134,7 @@ describe("a project's warning before it has agents", () => {
   })
 
   it('warns when nothing is installed, or nothing is turned on', () => {
-    expect(defaultProviderWarning(INHERIT, settings(ALL), installed([]))).toEqual({ text: 'No coding agent CLI is installed — Help → Agent Setup', fix: 'setup' })
+    expect(defaultProviderWarning(INHERIT, settings(ALL), installed([]))).toEqual({ text: 'No coding agent CLI is installed — Help → Provider Setup', fix: 'setup' })
     expect(defaultProviderWarning(INHERIT, settings([]), installed([]))).toEqual({ text: 'No coding agents are turned on — Settings → Providers', fix: 'providers' })
   })
 
@@ -144,13 +144,13 @@ describe("a project's warning before it has agents", () => {
   })
 
   it('names a chosen default that is missing or turned off', () => {
-    expect(defaultProviderWarning(INHERIT, settings(ALL, 'claude-code'), installed(['codex']))).toEqual({ text: "Claude Code isn't installed — Help → Agent Setup", fix: 'setup' })
+    expect(defaultProviderWarning(INHERIT, settings(ALL, 'claude-code'), installed(['codex']))).toEqual({ text: "Claude Code isn't installed — Help → Provider Setup", fix: 'setup' })
     expect(defaultProviderWarning({ defaultProvider: 'codex' }, settings(['copilot']), installed(['copilot']))).toEqual({ text: 'Codex is turned off — Settings → Providers', fix: 'providers' })
     expect(defaultProviderWarning(INHERIT, settings(ALL, 'codex'), installed(['codex']))).toBeNull()
   })
 })
 
-describe('which providers Hive warns about (the banner, the status bar, Agent Setup opening)', () => {
+describe('which providers Hive warns about (the banner, the status bar, Provider Setup opening)', () => {
   const ids = (w: ReturnType<typeof providerWarnings>) => w.providers.map((p) => p.id)
 
   it('not a provider only turned on: Automatic on Codex leaves a missing Claude Code alone', () => {

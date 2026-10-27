@@ -493,18 +493,18 @@ export function shownInstallInfo(info: AgentInstallInfo): AgentInstallInfo {
 }
 
 const READINESS = {
-  notInstalled: msg({ id: 'providers.readiness.notInstalled', defaultMessage: '{provider} is not installed.', description: "Agent Setup and Settings → Providers: Hive didn't find the coding agent's CLI. {provider} is its name (Claude Code)." }),
-  signedOut: msg({ id: 'providers.readiness.signedOut', defaultMessage: '{provider} is not signed in.', description: "Agent Setup and Settings → Providers: the coding agent's CLI has no sign-in. {provider} is its name." }),
-  update: msg({ id: 'providers.readiness.update', defaultMessage: '{provider} {version} is available.', description: 'Agent Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version.' }),
-  install: msg({ id: 'providers.action.install', defaultMessage: 'Install', description: "Agent Setup's button: installs the coding agent's CLI in a terminal." }),
-  signIn: msg({ id: 'providers.action.signIn', defaultMessage: 'Sign in', description: "Agent Setup's button: signs the coding agent's CLI in, in a terminal." }),
-  updateAction: msg({ id: 'providers.action.update', defaultMessage: 'Update', description: "Agent Setup's button: updates the coding agent's CLI in a terminal." })
+  notInstalled: msg({ id: 'providers.readiness.notInstalled', defaultMessage: '{provider} is not installed.', description: "Provider Setup and Settings → Providers: Hive didn't find the coding agent's CLI. {provider} is its name (Claude Code)." }),
+  signedOut: msg({ id: 'providers.readiness.signedOut', defaultMessage: '{provider} is not signed in.', description: "Provider Setup and Settings → Providers: the coding agent's CLI has no sign-in. {provider} is its name." }),
+  update: msg({ id: 'providers.readiness.update', defaultMessage: '{provider} {version} is available.', description: 'Provider Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version.' }),
+  install: msg({ id: 'providers.action.install', defaultMessage: 'Install', description: "Provider Setup's button: installs the coding agent's CLI in a terminal." }),
+  signIn: msg({ id: 'providers.action.signIn', defaultMessage: 'Sign in', description: "Provider Setup's button: signs the coding agent's CLI in, in a terminal." }),
+  updateAction: msg({ id: 'providers.action.update', defaultMessage: 'Update', description: "Provider Setup's button: updates the coding agent's CLI in a terminal." })
 }
 
-/** The CLI isn't installed: install it from Agent Setup. */
+/** The CLI isn't installed: install it from Provider Setup. */
 export const notInstalledIssue = (provider: string): ReadinessIssue => ({ id: 'not-installed', level: 'error', message: installText({ m: READINESS.notInstalled, values: { provider } }), action: { label: installText(READINESS.install), task: 'install' } })
 
-/** The CLI isn't signed in: sign in from Agent Setup, with what that does (`detail`). */
+/** The CLI isn't signed in: sign in from Provider Setup, with what that does (`detail`). */
 export const signedOutIssue = (provider: string, detail?: TextPart[]): ReadinessIssue => ({
   id: 'signed-out',
   level: 'error',

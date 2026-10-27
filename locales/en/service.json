@@ -757,11 +757,11 @@
   },
   "service.providers.retryUnavailable": {
     "defaultMessage": "This update retry is no longer available. Check again, then try Update.",
-    "description": "Agent Setup error when a user tries to retry an update whose failure is no longer current. Check again and Update are buttons."
+    "description": "Provider Setup error when a user tries to retry an update whose failure is no longer current. Check again and Update are buttons."
   },
   "service.providers.signInConnections": {
     "defaultMessage": "{cli} is signed in per connection: sign in from Settings → Connections.",
-    "description": "An error: Agent Setup was asked to sign a coding agent CLI ({cli}: \"Claude Code\") in, but its logins are Connections (Settings → Connections names a section)."
+    "description": "An error: Provider Setup was asked to sign a coding agent CLI ({cli}: \"Claude Code\") in, but its logins are Connections (Settings → Connections names a section)."
   },
   "service.providers.stillLooking": {
     "defaultMessage": "Hive is still looking for {cli}. Try again in a moment.",

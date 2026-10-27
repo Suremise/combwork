@@ -116,7 +116,7 @@ The words Chinese uses for Hive's terms ([glossary.md](glossary.md)). Use them e
 | sign in / sign out | 登录 / 退出登录 | |
 | tab / settings | 标签页 / 设置 | |
 | Session tab / Sessions tab | “会话”标签页 / “会话历史”标签页 | Chinese has no plural, so the Sessions tab (past conversations) is 会话历史. |
-| Agent Settings / Project Settings / Agent Setup | 智能体设置 / 项目设置 / 配置智能体 | Agent Setup installs and signs in the CLIs. |
+| Agent Settings / Project Settings / Provider Setup | 智能体设置 / 项目设置 / 配置提供方 | Provider Setup installs and signs in the CLIs. |
 | Settings sections | 常规、外观、通知、会话、智能体与工作树、提供方、助手、看板、工作区、键盘快捷键、更新、高级、Agent API | Cited as “设置”→“常规”→“…”. |
 | menus | 文件、编辑、视图、项目、会话、帮助 | |
 | conversation / transcript | 对话 / 会话记录 | |

@@ -79,7 +79,7 @@
   "main.gitInit.fix.staged": "revisa el .gitignore por si una regla vuelve a incluir .hive",
   "main.gitInit.nested": "Esta carpeta está dentro del repositorio git de {root}. Confirma que quieres un repositorio propio dentro de él.",
   "main.gitInit.noEmail": "Git no tiene un correo electrónico con el que hacer el primer commit: escribe uno.",
-  "main.gitInit.noGit": "{problem}: en Configuración de agentes se explica cómo solucionarlo.",
+  "main.gitInit.noGit": "{problem}: en Configuración de proveedores se explica cómo solucionarlo.",
   "main.gitInit.noName": "Git no tiene un nombre con el que hacer el primer commit: escribe uno.",
   "main.gitInit.otherVcs": "{vcs} controla esta carpeta (en {root}): Hive solo crea un repositorio git donde no hay otro sistema de control de versiones.",
   "main.gitInit.step.commit": "{n, plural, one {se hizo commit de # archivo} many {se hizo commit de # archivos} other {se hizo commit de # archivos}}",

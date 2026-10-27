@@ -156,7 +156,7 @@
   "session.start.openIn": "此对话已在 {agent} 中打开。智能体只能恢复没有其他智能体在运行的会话。",
   "session.start.otherFolder": "此会话曾在 {folder} 中运行。请用在该文件夹中工作的智能体恢复它。",
   "session.start.projectRunning": "此项目已有会话在运行。请先停止它。",
-  "session.start.providerMissing": "{resuming, select, yes {恢复此对话需要 {provider}。请通过“帮助”→“配置智能体”安装。} other {运行 {agent} 需要 {provider}。请通过“帮助”→“配置智能体”安装。}}",
+  "session.start.providerMissing": "{resuming, select, yes {恢复此对话需要 {provider}。请通过“帮助”→“配置提供方”安装。} other {运行 {agent} 需要 {provider}。请通过“帮助”→“配置提供方”安装。}}",
   "session.start.providerOff": "{provider} 已关闭。{resuming, select, yes {请在“设置”→“提供方”中开启它以恢复此对话。} other {请在“设置”→“提供方”中开启它以运行 {agent}。}}",
   "session.start.removing": "正在移除此项目",
   "session.start.repairing": "Hive 正在修复这个已移动的工作区：请在“修复”完成后再启动智能体。",

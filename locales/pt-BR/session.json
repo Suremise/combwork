@@ -156,7 +156,7 @@
   "session.start.openIn": "Esta conversa já está aberta em {agent}. Um agente só pode retomar uma sessão que nenhum outro agente esteja executando.",
   "session.start.otherFolder": "Esta sessão foi executada em {folder}. Retome-a com o agente que trabalha nessa pasta.",
   "session.start.projectRunning": "Já há uma sessão em execução para este projeto. Pare-a primeiro.",
-  "session.start.providerMissing": "{resuming, select, yes {É preciso ter {provider} para retomar esta conversa. Instale-o em Ajuda → Configuração de agentes.} other {É preciso ter {provider} para executar o agente {agent}. Instale-o em Ajuda → Configuração de agentes.}}",
+  "session.start.providerMissing": "{resuming, select, yes {É preciso ter {provider} para retomar esta conversa. Instale-o em Ajuda → Configuração de provedores.} other {É preciso ter {provider} para executar o agente {agent}. Instale-o em Ajuda → Configuração de provedores.}}",
   "session.start.providerOff": "O provedor {provider} está desativado. {resuming, select, yes {Ative-o em Configurações → Provedores para retomar esta conversa.} other {Ative-o em Configurações → Provedores para executar o agente {agent}.}}",
   "session.start.removing": "Este projeto está sendo removido",
   "session.start.repairing": "O Hive está reparando este espaço de trabalho movido: inicie o agente quando Reparar… terminar.",

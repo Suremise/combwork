@@ -278,7 +278,7 @@
   "workflow.refused.paths.excluded.message": "{card}: ścieżka {path} jest w folderze {folder}, który projekt bez kontroli wersji pomija w swojej pracy.",
   "workflow.refused.paths.excluded.next": "Zadeklaruj tylko pliki pracy, poza folderem {folder}: ścieżki karty zawężają pracę projektu, nigdy jej nie poszerzają.",
   "workflow.refused.platform.unknown.message": "{card}: Hive nie mógł odczytać {what}, więc nie da się sprawdzić reguły {rule}.",
-  "workflow.refused.platform.unknown.next": "Sprawdź Konfigurację agentów lub folder i spróbuj ponownie.",
+  "workflow.refused.platform.unknown.next": "Sprawdź Konfigurację dostawców lub folder i spróbuj ponownie.",
   "workflow.refused.platform.unknown.nextGone": "Repozytorium Git projektu zniknęło: poproś użytkownika, by je przywrócił albo przełączył projekt na Brak w zakładce Kontrola wersji (od następnej karty).",
   "workflow.refused.queue.advancing.message": "Karta {card} jest teraz scalana z {target}: nie można jej już usunąć z kolejki scalania.",
   "workflow.refused.queue.advancing.next": "Poczekaj, aż scalanie się zakończy. Jeśli zmiana nie jest potrzebna, cofnij ją w gałęzi {target}.",

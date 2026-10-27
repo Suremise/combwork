@@ -45,7 +45,7 @@ body:
     id: clis
     attributes:
       label: Coding agents
-      description: Which CLIs the problem involves, and their versions (Agent Setup shows them, and so do the diagnostics below).
+      description: Which CLIs the problem involves, and their versions (Provider Setup shows them, and so do the diagnostics below).
       placeholder: |
         Claude Code 2.1.302
         Codex 0.162.1

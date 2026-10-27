@@ -79,7 +79,7 @@
   "main.gitInit.fix.staged": "procure no .gitignore uma regra que traga a pasta .hive de volta",
   "main.gitInit.nested": "Esta pasta está dentro do repositório git em {root}. Confirme que você quer um repositório próprio dentro dele.",
   "main.gitInit.noEmail": "O git não tem um e-mail de autor para o primeiro commit: informe um.",
-  "main.gitInit.noGit": "{problem}: a Configuração de agentes diz como corrigir.",
+  "main.gitInit.noGit": "{problem}: a Configuração de provedores diz como corrigir.",
   "main.gitInit.noName": "O git não tem um nome de autor para o primeiro commit: informe um.",
   "main.gitInit.otherVcs": "{vcs} controla esta pasta (em {root}): o Hive só cria um repositório git onde não há outro sistema de controle de versão.",
   "main.gitInit.step.commit": "{n, plural, =0 {fez commit de # arquivos} one {fez commit de # arquivo} other {fez commit de # arquivos}}",

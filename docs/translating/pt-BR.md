@@ -138,7 +138,7 @@ is kept in English, it is as Brazilian developers say it.
 | backup | backup | |
 | staged | preparado | As VS Code says („alterações preparadas“). |
 | watch (a card watch) | observação, observação de cartão | |
-| Agent Setup | Configuração de agentes | |
+| Provider Setup | Configuração de provedores | |
 | the shipped modes (Coordinator, Planner, QA triager, Release manager) | Coordenador, Planejador, Triagem de QA, Gerente de release | As `assistant.modes.shipped.*` shows them. |
 | view (the Skills view, the MCP view) | visualização | „na visualização Skills“; the View menu is „Exibir“. |
 | Start… (a card) | Iniciar… | *Start New* is „Começar de novo“. |

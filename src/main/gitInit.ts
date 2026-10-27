@@ -65,7 +65,7 @@ export async function initCheck(projectPath: string): Promise<GitInitCheck> {
   // Refused: its English for the log and the error initRepo throws (#881), its text for the window.
   const refuse = (text: Text): GitInitCheck => ({ ...base, refused: englishText(text), refusedText: text })
   const problem = gitProblemData(gitTool())
-  if (problem) return refuse(withValues(msg({ id: 'main.gitInit.noGit', defaultMessage: '{problem}: Agent Setup says how to fix it.', description: "Why a folder can't be made a git repository (the Initialise Git Repository dialog): git is missing or broken. {problem} says what's wrong. Agent Setup is a view's name." }), { problem }))
+  if (problem) return refuse(withValues(msg({ id: 'main.gitInit.noGit', defaultMessage: '{problem}: Provider Setup says how to fix it.', description: "Why a folder can't be made a git repository (the Initialise Git Repository dialog): git is missing or broken. {problem} says what's wrong. Provider Setup is a view's name." }), { problem }))
   // Looked for at every level whatever git is there: a colocated Jujutsu repository has .git beside .jj.
   const other = otherVcsOf(projectPath)
   if (other) return refuse(withValues(msg({ id: 'main.gitInit.otherVcs', defaultMessage: '{vcs} keeps this folder (in {root}): Hive makes a git repository only where no other version control system is.', description: "Why a folder can't be made a git repository: another version control system (Jujutsu, Mercurial…), {vcs}, keeps it. {root} is the folder it keeps." }), { vcs: other.name, root: other.root }))

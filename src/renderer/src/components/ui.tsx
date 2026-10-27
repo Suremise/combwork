@@ -337,7 +337,7 @@ export function StaleNote({ what, error, at, onRetry }: { what: string; error: s
 }
 
 const COPY_CODE = {
-  copy: msg({ id: 'shell.copyCode.copy', defaultMessage: 'Copy {code}', description: 'Tooltip of the small Copy button beside a command or path shown as code (Agent Setup, say): {code} is exactly what it copies.' }),
+  copy: msg({ id: 'shell.copyCode.copy', defaultMessage: 'Copy {code}', description: 'Tooltip of the small Copy button beside a command or path shown as code (Provider Setup, say): {code} is exactly what it copies.' }),
   label: msg({ id: 'shell.copyCode.label', defaultMessage: 'Copy', description: 'The accessible name of the small Copy button beside a command or path shown as code. Keep it short.' }),
   copied: msg({ id: 'shell.copyCode.copied', defaultMessage: 'Copied', description: 'Shown for a moment beside a command or path after its Copy button copied it.' })
 }

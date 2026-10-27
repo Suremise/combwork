@@ -178,7 +178,7 @@ const C = {
   projectFolder: msg({ id: 'project.changes.projectFolder', defaultMessage: 'Project folder · {branch}', description: "The project folder in the picker. {branch} is its git branch (or the project's name)." }),
   worktreeOf: msg({ id: 'project.changes.worktreeOf', defaultMessage: "{agent}'s worktree", description: "Who the changes shown are: an agent's worktree." }),
   cantShow: msg({ id: 'project.changes.cantShow', defaultMessage: "{problem}, so Hive can't show {project}'s changes.", description: 'The Changes tab when git cannot run. {problem} says why, such as "Git isn\'t installed (or isn\'t on Hive\'s PATH)".' }),
-  agentSetup: msg({ id: 'project.changes.agentSetup', defaultMessage: 'Agent Setup', description: 'Button: opens Agent Setup, which checks git and says how to fix it.' }),
+  agentSetup: msg({ id: 'project.changes.agentSetup', defaultMessage: 'Provider Setup', description: 'Button: opens Provider Setup, which checks git and says how to fix it.' }),
   retry: msg({ id: 'project.retry', defaultMessage: 'Retry', description: 'Button: tries again.' }),
   changes: msg({ id: 'project.changes.heading', defaultMessage: 'Changes', description: "Heading of the Changes list (the Git tab's Changes section)." }),
   lookingUnused: msg({ id: 'project.changes.lookingTip', defaultMessage: 'Looking for unused worktrees…', description: 'Tooltip on the refresh button while Hive looks for unused worktrees.' }),

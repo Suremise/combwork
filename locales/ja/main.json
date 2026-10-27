@@ -79,7 +79,7 @@
   "main.gitInit.fix.staged": ".hiveを対象に戻すルールがないか、.gitignoreを確認してください",
   "main.gitInit.nested": "このフォルダーは{root}のgitリポジトリの中にあります。その中に別のリポジトリを作成する場合は、確認してください。",
   "main.gitInit.noEmail": "最初のコミットに使うメールアドレスがgitに設定されていません。入力してください。",
-  "main.gitInit.noGit": "{problem}：修正方法は「エージェントのセットアップ」で確認できます。",
+  "main.gitInit.noGit": "{problem}：修正方法は「プロバイダーのセットアップ」で確認できます。",
   "main.gitInit.noName": "最初のコミットに使う名前がgitに設定されていません。入力してください。",
   "main.gitInit.otherVcs": "このフォルダーは{vcs}で管理されています（{root}）。Hiveは、ほかのバージョン管理システムがない場所にだけgitリポジトリを作成します。",
   "main.gitInit.step.commit": "{n, plural, other {#件のファイルをコミット}}",

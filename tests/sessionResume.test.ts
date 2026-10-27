@@ -23,7 +23,7 @@ describe('resumeBlock', () => {
   })
   it('its provider is turned off, or not installed', () => {
     expect(resumeBlock(s, { ...ok, providerEnabled: false })).toMatch(/Codex is turned off.*Settings → Providers/)
-    expect(resumeBlock(s, { ...ok, providerInstalled: false })).toMatch(/Codex isn't installed.*Agent Setup/)
+    expect(resumeBlock(s, { ...ok, providerInstalled: false })).toMatch(/Codex isn't installed.*Provider Setup/)
   })
   it('no agent can run it: a worktree no agent uses, or no room for another agent', () => {
     expect(resumeBlock({ ...s, cwd: 'D:\\p\\.worktrees\\x' }, { ...ok, runners: [], canAddAgent: false })).toMatch(/worktree no agent uses any more/)
