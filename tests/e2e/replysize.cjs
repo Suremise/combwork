@@ -498,7 +498,7 @@ const prose = (seed, n) => {
   check('with Suggest a shorter title past at 0: kept, no nudge', !unNudged.includes('\n') && unNudged.endsWith(`: ${LONG}`), unNudged)
   await inv('advanced:set', 'hive.cards.titleNudgeChars', 80)
   // Out of Todo again, as the user would park them: the checks below count Todo's 50.
-  for (const x of (await api('GET', '/v1/tasks?column=todo')).body.filter((x) => x.title.startsWith(LONG) || x.title === 'Restart notice stays after a restart')) await inv('tasks:update', x.number, { column: 'hold' })
+  for (const made of (await api('GET', '/v1/tasks?column=todo')).body.filter((x) => x.title.startsWith(LONG) || x.title === 'Restart notice stays after a restart')) await inv('tasks:update', made.number, { column: 'hold' })
   measure('hive_reorder_tasks (as Assistant)', tool('hive_reorder_tasks', { column: 'todo', cards: [todo[31], todo[32]] }, 'assistant'), 300)
   // Undo (#1282): its messages' changes, a line each; one message's changes with their ids; what an undo did.
   tool('hive_update_tasks', { numbers: [todo[33], todo[34]], addLabels: ['undo-me'] }, 'assistant')
