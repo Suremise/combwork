@@ -138,6 +138,7 @@ export const SUITES = [
   { name: 'gitview' },
   { name: 'handovernotice' },
   { name: 'harnessleftovers' },
+  { name: 'hiddenredraw' },
   { name: 'hivetools' },
   { name: 'hivevcs' },
   { name: 'hookscopilot', needs: ['copilot'] },
