@@ -15,6 +15,10 @@
     "defaultMessage": "{name} is in use: stop the agents on it and close its sign-in, then remove it.",
     "description": "An error removing a connection ({name}, its name in Settings → Connections): agents run on it, or its sign-in terminal is open."
   },
+  "main.accounts.keyRemoveFailed": {
+    "defaultMessage": "{name} wasn't removed: its key couldn't be deleted. Nothing was changed; Remove tries again.",
+    "description": "An error removing a server connection ({name}, its name in Settings → Connections): its stored API key couldn't be deleted, so the connection was left as it was."
+  },
   "main.accounts.leftover": {
     "defaultMessage": "{name} is half removed: remove it again first.",
     "description": "An error signing a connection in ({name}): an earlier removal stopped partway, so it can't be used."
@@ -158,6 +162,10 @@
   "main.connections.launch.deleted": {
     "defaultMessage": "The connection chosen for {agent} no longer exists. Pick another in its Agent Settings, or let it use the workspace's default.",
     "description": "Starting an agent ({agent}) is refused: the connection chosen for it was removed. Agent Settings names a dialog."
+  },
+  "main.connections.launch.noKey": {
+    "defaultMessage": "{name} has no key. Add one in Settings → Connections, then start {agent}.",
+    "description": "Starting an agent ({agent}) is refused: its server connection ({name}) reaches a server that needs an API key, and none is saved for it. Settings → Connections names a section."
   },
   "main.connections.launch.none": {
     "defaultMessage": "No {cli} connection is on in this workspace. Add one in Settings → Connections and sign it in, then start {agent} again.",
@@ -386,6 +394,10 @@
   "main.installDir.whyFolder": {
     "defaultMessage": "Its permissions have an entry for an app package but none for ALL APPLICATION PACKAGES, which Hive's sandboxed windows need, and Hive couldn't add one. Run this command in PowerShell (as an administrator if you don't own the folder), then start Hive again:",
     "description": "The message when Hive can't start from its install folder, its last paragraph (a command follows). ALL APPLICATION PACKAGES is a Windows name and PowerShell a program: keep them."
+  },
+  "main.keys.unsafe": {
+    "defaultMessage": "Hive can't store a key safely on this system, so it wasn't saved.",
+    "description": "An error saving a server connection's API key (Settings → Connections): Windows' protection for stored secrets isn't available, and Hive won't keep a key in plain text."
   },
   "main.leftovers.end": {
     "defaultMessage": "End Them",
@@ -1002,6 +1014,50 @@
   "main.restart.why.stopped": {
     "defaultMessage": "it was stopped while it started",
     "description": "Why an agent was not resumed after Hive restarted: its launch ended (the user stopped it, or its CLI exited) before it was ready."
+  },
+  "main.server.key.chars": {
+    "defaultMessage": "A key has no spaces or special characters outside plain ASCII. Check what was pasted.",
+    "description": "An error saving a server connection's API key (Settings → Connections): it has spaces, line breaks or non-ASCII characters. The key itself is never shown."
+  },
+  "main.server.key.inField": {
+    "defaultMessage": "The key appears in the {field, select, name {name} url {base URL} other {model list}}: take it out of there first. Nothing was saved.",
+    "description": "An error saving a server connection's API key: the key was also typed into another field ({field}: its name, its base URL or its models), where it would be kept unencrypted."
+  },
+  "main.server.key.length": {
+    "defaultMessage": "A key is between {min, number} and {max, number} characters long. Check what was pasted.",
+    "description": "An error saving a server connection's API key: it is too short or too long. {min} and {max} are numbers. The key itself is never shown."
+  },
+  "main.server.notServer": {
+    "defaultMessage": "That connection doesn't get its model from a server.",
+    "description": "An error: an action for a server connection (its key, its models, its Set Up) was asked for a connection signed in through its CLI instead."
+  },
+  "main.server.setUp.noKey": {
+    "defaultMessage": "{name} has no key yet. Add its key first, then set it up.",
+    "description": "An error opening Set Up for a server connection ({name}, its name in Settings → Connections): its server needs an API key and none is saved."
+  },
+  "main.server.unsupported": {
+    "defaultMessage": "{cli} can't get its model from a server in Hive.",
+    "description": "An error adding a server connection for a coding agent CLI ({cli}: \"Codex\") that Hive has no server connections for."
+  },
+  "main.server.url.extra": {
+    "defaultMessage": "The URL can't have a query (?…) or a fragment (#…): give the key in its own field.",
+    "description": "An error saving a server connection's base URL: it has a query string or a fragment, which Hive won't keep (a key could be in it)."
+  },
+  "main.server.url.invalid": {
+    "defaultMessage": "That isn't a URL Hive can use: write it in full, such as https://api.example.com.",
+    "description": "An error saving a server connection's base URL (Settings → Connections): it can't be read as a URL."
+  },
+  "main.server.url.remoteHttp": {
+    "defaultMessage": "A server on another computer needs https://. Plain http:// is only for a server on this PC (localhost).",
+    "description": "An error saving a server connection's base URL: it uses http:// to a server that isn't on this computer, which would send the key unencrypted."
+  },
+  "main.server.url.scheme": {
+    "defaultMessage": "The URL must start with https:// (or http:// for a server on this PC).",
+    "description": "An error saving a server connection's base URL: it isn't http or https."
+  },
+  "main.server.url.userinfo": {
+    "defaultMessage": "The URL can't hold a user name or password: give the key in its own field.",
+    "description": "An error saving a server connection's base URL: it has user:password@ in it, which Hive won't keep."
   },
   "main.storage.claimed": {
     "defaultMessage": "The folder belongs to a session again.",

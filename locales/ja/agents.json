@@ -242,6 +242,7 @@
   "agents.models.fromCli": "{provider}{version, select, none {} other { {version}}}から",
   "agents.models.olderGroup": "旧バージョン",
   "agents.models.providerGroup": "{provider}のモデル",
+  "agents.models.serverAs": "{model}（{names}として）",
   "agents.models.unavailableGroup": "このアカウントでは使用不可",
   "agents.name.empty": "名前を入力してください。",
   "agents.name.taken": "{project}に「{agent}」という名前のエージェントがすでにあります。エージェント名はワークスペース全体で重複できません。「{suggestion}」はいかがですか。",

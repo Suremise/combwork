@@ -67,7 +67,7 @@ import { checkAccount, launchOnChosen, onConnectionSignedIn, setAccountSessions,
 import { connectionLayerFor, effortUsable, ensureMoved } from './connectionMoves'
 import { assistantOwn } from '../shared/connectionDefaults'
 import { resolveConnection } from '../shared/accounts'
-import { recacheEstimate, withoutAccountEnv } from './providers/common'
+import { recacheEstimate, withoutAccountEnv, withServerEnv } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage } from '../shared/usageDays'
@@ -2151,7 +2151,8 @@ class SessionManager {
       allowBackgroundSessions: providerSettings(config.settings, adapter.id).allowBackgroundSessions,
       ...(conn ? { connectionHome: conn.folder } : {}),
       // On a connection, without the variables its CLI would read as a login in its place (HI-1757).
-      env: withBinOnPath(withoutAccountEnv(conn ? adapter : null, childEnv({
+      // A server connection's own variables (HI-1772: its server, models and key) after those left out, for this launch only.
+      env: withBinOnPath(withServerEnv(conn?.server?.env, withoutAccountEnv(conn ? adapter : null, childEnv({
         HIVE_HOOK_TOKEN: hookAuth.token,
         HIVE_PROJECT: basename(projectPath),
         HIVE_PROJECT_PATH: projectPath,
@@ -2166,7 +2167,7 @@ class SessionManager {
         ...(conn ? { [conn.homeEnv]: conn.folder } : {}),
         // Not for the Assistant: it reaches the API through its hive tools, with its own token.
         ...(workspace.isAssistantHome(projectPath) ? {} : this.apiEnv(projectPath, agent.id))
-      })), this.binDir)
+      }))), this.binDir)
     }
     const delivered = await adapter.prepareLaunch(ctx)
     times?.mark('prepareLaunch')
@@ -2188,7 +2189,7 @@ class SessionManager {
     // Checked after the last await, just before spawning: stopped, its workspace closed or switched, or the
     // provider turned off while this launch was being prepared, it must not start a process.
     if (l.stopRequested || this.live.get(id) !== l || this.starting.get(id)?.cancelled || !workspaceFor(projectPath) || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
-    state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}) } : undefined
+    state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}), ...(conn.server ? { server: { models: conn.server.models } } : {}) } : undefined
     if (!isProviderEnabled(config.settings, adapter.id)) throw hiveError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name })
     l.startAllowed?.()
     const cmd = adapter.buildCommand(info.path, ctx)
@@ -2279,7 +2280,8 @@ class SessionManager {
         : {}),
       onExit: (code, output) => {
         screen?.dispose()
-        void this.onExit(projectPath, agent.id, state.runId, code, output)
+        // A server connection's key stays masked until what its exit left (its last output) is handled (HI-1772).
+        void Promise.resolve(this.onExit(projectPath, agent.id, state.runId, code, output)).finally(() => conn?.server?.endKeyUse())
       }
     })
     // Its process runs now (spawnPty returned, not thrown): its slot's writer is the run's processes' to settle (#1434).
@@ -3866,15 +3868,19 @@ class SessionManager {
    * transcript's), never recomputed. Without a price or a report the cost is cleared, so it shows as unknown.
    */
   private async liveCost(l: LiveSession, src: string, force: boolean): Promise<void> {
-    const own = usesOwnPrices(l.state.provider, config.settings)
+    // On a server connection (HI-1772) the CLI's report prices its server's model as a Claude model: never used, only
+    // Hive's estimate by the real model's id (unpriced unless the user priced it).
+    const onServer = !!l.state.launchedConnection?.server
+    const own = onServer || usesOwnPrices(l.state.provider, config.settings)
     if (l.adapter.descriptor.capabilities.reportsCost && !own) return this.setLiveCost(l, l.reportedCost, false)
     if (!force && Date.now() - (l.costAt ?? 0) <= COST_INTERVAL_MS) return
     l.costAt = Date.now()
     const usage = await this.usageFor(l.state.projectPath, src, l.state.sessionId, l.state.provider)
     // The settings changed while it was read: the read they started decides.
-    if (usesOwnPrices(l.state.provider, config.settings) !== own || !usage) return
+    if ((onServer || usesOwnPrices(l.state.provider, config.settings)) !== own || !usage) return
     // An estimate is Hive's (the user's prices, or a provider that reports none); anything else is the CLI's report.
     if (usage.costUsd != null && usage.costEstimated) this.setLiveCost(l, usage.costUsd, true)
+    else if (onServer) this.setLiveCost(l, undefined, false)
     else if (own) this.setLiveCost(l, l.reportedCost ?? usage.costUsd ?? undefined, false)
     else this.setLiveCost(l, usage.costUsd ?? undefined, false)
   }
@@ -4392,6 +4398,13 @@ class SessionManager {
         ? withValues(msg({ id: 'session.signIn.one', defaultMessage: '{agent} needs you to sign in to {provider}', description: "A notification's title: an agent's CLI sign-in has expired. {agent} is the agent, {provider} the coding agent's name." }), { agent: this.label(first), provider: d.name })
         : withValues(msg({ id: 'session.signIn.many', defaultMessage: '{n, plural, other {# agents need you to sign in to {provider}}}', description: "A notification's title: the CLI sign-in of several agents has expired. {n} is how many (2 or more), {provider} the coding agent's name." }), { n: waiting.length, provider: d.name })
     log.info(`${d.name}: sign-in refused for ${waiting.length} agent(s)`)
+    // A server connection's (HI-1772): its key was refused, replaced in Settings → Connections; no sign-in.
+    const server = first.launchedConnection?.server ? first.launchedConnection.name : null
+    if (server) {
+      const keyTitle = withValues(msg({ id: 'session.keyRefused.title', defaultMessage: "{n, plural, one {{agent} stopped: {name}'s key was refused} other {# agents stopped: {name}'s key was refused}}", description: "A notification's title: the server of a server connection ({name}) refused its API key, so agents on it stopped. {n} is how many agents, {agent} the first one's name." }), { n: waiting.length, agent: this.label(first), name: server })
+      this.notify(first.projectPath, keyTitle, withValues(msg({ id: 'session.keyRefused.body', defaultMessage: "Replace {name}'s key in Settings → Connections, then Resume in the project's header carries them on.", description: "The notification that a server connection's ({name}) API key was refused. Settings → Connections names a section; Resume is a button in the project's header." }), { name: server }), 'waiting', undefined, first.agentId)
+      return
+    }
     this.notify(first.projectPath, title, withValues(msg({ id: 'session.signIn.expired', defaultMessage: "{provider}'s sign-in has expired. {help}", description: "The notification that a CLI's sign-in has expired. {provider} is the coding agent's name; {help} says how to sign in again (a sentence or two)." }), { provider: d.name, help: d.text?.signInHelp ?? d.signInHelp }), 'waiting', undefined, first.agentId)
   }
 
@@ -4562,8 +4575,10 @@ class SessionManager {
     // Running another model than expected: its own auto-compact window, if its settings give it one (#242).
     const autoCompact = d.modelId && d.modelId !== st.modelId && l.autoCompactFor ? l.autoCompactFor(d.modelId) : st.autoCompact
     // The CLI's report is kept; it is shown unless the user chose their prices (#436), and then it isn't an estimate.
-    if (d.costUsd != null) l.reportedCost = d.costUsd
-    const reported = d.costUsd != null && !usesOwnPrices(st.provider, config.settings)
+    // On a server connection (HI-1772) never: it prices the server's model as a Claude model.
+    const onServer = !!st.launchedConnection?.server
+    if (d.costUsd != null && !onServer) l.reportedCost = d.costUsd
+    const reported = d.costUsd != null && !onServer && !usesOwnPrices(st.provider, config.settings)
     const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode && !isCliOwnMode(l.launchMode) ? d.permissionMode : st.permissionMode, contextWindow: d.contextWindow ?? st.contextWindow }
     if (
       next.effort === st.effort &&

@@ -20,6 +20,7 @@ import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../sha
 import { allProviders } from './providers'
 import { providerService } from './providerService'
 import { accountsView, addAccount, connectionHomes, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, setConnectionDefaults, signInAccount } from './accounts'
+import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setUpServerConnection } from './serverConnections'
 import { dismissMovedNotice, movedNotice } from './connectionMoves'
 import { config } from './config'
 import { clearRecent, recentChanged, recentFor, removeRecent } from './recentWorkspaces'
@@ -1536,6 +1537,17 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'connections:signIn': async (id) => {
       await refreshPathBeforeStart()
       return signInAccount(id)
+    },
+    // A server connection (HI-1772): the key crosses here once, from its field to the key store, and never back.
+    'connections:addServer': (input) => addServerConnection(input),
+    'connections:editServer': (id, patch) => editServerConnection(id, patch),
+    'connections:setKey': (id, key) => setServerKey(id, typeof key === 'string' ? key : ''),
+    'connections:removeKey': (id) => removeServerKey(id),
+    'connections:readModels': (id, request) => readServerModels(id, String(request)),
+    'connections:cancelModels': (id, request) => cancelServerModels(id, String(request)),
+    'connections:setUp': async (id) => {
+      await refreshPathBeforeStart()
+      return setUpServerConnection(id)
     },
     'connections:keepLogin': (id) => keepNewLogin(id),
     'connections:setOn': (id, on) => setAccountOn(id, on),

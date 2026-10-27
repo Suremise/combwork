@@ -1,4 +1,4 @@
-import type { AgentDef, AppSettings, AutoCompactSetting, Connection, EffortLevel, PermissionMode, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings } from './types'
+import type { AgentDef, AppSettings, AutoCompactSetting, Connection, EffortLevel, ModelAlias, PermissionMode, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, ServerModel } from './types'
 import type { AttachmentKind } from './attachments'
 import { msg, type Msg } from './i18n/msg'
 import type { Tr } from './tasks'
@@ -150,7 +150,48 @@ export interface ProviderCapabilities {
    * (`.claude`), which a test home is never (the test seam), and `orgs` whether its sign-in names an organisation, which
    * an identity then needs to be taken on (false: its email alone, HI-1757). Absent: the CLI has no accounts in Hive.
    */
-  connections?: { homeEnv: string; shared: readonly string[]; userHome: string; orgs: boolean }
+  connections?: { homeEnv: string; shared: readonly string[]; userHome: string; orgs: boolean; server?: ServerCaps }
+}
+
+/**
+ * How the CLI reaches a server of the user's (HI-1772: a server connection), when it can: the variables it reads, set
+ * for that launch only. `keylessToken` is a value that isn't secret, set as the key for a local server with none (the
+ * CLI otherwise asks for its login: the probe on HI-1772); `presets` fill Add Connection's form. Absent: the CLI has no
+ * server connections in Hive.
+ */
+export interface ServerCaps {
+  baseUrlEnv: string
+  keyEnv: string
+  keylessToken: string
+  /** The variable naming the model it runs as by default, and each alias's. */
+  modelEnv: string
+  aliasEnv: Record<ModelAlias, string>
+  /** The variable naming its subagents' model: the haiku alias's model. */
+  subagentEnv?: string
+  /** How models are listed when the user asks, without a preset of its own: a path under the base URL, read as `data[].id`. */
+  listing: ServerListing
+  presets: readonly ServerPreset[]
+}
+
+/** A server's model listing (HI-1772): `path` absolute (from the origin) or relative (under the base URL), the reply's list, and each entry's id. */
+export interface ServerListing {
+  path: string
+  list: string
+  id: string
+}
+
+/** A preset for Add Connection (HI-1772): a filled form, all of it editable. */
+export interface ServerPreset {
+  id: string
+  name: string
+  baseUrl: string
+  /** Its models, typed: the vendor's recommendation for this CLI (their ids and the aliases each stands in for). */
+  models?: readonly ServerModel[]
+  /** Its models read from the server instead (the user asks), with this listing. */
+  listing?: ServerListing
+  keyless?: boolean
+  /** Where its setup is documented, shown with the preset. */
+  docs?: string
 }
 
 /** What the CLI said about a model, for modeCaveat. */
@@ -629,7 +670,7 @@ export function extraArgsProblem(input: string | string[], tr?: Tr): string | nu
  * on, a CLI with them): its defaults, never the project's or the CLI's; `conn` null when none can be used (then the
  * agent's own alone). Permission mode and extra arguments are the CLI's and the project's either way.
  */
-export type LaunchLayer = { kind: 'legacy' } | { kind: 'connection'; conn: Pick<Connection, 'defaults'> | null }
+export type LaunchLayer = { kind: 'legacy' } | { kind: 'connection'; conn: Pick<Connection, 'defaults' | 'kind'> | null }
 
 /** What an agent launches with: its own overrides, else the project's (for its provider), else the global defaults; with a connection (`layer`), else the connection's defaults. */
 export function agentLaunchSettings(agent: Pick<AgentDef, 'provider' | 'model' | 'effort' | 'permissionMode' | 'use200kContext'> | null | undefined, cfg: Pick<ProjectConfig, 'providers' | 'defaultProvider'>, settings: Pick<AppSettings, 'providers' | 'defaultProvider'>, layer: LaunchLayer = { kind: 'legacy' }): AgentLaunchSettings {
@@ -645,6 +686,8 @@ export function agentLaunchSettings(agent: Pick<AgentDef, 'provider' | 'model' |
   if (layer.kind === 'connection') {
     // An agent's own, else its connection's default, else the CLI decides (its own default model and effort; context off).
     const d = layer.conn?.defaults
+    // A server connection (HI-1772) takes no effort or context choice: its server's models aren't the CLI's.
+    if (layer.conn?.kind === 'server') return { provider, model: agent?.model || d?.model || null, effort: null, permissionMode, extraArgs, use200kContext: false }
     return { provider, model: agent?.model || d?.model || null, effort: agent?.effort || d?.effort || null, permissionMode, extraArgs, use200kContext: contextLimit && (agent?.use200kContext ?? d?.use200kContext ?? false) }
   }
   const model = agent?.model || (pc.model && pc.model !== 'inherit' ? pc.model : g.defaultModel || null)

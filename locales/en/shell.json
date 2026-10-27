@@ -911,6 +911,14 @@
     "defaultMessage": "This view ran into a problem and couldn't be shown.",
     "description": "Where a view of the window failed to show."
   },
+  "shell.keyRefused.stopped": {
+    "defaultMessage": "Its turn stopped when {name}'s key was refused. Resume in the project's header carries it on.",
+    "description": "Tooltip of an agent whose turn stopped because its server connection's ({name}) API key was refused."
+  },
+  "shell.keyRefused.then": {
+    "defaultMessage": "{name}'s key was refused. Replace it in Settings → Connections, then Resume in the project's header carries on the agents it stopped.",
+    "description": "Tooltip of an agent whose server connection's ({name}) API key was refused, its second line. Settings → Connections names a section; Resume is a button in the project's header."
+  },
   "shell.loadFailed": {
     "defaultMessage": "Could not load {what}: {error}",
     "description": "A load that failed. {what} names what (the sessions, the diagnostics…), given by each view; {error} is why."
@@ -1398,6 +1406,10 @@
   "shell.status.idle": {
     "defaultMessage": "No session",
     "description": "An agent's status: it has no session."
+  },
+  "shell.status.keyRefused": {
+    "defaultMessage": "Key refused",
+    "description": "An agent's status: its server connection's API key was refused by the server (where a signed-in connection would need sign-in)."
   },
   "shell.status.question": {
     "defaultMessage": "{status} · has a question for you",

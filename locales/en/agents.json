@@ -971,6 +971,10 @@
     "defaultMessage": "{provider} models",
     "description": "A group of the model picker: the models the CLI ({provider}: its name) offers, or the user's list of them."
   },
+  "agents.models.serverAs": {
+    "defaultMessage": "{model} (as {names})",
+    "description": "A model of a server connection (Settings → Connections), with the Claude model names it stands in for. {model} is the server's model id (\"deepseek-flash\"); {names} the Claude names, joined (\"Opus, Sonnet\")."
+  },
   "agents.models.unavailableGroup": {
     "defaultMessage": "Not available to this account",
     "description": "A group of the model picker: models the CLI lists that the user's account can't use (shown, not offered)."

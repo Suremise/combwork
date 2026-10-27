@@ -242,6 +242,7 @@
   "agents.models.fromCli": "Z {provider}{version, select, none {} other { {version}}}",
   "agents.models.olderGroup": "Starsze wersje",
   "agents.models.providerGroup": "Modele {provider}",
+  "agents.models.serverAs": "{model} (jako {names})",
   "agents.models.unavailableGroup": "Niedostępne dla tego konta",
   "agents.name.empty": "Wpisz nazwę.",
   "agents.name.taken": "W projekcie {project} jest już agent o nazwie „{agent}”. Nazwy agentów są unikalne w całym obszarze roboczym: spróbuj „{suggestion}”.",

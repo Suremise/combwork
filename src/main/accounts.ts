@@ -3,7 +3,7 @@ import { join, resolve } from 'path'
 import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
 import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
-import type { Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, ProviderId, WorkspaceConfig } from '../shared/types'
+import type { Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, ProviderId, ServerConnection, ServerModel, WorkspaceConfig } from '../shared/types'
 import { cliDefaults } from '../shared/connectionDefaults'
 import { acceptable, accountState, resolveConnection, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { profileFolder } from '../shared/appName'
@@ -20,6 +20,10 @@ import { provider } from './providers'
 import { withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
 import { openWorkspaces, setNewWorkspaceExtras, workspace, workspaceOf } from './workspace'
+import { dropKeysExcept, keyInfo, loadKeys, removeKey, withKey } from './keyStore'
+import { holdKey } from './keyMatcher'
+import { aliasModels, MODEL_ALIASES, originOf, parseBaseUrl, serverDefaultModel } from '../shared/serverConnection'
+import type { ServerCaps } from '../shared/providers'
 
 /**
  * Hive's accounts (HI-980, SPEC §11.2): a CLI login per folder, under `<accounts>\<id>\`, each signed in through the
@@ -182,7 +186,21 @@ export function setAccountSessions(fn: (id: string) => boolean): void {
   sessionsOn = fn
 }
 
-const loginKey = (a: Pick<Connection, 'id' | 'provider'>): string => `task:${a.provider}:login:${a.id}`
+/** Its sign-in's terminal (a server connection's Set Up, HI-1772): one per connection, refusing removal while open. */
+export const loginKey = (a: Pick<Connection, 'id' | 'provider'>): string => `task:${a.provider}:login:${a.id}`
+
+/** A server connection's (HI-1772): nothing to sign in, check or watch; its key in the key store. */
+export const isServer = (a: Pick<Connection, 'kind'> | undefined): boolean => a?.kind === 'server'
+
+/** For serverConnections.ts (HI-1772): a connection's lock, and its changes, as this module's own take them. */
+export const connectionInternals = {
+  locked: <T>(id: string, fn: () => Promise<T>): Promise<T> => locked(id, fn),
+  assertOn: (): void => assertOn(),
+  mustGet: (id: string): Connection => mustGet(id),
+  change: (id: string, fn: (a: Connection) => void): void => changeAccount(id, fn),
+  inUse: (a: Connection): boolean => sessionsOn(a.id) || (claims.get(a.id) ?? 0) > 0 || loginsOpen.has(a.id) || hasPty(loginKey(a)),
+  assertUsable: (a: Connection): Promise<void> => assertUsable(a)
+}
 
 /** Accounts whose sign-in is open (from its start, under the lock, to its end): removal is refused meanwhile. */
 const loginsOpen = new Set<string>()
@@ -377,6 +395,8 @@ function startLeftovers(): void {
   if (leftoversDone) return
   leftoversDone = true
   void finishLeftoverRemovals()
+  // Keys of connections no longer there, or no longer server connections (a config restored from its backup): gone.
+  void dropKeysExcept(() => new Set(list().filter(isServer).map((a) => a.id))).catch((e) => log.warn(`old keys couldn't be removed: ${userText(String((e as Error).message ?? e))}`))
 }
 
 /** Finishes removals a crash or a quit stopped, their folders renamed aside (`.removing-<id>`). */
@@ -396,14 +416,18 @@ export async function finishLeftoverRemovals(): Promise<void> {
 // Add, rename, remove.
 // ---------------------------------------------------------------------------
 
-/** Adds an account, its folder and junctions made and checked; then the window offers its Sign in. */
-export async function addAccount(id: ProviderId, name: string): Promise<Connection> {
+/**
+ * Adds a connection, its folder and junctions made and checked; then the window offers its Sign in (a sign-in
+ * connection) or it is ready to use (a server connection, HI-1772: `server` given, checked by serverConnections.ts).
+ */
+export async function addAccount(id: ProviderId, name: string, server?: ServerConnection): Promise<Connection> {
   assertOn()
   support(id)
   const n = name.trim()
   if (!n) throw hiveError(NO_NAME, undefined, { kind: 'invalid' })
-  // Its defaults the CLI's as they are now (HI-1770), until edited.
-  const a: Connection = { id: `a-${randomBytes(4).toString('hex')}`, provider: id, kind: 'signIn', name: n, createdAt: new Date().toISOString(), defaults: cliDefaults(config.settings, id), defaultsFrom: 'cli' }
+  // Its defaults the CLI's as they are now (HI-1770), until edited; a server's models aren't the CLI's, so none.
+  const base = { id: `a-${randomBytes(4).toString('hex')}`, provider: id, name: n, createdAt: new Date().toISOString() }
+  const a: Connection = server ? { ...base, kind: 'server', server, defaults: {} } : { ...base, kind: 'signIn', defaults: cliDefaults(config.settings, id), defaultsFrom: 'cli' }
   return locked(a.id, async () => {
     try {
       await makeFolder(a)
@@ -472,6 +496,16 @@ export async function removeAccount(id: string): Promise<void> {
     // Asked again under the lock: a launch or sign-in may have started while it waited.
     if (inUse()) throw hiveError(IN_USE, { name: a.name }, { kind: 'conflict' })
     assertNotHeld(a)
+    // A server connection's key goes first (HI-1772): if that fails, nothing else is removed, the row still shows its
+    // key, and Remove tries again; a later failure leaves no key behind.
+    if (isServer(a)) {
+      try {
+        await removeKey(id)
+      } catch (e) {
+        log.warn(`connection ${id}'s key couldn't be removed: ${userText(String((e as Error).message ?? e))}`)
+        throw hiveError(msg({ id: 'main.accounts.keyRemoveFailed', defaultMessage: "{name} wasn't removed: its key couldn't be deleted. Nothing was changed; Remove tries again.", description: "An error removing a server connection ({name}, its name in Settings → Connections): its stored API key couldn't be deleted, so the connection was left as it was." }), { name: a.name }, { kind: 'conflict' })
+      }
+    }
     // Checks started before are dropped from here (their result would bring it back).
     generations.set(id, generation(id) + 1)
     unwatch(id)
@@ -520,7 +554,8 @@ const changes = new Map<string, number>()
 /** Reads the folder's sign-in from the CLI, and keeps it as `observed` unless the account was removed meanwhile. */
 async function checkOnce(id: string): Promise<ConnectionObserved | null> {
   const a = getAccount(id)
-  if (!a) return null
+  // A server connection has no sign-in to check (HI-1772).
+  if (!a || isServer(a)) return null
   const gen = generation(id)
   const dir = accountFolder(id)
   const at = new Date().toISOString()
@@ -595,7 +630,8 @@ export async function confirmAccount(id: string): Promise<{ observed: Connection
  */
 export async function signInAccount(id: string): Promise<string> {
   assertOn()
-  mustGet(id)
+  // A server connection has no sign-in: its Set Up opens the CLI instead (serverConnections.ts).
+  if (isServer(mustGet(id))) throw hiveError(NO_ACCOUNT, undefined, { kind: 'invalid' })
   // Started under the account's lock, so never while it is being removed: the account checked still there (a removal
   // before it wins), and its folder still the one Hive made (a folder replaced by a link would take the CLI's login
   // writes elsewhere).
@@ -665,6 +701,8 @@ function wantedIds(): Set<string> {
   const all = list()
   for (const w of openWorkspaces()) for (const p of PROVIDERS) for (const id of workspaceAccounts(w.config, p.id, all)?.on ?? []) out.add(id)
   for (const a of all) if (sessionsOn(a.id)) out.add(a.id)
+  // A server connection's folder holds no login to watch (HI-1772).
+  for (const a of all) if (isServer(a)) out.delete(a.id)
   return out
 }
 
@@ -800,7 +838,8 @@ export function accountsView(check = false): ConnectionsView {
   // Off (the preview switch, until S8): nothing is listed, and nothing is checked.
   if (!connectionsOn()) return { preview: false, providers: [], connections: [], workspace: {}, testHome: [] }
   const all = list()
-  if (check) for (const a of all) void checkAccount(a.id)
+  if (check) for (const a of all) if (!isServer(a)) void checkAccount(a.id)
+  void loadKeys()
   const providers = PROVIDERS.filter((p) => !!p.capabilities.connections && isProviderEnabled(config.settings, p.id)).map((p) => p.id)
   const cfg = workspace.path ? workspace.config : null
   const ws: ConnectionsView['workspace'] = {}
@@ -809,7 +848,12 @@ export function accountsView(check = false): ConnectionsView {
     if (w) ws[p] = w
   }
   const testHome = providers.filter((p) => !connectionsManaged(p))
-  return { preview: true, providers, connections: all.map((a) => ({ ...a, signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id) })), workspace: ws, testHome }
+  // A server connection's key: only that one is set, its last 4 characters and when (keyStore.ts); never the key.
+  const keyOf = (a: Connection): { key?: { last4: string; at: string } } => {
+    const k = isServer(a) ? keyInfo(a.id) : undefined
+    return k && k.origin === originOf(a.server?.baseUrl ?? '') ? { key: { last4: k.last4, at: k.at } } : {}
+  }
+  return { preview: true, providers, connections: all.map((a) => ({ ...a, signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a) })), workspace: ws, testHome }
 }
 
 /** Saves the asking window's workspace's accounts for a provider, worked out from how they are when it is written. */
@@ -888,6 +932,12 @@ export interface LaunchConnection {
   /** Ends the launch's claim: once its session runs (its live state then keeps it from removal) or it failed. */
   release: () => void
   /**
+   * A server connection's (HI-1772): the variables its launch gets (its server, its models, its key: secret, given to
+   * that launch's environment only and never kept), its models for the footer, and its key's use for masking, ended
+   * by whoever holds the launch once its process is gone (or it never started).
+   */
+  server?: { env: Record<string, string>; models: ServerModel[]; endKeyUse: () => void }
+  /**
    * Asked at the last moment, with the agent's (or the Assistant's) choice as saved then: whether that choice, resolved
    * again with its workspace's connections as they are now, is still this connection, and it is still there.
    */
@@ -900,6 +950,11 @@ export function onConnectionSignedIn(fn: (id: string) => void): void {
   signedInListeners.push(fn)
 }
 
+/** A server connection's key replaced (HI-1772): as a sign-in found again, its agents stopped by a refused key carry on. */
+export function connectionReadyAgain(id: string): void {
+  for (const fn of signedInListeners) fn(id)
+}
+
 const LAUNCH = {
   none: msg({ id: 'main.connections.launch.none', defaultMessage: 'No {cli} connection is on in this workspace. Add one in Settings → Connections and sign it in, then start {agent} again.', description: "Starting an agent ({agent}, its name) is refused: its workspace has no connection on for its coding agent CLI ({cli}: \"Claude Code\"). Settings → Connections names a section." }),
   offNoDefault: msg({ id: 'main.connections.launch.offNoDefault', defaultMessage: "{agent}'s connection, {name}, is off in this workspace, and no other {cli} connection is on. Turn one on in Settings → Connections.", description: "Starting an agent ({agent}) is refused: the connection chosen for it ({name}) is off in this workspace and there's no default to use instead. {cli} is the coding agent CLI." }),
@@ -907,7 +962,37 @@ const LAUNCH = {
   changedAgain: msg({ id: 'main.connections.launch.changedAgain', defaultMessage: "{agent}'s connection was changed again while it was starting. Start it again.", description: "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Hive started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Connections)." }),
   otherProvider: msg({ id: 'main.connections.launch.otherProvider', defaultMessage: 'The connection chosen for {agent} is for another CLI. Pick a {cli} connection in its Agent Settings.', description: 'Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent\'s CLI ("Claude Code").' }),
   signedOut: msg({ id: 'main.connections.launch.signedOut', defaultMessage: '{name} is signed out. Sign it in again in Settings → Connections, then start {agent}.', description: "Starting an agent ({agent}) is refused: its connection ({name}) isn't signed in." }),
-  changing: msg({ id: 'main.connections.launch.changing', defaultMessage: "{name}'s login kept changing while Hive checked it. Try starting {agent} again in a moment.", description: "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Hive checked who it is signed in as." })
+  changing: msg({ id: 'main.connections.launch.changing', defaultMessage: "{name}'s login kept changing while Hive checked it. Try starting {agent} again in a moment.", description: "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Hive checked who it is signed in as." }),
+  noKey: msg({ id: 'main.connections.launch.noKey', defaultMessage: '{name} has no key. Add one in Settings → Connections, then start {agent}.', description: "Starting an agent ({agent}) is refused: its server connection ({name}) reaches a server that needs an API key, and none is saved for it. Settings → Connections names a section." })
+}
+
+/**
+ * A server connection's launch variables (HI-1772), as its CLI's descriptor names them: its base URL, its key (or, for
+ * a local server with none, the descriptor's placeholder, which isn't secret), each alias's model, its subagents' (the
+ * haiku alias's) and its default model (the opus alias's, else sonnet's, else its first), so nothing asks the server
+ * for a Claude model it doesn't have.
+ */
+export function serverEnv(caps: ServerCaps, server: ServerConnection, key: string | null): Record<string, string> {
+  const alias = aliasModels(server.models)
+  const env: Record<string, string> = { [caps.baseUrlEnv]: server.baseUrl, [caps.keyEnv]: key ?? caps.keylessToken }
+  for (const a of MODEL_ALIASES) if (alias[a]) env[caps.aliasEnv[a]] = alias[a]!
+  if (caps.subagentEnv && alias.haiku) env[caps.subagentEnv] = alias.haiku
+  const main = serverDefaultModel(server.models)
+  if (main) env[caps.modelEnv] = main
+  return env
+}
+
+/**
+ * A server connection's part of a launch (HI-1772): its key decrypted for this launch's environment (refused without
+ * one, unless its server is this machine's), and that key masked from now until the launch's process is gone.
+ */
+async function serverPart(a: Connection, caps: ServerCaps, agentName: string): Promise<{ part: NonNullable<LaunchConnection['server']>; keyV: number | null; origin: string }> {
+  const b = parseBaseUrl(a.server?.baseUrl ?? '')
+  if (!a.server || !b.ok) throw hiveError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
+  const got = await withKey(a.id, b.origin)
+  if (!got && !b.local) throw hiveError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
+  const endKeyUse = got ? holdKey(got.key) : () => undefined
+  return { part: { env: serverEnv(caps, a.server, got?.key ?? null), models: a.server.models, endKeyUse }, keyV: got?.v ?? null, origin: b.origin }
 }
 
 /**
@@ -933,6 +1018,35 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
   const release = await claimAccount(id)
   try {
     const gen = generation(id)
+    const chosen = getAccount(id)
+    if (chosen && isServer(chosen) && caps.server) {
+      // A server connection (HI-1772): no login to confirm; its key, if it needs one, for this launch alone.
+      const { part, keyV, origin } = await serverPart(chosen, caps.server, o.agentName)
+      const a = getAccount(id)
+      // The connection, its server and its key as prepared, still so at the last look.
+      const same = (): boolean => {
+        const now = getAccount(id)
+        return generation(id) === gen && !!now && isServer(now) && originOf(now.server?.baseUrl ?? '') === origin && (keyInfo(id)?.origin === origin ? keyInfo(id)!.v : null) === keyV
+      }
+      if (!a || !same()) {
+        part.endKeyUse()
+        throw hiveError(NO_ACCOUNT, undefined, { kind: 'notFound' })
+      }
+      noteLastUsed(o.provider, id)
+      return {
+        id,
+        name: a.name,
+        folder: accountFolder(id),
+        homeEnv: caps.homeEnv,
+        ...(choice.note ? { note: choice.note } : {}),
+        release,
+        server: part,
+        stillValid: (wanted) => same() && (() => {
+          const now = choose(wanted)
+          return now.ok && now.id === id
+        })()
+      }
+    }
     const { observed, fresh } = await confirmAccount(id)
     const a = getAccount(id)
     if (!a || generation(id) !== gen) throw hiveError(NO_ACCOUNT, undefined, { kind: 'notFound' })
@@ -981,6 +1095,8 @@ export async function launchOnChosen(o: { provider: ProviderId; workspaceConfig:
       })
       return
     } catch (e) {
+      // It never started: its key's use ends here (a started one's ends with its process, sessions.ts).
+      conn?.server?.endKeyUse()
       if (!(e instanceof ConnectionChanged)) throw e
       if (again) throw hiveError(LAUNCH.changedAgain, { agent: o.agentName }, { kind: 'conflict' })
       log.info(`${userText(o.agentName)}: its connection was changed while it was starting; starting it on the one chosen now`)

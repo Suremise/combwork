@@ -5,7 +5,8 @@ import { AGENT_STATE_LABEL, AGENT_STATES, agentState, mostUrgent as mostUrgentSt
 import { agentDoingCards } from '@shared/tasks'
 import { cardsText } from '@shared/agentTable'
 import { cardLabel } from '@shared/projectKeys'
-import { modelCaps } from '@shared/models'
+import { modelCaps, serverModelLabel } from '@shared/models'
+import { serverDefaultModel, serverModelOf } from '@shared/serverConnection'
 import { agentChoosesMcp, agentMcpText } from '@shared/agentMcp'
 import { SESSION_LAYOUTS, agentLimitText, agentsPerPage, compactThreshold, contextPercent, agentModelShown, effortLabel, isCompacting, layoutPanes, mergeBlocked, mostUrgent, projectLayout, sessionInAgentFolder, transcriptWarnLimit, unmergedWork } from '@shared/defaults'
 import { cellPage, cellPageCount, neighbourCell, pageCells, pageIds, type CellDirection } from '@shared/paneCells'
@@ -1472,10 +1473,13 @@ export function PaneFooter({
   // What runs (#248): the session's reported model while it runs (status line, else its transcript), else what the choice
   // resolves to; the choice itself in the tooltip when it reads differently (an alias).
   const shown = agentModelShown(provider, a.model || pc.model, ps.defaultModel, providers[provider], live ? live.modelId || usage?.model || null : null)
-  const model = shown.label
+  // On a server connection (HI-1772): the server's real model, with the Claude names it stands in for, and no effort.
+  const onServer = live?.launchedConnection?.server
+  const serverModel = onServer ? serverModelOf(onServer.models, live?.modelId || usage?.model || a.model || serverDefaultModel(onServer.models) || '') : null
+  const model = serverModel?.id ? serverModelLabel(serverModel.id, serverModel.as, tr) : shown.label
   // With no effort set or reported, the model's own default when the CLI said what it is ("Medium (default)", #125).
   const runModel = a.model || (pc.model && pc.model !== 'inherit' ? pc.model : ps.defaultModel) || providers[provider]?.defaultModel || null
-  const effort = effortLabel(provider, live?.effort, a.effort ?? pc.effort, ps.defaultEffort, modelCaps(provider, runModel, providers[provider], settings).defaultEffort, settings)
+  const effort = onServer ? null : effortLabel(provider, live?.effort, a.effort ?? pc.effort, ps.defaultEffort, modelCaps(provider, runModel, providers[provider], settings).defaultEffort, settings)
   const threshold = compactThreshold(project.config, settings?.sessions.compactSuggestTokens ?? 0)
   const ctx = usage?.contextTokens ?? 0
   const pct = contextPercent(ctx, usage?.contextWindow)

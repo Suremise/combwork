@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { existsSync, mkdirSync } from 'original-fs'
 import { basename, join } from 'path'
 import { isMainThread, Worker } from 'worker_threads'
+import { maskKeys } from './keyMatcher'
 import { appendLog, BUSY, LOG_STATE_SLOTS, STOP, WRITTEN, type LogBatch } from './logWriter'
 import { noteStep, stallClock } from './stallWork'
 
@@ -227,7 +228,8 @@ if (toConsole) {
 
 function write(level: Level, scope: string, message: string, extra?: unknown): void {
   const detail = extra instanceof Error ? ` ${extra.stack ?? extra.message}` : extra !== undefined ? ` ${safeJson(extra)}` : ''
-  const line = `${new Date().toISOString()} [${level.toUpperCase()}] [${scope}] ${message}${detail}\n`
+  // A server connection's key in use never reaches the log or the console (HI-1772): masked before either is written.
+  const line = maskKeys(`${new Date().toISOString()} [${level.toUpperCase()}] [${scope}] ${message}${detail}\n`)
   const where = level === 'error' ? 'stderr' : 'stdout'
   if (toConsole && process[where]?.destroyed) consoleFailed(where, { code: 'ERR_STREAM_DESTROYED' })
   if (toConsole) {

@@ -346,6 +346,11 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return advanced.pattern('claude-code.accounts.loginFiles').test(name)
   }
 
+  /** What it reads as a login, a server or a model in a connection's place (HI-1772): left out on a connection. */
+  accountEnvDrop(): readonly string[] {
+    return advanced.get<string[]>('claude-code.accounts.dropEnv')
+  }
+
   /** Claude Code's own default: "model" in its home's settings.json (~/.claude's, or a connection's: HI-1755). */
   configuredDefaultModel(home = claudeHome()): string | null {
     try {

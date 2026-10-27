@@ -547,3 +547,15 @@ export function withoutAccountEnv<T extends Record<string, string | undefined>>(
   for (const k of Object.keys(out)) if (names.has(k.toUpperCase())) delete out[k]
   return out
 }
+
+/**
+ * An environment with a server connection's own variables set (HI-1772: its server, models and key), any spelling of
+ * the same names before them gone. `vars` undefined: the environment as it is.
+ */
+export function withServerEnv<T extends Record<string, string | undefined>>(vars: Record<string, string> | undefined, env: T): T {
+  if (!vars) return env
+  const names = new Set(Object.keys(vars).map((k) => k.toUpperCase()))
+  const out = { ...env }
+  for (const k of Object.keys(out)) if (names.has(k.toUpperCase())) delete out[k]
+  return { ...out, ...vars }
+}

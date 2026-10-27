@@ -1,7 +1,7 @@
 {
   "settings.accounts.add": {
     "defaultMessage": "Add Connection…",
-    "description": "Button in Settings → Connections: adds a connection (asks its name), then opens its sign-in."
+    "description": "Button in Settings → Connections: adds a connection (asks its name and where it gets its model), then opens its sign-in or sets up its server."
   },
   "settings.accounts.addConfirm": {
     "defaultMessage": "Add and Sign In",
@@ -88,7 +88,7 @@
     "description": "A warning on a connection (Settings → Connections) whose removal stopped partway. {what} is what's left, in English."
   },
   "settings.accounts.list.desc": {
-    "defaultMessage": "Add a connection, sign it in, and choose which are on in this workspace and which is its default.",
+    "defaultMessage": "Add a connection (signed in, or a server), and choose which are on in this workspace and which is its default.",
     "description": "What the list \"Connections\" does, under its title (Settings → Connections)."
   },
   "settings.accounts.list.tip": {
@@ -246,6 +246,14 @@
   "settings.accounts.switchAffected": {
     "defaultMessage": "Switch Them When Their Turn Is Over",
     "description": "Button on that banner: each of those agents ends once its turn is over and carries on, on the connection chosen now."
+  },
+  "settings.advanced.claude-code.accounts.dropEnv.desc": {
+    "defaultMessage": "The environment variables Hive leaves out when it runs Claude Code on a connection (its sign-in, its checks and its agents), so a key, token, server or model set on this PC can't stand in for the connection's own. A server connection's own (its server, key and models) are set after. Wrong, a variable Claude Code reads as a login or a server could make a connection run as someone else, or elsewhere.",
+    "description": "What the advanced setting \"Connections: sign-in variables left out\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.claude-code.accounts.dropEnv.title": {
+    "defaultMessage": "Connections: sign-in variables left out",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.claude-code.accounts.emailField.desc": {
     "defaultMessage": "The field of `claude auth status --json` with the email a connection's folder is signed in as. Wrong, Hive can't tell who a connection is signed in as, and can't warn when its login changes.",
@@ -2303,6 +2311,254 @@
     "defaultMessage": "Reset {column} to its default",
     "description": "Button beside a board column's colour: puts back its default colour. {column} is the column's name."
   },
+  "settings.connections.add.addServer": {
+    "defaultMessage": "Add",
+    "description": "The confirm button of Add Connection for a server connection."
+  },
+  "settings.connections.add.addSignIn": {
+    "defaultMessage": "Add and Sign In",
+    "description": "The confirm button of Add Connection for a sign-in connection: adds it, then opens its sign-in."
+  },
+  "settings.connections.add.adding": {
+    "defaultMessage": "Adding…",
+    "description": "The confirm button of Add Connection while it adds the connection."
+  },
+  "settings.connections.add.from": {
+    "defaultMessage": "Gets its model from",
+    "description": "Label of the choice in Add Connection (Settings → Connections): where the connection gets its model, its sign-in or a server (Darren, 27 Oct)."
+  },
+  "settings.connections.add.fromServer": {
+    "defaultMessage": "A server",
+    "description": "A choice of Gets its model from (Add Connection): a server reached by its base URL, with an API key or none (DeepSeek, Ollama, a company gateway)."
+  },
+  "settings.connections.add.fromSignIn": {
+    "defaultMessage": "Its sign-in",
+    "description": "A choice of Gets its model from (Add Connection): the CLI's own sign-in (a Claude account, for example), done in a terminal after it is added."
+  },
+  "settings.connections.add.name": {
+    "defaultMessage": "Name",
+    "description": "Label of a new connection's name (Settings → Connections → Add Connection)."
+  },
+  "settings.connections.add.namePlaceholder": {
+    "defaultMessage": "Anthropic · Max 1, Work, DeepSeek…",
+    "description": "Placeholder of a new connection's name box: examples of names."
+  },
+  "settings.connections.add.needName": {
+    "defaultMessage": "Give it a name.",
+    "description": "Add Connection's error while the name box is empty."
+  },
+  "settings.connections.add.title": {
+    "defaultMessage": "Add a {cli} connection",
+    "description": "Title of the dialog adding a connection (Settings → Connections). {cli} is a coding agent CLI (\"Claude Code\")."
+  },
+  "settings.connections.cancel": {
+    "defaultMessage": "Cancel",
+    "description": "A dialog's button in Settings → Connections that closes it without changing anything."
+  },
+  "settings.connections.server.addModel": {
+    "defaultMessage": "Add Model",
+    "description": "Button under a server connection's model list: adds a row."
+  },
+  "settings.connections.server.baseUrl": {
+    "defaultMessage": "Base URL",
+    "description": "Label of a server connection's base URL (Settings → Connections), such as https://api.deepseek.com/anthropic."
+  },
+  "settings.connections.server.changeFailed": {
+    "defaultMessage": "Couldn't change the connection",
+    "description": "An error's title: changing a server connection failed (Settings → Connections)."
+  },
+  "settings.connections.server.custom": {
+    "defaultMessage": "Custom",
+    "description": "A choice of a server connection's preset: no preset, the user fills in the form."
+  },
+  "settings.connections.server.docs": {
+    "defaultMessage": "Its setup is documented at {url}.",
+    "description": "Under a server connection's preset: where the service documents using it with the CLI. {url} is a web address."
+  },
+  "settings.connections.server.edit": {
+    "defaultMessage": "Edit Server…",
+    "description": "Button on a server connection: changes its base URL and its models."
+  },
+  "settings.connections.server.editTitle": {
+    "defaultMessage": "{name}'s server",
+    "description": "Title of the dialog changing a server connection's base URL and models ({name}, its name)."
+  },
+  "settings.connections.server.hostKey": {
+    "defaultMessage": "{host} · Key …{last4}",
+    "description": "A server connection's line in Settings → Connections: its server's host, and its key by its last 4 characters ({last4})."
+  },
+  "settings.connections.server.hostLocal": {
+    "defaultMessage": "{host} · On this PC, no key",
+    "description": "A server connection's line: its server is on this computer and has no key (none needed)."
+  },
+  "settings.connections.server.hostNoKey": {
+    "defaultMessage": "{host} · No key",
+    "description": "A server connection's line: its server's host, with no key saved."
+  },
+  "settings.connections.server.key": {
+    "defaultMessage": "API key",
+    "description": "Label of a server connection's API key box (Settings → Connections)."
+  },
+  "settings.connections.server.keyCleared": {
+    "defaultMessage": "{name}'s server changed, so its key was removed. Add the key for the new server.",
+    "description": "A notice after a server connection was moved to another server ({name}, its name): its old key was deleted."
+  },
+  "settings.connections.server.keyFailed": {
+    "defaultMessage": "Couldn't save the key",
+    "description": "An error's title: a server connection's API key wasn't saved (Settings → Connections)."
+  },
+  "settings.connections.server.keyFailedAdded": {
+    "defaultMessage": "{name} was added without its key. Use Add Key on it to try again.",
+    "description": "The error's text when a server connection ({name}) was added but its API key couldn't be stored. Add Key names a button on it."
+  },
+  "settings.connections.server.keyHint": {
+    "defaultMessage": "Stored encrypted for your Windows account, never shown again. The agent's commands can read it from their environment.",
+    "description": "Under a server connection's API key box: how Hive keeps the key, and that an agent running on it can read it (it is in the agent's environment)."
+  },
+  "settings.connections.server.keyLocal": {
+    "defaultMessage": "Not needed for a server on this PC.",
+    "description": "Under a server connection's API key box when its base URL is this computer (localhost): the key may be left empty."
+  },
+  "settings.connections.server.keySave": {
+    "defaultMessage": "Save Key",
+    "description": "The confirm button of the dialog asking a server connection's API key."
+  },
+  "settings.connections.server.keyTitle": {
+    "defaultMessage": "{name}'s API key",
+    "description": "Title of the dialog asking a server connection's API key ({name}, its name)."
+  },
+  "settings.connections.server.local": {
+    "defaultMessage": "{name} (on this PC)",
+    "description": "A preset of a server connection that runs on the user's own computer ({name}: \"Ollama\")."
+  },
+  "settings.connections.server.modelId": {
+    "defaultMessage": "Model id",
+    "description": "Placeholder of a model's id box in a server connection's model list (\"deepseek-flash\")."
+  },
+  "settings.connections.server.models": {
+    "defaultMessage": "Models",
+    "description": "Label of a server connection's model list (Settings → Connections)."
+  },
+  "settings.connections.server.modelsHint": {
+    "defaultMessage": "Each Claude name (Opus, Sonnet, Haiku) runs the model ticked for it. A model can stand in for several.",
+    "description": "Under a server connection's model list: the CLI asks for Claude models by name, and each name runs the server model ticked for it."
+  },
+  "settings.connections.server.moveWarn": {
+    "defaultMessage": "This is another server: its key will be removed, and you add the key for this one after.",
+    "description": "A warning in the dialog changing a server connection's base URL: the new URL is on another server, so the saved key (for the old server) is deleted when it is saved."
+  },
+  "settings.connections.server.needUrl": {
+    "defaultMessage": "Give the base URL in full, starting with https:// (or http:// for this PC).",
+    "description": "A server connection form's error: the base URL is empty or can't be used."
+  },
+  "settings.connections.server.needsKey": {
+    "defaultMessage": "Its server needs a key: agents on it are refused until one is added.",
+    "description": "A warning on a server connection with no key whose server isn't on this computer."
+  },
+  "settings.connections.server.preset": {
+    "defaultMessage": "Preset",
+    "description": "Label of a server connection's preset (Add Connection): a filled form for a known service."
+  },
+  "settings.connections.server.read": {
+    "defaultMessage": "Read Models",
+    "description": "Button on a server connection: reads its models from the server's model list."
+  },
+  "settings.connections.server.readAfter": {
+    "defaultMessage": "Read the models from the server once it is added",
+    "description": "A tick box in Add Connection for a server: its models are read from the server (its model list) right after it is added."
+  },
+  "settings.connections.server.readDone": {
+    "defaultMessage": "{n, plural, one {# model read from {name}.} other {# models read from {name}.}}",
+    "description": "A notice after reading a server connection's models ({name}, its name)."
+  },
+  "settings.connections.server.readDropped": {
+    "defaultMessage": "No longer listed, so taken out: {models}",
+    "description": "A second line of that notice: models the server doesn't list any more, removed from the connection ({models}, their ids)."
+  },
+  "settings.connections.server.readFailed": {
+    "defaultMessage": "Couldn't read {name}'s models",
+    "description": "An error's title: reading a server connection's models failed ({name}, its name)."
+  },
+  "settings.connections.server.reading": {
+    "defaultMessage": "Reading…",
+    "description": "A server connection's Read Models button while it reads them."
+  },
+  "settings.connections.server.removeKey": {
+    "defaultMessage": "Remove Key",
+    "description": "Button on a server connection with a key: deletes it (asks first)."
+  },
+  "settings.connections.server.removeKeyMessage": {
+    "defaultMessage": "It's deleted from this PC. Agents running on it keep it until they restart; new ones are refused until a key is added.",
+    "description": "The message of the dialog confirming a server connection's key is deleted."
+  },
+  "settings.connections.server.removeKeyTitle": {
+    "defaultMessage": "Remove {name}'s key?",
+    "description": "Title of the dialog confirming a server connection's key is deleted ({name}, its name)."
+  },
+  "settings.connections.server.removeModel": {
+    "defaultMessage": "Remove {model}",
+    "description": "Tooltip of the button removing a model ({model}, its id) from a server connection's list."
+  },
+  "settings.connections.server.replaceKey": {
+    "defaultMessage": "Replace Key…",
+    "description": "Button on a server connection with a key: asks for a new one in its place."
+  },
+  "settings.connections.server.save": {
+    "defaultMessage": "Save",
+    "description": "The confirm button of the dialog changing a server connection's server."
+  },
+  "settings.connections.server.saving": {
+    "defaultMessage": "Saving…",
+    "description": "A dialog's confirm button in Settings → Connections while it saves."
+  },
+  "settings.connections.server.setKey": {
+    "defaultMessage": "Add Key…",
+    "description": "Button on a server connection with no key: asks for one."
+  },
+  "settings.connections.server.setUp": {
+    "defaultMessage": "Set Up",
+    "description": "Button on a server connection: opens the CLI on it in a terminal, for its first-run screens (its theme, its notes), answered by the user."
+  },
+  "settings.connections.server.setUpFailed": {
+    "defaultMessage": "Couldn't open the setup",
+    "description": "An error's title: a server connection's Set Up terminal couldn't be opened."
+  },
+  "settings.connections.server.setUpHint": {
+    "defaultMessage": "The first time {cli} runs on it, it asks a few setup questions (its look, its notes). Answer them here once, or in the first agent's pane.",
+    "description": "Above the Set Up terminal of a server connection ({cli}: the coding agent CLI): what the terminal is for."
+  },
+  "settings.connections.server.why.failed": {
+    "defaultMessage": "The server answered with an error ({status}). Try again later.",
+    "description": "Why reading a server connection's models failed: the server answered with an HTTP error. {status} is its code (500)."
+  },
+  "settings.connections.server.why.forbidden": {
+    "defaultMessage": "The server refused access (403): the key may not be allowed to list models. Type the models in instead.",
+    "description": "Why reading a server connection's models failed: access was refused, though the key may be fine for using models."
+  },
+  "settings.connections.server.why.redirect": {
+    "defaultMessage": "The server sent Hive elsewhere ({status}), which Hive doesn't follow with a key. Check the base URL.",
+    "description": "Why reading a server connection's models failed: the server answered with a redirect. {status} is its code (301)."
+  },
+  "settings.connections.server.why.refused": {
+    "defaultMessage": "The server refused the key (401). Replace the key, then read again.",
+    "description": "Why reading a server connection's models failed: its API key was refused."
+  },
+  "settings.connections.server.why.shape": {
+    "defaultMessage": "The server's answer isn't a model list Hive can read. Type the models in instead.",
+    "description": "Why reading a server connection's models failed: its reply isn't the list Hive expects."
+  },
+  "settings.connections.server.why.stale": {
+    "defaultMessage": "The connection changed while its models were read. Read them again.",
+    "description": "Why reading a server connection's models was dropped: its server or key changed meanwhile, or a newer reading started."
+  },
+  "settings.connections.server.why.tooBig": {
+    "defaultMessage": "The model list is too large to read. Type the models in instead.",
+    "description": "Why reading a server connection's models failed: its reply was over Hive's size limit."
+  },
+  "settings.connections.server.why.unreachable": {
+    "defaultMessage": "Couldn't reach the server: check its base URL and that it is running.",
+    "description": "Why reading a server connection's models failed: no answer (not running, wrong address, a timeout)."
+  },
   "settings.data.copied": {
     "defaultMessage": "Path copied",
     "description": "A notice after a path was copied."
@@ -3888,12 +4144,12 @@
     "description": "Placeholder of Settings' search box."
   },
   "settings.section.accounts.desc": {
-    "defaultMessage": "How your agents reach their models: for now, Claude Code sign-ins Hive keeps, one folder each, signed in through Claude Code's own sign-in. Every connection shares your conversations and Claude Code's memory. Each agent and the Assistant runs on its own connection, or the workspace's default.",
+    "defaultMessage": "How your agents reach their models: a Claude Code sign-in Hive keeps, signed in through Claude Code's own sign-in, or a server such as DeepSeek or Ollama, reached by its base URL and key. Each has a folder of its own, and every connection shares your conversations and Claude Code's memory. Each agent and the Assistant runs on its own connection, or the workspace's default.",
     "description": "Under the heading of the section \"Connections\" of Settings: what it holds."
   },
   "settings.section.accounts.label": {
     "defaultMessage": "Connections",
-    "description": "A section of Settings, in its list on the left: connections, the ways Hive's agents reach their models (a CLI signed in, or later a base URL and key)."
+    "description": "A section of Settings, in its list on the left: connections, the ways Hive's agents reach their models (a CLI signed in, or a server with a base URL and key)."
   },
   "settings.section.advanced.desc": {
     "defaultMessage": "Developer features, the details Hive relies on that a CLI update can break (advanced.json), logs, data and resetting Hive.",

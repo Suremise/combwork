@@ -530,8 +530,17 @@ export const STATUS_TEXT: Readonly<Record<SessionStatus | 'idle', string>> = Obj
  * unknown, working…); when no turn runs, Hive's policy words: what its watch waits for, its status message, finished or
  * ready, with any background tasks it is running.
  */
-export function statusText(live: Pick<LiveSessionState, 'status' | 'statusMessage' | 'statusText' | 'mergeSlot' | 'mergeSlotText' | 'backgroundTasks' | 'question' | 'watch' | 'turn' | 'runtime'>): string {
+/** A server connection's refused key (HI-1772), where a sign-in connection's agent needs sign-in. */
+const KEY_REFUSED = {
+  status: msg({ id: 'shell.status.keyRefused', defaultMessage: 'Key refused', description: "An agent's status: its server connection's API key was refused by the server (where a signed-in connection would need sign-in)." }),
+  carryOn: msg({ id: 'shell.keyRefused.then', defaultMessage: "{name}'s key was refused. Replace it in Settings → Connections, then Resume in the project's header carries on the agents it stopped.", description: "Tooltip of an agent whose server connection's ({name}) API key was refused, its second line. Settings → Connections names a section; Resume is a button in the project's header." }),
+  stopped: msg({ id: 'shell.keyRefused.stopped', defaultMessage: "Its turn stopped when {name}'s key was refused. Resume in the project's header carries it on.", description: "Tooltip of an agent whose turn stopped because its server connection's ({name}) API key was refused." })
+}
+
+export function statusText(live: Pick<LiveSessionState, 'status' | 'statusMessage' | 'statusText' | 'mergeSlot' | 'mergeSlotText' | 'backgroundTasks' | 'question' | 'watch' | 'turn' | 'runtime' | 'launchedConnection'>): string {
   const text = ((): string => {
+    // On a server connection (HI-1772) there is no sign-in: its key was refused.
+    if (live.status === 'signin' && live.launchedConnection?.server) return tr(KEY_REFUSED.status)
     const projected = live.runtime ? runtimeLabel(live) : unknownStateText(live)
     if (projected) return projected
     // Waiting on cards: what for, in the window's words and its card names ("Waiting for HI-12 → Review", HI-1679: never
@@ -606,12 +615,16 @@ export function SafeguardMark({ live }: { live: Pick<LiveSessionState, 'safeguar
  * For the tooltips of an agent whose turn a refused sign-in stopped (#309): what its CLI said and how to sign in again
  * (while it needs sign-in), then that Resume (n) carries it on. Null for any other agent.
  */
-export function signInNote(live: Pick<LiveSessionState, 'status' | 'signIn' | 'provider'> | null | undefined): string | null {
+export function signInNote(live: Pick<LiveSessionState, 'status' | 'signIn' | 'provider' | 'launchedConnection'> | null | undefined): string | null {
   if (!live?.signIn) return null
   const d = providerDescriptor(live.provider)
   // Hive's own message in the window's language (#847), else what the CLI said, as it said it.
   const message = live.signIn.messageText ? shownText(live.signIn.messageText) : live.signIn.message
   const said = message.length > 160 ? `${message.slice(0, 160)}…` : message
+  // On a server connection (HI-1772): its key was refused, replaced in Settings → Connections (no sign-in).
+  const server = live.launchedConnection?.server ? live.launchedConnection.name : null
+  if (server && live.status === 'signin') return [tr(msg({ id: 'shell.signIn.said', defaultMessage: '{provider} says: {said}', description: "Tooltip of an agent that needs sign-in, its first line. {provider} is the coding agent's name; {said} what its CLI said, as it said it." }), { provider: d.name, said }), tr(KEY_REFUSED.carryOn, { name: server })].join('\n')
+  if (server && (live.status === 'ready' || live.status === 'finished')) return tr(KEY_REFUSED.stopped, { name: server })
   // Two lines: what the CLI said, then how to carry on (a message keeps no line break).
   if (live.status === 'signin')
     return [

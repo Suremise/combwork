@@ -687,11 +687,13 @@ export interface Connection {
   id: string
   provider: ProviderId
   /**
-   * How it runs its CLI (Darren, 26 Oct ~22:10: configured providers): `signIn`, a login folder of Hive's signed in
-   * through the CLI's own sign-in. The endpoint kind (a base URL and an API key) comes with its own card. Absent in a
-   * record from before it: signIn.
+   * Where it gets its model (Darren, 27 Oct ~08:55): `signIn`, a login folder of Hive's signed in through the CLI's own
+   * sign-in; `server`, a server it reaches by a base URL, with a key or none (HI-1772: DeepSeek, Ollama…), in a folder of
+   * Hive's too. Absent in a record from before it: signIn.
    */
-  kind?: 'signIn'
+  kind?: 'signIn' | 'server'
+  /** A server connection's server (HI-1772). Its key is never here: only in the key store (keyStore.ts). */
+  server?: ServerConnection
   /** The user's name for it ("Personal", "Hive overnight"). */
   name: string
   createdAt: string
@@ -706,6 +708,26 @@ export interface Connection {
   defaults?: ConnectionDefaults
   /** 'cli': `defaults` are still the CLI's per-CLI defaults as copied; cleared once they are edited. */
   defaultsFrom?: 'cli'
+}
+
+/** The Claude names a server's model can stand in for (HI-1772): the CLI's aliases. */
+export type ModelAlias = 'opus' | 'sonnet' | 'haiku'
+
+/** One of a server's models (HI-1772): its id at the server, and the aliases it stands in for (each alias at most one model). */
+export interface ServerModel {
+  id: string
+  as?: ModelAlias[]
+}
+
+/**
+ * A server connection's server (HI-1772): its base URL, its preset (the descriptor's, for its model listing), and its
+ * models, typed or read from it. Nothing secret: a key is in the key store, bound to the URL's origin.
+ */
+export interface ServerConnection {
+  baseUrl: string
+  preset?: string
+  models: ServerModel[]
+  modelsFrom: 'typed' | 'listed'
 }
 
 /** A connection's defaults (HI-1770); each absent: the CLI decides (its own default model, effort; context off). */
@@ -1999,6 +2021,8 @@ export interface LiveSessionState {
     note?: 'offFallback' | 'unknownLogin' | 'loginChanged'
     /** Who it launched as (HI-1756: its plan usage is that login's), as plan usage keeps a login (a hash); absent: unknown. */
     login?: string
+    /** A server connection's (HI-1772): its models as launched, so the footer shows the real model and what it stands in for. */
+    server?: { models: ServerModel[] }
   }
   /** A switch to the connection it would launch on now waits for its turn to be over (HI-1755). */
   switchPending?: boolean

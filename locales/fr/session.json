@@ -54,6 +54,8 @@
   "session.inUse.reserved": "Hive est déjà en train d’archiver, de supprimer ou de nettoyer cette session.",
   "session.inUse.running": "Elle est en cours. Arrête-la d’abord.",
   "session.inUse.writing": "Sa CLI écrit encore sa transcription. Réessaie dans un instant.",
+  "session.keyRefused.body": "Remplacez la clé de {name} dans Paramètres → Connexions, puis Reprendre dans l'en-tête du projet les relance.",
+  "session.keyRefused.title": "{n, plural, one {{agent} s'est arrêté : la clé de {name} a été refusée} many {# agents se sont arrêtés : la clé de {name} a été refusée} other {# agents se sont arrêtés : la clé de {name} a été refusée}}",
   "session.leftovers.body": "{processes}. {n, plural, one {Démarré par l’agent, il peut bloquer le dossier ou les ports du projet.} many {Démarrés par l’agent, ils peuvent bloquer le dossier ou les ports du projet.} other {Démarrés par l’agent, ils peuvent bloquer le dossier ou les ports du projet.}}",
   "session.leftovers.end": "Les arrêter",
   "session.leftovers.keep": "Laisser tourner",

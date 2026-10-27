@@ -219,6 +219,14 @@
     "defaultMessage": "Its CLI is still writing its transcript. Try again in a moment.",
     "description": "A session is left alone (archive, delete) for a moment: its coding agent is still writing its transcript."
   },
+  "session.keyRefused.body": {
+    "defaultMessage": "Replace {name}'s key in Settings → Connections, then Resume in the project's header carries them on.",
+    "description": "The notification that a server connection's ({name}) API key was refused. Settings → Connections names a section; Resume is a button in the project's header."
+  },
+  "session.keyRefused.title": {
+    "defaultMessage": "{n, plural, one {{agent} stopped: {name}'s key was refused} other {# agents stopped: {name}'s key was refused}}",
+    "description": "A notification's title: the server of a server connection ({name}) refused its API key, so agents on it stopped. {n} is how many agents, {agent} the first one's name."
+  },
   "session.leftovers.body": {
     "defaultMessage": "{processes}. {n, plural, one {It was started by the agent and may hold the project's folder or ports.} other {They were started by the agent and may hold the project's folder or ports.}}",
     "description": "The notice of processes an agent left running. {processes} lists them (\"node serve.js, 4 × tail -f …\"); {n} is how many."

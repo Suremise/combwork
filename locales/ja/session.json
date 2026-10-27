@@ -54,6 +54,8 @@
   "session.inUse.reserved": "Hiveがすでにこのセッションをアーカイブ、削除、またはクリーンアップしています。",
   "session.inUse.running": "実行中です。先に停止してください。",
   "session.inUse.writing": "CLIがまだトランスクリプトを書き込んでいます。しばらくしてからもう一度お試しください。",
+  "session.keyRefused.body": "設定 → 接続 で {name} のキーを置き換えると、プロジェクトのヘッダーの「再開」で続行できます。",
+  "session.keyRefused.title": "{n, plural, =1 {{agent} が停止しました: {name} のキーが拒否されました} other {{n, number} 件のエージェントが停止しました: {name} のキーが拒否されました}}",
   "session.leftovers.body": "{processes}。{n, plural, other {エージェントが起動したもので、プロジェクトのフォルダーやポートを使用している可能性があります。}}",
   "session.leftovers.end": "終了する",
   "session.leftovers.keep": "実行したままにする",

@@ -4,6 +4,7 @@ import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
 import type { ConnectionsView } from './accounts'
+import type { ServerModelsRead } from './serverConnection'
 import type { MovedNotice } from './connectionDefaults'
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
@@ -55,6 +56,7 @@ import type {
   ModeInfo,
   RecentWorkspace,
   Connection,
+  ServerModel,
   AgentInstallInfo,
   AppConfig,
   AppInfo,
@@ -935,6 +937,21 @@ export interface HiveRequests {
   'connections:remove': (id: string) => void
   /** Opens the account's sign-in (the CLI's own) in a terminal; returns the terminal's key. */
   'connections:signIn': (id: string) => string
+  /**
+   * Adds a server connection (HI-1772): its server, its models, and its key once (when the server needs one), which is
+   * stored encrypted and never sent back. Returns it.
+   */
+  'connections:addServer': (input: { cli: ProviderId; name: string; baseUrl: string; preset?: string; models: ServerModel[]; modelsFrom: 'typed' | 'listed'; key?: string }) => Connection & { keyFailed?: boolean }
+  /** Changes a server connection's server; `keyCleared`: its base URL moved to another server, so its key was removed. */
+  'connections:editServer': (id: string, patch: { baseUrl?: string; preset?: string | null; models?: ServerModel[]; modelsFrom?: 'typed' | 'listed' }) => { keyCleared: boolean }
+  /** Saves or replaces a server connection's key; the reply has its last 4 characters only. */
+  'connections:setKey': (id: string, key: string) => { last4: string }
+  'connections:removeKey': (id: string) => void
+  /** Reads a server connection's models from its server (`request`: this reading's id, for cancelling it and telling a stale reply). */
+  'connections:readModels': (id: string, request: string) => ServerModelsRead
+  'connections:cancelModels': (id: string, request: string) => void
+  /** Opens the CLI on a server connection, for its first-run screens; returns the terminal's key. */
+  'connections:setUp': (id: string) => string
   /** Takes on the login an account is now signed in as (its change answered). */
   'connections:keepLogin': (id: string) => void
   /** Turns an account on or off in this window's workspace. */
