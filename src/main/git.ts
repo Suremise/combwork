@@ -10,7 +10,8 @@ import { withValues } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { hiveError } from './hiveError'
 import { createLogger } from './logger'
-import { runGit, type GitOutcome, type GitReply, type GitRequest } from './gitWorker'
+import { runGit, type GitOutcome, type GitReply, type GitRequest, type RefsRequest } from './gitWorker'
+import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
 
 const log = createLogger('git')
 
@@ -71,16 +72,33 @@ export async function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1
  */
 class GitThread {
   private worker: Worker | null = null
-  private calls = new Map<number, (o: GitOutcome) => void>()
+  /** Each call under way: its answer, or null when the worker ended first. */
+  private calls = new Map<number, (r: GitReply | null) => void>()
   private next = 0
+  /** Why the worker last ended. */
+  private lost = ''
 
   run(m: Omit<GitRequest, 'id'>): Promise<GitOutcome> {
     const w = this.ensure()
     if (!w) return runGit(m)
     const id = ++this.next
     return new Promise((done) => {
-      this.calls.set(id, done)
+      this.calls.set(id, (r) => done(r && 'outcome' in r ? r.outcome : lostOutcome(this.lost)))
       w.postMessage({ ...m, id } satisfies GitRequest)
+    })
+  }
+
+  /**
+   * A repository's refs and working folders, read in the worker (HI-1814: observe.ts's read walked every ref file on
+   * main); here where there is none, and here again when it ended first (a read has no side effects).
+   */
+  refs(common: string, max: number): Promise<RepoRefs> {
+    const w = this.ensure()
+    if (!w) return Promise.resolve(readRepoRefs(common, max))
+    const id = ++this.next
+    return new Promise((done) => {
+      this.calls.set(id, (r) => done(r && 'refs' in r ? r.refs : readRepoRefs(common, max)))
+      w.postMessage({ id, kind: 'refs', common, max } satisfies RefsRequest)
     })
   }
 
@@ -93,14 +111,14 @@ class GitThread {
     w.on('message', (r: GitReply) => {
       const c = this.calls.get(r.id)
       this.calls.delete(r.id)
-      c?.(r.outcome)
+      c?.(r)
     })
     const gone = (why: string): void => {
       if (this.worker !== w) return
       this.worker = null
       log.warn(`git's worker ended (${why}); it starts again with the next command`)
-      const lost: GitOutcome = { stdout: new Uint8Array(), stderr: Buffer.from(`Hive's git worker ended (${why})`), error: { code: 'ERR_GIT_WORKER', killed: false, signal: null }, cwdExists: true } // i18n-ignore: git's error text, for the log and the caller's message
-      for (const c of this.calls.values()) c(lost)
+      this.lost = why
+      for (const c of this.calls.values()) c(null)
       this.calls.clear()
     }
     w.on('error', (e: Error) => gone(e.message))
@@ -109,6 +127,12 @@ class GitThread {
     return w
   }
 }
+
+/** A command's outcome when git's worker ended while it was under way: one that couldn't start (never git's answer). */
+const lostOutcome = (why: string): GitOutcome => ({ stdout: new Uint8Array(), stderr: Buffer.from(`Hive's git worker ended (${why})`), error: { code: 'ERR_GIT_WORKER', killed: false, signal: null }, cwdExists: true }) // i18n-ignore: git's error text, for the log and the caller's message
+
+/** The observer's read of a repository's refs (observe.ts), off main's thread: see GitThread.refs. */
+export const readRefsOffMain = (common: string, max: number): Promise<RepoRefs> => thread.refs(common, max)
 
 /** The worker's script, beside main's (inside the asar, as the others' are); a test's build of it (`useGitWorker`). */
 let gitScriptForTests: string | null = null

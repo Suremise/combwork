@@ -20,7 +20,7 @@ import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSess
 import { config } from './config'
 import { changesConfig, viewOf, withoutView } from '../shared/projectView'
 import { emit, emitTo } from './events'
-import { containsPlace, insideReal, isDir, placeKey, readJson, readKeptJson, removePath, retryWhileSaving, samePlace, withFileLock, writeKeptJson, type KeptReadOptions } from './fsutil'
+import { containsPlace, insideReal, isDir, placeKey, readJson, readKeptJson, readKeptJsonByStat, removePath, retryWhileSaving, samePlace, withFileLock, writeKeptJson, type KeptReadOptions } from './fsutil'
 import { admit, dismiss, setFenceReason } from './openingFence'
 import { AfterOpen } from './openProgress'
 import { whenAll } from '../shared/atMost'
@@ -141,6 +141,12 @@ export interface ProjectSeen {
 
 /** For unit tests (#1382): an agent leaving the project, its change about to wait for the board's lock. */
 export const configTestHooks: { beforeBoardRetry?: (projectPath: string) => void } = {}
+
+/** What a project.json gives (kept by its stat, HI-1814): its config over the defaults, and the view fields it still has. */
+const projectFileConfig = (raw: Record<string, unknown>): { cfg: ProjectConfig; viewKeys: string[] } => ({
+  cfg: mergeDefaults(structuredClone(DEFAULT_PROJECT_CONFIG), migrateProjectConfig(raw)),
+  viewKeys: Object.keys(viewOf(raw as Partial<ProjectConfig>))
+})
 
 export class WorkspaceService {
   path: string | null = null
@@ -1117,8 +1123,9 @@ export class WorkspaceService {
 
   /** A project's config; `opts` for a read that is written back (mutateProjectConfig, #1600). */
   async projectConfig(projectPath: string, opts?: KeptReadOptions): Promise<ProjectConfig> {
-    const raw = await readKeptJson<Record<string, unknown>>(join(projectPath, HIVE_DIR, 'project.json'), {}, opts)
-    const cfg = this.withView(projectPath, mergeDefaults(structuredClone(DEFAULT_PROJECT_CONFIG), migrateProjectConfig(raw)), raw)
+    // By its stat (HI-1814): read, migrated and merged with the defaults again only once it changed.
+    const file = await readKeptJsonByStat(join(projectPath, HIVE_DIR, 'project.json'), {} as Record<string, unknown>, projectFileConfig, opts)
+    const cfg = this.withView(projectPath, file.cfg, file.viewKeys)
     // The Assistant's "project" settings are Settings → Assistant; its file keeps the workspace's own choices.
     return this.isAssistantHome(projectPath) ? assistantProjectConfig(cfg, config.settings) : cfg
   }
@@ -1127,12 +1134,12 @@ export class WorkspaceService {
    * A project's config with this user's view of it (HI-1749: AppConfig.ui.projectViews) over its file's. The first read of
    * a project with none kept takes what its project.json has (from before the view moved out), so no one loses a layout.
    */
-  private withView(projectPath: string, cfg: ProjectConfig, raw: Record<string, unknown>): ProjectConfig {
+  private withView(projectPath: string, cfg: ProjectConfig, fileViewKeys: string[]): ProjectConfig {
     const views = config.get().ui.projectViews
     // One kept by its folder before it had an id is still its view.
     let view = views?.[projectViewKey(cfg, projectPath)] ?? views?.[projectViewKey({}, projectPath)]
     if (!view) {
-      view = viewOf(Object.fromEntries(Object.keys(viewOf(raw as Partial<ProjectConfig>)).map((k) => [k, cfg[k as keyof ProjectConfig]])) as Partial<ProjectConfig>)
+      view = viewOf(Object.fromEntries(fileViewKeys.map((k) => [k, cfg[k as keyof ProjectConfig]])) as Partial<ProjectConfig>)
       if (Object.keys(view).length) this.keepView(projectPath, { ...cfg, ...view })
     }
     return { ...cfg, ...view }

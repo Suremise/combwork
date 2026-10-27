@@ -8,8 +8,9 @@
 // below is the fallback: the tracked files (Git) or the deliverables (None) and the HEAD reflog, at the start and the end.
 
 import { randomUUID } from 'crypto'
-import { existsSync, readFileSync, statSync } from 'original-fs'
+import { stat } from 'original-fs/promises'
 import { join } from 'path'
+import { atMost } from '../../shared/atMost'
 import type { CardRecord } from './factStore'
 import type { FactData } from '../../shared/workflow/facts'
 import { refusal, type Refusal } from '../../shared/workflow/refusals'
@@ -30,20 +31,16 @@ export interface CheckRun {
   exec: Exec
 }
 
-/** What a stat snapshot sees of a set of files: each one's size and time, and the HEAD reflog's length. */
+/** Files a snapshot stats at once, off main's thread (the queue's snapshot is of every tracked file). */
+const SNAPSHOT_STATS = 8
+
+/**
+ * What a stat snapshot sees of a set of files: each one's size and time, and the HEAD reflog's size (each entry adds to
+ * it; HI-1814: it was read in full on main to count its lines).
+ */
 export async function snapshot(folder: string, files: string[], gitDir: string | null): Promise<string> {
-  const parts = files.map((f) => {
-    try {
-      const s = statSync(join(folder, f))
-      return `${f}:${s.size}:${s.mtimeMs}`
-    } catch {
-      return `${f}:gone`
-    }
-  })
-  if (gitDir) {
-    const log = join(gitDir, 'logs', 'HEAD')
-    parts.push(`reflog:${existsSync(log) ? readFileSync(log, 'utf8').split('\n').length : 0}`)
-  }
+  const parts = await atMost(SNAPSHOT_STATS, files, (f) => stat(join(folder, f)).then((s) => `${f}:${s.size}:${s.mtimeMs}`, () => `${f}:gone`))
+  if (gitDir) parts.push(`reflog:${await stat(join(gitDir, 'logs', 'HEAD')).then((s) => s.size, () => 0)}`)
   return parts.join('\n')
 }
 

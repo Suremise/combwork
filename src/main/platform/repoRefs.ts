@@ -1,0 +1,132 @@
+// A repository's refs and working folders read from its files, with no git process: the observer's read (observe.ts),
+// which git's worker runs off main's thread (HI-1814), and refSync for the reads that must be synchronous. Only Node's
+// built-ins here: git's worker loads it, and a worker can't load Electron.
+
+import { readdirSync, readFileSync, statSync } from 'original-fs'
+import { dirname, join, resolve } from 'path'
+
+/** A line or folder name → the commit it is at, read from the ref files. */
+export type Heads = Map<string, string | null>
+
+/** What a read of a repository found: its lines, its working folders with their HEADs, and each HEAD reflog's size. */
+export interface RepoRefs {
+  lines: Heads
+  folders: { folder: string; gitDir: string }[]
+  heads: Heads
+  /** git dir (lower-cased) → its HEAD reflog's size (0: none yet). */
+  sizes: Map<string, number>
+}
+
+/**
+ * A ref's commit, read synchronously from the ref files (loose, else packed-refs), with no git process: cheap enough to
+ * read again inside a transaction, as the fingerprint of what a guard decided on (ARCHITECTURE "The one path").
+ */
+export function refSync(common: string, ref: string, depth = 0): string | null {
+  try {
+    const v = readFileSync(join(common, ref), 'utf8').trim()
+    if (v.startsWith('ref: ') && depth < 5) return refSync(common, v.slice(5), depth + 1)
+    if (v) return v
+  } catch {
+    // Not a loose ref: packed, or missing.
+  }
+  try {
+    for (const l of readFileSync(join(common, 'packed-refs'), 'utf8').split(/\r?\n/)) {
+      const [sha, name] = l.split(' ')
+      if (name === ref) return sha
+    }
+  } catch {
+    // No packed refs.
+  }
+  return null
+}
+
+/** Reads a repository's lines, its first `max` working folders, their HEADs and their HEAD reflogs' sizes. */
+export function readRepoRefs(common: string, max: number): RepoRefs {
+  const lines = linesOf(common)
+  const folders = foldersOf(common).slice(0, max)
+  const heads: Heads = new Map()
+  const sizes = new Map<string, number>()
+  for (const f of folders) {
+    heads.set(f.folder, refSync(f.gitDir, 'HEAD') ?? refSync(common, readHeadRef(f.gitDir) ?? 'HEAD'))
+    let size = 0
+    try {
+      size = statSync(join(f.gitDir, 'logs', 'HEAD')).size
+    } catch {
+      // No reflog yet.
+    }
+    sizes.set(f.gitDir.toLowerCase(), size)
+  }
+  return { lines, folders, heads, sizes }
+}
+
+/** Every branch with its commit: loose refs under refs/heads, over packed-refs. */
+function linesOf(common: string): Heads {
+  const out: Heads = new Map()
+  try {
+    for (const l of readFileSync(join(common, 'packed-refs'), 'utf8').split(/\r?\n/)) {
+      const [sha, name] = l.split(' ')
+      if (name?.startsWith('refs/heads/') && /^[0-9a-f]{40,64}$/.test(sha)) out.set(name.slice('refs/heads/'.length), sha)
+    }
+  } catch {
+    // No packed refs.
+  }
+  const walk = (dir: string, prefix: string): void => {
+    let list
+    try {
+      list = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const e of list) {
+      if (e.isDirectory()) walk(join(dir, e.name), `${prefix}${e.name}/`)
+      else if (e.isFile() && !e.name.endsWith('.lock')) {
+        try {
+          const v = readFileSync(join(dir, e.name), 'utf8').trim()
+          if (/^[0-9a-f]{40,64}$/.test(v)) out.set(`${prefix}${e.name}`, v)
+        } catch {
+          // Being rewritten: the next read has it.
+        }
+      }
+    }
+  }
+  walk(join(common, 'refs', 'heads'), '')
+  return out
+}
+
+/** The working folders of a repository (its main folder, then each worktree), each with its git dir. */
+function foldersOf(common: string): { folder: string; gitDir: string }[] {
+  const out: { folder: string; gitDir: string }[] = []
+  // A repository's main folder holds its common dir as `.git`; a bare one has none.
+  if (isMainGitDir(common)) out.push({ folder: dirname(common), gitDir: common })
+  let names: string[] = []
+  try {
+    names = readdirSync(join(common, 'worktrees'))
+  } catch {
+    // No worktrees.
+  }
+  for (const n of names) {
+    const gitDir = join(common, 'worktrees', n)
+    try {
+      const target = readFileSync(join(gitDir, 'gitdir'), 'utf8').trim()
+      out.push({ folder: dirname(resolve(target)), gitDir })
+    } catch {
+      // Being made or removed.
+    }
+  }
+  return out
+}
+
+/** Whether a common git dir is a main folder's `.git` (not a bare repository). */
+export function isMainGitDir(common: string): boolean {
+  return /[\\/]\.git$/i.test(common)
+}
+
+/** What a git dir's HEAD names (`refs/heads/x`), when it is a symbolic ref. */
+function readHeadRef(gitDir: string): string | null {
+  try {
+    const v = readFileSync(join(gitDir, 'HEAD'), 'utf8').trim()
+    return v.startsWith('ref: ') ? v.slice(5) : null
+  } catch {
+    return null
+  }
+}

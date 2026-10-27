@@ -6,8 +6,10 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync } from 'original-fs'
+import { access } from 'original-fs/promises'
 import { isAbsolute, join, resolve as resolvePath } from 'path'
 import { git } from '../git'
+import { refSync } from './repoRefs'
 import type { FileChange } from '../../shared/workflow/facts'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
 import { isUnknown, unknown, type Change, type Containment, type Maybe } from './types'
@@ -118,28 +120,8 @@ function commonDirSync(folder: string): string | null {
   }
 }
 
-/**
- * A ref's commit, read synchronously from the ref files (loose, else packed-refs), with no git process: cheap enough to
- * read again inside a transaction, as the fingerprint of what a guard decided on (ARCHITECTURE "The one path").
- */
-export function refSync(common: string, ref: string, depth = 0): string | null {
-  try {
-    const v = readFileSync(join(common, ref), 'utf8').trim()
-    if (v.startsWith('ref: ') && depth < 5) return refSync(common, v.slice(5), depth + 1)
-    if (v) return v
-  } catch {
-    // Not a loose ref: packed, or missing.
-  }
-  try {
-    for (const l of readFileSync(join(common, 'packed-refs'), 'utf8').split(/\r?\n/)) {
-      const [sha, name] = l.split(' ')
-      if (name === ref) return sha
-    }
-  } catch {
-    // No packed refs.
-  }
-  return null
-}
+// A ref's commit from the ref files: kept with the observer's read, which git's worker loads (HI-1814).
+export { refSync }
 
 /**
  * A folder's checkout read from its ref files with no git process (as refSync): the branch it has checked out (null:
@@ -362,8 +344,10 @@ export async function worktreeNow(folder: string, o: { target?: string; gitPaths
   if (isUnknown(target)) return target
   const out = g.ok ? lines(g.out).map((l) => l.trim()) : []
   if (out.length !== asked.length + (o.target && target === undefined ? 1 : 0)) return unknown(U.state, { folder })
+  // Looked at off main's thread (HI-1814), all at once: a handful of paths.
+  const there = await Promise.all(MARKERS.map((_, i) => access(isAbsolute(out[i]) ? out[i] : join(folder, out[i])).then(() => true, () => false)))
   MARKERS.forEach((marker, i) => {
-    if (existsSync(isAbsolute(out[i]) ? out[i] : join(folder, out[i]))) files.push(`(${marker})`)
+    if (there[i]) files.push(`(${marker})`)
   })
   return { line, head: oid, dirty: files, ...(o.target ? { target: target === undefined ? out[asked.length] : target } : {}), gitPaths: out.slice(MARKERS.length, asked.length) }
 }
