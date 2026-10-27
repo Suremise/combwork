@@ -73,8 +73,10 @@ const DEFAULT_KEYS: readonly SlotDefaultKey[] = ['copy']
 /**
  * Sets (or, with null, removes, so it inherits) one of a level's slot defaults (HI-1765): Hive's (config.json) or the
  * workspace's (workspace.json, under its lock, against it as it is then). An empty string is that level's "none".
+ * `check` sees the level's defaults as the change replaces them, in the change's own turn (the workspace's in its save
+ * queue, HR5's HI-1765 round 1): throwing refuses it, nothing written.
  */
-export async function setSlotDefault(ws: WorkspaceService, level: WorkflowLevel, key: SlotDefaultKey, value: string | null): Promise<SlotDefaults> {
+export async function setSlotDefault(ws: WorkspaceService, level: WorkflowLevel, key: SlotDefaultKey, value: string | null, check?: (now: SlotDefaults | undefined) => void): Promise<SlotDefaults> {
   if (level !== 'global' && level !== 'workspace') throw hiveError(M.bad, undefined, { kind: 'invalid' })
   if (!DEFAULT_KEYS.includes(key)) throw hiveError(M.bad, undefined, { kind: 'invalid' })
   if (value !== null && (typeof value !== 'string' || value.length > MAX_TEXT)) throw hiveError(M.badText, undefined, { kind: 'invalid' })
@@ -84,11 +86,20 @@ export async function setSlotDefault(ws: WorkspaceService, level: WorkflowLevel,
     else d[key] = value
     return d
   }
-  if (level === 'global') return config.setSlotDefaults(next(config.settings.slotDefaults)).slotDefaults ?? {}
+  if (level === 'global') {
+    check?.(config.settings.slotDefaults)
+    return config.setSlotDefaults(next(config.settings.slotDefaults)).slotDefaults ?? {}
+  }
   let saved: SlotDefaults = {}
+  let checked = false
   await ws.saveWorkspaceConfigWith((c) => {
+    // The save works the change out again once written: checked only the first time, before anything is written.
+    if (!checked) check?.(c.slotDefaults)
+    checked = true
     saved = next(c.slotDefaults)
     return { slotDefaults: saved }
   })
+  // The windows read it again, whoever changed it (the settings tool, another window): their open rows follow.
+  ws.scheduleRefresh()
   return saved
 }

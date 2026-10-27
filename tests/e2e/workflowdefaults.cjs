@@ -133,6 +133,21 @@ const check = (name, ok, extra = '') => {
     const hiveCopy = hive.locator('[data-slot-default="copy"][data-level="global"]')
     check('Hive’s level has the files copied into new slots, at the default, .env*', !!(await lib.until(async () => (await hiveCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'default' && (await text(hiveCopy)).includes('.env*'), HUNG_MS)), await text(hiveCopy))
     await shots('hive-copy', hiveCopy)
+    // Changed elsewhere (the settings tool, another window) while open: the row follows (HR5's round 1), and so does the
+    // workspace's, inheriting it, then its own changed elsewhere.
+    const copyOf = async (l) => ({ origin: await l.locator('.workflow-origin').getAttribute('data-origin').catch(() => ''), field: await l.locator('textarea').inputValue().catch(() => ''), text: await text(l) })
+    await inv('slots:setLevelDefault', 'global', 'copy', 'changed.env')
+    check('…following a change made elsewhere while it is open', !!(await lib.until(async () => { const c = await copyOf(hiveCopy); return c.origin === 'here' && c.field === 'changed.env' }, HUNG_MS)), JSON.stringify(await copyOf(hiveCopy)))
+    await page.locator('.settings-nav .row', { hasText: 'Workspace' }).first().click()
+    const wsCopy = page.locator('[data-slot-default="copy"][data-level="workspace"]')
+    check('the workspace’s copied files inherit it, From Hive’s settings', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'global' && c.text.includes('changed.env') }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
+    await inv('slots:setLevelDefault', 'global', 'copy', 'again.env')
+    check('…following Hive’s changing while it is open', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'global' && c.text.includes('again.env') }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
+    await inv('slots:setLevelDefault', 'workspace', 'copy', 'ws.env')
+    check('…and its own set elsewhere', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'here' && c.field === 'ws.env' }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
+    await inv('slots:setLevelDefault', 'workspace', 'copy', null)
+    await inv('slots:setLevelDefault', 'global', 'copy', null)
+    check('…and inherits the default again once both are unset', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'default' && c.text.includes('.env*') }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
     // The workspace's level shows Hive's as what it inherits.
     await page.locator('.settings-nav .row', { hasText: 'Workspace' }).first().click()
     check('the workspace’s level inherits it: From Hive’s settings', !!(await lib.until(async () => (await row('dependenciesDone').innerText().catch(() => '')).includes('From Hive’s settings'), HUNG_MS)))

@@ -1,6 +1,6 @@
 import { basename } from 'path'
 import type { SettingsPatch } from '../shared/api'
-import type { EffortOption, FallbackModel, ModelPrice, ProjectConfig, ProviderId } from '../shared/types'
+import type { EffortOption, FallbackModel, ModelPrice, ProjectConfig, ProviderId, SlotDefaults } from '../shared/types'
 import { modelCaps } from '../shared/models'
 import { advancedDef, advancedTakes } from '../shared/advanced'
 import { projectProviderConfig, providerSettings } from '../shared/providers'
@@ -276,11 +276,16 @@ export async function applySetting(
     return { old, new: settingValue(e, config.settings, null, workspace.config) }
   }
   if ('slotLevel' in change) {
-    // A level's slot default (HI-1765), saved as Settings saves it: Hive's at once, the workspace's in its save queue.
-    const old = settingValue(e, config.settings, null, workspace.config)
-    guard?.(old)
-    await setSlotDefault(workspace, change.slotLevel.level, change.slotLevel.key, change.slotLevel.value)
-    return { old, new: settingValue(e, config.settings, null, workspace.config) }
+    // A level's slot default (HI-1765), saved as Settings saves it: Hive's at once, the workspace's in its save queue,
+    // the guard in the change's own turn, against the level's value it replaces (HR5's round 1).
+    const { level, key, value: v } = change.slotLevel
+    const at = (d: SlotDefaults | undefined): unknown => (level === 'global' ? settingValue(e, { ...config.settings, slotDefaults: d }) : settingValue(e, config.settings, null, { ...workspace.config, slotDefaults: d }))
+    let old: unknown
+    const saved = await setSlotDefault(workspace, level, key, v, (now) => {
+      old = at(now)
+      guard?.(old)
+    })
+    return { old, new: at(saved) }
   }
   if ('workspace' in change) {
     // The workspace's own (workspace.json), with nothing awaited between the guard and the change.

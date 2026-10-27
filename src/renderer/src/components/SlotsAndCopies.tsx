@@ -263,20 +263,29 @@ export function SlotCopyLevel({ level }: { level: WorkflowLevel }) {
   const workspacePath = useStore((s) => s.workspace?.path ?? '')
   const [form, setForm] = useState<SlotLevelForm | null>(null)
   const [shown, setShown] = useState(0)
+  // Read again when either level changes, from here or elsewhere (the settings tool, another window: HR5's round 1): Hive's
+  // come with the settings, the workspace's with the workspace. Only the latest read or save counts.
+  const levels = useStore((s) => s.settings?.slotDefaults)
+  const wsLevels = useStore((s) => s.workspace?.config.slotDefaults)
+  const latest = useRef(0)
   useEffect(() => {
-    let live = true
+    const n = ++latest.current
     void call('slots:levelForm', level).then(
-      (f) => live && setForm(f),
-      () => live && setForm(null)
+      (f) => n === latest.current && setForm(f),
+      () => n === latest.current && setForm(null)
     )
-    return () => {
-      live = false
-    }
-  }, [level, workspacePath])
+  }, [level, workspacePath, levels, wsLevels])
+  useEffect(
+    () => () => {
+      latest.current++
+    },
+    []
+  )
   const save = async (value: string | null): Promise<void> => {
+    const n = ++latest.current
     const next = await actions.attempt(tr(T.saveFailed), () => call('slots:setLevelDefault', level, 'copy', value))
-    if (next) setForm(next)
-    else setShown((x) => x + 1)
+    if (next && n === latest.current) setForm(next)
+    else if (!next) setShown((x) => x + 1)
     // The projects' tabs read it again: Hive's comes with the settings, the workspace's with the workspace.
     if (level === 'workspace') await actions.refreshWorkspace()
   }
@@ -314,7 +323,15 @@ export function SlotCopyLevel({ level }: { level: WorkflowLevel }) {
 /** A field taken when it loses focus or on Enter (a script, a list of patterns). */
 function Field({ value, placeholder, onCommit, multiline }: { value: string; placeholder: string; onCommit: (v: string) => void; multiline?: boolean }) {
   const [text, setText] = useState(value)
-  useEffect(() => setText(value), [value])
-  if (multiline) return <textarea className="input mono" rows={3} value={text} placeholder={placeholder} onChange={(e) => setText(e.target.value)} onBlur={() => text !== value && onCommit(text)} />
-  return <input className="input mono" value={text} placeholder={placeholder} onChange={(e) => setText(e.target.value)} onBlur={() => text !== value && onCommit(text)} onKeyDown={(e) => e.key === 'Enter' && text !== value && onCommit(text)} />
+  // A value changed elsewhere shows at once, but not over text being typed: that is committed (or not) as it leaves.
+  const editing = useRef(false)
+  useEffect(() => {
+    if (!editing.current) setText(value)
+  }, [value])
+  const leave = (): void => {
+    editing.current = false
+    if (text !== value) onCommit(text)
+  }
+  if (multiline) return <textarea className="input mono" rows={3} value={text} placeholder={placeholder} onFocus={() => (editing.current = true)} onChange={(e) => setText(e.target.value)} onBlur={leave} />
+  return <input className="input mono" value={text} placeholder={placeholder} onFocus={() => (editing.current = true)} onChange={(e) => setText(e.target.value)} onBlur={leave} onKeyDown={(e) => e.key === 'Enter' && text !== value && onCommit(text)} />
 }

@@ -1,10 +1,12 @@
 // The Assistant's settings tools (#186) on a provider's prices (#315): null puts back Hive's prices as Settings' Reset to
 // defaults does, the shipped models removed from the table too; a table keeps them removed; Revert puts the removed list
 // back with the overrides, and is refused when it changed since.
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { config } from '../src/main/config'
 import * as assistant from '../src/main/assistantControl'
 import { applySetting, revertSetting } from '../src/main/settingsTools'
+import { inWorkspace } from '../src/main/workspace'
+import type { WorkspaceConfig } from '../src/shared/types'
 import { settingChangeTexts, settingEntry } from '../src/shared/settingsCatalog'
 
 const prices = settingEntry('codex.prices')!
@@ -117,5 +119,59 @@ describe("the settings tools on the copied files, Hive's slot default (HI-1765)"
     } finally {
       config.settings.slotDefaults = was
     }
+  })
+})
+
+describe("the settings tools on the workspace's copied files, in its save queue (HR5's HI-1765 round 1)", () => {
+  const e = settingEntry('workspace.workflow.git.slotCopy')!
+  /** A workspace whose saves wait in their queue until `release`, then work the change out as the real one does. */
+  function heldWorkspace(copy: string) {
+    const state = { slotDefaults: { copy } } as Partial<WorkspaceConfig>
+    let change: ((c: WorkspaceConfig) => Partial<WorkspaceConfig>) | null = null
+    let done: (e?: unknown) => void = () => {}
+    const ws = {
+      config: state,
+      scheduleRefresh: () => {},
+      saveWorkspaceConfigWith: (fn: (c: WorkspaceConfig) => Partial<WorkspaceConfig>) => {
+        change = fn
+        return new Promise<void>((res, rej) => (done = (err) => (err ? rej(err) : res())))
+      }
+    }
+    const release = (): void => {
+      try {
+        Object.assign(state, change!(state as WorkspaceConfig))
+        done()
+      } catch (err) {
+        done(err)
+      }
+    }
+    return { ws, state, queued: () => change !== null, release }
+  }
+
+  it('a guard refusing by the time the change runs refuses it, nothing written', async () => {
+    const w = heldWorkspace('old')
+    let allowed = true
+    const p = inWorkspace(w.ws as never, () =>
+      applySetting(e, 'new', null, () => {
+        if (!allowed) throw new Error('revoked')
+      })
+    )
+    await vi.waitFor(() => expect(w.queued()).toBe(true))
+    allowed = false
+    w.release()
+    await expect(p).rejects.toThrow('revoked')
+    expect(w.state.slotDefaults).toEqual({ copy: 'old' })
+  })
+
+  it('the guard sees the value as the change replaces it, a change meanwhile included, and the reply says so', async () => {
+    const w = heldWorkspace('old')
+    const seen: unknown[] = []
+    const p = inWorkspace(w.ws as never, () => applySetting(e, 'new', null, (now) => void seen.push(now)))
+    await vi.waitFor(() => expect(w.queued()).toBe(true))
+    w.state.slotDefaults = { copy: 'meanwhile' }
+    w.release()
+    expect(await p).toEqual({ old: 'meanwhile', new: 'new' })
+    expect(seen).toEqual(['meanwhile'])
+    expect(w.state.slotDefaults).toEqual({ copy: 'new' })
   })
 })
