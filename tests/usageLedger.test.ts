@@ -5,9 +5,9 @@ import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { newUsageParser, parserShape, restoreParser, saveParser } from '../src/main/usageParsers'
 import { copilotEventsPath } from '../src/main/providers/copilot/events'
-import { keptRows, ledgerRows, rowCost, rowsPart, sessionHolds, summaryOf, usageFromRows, type LedgerRow, type SessionHold } from '../src/shared/usageLedger'
+import { holdIndex, holdIsSessions, holdsOfCard, keptRows, ledgerRows, rowCost, rowsPart, sessionHolds, summaryOf, usageFromRows, type LedgerRow, type SessionHold, type SessionWho } from '../src/shared/usageLedger'
 import { priceUsage } from '../src/shared/usageDays'
-import { sliceSession, sharedSpans } from '../src/shared/cardCosts'
+import { mergeSpans, sliceSession, sharedSpans } from '../src/shared/cardCosts'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import type { AppSettings, ProviderId, SessionUsage, TaskCard } from '../src/shared/types'
 
@@ -190,5 +190,65 @@ describe('the cards a session held', () => {
     expect(sessionHolds(cards, { agentId: 'a7' }, (n) => (n === 'HB2' ? ['a7'] : []), T0)).toHaveLength(1)
     expect(sessionHolds(cards, { agentId: 'a8' }, (n) => (n === 'HB2' ? ['a7'] : []), T0)).toHaveLength(0)
     expect(sessionHolds(cards, { agentName: 'hb2' }, () => [], T0)).toHaveLength(1)
+  })
+
+  it('are the same from a hold index, read once for every session, as from the cards (HI-1748)', () => {
+    // sessionHolds as it was before HI-1748, working every card's holds out again for each session.
+    const ms = (iso: string | undefined | null, fallback: number): number => (iso && Number.isFinite(Date.parse(iso)) ? Date.parse(iso) : fallback)
+    const before = (cards: TaskCard[], s: SessionWho, named: (name: string) => string[], now: number): SessionHold[] => {
+      const byName = new Map<string, Map<number, [number, number][]>>()
+      for (const c of cards) {
+        for (const h of holdsOfCard(c)) {
+          const m = byName.get(h.name.toLowerCase()) ?? new Map<number, [number, number][]>()
+          m.set(c.number, [...(m.get(c.number) ?? []), [ms(h.from, now), ms(h.to, now)]])
+          byName.set(h.name.toLowerCase(), m)
+        }
+      }
+      for (const m of byName.values()) for (const [n, spans] of m) m.set(n, mergeSpans(spans))
+      const out: SessionHold[] = []
+      for (const c of cards) {
+        const groups = new Map<string, { role: 'build' | 'review'; name: string; spans: [number, number][] }>()
+        for (const h of holdsOfCard(c)) {
+          if (!holdIsSessions(h, s, named)) continue
+          const g = groups.get(h.role) ?? { role: h.role, name: h.name, spans: [] }
+          g.spans.push([ms(h.from, now), ms(h.to, now)])
+          groups.set(h.role, g)
+        }
+        for (const g of groups.values()) {
+          const spans = mergeSpans(g.spans)
+          if (!spans.length) continue
+          const others = [...(byName.get(g.name.toLowerCase())?.entries() ?? [])].filter(([n]) => n !== c.number).map(([, sp]) => sp)
+          out.push({ card: c.number, role: g.role, parts: [...sharedSpans(spans, others).entries()] })
+        }
+      }
+      return out
+    }
+    let seed = 1748
+    const rand = (n: number): number => (seed = (seed * 1103515245 + 12345) % 2 ** 31) % n
+    const names = ['HB1', 'hb1', 'HR1', 'HB2', 'Agent 3']
+    const ids = ['a1', 'a2', undefined]
+    for (let board = 0; board < 20; board++) {
+      const cards = Array.from({ length: 30 }, (_, i) =>
+        card(
+          i + 1,
+          Array.from({ length: rand(4) }, () => {
+            const from = rand(10) === 0 ? 'not a time' : at(rand(3600))
+            // An open hold has no end.
+            const to = rand(5) === 0 ? undefined : at(rand(3600))
+            const agent = ids[rand(ids.length)]
+            return { ...(agent ? { agent } : {}), name: names[rand(names.length)], role: rand(2) ? ('build' as const) : ('review' as const), from, ...(to ? { to } : {}) }
+          })
+        )
+      )
+      const named = (n: string): string[] => (n.toLowerCase() === 'hb1' ? ['a1'] : n === 'HR1' ? ['a2'] : [])
+      const index = holdIndex(cards)
+      for (const who of [{ agentId: 'a1' }, { agentId: 'a2' }, { agentName: 'hb2' }, { agentName: 'Agent 3' }, {}]) {
+        for (const now of [T0 + 1800_000, Number.MAX_SAFE_INTEGER]) {
+          const want = before(cards, who, named, now)
+          expect(sessionHolds(index, who, named, now)).toEqual(want)
+          expect(sessionHolds(cards, who, named, now)).toEqual(want)
+        }
+      }
+    }
   })
 })
