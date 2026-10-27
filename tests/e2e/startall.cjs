@@ -378,6 +378,8 @@ const check = (name, ok, extra = '') => {
   const current = Object.fromEntries(await Promise.all([w, i, s].map(async (a) => [a.id, (await live(a.id)).sessionId])))
   await type(w.id, 'work 120')
   await until(async () => (await live(w.id))?.status === 'working', HUNG_MS)
+  // The dialog lists the window's agent states, which follow main's within a batch (HI-1806): once its chip says so (HI-1845).
+  await until(async () => /^1 working\b/.test(await chipText()), HUNG_MS)
   const archiveDialog = page.locator('.dialog', { hasText: 'Archive and start new for all agents?' })
   await lib.agentsMenuRun(page, 'Archive and Start New (3)')
   await archiveDialog.waitFor({ timeout: 5000 })
