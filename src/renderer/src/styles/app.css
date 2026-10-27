@@ -1745,6 +1745,32 @@ textarea.input {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+/* A tab's own icon (Hive's mark, a CLI's), the codicons' size; a dimmed tab (a CLI turned off, HI-1839) stays legible. */
+.hive-tab-icon {
+  display: inline-flex;
+}
+.hive-tab-icon > :is(.provider-icon, .tab-hex) {
+  inline-size: 13px;
+  block-size: 13px;
+}
+.hive-tab.muted:not(:hover) {
+  color: var(--fg-faint);
+}
+.hive-tab.muted .hive-tab-icon {
+  opacity: 0.6;
+}
+.hive-tab.muted.active:not(:hover) .hive-tab-label {
+  color: var(--fg-muted);
+}
+/* A short mark after a tab's name ("off"). */
+.hive-tab-tag {
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--fg-muted);
+}
 /* The tabs with every name, measured to choose between names and icons (Tabs' `fold`). */
 .hive-tabs-measure {
   position: absolute;
@@ -1766,7 +1792,8 @@ textarea.input {
 }
 /* The tabs' line runs under the whole row, the selected tab's underline on it. */
 .workflow-defaults-tabs > .hive-tabs-row,
-.kb-editor > .hive-tabs-row {
+.kb-editor > .hive-tabs-row,
+.advanced-list > .hive-tabs-row {
   border-block-end: 1px solid var(--border-subtle);
   margin-block-end: 4px;
 }

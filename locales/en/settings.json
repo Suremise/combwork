@@ -1667,6 +1667,10 @@
     "defaultMessage": "Applies to sessions started afterwards.",
     "description": "A line of an advanced value's info tip."
   },
+  "settings.advancedList.cliOff": {
+    "defaultMessage": "{cli} is turned off: these settings apply once you turn it on",
+    "description": "Tooltip of a dimmed tab of Settings → Advanced, and part of its name for screen readers: the CLI is turned off in Settings → Providers. {cli} is its name."
+  },
   "settings.advancedList.cliVersion": {
     "defaultMessage": "It is {cli}'s: a change records the version it was made for.",
     "description": "A line of an advanced value's info tip, for a CLI's value. {cli} is the CLI's name."
@@ -1719,9 +1723,17 @@
     "defaultMessage": "No advanced settings match.",
     "description": "Settings → Advanced's list when its filter finds nothing."
   },
+  "settings.advancedList.noMatchHere": {
+    "defaultMessage": "No settings of {group} match.",
+    "description": "A tab of Settings → Advanced with none of the filtered values: {group} is Hive or the CLI's name."
+  },
   "settings.advancedList.notValid": {
     "defaultMessage": "Not valid, so Hive uses the default: {problem}",
     "description": "Under an advanced value that isn't valid. {problem} says why."
+  },
+  "settings.advancedList.off": {
+    "defaultMessage": "off",
+    "description": "A short mark on the tab of a CLI turned off in Settings → Advanced (beside its name, such as Codex). Lower case, one short word."
   },
   "settings.advancedList.open": {
     "defaultMessage": "Open advanced.json",
@@ -1746,6 +1758,10 @@
   "settings.advancedList.restartFailed": {
     "defaultMessage": "Could not restart Hive",
     "description": "An error's title: restarting Hive from Settings → Advanced failed."
+  },
+  "settings.advancedList.tabs": {
+    "defaultMessage": "Hive and the CLIs",
+    "description": "Accessible name of Settings → Advanced's tabs: Hive, then one per CLI (Claude Code, Codex, GitHub Copilot)."
   },
   "settings.advancedList.unknown": {
     "defaultMessage": "advanced.json also names {ids}, which this Hive doesn't know (a typo, or a newer Hive's): kept in the file, not used.",
