@@ -784,7 +784,7 @@ describe('saving and loading templates', () => {
     writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), setupPending: [...(cfgOf(beta).setupPending ?? []), neat.worktree!.path] }))
     expect(pending()).toContain(placeKey(neat.worktree!.path))
     const neatGone = await run(() => removeAgent(beta, neat.id, { deleteWorktree: 'merged-clean', mergedInto: 'main' }))
-    expect(neatGone.worktree?.deleted).toBe(true)
+    expect(neatGone.worktree, 'kept, and why').toMatchObject({ deleted: true })
     expect(pending()).not.toContain(placeKey(neat.worktree!.path))
   })
 
