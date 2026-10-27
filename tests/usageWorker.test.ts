@@ -488,8 +488,8 @@ describe('the usage worker reading a transcript for main', () => {
 
   it('a locality fact on an unchanged file is kept (HI-1772 follow-up): history from before the flags, notLocal, then a stale local job, across a reopen', async () => {
     const h = await setup()
-    const line = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'qwen3:8b', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
-    writeFileSync(h.transcript, prompt(0) + line(1))
+    const qwen = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'qwen3:8b', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
+    writeFileSync(h.transcript, prompt(0) + qwen(1))
     const settings = { providers: { ...DEFAULT_SETTINGS.providers, 'claude-code': { ...DEFAULT_SETTINGS.providers['claude-code'], prices: { 'qwen3:8b': { input: 1000, cachedInput: 0, output: 1000 } } } } }
     // Recorded with no locality at all (as a history from before this change).
     expect((await h.ingest({ reportsIgnored: true })).status).toBe('written')
