@@ -65,7 +65,7 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
     check("a test Hive gets none of the suite's environment", !leaked(env).length, leaked(env).join(', '))
     // CHROME_CRASHPAD_PIPE_NAME: Hive's own crash handler, which Electron sets in main for its processes (#985); what Hive
     // starts doesn't get it (ptyHost's childEnv).
-    const allowed = new Set(upper([...ctx.ALLOW, 'HIVE_USER_DATA', 'HIVE_TEST_QUIET', 'HIVE_TEST_TIPS', 'HIVE_LANG', 'HIVE_TEST_TRASH_DIR', ...Object.keys(ctx.cliHomes()), 'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'HIVE_API_PORT', ...ctx.CARRIED, 'CHROME_CRASHPAD_PIPE_NAME']))
+    const allowed = new Set(upper([...ctx.ALLOW, 'HIVE_USER_DATA', 'HIVE_TEST_QUIET', 'HIVE_TEST_TIPS', 'HIVE_TEST_CLI_HOME_CONNECTION', 'HIVE_LANG', 'HIVE_TEST_TRASH_DIR', ...Object.keys(ctx.cliHomes()), 'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'HIVE_API_PORT', ...ctx.CARRIED, 'CHROME_CRASHPAD_PIPE_NAME']))
     // PROMPT: cmd.exe's default ($P$G), which Playwright's start of Electron on Windows sets; not the suite's.
     const extra = upper(Object.keys(env)).filter((k) => !allowed.has(k) && !(k === 'PROMPT' && env[Object.keys(env).find((x) => x.toUpperCase() === 'PROMPT')] === '$P$G'))
     check('…only the allowlist and its run context', !extra.length, extra.join(', '))

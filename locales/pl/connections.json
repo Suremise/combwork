@@ -1,0 +1,8 @@
+{
+  "connections.choice.default": "Domyślne w obszarze roboczym ({name})",
+  "connections.choice.defaultNone": "Domyślne w obszarze roboczym (żadne nie jest włączone)",
+  "connections.choice.gone": "Usunięte połączenie (agent nie zostanie uruchomiony)",
+  "connections.choice.label": "Połączenie",
+  "connections.choice.none": "W tym obszarze roboczym nie jest włączone żadne połączenie {cli}. Dodaj je w Ustawienia → Połączenia.",
+  "connections.choice.off": "{name} (wyłączone w tym obszarze roboczym: agenta uruchamia domyślne)"
+}

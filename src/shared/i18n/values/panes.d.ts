@@ -46,6 +46,12 @@ interface HiveMessageValues {
   'panes.failed.title': undefined
   'panes.footer.compactionHistory': undefined
   'panes.footer.compactions': { n: number; over: string }
+  'panes.footer.connectionChanged': undefined
+  'panes.footer.connectionOff': undefined
+  'panes.footer.connectionSwitching': undefined
+  'panes.footer.connectionSwitchingTip': undefined
+  'panes.footer.connectionTip': { name: string | number }
+  'panes.footer.connectionUnknown': undefined
   'panes.footer.costClick': undefined
   'panes.footer.costEstimated': undefined
   'panes.footer.costReported': undefined

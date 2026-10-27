@@ -1642,6 +1642,17 @@ export function PaneFooter({
           {effort && <span className="faint"> · {effort}</span>}
         </span>
       </Tooltip>
+      {live?.launchedConnection && (
+        <>
+          {sep('s0')}
+          <Tooltip content={connectionTip(live.launchedConnection, !!live.switchPending)}>
+            <span className="pane-foot-item foot-connection fit-clip" data-connection={live.launchedConnection.id} onClick={() => (onSettings ? onSettings() : set({ agentSettingsFor: { project: project.path, agentId: a.id } }))}>
+              {live.launchedConnection.note && <Icon name="warning" />} {live.launchedConnection.name}
+              {live.switchPending && <span className="faint"> · {tr(CONNECTION_TEXT.switching)}</span>}
+            </span>
+          </Tooltip>
+        </>
+      )}
       {sep('s1')}
       <ModeBadge project={project} a={a} variant="pane" />
       {/* The right side (#1013): warnings beside it, then the transcript's size, the context and the cost. */}
@@ -1649,6 +1660,24 @@ export function PaneFooter({
       {right.flatMap((item, i) => (i > 0 && right[i - 1].key !== 'size' ? [sep(`s-${item.key}`), item.node] : [item.node]))}
     </div>
   )
+}
+
+const CONNECTION_TEXT = {
+  tip: msg({ id: 'panes.footer.connectionTip', defaultMessage: 'Runs on the connection {name}.', description: "Hover of the connection in a pane's footer (HI-1755): the connection this session launched on ({name})." }),
+  offFallback: msg({ id: 'panes.footer.connectionOff', defaultMessage: "The connection chosen for it is off in this workspace, so it runs on the workspace's default.", description: "Added to the hover of a pane footer's connection: the agent's own connection is off in this workspace, so the default runs it." }),
+  unknownLogin: msg({ id: 'panes.footer.connectionUnknown', defaultMessage: "Hive couldn't check who this connection is signed in as when it started.", description: "Added to the hover of a pane footer's connection: the connection's sign-in couldn't be checked at launch (not the same as signed out)." }),
+  loginChanged: msg({ id: 'panes.footer.connectionChanged', defaultMessage: 'Its login changed since it was added: see Settings → Connections.', description: "Added to the hover of a pane footer's connection: the connection is signed in as another login than the one it was added with. Settings → Connections names a section." }),
+  switching: msg({ id: 'panes.footer.connectionSwitching', defaultMessage: 'switches once its turn is over', description: "After the connection in a pane's footer (lower case): the agent moves to another connection once its turn is over, then carries on." }),
+  switchingTip: msg({ id: 'panes.footer.connectionSwitchingTip', defaultMessage: 'Once its turn is over, it ends and carries on, on the connection chosen for it now.', description: "Added to the hover of a pane footer's connection while a switch waits for the agent's turn to be over." })
+}
+
+/** The hover of a pane footer's connection: which one it runs on, and why it isn't the one chosen, or what its check said. */
+function connectionTip(c: NonNullable<AgentInfo['live']>['launchedConnection'], switching: boolean): string {
+  if (!c) return ''
+  const parts = [tr(CONNECTION_TEXT.tip, { name: c.name })]
+  if (c.note) parts.push(tr(CONNECTION_TEXT[c.note]))
+  if (switching) parts.push(tr(CONNECTION_TEXT.switchingTip))
+  return parts.join(' ')
 }
 
 /** Why an agent's CLI exited before its session started, if it did (until its next launch or ✕). */

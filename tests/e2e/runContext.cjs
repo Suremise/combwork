@@ -224,6 +224,9 @@ function hiveEnv(vars = {}, parent = process.env) {
   const env = baseEnv(parent)
   env.HIVE_TEST_QUIET = parent.HIVE_TEST_QUIET === '0' ? '0' : '1'
   env.HIVE_TEST_TIPS = 'off'
+  // Its CLI test home stands in for a connection where its workspace has none on (HI-1755's seam, DEV_SEAMS): suites
+  // launch agents as before connections; the connections suites set it to '0' to test the real rule.
+  env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
   env.HIVE_LANG = 'en'
   env.HIVE_TEST_TRASH_DIR = trashDir(parent)
   Object.assign(env, cliHomes(parent))

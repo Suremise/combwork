@@ -4,20 +4,19 @@ import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
 import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
 import type { Connection, ConnectionObserved, ProviderId, WorkspaceConfig } from '../shared/types'
-import { ACCOUNTS_PREVIEW } from '../shared/advanced'
-import { acceptable, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
+import { acceptable, accountState, resolveConnection, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { profileFolder } from '../shared/appName'
 import { isProviderEnabled, providerDescriptor, PROVIDERS } from '../shared/providers'
 import { msg } from '../shared/i18n'
-import { advanced } from './advanced'
 import { config } from './config'
 import { emit, onHiveEvent } from './events'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { childEnv, hasPty } from './ptyHost'
+import { connectionsManaged, connectionsOn, testHomeSeam } from './connectionSeam'
 import { provider } from './providers'
 import { providerService } from './providerService'
-import { openWorkspaces, setNewWorkspaceExtras, workspace } from './workspace'
+import { openWorkspaces, setNewWorkspaceExtras, workspace, workspaceOf } from './workspace'
 
 /**
  * Hive's accounts (HI-980, SPEC §11.2): a CLI login per folder, under `<accounts>\<id>\`, each signed in through the
@@ -31,7 +30,8 @@ import { openWorkspaces, setNewWorkspaceExtras, workspace } from './workspace'
  * itself replaced), after its sign-in, and when Settings → Accounts is shown. `accepted` (who the user took it on as) and
  * `observed` (the latest check) are kept apart: a check never clears a change the user hasn't answered.
  *
- * Staged behind Settings → Advanced → Accounts (preview) until HI-1755 launches agents on them.
+ * Each launch on a connection goes through connectionForLaunch (HI-1755): which connection, its folder checked, its
+ * login confirmed, and a claim that keeps it from being removed until the session runs.
  */
 
 const log = createLogger('accounts')
@@ -63,8 +63,6 @@ export function accountsRoot(): string {
 export const accountFolder = (id: string): string => join(accountsRoot(), id)
 
 const samePath = (a: string, b: string): boolean => resolve(a).toLowerCase() === resolve(b).toLowerCase()
-
-export const accountsOn = (): boolean => advanced.get<boolean>(ACCOUNTS_PREVIEW)
 
 function list(): Connection[] {
   return config.get().connections ?? []
@@ -101,8 +99,9 @@ const PREVIEW_OFF = msg({ id: 'main.accounts.previewOff', defaultMessage: 'Conne
 const NO_NAME = msg({ id: 'main.accounts.noName', defaultMessage: 'Give the connection a name.', description: 'An error adding or renaming a connection in Settings → Connections: its name is empty.' })
 const NO_ACCOUNT = msg({ id: 'main.accounts.notFound', defaultMessage: 'There is no such connection.', description: 'An error: a connection named by its id is not in Settings → Connections (removed meanwhile).' })
 
+/** Refuses an action on connections while they are off (the preview switch, until S8): nothing is made or changed. */
 function assertOn(): void {
-  if (!accountsOn()) throw hiveError(PREVIEW_OFF, undefined, { kind: 'forbidden' })
+  if (!connectionsOn()) throw hiveError(PREVIEW_OFF, undefined, { kind: 'forbidden' })
 }
 
 function mustGet(id: string): Connection {
@@ -145,6 +144,7 @@ const claims = new Map<string, number>()
  * refused while one is held. Returns its release.
  */
 export async function claimAccount(id: string): Promise<() => void> {
+  assertOn()
   await locked(id, async () => {
     await assertUsable(mustGet(id))
     claims.set(id, (claims.get(id) ?? 0) + 1)
@@ -492,6 +492,7 @@ async function checkOnce(id: string): Promise<ConnectionObserved | null> {
   if (generation(id) !== gen || !getAccount(id)) return null
   if (observed.error) log.warn(`account ${id}'s check failed: ${userText(observed.error)}`)
   changeAccount(id, (x) => (x.observed = observed))
+  if (observed.loggedIn === true) for (const fn of signedInListeners) fn(id)
   return observed
 }
 
@@ -610,7 +611,6 @@ let rootWatch: FSWatcher | null = null
 /** The accounts on in any open workspace: those watched (HI-1755 adds those its sessions run on). */
 function wantedIds(): Set<string> {
   const out = new Set<string>()
-  if (!accountsOn()) return out
   const all = list()
   for (const w of openWorkspaces()) for (const p of PROVIDERS) for (const id of workspaceAccounts(w.config, p.id, all)?.on ?? []) out.add(id)
   for (const a of all) if (sessionsOn(a.id)) out.add(a.id)
@@ -722,7 +722,7 @@ function syncRoot(): void {
 
 /** Watches the accounts wanted now, and no others; each newly watched is checked. */
 export function syncWatches(): void {
-  if (accountsOn()) startLeftovers()
+  startLeftovers()
   const want = wantedIds()
   for (const id of [...watched.keys()]) if (!want.has(id)) unwatch(id)
   for (const id of want) {
@@ -746,9 +746,10 @@ export function stopAccountWatches(): void {
 
 /** What Settings → Accounts shows for the asking window's workspace; each account checked again as it is shown. */
 export function accountsView(check = false): ConnectionsView {
-  const preview = accountsOn()
+  // Off (the preview switch, until S8): nothing is listed, and nothing is checked.
+  if (!connectionsOn()) return { preview: false, providers: [], connections: [], workspace: {}, testHome: [] }
   const all = list()
-  if (check && preview) for (const a of all) void checkAccount(a.id)
+  if (check) for (const a of all) void checkAccount(a.id)
   const providers = PROVIDERS.filter((p) => !!p.capabilities.connections && isProviderEnabled(config.settings, p.id)).map((p) => p.id)
   const cfg = workspace.path ? workspace.config : null
   const ws: ConnectionsView['workspace'] = {}
@@ -756,7 +757,8 @@ export function accountsView(check = false): ConnectionsView {
     const w = workspaceAccounts(cfg, p, all)
     if (w) ws[p] = w
   }
-  return { preview, providers, connections: preview ? all.map((a) => ({ ...a, signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id) })) : [], workspace: ws }
+  const testHome = providers.filter((p) => !connectionsManaged(p))
+  return { preview: true, providers, connections: all.map((a) => ({ ...a, signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id) })), workspace: ws, testHome }
 }
 
 /** Saves the asking window's workspace's accounts for a provider, worked out from how they are when it is written. */
@@ -791,6 +793,17 @@ export async function setAccountDefault(id: string): Promise<void> {
   noteLastUsed(a.provider, id)
 }
 
+/** The Assistant's own connection for a provider in the asking window's workspace (HI-1755); null: the default. */
+export async function setAssistantConnection(id: ProviderId, connection: string | null): Promise<void> {
+  assertOn()
+  if (connection) {
+    const a = mustGet(connection)
+    if (a.provider !== id) throw hiveError(NO_ACCOUNT, undefined, { kind: 'invalid' })
+  }
+  await workspace.saveWorkspaceConfigWith((c) => ({ assistantConnection: { ...c.assistantConnection, [id]: connection } }))
+  emit({ type: 'connections-changed' })
+}
+
 /** The account a new workspace starts with (Darren, 26 Oct): the last chosen as a default, or launched on (HI-1755). */
 export function noteLastUsed(id: ProviderId, accountId: string): void {
   if (config.get().lastUsedConnection?.[id] === accountId) return
@@ -799,22 +812,166 @@ export function noteLastUsed(id: ProviderId, accountId: string): void {
 
 /**
  * A new workspace's accounts (only when it is made: opening one never turns an account on): the last used of each
- * provider, on and its default. Undefined with none, or with the preview off.
+ * provider, on and its default. Undefined with none.
  */
 export function newWorkspaceAccounts(): WorkspaceConfig['connections'] | undefined {
-  if (!accountsOn()) return undefined
   const out: NonNullable<WorkspaceConfig['connections']> = {}
   for (const [p, id] of Object.entries(config.get().lastUsedConnection ?? {}) as [ProviderId, string][]) if (id && getAccount(id)?.provider === p) out[p] = { on: [id], default: id }
   return Object.keys(out).length ? out : undefined
 }
 
-setNewWorkspaceExtras(() => {
-  const connections = newWorkspaceAccounts()
-  return connections ? { connections } : {}
-})
+// ---------------------------------------------------------------------------
+// Launching on a connection (HI-1755).
+// ---------------------------------------------------------------------------
 
-// Watches follow the open workspaces and their choices.
-onHiveEvent((e) => {
-  if (e.type === 'workspace-changed') syncWatches()
-})
-advanced.onChange(() => syncWatches())
+/** A launch's connection: its folder given as the CLI's home, held (claimed) until the launch ends either way. */
+export interface LaunchConnection {
+  id: string
+  name: string
+  folder: string
+  homeEnv: string
+  /** Why it isn't exactly what was chosen, or what its check couldn't say: shown on the agent. */
+  note?: 'offFallback' | 'unknownLogin' | 'loginChanged'
+  /** Ends the launch's claim: once its session runs (its live state then keeps it from removal) or it failed. */
+  release: () => void
+  /**
+   * Asked at the last moment, with the agent's (or the Assistant's) choice as saved then: whether that choice, resolved
+   * again with its workspace's connections as they are now, is still this connection, and it is still there.
+   */
+  stillValid: (wanted: string | null | undefined) => boolean
+}
+
+/** Told when a connection is found signed in (its check), with its id: sessions end that connection's sign-out wait. */
+const signedInListeners: ((id: string) => void)[] = []
+export function onConnectionSignedIn(fn: (id: string) => void): void {
+  signedInListeners.push(fn)
+}
+
+const LAUNCH = {
+  none: msg({ id: 'main.connections.launch.none', defaultMessage: 'No {cli} connection is on in this workspace. Add one in Settings → Connections and sign it in, then start {agent} again.', description: "Starting an agent ({agent}, its name) is refused: its workspace has no connection on for its coding agent CLI ({cli}: \"Claude Code\"). Settings → Connections names a section." }),
+  offNoDefault: msg({ id: 'main.connections.launch.offNoDefault', defaultMessage: "{agent}'s connection, {name}, is off in this workspace, and no other {cli} connection is on. Turn one on in Settings → Connections.", description: "Starting an agent ({agent}) is refused: the connection chosen for it ({name}) is off in this workspace and there's no default to use instead. {cli} is the coding agent CLI." }),
+  deleted: msg({ id: 'main.connections.launch.deleted', defaultMessage: "The connection chosen for {agent} no longer exists. Pick another in its Agent Settings, or let it use the workspace's default.", description: 'Starting an agent ({agent}) is refused: the connection chosen for it was removed. Agent Settings names a dialog.' }),
+  changedAgain: msg({ id: 'main.connections.launch.changedAgain', defaultMessage: "{agent}'s connection was changed again while it was starting. Start it again.", description: "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Hive started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Connections)." }),
+  otherProvider: msg({ id: 'main.connections.launch.otherProvider', defaultMessage: 'The connection chosen for {agent} is for another CLI. Pick a {cli} connection in its Agent Settings.', description: 'Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent\'s CLI ("Claude Code").' }),
+  signedOut: msg({ id: 'main.connections.launch.signedOut', defaultMessage: '{name} is signed out. Sign it in again in Settings → Connections, then start {agent}.', description: "Starting an agent ({agent}) is refused: its connection ({name}) isn't signed in." }),
+  changing: msg({ id: 'main.connections.launch.changing', defaultMessage: "{name}'s login kept changing while Hive checked it. Try starting {agent} again in a moment.", description: "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Hive checked who it is signed in as." })
+}
+
+/**
+ * The connection a launch runs on (HI-1755), or null for a provider without connections (or a test copy on its CLI
+ * test home: testHomeSeam). Resolved from what was asked for and the workspace's choice (resolveConnection); refused,
+ * saying why, when there is none to use; then claimed (its folder checked, under its lock) and its login confirmed
+ * afresh: signed out, still changing, or its folder unusable refuse; a check that couldn't tell goes ahead, noted. The
+ * caller releases it however the launch ends, and asks stillValid() again before its process starts.
+ */
+export async function connectionForLaunch(o: { provider: ProviderId; workspaceConfig: WorkspaceConfig | null; wanted: string | null | undefined; agentName: string }): Promise<LaunchConnection | null> {
+  const caps = providerDescriptor(o.provider).capabilities.connections
+  // Connections off (the preview switch, until S8): everything launches as before.
+  if (!caps || !connectionsOn()) return null
+  const cli = providerDescriptor(o.provider).name
+  const choose = (wanted: string | null | undefined): ReturnType<typeof resolveConnection> => resolveConnection(o.workspaceConfig, o.provider, wanted, list())
+  const choice = choose(o.wanted)
+  if (!choice.ok) {
+    if (choice.why === 'none' && testHomeSeam(caps.homeEnv)) return null
+    const name = choice.wanted ? (getAccount(choice.wanted)?.name ?? choice.wanted) : ''
+    throw hiveError(LAUNCH[choice.why], { agent: o.agentName, cli, name }, { kind: 'conflict' })
+  }
+  const id = choice.id
+  const release = await claimAccount(id)
+  try {
+    const gen = generation(id)
+    const { observed, fresh } = await confirmAccount(id)
+    const a = getAccount(id)
+    if (!a || generation(id) !== gen) throw hiveError(NO_ACCOUNT, undefined, { kind: 'notFound' })
+    if (!fresh) throw hiveError(LAUNCH.changing, { name: a.name, agent: o.agentName }, { kind: 'conflict' })
+    if (observed?.missing) await assertUsable(a)
+    if (observed?.loggedIn === false) throw hiveError(LAUNCH.signedOut, { name: a.name, agent: o.agentName }, { kind: 'conflict' })
+    const note = choice.note ?? (observed?.loggedIn === null ? 'unknownLogin' : accountState(a) === 'changed' ? 'loginChanged' : undefined)
+    noteLastUsed(o.provider, id)
+    return {
+      id,
+      name: a.name,
+      folder: accountFolder(id),
+      homeEnv: caps.homeEnv,
+      ...(note ? { note } : {}),
+      release,
+      stillValid: (wanted) => generation(id) === gen && !!getAccount(id) && (() => {
+        const now = choose(wanted)
+        return now.ok && now.id === id
+      })()
+    }
+  } catch (e) {
+    release()
+    throw e
+  }
+}
+
+/** A launch whose connection's choice was changed (or the connection removed) while it was starting: started again once. */
+class ConnectionChanged extends Error {}
+
+/**
+ * Launches on the connection chosen (HI-1755): the choice as saved now (`chosen`), prepared (connectionForLaunch), and
+ * looked at again at the last moment: `run` awaits `lastLook()` as its last await before the spawn, which ends the run
+ * when the choice saved then, resolved again, isn't the connection prepared. It is then started once more on that
+ * choice (the first claim released), and refused, saying why, if that changes too. Each launch looks at its own choice
+ * (and the defaults it follows) only, so another agent's or the Assistant's save never ends it.
+ */
+export async function launchOnChosen(o: { provider: ProviderId; workspaceConfig: WorkspaceConfig | null; agentName: string; chosen: () => Promise<string | null | undefined> }, run: (conn: LaunchConnection | null, lastLook: () => Promise<void>) => Promise<void>): Promise<void> {
+  // Connections off (the preview switch, until S8), or none for this CLI: it launches as before, its choice not read.
+  if (!providerDescriptor(o.provider).capabilities.connections || !connectionsOn()) return run(null, async () => undefined)
+  for (let again = false; ; again = true) {
+    const conn = await connectionForLaunch({ provider: o.provider, workspaceConfig: o.workspaceConfig, wanted: await o.chosen(), agentName: o.agentName })
+    try {
+      await run(conn, async () => {
+        if (conn && !conn.stillValid(await o.chosen())) throw new ConnectionChanged()
+      })
+      return
+    } catch (e) {
+      if (!(e instanceof ConnectionChanged)) throw e
+      if (again) throw hiveError(LAUNCH.changedAgain, { agent: o.agentName }, { kind: 'conflict' })
+      log.info(`${userText(o.agentName)}: its connection was changed while it was starting; starting it on the one chosen now`)
+    } finally {
+      conn?.release()
+    }
+  }
+}
+
+/** A connection's home, for what the CLI reads from it: its memory, skills and settings (HI-1755). */
+export interface ConnectionHome {
+  id: string
+  name: string
+  home: string
+}
+
+/**
+ * The homes of a provider's connections on in a workspace (or, with no workspace given, in every open one), for what
+ * Hive shows or allows from a CLI's home; undefined when the provider's sign-in isn't its connections' (it has none, or
+ * the test seam is on), so the CLI's own home is used as before.
+ */
+export function connectionHomes(id: ProviderId, cfg?: WorkspaceConfig | null): ConnectionHome[] | undefined {
+  if (!connectionsManaged(id)) return undefined
+  const all = list()
+  const ids = new Set<string>()
+  for (const c of cfg !== undefined ? (cfg ? [cfg] : []) : openWorkspaces().map((w) => w.config)) for (const x of workspaceAccounts(c, id, all)?.on ?? []) ids.add(x)
+  return all.filter((a) => ids.has(a.id)).map((a) => ({ id: a.id, name: a.name, home: accountFolder(a.id) }))
+}
+
+/** Whether a connection is one of the provider's on in the workspace a project (or host) belongs to (HI-1755). */
+export function connectionOnHere(id: string, cli: ProviderId, projectPath: string): boolean {
+  const ws = workspaceOf(projectPath)
+  return !!ws.path && !!workspaceAccounts(ws.config, cli, list())?.on.includes(id)
+}
+
+/**
+ * Connections' part of Hive's start (index.ts; nothing runs as this module loads, which other modules import): a new
+ * workspace starts with the last-used connections, and the watches follow the open workspaces and their choices.
+ */
+export function initConnections(): void {
+  setNewWorkspaceExtras(() => {
+    const connections = newWorkspaceAccounts()
+    return connections ? { connections } : {}
+  })
+  onHiveEvent((e) => {
+    if (e.type === 'workspace-changed') syncWatches()
+  })
+}

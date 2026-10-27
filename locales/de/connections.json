@@ -1,0 +1,8 @@
+{
+  "connections.choice.default": "Standard des Arbeitsbereichs ({name})",
+  "connections.choice.defaultNone": "Standard des Arbeitsbereichs (keine eingeschaltet)",
+  "connections.choice.gone": "Eine entfernte Verbindung (der Agent wird nicht gestartet)",
+  "connections.choice.label": "Verbindung",
+  "connections.choice.none": "In diesem Arbeitsbereich ist keine Verbindung für {cli} eingeschaltet. Füge eine unter Einstellungen → Verbindungen hinzu.",
+  "connections.choice.off": "{name} (in diesem Arbeitsbereich ausgeschaltet: Der Agent läuft mit dem Standard)"
+}

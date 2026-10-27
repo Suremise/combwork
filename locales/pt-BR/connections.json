@@ -1,0 +1,8 @@
+{
+  "connections.choice.default": "Padrão do espaço de trabalho ({name})",
+  "connections.choice.defaultNone": "Padrão do espaço de trabalho (nenhuma ativada)",
+  "connections.choice.gone": "Uma conexão removida (o agente não pode ser iniciado)",
+  "connections.choice.label": "Conexão",
+  "connections.choice.none": "Nenhuma conexão do {cli} está ativada neste espaço de trabalho. Adicione uma em Configurações → Conexões.",
+  "connections.choice.off": "{name} (desativada neste espaço de trabalho: a padrão roda o agente)"
+}

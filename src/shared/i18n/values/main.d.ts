@@ -34,6 +34,13 @@ interface HiveMessageValues {
   'main.branchMerge.cardWork': { branch: string | number; card: string | number }
   'main.branchMerge.notBranch': { branch: string | number }
   'main.branchMerge.same': { branch: string | number }
+  'main.connections.launch.changedAgain': { agent: string | number }
+  'main.connections.launch.changing': { name: string | number; agent: string | number }
+  'main.connections.launch.deleted': { agent: string | number }
+  'main.connections.launch.none': { cli: string | number; agent: string | number }
+  'main.connections.launch.offNoDefault': { agent: string | number; name: string | number; cli: string | number }
+  'main.connections.launch.otherProvider': { agent: string | number; cli: string | number }
+  'main.connections.launch.signedOut': { name: string | number; agent: string | number }
   'main.console.noWorkspace': undefined
   'main.console.title': { workspace: string | number }
   'main.corrupt.damaged': { file: string | number }

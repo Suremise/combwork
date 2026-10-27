@@ -16,11 +16,15 @@ interface HiveMessageValues {
   'project.agents.turnedOff': { provider: string | number }
   'project.apply.new': { live: string }
   'project.banner.change': undefined
+  'project.banner.connectionSetup': { cli: string | number }
+  'project.banner.connectionSetupAdd': undefined
   'project.banner.copyToWorkspace': undefined
   'project.banner.dangerous': { modes: string | number; count: number }
   'project.banner.dangerousMode': { agent: string | number; mode: string | number }
   'project.banner.restart': undefined
   'project.banner.restartNeeded': { many: string; agent: string | number }
+  'project.banner.restartWhenDone': undefined
+  'project.banner.switchFailed': undefined
   'project.banner.unmanagedMcp': { names: string | number }
   'project.card.asReported': undefined
   'project.card.cache': undefined

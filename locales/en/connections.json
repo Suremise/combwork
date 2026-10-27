@@ -1,0 +1,26 @@
+{
+  "connections.choice.default": {
+    "defaultMessage": "Workspace's default ({name})",
+    "description": "The first choice of connection: the workspace's default connection for the CLI, named ({name})."
+  },
+  "connections.choice.defaultNone": {
+    "defaultMessage": "Workspace's default (none on)",
+    "description": "The first choice of connection when the workspace has no connection on for the CLI: an agent on it is refused a start until one is."
+  },
+  "connections.choice.gone": {
+    "defaultMessage": "A removed connection (the agent is refused a start)",
+    "description": "A choice of connection that no longer exists: the agent can't start until another is chosen."
+  },
+  "connections.choice.label": {
+    "defaultMessage": "Connection",
+    "description": "Label of the choice of connection an agent runs on (Agent Settings, Add Agent, Settings → Assistant): which login or service runs it."
+  },
+  "connections.choice.none": {
+    "defaultMessage": "No {cli} connection is on in this workspace. Add one in Settings → Connections.",
+    "description": "Under the choice of connection when the workspace has none on for the CLI ({cli}: \"Claude Code\"). Settings → Connections names a section."
+  },
+  "connections.choice.off": {
+    "defaultMessage": "{name} (off in this workspace: the default runs it)",
+    "description": "A choice of connection that is chosen but off in this workspace ({name}): the workspace's default runs the agent instead."
+  }
+}

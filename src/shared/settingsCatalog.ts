@@ -230,7 +230,7 @@ export const SETTINGS_SECTIONS: SettingsSectionInfo<SettingsSection>[] = [
     )
   ),
   // Shown only with Settings → Advanced → Accounts (preview) on (HI-980, staged until HI-1755).
-  sectionInfo('accounts', msg({ id: 'settings.section.accounts.label', defaultMessage: 'Connections', description: "A section of Settings, in its list on the left: connections, the ways Hive's agents reach their models (a CLI signed in, or later a base URL and key)." }), msg({ id: 'settings.section.accounts.desc', defaultMessage: "How your agents reach their models: for now, Claude Code sign-ins Hive keeps, one folder each, signed in through Claude Code's own sign-in. Every connection shares your conversations and Claude Code's memory. A preview: agents still run on your usual login.", description: 'Under the heading of the section "Connections" of Settings: what it holds.' })),
+  sectionInfo('accounts', msg({ id: 'settings.section.accounts.label', defaultMessage: 'Connections', description: "A section of Settings, in its list on the left: connections, the ways Hive's agents reach their models (a CLI signed in, or later a base URL and key)." }), msg({ id: 'settings.section.accounts.desc', defaultMessage: "How your agents reach their models: for now, Claude Code sign-ins Hive keeps, one folder each, signed in through Claude Code's own sign-in. Every connection shares your conversations and Claude Code's memory. Each agent and the Assistant runs on its own connection, or the workspace's default.", description: 'Under the heading of the section "Connections" of Settings: what it holds.' })),
   sectionInfo('notifications', msg({ id: 'settings.section.notifications.label', defaultMessage: 'Notifications', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.notifications.desc', defaultMessage: 'Chimes and desktop notifications when agents finish or need you.', description: 'Under the heading of the section "Notifications" of Settings: what it holds.' })),
   sectionInfo('sessions', msg({ id: 'settings.section.sessions.label', defaultMessage: 'Sessions', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.sessions.desc', defaultMessage: 'Transcript backups, cache estimates and session behaviour.', description: 'Under the heading of the section "Sessions" of Settings: what it holds.' })),
   sectionInfo('assistant', msg({ id: 'settings.section.assistant.label', defaultMessage: 'Assistant', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.assistant.desc', defaultMessage: "The Hive Assistant's defaults: the side panel's overseer of each workspace (Ctrl+Alt+I). Each workspace can change them in the panel's Assistant Settings.", description: 'Under the heading of the section "Assistant" of Settings: what it holds.' })),
@@ -423,6 +423,13 @@ const APP_ROWS: Row[] = [
     wide: true
   },
   // Assistant
+  {
+    section: 'assistant',
+    key: 'connection',
+    title: msg({ id: 'settings.assistant.connection.title', defaultMessage: 'Connection (this workspace)', description: "A setting's title (Settings → Assistant): which connection the open workspace's Assistant runs on." }),
+    desc: msg({ id: 'settings.assistant.connection.desc', defaultMessage: "Which connection the Assistant of the open workspace runs on. The workspace's default unless you choose one.", description: 'What the setting "Connection (this workspace)" does, under its title (Settings → Assistant).' }),
+    type: 'custom'
+  },
   { section: 'assistant', key: 'provider', title: msg({ id: 'settings.assistant.provider.title', defaultMessage: 'Provider', description: "A setting's title (Settings → Assistant)." }), desc: msg({ id: 'settings.assistant.provider.desc', defaultMessage: 'The coding agent the Assistant runs, unless a workspace chooses another.', description: 'What the setting "Provider" does, under its title (Settings → Assistant).' }), tip: msg({ id: 'settings.assistant.provider.tip', defaultMessage: 'The Assistant is independent of your project agents: a Codex Assistant can look after Claude Code agents, and the other way round.', description: 'The info tip of the setting "Provider" (Settings → Assistant): more on what it does and when it applies.' }), type: 'custom' },
   {
     section: 'assistant',

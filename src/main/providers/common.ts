@@ -529,3 +529,7 @@ export const exportSubtitleText = (provider: string, session: string, project: s
 
 /** The Memory view's label for the user's own instructions file, which every project's agents read. */
 export const userMemoryLabel = (file: string): string => tr(USER_MEMORY, { file })
+
+const CONNECTION_MEMORY = msg({ id: 'providers.memory.connection', defaultMessage: '{file} of connection {name} (its agents, all projects)', description: "In the Memory view: a connection's own instructions file (HI-1755), which the agents running on that connection read in every project. {file} is its name (CLAUDE.md), {name} the connection's name (\"Personal\")." })
+/** The Memory view's label for a connection's own instructions file (HI-1755). */
+export const connectionMemoryLabel = (file: string, name: string): string => tr(CONNECTION_MEMORY, { file, name })

@@ -926,6 +926,12 @@ export interface HiveRequests {
   'connections:setOn': (id: string, on: boolean) => void
   /** Makes an account this window's workspace's default for its CLI. */
   'connections:setDefault': (id: string) => void
+  /** The Assistant's own connection for a CLI in this window's workspace (HI-1755); null: the workspace's default. */
+  'connections:setAssistant': (provider: ProviderId, id: string | null) => void
+  /** Switches this window's workspace's running agents whose connection isn't the one chosen now, each at its next safe point. */
+  'connections:switchAffected': () => { projectPath: string; agentId: string; result: 'queued' | 'waiting' | 'notRunning' }[]
+  /** Switches one agent to the connection chosen for it now, at its next safe point (HI-1755). */
+  'session:switchConnection': (projectPath: string, agentId: string) => 'queued' | 'waiting' | 'notRunning'
 
   'api:info': () => AgentApiInfo
   'api:regenerateToken': () => AgentApiInfo

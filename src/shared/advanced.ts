@@ -207,8 +207,8 @@ export const LANES_GENTLE_END = 'hive.lanes.gentleEnd'
 export const LANES_END_WAIT_MINUTES = 'hive.lanes.endWaitMinutes'
 
 /**
- * Whether Settings → Accounts is shown (HI-980, staged): its accounts aren't used by launches until HI-1755, which
- * removes this switch. Read by main's accounts and the window.
+ * Whether connections are on (HI-980, HI-1755, staged): Settings → Connections, the pickers and launching on a
+ * connection; off, everything launches as before. Removed by the cleanup slice, S8 (Darren, 26 Oct ~23:20).
  */
 export const ACCOUNTS_PREVIEW = 'hive.accounts.preview'
 
@@ -775,7 +775,7 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.hive.accounts.preview.title', defaultMessage: 'Connections (preview)', description: "An advanced setting's title (Settings → Advanced), listed under Hive: a switch that shows Settings → Connections before the feature is finished." }),
     desc: msg({
       id: 'settings.advanced.hive.accounts.preview.desc',
-      defaultMessage: "Shows Settings → Connections, where you keep the ways your agents reach their models: for now, Claude Code sign-ins, each a folder of its own signed in through Claude Code's own sign-in. A preview: agents don't run on these connections yet, and still use your usual Claude Code login.",
+      defaultMessage: "Turns on Connections: Settings → Connections, where you keep Claude Code sign-ins, each a folder of its own signed in through Claude Code's own sign-in, and a connection for each agent and the Assistant to run on. A preview: off, agents run on your usual Claude Code login, as before.",
       description: 'What the advanced setting "Connections (preview)" does (Settings → Advanced, under Hive). Settings → Connections names a section: use its name as Hive shows it.'
     }),
     kind: 'boolean',

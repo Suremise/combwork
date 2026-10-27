@@ -6,9 +6,9 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, sym
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { ACCOUNTS_PREVIEW } from '../src/shared/advanced'
 import { accountState, duplicateLogins, switchedOn, workspaceAccounts } from '../src/shared/accounts'
 import type { Connection } from '../src/shared/types'
+import { ACCOUNTS_PREVIEW } from '../src/shared/advanced'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-accounts-')
@@ -510,18 +510,5 @@ describe("a workspace's accounts", () => {
       await vi.waitFor(() => expect(accounts.getAccount(a.id)?.observed?.email).toBe('third@example.com'), { timeout: HUNG_MS })
       await run(() => accounts.setAccountOn(a.id, false))
     })
-  })
-})
-
-describe('the preview switch', () => {
-  it('off, every way into accounts is refused and nothing is listed', async () => {
-    await advanced.set(ACCOUNTS_PREVIEW, false)
-    try {
-      expect(await outcome(accounts.addAccount('claude-code', 'No'))).toMatch(/Connections are a preview/)
-      expect(accounts.accountsView()).toMatchObject({ preview: false, connections: [] })
-      expect(accounts.newWorkspaceAccounts()).toBeUndefined()
-    } finally {
-      await advanced.set(ACCOUNTS_PREVIEW, true)
-    }
   })
 })

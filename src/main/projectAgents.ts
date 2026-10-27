@@ -25,6 +25,7 @@ import { listOf, shownText, withValues, type Text } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { capturedText, HiveError, hiveError, shownError } from './hiveError'
 import { providerService } from './providerService'
+import { connectionOnHere } from './accounts'
 import { assertNameFree, withAgentNames, workspaceAgents } from './agentNames'
 import { sameAgentName } from '../shared/agentNames'
 import { chooseSpace, hiveBranch, reusableBranches, type BranchHome } from '../shared/hiveBranches'
@@ -324,6 +325,8 @@ export async function prepareAgent(projectPath: string, cfg: ProjectConfig, opts
   if (opts.workflowRole !== undefined) def.workflowRole = cleanWorkflowRole(opts.workflowRole)
   const mcpServers = cleanMcpServers(opts.mcpServers)
   if (mcpServers) def.mcpServers = mcpServers
+  // Its connection (HI-1755), when it is one of its provider's on in this workspace; else it uses the default.
+  if (opts.connection && connectionOnHere(opts.connection, provider, projectPath)) def.connection = opts.connection
 
   return { def, discard: async () => undefined }
 }
@@ -357,8 +360,10 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
     if (!patch.name) throw hiveError(msg({ id: 'worktrees.agent.enterName', defaultMessage: 'Enter a name.', description: "An error: an agent's name was emptied." }))
   }
   // Empty values clear an override so the agent follows the project again (and an empty role: its name is its role).
-  const { use200kContext, mcpServers, workflowRole, ...rest } = patch
+  const { use200kContext, mcpServers, workflowRole, connection, ...rest } = patch
   const clean: Partial<AgentDef> = { ...rest }
+  // Its connection (HI-1755): null or empty, the workspace's default again.
+  if (connection !== undefined) clean.connection = connection || undefined
   if ('role' in clean) clean.role = cleanRole(clean.role) || undefined
   // null clears it (an undo of the Assistant's change, #1282): the guess again. Absent, it stays as it is.
   if (workflowRole === null) clean.workflowRole = undefined
@@ -373,7 +378,7 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
     if (current && agentProvider(current, cfg, config.settings) !== patch.provider) {
       if (sessions.liveFor(projectPath, agentId)) throw hiveError(msg({ id: 'worktrees.agent.stopForProvider', defaultMessage: 'Stop the agent before changing its provider.', description: "An error: an agent's provider (its coding-agent CLI) can't change while it runs." }), undefined, { kind: 'conflict' })
       // Model, effort, mode and context belong to the old provider, and its conversations can't be resumed by the new one.
-      Object.assign(clean, { model: patch.model || undefined, effort: patch.effort || undefined, permissionMode: patch.permissionMode || undefined, use200kContext: typeof use200kContext === 'boolean' ? use200kContext : undefined, lastSessionId: undefined })
+      Object.assign(clean, { model: patch.model || undefined, effort: patch.effort || undefined, permissionMode: patch.permissionMode || undefined, use200kContext: typeof use200kContext === 'boolean' ? use200kContext : undefined, lastSessionId: undefined, connection: connection || undefined })
     }
   }
   // A name: free across the workspace (#702), checked holding the names lock against the agent as saved then, just

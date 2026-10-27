@@ -14,6 +14,7 @@ import { noteCliFolder, refreshPath } from './freshPath'
 import { emit, toast } from './events'
 import { createLogger } from './logger'
 import { childEnv, hasPty, killPty, spawnPty, startSize, writePty } from './ptyHost'
+import { connectionsManaged } from './connectionSeam'
 import { KeyGate } from './taskKeys'
 import { KeysStopped, PickNotFound, typeKeySteps } from './keySteps'
 import { compareTested, noteSelectedCli, testedVersion } from './testedClis'
@@ -80,7 +81,9 @@ class ProviderService {
    * "default"), else the model last seen in a session started without a model choice.
    */
   private resolveDefaultModel(id: ProviderId, catalog?: ModelCatalog | null): string | null {
-    return provider(id).configuredDefaultModel() ?? catalog?.defaultModel ?? config.get().observedDefaultModel[id] ?? null
+    // Its connections' settings are each their own (HI-1755: a launch reads its connection's); ~/.claude's isn't theirs.
+    const own = connectionsManaged(id) ? null : provider(id).configuredDefaultModel()
+    return own ?? catalog?.defaultModel ?? config.get().observedDefaultModel[id] ?? null
   }
 
   /** The efforts sessions started without an effort choice ran with, per model (the CLI's own defaults). */
@@ -399,6 +402,8 @@ class ProviderService {
       return key
     }
     if (task === 'login') {
+      // Signed in per connection (HI-1755): its sign-in is Settings → Connections', never ~/.claude's.
+      if (connectionsManaged(id)) throw hiveError(msg({ id: 'service.providers.signInConnections', defaultMessage: '{cli} is signed in per connection: sign in from Settings → Connections.', description: 'An error: Agent Setup was asked to sign a coding agent CLI ({cli}: "Claude Code") in, but its logins are Connections (Settings → Connections names a section).' }), { cli: name }, { kind: 'conflict' })
       const cmd = adapter.loginCommand(info.path)
       return this.runTask(id, task, cmd.file, cmd.args, `${name} sign-in`, undefined, shown) // i18n-ignore: the task's name in the log
     }

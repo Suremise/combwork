@@ -19,7 +19,7 @@ import { keptLaneOrder } from '../shared/laneBar'
 import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../shared/tips'
 import { allProviders } from './providers'
 import { providerService } from './providerService'
-import { accountsView, addAccount, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, signInAccount } from './accounts'
+import { accountsView, addAccount, connectionHomes, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, signInAccount } from './accounts'
 import { config } from './config'
 import { clearRecent, recentChanged, recentFor, removeRecent } from './recentWorkspaces'
 import { emit, emitTo, onHiveEvent } from './events'
@@ -247,7 +247,8 @@ function assertExtraArgs(args: unknown): void {
 
 function guardFile(path: string, write = false): string {
   if (insideArchive(path)) throw hiveError(M.insideArchive, undefined, { kind: 'forbidden' })
-  if (workspace.isAllowedPath(path) || allProviders().some((p) => p.fileAllowed(path, write))) return path
+  // A CLI's own files: its connections' homes on in this workspace (HI-1755), else the CLI's own home.
+  if (workspace.isAllowedPath(path) || allProviders().some((p) => p.fileAllowed(path, write, connectionHomes(p.id, workspace.path ? workspace.config : null)?.map((h) => h.home)))) return path
   // The skills that ship with Hive, to view one the workspace doesn't have.
   if (!write && insideReal(path, [skills.bundledSkillsDir()])) return path
   throw hiveError(M.outsideWorkspace, undefined, { kind: 'forbidden' })
@@ -1428,7 +1429,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
 
     'memory:list': async (p) => {
       const project = workspace.assertProject(p)
-      return (await Promise.all(allProviders().map((a) => a.memorySources(project)))).flat()
+      return (await Promise.all(allProviders().map((a) => a.memorySources(project, connectionHomes(a.id, workspace.config))))).flat()
     },
     'memory:instructionsShared': async (p, ids) => {
       const project = workspace.assertProject(p)
@@ -1521,6 +1522,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'connections:keepLogin': (id) => keepNewLogin(id),
     'connections:setOn': (id, on) => setAccountOn(id, on),
     'connections:setDefault': (id) => setAccountDefault(id),
+    'connections:setAssistant': (provider, id) => setAssistantConnection(provider, id),
+    'connections:switchAffected': () => sessions.switchAffected(workspace.path!),
+    'session:switchConnection': (p, agentId) => sessions.switchAtSafePoint(p, agentId),
 
     'api:info': () => apiInfo(),
     'api:regenerateToken': async () => {
