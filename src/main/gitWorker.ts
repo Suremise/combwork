@@ -31,7 +31,15 @@ export interface GitOutcome {
   error: { code: unknown; killed: boolean; signal: string | null } | null
   /** The command's folder is there (an ENOENT with it there is git missing, not the folder). */
   cwdExists: boolean
+  /** Its output stayed open after git exited, held by another process, and was closed (HI-1854: see runGit). */
+  held?: boolean
 }
+
+/**
+ * After git exits, how long its output may go quiet before Hive stops waiting for it to close (HI-1854). Git's output is
+ * all in its pipes once it has exited, read at once; one still open then is held by another process that inherited it.
+ */
+export const EXITED_QUIET_MS = 2000
 
 /** The observer's read of a repository (repoRefs.ts): its lines, its first `max` working folders and their HEADs. */
 export interface RefsRequest {
@@ -43,18 +51,45 @@ export interface RefsRequest {
 
 export type GitReply = { id: number; outcome: GitOutcome } | { id: number; refs: RepoRefs }
 
-/** Runs one command as git.ts runs it. */
-export function runGit(m: Omit<GitRequest, 'id'>): Promise<GitOutcome> {
+/**
+ * Runs one command as git.ts runs it. Its outcome comes when git has exited and its output is read: execFile waits for
+ * the output's pipes to close, and on Windows a process another thread starts meanwhile (main's, as this runs in a
+ * worker: an agent's terminal) can inherit their ends and hold them open for as long as it runs, so a command that ended
+ * was never answered (HI-1854). Once git has exited, its output is read until it closes or goes quiet for
+ * EXITED_QUIET_MS, then closed.
+ */
+export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS): Promise<GitOutcome> {
   return new Promise((res) => {
+    let held = false
+    let exited = false
+    let quiet: ReturnType<typeof setTimeout> | undefined
     const child = execFile('git', m.args, { cwd: m.cwd, windowsHide: true, maxBuffer: m.maxBuffer, encoding: 'buffer', ...(m.env ? { env: m.env } : {}), ...(m.timeout ? { timeout: m.timeout } : {}) }, (err, stdout, stderr) => {
+      clearTimeout(quiet)
       const e = err as (Error & { code?: unknown; killed?: boolean; signal?: string | null }) | null
       res({
         stdout: (stdout as unknown as Buffer) ?? Buffer.alloc(0),
         stderr: (stderr as unknown as Buffer) ?? Buffer.alloc(0),
         error: e ? { code: e.code, killed: !!e.killed, signal: e.signal ?? null } : null,
         // Only asked when git didn't start: a folder that isn't there makes Node say ENOENT too.
-        cwdExists: e && typeof e.code === 'string' ? existsSync(m.cwd) : true
+        cwdExists: e && typeof e.code === 'string' ? existsSync(m.cwd) : true,
+        ...(held ? { held } : {})
       })
+    })
+    // Closing them ends the call as their closing would have: execFile answers with what was read.
+    const waitQuiet = (): void => {
+      if (!exited) return
+      clearTimeout(quiet)
+      quiet = setTimeout(() => {
+        held = true
+        child.stdout?.destroy()
+        child.stderr?.destroy()
+      }, quietMs)
+    }
+    child.stdout?.on('data', waitQuiet)
+    child.stderr?.on('data', waitQuiet)
+    child.once('exit', () => {
+      exited = true
+      waitQuiet()
     })
     // What the command reads (update-ref --stdin's transaction).
     if (m.input !== undefined) child.stdin?.end(m.input)

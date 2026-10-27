@@ -53,6 +53,7 @@ export async function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1
   gitTestHooks.started?.(cwd, args)
   // Started off main's thread (HI-1783): gitWorker.ts runs it as this always did, and its outcome is read here.
   const o = await thread.run({ cwd, args: [...GIT_PREFIX, ...args], maxBuffer, ...(input !== undefined ? { input } : {}), ...(opts.env ? { env: opts.env } : {}), ...(opts.timeout ? { timeout: opts.timeout } : {}) })
+  if (o.held) log.warn(`git ${args[0]}'s output stayed open after it exited, held by another process (HI-1854): taken as read`)
   const buf = Buffer.from(o.stdout.buffer, o.stdout.byteOffset, o.stdout.byteLength)
   const err = o.error
   const errCode = err?.code
