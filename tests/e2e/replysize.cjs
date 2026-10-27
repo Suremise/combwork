@@ -344,8 +344,9 @@ const prose = (seed, n) => {
   // developer console (about 70 characters); 7,500 since #767 added Language (about 30 characters); 7,800 since #975
   // added Default view, #984 Resume agents after an unexpected close (about 85 characters each) and #976 Tile order
   // (about 40 characters). 7,780 since #1586 measures the checkout's path as `CHECKOUT` (10 characters, where the
-  // 7,800 assumed a checkout of about 40).
-  const settingsList = measure('hive_list_settings', tool('hive_list_settings', {}, 'assistant'), 7780)
+  // 7,800 assumed a checkout of about 40). 7,860 since HI-980's Connections and HI-1755's Assistant connection
+  // (accounts.list and assistant.connection, about 30 and 55 characters).
+  const settingsList = measure('hive_list_settings', tool('hive_list_settings', {}, 'assistant'), 7860)
   check("settings: the fake CLI's path as it is set, whatever its length (#1586)",settingsList.split('\n').some((l) => l.startsWith(`claude-code.executablePath = ${path.join(__dirname, 'fake-claude', 'fake-claude.cmd')} `)), settingsList.split('\n').find((l) => l.startsWith('claude-code.executablePath')))
   check('settings: a line each, id = value, read-only ones marked',/^sessions\.compactSuggestTokens = 200000 · Suggest compacting above$/m.test(settingsList) && /^agentApi\.port = \d+ \[read-only\] · /m.test(settingsList) && /^advanced\.showDeveloperFeatures = off · /m.test(settingsList) && !/^advanced\.(logs|data|reset) /m.test(settingsList), settingsList.slice(0, 300))
   // 1,800 and 11 lines since #1286's Advanced switches The Assistant starts with Hive's start view and Clear the CLI's
