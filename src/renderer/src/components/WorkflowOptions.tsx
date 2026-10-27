@@ -897,15 +897,18 @@ const N = {
  * offer. Choose… opens the first one's Workflow section; either answer is the last time it shows in the workspace.
  */
 export function PresetsNotice() {
-  const workspace = useStore((s) => s.workspace)
+  const path = useStore((s) => s.workspace?.path ?? null)
   const readOnly = useStore((s) => s.boardState?.readOnly ?? null)
+  // What main's answer depends on, as a string (HI-1807): the projects' names, and which have a workflow with no preset.
+  // Not the workspace object, replaced with each agent's change of state: a dozen agents working read it again more than
+  // once a second. The board's own part (answered, the upgrade's) changes only with readOnly or a reload.
+  const asked = useStore((s) => (s.workspace ? JSON.stringify([s.workspace.path, s.workspace.projects.map((p) => [p.path, p.name, !!p.config.workflow && p.config.workflow.preset === null])]) : null))
   const [projects, setProjects] = useState<{ path: string; name: string }[] | null>(null)
   // The workspaces answered in this window (#1464): a reload begun before the answer's board write commits (a new
   // workspace object meanwhile, or one already in flight) reads the old board, and must not show it again.
   const answered = useRef(new Set<string>())
   useEffect(() => {
-    const path = workspace?.path
-    if (!path || readOnly !== null || answered.current.has(path)) return setProjects(null)
+    if (!asked || !path || readOnly !== null || answered.current.has(path)) return setProjects(null)
     let live = true
     call('workflow:presetsNotice')
       .then((p) => live && setProjects(answered.current.has(path) ? null : p))
@@ -913,10 +916,10 @@ export function PresetsNotice() {
     return () => {
       live = false
     }
-  }, [workspace, readOnly])
+  }, [path, asked, readOnly])
   if (!projects?.length) return null
   const answer = (choose: boolean): void => {
-    if (workspace?.path) answered.current.add(workspace.path)
+    if (path) answered.current.add(path)
     if (choose) openVersionControl(projects[0].path, 'workflow')
     setProjects(null)
     void call('workflow:presetsNoticeSaid').catch((e) => notify('error', errorMessage(e)))
