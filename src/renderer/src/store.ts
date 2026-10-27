@@ -53,6 +53,7 @@ import type {
 import type { QueueView } from '@shared/workflow/queue'
 import type { KeptReturn } from '@shared/progressQueue'
 import type { SessionAction } from './util'
+import { storeUpdated } from './pageMarks'
 
 export type Activity = 'projects' | 'overview' | 'performance' | 'board' | 'notes' | 'skills' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
 export type { ProjectTab } from '@shared/projectTabs'
@@ -665,7 +666,14 @@ setInstalledCheck((id) => {
   return !i ? null : i.found ? true : i.checking ? null : false
 })
 
-export const set = useStore.setState
+/** Sets the store, noting which of its parts changed (HI-1775): a long task's line in hive.log names the updates made in it. */
+export const set: typeof useStore.setState = ((partial: Parameters<typeof useStore.setState>[0], replace?: boolean) => {
+  const before = useStore.getState()
+  useStore.setState(partial as never, replace as never)
+  const after = useStore.getState()
+  // The parts it changed (an update by a function too): what re-renders their readers.
+  if (after !== before) storeUpdated(Object.keys(after).filter((k) => after[k as keyof State] !== before[k as keyof State]))
+}) as typeof useStore.setState
 export const get = useStore.getState
 
 // A change of language (Settings → General → Language) renders the window again in it (#767).

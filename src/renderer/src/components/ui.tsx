@@ -16,6 +16,7 @@ import { placeTip, type Box } from '@shared/tipPlacement'
 import { placeMenu } from '@shared/menuPlacement'
 import { msg, tr, tRich, type Msg } from '@shared/i18n'
 import { watchStatus } from './watchLine'
+import { dialogOpened } from '../windowHealth'
 import { headingId, slugOf } from '@shared/docSections'
 
 export function Icon({ name, className, title, spin }: { name: string; className?: string; title?: string; spin?: boolean }) {
@@ -813,6 +814,8 @@ export function Modal({
 }) {
   const busyNow = useRef(busy)
   busyNow.current = busy
+  // Open: where the window is, for hive.log's long-task and hang lines (HI-1775).
+  useEffect(() => dialogOpened(title), [title])
   // Escape runs this render's onClose, never an earlier one's: a dialog whose fields fill in after it opens would
   // otherwise answer an Escape with its first render's view of them (#288).
   const onCloseNow = useRef(onClose)

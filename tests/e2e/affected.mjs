@@ -282,7 +282,8 @@ export const AREAS = [
   { paths: ['src/main/trash.ts'], suites: ['board', 'files', 'storage', 'sessiontree', 'templateshare', 'unusedwt', 'skills', 'transcript', 'unsaved', 'assistantimages'] },
   { paths: ['src/main/providerService.ts', 'src/main/taskKeys.ts'], suites: ['providers', 'codex-setup', 'startfail', 'models', 'testedclis', 'freshpath', 'providerdetect'] },
   { paths: ['src/main/keySteps.ts'], suites: ['codex', 'codex-setup'] },
-  { paths: ['src/main/rendererWatch.ts'], suites: ['rendercrash'] },
+  { paths: ['src/main/rendererWatch.ts'], suites: ['rendercrash', 'windowhealth'] },
+  { paths: ['src/shared/windowHealth.ts', 'src/renderer/src/windowHealth.ts', 'src/renderer/src/pageMarks.ts'], suites: ['windowhealth'] },
   // Why Hive stopped (#985): crash dumps and a log line for every way out; the updater and install-folder checks end the app through it.
   // Hive closing unexpectedly (#984): the running marker, the notice, Resume All and the setting; a merge left half done is told in it.
   { paths: ['src/main/lastRun.ts', 'src/shared/unexpectedClose.ts', 'src/main/mergeSlotHost.ts', 'src/main/mergeSlots.ts', 'tests/e2e/unexpectedclose.cjs', 'tests/e2e/unexpectedclose-leftovers.cjs'], suites: ['unexpectedclose', 'unexpectedclose-leftovers', 'restartresume'] },
