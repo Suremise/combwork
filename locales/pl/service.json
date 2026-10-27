@@ -197,6 +197,8 @@
   "service.providers.taskDone": "{task}: zakończono",
   "service.providers.taskFailed": "{task}: zakończono z kodem {code}",
   "service.slots.notPrepared": "Hive nie przygotował slotu {slot} dla karty {card}: {why}",
+  "service.slots.resumeFailed": "Hive nie wznowił rozmowy agenta {agent} w slocie {slot} dla karty {card} (trzy próby): {why}. Wznów agenta {agent} w Sesjach albo zacznij od nowa, a Hive przekaże mu kartę {card}.",
+  "service.slots.resumeHeld": "Hive nie może jeszcze przekazać karty {card} agentowi {agent}: jego rozmowy w slocie {slot} nie da się teraz wznowić ({why}). Hive przekaże mu kartę {card}, gdy tylko będzie można.",
   "service.templates.v09": "Szablony w 1.0 nie przypisują agentów do worktree, więc ich miejsce zajmują szablony Hive. Kopia {n, plural, one {szablonu} few {# szablonów} many {# szablonów} other {# szablonu}} jest przechowywana razem z kopią zapasową tablicy z 0.9.",
   "service.templates.v09Title": "Twoje szablony agentów z 0.9 nie są używane w 1.0",
   "service.transcripts.busy": "Ta sesja jest właśnie archiwizowana lub usuwana. Spróbuj ponownie za chwilę.",

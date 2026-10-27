@@ -197,6 +197,8 @@
   "service.providers.taskDone": "{task} abgeschlossen",
   "service.providers.taskFailed": "{task} mit Code {code} beendet",
   "service.slots.notPrepared": "Hive konnte {slot} nicht für {card} vorbereiten: {why}",
+  "service.slots.resumeFailed": "Hive konnte die Unterhaltung von {agent} in {slot} für {card} nicht fortsetzen (drei Versuche): {why}. Setze {agent} unter Sitzungen fort oder starte neu, dann gibt Hive {agent} die Karte {card}.",
+  "service.slots.resumeHeld": "Hive kann {agent} die Karte {card} noch nicht geben: Die Unterhaltung von {agent} in {slot} lässt sich gerade nicht fortsetzen ({why}). Hive gibt {agent} die Karte {card}, sobald es geht.",
   "service.templates.v09": "Vorlagen in 1.0 binden Agenten nicht an Worktrees, daher treten die Vorlagen von Hive an ihre Stelle. Eine Kopie {n, plural, one {der Vorlage} other {der # Vorlagen}} liegt bei der Board-Sicherung aus 0.9.",
   "service.templates.v09Title": "Deine Agentenvorlagen aus 0.9 werden in 1.0 nicht verwendet",
   "service.transcripts.busy": "Diese Sitzung wird gerade archiviert oder gelöscht. Versuche es gleich noch einmal.",

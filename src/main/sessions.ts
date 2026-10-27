@@ -486,6 +486,8 @@ interface PendingStart {
   runId: string
   /** Settles when the start has finished or given up. */
   done: Promise<unknown>
+  /** The start itself: its state, or why it failed or gave up (HI-1746: what a start that joins it reports). */
+  outcome: Promise<LiveSessionState>
 }
 
 export interface ListContext {
@@ -1514,12 +1516,13 @@ class SessionManager {
     // Two terminals on one conversation would both append to its transcript.
     if (opts.resumeId && [...this.starting.values()].some((p) => p.resumeId === opts.resumeId)) throw hiveError(msg({ id: 'session.start.beingOpened', defaultMessage: 'This conversation is already being opened in another agent.', description: 'Resuming a conversation is refused: another agent is starting on it now.' }), undefined, { kind: 'conflict' })
     if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw hiveError(msg({ id: 'session.start.cleaning', defaultMessage: "Hive is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Hive is moving or removing its files." }))
-    const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve(), runId: randomBytes(12).toString('hex') }
+    const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve(), outcome: Promise.resolve(null as never), runId: randomBytes(12).toString('hex') }
     this.starting.set(id, pending)
     // A start that takes over a second says where the time went (#1177: a resume waited ~45 s after an upgrade).
     const times = new StepTimes()
     const run = this.startReserved(projectPath, agentId, id, opts, times)
     pending.done = run.catch(() => undefined)
+    pending.outcome = run
     try {
       return await run
     } catch (e) {
@@ -1647,6 +1650,55 @@ class SessionManager {
     const agent = projectAgents(cfg).find((a) => a.id === agentId)
     const rec = agent ? await workspace.sessionRecord(projectPath, sessionId) : undefined
     return agent && rec ? resumeHold(await folderFacts(projectPath), folderAgent(agent), rec) : null
+  }
+
+  /** A start of the agent under way (HI-1746): the conversation it resumes (null: a new one) and its outcome. */
+  pendingStart(projectPath: string, agentId: string): { resumeId: string | null; outcome: Promise<LiveSessionState> } | null {
+    const p = this.starting.get(liveId(projectPath, agentId))
+    return p ? { resumeId: p.resumeId ?? null, outcome: p.outcome } : null
+  }
+
+  /**
+   * A resume of `sessionId` refused because the agent is running or starting (HI-1746: Resume All while Hive resumes
+   * that same conversation for a card): 'running' when the agent runs that conversation now, or once a start of it
+   * under way has finished (its failure or cancellation thrown); 'other' when it runs or starts anything else, or nothing.
+   */
+  async joinResume(projectPath: string, agentId: string, sessionId: string): Promise<'running' | 'other'> {
+    projectPath = workspace.assertSessionHost(projectPath)
+    // A start under way first (HR4's round 1): its live state is there before its launch has run, so it is joined by its
+    // outcome, never by that state; then the run it started, still the agent's, in that conversation.
+    const p = this.pendingStart(projectPath, agentId)
+    if (p) {
+      if (p.resumeId !== sessionId) return 'other'
+      const started = await p.outcome
+      const now = this.live.get(liveId(projectPath, agentId))?.state
+      return now?.runId === started.runId && now.sessionId === sessionId ? 'running' : 'other'
+    }
+    return this.live.get(liveId(projectPath, agentId))?.state.sessionId === sessionId ? 'running' : 'other'
+  }
+
+  /**
+   * The conversation a card's placement resumes for its stopped builder (HI-1746): the agent's newest record of its
+   * provider bound to the card's lease, chosen first; then whether it can resume: `held` (resumeHold's, never passed
+   * over for an older one or a new conversation), or `none` only when there is no such record or its transcript is gone.
+   * A read that fails throws (unknown: the placement tries again).
+   */
+  async leaseConversation(projectPath: string, agentId: string, lease: string): Promise<{ is: 'none' } | { is: 'resume'; id: string; name: string } | { is: 'held'; hold: ResumeHold }> {
+    const cfg = await workspace.projectConfig(projectPath)
+    const agent = projectAgents(cfg).find((a) => a.id === agentId)
+    if (!agent) return { is: 'none' }
+    const provider = agentLaunchSettings(agent, cfg, config.settings).provider
+    const rec = (await workspace.sessionsFile(projectPath)).sessions
+      .filter((r) => r.agentId === agentId && r.lease === lease && !r.archived && !r.sub && recordProvider(r) === provider)
+      .sort((x, y) => (y.lastActiveAt ?? '').localeCompare(x.lastActiveAt ?? ''))[0]
+    if (!rec) return { is: 'none' }
+    // A provider this version doesn't know: nothing it could resume. A lookup that fails throws (unknown: tried again).
+    const adapter = allProviders().find((p) => p.id === provider)
+    if (!adapter) return { is: 'none' }
+    const transcript = await adapter.transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath)
+    if (!transcript) return { is: 'none' }
+    const hold = resumeHold(await folderFacts(projectPath), folderAgent(agent), rec)
+    return hold ? { is: 'held', hold } : { is: 'resume', id: rec.id, name: rec.name }
   }
 
   /** Throws if the start was cancelled while it awaited something (the agent stopped, its workspace closed). */

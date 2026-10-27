@@ -504,6 +504,8 @@ export interface HiveRequests {
   'session:settleLeftovers': (projectPath: string, agentId: string, how: 'end' | 'keep') => number
   /** Types a short "carry on" into a running agent whose turn a refused sign-in stopped (Resume (n), #309). */
   'session:carryOn': (projectPath: string, agentId: string) => void
+  /** After a refused resume (Resume All): 'running' when the agent runs that conversation, or a start of it under way finished (its failure thrown); 'other' otherwise (HI-1746). */
+  'session:joinResume': (projectPath: string, agentId: string, sessionId: string) => 'running' | 'other'
   /** The user says an agent whose state is unknown (silent, no sign of its turn's end) is idle (#648). */
   'session:markIdle': (projectPath: string, agentId: string) => void
   'session:archive': (projectPath: string, sessionId: string, archived: boolean) => void

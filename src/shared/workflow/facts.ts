@@ -232,7 +232,8 @@ export interface FactData {
   /** Its builder's placement in the slot claimed by a Hive (its process), so two never place it; one gone is taken over. */
   PlacementClaimed: { lease: string; pid: number; started: number }
   /** Its builder given the card in the slot: typed in, or a new conversation started there; `delivery` the one made. */
-  BuilderPlaced: { lease: string; delivery: string | null; how: 'typed' | 'newConversation' | 'started' }
+  /** `resumed`: its builder's conversation bound to the lease, resumed with the card (HI-1746). */
+  BuilderPlaced: { lease: string; delivery: string | null; how: 'typed' | 'newConversation' | 'started' | 'resumed' }
   /** The card's folder moved (#1343: Repair relinking or recreating the agent's worktree at a new place): its work follows it. */
   FolderMoved: { from: string; to: string; why: 'repair' }
   /**

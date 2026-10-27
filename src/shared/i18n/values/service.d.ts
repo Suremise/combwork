@@ -199,6 +199,8 @@ interface HiveMessageValues {
   'service.providers.taskDone': { task: string | number }
   'service.providers.taskFailed': { task: string | number; code: string | number }
   'service.slots.notPrepared': { slot: string | number; card: string | number; why: string | number }
+  'service.slots.resumeFailed': { agent: string | number; slot: string | number; card: string | number; why: string | number }
+  'service.slots.resumeHeld': { card: string | number; agent: string | number; slot: string | number; why: string | number }
   'service.templates.v09': { n: number }
   'service.templates.v09Title': undefined
   'service.transcripts.busy': undefined
