@@ -91,6 +91,9 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     mkdirSync(join(project, '.hive'), { recursive: true })
     writeFileSync(join(project, 'a.txt'), 'a\n')
     writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'b2', name: 'B2' }, { id: 'r1', name: 'R1' }] }))
+    // Another project, for a card moved there and back (HI-1821).
+    mkdirSync(join(wsPath, 'beta', '.hive'), { recursive: true })
+    writeFileSync(join(wsPath, 'beta', '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'c1', name: 'C1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     lanes.startLanes()
@@ -552,5 +555,41 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     const other = owner === r1.lane.id ? r2.lane.id : r1.lane.id
     expect([owner === r1.lane.id || owner === r2.lane.id, (await lane(owner!)).cards[0].elsewhere, (await lane(other)).cards[0].elsewhere]).toEqual([true, undefined, owner])
     for (const r of [r1, r2]) await lanes.endLane(w, r.lane.id, { abandoned: true })
+  })
+
+  // HR4's round 1: a card moved to another project, listed by a newer lane there, and moved back (leaving its agent) is
+  // its project's lane's, never the other project's, for the view, the runtime and the check under the board's lock.
+  it('a card moved to another project and back is its own project’s lane’s, though a newer lane there still lists it (HI-1821)', async () => {
+    const [u, a1] = [await make('Away u'), await make('Away a1')]
+    const b1 = (await run(() => tasks.createTask({ title: 'Beta b1', project: 'beta' }, user))).number
+    const la = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [u, a1], by: 'Assistant' })).lane
+    await run(() => tasks.updateTask(u, { project: 'beta' }, user))
+    const lb = (await lanes.startLane(w, { project: 'beta', builder: 'c1', cards: [u, b1], by: 'Assistant' })).lane
+    await run(() => tasks.updateTask(u, { project: 'alpha' }, user))
+    const seen = await lane(la.id)
+    expect([seen.cards[0].elsewhere, seen.current, facts().card(u).lane]).toEqual([undefined, u, la.id])
+    expect((await lanes.laneNext(w, 'alpha', 'b1')).next).toMatchObject({ card: u })
+    // Under the board's lock: U started (given to no agent) while a change is decided reads as the lane's own card in
+    // flight, so the change is queued after it.
+    const real = w.projectConfig.bind(w)
+    const change = new AsyncLocalStorage<true>()
+    let started = false
+    const spy = vi.spyOn(w, 'projectConfig').mockImplementation(async (p) => {
+      if (!started && change.getStore() && (new Error().stack ?? '').includes('namesOf')) {
+        started = true
+        await run(() => tasks.updateTask(u, { column: 'doing' }, user))
+      }
+      return real(p)
+    })
+    let r: Awaited<ReturnType<typeof lanes.startLane>>
+    try {
+      r = await change.run(true, () => lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a1, u], by: 'Assistant' }))
+    } finally {
+      spy.mockRestore()
+    }
+    expect(started).toBe(true)
+    expect([r.lane.cards.map((c) => c.number), r.lane.queued]).toEqual([[u, a1], [a1, u]])
+    expect(r.note).toMatch(new RegExp(`queued: it applies once #${u} is Done`))
+    for (const l of [la, lb]) await lanes.endLane(w, l.id, { abandoned: true })
   })
 })
