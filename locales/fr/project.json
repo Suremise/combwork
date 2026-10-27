@@ -161,6 +161,7 @@
   "project.leftovers.none": "Aucune.",
   "project.leftovers.load": "les branches",
   "project.leftovers.loading": "Lecture des branches…",
+  "project.leftovers.refresh": "Relire les branches",
   "project.chart.dayTip": "{day} : {tokens} jetons · {cost} · {prompts, plural, one {# prompt} many {# prompts} other {# prompts}}",
   "project.chart.label": "Jetons par jour",
   "project.chart.other": "Autres ({count})",

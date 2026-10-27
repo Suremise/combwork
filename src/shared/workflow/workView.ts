@@ -256,6 +256,8 @@ export interface WorkView {
   folder: string | null
   /** The line it works on (Git: its branch); null for None. */
   line: string | null
+  /** Every line it has started on, over its whole history (HI-1823: an open card's earlier work, never a leftover). */
+  lines: string[]
   /** The revision its change starts from. */
   base: string | null
   target: string | null
@@ -419,6 +421,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     ...reviewSkipView(facts),
     folder: started?.folder ?? null,
     line: started?.line ?? null,
+    lines: s.lines,
     base: started?.base ?? null,
     target: started?.target ?? null,
     builder: started?.builder ?? null,
@@ -517,6 +520,8 @@ export interface WorkBadge {
   stages: StageId[] | null
   /** The line it works on this cycle (Git: its branch, from its Started or Adopted; #1424); null for None or none. */
   line: string | null
+  /** Every line it has started on, this cycle's and earlier ones' (HI-1823): while it is open, none is a leftover. */
+  lines: string[]
   /**
    * In Review: the revision submitted for it, which its review waits on or runs on (its latest submission's; #1424). Whole,
    * the window shows it through its platform's short form. Null outside Review, or for a no-code card.
@@ -583,6 +588,7 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     oldRules: onOldRules(v, current),
     stages: stagesOf ? keptStages(v, stagesOf) : null,
     line: v.line,
+    lines: v.lines,
     underReview: v.stage === 'review' && v.kind !== 'no-code' ? (latest?.revision ?? null) : null,
     startedAt: v.startedAt,
     lastSeq: v.lastSeq

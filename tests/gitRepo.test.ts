@@ -44,9 +44,9 @@ vi.mock('../src/main/workspace', () => ({
 }))
 /** The project's workflow target (#1642: '' for none, the default branch), and the board's open cards' lines. */
 let workTarget = ''
-let cardLines: { line: string; stage: string }[] = []
+let cardLines: { line: string; stage: string; lines?: string[] }[] = []
 vi.mock('../src/main/workflow/rulesets', () => ({ resolvedOf: () => ({ options: { target: workTarget } }) }))
-vi.mock('../src/main/workflow/cardWork', () => ({ workBadges: () => cardLines.map((b, i) => ({ card: i + 1, line: b.line, stage: b.stage, noCode: false })) }))
+vi.mock('../src/main/workflow/cardWork', () => ({ workBadges: () => cardLines.map((b, i) => ({ card: i + 1, line: b.line, stage: b.stage, noCode: false, lines: b.lines ?? [b.line] })) }))
 vi.mock('../src/main/sessions', () => ({ sessions: { liveFor: (_p: string, id: string) => (live[id] ? { status: live[id], cwd: agents.find((x) => x.id === id)?.worktree?.path ?? proj } : null), agentNow: (_p: string, id: string) => (live[id] ? { pending: pendingInput.has(id) } : null), lineWaiting: (_p: string, id: string) => typedWaiting.has(id) } }))
 vi.mock('../src/main/mergeSlotHost', () => ({ mergeSlots: { list: () => slots, asUser } }))
 vi.mock('../src/main/branchWatch', () => ({ checkProject: async () => undefined }))
@@ -710,6 +710,39 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     const left = leftoverBranches(all, busyLines(new Map([['hive/card', [{ stage: 'review' as const }]]])))
     expect(left.merged.map((b) => b.name)).toContain('zz/leftover')
     expect([left.merged.length, left.unmerged.map((b) => b.name)]).toEqual([2 + 205 + 1, ['spike/x']])
+  })
+
+  it("never deletes an open card's earlier line: one back from Done that started again elsewhere (HI-1823)", async () => {
+    const at = setUp()
+    // Card 2 started on hive/hb1, went to Done, and is open again, started this time in the project folder (on main).
+    cardLines = [{ line: 'hive/card', stage: 'review' }, { line: 'main', stage: 'active', lines: ['hive/hb1', 'main'] }]
+    const said = await repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }, { name: 'hive/hb2', sha: at['hive/hb2'] }])
+    expect(said).toContain('An open card works on hive/hb1')
+    expect(branchNames(proj)).toContain('hive/hb1')
+    expect(branchNames(proj)).not.toContain('hive/hb2')
+    // Done again: its lines are leftovers, deleted as any other.
+    cardLines = [{ line: 'hive/card', stage: 'review' }, { line: 'main', stage: 'done', lines: ['hive/hb1', 'main'] }]
+    expect(await repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }])).toMatch(/Deleted hive\/hb1\./)
+  })
+
+  it('names each branch by its whole ref, though a tag has its name (HR1, HI-1823 round 1)', async () => {
+    setUp()
+    // Tags called as the target, the folder's branch, a worktree's, an open card's and two free ones (git's short names
+    // would turn each into heads/…).
+    for (const t of ['1.0.0', 'main', 'hive/slot', 'hive/card', 'hive/hb1', 'spike/x']) git(proj, 'tag', t, 'main')
+    const all = await repo.leftoverInfo(proj, workTarget)
+    expect(all.branches.map((b) => b.name).sort()).toEqual(['1.0.0', 'hive/card', 'hive/hb1', 'hive/hb2', 'hive/slot', 'main', 'spike/x'])
+    expect(all.branches.find((b) => b.name === 'main')?.current).toBe(true)
+    expect(all.branches.find((b) => b.name === 'hive/slot')?.worktree).toBeTruthy()
+    expect(Object.fromEntries(all.branches.map((b) => [b.name, b.toTarget]))).toMatchObject({ '1.0.0': 0, 'hive/hb1': 0, 'spike/x': 1 })
+    const { busyLines, leftoverBranches } = await import('../src/shared/branchCleanup')
+    const left = leftoverBranches(all, busyLines(new Map([['hive/card', [{ stage: 'review' as const }]]])))
+    // The target, the folder's, the worktree's and the open card's stay protected; the free ones are offered by name.
+    expect([left.merged.map((b) => b.name), left.unmerged.map((b) => b.name)]).toEqual([['hive/hb1', 'hive/hb2'], ['spike/x']])
+    // And deleted by that name, the tag of the same name kept.
+    const said = await repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: git(proj, 'rev-parse', 'refs/heads/hive/hb1') }])
+    expect(said).toMatch(/Deleted hive\/hb1\./)
+    expect(git(proj, 'tag', '--list', 'hive/hb1')).toBe('hive/hb1')
   })
 
   it('deletes only what it was shown, merged and unused, and says why each other one is kept', async () => {

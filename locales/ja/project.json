@@ -161,6 +161,7 @@
   "project.leftovers.none": "なし。",
   "project.leftovers.load": "ブランチ",
   "project.leftovers.loading": "ブランチを読み込み中…",
+  "project.leftovers.refresh": "ブランチを再読み込み",
   "project.chart.dayTip": "{day}：{tokens}トークン · {cost} · {prompts, plural, other {プロンプト#件}}",
   "project.chart.label": "1日あたりのトークン",
   "project.chart.other": "その他（{count}）",

@@ -161,6 +161,7 @@
   "project.leftovers.none": "Keine.",
   "project.leftovers.load": "die Branches",
   "project.leftovers.loading": "Branches werden gelesen…",
+  "project.leftovers.refresh": "Branches erneut lesen",
   "project.chart.dayTip": "{day}: {tokens} Tokens · {cost} · {prompts, plural, one {# Prompt} other {# Prompts}}",
   "project.chart.label": "Tokens pro Tag",
   "project.chart.other": "Andere ({count})",

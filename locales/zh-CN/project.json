@@ -161,6 +161,7 @@
   "project.leftovers.none": "无。",
   "project.leftovers.load": "分支",
   "project.leftovers.loading": "正在读取分支…",
+  "project.leftovers.refresh": "重新读取分支",
   "project.chart.dayTip": "{day}：{tokens} 个 Token · {cost} · {prompts, plural, other {# 条提示词}}",
   "project.chart.label": "每日 Token 用量",
   "project.chart.other": "其他（{count}）",

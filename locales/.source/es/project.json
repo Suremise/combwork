@@ -237,6 +237,7 @@
   "project.leftovers.merged": "Merged into {target}",
   "project.leftovers.none": "None here.",
   "project.leftovers.notCounted": "commits not in {target}: not counted",
+  "project.leftovers.refresh": "Read the branches again",
   "project.leftovers.unmerged": "Not in {target}",
   "project.limit.heading": "{plan, select, none {Plan limits, account-wide, as of {when}} other {Plan limits ({plan}), account-wide, as of {when}}}",
   "project.limit.noConnections": "No {provider} connection is on in this workspace. Turn one on in Settings → Connections to see its plan limits here.",

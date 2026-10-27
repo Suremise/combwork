@@ -161,6 +161,7 @@
   "project.leftovers.none": "Ninguna.",
   "project.leftovers.load": "las ramas",
   "project.leftovers.loading": "Leyendo las ramas…",
+  "project.leftovers.refresh": "Volver a leer las ramas",
   "project.chart.dayTip": "{day}: {tokens} tokens · {cost} · {prompts, plural, one {# prompt} many {# prompts} other {# prompts}}",
   "project.chart.label": "Tokens por día",
   "project.chart.other": "Otros ({count})",

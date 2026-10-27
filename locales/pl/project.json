@@ -161,6 +161,7 @@
   "project.leftovers.none": "Brak.",
   "project.leftovers.load": "gałęzi",
   "project.leftovers.loading": "Odczytywanie gałęzi…",
+  "project.leftovers.refresh": "Odczytaj gałęzie ponownie",
   "project.chart.dayTip": "{day}: {tokens} tokenów · {cost} · {prompts, plural, one {# prompt} few {# prompty} many {# promptów} other {# promptu}}",
   "project.chart.label": "Tokeny dziennie",
   "project.chart.other": "Inne ({count})",

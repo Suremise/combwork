@@ -161,6 +161,7 @@
   "project.leftovers.none": "Nenhuma.",
   "project.leftovers.load": "as branches",
   "project.leftovers.loading": "Lendo as branches…",
+  "project.leftovers.refresh": "Ler as branches de novo",
   "project.chart.dayTip": "{day}: {tokens} tokens · {cost} · {prompts, plural, =0 {# prompts} one {# prompt} other {# prompts}}",
   "project.chart.label": "Tokens por dia",
   "project.chart.other": "Outros ({count})",

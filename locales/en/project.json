@@ -911,6 +911,10 @@
     "defaultMessage": "commits not in {target}: not counted",
     "description": "On a leftover branch in the Changes tab when Hive didn't count its commits (too many)."
   },
+  "project.leftovers.refresh": {
+    "defaultMessage": "Read the branches again",
+    "description": "A button on the Changes tab's leftover branches: reads them again (a branch changed outside Hive)."
+  },
   "project.leftovers.unmerged": {
     "defaultMessage": "Not in {target}",
     "description": "A group of the Changes tab's leftover branches: those with commits {target} hasn't."

@@ -229,6 +229,7 @@ interface HiveMessageValues {
   'project.leftovers.merged': { target: string | number }
   'project.leftovers.none': undefined
   'project.leftovers.notCounted': { target: string | number }
+  'project.leftovers.refresh': undefined
   'project.leftovers.unmerged': { target: string | number }
   'project.limit.heading': { plan: string; when: string | number }
   'project.limit.noConnections': { provider: string | number }

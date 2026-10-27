@@ -10,7 +10,7 @@ import { useProjectStages } from '../projectStages'
 import { at } from '../views/GitTab'
 import { BranchCards, deleteBranch } from '../views/GitBranches'
 import { PaneResizer } from './Resizer'
-import { Icon, LoadFailed, StaleNote } from './ui'
+import { Icon, IconButton, LoadFailed, StaleNote } from './ui'
 
 /**
  * The Changes tab's leftover branches (HI-1823): the local branches nothing uses now (branchCleanup.ts's
@@ -32,6 +32,7 @@ const M = {
   delete: msg({ id: 'project.leftovers.delete', defaultMessage: 'Delete…', description: "A button on a leftover branch in the Changes tab: deletes it, after a confirmation." }),
   none: msg({ id: 'project.leftovers.none', defaultMessage: 'None here.', description: "Under a group of the Changes tab's leftover branches that has none." }),
   load: msg({ id: 'project.leftovers.load', defaultMessage: 'the branches', description: "What couldn't be read, in an error on the Changes tab's leftover branches." }),
+  refresh: msg({ id: 'project.leftovers.refresh', defaultMessage: 'Read the branches again', description: "A button on the Changes tab's leftover branches: reads them again (a branch changed outside Hive)." }),
   loading: msg({ id: 'project.leftovers.loading', defaultMessage: 'Reading the branches…', description: "While the Changes tab's leftover branches are read." })
 }
 
@@ -46,10 +47,13 @@ export function useLeftovers(project: ProjectInfo, info: LeftoverInfo | null): {
   const badges = useWorkBadges()
   const onBranch = useMemo(() => branchCards(project.name, tasks, badges), [project.name, tasks, badges])
   return useMemo(() => {
-    const busy = busyLines(onBranch)
+    // An open card's lines, earlier cycles' too (one back from Done may have started again elsewhere), as main reads them.
+    const mine = new Set(tasks.filter((t) => t.project.toLowerCase() === project.name.toLowerCase()).map((t) => t.number))
+    const earlier = [...badges.values()].filter((b) => mine.has(b.card) && !b.noCode && b.stage !== 'done').flatMap((b) => b.lines ?? [])
+    const busy = new Set([...busyLines(onBranch), ...earlier])
     const l = info ? leftoverBranches(info, busy) : { merged: [], unmerged: [] }
     return { ...l, count: l.merged.length + l.unmerged.length, onBranch }
-  }, [info, onBranch])
+  }, [info, onBranch, tasks, badges, project.name])
 }
 
 /** The picker's entry, at the end of its Branches group. */
@@ -85,6 +89,9 @@ export function LeftoversPage({ project, read, selector, listWidth, onCompare }:
           <PaneResizer paneKey="changes" />
           <div className="pane-header" style={{ paddingLeft: 14 }}>
             {tr(M.heading)} {info && <span className="badge" style={{ marginLeft: 6 }}>{fmt.number(count)}</span>}
+            <div className="actions">
+              <IconButton icon={read.loading ? 'loading' : 'refresh'} spin={read.loading} title={tr(M.refresh)} action="refresh-leftovers" disabled={read.loading} onClick={read.reload} />
+            </div>
           </div>
           {selector}
         </div>
