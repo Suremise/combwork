@@ -671,7 +671,7 @@ setInstalledCheck((id) => {
 const KEPT_SAME = ['workspace', 'tasks', 'boardState', 'projectKeys', 'movedCardNames'] as const satisfies readonly (keyof State)[]
 
 /** How long agents' states wait to be shown together (HI-1806): a dozen agents send dozens a second. */
-const LIVE_BATCH_MS = 100
+const LIVE_BATCH_MS = 250
 /** Agents' states not shown yet (applyLiveState), by projectKey, the newest of each. */
 const pendingLive = new Map<string, LiveSessionState>()
 let liveTimer: ReturnType<typeof setTimeout> | null = null
@@ -1186,12 +1186,23 @@ export function projectNames(projects: readonly ProjectInfo[] | undefined): Reco
 }
 
 /**
- * Shows an agent's new state (a session-status event): with the others that came within LIVE_BATCH_MS, in one update of
- * the store (HI-1806), so a dozen agents changing state render the window a few times a second, not dozens.
+ * Shows an agent's new state (a session-status event): at once, then those that come within LIVE_BATCH_MS of it
+ * together at its end, in one update of the store (HI-1806), so a dozen agents changing state render the window a few
+ * times a second, not dozens, and one change on its own shows without waiting.
  */
 export function applyLiveState(state: LiveSessionState): void {
   pendingLive.set(projectKey(state.projectPath, state.agentId), state)
-  liveTimer ??= setTimeout(flushLiveStates, LIVE_BATCH_MS)
+  if (liveTimer) return
+  flushLiveStates()
+  liveTimer = setTimeout(liveWindowEnds, LIVE_BATCH_MS)
+}
+
+/** The batch's time is up: the states that came meanwhile are shown, and the next ones wait a while again. */
+function liveWindowEnds(): void {
+  liveTimer = null
+  if (!pendingLive.size) return
+  flushLiveStates()
+  liveTimer = setTimeout(liveWindowEnds, LIVE_BATCH_MS)
 }
 
 /** An agent's state as last told, shown yet or not. */
@@ -1203,8 +1214,6 @@ export function liveStateOf(projectPath: string, agentId: string): LiveSessionSt
 
 /** Shows the agents' states waiting (applyLiveState) now; also before the workspace is set, which they are older than. */
 export function flushLiveStates(): void {
-  if (liveTimer) clearTimeout(liveTimer)
-  liveTimer = null
   if (!pendingLive.size) return
   const states = [...pendingLive.values()]
   pendingLive.clear()

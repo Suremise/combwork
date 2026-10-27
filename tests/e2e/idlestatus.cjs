@@ -93,7 +93,10 @@ const check = (name, ok, extra = '') => {
     const s = await live(alpha, id)
     return s?.status === 'working' && /Compacting/.test(s.statusMessage ?? '') && s
   }, HUNG_MS)
-  const pane = await page.locator('.pane-status').first().innerText().catch(() => '')
+  // The pane follows main's state shortly after, not with it (the window shows agents' states in batches, HI-1806); the
+  // compaction lasts until the test ends it below.
+  let pane = ''
+  await until(async () => /Compacting/.test((pane = await page.locator('.pane-status').first().innerText().catch(() => ''))), HUNG_MS)
   check('an idle compaction shows as compacting', !!compacting && /Compacting/.test(pane), `${JSON.stringify(compacting)} · pane: ${pane}`)
   made('fake-idle-compact-done-Tester')
   const after = await until(async () => {
