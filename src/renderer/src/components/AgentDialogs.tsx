@@ -145,7 +145,9 @@ export function Overrides({
   if (!settings) return null
   const fromConnection = connection !== undefined
   const d = connection?.defaults
-  const whose = fromConnection ? tr(CONNECTION_DEFAULT) : (inherit ?? tr(PROJECTS))
+  const whose = inherit ?? (fromConnection ? tr(CONNECTION_DEFAULT) : tr(PROJECTS))
+  // The permission mode stays the CLI's and the project's with connections too.
+  const whoseMode = inherit ?? tr(PROJECTS)
   /** The first choice of each: whose it is, and what that is now. */
   const inherited = (value: string): string => tr(msg({ id: 'agents.overrides.inherited', defaultMessage: '{whose} ({value})', description: "The first choice of an agent's model, effort, mode or context: whose setting it follows ({whose}: \"Project's\") and what that is now ({value}: \"Opus 5.5\")." }), { whose, value })
   const onOff = (on: boolean): string => (on ? tr(msg({ id: 'agents.overrides.on', defaultMessage: 'On', description: "A choice of an agent's Use 200K context setting. Keep it short." })) : tr(msg({ id: 'agents.overrides.off', defaultMessage: 'Off', description: "A choice of an agent's Use 200K context setting. Keep it short." })))
@@ -176,7 +178,7 @@ export function Overrides({
       <EffortPicker provider={provider} model={runModel} value={effort} base={{ value: '', label: effortBase }} onChange={onEffort} />
       <label>{tr(msg({ id: 'agents.overrides.permission', defaultMessage: 'Permission mode', description: "Label of an agent's permission mode choice (Add Agent, Agent Settings)." }))}</label>
       <select className="select" value={permission} onChange={(e) => onPermission(e.target.value)}>
-        <option value="">{inherited(projectPermission)}</option>
+        <option value="">{tr(msg({ id: 'agents.overrides.inherited', defaultMessage: '{whose} ({value})', description: "The first choice of an agent's model, effort, mode or context: whose setting it follows ({whose}: \"Project's\") and what that is now ({value}: \"Opus 5.5\")." }), { whose: whoseMode, value: projectPermission })}</option>
         {modes.map((m) => (
           <option key={m.value} value={m.value}>
             {shownText(m.label, m.text?.label, tr)}

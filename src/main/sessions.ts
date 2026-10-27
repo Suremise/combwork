@@ -1301,16 +1301,23 @@ class SessionManager {
     const s = config.settings
     let pc = readPc ?? (await workspace.projectConfig(projectPath))
     const assistant = workspace.isAssistantHome(projectPath)
-    // Its CLI's model, effort and context from connections (HI-1770): the project's own moved onto its agents first (once,
-    // under the project's lock), so nothing launches with the project's unread and not yet its agents'; then read again.
+    // Where its model, effort and context come from (HI-1770), decided once for this resolution: Connections turned on or
+    // off while it reads the rest takes effect at the next, so the move, the agent read and the layer always agree.
     const movedCli = agentProvider(agent ?? projectAgents(pc)[0], pc, s)
-    if (!assistant && connectionLayerFor(movedCli) && !pc.migrations?.connections1?.[movedCli]) {
-      try {
-        await ensureMoved(projectPath, movedCli)
-      } catch (e) {
-        throw hiveError(M.moveFailed, { project: basename(projectPath), error: errorText(e) })
+    const layered = connectionLayerFor(movedCli)
+    if (layered && !assistant) {
+      // The project's own moved onto its agents first (once, under the project's lock), so nothing launches with the
+      // project's unread and not yet its agents'.
+      if (!pc.migrations?.connections1?.[movedCli]) {
+        try {
+          await ensureMoved(projectPath, movedCli)
+        } catch (e) {
+          throw hiveError(M.moveFailed, { project: basename(projectPath), error: errorText(e) })
+        }
+        pc = await workspace.projectConfig(projectPath)
       }
-      pc = await workspace.projectConfig(projectPath)
+      // The agent as saved now, whoever made the move (a start may hold one read before it): only its provider as
+      // given is kept (a run's own, pinProvider).
       const was = agent
       const fresh = was && projectAgents(pc).find((a) => a.id === was.id)
       if (was && fresh) agent = { ...fresh, provider: was.provider ?? fresh.provider }
@@ -1352,7 +1359,7 @@ class SessionManager {
     // The connection it would launch on (HI-1755): a change of choice asks for a restart.
     const cli = agentProvider(forAgent, pc, s)
     const wanted = assistant ? workspace.config.assistantConnection?.[cli] : forAgent?.connection
-    const choice = connectionLayerFor(cli) ? resolveConnection(workspace.config, cli, wanted, config.get().connections ?? []) : null
+    const choice = layered && cli === movedCli ? resolveConnection(workspace.config, cli, wanted, config.get().connections ?? []) : null
     const connection = choice ? (choice.ok ? choice.id : `!${choice.why}`) : null
     // Model, effort and context (HI-1770): with connections, its own, else its connection's defaults (never the project's
     // or the CLI's; none when no connection can be used). The Assistant's own are its agent's, else Settings → Assistant's.

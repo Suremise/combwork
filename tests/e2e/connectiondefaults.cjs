@@ -70,7 +70,9 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'proj
     await inv('connections:signIn', max1.id)
     check('Max 1 signed in', !!(await lib.until(async () => (await inv('connections:list')).connections.find((c) => c.id === max1.id && c.accepted?.email) ?? null, HUNG_MS)))
     await inv('connections:setOn', max1.id, true)
-    await inv('connections:setDefaults', max1.id, { model: 'sonnet', effort: 'low' })
+    // The CLI's own defaults deliberately another: Haiku, high, 200K on; the connection's Sonnet, low, 200K off.
+    await inv('settings:update', { providers: { 'claude-code': { defaultModel: 'haiku', defaultEffort: 'high', use200kContext: true } } })
+    await inv('connections:setDefaults', max1.id, { model: 'sonnet', effort: 'low', use200kContext: false })
     await page.keyboard.press('Control+,')
     await page.locator('.settings-nav').waitFor({ timeout: HUNG_MS })
     await page.locator('.settings-nav .row[data-section="accounts"]').click()
@@ -122,7 +124,24 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'proj
       return /Connection default/.test(first ?? '') ? first : null
     }, HUNG_MS)
     check('Agent Settings: an empty model reads "Connection default (Sonnet…)"', !!base && /Connection default \(Sonnet/.test(base), String(base))
+    const mode = await dialog.locator('.agent-form select').evaluateAll((all) => all.map((s) => s.options[0]?.textContent ?? '').find((x) => x.startsWith("Project's")) ?? '').catch(() => '')
+    check("…its permission mode still follows the project's (never \"Connection default\")", /^Project's \(/.test(mode), mode)
     await shots('agentsettings')
+    await page.keyboard.press('Escape')
+
+    // --- Settings → Assistant: an empty model, effort and context name the Assistant's connection's defaults, not the CLI's.
+    await page.keyboard.press('Control+,')
+    // Settings' own row (Project Settings, still open behind it, has a nav of its own).
+    const assistantRow = page.locator('.settings-nav .row[data-section="assistant"]')
+    await assistantRow.waitFor({ timeout: HUNG_MS })
+    await assistantRow.click()
+    const firsts = async () => page.locator('.assistant-defaults').first().locator('select').evaluateAll((all) => all.map((s) => s.options[0]?.textContent ?? '')).catch(() => [])
+    const shown = await lib.until(async () => {
+      const f = await firsts()
+      return f.some((x) => x.startsWith('Connection default')) ? f : null
+    }, HUNG_MS)
+    check("Settings → Assistant: Connection default (Sonnet…), (Low) and context (Off), never the CLI's Haiku, High, On", !!shown && shown.some((x) => /^Connection default \(Sonnet/.test(x)) && shown.includes('Connection default (Low)') && shown.includes('Connection default (Off)') && !shown.some((x) => /Haiku|High|\(On\)/.test(x)), JSON.stringify(shown ?? (await firsts())))
+    await shots('assistant')
     await page.keyboard.press('Escape')
   } catch (e) {
     check('the suite ran to its end', false, e.stack)

@@ -13,7 +13,8 @@ import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
 import { legacyOf, placeText, placeTip } from '../agentPlace'
-import { connectionCellText, useConnections } from './ConnectionChoice'
+import { connectionCellText, useConnections, useLaunchConnection } from './ConnectionChoice'
+import { assistantDefaults } from '@shared/connectionDefaults'
 import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
 import { cardLabel } from '@shared/projectKeys'
 import { loadAssistantChanges } from '../assistantUndo'
@@ -905,7 +906,11 @@ export function AssistantSettingsDialog() {
     // Reset each time the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openFlag])
+  // Its connection (HI-1770): with connections, an empty model, effort or context follows Settings → Assistant's, then its defaults.
+  const assistantChoice = useStore((s) => s.workspace?.config.assistantConnection?.[provider])
+  const launchConnection = useLaunchConnection(assistantChoice || undefined, provider)
   if (!openFlag || !a || !agent) return null
+  const inheritedFrom = launchConnection === undefined ? undefined : { defaults: assistantDefaults(settings?.assistant.providers[provider], launchConnection) }
   const close = (): void => set({ assistantSettingsOpen: false })
   const chooseProvider = (v: ProviderId): void => {
     setProvider(v)
@@ -982,7 +987,7 @@ export function AssistantSettingsDialog() {
       <h3 className="agent-dialog-h">{tr(M.codingAgent)}</h3>
       <ProviderChoice value={provider} current={current} onChange={chooseProvider} />
       <h3 className="agent-dialog-h">{tr(M.settings)}</h3>
-      <Overrides project={a} provider={provider} model={model} effort={effort} permission={permission} context={context} onModel={setModel} onEffort={setEffort} onPermission={setPermission} onContext={setContext} inherit={tr(M.default)} inheritIsDefault assistant />
+      <Overrides project={a} provider={provider} model={model} effort={effort} permission={permission} context={context} onModel={setModel} onEffort={setEffort} onPermission={setPermission} onContext={setContext} inherit={tr(M.default)} inheritIsDefault assistant connection={inheritedFrom} />
       {agent.live && <div className="detail">{tr(M.appliesNext)}</div>}
     </Modal>
   )

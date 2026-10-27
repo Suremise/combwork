@@ -1,4 +1,4 @@
-import type { AgentDef, AppSettings, AssistantProviderSettings, ConnectionDefaults, ConnectionsMoved, MovedField, ProjectConfig, ProviderId } from './types'
+import type { AgentDef, AppSettings, AssistantProviderSettings, Connection, ConnectionDefaults, ConnectionsMoved, EffortLevel, MovedField, ProjectConfig, ProviderId } from './types'
 import { projectAgents } from './defaults'
 import { projectProviderConfig, providerDescriptor, providerSettings } from './providers'
 
@@ -36,6 +36,16 @@ export function assistantOwn<A extends Pick<AgentDef, 'model' | 'effort' | 'use2
   if (!s) return agent
   const context = agent?.use200kContext ?? (s.use200kContext === 'on' ? true : s.use200kContext === 'off' ? false : undefined)
   return { ...(agent ?? ({} as A)), model: agent?.model || s.model || undefined, effort: agent?.effort || s.effort || undefined, use200kContext: context }
+}
+
+/**
+ * What the Assistant runs with when its own agent sets nothing (HI-1770): Settings → Assistant's for its CLI, else its
+ * connection's defaults; null connection (none usable): Settings → Assistant's alone.
+ */
+export function assistantDefaults(s: Partial<AssistantProviderSettings> | undefined, conn: Pick<Connection, 'defaults'> | null): ConnectionDefaults {
+  const d = conn?.defaults
+  const context = s?.use200kContext === 'on' ? true : s?.use200kContext === 'off' ? false : d?.use200kContext
+  return { ...(s?.model || d?.model ? { model: s?.model || d?.model } : {}), ...(s?.effort || d?.effort ? { effort: (s?.effort || d?.effort) as EffortLevel } : {}), ...(context !== undefined ? { use200kContext: context } : {}) }
 }
 
 /** A project's own model, effort and context for a CLI, where it set one (not inherit): what moves onto its agents. */

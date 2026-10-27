@@ -34,7 +34,7 @@ const { provider } = await import('../src/main/providers')
 const { providerService } = await import('../src/main/providerService')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { runSwitch } = await import('../src/main/connectionSwitch')
-const { authScope, sessions } = await import('../src/main/sessions')
+const { authScope, sessions, LaunchReads } = await import('../src/main/sessions')
 const moves = await import('../src/main/connectionMoves')
 const { agentLaunchSettings, providerDescriptor } = await import('../src/shared/providers')
 const { assistantOwn, cliDefaults, moveProjectOverrides } = await import('../src/shared/connectionDefaults')
@@ -65,7 +65,7 @@ beforeAll(async () => {
   mkdirSync(join(wsPath, 'gamma', '.hive'), { recursive: true })
   writeFileSync(join(wsPath, 'gamma', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   // Projects whose own model, effort and context move onto their agents (HI-1770), each test its own.
-  for (const name of ['mv1', 'mv2', 'mv3', 'mv4', 'mv5', 'mv6']) {
+  for (const name of ['mv1', 'mv2', 'mv3', 'mv4', 'mv5', 'mv6', 'mv7', 'mv8']) {
     mkdirSync(join(wsPath, name, '.hive'), { recursive: true })
     writeFileSync(join(wsPath, name, '.hive', 'project.json'), JSON.stringify({ version: 2, providers: { 'claude-code': { model: 'haiku', effort: 'high', permissionMode: 'inherit', extraArgs: '', use200kContext: 'on' }, codex: { model: 'gpt-5', effort: 'low', permissionMode: 'inherit', extraArgs: '', use200kContext: 'inherit' } }, agents: [{ id: 'own', name: `${name} Own`, provider: 'claude-code', model: 'opus', use200kContext: false }, { id: 'none', name: `${name} None`, provider: 'claude-code' }, { id: 'cx', name: `${name} Codex`, provider: 'codex' }] }))
   }
@@ -824,6 +824,47 @@ describe('model, effort and context from the connection (HI-1770)', () => {
     release()
     await held
     expect(await eff).toMatchObject({ model: 'haiku', effort: 'high', use200kContext: true })
+    expect((await w.projectConfig(p)).migrations?.connections1?.['claude-code']).toBeTruthy()
+  })
+
+  it('a move another caller made after the launch read its agent: the agent as saved now is used, not the one read before', async () => {
+    await signedInConnection('Personal', 'me@example.com')
+    const p = join(wsPath, 'mv7')
+    const before = (await w.projectConfig(p)).agents.find((a) => a.id === 'none')!
+    // The open's (or a toggle's) move completes first.
+    await here(() => moves.ensureMoved(p, 'claude-code'))
+    expect(await sessions.effective(p, before)).toMatchObject({ model: 'haiku', effort: 'high', use200kContext: true })
+  })
+
+  it('Connections turned on while a resolution reads the rest: it finishes on the layer it began with, consistently', async () => {
+    await signedInConnection('Personal', 'me@example.com')
+    const p = join(wsPath, 'mv8')
+    const agent = (await w.projectConfig(p)).agents.find((a) => a.id === 'none')!
+    // Its servers' read held until let go.
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    let reading!: () => void
+    const entered = new Promise<void>((r) => (reading = r))
+    class HeldReads extends LaunchReads {
+      override async servers() {
+        reading()
+        await gate
+        return super.servers()
+      }
+    }
+    await advanced.set(ACCOUNTS_PREVIEW, false)
+    try {
+      const eff = sessions.effective(p, agent, new HeldReads())
+      await entered
+      await advanced.set(ACCOUNTS_PREVIEW, true)
+      release()
+      // Begun before connections: the project's values, as before (never the connection layer with nothing moved).
+      expect(await eff).toMatchObject({ model: 'haiku', effort: 'high', use200kContext: true, connection: null })
+    } finally {
+      await advanced.set(ACCOUNTS_PREVIEW, true)
+    }
+    // The next one, with connections: moved first, then the agent's own (moved) values.
+    expect(await sessions.effective(p, agent)).toMatchObject({ model: 'haiku', effort: 'high', use200kContext: true })
     expect((await w.projectConfig(p)).migrations?.connections1?.['claude-code']).toBeTruthy()
   })
 
