@@ -716,5 +716,123 @@ async function recoverHost(ws: WorkspaceService, host: string, root: string, out
   }
 }
 
+/** The most of an attachment's text one read gives (HI-1751): a longer one is read in pages, by `offset`. */
+export const ATTACHMENT_PAGE = 64 * 1024
+/** How much of a file's start is looked at for a NUL byte, which makes it binary. */
+const SNIFF = 8192
+
+/**
+ * What reading a card's attachment gives an agent (HI-1751): a page of its text (`next`: the byte offset to read from
+ * for the page after it, absent at its end), or its kind and path when it isn't UTF-8 text.
+ */
+export type AttachmentRead =
+  | { name: string; file: string; size: number; kind: 'text'; offset: number; content: string; next?: number }
+  | { name: string; file: string; size: number; kind: 'image' | 'pdf' | 'binary'; path: string }
+
+/**
+ * Why an attachment can't be read: none by that name (`choices`: the card's), several (`choices`: those), its file gone,
+ * not where its card keeps it (a link on the way, a name that isn't plain), the card or file changed while it was read
+ * (read the card again), or an offset that isn't a byte of it (`size`).
+ */
+export type AttachmentReadProblem = { problem: 'unknown' | 'ambiguous' | 'missing' | 'outside' | 'changed' | 'offset'; choices?: string[]; size?: number }
+
+/** Tests: run between the file's open and the checks after it (a swap, a move, a deletion meanwhile). */
+export const attachmentReadSeams: { afterOpen: (() => Promise<void>) | null } = { afterOpen: null }
+
+/**
+ * A card's attachment for an agent (HI-1751: HR2 couldn't read HI-1702's evidence, the document tools refusing `.hive`),
+ * by its name or its file's name in the card's folder (`<time>_<name>`). `card`: the card as the caller was allowed to
+ * read it (its scope checked), whose project decides the folder: one moved or deleted meanwhile is refused, never read
+ * from another place. Only a regular file is read, its whole folder chain (`.hive`, `attachments`, `cards`, the card's)
+ * and itself no link, its name plain, checked before it is opened and again after, with the opened file's identity; the
+ * card's row is checked again before the reply. Text (UTF-8, no NUL in its first 8 KB) is read from the byte `offset`
+ * (a whole number from 0 to its size), ATTACHMENT_PAGE at a time and never more, each page ending on a whole character
+ * (a first page leaving out a byte-order mark), so the pages' contents joined are its text; bytes that aren't UTF-8 make
+ * it binary. An image, a PDF or a binary file gives its kind and path (the same offset rules), for the CLI's own reading.
+ */
+export async function readCardAttachment(ws: WorkspaceService, card: { number: number; project: string | null }, name: string, offsetRaw: string | null = null): Promise<AttachmentRead | AttachmentReadProblem> {
+  const n = card.number
+  const sameProject = (p: string | null | undefined): boolean => (p ?? null)?.toLowerCase() === card.project?.toLowerCase()
+  const now = (): { project: string | null; rows: Row[] } | null =>
+    boardRead(ws, (db) => {
+      const c = db.prepare('SELECT project FROM cards WHERE number = ?').get(n) as { project: string | null } | undefined // i18n-ignore: SQL
+      return c ? { project: c.project, rows: db.prepare(`SELECT ${COLUMNS} FROM card_attachments WHERE card = ?`).all(n) as Row[] } : null // i18n-ignore: SQL
+    })
+  const first = now()
+  if (!first || !sameProject(first.project)) return { problem: 'changed' }
+  const want = name.trim().toLowerCase()
+  const byFile = first.rows.filter((r) => r.file.toLowerCase() === want)
+  const found = byFile.length ? byFile : first.rows.filter((r) => r.name.toLowerCase() === want)
+  if (found.length !== 1) return { problem: found.length ? 'ambiguous' : 'unknown', choices: (found.length ? found : first.rows.sort(newest)).map((r) => r.file) }
+  const row = found[0]
+  if (!plainName(row.file)) return { problem: 'outside' }
+  const host = cardHost(ws, card.project)
+  const folder = cardFolder(host, n)
+  const path = join(folder, row.file)
+  // Each folder from the host's .hive down to the card's, and the file: there, and none of them a link.
+  const chain = [join(host, HIVE_DIR), join(host, HIVE_DIR, ATTACHMENTS_DIR), cardsRoot(host), folder]
+  const plain = async (): Promise<'ok' | 'missing' | 'outside'> => {
+    for (const d of chain) {
+      const st = await lstat(d).catch(() => null)
+      if (!st) return 'missing'
+      if (st.isSymbolicLink() || !st.isDirectory()) return 'outside'
+    }
+    const st = await lstat(path, { bigint: true }).catch(() => null)
+    if (!st) return 'missing'
+    if (st.isSymbolicLink() || !st.isFile() || !insideReal(path, [folder])) return 'outside'
+    return 'ok'
+  }
+  const before = await plain()
+  if (before !== 'ok') return { problem: before }
+  const fh = await open(path, 'r').catch(() => null)
+  if (!fh) return { problem: 'missing' }
+  try {
+    const opened = await fh.stat({ bigint: true })
+    await attachmentReadSeams.afterOpen?.()
+    // After the open: the chain still plain, and the path still the file that was opened.
+    const after = await plain()
+    if (after !== 'ok') return { problem: after === 'missing' ? 'changed' : after }
+    const leaf = await lstat(path, { bigint: true }).catch(() => null)
+    if (!leaf || leaf.dev !== opened.dev || leaf.ino !== opened.ino) return { problem: 'changed' }
+    const size = Number(opened.size)
+    const from = offsetRaw === null || offsetRaw === '' ? 0 : /^\d+$/.test(offsetRaw) ? Number(offsetRaw) : NaN
+    if (!Number.isSafeInteger(from) || from > size) return { problem: 'offset', size }
+    const head = { name: row.name, file: row.file, size }
+    const still = (): boolean => {
+      const again = now()
+      return !!again && sameProject(again.project) && again.rows.some((r) => r.id === row.id && r.file === row.file)
+    }
+    const kind = attachmentKind(row.name)
+    const binary = (k: 'image' | 'pdf' | 'binary'): AttachmentRead | AttachmentReadProblem => (still() ? { ...head, kind: k, path } : { problem: 'changed' })
+    if (kind === 'image' || kind === 'pdf') return binary(kind)
+    const sniff = Buffer.alloc(Math.min(SNIFF, size))
+    const got = (await fh.read(sniff, 0, sniff.length, 0)).bytesRead
+    if (sniff.subarray(0, got).includes(0)) return binary('binary')
+    // A page and up to 3 bytes after it, so its end can move back to a whole character (the byte after a cut is never
+    // a UTF-8 continuation byte, 10xxxxxx): never more read than that.
+    const buf = Buffer.alloc(Math.min(ATTACHMENT_PAGE + 3, size - from))
+    const { bytesRead } = await fh.read(buf, 0, buf.length, from)
+    // Shorter than its size at the open: changed meanwhile (an offset that moved on by nothing would read forever).
+    if (bytesRead < buf.length) return { problem: 'changed' }
+    let end = Math.min(bytesRead, ATTACHMENT_PAGE)
+    if (end < bytesRead) {
+      let back = end
+      while (back > 0 && (buf[back] & 0xc0) === 0x80) back--
+      if (back > 0) end = back
+    }
+    let text: string
+    try {
+      text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(buf.subarray(0, end))
+    } catch {
+      return binary('binary')
+    }
+    if (!still()) return { problem: 'changed' }
+    const content = from === 0 && text.startsWith('﻿') ? text.slice(1) : text
+    return { ...head, kind: 'text', offset: from, content, ...(from + end < size ? { next: from + end } : {}) }
+  } finally {
+    await fh.close()
+  }
+}
+
 /** Tests: the staging and trash folders' names. */
 export const CARD_FOLDERS_FOR_TESTS = { STAGING, TRASH, OP_FILE }

@@ -453,6 +453,23 @@ export function docSectionText(s: { path: string; heading?: DocHeadingRow; size?
   return `${head}: long, so here is its text before its subsections, then their outline.\n\n${s.content}\n\n${(s.subsections ?? []).map(headingLine).join('\n')}\n\nhive_read_section reads one of them as #<slug>, or this whole section with full=true.`
 }
 
+/** A card's attachment as GET /v1/tasks/:n/attachments/:name gives it (HI-1751): a page of its text, or its kind and path. */
+export type AttachmentReply =
+  | { name: string; file: string; size: number; kind: 'text'; offset: number; content: string; next?: number }
+  | { name: string; file: string; size: number; kind: 'image' | 'pdf' | 'binary'; path: string }
+
+/**
+ * A card's attachment (HI-1751): a line saying which bytes of it this is and where the next page starts (the byte offset
+ * to pass back as offset), then that text as it is; an image, a PDF or a binary file: its path, for the CLI's own reading.
+ */
+export function attachmentText(a: AttachmentReply): string {
+  const bytes = (n: number): string => `${n.toLocaleString('en')} bytes`
+  if (a.kind !== 'text') return `${a.name}: ${a.kind === 'binary' ? 'not text' : a.kind === 'pdf' ? 'a PDF' : 'an image'} (${bytes(a.size)}). Open it with your own file reading: ${a.path}`
+  const to = a.next ?? a.size
+  const where = a.offset === 0 && to === a.size ? bytes(a.size) : `bytes ${a.offset.toLocaleString('en')}–${to.toLocaleString('en')} of ${bytes(a.size)}`
+  return `${a.name} (${where}${a.next !== undefined ? `; more from offset ${a.next}` : ''})\n\n${a.content}`
+}
+
 /** A skill in a listing (GET /v1/skills?view=short): where it comes from and what it is for, without its folder. */
 export interface SkillRow {
   name: string
