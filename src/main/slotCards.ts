@@ -43,6 +43,7 @@ import { deliveriesOf, deliverNow, launchWith } from './deliveries'
 import { onHiveEvent } from './events'
 import { changingFolder } from './folderFence'
 import { samePlace } from './fsutil'
+import { samePath } from '../shared/movePaths'
 import { git } from './git'
 import { lanesWaitingForSlot, onLanesWritten, rawLanes, setLaneSlots, setLaneSlotWait } from './lanes'
 import { createLogger, userText } from './logger'
@@ -135,7 +136,15 @@ export function cycleIn(facts: readonly Fact[]): Cycle | null {
     if (f.kind === 'SlotPrepared' && (f.data as FactData['SlotPrepared']).lease === started.lease) c.prepared = f.data as FactData['SlotPrepared']
     else if (f.kind === 'PlacementClaimed' && (f.data as FactData['PlacementClaimed']).lease === started.lease) c.claimed = { ...(f.data as FactData['PlacementClaimed']), seq: f.seq }
     else if (f.kind === 'BuilderPlaced' && (f.data as FactData['BuilderPlaced']).lease === started.lease) c.placed = true
-    else if (f.kind === 'LineDeleting') c.deleting = f.data as FactData['LineDeleting']
+    // Repair's move and a line's rename, as the card's state follows them (facts.ts, #1343, #1305; HI-1791: a preparation
+    // after Repair fenced the folder from before the move).
+    else if (f.kind === 'FolderMoved') {
+      const d = f.data as FactData['FolderMoved']
+      if (samePath(c.started.folder, d.from)) c.started = { ...c.started, folder: d.to }
+    } else if (f.kind === 'LineRenamed') {
+      const d = f.data as FactData['LineRenamed']
+      if (c.started.line && c.started.line.toLowerCase() === d.from.toLowerCase()) c.started = { ...c.started, line: d.to }
+    } else if (f.kind === 'LineDeleting') c.deleting = f.data as FactData['LineDeleting']
     else if (f.kind === 'LineDeleteUndone') c.deleting = null
     else if (f.kind === 'LineDeleted') {
       c.deleted = true
