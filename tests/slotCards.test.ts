@@ -440,6 +440,33 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
   })
 })
 
+describe("a slot that couldn't be prepared (HI-1796)", { timeout: 60_000 }, () => {
+  it("tells its card with the workflow's own message (so its history line can show it), once", async () => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    const card = e.wf.createCard({ title: 'Placed' })
+    const slot = join(tempDir('slot-'), 'slot-a')
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
+    moved(await e.wf.start(card.key, B1))
+    const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'card', card: card.id, lane: null, project: 'p', from: '', to: null, why: null, endRev: null }
+    let tries = 0
+    state.pool = { openLeases: () => [lease], lease: () => lease, prepare: async () => (tries++, { error: 'git checkout failed (test)' }) }
+    const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
+    await settleSlotCards(ws, e.project)
+    const notices = () => e.store.pendingActions().filter((a) => a.kind === 'notify')
+    await vi.waitFor(() => expect(notices()).toHaveLength(1), { timeout: HUNG_MS })
+    const shown = notices()[0].payload.shown as { id: string; values: Record<string, string> }
+    expect(shown).toEqual({ id: 'service.slots.notPrepared', values: { slot: 'slot-a', card: card.key, why: 'git checkout failed (test)' } })
+    // A message the workflow knows: what the card's history line and the window resolve it by.
+    const { workflowMessage } = await import('../src/shared/workflow/texts')
+    expect(workflowMessage(shown.id)?.id).toBe('service.slots.notPrepared')
+    // Not tried again, nor told again, by the next pass.
+    await settleSlotCards(ws, e.project)
+    expect(tries).toBe(1)
+    expect(notices()).toHaveLength(1)
+  })
+})
+
 describe("a placement owed at a restart resumes its builder's conversation (HI-1746)", { timeout: 60_000 }, () => {
   async function owed(): Promise<{ e: Env; n: number; slot: string; cycle: NonNullable<ReturnType<typeof cycleIn>>; ws: never }> {
     const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
