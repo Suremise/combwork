@@ -3,7 +3,7 @@
 // while one runs, the watches, and a workspace's choice of accounts. All in this file's temp folders: the CLI is never
 // run (its status is faked), nothing signs in, and no real home or accounts folder is touched.
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { accountState, connectionReadiness, duplicateLogins, movedConnection, switchedOn, topOfOrder, workspaceAccounts } from '../src/shared/accounts'
@@ -563,6 +563,29 @@ describe("whether a connection trusts a workspace's folders (HI-1870)", () => {
   })
 })
 
+describe("where Set Up asks a CLI's trust question (HI-1871)", () => {
+  const ws = 'C:\\work\\ws'
+  const alpha = { project: 'alpha', folder: 'C:\\work\\ws\\alpha' }
+  const beta = { project: 'beta', folder: 'C:\\work\\ws\\beta' }
+  // A worktree project inside the workspace whose main repository is kept elsewhere: its trust root is outside.
+  const wtProject = { project: 'alpha-wt', folder: 'C:\\repos\\alpha' }
+
+  it('a CLI whose trust is inherited (Claude Code): the workspace folder, once, for the roots inside it', () => {
+    expect(accounts.chooseSetUpTarget(true, ws, [alpha, beta])).toEqual({ folder: ws, workspace: true })
+    // The workspace folder covers alpha; the outside root stays pending, asked next.
+    expect(accounts.chooseSetUpTarget(true, ws, [wtProject, alpha])).toEqual({ folder: ws, workspace: true })
+    // Only an outside root left (a worktree project's main repository elsewhere): that root, never the workspace again.
+    expect(accounts.chooseSetUpTarget(true, ws, [wtProject])).toEqual({ folder: 'C:\\repos\\alpha', project: 'alpha-wt' })
+    // A folder whose name only starts like the workspace's isn't inside it.
+    expect(accounts.chooseSetUpTarget(true, ws, [{ project: 'x', folder: 'C:\\work\\ws2\\x' }])).toEqual({ folder: 'C:\\work\\ws2\\x', project: 'x' })
+  })
+
+  it("a CLI whose trust isn't inherited (Codex): each pending root in turn; nothing pending: none", () => {
+    expect(accounts.chooseSetUpTarget(false, ws, [alpha, beta])).toEqual({ folder: alpha.folder, project: 'alpha' })
+    expect(accounts.chooseSetUpTarget(true, ws, [])).toBeUndefined()
+  })
+})
+
 describe("whether a connection is set up (connectionReadiness, HI-1870)", () => {
   it('anything definitely not done wins, then anything unknown, else done', () => {
     const none = { pending: [], unknown: false }
@@ -860,18 +883,25 @@ describe("a workspace's accounts", () => {
       const names = ['alpha', 'beta', 'gamma']
       const folders = names.map((n) => join(wsPath, n))
       // Each trust read held until the test answers it: how many projects it was asked about, and its answer.
-      let held: { projects: number; answer: (v: (boolean | null)[]) => void }[] = []
+      let held: { home: string; projects: number; answer: (v: (boolean | null)[]) => void }[] = []
       let spy: ReturnType<typeof vi.spyOn>
       let a: Connection
       const row = () => run(() => accounts.accountsView()).connections.find((c) => c.id === a.id)!
+      // Each project with a Claude Code agent of its own (HI-1871: only projects the connection would be used in count).
       const projectsNow = async (n: number): Promise<void> => {
-        for (const [i, f] of folders.entries()) if (i < n) mkdirSync(f, { recursive: true })
-        else rmSync(f, { recursive: true, force: true })
+        for (const [i, f] of folders.entries()) {
+          if (i >= n) {
+            rmSync(f, { recursive: true, force: true })
+            continue
+          }
+          mkdirSync(join(f, '.hive'), { recursive: true })
+          writeFileSync(join(f, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: `a-${i}`, name: `Agent ${i}`, provider: 'claude-code' }] }))
+        }
         await w.refresh()
       }
       beforeEach(async () => {
         held = []
-        spy = vi.spyOn(provider('claude-code'), 'connectionTrusts').mockImplementation((_home, targets) => new Promise((answer) => held.push({ projects: targets.length, answer })))
+        spy = vi.spyOn(provider('claude-code'), 'connectionTrusts').mockImplementation((dir, targets) => new Promise((answer) => held.push({ home: dir, projects: targets.length, answer })))
         a = await accounts.addAccount('claude-code', 'Trusting')
         writeFileSync(join(folderOf(a), '.claude.json'), JSON.stringify({ hasCompletedOnboarding: true }))
         await projectsNow(1)
@@ -884,6 +914,61 @@ describe("a workspace's accounts", () => {
         for (const h of held) h.answer([])
         await run(() => accounts.setAccountOn(a.id, false)).catch(() => undefined)
         await projectsNow(0)
+      })
+
+      it("counts only the projects it would be used in (HI-1871, Darren): an agent on it, own or the first on in the order; not another CLI's, nor one pinned elsewhere", async () => {
+        const mine = () => held.filter((h) => h.home === folderOf(a))
+        // Its first read (beforeEach): alpha, whose Claude Code agent has no connection of its own (the first on: this
+        // one), and the Assistant's home (the Assistant on it too).
+        expect(mine().map((h) => h.projects)).toEqual([2])
+        const other = await accounts.addAccount('claude-code', 'Other')
+        await run(() => accounts.setAccountOn(other.id, true))
+        // beta: a Codex agent; gamma: a Claude Code agent pinned to Other. Neither would use this connection.
+        const agentsOf = [{ provider: 'claude-code' }, { provider: 'codex' }, { provider: 'claude-code', connection: other.id }]
+        for (const [i, f] of folders.entries()) {
+          mkdirSync(join(f, '.hive'), { recursive: true })
+          writeFileSync(join(f, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: `a-${i}`, name: `Agent ${i}`, ...agentsOf[i] }] }))
+        }
+        await w.refresh()
+        await vi.waitFor(() => expect(row().trust?.checking).toBe(true), { timeout: HUNG_MS })
+        // Its set unchanged by them: no read of them, and its answer, once in, names alpha alone.
+        mine()[0].answer([false, true])
+        await vi.waitFor(() => expect(row().trust?.pending.map((p) => p.project)).toEqual(['alpha']), { timeout: HUNG_MS })
+        expect(mine()).toHaveLength(1)
+        // Other's own read is for gamma alone (its agent pinned to it), and the Assistant's home isn't Other's.
+        await vi.waitFor(() => expect(held.filter((h) => h.home === folderOf(other)).map((h) => h.projects)).toEqual([1]), { timeout: HUNG_MS })
+        for (const h of held.filter((x) => x.home === folderOf(other))) h.answer([true])
+        await run(() => accounts.setAccountOn(other.id, false))
+      })
+
+      it("follows the connection a project's agent would launch on now: reassigned, the project moves to the other's count; the order changed, the same (HR3, HI-1871)", async () => {
+        const mine = () => held.filter((h) => h.home === folderOf(a))
+        const others = (o: Connection) => held.filter((h) => h.home === folderOf(o))
+        mine()[0].answer([true, true])
+        await vi.waitFor(() => expect(row().trust?.checking).toBeUndefined(), { timeout: HUNG_MS })
+        const other = await accounts.addAccount('claude-code', 'Other')
+        await run(() => accounts.setAccountOn(other.id, true))
+        const rowOf = (id: string) => run(() => accounts.accountsView()).connections.find((c) => c.id === id)!
+        // Other, on but second in the order: no agent here would use it.
+        await vi.waitFor(() => expect(rowOf(other.id).trust?.checking).toBeUndefined(), { timeout: HUNG_MS })
+        expect(others(other)).toHaveLength(0)
+        // alpha's agent given Other as its own: alpha now counts for Other, and no longer for this one.
+        writeFileSync(join(folders[0], '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-0', name: 'Agent 0', provider: 'claude-code', connection: other.id }] }))
+        await w.refresh()
+        rowOf(other.id)
+        await vi.waitFor(() => expect(others(other).map((h) => h.projects)).toEqual([1]), { timeout: HUNG_MS })
+        await vi.waitFor(() => expect(mine().at(-1)!.projects).toBe(1), { timeout: HUNG_MS })
+        for (const h of held) h.answer([true, true])
+        // Back to no connection of its own, and Other moved to the top of the order: Other is the first on, so alpha
+        // and the Assistant's home are Other's now, this one counts none.
+        writeFileSync(join(folders[0], '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-0', name: 'Agent 0', provider: 'claude-code' }] }))
+        accounts.moveConnection(other.id, 0)
+        await w.refresh()
+        rowOf(other.id)
+        await vi.waitFor(() => expect(others(other).at(-1)!.projects).toBe(2), { timeout: HUNG_MS })
+        await vi.waitFor(() => expect(rowOf(a.id).trust).toEqual({ pending: [], unknown: false }), { timeout: HUNG_MS })
+        for (const h of held) h.answer([true, true])
+        await run(() => accounts.setAccountOn(other.id, false))
       })
 
       it('while its first read is held: Checking…, never done; refreshes mark it dirty, so one more read, not one each', async () => {
@@ -933,12 +1018,14 @@ describe("a workspace's accounts", () => {
         held[0].answer([false])
         // The stale answer (alpha untrusted) is never applied; one read for both projects follows, none for alpha alone.
         await vi.waitFor(() => expect(held).toHaveLength(2), { timeout: HUNG_MS })
-        expect(held[1].projects).toBe(2)
+        // Both projects, and the Assistant's home: the Assistant runs on this connection too (HI-1871).
+        expect(held[1].projects).toBe(3)
         expect(row().trust?.checking).toBe(true)
         held[1].answer([true, false])
         // The Set Up asked against the old set gets the current set's folder.
-        expect(await folder).toBe(realpathSync.native(folders[1]))
-        expect(row().trust).toEqual({ pending: [{ project: 'beta', folder: realpathSync.native(folders[1]) }], unknown: false })
+        // Claude Code's trust of a folder covers those inside it (HI-1871): Set Up asks once, in the workspace's folder.
+        expect(await folder).toBe(resolve(wsPath))
+        expect(row().trust).toEqual({ pending: [{ project: 'beta', folder: realpathSync.native(folders[1]) }], unknown: false, setUpIn: { folder: resolve(wsPath), workspace: true } })
         for (let i = 0; i < 5; i++) run(() => accounts.accountsView())
         expect(held).toHaveLength(2)
       })
@@ -953,7 +1040,7 @@ describe("a workspace's accounts", () => {
         run(() => accounts.accountsView(true))
         held[1].answer([false, true])
         await vi.waitFor(() => expect(held).toHaveLength(3), { timeout: HUNG_MS })
-        expect(held[2].projects).toBe(2)
+        expect(held[2].projects).toBe(3)
         held[2].answer([true, true])
         // A current answer with nothing pending: no folder (its own then), which isn't a cancellation.
         expect(await folder).toBeUndefined()

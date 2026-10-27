@@ -95,7 +95,8 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     check('…its Set Up runs Codex in that folder, where its trust is answered (the fake records it)', !!(await lib.until(async () => fs.existsSync(workToml) && fs.readFileSync(workToml, 'utf8').includes(`[projects.'${root}']`), HUNG_MS)))
     await inv('pty:kill', key)
     check('…read again as it ends: nothing pending', !!(await lib.until(async () => JSON.stringify(await trustOf(work.id)) === JSON.stringify({ pending: [], unknown: false }), HUNG_MS)))
-    check('…the other connection still needs it (each its own)', (await trustOf(home.id))?.pending.length === 1)
+    // Home: no agent here uses it yet (One has none of its own, so the first on, Work), so it counts nothing (HI-1871).
+    check('…the other connection, which no agent here would use, counts no project', JSON.stringify(await trustOf(home.id)) === JSON.stringify({ pending: [], unknown: false }))
 
     // --- Two agents at once: One on the default (Work), Two on its own choice (Home).
     await inv('agents:update', alpha, 'a-two', { connection: home.id })

@@ -59,6 +59,7 @@ interface HiveMessageValues {
   'settings.accounts.setUpChecking': undefined
   'settings.accounts.setUpDone': undefined
   'settings.accounts.setUpIn': { project: string | number; folder: string | number; cli: string | number }
+  'settings.accounts.setUpInWorkspace': { folder: string | number; cli: string | number }
   'settings.accounts.setUpNeeded': undefined
   'settings.accounts.signIn': undefined
   'settings.accounts.signInAgain': undefined

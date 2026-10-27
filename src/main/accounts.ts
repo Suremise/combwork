@@ -1,15 +1,15 @@
 import { randomBytes } from 'crypto'
-import { join, resolve } from 'path'
+import { join, resolve, sep } from 'path'
 import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
 import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
-import type { AppConfig, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, ProviderId, ServerConnection, ServerModel, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
+import type { AgentInfo, AppConfig, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, ProjectInfo, ProviderId, ServerConnection, ServerModel, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
 import { HIVE_DIR } from '../shared/defaults'
 import { readKeptJson } from './fsutil'
 import { cliDefaults } from '../shared/connectionDefaults'
-import { acceptable, accountState, movedConnection, resolveConnection, topOfOrder, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
+import { acceptable, accountState, type ConnectionTrust, movedConnection, resolveConnection, topOfOrder, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { profileFolder } from '../shared/appName'
-import { isProviderEnabled, providerDescriptor, PROVIDERS } from '../shared/providers'
+import { agentProvider, isProviderEnabled, providerDescriptor, PROVIDERS } from '../shared/providers'
 import { msg, type Msg } from '../shared/i18n'
 import { advanced } from './advanced'
 import { config } from './config'
@@ -759,6 +759,8 @@ async function readTrustOnce(id: string, projects: Projects): Promise<TrustAnswe
   const a = getAccount(id)
   const read = a && provider(a.provider).connectionTrusts
   if (!a || !read) return null
+  // No folder it would be used in here (HI-1871): nothing to read, nothing pending.
+  if (!projects.length) return { pending: [], unknown: false }
   const targets = await trustTargets(projects)
   const got = await read.call(provider(a.provider), accountFolder(id), targets).catch(() => targets.map(() => null))
   return { pending: targets.flatMap((t, i) => (got[i] === false && t.root ? [{ project: t.project, folder: t.root }] : [])), unknown: got.some((x) => x === null) }
@@ -805,18 +807,55 @@ function pruneTrust(): void {
 export async function setUpFolder(id: string): Promise<string | undefined> {
   const a = getAccount(id)
   if (!a || !workspace.path || !onHere(a)) return undefined
-  const st = requestTrust(id, workspace.path, projectsHere(), true)
+  const st = requestTrust(id, workspace.path, projectsFor(a), true)
   const answer = await new Promise<TrustAnswer | null | 'cancelled'>((r) => st.waiters.push(r))
   // Removed, or its workspace closed, while Hive checked: Set Up opens nowhere (never its own folder instead).
   if (answer === 'cancelled') throw hiveError(msg({ id: 'main.accounts.setUpCancelled', defaultMessage: "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Hive checked its folders.", description: "An error opening a connection's Set Up (Settings → Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started." }), { name: a.name }, { kind: 'conflict' })
-  return answer?.pending[0]?.folder
+  return answer ? setUpTarget(a, answer.pending)?.folder : undefined
+}
+
+/**
+ * Where Set Up asks a CLI's trust question next (HI-1871), from the resolved trust roots still pending (each a main
+ * repository root, or a project without Git's own folder: never a worktree's path). For a CLI whose trust of a folder
+ * covers the folders inside it (`trustInherits`: Claude Code), the workspace's own folder while it covers one of them:
+ * one answer for all those inside it, their slots and copies (worktrees of them) and the Assistant's home. A root
+ * outside it (a worktree project's main repository kept elsewhere: HR3's case) stays its own target, asked next.
+ * Otherwise the first pending root (Codex: one per project; a trusted folder above a repository doesn't cover it).
+ */
+function setUpTarget(a: Connection, pending: TrustAnswer['pending']): ConnectionTrust['setUpIn'] {
+  return chooseSetUpTarget(!!providerDescriptor(a.provider).capabilities.connections?.trustInherits, workspace.path, pending)
+}
+
+/** setUpTarget's choice, from whether the CLI's trust is inherited, the workspace's folder and the pending roots. */
+export function chooseSetUpTarget(inherits: boolean, ws: string | null | undefined, pending: TrustAnswer['pending']): ConnectionTrust['setUpIn'] {
+  if (!pending.length) return undefined
+  const inside = (folder: string): boolean => !!ws && (folder + sep).toLowerCase().startsWith((resolve(ws) + sep).toLowerCase())
+  if (ws && inherits && pending.some((p) => inside(p.folder))) return { folder: resolve(ws), workspace: true }
+  return { folder: pending[0].folder, project: pending[0].project }
 }
 
 /** Whether a connection is on in this window's workspace: its trust of the workspace's folders counts then. */
 const onHere = (a: Connection): boolean => !!workspace.path && !!workspaceAccounts(workspace.config, a.provider, list())?.on.includes(a.id)
 
-/** This window's workspace's projects, by name and folder. */
-const projectsHere = (): { name: string; path: string }[] => (workspace.info()?.projects ?? []).map((p) => ({ name: p.name, path: p.path }))
+/**
+ * The folders of this window's workspace a connection would be used in (HI-1871, Darren 27 Oct ~22:30): the projects
+ * with an agent whose connection, resolved as its launch would be (its own if on here, else the first in the order
+ * that's on), is this one, and the Assistant's home when the Assistant's is. "Needs set up" counts only these.
+ */
+const projectsFor = (a: Connection): { name: string; path: string }[] => {
+  const info = workspace.info()
+  const cfg = workspace.config
+  const all = list()
+  const usedBy = (p: ProjectInfo, own: (agent: AgentInfo) => string | null | undefined): boolean =>
+    p.agents.some((ag) => {
+      if (agentProvider(ag, p.config, config.settings) !== a.provider) return false
+      const r = resolveConnection(cfg, a.provider, own(ag), all)
+      return r.ok && r.id === a.id
+    })
+  const projects = (info?.projects ?? []).filter((p) => usedBy(p, (ag) => ag.connection)).map((p) => ({ name: p.name, path: p.path }))
+  const home = info?.assistant
+  return home && usedBy(home, () => cfg.assistantConnection?.[a.provider] ?? null) ? [...projects, { name: home.name, path: home.path }] : projects
+}
 
 /** Reads a connection's set-up state again, telling the windows when it changed. */
 export async function readSetUp(id: string): Promise<void> {
@@ -1209,12 +1248,19 @@ export function accountsView(check = false): ConnectionsView {
   if (check) for (const a of all) void (isServer(a) ? readSetUp(a.id) : checkAccount(a.id))
   // One not read yet (just added): its set-up state read once, a few files, its answer telling the windows (HI-1870).
   else for (const a of all) if (!setUpRead.has(a.id)) void readSetUp(a.id)
-  // Its trust of this workspace's folders (HI-1870), for each connection on here: read as shown, and when its projects changed.
-  const here = workspace.path ? projectsHere() : []
+  // Its trust of the folders it would be used in here (HI-1870; HI-1871: only those, Darren), for each connection on
+  // here: read as shown, and when that set of projects changed.
   pruneTrust()
+  const hereOf = new Map(workspace.path ? all.filter(onHere).map((a) => [a.id, projectsFor(a)] as const) : [])
   // Read when shown (a refresh joins the read under way), or when this set of projects hasn't been read yet.
-  if (workspace.path) for (const a of all) if (onHere(a) && (check || trustState.get(trustKey(a.id, workspace.path))?.sig !== JSON.stringify(here))) requestTrust(a.id, workspace.path, here)
-  const trustOf = (a: Connection): { trust?: TrustAnswer & { checking?: true } } => (workspace.path && onHere(a) && provider(a.provider).connectionTrusts ? { trust: trustShown(a.id, workspace.path, here) } : {})
+  if (workspace.path) for (const [id, here] of hereOf) if (check || trustState.get(trustKey(id, workspace.path))?.sig !== JSON.stringify(here)) requestTrust(id, workspace.path, here)
+  const trustOf = (a: Connection): { trust?: ConnectionTrust } => {
+    const here = hereOf.get(a.id)
+    if (!workspace.path || !here || !provider(a.provider).connectionTrusts) return {}
+    const t = trustShown(a.id, workspace.path, here)
+    const setUpIn = setUpTarget(a, t.pending)
+    return { trust: { ...t, ...(setUpIn ? { setUpIn } : {}) } }
+  }
   void loadKeys()
   const providers = PROVIDERS.filter((p) => !!p.capabilities.connections && isProviderEnabled(config.settings, p.id)).map((p) => p.id)
   const cfg = workspace.path ? workspace.config : null
