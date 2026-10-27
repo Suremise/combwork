@@ -174,8 +174,28 @@ async function findSkills(root: string, level: SkillInfo['level'], maxDepth: num
   return out
 }
 
-/** Machine skills read lately, by the homes they were read from (HI-1755: each workspace's connections' own). */
+/**
+ * Machine skills read lately, by the homes they were read from (HI-1755: each workspace's connections' own). Entries
+ * last 30 seconds and at most MACHINE_CACHE_MAX are kept, the least recently used going first (HI-1782): a set of
+ * homes no longer asked for (a connection turned off, a workspace closed) is let go rather than kept until Hive quits.
+ */
 const machineCache = new Map<string, { at: number; skills: SkillInfo[] }>()
+const MACHINE_CACHE_MS = 30_000
+const MACHINE_CACHE_MAX = 8
+
+function pruneMachineCache(now: number): void {
+  for (const [key, entry] of machineCache) if (now - entry.at >= MACHINE_CACHE_MS) machineCache.delete(key)
+  // A Map iterates in insertion order and a hit is put back last, so the first keys are the least recently used.
+  for (const key of machineCache.keys()) {
+    if (machineCache.size <= MACHINE_CACHE_MAX) break
+    machineCache.delete(key)
+  }
+}
+
+/** How many sets of homes the machine-skill cache holds (for tests). */
+export function machineSkillCacheSize(): number {
+  return machineCache.size
+}
 
 /**
  * Skills each provider's CLI loads from the user's profile and its installed plugins: for a CLI with connections, those
@@ -184,8 +204,13 @@ const machineCache = new Map<string, { at: number; skills: SkillInfo[] }>()
 async function machineSkills(cfg: WorkspaceConfig | null): Promise<SkillInfo[]> {
   const homes: [ReturnType<typeof provider>, string | undefined][] = allProviders().flatMap((x) => connectionHomes(x.id, cfg)?.map((h): [typeof x, string | undefined] => [x, h.home]) ?? [[x, undefined]])
   const key = JSON.stringify(homes.map(([p, h]) => [p.id, h ?? '']))
+  pruneMachineCache(Date.now())
   const cached = machineCache.get(key)
-  if (cached && Date.now() - cached.at < 30_000) return cached.skills
+  if (cached) {
+    machineCache.delete(key)
+    machineCache.set(key, cached)
+    return cached.skills
+  }
   const all: SkillInfo[] = []
   for (const [p, home] of homes) {
     const roots = p.skillRoots(home)
@@ -208,7 +233,9 @@ async function machineSkills(cfg: WorkspaceConfig | null): Promise<SkillInfo[]> 
       all.push({ ...s, provider: p.id })
     }
   }
+  machineCache.delete(key)
   machineCache.set(key, { at: Date.now(), skills: all })
+  pruneMachineCache(Date.now())
   return all
 }
 
