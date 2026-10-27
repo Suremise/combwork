@@ -3558,6 +3558,17 @@ Whether a conversation may resume there is its **hold** (none: it may):
     without being given (cancelled, refused, expired, stale), or a launch that couldn't start, is made again by a later
     pass [HR1's round 2]; then `BuilderPlaced`. A window Start hands its prompt (note, Read first)
     to that instead of typing it where the agent is.
+    **A lane's brief** (HI-1795: `hive_lane start`'s `brief`, kept with the lane, `brief: { text, rev, out }` in its
+    row's `extra`): every placement of one of the lane's cards, in every mode (typed, resumed, started, a new
+    conversation), carries the brief as it is when its delivery is made, after the card's own prompt (the window's or
+    offered one kept whole), in that one delivery; fixed once made, so a retry or a restart that finds it gives what it
+    carried, and an edit applies to the next placement made. Nothing records which conversation saw it. A start without
+    `brief` keeps the lane's (a list change, queued or not); the same text changes nothing; a new text or `''` (a clear)
+    takes the next rev, never one used before. Outside slots (no placement) it is delivered to the builder once per rev
+    (`lane-brief`, ref `<lane>:<rev>`, a `rebrief`), the lane recording the rev made (`out`) so one owed after a crash is
+    made by the next look (`laneBriefs.ts`, on lanes written and as a workspace opens), never twice; a replaced or
+    cleared brief's delivery not yet received is cancelled, and refreshed before it is offered, so it never arrives as the
+    current one.
     **Its builder stopped** (HI-1746: Hive quit between the card's start and its placement), the placement resumes the
     builder's newest conversation of its provider bound to the card's lease (a handover or a takeover binds it there),
     the card's prompt that launch's own line (`BuilderPlaced` `how: 'resumed'`); a new conversation only when there is

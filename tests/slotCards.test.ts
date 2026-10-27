@@ -34,7 +34,7 @@ const state = vi.hoisted(() => ({
   live: null as null | { cwd: string; sessionId: string },
   /** The card's slot folder, where a start that wins runs the builder. */
   slot: '',
-  deliveries: [] as { id: string; source?: string; ref?: string; state: string }[],
+  deliveries: [] as { id: string; source?: string; ref?: string; state: string; body?: string }[],
   /** The next delivery or launch: given, or not (refused, or its launch failed: cancelled). */
   next: [] as ('given' | 'refused' | 'launchFails')[],
   calls: [] as string[],
@@ -165,15 +165,15 @@ vi.mock('../src/main/sessions', async (orig) => {
 vi.mock('../src/main/deliveries', async (orig) => {
   const actual = await orig<typeof import('../src/main/deliveries')>()
   let seq = 0
-  const make = (nd: { source?: string; ref?: string }, given: boolean): { id: string; source?: string; ref?: string; state: string } => {
-    const r = { id: `m${++seq}`, source: nd.source, ref: nd.ref, state: given ? 'offered' : 'cancelled' }
+  const make = (nd: { source?: string; ref?: string; body?: string }, given: boolean): { id: string; source?: string; ref?: string; state: string; body?: string } => {
+    const r = { id: `m${++seq}`, source: nd.source, ref: nd.ref, state: given ? 'offered' : 'cancelled', body: nd.body }
     state.deliveries.push(r)
     return r
   }
   return {
     ...actual,
     deliveriesOf: async () => state.deliveries.map((r) => ({ ...r })),
-    deliverNow: async (_h: string, nd: { source?: string; ref?: string }) => {
+    deliverNow: async (_h: string, nd: { source?: string; ref?: string; body?: string }) => {
       const how = state.next.shift() ?? 'given'
       state.calls.push(`typed (${how})`)
       const r = make(nd, how === 'given')
@@ -201,7 +201,7 @@ vi.mock('../src/main/deliveries', async (orig) => {
 const { tellListeners } = await import('../src/main/events')
 const { withWriteFence } = await import('../src/main/workflow/factStore')
 const { LeaseLost } = await import('../src/main/workflow/queueRunner')
-const { cycleIn, deleteMergedLine, laneSlotIn, place, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
+const { cycleIn, deleteMergedLine, expectStartPrompt, laneSlotIn, place, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
 
 let env: Env | null = null
 afterEach(() => {
@@ -718,6 +718,98 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
       expect(kept(ws, n)).toMatchObject({ ref: `${n}:${again.seq}:l-2`, failures: 1, gaveUp: false })
       expect(notices(e)).toEqual([])
     })
+  })
+})
+
+describe("a lane's brief in every placement of its cards (HI-1795)", { timeout: 60_000 }, () => {
+  /** A lane's card started in its slot (the lane's lease, l-1) and prepared there, its builder B1; the lane as kept. */
+  async function laneCard(brief: string | null = 'Lane order: a, then b. Stay off src/renderer.'): Promise<{ e: Env; n: number; key: string; slot: string; cycle: NonNullable<ReturnType<typeof cycleIn>>; ws: never }> {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    const card = e.wf.createCard({ title: 'In a lane' })
+    const slot = join(tempDir('slot-'), 'slot-a')
+    state.slot = slot
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
+    moved(await e.wf.start(card.key, B1))
+    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'hive/AM/x', revision: 'r' }))
+    lane.text = brief
+    const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
+    return { e, n: card.id, key: card.key, slot, cycle: cycleIn(e.store.facts(card.id))!, ws }
+  }
+  /** The lane as rawLanes gives it: its brief's text set by each test. */
+  const lane = { text: null as string | null }
+  const laneLease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'lane', card: null, lane: 'lane-1', project: 'p', from: '', to: null, why: null, endRev: null } as never
+  const cardLease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'card', card: 0, lane: null, project: 'p', from: '', to: null, why: null, endRev: null } as never
+  const keptLanes = () => [{ id: 'lane-1', state: 'active', startedBy: 'the Assistant', ...(lane.text !== undefined ? { brief: { text: lane.text, rev: 1, out: null } } : {}) }]
+  const bodies = (): string[] => state.deliveries.map((d) => d.body ?? '')
+  const BRIEF = /Your lane's brief \(lane lane-1, from the Assistant\):\nLane order: a, then b\. Stay off src\/renderer\./
+
+  for (const [how, given] of [
+    ['typed', () => (state.live = { cwd: state.slot, sessionId: 's1' })],
+    ['newConversation', () => (state.live = { cwd: 'C:\\elsewhere', sessionId: 's0' })],
+    ['started', () => undefined],
+    ['resumed', () => (state.conv = { is: 'resume', id: 'c1', name: 'B1' })]
+  ] as const) {
+    it(`a lane's card placed ${how}: the one delivery carries the card's prompt, then the lane's brief`, async () => {
+      state.lanes = async () => keptLanes() as never
+      const { e, n, cycle, ws } = await laneCard()
+      given()
+      await place(ws, e.project, e.wf, n, cycle, laneLease)
+      expect(e.store.facts(n).filter((f) => f.kind === 'BuilderPlaced').map((f) => (f.data as { how: string }).how)).toEqual([how])
+      expect(bodies()).toHaveLength(1)
+      expect(bodies()[0]).toMatch(/^Work on task AM-\d+ from the Hive task board: /)
+      expect(bodies()[0]).toMatch(BRIEF)
+    })
+  }
+
+  it("a card of no lane, or a lane with no brief (or one cleared): the card's prompt alone", async () => {
+    state.lanes = async () => keptLanes() as never
+    const one = await laneCard()
+    await place(one.ws, one.e.project, one.e.wf, one.n, one.cycle, cardLease)
+    expect(bodies()[0]).not.toMatch(/lane's brief/)
+    env!.close()
+    state.deliveries = []
+    const cleared = await laneCard(null)
+    await place(cleared.ws, cleared.e.project, cleared.e.wf, cleared.n, cleared.cycle, laneLease)
+    expect(bodies()).toHaveLength(1)
+    expect(bodies()[0]).not.toMatch(/lane's brief/)
+  })
+
+  it("a window Start's own prompt is kept whole, the brief after it", async () => {
+    state.lanes = async () => keptLanes() as never
+    const { e, n, cycle, ws } = await laneCard()
+    expectStartPrompt(e.project, n)('Work on task AM-1 from the window, with the user\'s note: be quick.')
+    await place(ws, e.project, e.wf, n, cycle, laneLease)
+    expect(bodies()[0]).toMatch(/^Work on task AM-1 from the window, with the user's note: be quick\.\n\nYour lane's brief/)
+    expect(bodies()[0]).toMatch(BRIEF)
+  })
+
+  it('fixed once made: a retry finds its delivery and makes no other, whatever the brief says since; one not given is made again with the brief as it is then', async () => {
+    state.lanes = async () => keptLanes() as never
+    const { e, n, cycle, ws } = await laneCard()
+    // The first try's delivery not given (its launch failed): nothing recorded.
+    state.next = ['launchFails']
+    await expect(place(ws, e.project, e.wf, n, cycle, laneLease)).rejects.toThrow(/couldn't start/)
+    // The brief edited before the next try: that try's one delivery carries the new text.
+    lane.text = 'Edited: only card b now.'
+    await place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, laneLease)
+    expect(bodies()).toHaveLength(2)
+    expect(bodies()[1]).toMatch(/Your lane's brief \(lane lane-1, from the Assistant\):\nEdited: only card b now\./)
+    // Placed: edited again, a later pass makes nothing more (its delivery's body is what was given).
+    lane.text = 'Edited again.'
+    await place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, laneLease)
+    expect(bodies()).toHaveLength(2)
+    expect(bodies()[1]).toMatch(/Edited: only card b now\./)
+  })
+
+  it('a delivery made before a restart (on its way: uncertain) is never remade with a later brief', async () => {
+    state.lanes = async () => keptLanes() as never
+    const { e, n, cycle, ws } = await laneCard()
+    state.deliveries.push({ id: 'm9', source: 'slot-placement', ref: `${n}:${cycle.seq}:l-1`, state: 'uncertain', body: 'Work on task … (as made before the restart)' })
+    lane.text = 'A brief edited after that delivery was made.'
+    await place(ws, e.project, e.wf, n, cycle, laneLease)
+    expect(bodies()).toEqual(['Work on task … (as made before the restart)'])
+    expect(e.store.facts(n).find((f) => f.kind === 'BuilderPlaced')?.data).toMatchObject({ delivery: 'm9' })
   })
 })
 

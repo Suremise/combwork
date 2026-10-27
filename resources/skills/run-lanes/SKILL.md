@@ -38,7 +38,7 @@ Then what this lane needs and the rules can't know: test homes or other safety r
 
 - Give rounds and a wait only when the user did; otherwise the lane takes the project's workflow options (Card loops).
 - Explain the goal and the handoffs, give a sensible default and leave room for judgement: ask agents to say when they do something else, and why.
-- Start the lane yourself with `hive_lane` `start`, so the user sees it at once.
+- Start the lane yourself with `hive_lane` `start`, so the user sees it at once, with the builder's brief in its `brief` (coordinate-agents, A new lane): Hive gives it with each of its cards, where a prompt alone is lost to the slot's new conversation.
 
 ## Watch to the end
 

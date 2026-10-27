@@ -217,6 +217,8 @@ export const AREAS = [
   { paths: ['src/shared/laneStages.ts', 'src/renderer/src/projectStages.ts', 'tests/e2e/lanestages.cjs'], suites: ['lanestages', 'progresslanes'] },
   { paths: ['tests/e2e/laneend.cjs', 'tests/e2e/cliquit.cjs', 'src/main/slotsApp.ts', 'src/main/sessions.ts', 'src/main/deliveries.ts', 'src/main/providers/claude/adapter.ts', 'src/main/providers/codex/adapter.ts'], suites: ['laneend', 'slotsessions', 'cliquit'] },
   { paths: ['src/main/laneStart.ts', 'src/shared/laneBrief.ts', 'src/renderer/src/components/LaneStartDialog.tsx', 'tests/e2e/lanestart.cjs'], suites: ['agentrole', 'lanestart'] },
+  // A lane's brief (HI-1795): given with its cards' placements in slots, delivered outside them.
+  { paths: ['src/main/laneBriefs.ts', 'tests/e2e/lanebrief.cjs'], suites: ['lanebrief', 'slotrecovery'] },
   // The shared list's other user: the Assistant's "Done by the Assistant" (#312).
   { paths: ['src/renderer/src/components/ShowAllList.tsx'], suites: ['assistantpanel', 'assistantundo'] },
   { paths: ['src/main/progressReporters/'], suites: ['progressreport', 'progressstates', 'packaged-progress'] },
