@@ -538,12 +538,26 @@ export const connectionMemoryLabel = (file: string, name: string): string => tr(
  * An environment for running a CLI on a connection (HI-1757): without the variables it would read as a login instead.
  * `adapter` null (not on a connection): the environment as it is.
  */
-export function withoutAccountEnv<T extends Record<string, string | undefined>>(adapter: { accountEnvDrop?(): readonly string[] } | null, env: T): T {
+export function withoutAccountEnv<T extends Record<string, string | undefined>>(adapter: { accountEnvDrop?(): readonly string[]; accountEnvDropPattern?(): RegExp } | null, env: T): T {
   const drop = adapter?.accountEnvDrop?.() ?? []
-  if (!drop.length) return env
+  const pattern = adapter?.accountEnvDropPattern?.() ?? null
+  if (!drop.length && !pattern) return env
   const out = { ...env }
-  // Windows' variable names aren't case-sensitive: any spelling of one goes.
+  // Windows' variable names aren't case-sensitive: any spelling of one goes (a pattern is matched on the name in
+  // capitals, as well as as written).
   const names = new Set(drop.map((k) => k.toUpperCase()))
-  for (const k of Object.keys(out)) if (names.has(k.toUpperCase())) delete out[k]
+  for (const k of Object.keys(out)) if (names.has(k.toUpperCase()) || (pattern && (pattern.test(k) || pattern.test(k.toUpperCase())))) delete out[k]
   return out
+}
+
+/**
+ * An environment with a server connection's own variables set (HI-1772: its server, models and key), any spelling of
+ * the same names before them gone. `vars` undefined: the environment as it is.
+ */
+export function withServerEnv<T extends Record<string, string | undefined>>(vars: Record<string, string> | undefined, env: T): T {
+  if (!vars) return env
+  const names = new Set(Object.keys(vars).map((k) => k.toUpperCase()))
+  const out = { ...env }
+  for (const k of Object.keys(out)) if (names.has(k.toUpperCase())) delete out[k]
+  return { ...out, ...vars }
 }

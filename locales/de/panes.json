@@ -53,6 +53,7 @@
   "panes.footer.connectionUnknown": "Hive konnte beim Start nicht prüfen, als wer diese Verbindung angemeldet ist.",
   "panes.footer.costClick": "Klicken, um die Details dieser Sitzung in der Übersicht zu sehen",
   "panes.footer.costEstimated": "Kosten dieser Sitzung zu API-Preisen, von Hive aus den Tokens geschätzt",
+  "panes.footer.costFreeTip": "Diese Unterhaltung läuft nur auf einem Server auf diesem PC und kostet daher nichts. Ihre Token werden trotzdem gezählt.",
   "panes.footer.costReported": "Kosten dieser Sitzung zu API-Preisen, wie vom Anbieter gemeldet",
   "panes.footer.ctxValue": "ctx {value}",
   "panes.footer.handOverWhen": "{when, select, now {Übergib an eine neue Unterhaltung: Klicke für Übergeben an… und wähle den Agenten selbst.} other {Der Agent kann an eine neue Unterhaltung übergeben, wenn er fertig ist: nicht, während er arbeitet, mergt oder auf einer Karte einer Kartenschleife ist.}}",

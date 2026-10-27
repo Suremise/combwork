@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { existsSync, mkdirSync } from 'original-fs'
 import { basename, join } from 'path'
 import { isMainThread, Worker } from 'worker_threads'
+import { maskKeys } from './keyMatcher'
 import { appendLog, BUSY, LOG_STATE_SLOTS, STOP, WRITTEN, type LogBatch } from './logWriter'
 import { noteStep, stallClock } from './stallWork'
 
@@ -225,9 +226,18 @@ if (toConsole) {
   process.stderr?.on?.('error', (e: unknown) => consoleFailed('stderr', e))
 }
 
-function write(level: Level, scope: string, message: string, extra?: unknown): void {
+/**
+ * A line of hive.log as written: its data serialised, then a server connection's key in use masked in it (HI-1772), in
+ * any form the serialising wrote it (keyMatcher.ts's forms), before the log or the console get it.
+ */
+export function logLine(level: Level, scope: string, message: string, extra?: unknown): string {
   const detail = extra instanceof Error ? ` ${extra.stack ?? extra.message}` : extra !== undefined ? ` ${safeJson(extra)}` : ''
-  const line = `${new Date().toISOString()} [${level.toUpperCase()}] [${scope}] ${message}${detail}\n`
+  // Its time, level and scope are Hive's own; strict masking (keyMatcher.ts) is for what follows them.
+  return `${new Date().toISOString()} [${level.toUpperCase()}] [${scope}] ${maskKeys(`${message}${detail}`)}\n`
+}
+
+function write(level: Level, scope: string, message: string, extra?: unknown): void {
+  const line = logLine(level, scope, message, extra)
   const where = level === 'error' ? 'stderr' : 'stdout'
   if (toConsole && process[where]?.destroyed) consoleFailed(where, { code: 'ERR_STREAM_DESTROYED' })
   if (toConsole) {

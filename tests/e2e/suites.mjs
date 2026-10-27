@@ -100,6 +100,7 @@ export const SUITES = [
   { name: 'connectionrows' },
   { name: 'connections' },
   { name: 'connections-codex' },
+  { name: 'connections-server' },
   { name: 'connectionusage' },
   { name: 'consoletext' },
   { name: 'consolewindow' },

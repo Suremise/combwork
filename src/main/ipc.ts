@@ -20,6 +20,10 @@ import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../sha
 import { allProviders } from './providers'
 import { providerService } from './providerService'
 import { accountsView, addAccount, connectionHomes, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, setAccountDefault, setAccountOn, setConnectionDefaults, signInAccount } from './accounts'
+import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setUpServerConnection } from './serverConnections'
+import { requireMasking } from './keyCoverage'
+import { resetMasking } from './keyStore'
+import { maskDeep, maskKeys } from './keyMatcher'
 import { dismissMovedNotice, movedNotice } from './connectionMoves'
 import { config } from './config'
 import { clearRecent, recentChanged, recentFor, removeRecent } from './recentWorkspaces'
@@ -463,7 +467,11 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'app:openPath': (p) => void shell.openPath(guardFile(p)),
     'app:showInFolder': (p) => shell.showItemInFolder(guardFile(p)),
     'app:openLogs': () => void shell.openPath(logsDir()),
-    'app:diagnostics': (opts) => diagnostics({ recording: opts?.recording === true }),
+    // Not while server connections' keys can't be masked (HI-1772): nothing is copied.
+    'app:diagnostics': async (opts) => {
+      await requireMasking()
+      return diagnostics({ recording: opts?.recording === true })
+    },
     'app:keepAwake': () => keepAwakeCount(),
     'app:resumeAfterClose': async () => {
       const r = await resumeAfterClose()
@@ -692,7 +700,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
         filters: [{ name: 'JSON', extensions: ['json'] }]
       })
       if (r.canceled || !r.filePath) return null
-      await writeTextAtomic(r.filePath, JSON.stringify(metricsExport(report, app.getVersion(), sanitize), null, 2) + '\n')
+      // Masked by every key's fingerprint (HI-1772); refused, nothing written, while they can't be read.
+      await requireMasking()
+      await writeTextAtomic(r.filePath, JSON.stringify(maskDeep(metricsExport(report, app.getVersion(), sanitize)), null, 2) + '\n')
       return r.filePath
     },
     // Each takes the workspace's folder and lifetime before awaiting anything (benchContext): work whose workspace closes
@@ -782,7 +792,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const r = await dialog.showOpenDialog(win(), { title: tr(M.exportBoard), buttonLabel: tr(M.exportBoardButton), defaultPath: app.getPath('documents'), properties: ['openDirectory', 'createDirectory'] })
       if (r.canceled || !r.filePaths[0]) return null
       const dir = join(r.filePaths[0], `hive-board-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`)
-      return { dir, cards: await exportBoard(ws, dir) }
+      await requireMasking()
+      return { dir, cards: await exportBoard(ws, dir, maskDeep) }
     },
     'tasks:create': async (input, drafts) => tasks.changeWithAttachments({ kind: 'user' }, await stageDrafts(currentWorkspace(), drafts, input.project ?? null), 'description', () => tasks.createTask(input, { kind: 'user' })),
     'tasks:setKind': (n, kind, opts) => tasks.setKind(n, kind, { kind: 'user' }, opts ?? {}),
@@ -1057,7 +1068,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const name = await templates.exportName(ref)
       const r = await dialog.showSaveDialog(win(), { title: tr(M.exportTemplate), defaultPath: join(app.getPath('downloads'), name), filters: [{ name: tr(M.templateFiles), extensions: ['json'] }] })
       if (r.canceled || !r.filePath) return null
-      await templates.exportTemplate(ref, r.filePath)
+      await requireMasking()
+      await templates.exportTemplate(ref, r.filePath, maskDeep)
       return r.filePath
     },
     'templates:pickImport': async () => {
@@ -1153,7 +1165,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
         filters: [{ name: 'Markdown', extensions: ['md'] }] // i18n-ignore: a file format's name
       })
       if (r.canceled || !r.filePath) return null
-      await writeTextAtomic(r.filePath, await transcripts.markdown(p, id, title))
+      // No server connection's key in it (HI-1772), whatever the session printed: masked by every key's fingerprint, kept
+      // since it was saved; refused, nothing written, while they can't be read.
+      await requireMasking()
+      await writeTextAtomic(r.filePath, maskKeys(await transcripts.markdown(p, id, title)))
       return r.filePath
     },
     'attachments:copyImage': async (path) => {
@@ -1545,6 +1560,21 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'connections:signIn': async (id) => {
       await refreshPathBeforeStart()
       return signInAccount(id)
+    },
+    // A server connection (HI-1772): the key crosses here once, from its field to the key store, and never back.
+    'connections:addServer': (input) => addServerConnection(input),
+    'connections:editServer': (id, patch) => editServerConnection(id, patch),
+    'connections:setKey': (id, key) => setServerKey(id, typeof key === 'string' ? key : ''),
+    'connections:removeKey': (id) => removeServerKey(id),
+    'connections:readModels': (id, request) => readServerModels(id, String(request)),
+    'connections:cancelModels': (id, request) => cancelServerModels(id, String(request)),
+    'connections:setUp': async (id) => {
+      await refreshPathBeforeStart()
+      return setUpServerConnection(id)
+    },
+    'connections:resetMasking': async () => {
+      await resetMasking()
+      emit({ type: 'connections-changed' })
     },
     'connections:keepLogin': (id) => keepNewLogin(id),
     'connections:setOn': (id, on) => setAccountOn(id, on),

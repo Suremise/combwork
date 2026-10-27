@@ -53,6 +53,7 @@
   "panes.footer.connectionUnknown": "起動時に、この接続が誰としてサインインしているかをHiveが確認できませんでした。",
   "panes.footer.costClick": "クリックすると、このセッションの詳細を「概要」に表示します",
   "panes.footer.costEstimated": "このセッションのAPI換算コスト（トークン数からHiveが推定）",
+  "panes.footer.costFreeTip": "この会話はこの PC 上のサーバーだけで動いているため、費用はかかりません。トークンは引き続き数えられます。",
   "panes.footer.costReported": "このセッションのAPI換算コスト（プロバイダーの報告値）",
   "panes.footer.ctxValue": "コンテキスト：{value}",
   "panes.footer.handOverWhen": "{when, select, now {新しい会話に引き継ぎましょう。クリックして「引き継ぐ…」を開き、エージェント自身を選びます。} other {作業が終わったら新しい会話に引き継げます。作業中、マージ中、カードループのカードに取り組んでいる間は引き継げません。}}",

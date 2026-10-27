@@ -5,6 +5,7 @@ interface HiveMessageValues {
   'main.accounts.checkHeld': { name: string | number; cli: string | number }
   'main.accounts.folderNotUsable': { name: string | number }
   'main.accounts.inUse': { name: string | number }
+  'main.accounts.keyRemoveFailed': { name: string | number }
   'main.accounts.leftover': { name: string | number }
   'main.accounts.makeFailed': { error: string | number }
   'main.accounts.noHome': { cli: string | number; folder: string | number }
@@ -41,6 +42,7 @@ interface HiveMessageValues {
   'main.connections.launch.changedAgain': { agent: string | number }
   'main.connections.launch.changing': { name: string | number; agent: string | number }
   'main.connections.launch.deleted': { agent: string | number }
+  'main.connections.launch.noKey': { name: string | number; agent: string | number }
   'main.connections.launch.none': { cli: string | number; agent: string | number }
   'main.connections.launch.offNoDefault': { agent: string | number; name: string | number; cli: string | number }
   'main.connections.launch.otherProvider': { agent: string | number; cli: string | number }
@@ -98,6 +100,9 @@ interface HiveMessageValues {
   'main.installDir.whatFolder': undefined
   'main.installDir.whyFile': undefined
   'main.installDir.whyFolder': undefined
+  'main.keys.maskingFull': undefined
+  'main.keys.maskingUnreadable': undefined
+  'main.keys.unsafe': undefined
   'main.leftovers.end': undefined
   'main.leftovers.keep': undefined
   'main.leftovers.leave': undefined
@@ -252,6 +257,17 @@ interface HiveMessageValues {
   'main.restart.why.removed': undefined
   'main.restart.why.running': undefined
   'main.restart.why.stopped': undefined
+  'main.server.key.chars': undefined
+  'main.server.key.inField': { field: string }
+  'main.server.key.length': { min: number; max: number }
+  'main.server.notServer': undefined
+  'main.server.setUp.noKey': { name: string | number }
+  'main.server.unsupported': { cli: string | number }
+  'main.server.url.extra': undefined
+  'main.server.url.invalid': undefined
+  'main.server.url.remoteHttp': undefined
+  'main.server.url.scheme': undefined
+  'main.server.url.userinfo': undefined
   'main.storage.claimed': undefined
   'main.storage.noLonger': { path: string | number }
   'main.storage.purgeChanged': undefined

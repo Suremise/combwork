@@ -155,3 +155,78 @@ describe("a live session's cost follows Session costs (#436)", () => {
     expect(cost(l).costUsd).toBe(9)
   })
 })
+
+describe('a session that ran on a server connection (HI-1772)', () => {
+  // A server's model (no price of Hive's) with the $9 Claude Code reported for it, priced as a Claude model.
+  const serverTranscript = join(base, 'server-session.jsonl')
+  type UsageFor = (projectPath: string, path: string, sessionId: string, provider: string, o?: { reportsIgnored?: boolean }) => Promise<{ costUsd: number | null; inputTokens: number } | null>
+  const usageFor = (o?: { reportsIgnored?: boolean }) => (sessions as unknown as { usageFor: UsageFor }).usageFor(project, serverTranscript, 'server-session', 'claude-code', o)
+
+  it("main's cached read answers only the policy it was read with: the report before, never after, the same tokens", async () => {
+    choose('reported')
+    const lines = [
+      { type: 'user', timestamp: '2026-10-11T09:00:00Z', message: { role: 'user', content: 'hello' } },
+      { type: 'assistant', timestamp: '2026-10-11T09:00:01Z', requestId: 'r1', message: { model: 'deepseek-flash', content: [{ type: 'text', text: 'ok' }], usage: { input_tokens: 1_000_000, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } } },
+      { type: 'cost-state', timestamp: '2026-10-11T09:00:02Z', totalCostUSD: 9 }
+    ]
+    writeFileSync(serverTranscript, lines.map((x) => JSON.stringify(x)).join('\n') + '\n')
+    const before = await usageFor()
+    expect(before).toMatchObject({ costUsd: 9, inputTokens: 1_000_000 })
+    // The same file, unchanged, now as a server session: read again without the report.
+    const after = await usageFor({ reportsIgnored: true })
+    expect(after).toMatchObject({ costUsd: null, inputTokens: 1_000_000 })
+    expect(await usageFor({ reportsIgnored: true })).toMatchObject({ costUsd: null })
+  })
+
+  it("its live cost never takes the CLI's report: a session that switched to a server connection drops the $9", async () => {
+    choose('reported')
+    const l = idle()
+    expect(cost(l).costUsd).toBe(9)
+    l.state.launchedConnection = { id: 'a-server', name: 'DeepSeek', server: { models: [] } }
+    manager.applyDetails(l, { costUsd: 12 })
+    await sessions.repriceLive()
+    expect(cost(l).costUsd).not.toBe(12)
+    expect(cost(l).costUsd).not.toBe(9)
+  })
+
+  it('free (Darren 27 Oct): a known $0 whatever prices are set, its tokens as read; the cache answers only the policy asked', async () => {
+    // A price for its model: free overrides it.
+    config.settings.providers = { ...DEFAULT_SETTINGS.providers, 'claude-code': { ...DEFAULT_SETTINGS.providers['claude-code'], prices: { 'deepseek-flash': { input: 5, cachedInput: 0, output: 0 } } } }
+    sessions.clearUsageCache()
+    type Free = (projectPath: string, path: string, sessionId: string, provider: string, o?: { reportsIgnored?: boolean; costFree?: boolean }) => Promise<{ costUsd: number | null; costFree?: true; inputTokens: number } | null>
+    const read = (o?: { reportsIgnored?: boolean; costFree?: boolean }) => (sessions as unknown as { usageFor: Free }).usageFor(project, serverTranscript, 'server-session', 'claude-code', o)
+    expect(await read({ reportsIgnored: true })).toMatchObject({ costUsd: 5, inputTokens: 1_000_000 })
+    expect(await read({ reportsIgnored: true, costFree: true })).toMatchObject({ costUsd: 0, costFree: true, inputTokens: 1_000_000 })
+    expect((await read({ reportsIgnored: true }))?.costFree).toBeUndefined()
+  })
+
+  it('a live session whose conversation ran only on servers on this PC: free (local), $0, whatever the CLI reports', async () => {
+    choose('reported')
+    const l = idle() as Live & { costFree?: boolean }
+    l.state.launchedConnection = { id: 'a-ollama', name: 'Ollama', server: { models: [], local: true } }
+    l.costFree = true
+    manager.applyDetails(l, { costUsd: 12 })
+    await sessions.repriceLive()
+    expect(l.state.costFree).toBe(true)
+    expect(cost(l).costUsd).toBe(0)
+  })
+
+  it('a local-only conversation, then a /resume into one that ran elsewhere: free (local) goes, both ways', async () => {
+    choose('reported')
+    const l = idle() as Live & { costFree?: boolean }
+    l.state.launchedConnection = { id: 'a-ollama', name: 'Ollama', server: { models: [], local: true } }
+    l.costFree = true
+    await sessions.repriceLive()
+    expect(l.state.costFree).toBe(true)
+    // Its record for the new conversation says notLocal: not free, and the footer says so at once.
+    l.costFree = false
+    await sessions.repriceLive()
+    expect(l.state.costFree).toBeUndefined()
+    expect(cost(l).costUsd).not.toBe(0)
+    // And back (another local-only conversation).
+    l.costFree = true
+    await sessions.repriceLive()
+    expect(l.state.costFree).toBe(true)
+    expect(cost(l).costUsd).toBe(0)
+  })
+})

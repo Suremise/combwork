@@ -3,6 +3,7 @@ import type { Connection } from '@shared/types'
 import type { MovedNotice } from '@shared/connectionDefaults'
 import { providerDescriptor } from '@shared/providers'
 import { effortName, modelCaps } from '@shared/models'
+import { serverDefaultModel } from '@shared/serverConnection'
 import { modelLabel } from '@shared/defaults'
 import { msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
@@ -45,9 +46,25 @@ export function ConnectionDefaultsEditor({ connection: c }: { connection: Connec
   const save = (patch: { model?: string | null; effort?: string | null; use200kContext?: boolean | null }): void => {
     call('connections:setDefaults', c.id, patch).catch((e) => notify('error', tr(M.failed), errorMessage(e)))
   }
-  const cliModel = info?.defaultModel ?? null
+  // A server connection's (HI-1772): its own models, its default the one standing in for Opus; no effort or context.
+  const server = c.kind === 'server'
+  const cliModel = server ? (serverDefaultModel(c.server?.models ?? []) ?? null) : (info?.defaultModel ?? null)
   const runModel = d.model || cliModel
   const defEffort = modelCaps(c.provider, runModel, info, settings).defaultEffort
+  if (server)
+    return (
+      <div className="connection-defaults" data-defaults={c.id}>
+        <button className="btn subtle small" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          <Icon name={open ? 'chevron-down' : 'chevron-right'} /> {tr(M.defaults)}
+        </button>
+        {open && (
+          <div className="agent-form connection-defaults-form">
+            <label>{tr(M.model)}</label>
+            <ModelPicker provider={c.provider} connection={c} value={d.model ?? ''} base={{ value: '', label: cliModel ? tr(M.cliDefaultIs, { provider: c.name, which: cliModel }) : tr(M.cliDefault, { provider: c.name }) }} onChange={(v) => save({ model: v || null })} />
+          </div>
+        )}
+      </div>
+    )
   return (
     <div className="connection-defaults" data-defaults={c.id}>
       <button className="btn subtle small" aria-expanded={open} onClick={() => setOpen((v) => !v)}>

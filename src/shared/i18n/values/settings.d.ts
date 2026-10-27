@@ -63,6 +63,8 @@ interface HiveMessageValues {
   'settings.accounts.state.signedOut': undefined
   'settings.accounts.state.unchecked': undefined
   'settings.accounts.switchAffected': undefined
+  'settings.advanced.claude-code.accounts.dropEnv.desc': undefined
+  'settings.advanced.claude-code.accounts.dropEnv.title': undefined
   'settings.advanced.claude-code.accounts.emailField.desc': undefined
   'settings.advanced.claude-code.accounts.emailField.title': undefined
   'settings.advanced.claude-code.accounts.loggedInField.desc': undefined
@@ -577,6 +579,76 @@ interface HiveMessageValues {
   'settings.chime.soft': undefined
   'settings.columnColors.pick': { column: string | number }
   'settings.columnColors.reset': { column: string | number }
+  'settings.connections.add.addServer': undefined
+  'settings.connections.add.addSignIn': undefined
+  'settings.connections.add.adding': undefined
+  'settings.connections.add.from': undefined
+  'settings.connections.add.fromServer': undefined
+  'settings.connections.add.fromSignIn': undefined
+  'settings.connections.add.name': undefined
+  'settings.connections.add.namePlaceholder': undefined
+  'settings.connections.add.needName': undefined
+  'settings.connections.add.title': { cli: string | number }
+  'settings.connections.cancel': undefined
+  'settings.connections.masking.full': undefined
+  'settings.connections.masking.gap': { date: string | number }
+  'settings.connections.masking.reset': undefined
+  'settings.connections.masking.resetConfirm': undefined
+  'settings.connections.masking.resetFailed': undefined
+  'settings.connections.masking.resetMessage': undefined
+  'settings.connections.masking.resetTitle': undefined
+  'settings.connections.masking.unavailable': undefined
+  'settings.connections.server.addModel': undefined
+  'settings.connections.server.baseUrl': undefined
+  'settings.connections.server.changeFailed': undefined
+  'settings.connections.server.custom': undefined
+  'settings.connections.server.docs': { url: string | number }
+  'settings.connections.server.edit': undefined
+  'settings.connections.server.editTitle': { name: string | number }
+  'settings.connections.server.hostKey': { host: string | number; last4: string | number }
+  'settings.connections.server.hostLocal': { host: string | number }
+  'settings.connections.server.hostNoKey': { host: string | number }
+  'settings.connections.server.key': undefined
+  'settings.connections.server.keyCleared': { name: string | number }
+  'settings.connections.server.keyFailed': undefined
+  'settings.connections.server.keyFailedAdded': { name: string | number }
+  'settings.connections.server.keyHint': undefined
+  'settings.connections.server.keyLocal': undefined
+  'settings.connections.server.keySave': undefined
+  'settings.connections.server.keyTitle': { name: string | number }
+  'settings.connections.server.local': { name: string | number }
+  'settings.connections.server.modelId': undefined
+  'settings.connections.server.models': undefined
+  'settings.connections.server.modelsHint': undefined
+  'settings.connections.server.moveWarn': undefined
+  'settings.connections.server.needUrl': undefined
+  'settings.connections.server.needsKey': undefined
+  'settings.connections.server.preset': undefined
+  'settings.connections.server.read': undefined
+  'settings.connections.server.readAfter': undefined
+  'settings.connections.server.readDone': { n: number; name: string | number }
+  'settings.connections.server.readDropped': { models: string | number }
+  'settings.connections.server.readFailed': { name: string | number }
+  'settings.connections.server.reading': undefined
+  'settings.connections.server.removeKey': undefined
+  'settings.connections.server.removeKeyMessage': undefined
+  'settings.connections.server.removeKeyTitle': { name: string | number }
+  'settings.connections.server.removeModel': { model: string | number }
+  'settings.connections.server.replaceKey': undefined
+  'settings.connections.server.save': undefined
+  'settings.connections.server.saving': undefined
+  'settings.connections.server.setKey': undefined
+  'settings.connections.server.setUp': undefined
+  'settings.connections.server.setUpFailed': undefined
+  'settings.connections.server.setUpHint': { cli: string | number }
+  'settings.connections.server.why.failed': { status: string | number }
+  'settings.connections.server.why.forbidden': undefined
+  'settings.connections.server.why.redirect': { status: string | number }
+  'settings.connections.server.why.refused': undefined
+  'settings.connections.server.why.shape': undefined
+  'settings.connections.server.why.stale': undefined
+  'settings.connections.server.why.tooBig': undefined
+  'settings.connections.server.why.unreachable': undefined
   'settings.data.copied': undefined
   'settings.data.copyPath': undefined
   'settings.emptyDefault': undefined

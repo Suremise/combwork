@@ -392,6 +392,7 @@ interface HiveMessageValues {
   'performance.usage.contextMax': { max: string | number; hasWindow: string; window: string | number }
   'performance.usage.contextTip': { sessions: number; avg: string | number; max: string | number; hasWindow: string; window: string | number }
   'performance.usage.cost': undefined
+  'performance.usage.costFree': { n: number }
   'performance.usage.costUnknown': { n: number }
   'performance.usage.empty': undefined
   'performance.usage.heading': undefined

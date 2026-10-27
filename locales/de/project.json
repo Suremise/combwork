@@ -363,5 +363,7 @@
   "project.tabs.tip": "{tab} ({key})",
   "project.limit.tipConnection": "Wie viel vom {window, select, fiveHour {5-Stunden-Kontingent} weekly {Wochenkontingent} other {Kontingent „{label}“}} des Plans auf {name} genutzt ist, über alle seine Sitzungen (nicht nur in Hive).",
   "project.limit.noneConnection": "Seine Limits erscheinen nach der nächsten Nachricht in einer Sitzung auf {name}.",
-  "project.limit.noConnections": "In diesem Arbeitsbereich ist keine Verbindung für {provider} eingeschaltet. Schalte eine unter Einstellungen → Verbindungen ein, um hier ihre Plan-Limits zu sehen."
+  "project.limit.noConnections": "In diesem Arbeitsbereich ist keine Verbindung für {provider} eingeschaltet. Schalte eine unter Einstellungen → Verbindungen ein, um hier ihre Plan-Limits zu sehen.",
+  "project.cost.freeLocal": "kostenlos (lokal)",
+  "project.cost.withFree": "{cost} + kostenlos (lokal)"
 }

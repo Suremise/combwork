@@ -385,6 +385,8 @@ export interface ProviderAdapter {
    * connection (its sign-in, its checks, its sessions: withoutAccountEnv), so they can't stand in for the connection's own.
    */
   accountEnvDrop?(): readonly string[]
+  /** The same by a pattern on the variable's name (HI-1772: Claude Code reads whole families: ANTHROPIC_*, CLAUDE_CODE_USE_*). */
+  accountEnvDropPattern?(): RegExp
   /**
    * Whether a connection's folder (its home) is held by the CLI's own check of it, not yet confirmed ended (HI-1757:
    * Codex's app server): its sign-in and removal are refused meanwhile, as while a launch holds it.

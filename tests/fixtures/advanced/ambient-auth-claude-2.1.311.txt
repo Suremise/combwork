@@ -1,0 +1,9 @@
+claude auth status --json, Claude Code 2.1.311, in a new empty CLAUDE_CONFIG_DIR with an allowlisted environment and one variable each time (HI-1772); values were dummies, folders left out:
+(none): exit 1, "loggedIn": false, "authMethod": "none", "apiProvider": "firstParty"
+ANTHROPIC_API_KEY: exit 0, "loggedIn": true, "authMethod": "api_key", "apiProvider": "firstParty"
+ANTHROPIC_AUTH_TOKEN: exit 0, "loggedIn": true, "authMethod": "oauth_token", "apiProvider": "firstParty"
+CLAUDE_CODE_OAUTH_TOKEN: exit 0, "loggedIn": true, "authMethod": "oauth_token", "apiProvider": "firstParty"
+CLAUDE_CODE_USE_BEDROCK=1: exit 0, "loggedIn": true, "authMethod": "third_party", "apiProvider": "bedrock"
+CLAUDE_CODE_USE_VERTEX=1: exit 0, "loggedIn": true, "authMethod": "third_party", "apiProvider": "vertex"
+CLAUDE_CODE_USE_FOUNDRY=1: exit 0, "loggedIn": true, "authMethod": "third_party", "apiProvider": "foundry"
+claude -p "say hi", Claude Code 2.1.311, a new empty CLAUDE_CONFIG_DIR, ANTHROPIC_BASE_URL a local stub, ANTHROPIC_AUTH_TOKEN a dummy, ANTHROPIC_CUSTOM_HEADERS="X-Probe-Header: probe-value" (HI-1772 round 1): its first request /v1/messages?beta=true came with X-Probe-Header: probe-value and Authorization: Bearer (the dummy)

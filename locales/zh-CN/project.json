@@ -363,5 +363,7 @@
   "project.tabs.tip": "{tab}（{key}）",
   "project.limit.tipConnection": "{name} 的所有会话（不仅是 Hive 中的）已用掉的套餐{window, select, fiveHour { 5 小时} weekly {每周} other { {label} }}额度。",
   "project.limit.noneConnection": "在 {name} 上的会话中发送下一条消息后，其限额就会显示在这里。",
-  "project.limit.noConnections": "此工作区中没有已启用的 {provider} 连接。请在“设置”→“连接”中启用一个，以便在这里查看其套餐限额。"
+  "project.limit.noConnections": "此工作区中没有已启用的 {provider} 连接。请在“设置”→“连接”中启用一个，以便在这里查看其套餐限额。",
+  "project.cost.freeLocal": "免费（本地）",
+  "project.cost.withFree": "{cost} + 免费（本地）"
 }
