@@ -31,7 +31,7 @@ import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, STAGE_CATEGORY, type AskAction
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
-import { afterBoardWrite, archiveBatchDocs, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
+import { afterBoardWrite, archiveBatchDocs, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
@@ -464,6 +464,64 @@ export async function getTask(n: number, ws: WorkspaceService = workspace): Prom
   if (!raw) throw unknownTask(n)
   return withoutGone(clean(raw, n, ids, cardKeys(ws, [n]).get(n)), (x) => hasCard(ws, x))
 }
+
+/**
+ * Cards as getTask reads them (null: not on the board; undefined: it couldn't be read now), kept (HI-1780: the lanes read every running lane's cards on each
+ * board change, three times): one is read in full again only once its revision (CARD_REVS_STEP: any write to its row or
+ * its parts), its key, the project names by id or the board's opening changed; a card one links to or waits for that
+ * is gone since leaves its lists, as getTask leaves it out. The same object is given until then: never change it. On a
+ * board waiting for its 1.0 upgrade (no revisions), each is read as getTask does.
+ */
+export async function cardsNow(ws: WorkspaceService, numbers: readonly number[]): Promise<Map<number, TaskCard | null | undefined>> {
+  const out = new Map<number, TaskCard | null | undefined>()
+  const path = ws.path
+  if (!path || !numbers.length) return out
+  const ids = await ws.projectIds()
+  if (ws.path !== path) return out
+  const wanted = [...new Set(numbers)]
+  const revs = cardRevs(ws, wanted)
+  if (!revs) {
+    for (const n of wanted) out.set(n, await getTask(n, ws).catch(unreadable))
+    return out
+  }
+  const keys = cardKeys(ws, wanted)
+  const names = JSON.stringify([...ids.byId])
+  let kept = keptCards.get(ws)
+  if (!kept || kept.path !== path || kept.generation !== revs.generation || kept.names !== names) keptCards.set(ws, (kept = { path, generation: revs.generation, names, cards: new Map() }))
+  // The cards the kept ones link to or wait for that are still on the board (one read of those alone).
+  let all: Set<number> | null = null
+  const there = (x: number): boolean => {
+    if (!all) {
+      const refs = [...kept!.cards.values()].flatMap(({ card }) => [...card.blockedBy, ...card.links])
+      all = new Set([...(cardRevs(ws, [...new Set(refs)])?.revs.keys() ?? [])])
+    }
+    return all.has(x)
+  }
+  for (const n of wanted) {
+    const rev = revs.revs.get(n)
+    if (rev === undefined) {
+      kept.cards.delete(n)
+      out.set(n, null)
+      continue
+    }
+    const at = `${rev}\n${keys.get(n) ?? ''}`
+    const was = kept.cards.get(n)
+    if (was?.at === at) {
+      out.set(n, was.card.blockedBy.length || was.card.links.length ? withoutGone(was.card, there) : was.card)
+      continue
+    }
+    // Read at its revision or after: a write since raises it again, so the next look reads it again.
+    const card = await getTask(n, ws).catch(unreadable)
+    if (card) kept.cards.set(n, { at, card })
+    else kept.cards.delete(n)
+    out.set(n, card)
+  }
+  return out
+}
+/** A card read refused: null when there is no such card, undefined when it couldn't be read. */
+const unreadable = (e: Error): null | undefined => (e.message.startsWith('Unknown task') ? null : undefined)
+/** Each workspace's cards cardsNow read, with the revision and key each was read at, for an opening and project names. */
+const keptCards = new WeakMap<WorkspaceService, { path: string; generation: number; names: string; cards: Map<number, { at: string; card: TaskCard }> }>()
 
 /**
  * Saves a card (in a board change) with its project's id beside its name (#508). A card whose project the workspace doesn't

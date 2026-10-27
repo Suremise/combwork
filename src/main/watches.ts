@@ -22,7 +22,7 @@ import { cardStallIn, laneOrderView } from './cardStall'
 import { noteLoopWatch } from './loopCheck'
 import { isResuming } from './restartResume'
 import { sessions } from './sessions'
-import { allTasks, getTask, inScope, liveCardHeads, noteOnCard, unknownTask } from './tasks'
+import { cardsNow, getTask, inScope, liveCardHeads, noteOnCard, unknownTask } from './tasks'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
 import { isUnread, type DeliveryRecord } from '../shared/deliveries'
@@ -1393,7 +1393,8 @@ function laneBoard(ws: WorkspaceService): LaneBoard {
     async byNumber(numbers) {
       const missing = [...new Set(numbers)].filter((n) => !reads.has(n))
       if (missing.length) {
-        const batch = allTasks(ws, { numbers: missing }).then((cards) => new Map(cards.map((c) => [c.number, c])))
+        // Each kept until it changes (HI-1780: lane notices and lane watches look again on every board change).
+        const batch = cardsNow(ws, missing).then((cards) => new Map([...cards].flatMap(([n, c]): [number, TaskCard][] => (c ? [[n, c]] : []))))
         for (const n of missing) {
           const one = batch.then((m) => m.get(n) ?? null)
           // A read that failed fails each round that awaits it, never as unhandled for the cards no round got to.

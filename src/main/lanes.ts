@@ -20,12 +20,12 @@ import { createDelivery, offerNow } from './deliveries'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName } from '../shared/projectIds'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
-import { getTask, inScope } from './tasks'
+import { cardsNow, inScope } from './tasks'
 import { journalFact } from './journalService'
 import { openWorkspaces, type WorkspaceService } from './workspace'
 import { cardRef } from '../shared/projectKeys'
 import { withCardNames } from './projectKeys'
-import { roundLimitCards, rulesetStages } from './workflow/cardWork'
+import { factHeadsOf, roundLimitCards, rulesetStages } from './workflow/cardWork'
 import { rulesEnforced } from './workflow/recorder'
 import { rulesetsNow } from './workflow/rulesets'
 import { laneValues, noteLaneIn, sameValue, type FieldChange } from './assistantChanges'
@@ -326,17 +326,16 @@ function close(l: LaneRecord, state: 'ended' | 'abandoned', cards: readonly Lane
 
 /** The lane cards as the board has them now, each read once, as the lane's project sees them. */
 async function cardsOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promise<Map<string, Map<number, TaskCard | null>>> {
-  const reads = new Map<number, Promise<TaskCard | null>>()
   const out = new Map<string, Map<number, TaskCard | null>>()
+  // An ended lane reads as it was left: nothing to read. The others' cards in one read, each kept until it changes
+  // (HI-1780: cardsNow).
+  const cards = await cardsNow(ws, lanes.filter((l) => !isFrozen(l)).flatMap((l) => l.cards))
   for (const l of lanes) {
     const m = new Map<number, TaskCard | null>()
     out.set(l.id, m)
-    // An ended lane reads as it was left: nothing to read.
     if (isFrozen(l)) continue
     for (const n of l.cards) {
-      let r = reads.get(n)
-      if (!r) reads.set(n, (r = getTask(n, ws).catch(() => null)))
-      const card = await r
+      const card = cards.get(n) ?? null
       m.set(n, card && !card.archived && inScope(card, l.project) ? card : null)
     }
   }
@@ -373,6 +372,10 @@ export const lanesEnforced = enforced
 async function factsOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promise<Map<string, Map<number, LaneCardFacts> | null>> {
   const out = new Map<string, Map<number, LaneCardFacts> | null>()
   const on = await enforced()
+  // Each card's kept by its facts' head (HI-1780: every board change reads every running lane, and facts are only ever
+  // added): only a card with new facts is read and folded again.
+  const heads = on && ws.path ? factHeadsOf(ws, lanes.filter(running).flatMap((l) => l.cards)) : new Map<number, string>()
+  const kept = keptLaneFacts(ws)
   for (const l of lanes) {
     if (!on || !running(l) || !ws.path) {
       out.set(l.id, null)
@@ -382,12 +385,20 @@ async function factsOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Prom
       const store = FactStore.forBoard(ws, { project: l.project, key: l.project })
       const m = new Map<number, LaneCardFacts>()
       for (const n of l.cards) {
+        const key = heads.get(n) ?? ''
+        const was = kept.get(n)
+        if (was?.key === key) {
+          m.set(n, was.facts)
+          continue
+        }
         const all = store.facts(n)
         const s = foldCard(all)
         const asks = forYou(s)
         // Who reviewed and reviews it (#1446: a pool lane's hover names them).
         const last = s.verdicts.at(-1)
-        m.set(n, { stage: s.stage, forYou: asks.length > 0, ...(asks[0] ? { ask: asks[0].kind } : {}), stale: !!s.stale, rounds: s.rounds, lastVerdict: last ? { reviewer: last.reviewer, pass: last.pass } : null, reviewing: reviewingNow(all, () => true)?.reviewing ?? null })
+        const facts: LaneCardFacts = { stage: s.stage, forYou: asks.length > 0, ...(asks[0] ? { ask: asks[0].kind } : {}), stale: !!s.stale, rounds: s.rounds, lastVerdict: last ? { reviewer: last.reviewer, pass: last.pass } : null, reviewing: reviewingNow(all, () => true)?.reviewing ?? null }
+        kept.set(n, { key, facts })
+        m.set(n, facts)
       }
       out.set(l.id, m)
     } catch (e) {
@@ -396,6 +407,14 @@ async function factsOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Prom
     }
   }
   return out
+}
+
+/** Each workspace's lane cards' facts as factsOf read them, with their facts' head then; a workspace opened again starts afresh. */
+const laneFacts = new WeakMap<WorkspaceService, { path: string | null; life: unknown; cards: Map<number, { key: string; facts: LaneCardFacts }> }>()
+function keptLaneFacts(ws: WorkspaceService): Map<number, { key: string; facts: LaneCardFacts }> {
+  let c = laneFacts.get(ws)
+  if (!c || c.path !== ws.path || c.life !== ws.lifetime) laneFacts.set(ws, (c = { path: ws.path, life: ws.lifetime, cards: new Map() }))
+  return c.cards
 }
 
 /** Lanes as they read now. */
@@ -963,7 +982,7 @@ export async function refresh(ws: WorkspaceService): Promise<void> {
       return !!n && (!n.has(l.builder.id) || (!!l.reviewer && !n.has(l.reviewer.id)))
     })
     if (done.length || orphan.length) {
-      const cardsNow = new Map(live.map((l, i) => [l.id, vs[i].cards]))
+      const laneCardsNow = new Map(live.map((l, i) => [l.id, vs[i].cards]))
       const on = await enforced()
       const ended: EndedLane[] = []
       const closed: LaneRecord[] = []
@@ -979,8 +998,8 @@ export async function refresh(ws: WorkspaceService): Promise<void> {
             // again: HR6's #1270 round 1, a card reopened meanwhile).
             if (decided && sameList(l.cards, decided.cards)) {
               checks.push(stillAllDone(ws, l, [...l.cards]))
-              endVerified(ws, l, cardsNow.get(l.id), on, ended)
-            } else if (orphan.some((d) => d.id === l.id)) close(l, 'abandoned', cardsNow.get(l.id))
+              endVerified(ws, l, laneCardsNow.get(l.id), on, ended)
+            } else if (orphan.some((d) => d.id === l.id)) close(l, 'abandoned', laneCardsNow.get(l.id))
             else continue
             closed.push(l)
           }

@@ -35,6 +35,22 @@ function factHeads(db: Db['reader']): Map<number, string> {
   return heads
 }
 
+/** These cards' facts' heads, as factHeads gives them (a card with no facts has none). */
+function headsOf(db: Db['reader'], numbers: readonly number[]): Map<number, string> {
+  const heads = new Map<number, string>()
+  for (const r of prepared(db, 'SELECT card, max(seq) AS seq, count(*) AS n FROM card_facts WHERE card IN (SELECT value FROM json_each(?)) GROUP BY card').all(JSON.stringify(numbers)) as Row[]) heads.set(r.card as number, `${r.seq}/${r.n}`)
+  return heads
+}
+
+/**
+ * These cards' facts' heads (HI-1780: what a read kept per card is made from, facts being only ever added), from one
+ * snapshot of hive.db; empty on a board waiting for its 1.0 upgrade.
+ */
+export function factHeadsOf(ws: WorkspaceService, numbers: readonly number[]): Map<number, string> {
+  if (!numbers.length) return new Map()
+  return boardRead(ws, (db) => (hasFacts(db) ? headsOf(db, numbers) : new Map()))
+}
+
 /** Up to how many changed cards are read one by one; more (the first read, a board changed in bulk), and every live card's facts are read at once. */
 const ONE_BY_ONE = 40
 
@@ -187,14 +203,26 @@ export function roundLimitCards(ws: WorkspaceService, numbers: readonly number[]
   if (!numbers.length) return out
   boardRead(ws, (db) => {
     if (!hasFacts(db)) return
+    // Kept by each card's facts' head (HI-1780: every board change asks of every running lane's cards).
+    const wanted = [...new Set(numbers)]
+    const heads = headsOf(db, wanted)
+    const kept = keptOf(roundLimits, ws)
     const stmt = prepared(db, QUERIES['facts.ofCard'].sql)
-    for (const n of new Set(numbers)) {
-      const facts = (stmt.all(n) as Row[]).map(factOf)
-      if (facts.some((f) => f.kind === 'ApprovalRequested') && foldCard(facts).requests.some((r) => r.gate === ROUND_LIMIT_GATE)) out.add(n)
+    for (const n of wanted) {
+      const key = heads.get(n) ?? ''
+      let k = kept.get(n)
+      if (k?.key !== key) {
+        const facts = (stmt.all(n) as Row[]).map(factOf)
+        kept.set(n, (k = { key, value: facts.some((f) => f.kind === 'ApprovalRequested') && foldCard(facts).requests.some((r) => r.gate === ROUND_LIMIT_GATE) }))
+      }
+      if (k.value) out.add(n)
     }
   })
   return out
 }
+
+/** Each workspace's cards' "at their round limit", by card (roundLimitCards). */
+const roundLimits: Kept<boolean> = new WeakMap()
 
 /**
  * A card's kind (#1277, §16.7.3: the `kind` column) and a kind an agent proposed, not answered yet: what the Agent API's

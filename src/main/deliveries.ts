@@ -44,7 +44,7 @@ import { createLogger, userText } from './logger'
 import { readyFor } from './readiness'
 import { sessions } from './sessions'
 import { folderChanging, folderSteady, inFolder, onFolderSteady } from './folderFence'
-import { getTask } from './tasks'
+import { cardsNow } from './tasks'
 import { workspaceFor, WorkspaceService } from './workspace'
 import { isAdmitted, refusedOpen } from './openingFence'
 import { cardRef } from '../shared/projectKeys'
@@ -1290,7 +1290,8 @@ export function staleWhy(card: TaskCard | null, n: number, round: number): strin
 async function boardCard(host: string, n: number): Promise<TaskCard | null | undefined> {
   const ws = workspaceFor(host)
   if (!ws?.path) return undefined
-  return getTask(n, ws).catch((e: Error) => (e.message.startsWith('Unknown task') ? null : undefined))
+  // Kept until it changes (HI-1780: every board change checks each unread delivery tied to a round).
+  return (await cardsNow(ws, [n])).get(n)
 }
 let cardNow = boardCard
 /** For tests: how a card is read (null: as the board has it). */

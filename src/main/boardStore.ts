@@ -1508,6 +1508,19 @@ export function holdChanges(ws: WorkspaceService, since: number | null): { gener
   })
 }
 
+/**
+ * These cards' revisions (CARD_REVS_STEP: raised by every write to a card's row or its parts) and the board's opening,
+ * from one snapshot; a card not on the board has none. Null on a board with no revisions (a 0.9 board waiting for its
+ * upgrade). What a read kept per card checks itself against (HI-1780).
+ */
+export function cardRevs(ws: WorkspaceService, numbers: readonly number[]): { generation: number; revs: Map<number, number> } | null {
+  return readSnapshot(ws, (b, db) => {
+    if (b.legacy) return null
+    const rows = numbers.length ? (db.prepare('SELECT number, rev FROM cards WHERE number IN (SELECT value FROM json_each(?))').all(JSON.stringify(numbers)) as { number: number; rev: number }[]) : [] // i18n-ignore: SQL
+    return { generation: b.generation, revs: new Map(rows.map((r) => [r.number, r.rev])) }
+  })
+}
+
 /** Each card's place fields, from their columns (nothing else of a card read): what placing a card needs (#458). */
 export function cardPlaces(ws: WorkspaceService): { number: number; raw: { column: unknown; order: unknown; archived: boolean; project: unknown; projectId: unknown } }[] {
   return readSnapshot(ws, (b, db) => {
