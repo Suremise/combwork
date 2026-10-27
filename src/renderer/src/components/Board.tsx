@@ -238,7 +238,7 @@ const MOVE = {
 
 /** A refusal's three sentences, one per line, in the window's language, the card named as the window names it (`name`). */
 const refusalText = (r: Refusal, name: string): string => {
-  const l = refusalLines(r.rule, { ...r.values, ...(r.values.card !== undefined ? { card: name } : {}) }, IN_WINDOW)
+  const l = refusalLines(r.rule, { ...r.values, ...(r.values.card !== undefined ? { card: name } : {}) }, { ...IN_WINDOW, forUser: true })
   return [l.message, l.next, ...(l.change ? [l.change] : [])].join('\n')
 }
 

@@ -314,7 +314,9 @@ interface HiveMessageValues {
   'workflow.refused.submit.decisionsReceived.message': { card: string | number }
   'workflow.refused.submit.decisionsReceived.next': undefined
   'workflow.refused.submit.empty.message': { card: string | number }
+  'workflow.refused.submit.empty.messageForUser': undefined
   'workflow.refused.submit.empty.next': undefined
+  'workflow.refused.submit.empty.nextForUser': undefined
   'workflow.refused.submit.followUpNotBuilder.message': { card: string | number }
   'workflow.refused.submit.followUpNotBuilder.next': undefined
   'workflow.refused.submit.identity.change': undefined

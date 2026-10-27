@@ -2565,6 +2565,11 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   `whose` value): a reviewer's review or verdict on a card no longer in Review hears that its review is over (back for
   more work: leave it with no verdict and wait for its return to Review; moved on: leave it), and the card's builder
   refused a move while the card waits in Review hears to wait for the verdict.
+- **The user's own move** (a drag on the board, the card dialog; HI-1851): its toast's title names the card and the
+  column ("HI-12 can't move to Review"), and a rule whose sentences are worded for the agent (`submit.empty`'s "If the
+  user didn't ask you to commit, ask them") has its own for the user (`FOR_USER` in `refusals.ts`, the format's
+  `forUser`): "Nothing is committed to review yet. Commit the card's work, then move it again." An agent's refusal
+  shown in the window (the Progress panel) keeps the agent's words.
 - `next` is the exact next step the agent can take, possible under the card's ruleset (§16.5.4); `override` says who
   can override (never the agent).
 - Every refused intent appends a `Refused` fact (so the lane shows it) [#1120 c]; the window collapses repeats.

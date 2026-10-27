@@ -437,6 +437,12 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     expect(workNotes(badge({ revision: null, refused: { move: 'submit', rule: 'move.notFromHere', values: { card: 'alpha-7', stage: 'todo', move: 'submit', moves: 'start' }, at: '', times: 1 } }), 'todo', null, short, tr, names, 'AL-7')[0]).toMatch(/^AL-7 /)
   })
 
+  it("the user's own move refused (HI-1851): a rule worded for agents has the user's words, the card left to the toast's title; others as agents get them", () => {
+    const window = { one: (m: Parameters<typeof tr>[0], v?: Record<string, string | number>) => tr(m, v), list: (items: string[]) => items.join(', '), names: true, forUser: true }
+    expect(refusalLines('submit.empty', { card: 'AL-7' }, window)).toEqual({ message: 'Nothing is committed to review yet.', next: "Commit the card's work, then move it again.", change: null })
+    expect(refusalLines('submit.unchanged', { card: 'AL-7' }, window).message).toBe("AL-7: its files haven't changed since it started.")
+  })
+
   it('a stale pass (#1279): the revision it was for and the one now, through the platform', () => {
     expect(workNotes(badge({ stage: 'approved', stale: true, stalePass: { approved: 'a3f2c1d9e8', current: 'b71e09a4cc' } }), 'passed', null, short, tr)).toEqual(['Pass was for a3f2c1d; now at b71e09a', 'Revision: a3f2c1d'])
     expect(workNotes(badge({ revision: null, stale: true, stalePass: { approved: 'a3f2c1d9e8', current: null } }), 'passed', null, short, tr)).toEqual(['Pass was for a3f2c1d: it no longer holds'])
