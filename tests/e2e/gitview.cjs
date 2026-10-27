@@ -118,7 +118,16 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   await add.locator('#git-form-name').fill('gh')
   await add.locator('#git-form-url').fill('https://github.com/example/alpha.git')
   await add.getByRole('button', { name: 'Add', exact: true }).click()
-  check('Add remote… adds it', !!(await lib.until(async () => (await branches.locator('[data-remote="gh"]').count()) === 1, HUNG_MS)) && g(alpha, 'remote').includes('gh'))
+  const added = !!(await lib.until(async () => (await branches.locator('[data-remote="gh"]').count()) === 1, HUNG_MS)) && g(alpha, 'remote').includes('gh')
+  // HI-1854: under load it was added but never shown (a git read of the view's never answered): what was on screen, git's
+  // remotes, and whether the view's read was still under way (its reload button turning).
+  let notAdded = ''
+  if (!added) {
+    await shot(page, 'add-remote-failed')
+    const reading = (await branches.locator('[data-action="reload-branches"] .spin').count()) > 0
+    notAdded = `dialogs: ${JSON.stringify(await page.locator('.dialog').allInnerTexts())}; git remote: ${JSON.stringify(g(alpha, 'remote'))}; the view still reading: ${reading}`
+  }
+  check('Add remote… adds it', added, notAdded)
   const warning = branches.locator('[data-identity-warning]')
   check('a personal email on a GitHub remote warns', !!(await lib.until(async () => /show test\.user@example\.com to anyone/.test(await text(warning)), HUNG_MS)), await text(warning))
   check('the identity used is the global one', (await text(branches.locator('[data-identity-used="email"]'))) === 'test.user@example.com')
@@ -169,9 +178,13 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   await history.locator('[data-history-branch]').selectOption('refs/heads/main')
   check('the picker shows main: its own commits, from its first page', !!(await lib.until(() => onPage('refs/heads/main', 1, 2), HUNG_MS)) && (await history.locator('.table-paging').count()) === 0)
 
-  // --- Changes is still the default section's content.
+  // --- Changes: with a target set (release, above), it opens on the target compared with main (HI-1824); the project
+  // folder in its picker shows the working tree.
   await page.locator('.git-sections button', { hasText: 'Changes' }).click()
-  check('Changes shows the working tree', !!(await lib.until(async () => (await page.locator('.split-list .pane-header', { hasText: 'Changes' }).count()) === 1, HUNG_MS)))
+  const comparing = page.locator('[data-compare-page]')
+  check('Changes opens on the target compared with main', !!(await lib.until(async () => (await comparing.count()) === 1 && (await comparing.getAttribute('data-compare-base')) === 'main' && (await comparing.getAttribute('data-compare-head')) === 'release', HUNG_MS)))
+  await page.locator('select.changes-picker').selectOption('')
+  check('its project folder shows the working tree', !!(await lib.until(async () => (await page.locator('.split-list .pane-header', { hasText: 'Changes' }).count()) === 1, HUNG_MS)))
 
   // --- A project without git.
   await page.getByText('beta', { exact: true }).first().click()

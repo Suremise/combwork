@@ -10,8 +10,12 @@ import { join } from 'path'
 import { build } from 'esbuild'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { git, readRefsOffMain, useGitWorker, type GitResult } from '../src/main/git'
+import { runGit } from '../src/main/gitWorker'
 import { readRepoRefs } from '../src/main/platform/repoRefs'
 import { tempDir } from './tempDir'
+
+// The longest a test here waits for what it waits on: a bound for a hung run, never how long it should take.
+const HUNG_MS = 30_000
 
 // The run's allowlisted environment and test git config for every git child, as the suites' git has (never this
 // process's environment).
@@ -70,6 +74,17 @@ describe("git's worker (HI-1783)", () => {
     const got = await Promise.all(inputs.map((t) => git(repo, ['hash-object', '--stdin'], undefined, t)))
     expect(got.map((r) => r.out.trim())).toEqual(want)
   })
+
+  it('answers a command that has exited though another process holds its output open (HI-1854)', async () => {
+    // An alias whose shell leaves a process behind that inherited git's output, as a process main starts meanwhile can
+    // (an agent's terminal): git exits, its pipes stay open while that one runs (it ends by itself, long after the test).
+    const hold = ['-c', 'alias.hold=!sleep 60 & echo started', 'hold']
+    const r = await runGit({ cwd: repo, args: hold, maxBuffer: 1024 * 1024, env: gitEnv() }, 100)
+    expect({ out: Buffer.from(r.stdout).toString().trim(), error: r.error, held: r.held }).toEqual({ out: 'started', error: null, held: true })
+    // And through the worker, at its own quiet time.
+    useGitWorker(bundle)
+    expect(await git(repo, hold, undefined, undefined, { env: gitEnv() })).toMatchObject({ ok: true, out: 'started\n' })
+  }, HUNG_MS)
 
   it("reads a repository's lines, folders, HEADs and reflogs as this thread does (HI-1814)", async () => {
     const r = tempDir('hive-git-worker-refs-')
