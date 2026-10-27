@@ -467,22 +467,27 @@ export function setConnectionDefaults(id: string, patch: { model?: string | null
  * are taken once, by the first sign-in connection of an upgrade from 0.9. Inside the config.update adding it.
  */
 function takeCliDefaults(c: AppConfig, a: Connection): Connection {
-  // Taken already, or a connection of its CLI made before this record (a preview's) had them.
-  if ((c.connectionDefaultsTaken ?? []).includes(a.provider) || (c.connections ?? []).some((x) => x.provider === a.provider)) return a
-  c.connectionDefaultsTaken = [...(c.connectionDefaultsTaken ?? []), a.provider]
+  const taken = c.connectionDefaultsTaken ?? []
+  if (taken.includes(a.provider)) return a
+  c.connectionDefaultsTaken = [...taken, a.provider]
+  // A connection of its CLI made before this record (a preview's) had them already: recorded as taken, not given again.
+  if ((c.connections ?? []).some((x) => x.provider === a.provider)) return a
   return { ...a, defaults: cliDefaults(c.settings, a.provider), defaultsFrom: 'cli' }
 }
 
 /**
- * Connections made before they had defaults (HI-1755's) get the CLI's old ones (HI-1770): only where `defaults` is
- * absent, so one the user emptied or edited is never filled in again. Each such connection counts as its CLI's taking
- * them (a later new one starts with none).
+ * The connections from before this record (a preview's, HI-1774 round 1): connections made before they had defaults
+ * (HI-1755's) get the CLI's old ones (HI-1770), only where `defaults` is absent (one the user emptied or edited is never
+ * filled in again); and every CLI with a connection, whatever its defaults, is recorded as having taken them, so none is
+ * given them again, even once those connections are removed.
  */
 export function seedConnectionDefaults(): void {
-  if (!list().some((a) => a.defaults === undefined)) return
+  const all = list()
+  const taken = config.get().connectionDefaultsTaken ?? []
+  if (!all.some((a) => a.defaults === undefined || !taken.includes(a.provider))) return
   config.update((c) => {
     c.connections = (c.connections ?? []).map((a) => (a.defaults === undefined ? { ...a, defaults: cliDefaults(c.settings, a.provider), defaultsFrom: 'cli' as const } : a))
-    c.connectionDefaultsTaken = [...new Set([...(c.connectionDefaultsTaken ?? []), ...c.connections.filter((a) => a.defaultsFrom === 'cli').map((a) => a.provider)])]
+    c.connectionDefaultsTaken = [...new Set([...(c.connectionDefaultsTaken ?? []), ...c.connections.map((a) => a.provider)])]
   })
   emit({ type: 'connections-changed' })
 }
@@ -1200,6 +1205,8 @@ export function connectionOnHere(id: string, cli: ProviderId, projectPath: strin
  * workspace starts with the last-used connections, and the watches follow the open workspaces and their choices.
  */
 export function initConnections(): void {
+  // Connections from before the old per-CLI defaults' record (a preview's) count as having taken them, at once.
+  seedConnectionDefaults()
   setNewWorkspaceExtras(() => {
     const connections = newWorkspaceAccounts()
     return connections ? { connections } : {}

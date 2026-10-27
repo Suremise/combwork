@@ -64,7 +64,7 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('Control+,')
   const openSection = async (name) => {
     await page.locator('.settings-nav .row', { hasText: name }).first().click()
-    await lib.sleep(400)
+    await lib.until(async () => (await page.locator('.settings-nav .row.selected', { hasText: name }).count()) > 0, HUNG_MS)
   }
   await openSection('Claude Code')
   check('Settings says where the models come from', (await page.locator('.fallback-source', { hasText: 'Models now: From Claude Code 2.1.999' }).count()) === 1)
@@ -82,25 +82,28 @@ const check = (name, ok, extra = '') => {
 
   const effortSelect = defaultsOf('claude-code').locator('select.effort-picker').first()
   const effortValues = async () => (await options(effortSelect)).map((o) => o.value).filter(Boolean)
+  // Each change polled until the picker shows it (HI-1774 round 1: never a sleep, then one look).
+  const opusLevels = JSON.stringify(['low', 'medium', 'high', 'max'])
   await update({ assistant: { providers: { 'claude-code': { model: 'claude-opus-4-6' } } } })
-  await lib.sleep(300)
-  check("with Opus 4.6, the effort picker offers its levels (no Extra high)", JSON.stringify(await effortValues()) === JSON.stringify(['low', 'medium', 'high', 'max']), JSON.stringify(await effortValues()))
+  check("with Opus 4.6, the effort picker offers its levels (no Extra high)", !!(await lib.until(async () => JSON.stringify(await effortValues()) === opusLevels, HUNG_MS)), JSON.stringify(await effortValues()))
   await update({ assistant: { providers: { 'claude-code': { model: 'haiku' } } } })
-  await lib.sleep(300)
-  check('with Haiku, none: it has no effort setting, and says so', (await effortValues()).length === 0 && (await page.locator('.effort-caveat', { hasText: 'Haiku 4.5 has no effort setting' }).count()) === 1, JSON.stringify(await effortValues()))
+  check('with Haiku, none: it has no effort setting, and says so', !!(await lib.until(async () => (await effortValues()).length === 0 && (await page.locator('.effort-caveat', { hasText: 'Haiku 4.5 has no effort setting' }).count()) === 1, HUNG_MS)), JSON.stringify(await effortValues()))
   // A choice the model doesn't take stays chosen, marked, never changed behind the user's back.
   await update({ assistant: { providers: { 'claude-code': { model: 'claude-opus-4-6', effort: 'xhigh' } } } })
-  await lib.sleep(300)
-  const unsupported = (await options(effortSelect)).find((o) => o.value === 'xhigh')
-  check("an effort the model doesn't take stays, marked as such", (await effortSelect.inputValue()) === 'xhigh' && /not offered with Opus 4\.6/.test(unsupported?.label ?? '') && (await page.locator('.effort-caveat', { hasText: "doesn't offer Extra high with Opus 4.6" }).count()) === 1, JSON.stringify(unsupported))
+  const unsupportedShown = async () => {
+    const o = (await options(effortSelect)).find((x) => x.value === 'xhigh')
+    return (await effortSelect.inputValue()) === 'xhigh' && /not offered with Opus 4\.6/.test(o?.label ?? '') && (await page.locator('.effort-caveat', { hasText: "doesn't offer Extra high with Opus 4.6" }).count()) === 1
+  }
+  check("an effort the model doesn't take stays, marked as such", !!(await lib.until(unsupportedShown, HUNG_MS)), JSON.stringify((await options(effortSelect)).find((o) => o.value === 'xhigh')))
   await page.screenshot({ path: path.join(lib.WORK, 'models-effort-unsupported.png') })
   // Both themes: the warning and the lists in light too.
+  const themed = (t) => lib.until(async () => (await page.evaluate(() => document.documentElement.getAttribute('data-theme'))) === t, HUNG_MS)
   const light = async (file) => {
     await update({ appearance: { theme: 'light' } })
-    await lib.sleep(300)
+    await themed('light')
     await page.screenshot({ path: path.join(lib.WORK, file) })
     await update({ appearance: { theme: 'dark' } })
-    await lib.sleep(200)
+    await themed('dark')
   }
   await light('models-effort-unsupported-light.png')
   await update({ assistant: { providers: { 'claude-code': { model: '', effort: '' } } } })
@@ -109,9 +112,9 @@ const check = (name, ok, extra = '') => {
   const codexOffered = (await options(defaultsOf('codex').locator('.model-picker select').first())).map((o) => o.value)
   check('the Codex model picker includes gpt-6.1-sol', codexOffered.includes('gpt-6.1-sol') && !codexOffered.includes('gpt-reserve'), JSON.stringify(codexOffered))
   await update({ assistant: { providers: { codex: { model: 'gpt-5.5' } } } })
-  await lib.sleep(300)
   const codexEfforts = async () => (await options(defaultsOf('codex').locator('select.effort-picker').first())).map((o) => o.value).filter(Boolean)
-  check('with GPT-5.5, the Codex effort picker stops at Extra high', JSON.stringify(await codexEfforts()) === JSON.stringify(['low', 'medium', 'high', 'xhigh']), JSON.stringify(await codexEfforts()))
+  const codexLevels = JSON.stringify(['low', 'medium', 'high', 'xhigh'])
+  check('with GPT-5.5, the Codex effort picker stops at Extra high', !!(await lib.until(async () => JSON.stringify(await codexEfforts()) === codexLevels, HUNG_MS)), JSON.stringify(await codexEfforts()))
   await update({ assistant: { providers: { codex: { model: '' } } } })
 
   // --- The footer: a model's default effort when nothing is set or reported.

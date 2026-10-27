@@ -949,6 +949,39 @@ describe('model, effort and context from the connection (HI-1770)', () => {
     }
   })
 
+  it("a preview's connection emptied by the user, seeded, then removed: a new one never takes the old defaults (HI-1774 round 1, HR3's repro)", async () => {
+    const g = config.settings.providers['claude-code']
+    const was = { defaultModel: g.defaultModel }
+    Object.assign(g, { defaultModel: 'sonnet' })
+    try {
+      // As a preview left it: defaults the user emptied, and no record yet (the old format).
+      config.update((c) => {
+        c.connections = [{ id: 'a-preview2', provider: 'claude-code', kind: 'signIn', name: 'Preview', createdAt: '', defaults: {} }]
+        delete c.connectionDefaultsTaken
+      })
+      accounts.seedConnectionDefaults()
+      expect(config.get().connectionDefaultsTaken).toEqual(['claude-code'])
+      expect(accounts.getAccount('a-preview2')?.defaults).toEqual({})
+      await accounts.removeAccount('a-preview2')
+      const a = await accounts.addAccount('claude-code', 'After')
+      expect(accounts.getAccount(a.id)?.defaults).toEqual({})
+      // Recorded too where the add meets a preview's connection first (no seed yet): removed, still none.
+      for (const x of [...(config.get().connections ?? [])]) await accounts.removeAccount(x.id)
+      config.update((c) => {
+        c.connections = [{ id: 'a-preview3', provider: 'claude-code', kind: 'signIn', name: 'Preview', createdAt: '', defaults: {} }]
+        delete c.connectionDefaultsTaken
+      })
+      const beside = await accounts.addAccount('claude-code', 'Beside')
+      expect(accounts.getAccount(beside.id)?.defaults).toEqual({})
+      expect(config.get().connectionDefaultsTaken).toEqual(['claude-code'])
+      for (const id of ['a-preview3', beside.id]) await accounts.removeAccount(id)
+      const last = await accounts.addAccount('claude-code', 'Last')
+      expect(accounts.getAccount(last.id)?.defaults).toEqual({})
+    } finally {
+      Object.assign(g, was)
+    }
+  })
+
   it("a preview's connections from before the record (HI-1774): a new one of their CLI never takes the old defaults", async () => {
     const g = config.settings.providers['claude-code']
     const was = { defaultModel: g.defaultModel }
