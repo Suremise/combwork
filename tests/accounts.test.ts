@@ -770,5 +770,60 @@ describe("a workspace's accounts", () => {
       await vi.waitFor(() => expect(accounts.getAccount(a.id)?.observed?.email).toBe('third@example.com'), { timeout: HUNG_MS })
       await run(() => accounts.setAccountOn(a.id, false))
     })
+
+    it("its trust of the workspace's projects (HI-1870 round 1): unknown while read, never done before; refreshes join one read; an older project set's answer never replaces a newer one's", async () => {
+      const a = await accounts.addAccount('claude-code', 'Trusting')
+      writeFileSync(join(folderOf(a), '.claude.json'), JSON.stringify({ hasCompletedOnboarding: true }))
+      const projectsAdded = ['alpha', 'beta', 'gamma'].map((n) => join(wsPath, n))
+      mkdirSync(projectsAdded[0], { recursive: true })
+      await w.refresh()
+      // Each trust read held until the test answers it: what it was asked about, and its answer.
+      const held: { projects: number; answer: (v: (boolean | null)[]) => void }[] = []
+      const spy = vi.spyOn(provider('claude-code'), 'connectionTrusts').mockImplementation((_home, targets) => new Promise((answer) => held.push({ projects: targets.length, answer })))
+      const row = () => run(() => accounts.accountsView()).connections.find((c) => c.id === a.id)!
+      try {
+        await run(() => accounts.setAccountOn(a.id, true))
+        await vi.waitFor(() => expect(row().setUp).toBe(true), { timeout: HUNG_MS })
+        await vi.waitFor(() => expect(held).toHaveLength(1), { timeout: HUNG_MS })
+        // Held: unknown, never done before it answers.
+        expect(row().trust).toEqual({ pending: [], unknown: true })
+        expect(connectionReadiness(row())).toBe('unknown')
+        // Refreshes and Settings shown while it is held join it: no other read starts.
+        for (let i = 0; i < 13; i++) run(() => accounts.accountsView(i % 4 === 0))
+        held[0].answer([true])
+        await vi.waitFor(() => expect(row().trust).toEqual({ pending: [], unknown: false }), { timeout: HUNG_MS })
+        expect(connectionReadiness(row())).toBe('done')
+        expect(held).toHaveLength(1)
+
+        // A project added: the answer for the old set isn't shown as done while the new set is read.
+        mkdirSync(projectsAdded[1], { recursive: true })
+        await w.refresh()
+        row()
+        await vi.waitFor(() => expect(held).toHaveLength(2), { timeout: HUNG_MS })
+        expect(held[1].projects).toBe(2)
+        expect(connectionReadiness(row())).toBe('unknown')
+        // Another added while that is held: its own read; answered first, then the older one, which is dropped.
+        mkdirSync(projectsAdded[2], { recursive: true })
+        await w.refresh()
+        row()
+        await vi.waitFor(() => expect(held).toHaveLength(3), { timeout: HUNG_MS })
+        held[2].answer([true, true, false])
+        await vi.waitFor(() => expect(row().trust?.pending.map((p) => p.project)).toEqual(['gamma']), { timeout: HUNG_MS })
+        held[1].answer([false, false])
+        // The older answer settles with nothing written: the newer set's stays. What follows its answer is promise
+        // continuations only (no I/O), all run before the next macrotask: not a wait for time.
+        await new Promise<void>((r) => setImmediate(r))
+        expect(row().trust).toEqual({ pending: [{ project: 'gamma', folder: expect.stringMatching(/gamma$/) }], unknown: false })
+        expect(connectionReadiness(row())).toBe('needed')
+        // Read again (as its Set Up ends) while the set is unchanged, it keeps the definite not-done shown meanwhile.
+        expect(row().trust?.pending).toHaveLength(1)
+      } finally {
+        spy.mockRestore()
+        for (const h of held) h.answer([])
+        await run(() => accounts.setAccountOn(a.id, false))
+        for (const p of projectsAdded) rmSync(p, { recursive: true, force: true })
+        await w.refresh()
+      }
+    })
   })
 })

@@ -3,7 +3,7 @@ import type { ServerCaps, ServerListing } from '../shared/providers'
 import { providerDescriptor } from '../shared/providers'
 import { msg, type Msg } from '../shared/i18n'
 import { keepListedRemote, keyProblem, listedIds, listedRemote, listingUrl, mergeListed, parseBaseUrl, type BaseUrlProblem, type ServerModelsRead } from '../shared/serverConnection'
-import { accountFolder, addAccount, connectionInternals, connectionReadyAgain, effectiveModels, getAccount, isServer, loginKey, readSetUp, serverEnv } from './accounts'
+import { accountFolder, addAccount, connectionInternals, connectionReadyAgain, effectiveModels, getAccount, isServer, loginKey, readSetUp, rereadTrust, serverEnv } from './accounts'
 import { hasPty } from './ptyHost'
 import { emit } from './events'
 import { hiveError } from './hiveError'
@@ -289,6 +289,6 @@ export async function setUpServerConnection(id: string, folder?: string): Promis
     if (!got && !b.local) throw hiveError(msg({ id: 'main.server.setUp.noKey', defaultMessage: '{name} has no key yet. Add its key first, then set it up.', description: "An error opening Set Up for a server connection ({name}, its name in Settings → Connections): its server needs an API key and none is saved." }), { name: a.name }, { kind: 'conflict' })
     const homeEnv = providerDescriptor(a.provider).capabilities.connections!.homeEnv
     // Once it ends, its set-up state is read again (HI-1870).
-    return providerService.runAccountLogin(a.provider, id, { [homeEnv]: accountFolder(id) }, () => void readSetUp(id), { env: serverEnv(caps, server, got?.key ?? null), cwd: folder ?? accountFolder(id) })
+    return providerService.runAccountLogin(a.provider, id, { [homeEnv]: accountFolder(id) }, () => (void readSetUp(id), rereadTrust(id)), { env: serverEnv(caps, server, got?.key ?? null), cwd: folder ?? accountFolder(id) })
   })
 }

@@ -611,44 +611,110 @@ interface ProjectTarget extends TrustTarget {
  * made from it (probed: Claude Code 2.1.311, Codex 0.164.0; a worktree's own entry covers only itself), or a project
  * without Git's own real path. Read off main's thread (git's worker, async file calls).
  */
-export async function trustTargets(projects: readonly { name: string; path: string }[]): Promise<ProjectTarget[]> {
-  return Promise.all(
-    projects.map(async (p): Promise<ProjectTarget> => {
-      const real = await realpath(p.path).catch(() => null)
-      // An 8.3 path (a `~N` part its long form doesn't have): Claude Code doesn't expand it.
-      const short = /~\d/.test(p.path) && !!real && real.toLowerCase() !== resolve(p.path).toLowerCase()
-      const run = (cwd: string, args: string[]) => git(cwd, args, undefined, undefined, { timeout: GIT_TRUST_MS }).catch(() => null)
-      const r = await run(p.path, ['rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir', '--show-toplevel'])
-      if (!r?.ok) {
-        // Not a repository (git says so): the folder itself. Anything else (a bare repository, a timeout, git missing)
-        // can't be told, and Set Up never opens in a git folder.
-        const notRepo = !!r && /not a git repository/i.test(r.err)
-        return { project: p.name, root: notRepo ? real : null, git: !notRepo && !!real, short }
-      }
-      const [gitDir, common, top] = r.out.trim().split(/\r?\n/)
-      const same = (a?: string, b?: string): boolean => !!a && !!b && resolve(a).toLowerCase() === resolve(b).toLowerCase()
-      // In the main working tree (its git folder the common one, wherever that is kept): its top level.
-      let tree: string | undefined = same(gitDir, common) ? top : undefined
-      if (!tree) {
-        // A linked worktree: the main working tree, as git lists it first, checked to be one (not a git folder).
-        const worktrees = await run(p.path, ['worktree', 'list', '--porcelain'])
-        const first = worktrees?.ok ? worktrees.out.split(/\r?\n\r?\n/)[0].split(/\r?\n/) : []
-        const listed = first.includes('bare') ? undefined : first.find((l) => l.startsWith('worktree '))?.slice('worktree '.length)
-        const check = listed ? await run(listed, ['rev-parse', '--path-format=absolute', '--git-common-dir', '--show-toplevel']) : null
-        const [itsCommon, itsTop] = check?.ok ? check.out.trim().split(/\r?\n/) : []
-        if (same(itsCommon, common) && same(itsTop, listed)) tree = itsTop
-      }
-      return { project: p.name, root: tree ? await realpath(tree).catch(() => null) : null, git: true, short }
-    })
-  )
+export function trustTargets(projects: readonly { name: string; path: string }[]): Promise<ProjectTarget[]> {
+  // One resolution per project set at a time, shared by every connection and window asking for it.
+  const sig = JSON.stringify(projects)
+  const under = targetsInFlight.get(sig)
+  if (under) return under
+  const now = Promise.all(projects.map((p) => targetSlot(() => resolveTarget(p)))).finally(() => targetsInFlight.delete(sig))
+  targetsInFlight.set(sig, now)
+  return now
+}
+
+/** Target resolutions under way, by project set (HI-1870 round 1: refreshes join them rather than start more git). */
+const targetsInFlight = new Map<string, Promise<ProjectTarget[]>>()
+
+/** How many projects' folders are resolved at once, across every connection, window and workspace: the rest wait. */
+const TARGETS_AT_ONCE = 4
+let targetsRunning = 0
+const targetsWaiting: (() => void)[] = []
+async function targetSlot<T>(fn: () => Promise<T>): Promise<T> {
+  if (targetsRunning >= TARGETS_AT_ONCE) await new Promise<void>((r) => targetsWaiting.push(r))
+  targetsRunning++
+  try {
+    return await fn()
+  } finally {
+    targetsRunning--
+    targetsWaiting.shift()?.()
+  }
+}
+
+/** One project's folder for the trust check (trustTargets). */
+async function resolveTarget(p: { name: string; path: string }): Promise<ProjectTarget> {
+  const real = await realpath(p.path).catch(() => null)
+  // An 8.3 path (a `~N` part its long form doesn't have): Claude Code doesn't expand it.
+  const short = /~\d/.test(p.path) && !!real && real.toLowerCase() !== resolve(p.path).toLowerCase()
+  const run = (cwd: string, args: string[]) => git(cwd, args, undefined, undefined, { timeout: GIT_TRUST_MS }).catch(() => null)
+  const r = await run(p.path, ['rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir', '--show-toplevel'])
+  if (!r?.ok) {
+    // Not a repository (git says so): the folder itself. Anything else (a bare repository, a timeout, git missing)
+    // can't be told, and Set Up never opens in a git folder.
+    const notRepo = !!r && /not a git repository/i.test(r.err)
+    return { project: p.name, root: notRepo ? real : null, git: !notRepo && !!real, short }
+  }
+  const [gitDir, common, top] = r.out.trim().split(/\r?\n/)
+  const same = (a?: string, b?: string): boolean => !!a && !!b && resolve(a).toLowerCase() === resolve(b).toLowerCase()
+  // In the main working tree (its git folder the common one, wherever that is kept): its top level.
+  let tree: string | undefined = same(gitDir, common) ? top : undefined
+  if (!tree) {
+    // A linked worktree: the main working tree, as git lists it first, checked to be one (not a git folder).
+    const worktrees = await run(p.path, ['worktree', 'list', '--porcelain'])
+    const first = worktrees?.ok ? worktrees.out.split(/\r?\n\r?\n/)[0].split(/\r?\n/) : []
+    const listed = first.includes('bare') ? undefined : first.find((l) => l.startsWith('worktree '))?.slice('worktree '.length)
+    const check = listed ? await run(listed, ['rev-parse', '--path-format=absolute', '--git-common-dir', '--show-toplevel']) : null
+    const [itsCommon, itsTop] = check?.ok ? check.out.trim().split(/\r?\n/) : []
+    if (same(itsCommon, common) && same(itsTop, listed)) tree = itsTop
+  }
+  return { project: p.name, root: tree ? await realpath(tree).catch(() => null) : null, git: true, short }
 }
 
 /** Per connection and workspace (`<id>|<workspace>`): its projects' trust as last read, with what it was read for. */
 const trustRead = new Map<string, { projects: { name: string; path: string }[]; sig: string; pending: { project: string; folder: string }[]; unknown: boolean }>()
 const trustKey = (id: string, ws: string): string => `${id}|${ws.toLowerCase()}`
 
-/** Reads a connection's trust of a workspace's projects again (HI-1870), telling the windows when it changed. */
-async function readTrust(id: string, ws: string, projects: { name: string; path: string }[]): Promise<{ pending: { project: string; folder: string }[]; unknown: boolean } | null> {
+type TrustAnswer = { pending: { project: string; folder: string }[]; unknown: boolean }
+
+/**
+ * Per connection and workspace: the trust read under way (its project set) and one queued after it (`fresh`: asked for
+ * once something changed meanwhile, a terminal ended). A refresh for the same set joins them; another set starts its own.
+ */
+const trustInFlight = new Map<string, { sig: string; now: Promise<TrustAnswer | null>; next?: Promise<TrustAnswer | null> }>()
+/** Per connection and workspace, the latest read started: an older one's answer is dropped, never written over it. */
+const trustSeq = new Map<string, number>()
+let trustSeqs = 0
+
+/**
+ * Reads a connection's trust of a workspace's projects (HI-1870), telling the windows when it changed. Coalesced: one
+ * read per connection, workspace and project set at a time; `fresh` waits for one begun after the call (the one under
+ * way may have read the files before the change).
+ */
+function readTrust(id: string, ws: string, projects: { name: string; path: string }[], fresh = false): Promise<TrustAnswer | null> {
+  const key = trustKey(id, ws)
+  const sig = JSON.stringify(projects)
+  const f = trustInFlight.get(key)
+  if (f && f.sig === sig) {
+    if (!fresh) return f.next ?? f.now
+    f.next ??= f.now.catch(() => null).then(() => startTrust(key, id, projects))
+    return f.next
+  }
+  return startTrust(key, id, projects)
+}
+
+function startTrust(key: string, id: string, projects: { name: string; path: string }[]): Promise<TrustAnswer | null> {
+  const sig = JSON.stringify(projects)
+  const seq = ++trustSeqs
+  trustSeq.set(key, seq)
+  const now = readTrustOnce(key, id, projects, seq)
+  // A read queued after this one (`next`, set by readTrust) starts once it ends and takes its place here.
+  trustInFlight.set(key, { sig, now })
+  void now.catch(() => null).then(() => {
+    const f = trustInFlight.get(key)
+    if (f?.now === now && !f.next) trustInFlight.delete(key)
+  })
+  return now
+}
+
+async function readTrustOnce(key: string, id: string, projects: { name: string; path: string }[], seq: number): Promise<TrustAnswer | null> {
   const a = getAccount(id)
   const read = a && provider(a.provider).connectionTrusts
   if (!a || !read) return null
@@ -657,16 +723,34 @@ async function readTrust(id: string, ws: string, projects: { name: string; path:
   const got = await read.call(provider(a.provider), accountFolder(id), targets).catch(() => targets.map(() => null))
   const pending = targets.flatMap((t, i) => (got[i] === false && t.root ? [{ project: t.project, folder: t.root }] : []))
   const now = { projects, sig: JSON.stringify(projects), pending, unknown: got.some((x) => x === null) }
-  if (generation(id) !== gen || !getAccount(id)) return null
-  const was = trustRead.get(trustKey(id, ws))
-  trustRead.set(trustKey(id, ws), now)
-  if (!was || JSON.stringify([was.pending, was.unknown]) !== JSON.stringify([now.pending, now.unknown])) emit({ type: 'connections-changed' })
-  return now
+  // Removed meanwhile, or a newer read started (another project set, or one asked for after a change): dropped.
+  if (generation(id) !== gen || !getAccount(id) || trustSeq.get(key) !== seq) return null
+  const was = trustRead.get(key)
+  trustRead.set(key, now)
+  if (!was || JSON.stringify([was.sig, was.pending, was.unknown]) !== JSON.stringify([now.sig, now.pending, now.unknown])) emit({ type: 'connections-changed' })
+  return { pending, unknown: now.unknown }
 }
 
-/** Every workspace a connection's trust was read for, read again (a Set Up or sign-in ended, a check). */
-function rereadTrust(id: string): void {
-  for (const [k, v] of trustRead) if (k.startsWith(`${id}|`)) void readTrust(id, k.slice(id.length + 1), v.projects)
+/** Every workspace a connection's trust was read for, read again, once each (its Sign In or Set Up terminal ended). */
+export function rereadTrust(id: string): void {
+  for (const [k, v] of trustRead) if (k.startsWith(`${id}|`)) void readTrust(id, k.slice(id.length + 1), v.projects, true)
+}
+
+/**
+ * A connection's trust of this window's workspace as the view shows it (HI-1870 round 1): its answer for the current
+ * project set; else, while that is read, unknown, keeping the projects already found untrusted that are still here (a
+ * definite not-done). Never `done` from an answer for another set, nor before one.
+ */
+function trustShown(id: string, ws: string, here: { name: string; path: string }[]): TrustAnswer {
+  const t = trustRead.get(trustKey(id, ws))
+  if (t && t.sig === JSON.stringify(here)) return { pending: t.pending, unknown: t.unknown }
+  return { pending: (t?.pending ?? []).filter((p) => here.some((h) => h.name === p.project)), unknown: true }
+}
+
+/** Forgets trust read for workspaces no window has open any more. */
+function pruneTrust(): void {
+  const open = new Set(openWorkspaces().map((w) => w.path!.toLowerCase()))
+  for (const k of [...trustRead.keys()]) if (!open.has(k.slice(k.indexOf('|') + 1))) trustRead.delete(k)
 }
 
 /**
@@ -676,7 +760,7 @@ function rereadTrust(id: string): void {
 export async function setUpFolder(id: string): Promise<string | undefined> {
   const a = getAccount(id)
   if (!a || !workspace.path || !onHere(a)) return undefined
-  const t = await readTrust(id, workspace.path, projectsHere())
+  const t = await readTrust(id, workspace.path, projectsHere(), true)
   return t?.pending[0]?.folder
 }
 
@@ -688,7 +772,6 @@ const projectsHere = (): { name: string; path: string }[] => (workspace.info()?.
 
 /** Reads a connection's set-up state again, telling the windows when it changed. */
 export async function readSetUp(id: string): Promise<void> {
-  rereadTrust(id)
   const a = getAccount(id)
   if (!a) return
   const read = provider(a.provider).connectionSetUp
@@ -813,6 +896,8 @@ async function openLoginTerminal(id: string, setUp: boolean, folder?: string): P
     try {
       return providerService.runAccountLogin(a.provider, id, { [homeEnv]: accountFolder(id) }, () => {
         loginsOpen.delete(id)
+        // Its trust read again too (HI-1870): a Set Up's trust question may have been answered.
+        rereadTrust(id)
         void checkAccount(id).then((o) => {
           if (generation(id) !== gen) return
           const ok = acceptable(o ?? undefined, namesOrgs(a.provider))
@@ -1008,11 +1093,10 @@ export function accountsView(check = false): ConnectionsView {
   else for (const a of all) if (!setUpRead.has(a.id)) void readSetUp(a.id)
   // Its trust of this workspace's folders (HI-1870), for each connection on here: read as shown, and when its projects changed.
   const here = workspace.path ? projectsHere() : []
+  pruneTrust()
+  // Read when shown (a refresh joins the read under way), or when this set of projects hasn't been read yet.
   if (workspace.path) for (const a of all) if (onHere(a) && (check || trustRead.get(trustKey(a.id, workspace.path))?.sig !== JSON.stringify(here))) void readTrust(a.id, workspace.path, here)
-  const trustOf = (a: Connection): { trust?: { pending: { project: string; folder: string }[]; unknown: boolean } } => {
-    const t = workspace.path && onHere(a) ? trustRead.get(trustKey(a.id, workspace.path)) : undefined
-    return t ? { trust: { pending: t.pending, unknown: t.unknown } } : {}
-  }
+  const trustOf = (a: Connection): { trust?: TrustAnswer } => (workspace.path && onHere(a) && provider(a.provider).connectionTrusts ? { trust: trustShown(a.id, workspace.path, here) } : {})
   void loadKeys()
   const providers = PROVIDERS.filter((p) => !!p.capabilities.connections && isProviderEnabled(config.settings, p.id)).map((p) => p.id)
   const cfg = workspace.path ? workspace.config : null
