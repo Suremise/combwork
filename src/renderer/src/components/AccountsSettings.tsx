@@ -290,7 +290,8 @@ export function AccountsSettings() {
                       </div>
                     </>
                   )}
-                  {needsSetUp && <div className="account-setup-note hint" data-set-up-note>{setUpHint(a.provider)}</div>}
+                  {/* Said once: above its Set Up terminal while that is open (the Assistant, HI-1871). */}
+                  {needsSetUp && !(terminal?.setUp && terminal.id === a.id) && <div className="account-setup-note hint" data-set-up-note>{setUpHint(a.provider)}</div>}
                   {needsSetUp && pending.length > 0 && <div className="account-setup-note hint" data-not-trusted>{tr(M.notTrusted, { projects: fmt.list([...pending.slice(0, 3).map((x) => x.project), ...(pending.length > 3 ? [tr(M.moreProjects, { n: pending.length - 3 })] : [])]) })}</div>}
                   {state === 'changed' && a.accepted && o?.email && <div className="account-warning" data-warning="changed"><Icon name="warning" /> {tr(M.changedTo, { now: o.email, was: a.accepted.email })}</div>}
                   {same && <div className="account-warning" data-warning="duplicate"><Icon name="warning" /> {tr(M.sameLogin, { names: fmt.list(same.map(nameOf)) })}</div>}
