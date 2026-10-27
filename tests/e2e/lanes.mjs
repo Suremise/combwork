@@ -100,6 +100,13 @@ export async function withLock(dir, fn) {
       mkdirSync(lock)
       break
     } catch (e) {
+      // Windows refuses the folder while one just released is still being deleted (another runner's handle on it, as a
+      // stat): EPERM, at times EACCES (HI-1800: 3 of 36 runners racing for it). Taken again once it is gone, within the
+      // same bound; a folder Hive can't write to at all still fails then.
+      if ((e.code === 'EPERM' || e.code === 'EACCES') && Date.now() - start <= 4 * LOCK_MAX_MS) {
+        await sleep(50)
+        continue
+      }
       if (e.code !== 'EEXIST') throw e
       let age = 0
       try {
