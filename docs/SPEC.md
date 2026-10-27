@@ -4079,6 +4079,14 @@ applied at the next card boundary, the lane showing "list changes after AM-12"; 
 The lane's cards, Todo ones included, use **the lane's ruleset** (the one in force when the lane started) until the
 lane ends; a Todo card not in a lane uses the current one.
 
+**A card another agent has** [HI-1821] (open, and on the board given to an agent other than the lane's builder) is
+another lane's work: its lane still lists and shows it, but never takes it as its current or next card, never pauses
+or waits on it (a request for you on it, its merge), and never queues a list change behind it; a lane's card starts
+without waiting for it. A change that **only takes cards out** (the list as it was, less some, in its order) and keeps
+the builder's own card in flight applies at once, so a card moved to another lane leaves its old lane at once. A
+`hive_lane start` listing an open card that another builder's running lane lists (or has queued) is not refused: its
+reply warns, naming that lane, so the card is taken out of one of them.
+
 #### 16.11.2 One card at a time
 
 [P1, answering HB3's round 1 finding 4; OP-36] A lane's builder keeps one slot (OP-10), and the merge queue is

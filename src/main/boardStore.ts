@@ -1162,11 +1162,11 @@ export const boardValue = (ws: WorkspaceService, key: string): string | null => 
  * against under the board's lock, just before it saves (#1270: a lane ended or its queued list applied only if its
  * cards are still where the decision read them). A card not on the board is missing from the map.
  */
-export function cardPlacesNow(ws: WorkspaceService, numbers: readonly number[]): Map<number, { column: string; project: string; archived: boolean }> {
+export function cardPlacesNow(ws: WorkspaceService, numbers: readonly number[]): Map<number, { column: string; project: string; archived: boolean; agent: string | null }> {
   if (!numbers.length) return new Map()
   return readSnapshot(ws, (_b, db) => {
-    const rows = db.prepare(`SELECT number, col, project, archived FROM cards WHERE number IN (${numbers.map(() => '?').join(', ')})`).all(...numbers) as { number: number; col: string; project: string; archived: number }[] // i18n-ignore: SQL
-    return new Map(rows.map((r) => [r.number, { column: r.col, project: r.project, archived: r.archived === 1 }]))
+    const rows = db.prepare(`SELECT number, col, project, archived, agent FROM cards WHERE number IN (${numbers.map(() => '?').join(', ')})`).all(...numbers) as { number: number; col: string; project: string; archived: number; agent: string | null }[] // i18n-ignore: SQL
+    return new Map(rows.map((r) => [r.number, { column: r.col, project: r.project, archived: r.archived === 1, agent: r.agent }]))
   })
 }
 /** Sets one of the board's own values (inside boardWrite). */

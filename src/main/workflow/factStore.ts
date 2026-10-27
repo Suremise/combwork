@@ -564,6 +564,11 @@ export class FactStore {
     return this.conn.read((db) => (db.prepare("SELECT id FROM lanes WHERE project = ? COLLATE NOCASE AND state = 'active' ORDER BY ord").all(this.scope.project) as { id: string }[]).map((r) => r.id))
   }
 
+  /** The agent a card is given to on the board (its id), or null: none, or no such card (HI-1821: a lane's card held elsewhere). */
+  cardAgent(n: number): string | null {
+    return this.conn.read((db) => (db.prepare('SELECT agent FROM cards WHERE number = ?').get(n) as { agent: string | null } | undefined)?.agent ?? null)
+  }
+
   /** A lane's builder agent (lanes.ts's), or null: the one to tell when its queued list applies (#1270). */
   laneBuilder(id: string): string | null {
     return this.conn.read((db) => (db.prepare('SELECT builder_id FROM lanes WHERE id = ? AND project = ? COLLATE NOCASE').get(id, this.scope.project) as { builder_id: string } | undefined)?.builder_id ?? null)
