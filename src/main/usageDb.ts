@@ -176,6 +176,12 @@ export const USAGE_MIGRATIONS: Migration[] = [
           PRIMARY KEY (scope, key)
         ) STRICT, WITHOUT ROWID;
       `)
+  },
+  {
+    version: 2,
+    name: 'usage-reports-ignored',
+    // A session that ran on a server connection (HI-1772): its CLI's cost reports never counted. Set once, never cleared.
+    up: (db) => db.exec('ALTER TABLE usage_sessions ADD COLUMN reports_ignored INTEGER NOT NULL DEFAULT 0') // i18n-ignore: SQL
   }
 ]
 
@@ -203,10 +209,12 @@ export interface Cursor {
   source: string
   /** The holds its rows were shared out by (null: none recorded). */
   holdsKey: string | null
+  /** Its CLI's cost reports aren't counted (HI-1772: it ran on a server connection): set once, never cleared. */
+  reportsIgnored: boolean
 }
 
 export function cursorOf(db: DatabaseSync, scope: string, session: string): Cursor | null {
-  const s = db.prepare('SELECT path, size, mtime, offset, state, state_offset, state_shape, state_version, state_check, state_at, source, holds_key FROM usage_sessions WHERE scope = ? AND session = ?').get(scope, session) as Record<string, unknown> | undefined // i18n-ignore: SQL
+  const s = db.prepare('SELECT path, size, mtime, offset, state, state_offset, state_shape, state_version, state_check, state_at, source, holds_key, reports_ignored FROM usage_sessions WHERE scope = ? AND session = ?').get(scope, session) as Record<string, unknown> | undefined // i18n-ignore: SQL
   if (!s) return null
   const sums = db.prepare('SELECT coalesce(sum(requests), 0) AS q, coalesce(sum(input + output + cache_write + cache_read), 0) AS t FROM usage_rows WHERE scope = ? AND session = ?').get(scope, session) as { q: number; t: number } // i18n-ignore: SQL
   return {
@@ -223,7 +231,8 @@ export function cursorOf(db: DatabaseSync, scope: string, session: string): Curs
     requests: sums.q,
     tokens: sums.t,
     source: s.source as string,
-    holdsKey: (s.holds_key as string | null) ?? null
+    holdsKey: (s.holds_key as string | null) ?? null,
+    reportsIgnored: s.reports_ignored === 1
   }
 }
 
@@ -257,6 +266,8 @@ export interface SessionWrite extends SessionMeta {
   rows: LedgerRow[]
   /** Its baseline, when it changed (null: as it is). */
   baseline: BaselineDay[] | null
+  /** Written without its CLI's cost reports (HI-1772): the session is marked so for good. */
+  reportsIgnored?: boolean
 }
 
 /**
@@ -292,6 +303,8 @@ export function writeSession(db: DatabaseSync, w: SessionWrite, expect: { offset
       s.title, s.customTitle ?? null, s.model, s.cliVersion, s.reasoningTokens ?? 0, s.contextTokens ?? 0, s.contextInputTokens ?? null, s.lastOutputTokens ?? null, s.contextWindow ?? null,
       s.cacheTtlSeconds ?? 0, s.firstActivity, s.lastActivity, s.userMessages ?? 0, s.lastPrompt, premiumOf(s), w.timeline ? w.timeline.step : null, at
     )
+    // One way (HI-1772): a write that ignores the CLI's cost reports marks the session so; none ever unmarks it.
+    if (w.reportsIgnored) db.prepare('UPDATE usage_sessions SET reports_ignored = 1 WHERE scope = ? AND session = ?').run(w.scope, w.session) // i18n-ignore: SQL
     if (w.state === 'clear') clearState(db, w.scope, w.session)
     else if (w.state) db.prepare('UPDATE usage_sessions SET state = ?, state_offset = ?, state_shape = ?, state_version = ?, state_check = ?, state_at = ? WHERE scope = ? AND session = ?').run(w.state.data, w.state.offset, w.state.shape, w.state.version, w.state.check, at, w.scope, w.session) // i18n-ignore: SQL
     return true

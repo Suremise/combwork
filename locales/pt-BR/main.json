@@ -98,6 +98,8 @@
   "main.installDir.whatFolder": "O Windows não deixa as janelas do Hive lerem a pasta em que o Hive está instalado:",
   "main.installDir.whyFile": "As permissões do arquivo têm uma entrada para um pacote de app, mas nenhuma para ALL APPLICATION PACKAGES, de que as janelas em sandbox do Hive precisam, e o Hive não conseguiu adicionar uma. Execute este comando no PowerShell (como administrador, se você não for o dono deles): ele adiciona a entrada à pasta e ao arquivo. Depois inicie o Hive de novo:",
   "main.installDir.whyFolder": "As permissões da pasta têm uma entrada para um pacote de app, mas nenhuma para ALL APPLICATION PACKAGES, de que as janelas em sandbox do Hive precisam, e o Hive não conseguiu adicionar uma. Execute este comando no PowerShell (como administrador, se você não for o dono da pasta) e depois inicie o Hive de novo:",
+  "main.keys.maskingFull": "O Hive não consegue manter o mascaramento de mais uma chave: ele já mantém o máximo possível. A chave não foi salva.",
+  "main.keys.maskingUnreadable": "O Hive não consegue verificar isto quanto a chaves de API: os dados de mascaramento dele não podem ser lidos. Veja Configurações → Conexões.",
   "main.keys.unsafe": "O Hive não consegue guardar uma chave com segurança neste sistema, então ela não foi salva.",
   "main.leftovers.end": "Encerrar",
   "main.leftovers.keep": "Manter em execução",

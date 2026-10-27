@@ -1,7 +1,7 @@
 // The usage worker (#1106): records a session from its transcript, reads only what was added since (taking up its
 // parser's state), never makes a session's totals smaller, keeps a kept usage only for a session it doesn't have, and
 // leaves a session another writer recorded meanwhile as that writer wrote it.
-import { appendFileSync, readFileSync, writeFileSync } from 'fs'
+import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { spawn, type ChildProcess } from 'child_process'
 import { join } from 'path'
 import { Worker } from 'worker_threads'
@@ -418,20 +418,37 @@ describe('the usage worker reading a transcript for main', () => {
     // As a sign-in session: the report is its cost.
     expect((await t.ingest()).status).toBe('written')
     expect(await cost()).toBeCloseTo(4.2)
-    // As a server session (its record's serverRan): recorded again without it, unpriced (Hive has no price for its model).
-    const s = await setup()
-    writeFileSync(s.transcript, readFileSync(t.transcript, 'utf8'))
-    expect((await s.ingest({ reportsIgnored: true })).status).toBe('written')
-    const st = (await s.stored())!
-    const rows = st.rows
-    expect(usageFromRows(st.summary, rows, settings).costUsd).toBeNull()
-    expect(rows.reduce((n, r) => n + r.outputTokens, 0)).toBe(200)
+    // The same session, now marked (its record's serverRan): the same file, unchanged, read again without the report.
+    const tokens = async () => (await t.stored())!.rows.reduce((n, r) => n + r.outputTokens, 0)
+    const days = async () => [...new Set((await t.stored())!.rows.map((r) => r.day))]
+    const daysBefore = await days()
+    expect((await t.ingest({ reportsIgnored: true })).status).toBe('written')
+    expect(await cost()).toBeNull()
+    expect(await tokens()).toBe(200)
+    expect(await days()).toEqual(daysBefore)
+    // A late job from before it was marked: never brings the report back; then nothing to do.
+    expect((await t.ingest({ reportsIgnored: false })).status).toBe('unchanged')
+    expect(await cost()).toBeNull()
+    // More of the file, read on from its saved parser: still without the report.
+    appendFileSync(t.transcript, server(4) + JSON.stringify({ type: 'cost-state', timestamp: new Date(T0 + 5000).toISOString(), totalCostUSD: 6.3 }) + '\n')
+    expect((await t.ingest()).status).toBe('written')
+    expect(await cost()).toBeNull()
+    expect(await tokens()).toBe(300)
     // A read for its footer the same way; without the flag, the report.
-    const readFor = (reportsIgnored?: boolean) => call({ type: 'read', path: s.transcript, session: 'abc', provider: 'claude-code', seed: null, ...(reportsIgnored ? { reportsIgnored } : {}) }) as Promise<{ usage: SessionUsage }>
+    const readFor = (reportsIgnored?: boolean) => call({ type: 'read', path: t.transcript, session: 'abc', provider: 'claude-code', seed: null, ...(reportsIgnored ? { reportsIgnored } : {}) }) as Promise<{ usage: SessionUsage }>
     expect(priceUsage((await readFor(true)).usage, settings).costUsd).toBeNull()
-    expect(priceUsage((await readFor()).usage, settings).costUsd).toBeCloseTo(4.2)
+    expect(priceUsage((await readFor()).usage, settings).costUsd).toBeCloseTo(6.3)
+    // A session marked once its transcript is gone: its stored rows stripped of the report, counts kept.
+    const g = await setup()
+    writeFileSync(g.transcript, readFileSync(t.transcript, 'utf8'))
+    expect((await g.ingest()).status).toBe('written')
+    rmSync(g.transcript)
+    expect((await g.ingest({ reportsIgnored: true })).status).toBe('written')
+    const gs = (await g.stored())!
+    expect(usageFromRows(gs.summary, gs.rows, settings).costUsd).toBeNull()
+    expect(gs.rows.reduce((n, r) => n + r.outputTokens, 0)).toBe(300)
+    await g.close()
     await t.close()
-    await s.close()
   })
 })
 

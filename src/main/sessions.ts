@@ -246,6 +246,8 @@ export function stopWaitMs(timeoutMs: number, graces: (number | undefined)[]): n
 interface LiveSession {
   state: LiveSessionState
   adapter: ProviderAdapter
+  /** The session whose record was saved with `serverRan` (HI-1772): let go from serverSessions once the run exits. */
+  serverRanSaved?: string
   /** The terminal as rendered, for an adapter that reads it (its footer's mode, or a menu to pick from: #396). */
   screen?: TerminalScreen | null
   /** The size refreshes given so far, for a CLI that needs them (capabilities.startupSizeRefresh, #486). */
@@ -545,6 +547,8 @@ interface UsageSeen {
   mtime: number
   /** The worker's result, before costs, which follow the prices in the settings. */
   raw: SessionUsage
+  /** Read without its CLI's cost reports (HI-1772): a read asking otherwise isn't this one. */
+  reportsIgnored: boolean
   /** Worked out from raw (with costs); null until asked for again after a price change. */
   usage: SessionUsage | null
 }
@@ -2287,7 +2291,11 @@ class SessionManager {
       onExit: (code, output) => {
         screen?.dispose()
         // A server connection's key stays masked until what its exit left (its last output) is handled (HI-1772).
-        void Promise.resolve(this.onExit(projectPath, agent.id, state.runId, code, output)).finally(() => conn?.server?.endKeyUse())
+        void Promise.resolve(this.onExit(projectPath, agent.id, state.runId, code, output)).finally(() => {
+          // Its record says it ran on a server (saved): no longer kept in memory once no live run has it (HI-1772).
+          const sid = l.serverRanSaved
+          if (sid && !this.liveStates().some((s) => s.sessionId === sid)) serverSessions.delete(sid)
+        })
       }
     })
     // Its process runs now (spawnPty returned, not thrown): its slot's writer is the run's processes' to settle (#1434).
@@ -2364,6 +2372,12 @@ class SessionManager {
       // On a server connection (HI-1772), kept once set: its CLI's cost reports are never counted for it.
       ...(state.launchedConnection?.server ? { serverRan: true as const } : {})
     }, { createdAt: state.sessionCreatedAt })
+    // Its record says it ran on a server (HI-1772, now or in an earlier run): its reads leave the CLI's cost reports out
+    // while it runs; once it exits, its record says so (serverRanSaved: only once that write succeeded).
+    if (rec.serverRan && sessionId) {
+      serverSessions.add(sessionId)
+      l.serverRanSaved = sessionId
+    }
     // The conversation it was meant for has it: one the CLI moves to later (/clear, /new) wasn't handed over.
     l.handedOverFrom = undefined
     // Started in a slot: bound to the lease it started under (a conversation the CLI moves to later, too).
@@ -2584,7 +2598,7 @@ class SessionManager {
     }
     const l = check(this.live.get(id))
     const src = await this.liveTranscript(l)
-    const before = src ? ((await this.usageFor(l.state.projectPath, src, l.state.sessionId, l.state.provider))?.compactions.length ?? 0) : 0
+    const before = src ? ((await this.usageFor(l.state.projectPath, src, l.state.sessionId, l.state.provider, this.costPolicy(l)))?.compactions.length ?? 0) : 0
     // Again: a second Compact or a prompt may have come meanwhile (one at a time, only while idle).
     if (this.live.get(id) !== l) throw hiveError(M.noSession, undefined, { kind: 'conflict' })
     check(l)
@@ -3857,11 +3871,11 @@ class SessionManager {
     await this.readSafeguards(l, src)
     if (l.compacting) {
       // Fallback if the compaction hooks never arrive: a new compaction in the transcript.
-      const u = await this.usageFor(l.state.projectPath, src, sessionId, l.state.provider)
+      const u = await this.usageFor(l.state.projectPath, src, sessionId, l.state.provider, this.costPolicy(l))
       if (u) l.compacting?.transcript(u.compactions)
     }
     if (l.defaultModel) {
-      const usage = await this.usageFor(l.state.projectPath, src, sessionId, l.state.provider)
+      const usage = await this.usageFor(l.state.projectPath, src, sessionId, l.state.provider, this.costPolicy(l))
       if (usage?.model) {
         providerService.observeDefaultModel(l.state.provider, usage.model)
         l.defaultModel = false
@@ -3885,7 +3899,7 @@ class SessionManager {
     if (l.adapter.descriptor.capabilities.reportsCost && !own) return this.setLiveCost(l, l.reportedCost, false)
     if (!force && Date.now() - (l.costAt ?? 0) <= COST_INTERVAL_MS) return
     l.costAt = Date.now()
-    const usage = await this.usageFor(l.state.projectPath, src, l.state.sessionId, l.state.provider)
+    const usage = await this.usageFor(l.state.projectPath, src, l.state.sessionId, l.state.provider, this.costPolicy(l))
     // The settings changed while it was read: the read they started decides.
     if ((onServer || usesOwnPrices(l.state.provider, config.settings)) !== own || !usage) return
     // An estimate is Hive's (the user's prices, or a provider that reports none); anything else is the CLI's report.
@@ -5553,13 +5567,18 @@ class SessionManager {
    * its last read stopped, or (not read in this run: a session resumed after a restart) from its session's saved state in
    * the history of `projectPath`, its host. Unchanged since main last had it, answered here without asking the worker.
    */
+  /** A running session's cost policy (HI-1772): on a server connection now, or its record says it ran on one. */
+  private costPolicy(l: LiveSession): { reportsIgnored: boolean } {
+    return { reportsIgnored: !!l.state.launchedConnection?.server || (!!l.state.sessionId && serverSessions.has(l.state.sessionId)) }
+  }
+
   private async usageFor(projectPath: string, path: string, sessionId: string, provider: ProviderId, o: { noWait?: boolean; reportsIgnored?: boolean } = {}): Promise<SessionUsage | null> {
     // A session that ran on a server connection (HI-1772): read without its CLI's cost reports.
     const reportsIgnored = !!o.reportsIgnored || serverSessions.has(sessionId)
     try {
       const s = await stat(path)
       const seen = usageSeen.get(path)
-      if (seen && seen.mtime === s.mtimeMs && seen.size === s.size && seen.sessionId === sessionId && seen.provider === provider) {
+      if (seen && seen.mtime === s.mtimeMs && seen.size === s.size && seen.sessionId === sessionId && seen.provider === provider && seen.reportsIgnored === reportsIgnored) {
         // Most recently used last: the oldest go first when there are too many.
         usageSeen.delete(path)
         usageSeen.set(path, seen)
@@ -5571,7 +5590,7 @@ class SessionManager {
       this.checkUnderstood(provider, r.usage, r.size)
       // The title the CLI's own index gives it (Codex's, Copilot's), which the worker's parsers can't read.
       const raw = this.titled(r.usage)
-      const c: UsageSeen = { sessionId, provider, size: r.size, mtime: r.mtime, raw, usage: this.priced(raw) }
+      const c: UsageSeen = { sessionId, provider, size: r.size, mtime: r.mtime, raw, usage: this.priced(raw), reportsIgnored }
       usageSeen.delete(path)
       usageSeen.set(path, c)
       if (usageSeen.size > MAX_USAGE_SEEN) usageSeen.delete(usageSeen.keys().next().value!)

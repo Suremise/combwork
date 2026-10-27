@@ -232,7 +232,8 @@ if (toConsole) {
  */
 export function logLine(level: Level, scope: string, message: string, extra?: unknown): string {
   const detail = extra instanceof Error ? ` ${extra.stack ?? extra.message}` : extra !== undefined ? ` ${safeJson(extra)}` : ''
-  return maskKeys(`${new Date().toISOString()} [${level.toUpperCase()}] [${scope}] ${message}${detail}\n`)
+  // Its time, level and scope are Hive's own; strict masking (keyMatcher.ts) is for what follows them.
+  return `${new Date().toISOString()} [${level.toUpperCase()}] [${scope}] ${maskKeys(`${message}${detail}`)}\n`
 }
 
 function write(level: Level, scope: string, message: string, extra?: unknown): void {

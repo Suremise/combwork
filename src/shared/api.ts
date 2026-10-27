@@ -952,6 +952,8 @@ export interface HiveRequests {
   'connections:cancelModels': (id: string, request: string) => void
   /** Opens the CLI on a server connection, for its first-run screens; returns the terminal's key. */
   'connections:setUp': (id: string) => string
+  /** Reset Masking Data (the user confirmed it): fingerprints made again from the keys saved now; masking strict for good after. */
+  'connections:resetMasking': () => void
   /** Takes on the login an account is now signed in as (its change answered). */
   'connections:keepLogin': (id: string) => void
   /** Turns an account on or off in this window's workspace. */

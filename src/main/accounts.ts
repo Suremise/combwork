@@ -21,7 +21,7 @@ import { withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
 import { openWorkspaces, setNewWorkspaceExtras, workspace, workspaceOf } from './workspace'
 import { dropKeysExcept, keyInfo, loadKeys, removeKey, withKey } from './keyStore'
-import { holdKey } from './keyMatcher'
+import { coverageView } from './keyCoverage'
 import { aliasModels, MODEL_ALIASES, originOf, parseBaseUrl, serverDefaultModel } from '../shared/serverConnection'
 import type { ServerCaps } from '../shared/providers'
 
@@ -853,7 +853,7 @@ export function accountsView(check = false): ConnectionsView {
     const k = isServer(a) ? keyInfo(a.id) : undefined
     return k && k.origin === originOf(a.server?.baseUrl ?? '') ? { key: { last4: k.last4, at: k.at } } : {}
   }
-  return { preview: true, providers, connections: all.map((a) => ({ ...a, signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a) })), workspace: ws, testHome }
+  return { preview: true, providers, connections: all.map((a) => ({ ...a, signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a) })), workspace: ws, testHome, masking: coverageView() }
 }
 
 /** Saves the asking window's workspace's accounts for a provider, worked out from how they are when it is written. */
@@ -936,7 +936,7 @@ export interface LaunchConnection {
    * that launch's environment only and never kept), its models for the footer, and its key's use for masking, ended
    * by whoever holds the launch once its process is gone (or it never started).
    */
-  server?: { env: Record<string, string>; models: ServerModel[]; endKeyUse: () => void }
+  server?: { env: Record<string, string>; models: ServerModel[] }
   /**
    * Asked at the last moment, with the agent's (or the Assistant's) choice as saved then: whether that choice, resolved
    * again with its workspace's connections as they are now, is still this connection, and it is still there.
@@ -991,8 +991,7 @@ async function serverPart(a: Connection, caps: ServerCaps, agentName: string): P
   if (!a.server || !b.ok) throw hiveError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
   const got = await withKey(a.id, b.origin)
   if (!got && !b.local) throw hiveError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
-  const endKeyUse = got ? holdKey(got.key) : () => undefined
-  return { part: { env: serverEnv(caps, a.server, got?.key ?? null), models: a.server.models, endKeyUse }, keyV: got?.v ?? null, origin: b.origin }
+  return { part: { env: serverEnv(caps, a.server, got?.key ?? null), models: a.server.models }, keyV: got?.v ?? null, origin: b.origin }
 }
 
 /**
@@ -1029,7 +1028,6 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
         return generation(id) === gen && !!now && isServer(now) && originOf(now.server?.baseUrl ?? '') === origin && (keyInfo(id)?.origin === origin ? keyInfo(id)!.v : null) === keyV
       }
       if (!a || !same()) {
-        part.endKeyUse()
         throw hiveError(NO_ACCOUNT, undefined, { kind: 'notFound' })
       }
       noteLastUsed(o.provider, id)
@@ -1095,8 +1093,6 @@ export async function launchOnChosen(o: { provider: ProviderId; workspaceConfig:
       })
       return
     } catch (e) {
-      // It never started: its key's use ends here (a started one's ends with its process, sessions.ts).
-      conn?.server?.endKeyUse()
       if (!(e instanceof ConnectionChanged)) throw e
       if (again) throw hiveError(LAUNCH.changedAgain, { agent: o.agentName }, { kind: 'conflict' })
       log.info(`${userText(o.agentName)}: its connection was changed while it was starting; starting it on the one chosen now`)

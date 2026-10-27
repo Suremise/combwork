@@ -1,48 +1,65 @@
-import { createHmac, randomBytes, randomInt } from 'crypto'
+import { createHmac } from 'crypto'
+import { isMainThread } from 'worker_threads'
 import { setKeyMasker } from '../shared/redact'
 
 /**
- * Finds a server connection's key in text without keeping the key (HI-1772): for each key in use, a keyed hash (HMAC,
- * with a salt made for this run of Hive) of every run of FRAGMENT characters in it, and of each of those runs as the key
- * is written once or twice JSON-escaped and URL-encoded (a log's serialised data, a payload inside a payload, a query).
- * Text is scanned once with a rolling hash whose base is secret too, and a window that matches is checked by its HMAC;
- * every matching window is masked, so any FRAGMENT characters or more of a key are masked wherever they are: the whole
- * key, a key inside a longer run or in JSON, or a piece of one cut off by a string's edge or split between strings.
- * Fewer than FRAGMENT characters can't be told from noise and are left.
+ * Finds server connections' keys in text without the keys (HI-1772): each key ever saved left a fingerprint
+ * (keyCoverage.ts keeps them, encrypted, across Replace, Remove and restarts): a keyed hash (HMAC, a secret salt) of
+ * every run of FRAGMENT characters of it, as it is, JSON-escaped once and twice, and URL-encoded. Text is scanned once
+ * with a rolling hash whose base is secret too, and a window that matches is checked by its HMAC; every matching window
+ * is masked, so any FRAGMENT characters or more of a key are masked wherever they are, whole or cut anywhere.
  *
- * Registered while the key is in use (a launch until its exit is handled, a Set Up terminal, a model reading, a Save,
- * an export: holdKey), counted, and dropped when the last use ends: no key is decrypted at start-up. maskKeys is plugged
- * into shared/redact.ts's maskSecrets (the developer console, its recordings and flight captures, Copy Diagnostics,
- * transcript views) and hive.log's writer, and the exports call it on what they write.
+ * Strict (`strict()`): while the fingerprints aren't loaded yet in main, can't be read, or a reset lost some (a coverage
+ * gap, for good), every run of FRAGMENT or more characters without whitespace is masked instead: a key has no
+ * whitespace in any of its forms, so none of it can pass. `none` (no key was ever saved): nothing to mask.
+ *
+ * maskKeys is plugged into shared/redact.ts's maskSecrets (the developer console, its recordings and flight captures,
+ * Copy Diagnostics, transcript views) and hive.log's line (logger.ts logLine); the exports mask what they write with it.
  */
 
 export const FRAGMENT = 8
-/** A prime under 2^24: products stay exact in a double (under 2^48). A prefilter only: each hit is checked by its HMAC. */
-const MOD = 16777213
-/** The rolling hash's base: secret, so the prefilter's hashes say nothing about the key on their own. */
-const BASE = randomInt(1 << 12, MOD - 1)
-const salt = randomBytes(32)
-const mac = (s: string): string => createHmac('sha256', salt).update(s, 'utf8').digest('base64')
+/** A prime under 2^24: products stay exact in a double. A prefilter only: each hit is checked by its HMAC. */
+export const MOD = 16777213
+/** The HMAC kept per window: its first bytes, enough to tell a key's window from others. */
+const MAC_BYTES = 12
 
-const mulMod = (a: number, b: number): number => (a * b) % MOD
-/** BASE^(FRAGMENT-1) mod MOD: takes the window's first character out. */
-const TOP = (() => {
-  let p = 1
-  for (let i = 0; i < FRAGMENT - 1; i++) p = mulMod(p, BASE)
-  return p
-})()
+export type MaskingState = 'none' | 'pending' | 'ready' | 'unavailable'
+export interface MatchSecret {
+  salt: Buffer
+  base: number
+}
+/** A window's fingerprint: its prefilter hash and its truncated HMAC. */
+export type Window = [hash: number, mac: string]
 
-function windows(s: string): number[] {
+// Electron's main process starts pending (strict) until keyCoverage says what it has; a worker (and a plain Node test
+// run, which loads no coverage) has none.
+let state: MaskingState = isMainThread && (process as { type?: string }).type === 'browser' ? 'pending' : 'none'
+let gap = false
+let secret: MatchSecret | null = null
+let top = 1
+let index = new Map<number, Set<string>>()
+
+const mac = (s: MatchSecret, text: string): string => createHmac('sha256', s.salt).update(text, 'utf8').digest().subarray(0, MAC_BYTES).toString('base64')
+
+function hashes(s: MatchSecret, text: string): number[] {
   const out: number[] = []
-  if (s.length < FRAGMENT) return out
+  if (text.length < FRAGMENT) return out
   let h = 0
-  for (let i = 0; i < FRAGMENT; i++) h = (mulMod(h, BASE) + s.charCodeAt(i)) % MOD
+  for (let i = 0; i < FRAGMENT; i++) h = ((h * s.base) % MOD + text.charCodeAt(i)) % MOD
   out.push(h)
-  for (let i = FRAGMENT; i < s.length; i++) {
-    h = (mulMod((h - mulMod(s.charCodeAt(i - FRAGMENT), TOP) + MOD) % MOD, BASE) + s.charCodeAt(i)) % MOD
+  const t = topOf(s)
+  for (let i = FRAGMENT; i < text.length; i++) {
+    h = ((((h - ((text.charCodeAt(i - FRAGMENT) * t) % MOD) + MOD) % MOD) * s.base) % MOD + text.charCodeAt(i)) % MOD
     out.push(h)
   }
   return out
+}
+
+/** base^(FRAGMENT-1) mod MOD: takes a window's first character out. */
+function topOf(s: MatchSecret): number {
+  let p = 1
+  for (let i = 0; i < FRAGMENT - 1; i++) p = (p * s.base) % MOD
+  return p
 }
 
 /** The ways a key is written where Hive may meet it: as it is, JSON-escaped once and twice, URL-encoded. */
@@ -52,77 +69,69 @@ function forms(key: string): string[] {
   return [...new Set([key, once, twice, encodeURIComponent(key)])]
 }
 
-interface Entry {
-  /** Each window's rolling hash → the HMACs of the windows with it. */
-  grams: Map<number, Set<string>>
-  refs: number
-}
-const entries = new Map<string, Entry>()
-/** All keys' windows together, rebuilt when a key is held or let go. */
-let index = new Map<number, Set<string>>()
-
-function rebuild(): void {
-  const next = new Map<number, Set<string>>()
-  for (const e of entries.values())
-    for (const [h, macs] of e.grams) {
-      let s = next.get(h)
-      if (!s) next.set(h, (s = new Set()))
-      for (const m of macs) s.add(m)
-    }
-  index = next
+/** A key's fingerprint under a secret: every window of every form (kept, encrypted, by keyCoverage.ts). */
+export function fingerprint(s: MatchSecret, key: string): Window[] {
+  const out: Window[] = []
+  for (const f of forms(key)) hashes(s, f).forEach((h, i) => out.push([h, mac(s, f.slice(i, i + FRAGMENT))]))
+  return out
 }
 
-/** A use of a key: masked from now on, until every use is released. Returns its release (safe to call twice). */
-export function holdKey(key: string): () => void {
-  const id = mac(`key:${key}`)
-  let e = entries.get(id)
-  if (!e) {
-    const grams = new Map<number, Set<string>>()
-    for (const f of forms(key))
-      windows(f).forEach((h, i) => {
-        let s = grams.get(h)
-        if (!s) grams.set(h, (s = new Set()))
-        s.add(mac(f.slice(i, i + FRAGMENT)))
-      })
-    e = { grams, refs: 0 }
-    entries.set(id, e)
-    rebuild()
+/** What keyCoverage.ts loaded or decided: the state, the sticky gap, and (ready) the secret and every key's windows. */
+export function setMasking(o: { state: MaskingState; gap?: boolean; secret?: MatchSecret | null; windows?: Window[] }): void {
+  state = o.state
+  if (o.gap !== undefined) gap = gap || o.gap
+  if (o.secret !== undefined) {
+    secret = o.secret
+    top = secret ? topOf(secret) : 1
   }
-  e.refs++
-  const entry = e
-  let released = false
-  return () => {
-    if (released) return
-    released = true
-    entry.refs--
-    if (entry.refs <= 0 && entries.get(id) === entry) {
-      entries.delete(id)
-      rebuild()
-    }
+  if (o.windows) {
+    index = new Map()
+    addWindows(o.windows)
   }
 }
 
-/** How many keys are masked now (tests). */
-export const keysInUse = (): number => entries.size
+/** A newly saved key's windows, matched from now on. */
+export function addWindows(windows: Window[]): void {
+  for (const [h, m] of windows) {
+    let s = index.get(h)
+    if (!s) index.set(h, (s = new Set()))
+    s.add(m)
+  }
+}
+
+/** Whether every long run is masked: not loaded yet, unreadable, or a coverage gap (sticky). */
+export const strict = (): boolean => gap || state === 'pending' || state === 'unavailable'
+export const maskingState = (): { state: MaskingState; gap: boolean } => ({ state, gap })
 
 const MASK = '<key>'
+const STRICT_MASK = '<masked>'
+const LONG_RUN = new RegExp(`[^\\s]{${FRAGMENT},}`, 'g')
 
-/** The text with every run of FRAGMENT or more characters of a key in use masked, in any of the forms it is written in. */
+/** The text with every run of FRAGMENT or more characters of a saved key masked (strict: every long run). */
 export function maskKeys(text: string): string {
-  if (!index.size || !text || text.length < FRAGMENT) return text
+  if (!text) return text
+  if (strict()) return text.replace(LONG_RUN, STRICT_MASK)
+  if (state === 'none' || !secret || !index.size || text.length < FRAGMENT) return text
+  const s = secret
   const ranges: [number, number][] = []
-  windows(text).forEach((h, i) => {
+  // The rolling hash inline (as hashes() does), checked against the index as it goes.
+  let h = 0
+  for (let i = 0; i < FRAGMENT; i++) h = ((h * s.base) % MOD + text.charCodeAt(i)) % MOD
+  for (let i = 0; ; i++) {
     const macs = index.get(h)
-    if (!macs || !macs.has(mac(text.slice(i, i + FRAGMENT)))) return
-    const last = ranges[ranges.length - 1]
-    if (last && i <= last[1]) last[1] = i + FRAGMENT
-    else ranges.push([i, i + FRAGMENT])
-  })
+    if (macs && macs.has(mac(s, text.slice(i, i + FRAGMENT)))) {
+      const last = ranges[ranges.length - 1]
+      if (last && i <= last[1]) last[1] = i + FRAGMENT
+      else ranges.push([i, i + FRAGMENT])
+    }
+    if (i + FRAGMENT >= text.length) break
+    h = ((((h - ((text.charCodeAt(i) * top) % MOD) + MOD) % MOD) * s.base) % MOD + text.charCodeAt(i + FRAGMENT)) % MOD
+  }
   if (!ranges.length) return text
   let out = ''
   let at = 0
-  for (const [s, end] of ranges) {
-    out += text.slice(at, s) + MASK
+  for (const [start, end] of ranges) {
+    out += text.slice(at, start) + MASK
     at = end
   }
   return out + text.slice(at)
@@ -130,7 +139,7 @@ export function maskKeys(text: string): string {
 
 /** A value with every string in it (and every key of its objects) masked: for what is written as JSON, before encoding. */
 export function maskDeep<T>(v: T): T {
-  if (!index.size) return v
+  if (state === 'none' && !gap) return v
   const walk = (x: unknown): unknown => {
     if (typeof x === 'string') return maskKeys(x)
     if (Array.isArray(x)) return x.map(walk)
@@ -138,6 +147,15 @@ export function maskDeep<T>(v: T): T {
     return x
   }
   return walk(v) as T
+}
+
+/** For tests: as a process that has loaded nothing (the gap included, which nothing else lowers). */
+export function resetMaskingForTests(to: MaskingState = 'none'): void {
+  state = to
+  gap = false
+  secret = null
+  top = 1
+  index = new Map()
 }
 
 setKeyMasker(maskKeys)

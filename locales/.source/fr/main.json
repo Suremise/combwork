@@ -98,6 +98,8 @@
   "main.installDir.whatFolder": "Windows won't let Hive's windows read the folder Hive is installed in:",
   "main.installDir.whyFile": "Its permissions have an entry for an app package but none for ALL APPLICATION PACKAGES, which Hive's sandboxed windows need, and Hive couldn't add one. Run this command in PowerShell (as an administrator if you don't own them): it adds the entry to the folder and to the file. Then start Hive again:",
   "main.installDir.whyFolder": "Its permissions have an entry for an app package but none for ALL APPLICATION PACKAGES, which Hive's sandboxed windows need, and Hive couldn't add one. Run this command in PowerShell (as an administrator if you don't own the folder), then start Hive again:",
+  "main.keys.maskingFull": "Hive can't keep masking for another key: it already keeps the most it can. The key wasn't saved.",
+  "main.keys.maskingUnreadable": "Hive can't check this for API keys: its masking data can't be read. See Settings → Connections.",
   "main.keys.unsafe": "Hive can't store a key safely on this system, so it wasn't saved.",
   "main.leftovers.end": "End Them",
   "main.leftovers.keep": "Keep Running",

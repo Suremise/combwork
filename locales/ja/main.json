@@ -98,6 +98,8 @@
   "main.installDir.whatFolder": "Windowsの制限により、HiveのウィンドウがHiveのインストール先フォルダーを読み取れません：",
   "main.installDir.whyFile": "そのアクセス許可にはアプリパッケージのエントリがありますが、Hiveのサンドボックス化されたウィンドウに必要なALL APPLICATION PACKAGESのエントリがなく、Hiveはそれを追加できませんでした。PowerShellで次のコマンドを実行してください（所有者でない場合は管理者として）。フォルダーとファイルにエントリが追加されます。その後、Hiveをもう一度起動してください：",
   "main.installDir.whyFolder": "そのアクセス許可にはアプリパッケージのエントリがありますが、Hiveのサンドボックス化されたウィンドウに必要なALL APPLICATION PACKAGESのエントリがなく、Hiveはそれを追加できませんでした。PowerShellで次のコマンドを実行し（フォルダーの所有者でない場合は管理者として）、Hiveをもう一度起動してください：",
+  "main.keys.maskingFull": "Hive はこれ以上のキーをマスクできません。保持できる上限に達しています。キーは保存されませんでした。",
+  "main.keys.maskingUnreadable": "Hive はこれに API キーが含まれていないか確認できません。マスク用のデータを読み取れません。設定 → 接続 を確認してください。",
   "main.keys.unsafe": "このシステムではHiveがキーを安全に保存できないため、保存しませんでした。",
   "main.leftovers.end": "終了する",
   "main.leftovers.keep": "実行したままにする",

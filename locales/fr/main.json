@@ -98,6 +98,8 @@
   "main.installDir.whatFolder": "Windows empêche les fenêtres de Hive de lire le dossier où Hive est installé :",
   "main.installDir.whyFile": "Ses autorisations ont une entrée pour un package d’application, mais aucune pour ALL APPLICATION PACKAGES, dont les fenêtres isolées de Hive ont besoin, et Hive n’a pas pu en ajouter une. Exécute cette commande dans PowerShell (en tant qu’administrateur s’ils ne t’appartiennent pas) : elle ajoute l’entrée au dossier et au fichier. Puis redémarre Hive :",
   "main.installDir.whyFolder": "Ses autorisations ont une entrée pour un package d’application, mais aucune pour ALL APPLICATION PACKAGES, dont les fenêtres isolées de Hive ont besoin, et Hive n’a pas pu en ajouter une. Exécute cette commande dans PowerShell (en tant qu’administrateur si le dossier ne t’appartient pas), puis redémarre Hive :",
+  "main.keys.maskingFull": "Hive ne peut pas assurer le masquage d'une clé de plus : il en suit déjà le maximum possible. La clé n'a pas été enregistrée.",
+  "main.keys.maskingUnreadable": "Hive ne peut pas vérifier ceci pour des clés d'API : ses données de masquage sont illisibles. Voir Paramètres → Connexions.",
   "main.keys.unsafe": "Hive ne peut pas stocker de clé en sécurité sur ce système, elle n’a donc pas été enregistrée.",
   "main.leftovers.end": "Les arrêter",
   "main.leftovers.keep": "Laisser tourner",

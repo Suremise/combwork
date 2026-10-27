@@ -17,6 +17,11 @@ export interface ConnectionsView {
   workspace: Partial<Record<ProviderId, WorkspaceConnections>>
   /** Providers a test copy runs on its CLI test home where nothing is on (the test seam, HI-1755): no setup is asked for. */
   testHome: ProviderId[]
+  /**
+   * Server connections' key masking (HI-1772): `unavailable`, its data can't be read (strict, exports refused: Reset
+   * Masking Data); `gap`, a reset lost some (strict for good, since `gapSince`); `full`, near the most keys it keeps.
+   */
+  masking?: { state: 'none' | 'pending' | 'ready' | 'unavailable'; gap: boolean; gapSince?: string; full: boolean }
 }
 
 /**

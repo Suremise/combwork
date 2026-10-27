@@ -624,6 +624,11 @@ export interface AppConfig {
   connections?: Connection[]
   /** Per provider: the account last chosen as a workspace's default (or launched on), which a new workspace starts with. */
   lastUsedConnection?: Partial<Record<ProviderId, string>>
+  /**
+   * Server connections' key masking (HI-1772), mirrored with key-coverage.json and never cleared: `ever`, a key was
+   * saved (so fingerprints must exist); `gap`, a reset lost some (masking strict for good).
+   */
+  keyMasking?: { ever?: true; gap?: true }
   /** A version the user chose to skip; automatic checks don't offer it. */
   skippedUpdate?: string
   /** Version that last ran, to say "Hive updated" once after an update. */

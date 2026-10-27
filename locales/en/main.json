@@ -395,6 +395,14 @@
     "defaultMessage": "Its permissions have an entry for an app package but none for ALL APPLICATION PACKAGES, which Hive's sandboxed windows need, and Hive couldn't add one. Run this command in PowerShell (as an administrator if you don't own the folder), then start Hive again:",
     "description": "The message when Hive can't start from its install folder, its last paragraph (a command follows). ALL APPLICATION PACKAGES is a Windows name and PowerShell a program: keep them."
   },
+  "main.keys.maskingFull": {
+    "defaultMessage": "Hive can't keep masking for another key: it already keeps the most it can. The key wasn't saved.",
+    "description": "An error saving a server connection's API key: Hive keeps a fingerprint of every key ever saved (to hide it in logs and exports) and has reached its limit."
+  },
+  "main.keys.maskingUnreadable": {
+    "defaultMessage": "Hive can't check this for API keys: its masking data can't be read. See Settings → Connections.",
+    "description": "An error: an export, Copy Diagnostics or a recording was refused because the data Hive uses to hide server connections' API keys can't be read. Settings → Connections names a section, where it can be reset."
+  },
   "main.keys.unsafe": {
     "defaultMessage": "Hive can't store a key safely on this system, so it wasn't saved.",
     "description": "An error saving a server connection's API key (Settings → Connections): Windows' protection for stored secrets isn't available, and Hive won't keep a key in plain text."

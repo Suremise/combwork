@@ -98,6 +98,8 @@
   "main.installDir.whatFolder": "Windows lässt die Fenster von Hive den Installationsordner von Hive nicht lesen:",
   "main.installDir.whyFile": "Die Berechtigungen haben einen Eintrag für ein App-Paket, aber keinen für ALL APPLICATION PACKAGES, den die Sandbox-Fenster von Hive brauchen, und Hive konnte keinen hinzufügen. Führe diesen Befehl in PowerShell aus (als Administrator, wenn Ordner und Datei dir nicht gehören): Er fügt den Eintrag dem Ordner und der Datei hinzu. Starte Hive dann erneut:",
   "main.installDir.whyFolder": "Die Berechtigungen haben einen Eintrag für ein App-Paket, aber keinen für ALL APPLICATION PACKAGES, den die Sandbox-Fenster von Hive brauchen, und Hive konnte keinen hinzufügen. Führe diesen Befehl in PowerShell aus (als Administrator, wenn dir der Ordner nicht gehört) und starte Hive dann erneut:",
+  "main.keys.maskingFull": "Hive kann für keinen weiteren Schlüssel die Maskierung führen: Es führt bereits so viele, wie es kann. Der Schlüssel wurde nicht gespeichert.",
+  "main.keys.maskingUnreadable": "Hive kann dies nicht auf API-Schlüssel prüfen: Seine Maskierungsdaten können nicht gelesen werden. Siehe Einstellungen → Verbindungen.",
   "main.keys.unsafe": "Hive kann auf diesem System keinen Schlüssel sicher speichern, deshalb wurde er nicht gespeichert.",
   "main.leftovers.end": "Beenden",
   "main.leftovers.keep": "Weiterlaufen lassen",

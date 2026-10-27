@@ -98,6 +98,8 @@
   "main.installDir.whatFolder": "Windows no deja que las ventanas de Hive lean la carpeta donde está instalado Hive:",
   "main.installDir.whyFile": "Sus permisos tienen una entrada para un paquete de aplicación, pero ninguna para ALL APPLICATION PACKAGES, que necesitan las ventanas aisladas de Hive, y Hive no pudo agregarla. Ejecuta este comando en PowerShell (como administrador si no eres su propietario): agrega la entrada a la carpeta y al archivo. Luego vuelve a iniciar Hive:",
   "main.installDir.whyFolder": "Sus permisos tienen una entrada para un paquete de aplicación, pero ninguna para ALL APPLICATION PACKAGES, que necesitan las ventanas aisladas de Hive, y Hive no pudo agregarla. Ejecuta este comando en PowerShell (como administrador si no eres el propietario de la carpeta) y luego vuelve a iniciar Hive:",
+  "main.keys.maskingFull": "Hive no puede enmascarar otra clave más: ya lleva el máximo que puede. La clave no se guardó.",
+  "main.keys.maskingUnreadable": "Hive no puede comprobar si esto contiene claves de API: no se pueden leer sus datos de enmascaramiento. Consulta Configuración → Conexiones.",
   "main.keys.unsafe": "Hive no puede guardar una clave de forma segura en este sistema, así que no se guardó.",
   "main.leftovers.end": "Terminarlos",
   "main.leftovers.keep": "Dejar en ejecución",

@@ -6,7 +6,7 @@ import { msg } from '../shared/i18n'
 import { emit } from './events'
 import { writeJsonAtomic } from './fsutil'
 import { hiveError } from './hiveError'
-import { holdKey } from './keyMatcher'
+import { addKeyFingerprint, resetCoverage } from './keyCoverage'
 import { createLogger } from './logger'
 
 /**
@@ -17,8 +17,9 @@ import { createLogger } from './logger'
  * keep a removed key), under one lock for the whole file (`serial`), so two connections saving at once can't lose each
  * other's. Lock order: a connection's own lock (accounts.ts), then this one; config is written after, outside it.
  *
- * A key is decrypted only for a launch's environment, a Set Up terminal's, or a model listing's request (withKey), and
- * never sent to a window: the view gets `keyInfo`.
+ * A key is decrypted only for a launch's environment, a Set Up terminal's, a model listing's request (withKey), or Reset
+ * Masking Data (the user confirmed it), and never sent to a window: the view gets `keyInfo`. Its fingerprint is kept
+ * before it (keyCoverage.ts), so its text is masked for good without it.
  */
 
 const log = createLogger('keys')
@@ -109,6 +110,8 @@ function assertSafe(): void {
 export function saveKey(id: string, origin: string, key: string): Promise<KeyInfo> {
   assertSafe()
   return serial(async () => {
+    // Its fingerprint first (HI-1772): masked for good, whatever happens to the key after; refused if it can't be kept.
+    await addKeyFingerprint(id, key)
     const store = await read()
     const blob = safeStorage.encryptString(key).toString('base64')
     const entry: Entry = { v: randomBytes(12).toString('hex'), origin, last4: key.slice(-4), at: new Date().toISOString(), blob }
@@ -158,31 +161,24 @@ export function dropKeysExcept(keep: () => ReadonlySet<string>): Promise<string[
 }
 
 /**
- * Runs an export with every saved key masked (HI-1772 round 1): a transcript, the board or a report written to a file
- * may hold a key a session printed, even one whose run ended long ago, when no use of it is held. Each saved key is
- * decrypted for the export alone (the user asked for it; never at start-up), held for masking while it runs, and let go
- * after, however it ends. What the export writes goes through maskKeys.
+ * Reset Masking Data (HI-1772; the user confirmed it, in Settings → Connections): the one decryption besides a launch,
+ * Set Up and a model reading. The keys saved now that can still be read are fingerprinted again (keyCoverage.ts), under
+ * this lock; what was lost leaves a coverage gap for good.
  */
-export async function withSavedKeysMasked<T>(fn: () => Promise<T>): Promise<T> {
-  const keys = await serial(async () => {
+export function resetMasking(): Promise<number> {
+  return serial(async () => {
     const store = await read()
-    const out: string[] = []
+    const keys: { conn: string; key: string }[] = []
     for (const [id, e] of Object.entries(store)) {
       try {
-        out.push(safeStorage.decryptString(Buffer.from(e.blob, 'base64')))
-      } catch (err) {
-        log.warn(`connection ${id}'s key couldn't be decrypted for an export: ${(err as Error).message}`)
+        keys.push({ conn: id, key: safeStorage.decryptString(Buffer.from(e.blob, 'base64')) })
+      } catch {
+        log.warn(`connection ${id}'s key couldn't be read for the masking reset: it isn't fingerprinted again`)
       }
     }
-    return out
+    await resetCoverage(keys)
+    return keys.length
   })
-  const releases = keys.map((k) => holdKey(k))
-  keys.length = 0
-  try {
-    return await fn()
-  } finally {
-    for (const r of releases) r()
-  }
 }
 
 /**

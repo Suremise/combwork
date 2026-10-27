@@ -98,6 +98,8 @@
   "main.installDir.whatFolder": "Windows nie pozwala oknom Hive odczytać folderu, w którym zainstalowano Hive:",
   "main.installDir.whyFile": "Uprawnienia mają wpis dla pakietu aplikacji, ale brak w nich wpisu dla ALL APPLICATION PACKAGES, którego potrzebują okna Hive działające w piaskownicy, a nie udało się go dodać. Uruchom to polecenie w PowerShell (jako administrator, jeśli nie jesteś ich właścicielem): doda ono wpis do folderu i do pliku. Potem uruchom Hive ponownie:",
   "main.installDir.whyFolder": "Uprawnienia mają wpis dla pakietu aplikacji, ale brak w nich wpisu dla ALL APPLICATION PACKAGES, którego potrzebują okna Hive działające w piaskownicy, a nie udało się go dodać. Uruchom to polecenie w PowerShell (jako administrator, jeśli nie jesteś właścicielem folderu), a potem uruchom Hive ponownie:",
+  "main.keys.maskingFull": "Hive nie może maskować kolejnego klucza: prowadzi już tyle, ile może. Klucz nie został zapisany.",
+  "main.keys.maskingUnreadable": "Hive nie może sprawdzić tego pod kątem kluczy API: nie da się odczytać jego danych maskowania. Zobacz Ustawienia → Połączenia.",
   "main.keys.unsafe": "Hive nie może bezpiecznie przechować klucza w tym systemie, więc go nie zapisano.",
   "main.leftovers.end": "Zakończ je",
   "main.leftovers.keep": "Nie zatrzymuj",

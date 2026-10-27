@@ -7,7 +7,6 @@ import { accountFolder, addAccount, connectionInternals, connectionReadyAgain, g
 import { hasPty } from './ptyHost'
 import { emit } from './events'
 import { hiveError } from './hiveError'
-import { holdKey } from './keyMatcher'
 import { keyInfo, removeKey, saveKey, withKey } from './keyStore'
 import { createLogger, userText } from './logger'
 import { providerService } from './providerService'
@@ -99,8 +98,7 @@ export async function addServerConnection(input: ServerInput): Promise<Connectio
   const key = input.key ? checkedKey(input.key) : undefined
   // Checked before anything is made: a key in a field that is kept unencrypted refuses it all.
   if (key) assertKeyNotIn(key, { name: input.name, url: b.url, models })
-  const endUse = key ? holdKey(key) : null
-  try {
+  {
     const a = await addAccount(input.cli, input.name, { baseUrl: b.url, ...(preset ? { preset } : {}), models, modelsFrom: input.modelsFrom === 'listed' ? 'listed' : 'typed' })
     let keyFailed = false
     if (key) {
@@ -114,8 +112,6 @@ export async function addServerConnection(input: ServerInput): Promise<Connectio
     }
     emit({ type: 'connections-changed' })
     return keyFailed ? { ...a, keyFailed } : a
-  } finally {
-    endUse?.()
   }
 }
 
@@ -157,8 +153,7 @@ export async function setServerKey(id: string, key: string): Promise<{ last4: st
   assertOn()
   checkedKey(key)
   serverOf(id)
-  const endUse = holdKey(key)
-  try {
+  {
     return await locked(id, async () => {
       const { a, server } = serverOf(id)
       const b = checkedUrl(server.baseUrl)
@@ -171,8 +166,6 @@ export async function setServerKey(id: string, key: string): Promise<{ last4: st
       connectionReadyAgain(id)
       return { last4: info.last4 }
     })
-  } finally {
-    endUse()
   }
 }
 
@@ -224,7 +217,6 @@ export async function readServerModels(id: string, request: string): Promise<Lis
   listings.set(id, { request, abort })
   const timer = setTimeout(() => abort.abort(), LIST_TIMEOUT_MS)
   const got = await withKey(id, b.origin)
-  const endUse = got ? holdKey(got.key) : () => undefined
   // What this reading was made for: the base URL in full (its path too), the preset and the key's own save id. Any of
   // them changed since (or a newer reading, or the connection gone), and whatever came back is stale.
   const asked = { baseUrl: server.baseUrl, preset: server.preset ?? null, key: got?.v ?? null }
@@ -269,7 +261,6 @@ export async function readServerModels(id: string, request: string): Promise<Lis
     return { ok: false, why: 'failed' } // i18n-ignore: a reason's code, not text
   } finally {
     clearTimeout(timer)
-    endUse()
     if (listings.get(id)?.request === request) listings.delete(id)
   }
 }
@@ -317,13 +308,7 @@ export async function setUpServerConnection(id: string): Promise<string> {
     const b = checkedUrl(server.baseUrl)
     const got = await withKey(id, b.origin)
     if (!got && !b.local) throw hiveError(msg({ id: 'main.server.setUp.noKey', defaultMessage: '{name} has no key yet. Add its key first, then set it up.', description: "An error opening Set Up for a server connection ({name}, its name in Settings → Connections): its server needs an API key and none is saved." }), { name: a.name }, { kind: 'conflict' })
-    const endUse = got ? holdKey(got.key) : () => undefined
     const homeEnv = providerDescriptor(a.provider).capabilities.connections!.homeEnv
-    try {
-      return providerService.runAccountLogin(a.provider, id, { [homeEnv]: accountFolder(id) }, () => endUse(), { env: serverEnv(caps, server, got?.key ?? null), cwd: accountFolder(id) })
-    } catch (e) {
-      endUse()
-      throw e
-    }
+    return providerService.runAccountLogin(a.provider, id, { [homeEnv]: accountFolder(id) }, () => undefined, { env: serverEnv(caps, server, got?.key ?? null), cwd: accountFolder(id) })
   })
 }

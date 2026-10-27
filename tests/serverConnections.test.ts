@@ -4,10 +4,10 @@
 // launch's environment (masked while used); a keyless launch only for this PC's server; its models read from the server
 // when asked (bounded, redirects refused, a stale reply dropped). Dummy keys only, in this file's temp folders; the CLI
 // is never run and nothing signs in.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { createServer, type Server, type ServerResponse } from 'http'
 import { join } from 'path'
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { ACCOUNTS_PREVIEW } from '../src/shared/advanced'
 import { tempDir } from './tempDir'
@@ -31,7 +31,10 @@ vi.mock('../src/main/ptyHost', async (original) => ({
 const accounts = await import('../src/main/accounts')
 const servers = await import('../src/main/serverConnections')
 const keys = await import('../src/main/keyStore')
-const { maskDeep, maskKeys, keysInUse } = await import('../src/main/keyMatcher')
+const { fingerprint, maskDeep, maskKeys, maskingState, resetMaskingForTests } = await import('../src/main/keyMatcher')
+const { logLine } = await import('../src/main/logger')
+const { saveCapture } = await import('../src/main/consoleRecorder')
+const coverage = await import('../src/main/keyCoverage')
 const { config } = await import('../src/main/config')
 const { advanced } = await import('../src/main/advanced')
 const { provider } = await import('../src/main/providers')
@@ -84,6 +87,34 @@ async function serverOn(input: Partial<typeof deepseek> & { key?: string } = {})
 const launch = (wanted?: string | null) => accounts.connectionForLaunch({ provider: 'claude-code', workspaceConfig: w.config, wanted, agentName: 'Builder' })
 const store = (): Record<string, { v: number; origin: string; last4: string; blob: string }> => (existsSync(keyFile) ? JSON.parse(readFileSync(keyFile, 'utf8')) : {})
 const view = () => here(() => accounts.accountsView())
+
+/** As after a restart: the fingerprints read again from disk, nothing kept in memory. */
+async function restart(): Promise<void> {
+  coverage.forgetCoverageForTests()
+  resetMaskingForTests('pending')
+  coverage.startCoverage()
+  await coverage.loadCoverage()
+}
+const fpFile = join(profile, 'key-fingerprints.json')
+const marksFile = join(profile, 'key-coverage.json')
+
+// First in this file: before any key is saved in its profile.
+describe('a profile that never saved a key (round 2)', () => {
+  it('a keyless local server only: nothing masked, no fingerprint file, no safeStorage needed', async () => {
+    safe.available = false
+    try {
+      await serverOn({ name: 'Ollama', preset: 'ollama', baseUrl: 'http://localhost:11434', models: [{ id: 'qwen3:8b', as: ['opus'] }] })
+      await restart()
+      expect(maskingState()).toEqual({ state: 'none', gap: false })
+      expect(existsSync(fpFile)).toBe(false)
+      expect(logLine('info', 'x', `plain ${KEY} text`)).toContain(KEY)
+      expect(await outcome(coverage.requireMasking())).toBe('ok')
+    } finally {
+      safe.available = true
+    }
+  })
+})
+
 
 describe('a server connection and its key', () => {
   it('added with its key: a server connection with its folder, the key encrypted in the key store alone', async () => {
@@ -248,9 +279,7 @@ describe('launching on a server connection', () => {
       expect(maskKeys(`token ${KEY}`)).toBe('token <key>')
     } finally {
       conn.release()
-      conn.server!.endKeyUse()
     }
-    expect(keysInUse()).toBe(0)
   })
 
   it('no key: refused for a server on another computer; a server on this PC gets the placeholder, nothing inherited', async () => {
@@ -265,7 +294,6 @@ describe('launching on a server connection', () => {
       expect(env.ANTHROPIC_AUTH_TOKEN).toBe('none')
     } finally {
       conn.release()
-      conn.server!.endKeyUse()
     }
   })
 
@@ -278,7 +306,6 @@ describe('launching on a server connection', () => {
       expect(env).toEqual({ PATH: 'x', ...conn.server!.env })
     } finally {
       conn.release()
-      conn.server!.endKeyUse()
     }
     // Set Up's terminal: the same, from this process's own environment.
     const was = { ...process.env }
@@ -292,10 +319,8 @@ describe('launching on a server connection', () => {
       for (const [k, v] of Object.entries(inherited)) expect(env[k] === undefined || env[k] !== v, k).toBe(true)
       expect(env.CLAUDE_CODE_SUBAGENT_MODEL).toBe('deepseek-flash')
       expect(env).toMatchObject({ ANTHROPIC_BASE_URL: 'https://api.deepseek.com/anthropic', ANTHROPIC_AUTH_TOKEN: KEY, CLAUDE_CONFIG_DIR: accounts.accountFolder(remote.id) })
-      // Its key masked while the terminal is open, and let go once it ends.
+      // Its key masked, by its fingerprint.
       expect(maskKeys(KEY)).toBe('<key>')
-      spawned.at(-1)!.onExit?.(0)
-      expect(keysInUse()).toBe(0)
     } finally {
       for (const k of Object.keys(inherited)) if (!(k in was)) delete process.env[k]
     }
@@ -315,7 +340,6 @@ describe('launching on a server connection', () => {
       expect(conn.stillValid(a.id)).toBe(false)
     } finally {
       conn.release()
-      conn.server!.endKeyUse()
     }
     // A path on the same server keeps the key; another server removes it.
     expect(await servers.editServerConnection(a.id, { baseUrl: 'https://api.deepseek.com/anthropic/v2' })).toEqual({ keyCleared: false })
@@ -334,7 +358,6 @@ describe('launching on a server connection', () => {
       expect(conn.stillValid(a.id)).toBe(false)
     } finally {
       conn.release()
-      conn.server!.endKeyUse()
     }
     // Even with the store emptied (damaged) between: never the same save id twice.
     const before = store()[a.id].v
@@ -344,17 +367,110 @@ describe('launching on a server connection', () => {
   })
 })
 
-describe('exports (round 1)', () => {
-  it('every saved key masked in what an export writes, though no use of it is held; let go after', async () => {
-    await serverOn({ key: KEY })
-    expect(keysInUse()).toBe(0)
-    const out = await keys.withSavedKeysMasked(async () => ({ text: maskKeys(`## Tool\n\`env\` printed ANTHROPIC_AUTH_TOKEN=${KEY}\n`), json: JSON.stringify(maskDeep({ comments: [{ text: `key ${KEY}` }] })) }))
-    expect(out.text).not.toContain(KEY.slice(0, 8))
-    expect(JSON.parse(out.json)).toEqual({ comments: [{ text: 'key <key>' }] })
-    expect(keysInUse()).toBe(0)
-    // A failing export lets them go too.
-    expect(await outcome(keys.withSavedKeysMasked(async () => Promise.reject(new Error('disk full'))))).toBe('disk full')
-    expect(keysInUse()).toBe(0)
+describe('key coverage: every saved key masked for good (round 2)', () => {
+  const A = 'Ab!7#mP2&vL9^tR4~wX8'
+  const B = 'Bq%3*bQ6(kD1)yU5+eW2'
+  const oldOutput = (k: string) => `## Tool\n\`env\` printed ANTHROPIC_AUTH_TOKEN=${k}\n`
+  // One profile for the file: a test that leaves the fingerprints unreadable is followed by a reset (as a user would).
+  const readable = async (): Promise<void> => {
+    if (maskingState().state === 'unavailable') await keys.resetMasking()
+  }
+  beforeEach(readable)
+  afterAll(readable)
+
+  it("rotated, removed, the connection removed, and a restart: an old session's export still masks the first key, with no key decrypted", async () => {
+    const a = await serverOn({ key: A })
+    await servers.setServerKey(a.id, B)
+    await servers.removeServerKey(a.id)
+    await accounts.removeAccount(a.id)
+    // Nothing plain in the fingerprint file.
+    expect(readFileSync(fpFile, 'utf8')).not.toMatch(/Ab!7|Bq%3|mP2&|kD1\)/)
+    await restart()
+    expect(maskingState()).toEqual({ state: 'ready', gap: false })
+    const decrypt = vi.spyOn(electron.safeStorage, 'decryptString')
+    try {
+      await coverage.requireMasking()
+      for (const k of [A, B]) {
+        expect(maskKeys(oldOutput(k))).not.toContain(k.slice(0, 8))
+        expect(JSON.parse(JSON.stringify(maskDeep({ comments: [{ text: `key ${k}` }] })))).toEqual({ comments: [{ text: 'key <key>' }] })
+        expect(logLine('info', 'x', `said ${k}`, { k })).not.toContain(k.slice(4, 12))
+      }
+      expect(decrypt).not.toHaveBeenCalled()
+    } finally {
+      decrypt.mockRestore()
+    }
+  })
+
+  it('missing or damaged or undecryptable fingerprints after a key was saved: unavailable, strict everywhere, exports refused before writing, a new key refused', async () => {
+    await serverOn({ key: A })
+    for (const spoil of [() => writeFileSync(fpFile, '{ damaged'), () => rmSync(fpFile), () => vi.spyOn(electron.safeStorage, 'decryptString').mockImplementationOnce(() => { throw new Error('DPAPI') })]) {
+      const keep = readFileSync(fpFile)
+      spoil()
+      await restart()
+      expect(maskingState().state).toBe('unavailable')
+      expect(logLine('warn', 'x', `printed ${A}`, { A })).not.toContain(A.slice(0, 8))
+      expect(await outcome(coverage.requireMasking())).toMatch(/can't check this for API keys/)
+      // A capture isn't written at all.
+      const recs = join(profile, 'console-recordings')
+      const before = existsSync(recs) ? readdirSync(recs).length : 0
+      expect(await outcome(saveCapture({ source: { kind: 'session', label: 'x' }, events: [], trigger: 't', what: 'w', keep: 5 }))).toMatch(/can't check this for API keys/)
+      expect(existsSync(recs) ? readdirSync(recs).length : 0).toBe(before)
+      const c = await serverOn({ name: `Another ${Math.random()}` })
+      expect(await outcome(servers.setServerKey(c.id, B))).toMatch(/can't check this for API keys/)
+      writeFileSync(fpFile, keep)
+      await restart()
+      expect(maskingState().state).toBe('ready')
+    }
+  })
+
+  it("the markers stand without the key store: lost fingerprints after every key is gone are still unavailable, and a backup of config can't lower them", async () => {
+    const a = await serverOn({ key: A })
+    await servers.removeServerKey(a.id)
+    rmSync(fpFile)
+    // The config mirror alone, as after the profile's file was lost; then the file alone, as after config.json's .bak.
+    rmSync(marksFile)
+    await restart()
+    expect(maskingState().state).toBe('unavailable')
+    expect(JSON.parse(readFileSync(marksFile, 'utf8'))).toMatchObject({ ever: true })
+    config.update((c) => delete c.keyMasking)
+    await restart()
+    expect(maskingState().state).toBe('unavailable')
+    expect(config.get().keyMasking).toMatchObject({ ever: true })
+  })
+
+  it('Reset: fingerprints made again from the keys saved now, and strict for good, a new session printing a lost key included, across a restart', async () => {
+    const a = await serverOn({ key: A })
+    await servers.setServerKey(a.id, B)
+    writeFileSync(fpFile, '{ damaged')
+    await restart()
+    expect(maskingState().state).toBe('unavailable')
+    await keys.resetMasking()
+    expect(maskingState()).toEqual({ state: 'ready', gap: true })
+    // A new session's output, a new comment: A's fingerprint is lost, so every long run is masked.
+    expect(maskKeys(`new session ran: cat old.env -> ${A}`)).not.toContain(A.slice(0, 8))
+    expect(logLine('info', 'x', `printed ${A}`)).not.toContain(A.slice(0, 8))
+    expect(JSON.stringify(maskDeep({ comment: `quoting ${A}` }))).not.toContain(A.slice(0, 8))
+    expect(await outcome(coverage.requireMasking())).toBe('ok')
+    await restart()
+    expect(maskingState()).toEqual({ state: 'ready', gap: true })
+    expect(JSON.parse(readFileSync(marksFile, 'utf8'))).toMatchObject({ ever: true, gap: true })
+    expect(coverage.coverageView()).toMatchObject({ gap: true, gapSince: expect.any(String) })
+  })
+
+  it('past the bound a new key is refused and nothing is dropped; the first key still masked after a restart', async () => {
+    try {
+      await restart()
+      const per = fingerprint({ salt: Buffer.alloc(32), base: 4099 }, A).length
+      coverage.setMaxWindowsForTests(coverage.coverageWindows() + per * 2)
+      const a = await serverOn({ key: A })
+      await servers.setServerKey(a.id, B)
+      expect(await outcome(servers.setServerKey(a.id, 'Cz!9#mQ3&vL8^tR5~wY7'))).toMatch(/can't keep masking for another key/)
+      expect(store()[a.id].last4).toBe(B.slice(-4))
+      await restart()
+      expect(maskKeys(oldOutput(A))).not.toContain(A.slice(0, 8))
+    } finally {
+      coverage.setMaxWindowsForTests(coverage.MAX_WINDOWS)
+    }
   })
 })
 
@@ -386,7 +502,6 @@ describe("reading a server's models (when asked)", () => {
     expect(r).toEqual({ ok: true, models: [{ id: 'kept', as: ['opus'] }, { id: 'new' }], dropped: ['gone'] })
     expect(seen).toEqual([{ url: '/v1/models', auth: `Bearer ${KEY}` }])
     expect(accounts.getAccount(a.id)!.server).toMatchObject({ modelsFrom: 'listed', models: [{ id: 'kept', as: ['opus'] }, { id: 'new' }] })
-    expect(keysInUse()).toBe(0)
   })
 
   it('by kind only: refused (401), forbidden (403), failed (500), a redirect not followed, not a list, too large', async () => {

@@ -590,6 +590,14 @@ interface HiveMessageValues {
   'settings.connections.add.needName': undefined
   'settings.connections.add.title': { cli: string | number }
   'settings.connections.cancel': undefined
+  'settings.connections.masking.full': undefined
+  'settings.connections.masking.gap': { date: string | number }
+  'settings.connections.masking.reset': undefined
+  'settings.connections.masking.resetConfirm': undefined
+  'settings.connections.masking.resetFailed': undefined
+  'settings.connections.masking.resetMessage': undefined
+  'settings.connections.masking.resetTitle': undefined
+  'settings.connections.masking.unavailable': undefined
   'settings.connections.server.addModel': undefined
   'settings.connections.server.baseUrl': undefined
   'settings.connections.server.changeFailed': undefined

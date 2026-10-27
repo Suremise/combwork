@@ -38,6 +38,7 @@ import { setDateStyle } from '../shared/dates'
 import { SERVABLE_EXT, servableType, unwatchAll } from './files'
 import { movedAttachment } from './attachmentsFolder'
 import { config } from './config'
+import { loadCoverage, startCoverage } from './keyCoverage'
 import { closeConsoleWindows, sendToConsoles } from './consoleWindow'
 import { allTasks, archiveOldDone, endExitedReviews } from './tasks'
 import { agentCardText } from '../shared/agentTable'
@@ -835,6 +836,9 @@ const ALLOWED_PERMISSIONS = new Set(['clipboard-read', 'clipboard-sanitized-writ
 
 app.whenReady().then(async () => {
   config.load()
+  // Server connections' key masking (HI-1772): what is known at once, then the fingerprints read (strict meanwhile).
+  startCoverage()
+  void loadCoverage()
   // Before anything shows text: notifications, the tray and dialogs in the user's language (#767).
   await startI18n(config.settings)
   // Advanced settings (#367): advanced.json's overrides, followed as it changes.

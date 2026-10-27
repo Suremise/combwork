@@ -389,6 +389,45 @@ export function ServerConnectionDetail({ c, keyLast4, onSetUp }: { c: Connection
   )
 }
 
+const MASKING = {
+  unavailable: msg({ id: 'settings.connections.masking.unavailable', defaultMessage: "Hive can't read the data it uses to hide your API keys in logs and exports. Until it is reset, every long word is hidden in its logs, and exports, Copy Diagnostics and recordings are refused.", description: "A warning in Settings → Connections: the data Hive keeps to recognise server connections' API keys (to hide them) can't be read. A long word is 8 characters or more without a space." }),
+  gap: msg({ id: 'settings.connections.masking.gap', defaultMessage: "Since {date}, Hive hides every long word in its logs, recordings and exports, for good: keys saved before its masking data was reset can't be recognised any more.", description: "A note in Settings → Connections after Reset Masking Data: Hive masks strictly from then on. {date} is when it was reset. A long word is 8 characters or more without a space." }),
+  full: msg({ id: 'settings.connections.masking.full', defaultMessage: 'Hive is near the most API keys it can keep masking for. Past it, a new key is refused.', description: 'A warning in Settings → Connections: Hive keeps a fingerprint of every API key ever saved (to hide it in logs and exports), and is nearly at its limit.' }),
+  reset: msg({ id: 'settings.connections.masking.reset', defaultMessage: 'Reset Masking Data…', description: "Button in Settings → Connections when Hive's key masking data can't be read: makes it again from the keys saved now (asks first)." }),
+  resetTitle: msg({ id: 'settings.connections.masking.resetTitle', defaultMessage: 'Reset masking data?', description: "Title of the dialog confirming Reset Masking Data (Settings → Connections)." }),
+  resetMessage: msg({ id: 'settings.connections.masking.resetMessage', defaultMessage: "Hive can no longer recognise keys saved before. From now on it hides every long word (8 characters or more with no spaces) in its logs, recordings and exports, for good, so none of them can show an old key. This can't be undone.", description: "The message of the dialog confirming Reset Masking Data (Settings → Connections): what the user gives up." }),
+  resetConfirm: msg({ id: 'settings.connections.masking.resetConfirm', defaultMessage: 'Reset', description: 'The confirm button of the dialog confirming Reset Masking Data.' }),
+  resetFailed: msg({ id: 'settings.connections.masking.resetFailed', defaultMessage: "Couldn't reset the masking data", description: "An error's title: Reset Masking Data failed (Settings → Connections)." })
+}
+
+/** Key masking's state (HI-1772): unreadable (with Reset Masking Data…), strict for good since a reset, or near full. */
+export function MaskingBanner({ masking }: { masking?: { state: string; gap: boolean; gapSince?: string; full: boolean } }) {
+  if (!masking) return null
+  const reset = (): void => {
+    void confirm({ title: tr(MASKING.resetTitle), message: tr(MASKING.resetMessage), confirmLabel: tr(MASKING.resetConfirm), danger: true, run: () => call('connections:resetMasking') }).catch((e) => notify('error', tr(MASKING.resetFailed), errorMessage(e)))
+  }
+  return (
+    <>
+      {masking.state === 'unavailable' && (
+        <div className="banner warn" data-masking="unavailable">
+          <Icon name="warning" /> {tr(MASKING.unavailable)}
+          <button className="btn small" onClick={reset}>{tr(MASKING.reset)}</button>
+        </div>
+      )}
+      {masking.gap && masking.state !== 'unavailable' && (
+        <div className="banner" data-masking="gap">
+          <Icon name="shield" /> {tr(MASKING.gap, { date: masking.gapSince ? fmt.dateTime(new Date(masking.gapSince)) : '' })}
+        </div>
+      )}
+      {masking.full && (
+        <div className="banner warn" data-masking="full">
+          <Icon name="warning" /> {tr(MASKING.full)}
+        </div>
+      )}
+    </>
+  )
+}
+
 /** Opens a server connection's Set Up terminal; its key, or null when it couldn't be opened (said). */
 export async function setUpServer(id: string): Promise<string | null> {
   try {

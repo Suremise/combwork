@@ -9,7 +9,7 @@ import { confirm, notify, prompt, useStore } from '../store'
 import { Icon, Switch } from './ui'
 import { timeAgo } from '../util'
 import { TerminalView } from './TerminalView'
-import { AddConnectionDialog, hasServers, ServerConnectionDetail, setUpHint, setUpServer } from './ServerConnections'
+import { AddConnectionDialog, hasServers, MaskingBanner, ServerConnectionDetail, setUpHint, setUpServer } from './ServerConnections'
 
 /**
  * Settings → Accounts (HI-980): Hive's accounts, each a CLI login in a folder of its own, signed in through the CLI's
@@ -143,6 +143,7 @@ export function AccountsSettings() {
   return (
     <div className="accounts-settings">
       {!wsPath && <p className="hint">{tr(M.noWorkspace)}</p>}
+      <MaskingBanner masking={view.masking} />
       <MovedNoticeBanner />
       {affected > 0 && (
         <div className="banner warn" data-switch-affected>

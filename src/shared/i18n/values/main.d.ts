@@ -100,6 +100,8 @@ interface HiveMessageValues {
   'main.installDir.whatFolder': undefined
   'main.installDir.whyFile': undefined
   'main.installDir.whyFolder': undefined
+  'main.keys.maskingFull': undefined
+  'main.keys.maskingUnreadable': undefined
   'main.keys.unsafe': undefined
   'main.leftovers.end': undefined
   'main.leftovers.keep': undefined

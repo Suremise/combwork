@@ -3,7 +3,7 @@ import { createHash } from 'crypto'
 import { open, stat } from 'original-fs/promises'
 import { dirname, join } from 'path'
 import type { AppSettings, ProviderId, SessionUsage } from '../shared/types'
-import { baselineOfRows, baselineOfUsage, dominates, ledgerRows, mergeBaselines, reshareRows, sessionRows, summaryOf, unknownOnCards, type SessionHold } from '../shared/usageLedger'
+import { baselineOfRows, baselineOfUsage, baselineWithoutReports, dominates, ledgerRows, mergeBaselines, reshareRows, rowsWithoutReports, sessionRows, summaryOf, unknownOnCards, type SessionHold } from '../shared/usageLedger'
 import { openDb, type Db } from './db'
 import { readAdvancedFrom, valuesReader } from './advancedValues'
 import type { DatabaseSync } from 'node:sqlite'
@@ -314,7 +314,13 @@ async function ingest(file: string, job: IngestJob): Promise<IngestResult> {
   if (readOnly(file)) return { status: 'busy' }
   const db = dbOf(file).writer
   const cur = cursorOf(db, job.scope, job.session)
+  // Its CLI's cost reports aren't counted (HI-1772) when the job says so or the history already does: one way, so a
+  // late job from before the session was marked never brings them back. Turned just now: nothing recorded is kept as
+  // it was (re-read, or its stored rows stripped when there is nothing to read).
+  const ignore = !!job.reportsIgnored || !!cur?.reportsIgnored
+  const turned = ignore && !!cur && !cur.reportsIgnored
   const unchanged = (): IngestResult => {
+    if (turned) return stripStored(db, job)
     updateMeta(db, job, job.external ? 'external' : 'transcript')
     reshare(db, job, cur)
     return { status: 'unchanged' }
@@ -331,7 +337,7 @@ async function ingest(file: string, job: IngestJob): Promise<IngestResult> {
   }
   if (!st.isFile()) return cur ? unchanged() : { status: 'missing' }
   const samePath = !!cur?.path && cur.path.toLowerCase() === job.path.toLowerCase()
-  if (cur && samePath && cur.size === st.size && cur.mtime === st.mtimeMs) return unchanged()
+  if (!turned && cur && samePath && cur.size === st.size && cur.mtime === st.mtimeMs) return unchanged()
   // The parser this run read the file with (a running session's footer, an earlier job), when it is at least as far on as
   // the saved state; else the saved state taken up (takeUp), else a new parser from the start.
   let parser: RawUsageParser | null = null
@@ -357,7 +363,7 @@ async function ingest(file: string, job: IngestJob): Promise<IngestResult> {
   }
   // A session that ran on a server connection (HI-1772): its CLI's cost reports aren't counted.
   const read0 = parser.result()
-  const raw = job.reportsIgnored ? withoutCostReports(read0) : read0
+  const raw = ignore ? withoutCostReports(read0) : read0
   // What it read is kept for the next read of a running session (the footer's, the next tick's); a session that ended
   // has its state saved below, and its parser is let go.
   if (job.keepState === 'now') reads.delete(readKey(job.path))
@@ -366,13 +372,18 @@ async function ingest(file: string, job: IngestJob): Promise<IngestResult> {
   const now = cursorOf(db, job.scope, job.session)
   const settings = providers ? { providers } : null
   const stored = now ? storedSession(db, job.scope, job.session) : null
+  // Without reports: what was recorded is compared and kept without its CLI's charges too (HI-1772).
+  const ignoreNow = ignore || !!now?.reportsIgnored
+  const storedRows = stored ? (ignoreNow ? rowsWithoutReports(stored.rows) : stored.rows) : []
   let baseline = now ? baselineOf(db, job.scope, job.session) : []
+  const strippedBaseline = ignoreNow && baseline.some((d) => d.costUsd !== null && !d.costEstimated)
+  if (ignoreNow) baseline = baselineWithoutReports(baseline)
   const read = ledgerRows(raw, job.holds, settings)
   let rows = sessionRows(read, baseline, job.provider, settings)
-  let grew = false
-  if (stored && !dominates(rows, stored.rows)) {
+  let grew = strippedBaseline
+  if (stored && !dominates(rows, storedRows)) {
     // Less of something than recorded: what was recorded joins the baseline, and neither is lost.
-    baseline = mergeBaselines(baseline, baselineOfRows(stored.rows))
+    baseline = mergeBaselines(baseline, baselineOfRows(storedRows))
     rows = sessionRows(read, baseline, job.provider, settings)
     grew = true
     log('info', `usage history: ${job.session} read less of something than recorded: what was recorded is kept beside it`, job.path)
@@ -391,10 +402,38 @@ async function ingest(file: string, job: IngestJob): Promise<IngestResult> {
     timeline: raw.timeline ?? null,
     rows,
     holdsKey: job.holdsKey,
-    baseline: grew ? baseline : null
+    baseline: grew ? baseline : null,
+    ...(ignoreNow ? { reportsIgnored: true } : {})
   }
   const ok = writeSession(db, w, now ? { offset: now.offset, path: now.path } : null)
   return { status: ok ? 'written' : 'busy', requests: raw.requests }
+}
+
+/**
+ * A recorded session marked as ignoring its CLI's cost reports (HI-1772) with nothing to read again (its transcript
+ * gone, or unchanged): its stored rows and baseline written again without those charges, counts and cards as they were.
+ */
+function stripStored(db: DatabaseSync, job: IngestJob): IngestResult {
+  const now = cursorOf(db, job.scope, job.session)
+  const stored = now ? storedSession(db, job.scope, job.session) : null
+  if (!now || !stored) return { status: 'missing' }
+  const timeline = storedTimelines(db, job.scope).find((s) => s.session === job.session)?.timeline ?? null
+  const w: SessionWrite = {
+    ...job,
+    source: now.source === 'external' ? 'external' : 'transcript',
+    path: now.path,
+    size: now.size,
+    mtime: now.mtime,
+    offset: now.offset,
+    state: null,
+    summary: stored.summary,
+    timeline: timeline ? { ...timeline, reports: [], rows: timeline.rows.map((r) => (r[6] >= 0 ? (Object.assign([...r], { 6: -1 }) as typeof r) : r)) } : null,
+    rows: rowsWithoutReports(stored.rows),
+    holdsKey: now.holdsKey,
+    baseline: baselineWithoutReports(baselineOf(db, job.scope, job.session)),
+    reportsIgnored: true
+  }
+  return { status: writeSession(db, w, { offset: now.offset, path: now.path }) ? 'written' : 'busy' }
 }
 
 /** A recorded session's cards shared out again from what is stored, when the holds its rows were made by changed. */

@@ -2355,6 +2355,38 @@
     "defaultMessage": "Cancel",
     "description": "A dialog's button in Settings → Connections that closes it without changing anything."
   },
+  "settings.connections.masking.full": {
+    "defaultMessage": "Hive is near the most API keys it can keep masking for. Past it, a new key is refused.",
+    "description": "A warning in Settings → Connections: Hive keeps a fingerprint of every API key ever saved (to hide it in logs and exports), and is nearly at its limit."
+  },
+  "settings.connections.masking.gap": {
+    "defaultMessage": "Since {date}, Hive hides every long word in its logs, recordings and exports, for good: keys saved before its masking data was reset can't be recognised any more.",
+    "description": "A note in Settings → Connections after Reset Masking Data: Hive masks strictly from then on. {date} is when it was reset. A long word is 8 characters or more without a space."
+  },
+  "settings.connections.masking.reset": {
+    "defaultMessage": "Reset Masking Data…",
+    "description": "Button in Settings → Connections when Hive's key masking data can't be read: makes it again from the keys saved now (asks first)."
+  },
+  "settings.connections.masking.resetConfirm": {
+    "defaultMessage": "Reset",
+    "description": "The confirm button of the dialog confirming Reset Masking Data."
+  },
+  "settings.connections.masking.resetFailed": {
+    "defaultMessage": "Couldn't reset the masking data",
+    "description": "An error's title: Reset Masking Data failed (Settings → Connections)."
+  },
+  "settings.connections.masking.resetMessage": {
+    "defaultMessage": "Hive can no longer recognise keys saved before. From now on it hides every long word (8 characters or more with no spaces) in its logs, recordings and exports, for good, so none of them can show an old key. This can't be undone.",
+    "description": "The message of the dialog confirming Reset Masking Data (Settings → Connections): what the user gives up."
+  },
+  "settings.connections.masking.resetTitle": {
+    "defaultMessage": "Reset masking data?",
+    "description": "Title of the dialog confirming Reset Masking Data (Settings → Connections)."
+  },
+  "settings.connections.masking.unavailable": {
+    "defaultMessage": "Hive can't read the data it uses to hide your API keys in logs and exports. Until it is reset, every long word is hidden in its logs, and exports, Copy Diagnostics and recordings are refused.",
+    "description": "A warning in Settings → Connections: the data Hive keeps to recognise server connections' API keys (to hide them) can't be read. A long word is 8 characters or more without a space."
+  },
   "settings.connections.server.addModel": {
     "defaultMessage": "Add Model",
     "description": "Button under a server connection's model list: adds a row."
