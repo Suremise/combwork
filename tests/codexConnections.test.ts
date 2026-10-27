@@ -4,7 +4,7 @@
 // folder (its own login store and config, the PC's sandbox). All in this file's temp folders: Codex is never run (its
 // status is faked), nothing signs in, and no real home is touched.
 import { spawn } from 'child_process'
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -30,11 +30,10 @@ const { providerService } = await import('../src/main/providerService')
 const { withoutAccountEnv } = await import('../src/main/providers/common')
 const seam = await import('../src/main/connectionSeam')
 const { CONNECTION_STORE, codex, codexAccountStatus } = await import('../src/main/providers/codex/adapter')
-const { codexCheckHeld, codexCheckSeams, resetCodexChecksForTests, restoreCodexCheckHolds, stopCodexChecks } = await import('../src/main/codexChecks')
+const { codexCheckHeld, codexCheckSeams, resetCodexChecksForTests, stopCodexChecks } = await import('../src/main/codexChecks')
 const { queueHost } = await import('../src/main/workflow/queueJobs')
 const { windowsProbe } = await import('../src/main/workflow/queueProcs')
 type Listed = import('../src/main/workflow/queueProcs').Listed
-type ProcessProbe = import('../src/main/workflow/queueProcs').ProcessProbe
 
 // Child processes get the run context's allowlisted environment (tests/e2e/runContext.cjs), never this shell's.
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -42,9 +41,7 @@ const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { 
 const HUNG_MS = 30_000
 // Codex's checks run on a real process supervisor of the tests' own (as the merge queue's tests), in this file's folder.
 const sharedHost = queueHost()
-const checksRoot = join(base, 'codex-checks')
 codexCheckSeams.host = sharedHost
-codexCheckSeams.root = checksRoot
 
 const FIX = join(__dirname, 'fixtures', 'advanced', 'account-read-codex-0.164.0.jsonl')
 const FIELDS = { account: 'account', email: 'email', plan: 'planType' }
@@ -65,11 +62,6 @@ beforeAll(async () => {
     checked.set(env.CODEX_HOME!, env)
     return { ok: true, loggedIn: true, email: 'one@example.com', plan: 'plus' }
   })
-})
-
-afterAll(() => {
-  vi.restoreAllMocks()
-  rmSync(base, { recursive: true, force: true })
 })
 
 describe("what Codex's app server says of a connection's sign-in (the recorded fixture)", () => {
@@ -170,27 +162,28 @@ function fakeCli(name: string, script: string): string {
   writeFileSync(cmd, `@"${process.execPath}" "${join(dir, 'fake.cjs')}" %*\r\n`)
   return cmd
 }
-/** Every process a test started, by its pid and start: ended exactly when the file ends (a failed test leaves none). */
-const started: Listed[] = []
+/** Each process a helper started, with when it said it started (pidsFiles), and each identified while running: the teardown's. */
+const pidsFiles: string[] = []
+const identified: Listed[] = []
 async function identify(pid: number): Promise<Listed> {
-  const p = await vi.waitFor(async () => {
-    const found = (await windowsProbe.list())?.find((x) => x.pid === pid)
-    if (!found) throw new Error(`process ${pid} isn't listed yet`)
-    return found
-  }, { timeout: HUNG_MS, interval: 200 })
-  started.push(p)
+  const p = await vi.waitFor(
+    async () => {
+      const found = (await windowsProbe.list())?.find((x) => x.pid === pid)
+      if (!found) throw new Error(`process ${pid} isn't listed yet`)
+      return found
+    },
+    { timeout: HUNG_MS, interval: 200 }
+  )
+  identified.push(p)
   return p
 }
 const running = (p: Listed): Promise<boolean | null> => windowsProbe.alive(p.pid, p.started)
-/** A process that sleeps (detached, hidden, the tests' allowlisted environment), for a job to follow. */
+/** A process that sleeps (detached, hidden, the tests' allowlisted environment). */
 async function sleeper(): Promise<Listed> {
   const k = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120000)'], { stdio: 'ignore', detached: true, windowsHide: true, env: baseEnv() })
   k.unref()
   return identify(k.pid!)
 }
-afterAll(async () => {
-  await windowsProbe.end(started)
-})
 /** Waits for a condition, bounded only against a hang. */
 const until = (fn: () => Promise<boolean> | boolean): Promise<void> => vi.waitFor(async () => expect(await fn()).toBe(true), { timeout: HUNG_MS, interval: 200 })
 
@@ -244,15 +237,19 @@ if (args[0] === 'app-server') {
   })
 })
 
-describe("Codex's checks owned from before they run until confirmed gone (HR6's round 2, the s66/s68 design)", () => {
-  /** A server that answers who it is signed in as and starts a child; `stubborn`: it ignores its stdin closing. Its pids go to a file. */
-  const server = (name: string, stubborn: boolean) => {
+describe("Codex's checks owned from before they run until their end is confirmed (round 4: s91, s93)", () => {
+  /**
+   * A server that answers who it is signed in as (`answers`: else never) and starts a child; `stubborn`: it ignores its
+   * stdin closing. Its and its child's pids and starts go to a file the teardown reads.
+   */
+  const server = (name: string, o: { stubborn?: boolean; answers?: boolean } = {}) => {
     const pids = join(base, `${name}-pids.json`)
+    pidsFiles.push(pids)
     const cmd = fakeCli(name, `
 const fs = require('fs')
 const { spawn } = require('child_process')
 const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120000)'], { stdio: 'ignore', windowsHide: true, env: { SystemRoot: process.env.SystemRoot || '', PATH: process.env.PATH || '' } })
-fs.writeFileSync(${JSON.stringify(pids)}, JSON.stringify({ server: process.pid, child: child.pid }))
+fs.writeFileSync(${JSON.stringify(pids)}, JSON.stringify([{ pid: process.pid, at: Date.now() }, { pid: child.pid, at: Date.now() }]))
 let buf = ''
 process.stdin.on('data', (d) => {
   buf += d
@@ -260,147 +257,178 @@ process.stdin.on('data', (d) => {
   while ((i = buf.indexOf('\\n')) >= 0) {
     const m = JSON.parse(buf.slice(0, i)); buf = buf.slice(i + 1)
     if (m.id === 1) process.stdout.write(JSON.stringify({ id: 1, result: {} }) + '\\n')
-    else if (m.id === 2) process.stdout.write(JSON.stringify({ id: 2, result: { account: { type: 'chatgpt', email: 'one@example.com', planType: 'plus' } } }) + '\\n')
+    else if (m.id === 2 && ${o.answers !== false}) process.stdout.write(JSON.stringify({ id: 2, result: { account: { type: 'chatgpt', email: 'one@example.com', planType: 'plus' } } }) + '\\n')
   }
 })
-process.stdin.on('end', () => { if (!${stubborn}) { child.kill(); process.exit(0) } })
-setTimeout(() => { child.kill(); process.exit(0) }, 120000)
+process.stdin.on('end', () => { if (!${!!o.stubborn}) { child.kill(); process.exit(0) } })
 `)
     return {
       cmd,
-      /** Its server's and child's pids still running, from one listing (a pid alone: they ran moments ago). */
+      started: () => existsSync(pids),
+      /** Its server's and child's pids still running, from one listing. */
       left: async (): Promise<number[]> => {
-        const { server: a, child: b } = JSON.parse(readFileSync(pids, 'utf8')) as { server: number; child: number }
+        if (!existsSync(pids)) return []
+        const ps = JSON.parse(readFileSync(pids, 'utf8')) as { pid: number; at: number }[]
         const list = (await windowsProbe.list()) ?? []
-        return [a, b].filter((pid) => list.some((p) => p.pid === pid))
+        return ps.filter((x) => list.some((p) => p.pid === x.pid && Math.abs(p.started - x.at) < 3000)).map((x) => x.pid)
       }
     }
   }
   const homeOf = (n: string): string => join(base, 'profile', 'accounts', n)
-  const status = (cmd: string, n: string) => codex.accountStatus(cmd, { ...baseEnv(), CODEX_HOME: homeOf(n) })
-  const files = (): string[] => (existsSync(checksRoot) ? readdirSync(checksRoot) : [])
-  /** A probe that can't list processes (as PowerShell blocked): nothing it names can be confirmed gone. */
-  const blind: ProcessProbe = { ...windowsProbe, list: async () => null }
+  const status = (cmd: string, folder: string) => codex.accountStatus(cmd, { ...baseEnv(), CODEX_HOME: folder })
+  const ID = { ok: true, loggedIn: true, email: 'one@example.com', plan: 'plus' }
+  /** The test supervisor, with its `hasjob` answer replaced while `unknown` is set (a supervisor that can't tell), and slowed by `slow` ms. */
+  const flaky = { unknown: false, slow: 0 }
+  const doubtful = new Proxy(sharedHost, {
+    get(target, prop) {
+      if (prop === 'request')
+        return async (command: string, ...rest: (number | string | undefined)[]) => {
+          if (command === 'hasjob' && flaky.slow) await new Promise((res) => setTimeout(res, flaky.slow))
+          if (command === 'hasjob' && flaky.unknown) return 'unknown: 5'
+          return target.request(command as never, ...(rest as [string]))
+        }
+      const v = Reflect.get(target, prop, target)
+      return typeof v === 'function' ? v.bind(target) : v
+    }
+  })
   beforeAll(async () => {
     // The real status check (the file's earlier tests fake it), with a short time to close.
     statusSpy.mockRestore()
     await advanced.set('codex.appServer.closeSeconds', 1)
   })
-  afterEach(() => {
-    codexCheckSeams.probe = undefined
-    codexCheckSeams.afterAssign = undefined
-    codexCheckSeams.beforeConfirm = undefined
+  afterEach(async () => {
+    Object.assign(flaky, { unknown: false, slow: 0 })
+    for (const k of ['beforeStart', 'afterAssign', 'beforeConfirm', 'onEnd'] as const) codexCheckSeams[k] = undefined
     codexCheckSeams.host = sharedHost
-  })
-  afterAll(async () => {
-    await advanced.set('codex.appServer.closeSeconds', null)
+    // Each test ends with nothing held and Hive not quitting, as a new start.
+    await stopCodexChecks()
+    resetCodexChecksForTests()
   })
 
-  it('one that ends by itself: the identity, its child gone with it, no record left', async () => {
-    const s = server('willing-cli', false)
-    expect(await status(s.cmd, 'a-willing')).toEqual({ ok: true, loggedIn: true, email: 'one@example.com', plan: 'plus' })
+  it('one that ends by itself: the identity, its child gone with it, nothing held', async () => {
+    const s = server('willing-cli')
+    expect(await status(s.cmd, homeOf('a-willing'))).toEqual(ID)
     expect(await s.left()).toEqual([])
     expect(codexCheckHeld(homeOf('a-willing'))).toBe(false)
-    expect(files().filter((f) => f.endsWith('.check'))).toEqual([])
   }, 60_000)
 
   it('one that ignores its stdin closing, behind a .cmd launcher: its job ends it and its child; the identity only then', async () => {
-    const s = server('stubborn-cli', true)
-    expect(await status(s.cmd, 'a-stubborn')).toEqual({ ok: true, loggedIn: true, email: 'one@example.com', plan: 'plus' })
+    const s = server('stubborn-cli', { stubborn: true })
+    expect(await status(s.cmd, homeOf('a-stubborn'))).toEqual(ID)
     expect(await s.left()).toEqual([])
     expect(codexCheckHeld(homeOf('a-stubborn'))).toBe(false)
   }, 60_000)
 
-  it("an end that can't be confirmed (a followed process it can't see gone): a failed check, held, the journal kept; released once it can", async () => {
-    const s = server('followed-cli', false)
-    const k = await sleeper()
-    codexCheckSeams.afterAssign = async (job) => void expect(await job.follow(k.pid)).toBe(true)
-    codexCheckSeams.probe = blind
-    const r = await status(s.cmd, 'a-followed')
-    expect(r).toEqual({ ok: false, error: "couldn't end Codex's check" })
-    expect(codexCheckHeld(homeOf('a-followed'))).toBe(true)
-    expect(files().some((f) => f.endsWith('.check'))).toBe(true)
-    expect(files().some((f) => /\.followed|\.sealed-/.test(f))).toBe(true)
-    // Held: a second check is refused at once, nothing spawned.
-    expect(await status(s.cmd, 'a-followed')).toEqual({ ok: false, error: "a check of this connection is already running, or its last one hasn't ended yet" })
-    // Able to see it again: it is ended exactly, and the connection released.
-    codexCheckSeams.probe = windowsProbe
-    await until(() => !codexCheckHeld(homeOf('a-followed')))
-    expect(await running(k)).toBe(false)
-    expect(files().filter((f) => f.endsWith('.check'))).toEqual([])
-  }, 90_000)
-
-  it('its supervisor replaced between the end and its confirmation: never the identity, the journal kept, until the followed process is confirmed gone', async () => {
-    const s = server('replaced-cli', false)
+  it("its supervisor ended between the job's end and its confirmation: confirmed only once no job by its name is left (kill on close), on a new supervisor", async () => {
+    const s = server('replaced-cli', { stubborn: true })
     await sharedHost.ensure()
     const before = sharedHost.instance
-    const k = await sleeper()
-    codexCheckSeams.afterAssign = async (job) => void expect(await job.follow(k.pid)).toBe(true)
-    codexCheckSeams.probe = blind
-    // After the job's end: its supervisor ends, as a crash would (Windows closes its jobs, kill on close); the next request
-    // starts another, which never had the job.
+    // After the job's end: its supervisor ends, as a crash would (Windows closes its jobs, kill on close).
     codexCheckSeams.beforeConfirm = async () => {
       const sup = await identify(sharedHost.pid!)
       await windowsProbe.end([sup])
       await until(async () => (await running(sup)) === false)
     }
-    const r = await status(s.cmd, 'a-replaced')
-    expect(r).toEqual({ ok: false, error: "couldn't end Codex's check" })
-    expect(codexCheckHeld(homeOf('a-replaced'))).toBe(true)
-    expect(files().some((f) => /\.followed|\.sealed-/.test(f))).toBe(true)
-    codexCheckSeams.beforeConfirm = undefined
-    codexCheckSeams.probe = windowsProbe
-    await until(() => !codexCheckHeld(homeOf('a-replaced')))
-    expect(await running(k)).toBe(false)
-    // A new supervisor runs the next checks.
+    expect(await status(s.cmd, homeOf('a-replaced'))).toEqual(ID)
+    expect(await s.left()).toEqual([])
     expect(sharedHost.instance).not.toBe(before)
+    expect(codexCheckHeld(homeOf('a-replaced'))).toBe(false)
   }, 90_000)
 
-  it('held across a restart: restored before connections are used (sign-in and removal refused), kept at quit, released once confirmed', async () => {
+  it("an end its supervisor can't confirm: a failed check, the connection held (sign-in, removal and checks refused); a later check confirms it, then runs", async () => {
     const a = await accounts.addAccount('codex', 'Held')
-    const s = server('restart-cli', false)
-    const k = await sleeper()
-    codexCheckSeams.afterAssign = async (job) => void expect(await job.follow(k.pid)).toBe(true)
-    codexCheckSeams.probe = blind
-    // The check runs in the connection's own folder, so its hold is that connection's.
-    expect(await codex.accountStatus(s.cmd, { ...baseEnv(), CODEX_HOME: accounts.accountFolder(a.id) })).toMatchObject({ ok: false })
-    // Quitting with it held: its record kept.
-    await stopCodexChecks()
-    expect(files().some((f) => f.endsWith('.check') && f.toLowerCase().includes(a.id.toLowerCase()))).toBe(true)
-    // A new start: held again from its record, before any connection call.
-    resetCodexChecksForTests()
-    expect(codexCheckHeld(accounts.accountFolder(a.id))).toBe(false)
-    await restoreCodexCheckHolds()
-    expect(codexCheckHeld(accounts.accountFolder(a.id))).toBe(true)
+    const folder = accounts.accountFolder(a.id)
+    const s = server('held-cli')
+    codexCheckSeams.host = doubtful
+    flaky.unknown = true
+    expect(await status(s.cmd, folder)).toEqual({ ok: false, error: "couldn't end Codex's check" })
+    expect(codexCheckHeld(folder)).toBe(true)
     await expect(accounts.removeAccount(a.id)).rejects.toThrow(/is being checked/)
     await expect(accounts.signInAccount(a.id)).rejects.toThrow(/is being checked/)
-    // Recovered once the followed process can be seen ended: released, and then removable.
-    codexCheckSeams.probe = windowsProbe
-    await until(() => !codexCheckHeld(accounts.accountFolder(a.id)))
-    expect(await running(k)).toBe(false)
+    // Still can't be told: refused, nothing spawned.
+    expect(await status(s.cmd, folder)).toEqual({ ok: false, error: "its last check of Codex hasn't ended yet" })
+    // Once it can: the old end is confirmed (no job by its name left), and the check runs.
+    flaky.unknown = false
+    expect(await status(s.cmd, folder)).toEqual(ID)
+    expect(codexCheckHeld(folder)).toBe(false)
+    expect(await s.left()).toEqual([])
     await accounts.removeAccount(a.id)
-  }, 120_000)
+  }, 90_000)
 
-  it('a record it can\'t name (or a folder it can\'t read) holds every Codex connection', async () => {
-    mkdirSync(checksRoot, { recursive: true })
-    writeFileSync(join(checksRoot, 'unknown.check'), '{}')
+  it('a process of the check that leaves its job (ended by the supervisor, unconfirmed): a failed check, held until Hive restarts', async () => {
+    const s = server('escaped-cli')
+    const k = await sleeper()
+    // The supervisor told to follow a process for the check's job, which has no journal: it ends it and says "unowned".
+    codexCheckSeams.afterAssign = async (job) => void expect(await job.follow(k.pid)).toBe(false)
+    const escaped = { ok: false, error: "a process Codex started left Hive's job: its end can't be confirmed" }
+    expect(await status(s.cmd, homeOf('a-escaped'))).toEqual(escaped)
+    expect(codexCheckHeld(homeOf('a-escaped'))).toBe(true)
+    await until(async () => (await running(k)) === false)
+    // Its job's own end confirmed, yet never released: the next check is refused the same way.
+    codexCheckSeams.afterAssign = undefined
+    expect(await status(s.cmd, homeOf('a-escaped'))).toEqual(escaped)
+    expect(await s.left()).toEqual([])
+    // A restart releases it.
     resetCodexChecksForTests()
-    await restoreCodexCheckHolds()
-    expect(codexCheckHeld(homeOf('a-any'))).toBe(true)
-    rmSync(join(checksRoot, 'unknown.check'))
-    resetCodexChecksForTests()
-  })
+    expect(codexCheckHeld(homeOf('a-escaped'))).toBe(false)
+  }, 90_000)
 
-  it('no supervisor, or a launcher that fails: a failed check, nothing held', async () => {
+  it('a check held before its supervisor starts, then quit: nothing is launched after the quit', async () => {
+    const s = server('paused-cli')
+    let go!: () => void
+    const gate = new Promise<void>((res) => (go = res))
+    codexCheckSeams.beforeStart = () => gate
+    const check = status(s.cmd, homeOf('a-paused'))
+    const stopping = stopCodexChecks()
+    setTimeout(go, 200)
+    await stopping
+    expect(await check).toMatchObject({ ok: false })
+    expect(s.started()).toBe(false)
+    expect(codexCheckHeld(homeOf('a-paused'))).toBe(false)
+  }, 60_000)
+
+  it('a check waiting for its answer, then quit: the quit ends it and its child before it returns', async () => {
+    const s = server('waiting-cli', { stubborn: true, answers: false })
+    const check = status(s.cmd, homeOf('a-waiting'))
+    await until(() => s.started())
+    await until(async () => (await s.left()).length === 2)
+    await stopCodexChecks()
+    expect(await s.left()).toEqual([])
+    expect(await check).toEqual({ ok: false, error: 'Hive is quitting' })
+    expect(codexCheckHeld(homeOf('a-waiting'))).toBe(false)
+  }, 60_000)
+
+  it("a held check's retry under way when Hive quits: the quit's end runs after it, never beside it", async () => {
+    const s = server('retry-cli')
+    codexCheckSeams.host = doubtful
+    flaky.unknown = true
+    expect(await status(s.cmd, homeOf('a-retry'))).toMatchObject({ ok: false })
+    let inFlight = 0
+    let most = 0
+    codexCheckSeams.onEnd = (phase) => {
+      inFlight += phase === 'in' ? 1 : -1
+      most = Math.max(most, inFlight)
+    }
+    // A later check retries the old end, slowly (the supervisor slow to answer); Hive quits meanwhile.
+    flaky.slow = 1500
+    const retry = status(s.cmd, homeOf('a-retry'))
+    await until(() => inFlight === 1)
+    await stopCodexChecks()
+    await retry
+    expect(most).toBe(1)
+  }, 90_000)
+
+  it('no supervisor, or a launcher whose command is missing: a failed check, nothing held', async () => {
     codexCheckSeams.host = { ensure: async () => false } as never
-    expect(await status(fakeCli('unused-cli', ''), 'a-nohost')).toEqual({ ok: false, error: "Hive can't own Codex's check here (its process tracking is off)" })
+    expect(await status(fakeCli('unused-cli', ''), homeOf('a-nohost'))).toEqual({ ok: false, error: "Hive can't own Codex's check here (its process tracking is off)" })
     expect(codexCheckHeld(homeOf('a-nohost'))).toBe(false)
     codexCheckSeams.host = sharedHost
-    const r = await status(join(base, 'no-such-codex.exe'), 'a-nostart')
+    const r = await status(join(base, 'no-such-codex.exe'), homeOf('a-nostart'))
     expect(r.ok).toBe(false)
     expect(codexCheckHeld(homeOf('a-nostart'))).toBe(false)
   }, 60_000)
 })
+
 
 describe('a Codex launch on a connection', () => {
   const conn = join(base, 'profile', 'accounts', 'a-launch')
@@ -442,3 +470,21 @@ describe('a Codex launch on a connection', () => {
     expect(codex.skillRoots(conn).machine).toEqual([join(conn, 'skills')])
   })
 })
+
+// The file's one teardown, run however its tests ended (an assertion or a check that threw included): Codex's checks
+// stopped and forgotten; every process a helper started ended exactly (those identified, and each fake server and its
+// child by the pid and start it wrote) and seen gone; the test supervisor closed; then the temp tree removed.
+afterAll(async () => {
+  await stopCodexChecks().catch(() => undefined)
+  resetCodexChecksForTests()
+  const list = (await windowsProbe.list()) ?? []
+  const fromFiles = pidsFiles.filter((f) => existsSync(f)).flatMap((f) => JSON.parse(readFileSync(f, 'utf8')) as { pid: number; at: number }[])
+  const helpers = [...identified, ...fromFiles.flatMap((x) => list.filter((p) => p.pid === x.pid && Math.abs(p.started - x.at) < 3000))].filter((p) => list.some((q) => q.pid === p.pid && q.started === p.started))
+  await windowsProbe.end(helpers)
+  await sharedHost.close()
+  await vi.waitFor(async () => {
+    for (const p of helpers) expect(await running(p), `helper ${p.pid} still running`).toBe(false)
+  }, { timeout: HUNG_MS, interval: 200 })
+  vi.restoreAllMocks()
+  rmSync(base, { recursive: true, force: true })
+}, 90_000)

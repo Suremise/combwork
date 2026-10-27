@@ -30,7 +30,7 @@ import { endTree } from '../progressReporters/wrapper'
 import type { FactStore, QueueLease, QueueProc, QueueProcKind } from './factStore'
 import type { JobHost } from '../processSupervisor'
 import { clearJournal, endLeaseJob, journalOf, journalPath, LeaseJob, queueHost, sealJournal, startLauncher, type Journalled } from './queueJobs'
-import { defaultProbe, goneWithin, treeOf, type Listed, type ProcessProbe } from './queueProcs'
+import { defaultProbe, treeOf, type Listed, type ProcessProbe } from './queueProcs'
 import type { Workflow } from './runtime'
 
 const log = createLogger('queue')
@@ -625,8 +625,18 @@ const matches = (p: Listed, r: QueueProc): boolean => p.pid === r.pid && p.start
 
 const uniq = (l: Listed[]): Listed[] => l.filter((p, i) => l.findIndex((x) => x.pid === p.pid && x.started === p.started) === i)
 
-/** Waits until none of these processes runs (queueProcs' goneWithin, END_WAIT_MS). */
-const gone = (probe: ProcessProbe, targets: Listed[]): Promise<Listed[] | null> => goneWithin(probe, targets, END_WAIT_MS)
+/** Waits until none of these processes runs (by pid and start); those still running after END_WAIT_MS, or null when they can't be listed. */
+async function gone(probe: ProcessProbe, targets: Listed[]): Promise<Listed[] | null> {
+  if (!targets.length) return []
+  const until = Date.now() + END_WAIT_MS
+  for (;;) {
+    const list = await probe.list()
+    if (!list) return null
+    const still = targets.filter((t) => list.some((p) => p.pid === t.pid && p.started === t.started))
+    if (!still.length || Date.now() > until) return still
+    await new Promise((res) => setTimeout(res, 200))
+  }
+}
 
 /**
  * Whether a target's queue still needs its worktree (#1360 item 5): an open queue entry for it, an unfinished journal
