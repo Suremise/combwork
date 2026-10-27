@@ -1056,7 +1056,8 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
       const cardPrompt = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? taskPrompt(card, !!sessions.hiveMcp(projectPath), { from: 'todo', attachments: await cardAttachments(ws, n) })
       // Its lane's brief as it is now (HI-1795), after the card's own prompt (the window's or offered one kept whole): in
       // every placement of the lane's cards, whatever conversation works the card. Fixed with the delivery once made.
-      const brief = l.kind === 'lane' && l.lane ? briefOf((await rawLanes(ws).catch(() => [])).find((x) => x.id === l.lane)) : null
+      // A read that fails is unknown, never "no brief": it throws, and the pass tries again (HR4's round 1).
+      const brief = l.kind === 'lane' && l.lane ? briefOf((await rawLanes(ws)).find((x) => x.id === l.lane)) : null
       const prompt = brief ? `${cardPrompt}\n\n${brief}` : cardPrompt
       const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: n, body: prompt, source: PLACEMENT, ref } // i18n-ignore: who a delivery is from, as agents read it
       log.info(`Giving ${userText(agent.name)} #${n} in ${userText(cycle.started.slot)} (${how})`)

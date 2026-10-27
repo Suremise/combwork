@@ -135,6 +135,27 @@ describe("a lane's brief kept with the lane, and delivered outside slots (HI-179
     expect(await at(4)).toEqual({ cancel: expect.stringMatching(/no longer current/) })
   })
 
+  it("two open workspaces whose folders share a prefix (ws, ws-other): each one's current brief stays valid, found in its own workspace (HR4's round 1)", async () => {
+    const otherPath = `${wsPath}-other`
+    const otherProject = join(otherPath, 'alpha')
+    mkdirSync(join(otherProject, '.hive'), { recursive: true })
+    writeFileSync(join(otherProject, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
+    const other = createWorkspaceService()
+    await other.open(otherPath)
+    try {
+      const mine = (await start([await make('Mine a')], 'Brief of ws.')).lane
+      const theirCard = (await inWorkspace(other, () => tasks.createTask({ title: 'Theirs a', project: 'alpha' }, user))).number
+      const theirs = (await lanes.startLane(other, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [theirCard], by: 'the Assistant', brief: 'Brief of ws-other.' })).lane
+      expect(await laneBriefRefreshForTests({ source: LANE_BRIEF_SOURCE, ref: `${mine.id}:1` } as never, project)).toBeNull()
+      expect(await laneBriefRefreshForTests({ source: LANE_BRIEF_SOURCE, ref: `${theirs.id}:1` } as never, otherProject)).toBeNull()
+      // Each lane is only its own workspace's: asked from the other's project, it isn't found there.
+      expect(await laneBriefRefreshForTests({ source: LANE_BRIEF_SOURCE, ref: `${theirs.id}:1` } as never, project)).toEqual({ cancel: expect.stringMatching(/no longer current/) })
+      await lanes.endLane(other, theirs.id, { abandoned: true })
+    } finally {
+      await disposeWorkspaceService(other)
+    }
+  })
+
   it("one owed (saved, its delivery not yet made or not yet recorded) is made by the next look, once", async () => {
     const a = await make('Owed a')
     // Saved with the lane, no look yet (a crash before its delivery): the next look makes it.

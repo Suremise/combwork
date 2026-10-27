@@ -14,7 +14,7 @@ import { mutateLanes, onLanesWritten, rawLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { resolvedOf } from './workflow/rulesets'
 import { workflowEnforced } from './workflow/service'
-import { openWorkspaces, type WorkspaceService } from './workspace'
+import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 
 const log = createLogger('lanes')
 
@@ -99,7 +99,8 @@ async function settleOnce(ws: WorkspaceService): Promise<void> {
 /** Just before one is offered: still its lane's current brief (the lane running, this rev), else cancelled. */
 const source: DeliverySource = {
   refresh: async (r, host) => {
-    const ws = openWorkspaces().find((w) => !!w.path && host.toLowerCase().startsWith(w.path.toLowerCase()))
+    // The host's own workspace, by its folder's boundary (HR4's round 1: a prefix match took `ws` for `ws-other`'s).
+    const ws = workspaceFor(host)
     const [id, rev] = (r.ref ?? '').split(':')
     const lane = ws ? (await rawLanes(ws)).find((l) => l.id === id) : undefined
     if (!lane || lane.state !== 'active' || !lane.brief?.text || String(lane.brief.rev) !== rev) return { cancel: 'its lane brief is no longer current' } // i18n-ignore: why a delivery was cancelled, for the log

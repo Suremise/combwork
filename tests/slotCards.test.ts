@@ -762,6 +762,21 @@ describe("a lane's brief in every placement of its cards (HI-1795)", { timeout: 
     })
   }
 
+  it("its lane read failing (unknown, HR4's round 1): nothing delivered or placed, tried again; the retry's prompt keeps the brief", async () => {
+    let fails = 1
+    state.lanes = async () => {
+      if (fails-- > 0) throw new Error('the board is closing (test)')
+      return keptLanes() as never
+    }
+    const { e, n, cycle, ws } = await laneCard()
+    await expect(place(ws, e.project, e.wf, n, cycle, laneLease)).rejects.toThrow(/board is closing/)
+    expect(bodies()).toEqual([])
+    expect(e.store.facts(n).some((f) => f.kind === 'BuilderPlaced')).toBe(false)
+    await place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, laneLease)
+    expect(bodies()).toHaveLength(1)
+    expect(bodies()[0]).toMatch(BRIEF)
+  })
+
   it("a card of no lane, or a lane with no brief (or one cleared): the card's prompt alone", async () => {
     state.lanes = async () => keptLanes() as never
     const one = await laneCard()
