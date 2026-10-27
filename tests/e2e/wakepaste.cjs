@@ -75,6 +75,8 @@ const check = (name, ok, extra = '') => {
   await page.getByText('alpha', { exact: true }).first().click()
   const agent = await lib.addAgent(inv, alpha, { name: 'Watcher' })
   const card = (await inv('tasks:create', { title: 'Watched', project: 'alpha' })).number
+  // Wakes name the card by its key (#1219), not its number.
+  const named = `${(await inv('tasks:list')).find((c) => c.number === card).key}`
   await inv('session:start', alpha, { agentId: agent.id })
   check('the agent starts', !!(await lib.until(() => idle(alpha, agent.id), 30000)))
   await inv('session:start', home, { agentId: 'assistant' })
@@ -88,7 +90,7 @@ const check = (name, ok, extra = '') => {
       await say(p, id, `hive hive_wait_for_tasks {"cards":[${card}],"changes":["comment"],"wake":true}`)
       return lib.until(async () => (await live(p, id))?.status === 'watching', HUNG_MS)
     }
-    const mine = () => wakes().filter((w) => w.text.includes(`#${card}`) && w.agent === name)
+    const mine = () => wakes().filter((w) => w.text.includes(named) && w.agent === name)
     let name = null
 
     // Read as usual: taken at its first Enter.
