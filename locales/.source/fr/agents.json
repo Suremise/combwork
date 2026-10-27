@@ -243,6 +243,8 @@
   "agents.models.olderGroup": "Older versions",
   "agents.models.providerGroup": "{provider} models",
   "agents.models.serverAs": "{model} (as {names})",
+  "agents.models.serverCloud": "{model} (cloud)",
+  "agents.models.serverCloudAs": "{model} (cloud, as {names})",
   "agents.models.unavailableGroup": "Not available to this account",
   "agents.name.empty": "Enter a name.",
   "agents.name.taken": "There is already an agent called \"{agent}\" in {project}. Agent names are unique across the workspace: try \"{suggestion}\".",

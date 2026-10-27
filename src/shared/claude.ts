@@ -290,9 +290,20 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
             listing: { path: '/models', list: 'data', id: 'id' },
             docs: 'https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code'
           },
-          // Ollama's Anthropic-compatible API (docs.ollama.com/api/anthropic-compatibility, Ollama 0.14 and later): no key,
-          // its models those it has pulled.
-          { id: 'ollama', name: 'Ollama', baseUrl: 'http://localhost:11434', keyless: true, listing: { path: '/api/tags', list: 'models', id: 'name' }, docs: 'https://docs.ollama.com/api/anthropic-compatibility' } // i18n-ignore: a product's name
+          // Ollama's Anthropic-compatible API, as its Claude Code guide sets it up (docs.ollama.com/integrations/claude-code,
+          // checked 27 Oct 2026 with Ollama 0.33.1, HI-1773): no key, its models those it has pulled. A cloud model, run on
+          // ollama.com through this server, has `remote_host` in the listing (ollama/api/types.go's ListModelResponse); a
+          // typed one is told by its tag. The guide recommends a 64K context or more.
+          {
+            id: 'ollama',
+            name: 'Ollama', // i18n-ignore: a product's name
+            baseUrl: 'http://localhost:11434',
+            keyless: true,
+            listing: { path: '/api/tags', list: 'models', id: 'name', remote: 'remote_host' },
+            remoteModels: 'claude-code.connections.remoteModels',
+            contextAdvice: 64_000,
+            docs: 'https://docs.ollama.com/integrations/claude-code'
+          }
         ]
       }
     }

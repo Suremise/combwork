@@ -41,7 +41,7 @@ const { provider } = await import('../src/main/providers')
 const { providerService } = await import('../src/main/providerService')
 const { withoutAccountEnv, withServerEnv } = await import('../src/main/providers/common')
 const { createWorkspaceService, inWorkspace } = await import('../src/main/workspace')
-const { agentLaunchSettings } = await import('../src/shared/providers')
+const { agentLaunchSettings, providerDescriptor } = await import('../src/shared/providers')
 
 // Dummy keys shaped so no other masking rule catches them: only the key matcher can.
 const KEY = 'Zq!7#mP2&vL9^tR4~wX8'
@@ -79,7 +79,7 @@ afterEach(async () => {
 })
 
 const deepseek = { cli: 'claude-code' as const, name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/anthropic', preset: 'deepseek', models: [{ id: 'deepseek-flash[1m]', as: ['opus' as const, 'sonnet' as const] }, { id: 'deepseek-flash', as: ['haiku' as const] }], modelsFrom: 'typed' as const }
-async function serverOn(input: Partial<typeof deepseek> & { key?: string } = {}) {
+async function serverOn(input: Partial<Parameters<typeof servers.addServerConnection>[0]> = {}) {
   const a = await servers.addServerConnection({ ...deepseek, ...input })
   await here(() => accounts.setAccountOn(a.id, true))
   return a
@@ -580,4 +580,83 @@ describe("reading a server's models (when asked)", () => {
     expect(await reading).toEqual({ ok: false, why: 'stale' })
     expect(accounts.getAccount(a.id)!.server!.models.map((m) => m.id)).toEqual(['kept'])
   }, HUNG_MS * 2)
+})
+
+describe('Ollama cloud models: on this PC, but not local (HI-1773, Darren 27 Oct)', () => {
+  let srv: Server
+  let port = 0
+  let tags: unknown = { models: [] }
+  beforeAll(async () => {
+    // A stand-in for Ollama's own server on this PC: its /api/tags, as Ollama 0.33.1 answers (ollama/api/types.go's ListModelResponse).
+    srv = createServer((req, res) => {
+      res.writeHead(req.url === '/api/tags' ? 200 : 404, { 'content-type': 'application/json' })
+      res.end(JSON.stringify(req.url === '/api/tags' ? tags : {}))
+    })
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()))
+    port = (srv.address() as { port: number }).port
+  })
+  afterAll(() => new Promise<void>((r) => srv.close(() => r())))
+  const ollama = (models: { id: string; as?: ('opus' | 'sonnet' | 'haiku')[]; remote?: true }[], preset: string | undefined = 'ollama') => serverOn({ name: 'Ollama', preset, baseUrl: `http://127.0.0.1:${port}`, models })
+  const local = async (id: string): Promise<boolean> => {
+    const conn = (await launch(id))!
+    try {
+      return conn.server!.local
+    } finally {
+      conn.release()
+    }
+  }
+  const tag = (name: string, remote?: string) => ({ name, model: name, size: 1, digest: 'x', ...(remote ? { remote_model: name, remote_host: remote } : {}) })
+
+  it("read from Ollama: a model it marks remote (an alias of a cloud model too) is cloud, the rest local; each reading says it afresh", async () => {
+    const a = await ollama([{ id: 'qwen3:8b', as: ['opus'] }])
+    expect(await local(a.id)).toBe(true)
+    // The server's own mark, whatever the name; a cloud tag it doesn't mark (an older Ollama), by the preset's pattern.
+    tags = { models: [tag('qwen3:8b'), tag('mine', 'https://ollama.com:443'), tag('glm-4.6:cloud')] }
+    expect(await servers.readServerModels(a.id, 'r1')).toMatchObject({ ok: true, models: [{ id: 'qwen3:8b', as: ['opus'] }, { id: 'mine', remote: true }, { id: 'glm-4.6:cloud', remote: true }] })
+    expect(await local(a.id)).toBe(false)
+    // Read again: what this reading says, not what the last one did.
+    tags = { models: [tag('qwen3:8b'), tag('mine')] }
+    expect(await servers.readServerModels(a.id, 'r2')).toMatchObject({ ok: true, models: [{ id: 'qwen3:8b', as: ['opus'] }, { id: 'mine' }] })
+    expect(accounts.getAccount(a.id)!.server!.models[1].remote).toBeUndefined()
+    expect(await local(a.id)).toBe(true)
+  })
+
+  it("an edit of its names keeps the server's mark; the window can't mark a model or take a mark off", async () => {
+    const a = await ollama([])
+    tags = { models: [tag('qwen3:8b'), tag('mine', 'https://ollama.com:443')] }
+    await servers.readServerModels(a.id, 'r')
+    // As the window sends them: its names changed, no marks (or a mark of its own on a local model).
+    await servers.editServerConnection(a.id, { models: [{ id: 'qwen3:8b', as: ['haiku'], remote: true }, { id: 'mine', as: ['opus'] }] })
+    expect(accounts.getAccount(a.id)!.server!.models).toEqual([{ id: 'qwen3:8b', as: ['haiku'] }, { id: 'mine', as: ['opus'], remote: true }])
+    expect(await local(a.id)).toBe(false)
+    // Taken out: local again.
+    await servers.editServerConnection(a.id, { models: [{ id: 'qwen3:8b', as: ['opus'] }] })
+    expect(await local(a.id)).toBe(true)
+  })
+
+  it('typed: by the preset\'s pattern (a tag of cloud or …-cloud, never a name\'s own -cloud), and only for the Ollama preset', async () => {
+    const a = await ollama([{ id: 'qwen3:8b', as: ['opus'] }, { id: 'gpt-oss:120b-cloud' }, { id: 'my-cloud' }])
+    expect(accounts.getAccount(a.id)!.server!.models.map((m) => [m.id, !!m.remote])).toEqual([['qwen3:8b', false], ['gpt-oss:120b-cloud', true], ['my-cloud', false]])
+    expect(await local(a.id)).toBe(false)
+    // A custom server on this PC: no pattern of Ollama's applies.
+    const custom = await ollama([{ id: 'gemma4:cloud', as: ['opus'] }], '')
+    expect(accounts.getAccount(custom.id)!.server!.models[0].remote).toBeUndefined()
+    expect(await local(custom.id)).toBe(true)
+    // The real names Ollama gives (tests/fixtures/advanced): its cloud models taken, its local ones not.
+    const test = accounts.remoteModelTest(providerDescriptor('claude-code').capabilities.connections!.server!, 'ollama')
+    expect(['gemma4:cloud', 'kimi-k2.7-code:cloud', 'qwen3-coder:480b-cloud', 'deepseek-v3.1:671b-cloud'].every(test)).toBe(true)
+    expect(['qwen3.8:27b', 'qwen3-coder-next:q4_K_M', 'qwen3.6:35b-a3b', 'devstral-small-2:24b', 'my-cloud', 'cloud'].some(test)).toBe(false)
+  })
+
+  it('the pattern as set in Settings → Advanced applies at the next launch to models already typed', async () => {
+    const a = await ollama([{ id: 'qwen3:8b', as: ['opus'] }])
+    expect(await local(a.id)).toBe(true)
+    await advanced.set('claude-code.connections.remoteModels', '^qwen3:')
+    try {
+      expect(await local(a.id)).toBe(false)
+    } finally {
+      await advanced.set('claude-code.connections.remoteModels', null)
+    }
+    expect(await local(a.id)).toBe(true)
+  })
 })

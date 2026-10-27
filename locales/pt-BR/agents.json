@@ -243,6 +243,8 @@
   "agents.models.olderGroup": "Versões anteriores",
   "agents.models.providerGroup": "Modelos do {provider}",
   "agents.models.serverAs": "{model} (como {names})",
+  "agents.models.serverCloud": "{model} (nuvem)",
+  "agents.models.serverCloudAs": "{model} (nuvem, como {names})",
   "agents.models.unavailableGroup": "Indisponíveis para esta conta",
   "agents.name.empty": "Digite um nome.",
   "agents.name.taken": "Já existe um agente chamado “{agent}” no projeto {project}. Os nomes de agentes são únicos em todo o espaço de trabalho: tente “{suggestion}”.",

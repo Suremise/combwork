@@ -32,15 +32,24 @@ export function connectionModels(conn: Pick<Connection, 'kind' | 'server'>, info
     case 'server': {
       const models = conn.server?.models ?? []
       const def = serverDefaultModel(models)
-      return { catalog: { source: 'cli', version: null, at: '', models: models.map((m) => ({ value: m.id, label: serverModelLabel(m.id, m.as ?? [], tr), efforts: [] })), ...(def ? { defaultModel: def } : {}) }, ...(def ? { defaultModel: def } : {}) }
+      return { catalog: { source: 'cli', version: null, at: '', models: models.map((m) => ({ value: m.id, label: serverModelLabel(m.id, m.as ?? [], tr, m.remote), efforts: [] })), ...(def ? { defaultModel: def } : {}) }, ...(def ? { defaultModel: def } : {}) }
     }
   }
 }
 
-/** A server's model as shown (HI-1772): its id, with the Claude names it stands in for ("deepseek-flash (as Opus, Sonnet)"). */
-export function serverModelLabel(id: string, as: readonly ModelAlias[], tr?: Tr): string {
-  if (!as.length) return id
+/**
+ * A server's model as shown (HI-1772): its id, with the Claude names it stands in for ("deepseek-flash (as Opus,
+ * Sonnet)"), and "cloud" for one its server runs elsewhere (HI-1773: "glm-4.6:cloud (cloud, as Opus)").
+ */
+export function serverModelLabel(id: string, as: readonly ModelAlias[], tr?: Tr, remote?: boolean): string {
+  if (!as.length && !remote) return id
   const names = as.map((a) => ALIAS_NAMES[a])
+  if (remote) {
+    const c = as.length
+      ? msg({ id: 'agents.models.serverCloudAs', defaultMessage: '{model} (cloud, as {names})', description: "A model of a server connection that its server runs in the cloud rather than on this PC (an Ollama cloud model), with the Claude model names it stands in for. {model} is the model id (\"glm-4.6:cloud\"); {names} the Claude names, joined (\"Opus, Sonnet\")." })
+      : msg({ id: 'agents.models.serverCloud', defaultMessage: '{model} (cloud)', description: "A model of a server connection that its server runs in the cloud rather than on this PC (an Ollama cloud model). {model} is the model id (\"glm-4.6:cloud\")." })
+    return tr ? tr(c, { model: id, names: fmt.list(names) }) : `${id} (cloud${as.length ? `, as ${names.join(', ')}` : ''})` // i18n-ignore: English without tr
+  }
   const m = msg({ id: 'agents.models.serverAs', defaultMessage: '{model} (as {names})', description: "A model of a server connection (Settings → Connections), with the Claude model names it stands in for. {model} is the server's model id (\"deepseek-flash\"); {names} the Claude names, joined (\"Opus, Sonnet\")." })
   return tr ? tr(m, { model: id, names: fmt.list(names) }) : `${id} (as ${names.join(', ')})` // i18n-ignore: English without tr
 }

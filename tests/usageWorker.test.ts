@@ -509,6 +509,36 @@ describe('the usage worker reading a transcript for main', () => {
     expect((await priced()).costFree).toBeUndefined()
     await h.close()
   })
+
+  it("an Ollama cloud model (HI-1773, Darren 27 Oct): a conversation free while local only, then run on a connection with a cloud model: Hive's price for that id, never the CLI's report", async () => {
+    const t = await setup()
+    // Claude Code's own $5 for it, priced as a Claude model, beside the requests.
+    const cloud = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'glm-4.6:cloud', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
+    writeFileSync(t.transcript, prompt(0) + cloud(1) + JSON.stringify({ type: 'cost-state', timestamp: new Date(T0 + 2000).toISOString(), totalCostUSD: 5 }) + '\n')
+    const priced = { providers: { ...DEFAULT_SETTINGS.providers, 'claude-code': { ...DEFAULT_SETTINGS.providers['claude-code'], prices: { 'glm-4.6:cloud': { input: 1_000_000, cachedInput: 0, output: 1_000_000 } } } } }
+    const unpriced = { providers: DEFAULT_SETTINGS.providers }
+    const usage = async (settings: typeof unpriced) => {
+      const st = (await t.stored())!
+      return usageFromRows(st.summary, st.rows, settings)
+    }
+    // Its first runs on a connection that was local only: free.
+    expect((await t.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('written')
+    expect(await usage(priced)).toMatchObject({ costUsd: 0, costFree: true })
+    // Its connection gained a cloud model, so its next launch wasn't local (runsLocally): the same file, unchanged, its
+    // free rows read again as charges.
+    expect((await t.ingest({ reportsIgnored: true, notLocal: true })).status).toBe('written')
+    const after = await usage(priced)
+    expect(after.costFree).toBeUndefined()
+    // The user's price for glm-4.6:cloud (10 + 100 tokens at $1 each), not the $5 Claude Code reported.
+    expect(after.costUsd).toBeCloseTo(110)
+    expect(after.outputTokens).toBe(100)
+    // No price for it: unpriced, its tokens still counted.
+    expect(await usage(unpriced)).toMatchObject({ costUsd: null, outputTokens: 100 })
+    // A stale job from while it was local never makes it free again.
+    expect((await t.ingest({ reportsIgnored: true, serverLocal: true })).status).toBe('unchanged')
+    expect((await usage(priced)).costFree).toBeUndefined()
+    await t.close()
+  })
 })
 
 describe('the usage worker as main starts it (HI-1729)', () => {

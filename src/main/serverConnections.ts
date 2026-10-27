@@ -2,8 +2,8 @@ import type { Connection, ProviderId, ServerConnection, ServerModel } from '../s
 import type { ServerCaps, ServerListing } from '../shared/providers'
 import { providerDescriptor } from '../shared/providers'
 import { msg, type Msg } from '../shared/i18n'
-import { cleanModels, keyProblem, listedIds, listingUrl, mergeListed, parseBaseUrl, type BaseUrlProblem, type ServerModelsRead } from '../shared/serverConnection'
-import { accountFolder, addAccount, connectionInternals, connectionReadyAgain, getAccount, isServer, loginKey, serverEnv } from './accounts'
+import { keyProblem, listedIds, listedRemote, listingUrl, markRemote, mergeListed, parseBaseUrl, type BaseUrlProblem, type ServerModelsRead } from '../shared/serverConnection'
+import { accountFolder, addAccount, connectionInternals, connectionReadyAgain, getAccount, isServer, loginKey, remoteModelTest, serverEnv } from './accounts'
 import { hasPty } from './ptyHost'
 import { emit } from './events'
 import { hiveError } from './hiveError'
@@ -94,7 +94,8 @@ export async function addServerConnection(input: ServerInput): Promise<Connectio
   const caps = capsOf(input.cli)
   const b = checkedUrl(input.baseUrl)
   const preset = caps.presets.find((p) => p.id === input.preset)?.id
-  const models = cleanModels(input.models ?? [])
+  // Typed (nothing read from its server yet): remote only by its preset's pattern (HI-1773).
+  const models = markRemote(input.models ?? [], [], remoteModelTest(caps, preset))
   const key = input.key ? checkedKey(input.key) : undefined
   // Checked before anything is made: a key in a field that is kept unencrypted refuses it all.
   if (key) assertKeyNotIn(key, { name: input.name, url: b.url, models })
@@ -139,7 +140,9 @@ export async function editServerConnection(id: string, patch: { baseUrl?: string
         if (p) s.preset = p
         else delete s.preset
       }
-      if (patch.models) s.models = cleanModels(patch.models)
+      // A model its server's listing marked remote stays so through an edit of its names (HI-1773); the window can't
+      // mark or unmark one. With the preset as now changed.
+      if (patch.models || patch.preset !== undefined) s.models = markRemote(patch.models ?? s.models, s.models, remoteModelTest(caps, s.preset))
       if (patch.modelsFrom) s.modelsFrom = patch.modelsFrom === 'listed' ? 'listed' : 'typed'
       a.server = s
     })
@@ -247,11 +250,14 @@ export async function readServerModels(id: string, request: string): Promise<Lis
     }
     const ids = listedIds(parsed, listingOf(server, caps))
     if (!ids) return said({ ok: false, why: 'shape' }) // i18n-ignore: a reason's code, not text
+    // Remote as this reading says (HI-1773): the server's own mark, else its preset's pattern (a server too old to mark them).
+    const marked = new Set(listedRemote(parsed, listingOf(server, caps)))
+    const byPattern = remoteModelTest(caps, server.preset)
     // Kept only if this is still the reading asked for, on the same server (its whole base URL) with the same key.
     return await locked(id, async () => {
       const now = getAccount(id)
       if (!now || !current()) return { ok: false, why: 'stale' } as const // i18n-ignore: a reason's code, not text
-      const merged = mergeListed(now.server!.models, ids)
+      const merged = mergeListed(now.server!.models, ids, (m) => marked.has(m) || byPattern(m))
       change(id, (a) => (a.server = { ...a.server!, models: merged.models, modelsFrom: 'listed' }))
       log.info(`connection ${id}: ${ids.length} model(s) read from its server`)
       return { ok: true, models: merged.models, dropped: merged.dropped } as const

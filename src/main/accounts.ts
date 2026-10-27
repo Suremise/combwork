@@ -9,6 +9,7 @@ import { acceptable, accountState, resolveConnection, workspaceAccounts, switche
 import { profileFolder } from '../shared/appName'
 import { isProviderEnabled, providerDescriptor, PROVIDERS } from '../shared/providers'
 import { msg, type Msg } from '../shared/i18n'
+import { advanced } from './advanced'
 import { config } from './config'
 import { emit, onHiveEvent } from './events'
 import { hiveError } from './hiveError'
@@ -934,7 +935,8 @@ export interface LaunchConnection {
   /**
    * A server connection's (HI-1772): the variables its launch gets (its server, its models, its key: secret, given to
    * that launch's environment only and never kept), its models for the footer, and its key's use for masking, ended
-   * by whoever holds the launch once its process is gone (or it never started).
+   * by whoever holds the launch once its process is gone (or it never started); `local`, it runs only on this PC
+   * (runsLocally).
    */
   server?: { env: Record<string, string>; models: ServerModel[]; local: boolean }
   /**
@@ -983,6 +985,26 @@ export function serverEnv(caps: ServerCaps, server: ServerConnection, key: strin
 }
 
 /**
+ * Whether a model id is one a server connection's preset says its server runs elsewhere (HI-1773: an Ollama cloud
+ * model), by the preset's advanced pattern; false for a preset with none, or none chosen.
+ */
+export function remoteModelTest(caps: ServerCaps, preset: string | undefined): (id: string) => boolean {
+  const setting = caps.presets.find((p) => p.id === preset)?.remoteModels
+  if (!setting) return () => false
+  const re = advanced.pattern(setting)
+  return (id) => re.test(id)
+}
+
+/**
+ * Whether a server connection runs only on this PC (HI-1773): its server is, and none of its models is one the server
+ * runs elsewhere (as its listing said, or by its preset's pattern now). Its sessions are then free (local).
+ */
+export function runsLocally(caps: ServerCaps, server: ServerConnection, local: boolean): boolean {
+  const remote = remoteModelTest(caps, server.preset)
+  return local && !server.models.some((m) => m.remote || remote(m.id))
+}
+
+/**
  * A server connection's part of a launch (HI-1772): its key decrypted for this launch's environment (refused without
  * one, unless its server is this machine's), and that key masked from now until the launch's process is gone.
  */
@@ -991,7 +1013,7 @@ async function serverPart(a: Connection, caps: ServerCaps, agentName: string): P
   if (!a.server || !b.ok) throw hiveError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
   const got = await withKey(a.id, b.origin)
   if (!got && !b.local) throw hiveError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
-  return { part: { env: serverEnv(caps, a.server, got?.key ?? null), models: a.server.models, local: b.local }, keyV: got?.v ?? null, origin: b.origin }
+  return { part: { env: serverEnv(caps, a.server, got?.key ?? null), models: a.server.models, local: runsLocally(caps, a.server, b.local) }, keyV: got?.v ?? null, origin: b.origin }
 }
 
 /**

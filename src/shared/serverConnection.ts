@@ -81,7 +81,7 @@ export function validModelId(id: string): boolean {
 
 /**
  * A server's models made consistent: valid ids, each once (its first), and each alias on at most one model (its first
- * there); aliases kept in MODEL_ALIASES' order.
+ * there); aliases kept in MODEL_ALIASES' order, and `remote` as it was.
  */
 export function cleanModels(models: readonly ServerModel[]): ServerModel[] {
   const seen = new Set<string>()
@@ -93,9 +93,22 @@ export function cleanModels(models: readonly ServerModel[]): ServerModel[] {
     seen.add(id)
     const as = MODEL_ALIASES.filter((a) => Array.isArray(m.as) && m.as.includes(a) && !taken.has(a))
     for (const a of as) taken.add(a)
-    out.push(as.length ? { id, as } : { id })
+    out.push({ id, ...(as.length ? { as } : {}), ...(m.remote === true ? { remote: true as const } : {}) })
   }
   return out
+}
+
+/**
+ * Models as saved from a form (HI-1773): a model is remote when it was (its server's listing said so: an edit of its
+ * names keeps that, whatever the window sent) or its id is one its preset's pattern takes; the window never makes one
+ * remote, nor local again.
+ */
+export function markRemote(models: readonly ServerModel[], before: readonly ServerModel[], isRemoteId: (id: string) => boolean): ServerModel[] {
+  const was = new Set(before.filter((m) => m.remote).map((m) => m.id))
+  return cleanModels(models.map(({ remote: _sent, ...m }) => {
+    const id = typeof m.id === 'string' ? m.id.trim() : ''
+    return was.has(id) || isRemoteId(id) ? { ...m, remote: true as const } : m
+  }))
 }
 
 /** Each alias's model, where one stands in for it. */
@@ -113,16 +126,17 @@ export function serverDefaultModel(models: readonly ServerModel[]): string | und
 
 /**
  * What a model the CLI reports is on a server connection (HI-1772): the server's model, and the aliases it stands in
- * for. The CLI may report an alias's Claude name (`claude-sonnet-…`), which is then that alias's model; an id the
- * table doesn't know is itself, standing in for nothing.
+ * for (and whether its server runs it elsewhere, HI-1773). The CLI may report an alias's Claude name (`claude-sonnet-…`),
+ * which is then that alias's model; an id the table doesn't know is itself, standing in for nothing.
  */
-export function serverModelOf(models: readonly ServerModel[], reported: string): { id: string; as: ModelAlias[] } {
+export function serverModelOf(models: readonly ServerModel[], reported: string): { id: string; as: ModelAlias[]; remote?: true } {
+  const of = (m: ServerModel): { id: string; as: ModelAlias[]; remote?: true } => ({ id: m.id, as: m.as ?? [], ...(m.remote ? { remote: true as const } : {}) })
   // Its own id, else with a suffix the CLI drops in what it reports (`deepseek-flash[1m]`).
   const own = models.find((m) => m.id === reported) ?? models.find((m) => m.id.replace(/\[[^\]]*\]$/, '') === reported)
-  if (own) return { id: own.id, as: own.as ?? [] }
+  if (own) return of(own)
   const alias = MODEL_ALIASES.find((a) => new RegExp(`^(claude-)?${a}\\b`, 'i').test(reported))
   const mapped = alias ? models.find((m) => m.as?.includes(alias)) : undefined
-  return mapped ? { id: mapped.id, as: mapped.as ?? [] } : { id: reported, as: [] }
+  return mapped ? of(mapped) : { id: reported, as: [] }
 }
 
 /** The URL a listing is read from: its path from the origin when it starts with `/`, else under the base URL. */
@@ -145,11 +159,29 @@ export function listedIds(reply: unknown, listing: ServerListing): string[] | nu
   return out
 }
 
+/** The ids a listing's reply says its server runs elsewhere (HI-1773): entries whose `remote` field isn't empty. */
+export function listedRemote(reply: unknown, listing: ServerListing): string[] {
+  const list = listing.remote && reply && typeof reply === 'object' ? (reply as Record<string, unknown>)[listing.list] : undefined
+  if (!Array.isArray(list)) return []
+  const out: string[] = []
+  for (const e of list) {
+    if (!e || typeof e !== 'object') continue
+    const { [listing.id]: id, [listing.remote!]: remote } = e as Record<string, unknown>
+    if (typeof id === 'string' && typeof remote === 'string' && remote.trim()) out.push(id)
+  }
+  return out
+}
+
 /**
- * A listing's ids as the connection's models: the mappings of ids still listed kept; `dropped`, the ids no longer
- * listed (said to the user).
+ * A listing's ids as the connection's models: the mappings of ids still listed kept, and whether each is remote as this
+ * reading says (`isRemote`: its listing's mark, else its preset's pattern), never as before; `dropped`, the ids no
+ * longer listed (said to the user).
  */
-export function mergeListed(before: readonly ServerModel[], ids: readonly string[]): { models: ServerModel[]; dropped: string[] } {
+export function mergeListed(before: readonly ServerModel[], ids: readonly string[], isRemote: (id: string) => boolean = () => false): { models: ServerModel[]; dropped: string[] } {
   const was = new Map(before.map((m) => [m.id, m]))
-  return { models: cleanModels(ids.map((id) => was.get(id) ?? { id })), dropped: before.map((m) => m.id).filter((id) => !ids.includes(id)) }
+  const models = ids.map((id) => {
+    const as = was.get(id)?.as
+    return { id, ...(as ? { as } : {}), ...(isRemote(id) ? { remote: true as const } : {}) }
+  })
+  return { models: cleanModels(models), dropped: before.map((m) => m.id).filter((id) => !ids.includes(id)) }
 }
