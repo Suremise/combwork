@@ -23,7 +23,6 @@
 // waits.
 
 import { projectAgents } from '../shared/defaults'
-import { msg } from '../shared/i18n'
 import { taskPrompt } from '../shared/tasks'
 import { agentWorkflowRole, buildsWork } from '../shared/workflow/roles'
 import { SLOT_NOTICES, workflowText } from '../shared/workflow/texts'
@@ -67,10 +66,6 @@ import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace
 import { cardAttachments } from './cardAttachments'
 
 const log = createLogger('slots')
-
-const M = {
-  notPrepared: msg({ id: 'service.slots.notPrepared', defaultMessage: "Hive couldn't get {slot} ready for {card}: {why}", description: "A notice: a card was started in a slot (a worktree Hive lends to a card or a lane), and Hive couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English." })
-}
 
 /** What a placement's delivery is made from: its identity is the card's cycle and lease, so it is made once. */
 const PLACEMENT = 'slot-placement'
@@ -837,7 +832,7 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
       log.warn(`Slot ${userText(st.slot)} couldn't be prepared for #${n}: ${userText(r.error)}`)
       await wf.write(card.card, null, 'hive', (w) => {
         const english = `Hive couldn't get ${st.slot} ready for ${card.card.key}: ${r.error}` // i18n-ignore: agent-facing, and the notice's English
-        w.action('notify', { text: english, shown: workflowText(M.notPrepared, { slot: st.slot, card: card.card.key, why: r.error }) })
+        w.action('notify', { text: english, shown: workflowText(SLOT_NOTICES.notPrepared, { slot: st.slot, card: card.card.key, why: r.error }) })
         wf.wake(w, st.builder, english)
       })
       return null
