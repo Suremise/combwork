@@ -3,13 +3,37 @@
 // packed-refs rewrite), a write in an ignored folder doesn't count, a folder gone and back (#964) leaves its record
 // unknown rather than empty, and the watches close when their workspace does.
 import { execFileSync } from 'child_process'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { Observer, observer, type ObserveEvent } from '../src/main/platform/observe'
+import { FILE_TIME_SLACK_MS, Observer, observer, type ObserveEvent } from '../src/main/platform/observe'
 import { isUnknown } from '../src/main/platform/types'
 import { tempDir } from './tempDir'
+
+// A file's metadata as the write log reads it (HI-1767), changed for one path at a time: `fail` makes lstat and stat of
+// it reject with that code; `link` makes it a link: lstat reports the link's own times, stat its target's.
+const meta = vi.hoisted(() => ({ fail: new Map<string, string>(), link: new Map<string, { own: number; target: number }>() }))
+vi.mock('fs/promises', async (original) => {
+  const real = await original<typeof import('fs/promises')>()
+  const key = (p: unknown): string => String(p).toLowerCase()
+  const failing = (p: unknown): void => {
+    const code = meta.fail.get(key(p))
+    if (code) throw Object.assign(new Error(`${code}: stubbed, ${String(p)}`), { code })
+  }
+  const read = (which: 'stat' | 'lstat') =>
+    (async (p: string, ...rest: unknown[]) => {
+      failing(p)
+      const s = await (real[which] as (...a: unknown[]) => Promise<import('fs').Stats>)(p, ...rest)
+      const l = meta.link.get(key(p))
+      if (!l) return s
+      const at = which === 'lstat' ? l.own : l.target
+      return Object.assign(Object.create(Object.getPrototypeOf(s)), s, { mtimeMs: at, ctimeMs: at, isSymbolicLink: () => which === 'lstat' })
+    }) as typeof real.stat
+  const stat = read('stat')
+  const lstat = read('lstat') as typeof real.lstat
+  return { ...real, default: { ...real, stat, lstat }, stat, lstat }
+})
 
 const base = tempDir('hive-observe-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -33,6 +57,12 @@ function repo(): string {
   run(p, 'commit', '-q', '-m', 'one')
   return p
 }
+
+/**
+ * Main's thread busy for a while, as under load (HI-1767): nothing else runs, so a watch's events wait. Not a wait for
+ * a condition: what the test then checks is the write log's answer.
+ */
+const busy = (ms: number): void => void Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 
 /** Once a folder's watch is armed: its record is complete from now on. */
 const armed = (o: Observer, folder: string) => vi.waitFor(async () => expect(isUnknown(await o.changedBetween(folder, Date.now(), Date.now()))).toBe(false), { timeout: HUNG_MS })
@@ -100,6 +130,66 @@ describe('the watcher on a Git repository', () => {
     writeFileSync(join(p, 'a.txt'), 'a\n')
     expect(run(p, 'status', '--porcelain')).toBe('')
     expect(await between(t0)).toEqual({ changed: true, paths: ['a.txt'] })
+  })
+
+  it("a write or a deletion just before the start, its event coming after it, doesn't count (HI-1767)", async () => {
+    mkdirSync(join(p, 'sub'))
+    commit(p, 'sub/c.txt', 'c\n')
+    await seen({ kind: 'lineMoved', line: 'main' })
+    await armed(o, p)
+    // Written (as a check copy's reset or a merge writes), then main's thread busy past the write's times: the watch's
+    // events can only come in after the start is taken.
+    writeFileSync(join(p, 'a.txt'), 'late\n')
+    rmSync(join(p, 'sub', 'c.txt'))
+    busy(FILE_TIME_SLACK_MS + 50)
+    const t0 = Date.now()
+    expect(await between(t0)).toEqual({ changed: false, paths: [] })
+    // Their events did come in, after the start: the write log has them, and the check left them out.
+    await seen({ kind: 'written', folder: p, paths: ['a.txt'] })
+    // A write after it still counts, however soon.
+    const t1 = Date.now()
+    writeFileSync(join(p, 'a.txt'), 'a\n')
+    expect((await between(t1)).paths).toEqual(['a.txt'])
+  })
+
+  it("an edit undone during the run still counts when its file can't be read: never judged by its folder's age (HI-1767, HR2's round 1)", async () => {
+    // The folder's own times well before the run: only the file's can say it was written meanwhile.
+    busy(FILE_TIME_SLACK_MS + 50)
+    const t0 = Date.now()
+    writeFileSync(join(p, 'a.txt'), 'changed\n')
+    writeFileSync(join(p, 'a.txt'), 'a\n')
+    expect(run(p, 'status', '--porcelain')).toBe('')
+    await seen({ kind: 'written', folder: p, paths: ['a.txt'] })
+    try {
+      for (const code of ['EACCES', 'EPERM', 'EIO']) {
+        meta.fail.set(join(p, 'a.txt').toLowerCase(), code)
+        expect(await between(t0)).toEqual({ changed: true, paths: ['a.txt'] })
+      }
+    } finally {
+      meta.fail.clear()
+    }
+  })
+
+  it("a link counts by its own times and its target's, the later: replaced meanwhile, or its target written through it (HI-1767)", async () => {
+    busy(FILE_TIME_SLACK_MS + 50)
+    const t0 = Date.now()
+    writeFileSync(join(p, 'a.txt'), 'through the link\n')
+    await seen({ kind: 'written', folder: p, paths: ['a.txt'] })
+    const link = join(p, 'a.txt').toLowerCase()
+    const old = t0 - 3_600_000
+    try {
+      // The link replaced during the run, pointing at a target last written an hour ago (stat alone reads the target).
+      meta.link.set(link, { own: t0 + 10, target: old })
+      expect(await between(t0)).toEqual({ changed: true, paths: ['a.txt'] })
+      // Its target written through it during the run, the link itself an hour old.
+      meta.link.set(link, { own: old, target: t0 + 10 })
+      expect(await between(t0)).toEqual({ changed: true, paths: ['a.txt'] })
+      // Both an hour old: the write was before the run, its event late.
+      meta.link.set(link, { own: old, target: old })
+      expect(await between(t0)).toEqual({ changed: false, paths: [] })
+    } finally {
+      meta.link.clear()
+    }
   })
 
   it("a write in an ignored folder (out/, node_modules) does not count, an install's burst included", async () => {

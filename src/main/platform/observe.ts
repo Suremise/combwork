@@ -16,6 +16,7 @@
 // record starting again then). A watch's error does the same.
 
 import { watch, readdirSync, readFileSync, existsSync, statSync, type FSWatcher } from 'original-fs'
+import { lstat, stat } from 'original-fs/promises'
 import { dirname, isAbsolute, join, resolve, sep } from 'path'
 import { git } from '../git'
 import { createLogger, userText } from '../logger'
@@ -37,6 +38,11 @@ const RETRY_MS = 3000
 /** Before answering, a folder's events are let in until it is quiet this long, at most WRITES_SETTLE_MAX_MS. */
 const WRITES_QUIET_MS = 150
 const WRITES_SETTLE_MAX_MS = 2000
+/**
+ * How far before a stretch's start a write's own time may be and still count in it (HI-1767): Windows stamps a file's
+ * times from a clock that ticks about every 15.6 ms, so a write just after t0 can carry a time a tick before it.
+ */
+export const FILE_TIME_SLACK_MS = 100
 /**
  * A watch just started may miss the first moment's events (Windows arms it asynchronously): its record counts as
  * complete only from this long after it starts.
@@ -644,6 +650,13 @@ export class Observer {
       const ignored = new Set(r.out.split('\0').filter(Boolean))
       files = files.filter((f) => !ignored.has(f))
     }
+    // An event is timed when it arrives, so one for a write just before t0 can come after it (HI-1767: a check copy's
+    // reset, or the target merged in, then a check at once: their events still coming past the settle's quiet or its
+    // cap, under load). A file last written before t0 wasn't written meanwhile, however late its event; one written
+    // meanwhile, and put back, was. One at a time: a long list is a reset's, not a run's.
+    const during: string[] = []
+    for (const f of files) if (await writtenSince(l.folder, f, t0)) during.push(f)
+    files = during
     const paths = [...marks, ...files]
     return { changed: paths.length > 0, paths }
   }
@@ -661,6 +674,43 @@ export class Observer {
     this.projects.clear()
     this.subscribers.clear()
     this.list = []
+  }
+}
+
+/**
+ * Whether a folder-relative path was written at or after t0, by its own times (modified or changed, whichever is
+ * later, FILE_TIME_SLACK_MS before t0 counting too: the safe side). A link's times are its own and its target's,
+ * whichever is later (a link replaced, or its target written through it). Only a path shown gone (ENOENT, ENOTDIR)
+ * was deleted: when, its nearest folder that is says (a deletion changes the folder holding it), up to the folder
+ * itself. Anything else unreadable (EACCES, EPERM, an I/O error: HR2's round 1) counts: a file there that can't be
+ * read is never judged by its folder's age.
+ */
+async function writtenSince(folder: string, rel: string, t0: number): Promise<boolean> {
+  const root = resolve(folder)
+  for (let p = resolve(root, rel); p.length >= root.length; p = dirname(p)) {
+    const at = await writtenAt(p)
+    if (at === 'unreadable') return true
+    if (at !== 'gone') return at >= t0 - FILE_TIME_SLACK_MS
+    if (p.length === root.length) break
+  }
+  return true
+}
+
+/** A path's last write (the later of its modified and changed times, a link's and its target's), gone, or unreadable. */
+async function writtenAt(p: string): Promise<number | 'gone' | 'unreadable'> {
+  const gone = (e: unknown): boolean => ['ENOENT', 'ENOTDIR'].includes((e as NodeJS.ErrnoException).code ?? '')
+  try {
+    const own = await lstat(p)
+    const times = [own.mtimeMs, own.ctimeMs]
+    if (own.isSymbolicLink()) {
+      // Its target: gone (a dangling link) adds nothing; unreadable counts.
+      const target = await stat(p).catch((e: unknown) => (gone(e) ? null : 'unreadable' as const))
+      if (target === 'unreadable') return target
+      if (target) times.push(target.mtimeMs, target.ctimeMs)
+    }
+    return Math.max(...times)
+  } catch (e) {
+    return gone(e) ? 'gone' : 'unreadable'
   }
 }
 
