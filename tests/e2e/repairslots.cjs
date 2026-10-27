@@ -129,12 +129,14 @@ const isIn = (dir, rev, ref) => {
     check('B2’s lane is lent slot-a', lane.slot === 'slot-a', JSON.stringify(lane))
     const slotA = path.join(treesOf(before), 'slot-a')
     await until(async () => same((await live(alpha, 'b2'))?.cwd, slotA) && (await idle(alpha, 'b2')), HUNG_MS)
-    const s1 = await intent(await tokenOf(alpha, 'b2'), c1, 'start')
+    const tb2Before = await tokenOf(alpha, 'b2')
+    // B2 in a turn (until a file the test never makes): its card's slot is prepared only once it is quiet, so the
+    // preparation is still owed as Hive closes, and runs after Repair (HI-1791: in slot-a's new folder).
+    await lib.typeLine(inv, lib.ptyKey(alpha, 'b2'), home, null, 'holduntil repairslots-never', { live: () => live(alpha, 'b2') })
+    check('…B2 in its turn', !!(await until(async () => (await live(alpha, 'b2'))?.status === 'working', HUNG_MS)))
+    const s1 = await intent(tb2Before, c1, 'start')
     check(`${key} starts in slot-a`, s1.status === 200 && same(s1.body?.data?.folder, slotA), JSON.stringify(s1.body))
-    // Its slot made ready and B2 placed there before Hive closes (HI-1784): a preparation left under way runs again after
-    // Repair, and B2's start meanwhile is refused (slot-a "is still being set up").
-    const settled = await until(async () => (await inv('tasks:facts', c1)).some((f) => f.kind === 'BuilderPlaced'), HUNG_MS)
-    check('…its slot prepared and B2 placed there', !!settled, JSON.stringify((await inv('tasks:facts', c1)).map((f) => f.kind)))
+    check('…its preparation owed as Hive closes (B2 busy)', !(await inv('tasks:facts', c1)).some((f) => f.kind === 'SlotPrepared') && (await live(alpha, 'b2'))?.status === 'working', JSON.stringify((await inv('tasks:facts', c1)).map((f) => f.kind)))
     await h.app.close()
     h = null
     // A review copy, as #1435's pool keeps one (its worktree, detached, and its row).
@@ -177,6 +179,17 @@ const isIn = (dir, rev, ref) => {
     check('…and the slots’ rows follow', ['hb1', 'slot-a'].every((n) => same(slots.find((s) => s.name === n)?.folder, path.join(treesOf(after), n))), JSON.stringify(slots))
     const facts = await inv('tasks:facts', c1)
     check(`${key}'s folder follows slot-a (FolderMoved), never Gone: folder`, facts.some((f) => f.kind === 'FolderMoved' && same(f.data?.to, path.join(treesOf(after), 'slot-a'))) && !facts.some((f) => f.kind === 'Gone' && f.data?.what === 'folder'), JSON.stringify(facts.map((f) => [f.kind, f.data?.what])))
+    // The preparation owed from before the move, then B2's placement, after Repair (B2 not running: its conversation in
+    // slot-a resumed there with the card, HI-1746).
+    const kindsNow = async () => (await inv('tasks:facts', c1)).map((f) => f.kind)
+    check(`…${key}'s slot prepared after Repair, and B2 placed there`, !!(await until(async () => {
+      const k = await kindsNow()
+      return k.filter((x) => x === 'SlotPrepared').length === 1 && k.filter((x) => x === 'BuilderPlaced').length === 1
+    }, HUNG_MS)), JSON.stringify(await kindsNow()))
+    // Fenced and logged at slot-a where it is now, never at the folder from before the move (HI-1791).
+    const log = fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+    const preparing = log.slice(log.lastIndexOf('Repairing a move')).split(/\r?\n/).filter((l) => l.includes('preparing a slot'))
+    check('…its preparation fenced slot-a at its new folder, never the old one (HI-1791)', preparing.length > 0 && preparing.every((l) => l.toLowerCase().includes(path.join(treesOf(after), 'slot-a').toLowerCase())), JSON.stringify(preparing))
 
     // B1's conversation in hb1 resumes there; the lane carries on.
     const rec = (await inv('session:list', alpha2)).find((s) => s.id === b1.sessionId)
