@@ -52,6 +52,7 @@ import { readLaneCards, readLaneCondition } from '../shared/laneWatch'
 import { agentBusy, AGENT_WATCH_MAX_AGENTS, type AgentNow, type WatchedAgent } from '../shared/agentWatch'
 import { alreadyThere, cardChange, changesBetween, decodeSince, handoffsSince, markOf, movedIntoSince, readCondition, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_LIMIT_MINUTES, type CardChange, type CardMark } from '../shared/watch'
 import { waitMaxSeconds } from './advanced'
+import { titleNudge } from './titleNudge'
 import { insideReal, placeMatcher, placeRelative, readCapped, readJson, samePlace, writeJsonAtomic } from './fsutil'
 import { GUIDANCE_REVISION, skillRevisions } from './guidance'
 import agentApiDoc from '../../docs/AGENT_API.md?raw'
@@ -2538,7 +2539,9 @@ route('POST', '/v1/tasks', async ({ body }) => {
   // project is known to be allowed, and published with it.
   const paths = attachmentList(body)
   const create = () => withAttachments(paths, typeof input.project === 'string' && input.project ? input.project : callerScope(), (files) => tasks.changeWithAttachments(actor, files, 'description', () => tasks.createTask(input, actor)))
-  const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, attachedLines(c)) : taskView(c))
+  // A long title is kept, with a line suggesting a shorter one (HI-1872).
+  const nudge = titleNudge(title, actor)
+  const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, attachedLines(c)) : await taskView(c)), ...(nudge ? { nudge } : {}) })
   if (actor.kind !== 'assistant') return reply(await create())
   const project = typeof input.project === 'string' && input.project ? input.project : null
   const given = await knownAgent(project, input.agent)
@@ -2594,7 +2597,8 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
     changes.push(...attachedLines(c))
     return c
   }
-  const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, changes) : taskView(c))
+  const nudge = patch.title === undefined ? null : titleNudge(patch.title, actor)
+  const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, changes) : await taskView(c)), ...(nudge ? { nudge } : {}) })
   if (actor.kind !== 'assistant') {
     const c = await apply()
     const copy = await reviewCopyAfter(actor, c, { start: patch.review === 'start', verdict: patch.review === 'passed' || patch.review === 'failed' || patch.column === 'passed' })

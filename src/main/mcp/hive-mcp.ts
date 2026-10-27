@@ -723,7 +723,7 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        title: { type: 'string' },
+        title: { type: 'string', description: 'About 70 characters: the outcome wanted or the problem, in words; no evidence, numbers, file names, paths or names of people (they go in the description).' },
         description: { type: 'string', description: 'Markdown: what to do and how to tell it is done, in full (whoever starts it reads only the card).' },
         project: projectArg,
         agent: { type: 'string', description: 'Give it to this agent of the project (name or id).' },
@@ -755,7 +755,7 @@ const tools: Tool[] = [
         position: { type: 'string', enum: ['top', 'bottom'], description: ASSISTANT ? 'The top (highest priority) or bottom of its column.' : "The top (highest priority) or bottom of your project's cards in its column." },
         before: { type: ['number', 'string'], description: 'Just above this card (its key), which must be in the column the card ends up in.' },
         blocked: { type: 'string' },
-        title: { type: 'string' },
+        title: { type: 'string', description: 'Short (about 70 characters); the detail goes in the description.' },
         description: { type: 'string' },
         ...(ASSISTANT ? { project: { type: 'string' } } : {}),
         agent: { type: 'string', description: 'Agent name or id; empty takes it from its agent.' },
