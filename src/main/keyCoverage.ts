@@ -95,6 +95,18 @@ function keysSaved(): boolean {
 const neverKeyed = (m: Marks): boolean => !m.ever && !m.gap && !existsSync(fingerprintsFile()) && !keysSaved()
 
 /**
+ * As the main process starts, before ready (HI-1855): hive.log's first lines (the install folder's check) were masked
+ * strictly in every profile. A profile with no evidence of a key ever saved (config.json read as is: unreadable, it
+ * stays strict) masks nothing from here; any other stays strict until startCoverage and loadCoverage, after ready.
+ */
+export function startCoverageEarly(): void {
+  const c = config.savedKeyMasking()
+  if (c === null) return
+  const f = readMarksFile()
+  if (neverKeyed({ ...((f.ever || c.ever) ? { ever: true } : {}), ...((f.gap || c.gap) ? { gap: true } : {}) })) setMasking({ state: 'none', gap: false })
+}
+
+/**
  * At start, before anything is logged with a key in it: a profile that never saved a key masks nothing at once;
  * any other is strict until loadCoverage has read its fingerprints (a few small files, read once here).
  */

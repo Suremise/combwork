@@ -38,7 +38,7 @@ import { setDateStyle } from '../shared/dates'
 import { SERVABLE_EXT, servableType, unwatchAll } from './files'
 import { movedAttachment } from './attachmentsFolder'
 import { config } from './config'
-import { loadCoverage, startCoverage } from './keyCoverage'
+import { loadCoverage, startCoverage, startCoverageEarly } from './keyCoverage'
 import { closeConsoleWindows, sendToConsoles } from './consoleWindow'
 import { allTasks, archiveOldDone, endExitedReviews } from './tasks'
 import { agentCardText } from '../shared/agentTable'
@@ -124,6 +124,8 @@ let quitting = false
 // productName, "Hive Desktop", but users' settings and conversations are in %APPDATA%\Hive (#443).
 if (process.env.HIVE_USER_DATA) app.setPath('userData', process.env.HIVE_USER_DATA)
 else app.setPath('userData', join(app.getPath('appData'), profileFolder(app.isPackaged)))
+// Key masking as the profile's files say, before the first line is logged (HI-1855): strict only where a key may be.
+startCoverageEarly()
 // Every way out from here on is logged (#985).
 startExitLog()
 
