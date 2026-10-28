@@ -189,6 +189,56 @@ describe("other CLIs' retry waits (HI-1973)", () => {
     expect(told.length).toBe(2)
   })
 
+  it("Copilot's wait, its retry time unknown, stands through long quiet backoffs (the 5 s loop's looks), tells the Assistant once past the while, and ends on progress (HR6's round 1)", async () => {
+    await advanced.set('hive.retry.tellAssistantAfterSeconds', 60)
+    const told: State[] = []
+    sessions.retryOverdue = (st) => void told.push(st as never)
+    const start = Date.now()
+    vi.useFakeTimers({ toFake: ['Date'], now: start })
+    try {
+      const { st } = agent('long', copilot, 'copilot')
+      await hook(st, { hook_event_name: 'UserPromptSubmit', prompt: 'go' })
+      await hook(st, copilotRetry('{"message":"Rate limit reached for requests","code":"rate_limit_exceeded"}'))
+      const since = st.retryWait!.since
+      /** The 5 s loop's steps for this agent at `ms` after the start: its retry look, then the Assistant's notice. */
+      const tick = (ms: number): void => {
+        vi.setSystemTime(start + ms)
+        s.checkRetry(p, st.agentId)
+        s.checkRetryNotice(p, st.agentId)
+      }
+      // A backoff of 45 s, longer than any grace: the wait stands, nothing told yet (under the while).
+      for (const ms of [5_000, 20_000, 45_000]) tick(ms)
+      expect(st.retryWait).toMatchObject({ attempt: 1, since, retryAt: null })
+      expect(runtimeLabel(st as never)).toBe('Rate-limited (429) · retrying… (try 1)')
+      expect(told).toEqual([])
+      // Its next try, 50 s in: the same wait (its start kept, the tries counted).
+      vi.setSystemTime(start + 50_000)
+      await hook(st, copilotRetry('{"message":"Rate limit reached for requests","code":"rate_limit_exceeded"}'))
+      expect(st.retryWait).toMatchObject({ attempt: 2, since })
+      // Another long backoff, past the while (60 s from its first try): told once, however many looks follow.
+      for (const ms of [65_000, 90_000, 130_000]) tick(ms)
+      expect(st.retryWait).toMatchObject({ attempt: 2, since })
+      expect(told.length).toBe(1)
+      // Copilot goes on (a tool call): the wait is over, and the looks after it change nothing.
+      await hook(st, { hook_event_name: 'PreToolUse', tool_name: 'view', tool_input: { path: 'a.txt' } })
+      expect(st.retryWait).toBeUndefined()
+      tick(200_000)
+      expect(st.retryWait).toBeUndefined()
+      expect(told.length).toBe(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("Copilot's wait ends with its turn, whatever its retry time", async () => {
+    const { st } = agent('turnend', copilot, 'copilot')
+    await hook(st, { hook_event_name: 'UserPromptSubmit', prompt: 'go' })
+    await hook(st, copilotRetry('429 Too Many Requests'))
+    expect(st.retryWait).toBeDefined()
+    await hook(st, { hook_event_name: 'Stop' })
+    expect(st.retryWait).toBeUndefined()
+  })
+
   it('tells nobody at 0', async () => {
     await advanced.set('hive.retry.tellAssistantAfterSeconds', 0)
     const told: unknown[] = []

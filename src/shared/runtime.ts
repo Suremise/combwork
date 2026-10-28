@@ -55,9 +55,14 @@ export function unknownStateText(st: Pick<LiveSessionState, 'turn'> | null | und
 /** How long past its retry time (or, with none, past when it was told) a retry wait still counts (HI-1972). */
 export const RETRY_GRACE_MS = 30_000
 
-/** Whether a retry wait (HI-1972) still stands at `now`: its retry time, or when it was told, less than RETRY_GRACE_MS ago. */
+/**
+ * Whether a retry wait (HI-1972) still stands at `now`: its retry time less than RETRY_GRACE_MS ago. One whose CLI
+ * doesn't say when it tries again (HI-1973: Copilot's, retryAt null) has no deadline Hive could know: it stands until
+ * the CLI is heard from again, its turn ends or its launch does (HR6's round 1: a guessed 30 s lost long waits).
+ */
 export function retryWaitCurrent(w: RetryWait, now = Date.now()): boolean {
-  const end = Date.parse(w.retryAt ?? w.at)
+  if (w.retryAt === null) return true
+  const end = Date.parse(w.retryAt)
   return Number.isFinite(end) && end + RETRY_GRACE_MS > now
 }
 
