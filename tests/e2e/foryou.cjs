@@ -401,7 +401,7 @@ const check = (name, ok, extra = '') => {
     const t = (await inv('tasks:create', { title: 'Three questions', project: 'beta' })).number
     await inv('tasks:move', t, 'doing', { agent: maker.id })
     for (const text of ['First: which icon?', 'Second: which colour?', 'Third: ship it today?']) await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${t}`, kind: 'decide', text })}`)
-    const forYouOf = async (n) => ((await inv('tasks:forYou')).items ?? []).filter((i) => i.card === n).length
+    const forYouOf = async (num) => ((await inv('tasks:forYou')).items ?? []).filter((i) => i.card === num).length
     check('three requests on one card', !!(await lib.until(async () => (await forYouOf(t)) === 3, HUNG_MS)), String(await forYouOf(t)))
     check('…the status bar counts the card once', !!(await lib.until(async () => (await needCount()) === before + 1, HUNG_MS)), JSON.stringify({ before, now: await needCount() }))
     const tip = await lib.hoverTip(page, needItem, (x) => /need/.test(x), HUNG_MS)
