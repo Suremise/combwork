@@ -153,7 +153,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     // A line typed into B1 (typeLine): Hive may type a wake into it at the same moment (a verdict's, a line moved's), and
     // the line is typed again when the wake disturbed it or B1 dropped it.
     // Each try waits for B1 idle with its inbox quiet (HI-1918: idle between Hive's own turns isn't enough).
-    const typeTo = (text, taken) => lib.typeLine(inv, lib.ptyKey(alpha, b1.id), claudeHome, 'B1', text, { ready: async () => (await idle(b1.id)) && (await lib.inboxQuiet(PORT, 'alpha', b1.name, tokens.b1)), ...(taken ? { taken } : { live: () => live(b1.id) }), hungMs: 60000 })
+    const typeTo = (text, taken) => lib.typeLine(inv, lib.ptyKey(alpha, b1.id), claudeHome, 'B1', text, { ready: async () => lib.agentQuiet(PORT, 'alpha', await live(b1.id), tokens.b1), strict: true, ...(taken ? { taken } : { live: () => live(b1.id) }), hungMs: 60000 })
     const shell = async (cmd) => {
       const before = shells().length
       await typeTo(`shell: ${cmd}`)
