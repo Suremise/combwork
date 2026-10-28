@@ -512,6 +512,11 @@ export async function readAttachment(projectPath: string, path: string): Promise
   projectPath = workspace.assertSessionHost(projectPath)
   const { root, abs } = await attachmentAt(projectPath, path)
   await assertOwnAttachment(root, abs, 'file')
+  return attachmentText(abs)
+}
+
+/** A kept file's text as the viewer previews it (a session's attachment, or a card's: HI-1958), checked by its caller. */
+export async function attachmentText(abs: string): Promise<AttachmentContent> {
   if ((await stat(abs)).size > MAX_ATTACHMENT_TEXT) return { kind: 'too-large', text: '' }
   const buf = await readFile(abs)
   for (let i = 0; i < Math.min(buf.length, 8000); i++) if (buf[i] === 0) return { kind: 'binary', text: '' }

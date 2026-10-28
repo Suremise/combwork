@@ -150,9 +150,11 @@
   "files.view.table": "Table",
   "files.view.tooLarge": "This file is too large to open here ({size}).",
   "files.viewer.newer": "Newer (←)",
-  "files.viewer.noPreview": "No preview for this kind of file. Reveal it, or insert it into a session.",
+  "files.viewer.noPreview": "No preview for this kind of file. Show it in its folder, or insert it into a session.",
   "files.viewer.older": "Older (→)",
+  "files.viewer.openInApp": "Open in Its App",
   "files.viewer.position": "{index, number} of {count, number}",
   "files.viewer.readFailed": "Couldn't read it: {error}",
+  "files.viewer.removeFromCard": "Remove from Card",
   "files.viewer.tooLarge": "Too large to preview here. Reveal it to open it in another program."
 }

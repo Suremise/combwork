@@ -48,6 +48,24 @@ const M = {
   meta: msg({ id: 'board.attach.meta', defaultMessage: '{size} · {by}, {when}', description: "Under a card attachment's name (HI-1700): its size, who added it and when ({when}: \"4 minutes ago\")." })
 }
 
+/** What the attachment viewer says of a card attachment too (HI-1958): Show in Folder, and a file that is gone. */
+export const CARD_ATTACH_TEXT = { show: M.show, missing: M.missing }
+
+/**
+ * Removes a card attachment after asking (the Attachments tab and its viewer, HI-1958): true once it is gone, false
+ * when the user said no or it failed (said in a notice). `card`: the card's name, its key.
+ */
+export async function removeCardAttachmentAsked(card: string, a: CardAttachment): Promise<boolean> {
+  if (!(await confirm({ title: tr(M.removeTitle, { name: a.name, card }), message: tr(M.removeMessage, { used: 'none' }), confirmLabel: tr(M.remove), danger: true }))) return false
+  try {
+    await call('cards:removeAttachment', a.card, a.id)
+    return true
+  } catch (e) {
+    notify('error', tr(PANE.failed, { file: a.name }), errorMessage(e))
+    return false
+  }
+}
+
 /** A card's attachments, newest first, read again whenever the board changes. */
 export function useCardAttachments(card: number | null): { list: CardAttachment[]; reload: () => Promise<void> } {
   // Each read of the board: an attachment added or removed leaves the cards, so `tasks`, as they were (HI-1853).
@@ -258,22 +276,21 @@ export function useProjectCardAttachments(projectPath: string | null): { groups:
 
 const NO_GROUPS: CardAttachmentGroup[] = []
 
+/** A project's card attachments as its Attachments tab shows them, `kind` filtering them: by card, newest card first. */
+export const shownCardGroups = (groups: CardAttachmentGroup[], kind: AttachmentKind | null): CardAttachmentGroup[] =>
+  groups.map((g) => ({ ...g, attachments: g.attachments.filter((a) => !kind || a.kind === kind) })).filter((g) => g.attachments.length)
+
 /**
  * The Attachments tab's Cards section (HI-1700): the files kept with the project's cards, by card (its key, which opens
- * it, title and column), newest card first; each file a tile, right-click to open, show or remove it.
+ * it, title and column), newest card first; each file a tile, a click opens it in the attachment viewer (`onOpen`, as a
+ * pane attachment's does: HI-1958), right-click to open, show or remove it.
  */
-export function CardAttachmentSection({ groups, kind, reload }: { groups: CardAttachmentGroup[]; kind: AttachmentKind | null; reload: () => Promise<void> }) {
+export function CardAttachmentSection({ groups, kind, reload, onOpen }: { groups: CardAttachmentGroup[]; kind: AttachmentKind | null; reload: () => Promise<void>; onOpen: (a: CardAttachment) => void }) {
   const menu = useContextMenu()
-  const shown = groups.map((g) => ({ ...g, attachments: g.attachments.filter((a) => !kind || a.kind === kind) })).filter((g) => g.attachments.length)
+  const shown = shownCardGroups(groups, kind)
   if (!shown.length) return null
   const remove = async (g: CardAttachmentGroup, a: CardAttachment): Promise<void> => {
-    const label = g.key ?? `#${g.card}`
-    if (!(await confirm({ title: tr(M.removeTitle, { name: a.name, card: label }), message: tr(M.removeMessage, { used: 'none' }), confirmLabel: tr(M.remove), danger: true }))) return
-    try {
-      await call('cards:removeAttachment', g.card, a.id)
-    } catch (e) {
-      notify('error', tr(PANE.failed, { file: a.name }), errorMessage(e))
-    }
+    await removeCardAttachmentAsked(g.key ?? `#${g.card}`, a)
     await reload()
   }
   const menuFor = (g: CardAttachmentGroup, a: CardAttachment): MenuEntry[] => [
@@ -301,7 +318,7 @@ export function CardAttachmentSection({ groups, kind, reload }: { groups: CardAt
           <div className="image-grid">
             {g.attachments.map((a) => (
               <Tooltip key={a.id} content={`${a.name} · ${formatBytes(a.size)} · ${a.by}${a.missing ? `\n${tr(M.missing)}` : ''}`}>
-                <div className={`thumb${a.kind !== 'image' || a.missing ? ' file' : ''}`} data-kind={a.kind} data-attachment={a.id} onContextMenu={(e) => menu.open(e, menuFor(g, a))} onDoubleClick={() => !a.missing && void window.hive.invoke(a.kind === 'image' || a.kind === 'pdf' ? 'app:openPath' : 'app:showInFolder', a.path)}>
+                <div className={`thumb${a.kind !== 'image' || a.missing ? ' file' : ''}`} data-kind={a.kind} data-attachment={a.id} onClick={() => onOpen(a)} onContextMenu={(e) => menu.open(e, menuFor(g, a))}>
                   {a.kind === 'image' && !a.missing ? (
                     <img src={imageUrl(a.path)} loading="lazy" alt={a.name} draggable={false} />
                   ) : (

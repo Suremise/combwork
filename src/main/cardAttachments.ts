@@ -99,6 +99,29 @@ export async function cardAttachments(ws: WorkspaceService, card: number): Promi
   return Promise.all(found.rows.sort(newest).map(async (r) => withPath(found.host, r, !(await exists(join(cardFolder(found.host, card), r.file))))))
 }
 
+/**
+ * A card attachment's file, for the viewer's preview (HI-1958): by the card and its id, never a path from the window.
+ * As readCardAttachment checks (HI-1751): its name plain, each folder from the host's `.hive` down to the card's there
+ * and no link, and itself a regular file in the card's folder.
+ */
+export async function cardAttachmentFile(ws: WorkspaceService, card: number, id: string): Promise<string> {
+  const found = boardRead(ws, (db) => {
+    const c = db.prepare('SELECT project FROM cards WHERE number = ?').get(card) as { project: string | null } | undefined // i18n-ignore: SQL
+    const r = c && (db.prepare(`SELECT ${COLUMNS} FROM card_attachments WHERE card = ? AND id = ?`).get(card, id) as Row | undefined) // i18n-ignore: SQL
+    return c && r ? { host: cardHost(ws, c.project), row: r } : null
+  })
+  if (!found || !plainName(found.row.file)) throw hiveError(M.noAttachment, undefined, { kind: 'notFound' })
+  const folder = cardFolder(found.host, card)
+  const abs = join(folder, found.row.file)
+  for (const d of [join(found.host, HIVE_DIR), join(found.host, HIVE_DIR, ATTACHMENTS_DIR), cardsRoot(found.host), folder]) {
+    const st = await lstat(d).catch(() => null)
+    if (!st || st.isSymbolicLink() || !st.isDirectory()) throw hiveError(M.noAttachment, undefined, { kind: 'notFound' })
+  }
+  const st = await lstat(abs).catch(() => null)
+  if (!st || st.isSymbolicLink() || !st.isFile() || !insideReal(abs, [folder])) throw hiveError(M.noAttachment, undefined, { kind: 'notFound' })
+  return abs
+}
+
 /** Every attachment of a project's cards (its Attachments tab), by card number, newest first; archived cards' too. */
 export async function projectCardAttachments(ws: WorkspaceService, project: string): Promise<Map<number, CardAttachment[]>> {
   const rows = boardRead(ws, (db) => db.prepare(`SELECT ${COLUMNS} FROM card_attachments WHERE card IN (SELECT number FROM cards WHERE project = ? COLLATE NOCASE)`).all(project) as Row[]) // i18n-ignore: SQL

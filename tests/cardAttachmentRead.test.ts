@@ -19,6 +19,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const att = await import('../src/main/cardAttachments')
+const { attachmentText } = await import('../src/main/files')
 const { advanced } = await import('../src/main/advanced')
 
 advanced.load(join(base, 'profile'))
@@ -221,5 +222,34 @@ describe("a card's attachment read through Hive (HI-1751)", () => {
     await expect(inWorkspace(w, () => tasks.readTask(c.number, agentOf('q') as never))).rejects.toThrow()
     expect((await inWorkspace(w, () => tasks.readTask(c.number, agentOf('p') as never))).number).toBe(c.number)
     expect((await inWorkspace(w, () => tasks.readTask(c.number, user))).number).toBe(c.number)
+  })
+})
+describe("a card's attachment in the attachment viewer (HI-1958)", () => {
+  it('its text by card and id, as the viewer previews it; only a file in its own card folder, never through a link', async () => {
+    const { w, root } = await workspace()
+    const c = await cardWith(w, { 'notes.md': '# Notes', 'shot.png': 'png bytes' })
+    const list = await inWorkspace(w, () => att.cardAttachments(w, c.number))
+    const md = list.find((a) => a.name === 'notes.md')!
+    const path = await inWorkspace(w, () => att.cardAttachmentFile(w, c.number, md.id))
+    expect(path).toBe(md.path)
+    expect(await attachmentText(path)).toEqual({ kind: 'text', text: '# Notes' })
+    // Another card's id, an id it doesn't have: refused.
+    const other = await cardWith(w, { 'x.txt': 'x' })
+    await expect(inWorkspace(w, () => att.cardAttachmentFile(w, other.number, md.id))).rejects.toThrow(/no such attachment/)
+    // A junction in its folder's place: refused, then read again once the real folder is back.
+    const level = folderOf(root, c.number)
+    const elsewhere = join(base, `elsewhere-${++n}`)
+    renameSync(level, elsewhere)
+    junction(elsewhere, level)
+    try {
+      await expect(inWorkspace(w, () => att.cardAttachmentFile(w, c.number, md.id))).rejects.toThrow(/no such attachment/)
+    } finally {
+      rmSync(level)
+      renameSync(elsewhere, level)
+    }
+    expect(await inWorkspace(w, () => att.cardAttachmentFile(w, c.number, md.id))).toBe(md.path)
+    // Its file gone: refused, as a missing one (the viewer shows that it's gone, never reads it).
+    rmSync(md.path)
+    await expect(inWorkspace(w, () => att.cardAttachmentFile(w, c.number, md.id))).rejects.toThrow(/no such attachment/)
   })
 })

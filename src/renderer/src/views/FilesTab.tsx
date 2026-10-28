@@ -12,7 +12,8 @@ import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { pasteIntoTerminal } from '../components/TerminalView'
 import { Icon, IconButton, InfoTip, LoadFailed, Modal, SearchInput, StaleNote, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
 import { cardLabelOf, chooseTab, confirm, filesListeners, useRememberedTab, focusedAgentId, get, notify, openInSessionsTab, projectKey, set, setProjectTab, showAgent, useDateStyle, useStore } from '../store'
-import { attachToCardMenu, CardAttachmentSection, useProjectCardAttachments } from '../components/CardAttachments'
+import { attachToCardMenu, CARD_ATTACH_TEXT, CardAttachmentSection, removeCardAttachmentAsked, shownCardGroups, useProjectCardAttachments } from '../components/CardAttachments'
+import type { CardAttachment } from '@shared/cardAttachments'
 import { TabPanel, Tabs } from '../components/Tabs'
 import { useScopedLoad } from '../scopedLoad'
 import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
@@ -136,7 +137,9 @@ const M = {
   newer: msg({ id: 'files.viewer.newer', defaultMessage: 'Newer (←)', description: "Tooltip on the attachment viewer's left arrow. Keep the arrow." }),
   older: msg({ id: 'files.viewer.older', defaultMessage: 'Older (→)', description: "Tooltip on the attachment viewer's right arrow. Keep the arrow." }),
   readFailed: msg({ id: 'files.viewer.readFailed', defaultMessage: "Couldn't read it: {error}", description: "The attachment viewer when the file can't be read. {error} is why (from Windows, may be English)." }),
-  noPreview: msg({ id: 'files.viewer.noPreview', defaultMessage: 'No preview for this kind of file. Reveal it, or insert it into a session.', description: 'The attachment viewer for a file it cannot show. Reveal and Insert into Session are its buttons.' }),
+  noPreview: msg({ id: 'files.viewer.noPreview', defaultMessage: 'No preview for this kind of file. Show it in its folder, or insert it into a session.', description: 'The attachment viewer for a file it cannot show. Show in Folder and Insert into Session are its buttons (the second only while an agent runs).' }),
+  openInApp: msg({ id: 'files.viewer.openInApp', defaultMessage: 'Open in Its App', description: "A button in the attachment viewer (HI-1958), for an image or a PDF only: opens it in the program Windows opens that kind of file with (its photo viewer, its PDF reader), for zooming, printing and the like. Other kinds of file are never opened (nothing attached is ever run): they get Show in Folder instead." }),
+  removeFromCard: msg({ id: 'files.viewer.removeFromCard', defaultMessage: 'Remove from Card', description: "A button in the attachment viewer for a card's attachment (HI-1958): takes the file off its card (to the Recycle Bin), after asking. A session's attachment has Delete there instead." }),
   tooLarge: msg({ id: 'files.viewer.tooLarge', defaultMessage: 'Too large to preview here. Reveal it to open it in another program.', description: 'The attachment viewer for a file too large to show.' })
 }
 
@@ -1014,6 +1017,8 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
   const all = loaded.data
   const error = loaded.error
   const [viewing, setViewing] = useState<SessionAttachment | null>(null)
+  // A card attachment open in the same viewer (HI-1958).
+  const [viewingCard, setViewingCard] = useState<CardAttachment | null>(null)
   // Each tab's own kind filter (HI-1841).
   const [filters, setFilters] = useState<Record<AttachTab, AttachmentKind | null>>(NO_KINDS)
   // The tab shown when it isn't the remembered one: a link's (kept after its jump), or Pane attachments while the
@@ -1022,6 +1027,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
   // What is open in the viewer, and the filters, are the last project's.
   useEffect(() => {
     setViewing(null)
+    setViewingCard(null)
     setFilters(NO_KINDS)
   }, [project.path])
   const menu = useContextMenu()
@@ -1069,6 +1075,18 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
   // Same order as on screen: current sessions first, archived last.
   const flat = useMemo(() => [...groups.filter((g) => !g.archived), ...groups.filter((g) => g.archived)].flatMap((g) => g.attachments), [groups])
   const total = useMemo(() => (all ?? []).reduce((n, g) => n + g.attachments.length, 0), [all])
+  // Card attachments' filter, and the files its tab shows, in their order: the card viewer's arrows go through these.
+  const cardKind = tab === 'card' ? shownKind : filters.card
+  const cardGroups = useMemo(() => shownCardGroups(cardFiles.groups, cardKind), [cardFiles.groups, cardKind])
+  const cardFlat = useMemo(() => cardGroups.flatMap((g) => g.attachments), [cardGroups])
+  /** A card attachment taken off its card from the viewer, after asking: the viewer goes on to the next one shown. */
+  const removeCard = async (a: CardAttachment): Promise<void> => {
+    const g = cardGroups.find((x) => x.card === a.card)
+    if (!(await removeCardAttachmentAsked(g?.key ?? `#${a.card}`, a))) return
+    const i = cardFlat.findIndex((x) => x.id === a.id)
+    setViewingCard((v) => (v?.id === a.id ? (cardFlat[i + 1] ?? cardFlat[i - 1] ?? null) : v))
+    await cardFiles.reload()
+  }
 
   const remove = async (a: SessionAttachment): Promise<void> => {
     const ok = await confirm({ title: tr(M.trashTitle), message: tr(M.attachDeleteMessage, { name: a.name }), detail: tr(M.attachDeleteDetail), confirmLabel: tr(M.trashButton), danger: true })
@@ -1260,7 +1278,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
       {/* Each tab its own page (HI-1841); the Assistant's view has Pane attachments alone, without tabs. */}
       {!assistant && (
         <TabPanel idBase={`${tabsId}-attach`} id="card" selected={tab === 'card'} data-tab-panel="card">
-          {cardCount ? <CardAttachmentSection groups={cardFiles.groups} kind={tab === 'card' ? shownKind : filters.card} reload={cardFiles.reload} /> : <div className="empty-state attachment-tab-empty">{cardFiles.loaded ? tr(M.cardEmpty) : cardFiles.failed ? tr(M.cardFailed) : <Icon name="loading" spin />}</div>}
+          {cardCount ? <CardAttachmentSection groups={cardFiles.groups} kind={cardKind} reload={cardFiles.reload} onOpen={setViewingCard} /> : <div className="empty-state attachment-tab-empty">{cardFiles.loaded ? tr(M.cardEmpty) : cardFiles.failed ? tr(M.cardFailed) : <Icon name="loading" spin />}</div>}
         </TabPanel>
       )}
       <PanePanel assistant={assistant} idBase={`${tabsId}-attach`} selected={tab === 'pane'}>
@@ -1280,18 +1298,36 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
       {viewing && (
         <AttachmentViewer
           host={project.path}
-          attachment={viewing}
-          attachments={flat}
+          item={viewing}
+          items={flat}
+          view={(a) => paneViewed(project.path, a)}
           live={!!project.live}
           // Worked out for the one shown, so it follows navigation and its session starting or stopping (main refuses too).
-          deleteBlocked={running(viewing) ? tr(M.running, { host }) : null}
+          remove={{ label: tr(M.delete), blocked: running(viewing) ? tr(M.running, { host }) : null }}
           onNavigate={setViewing}
           onClose={() => setViewing(null)}
           onInsert={(a) => {
             setViewing(null)
             void insertIntoSession(project, [a.path])
           }}
-          onDelete={(a) => void remove(a)}
+          onRemove={(a) => void remove(a)}
+        />
+      )}
+      {viewingCard && (
+        <AttachmentViewer
+          host={project.path}
+          item={viewingCard}
+          items={cardFlat}
+          view={cardViewed}
+          live={!!project.live}
+          remove={{ label: tr(M.removeFromCard), blocked: null }}
+          onNavigate={setViewingCard}
+          onClose={() => setViewingCard(null)}
+          onInsert={(a) => {
+            setViewingCard(null)
+            void insertIntoSession(project, [a.path])
+          }}
+          onRemove={(a) => void removeCard(a)}
         />
       )}
       {menu.element}
@@ -1315,33 +1351,62 @@ const ATTACHMENT_FILTER_LABEL: Record<AttachmentKind, Msg> = { image: M.images, 
 /** A kept attachment's own name, without the time Hive put in front of it ("2026-10-12_09-30-00_report.pdf" is "report.pdf"). */
 const shownName = (name: string): string => name.replace(/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_/, '')
 
-function AttachmentViewer({
+/**
+ * What the attachment viewer shows (HI-1958): a session's attachment or a card's, as one. `read` gives its text for a
+ * preview (a session's through its host, a card's by its card and id, never a path main didn't list).
+ */
+interface Viewed {
+  path: string
+  /** Its name as shown, its kind, its size and the time in its title. */
+  name: string
+  kind: AttachmentKind
+  size: number
+  when: string
+  /** Its file is gone (a card's: its row outlived it). */
+  missing: boolean
+  read: () => Promise<AttachmentContent>
+}
+
+/** A session's attachment in the viewer. */
+const paneViewed = (host: string, a: SessionAttachment): Viewed => ({ path: a.path, name: shownName(a.name), kind: a.kind, size: a.size, when: attachmentTime(a), missing: false, read: () => call('attachments:read', host, a.path) })
+/** A card's attachment in the viewer (HI-1958). */
+const cardViewed = (a: CardAttachment): Viewed => ({ path: a.path, name: a.name, kind: a.kind, size: a.size, when: formatDateTime(a.at), missing: !!a.missing, read: () => call('cards:readAttachment', a.card, a.id) })
+
+/**
+ * The attachment viewer (pane and card attachments alike, HI-1958): the one shown, arrows through the others shown,
+ * and its actions. An image or a PDF opens in its app; any other kind is shown in its folder, never opened (#387:
+ * nothing attached is ever run; Darren's decision on HI-1958). `remove`: its label (Delete, Remove from Card) and why it
+ * can't be now, or null.
+ */
+function AttachmentViewer<T>({
   host,
-  attachment,
-  attachments,
+  item,
+  items,
+  view,
   live,
-  deleteBlocked,
+  remove,
   onNavigate,
   onClose,
   onInsert,
-  onDelete
+  onRemove
 }: {
-  /** The session host whose attachment it is. */
+  /** The folder whose previews read it (a session host, or the card's project). */
   host: string
-  attachment: SessionAttachment
-  attachments: SessionAttachment[]
+  item: T
+  items: T[]
+  view: (t: T) => Viewed
   live: boolean
-  /** Why this one can't be deleted now (its session is running), or null. */
-  deleteBlocked: string | null
-  onNavigate: (a: SessionAttachment) => void
+  remove: { label: string; blocked: string | null }
+  onNavigate: (t: T) => void
   onClose: () => void
-  onInsert: (a: SessionAttachment) => void
-  onDelete: (a: SessionAttachment) => void
+  onInsert: (t: T) => void
+  onRemove: (t: T) => void
 }) {
-  const i = attachments.findIndex((x) => x.path === attachment.path)
+  const shown = view(item)
+  const i = items.findIndex((x) => view(x).path === shown.path)
   // The list is newest first, so "previous" (left) is the newer one.
-  const prev = attachments[i - 1]
-  const next = attachments[i + 1]
+  const prev = items[i - 1]
+  const next = items[i + 1]
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'ArrowLeft' && prev) onNavigate(prev)
@@ -1352,11 +1417,12 @@ function AttachmentViewer({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [prev, next, onNavigate])
-  const image = attachment.kind === 'image'
+  const image = shown.kind === 'image'
+  const opens = image || shown.kind === 'pdf'
   return (
     <Modal
-      title={`${attachmentTime(attachment)} · ${shownName(attachment.name)}`}
-      icon={fileNameIcon(attachment.name)}
+      title={`${shown.when} · ${shown.name}`}
+      icon={shown.missing ? 'warning' : fileNameIcon(shown.name)}
       onClose={onClose}
       wide
       // Sized to what it shows, with its own controls: it stays put (#133).
@@ -1364,26 +1430,35 @@ function AttachmentViewer({
       footer={
         <>
           <span className="faint" style={{ marginRight: 'auto' }}>
-            {tr(M.position, { index: i + 1, count: attachments.length })} · {formatBytes(attachment.size)}
+            {tr(M.position, { index: i + 1, count: items.length })} · {formatBytes(shown.size)}
           </span>
-          <Tooltip content={deleteBlocked}>
-            <button className="btn subtle danger-text" disabled={!!deleteBlocked} aria-description={deleteBlocked ?? undefined} onClick={() => onDelete(attachment)}>
-              <Icon name="trash" /> {tr(M.delete)}
+          <Tooltip content={remove.blocked}>
+            <button className="btn subtle danger-text" data-action="viewer-remove" disabled={!!remove.blocked} aria-description={remove.blocked ?? undefined} onClick={() => onRemove(item)}>
+              <Icon name="trash" /> {remove.label}
             </button>
           </Tooltip>
-          <button className="btn subtle" onClick={() => void call('app:showInFolder', attachment.path)}>
-            <Icon name="folder-opened" /> {tr(FILES_TEXT.reveal)}
-          </button>
-          <button className="btn subtle" onClick={() => copyText(attachment.path)}>
-            {tr(M.copyPath)}
-          </button>
-          {image && (
-            <button className="btn subtle" onClick={() => void actions.attempt(tr(M.copyImageFailed), () => call('attachments:copyImage', attachment.path))}>
+          {!shown.missing &&
+            (opens ? (
+              <button className="btn subtle" data-action="viewer-open" onClick={() => void call('app:openPath', shown.path)}>
+                <Icon name="link-external" /> {tr(M.openInApp)}
+              </button>
+            ) : (
+              <button className="btn subtle" data-action="viewer-show" onClick={() => void call('app:showInFolder', shown.path)}>
+                <Icon name="folder-opened" /> {tr(CARD_ATTACH_TEXT.show)}
+              </button>
+            ))}
+          {!shown.missing && (
+            <button className="btn subtle" onClick={() => copyText(shown.path)}>
+              {tr(M.copyPath)}
+            </button>
+          )}
+          {image && !shown.missing && (
+            <button className="btn subtle" onClick={() => void actions.attempt(tr(M.copyImageFailed), () => call('attachments:copyImage', shown.path))}>
               <Icon name="copy" /> {tr(M.copyImage)}
             </button>
           )}
-          {live && (
-            <button className="btn primary" onClick={() => onInsert(attachment)}>
+          {live && !shown.missing && (
+            <button className="btn primary" onClick={() => onInsert(item)}>
               <Icon name="terminal" /> {tr(M.insertIntoSession)}
             </button>
           )}
@@ -1392,12 +1467,19 @@ function AttachmentViewer({
     >
       <div className="image-viewer">
         <IconButton icon="chevron-left" title={tr(M.newer)} disabled={!prev} onClick={() => prev && onNavigate(prev)} />
-        {image ? (
+        {shown.missing ? (
+          <div className="attachment-frame" data-missing>
+            <div className="attachment-none">
+              <Icon name="warning" />
+              {tr(CARD_ATTACH_TEXT.missing)}
+            </div>
+          </div>
+        ) : image ? (
           <div className="image-frame">
-            <img src={imageUrl(attachment.path)} alt={attachment.name} />
+            <img src={imageUrl(shown.path)} alt={shown.name} />
           </div>
         ) : (
-          <AttachmentFrame host={host} attachment={attachment} />
+          <AttachmentFrame host={host} attachment={shown} />
         )}
         <IconButton icon="chevron-right" title={tr(M.older)} disabled={!next} onClick={() => next && onNavigate(next)} />
       </div>
@@ -1406,16 +1488,19 @@ function AttachmentViewer({
 }
 
 /** An attachment that isn't an image, previewed as the Files tab would (a PDF, Markdown, a CSV's table) or as text. */
-function AttachmentFrame({ host, attachment }: { host: string; attachment: SessionAttachment }) {
+function AttachmentFrame({ host, attachment }: { host: string; attachment: Viewed }) {
   const fromDisk = previewsFromDisk(attachment.name)
   const [content, setContent] = useState<AttachmentContent | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
+  // Its read as of this render: the effect runs again for another file, never for a new function of the same one.
+  const read = useRef(attachment.read)
+  read.current = attachment.read
   useEffect(() => {
     setContent(null)
     setFailed(null)
     if (fromDisk || attachment.kind === 'file') return
     let live = true
-    call('attachments:read', host, attachment.path).then(
+    read.current().then(
       (c) => live && setContent(c),
       (e) => live && setFailed(errorMessage(e))
     )

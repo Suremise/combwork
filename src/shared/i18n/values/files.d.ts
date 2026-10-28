@@ -154,7 +154,9 @@ interface HiveMessageValues {
   'files.viewer.newer': undefined
   'files.viewer.noPreview': undefined
   'files.viewer.older': undefined
+  'files.viewer.openInApp': undefined
   'files.viewer.position': { index: number; count: number }
   'files.viewer.readFailed': { error: string | number }
+  'files.viewer.removeFromCard': undefined
   'files.viewer.tooLarge': undefined
 }
