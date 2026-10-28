@@ -13,6 +13,8 @@ const M = {
   output: msg({ id: 'workspace.closeCommand.output', defaultMessage: "The command's last output", description: "In the close command panel: the accessible name of the command's last lines of output." }),
   command: msg({ id: 'workspace.closeCommand.command', defaultMessage: 'The command', description: 'In the close command panel: the accessible name of the command Hive runs, shown as it runs.' }),
   dontWait: msg({ id: 'workspace.closeCommand.dontWait', defaultMessage: "Don't wait", description: 'A button of the close command panel: Hive stops waiting for the command and goes on closing; the command keeps running.' }),
+  saving: msg({ id: 'workspace.closeCommand.saving', defaultMessage: 'Waiting for {workspace} to finish saving…', description: "The heading of the close command panel's first step: Hive waits until it has finished writing the closing workspace's files before it runs the user's close command (or When Hive quits, run). {workspace} is the workspace's folder name." }),
+  savingNote: msg({ id: 'workspace.closeCommand.savingNote', defaultMessage: "If you don't wait, Hive goes on without running your close command, nor When Hive quits, run: the workspace's files may not be fully saved.", description: "Under the close command panel's Don't wait button while Hive is still saving the closing workspace. Settings → General → When Hive quits, run is a setting's name: keep it as Hive shows it." }),
   dontWaitNote: msg({ id: 'workspace.closeCommand.dontWaitNote', defaultMessage: "If you don't wait, Hive goes on and the command keeps running by itself.", description: "Under the close command panel's Don't wait button." }),
   failedExit: msg({ id: 'workspace.closeCommand.failedExit', defaultMessage: '{kind, select, quit {Your quit command failed (exit code {code})} other {Your close command failed (exit code {code})}}', description: "The heading of the close command panel when the user's command ended with an error. {code} is its exit code (a number, kept as it is). kind quit: the command run as Hive quits; other: as a workspace closes." }),
   failed: msg({ id: 'workspace.closeCommand.failed', defaultMessage: '{kind, select, quit {Your quit command failed} other {Your close command failed}}', description: "The heading of the close command panel when the user's command failed with no exit code. kind quit: the command run as Hive quits; other: as a workspace closes." }),
@@ -36,7 +38,7 @@ function failedTitle(run: CloseCommandRun): string {
  */
 export function CloseCommandPanel() {
   const run = useStore((s) => s.closeCommand)
-  if (!run || (run.state !== 'running' && run.state !== 'failed')) return null
+  if (!run || (run.state !== 'saving' && run.state !== 'running' && run.state !== 'failed')) return null
   return <Panel run={run} />
 }
 
@@ -93,7 +95,10 @@ function Panel({ run }: { run: CloseCommandRun }) {
   const card = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
   useKeyboardModal(card, button)
+  const saving = run.state === 'saving'
   const running = run.state === 'running'
+  // Waiting, while saving or running: the spinner and Don't wait.
+  const waiting = saving || running
   const now = useNow(running ? 1000 : 60000)
   const started = Date.parse(run.startedAt)
   const lines = run.lines.slice(-8)
@@ -101,15 +106,17 @@ function Panel({ run }: { run: CloseCommandRun }) {
     <div className="overlay close-command" data-state={run.state} data-kind={run.kind}>
       <div ref={card} className="dialog close-command-card" role="alertdialog" aria-modal="true" aria-labelledby="close-command-title" aria-describedby="close-command-state">
         <div className="dialog-header">
-          {running ? <Icon name="loading" spin /> : <Icon name="error" className="close-command-error" />}
+          {waiting ? <Icon name="loading" spin /> : <Icon name="error" className="close-command-error" />}
           <h2 id="close-command-title" aria-live="polite">
-            {running ? tr(M.running, { kind: run.kind }) : failedTitle(run)}
+            {saving ? tr(M.saving, { workspace: run.workspace ?? '' }) : running ? tr(M.running, { kind: run.kind }) : failedTitle(run)}
           </h2>
         </div>
         <div className="dialog-body">
-          <div className="close-command-text" aria-label={tr(M.command)}>
-            {run.command}
-          </div>
+          {run.command && (
+            <div className="close-command-text" aria-label={tr(M.command)}>
+              {run.command}
+            </div>
+          )}
           <div id="close-command-state" className="faint" aria-live="polite">
             {running && Number.isFinite(started) ? tr(M.elapsed, { time: durationText(now - started, tr) }) : run.failure === 'spawn' && run.error ? run.error : ''}
           </div>
@@ -118,10 +125,10 @@ function Panel({ run }: { run: CloseCommandRun }) {
               {lines.join('\n')}
             </pre>
           )}
-          {running && <p className="faint close-command-note">{tr(M.dontWaitNote)}</p>}
+          {waiting && <p className="faint close-command-note">{tr(saving ? M.savingNote : M.dontWaitNote)}</p>}
         </div>
         <div className="dialog-footer">
-          {running ? (
+          {waiting ? (
             <button ref={button} className="btn" autoFocus onClick={() => void call('closeCommand:dontWait', run.id)}>
               {tr(M.dontWait)}
             </button>

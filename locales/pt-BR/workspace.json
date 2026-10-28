@@ -122,6 +122,8 @@
   "workspace.closeCommand.output": "A última saída do comando",
   "workspace.closeCommand.runner": "O Hive parou de acompanhar seu comando antes que ele terminasse. Ele ainda pode estar rodando.",
   "workspace.closeCommand.running": "{kind, select, quit {Rodando seu comando ao sair…} other {Rodando seu comando ao fechar…}}",
+  "workspace.closeCommand.saving": "Aguardando {workspace} terminar de salvar…",
+  "workspace.closeCommand.savingNote": "Se você não esperar, o Hive continua sem rodar seu comando de fechamento nem \"Ao sair do Hive, rodar\": os arquivos do espaço de trabalho podem não estar totalmente salvos.",
   "workspace.closeCommand.spawn": "{kind, select, quit {Não foi possível iniciar seu comando ao sair} other {Não foi possível iniciar seu comando ao fechar}}",
   "workspace.docs.about": "Sobre o {app}",
   "workspace.docs.api": "Agent API",

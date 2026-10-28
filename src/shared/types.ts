@@ -847,12 +847,18 @@ export interface CloseCommandRun {
   /** The command as it runs, its placeholders filled in. */
   command: string
   startedAt: string
-  /** running: the spinner, Don't wait; failed: its exit code (or why), Close; ok and left: the panel goes. */
-  state: 'running' | 'ok' | 'failed' | 'left'
+  /**
+   * saving: its workspace isn't finished being written yet (the spinner, Don't wait, which skips its command and When
+   * Hive quits); running: the command (the spinner, Don't wait); failed: its exit code (or why), Close; ok and left: the
+   * panel goes.
+   */
+  state: 'saving' | 'running' | 'ok' | 'failed' | 'left'
+  /** The workspace's folder name, for the saving step's "Waiting for <workspace> to finish saving…". */
+  workspace?: string
   /** The output's last lines (at most 8, each at most 400 characters). */
   lines: string[]
   exitCode: number | null
-  /** Why it failed without an exit code: 'drain' (Hive couldn't finish saving in time, so it didn't run), 'spawn', 'runner'. */
+  /** Why it failed without an exit code: 'drain' (its workspace's close didn't finish, so it didn't run), 'spawn', 'runner'. */
   failure?: 'drain' | 'spawn' | 'runner'
   /** The error, for 'spawn' (the system's text). */
   error?: string

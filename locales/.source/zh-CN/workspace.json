@@ -122,6 +122,8 @@
   "workspace.closeCommand.output": "The command's last output",
   "workspace.closeCommand.runner": "Hive stopped following your command before it ended. It may still be running.",
   "workspace.closeCommand.running": "{kind, select, quit {Running your quit command…} other {Running your close command…}}",
+  "workspace.closeCommand.saving": "Waiting for {workspace} to finish saving…",
+  "workspace.closeCommand.savingNote": "If you don't wait, Hive goes on without running your close command, nor When Hive quits, run: the workspace's files may not be fully saved.",
   "workspace.closeCommand.spawn": "{kind, select, quit {Your quit command couldn't be started} other {Your close command couldn't be started}}",
   "workspace.docs.about": "About {app}",
   "workspace.docs.api": "Agent API",

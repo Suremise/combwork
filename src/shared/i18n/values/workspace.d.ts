@@ -124,6 +124,8 @@ interface HiveMessageValues {
   'workspace.closeCommand.output': undefined
   'workspace.closeCommand.runner': undefined
   'workspace.closeCommand.running': { kind: string }
+  'workspace.closeCommand.saving': { workspace: string | number }
+  'workspace.closeCommand.savingNote': undefined
   'workspace.closeCommand.spawn': { kind: string }
   'workspace.docs.about': { app: string | number }
   'workspace.docs.api': undefined

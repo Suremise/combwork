@@ -491,6 +491,14 @@
     "defaultMessage": "{kind, select, quit {Running your quit command…} other {Running your close command…}}",
     "description": "The heading of the panel Hive shows while it runs the user's own command as a workspace closes (kind other: Settings → Workspace → When this workspace closes, run) or as Hive quits (kind quit: Settings → General → When Hive quits, run)."
   },
+  "workspace.closeCommand.saving": {
+    "defaultMessage": "Waiting for {workspace} to finish saving…",
+    "description": "The heading of the close command panel's first step: Hive waits until it has finished writing the closing workspace's files before it runs the user's close command (or When Hive quits, run). {workspace} is the workspace's folder name."
+  },
+  "workspace.closeCommand.savingNote": {
+    "defaultMessage": "If you don't wait, Hive goes on without running your close command, nor When Hive quits, run: the workspace's files may not be fully saved.",
+    "description": "Under the close command panel's Don't wait button while Hive is still saving the closing workspace. Settings → General → When Hive quits, run is a setting's name: keep it as Hive shows it."
+  },
   "workspace.closeCommand.spawn": {
     "defaultMessage": "{kind, select, quit {Your quit command couldn't be started} other {Your close command couldn't be started}}",
     "description": "The heading of the close command panel when Windows couldn't start the user's command (the system's reason follows). kind quit: the command run as Hive quits; other: as a workspace closes."

@@ -7,7 +7,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const state = vi.hoisted(() => ({ drains: [] as { path: string; resolve: (r: { drained: boolean; left?: string[] }) => void }[], started: [] as string[], runs: true }))
 
 vi.mock('../src/main/closeCommand/drain', () => ({
-  drainWorkspace: (path: string) => new Promise((resolve) => state.drains.push({ path, resolve: resolve as never }))
+  // As the real one: its `cancelled` (the user's Don't wait) ends it at once, not drained.
+  drainWorkspace: (path: string, _place: string, o: { cancelled?: AbortSignal } = {}) =>
+    new Promise((resolve) => {
+      state.drains.push({ path, resolve: resolve as never })
+      o.cancelled?.addEventListener('abort', () => resolve({ drained: false, left: ["the user didn't wait for it"] }))
+    })
 }))
 vi.mock('../src/main/closeCommand/runs', async (orig) => {
   const real = await orig<typeof import('../src/main/closeCommand/runs')>()
@@ -22,7 +27,21 @@ vi.mock('../src/main/closeCommand/runs', async (orig) => {
   }
 })
 
-const { closeWithCommand, quitRunsAny, runQuitCommand } = await import('../src/main/closeCommand/closeCommands')
+const { closeCommandState, closeWithCommand, dontWait, quitRunsAny, runQuitCommand } = await import('../src/main/closeCommand/closeCommands')
+const { EventEmitter } = await import('events')
+
+let windows = 0
+/** A window, as far as the panels use one: what it was sent. */
+function fakeWin() {
+  const sent: unknown[] = []
+  const id = ++windows
+  return Object.assign(new EventEmitter(), { sent, webContents: { id, send: (_c: string, e: unknown) => void sent.push(e) }, isDestroyed: () => false, isVisible: () => true, showInactive: () => undefined })
+}
+/** The window's panel, once it shows `state`. */
+const panelIn = async (win: ReturnType<typeof fakeWin>, want: string) => {
+  for (let i = 0; i < 20 && closeCommandState(win as never)?.state !== want; i++) await Promise.resolve()
+  return closeCommandState(win as never)
+}
 
 /** A window's workspace service, as far as the close commands use it; `held`: its close waits for the gate. */
 function fakeWs(path: string | null, command = '', held?: Promise<void>) {
@@ -106,7 +125,7 @@ describe('a workspace closing with its command', () => {
   })
 })
 
-describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3)", () => {
+describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3; the saving step)", () => {
   it('a workspace with no command of its own is drained all the same, and one not drained blocks it', async () => {
     const ws = fakeWs('D:\\ws\\Plain')
     const r = closeWithCommand(ws as never, 'quit', null, { drain: true })
@@ -139,20 +158,40 @@ describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3)",
     expect(state.drains).toHaveLength(0)
   })
 
-  it("a close held past quit's bound ends it at once, not drained; released later, it starts nothing", async () => {
-    const held = gate()
-    const withCommand = fakeWs('D:\\ws\\Work', 'backup', held.wait)
-    const plain = fakeWs('D:\\ws\\Plain', '', held.wait)
-    const bound = new AbortController()
-    const a = closeWithCommand(withCommand as never, 'quit', null, { cancelled: bound.signal, drain: true })
-    const b = closeWithCommand(plain as never, 'quit', null, { cancelled: bound.signal, drain: true })
-    await flush()
-    bound.abort()
-    await expect(Promise.all([a, b])).resolves.toEqual(['notDrained', 'notDrained'])
-    held.open()
-    await flush()
-    expect(state.drains).toHaveLength(0)
-    expect(state.started).toHaveLength(0)
+  it("a close held, and the user's Don't wait at its saving step: at once, its command and When Hive quits skipped; released later, it starts nothing (Darren's decision, 14:15)", async () => {
+    for (const command of ['backup', '']) {
+      const held = gate()
+      const ws = fakeWs('D:\\ws\\Work', command, held.wait)
+      const win = fakeWin()
+      const r = closeWithCommand(ws as never, 'quit', win as never, { drain: true })
+      const saving = await panelIn(win, 'saving')
+      expect(saving).toMatchObject({ state: 'saving', workspace: 'Work', command })
+      dontWait(win as never, saving!.id)
+      await expect(r).resolves.toBe('leftSaving')
+      expect(closeCommandState(win as never)).toBeNull()
+      held.open()
+      await flush()
+      expect(state.drains).toHaveLength(0)
+      expect(state.started).toHaveLength(0)
+    }
+  })
+
+  it('a drain under way: its saving step shows until it ends, and the command then runs in the same panel', async () => {
+    const ws = fakeWs('D:\\ws\\Work', 'backup')
+    const win = fakeWin()
+    const r = closeWithCommand(ws as never, 'window', win as never)
+    const saving = await panelIn(win, 'saving')
+    expect(saving?.state).toBe('saving')
+    // The step is up from the start: its close first, then its drain.
+    for (let i = 0; i < 20 && !state.drains.length; i++) await Promise.resolve()
+    state.drains[0].resolve({ drained: true })
+    // The runner's start fails (stood in): the same panel says so, until it is closed.
+    const failed = await panelIn(win, 'failed')
+    expect([failed?.id, failed?.failure]).toEqual([saving?.id, 'spawn'])
+    expect(state.started).toEqual(['backup'])
+    const { dismiss } = await import('../src/main/closeCommand/closeCommands')
+    dismiss(win as never, failed!.id)
+    await expect(r).resolves.toBe('failed')
   })
 
   it('a plain close under way when the quit joins it: drained as part of it, before the global one', async () => {
@@ -170,17 +209,17 @@ describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3)",
   })
 
   for (const command of ['', 'backup']) {
-    it(`a close under way (${command ? 'with a command' : 'plain'}) when the quit joins it, held past quit's bound: the quit goes on at once, and released later nothing starts (HR6's round 2, finding 1)`, async () => {
+    it(`a window's close under way (${command ? 'with a command' : 'plain'}) when the quit joins it: its saving step shows, and Don't wait there ends both at once; released later, nothing starts (HR6's round 2, finding 1; Darren's decision, 14:15)`, async () => {
       const held = gate()
       const ws = fakeWs('D:\\ws\\Work', command, held.wait)
-      // The window's own close, with no bound of its own; then the quit joins it, with its bound.
-      const closing = closeWithCommand(ws as never, 'window', null)
-      const limit = new AbortController()
-      const joined = closeWithCommand(ws as never, 'quit', null, { cancelled: limit.signal, drain: true })
-      await flush()
-      limit.abort()
-      await expect(joined).resolves.toBe('notDrained')
-      await expect(closing).resolves.toBe('notDrained')
+      const win = fakeWin()
+      // The window's own close first; then the quit joins it, needing it drained.
+      const closing = closeWithCommand(ws as never, 'window', win as never)
+      const joined = closeWithCommand(ws as never, 'quit', win as never, { drain: true })
+      const saving = await panelIn(win, 'saving')
+      expect(saving?.workspace).toBe('Work')
+      dontWait(win as never, saving!.id)
+      await expect(Promise.all([closing, joined])).resolves.toEqual(['leftSaving', 'leftSaving'])
       held.open()
       await flush()
       expect(state.drains).toHaveLength(0)
@@ -191,10 +230,11 @@ describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3)",
 
 describe('When Hive quits, run', () => {
   it("doesn't run after a workspace that wasn't finished being written, nor with none set", async () => {
-    await expect(runQuitCommand({ command: 'backup all', onUpdate: false }, 'quit', null, true)).resolves.toBe('notDrained')
-    await expect(runQuitCommand({ command: '', onUpdate: false }, 'quit', null, false)).resolves.toBe('skipped')
+    await expect(runQuitCommand({ command: 'backup all', onUpdate: false }, 'quit', null, 'failed')).resolves.toBe('notDrained')
+    await expect(runQuitCommand({ command: 'backup all', onUpdate: false }, 'quit', null, 'left')).resolves.toBe('leftSaving')
+    await expect(runQuitCommand({ command: '', onUpdate: false }, 'quit', null, null)).resolves.toBe('skipped')
     expect(state.started).toHaveLength(0)
-    await expect(runQuitCommand({ command: 'backup all {reason}', onUpdate: false }, 'quit', null, false)).resolves.toBe('failed')
+    await expect(runQuitCommand({ command: 'backup all {reason}', onUpdate: false }, 'quit', null, null)).resolves.toBe('failed')
     expect(state.started).toEqual(['backup all quit'])
   })
 

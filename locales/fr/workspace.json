@@ -122,6 +122,8 @@
   "workspace.closeCommand.output": "La dernière sortie de la commande",
   "workspace.closeCommand.runner": "Hive a cessé de suivre ta commande avant qu’elle se termine. Elle s’exécute peut-être encore.",
   "workspace.closeCommand.running": "{kind, select, quit {Exécution de ta commande de sortie…} other {Exécution de ta commande de fermeture…}}",
+  "workspace.closeCommand.saving": "En attente de la fin de l'enregistrement de {workspace}…",
+  "workspace.closeCommand.savingNote": "Si vous n'attendez pas, Hive continue sans lancer votre commande de fermeture ni « Quand Hive quitte, exécuter » : les fichiers de l'espace de travail ne sont peut-être pas entièrement enregistrés.",
   "workspace.closeCommand.spawn": "{kind, select, quit {Impossible de lancer ta commande de sortie} other {Impossible de lancer ta commande de fermeture}}",
   "workspace.docs.about": "À propos de {app}",
   "workspace.docs.api": "Agent API",

@@ -61,7 +61,9 @@ async function shots(page, name) {
 
   // The settings rows' first two saves each slowed (HR6's round 1, finding 5): a tick right after typing must not save
   // the old command over the new one.
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47973), HIVE_TEST_RUN_ON_CLOSE: '1', HIVE_TEST_SLOW_IPC: 'closeCommand:setWorkspace=1500*2,settings:update=1500*2' } })
+  // The saving step held while this file exists (HIVE_TEST_HOLD_DRAIN), as a slow save would keep it.
+  const holdDrain = path.join(marks, 'hold-drain')
+  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47973), HIVE_TEST_RUN_ON_CLOSE: '1', HIVE_TEST_SLOW_IPC: 'closeCommand:setWorkspace=1500*2,settings:update=1500*2', HIVE_TEST_HOLD_DRAIN: holdDrain } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, wsA)
 
@@ -179,6 +181,22 @@ async function shots(page, name) {
   check('…the dialog still there once it has gone, and Escape is its own again', closedC === true && (await about.isVisible()))
   await page.keyboard.press('Escape')
   check('…which closes it', !!(await lib.until(async () => !(await about.isVisible().catch(() => false)), HUNG_MS)))
+
+  // --- 2c. The saving step (Darren's decision, 28 Oct ~14:15): no timer; the panel says it waits for the workspace to
+  // finish saving, and Don't wait there goes on without running its command.
+  await lib.openWorkspace(inv, page, wsB)
+  await inv('closeCommand:setWorkspace', { command: command('b-held', 'quick'), onUpdate: false })
+  fs.writeFileSync(holdDrain, 'hold')
+  let switchedHeld = false
+  const switchingHeld = lib.openWorkspace(inv, page, wsA, HUNG_MS * 2).then(() => (switchedHeld = true))
+  check("the saving step: its panel names the workspace, with the spinner and Don't wait",!!(await lib.until(async () => (await panel(page, 'saving').count()) === 1, HUNG_MS)) && ((await page.locator('.close-command #close-command-title').textContent()) ?? '').includes(path.basename(wsB)) && (await page.locator('.close-command .spin').count()) > 0)
+  check('…and the window waits on it', !switchedHeld)
+  await shots(page, 'saving')
+  await page.locator('.close-command .dialog-footer button').click()
+  await switchingHeld
+  fs.rmSync(holdDrain, { force: true })
+  const heldRuns = fs.existsSync(path.join(userData, 'close-commands')) ? fs.readdirSync(path.join(userData, 'close-commands')).filter((n) => fs.readFileSync(path.join(userData, 'close-commands', n, 'job.json'), 'utf8').includes('b-held')) : []
+  check("Don't wait while saving: the switch goes on, and the command never starts", switchedHeld && (await panel(page, 'saving').count()) === 0 && heldRuns.length === 0 && mark('b-held') === null, JSON.stringify(heldRuns))
 
   // --- 3. Quitting with two windows: each window's command, then When Hive quits after them; one left running.
   await lib.openWorkspace(inv, page, wsA)

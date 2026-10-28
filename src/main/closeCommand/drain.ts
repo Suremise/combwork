@@ -10,9 +10,6 @@ import { checkpointsReleased } from '../walCheckpoint'
 // under way (dbWrites: each counted from the moment it was asked for, its wait for the board's lock included) have
 // ended, its board and journal are closed (a save's lease kept neither open), and no WAL checkpoint holds either file.
 
-/** How long a drain may take: past it, the command doesn't run (HR6's s30 answer: never on files still being written). */
-export const DRAIN_MS = 10_000
-
 /** What was still open when a drain gave up, for the log. */
 export type DrainResult = { drained: true } | { drained: false; left: string[] }
 
@@ -29,7 +26,8 @@ export const storeDrainDeps: DrainDeps = { writes: writesAt, boardOpen, journalO
 
 /**
  * Waits until the workspace at `path` (its real place `place`) has nothing being written: woken as each write ends,
- * never polled. `cancelled`: an outer bound (Hive quitting) gave up on it, so it ends at once, not drained.
+ * never polled. No timer of its own (Darren's decision of 28 Oct ~14:15: the wait is shown, as its panel's saving step):
+ * `cancelled`, the user's Don't wait, ends it at once, not drained; `ms` bounds it for a test.
  */
 export function drainWorkspace(path: string, place: string, o: { ms?: number; cancelled?: AbortSignal; deps?: DrainDeps } = {}): Promise<DrainResult> {
   const deps = o.deps ?? storeDrainDeps
@@ -49,13 +47,13 @@ export function drainWorkspace(path: string, place: string, o: { ms?: number; ca
     const finish = (r: DrainResult): void => {
       if (done) return
       done = true
-      clearTimeout(timer)
+      if (timer) clearTimeout(timer)
       stop()
       o.cancelled?.removeEventListener('abort', onAbort)
       resolve(r)
     }
-    const timer = setTimeout(() => finish({ drained: false, left: [...leftNow(), 'not drained in time'] }), o.ms ?? DRAIN_MS) // i18n-ignore: for the log
-    const onAbort = (): void => finish({ drained: false, left: [...leftNow(), 'Hive stopped waiting for it'] }) // i18n-ignore: for the log
+    const timer = o.ms === undefined ? null : setTimeout(() => finish({ drained: false, left: [...leftNow(), 'not drained in time'] }), o.ms) // i18n-ignore: for the log
+    const onAbort = (): void => finish({ drained: false, left: [...leftNow(), "the user didn't wait for it"] }) // i18n-ignore: for the log
     if (o.cancelled?.aborted) return onAbort()
     o.cancelled?.addEventListener('abort', onAbort)
     // Looked at again whenever a write ends; once none is under way, the checkpoints are waited for, then all of it is

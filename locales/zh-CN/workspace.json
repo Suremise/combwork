@@ -122,6 +122,8 @@
   "workspace.closeCommand.output": "命令的最新输出",
   "workspace.closeCommand.runner": "命令结束前，Hive 已停止跟踪它。它可能仍在运行。",
   "workspace.closeCommand.running": "{kind, select, quit {正在运行退出时的命令…} other {正在运行关闭时的命令…}}",
+  "workspace.closeCommand.saving": "正在等待 {workspace} 保存完毕…",
+  "workspace.closeCommand.savingNote": "如果不等待，Hive 会继续，而不运行你的关闭命令，也不运行“Hive 退出时运行”：工作区的文件可能尚未完全保存。",
   "workspace.closeCommand.spawn": "{kind, select, quit {无法启动退出时的命令} other {无法启动关闭时的命令}}",
   "workspace.docs.about": "关于 {app}",
   "workspace.docs.api": "Agent API",

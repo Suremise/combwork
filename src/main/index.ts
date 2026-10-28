@@ -667,30 +667,22 @@ async function quitNow(tellUser: boolean): Promise<void> {
   }
 }
 
-/** How long Hive quitting waits for every workspace to finish being written (the drain only, never a command). */
-const QUIT_DRAIN_MS = 15_000
-
 /**
  * The close commands as Hive quits (HI-1368): only when a window's workspace or When Hive quits has one; otherwise the
  * quit goes on as before, its databases closed by will-quit. Every window's workspace closes at once, each command run
- * in its window, then When Hive quits in the last one used (not run if a workspace wasn't written in time). The drains
- * are bounded together: past it, one still draining doesn't run, and neither does When Hive quits.
+ * in its window once its saving step is done, then When Hive quits in the last one used: not run if a workspace's close
+ * failed, or the user didn't wait for one to finish saving (its Don't wait, the only way past a saving step).
  */
 async function closeCommandsOnQuit(reason: CloseReason): Promise<void> {
   const entries = hiveWindows()
   const global = config.settings.general.onQuit
   if (!quitRunsAny(entries.map((e) => e.ws), global)) return
   // When Hive quits runs only once every workspace has closed and drained, theirs with a command or not (HR6's round 1).
+  // No timer: each window's saving step shows, and its Don't wait is the user's (Darren's decision, 28 Oct ~14:15).
   const drain = quitCommandPlanned(global, reason)
-  const bound = new AbortController()
-  const timer = setTimeout(() => bound.abort(), QUIT_DRAIN_MS)
-  try {
-    const outcomes = await Promise.all(entries.map((e) => closeWithCommand(e.ws, reason, e.win, { cancelled: bound.signal, drain }).catch((err): RunOutcome => (log.warn("closing a window's workspace as Hive quits", err), 'notDrained'))))
-    const last = lastFocused() ?? entries[0]
-    await runQuitCommand(global, reason, last?.win ?? null, outcomes.includes('notDrained'))
-  } finally {
-    clearTimeout(timer)
-  }
+  const outcomes = await Promise.all(entries.map((e) => closeWithCommand(e.ws, reason, e.win, { drain }).catch((err): RunOutcome => (log.warn("closing a window's workspace as Hive quits", err), 'notDrained'))))
+  const last = lastFocused() ?? entries[0]
+  await runQuitCommand(global, reason, last?.win ?? null, outcomes.includes('notDrained') ? 'failed' : outcomes.includes('leftSaving') ? 'left' : null)
 }
 
 /** Starts Hive again once this one has quit, as it was started but for the once-only --disable-gpu. */
