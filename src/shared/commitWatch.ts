@@ -1,4 +1,4 @@
-// A watch on React's commits in test copies of Hive (HI-1387, step 1 of 2: it records, nothing fails on it yet). A render
+// A watch on React's commits in test copies of Hive (HI-1387; a suite fails on its commit chain, HI-1865). A render
 // loop (a setState per event in a useEffect, #1366) only throws (#185) once React's nested-update limit is passed, and a
 // production build says nothing before then, so a smaller loop went unseen in suites that passed. React DOM reports each
 // commit to a DevTools hook installed before it loads, production builds too: test copies install one
@@ -10,7 +10,10 @@
 export const COMMIT_WATCH_ARG = '--hive-commit-watch'
 /** The window a burst is counted in (ms): React's nested-update limit is reached that fast in a loop. */
 export const COMMIT_BURST_WINDOW_MS = 250
-/** React's own nested-update limit: the candidate threshold step 2 may fail a suite at, once a full run shows normal bursts. */
+/**
+ * React's own nested-update limit: a suite whose commit chain reaches it fails (HI-1865: a full run's normal suites
+ * stayed at 8 or under). Bursts are recorded only: fast typing makes them as large as a loop's.
+ */
 export const COMMIT_BURST_LIMIT = 50
 /** The console line's start: `<marker> <n>`, n the largest burst so far. */
 export const COMMIT_BURST_MARKER = '[hive commit burst]' // i18n-ignore: a test copy's console marker, read by the e2e harness

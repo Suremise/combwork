@@ -634,12 +634,13 @@ _electron.launch = async (...args) => {
   return app
 }
 
-// React's commit bursts in the suite's test copies (HI-1387, step 1: recorded, nothing fails on them yet). Each window
-// of a test copy says each new largest burst on its console (src/shared/commitWatch.ts: `<marker> <n>`, n commits within
-// 250 ms), small ones too; the suite's largest is said once as it exits, for the run's output (run.mjs), and once at the
-// time it first reaches React's nested-update limit, the candidate threshold. Step 2 decides whether to fail a suite
-// there, once a full run shows what normal bursts are (HI-1759). Beside it, each window's longest commit chain (HI-1865:
-// commits with nothing from outside between them, a setState-in-useEffect loop's shape), said and recorded the same way.
+// React's commits in the suite's test copies (HI-1387, HI-1865). Each window of a test copy says each new largest burst
+// on its console (src/shared/commitWatch.ts: `<marker> <n>`, n commits within 250 ms), small ones too, and each new
+// longest commit chain (commits with nothing from outside between them: a setState-in-useEffect loop's shape). The
+// suite's largest of each is said once as it exits, for the run's output (run.mjs), and once at the time it first
+// reaches React's nested-update limit. The burst is recorded only: input makes bursts as large as a loop's (HI-1864).
+// The chain fails the suite at the limit (HI-1865: a full run's normal suites stayed at 8 or under), unless the suite
+// accepts its chain (acceptCommitChain: commitburst's deliberate loop).
 const COMMIT_BURST_MARKER = '[hive commit burst]'
 const COMMIT_CHAIN_MARKER = '[hive commit chain]'
 const COMMIT_BURST_LIMIT = 50
@@ -708,15 +709,33 @@ function burstWatcher({ onFirst = () => {}, onReach = () => {}, marker = COMMIT_
   }
 }
 const bursts = burstWatcher({
-  onFirst: () => process.once('exit', () => console.log(`INFO React commit burst: the largest was ${bursts.largest()} commits within 250 ms (recorded only; ${COMMIT_BURST_LIMIT}, React's nested-update limit, is the candidate threshold, HI-1387)`)),
-  onReach: (n) => console.log(`INFO React commit burst: ${n} commits within 250 ms, React's nested-update limit, the candidate threshold: recorded only for now (HI-1387)`)
+  onFirst: () => process.once('exit', () => console.log(`INFO React commit burst: the largest was ${bursts.largest()} commits within 250 ms (recorded only: a suite fails on its commit chain, HI-1865)`)),
+  onReach: (n) => console.log(`INFO React commit burst: ${n} commits within 250 ms, React's nested-update limit: recorded only (a suite fails on its commit chain, HI-1865)`)
 })
+/** Why the suite's commit chain at the limit is expected (acceptCommitChain), or null: then the chain fails it. */
+let chainAccepted = null
 const chains = burstWatcher({
   marker: COMMIT_CHAIN_MARKER,
   read: 'chain',
-  onFirst: () => process.once('exit', () => console.log(`INFO React commit chain: the longest was ${chains.largest()} commits with nothing from outside between them (recorded only; ${COMMIT_BURST_LIMIT}, React's nested-update limit, is the candidate threshold, HI-1865)`)),
-  onReach: (n) => console.log(`INFO React commit chain: ${n} commits with nothing from outside between them, React's nested-update limit, the candidate threshold: recorded only for now (HI-1865)`)
+  onFirst: () => process.once('exit', chainVerdict),
+  onReach: (n) => console.log(`INFO React commit chain: ${n} commits with nothing from outside between them, React's nested-update limit: the suite fails as it exits unless it accepts its chain (HI-1865)`)
 })
+/**
+ * The suite's commit chain, as it exits (HI-1865): its longest, said; at React's nested-update limit, a FAIL line and
+ * exit code 1 (an exit listener sets it even after the suite's own process.exit(0)), unless the suite accepted it.
+ */
+function chainVerdict() {
+  const n = chains.largest()
+  if (n < COMMIT_BURST_LIMIT) return console.log(`INFO React commit chain: the longest was ${n} commits with nothing from outside between them (a suite fails at ${COMMIT_BURST_LIMIT}, React's nested-update limit, HI-1865)`)
+  if (chainAccepted !== null) return console.log(`INFO React commit chain: the longest was ${n} commits with nothing from outside between them, at React's nested-update limit (${COMMIT_BURST_LIMIT}), accepted by the suite: ${chainAccepted} (HI-1865)`)
+  console.log(`FAIL React commit chain: the longest was ${n} commits with nothing from outside between them, at React's nested-update limit (${COMMIT_BURST_LIMIT}): a render loop, such as a setState per commit in a useEffect (#1366, HI-1865)`)
+  process.exitCode = 1
+}
+/** A suite whose test copies make a chain at the limit on purpose (commitburst's loop) says so, and why: it doesn't fail. */
+const acceptCommitChain = (why) => {
+  if (typeof why !== 'string' || !why.trim()) throw new Error('acceptCommitChain needs the reason the chain is expected')
+  chainAccepted = why
+}
 /** The suite's largest burst so far (0 while no window has reported). */
 const commitBursts = () => bursts.largest() ?? 0
 /** The suite's longest commit chain so far (0 while no window has reported). */
@@ -1617,4 +1636,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { projectConfig, commitBursts, commitChains, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, inboxQuiet, inboxPending, agentQuiet, typeLine, fakePrompts, skip }
+module.exports = { projectConfig, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, inboxQuiet, inboxPending, agentQuiet, typeLine, fakePrompts, skip }

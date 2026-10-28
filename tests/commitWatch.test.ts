@@ -1,6 +1,8 @@
-// React's commit watch in test copies (HI-1387, step 1: recorded, nothing fails on it yet): the burst counter, the
-// console line lib.cjs reads, and that only a test copy's window turns it on. The hook in a real window: the commitburst
-// e2e. The commit chain beside it (HI-1865): commits with nothing from outside between them.
+// React's commit watch in test copies (HI-1387): the burst counter, the console line lib.cjs reads, and that only a test
+// copy's window turns it on. The hook in a real window: the commitburst e2e. The commit chain beside it (HI-1865):
+// commits with nothing from outside between them, which fails a suite at React's nested-update limit (the burst is
+// recorded only).
+import { spawnSync } from 'child_process'
 import { readFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
@@ -149,6 +151,33 @@ describe("React's commit watch (HI-1387)", () => {
       p.say(`${COMMIT_CHAIN_MARKER} 82`)
       expect(w.largest()).toBe(82)
       expect(reached).toEqual([82])
+    })
+
+    it('fails a suite whose chain reaches the limit as it exits, though it ends with process.exit(0), unless it accepts it (HI-1865)', () => {
+      const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
+      // A suite of a few lines: its window a stand-in saying a chain on its console.
+      const suite = (chain: number, accept = '') => {
+        const script = [
+          'const lib = require(process.argv[1]); const listeners = []',
+          "const page = { on: (e, f) => { if (e === 'console') listeners.push(f) }, evaluate: async () => undefined }",
+          'lib.watchCommitBursts({ windows: () => [page], on: () => {} })',
+          `for (const f of listeners) f({ text: () => '${COMMIT_CHAIN_MARKER} ${chain}' })`,
+          'if (process.argv[2]) lib.acceptCommitChain(process.argv[2])',
+          'process.exit(0)'
+        ].join('\n')
+        const r = spawnSync(process.execPath, ['-e', script, join(root, 'tests', 'e2e', 'lib.cjs'), accept], { env: baseEnv(), encoding: 'utf8' })
+        return { code: r.status, lines: String(r.stdout).split(/\r?\n/).filter(Boolean) }
+      }
+      const under = suite(COMMIT_BURST_LIMIT - 1)
+      expect(under.code).toBe(0)
+      expect(under.lines.some((l) => l.startsWith(`INFO React commit chain: the longest was ${COMMIT_BURST_LIMIT - 1} `))).toBe(true)
+      const loop = suite(COMMIT_BURST_LIMIT)
+      expect(loop.code).toBe(1)
+      expect(loop.lines.some((l) => l.startsWith(`FAIL React commit chain: the longest was ${COMMIT_BURST_LIMIT} `))).toBe(true)
+      const accepted = suite(80, 'its loop is on purpose')
+      expect(accepted.code).toBe(0)
+      expect(accepted.lines.some((l) => l.startsWith('FAIL'))).toBe(false)
+      expect(accepted.lines.some((l) => l.includes('accepted by the suite: its loop is on purpose'))).toBe(true)
     })
   })
 

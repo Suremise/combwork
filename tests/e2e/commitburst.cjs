@@ -1,13 +1,14 @@
-// React's commit bursts in a test copy (HI-1387, step 1: recorded, nothing fails on them yet). A production build says
-// nothing of a render loop until it throws (#185), so a test copy's window watches React's commits through a DevTools
-// hook (src/renderer/src/commitWatch.ts) and says each new largest burst on its console, which lib.cjs collects. A
-// window's ordinary count is recorded, not judged (calibration for step 2, HI-1759). A deliberate loop (a setState per
-// commit in a useEffect, as #1366's was, renderer commitLoop.tsx) is caught: its burst reaches React's nested-update
-// limit, the candidate threshold, seen by the page and by lib.cjs, without throwing. Beside the burst, the commit chain
-// (HI-1865: commits with nothing from outside between them): the loop's reaches the limit, fast typing's stays short,
-// however many commits it makes within 250 ms. Dev build, throwaway profile, quiet.
+// React's commits in a test copy (HI-1387, HI-1865). A production build says nothing of a render loop until it throws
+// (#185), so a test copy's window watches React's commits through a DevTools hook (src/renderer/src/commitWatch.ts) and
+// says each new largest burst (commits within 250 ms) and longest chain (commits with nothing from outside between them)
+// on its console, which lib.cjs collects. A window's ordinary counts are small. A deliberate loop (a setState per commit
+// in a useEffect, as #1366's was, renderer commitLoop.tsx) is caught: its burst and its chain reach React's nested-update
+// limit, seen by the page and by lib.cjs, without throwing; fast typing's burst is as large, but its chain stays short.
+// A suite whose chain reaches the limit fails as it exits (lib.cjs), shown here by a child run; this suite's own loop is
+// accepted. Dev build, throwaway profile, quiet.
 const lib = require('./lib.cjs')
 const path = require('path')
+const { spawnSync } = require('child_process')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 30000
@@ -59,6 +60,25 @@ const check = (name, ok, extra = '') => {
     check('…and its chain reaches the limit: nothing from outside between its commits', chain >= LIMIT, String(chain))
     check('…which lib.cjs has from the console', !!(await lib.until(() => lib.commitChains() >= chain, HUNG_MS, 100)), `${lib.commitChains()} of ${chain}`)
     check('…which records it only: no page error (it never throws)', errors.length === 0, errors.join('; '))
+    lib.acceptCommitChain('commitburst makes a render loop on purpose')
+
+    // lib.cjs fails a suite whose chain reaches the limit, as it exits, even one that ends with process.exit(0): a child
+    // suite of a few lines, its window a stand-in saying a chain of 60 on its console; and accepted, it passes.
+    const child = (accept) => {
+      const script = `const lib = require(process.argv[1]); const listeners = []
+        const page = { on: (e, f) => { if (e === 'console') listeners.push(f) }, evaluate: async () => undefined }
+        lib.watchCommitBursts({ windows: () => [page], on: () => {} })
+        for (const f of listeners) f({ text: () => '[hive commit chain] 60' })
+        if (process.argv[2] === 'accept') lib.acceptCommitChain('a test of the acceptance')
+        process.exit(0)`
+      const r = spawnSync(process.execPath, ['-e', script, path.join(__dirname, 'lib.cjs'), accept ? 'accept' : ''], { env: lib.baseEnv(), encoding: 'utf8', timeout: HUNG_MS })
+      return { code: r.status, lines: String(r.stdout ?? '').split(/\r?\n/) }
+    }
+    const loop = child(false)
+    check('a suite whose chain reaches the limit fails: exit code 1 though it ended with process.exit(0)', loop.code === 1, String(loop.code))
+    check('…and a FAIL line naming its chain', loop.lines.some((l) => l.startsWith('FAIL React commit chain: the longest was 60 ')), loop.lines.join(' | '))
+    const accepted = child(true)
+    check('a suite that accepts its chain passes, saying why', accepted.code === 0 && accepted.lines.some((l) => l.includes('accepted by the suite: a test of the acceptance')) && !accepted.lines.some((l) => l.startsWith('FAIL')), `${accepted.code}: ${accepted.lines.join(' | ')}`)
   } catch (e) {
     check('no exception', false, e?.stack ?? String(e))
   } finally {
