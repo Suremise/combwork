@@ -96,6 +96,8 @@ export async function commonDirFast(repo: string): Promise<Maybe<string>> {
  * has no readable `.git` of its own (a repository's subfolder): ask git.
  */
 export function gitDirSync(folder: string): string | null {
+  // GIT_DIR or GIT_COMMON_DIR in the environment chooses another repository than `.git` names (HR3's HI-1970 round 1).
+  if (process.env.GIT_DIR || process.env.GIT_COMMON_DIR) return null
   const dot = join(folder, '.git')
   try {
     if (statSync(dot).isDirectory()) return resolvePath(dot)
@@ -325,7 +327,7 @@ export async function worktreeNow(folder: string, o: { target?: string; gitPaths
   // HI-1970: the markers are in the folder's own git dir and the line's head in the ref files, read from `.git` with no
   // git process (as lineHead), read now as the rev-parse would be; git where they can't say (other paths asked, a git
   // dir moved by GIT_DIR, a line the ref files don't name).
-  const own = o.gitPaths?.length || process.env.GIT_DIR ? null : gitDirSync(folder)
+  const own = o.gitPaths?.length ? null : gitDirSync(folder)
   const common = own && o.target && plainBranch(o.target) ? commonDirSync(folder) : null
   const known = common && o.target ? branchRefSync(common, o.target) : null
   const fast = own && (!o.target || known)

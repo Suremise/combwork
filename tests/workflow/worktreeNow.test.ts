@@ -89,6 +89,27 @@ describe('worktreeNow', () => {
     }
   })
 
+  it("GIT_DIR set: git's repository, not the folder's `.git` (HR3's HI-1970 round 1)", async () => {
+    const a = gitRepo(join(tempDir('git-'), 'a'))
+    const b = gitRepo(join(tempDir('git-'), 'b'))
+    const bHead = commit(b, { 'b.txt': 'b\n' }, 'b moves')
+    const { commonGitDir } = await import('../../src/main/repoLock')
+    const env = { GIT_DIR: process.env.GIT_DIR, GIT_WORK_TREE: process.env.GIT_WORK_TREE }
+    process.env.GIT_DIR = join(b, '.git')
+    process.env.GIT_WORK_TREE = b
+    try {
+      expect(G.gitDirSync(a)).toBeNull()
+      expect(await commonGitDir(a)).toBe(realpathSync.native(join(b, '.git')))
+      expect(await commonGitDir(a)).toBe(realpathSync.native(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: a, encoding: 'utf8', env: process.env }).trim()))
+      expect(await G.worktreeNow(a, { target: 'main' })).toMatchObject({ target: bHead })
+    } finally {
+      for (const [k, v] of Object.entries(env)) {
+        if (v === undefined) delete process.env[k]
+        else process.env[k] = v
+      }
+    }
+  })
+
   it('a branch with a diverged upstream: the same branch, head and files, with no ahead/behind count asked of git (#1377)', async () => {
     const repo = gitRepo(join(tempDir('git-'), 'r'))
     // A clone whose main is its upstream, both sides moved on.
