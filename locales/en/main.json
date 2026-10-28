@@ -787,6 +787,34 @@
     "defaultMessage": "{n, plural, one {Working on: {projects}, as before its rename.} other {Working on: {projects}, as before their rename.}}",
     "description": "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): renamed projects stay Working on. Working on is how the sidebar marks projects: use its name as shown. {projects} lists them; {n} is how many."
   },
+  "main.outage.gaveUpBody": {
+    "defaultMessage": "{n, plural, one {It was resumed once in the past hour} other {It was resumed # times in the past hour}} and stopped again, so Hive won't resume it again by itself. This PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
+    "description": "The notice that Hive stopped resuming an agent whose connection kept dropping. {n} is how many times it was resumed in the past hour. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them."
+  },
+  "main.outage.gaveUpTitle": {
+    "defaultMessage": "{agent}'s connection keeps dropping",
+    "description": "A notice's title: an agent's connection dropped again after Hive had resumed it several times in an hour, so Hive stopped resuming it. {agent} is the agent's name."
+  },
+  "main.outage.progressTitle": {
+    "defaultMessage": "{agent}: waiting for the connection",
+    "description": "A Progress panel run's title while Hive waits for an agent's connection to come back, to resume it. {agent} is the agent's name."
+  },
+  "main.outage.progressWaiting": {
+    "defaultMessage": "the connection to come back",
+    "description": "What a Progress panel run waits for, after \"Waiting for\": the connection of an agent whose turn a dropped connection ended."
+  },
+  "main.outage.resumedSummary": {
+    "defaultMessage": "Resumed: the connection dropped at {dropped} and came back at {back}.",
+    "description": "A Progress panel run's summary: Hive resumed an agent once its connection came back. {dropped} and {back} are times of day."
+  },
+  "main.outage.timedOutBody": {
+    "defaultMessage": "Hive waited {minutes, plural, one {# minute} other {# minutes}} and stopped waiting. If other apps can reach the internet, this PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
+    "description": "The notice that Hive stopped waiting for an agent's connection. {minutes} is how long it waited. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them."
+  },
+  "main.outage.timedOutTitle": {
+    "defaultMessage": "{agent}'s connection didn't come back",
+    "description": "A notice's title: Hive waited for an agent's connection to come back, to resume it, and gave up. {agent} is the agent's name."
+  },
   "main.plan.close": {
     "defaultMessage": "You are getting close to the limit.",
     "description": "A plan-usage notice, below 95% used."

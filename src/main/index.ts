@@ -114,6 +114,7 @@ import { exitBy, logCrashDumps, startCrashDumps, startExitLog } from './exitLog'
 import { checkLastRun, startRunMarker, startupStep, tellUnexpectedClose } from './lastRun'
 import { initRestartRecovery, loadRestartRecord, recordClosing, startRestartRecovery, stopRestartRecovery, stopWatchingRestartRequests, watchRestartRequests } from './restartResume'
 import type { RestartReason } from '../shared/restartResume'
+import { startOutageResume } from './outageResume'
 import { chooseStartLanguage, languageInfo, startI18n, switchLanguage } from './i18n'
 import { fmt, msg, tr } from '../shared/i18n'
 
@@ -886,6 +887,8 @@ app.whenReady().then(async () => {
   checkLastRun()
   startRunMarker()
   initRestartRecovery()
+  // Agents whose turn a dropped connection ended, resumed once it is back (HI-1612; Settings → Advanced, off by default).
+  startOutageResume()
   // An installer asking Hive to close for an install (installer.nsh): the agents are recorded and told, then Hive quits.
   watchRestartRequests(() => {
     quitReason = 'install'

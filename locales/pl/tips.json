@@ -312,6 +312,8 @@
   "tips.noCodeCards.title": "Karty bez kodu",
   "tips.off.message": "Nadal są w Pomoc → Wskazówki…, a w Ustawienia → Ogólne włączysz je z powrotem.",
   "tips.off.title": "Wskazówki są wyłączone",
+  "tips.outageResume.text": "Włącz Ustawienia → Zaawansowane → Wznawiaj agentów po zerwaniu połączenia, a agent zatrzymany przez restart routera lub chwilowy zanik Wi-Fi poczeka na połączenie i sam ponownie wykona to, co zostało przerwane. Nigdy przy limicie użycia ani wygasłym logowaniu.",
+  "tips.outageResume.title": "Agenci mogą kontynuować po zerwaniu połączenia",
   "tips.overview.text": "Przegląd obszaru roboczego pokazuje, ile zużył każdy projekt, co teraz działa i tablicę, dzień po dniu. {key}",
   "tips.overview.title": "Cały obszar roboczy w skrócie",
   "tips.ownShortcuts.text": "Ustawienia → Skróty klawiszowe pozwalają zmienić dowolny skrót, a Ustawienia projektu – zmienić je dla jednego projektu.",

@@ -447,6 +447,14 @@
     "defaultMessage": "Pass right-click to Claude Code",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.claude-code.outage.connectionError.desc": {
+    "defaultMessage": "What a StopFailure hook's message says when Claude Code couldn't reach its API after its retries: with Resume agents after a connection drops on, Hive waits for the connection and resumes the agent. Wrong, such agents stay stopped.",
+    "description": "What the advanced setting \"Connection dropped: StopFailure message\" is for, and what goes wrong when it is wrong (Settings → Advanced). Resume agents after a connection drops is the title of another advanced setting."
+  },
+  "settings.advanced.claude-code.outage.connectionError.title": {
+    "defaultMessage": "Connection dropped: StopFailure message",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.claude-code.override.mcpIsolation.desc": {
     "defaultMessage": "Hive starts Claude Code with --strict-mcp-config, so its sessions get only the MCP servers the workspace gives them. Turned off, the servers in your own Claude Code config and the project's .mcp.json load beside them, as they would outside Hive (Claude Code may ask you to approve a project's new servers first). The workspace's servers, Hive's own hive among them, win over yours of the same name.",
     "description": "What the advanced setting \"Only the workspace's MCP servers\" does (Settings → Advanced, under Claude Code). --strict-mcp-config is a command-line option and .mcp.json a file name: keep them. hive is the name of Hive's MCP server."
@@ -783,6 +791,14 @@
     "defaultMessage": "Pass right-click to Codex",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.codex.outage.connectionError.desc": {
+    "defaultMessage": "A turn's error, in Codex's session file, that means it lost its connection to its API: with Resume agents after a connection drops on, Hive waits for the connection and resumes the agent. Wrong, such agents stay stopped.",
+    "description": "What the advanced setting \"Connection dropped: error message\" is for, and what goes wrong when it is wrong (Settings → Advanced). Resume agents after a connection drops is the title of another advanced setting."
+  },
+  "settings.advanced.codex.outage.connectionError.title": {
+    "defaultMessage": "Connection dropped: error message",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.codex.override.mcpIsolation.desc": {
     "defaultMessage": "Hive's Codex sessions get the MCP servers the workspace gives them, and Hive turns off the ones in your own Codex config and the project's (enabled=false, for those sessions only). Turned off, those load beside the workspace's too, as they would outside Hive. Hive's own hive server always wins over one of yours with that name.",
     "description": "What the advanced setting \"Only the workspace's MCP servers\" does (Settings → Advanced, under Codex). enabled=false is a config value: keep it. hive is the name of Hive's MCP server."
@@ -1045,6 +1061,14 @@
   },
   "settings.advanced.copilot.mouse.rightClickToCli.title": {
     "defaultMessage": "Pass right-click to Copilot",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.copilot.outage.connectionError.desc": {
+    "defaultMessage": "What Copilot's error says when it couldn't reach its model's API after its retries: with Resume agents after a connection drops on, Hive waits for the connection and resumes the agent. Wrong, such agents stay stopped.",
+    "description": "What the advanced setting \"Connection dropped: error message\" is for, and what goes wrong when it is wrong (Settings → Advanced). Resume agents after a connection drops is the title of another advanced setting."
+  },
+  "settings.advanced.copilot.outage.connectionError.title": {
+    "defaultMessage": "Connection dropped: error message",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.copilot.override.allMcpInstructions.desc": {
@@ -1386,6 +1410,78 @@
   "settings.advanced.hive.notes.workspaceNotesMax.title": {
     "defaultMessage": "Workspace notes: most an agent gets",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in bytes: how much of the shared note Workspace notes an agent's instructions get at most."
+  },
+  "settings.advanced.hive.outage.checkFirstSeconds.desc": {
+    "defaultMessage": "How long after the turn ends Hive first checks the connection. Each check that finds it still down doubles the wait before the next, up to the longest wait below.",
+    "description": "What the advanced setting \"Resuming after a connection drops: first check after\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.checkFirstSeconds.title": {
+    "defaultMessage": "Resuming after a connection drops: first check after",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"30 s\")."
+  },
+  "settings.advanced.hive.outage.checkMostSeconds.desc": {
+    "defaultMessage": "The longest Hive waits between two checks of the connection.",
+    "description": "What the advanced setting \"Resuming after a connection drops: longest wait between checks\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.checkMostSeconds.title": {
+    "defaultMessage": "Resuming after a connection drops: longest wait between checks",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\")."
+  },
+  "settings.advanced.hive.outage.checkUrl.claude-code.desc": {
+    "defaultMessage": "The address Hive asks to see whether Claude Code's connection is back: its API host. Any reply counts, an error page too. An agent on a server connection is checked at its server's address instead.",
+    "description": "What the advanced setting \"Resuming after a connection drops: address checked for Claude Code\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.checkUrl.claude-code.title": {
+    "defaultMessage": "Resuming after a connection drops: address checked for Claude Code",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. Claude Code is a product name."
+  },
+  "settings.advanced.hive.outage.checkUrl.codex.desc": {
+    "defaultMessage": "The address Hive asks to see whether Codex's connection is back: its API host. Any reply counts, an error page too.",
+    "description": "What the advanced setting \"Resuming after a connection drops: address checked for Codex\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.checkUrl.codex.title": {
+    "defaultMessage": "Resuming after a connection drops: address checked for Codex",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. Codex is a product name."
+  },
+  "settings.advanced.hive.outage.checkUrl.copilot.desc": {
+    "defaultMessage": "The address Hive asks to see whether GitHub Copilot's connection is back: its API host. Any reply counts, an error page too.",
+    "description": "What the advanced setting \"Resuming after a connection drops: address checked for GitHub Copilot\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.checkUrl.copilot.title": {
+    "defaultMessage": "Resuming after a connection drops: address checked for GitHub Copilot",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. GitHub Copilot is a product name."
+  },
+  "settings.advanced.hive.outage.notConnection.desc": {
+    "defaultMessage": "A failed turn whose error this regular expression finds is never resumed, whatever a CLI's connection error pattern finds: a usage or rate limit, a sign-in, an overloaded server. Resuming wouldn't help those, and could repeat.",
+    "description": "What the advanced setting \"Resuming after a connection drops: errors that are never a dropped connection\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.notConnection.title": {
+    "defaultMessage": "Resuming after a connection drops: errors that are never a dropped connection",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive."
+  },
+  "settings.advanced.hive.outage.resume.desc": {
+    "defaultMessage": "When an agent's turn ends because its CLI couldn't reach its API (a router restarting, Wi-Fi dropping), Hive shows it waiting for the connection, checks the CLI's API host now and then, and once it answers tells the agent to rerun what was cut off and carry on. Never for a usage limit, an expired sign-in or an overloaded server. After three resumes in an hour that end the same way, or once the wait's limit passes, Hive stops and says what to try.",
+    "description": "What the advanced setting \"Resume agents after a connection drops\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.resume.title": {
+    "defaultMessage": "Resume agents after a connection drops",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.hive.outage.resumesPerHour.desc": {
+    "defaultMessage": "How many times in an hour Hive resumes the same agent. Once its turn ends on a connection error again after that many, Hive stops: the PC's own network may not have recovered.",
+    "description": "What the advanced setting \"Resuming after a connection drops: resumes in an hour\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.resumesPerHour.title": {
+    "defaultMessage": "Resuming after a connection drops: resumes in an hour",
+    "description": "An advanced setting's title (Settings → Advanced), followed by a number."
+  },
+  "settings.advanced.hive.outage.waitMinutes.desc": {
+    "defaultMessage": "How long Hive waits for the connection to come back before it stops waiting and tells you.",
+    "description": "What the advanced setting \"Resuming after a connection drops: wait at most\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.waitMinutes.title": {
+    "defaultMessage": "Resuming after a connection drops: wait at most",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"120 min\")."
   },
   "settings.advanced.hive.progress.lanesShown.desc": {
     "defaultMessage": "How many card-loop lanes the Progress panel shows before its lanes scroll, until you drag the section's top edge (the drag is kept per workspace). A workspace that runs many lanes at once can set its own.",

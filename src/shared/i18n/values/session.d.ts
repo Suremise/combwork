@@ -181,6 +181,8 @@ interface HiveMessageValues {
   'session.status.asksAtStart': undefined
   'session.status.asksTrust': undefined
   'session.status.compacting': undefined
+  'session.status.connectionKeepsDropping': undefined
+  'session.status.connectionNotBack': undefined
   'session.status.failedTurn': undefined
   'session.status.safeguardAsks': { provider: string | number }
   'session.status.safeguardAsksTools': { provider: string | number; tools: string | number }
@@ -188,6 +190,7 @@ interface HiveMessageValues {
   'session.status.settingUp': { command: string | number }
   'session.status.signedInAgain': undefined
   'session.status.tasksDropped': { minutes: number }
+  'session.status.waitingForConnection': undefined
   'session.tracker.body': { reason: string | number; detail: string | number }
   'session.tracker.detail': undefined
   'session.tracker.helperFailed': { why: string | number }
