@@ -4050,8 +4050,7 @@ module.exports.SCENARIOS.push(
       // Back in Doing with Coder after round 2's failed review, as a failed verdict leaves it.
       const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>", and README.md shows it.', agent: 'coder', column: 'doing' })
       const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
-      const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [a, b], rounds: 10, name: 'greetings' })
-      if (r.status !== 200) throw new Error(`lane: ${r.text}`)
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], rounds: 10, name: 'greetings' })
       for (const text of ["Round 1: FAILED. 1. greet.js has no test.", 'Fixed: greet.test.js covers greet().', "Round 2: FAILED. 1. README.md's example still says Hello."]) await c.api('POST', `/v1/tasks/${a}/comments`, { text })
       // Coder at work on the fix, as Hive's wake left it (#1537: with Coder stopped the loop had stalled, a question fairly
       // put to the user, not the loop's own round).
@@ -4118,8 +4117,7 @@ module.exports.SCENARIOS.push(
       c.git('checkout', '-q', base)
       const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'passed', comments: [`Done on branch greetings (${done[0]}).`, 'Round 1: PASSED.'] })
       const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder', column: 'passed', comments: [`Done on branch greetings (${done[1]}).`, 'Round 1: PASSED.'] })
-      const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' })
-      if (r.status !== 200) throw new Error(`lane: ${r.text}`)
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' })
       // Coder at its lane's end, merging the lane's work as its card loop says: working, not stalled.
       await busyCoder(c, 20, 600, c.agents.coder, `The greetings lane's cards have passed: you're merging branch greetings into ${base} at the lane's end. Its merge checks are first: `)
       c.head = c.git('rev-parse', 'HEAD').trim()
