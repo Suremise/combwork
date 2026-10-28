@@ -205,10 +205,15 @@ describe("an agent's branch between a lane's cards (#1271)", () => {
     await approved(w, wt, cards[0], 'one.txt')
     await merged(w, repo, cards[0], 'squash')
     // Uncommitted work in the worktree: waits.
+    const dirty = Date.now()
     writeFileSync(join(wt, 'scratch.txt'), 'not yet\n')
     await update(w)
     expect(lines.lineWaiting(w, lane)).toBe(cards[1])
-    expect(await laneStatus(w, lane)).toEqual({ reason: 'lineUpdate', card: cards[1] })
+    const waits = await laneStatus(w, lane)
+    expect(waits).toEqual({ reason: 'lineUpdate', card: cards[1], since: expect.any(Number) })
+    // HI-1926: since is when the wait began, the update that found the worktree dirty.
+    expect(waits!.since).toBeGreaterThanOrEqual(dirty)
+    expect(waits!.since).toBeLessThanOrEqual(Date.now())
     expect(facts(w, cards[0]).some((f) => f.kind === 'LineMoved')).toBe(false)
     rmSync(join(wt, 'scratch.txt'))
     // The builder in a turn: waits.

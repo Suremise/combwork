@@ -4122,13 +4122,14 @@ repeating them (#533) [note §8].
   optional section per version control (`{ none?, git? }`, each `{ preset, options }`; `shared/workflow/templateOptions.ts`),
   additive to v2. Every option is on one side (`TEMPLATE_CARRIED`, `TEMPLATE_NOT_CARRIED`; a unit test fails on one on
   neither): carried are review, reviewers, reviewerMode, noSelfReview, sameness, okBefore, preChecks and mergeChecks (names
-  only), mergeInstall, finish, style, strict, dependenciesDone, folder, slotsUpToDate, identity (**on/off only**, made from
+  only), focusedTests (G20, HI-1949: its runner and picker are commands), mergeInstall, finish, style, strict, dependenciesDone, folder, slotsUpToDate, identity (**on/off only**, made from
   the loading project's git identity), stopOwnRuns, sharedFolderWarning, fileLocks, the loops' four and stageNames; never
   target, targetOwn, pushTarget, commands, commitMessage, excluded. A platform carries only its form's (`carriedFor`).
   **Whitelisted at every boundary**: saving (`templateWorkflowOf`, from the options in force; none when they fell back to
   all off), reading a file, an import or an edit (`readTemplateWorkflow`: options it doesn't carry left out; a value its
   option doesn't take, an identity that isn't a boolean, a carried option the platform lacks, a preset it doesn't offer, a
-  contradiction or stage names that can't be saved make the section unusable: dropped, said as `workflowDropped`, the
+  contradiction (but G20's runner missing: the loading project's, flagged in its plan as `focused.run` among the checks
+  with no command, its form refusing to save until it is set) or stage names that can't be saved make the section unusable: dropped, said as `workflowDropped`, the
   other section and the agents kept), exporting, and loading (`overlayTemplateWorkflow`). **Save as Template** has
   **Include this project's workflow** (ticked; `templates:save`'s `includeWorkflow`); replacing a template keeps its other
   section, and unticked all of them, said in the notice (`SavedWorkflow`). An edit keeps the sections unless it sends them.

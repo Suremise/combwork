@@ -3,7 +3,7 @@
 // none of them; one that can't be used is dropped and said, its sibling and the agents kept), and laid over another
 // project's options (its own target, commands and identity kept; check names it has no command for flagged).
 import { describe, expect, it } from 'vitest'
-import { allOff, OPTION_TAKES, preset, type OptionKey, type WorkflowOptions } from '../src/shared/workflow/options'
+import { allOff, contradictions, FOCUSED_RUN, OPTION_TAKES, preset, type OptionKey, type WorkflowOptions } from '../src/shared/workflow/options'
 import { carriedFor, overlayTemplateWorkflow, readTemplateWorkflow, readTemplateWorkflows, TEMPLATE_CARRIED, TEMPLATE_NOT_CARRIED, templateWorkflowOf, type WorkflowBase } from '../src/shared/workflow/templateOptions'
 import { exportable, readTemplate, TEMPLATE_VERSION, isAgentTemplate } from '../src/shared/templates'
 import { HIVE_TEMPLATES } from '../src/shared/templateDefaults'
@@ -28,6 +28,8 @@ describe('the split (HI-1910)', () => {
     expect([...sides].sort()).toEqual(all)
     // HR5's OK on the design: how agents share a folder is a rule, carried.
     expect(TEMPLATE_CARRIED).toEqual(expect.arrayContaining(['sharedFolderWarning', 'fileLocks', 'stageNames', 'loopRounds', 'identity']))
+    // HR4's OK (HI-1949): G20 is a rule, carried; its runner and picker are commands, never.
+    expect(TEMPLATE_CARRIED).toContain('focusedTests')
     expect(TEMPLATE_NOT_CARRIED).toEqual(expect.arrayContaining(['target', 'targetOwn', 'pushTarget', 'commands', 'commitMessage', 'excluded']))
   })
 
@@ -76,6 +78,19 @@ describe('a section read as untrusted', () => {
     expect(bad({ stageNames: { review: 'x'.repeat(40) } })).toBeNull()
     expect(readTemplateWorkflow('not a section', 'git')).toBeNull()
     expect(bad({ review: 'agent', noSelfReview: true }, 'none', 'pair')).toEqual({ preset: 'pair', options: { review: 'agent', noSelfReview: true } })
+  })
+
+  it('G20 (HI-1367): a section with focused tests on reads without a runner, the loading project’s own; every other contradiction still drops it', () => {
+    const team = templateWorkflowOf(preset('git', 'team', { quick: ['lint'], tests: ['unit'], focused: { run: 'npm run focused', pick: 'npm run pick' } }), 'team')
+    expect(team.options).toMatchObject({ focusedTests: true, finish: 'hiveMerges' })
+    expect(JSON.stringify(team)).not.toContain('npm run')
+    expect(readTemplateWorkflow(JSON.parse(JSON.stringify(team)), 'git')).toEqual(team)
+    // Only the runner's contradiction is the loading project's: Hive merging with everyone in the project folder still drops it.
+    expect(readTemplateWorkflow({ ...team, options: { ...team.options, folder: 'project' } }, 'git')).toBeNull()
+    expect(readTemplateWorkflow({ preset: null, options: { focusedTests: true, finish: 'hiveMerges', folder: 'project' } }, 'git')).toBeNull()
+    expect(readTemplateWorkflow({ preset: null, options: { focusedTests: 'yes' } }, 'git')).toBeNull()
+    // None has no merging, so no G20: a None section naming it can't be used.
+    expect(readTemplateWorkflow({ preset: null, options: { focusedTests: true } }, 'none')).toBeNull()
   })
 
   it('keeps a usable section beside one dropped, and says which was dropped', () => {
@@ -138,6 +153,22 @@ describe("laid over another project's options", () => {
     expect(o.identityOff).toBe(false)
     expect(o.changes.map((c) => c.key)).toEqual(expect.arrayContaining(['review', 'preChecks', 'identity', 'stageNames']))
     expect(o.changes.some((c) => (['target', 'commands', 'excluded'] as OptionKey[]).includes(c.key))).toBe(false)
+  })
+
+  it('G20 (HI-1949): its runner is flagged where B has none or a blank one, and B still can’t save until it is set; B’s own runner kept, nothing flagged', () => {
+    const team = templateWorkflowOf(preset('git', 'team', { quick: [], tests: [], focused: { run: 'npm run focused' } }), 'team')
+    const over = (commands: Record<string, string>) => overlayTemplateWorkflow(team, { platform: 'git', options: { ...bOptions, commands }, own: { commands }, identity: null })
+    for (const commands of [{}, { [FOCUSED_RUN]: '  ' }] as Record<string, string>[]) {
+      const o = over(commands)
+      expect([o.options.focusedTests, o.missingCommands]).toEqual([true, [FOCUSED_RUN]])
+      expect(contradictions(o.options)).toContain('focusedNeedsRunner')
+    }
+    const own = over({ [FOCUSED_RUN]: 'pnpm focused' })
+    expect([own.options.commands[FOCUSED_RUN], own.missingCommands]).toEqual(['pnpm focused', []])
+    expect(contradictions(own.options)).not.toContain('focusedNeedsRunner')
+    // Off, or where Hive doesn't merge, it needs no runner: nothing flagged.
+    expect(overlayTemplateWorkflow({ ...team, options: { ...team.options, focusedTests: false } }, { platform: 'git', options: bOptions, own: {}, identity: null }).missingCommands).toEqual([])
+    expect(overlayTemplateWorkflow({ ...team, options: { ...team.options, finish: 'agentMerges' } }, { platform: 'git', options: bOptions, own: {}, identity: null }).missingCommands).toEqual([])
   })
 
   it('an identity on, where B has none in its git config: it stays off, and is said', () => {
