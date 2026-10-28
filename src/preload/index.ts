@@ -1,14 +1,17 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import type { HiveBridge } from '../shared/api'
 import type { HiveEvent } from '../shared/types'
-import { COMMIT_WATCH_ARG } from '../shared/commitWatch'
+import { COMMIT_WATCH_ARG, FROM_MAIN_EVENT } from '../shared/commitWatch'
 
 /**
  * What arrived from main lately (HI-1775): each reply, event and terminal output, the same kind in a row counted as
  * one, so a long task's line can say what came just before it. A small ring: only the last moments matter.
  */
 const arrived: { at: number; what: string; n: number }[] = []
+/** A test copy's commit watch (HI-1865): the page is told of each arrival before its own code hears of it. */
+const commitWatch = process.argv.includes(COMMIT_WATCH_ARG)
 const noteArrived = (what: string): void => {
+  if (commitWatch) window.dispatchEvent(new Event(FROM_MAIN_EVENT))
   const at = Date.now()
   const last = arrived.at(-1)
   if (last && last.what === what && at - last.at < 100) {
@@ -21,6 +24,7 @@ const noteArrived = (what: string): void => {
 }
 ipcRenderer.on('hive:event', (_: IpcRendererEvent, event: HiveEvent) => noteArrived(`event ${event.type}`)) // i18n-ignore: hive.log, in English
 ipcRenderer.on('pty:data', () => noteArrived('terminal output')) // i18n-ignore: hive.log, in English
+ipcRenderer.on('pty:exit', () => noteArrived('terminal exit')) // i18n-ignore: hive.log, in English
 
 const bridge: HiveBridge = {
   invoke: (channel, ...args) =>
@@ -48,7 +52,7 @@ const bridge: HiveBridge = {
   },
   pathForFile: (file) => webUtils.getPathForFile(file),
   platform: process.platform,
-  commitWatch: process.argv.includes(COMMIT_WATCH_ARG),
+  commitWatch,
   arrivals: (from, to) => arrived.filter((a) => a.at >= from && a.at <= to).map((a) => (a.n > 1 ? `${a.what} ×${a.n}` : a.what))
 }
 

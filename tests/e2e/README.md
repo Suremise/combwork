@@ -692,14 +692,21 @@ Start from an existing suite and use `lib.cjs`:
 
 **Quiet test copies** (unpackaged builds only): a copy of Hive started with a test profile (`HIVE_USER_DATA`, which every suite sets) is quiet, however it was started (the runner, `node tests/e2e/<suite>.cjs`, a scenario or a Playwright script), and so is one started with `HIVE_TEST_QUIET=1`. `HIVE_TEST_QUIET=0` turns it off, for a suite that needs a real window (listed in `LOUD` in `tests/testQuiet.test.ts`, which fails for a suite that starts Hive without a test profile or turns quiet off unlisted). So the copies of Hive the suites start never interrupt you: their windows open off screen, to the left of your screens, and never take focus (`showInactive`; Chromium's occlusion tracking is off for them, so they still draw), and they raise no Windows notification, taskbar flash or chime (`src/main/testQuiet.ts`; the window still counts a chime, for `window.__hiveChimes`). Set `HIVE_TEST_NOTIFY_LOG=<file>` to have each notification, flash and chime they would have made written there as a JSON line (`{ kind, title, body }`); `bursts` checks its notifications that way. The message Hive shows when it can't start from its install folder (`src/main/installDir.ts`) is recorded there too (`kind: 'dialog'`), and `HIVE_TEST_DIALOG_SNAPSHOT=<png>` draws it off screen to that picture without showing it; `HIVE_TEST_INSTALL_DIR` makes Hive check a test folder's permissions instead of its own folder's (`installdir`). Quitting with processes agents left running asks in a native dialog (#507), which a quiet copy skips (leaving them running, and listed again at its next start: `leftovers-restart`, #614) unless started with `HIVE_TEST_ASK_LEFTOVERS=1`: `leftovers` sets it and stubs the dialog, and sets `HIVE_TEST_JOB_KILL_FAILS=1` in Hive's main process while it runs to make ending them fail, as Windows refusing would, and starts a second copy with `HIVE_TEST_PROCESS_TRACKER=silent` and `HIVE_TEST_TRACKER_WAIT_MS=3000` (a tracker that never gets going: agents start untracked, with one notice; `=fail` acts out one that can't start at all). Suites that need a focused window stub it (`inbox`, `progress`, `taskbar`) rather than taking OS focus. Maximising is simulated the same way: `carddialog` gives its off-screen window a screen's work-area size, makes `isMaximized()` say so and emits `maximize`/`unmaximize`, which checks Hive's handling of them (the card kept in the window, the title-bar buttons dimmed) but not Electron's and Windows' own maximise. For that, run it on its own with **`HIVE_E2E_NATIVE=1 node tests/e2e/carddialog.cjs`** (PowerShell: `$env:HIVE_E2E_NATIVE='1'; node tests/e2e/carddialog.cjs`): the same checks with the real `maximize()`/`unmaximize()` in a normal window, which **comes on screen, takes the focus and fills the screen** while it runs, so only when asked. The runner drops `HIVE_E2E_NATIVE`, so full and `--affected` runs stay quiet.
 
-**React's commit bursts** (HI-1387, step 1 of 2: recorded, nothing fails on them yet): a render loop (a setState per
-event in a useEffect, #1366) only throws once React's nested-update limit (50) is passed, and a production build says
-nothing before then. So a quiet test copy's window counts React's commits through a DevTools hook installed before
-React DOM loads (`src/renderer/src/commitWatch.ts`; main passes `--hive-commit-watch` to a test copy's window only), and
-says each new largest burst (the most commits within 250 ms) on its console. `lib.cjs` collects them from every window
-of the suite's test copies: the suite's largest is an `INFO React commit burst` line as it exits (and one at the time
-it first reaches 50), and the runner lists each suite's at the end of the run. `commitburst` checks a deliberate loop is
-caught. Step 2 makes a burst of 50 fail its suite, once a full fake run shows the normal bursts well under it.
+**React's commit bursts and chains** (HI-1387, HI-1865): a render loop (a setState per event in a useEffect, #1366)
+only throws once React's nested-update limit (50) is passed, and a production build says nothing before then. So a quiet
+test copy's window counts React's commits through a DevTools hook installed before React DOM loads
+(`src/renderer/src/commitWatch.ts`; main passes `--hive-commit-watch` to a test copy's window only), and says on its
+console each new largest burst (the most commits within 250 ms) and each new longest chain (commits with nothing from
+outside between them: no input or other DOM event, no message or reply from main, which the preload marks, and no
+timer's or frame's callback; React's own scheduling, through a MessageChannel and microtasks, keeps a chain going).
+`lib.cjs` collects both from every window of the suite's test copies: each suite's largest is an `INFO React commit
+burst` and an `INFO React commit chain` line as it exits (and one at the time it first reaches 50), and the runner lists
+each suite's at the end of the run. **A chain of 50 fails its suite** as it exits (a `FAIL React commit chain` line and
+exit code 1, set even after the suite's own `process.exit(0)`): a full fake run's normal suites stayed at 8 or under
+(HI-1865), so a loop stands out. A suite that makes one on purpose says so with `lib.acceptCommitChain(why)`. Bursts
+are recorded only: fast typing makes one as large as a loop's (HI-1864), but each key starts a new chain.
+`commitburst` checks a deliberate loop is caught (its burst and chain both reach 50) and typing's chain stays short,
+shows a child run failing at a chain of 60 and passing once it accepts it, and accepts its own loop.
 
 **Tips** are off in every test copy of Hive (`lib.hiveEnv` sets `HIVE_TEST_TIPS=off`, which unpackaged builds and quiet packaged ones take, #1599: a profile that doesn't set *Show a tip when Hive starts* gets it off), so no tip card covers what a suite clicks. A suite about tips (`tips`) turns them on in its profile.
 
