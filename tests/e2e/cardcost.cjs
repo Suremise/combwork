@@ -1,6 +1,7 @@
 // Cost per card and per lane (#602), on fake Claude Code agents with a price of the user's for their model: a builder
-// works on a card in Doing and a reviewer reviews it, in a lane; the card's panel says "cost: ≈ $… · 1 round" with each
-// side's part and tokens on hover; the lane's hover splits its cost into cards and overhead (the builder's turn after
+// works on a card in Doing and a reviewer reviews it, in a lane, failing round 1 and passing round 2; the card's panel
+// says "cost: ≈ $… · 2 rounds" with each side's part and tokens on hover, and its Work section its cost by round and
+// role (HI-1906), adding up to it, screenshotted in both themes; the lane's hover splits its cost into cards and overhead (the builder's turn after
 // the card passed, holding none); Performance's Cards table lists the card, sortable, a row opening it. A card held by
 // an agent with no session is Unknown, never $0. The Agent API's card leaves the holds out. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR.
@@ -82,14 +83,27 @@ const plain = (s) => (s ?? '').replace(/ /g, ' ')
   check('…to Review', (await api(tb, 'PATCH', `/v1/tasks/${n}`, { column: 'review', comment: 'Ready.' })).status === 200)
   check('the reviewer starts', (await api(tr, 'PATCH', `/v1/tasks/${n}`, { review: 'start' })).status === 200)
   check("the reviewer's turn", await turn(r))
+  // Round 1 fails (HI-1906: a card's cost by round), round 2 passes.
+  const failedIt = await api(tr, 'POST', `/v1/tasks/${encodeURIComponent(await lib.cardLabel(inv, n))}/verdict`, { pass: false, comment: 'Fix it.' })
+  check('…and fails it: back in Doing', failedIt.status === 200 && failedIt.body?.to === 'active', JSON.stringify(failedIt.body))
+  check("the builder's turn on round 2", await turn(b))
+  check('…to Review again', (await api(tb, 'PATCH', `/v1/tasks/${n}`, { column: 'review', comment: 'Fixed.' })).status === 200)
+  check('the reviewer starts round 2', (await api(tr, 'PATCH', `/v1/tasks/${n}`, { review: 'start' })).status === 200)
+  check("the reviewer's turn on round 2", await turn(r))
   check('…and passes it', (await api(tr, 'PATCH', `/v1/tasks/${n}`, { review: 'passed', column: 'passed', comment: 'Passed.' })).status === 200)
   // Holding no card now: the lane's overhead.
   check("the builder's turn after it passed", await turn(b))
 
   const cost = (await inv('costs:cards', { numbers: [n] }))[0]
   check('the card has a cost from both sides', !!cost && cost.build.priced > 0 && cost.build.cost > 0 && cost.review.priced > 0 && cost.review.cost > 0 && cost.total.estimated && cost.total.unpriced === 0, JSON.stringify(cost))
-  check('…and one round', cost?.rounds === 1)
-  check('…its holds kept on the card: B1 building, R1 reviewing', JSON.stringify((await inv('tasks:list')).find((c) => c.number === n)?.held?.map((h) => [h.name, h.role, !!h.to])) === JSON.stringify([['B1', 'build', true], ['R1', 'review', true]]))
+  check('…and two rounds', cost?.rounds === 2)
+  const holds = JSON.stringify((await inv('tasks:list')).find((c) => c.number === n)?.held?.map((h) => [h.name, h.role, !!h.to]))
+  check('…its holds kept on the card: B1 building, R1 reviewing, twice', holds === JSON.stringify([['B1', 'build', true], ['R1', 'review', true], ['B1', 'build', true], ['R1', 'review', true]]), holds)
+  // By round and role (HI-1906): each round's builder and reviewer parts, shares of the card's cost, adding up to it.
+  const byRound = await inv('costs:rounds', n)
+  const parts = byRound?.rounds.flatMap((x) => [x.build, x.review]) ?? []
+  check('its cost by round: two rounds, each with a builder’s and a reviewer’s part', byRound?.rounds.length === 2 && parts.every((p) => p.priced > 0 && p.cost > 0) && !byRound.outside, JSON.stringify(byRound))
+  check('…adding up to its cost', !!byRound?.total && Math.abs(parts.reduce((a, p) => a + p.cost, 0) - cost.total.cost) < 1e-9 && Math.abs(byRound.total.cost - cost.total.cost) < 1e-9)
   const viaApi = await api(tb, 'GET', `/v1/tasks/${n}`)
   check("the Agent API's card leaves its holds out", viaApi.status === 200 && !('held' in (viaApi.body ?? {})) && !('held' in ((await api(tb, 'GET', `/v1/tasks/${n}?history=false`)).body ?? {})))
 
@@ -107,7 +121,22 @@ const plain = (s) => (s ?? '').replace(/ /g, ' ')
   await row.locator(`.lane-seg[data-card="${n}"]`).click()
   const dialog = page.locator('.dialog[role="dialog"]').first()
   const line = dialog.locator('[data-testid="card-cost"]')
-  check('the card says its cost and rounds', !!(await until(async () => /^cost: ≈ \$\d+\.\d\d · 1 round$/.test(plain(await line.innerText().catch(() => ''))), HUNG_MS)), await line.innerText().catch(() => ''))
+  check('the card says its cost and rounds', !!(await until(async () => /^cost: ≈ \$\d+\.\d\d · 2 rounds$/.test(plain(await line.innerText().catch(() => ''))), HUNG_MS)), await line.innerText().catch(() => ''))
+  // Its Work section's table: a row a round and the total, the builder's and reviewer's columns, adding up as shown.
+  const table = dialog.locator('[data-testid="card-round-costs"]')
+  check('its Work section shows its cost by round', !!(await until(async () => (await table.locator('tbody tr').count()) === 2, HUNG_MS)))
+  const cents = (s) => Math.round(Number(plain(s).replace(/[^\d.]/g, '')) * 100)
+  const cellsOf = async (round) => Promise.all(['build', 'review', 'total'].map(async (role) => cents(await table.locator(`tr[data-round="${round}"] td[data-role="${role}"]`).innerText())))
+  const [r1, r2, sums] = [await cellsOf(1), await cellsOf(2), await cellsOf('total')]
+  check('…each round’s builder and reviewer adding up to its total, and the rounds to the card’s cost line', r1[0] + r1[1] === r1[2] && r2[0] + r2[1] === r2[2] && r1[0] + r2[0] === sums[0] && r1[1] + r2[1] === sums[1] && sums[0] + sums[1] === sums[2] && sums[2] === cents((await line.innerText()).replace(/·.*/, '')), JSON.stringify({ r1, r2, sums, line: await line.innerText() }))
+  await table.scrollIntoViewIfNeeded()
+  const theme0 = await page.evaluate(() => document.documentElement.getAttribute('data-theme'))
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate((th) => document.documentElement.setAttribute('data-theme', th), theme)
+    await page.mouse.move(5, 5)
+    await page.screenshot({ path: path.join(shots, `card-rounds-${theme}.png`) })
+  }
+  await page.evaluate((th) => (th ? document.documentElement.setAttribute('data-theme', th) : document.documentElement.removeAttribute('data-theme')), theme0)
   await line.hover()
   const tip = page.locator('.tip', { hasText: 'Builder' }).last()
   check('…its builder’s and reviewer’s parts and tokens on hover', !!(await until(async () => /Builder ≈ \$.*in \d.*Reviewer ≈ \$.*in \d/s.test(plain(await tip.innerText().catch(() => ''))), HUNG_MS)), await tip.innerText().catch(() => ''))
@@ -132,7 +161,7 @@ const plain = (s) => (s ?? '').replace(/ /g, ' ')
   const [nName, mName] = [await lib.cardLabel(inv, n), await lib.cardLabel(inv, m)]
   const cardRow = cards.locator('tbody tr', { hasText: `${nName} Cost per card` })
   check('Performance lists the card', !!(await until(async () => (await cardRow.count()) === 1, HUNG_MS)))
-  check('…with its cost and rounds', /≈ \$\d/.test(plain(await cardRow.innerText())) && /\b1\b/.test(await cardRow.innerText()), await cardRow.innerText())
+  check('…with its cost and rounds', /≈ \$\d/.test(plain(await cardRow.innerText())) && /\b2\b/.test(await cardRow.innerText()), await cardRow.innerText())
   const unknownRow = cards.locator('tbody tr', { hasText: `${mName} Nobody ran` })
   check('…and the unknown one as Unknown, sorted last', /Unknown/.test(await unknownRow.innerText().catch(() => '')) && (await cards.locator('tbody tr').last().innerText()).includes(mName))
   await page.screenshot({ path: path.join(shots, 'performance.png') })

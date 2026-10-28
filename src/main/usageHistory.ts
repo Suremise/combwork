@@ -947,12 +947,16 @@ class UsageHistory {
     return (await this.call<SessionId[]>({ type: 'ids', file: usageFile(workspace), scope })).map((s) => ({ ...(s.agentId ? { agentId: s.agentId } : {}), ...(s.agentName ? { agentName: s.agentName } : {}) }))
   }
 
-  /** A host's sessions with their timelines (a lane's cost). */
-  async timelines(projectPath: string): Promise<(SessionMeta & { summary: UsageSummary; timeline: import('../shared/usageTimeline').UsageTimeline | null; firstActivity: string | null; lastActivity: string | null })[]> {
+  /**
+   * A host's sessions with their timelines (a lane's cost); only `only`'s when given (HI-1906: a card's, from its ledger
+   * rows), each by its scope and session, so a session of another host with the same id is never taken.
+   */
+  async timelines(projectPath: string, only?: { scope: string; session: string }[]): Promise<(SessionMeta & { summary: UsageSummary; timeline: import('../shared/usageTimeline').UsageTimeline | null; firstActivity: string | null; lastActivity: string | null })[]> {
     const ws = workspaceFor(projectPath)
     if (!ws?.path) return []
     const { workspace, scope } = await ws.sessionScope(projectPath)
-    return this.call({ type: 'timelines', file: usageFile(workspace), scope })
+    const ids = only ? [...new Set(only.filter((s) => s.scope === scope).map((s) => s.session))] : undefined
+    return this.call({ type: 'timelines', file: usageFile(workspace), scope, ...(ids ? { sessions: ids } : {}) })
   }
 }
 

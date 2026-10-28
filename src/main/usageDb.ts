@@ -482,13 +482,15 @@ const placeholders = (n: number): string => Array.from({ length: n }, () => '?')
 const keyOf = (r: Rec): string => `${r.scope as string}\0${r.session as string}`
 
 /** Rows of a table for some scopes (all: null) or one session, grouped by session in their order. */
-function grouped<T>(db: DatabaseSync, table: string, where: { scopes: string[] | null } | { scope: string; session: string }, order: string, map: (r: Rec) => T): Map<string, T[]> {
+function grouped<T>(db: DatabaseSync, table: string, where: { scopes: string[] | null } | { scope: string; session: string } | { scope: string; sessions: string[] }, order: string, map: (r: Rec) => T): Map<string, T[]> {
   const [sql, args] =
-    'session' in where
-      ? [`WHERE scope = ? AND session = ?`, [where.scope, where.session]] // i18n-ignore: SQL
-      : where.scopes
-        ? [`WHERE scope IN (${placeholders(where.scopes.length)})`, where.scopes] // i18n-ignore: SQL
-        : ['', []]
+    'sessions' in where
+      ? [`WHERE scope = ? AND session IN (${placeholders(where.sessions.length)})`, [where.scope, ...where.sessions]] // i18n-ignore: SQL
+      : 'session' in where
+        ? [`WHERE scope = ? AND session = ?`, [where.scope, where.session]] // i18n-ignore: SQL
+        : where.scopes
+          ? [`WHERE scope IN (${placeholders(where.scopes.length)})`, where.scopes] // i18n-ignore: SQL
+          : ['', []]
   const out = new Map<string, T[]>()
   for (const r of db.prepare(`SELECT * FROM ${table} ${sql} ORDER BY scope, session, ${order}`).all(...args) as Rec[]) { // i18n-ignore: SQL
     const k = keyOf(r)
@@ -582,14 +584,19 @@ export function cardRows(db: DatabaseSync, cards: number[]): (SessionMeta & { ro
   return rows.map((r) => ({ ...metaOf(r), row: rowOf(r) }))
 }
 
-/** Sessions of a scope with their timelines (for spans of time no card has: a lane's), who each was and its summary. */
-export function storedTimelines(db: DatabaseSync, scope: string): (SessionMeta & { summary: UsageSummary; timeline: UsageTimeline | null; firstActivity: string | null; lastActivity: string | null })[] {
-  const where = { scopes: [scope] }
+/**
+ * Sessions of a scope with their timelines (for spans of time no card has: a lane's), who each was and its summary; only
+ * those named in `sessions` when given (HI-1906: a card's, by its ledger rows, not every session of the scope).
+ */
+export function storedTimelines(db: DatabaseSync, scope: string, sessions?: string[]): (SessionMeta & { summary: UsageSummary; timeline: UsageTimeline | null; firstActivity: string | null; lastActivity: string | null })[] {
+  if (sessions && !sessions.length) return []
+  const where = sessions ? { scope, sessions } : { scopes: [scope] }
   const rows = grouped(db, 'usage_timeline', where, 'seq', (r) => r)
   const charges = grouped(db, 'usage_charges', where, 'seq', (r) => r.usd as number)
   const compactions = grouped(db, 'usage_compactions', where, 'seq', compactionOf)
   const guards = grouped(db, 'usage_safeguards', where, 'kind, key', (r) => r)
-  return (db.prepare('SELECT * FROM usage_sessions WHERE scope = ?').all(scope) as Rec[]).map((s) => { // i18n-ignore: SQL
+  const list = sessions ? db.prepare(`SELECT * FROM usage_sessions WHERE scope = ? AND session IN (${placeholders(sessions.length)})`).all(scope, ...sessions) : db.prepare('SELECT * FROM usage_sessions WHERE scope = ?').all(scope) // i18n-ignore: SQL
+  return (list as Rec[]).map((s) => {
     const k = keyOf(s)
     const summary = summaryOf(s, compactions.get(k) ?? [], guards.get(k) ?? [])
     return { ...metaOf(s), summary, timeline: timelineOf((s.timeline_step as number | null) ?? null, rows.get(k) ?? [], charges.get(k) ?? []), firstActivity: summary.firstActivity, lastActivity: summary.lastActivity }

@@ -113,6 +113,8 @@
   "tips.cardAttachmentsCleanup.title": "已归档卡片的截图会自动清理",
   "tips.cardCost.text": "卡片面板会显示其智能体持有它期间的用量，如“{example}”，悬停可查看构建者和评审者各自的部分及 Token。“性能”列出每张卡片的费用，进度面板中通道的悬停提示则显示其额外开销。",
   "tips.cardCost.title": "一张卡片花了多少",
+  "tips.cardCostRounds.text": "卡片的“工作记录”部分最后是按轮次的费用：每轮中构建者和评审者各自的部分，加起来等于这张卡片的费用。看看是多出的轮次还是一次长时间读取推高了费用。",
+  "tips.cardCostRounds.title": "每轮评审花了多少",
   "tips.cardDecisions.text": "卡片的“决定”位于评论上方，记录你做出的决定：智能体进入评审前会对照它们检查工作，评审者会判定忽略了某项决定的工作不通过。把决定告诉助手，它会记在那里；正在等你回答的智能体也会收到通知。",
   "tips.cardDecisions.title": "把你的决定写在卡片上",
   "tips.cardLinks.text": "智能体或助手输出的卡片编号（如 #12）都是链接：悬停可查看标题和所在列，按住 Ctrl 单击即可打开卡片。",

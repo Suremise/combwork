@@ -455,6 +455,14 @@
     "defaultMessage": "What a card cost",
     "description": "A tip's title."
   },
+  "tips.cardCostRounds.text": {
+    "defaultMessage": "A card's Work section ends with its cost by round: the builder's and reviewer's parts in each round, adding up to the card's cost. See whether extra rounds or one long read drove it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Work is a section of the card dialog)."
+  },
+  "tips.cardCostRounds.title": {
+    "defaultMessage": "What each review round cost",
+    "description": "A tip's title."
+  },
   "tips.cardDecisions.text": {
     "defaultMessage": "A card's Decisions, above its comments, hold what you decided: agents check their work against them before Review, and reviewers fail work that ignores one. Tell the Assistant a decision and it records it there; an agent waiting for your answer is told.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
