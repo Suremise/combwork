@@ -44,7 +44,47 @@ export function burstCounter(windowMs = COMMIT_BURST_WINDOW_MS): { add: (t: numb
 
 /** The burst a console line says (`<marker> <n>`), or null for any other line. */
 export function burstOf(text: string): number | null {
-  if (!text.startsWith(COMMIT_BURST_MARKER)) return null
-  const n = Number(text.slice(COMMIT_BURST_MARKER.length).trim())
+  return countOf(COMMIT_BURST_MARKER, text)
+}
+
+/**
+ * The chain's console line's start (HI-1865): `<marker> <n>`, n the longest chain so far. A chain is commits that follow
+ * each other with nothing from outside between them (no input, no message or reply from main, no timer): how a setState
+ * in a useEffect loops (#1366), however fast or slow, and what React counts toward its own limit. A window's ordinary
+ * work, however busy, starts a new chain at each thing from outside.
+ */
+export const COMMIT_CHAIN_MARKER = '[hive commit chain]' // i18n-ignore: a test copy's console marker, read by the e2e harness
+/** The DOM event the preload sends the page as each message or reply from main arrives (the page can't see IPC itself). */
+export const FROM_MAIN_EVENT = 'hive-commit-watch-from-main'
+
+/** Counts commit chains: outside() as anything from outside arrives, commit() at each commit (returns the chain's length). */
+export function chainCounter(): { outside: () => void; commit: () => number; readonly max: number } {
+  let chain = 0
+  let fresh = true
+  let max = 0
+  return {
+    outside() {
+      fresh = true
+    },
+    commit() {
+      chain = fresh ? 1 : chain + 1
+      fresh = false
+      if (chain > max) max = chain
+      return chain
+    },
+    get max() {
+      return max
+    }
+  }
+}
+
+/** The chain a console line says (`<marker> <n>`), or null for any other line. */
+export function chainOf(text: string): number | null {
+  return countOf(COMMIT_CHAIN_MARKER, text)
+}
+
+function countOf(marker: string, text: string): number | null {
+  if (!text.startsWith(marker)) return null
+  const n = Number(text.slice(marker.length).trim())
   return Number.isInteger(n) && n > 0 ? n : null
 }
