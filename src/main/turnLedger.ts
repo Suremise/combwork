@@ -64,6 +64,8 @@ export interface Turn {
   continued: number
   /** How it ended (for the log): 'stop', 'interrupt', 'idle', 'transcript', 'screen', 'user'… */
   endedBy?: string
+  /** It took over the id of a compaction the CLI began itself (HI-1916): that compaction's news under it is old news. */
+  fromCompaction?: true
 }
 
 export interface TurnLedger {
@@ -188,6 +190,13 @@ export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { h
     // once and ends once: a start of it again, or its news once it is over, is stale; the launch's SessionEnd isn't.
     const k = ledger.compaction
     if (turn === k?.id) {
+      // Codex 0.164 can run the turn that follows a compaction it began itself under that compaction's id (HI-1916: HR5,
+      // resumed into a full context on 27 Oct, had all its turn's hooks dropped here). Its prompt begins that turn, the
+      // compaction still under way or over; anything else of a turn before that prompt stays stale.
+      if (ev.kind === 'prompt') {
+        begin(ledger, turn, now).fromCompaction = true
+        return { verdict: 'apply', event: ev, note: 'a turn under the id of a compaction the CLI began itself' } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
+      }
       if (!launchWide) return { verdict: 'stale', why: `${what(ev)} under a compaction's id` } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
       if (ev.kind === 'compactStart') return { verdict: 'stale', why: k.open ? 'a repeated compaction start' : 'a compaction start of a compaction that is over' } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
       if (!k.open && ev.kind !== 'end') return { verdict: 'stale', why: `${what(ev)} of a compaction that is over` } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
@@ -215,6 +224,9 @@ export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { h
   }
   // Launch-wide hooks (naming the latest turn, or none); the CLI's session ending is the launch's.
   if (launchWide) {
+    // The compaction a turn took the id of (HI-1916) ended before or as it began: its news, late or repeated, mustn't
+    // make the turn ready or "Compacting" while it runs.
+    if (turn && a?.fromCompaction && running && (ev.kind === 'compactStart' || ev.kind === 'compactEnd' || ev.kind === 'start')) return { verdict: 'stale', why: `${what(ev)} of the compaction its turn took the id of` } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
     if (ev.kind === 'end') end(ledger, 'end')
     return { verdict: 'apply', event: ev }
   }
