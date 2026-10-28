@@ -59,7 +59,7 @@ vi.mock('../src/main/tasks', () => ({
 vi.mock('../src/main/workflow/service', () => ({ workflowEnforced: () => state.enforced }))
 vi.mock('../src/main/workflow/rulesets', () => ({ resolvedOf: () => ({ options: state.options }) }))
 
-const { laneBusyCheck, launchRecordedLane, laneStartInfo, recordedLaneNote, resumeLaneBuilder, startLaneFromWindow, startWaitingLane } = await import('../src/main/laneStart')
+const { checkLanePool, laneBusyCheck, launchRecordedLane, laneStartInfo, recordedLaneNote, resumeLaneBuilder, startLaneFromWindow, startWaitingLane } = await import('../src/main/laneStart')
 const { allOff } = await import('../src/shared/workflow/options')
 
 const ws = {
@@ -116,6 +116,23 @@ describe('Start Lane… with the reviewer pool (#1443)', () => {
     const lonely = { ...(ws as object), projectConfig: async () => ({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'e1', name: 'E1', workflowRole: 'either' }] }) } as never
     await expect(startLaneFromWindow(lonely, 'D:\\ws\\alpha', { builder: 'e1', reviewer: null, pool: true, cards: [1] })).rejects.toThrow(/pool has nobody/)
     expect(state.recorded).toEqual([])
+  })
+
+  it("the Assistant's pool lane (HI-1581) is refused as the window's is, and a recorded one starts only its builder, with the pool in its brief", async () => {
+    await expect(checkLanePool(ws, 'D:\\ws\\alpha', 'b1')).rejects.toThrow(/one reviewer per lane/)
+    state.enforced = true
+    state.options = { ...allOff('git'), review: 'agent', noSelfReview: true }
+    await expect(checkLanePool(ws, 'D:\\ws\\alpha', 'b1')).rejects.toThrow(/one reviewer per lane/)
+    pool()
+    await expect(checkLanePool(ws, 'D:\\ws\\alpha', 'b1')).resolves.toBeUndefined()
+    const lonely = { ...(ws as object), projectConfig: async () => ({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'e1', name: 'E1', workflowRole: 'either' }] }) } as never
+    await expect(checkLanePool(lonely, 'D:\\ws\\alpha', 'e1')).rejects.toThrow(/pool has nobody/)
+    // Recorded with the pool (POST /v1/lanes), it starts as Start Lane's does: its builder alone.
+    state.lanes = [{ id: 'lane-p', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: null, pool: true, cards: [1], rounds: 3 }]
+    const l = await launchRecordedLane(ws, 'D:\\ws\\alpha', 'lane-p')
+    expect(state.calls).toEqual(['start b1'])
+    expect(state.briefs[0]).toContain('reviewed by the pool (R1 and R2)')
+    expect(recordedLaneNote(l)).toBe("Started B1 with the lane's brief.")
   })
 })
 

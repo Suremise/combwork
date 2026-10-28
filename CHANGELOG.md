@@ -118,6 +118,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Also new
 
+- **The Hive Assistant starts pool lanes too.** In a project whose reviewers are a shared pool, the Assistant can now start a lane reviewed by the pool, as **Start Lane** in the window can; it no longer asks you to start such lanes yourself (HI-1581).
 - **See why Hive felt slow.** The Performance page lists the main process's recent stalls under **Main process stalls**: when, how long, whether it was working or waiting, the database or file step that held it and what else was under way, the last 50 since Hive started (HI-1135).
 - **Shorter card titles from agents.** Agents and the Assistant write a card's title in about 70 characters and the detail in its description, so `git log` and the board aren't cut off; a longer one is kept, and Hive suggests to the agent a shorter one (Settings → Advanced → Suggest a shorter title past). Your own titles are never questioned.
 - **Archived cards' attachments clean up after themselves.** A card's screenshots and logs go to the Recycle Bin 30 days after the card is archived; choose 3, 7 or 90 days, or Never, per project in Project Settings → Storage, where **Clean Up Now…** shows what is due and removes it at once. Open and Done cards keep theirs, and the card says when its files were removed (HI-1842).

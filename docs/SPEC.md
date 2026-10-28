@@ -3965,6 +3965,9 @@ repeating them (#533) [note §8].
   HI-R2)* (`lanes:startInfo`: the agents whose role reviews), pre-chosen for a builder that isn't paired; refused where
   the rules don't have one or nobody but the builder reviews. The lane records `pool` with no reviewer (its row's
   `extra`), only its builder starts, and its brief says *reviewed by the pool (…)*, with no reviewer for `hive_lane`.
+  The Assistant and scripts start one with `POST /v1/lanes` `pool: true` (`hive_lane` `start`, HI-1581): refused as
+  Start Lane refuses it (`checkLanePool`: `poolNotOffered`, `poolEmpty`), with a reviewer of its own (`400`), and for
+  an agent's own lane (`403`); it then starts as Start Lane's does (HI-1900's `launchRecordedLane`: the builder only).
   Nobody joins it (`hive_lane join` is refused); a builder's own `hive_lane start` naming no reviewer keeps the pool, one
   naming a reviewer makes it one per lane.
 - **Assignment**: a pool lane's submission writes `assignReviewer` (`card_actions`) instead of waking a reviewer, and so
