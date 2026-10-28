@@ -3,7 +3,7 @@
 // watch, is laneWatch.test.ts's; the holds a Start and a placement take, taskStartSlot.test.ts's and slotCards.test.ts's.
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { START_HOLD_MS, resetAgentStartsForTests, startBegins, startBegun, startEnded, startFailed, startNow } from '../src/main/agentStarts'
+import { START_HOLD_MS, onAgentStartChange, resetAgentStartsForTests, startBegins, startBegun, startEnded, startFailed, startNow } from '../src/main/agentStarts'
 import { tempDir } from './tempDir'
 
 const p = join(tempDir('agentstarts-'), 'alpha')
@@ -80,5 +80,25 @@ describe('a start that failed (HI-1976)', () => {
     startFailed(p, 'b1', 'error: unknown option --bogus')
     startBegins(p, 'b1')
     expect(startNow(p, 'b1').failed).toBeNull()
+  })
+
+  it("tells of each change to a project's starts, so the window is told at once (HI-1977)", () => {
+    const told: string[] = []
+    const off = onAgentStartChange((projectPath, agentId) => told.push(`${projectPath}|${agentId}`))
+    try {
+      startBegun(p, 'b1', '#12', { fresh: true })
+      startEnded(p, 'b1', '#12', { failed: 'its slot could not be prepared' })
+      startFailed(p, 'b1', 'error: unknown option --bogus')
+      startBegins(p, 'b1')
+      expect(told).toEqual(Array(4).fill(`${p}|b1`))
+      // Nothing changed: a launch with no failure to clear, an end of a start never begun.
+      startBegins(p, 'b1')
+      startEnded(p, 'b2', '#9')
+      expect(told).toHaveLength(4)
+    } finally {
+      off()
+    }
+    startBegun(p, 'b1', '#13')
+    expect(told).toHaveLength(4)
   })
 })

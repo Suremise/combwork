@@ -834,6 +834,7 @@ interface HiveMessageValues {
   'board.stalled.reviewWait': { agent: string | number; card: string | number; waited: string | number }
   'board.stalled.reviewWaitBusy': { agent: string | number; card: string | number; waited: string | number }
   'board.stalled.reviewWaitSilent': { agent: string | number; card: string | number; silent: string | number; waited: string | number }
+  'board.stalled.startFailed': { agent: string | number; why: string | number }
   'board.stalled.wakeUntaken': { agent: string | number; card: string | number }
   'board.start.busy': { status: string | number }
   'board.start.idle': { status: string | number }
