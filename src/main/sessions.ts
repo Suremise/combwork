@@ -15,6 +15,7 @@ import { copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, writeFi
 import { constants as fsConstants, existsSync, realpathSync } from 'original-fs'
 import { TYPED_NEWLINE_KEYS, typedText } from '../shared/terminalInput'
 import { failedStart, type StartFailure } from '../shared/startFailure'
+import { startFailed, startSucceeded } from './agentStarts'
 import { BrowserWindow, Notification, app, clipboard } from 'electron'
 import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { formatDateTime } from '../shared/dates'
@@ -1688,7 +1689,9 @@ class SessionManager {
     pending.done = run.catch(() => undefined)
     pending.outcome = run
     try {
-      return await run
+      const started = await run
+      startSucceeded(projectPath, agentId)
+      return started
     } catch (e) {
       // Given up before any process of it ran: its slot's writer released now (#1434). One that ran is its exit's.
       if (!this.writers.get(pending.runId)?.spawned) this.settleWriterOf(pending.runId)
@@ -3918,7 +3921,11 @@ class SessionManager {
           { name: l.adapter.descriptor.name, startHint: l.adapter.startHint?.bind(l.adapter) }
         )
       : undefined
-    if (failure) log.warn(`${userText(this.label(l!.state))}: exited with code ${code} before it started: ${userText(failure.reason.replace(/\n/g, ' | '))}`)
+    if (failure) {
+      log.warn(`${userText(this.label(l!.state))}: exited with code ${code} before it started: ${userText(failure.reason.replace(/\n/g, ' | '))}`)
+      // A card's stall says why (HI-1976).
+      startFailed(projectPath, agentId, failure.reason)
+    }
     if (l) {
       if (l.backupTimer) clearInterval(l.backupTimer)
       l.compacting?.end()

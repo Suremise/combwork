@@ -14,6 +14,7 @@ import { REVIEW_WAIT_STALL_MS } from '../src/shared/tasks'
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
 import { LANE_NEXT_STALL_MS, laneNextWaitReason, RETURN_STALL_MS, returnedWaitReason, STALE_STALL_MS, staleWaitReason } from '../src/main/cardStall'
+import { resetAgentStartsForTests, startBegun, startEnded } from '../src/main/agentStarts'
 /** The merge queue's returns as queueReturnOf finds them (HI-1721), by card: none unless a test sets one. */
 const { returns, stales } = vi.hoisted(() => ({ returns: new Map<number, { at: string; text: string; builder: string | null }>(), stales: new Map<number, { since: string; approved: string | null; current: string | null }>() }))
 vi.mock('../src/main/queueReturn', () => ({ queueReturnOf: async (_ws: unknown, _p: string, n: number) => returns.get(n) ?? null, returnIn: () => null, staleApprovalOf: async (_ws: unknown, _p: string, n: number) => stales.get(n) ?? null, staleIn: () => null }))
@@ -753,6 +754,37 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
     expect(st.told[0]).toContain(`#${a} is stalled: "B1 isn't running."`)
     await disposeWorkspaceService(w)
+  })
+
+  // HI-1975's start: told "HB5 isn't running" 83 ms after Start, while its slot took 15 s to get ready.
+  it("an agent whose start is under way (its slot being prepared) is starting, not stalled; a start that fails stalls it with why (HI-1976)", async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a] = await newCards(w, 'b1', 1)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    await watchAll(w, home, st)
+    await watches.evaluateWatches(w)
+    await watches.settled()
+    expect(st.typed).toEqual([])
+    const liveFor = sessions.liveFor.bind(sessions)
+    Object.assign(sessions, { liveFor: (p: string, id: string) => (id === 'b1' ? null : liveFor(p, id)) })
+    try {
+      // B1 not running yet, its Start's hold on: a slow start (its slot prepared for minutes) raises no stall.
+      startBegun(alpha, 'b1', `#${a}`, { fresh: true })
+      await watches.evaluateWatches(w)
+      await watches.settled()
+      expect(st.told).toEqual([])
+      expect(st.typed).toEqual([])
+      // Its start fails: stalled, with the failure rather than "isn't running".
+      startEnded(alpha, 'b1', `#${a}`, { failed: "Hive couldn't get slot-g ready: git worktree add failed" })
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+      expect(st.told[0]).toContain(`#${a} is stalled: "B1's start failed: Hive couldn't get slot-g ready: git worktree add failed"`)
+    } finally {
+      Object.assign(sessions, { liveFor })
+      resetAgentStartsForTests()
+      await disposeWorkspaceService(w)
+    }
   })
 
   it('a review started with no verdict, its reviewer only watching the card, wakes it once it has watched for the limit (#843)', async () => {
