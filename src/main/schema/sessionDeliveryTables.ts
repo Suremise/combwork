@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
 import { deliveryFromRow, deliveryToRow, keptUsageFromRow, keptUsageToRow, rowText, sessionFromRows, sessionToRows, type Row } from './sessionDeliveryCodec'
-import { V1_0_STEPS } from './v1_0'
+import { QUERIES, V1_0_STEPS } from './v1_0'
 
 /**
  * Sessions' and deliveries' typed tables (#1211, v1_0.ts's "sessions and deliveries in tables"): a host's records read
@@ -56,6 +56,58 @@ export function readSessionRecord(db: Db, host: string, id: string): Rec | null 
   const row = db.prepare('SELECT * FROM sessions WHERE host = ? AND id = ?').get(host, id) as Rec | undefined // i18n-ignore: SQL
   if (!row) return null
   return sessionFromRows(row, db.prepare('SELECT * FROM session_cards WHERE host = ? AND session = ? ORDER BY ord').all(host, id) as Rec[]) // i18n-ignore: SQL
+}
+
+/**
+ * These records of a host by their ids (their keys), in the order given (`saved`: in the host's, as readSessionRecords
+ * gives them); an id with no record is left out.
+ */
+function readSessionRecordsByIds(db: Db, host: string, ids: string[], o: { saved?: boolean } = {}): Rec[] {
+  if (!ids.length) return []
+  const list = JSON.stringify(ids)
+  const rows = new Map((db.prepare(QUERIES['sessions.byIds'].sql).all(host, list) as Rec[]).map((r) => [r.id as string, r]))
+  const cards = new Map<string, Rec[]>()
+  for (const c of db.prepare(QUERIES['sessions.cardsOf'].sql).all(host, list) as Rec[]) {
+    const of = cards.get(c.session as string) ?? []
+    of.push(c)
+    cards.set(c.session as string, of)
+  }
+  const found = ids.map((id) => rows.get(id)).filter((r): r is Rec => !!r)
+  if (o.saved) found.sort((a, b) => (a.ord as number) - (b.ord as number) || (String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0))
+  return found.map((r) => sessionFromRows(r, cards.get(r.id as string) ?? []))
+}
+
+/**
+ * `fn`'s reads on one snapshot (inside a transaction already open, that one's): which records an index names, and those
+ * records with their cards, are of the same commit (HR5's HI-1236 round 1: another connection committing between them).
+ */
+function onOneSnapshot<T>(db: Db, fn: () => T): T {
+  if (db.isTransaction) return fn()
+  db.exec('BEGIN')
+  try {
+    const out = fn()
+    db.exec('COMMIT')
+    return out
+  } catch (e) {
+    if (db.isTransaction) db.exec('ROLLBACK')
+    throw e
+  }
+}
+
+/**
+ * An agent's records of a host, most recently active first, those active at the same time in the host's order (as a
+ * stable sort of readSessionRecords' would give them). HI-1236: by `sessions_agent`, no other record read.
+ */
+export function readAgentSessionRecords(db: Db, host: string, agentId: string): Rec[] {
+  return onOneSnapshot(db, () => readSessionRecordsByIds(db, host, (db.prepare(QUERIES['sessions.byAgent'].sql).all(host, agentId) as { id: string }[]).map((r) => r.id)))
+}
+
+/** The records of a host that worked on a card (its `cards`), in the host's order (HI-1236: by `session_cards_card`). */
+export function readCardSessionRecords(db: Db, host: string, card: number): Rec[] {
+  return onOneSnapshot(db, () => {
+    const ids = [...new Set((db.prepare(QUERIES['sessions.byCard'].sql).all(card, host) as { session: string }[]).map((r) => r.session))]
+    return readSessionRecordsByIds(db, host, ids, { saved: true })
+  })
 }
 
 export const readDeleted = (db: Db, host: string): string[] => (db.prepare('SELECT id FROM sessions_deleted WHERE host = ? ORDER BY ord, id').all(host) as { id: string }[]).map((r) => r.id) // i18n-ignore: SQL
