@@ -1491,6 +1491,10 @@
     "defaultMessage": "none known",
     "description": "A stall's Step or During it cell in the Performance page's Main process stalls table when Hive knows of none. Lower case."
   },
+  "performance.stalls.repeated": {
+    "defaultMessage": "×{n, number} · {length}",
+    "description": "After a work's name in a stall's During it or Step cell when there were several of it: how many ({n}) and their length in all ({length}: \"81 ms\", or \"1.5 s, still running\")."
+  },
   "performance.stalls.running": {
     "defaultMessage": "{length}, still running",
     "description": "A work's length in a stall's During it or Step cell, while it was still under way when the stall was recorded ({length}: \"1.5 s\")."

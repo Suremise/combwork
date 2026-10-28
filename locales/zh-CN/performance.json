@@ -372,6 +372,7 @@
   "performance.stalls.more": "还有 {n, number} 项",
   "performance.stalls.ms": "{ms, number} 毫秒",
   "performance.stalls.none": "无已知",
+  "performance.stalls.repeated": "×{n, number} · {length}",
   "performance.stalls.running": "{length}，仍在运行",
   "performance.stalls.seconds": "{s} 秒",
   "performance.stalls.since": "自 Hive 启动以来",

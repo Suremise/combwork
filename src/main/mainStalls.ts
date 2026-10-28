@@ -81,16 +81,29 @@ export function workDuring(from: number, to: number, max = NAMED, held: Work[] =
 
 /**
  * A stall as the Performance view keeps it (HI-1135), its work found as the warning finds it, copied now (labels made,
- * times fixed), so later changes to the work can't change it: the synchronous steps apart from the other work, at most
- * NAMED each, with how many more.
+ * times fixed), so later changes to the work can't change it: the synchronous steps apart from the other work, each
+ * label once with its count and total time, the longest total first (the Assistant's review: a burst of one call
+ * crowded out the rest), at most NAMED each, with how many works the rest had.
  */
 export function stallOf(from: number, to: number, ms: number, cpuMs: number | null, held: Work[] = []): Omit<MainStall, 'at'> {
   const now = stallClock.mono()
   const found = overlapping(from, to, held)
-  const shown = (ws: Work[]): MainStallWork[] => ws.slice(0, NAMED).map((w) => ({ label: labelOf(w), ms: Math.round((w.end ?? now) - w.start), running: w.end === null }))
-  const steps = found.filter((w) => w.step)
-  const work = found.filter((w) => !w.step)
-  return { ms, cpuMs, steps: shown(steps), stepsMore: Math.max(0, steps.length - NAMED), work: shown(work), workMore: Math.max(0, work.length - NAMED) }
+  const grouped = (ws: Work[]): { list: MainStallWork[]; more: number } => {
+    const by = new Map<string, MainStallWork>()
+    for (const w of ws) {
+      const label = labelOf(w)
+      const g = by.get(label) ?? { label, count: 0, ms: 0, running: false }
+      g.count++
+      g.ms += (w.end ?? now) - w.start
+      g.running ||= w.end === null
+      by.set(label, g)
+    }
+    const all = [...by.values()].map((g) => ({ ...g, ms: Math.round(g.ms) })).sort((a, b) => b.ms - a.ms || b.count - a.count)
+    return { list: all.slice(0, NAMED), more: all.slice(NAMED).reduce((n, g) => n + g.count, 0) }
+  }
+  const steps = grouped(found.filter((w) => w.step))
+  const work = grouped(found.filter((w) => !w.step))
+  return { ms, cpuMs, steps: steps.list, stepsMore: steps.more, work: work.list, workMore: work.more }
 }
 
 /** The stalls kept since Hive started (HI-1135): the last MAIN_STALLS_KEPT, and how many in all. */

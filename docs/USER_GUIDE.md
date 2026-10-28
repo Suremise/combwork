@@ -685,6 +685,8 @@ Every pane's typing goes through Hive's main process, so when it is busy for mor
 - **Step**: the database or file step that held the main process, where Hive knows one;
 - **During it**: what else was under way, such as a window's call (`ipc …`), an Agent API request (`api …`) or a hook (`hook …`), with how long each took. Some of these may only have waited behind the stall rather than caused it.
 
+In **Step** and **During it**, work that happened several times shows once, with how many times and how long in all (`db transaction … ×52 · 81 ms`), the longest first.
+
 The names are Hive's own for its work, never your text. Hive's log (**Help → Open Logs Folder**, `hive.log`) notes the same stalls, at most one line a minute. If Hive feels slow, a screenshot of this table with **Help → Copy Diagnostics…** helps find why.
 
 ### Cost per card <a id="cost-per-card"></a>

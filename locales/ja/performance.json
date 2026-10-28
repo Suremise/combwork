@@ -372,6 +372,7 @@
   "performance.stalls.more": "ほか{n, number}件",
   "performance.stalls.ms": "{ms, number} ms",
   "performance.stalls.none": "把握なし",
+  "performance.stalls.repeated": "×{n, number} · {length}",
   "performance.stalls.running": "{length}、実行中",
   "performance.stalls.seconds": "{s}秒",
   "performance.stalls.since": "Hiveの起動以降",

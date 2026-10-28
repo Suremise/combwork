@@ -374,6 +374,7 @@ interface HiveMessageValues {
   'performance.stalls.more': { n: number }
   'performance.stalls.ms': { ms: number }
   'performance.stalls.none': undefined
+  'performance.stalls.repeated': { n: number; length: string | number }
   'performance.stalls.running': { length: string | number }
   'performance.stalls.seconds': { s: string | number }
   'performance.stalls.since': undefined

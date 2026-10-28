@@ -264,15 +264,46 @@ describe("the Performance view's stalls (HI-1135)", () => {
     const { stall, end } = s.recorded[0]
     expect(end).toBe(now)
     expect(stall).toMatchObject({ ms: 900, cpuMs: 40, stepsMore: 0, workMore: 0 })
-    expect(stall.steps).toEqual([{ label: 'db commit hive.db', ms: 900, running: false }])
-    expect(stall.work).toEqual(expect.arrayContaining([{ label: 'ipc tasks:list', ms: 900, running: false }, { label: 'api POST /v1/tasks', ms: 900, running: true }]))
+    expect(stall.steps).toEqual([{ label: 'db commit hive.db', count: 1, ms: 900, running: false }])
+    expect(stall.work).toEqual(expect.arrayContaining([{ label: 'ipc tasks:list', count: 1, ms: 900, running: false }, { label: 'api POST /v1/tasks', count: 1, ms: 900, running: true }]))
     // Copied as it was: a label made later, or the work ending later, doesn't change it.
     route = 'api POST /v1/changed'
     now += 5000
     request()
-    expect(stall.work.find((w) => w.label.startsWith('api'))).toEqual({ label: 'api POST /v1/tasks', ms: 900, running: true })
+    expect(stall.work.find((w) => w.label.startsWith('api'))).toEqual({ label: 'api POST /v1/tasks', count: 1, ms: 900, running: true })
     // As the log says it, the same CPU.
     expect(s.warnings[0]).toMatch(/^The main process was busy for 900 ms \(main thread CPU 40 ms\)/)
+  })
+
+  it("lists each label once with its count and total, the longest total first, and counts the works of those left out (the Assistant's review)", () => {
+    const s = watcher()
+    s.tick()
+    // A burst of one call, short each (a stall needs some overlap), beside one long call and six other labels.
+    for (let i = 0; i < 4; i++) ran('ipc performance:stalls', 1)
+    const long = beginWork('ipc queue:list')
+    for (let i = 0; i < 6; i++) ran(`ipc other-${i}`, 10 + i)
+    s.stall(1500, 1500)
+    long()
+    s.settle()
+    const { work, workMore } = s.recorded[0].stall
+    expect(work).toHaveLength(5)
+    expect(work[0]).toMatchObject({ label: 'ipc queue:list', count: 1 })
+    expect(new Set(work.map((w) => w.label)).size).toBe(5)
+    // Shown longest first; the four 0 ms calls are one label, its four works counted among the more.
+    expect(work.map((w) => w.ms)).toEqual([...work.map((w) => w.ms)].sort((a, b) => b - a))
+    expect(work.some((w) => w.label === 'ipc performance:stalls')).toBe(false)
+    expect(workMore).toBe(4 + 2)
+    // Ranked by total: four of them at 30 ms each outrank one at 100 ms.
+    const t = watcher()
+    t.tick()
+    noteStep('db transaction a database', now - 100)
+    for (let i = 0; i < 4; i++) noteStep('db open hive.db', now - 30)
+    t.stall(900, 0)
+    t.settle()
+    expect(t.recorded[0].stall.steps).toEqual([
+      { label: 'db open hive.db', count: 4, ms: 120, running: false },
+      { label: 'db transaction a database', count: 1, ms: 100, running: false }
+    ])
   })
 
   it("keeps every stall in the log's quiet minute, which the log leaves out", () => {

@@ -372,6 +372,7 @@
   "performance.stalls.more": "et {n, number} de plus",
   "performance.stalls.ms": "{ms, number} ms",
   "performance.stalls.none": "aucune connue",
+  "performance.stalls.repeated": "×{n, number} · {length}",
   "performance.stalls.running": "{length}, encore en cours",
   "performance.stalls.seconds": "{s} s",
   "performance.stalls.since": "depuis le démarrage de Hive",

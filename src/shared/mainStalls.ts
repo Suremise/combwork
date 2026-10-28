@@ -4,11 +4,14 @@
  * the work (a channel, a route template, a hook's event, a step and its file's own name), never the user's text.
  */
 
-/** Work under way during a stall, as it was when the stall was recorded. */
+/** Work under way during a stall, as it was when the stall was recorded: each label once, with how many there were. */
 export interface MainStallWork {
   label: string
-  /** How long it took (the whole work, as hive.log's line says it, not only its overlap with the stall); so far, while running. */
+  /** How many works had this label (the Assistant's review: one line each, not one per call). */
+  count: number
+  /** How long they took in all (each the whole work, as hive.log's line says it, not only its overlap with the stall); so far, while running. */
   ms: number
+  /** Whether one of them was still running. */
   running: boolean
 }
 
@@ -20,6 +23,7 @@ export interface MainStall {
   cpuMs: number | null
   /** The synchronous steps that held the thread (HI-1692): the stronger evidence of a cause. */
   steps: MainStallWork[]
+  /** How many works the labels not listed had. */
   stepsMore: number
   /** The other work it overlapped (IPC calls, Agent API requests, hooks): context, which may only have waited behind it. */
   work: MainStallWork[]

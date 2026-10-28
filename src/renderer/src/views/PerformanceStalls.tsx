@@ -36,6 +36,7 @@ const M = {
   ms: msg({ id: 'performance.stalls.ms', defaultMessage: '{ms, number} ms', description: 'A length in milliseconds ("750 ms") in the Performance page\'s Main process stalls table.' }),
   seconds: msg({ id: 'performance.stalls.seconds', defaultMessage: '{s} s', description: 'A length in seconds ("1.5 s", the number already formatted) in the Performance page\'s Main process stalls table.' }),
   running: msg({ id: 'performance.stalls.running', defaultMessage: '{length}, still running', description: "A work's length in a stall's During it or Step cell, while it was still under way when the stall was recorded ({length}: \"1.5 s\")." }),
+  repeated: msg({ id: 'performance.stalls.repeated', defaultMessage: '×{n, number} · {length}', description: "After a work's name in a stall's During it or Step cell when there were several of it: how many ({n}) and their length in all ({length}: \"81 ms\", or \"1.5 s, still running\")." }),
   count: msg({ id: 'performance.stalls.count', defaultMessage: '{total, plural, one {# stall since Hive started} other {# stalls since Hive started}}{listed, select, all {} other {; the last {kept, number} are listed}}.', description: "Under the Performance page's Main process stalls table: how many stalls there were since Hive started, and that only the last {kept} are listed when there were more. {listed} is a key (all or some): don't translate the keys, only the texts." }),
   empty: msg({ id: 'performance.stalls.empty', defaultMessage: 'No stalls since Hive started.', description: "The Performance page's Main process stalls table when there were none." }),
   loadTarget: msg({ id: 'performance.stalls.loadTarget', defaultMessage: "the main process's stalls", description: 'What could not be read on the Performance page: shown in "Could not load {what}: {error}".' })
@@ -44,14 +45,20 @@ const M = {
 /** A length as the table shows it: milliseconds under a second, else seconds to one decimal. */
 const length = (ms: number): string => (ms < 1000 ? tr(M.ms, { ms }) : tr(M.seconds, { s: fmt.figure(ms / 1000, 1) }))
 
-/** A cell's work, a line each (its fixed name as Hive gives it, and its length), and how many more. */
+/** A work's length, and how many there were when more than one ("×52 · 81 ms"). */
+const workLength = (w: MainStallWork): string => {
+  const shown = w.running ? tr(M.running, { length: length(w.ms) }) : length(w.ms)
+  return w.count > 1 ? tr(M.repeated, { n: w.count, length: shown }) : shown
+}
+
+/** A cell's work, a line per label (its fixed name as Hive gives it, how many, and their length), and how many more. */
 function WorkLines({ list, more }: { list: MainStallWork[]; more: number }) {
   if (!list.length) return <span className="faint">{tr(M.none)}</span>
   return (
     <span className="perf-stall-work">
-      {list.map((w, i) => (
-        <span key={i} className="perf-stall-item">
-          <code>{w.label}</code> <span className="faint">{w.running ? tr(M.running, { length: length(w.ms) }) : length(w.ms)}</span>
+      {list.map((w) => (
+        <span key={w.label} className="perf-stall-item">
+          <code>{w.label}</code> <span className="faint">{workLength(w)}</span>
         </span>
       ))}
       {more > 0 && <span className="faint">{tr(M.more, { n: more })}</span>}
