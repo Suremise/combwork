@@ -718,13 +718,19 @@ const pendingLive = new Map<string, LiveSessionState>()
  */
 const pendingWith: ((s: State) => Partial<State>)[] = []
 let liveTimer: ReturnType<typeof setTimeout> | null = null
+/**
+ * The parts set with setLoaded (HI-1938): a direct set of one shows the changes waiting first, so an older answer
+ * waiting never replaces what was set after it.
+ */
+const LOADED = new Set<string>(['lanes', 'laneOrder', 'mergeSlots', 'assistantActions', 'assistantQuestions', 'assistantChanges', 'queues', 'queueKept', 'advanced', 'recent', 'openProgress', 'skillsVersion', 'modesVersion'] satisfies (keyof State)[])
 
 /** Sets the store, noting which of its parts changed (HI-1775): a long task's line in hive.log names the updates made in it. */
 export const set: typeof useStore.setState = ((partial: Parameters<typeof useStore.setState>[0], replace?: boolean) => {
   let before = useStore.getState()
   let update = typeof partial === 'function' ? partial(before) : partial
-  // A workspace set (main's newer report, a change made here): the agents' states waiting are older, so shown first.
-  if ((pendingLive.size || pendingWith.length) && update && 'workspace' in update) {
+  // A workspace set (main's newer report, a change made here): the agents' states waiting are older, so shown first;
+  // likewise the loaded parts waiting (setLoaded) before a direct set of one.
+  if ((pendingLive.size || pendingWith.length) && update && ('workspace' in update || Object.keys(update).some((k) => LOADED.has(k)))) {
     flushLiveStates()
     before = useStore.getState()
     if (typeof partial === 'function') update = partial(before)
@@ -1344,6 +1350,15 @@ export function applyLiveState(state: LiveSessionState): void {
 export function setWithLive(change: (s: State) => Partial<State>, withNext = false): void {
   pendingWith.push(change)
   if (!withNext) showSoon()
+}
+
+/**
+ * Sets a part of the workspace main sent (a load's answer, an event's): in the same batch as the agents' states (HI-1938),
+ * at once when none came lately, else at the batch's end. Opening a workspace loads a dozen parts, each answering on its
+ * own: shown together, not one render each. Only for the parts in LOADED (a direct set of one shows the batch first).
+ */
+export function setLoaded(change: Partial<State> | ((s: State) => Partial<State>)): void {
+  setWithLive(typeof change === 'function' ? change : () => change)
 }
 
 /** Shows what waits now, unless a batch is under way: then at its end. */
