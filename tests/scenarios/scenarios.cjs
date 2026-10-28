@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 95
+const FIXTURES_VERSION = 96
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -250,14 +250,18 @@ async function trustSlot(c, status) {
   c.trustedSlot = true
 }
 /**
- * Card `key` of agent `who` ('coder' or 'implementer') in Review with a real submission (#1537): started, its work on
- * src/greet.js committed, and submitted as the user moves it, so a project's rules leave it there.
+ * Card `key` of agent `who` ('coder' or 'implementer') in Review with a real submission (#1537): started, its work
+ * committed (`card.files`, by default src/greet.js), and submitted as the user moves it, so a project's rules leave it
+ * there.
  */
 async function submittedCard(c, key, card, who = 'coder') {
-  const n = await c.card(key, { ...card, agent: who })
+  const { files = { 'src/greet.js': 'module.exports = (name) => `Hi, ${name}`\n' }, ...rest } = card
+  const n = await c.card(key, { ...rest, agent: who })
   await userMove(c, n, 'doing')
-  require('fs').mkdirSync(require('path').join(c.alpha, 'src'), { recursive: true })
-  c.write('src/greet.js', 'module.exports = (name) => `Hi, ${name}`\n')
+  for (const [rel, text] of Object.entries(files)) {
+    require('fs').mkdirSync(require('path').dirname(require('path').join(c.alpha, rel)), { recursive: true })
+    c.write(rel, text)
+  }
   c.git('add', '-A')
   c.git('-c', `user.name=${who}`, '-c', `user.email=${who}@example.com`, 'commit', '-qm', card.title)
   await userMove(c, n, 'review')
@@ -271,6 +275,10 @@ const worktreesOf = (c) => c.git('worktree', 'list', '--porcelain').split(/\r?\n
  * (#1219).
  */
 const isCard = (ref, n) => new RegExp(`^(#|[A-Za-z][A-Za-z0-9]*-)?${n}$`).test(String(ref ?? '').trim())
+/** Whether a call's list of cards names card `n`, each by number or key (HI-1950: a model names cards by key). */
+const namesCard = (refs, n) => Array.isArray(refs) && refs.some((r) => isCard(r, n))
+/** Whether a call's list of cards is exactly cards `ns`, in that order, each by number or key. */
+const namesCards = (refs, ns) => Array.isArray(refs) && refs.length === ns.length && ns.every((n, i) => isCard(refs[i], n))
 /**
  * The calls that could move card `n` (#1474): hive_update_task and hive_update_tasks with a column or an override, and
  * the intents that move a card.
@@ -826,9 +834,13 @@ module.exports.SCENARIOS = [
   {
     id: 'review-card',
     title: "Review a card: it stays in Review with the implementer; the reviewer's verdict ends the review",
-    files: { 'greet.js': "module.exports = (name) => 'Helo, ' + name\n" },
+    // A real submission (HI-1950): greet.js is the card's own commit, so the revision under review changes something; the
+    // project reviews (Pair), Implementer builds and Coder reviews, as inReview's.
     async setup(c) {
-      await c.card('b', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>".', column: 'review', agent: 'implementer', comments: ['Done: greet.js added.'] })
+      await pairInProject(c)
+      await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'reviewer' })
+      await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'builder' })
+      await submittedCard(c, 'b', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>".', files: { 'greet.js': "module.exports = (name) => 'Helo, ' + name\n" }, after: ['Done: greet.js added.'] }, 'implementer')
     },
     prompt: (c) => `Review card #${c.cards.b}.`,
     fake: (c) => `skill review-agent-work then ${fakeStartReview(c.cards.b)} then ${fakeVerdict(c.cards.b, false, 'Round 1: FAILED: 1 finding: greet() says Helo.\n\n1. greet.js returns "Helo, <name>": make it "Hello, <name>".')}`,
@@ -1642,7 +1654,8 @@ module.exports.SCENARIOS = [
     expect: (o) => [
       ['read the handover skill', read(o, 'handover'), o.skillsRead.join(',')],
       ['saved a handover', ran(o, 'hive_create_handover').length > 0 && o.notes.some((n) => /^handovers\/.+-alpha-/.test(n)), o.notes.join(',')],
-      ["didn't re-run the tests just to write it", !o.tools.some((t) => /npm(\.cmd)? (run )?test/.test(t.input))]
+      // Its shell commands only (HI-1950): a handover that says the tests passed names `npm test` without running it.
+      ["didn't re-run the tests just to write it", testRunsOf(o).length === 0, testRunsOf(o).map((r) => r.command).join(' | ')]
     ],
     fakeSkips: ['saved a handover']
   },
@@ -2260,7 +2273,7 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const h = history(o.cards.r)
       const asked = (o.cards.r?.comments ?? []).slice(1).some((x) => /commit/i.test(x.text))
-      const watches = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => Array.isArray(a.cards) && a.cards.includes(c.cards.r) && a.wake === true)
+      const watches = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(a.cards, c.cards.r) && a.wake === true)
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['gave no verdict (not failed on that alone)', !h.some((x) => /^Review (passed|failed)$/.test(x)), h.join(' | ')],
@@ -2291,7 +2304,7 @@ module.exports.SCENARIOS = [
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['registered the lane (hive_lane start)', starts.length >= 1, o.hiveCalls.map((x) => x.tool).join(',')],
-        ['the cards in order, its reviewer, the rounds and the wait', JSON.stringify(first.cards) === JSON.stringify([c.cards.a, c.cards.b]) && /implementer/i.test(String(first.reviewer ?? '')) && first.rounds === 10 && first.waitMinutes === 360, JSON.stringify(first)],
+        ['the cards in order, its reviewer, the rounds and the wait', namesCards(first.cards, [c.cards.a, c.cards.b]) &&/implementer/i.test(String(first.reviewer ?? '')) && first.rounds === 10 && first.waitMinutes === 360, JSON.stringify(first)],
         ["before its first card's review", !!startedAt && (!review || startedAt <= review.at), `${startedAt} / ${review?.at}`],
         ['one lane, not one a card', starts.length === 1, String(starts.length)],
         ['its first card to Review, the second not begun', o.cards.a?.column === 'review' && o.cards.b?.column === 'todo', `${o.cards.a?.column} / ${o.cards.b?.column}`],
@@ -2324,7 +2337,7 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       // Its lanes as saved (#1018: the workspace's database).
       const lane = require('../e2e/storeDocs.cjs').storeDocs(c.ws, 'lanes').find((l) => l.cards?.includes(c.cards.a))
-      const waits = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => a.cards?.includes(c.cards.a))
+      const waits = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(a.cards, c.cards.a))
       // Its watch for the verdict, its own or the one Hive arms at its submission (#1639): the lane's wait long.
       const minutes = o.watch ? Math.round((Date.parse(o.watch.limitAt) - Date.parse(o.watch.since)) / 60000) : null
       return [
@@ -2393,7 +2406,7 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const lanes = ran(o, 'hive_lane').map((x) => argsOf(x))
       const joins = lanes.filter((a) => a.action === 'join')
-      const arrivals = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => Array.isArray(a.cards) && a.cards.includes(c.cards.a) && a.column === 'review')
+      const arrivals = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(a.cards, c.cards.a) && a.column === 'review')
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ["joined the builder's lane by its name", joins.length >= 1 && /implementer/i.test(String(joins[0].builder ?? '')), JSON.stringify(lanes)],
@@ -2418,7 +2431,7 @@ module.exports.SCENARIOS = [
     fake: (c) => `skill card-loop hive hive_wait_for_tasks {"cards":[${c.cards.b}],"column":"review","wake":true} then ${fakeStartReview(c.cards.b)} then ${fakeVerdict(c.cards.b, true)}`,
     expect: (o, c) => {
       // Its waits for #b to arrive in Review (cards [b], no changes): one answered Already, none repeated.
-      const arrivals = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => Array.isArray(a.cards) && a.cards.includes(c.cards.b) && a.column === 'review' && !a.changes && !a.cancel)
+      const arrivals = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(a.cards, c.cards.b) && a.column === 'review' && !a.changes && !a.cancel)
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['reviewed the card already in Review', history(o.cards.b).includes('Started reviewing') && history(o.cards.b).some((h) => /^Review (passed|failed)$/.test(h)), history(o.cards.b).join(' | ')],

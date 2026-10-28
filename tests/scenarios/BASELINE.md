@@ -36,6 +36,25 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## Three checks that failed a model doing it right (HI-1950): the fake Claude Code, fixtures v96, 28 October 2026
+
+HI-686's Claude Code trials (`results/2026-10-28T10-28-14-claude-code`, CLI 2.1.312, its default model) failed three
+scenarios where the agent did the right thing; the fakes passed them, as they only do what the checks expect:
+- **card-loop-lane**: the agent named its lane's cards by key (`["AL-1","AL-2"]`), the form the tools ask for (HI-1661),
+  and the check compared numbers. `namesCards` and `namesCard` accept each card's number or key, in order: used there and
+  in the other checks of an agent's own card lists (card-loop-uncommitted, card-loop-lane-defaults and -override,
+  card-loop-lane-join, card-loop-already-in-review).
+- **wrap-up**: the agent ran no tests, but the check matched `npm test` in its handover's own text. It now counts only
+  test runs among the shell commands (`testRunsOf`), as the review scenarios do.
+- **review-card**: the card was put in Review with `greet.js` in the initial commit, so its submission changed nothing and
+  the reviewer rightly asked for a commit rather than giving a verdict. It now has a real submission (`submittedCard`
+  with the card's own files, in a project that reviews: Pair, Implementer building, Coder reviewing).
+
+The fake Claude Code passes all nine scenarios these changes touch (`results/2026-10-28T11-21-57-fake`, with
+coordinator-start-reviewer, whose `submittedCard` now takes the files). Fifteen other setups still put a card straight in
+Review with its work in the initial commit; none has failed a real run yet, and a scenario whose review needs a
+submitted change should use `submittedCard`.
+
 ## Reading the owning skill, recorded (#1611): the three fakes, fixtures v91, 25 October 2026
 
 Claude Code's #1537 trial relayed the user's answer to a watching reviewer correctly without reading coordinate-agents.
