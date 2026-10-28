@@ -3,6 +3,10 @@
 interface HiveMessageValues {
   'activity.agents': { n: number }
   'activity.all': undefined
+  'activity.block.asked': { other: string; file: string | number; holder: string | number }
+  'activity.block.blocked': { other: string; file: string | number; holder: string | number }
+  'activity.block.for': { time: string | number }
+  'activity.block.tip': undefined
   'activity.cards': { n: number }
   'activity.cardsLabel': undefined
   'activity.closeDetails': undefined

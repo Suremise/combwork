@@ -1013,6 +1013,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'session:clearUsageCache': () => sessions.forgetUsageCache(),
     'session:adopt': (p, id) => sessions.adopt(p, id),
     'session:usage': (p, id) => sessions.usage(workspace.assertSessionHost(p), id),
+    'session:hooks': (p, agentId) => sessions.sessionHooks(workspace.assertSessionHost(p), agentId),
     'session:markSeen': (p, ids) => sessions.markSeen(p, ids),
     'session:live': () => sessions.liveStates(),
     'session:setMode': (p, agentId, mode) => sessions.setPermissionMode(p, agentId, mode),
@@ -1154,7 +1155,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'transcript:tool': (p, id, itemId) => transcripts.tool(p, id, itemId),
     'activity:now': async (p) => {
       p = workspace.assertProject(p)
-      return { launches: await projectLaunches(p), tasks: sessions.backgroundTasks(p) }
+      return { launches: await projectLaunches(p), tasks: sessions.backgroundTasks(p), blocks: sessions.hookBlocks(p) }
     },
     'activity:turns': (p, id, known) => transcripts.turns(p, id, known),
     'activity:sessions': (p, hours) => sessions.activitySessions(workspace.assertProject(p), Math.max(1, Math.min(24 * 7, Number(hours) || 24))),

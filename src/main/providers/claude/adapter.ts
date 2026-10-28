@@ -13,10 +13,12 @@ import { config } from '../../config'
 import { claudeFileAllowed, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
-import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
+import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
-import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
+import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
 import { autoCompactOf, effectiveEnv, settingsScopes } from './autoCompact'
+import { claudeScopeHooks, rowsOfHooksTable } from '../../hookListing'
+import type { HookListing } from '../../../shared/hooks'
 import { connectionsManaged } from '../../connectionSeam'
 import { hiveStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
 import { MEMORY_ENV_OVERRIDES, connectionMemoryDir, memoryBase } from './memoryDir'
@@ -529,6 +531,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const env = effectiveEnv(ctx.env, scopes).env
     const named = MEMORY_ENV_OVERRIDES.some((v) => env[v]) || (env.CLAUDE_CONFIG_DIR ?? '') !== (home ?? '') || scopes.some((s) => s.unsure !== undefined || (s.json && typeof s.json === 'object' && (s.json as Record<string, unknown>)[field] != null))
     const memoryDir = home && !named && advanced.get<boolean>('claude-code.memory.realPath') ? await connectionMemoryDir(home, () => memoryBase(ctx.cwd)) : null
+    // What Hive passed, for the agent's Hooks dialog (HI-982: launchHooks).
+    keepBounded(this.hooksByRun, ctx.runId, hooks)
     // The user's --settings merged in: Hive passes only this file (#330).
     const settings = mergeLaunchSettings({ hooks, statusLine }, theirs, { url: ctx.hookUrl, envVar: 'HIVE_HOOK_TOKEN' })
     if (memoryDir) settings[field] = memoryDir
@@ -608,6 +612,40 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     if (obj(scopes[0]?.json)?.allowManagedHooksOnly === true) return scopes[0].label
     const deciding = scopes.find((s) => typeof obj(s.json)?.disableAllHooks === 'boolean')
     return deciding && obj(deciding.json)!.disableAllHooks === true ? deciding.label : null
+  }
+
+  /** Hive's hooks as each launch's prepareLaunch built them (HI-982), until launchHooks takes them. */
+  private hooksByRun = new Map<string, Record<string, unknown[]>>()
+
+  /**
+   * The launch's hooks (HI-982): Hive's as passed (off where a setting turns hooks off: hooksOffIn), then each settings
+   * scope's as read now, at launch: configured, their loading unverified, since Claude Code doesn't say which it loaded.
+   * Listed again, the rows stay the launch's, with each file whose hooks changed since then said to have changed.
+   */
+  launchHooks(ctx: LaunchContext): LaunchHooks {
+    const passed = this.hooksByRun.get(ctx.runId) ?? {}
+    this.hooksByRun.delete(ctx.runId)
+    const secrets = [ctx.hookAuthFile, ctx.env.HIVE_HOOK_TOKEN ?? '']
+    const off = this.hooksOffIn(ctx)
+    const hive = rowsOfHooksTable(passed, { source: 'hive', status: off ? 'disabled' : 'passed', ...(off ? { why: off } : {}), observed: true }, secrets)
+    const read = (): ReturnType<typeof settingsScopes> => settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
+    // What of a scope decides its hooks: their table and the switches that turn them off.
+    const print = (json: unknown): string => {
+      const o = json && typeof json === 'object' ? (json as Record<string, unknown>) : {}
+      return JSON.stringify([o.hooks ?? null, o.disableAllHooks ?? null, o.allowManagedHooksOnly ?? null])
+    }
+    const first = read()
+    const atLaunch = new Map(first.map((s) => [s.file ?? s.label, print(s.json)]))
+    const own = claudeScopeHooks(first, secrets)
+    const listing: HookListing = { basis: 'launch', rows: [...hive.rows, ...own.rows], notes: own.notes }
+    return {
+      listing,
+      receivers: Object.fromEntries(hive.rows.map((r) => [r.event, r.type])),
+      now: async () => {
+        const changed = read().filter((s) => s.file && atLaunch.get(s.file) !== print(s.json))
+        return { ...listing, notes: [...listing.notes, ...changed.map((s) => ({ kind: 'changed' as const, file: s.file! }))] }
+      }
+    }
   }
 
   backgroundTasks(appended: string, memo: Record<string, unknown>): BackgroundTaskEvent[] {

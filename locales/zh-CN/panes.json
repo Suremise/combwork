@@ -98,6 +98,7 @@
   "panes.menu.compact": "压缩…",
   "panes.menu.discard": "丢弃工作树和分支…",
   "panes.menu.handOver": "交接给…",
+  "panes.menu.hooks": "钩子…",
   "panes.menu.moveDown": "下移",
   "panes.menu.moveLeft": "左移",
   "panes.menu.moveRight": "右移",

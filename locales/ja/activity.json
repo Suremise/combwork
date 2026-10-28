@@ -1,6 +1,10 @@
 {
   "activity.agents": "{n, plural, =0 {すべてのエージェント} other {#個のエージェント}}",
   "activity.all": "すべて",
+  "activity.block.asked": "{other, select, yes {編集は承認待ち：{file}は別のプロジェクトのエージェントがロック中} other {編集は承認待ち：{file}は{holder}がロック中}}",
+  "activity.block.blocked": "{other, select, yes {編集をブロック：{file}は別のプロジェクトのエージェントがロック中} other {編集をブロック：{file}は{holder}がロック中}}",
+  "activity.block.for": "Hiveのファイルロック · {time}",
+  "activity.block.tip": "ロックが続いている間表示されます。別のエージェントが作業を終えるか、エージェントが再試行するか別の作業に移るか、そのターンが終わると消えます。履歴はエージェントの⋯ → フック…にあります。",
   "activity.cards": "{n, plural, =0 {すべてのカード} other {#件のカード}}",
   "activity.cardsLabel": "カード",
   "activity.closeDetails": "詳細を閉じる",

@@ -7,6 +7,7 @@ import type { HiveEvent } from '@shared/types'
 import { call } from './api'
 import { playChime } from './chime'
 import { matchKeybinding, runCommand } from './commands'
+import { HooksDialog } from './components/HooksDialog'
 import { AboutDialog, AgentSetupDialog, DiagnosticsDialog, CommandPalette, CompactDialog, Dialogs, NotificationCenter, ProvidersBanner, QuitDialog, QuitPendingBanner, ShortcutsDialog, Toasts } from './components/Overlays'
 import { ConnectionsIntroBanner } from './components/ConnectionChoice'
 import { AddAgentDialog, AgentSettingsDialog, HandOverDialog, MergeDialog, TemplateAgentDialog } from './components/AgentDialogs'
@@ -536,6 +537,7 @@ export function App() {
       <CommandPalette />
       <QuitDialog />
       <CompactDialog />
+      <HooksDialog />
       <MoveRepairDialog />
       <SetAsideDialog />
       <BoardUpgradeAsk />

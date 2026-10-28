@@ -389,6 +389,21 @@ Hive only ever ends processes the agent's session started: never one you started
 - Click a row to see its details: its status, its input exactly (a prompt, a tool call's input, a command line, with secrets hidden as in Hive's log) and what it did last.
 - **Activity** in an agent's **⋯** menu opens that agent's tab. A card in **Doing** or **Review** has **Activity** in its dialog and its right-click menu: it opens on the agent working on it.
 - A process an agent's session started has **End Process…** in its details. It ends only that process, after you confirm, and only while it is still the one listed. The agent's own CLI isn't ended here: use **Stop**.
+- **Blocked edits** show under **Now** while they stand: *Edit blocked: app.ts is locked by HB3* when Hive's file lock stopped the agent editing a file another agent is editing (or *waiting for your OK* with **Ask me**). The row goes once the other agent finishes and releases the file, the agent tries again or does something else, or its turn ends. Its history is in the agent's **Hooks…** dialog.
+
+### An agent's hooks <a id="agent-hooks"></a>
+
+**Hooks…** in an agent's **⋯** menu (or **Agent Hooks…** in the command palette) shows the hooks its running session has and what Hive received from them. It's for finding out why an agent seems stuck or silent. Hive only shows hooks here: it never changes or turns off a hook, and never edits a coding agent's settings.
+
+- **What's loaded** lists each hook: its event (SessionStart, PreToolUse…), where it comes from (**Hive**, **User**, **Project**, **Managed settings**…, with its file on hover), what it runs (whole on hover, Hive's sign-in details left out) and how sure Hive is that it's loaded:
+  - **Passed by Hive**: Hive's own, given to this session when it started.
+  - For Codex, the list is Codex's own (asked when the dialog opens), with Codex's trust: **Trusted**, **Not trusted** or **Changed since trusted** (the last two don't run until you review them in Codex).
+  - For Claude Code, the list is its settings files as they were when the session started, **Configured · loading unverified** (Claude Code doesn't say which it loaded), or **Turned off** (`disableAllHooks`) or **Not loaded** (managed settings allowing only their own). A file changed since the session started is said so.
+  - For Copilot, only Hive's are listed: Copilot may load others Hive doesn't read.
+  - A file Hive couldn't read, or that isn't valid JSON, is said so: it never reads as "no hooks".
+  - Every hook that isn't Hive's is marked **Not observed by Hive**: Hive never sees when it runs.
+- **What fired** lists the last 50 hooks Hive received from the session, newest first, alike ones grouped (*34 × Stop*): when, the event and which of Hive's hooks it came through, **Hive's reply** (*Allowed*, *Blocked* with the reason, *Asked the user*, *Sent context*, *Error* and where) and what Hive **took it as** (*Applied*, or *Ignored* and why, such as a turn that is over). *Hive took* is Hive's own handling time, not how long any hook command ran. It's kept in memory only, and starts again when the session restarts.
+- **Refresh** reads it again. If the agent restarted since, the dialog says so rather than showing the old session as current.
 
 ### Reading past sessions <a id="reading-past-sessions"></a>
 

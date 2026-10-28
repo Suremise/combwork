@@ -1,6 +1,10 @@
 {
   "activity.agents": "{n, plural, =0 {Alle Agenten} one {# Agent} other {# Agenten}}",
   "activity.all": "Alle",
+  "activity.block.asked": "{other, select, yes {Änderung wartet auf deine Zustimmung: {file} ist von einem Agenten eines anderen Projekts gesperrt} other {Änderung wartet auf deine Zustimmung: {file} ist von {holder} gesperrt}}",
+  "activity.block.blocked": "{other, select, yes {Änderung blockiert: {file} ist von einem Agenten eines anderen Projekts gesperrt} other {Änderung blockiert: {file} ist von {holder} gesperrt}}",
+  "activity.block.for": "Hives Dateisperre · {time}",
+  "activity.block.tip": "Wird angezeigt, solange die Sperre besteht: Sie verschwindet, sobald der andere Agent fertig ist, der Agent es erneut versucht oder weitermacht oder sein Durchgang endet. Ihr Verlauf steht beim Agenten unter ⋯ → Hooks…",
   "activity.cards": "{n, plural, =0 {Alle Karten} one {# Karte} other {# Karten}}",
   "activity.cardsLabel": "Karten",
   "activity.closeDetails": "Details schließen",

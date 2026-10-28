@@ -29,6 +29,7 @@
   "shell.command.agent.add": "添加智能体",
   "shell.command.agent.addWith": "添加智能体…",
   "shell.command.agent.focusN": "聚焦智能体 {n}",
+  "shell.command.agent.hooks": "智能体钩子…",
   "shell.command.agent.menu": "智能体菜单…",
   "shell.command.agent.moveDown": "下移智能体",
   "shell.command.agent.moveLeft": "左移智能体",

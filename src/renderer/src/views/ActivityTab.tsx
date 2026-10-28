@@ -445,6 +445,16 @@ function PartView({ project, part: p, many, selected, onSelect, showOwn, onShowO
           </div>
         </div>
       )}
+      {p.blocks.map((b) => (
+        // A lock block standing now (HI-982): live only, gone once its decision ends; the Hooks dialog keeps the history.
+        <div key={b.key} className="activity-row act-waiting" data-block={b.kind} title={tr(M.blockTip)}>
+          <Icon name="lock" />
+          <div className="activity-row-text">
+            <div className="activity-row-title">{tr(b.kind === 'asked' ? M.blockAsked : M.blockBlocked, { file: b.file, holder: b.holder ?? '', other: b.holder === null ? 'yes' : 'no' })}</div>
+            <div className="activity-row-sub faint">{tr(M.blockFor, { time: ranFor(b.at) })}</div>
+          </div>
+        </div>
+      ))}
       {p.subagents.length > 0 && (
         <>
           <h3 className="activity-group" data-group="subagents">
@@ -676,6 +686,10 @@ const M = {
   showOwn: msg({ id: 'activity.showOwn', defaultMessage: '{n, plural, =0 {Show the agent’s own processes} one {Show the agent’s own process (#)} other {Show the agent’s own processes (#)}}', description: "A checkbox beside the Activity tab's Processes heading: also shows the agent's own processes (its CLI, the terminal hosting it, Hive's tool server for it), hidden by default. {n}: how many are hidden." }),
   thinking: msg({ id: 'activity.thinking', defaultMessage: 'Thinking…', description: 'In the Activity tab, what an agent is doing when it works with no tool call under way and nothing written yet in its turn.' }),
   writing: msg({ id: 'activity.writing', defaultMessage: 'Writing…', description: 'In the Activity tab, what an agent is doing when it works with no tool call under way, after it started writing its reply.' }),
+  blockBlocked: msg({ id: 'activity.block.blocked', defaultMessage: '{other, select, yes {Edit blocked: {file} is locked by an agent of another project} other {Edit blocked: {file} is locked by {holder}}}', description: "In the Activity tab, under Now: Hive's file lock blocked the agent's edit of a file another agent is editing, while that stands. {file} is the file's path; {holder} the agent editing it." }),
+  blockAsked: msg({ id: 'activity.block.asked', defaultMessage: '{other, select, yes {Edit waiting for your OK: {file} is locked by an agent of another project} other {Edit waiting for your OK: {file} is locked by {holder}}}', description: "In the Activity tab, under Now: Hive's file lock (Ask me) holds the agent's edit of a file another agent is editing until the user allows it. {file} is the file's path; {holder} the agent editing it." }),
+  blockFor: msg({ id: 'activity.block.for', defaultMessage: "Hive's file lock · {time}", description: 'The second line of a lock block in the Activity tab: what blocked the edit, and for how long it has stood ({time}, such as "2 min").' }),
+  blockTip: msg({ id: 'activity.block.tip', defaultMessage: "Shown while the lock stands: it goes once the other agent finishes, the agent tries again or moves on, or its turn ends. Its history is in the agent's ⋯ → Hooks…", description: 'Tooltip on a lock block in the Activity tab. ⋯ → Hooks… is the agent menu item: keep the arrow and the dots.' }),
   notRunning: msg({ id: 'activity.notRunning', defaultMessage: 'Not running', description: "In the Activity tab, under Now, for an agent that isn't running." }),
   role: msg({ id: 'activity.role', defaultMessage: '{role, select, builder {builder} other {reviewer}}', description: "Beside an agent's name in the Activity tab when a card's builder and reviewer are both shown: its role on the card. Lower case." }),
   promptFor: msg({ id: 'activity.promptFor', defaultMessage: 'Prompt · {time} ago', description: "The line under an agent's prompt in the Activity tab: when it was given, as a duration ({time}: \"4 min\")." }),

@@ -118,6 +118,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Also new
 
+- **See an agent's hooks.** **Hooks…** in an agent's ⋯ menu shows the hooks its session has (Hive's own, and yours and the project's, each saying how sure Hive is that it's loaded) and the last 50 hooks Hive received from it, with Hive's reply and whether Hive applied or ignored each one and why. Activity shows an edit Hive's file lock is blocking while it stands (*Edit blocked: app.ts is locked by HB3*). Read-only: Hive never changes a hook (HI-982).
 - **Multi-line prompts for Codex.** With **Send prompts as typed** on, Hive types each line break of a prompt into Codex as Alt+Enter, a key Codex takes as a new line, so the prompt arrives as written instead of on one line. That's the default with Codex 0.164.0, where it was tried; other versions get spaces unless you choose a key in **Settings → Advanced → Codex → Typed prompts: line breaks** (HI-1327).
 - **The Hive Assistant starts pool lanes too.** In a project whose reviewers are a shared pool, the Assistant can now start a lane reviewed by the pool, as **Start Lane** in the window can; it no longer asks you to start such lanes yourself (HI-1581).
 - **See why Hive felt slow.** The Performance page lists the main process's recent stalls under **Main process stalls**: when, how long, whether it was working or waiting, the database or file step that held it and what else was under way, the last 50 since Hive started (HI-1135).

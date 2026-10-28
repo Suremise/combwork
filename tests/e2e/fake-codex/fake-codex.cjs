@@ -135,6 +135,17 @@ if (args[0] === 'app-server') {
       else if (m.method === 'account/read') {
         const a = inConnection ? connectionAccount() : { email: 'fake@example.com', plan: 'plus' }
         process.stdout.write(JSON.stringify({ id: m.id, result: { account: a ? { type: 'chatgpt', email: a.email, planType: a.plan } : null, requiresOpenaiAuth: true, workspaceRouting: null } }) + '\n')
+      } else if (m.method === 'hooks/list' && process.env.CODEX_HOME && fs.existsSync(path.join(process.env.CODEX_HOME, 'fake-hooks-list.json'))) {
+        // A suite's hooks (HI-982: hooksview): those of fake-hooks-list.json, after the -c hooks.<event> it was given,
+        // listed as Codex 0.164 lists the session flags' (codexownhooks pins the fields), trusted.
+        const own = JSON.parse(fs.readFileSync(path.join(process.env.CODEX_HOME, 'fake-hooks-list.json'), 'utf8'))
+        const flags = []
+        for (let k = 1; k < args.length; k++) {
+          const c = args[k - 1] === '-c' && /^hooks\.([A-Za-z]+)=/.exec(args[k])
+          const command = c && /command\s*=\s*("(?:[^"\\]|\\.)*")/.exec(args[k])
+          if (command) flags.push({ key: `C:\\<session-flags>\\config.toml:${c[1].replace(/[A-Z]/g, (x, at) => (at ? '_' : '') + x.toLowerCase())}:0:0`, source: 'sessionFlags', command: JSON.parse(command[1]), trustStatus: 'trusted', currentHash: 'sha256:fake' })
+        }
+        process.stdout.write(JSON.stringify({ id: m.id, result: { data: [{ hooks: [...flags, ...own] }] } }) + '\n')
       } else if (m.id === 2) process.stdout.write(JSON.stringify({ id: 2, result: { data: [] } }) + '\n')
     }
   })

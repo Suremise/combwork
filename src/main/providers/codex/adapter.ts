@@ -22,7 +22,7 @@ import { plainHttpsJson } from '../../plainHttpsJson'
 import { findSecretWarnings } from '../../mcpSecrets'
 import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import { storePwshFirst, storePwshIssue } from './storePwsh'
-import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, TrustReading, TrustTarget, ExternalSession, KeySteps, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
+import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, TrustReading, TrustTarget, ExternalSession, KeySteps, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
 import { codexBackgroundMemo, codexBackgroundTasks, type CodexBackgroundMemo } from './background'
 import { codexSafeguards } from './safeguards'
 import { codexTranscriptTurns } from './turns'
@@ -34,6 +34,9 @@ import { permissionsMenuLabel, permissionsMenuNumber } from './permissionsMenu'
 import { strayCodexWarning } from './strayFolder'
 import { advanced } from '../../advanced'
 import { launchOverrides } from '../../advancedValues'
+import { codexListedHooks } from '../../hookListing'
+import type { HookListing, HookRow } from '../../../shared/hooks'
+import { withoutHiveAuth } from '../../../shared/hooks'
 
 const log = createLogger('codex')
 /** Rollouts stat'd at once while listing a folder's sessions (HI-1681). */
@@ -197,6 +200,22 @@ export function hookHash(label: string, matcher: string | undefined, command: st
   const id: Record<string, unknown> = { event_name: label, hooks: [{ type: 'command', command, timeout, async: false }] }
   if (matcher) id.matcher = matcher
   return 'sha256:' + createHash('sha256').update(JSON.stringify(sortDeep(id))).digest('hex')
+}
+
+/**
+ * The config overrides of a launch's arguments (`-c k=v`, `--config k=v`), for asking its app server what the launch has
+ * (HI-982): only those, since its other arguments (-s, -a, resume) aren't the app server's; without the developer
+ * instructions and MCP servers, which say nothing of hooks.
+ */
+export function hookQueryArgs(args: readonly string[]): string[] {
+  const out: string[] = []
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]
+    const v = a === '-c' || a === '--config' ? args[++i] : a.startsWith('--config=') ? a.slice('--config='.length) : null
+    if (typeof v !== 'string' || /^(developer_instructions\s*=|mcp_servers[.=])/.test(v)) continue
+    out.push('-c', v)
+  }
+  return out
 }
 
 /** -c overrides for Hive's hooks, with the trust records that let them run without a review prompt. */
@@ -970,10 +989,48 @@ export class CodexAdapter implements ProviderAdapter {
     args.push(...ctx.extraArgs)
     // After the user's own arguments, so it is the one Codex keeps: their own -c developer_instructions is already in it.
     if (developer !== null) args.push('-c', `developer_instructions=${toToml(developer)}`)
+    // Its config overrides, for asking Codex which hooks the launch has (HI-982: launchHooks).
+    keepBounded(this.configByRun, ctx.runId, hookQueryArgs(args))
     // Codex takes a first prompt as its last argument (after "resume <id>" too) and starts on it.
     if (ctx.initialPrompt) args.push(...taskArgs(executable, ctx.initialPrompt))
     const s = toSpawnable(executable, args)
     return { file: s.file, args: s.args, env: ctx.env }
+  }
+
+  /** Each launch's config overrides as buildCommand gave them (HI-982), until launchHooks takes them. */
+  private configByRun = new Map<string, string[]>()
+
+  /**
+   * The launch's hooks (HI-982): Hive's as passed (the -c hooks.<event> of hookOverrides), and every hook Codex itself
+   * lists for the launch, asked when the dialog opens (its app server's hooks/list, in the launch's environment and
+   * folder, with the launch's config overrides only: never its other arguments), each with Codex's trust. Hive's are
+   * those of the session flags running exactly Hive's command, with Codex's trust; Codex unable to say, they are as
+   * passed and the rest unknown.
+   */
+  launchHooks(ctx: LaunchContext): LaunchHooks {
+    const overrides = this.configByRun.get(ctx.runId) ?? []
+    this.configByRun.delete(ctx.runId)
+    const command = hookCommand(ctx.hookUrl, ctx.hookAuthFile)
+    const secrets = [ctx.hookAuthFile, ctx.env.HIVE_HOOK_TOKEN ?? '']
+    const hive: HookRow[] = HOOKS.map((h) => ({ event: h.event, source: 'hive', type: 'command', command: withoutHiveAuth(command, secrets), ...(h.matcher ? { matcher: h.matcher } : {}), status: 'passed', observed: true }))
+    const listing: HookListing = { basis: 'cli', rows: hive, notes: [] }
+    return {
+      listing,
+      receivers: Object.fromEntries(HOOKS.map((h) => [h.event, 'command'])),
+      now: async () => {
+        const answer = await appServerAnswer(ctx.executable, overrides, ctx.cwd, 'hooks/list', { cwds: [ctx.cwd] }, ctx.env, 20000)
+        if (!answer.ok) return { ...listing, notes: [{ kind: 'cliUnknown', why: answer.error.slice(0, 300) }] }
+        const all = ((answer.result as { data?: { hooks?: unknown[] }[] } | null)?.data ?? []).flatMap((e) => (Array.isArray(e?.hooks) ? e.hooks : []))
+        const got = codexListedHooks(all as never[], { command, flagsFile: SESSION_FLAGS }, secrets)
+        // Hive's as passed while Codex trusts them; else as Codex has them, or unknown where it doesn't list them (a later
+        // -c of the user's own for that event replaced Hive's).
+        const rows = hive.map((r): HookRow => {
+          const trust = got.hiveTrust.get(r.event) ?? 'unknown'
+          return { ...r, status: trust === 'trusted' ? 'passed' : trust }
+        })
+        return { basis: 'cli', rows: [...rows, ...got.rows], notes: got.more ? [{ kind: 'more', source: 'other', count: got.more }] : [] }
+      }
+    }
   }
 
   // -------------------------------------------------------------------------

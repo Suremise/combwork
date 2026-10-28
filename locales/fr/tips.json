@@ -5,6 +5,8 @@
   "tips.advancedSettings.title": "Corriger toi-même un changement de CLI",
   "tips.agentConsole.text": "Paramètres → Agent API → Permettre aux agents de lire la console de développement donne aux agents un outil en lecture seule qui montre les hooks et la ligne d’état de leur CLI à côté de ce que Hive en a compris, expurgés, pour qu’ils puissent déboguer ce que voit Hive.",
   "tips.agentConsole.title": "Montrer aux agents ce que leur CLI envoie",
+  "tips.agentHooks.text": "Hooks… dans le menu ⋯ d’un agent liste les hooks de sa session, les tiens aussi, et les derniers hooks reçus par Hive : ce que Hive a répondu, et s’il a appliqué ou ignoré chacun, et pourquoi.",
+  "tips.agentHooks.title": "Voir pourquoi les hooks d’un agent se sont tus",
   "tips.agentInSlot.text": "À côté du nom d’un agent sur son volet : dans slot-b pendant qu’il réalise une carte dans un emplacement (clique dessus pour Branches et dépôts distants), repris : hb2 dans l’emplacement repris pour lui, ancien dossier : hr4 pour l’ancien dossier d’un relecteur. Le survol du projet les liste dans une colonne Emplacement.",
   "tips.agentInSlot.title": "Voir où travaille chaque agent",
   "tips.agentLayouts.text": "Chaque agent a son propre volet : choisis une disposition à droite de la barre de la session, et fais glisser un volet par son en-tête pour les réorganiser. Les verrous de fichiers empêchent deux agents de modifier le même fichier.",

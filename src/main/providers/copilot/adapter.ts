@@ -12,7 +12,8 @@ import { config } from '../../config'
 import { writeJsonAtomic } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { AGENTS_SKILLS, agentsSkillCopyPath, compareVersions, exportSubtitleText, hookIds, promptArg, runsThroughCmd, syncAgentsSkills, toSpawnable, userMemoryLabel } from '../common'
-import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
+import { rowsOfHooksTable } from '../../hookListing'
+import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
 import { copilotEnv, copilotHome, noAutoUpdateArgs } from './home'
 import { launchOverrides } from '../../advancedValues'
 import { overrideId } from '../../../shared/advanced'
@@ -391,6 +392,17 @@ export class CopilotAdapter implements ProviderAdapter {
         break
     }
     return out
+  }
+
+  /**
+   * The launch's hooks (HI-982): Hive's, as its launch plugin passes them (copilotHooks). Copilot may load others too
+   * (the folder's, its own plugins'), which Hive doesn't read: said so, never listed as none.
+   */
+  launchHooks(ctx: LaunchContext): LaunchHooks {
+    const token = ctx.env.HIVE_HOOK_TOKEN ?? ''
+    const hive = rowsOfHooksTable(copilotHooks(ctx.hookUrl, token).hooks, { source: 'plugin', status: 'passed', observed: true }, [token])
+    const rows = hive.rows.map((r) => ({ ...r, source: 'hive' as const }))
+    return { listing: { basis: 'launch', rows, notes: [{ kind: 'othersUnread' }] }, receivers: Object.fromEntries(rows.map((r) => [r.event, r.type])) }
   }
 
   /** Claude Code's reply format, which Copilot honours for PascalCase PreToolUse (deny, and ask: its own dialog). */
