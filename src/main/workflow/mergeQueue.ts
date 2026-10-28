@@ -1259,7 +1259,10 @@ export class MergeQueue {
       await this.write(card, (w) => w.fact('FocusedPicked', { entry: entry.id, revision: entry.revision, result, paths: changePaths(changed), tests: p.tests }))
       // Needs combined by id (finding 4): a test that needs a real CLI or the packaged build only as the merge picks it has
       // no review to prove it (realProof = review, the user's decision), new or not.
-      const unproved = p.tests.filter((t) => reviewProved(t) && !approved.some((a) => a.id === t.id && reviewProved(a)))
+      // Each review-only need the merge's pick finds that the reviewed selection didn't have for that id (HR4's round 2
+      // finding 2: real → real and packaged is new too).
+      const had = (id: string): FocusedTest['needs'] => approved.find((a) => a.id === id)?.needs ?? []
+      const unproved = p.tests.filter((t) => t.needs.some((n) => (n === 'real' || n === 'packaged') && !had(t.id).includes(n)))
       if (unproved.length) return { kind: 'focused', focused: { why: 'newProof', tests: unproved.map((t) => t.id) } } // i18n-ignore: codes (a why, a check name), never shown as text
       tests = chosenTests({ ...choice, source: 'picked', picked: approved, added: p.tests })
     }

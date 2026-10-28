@@ -9,7 +9,7 @@ import { join } from 'path'
 import { tempDir } from '../tempDir'
 import { B1, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
-import { changedSince, chosenTests, choiceStands, parsePick, readResults, testsGiven, validTestId, type FocusedChoice } from '../../src/shared/workflow/focused'
+import { changedSince, chosenTests, choiceStands, parsePick, readResults, testsGiven, validTestId, type FocusedChoice, type FocusedNeed, type FocusedTest } from '../../src/shared/workflow/focused'
 import { parseRaw, pathChanges } from '../../src/main/workflow/focusedRun'
 import { queueChecks } from '../../src/main/workflow/queueChecks'
 import { isRefusal } from '../../src/main/workflow/runtime'
@@ -436,20 +436,54 @@ describe("HR4's round 1: what the merge takes as proof, decisions and results", 
     await vi.waitFor(() => expect(alive()).toBe(false), { timeout: 30_000 })
   })
 
-  it('8: a newer submission of the card ends the pick of the one before', async () => {
-    const p = steered()
-    const pid = join(tempDir('focused-pid-'), 'pid')
-    const go = join(tempDir('focused-go-'), 'go')
-    p.set({ pick: [], holdFor: go, pidTo: pid })
-    const e = team(p.command, runner().command)
-    const { card } = await built(e)
-    const first = e.wf.submit(card.key, B1, { summary: 'first' })
-    await vi.waitFor(() => expect(existsSync(pid)).toBe(true), { timeout: 30_000 })
-    p.set({ pick: [] })
-    const second = await e.wf.submit(card.key, B1, { summary: 'second' })
-    moved(second)
-    expect(isRefusal(await first)).toBe(true)
-    expect(e.wf.state(card).submissions).toHaveLength(1)
-    writeFileSync(go, 'go')
-  })
+  // HR4's round 2 finding 1: with the builder's own list too (none, empty, some), an ended submission is never recorded.
+  for (const tests of [undefined, [], [{ id: 'mine', needs: [] }]] as (FocusedTest[] | undefined)[]) {
+    it(`8: a newer submission of the card ends the one before, whose write is refused (tests: ${JSON.stringify(tests)})`, async () => {
+      const p = steered()
+      const pid = join(tempDir('focused-pid-'), 'pid')
+      const go = join(tempDir('focused-go-'), 'go')
+      p.set({ pick: [], holdFor: go, pidTo: pid })
+      const e = team(p.command, runner().command)
+      const { card } = await built(e)
+      const first = e.wf.submit(card.key, B1, { summary: 'OLD', ...(tests ? { tests: [...tests] } : {}) })
+      await vi.waitFor(() => expect(existsSync(pid)).toBe(true), { timeout: 30_000 })
+      p.set({ pick: [] })
+      moved(await e.wf.submit(card.key, B1, { summary: 'NEW', ...(tests ? { tests: [...tests] } : {}) }))
+      refusedBy(await first, 'submit.focusedChosen')
+      expect(e.wf.state(card).submissions.map((x) => x.summary)).toEqual(['NEW'])
+      writeFileSync(go, 'go')
+    })
+
+    it(`8: a submission whose workspace closed while it picked is refused (tests: ${JSON.stringify(tests)})`, async () => {
+      const life = new AbortController()
+      const p = steered()
+      const pid = join(tempDir('focused-pid-'), 'pid')
+      p.set({ pick: [], holdFor: join(tempDir('focused-never-'), 'go'), pidTo: pid })
+      env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], mergeChecks: [], okBefore: { mode: 'never', labels: [] }, focusedTests: true, commands: { 'focused.pick': p.command, 'focused.run': runner().command } }, { focused: { env: base, timeoutMs: () => 60_000, life: life.signal } })
+      const { card } = await built(env)
+      const submitting = env.wf.submit(card.key, B1, { summary: 'x', ...(tests ? { tests: [...tests] } : {}) })
+      await vi.waitFor(() => expect(existsSync(pid)).toBe(true), { timeout: 30_000 })
+      life.abort()
+      refusedBy(await submitting, 'submit.focusedChosen')
+      expect(env.wf.state(card).submissions).toEqual([])
+    })
+  }
+
+  // HR4's round 2 finding 2: each review-only need the merge's pick adds for an id is new, whatever it had.
+  for (const [was, now] of [[['real'], ['real', 'packaged']], [['packaged'], ['packaged', 'real']]] as FocusedNeed[][][]) {
+    it(`4: a test approved as ${was.join(' and ')} that the merge's pick finds needs ${now.join(' and ')} has no proof for it: returned`, async () => {
+      const p = steered()
+      p.set({ pick: [{ test: 'one', needs: was }] })
+      const e = team(p.command, runner().command)
+      const { card, revision } = await built(e, { 'README.md': 'card\n' + readFileSync(join(e.project, 'README.md'), 'utf8') })
+      await approved(e, card)
+      await proofBy(e, card, revision, 'one', 'R1')
+      commit(e.project, { 'README.md': readFileSync(join(e.project, 'README.md'), 'utf8') + 'target\n' }, 'target moves')
+      p.set({ pick: [{ test: 'one', needs: now }] })
+      const [o] = await queue(e).drain('main')
+      expect(o).toMatchObject({ outcome: 'returned', reason: 'focused' })
+      expect(e.wf.state(card).entries.at(-1)?.failure).toMatchObject({ focused: { why: 'newProof', tests: ['one'] } })
+      expect(e.wf.state(card).focusedAccepted).toEqual([])
+    })
+  }
 })

@@ -316,6 +316,8 @@ interface SubmitGathered {
   commits?: string[]
   paths?: string[]
   inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>
+  /** G20 (HI-1367): its submission's operation, aborted once a newer submission of the card or its workspace's close ended it. */
+  focusedOp?: AbortSignal
   warnings: string[]
   earlier: boolean
   fin: FinishInputs | Record<string, never>
@@ -1178,6 +1180,9 @@ export class Workflow {
 
     const g = await this.gatherSubmit(card, s, actor, args)
     if (!('inputs' in g)) return this.refuse(card, actor, 'submit', g)
+    // Ended while it gathered (a newer submission of the card, its workspace closing): refused before anything, and never
+    // gathered again (which would end the newer one in turn).
+    if (g.focusedOp?.aborted) return this.refuse(card, actor, 'submit', { rule: 'submit.focusedChosen', values: { card: card.key, revision: (g.revision ?? '').slice(0, 7), state: 'unknown', why: 'cancelled' } }) // i18n-ignore: codes
     // The same revision again: a new submission only with a note (§16.8.1).
     const waiting = (from === 'review' || from === 'approved' || awaitsAgentMerge(g.r, g.s)) && !g.s.stale
     if (g.earlier && !waiting && !args.note && !args.drag) return this.refuse(card, actor, 'submit', { rule: 'submit.sameRevisionNote', values: { revision: g.revision!.slice(0, 7) } })
@@ -1190,6 +1195,8 @@ export class Workflow {
     const out = await this.write(card, g.r, actor, (w) => {
       const changed = this.stillAt(w, g.s, 'submit') ?? this.evidenceChanged(w, g.o, g.before, g.card)
       if (changed) return changed
+      // Ended (HR4's round 2 finding 1): a newer submission of the card, or its workspace closing, read under the lock.
+      if (g.focusedOp?.aborted) return { rule: 'submit.focusedChosen', values: { card: card.key, revision: (g.revision ?? '').slice(0, 7), state: 'unknown', why: 'cancelled' } } as GuardRefusal // i18n-ignore: codes
       // Every refusal before anything is written: an override never commits without its move.
       if (from === 'review' && !g.s.stale && !followUp) return { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: 'submit', moves: this.movesFrom(from, g.r).join(', ') } } as GuardRefusal
       // Read again under the transaction: still in Review, unstale, and the agent its builder now (not when the call began).
@@ -1293,11 +1300,12 @@ export class Workflow {
     if (runner && this.cfg.runsOf) inputs.runsGoing = this.cfg.runsOf(runner)
     // G20 (HI-1367): the tests the change needs, picked in the card's folder at exactly this revision, or named by its
     // builder; kept with the submission (its `focused`), and a pick that couldn't choose refuses without the builder's list.
-    if (r.guards.submit.includes('submit.focusedChosen') && card.kind === 'code' && revision && base && !predicted) inputs.focused = await this.chooseFocused(card, o, this.folderOf(s), revision, base, args.tests)
+    let focusedOp: AbortSignal | undefined
+    if (r.guards.submit.includes('submit.focusedChosen') && card.kind === 'code' && revision && base && !predicted) ({ choice: inputs.focused, op: focusedOp } = await this.chooseFocused(card, o, this.folderOf(s), revision, base, args.tests))
     const earlier = card.kind === 'code' && s.submissions.some((x) => x.revision === revision)
     const fin = o.review === 'none' ? await this.finishInputs(card, s, r, revision) : {}
     const only = card.kind === 'no-code' ? (id: GuardId) => NO_CODE_GUARDS.includes(id) : undefined
-    return { r, o, card, s, from, agent, runner, setPaths, revision, base, key, files, ...(commits ? { commits } : {}), ...(paths ? { paths } : {}), inputs, warnings, earlier, fin, before, ...(only ? { only } : {}) }
+    return { r, o, card, s, from, agent, runner, setPaths, revision, base, key, files, ...(commits ? { commits } : {}), ...(paths ? { paths } : {}), inputs, warnings, earlier, fin, before, ...(only ? { only } : {}), ...(focusedOp ? { focusedOp } : {}) }
   }
 
   /**
@@ -1305,22 +1313,19 @@ export class Workflow {
    * the revision (`pickAtRevision`); the builder's `tests` are its additions, or, when the pick couldn't choose, the list
    * that stands in for it (`manual`, reviewed with the change). Never throws.
    */
-  private async chooseFocused(card: CardRecord, o: WorkflowOptions, folder: string, revision: string, base: string, tests: FocusedTest[] | undefined): Promise<FocusedChoice> {
-    // One pick per card at a time (HR4's round 1 finding 8): a newer submission's ends the one before, as its workspace
-    // closing ends any; an ended pick is `unknown` (cancelled), and its submission's write is refused as stale anyway.
+  private async chooseFocused(card: CardRecord, o: WorkflowOptions, folder: string, revision: string, base: string, tests: FocusedTest[] | undefined): Promise<{ choice: FocusedChoice; op: AbortSignal }> {
+    // One submission per card at a time (HR4's rounds 1 and 2, finding 8): a newer one ends the one before, as its
+    // workspace closing ends any. `op` stays aborted for the ended one through its write, which is then refused whatever
+    // its choice (a builder's list stands in for a pick that couldn't choose, never for a submission that was ended).
     this.picks.get(card.id)?.abort()
     const own = new AbortController()
     this.picks.set(card.id, own)
     const life = this.cfg.focused?.life
-    const signal = life ? AbortSignal.any([own.signal, life]) : own.signal
-    try {
-      return await this.pickFor(o, folder, revision, base, tests, signal)
-    } finally {
-      if (this.picks.get(card.id) === own) this.picks.delete(card.id)
-    }
+    const op = life ? AbortSignal.any([own.signal, life]) : own.signal
+    return { choice: await this.pickFor(o, folder, revision, base, tests, op), op }
   }
 
-  /** The picks running now, by card: a newer one aborts the one before. */
+  /** Each card's latest submission's operation: a newer one aborts the one before (its pick, and its write). */
   private readonly picks = new Map<number, AbortController>()
 
   private async pickFor(o: WorkflowOptions, folder: string, revision: string, base: string, tests: FocusedTest[] | undefined, signal: AbortSignal): Promise<FocusedChoice> {
@@ -1331,7 +1336,7 @@ export class Workflow {
     if (!change) p = { state: 'unknown', tests: [], why: 'noChange' } // i18n-ignore: codes (a why, a check name), never shown as text
     else if (!command) p = { state: 'unknown', tests: [], why: 'noPicker' } // i18n-ignore: codes (a why, a check name), never shown as text
     else p = await (this.cfg.focused?.pick ?? ((c, f, rev, b, ch) => pickAtRevision(deps, c, f, rev, b, ch)))(command, folder, revision, base, change)
-    const manual = p.state !== 'chosen' && !!tests
+    const manual = p.state !== 'chosen' && p.why !== 'cancelled' && !!tests
     return { state: p.state, ...(p.why ? { why: p.why } : {}), source: manual ? 'manual' : 'picked', picked: p.tests, added: tests ?? [], change, ...(p.diagnostics ? { diagnostics: p.diagnostics } : {}) }
   }
 

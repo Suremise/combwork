@@ -2970,7 +2970,7 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    - **At submit** (`submit.focusedChosen`): Hive reads the change path by path (`git diff --raw` with full blob ids,
      modes and rename endpoints) and runs the picker in the card's folder under a check's bracket (§16.13): at exactly
      the revision, clean at both ends, nothing written in between, else its pick is `unknown` (a check copy has no
-     dependencies, and Hive's own picker needs them; a newer submission of the card, or its workspace closing, ends it with its tree, `cancelled`). Its stdin is the paths, `HIVE_FOCUSED_BASE` the base; its stdout
+     dependencies, and Hive's own picker needs them; a newer submission of the card, or its workspace closing, ends it with its tree, `cancelled`, and that submission's write is refused under the lock, with the builder's own list or not). Its stdin is the paths, `HIVE_FOCUSED_BASE` the base; its stdout
      JSON lines `{"test", "needs": [unit | fake | real | packaged]}` or `{"every": true}`, its stderr kept apart as
      diagnostics, bounded (256 KB, 500 tests), ended with its tree at Advanced `hive.focused.pickSeconds` (180 s). A
      pick that fails, times out, can't be read or says every test refuses the submit unless the builder names the tests
