@@ -271,6 +271,36 @@ describe('the usage history of a workspace', () => {
     }
   })
 
+  it('a roll-up waiting behind other jobs leaves a session resumed meanwhile alone: the running ones are read as it goes to the worker (HI-1648 review round 1)', async () => {
+    // Two sessions last active on 12 Oct (over 14 days ago), recorded in full detail.
+    const [resumed, ended] = [newId(), newId()]
+    for (const id of [resumed, ended]) {
+      write(cliFile(id), transcript(id, [5, 6]))
+      await run(() => workspace.upsertSession(p, { id, agent: 'claude-code', agentId: 'c1', name: id, lastActiveAt: new Date(T0).toISOString() }))
+      await run(() => usageHistory.ingest(p, id, { priority: 0, keepState: 'no' }))
+    }
+    const step = async (id: string) => (await run(() => usageHistory.timelines(p))).find((s) => s.session === id)?.timeline?.step
+    expect([await step(resumed), await step(ended)]).toEqual([1, 1])
+    const h = usageHistory as unknown as { enqueue: (k: string, pr: number, q: () => Promise<null>) => Promise<unknown>; rollUp: (ws: unknown, r: unknown) => Promise<void>; rolledUp: Map<string, number> }
+    const live = (sessions as unknown as { live: Map<string, unknown> }).live
+    // The queue held by a job before it; the roll-up queued behind it, then the session resumed while it waits.
+    let open!: () => void
+    const gate = h.enqueue('gate', 0, () => new Promise<null>((r) => (open = () => r(null))))
+    await vi.waitFor(() => expect(open).toBeTypeOf('function'))
+    h.rolledUp.clear()
+    const rolled = run(() => h.rollUp(w, { path: w.path, signal: w.lifetime }))
+    live.set(`${p.toLowerCase()}#resumed`, { state: { sessionId: resumed, projectPath: p, provider: 'claude-code' } })
+    try {
+      open()
+      await gate
+      await rolled
+      expect(await step(ended)).toBe(3600)
+      expect(await step(resumed)).toBe(1)
+    } finally {
+      live.delete(`${p.toLowerCase()}#resumed`)
+    }
+  })
+
   it('the Overview reads no transcript', async () => {
     const reads = vi.spyOn(sessions, 'anyTranscript')
     const usageFor = vi.spyOn(sessions as unknown as { usageFor: () => Promise<unknown> }, 'usageFor')
