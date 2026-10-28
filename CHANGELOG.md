@@ -177,6 +177,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **A Copilot agent whose model can't be reached no longer shows working for ever.** When GitHub Copilot gives up on its model after its retries (the network down, a local model server stopped), it ends the turn without saying so in its hooks. Hive now reads that end from Copilot's session file: the agent shows the turn ended on an error, with Copilot's message, and **Resume agents after a connection drops** carries it on like the other CLIs' agents (HI-1960).
 - **Starting a card back from Review starts its agent.** Starting a card in Review with its builder stopped (the Assistant's `hive_start_task`, the board's Start) moved the card to Doing and replied *Started*, but never launched the builder or gave it the card, when the card had been built in a slot. Hive now launches the builder with the card and the note, as for a card in Doing (HI-1953).
 - **Loading a template ends the replaced agents' lanes.** A card loop whose builder or reviewer a template's load removed stayed running with nobody on it; it now ends as it does when you remove the agent, and the removed agent's kept terminal output goes with it (HI-1502).
 - **The Progress panel's "runs failed" line stays in sight.** On the Pulse tab it sat under the runs going on, so with several runs it was pushed out of view. It now sits above them, under the merge going on (HI-1923).

@@ -289,6 +289,8 @@ interface HiveMessageValues {
   'settings.advanced.copilot.signIn.hookMessage.title': undefined
   'settings.advanced.copilot.trust.prompt.desc': undefined
   'settings.advanced.copilot.trust.prompt.title': undefined
+  'settings.advanced.copilot.turnFailed.errorType.desc': undefined
+  'settings.advanced.copilot.turnFailed.errorType.title': undefined
   'settings.advanced.copilotFooter.desc': { mode: string | number; footer: string | number; shared: string }
   'settings.advanced.copilotFooter.title': { mode: string | number }
   'settings.advanced.data.desc': undefined

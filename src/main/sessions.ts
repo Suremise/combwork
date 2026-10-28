@@ -4799,6 +4799,9 @@ class SessionManager {
       void this.inHookOrder(l.state.runId, () => {
         if (this.live.get(id) !== l || rec.key === l.failureDone) return
         l.failure = rec
+        // A CLI that sends no Stop after a failed turn (Copilot, HI-1960): its record ends the running turn, failed, as
+        // that Stop would (failedIfRecorded gives it the CLI's words).
+        if (l.adapter.descriptor.capabilities.failureEndsTurn && l.ledger && failureTurn(l.ledger, rec) === 'running') return this.endTurnFrom(id, l, 'transcript', `${l.adapter.descriptor.name} recorded its turn failed at ${d.turnFailedAt}`) // i18n-ignore: the log and the hook journal (English)
         this.settleFailure(id, l)
       })
     }

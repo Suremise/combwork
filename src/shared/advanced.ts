@@ -2164,6 +2164,19 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/signin-error-copilot-1.0.95.jsonl`, version: '1.0.95', text: 'authentication' }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  // A turn that failed (HI-1960): Copilot 1.0.105 gives up on a model call with a session.error of this type and no
+  // Stop (each ErrorOccurred hook of its retries says recoverable, the last too).
+  {
+    id: 'copilot.turnFailed.errorType',
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.turnFailed.errorType.title', defaultMessage: 'Turn failed: error type', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.copilot.turnFailed.errorType.desc', defaultMessage: "A session error's type, in Copilot's session file, that means its turn ended because a model call failed after Copilot's retries (it sends no Stop then): Hive ends the turn as failed, with Copilot's message. Wrong, such an agent shows working until you look.", description: 'What the advanced setting "Turn failed: error type" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'pattern',
+    default: '^query$',
+    flags: 'i',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/connection-error-copilot-1.0.105.jsonl`, version: '1.0.105', text: 'query' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   {
     id: 'copilot.signIn.errorMessage',
     group: 'copilot',

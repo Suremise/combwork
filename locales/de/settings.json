@@ -287,6 +287,8 @@
   "settings.advanced.copilot.signIn.hookMessage.title": "Anmeldung abgelehnt: ErrorOccurred-Hook",
   "settings.advanced.copilot.trust.prompt.desc": "Die Frage von Copilot vor der ersten Sitzung in einem Ordner. Solange sie zu sehen ist, zeigt Hive, dass der Agent auf dich wartet.",
   "settings.advanced.copilot.trust.prompt.title": "Vertrauensfrage",
+  "settings.advanced.copilot.turnFailed.errorType.desc": "Der Typ eines Sitzungsfehlers in der Sitzungsdatei von Copilot, der bedeutet, dass der Durchgang endete, weil ein Modellaufruf nach den Wiederholungen von Copilot fehlschlug (Copilot sendet dann kein Stop): Hive beendet den Durchgang als fehlgeschlagen, mit der Meldung von Copilot. Falsch, zeigt ein solcher Agent „Arbeitet“, bis du nachsiehst.",
+  "settings.advanced.copilot.turnFailed.errorType.title": "Durchgang fehlgeschlagen: Fehlertyp",
   "settings.advanced.copilotFooter.desc": "Die Fußzeile von Copilot im Modus {mode} („{footer}“){shared, select, yes {, die sich Fragen und Änderungen annehmen teilen (Hive unterscheidet sie am Modus, mit dem die Sitzung begann)} other {}}. Hive liest den Modus eines Agenten aus seiner Fußzeile (der zuletzt auf dem Bildschirm gefundene Modus) und wechselt Modi, indem es Shift+Tab drückt, bis die Fußzeile den gewünschten zeigt; ist sie falsch, erkennt Hive den Agenten nicht in diesem Modus und kann ohne Neustart nicht dorthin wechseln.",
   "settings.advanced.copilotFooter.title": "Fußzeile: {mode}",
   "settings.advanced.data.desc": "Hive speichert seine Einstellungen in %APPDATA%\\Hive\\config.json.",

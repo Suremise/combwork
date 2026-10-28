@@ -128,13 +128,13 @@ function fakeHost(o: { on?: boolean; up?: boolean; perHour?: number; waitMs?: nu
   }
   const pending = (): number => timers.filter((t) => t.live).length
   /** The clock moved on with no timer run: the PC asleep, its timers held until it wakes. */
-  const sleep = (ms: number): void => void (now += ms)
+  const jumpClock = (ms: number): void => void (now += ms)
   return {
     h,
     host,
     advance,
     pending,
-    sleep,
+    jumpClock,
     at: () => now,
     setWait: (ms: number) => void (waitMs = ms),
     onCheck: (fn: (() => void) | null) => void (duringCheck = fn)
@@ -287,10 +287,10 @@ describe('the wait (OutageResume)', () => {
   })
 
   it('never resumes past the wait: a timer the PC slept through times out, the host up or not (HR2 round 1, finding 2)', async () => {
-    const { h, host, advance, sleep, pending } = fakeHost({ up: true })
+    const { h, host, advance, jumpClock, pending } = fakeHost({ up: true })
     const o = new OutageResume(host)
     o.failed(agent(), REFUSED)
-    sleep(12 * 3_600_000)
+    jumpClock(12 * 3_600_000)
     await advance(0)
     expect(h.checks).toBe(0)
     expect(h.notes).toEqual([])
@@ -299,10 +299,10 @@ describe('the wait (OutageResume)', () => {
   })
 
   it('never resumes when the check itself ends past the wait, though the host answered', async () => {
-    const { h, host, advance, sleep, onCheck } = fakeHost({ up: true })
+    const { h, host, advance, jumpClock, onCheck } = fakeHost({ up: true })
     const o = new OutageResume(host)
     o.failed(agent(), REFUSED)
-    onCheck(() => sleep(2 * 3_600_000))
+    onCheck(() => jumpClock(2 * 3_600_000))
     await advance(30_000)
     expect(h.checks).toBe(1)
     expect(h.notes).toEqual([])

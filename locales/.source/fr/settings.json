@@ -293,6 +293,8 @@
   "settings.advanced.copilot.signIn.hookMessage.title": "Sign-in refused: ErrorOccurred hook",
   "settings.advanced.copilot.trust.prompt.desc": "Copilot's question before a folder's first session. Hive shows the agent as waiting for you while it is on screen.",
   "settings.advanced.copilot.trust.prompt.title": "Trust question",
+  "settings.advanced.copilot.turnFailed.errorType.desc": "A session error's type, in Copilot's session file, that means its turn ended because a model call failed after Copilot's retries (it sends no Stop then): Hive ends the turn as failed, with Copilot's message. Wrong, such an agent shows working until you look.",
+  "settings.advanced.copilot.turnFailed.errorType.title": "Turn failed: error type",
   "settings.advanced.copilotFooter.desc": "Copilot's footer in the {mode} mode (\"{footer}\"){shared, select, yes {, which Ask and Accept edits share (Hive tells them apart by the mode the session started in)} other {}}. Hive reads an agent's mode from its footer (the mode found last on screen), and switches modes by pressing Shift+Tab until the footer shows the one wanted; wrong, Hive doesn't see the agent in that mode, and can't switch to it without a restart.",
   "settings.advanced.copilotFooter.title": "Footer: {mode}",
   "settings.advanced.data.desc": "Hive keeps its settings in %APPDATA%\\Hive\\config.json.",

@@ -287,6 +287,8 @@
   "settings.advanced.copilot.signIn.hookMessage.title": "Inicio de sesión rechazado: hook ErrorOccurred",
   "settings.advanced.copilot.trust.prompt.desc": "La pregunta de Copilot antes de la primera sesión en una carpeta. Mientras está en pantalla, Hive muestra que el agente te espera.",
   "settings.advanced.copilot.trust.prompt.title": "Pregunta de confianza",
+  "settings.advanced.copilot.turnFailed.errorType.desc": "El tipo de un error de sesión, en el archivo de sesión de Copilot, que indica que su turno terminó porque una llamada al modelo falló tras los reintentos de Copilot (entonces no envía Stop): Hive termina el turno como fallido, con el mensaje de Copilot. Si es incorrecto, un agente así aparece como “Trabajando” hasta que lo revises.",
+  "settings.advanced.copilot.turnFailed.errorType.title": "Turno fallido: tipo de error",
   "settings.advanced.copilotFooter.desc": "El pie de Copilot en el modo {mode} (“{footer}”){shared, select, yes {, que comparten Preguntar y Aceptar ediciones (Hive los distingue por el modo en que se inició la sesión)} other {}}. Hive lee el modo de un agente en su pie (el último modo que aparece en pantalla) y cambia de modo presionando Shift+Tab hasta que el pie muestra el deseado; si es incorrecto, Hive no ve al agente en ese modo y no puede cambiar a él sin reiniciar.",
   "settings.advanced.copilotFooter.title": "Pie: {mode}",
   "settings.advanced.data.desc": "Hive guarda su configuración en %APPDATA%\\Hive\\config.json.",

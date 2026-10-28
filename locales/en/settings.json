@@ -1151,6 +1151,14 @@
     "defaultMessage": "Trust question",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.copilot.turnFailed.errorType.desc": {
+    "defaultMessage": "A session error's type, in Copilot's session file, that means its turn ended because a model call failed after Copilot's retries (it sends no Stop then): Hive ends the turn as failed, with Copilot's message. Wrong, such an agent shows working until you look.",
+    "description": "What the advanced setting \"Turn failed: error type\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.turnFailed.errorType.title": {
+    "defaultMessage": "Turn failed: error type",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.copilotFooter.desc": {
     "defaultMessage": "Copilot's footer in the {mode} mode (\"{footer}\"){shared, select, yes {, which Ask and Accept edits share (Hive tells them apart by the mode the session started in)} other {}}. Hive reads an agent's mode from its footer (the mode found last on screen), and switches modes by pressing Shift+Tab until the footer shows the one wanted; wrong, Hive doesn't see the agent in that mode, and can't switch to it without a restart.",
     "description": "What the advanced setting is for (Settings → Advanced, under GitHub Copilot). {mode} is a mode's name; {footer} is Copilot's own footer text, in English: keep it as it is. {shared} is yes for the footer two modes share."

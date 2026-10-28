@@ -83,6 +83,9 @@ export function eventsDetails(text: string, memo: CopilotDetailsMemo = copilotDe
     memo.denied = false
     refusedEnd = null
     delete out.interruptedAt
+    // A turn after a failed one: that failure is history.
+    delete out.turnFailed
+    delete out.turnFailedAt
   }
   for (const line of text.split('\n')) {
     const r = parseLine(line)
@@ -156,6 +159,10 @@ export function eventsDetails(text: string, memo: CopilotDetailsMemo = copilotDe
           out.signIn = refused
           if (typeof r.timestamp === 'string') out.signInAt = r.timestamp
           else delete out.signInAt
+        } else if (typeof d.errorType === 'string' && advanced.pattern('copilot.turnFailed.errorType').test(d.errorType)) {
+          // A model call given up on after its retries (HI-1960): the turn is over, failed, and no Stop comes.
+          out.turnFailed = typeof d.message === 'string' ? d.message.trim() : ''
+          out.turnFailedAt = typeof r.timestamp === 'string' ? r.timestamp : new Date().toISOString()
         }
         break
       }

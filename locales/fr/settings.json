@@ -287,6 +287,8 @@
   "settings.advanced.copilot.signIn.hookMessage.title": "Connexion refusée : hook ErrorOccurred",
   "settings.advanced.copilot.trust.prompt.desc": "La question de Copilot avant la première session dans un dossier. Tant qu’elle est à l’écran, Hive montre l’agent en attente de ta réponse.",
   "settings.advanced.copilot.trust.prompt.title": "Question de confiance",
+  "settings.advanced.copilot.turnFailed.errorType.desc": "Le type d’une erreur de session, dans le fichier de session de Copilot, qui signifie que son tour s’est terminé parce qu’un appel au modèle a échoué après les nouvelles tentatives de Copilot (il n’envoie alors pas de Stop) : Hive termine le tour en échec, avec le message de Copilot. S’il est faux, un tel agent reste « Au travail » jusqu’à ce que tu regardes.",
+  "settings.advanced.copilot.turnFailed.errorType.title": "Tour en échec : type d’erreur",
   "settings.advanced.copilotFooter.desc": "Le pied de Copilot dans le mode {mode} (« {footer} »){shared, select, yes {, que partagent Demander et Accepter les modifications (Hive les distingue par le mode dans lequel la session a démarré)} other {}}. Hive lit le mode d’un agent dans son pied (le dernier mode trouvé à l’écran) et change de mode en appuyant sur Shift+Tab jusqu’à ce que le pied affiche celui voulu ; s’il est faux, Hive ne voit pas l’agent dans ce mode et ne peut pas y passer sans redémarrage.",
   "settings.advanced.copilotFooter.title": "Pied : {mode}",
   "settings.advanced.data.desc": "Hive conserve ses paramètres dans %APPDATA%\\Hive\\config.json.",

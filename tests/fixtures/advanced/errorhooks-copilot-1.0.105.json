@@ -1,0 +1,207 @@
+{
+  "what": "GitHub Copilot CLI 1.0.105 launched by Hive (its own launch plugin, HI-1960) when its model's API can't be reached: offline BYOK (COPILOT_OFFLINE=true, COPILOT_MODEL=gpt-4.1, a dummy COPILOT_PROVIDER_API_KEY) in a new COPILOT_HOME with an empty GH_CONFIG_DIR and gh off PATH, COPILOT_PROVIDER_BASE_URL a closed port on 127.0.0.1 (refused) or a host under .invalid (notFound); one prompt, 'reply ok'. The hooks Hive received (its developer console, text shown; the error's stack left out) and the session.error Copilot wrote to events.jsonl. An ErrorOccurred for each of its 6 tries, every one recoverable: true, the last too; no Stop; the turn ends with the session.error (3 ms after the last hook). Nothing reached a real model. Ids, folders and the port replaced.",
+  "refused": {
+    "hooks": [
+      {
+        "hook_event_name": "SessionStart",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:31:56.610Z",
+        "cwd": "C:\\work\\alpha",
+        "source": "new",
+        "initial_prompt": "reply ok"
+      },
+      {
+        "hook_event_name": "UserPromptSubmit",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:31:56.944Z",
+        "cwd": "C:\\work\\alpha",
+        "prompt": "reply ok"
+      },
+      {
+        "hook_event_name": "ErrorOccurred",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:31:59.173Z",
+        "cwd": "C:\\work\\alpha",
+        "error": {
+          "message": "\"Failed native model HTTP request: error sending request for url (http://127.0.0.1:50000/v1/chat/completions): client error (Connect): tcp connect error: No connection could be made because the target machine actively refused it. (os error 10061) [ECONNREFUSED]\"",
+          "name": "Error"
+        },
+        "error_context": "model_call",
+        "recoverable": true
+      },
+      {
+        "hook_event_name": "ErrorOccurred",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:32:02.255Z",
+        "cwd": "C:\\work\\alpha",
+        "error": {
+          "message": "\"Failed native model HTTP request: error sending request for url (http://127.0.0.1:50000/v1/chat/completions): client error (Connect): tcp connect error: No connection could be made because the target machine actively refused it. (os error 10061) [ECONNREFUSED]\"",
+          "name": "Error"
+        },
+        "error_context": "model_call",
+        "recoverable": true
+      },
+      {
+        "hook_event_name": "ErrorOccurred",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:32:06.303Z",
+        "cwd": "C:\\work\\alpha",
+        "error": {
+          "message": "\"Failed native model HTTP request: error sending request for url (http://127.0.0.1:50000/v1/chat/completions): client error (Connect): tcp connect error: No connection could be made because the target machine actively refused it. (os error 10061) [ECONNREFUSED]\"",
+          "name": "Error"
+        },
+        "error_context": "model_call",
+        "recoverable": true
+      },
+      {
+        "hook_event_name": "ErrorOccurred",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:32:12.422Z",
+        "cwd": "C:\\work\\alpha",
+        "error": {
+          "message": "\"Failed native model HTTP request: error sending request for url (http://127.0.0.1:50000/v1/chat/completions): client error (Connect): tcp connect error: No connection could be made because the target machine actively refused it. (os error 10061) [ECONNREFUSED]\"",
+          "name": "Error"
+        },
+        "error_context": "model_call",
+        "recoverable": true
+      },
+      {
+        "hook_event_name": "ErrorOccurred",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:32:22.489Z",
+        "cwd": "C:\\work\\alpha",
+        "error": {
+          "message": "\"Failed native model HTTP request: error sending request for url (http://127.0.0.1:50000/v1/chat/completions): client error (Connect): tcp connect error: No connection could be made because the target machine actively refused it. (os error 10061) [ECONNREFUSED]\"",
+          "name": "Error"
+        },
+        "error_context": "model_call",
+        "recoverable": true
+      },
+      {
+        "hook_event_name": "ErrorOccurred",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:32:32.561Z",
+        "cwd": "C:\\work\\alpha",
+        "error": {
+          "message": "\"Failed native model HTTP request: error sending request for url (http://127.0.0.1:50000/v1/chat/completions): client error (Connect): tcp connect error: No connection could be made because the target machine actively refused it. (os error 10061) [ECONNREFUSED]\"",
+          "name": "Error"
+        },
+        "error_context": "model_call",
+        "recoverable": true
+      }
+    ],
+    "sessionError": {
+      "type": "session.error",
+      "data": {
+        "errorType": "query",
+        "message": "Could not connect to local model provider at http://127.0.0.1:50000/v1.\n  Check that the service is running and the port is correct.",
+        "originatingMessageId": "00000000-0000-4000-8000-000000000003"
+      },
+      "id": "00000000-0000-4000-8000-000000000001",
+      "timestamp": "2026-10-28T13:32:32.564Z",
+      "parentId": "00000000-0000-4000-8000-000000000002"
+    }
+  },
+  "notFound": {
+    "hooks": [
+      {
+        "hook_event_name": "SessionStart",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:35:10.785Z",
+        "cwd": "C:\\work\\alpha",
+        "source": "new",
+        "initial_prompt": "reply ok"
+      },
+      {
+        "hook_event_name": "UserPromptSubmit",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:35:11.117Z",
+        "cwd": "C:\\work\\alpha",
+        "prompt": "reply ok"
+      },
+      {
+        "hook_event_name": "ErrorOccurred",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:35:11.371Z",
+        "cwd": "C:\\work\\alpha",
+        "error": {
+          "message": "\"Failed native model HTTP request: error sending request for url (http://hive-outage-probe.invalid/v1/chat/completions): client error (Connect): dns error: error resolving DNS: No such host is known. (os error 11001) [ENOTFOUND]\"",
+          "name": "Error"
+        },
+        "error_context": "model_call",
+        "recoverable": true
+      },
+      {
+        "hook_event_name": "ErrorOccurred",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:35:12.401Z",
+        "cwd": "C:\\work\\alpha",
+        "error": {
+          "message": "\"Failed native model HTTP request: error sending request for url (http://hive-outage-probe.invalid/v1/chat/completions): client error (Connect): dns error: error resolving DNS: No such host is known. (os error 11001) [ENOTFOUND]\"",
+          "name": "Error"
+        },
+        "error_context": "model_call",
+        "recoverable": true
+      },
+      {
+        "hook_event_name": "ErrorOccurred",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:35:14.438Z",
+        "cwd": "C:\\work\\alpha",
+        "error": {
+          "message": "\"Failed native model HTTP request: error sending request for url (http://hive-outage-probe.invalid/v1/chat/completions): client error (Connect): dns error: error resolving DNS: No such host is known. (os error 11001) [ENOTFOUND]\"",
+          "name": "Error"
+        },
+        "error_context": "model_call",
+        "recoverable": true
+      },
+      {
+        "hook_event_name": "ErrorOccurred",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:35:18.495Z",
+        "cwd": "C:\\work\\alpha",
+        "error": {
+          "message": "\"Failed native model HTTP request: error sending request for url (http://hive-outage-probe.invalid/v1/chat/completions): client error (Connect): dns error: error resolving DNS: No such host is known. (os error 11001) [ENOTFOUND]\"",
+          "name": "Error"
+        },
+        "error_context": "model_call",
+        "recoverable": true
+      },
+      {
+        "hook_event_name": "ErrorOccurred",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:35:26.532Z",
+        "cwd": "C:\\work\\alpha",
+        "error": {
+          "message": "\"Failed native model HTTP request: error sending request for url (http://hive-outage-probe.invalid/v1/chat/completions): client error (Connect): dns error: error resolving DNS: No such host is known. (os error 11001) [ENOTFOUND]\"",
+          "name": "Error"
+        },
+        "error_context": "model_call",
+        "recoverable": true
+      },
+      {
+        "hook_event_name": "ErrorOccurred",
+        "session_id": "00000000-0000-4000-8000-000000000000",
+        "timestamp": "2026-10-28T13:35:34.627Z",
+        "cwd": "C:\\work\\alpha",
+        "error": {
+          "message": "\"Failed native model HTTP request: error sending request for url (http://hive-outage-probe.invalid/v1/chat/completions): client error (Connect): dns error: error resolving DNS: No such host is known. (os error 11001) [ENOTFOUND]\"",
+          "name": "Error"
+        },
+        "error_context": "model_call",
+        "recoverable": true
+      }
+    ],
+    "sessionError": {
+      "type": "session.error",
+      "data": {
+        "errorType": "query",
+        "message": "Failed to get response from the AI model; retried 5 times (total retry wait time: 23.00 seconds) Last error: Failed native model HTTP request: error sending request for url (http://hive-outage-probe.invalid/v1/chat/completions): client error (Connect): dns error: error resolving DNS: No such host is known. (os error 11001) [ENOTFOUND]",
+        "originatingMessageId": "00000000-0000-4000-8000-000000000003"
+      },
+      "id": "00000000-0000-4000-8000-000000000001",
+      "timestamp": "2026-10-28T13:35:34.631Z",
+      "parentId": "00000000-0000-4000-8000-000000000002"
+    }
+  }
+}
