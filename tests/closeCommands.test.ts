@@ -158,19 +158,25 @@ describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3; t
     expect(state.drains).toHaveLength(0)
   })
 
-  it("a close held, and the user's Don't wait at its saving step: at once, its command and When Hive quits skipped; released later, it starts nothing (Darren's decision, 14:15)", async () => {
+  it("a close held, and Skip the command at its saving step: the panel stays and the close goes on; released, its command and When Hive quits are skipped and nothing starts (Darren's decision, 15:30)", async () => {
     for (const command of ['backup', '']) {
       const held = gate()
       const ws = fakeWs('D:\\ws\\Work', command, held.wait)
       const win = fakeWin()
-      const r = closeWithCommand(ws as never, 'quit', win as never, { drain: true })
+      let outcome: string | null = null
+      const r = closeWithCommand(ws as never, 'quit', win as never, { drain: true }).then((x) => (outcome = x))
       const saving = await panelIn(win, 'saving')
       expect(saving).toMatchObject({ state: 'saving', workspace: 'Work', command })
       dontWait(win as never, saving!.id)
-      await expect(r).resolves.toBe('leftSaving')
-      expect(closeCommandState(win as never)).toBeNull()
-      held.open()
+      expect(closeCommandState(win as never)).toMatchObject({ state: 'saving', skipped: true })
       await flush()
+      expect(outcome).toBeNull()
+      expect(ws.close).toHaveBeenCalledTimes(1)
+      held.open()
+      await r
+      expect(outcome).toBe('leftSaving')
+      expect(closeCommandState(win as never)).toBeNull()
+      expect(ws.close).toHaveBeenCalledTimes(1)
       expect(state.drains).toHaveLength(0)
       expect(state.started).toHaveLength(0)
     }
@@ -209,7 +215,7 @@ describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3; t
   })
 
   for (const command of ['', 'backup']) {
-    it(`a window's close under way (${command ? 'with a command' : 'plain'}) when the quit joins it: its saving step shows, and Don't wait there ends both at once; released later, nothing starts (HR6's round 2, finding 1; Darren's decision, 14:15)`, async () => {
+    it(`a window's close under way (${command ? 'with a command' : 'plain'}) when the quit joins it: one close, its saving step shown; Skip there, then the close released: both skipped, nothing starts (Darren's decision, 15:30)`, async () => {
       const held = gate()
       const ws = fakeWs('D:\\ws\\Work', command, held.wait)
       const win = fakeWin()
@@ -219,9 +225,9 @@ describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3; t
       const saving = await panelIn(win, 'saving')
       expect(saving?.workspace).toBe('Work')
       dontWait(win as never, saving!.id)
-      await expect(Promise.all([closing, joined])).resolves.toEqual(['leftSaving', 'leftSaving'])
       held.open()
-      await flush()
+      await expect(Promise.all([closing, joined])).resolves.toEqual(['leftSaving', 'leftSaving'])
+      expect(ws.close).toHaveBeenCalledTimes(1)
       expect(state.drains).toHaveLength(0)
       expect(state.started).toHaveLength(0)
     })

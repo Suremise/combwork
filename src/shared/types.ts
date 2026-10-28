@@ -848,13 +848,15 @@ export interface CloseCommandRun {
   command: string
   startedAt: string
   /**
-   * saving: its workspace isn't finished being written yet (the spinner, Don't wait, which skips its command and When
-   * Hive quits); running: the command (the spinner, Don't wait); failed: its exit code (or why), Close; ok and left: the
-   * panel goes.
+   * saving: its workspace isn't closed and written yet (the spinner, Skip the command, which skips its command and When
+   * Hive quits, the close itself always finishing); running: the command (the spinner, Don't wait); failed: its exit
+   * code (or why), Close; ok and left: the panel goes.
    */
   state: 'saving' | 'running' | 'ok' | 'failed' | 'left'
   /** The workspace's folder name, for the saving step's "Waiting for <workspace> to finish saving…". */
   workspace?: string
+  /** The saving step's Skip the command was pressed: the command won't run, and the panel stays until the close ends. */
+  skipped?: boolean
   /** The output's last lines (at most 8, each at most 400 characters). */
   lines: string[]
   exitCode: number | null

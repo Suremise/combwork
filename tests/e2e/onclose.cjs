@@ -182,21 +182,21 @@ async function shots(page, name) {
   await page.keyboard.press('Escape')
   check('…which closes it', !!(await lib.until(async () => !(await about.isVisible().catch(() => false)), HUNG_MS)))
 
-  // --- 2c. The saving step (Darren's decision, 28 Oct ~14:15): no timer; the panel says it waits for the workspace to
-  // finish saving, and Don't wait there goes on without running its command.
+  // --- 2c. The saving step (Darren's decisions, 28 Oct ~14:15 and ~15:30): no timer; the panel says it waits for the
+  // workspace to finish saving, and Skip the command there means the command never runs (the close itself finishing).
   await lib.openWorkspace(inv, page, wsB)
   await inv('closeCommand:setWorkspace', { command: command('b-held', 'quick'), onUpdate: false })
   fs.writeFileSync(holdDrain, 'hold')
   let switchedHeld = false
   const switchingHeld = lib.openWorkspace(inv, page, wsA, HUNG_MS * 2).then(() => (switchedHeld = true))
   check("the saving step: its panel names the workspace, with the spinner and Don't wait",!!(await lib.until(async () => (await panel(page, 'saving').count()) === 1, HUNG_MS)) && ((await page.locator('.close-command #close-command-title').textContent()) ?? '').includes(path.basename(wsB)) && (await page.locator('.close-command .spin').count()) > 0)
-  check('…and the window waits on it', !switchedHeld)
+  check('…and the window waits on it, its button Skip the command', !switchedHeld && ((await page.locator('.close-command .dialog-footer button').textContent()) ?? '').includes('Skip the command'))
   await shots(page, 'saving')
   await page.locator('.close-command .dialog-footer button').click()
   await switchingHeld
   fs.rmSync(holdDrain, { force: true })
   const heldRuns = fs.existsSync(path.join(userData, 'close-commands')) ? fs.readdirSync(path.join(userData, 'close-commands')).filter((n) => fs.readFileSync(path.join(userData, 'close-commands', n, 'job.json'), 'utf8').includes('b-held')) : []
-  check("Don't wait while saving: the switch goes on, and the command never starts", switchedHeld && (await panel(page, 'saving').count()) === 0 && heldRuns.length === 0 && mark('b-held') === null, JSON.stringify(heldRuns))
+  check('Skip the command: once the close ends the switch goes on, and the command never starts', switchedHeld && (await panel(page, 'saving').count()) === 0 && heldRuns.length === 0 && mark('b-held') === null, JSON.stringify(heldRuns))
 
   // --- 3. Quitting with two windows: each window's command, then When Hive quits after them; one left running.
   await lib.openWorkspace(inv, page, wsA)

@@ -14,7 +14,9 @@ const M = {
   command: msg({ id: 'workspace.closeCommand.command', defaultMessage: 'The command', description: 'In the close command panel: the accessible name of the command Hive runs, shown as it runs.' }),
   dontWait: msg({ id: 'workspace.closeCommand.dontWait', defaultMessage: "Don't wait", description: 'A button of the close command panel: Hive stops waiting for the command and goes on closing; the command keeps running.' }),
   saving: msg({ id: 'workspace.closeCommand.saving', defaultMessage: 'Waiting for {workspace} to finish saving…', description: "The heading of the close command panel's first step: Hive waits until it has finished writing the closing workspace's files before it runs the user's close command (or When Hive quits, run). {workspace} is the workspace's folder name." }),
-  savingNote: msg({ id: 'workspace.closeCommand.savingNote', defaultMessage: 'If you don\'t wait, Hive goes on without running your close command or the "When Hive quits" one: the workspace\'s files may not be fully saved.', description: "Under the close command panel's Don't wait button while Hive is still saving the closing workspace. The quoted When Hive quits names the setting Settings → General → When Hive quits, run: keep it in quotes." }),
+  savingNote: msg({ id: 'workspace.closeCommand.savingNote', defaultMessage: 'Hive finishes saving first. If you skip, it won\'t run your close command or the "When Hive quits" one.', description: "Under the close command panel's Skip the command button, while Hive is still closing and saving the workspace (the close always finishes). The quoted When Hive quits names the setting Settings → General → When Hive quits, run: keep it in quotes." }),
+  skip: msg({ id: 'workspace.closeCommand.skip', defaultMessage: 'Skip the command', description: "A button of the close command panel while Hive is still closing and saving the workspace: the user's close command (and When Hive quits, run) won't run; Hive still finishes closing the workspace." }),
+  skipped: msg({ id: 'workspace.closeCommand.skipped', defaultMessage: "Skipped: the command won't run. Hive is finishing closing the workspace.", description: 'In the close command panel once the user has pressed Skip the command, while Hive finishes closing the workspace (the panel then goes).' }),
   dontWaitNote: msg({ id: 'workspace.closeCommand.dontWaitNote', defaultMessage: "If you don't wait, Hive goes on and the command keeps running by itself.", description: "Under the close command panel's Don't wait button." }),
   failedExit: msg({ id: 'workspace.closeCommand.failedExit', defaultMessage: '{kind, select, quit {Your quit command failed (exit code {code})} other {Your close command failed (exit code {code})}}', description: "The heading of the close command panel when the user's command ended with an error. {code} is its exit code (a number, kept as it is). kind quit: the command run as Hive quits; other: as a workspace closes." }),
   failed: msg({ id: 'workspace.closeCommand.failed', defaultMessage: '{kind, select, quit {Your quit command failed} other {Your close command failed}}', description: "The heading of the close command panel when the user's command failed with no exit code. kind quit: the command run as Hive quits; other: as a workspace closes." }),
@@ -125,12 +127,13 @@ function Panel({ run }: { run: CloseCommandRun }) {
               {lines.join('\n')}
             </pre>
           )}
-          {waiting && <p className="faint close-command-note">{tr(saving ? M.savingNote : M.dontWaitNote)}</p>}
+          {waiting && <p className="faint close-command-note">{tr(saving ? (run.skipped ? M.skipped : M.savingNote) : M.dontWaitNote)}</p>}
         </div>
         <div className="dialog-footer">
           {waiting ? (
-            <button ref={button} className="btn" autoFocus onClick={() => void call('closeCommand:dontWait', run.id)}>
-              {tr(M.dontWait)}
+            // While saving, Skip the command (once pressed it stays, done: the panel goes as the close ends); then Don't wait.
+            <button ref={button} className="btn" autoFocus aria-disabled={saving && run.skipped ? true : undefined} onClick={() => void (!(saving && run.skipped) && call('closeCommand:dontWait', run.id))}>
+              {tr(saving ? M.skip : M.dontWait)}
             </button>
           ) : (
             <button ref={button} className="btn primary" autoFocus onClick={() => void call('closeCommand:dismiss', run.id)}>

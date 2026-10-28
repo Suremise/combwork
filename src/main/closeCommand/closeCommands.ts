@@ -23,17 +23,23 @@ const log = createLogger('close-command')
 const FOLLOW_MS = 250
 
 /** Each window's run its panel shows (by its webContents' id), and how Hive's wait for it ends. */
-const shown = new Map<number, { run: CloseCommandRun; end: (how: 'left' | 'dismissed') => void }>()
+const shown = new Map<number, { run: CloseCommandRun; end: (how: 'left' | 'dismissed') => void; skip: () => void }>()
 
 /** A window's run, for a window that reloads while its panel is up. */
 export function closeCommandState(win: BrowserWindow): CloseCommandRun | null {
   return shown.get(win.webContents.id)?.run ?? null
 }
 
-/** The panel's Don't wait: Hive stops waiting, for the command (it carries on) or for the workspace to finish saving (its command doesn't run). */
+/**
+ * The panel's button while Hive waits (closeCommand:dontWait): while its workspace is still closing and being written,
+ * Skip the command (it won't run, nor When Hive quits; the close itself finishes and the panel stays until it has, Darren's
+ * decision of 28 Oct ~15:30); once the command runs, Don't wait (Hive goes on, the command carries on).
+ */
 export function dontWait(win: BrowserWindow, id: string): void {
   const s = shown.get(win.webContents.id)
-  if (s && s.run.id === id && (s.run.state === 'running' || s.run.state === 'saving')) s.end('left')
+  if (!s || s.run.id !== id) return
+  if (s.run.state === 'saving') s.skip()
+  else if (s.run.state === 'running') s.end('left')
 }
 
 /** The panel's Close, on a failed run: Hive goes on. */
@@ -66,6 +72,8 @@ interface Panel {
   update: (r: Partial<CloseCommandRun>) => void
   ended: Promise<'left' | 'dismissed' | 'gone'>
   end: (how: 'left' | 'dismissed') => void
+  /** Resolves when its saving step's Skip the command is pressed (the panel stays up). */
+  skipped: Promise<void>
 }
 
 /**
@@ -77,6 +85,8 @@ function showPanel(win: BrowserWindow | null, run: CloseCommandRun): Panel {
   const ended = new Promise<'left' | 'dismissed' | 'gone'>((r) => (finish = r))
   const id = win && !win.isDestroyed() ? win.webContents.id : null
   const current = { ...run }
+  let skipNow!: () => void
+  const skipped = new Promise<void>((r) => (skipNow = r))
   const end = (how: 'left' | 'dismissed' | 'gone'): void => {
     if (id !== null && shown.get(id)?.run === current) shown.delete(id)
     if (win && !win.isDestroyed()) win.removeListener('closed', gone)
@@ -86,9 +96,15 @@ function showPanel(win: BrowserWindow | null, run: CloseCommandRun): Panel {
   const gone = (): void => end('gone')
   if (id === null) {
     finish('gone')
-    return { run: current, update: (r) => void Object.assign(current, r), ended, end: () => undefined }
+    return { run: current, update: (r) => void Object.assign(current, r), ended, end: () => undefined, skipped }
   }
-  shown.set(id, { run: current, end })
+  const skip = (): void => {
+    if (current.skipped) return
+    current.skipped = true
+    if (shown.get(id)?.run === current) send(win, current)
+    skipNow()
+  }
+  shown.set(id, { run: current, end, skip })
   win!.once('closed', gone)
   if (!win!.isVisible() && !testQuiet()) win!.showInactive()
   send(win, current)
@@ -99,7 +115,8 @@ function showPanel(win: BrowserWindow | null, run: CloseCommandRun): Panel {
       if (shown.get(id)?.run === current) send(win, current)
     },
     ended,
-    end
+    end,
+    skipped
   }
 }
 
@@ -206,18 +223,19 @@ async function closeFailed(panel: Panel): Promise<RunOutcome> {
 }
 
 /**
- * A close of one open of a workspace (s11): joined by every later close of that open. Its close and drain (the saving
- * step) have no timer of their own (Darren's decision of 28 Oct ~14:15): they show in its window's panel as "Waiting for
- * <workspace> to finish saving…", and the user's Don't wait there (`abort`) ends the step at once, nothing of the close
- * starting after, the close ending later or not. A command, once started, and a failure's dismissal wait as long as
- * they take. `wantDrain`: a caller needs it drained (When Hive quits) though it has no command of its own; asked before
- * its close has ended, its own saving step does it, and `drainedOk` says it did. `showSaving`: brings up its saving step
- * now, for a caller that joins it and needs it drained (a quit joining a window's close).
+ * A close of one open of a workspace (s11): joined by every later close of that open, and never cancelled or begun again
+ * (Darren's decision of 28 Oct ~15:30): Hive always finishes closing it, as it did before close commands. Its saving step
+ * (the close, then the drain) shows in its window's panel as "Waiting for <workspace> to finish saving…"; that step's
+ * Skip the command (`skip`) means its command won't run, nor When Hive quits, and ends the drain's wait, never the
+ * close: the panel stays until the close has finished. A command, once started, and a failure's dismissal wait as long
+ * as they take. `wantDrain`: a caller needs it drained (When Hive quits) though it has no command of its own; asked
+ * before its close has ended, its saving step does it, and `drainedOk` says it did. `showSaving`: brings up its saving
+ * step now, for a caller that joins it and needs it drained (a quit joining a window's close).
  */
 interface CloseOp {
   path: string
   place: string | null
-  abort: AbortController
+  skip: AbortController
   wantDrain: boolean
   drainedOk: boolean
   showSaving: () => void
@@ -229,9 +247,9 @@ const closing = new WeakMap<WorkspaceService, CloseOp>()
  * Closes a window's workspace for `reason`, running its close command once it has closed and drained, and waiting for
  * it as its panel says. With no command (or none for this reason, or a test copy), it is an ordinary close, unless
  * `drain` (When Hive quits will run after it, HR6's round 1, finding 1): then it is drained all the same, the saving step
- * shown, and is 'leftSaving' or 'notDrained' if the user stopped waiting or its close failed. A second call for the
- * same open joins the first (its reason wins), drained as part of it if this one needs that, or after it with a saving
- * step of its own if the first had already closed without one.
+ * shown, and is 'leftSaving' if the user skipped the command, or 'notDrained' if its close failed. A second call for
+ * the same open joins the first (its reason wins), drained as part of it if this one needs that, or after it with a
+ * saving step of its own if the first had already closed without one. The close itself is never cancelled.
  */
 export function closeWithCommand(ws: WorkspaceService, reason: CloseReason, win: BrowserWindow | null, o: { drain?: boolean } = {}): Promise<RunOutcome> {
   const path = ws.path
@@ -246,7 +264,7 @@ export function closeWithCommand(ws: WorkspaceService, reason: CloseReason, win:
     })
   }
   if (!path) return ws.close().then(() => 'skipped' as const)
-  const op: CloseOp = { path, place: ws.openPlace, abort: new AbortController(), wantDrain: !!o.drain, drainedOk: false, showSaving: () => undefined, done: Promise.resolve('skipped') }
+  const op: CloseOp = { path, place: ws.openPlace, skip: new AbortController(), wantDrain: !!o.drain, drainedOk: false, showSaving: () => undefined, done: Promise.resolve('skipped') }
   const plan = planRun(ws.config.onClose, reason, { workspace: path }, { runs: closeCommandsRun() })
   op.done = closeAndRun(ws, op, plan, win)
   closing.set(ws, op)
@@ -261,7 +279,8 @@ async function savingStep(win: BrowserWindow | null, path: string, place: string
   if (!place) return 'skipped'
   const stop = new AbortController()
   const panel = showPanel(win, newRun('workspace', '', 'saving', basename(path)))
-  void panel.ended.then((how) => how === 'left' && stop.abort())
+  // Its close is over: skipping ends the wait at once.
+  void panel.skipped.then(() => stop.abort())
   const d: DrainResult = await drainWorkspace(path, place, { cancelled: stop.signal })
   panel.end('dismissed')
   return d.drained ? 'skipped' : 'leftSaving'
@@ -269,7 +288,7 @@ async function savingStep(win: BrowserWindow | null, path: string, place: string
 
 /**
  * For the onclose suite (unpackaged builds only): the saving step waits while HIVE_TEST_HOLD_DRAIN's file exists, as a
- * slow save would keep it, until the user's Don't wait.
+ * slow save would keep it, until the user skips the command.
  */
 async function heldForTest(signal: AbortSignal): Promise<void> {
   const file = app.isPackaged ? undefined : process.env.HIVE_TEST_HOLD_DRAIN
@@ -281,56 +300,54 @@ async function closeAndRun(ws: WorkspaceService, op: CloseOp, plan: ReturnType<t
   const name = userText(basename(op.path))
   if ('skip' in plan && plan.skip !== 'none') log.info(`${name}'s close command not run: ${plan.skip === 'test' ? 'a test copy of Hive' : 'Hive is restarting for an update'}`)
   const hasCommand = 'command' in plan
-  // The saving step's panel: up from the start when there is a command to run, or a caller needs it drained; brought
-  // up later by a caller that joins needing that (a quit joining this window's close). Its Don't wait ends the step.
+  // The saving step's panel: up from the start when there is a command to run, or a caller needs it drained; brought up
+  // later by a caller that joins needing that (a quit joining this window's close). Its Skip the command ends the
+  // drain's wait, never the close.
   let panel: Panel | null = null
-  let left = false
   op.showSaving = () => {
     if (panel) return
     panel = showPanel(win, newRun('workspace', hasCommand ? plan.command : '', 'saving', basename(op.path)))
-    void panel.ended.then((how) => {
-      if (how !== 'left' || op.drainedOk) return
-      left = true
-      op.abort.abort()
+    void panel.skipped.then(() => {
+      log.info(`${name}: the user skipped its close command; Hive finishes closing it`)
+      op.skip.abort()
     })
   }
   if (hasCommand || op.wantDrain) op.showSaving()
-  const signal = op.abort.signal
-  const stopped = new Promise<'stopped'>((resolve) => {
-    if (signal.aborted) return resolve('stopped')
-    signal.addEventListener('abort', () => resolve('stopped'), { once: true })
-  })
-  const closed = await Promise.race([ws.close().then(() => null, (e: unknown) => ({ error: e })), stopped])
-  const says = (r: RunOutcome): RunOutcome => {
-    log.warn(`${name}: ${r === 'leftSaving' ? "the user didn't wait for it to finish saving" : "its close didn't finish"}, so ${hasCommand ? 'its close command' : 'When Hive quits, run'} won't run`)
-    return r
+  const ended = (): void => (panel as Panel | null)?.end('dismissed')
+  const skipped = (): RunOutcome => {
+    log.warn(`${name}: the user skipped the command, so ${hasCommand ? 'its close command' : 'When Hive quits, run'} won't run`)
+    ended()
+    return 'leftSaving'
   }
-  if (closed === 'stopped') return says('leftSaving')
-  if (closed) {
+  // The close, always to its end, as before close commands.
+  try {
+    await ws.close()
+  } catch (e) {
     // Nothing to run and nothing waiting on it: an ordinary close's failure, as before.
-    if (!panel) throw closed.error
-    log.warn(`${name}'s close failed`, closed.error)
-    const up = panel as Panel
-    if (hasCommand) return closeFailed(up)
-    up.end('dismissed')
-    return says('notDrained')
+    if (!panel) throw e
+    log.warn(`${name}'s close failed, so ${hasCommand ? 'its close command' : 'When Hive quits, run'} won't run`, e)
+    if (hasCommand) return closeFailed(panel)
+    ended()
+    return 'notDrained'
   }
   // Drained when it has a command to run, or a caller asked for it before its close ended.
   if (!hasCommand && !op.wantDrain) return 'skipped'
   op.showSaving()
-  await heldForTest(signal)
-  const d: DrainResult = op.place ? await drainWorkspace(op.path, op.place, { cancelled: signal }) : { drained: true }
+  if (op.skip.signal.aborted) return skipped()
+  await heldForTest(op.skip.signal)
+  const d: DrainResult = op.place ? await drainWorkspace(op.path, op.place, { cancelled: op.skip.signal }) : { drained: true }
   op.drainedOk = d.drained
-  const shownPanel = panel as Panel | null
+  if (op.skip.signal.aborted) return skipped()
   if (!d.drained) {
-    shownPanel?.end('dismissed')
-    return says(left ? 'leftSaving' : 'notDrained')
+    log.warn(`${name} wasn't finished being written (${d.left.join(', ')}), so ${hasCommand ? 'its close command' : 'When Hive quits, run'} won't run`)
+    ended()
+    return 'notDrained'
   }
   if (!hasCommand) {
-    shownPanel?.end('dismissed')
+    ended()
     return 'skipped'
   }
-  return runInWindow(win, 'workspace', basename(op.path), op.place ?? op.path.toLowerCase(), plan.command, op.path, shownPanel ?? undefined)
+  return runInWindow(win, 'workspace', basename(op.path), op.place ?? op.path.toLowerCase(), plan.command, op.path, (panel as Panel | null) ?? undefined)
 }
 
 /**
