@@ -131,6 +131,7 @@
   "session.purge.reading": "Hiveがトランスクリプトを読み込んでいます（エクスポートまたは検索）。しばらくしてからもう一度お試しください。",
   "session.purge.running": "実行中です。",
   "session.purge.unread": "セッションの使用量を記録できなかったため、保持しました。",
+  "session.restartMode.didntStop": "{agent}が時間内に停止しなかったため、新しいモードで再起動しませんでした。停止してからもう一度お試しください。",
   "session.setup.failed": "セットアップコマンドが終了コード{code}で終了しました。出力はエージェントのターミナルにあります。修正してからエージェントをもう一度起動するか、セットアップなしで起動してください。",
   "session.setup.failedTitle": "{project} · {agent}：セットアップに失敗しました",
   "session.signIn.again": "{provider}に再びサインインしました",

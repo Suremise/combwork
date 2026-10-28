@@ -131,6 +131,7 @@
   "session.purge.reading": "Hive está leyendo su transcripción (una exportación o una búsqueda). Vuelve a intentarlo en un momento.",
   "session.purge.running": "Está en ejecución.",
   "session.purge.unread": "Hive no pudo registrar lo que usó la sesión, así que se conserva.",
+  "session.restartMode.didntStop": "El agente {agent} no se detuvo a tiempo, así que no se reinició en el nuevo modo. Vuelve a intentarlo cuando se haya detenido.",
   "session.setup.failed": "El comando de preparación terminó con el código {code}. Su salida está en la terminal del agente. Corrígelo y vuelve a iniciar el agente, o inícialo sin preparación.",
   "session.setup.failedTitle": "{project} · {agent}: falló la preparación",
   "session.signIn.again": "Se volvió a iniciar sesión en {provider}",

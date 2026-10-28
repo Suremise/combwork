@@ -131,6 +131,7 @@
   "session.purge.reading": "Hive 正在读取它的会话记录（导出或搜索）。请稍后重试。",
   "session.purge.running": "它正在运行。",
   "session.purge.unread": "Hive 无法记录此会话的用量，因此保留它。",
+  "session.restartMode.didntStop": "{agent} 没有及时停止，因此没有以新模式重新启动。请在它停止后重试。",
   "session.setup.failed": "初始化命令以退出码 {code} 退出，输出在智能体的终端中。请修复后再次启动智能体，或跳过初始化直接启动。",
   "session.setup.failedTitle": "{project} · {agent}：初始化失败",
   "session.signIn.again": "已重新登录 {provider}",

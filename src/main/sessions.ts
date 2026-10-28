@@ -3607,7 +3607,14 @@ class SessionManager {
       })
     )
     this.stop(projectPath, agentId)
-    await Promise.race([exited, new Promise((r) => setTimeout(r, 8000))])
+    // Its exit, waited for as long as its CLI's own way of ending may take (stopWaitMs, as stopping waits), never a
+    // fixed 8 s a slow CLI outlasts (HI-1869). Exited, its slot's writer release is under way, and the start below waits
+    // for it (placeFor's earlierWritersSettled, HI-1867), refused only if its processes are kept or not known to end.
+    let timer: NodeJS.Timeout | undefined
+    await Promise.race([exited, new Promise((r) => (timer = setTimeout(r, stopWaitMs(8000, [l.adapter.exitKeys?.graceMs]))))])
+    clearTimeout(timer)
+    // Still running: said so, rather than the start's "already running" (its old run keeps its slot meanwhile).
+    if (this.live.get(id)?.state.runId === l.state.runId) throw hiveError(msg({ id: 'session.restartMode.didntStop', defaultMessage: "{agent} didn't stop in time, so it wasn't restarted in the new mode. Try again once it has stopped.", description: "Switching a running agent's permission mode (it restarts in the new mode) is refused: the agent ({agent}, its name) was told to stop but hadn't ended yet, so nothing was started." }), { agent: l.state.agentName ?? agentId }, { kind: 'conflict' })
     await this.start(projectPath, { resumeId: resumable ? sessionId : undefined, name: sessionName, agentId, permissionMode: mode })
   }
 

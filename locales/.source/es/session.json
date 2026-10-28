@@ -135,6 +135,7 @@
   "session.purge.reading": "Hive is reading its transcript (an export or a search). Try again in a moment.",
   "session.purge.running": "It is running.",
   "session.purge.unread": "Hive couldn't record what the session used, so it is kept.",
+  "session.restartMode.didntStop": "{agent} didn't stop in time, so it wasn't restarted in the new mode. Try again once it has stopped.",
   "session.setup.failed": "The setup command exited with code {code}. Its output is in the agent's terminal. Fix it and start the agent again, or start it without setup.",
   "session.setup.failedTitle": "{project} · {agent}: setup failed",
   "session.signIn.again": "Signed in to {provider} again",
