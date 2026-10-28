@@ -11946,6 +11946,76 @@ button.progress-run-show:focus-visible {
   flex: 1 1 0;
   padding-top: var(--space-2);
 }
+/* HI-1926: the Lanes tab's lanes stacked from the bottom, growing upwards to the top, then scrolling (no row limit). */
+.progress-lanes.full .progress-lanes-list {
+  display: flex;
+  flex-direction: column;
+}
+.progress-lanes.full .progress-lanes-list > :first-child {
+  margin-top: auto;
+}
+.progress-lanes.full .progress-lane {
+  flex-shrink: 0;
+}
+.progress-lane-expand {
+  flex-shrink: 0;
+  margin: -2px 0 -2px -4px;
+}
+.progress-lane-waited {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.progress-lane-waited.long {
+  color: var(--warning);
+  font-weight: 600;
+  opacity: 1;
+}
+/* A lane's cards in order (HI-1926): a line each, its state's icon, key, title, round, time and a Done card's commit. */
+.progress-lane-queue {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 4px 0 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+.progress-lane-queue-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 1px 0;
+}
+.progress-lane-queue-icon,
+.progress-lane-queue-key,
+.progress-lane-queue-round,
+.progress-lane-queue-time,
+.progress-lane-queue-commit {
+  flex-shrink: 0;
+}
+.progress-lane-queue-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-lane-queue-time,
+.progress-lane-queue-commit {
+  font-variant-numeric: tabular-nums;
+}
+.progress-lane-queue-row.done > .progress-lane-queue-icon {
+  color: var(--success);
+}
+.progress-lane-queue-row.doing > .progress-lane-queue-icon {
+  color: var(--accent);
+}
+.progress-lane-queue-row.waiting > .progress-lane-queue-icon {
+  color: var(--warning);
+}
+.progress-lane-queue-row.gone,
+.progress-lane-queue-row.unrecorded {
+  opacity: 0.7;
+}
 /* Needs attention (#1309): failures nothing has passed since, one line that opens them in Runs. */
 .progress-attention {
   display: flex;

@@ -299,6 +299,83 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     await setWidth(280)
     await shoot('lanes-narrow')
 
+    // --- HI-1926: a lane opens to its cards in order, each with its state, round and time; folded again once the tab
+    // is left. Its header says how long it has waited when it waits. Then seven lanes: stacked from the bottom, growing
+    // upwards to the top, then scrolling, the first and the last reachable.
+    await setWidth(440)
+    const tabsLane = panel.locator('.progress-tab-lanes .progress-lane').first()
+    await tabsLane.locator('.progress-lane-expand').click()
+    const queueRows = tabsLane.locator('.progress-lane-queue-row')
+    const queue = () => queueRows.evaluateAll((els) => els.map((e) => `${e.dataset.card}:${e.dataset.state}:${e.querySelector('.progress-lane-queue-round')?.textContent ?? ''}:${e.querySelector('.progress-lane-queue-time') ? 'time' : ''}`))
+    // The lane's cards in its order: the first being worked (its time so far), the next two not started (no time).
+    check('a lane opens to its cards in order: state, round and time so far for the one in progress, none for those to do', !!(await until(async () => {
+      const q = await queue()
+      return q.length === 3 && q[0].startsWith(`${a.number}:`) && q[0].endsWith(':r1:time') && q[1] === `${b.number}:todo:r1:` && q[2] === `${c.number}:todo:r1:`
+    }, HUNG_MS)), JSON.stringify(await queue()))
+    await queueRows.first().locator('.progress-lane-queue-key').click()
+    check("…a card's key opens it", !!(await until(async () => (await page.locator('[role="dialog"]').filter({ hasText: a.key }).count()) > 0, HUNG_MS)))
+    await page.keyboard.press('Escape')
+    await shoot('lanes-queue')
+    await showTab('pulse')
+    await showTab('lanes')
+    check('…folded again once the tab was left', !!(await until(async () => (await panel.locator('.progress-tab-lanes .progress-lane-queue').count()) === 0, HUNG_MS)))
+    const waited = panel.locator('.progress-tab-lanes .progress-lane-waited')
+    const why = panel.locator('.progress-tab-lanes .progress-lane-why')
+    check('…a lane that waits says for how long', (await why.count()) === 0 || !!(await until(async () => /\d/.test((await waited.first().textContent().catch(() => '')) ?? ''), HUNG_MS)), `${await why.first().textContent().catch(() => '')} ${await waited.first().textContent().catch(() => '')}`)
+    // A lane waiting for you (B1 asks about its card): its header says why and for how long, from when the wait began;
+    // past the bound (Settings → Advanced, set to its least, a minute) the time is marked.
+    const asked = await api(t1, 'POST', `/v1/tasks/${a.key}/ask`, { kind: 'decide', text: 'Which way should the lane go?' })
+    check('B1 asks the user about its card', asked.status === 200, JSON.stringify(asked.body))
+    const tabsWaited = tabsLane.locator('.progress-lane-waited')
+    check('…its lane waits for you, saying for how long', !!(await until(async () => /for you|you/i.test((await tabsLane.locator('.progress-lane-why').textContent().catch(() => '')) ?? '') && /\d/.test((await tabsWaited.textContent().catch(() => '')) ?? ''), HUNG_MS)), `${await tabsLane.locator('.progress-lane-why').textContent().catch(() => '')} ${await tabsWaited.textContent().catch(() => '')}`)
+    check('…not marked yet (under an hour)', !((await tabsWaited.getAttribute('class')) ?? '').includes('long'))
+    // Its card, opened in the lane's queue, waits for you too (HR5's round 1: an ordinary request, not only a block).
+    await tabsLane.locator('.progress-lane-expand').click()
+    check("…and its card in the lane's queue is waiting for you", !!(await until(async () => (await tabsLane.locator(`.progress-lane-queue-row[data-card="${a.number}"]`).getAttribute('data-state').catch(() => null)) === 'waiting', HUNG_MS)), await tabsLane.locator(`.progress-lane-queue-row[data-card="${a.number}"]`).getAttribute('data-state').catch(() => ''))
+    await tabsLane.locator('.progress-lane-expand').click()
+    await shoot('lanes-wait')
+    await inv('advanced:set', 'hive.lanes.waitYouMinutes', 1)
+    // The bound a minute: marked once a minute has passed (a condition, bounded for a hung run).
+    check('…past its bound (a minute, Settings → Advanced), the time is marked', !!(await until(async () => ((await tabsWaited.getAttribute('class').catch(() => '')) ?? '').includes('long'), 120_000)), await tabsWaited.textContent().catch(() => ''))
+    await shoot('lanes-wait-long')
+    await inv('advanced:set', 'hive.lanes.waitYouMinutes', null)
+    // Six more lanes (solo, their builders started by Hive): seven in all, more than fit.
+    for (let i = 2; i <= 7; i++) {
+      const bx = await lib.addAgent(inv, alpha, { name: `B${i}` })
+      const card = await inv('tasks:create', { title: `Lane card ${i}`, project: 'alpha' })
+      await inv('lanes:start', alpha, { builder: bx.id, reviewer: null, cards: [card.number], name: `solo ${i}` })
+    }
+    const laneList = panel.locator('.progress-tab-lanes .progress-lanes-list')
+    check('seven lanes in the Lanes tab', !!(await until(async () => (await panel.locator('.progress-tab-lanes .progress-lane').count()) === 7, HUNG_MS)), String(await panel.locator('.progress-tab-lanes .progress-lane').count()))
+    await lib.fitWindow(app, page, { width: 1400, height: 520 })
+    const fill = async () =>
+      laneList.evaluate((el) => {
+        const rows = [...el.querySelectorAll(':scope > .progress-lane')]
+        const box = el.getBoundingClientRect()
+        el.scrollTop = 0
+        const firstTop = rows[0].getBoundingClientRect().top - box.top
+        el.scrollTop = el.scrollHeight
+        const lastBottom = box.bottom - rows.at(-1).getBoundingClientRect().bottom
+        return { scrolls: el.scrollHeight > el.clientHeight + 1, firstTop, lastBottom }
+      })
+    check('…more than fit: they fill the tab to the top and scroll, the first and the last reachable', !!(await until(async () => {
+      const f = await fill()
+      return f.scrolls && f.firstTop >= -1 && f.firstTop < 20 && f.lastBottom >= -1 && f.lastBottom < 20
+    }, HUNG_MS)), JSON.stringify(await fill()))
+    await lib.fitWindow(app, page, { width: 1400, height: 850 })
+    // A few lanes in a tall panel: at the bottom, growing upwards (the space above them).
+    const bottomed = async () => laneList.evaluate((el) => {
+      const rows = [...el.querySelectorAll(':scope > .progress-lane')]
+      const box = el.getBoundingClientRect()
+      return el.scrollHeight <= el.clientHeight + 1 ? Math.round(box.bottom - rows.at(-1).getBoundingClientRect().bottom) : null
+    })
+    check('…in a tall panel, all of them shown, stacked from the bottom', !!(await until(async () => {
+      const gap = await bottomed()
+      return gap !== null && gap < 20
+    }, HUNG_MS)), String(await bottomed()))
+    await shoot('lanes-seven')
+    for (const l of await inv('lanes:list')) if ((l.name ?? '').startsWith('solo ')) await inv('lanes:end', l.id, true).catch(() => undefined)
+
     // --- The keyboard: arrow keys, Home and End move through the tabs, choosing as they go; the tab kept.
     // The tabs move the keyboard in an animation frame after choosing, which a busy window runs late: each key waits for
     // its tab chosen and the keyboard on it before the next (#1465: Right after Home went to Lanes, still focused, and

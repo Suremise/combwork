@@ -334,6 +334,10 @@ interface HiveMessageValues {
   'settings.advanced.hive.lanes.endWaitMinutes.title': undefined
   'settings.advanced.hive.lanes.gentleEnd.desc': undefined
   'settings.advanced.hive.lanes.gentleEnd.title': undefined
+  'settings.advanced.hive.lanes.waitReviewerMinutes.desc': undefined
+  'settings.advanced.hive.lanes.waitReviewerMinutes.title': undefined
+  'settings.advanced.hive.lanes.waitYouMinutes.desc': undefined
+  'settings.advanced.hive.lanes.waitYouMinutes.title': undefined
   'settings.advanced.hive.mcp.connectSeconds.desc': undefined
   'settings.advanced.hive.mcp.connectSeconds.title': undefined
   'settings.advanced.hive.mcp.replySeconds.desc': undefined
