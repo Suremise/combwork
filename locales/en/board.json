@@ -1439,6 +1439,14 @@
     "defaultMessage": "Your answer",
     "description": "The label (and placeholder) of the box under a question for the user (For you) in the card dialog: the user's answer, sent to the agent that asked."
   },
+  "board.forYou.resolvedBy": {
+    "defaultMessage": "{gone, select, yes {By a decision since removed} other {By your decision: “{decision}”}}, {who, select, you {recorded by you} assistant {recorded by the Assistant} other {recorded by {name}}}",
+    "description": "Under a request in the card dialog's For you section answered by a decision (HI-1932): the user's decision that answered it ({decision}: its words, cut short; gone yes: the user has removed that decision from the card since), and who wrote the decision down: the user, the Hive Assistant (recording the user's own words), or another ({name}). Keep the select keys."
+  },
+  "board.forYou.resolvedHeading": {
+    "defaultMessage": "Answered by your decisions",
+    "description": "A heading in the card dialog's For you section (HI-1932): the requests that waited for the user (questions) and were answered by a decision the user made, recorded on the card. Glossary: For you, decision."
+  },
   "board.forYou.rounds": {
     "defaultMessage": "More rounds",
     "description": "The label of the number box beside Carry on, at a card loop's round limit: how many more review rounds the card gets."

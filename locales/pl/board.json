@@ -359,6 +359,8 @@
   "board.forYou.offerReason": "Uzasadnienie (opcjonalne)",
   "board.forYou.offerTip": "{action, select, done {Przenosi kartę do Gotowe w Twoim imieniu, w razie potrzeby pomijając reguły projektu (zapisane jako wyjątek, z uzasadnieniem obok), i odpowiada na pytanie.} noCode {Zmienia kartę na kartę bez kodu w Twoim imieniu (zapisane jako wyjątek, z uzasadnieniem obok), i odpowiada na pytanie.} skipReview {Pomija recenzję karty w Twoim imieniu (z uzasadnieniem obok) i odpowiada na pytanie.} other {Odblokowuje kartę (uzasadnienie obok zostaje dodane jako Twój komentarz) i odpowiada na pytanie.}}",
   "board.forYou.reply": "Twoja odpowiedź",
+  "board.forYou.resolvedBy": "{gone, select, yes {Decyzją, która została usunięta} other {Twoją decyzją: „{decision}”}}, {who, select, you {zapisaną przez Ciebie} assistant {zapisaną przez Asystenta} other {zapisaną przez {name}}}",
+  "board.forYou.resolvedHeading": "Odpowiedziane Twoimi decyzjami",
   "board.forYou.rounds": "Więcej rund",
   "board.forYou.saveAndMerge": "Zapisz i kontynuuj scalanie",
   "board.forYou.send": "Wyślij odpowiedź",

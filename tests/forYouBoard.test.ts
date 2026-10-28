@@ -690,3 +690,99 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     expect(facts(w, real).filter((f) => f.kind === 'KindProposed')).toEqual([])
   })
 })
+
+describe("a decision that answers a card's open requests (HI-1932)", () => {
+  const assistant = { kind: 'assistant' } as const
+  /** A card in Doing with its builder's questions: two Decide, one Approve. */
+  async function asked(): Promise<{ w: WS; card: number; ids: string[] }> {
+    const { w } = await workspace({ ...allOff('git'), review: 'agent', finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    for (const [kind, text] of [['decide', 'Which icon?'], ['decide', 'Which colour?'], ['approve', 'OK to push the tag?']] as const) await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind, text }))
+    const ids = forYou(w).items.map((i) => i.request)
+    expect(ids).toHaveLength(3)
+    return { w, card, ids }
+  }
+  const decisionsOf = async (w: WS, card: number) => (await inWorkspace(w, () => tasks.getTask(card))).decisions ?? []
+  const approvals = (w: WS, card: number) => facts(w, card).filter((f) => f.kind === 'Approval').map((f) => f.data as { request: string; note?: string; byDecision?: { decision: string; recordedBy: string } })
+
+  it("the Assistant's decision naming two questions closes those two, in one write with the decision; the Approve stays; the asker is woken once", async () => {
+    const { w, card, ids } = await asked()
+    const after = await update(w, card, { decision: 'The bee icon, in amber.', answers: [ids[0], ids[1], ids[0]] }, assistant)
+    expect(after.decisions?.map((d) => [d.text, d.recordedBy])).toEqual([['The bee icon, in amber.', 'Assistant']])
+    const id = after.decisions![0].id
+    expect(approvals(w, card)).toEqual([
+      expect.objectContaining({ request: ids[0], note: 'The bee icon, in amber.', byDecision: expect.objectContaining({ decision: id, recordedBy: 'Assistant' }) }),
+      expect.objectContaining({ request: ids[1], byDecision: expect.objectContaining({ decision: id }) })
+    ])
+    expect(forYou(w).items.map((i) => i.request)).toEqual([ids[2]])
+    const wakes = actions(w, card).filter((a) => a.kind === 'wake' && a.payload.agent === 'a1').map((a) => String(a.payload.why))
+    expect(wakes.filter((x) => x.includes('with a decision'))).toHaveLength(1)
+    expect(wakes.at(-1)).toMatch(/"Which icon\?" and "Which colour\?" with a decision \(recorded by Assistant\): The bee icon, in amber\./)
+    expect(after.history.filter((h) => /^Closed a question for you with your decision/.test(h.what)).map((h) => [h.by, h.what])).toEqual([
+      ['Assistant', 'Closed a question for you with your decision: "Which icon?"'],
+      ['Assistant', 'Closed a question for you with your decision: "Which colour?"']
+    ])
+    // For you's resolved list: each with its question, the decision's id and its recorder.
+    const view = await inWorkspace(w, async () => (await import('../src/main/workflow/cardWork')).cardWork(w, card))
+    expect(view?.resolvedByDecision.map((r) => [r.question, r.decision, r.recordedBy])).toEqual([
+      ['Which colour?', id, 'Assistant'],
+      ['Which icon?', id, 'Assistant']
+    ])
+  })
+
+  it('refused with nothing written: a project agent, an Approve, a request not open, a first one valid and a later not, a bad shape', async () => {
+    const { w, card, ids } = await asked()
+    const before = facts(w, card).length
+    const tries: [Parameters<typeof tasks.updateTask>[1], Parameters<typeof tasks.updateTask>[2], RegExp][] = [
+      [{ decision: 'x', answers: [ids[0]] }, b1, /Only the user, or the Assistant/],
+      [{ decision: 'Yes, push it', answers: [ids[2]] }, assistant, /can't answer/],
+      [{ decision: 'x', answers: [ids[0], 'r999'] }, assistant, /isn't an open request/],
+      [{ decision: 'x', answers: [ids[0], ids[2]] }, assistant, /can't answer/],
+      [{ decision: '  ', answers: [ids[0]] }, assistant, /answers takes the ids/],
+      [{ answers: [ids[0]] }, assistant, /answers takes the ids/],
+      [{ decision: 'x', answers: [] }, assistant, /answers takes the ids/],
+      [{ decision: 'x', answers: Array.from({ length: 21 }, (_, i) => `r${i}`) }, assistant, /answers takes the ids/],
+      [{ decision: 'x', answers: [ids[0]], title: 'Renamed' }, assistant, /answers takes the ids/]
+    ]
+    for (const [patch, actor, why] of tries) await expect(update(w, card, patch, actor), JSON.stringify(patch)).rejects.toThrow(why)
+    await expect(update(w, card, { decision: 'x', answers: [ids[0]] }, assistant, { comment: 'and a comment' })).rejects.toThrow(/answers takes the ids/)
+    expect(facts(w, card).length).toBe(before)
+    expect(await decisionsOf(w, card)).toEqual([])
+    expect(forYou(w).items).toHaveLength(3)
+  })
+
+  it('one the user answers in For you meanwhile: the decision naming it is refused whole; the ordinary answer still works and others stay', async () => {
+    const { w, card, ids } = await asked()
+    await answer(w, card, ids[0], { outcome: 'answered', reply: 'The bee' })
+    await expect(update(w, card, { decision: 'Amber', answers: [ids[1], ids[0]] }, assistant)).rejects.toThrow(/isn't an open request/)
+    expect(await decisionsOf(w, card)).toEqual([])
+    expect(forYou(w).items.map((i) => i.request)).toEqual([ids[1], ids[2]])
+    // The user's own decision, from the window (the user is allowed too), closes the one left.
+    const after = await update(w, card, { decision: 'Amber', answers: [ids[1]] }, user)
+    expect(after.decisions?.map((d) => d.recordedBy)).toEqual(['You'])
+    expect(forYou(w).items.map((i) => i.request)).toEqual([ids[2]])
+  })
+
+  it('under the write, a request closed between the check and the write refuses it whole: no decision, no answer', async () => {
+    const { w, card, ids } = await asked()
+    const { Workflow } = await import('../src/main/workflow/runtime')
+    const real = Workflow.prototype.answerByDecision
+    const spy = vi.spyOn(Workflow.prototype, 'answerByDecision').mockImplementationOnce(async function (this: InstanceType<typeof Workflow>, ref, requests, d) {
+      // Another window answers the second one first: after tasks.ts's check, before the write.
+      await this.answer(`#${card}`, ids[1], 'answered', { note: 'Blue' })
+      return real.call(this, ref, requests, d)
+    })
+    try {
+      const got = await update(w, card, { decision: 'Amber', answers: [ids[0], ids[1]] }, assistant).then(() => 'resolved', (e) => String(e))
+      expect([spy.mock.calls.length, got]).toEqual([1, expect.stringMatching(/./)])
+      expect(got).not.toBe('resolved')
+    } finally {
+      spy.mockRestore()
+    }
+    expect(await decisionsOf(w, card)).toEqual([])
+    expect(approvals(w, card).map((a) => [a.request, !!a.byDecision])).toEqual([[ids[1], false]])
+    expect(forYou(w).items.map((i) => i.request)).toEqual([ids[0], ids[2]])
+  })
+})

@@ -359,6 +359,8 @@
   "board.forYou.offerReason": "Motivo (opcional)",
   "board.forYou.offerTip": "{action, select, done {Move o cartão para Concluído em seu nome, pulando as regras do projeto onde for preciso (registrado como exceção, com o motivo ao lado), e responde a pergunta.} noCode {Torna o cartão um cartão sem código em seu nome (registrado como exceção, com o motivo ao lado), e responde a pergunta.} skipReview {Faz o cartão pular a revisão em seu nome (com o motivo ao lado), e responde a pergunta.} other {Desbloqueia o cartão (o motivo ao lado é adicionado como seu comentário) e responde a pergunta.}}",
   "board.forYou.reply": "Sua resposta",
+  "board.forYou.resolvedBy": "{gone, select, yes {Por uma decisão já removida} other {Pela sua decisão: “{decision}”}}, {who, select, you {registrada por você} assistant {registrada pelo Assistente} other {registrada por {name}}}",
+  "board.forYou.resolvedHeading": "Respondidas pelas suas decisões",
   "board.forYou.rounds": "Mais rodadas",
   "board.forYou.saveAndMerge": "Salvar e continuar o merge",
   "board.forYou.send": "Enviar resposta",

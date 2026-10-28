@@ -361,6 +361,8 @@ interface HiveMessageValues {
   'board.forYou.offerReason': undefined
   'board.forYou.offerTip': { action: string }
   'board.forYou.reply': undefined
+  'board.forYou.resolvedBy': { gone: string; decision: string | number; who: string; name: string | number }
+  'board.forYou.resolvedHeading': undefined
   'board.forYou.rounds': undefined
   'board.forYou.saveAndMerge': undefined
   'board.forYou.send': undefined

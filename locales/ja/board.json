@@ -359,6 +359,8 @@
   "board.forYou.offerReason": "理由（任意）",
   "board.forYou.offerTip": "{action, select, done {あなたとしてカードを完了に移動し（必要ならプロジェクトのルールをスキップし、横の理由とともに例外として記録します）、質問に答えます。} noCode {あなたとしてカードをコードなしのカードにし（横の理由とともに例外として記録します）、質問に答えます。} skipReview {あなたとしてカードのレビューを省略し（横の理由を添えて）、質問に答えます。} other {カードのブロックを解除し（横の理由はあなたのコメントとして追加されます）、質問に答えます。}}",
   "board.forYou.reply": "回答",
+  "board.forYou.resolvedBy": "{gone, select, yes {削除された決定事項で回答} other {あなたの決定事項で回答：「{decision}」}}、{who, select, you {記録：あなた} assistant {記録：アシスタント} other {記録：{name}}}",
+  "board.forYou.resolvedHeading": "あなたの決定事項で回答済み",
   "board.forYou.rounds": "追加ラウンド",
   "board.forYou.saveAndMerge": "保存してマージを続行",
   "board.forYou.send": "返信を送信",

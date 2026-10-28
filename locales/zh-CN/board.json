@@ -359,6 +359,8 @@
   "board.forYou.offerReason": "理由（可选）",
   "board.forYou.offerTip": "{action, select, done {以你的身份把卡片移到已完成，必要时跳过项目的规则（记为例外放行，并附上旁边的理由），并回答问题。} noCode {以你的身份把卡片改为无代码卡片（记为例外放行，并附上旁边的理由），并回答问题。} skipReview {以你的身份让卡片跳过评审（附上旁边的理由），并回答问题。} other {解除卡片的受阻状态（旁边的理由会作为你的评论添加），并回答问题。}}",
   "board.forYou.reply": "你的回答",
+  "board.forYou.resolvedBy": "{gone, select, yes {由一项已删除的决定回答} other {由你的决定回答：“{decision}”}}，{who, select, you {由你记录} assistant {由助手记录} other {由 {name} 记录}}",
+  "board.forYou.resolvedHeading": "已由你的决定回答",
   "board.forYou.rounds": "更多轮次",
   "board.forYou.saveAndMerge": "保存并继续合并",
   "board.forYou.send": "发送回复",

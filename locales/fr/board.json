@@ -359,6 +359,8 @@
   "board.forYou.offerReason": "Raison (facultative)",
   "board.forYou.offerTip": "{action, select, done {Déplace la carte vers Terminé en ton nom, en contournant les règles de son projet si besoin (enregistré comme dérogation, avec la raison à côté), et répond à la question.} noCode {Passe la carte sans code en ton nom (enregistré comme dérogation, avec la raison à côté), et répond à la question.} skipReview {Fait ignorer la relecture de la carte en ton nom (avec la raison à côté), et répond à la question.} other {Débloque la carte (la raison à côté est ajoutée comme ton commentaire), et répond à la question.}}",
   "board.forYou.reply": "Ta réponse",
+  "board.forYou.resolvedBy": "{gone, select, yes {Par une décision supprimée depuis} other {Par ta décision : « {decision} »}}, {who, select, you {notée par toi} assistant {notée par l’Assistant} other {notée par {name}}}",
+  "board.forYou.resolvedHeading": "Répondues par tes décisions",
   "board.forYou.rounds": "Tours supplémentaires",
   "board.forYou.saveAndMerge": "Enregistrer et poursuivre la fusion",
   "board.forYou.send": "Envoyer la réponse",

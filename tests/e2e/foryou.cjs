@@ -420,12 +420,56 @@ const check = (name, ok, extra = '') => {
     check('…a request under it opens its card', !!(await lib.until(async () => (await tDialog.count()) === 1 && (await tDialog.locator('.task-title-input').inputValue()) === 'Three questions', HUNG_MS)))
     await page.keyboard.press('Escape')
     await lib.until(async () => (await tDialog.count()) === 0, HUNG_MS)
+    // HI-1932: the user's answer, given in a chat with the Assistant, recorded by it as a decision naming the questions
+    // it answers, closes those: in one write, the asker told, the card's resolved list and history saying who recorded
+    // it. Maker's lane on the card pauses while any question waits for the user, and goes on once none does.
+    await makerSays(`hive hive_lane ${JSON.stringify({ action: 'start', cards: [`#${t}`] })}`)
+    const betaLane = async () => (await inv('lanes:list')).find((l) => l.project === 'beta' && l.cards.some((c) => c.number === t))
+    check("Maker's lane on the card pauses: waiting for the user", !!(await lib.until(async () => (await betaLane())?.state === 'paused' && (await betaLane())?.pausedOn === t, HUNG_MS)), JSON.stringify(await betaLane()))
+    const home = (await inv('workspace:refresh')).assistant.path
+    await inv('session:start', home, { agentId: 'assistant' })
+    const assistantLive = async () => (await inv('session:live')).find((x) => x.projectPath.toLowerCase() === home.toLowerCase() && x.agentId === 'assistant')
+    await lib.until(async () => ['waiting', 'ready'].includes((await assistantLive())?.status), HUNG_MS)
+    if ((await assistantLive())?.status === 'waiting') await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
+    check('the Assistant runs', !!(await lib.until(async () => (await assistantLive())?.status === 'ready', HUNG_MS)))
+    const tokenFile = path.join(userData, 'assistant-api', `${require('crypto').createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
+    const assistantToken = JSON.parse(fs.readFileSync(tokenFile, 'utf8')).token
+    const asAssistant = async (method, route, body) => {
+      const res = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${assistantToken}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
+      return { status: res.status, json: await res.json().catch(() => null) }
+    }
+    const read = await asAssistant('GET', `/v1/tasks/${t}`)
+    const waiting = read.json?.forYou ?? []
+    check("hive_read_task lists the card's open requests with their ids", read.status === 200 && waiting.length === 3 && waiting.every((x) => /\/r\d+$/.test(x.request)) && waiting[0].text === 'First: which icon?', JSON.stringify(read.json?.forYou))
+    const [first, second, third] = waiting.map((x) => x.request)
+    const decided = await asAssistant('PATCH', `/v1/tasks/${t}`, { decision: 'The bee icon, in amber.', answers: [first, second] })
+    check("the Assistant's decision naming two of them is taken", decided.status === 200, JSON.stringify(decided.json))
+    check('…those two leave For you; the third stays, still counted', !!(await lib.until(async () => (await forYouOf(t)) === 1, HUNG_MS)) && (await inv('tasks:forYou')).items.some((i) => i.request === third), String(await forYouOf(t)))
+    check('…the lane still waits for the user, on the third', (await betaLane())?.state === 'paused' && (await betaLane())?.pausedOn === t, JSON.stringify(await betaLane()))
+    const cardNow = await card(t)
+    const decisionId = cardNow.decisions?.find((d) => d.text === 'The bee icon, in amber.')?.id
+    check('…the decision on the card, recorded by the Assistant', !!decisionId && cardNow.decisions.find((d) => d.id === decisionId).recordedBy === 'Assistant', JSON.stringify(cardNow.decisions))
+    check('…a history line for each, by the Assistant', cardNow.history.filter((h) => h.by === 'Assistant' && /^Closed a question for you with your decision/.test(h.what)).length === 2, JSON.stringify(cardNow.history.slice(-4)))
+    check('…Maker is told, once', !!(await lib.until(async () => wakes('Maker').filter((x) => x.includes('with a decision (recorded by Assistant): The bee icon, in amber.')).length === 1, HUNG_MS)), JSON.stringify(wakes('Maker').slice(-3)))
+    await openByTitle(page, t)
+    const resolvedIn = page.locator('.dialog').filter({ has: page.locator('.task-title-input') }).locator('[data-section="for-you"] [data-resolved] .for-you-resolved-row')
+    check("the card's For you section lists them: the question, the decision (by its id), recorded by the Assistant", !!(await lib.until(async () => (await resolvedIn.count()) === 2, HUNG_MS)) && (await resolvedIn.evaluateAll((els) => els.map((e) => e.dataset.decision))).every((d) => d === decisionId) && (await resolvedIn.first().innerText()).includes('By your decision: “The bee icon, in amber.”, recorded by the Assistant') && /Second: which colour\?/.test(await resolvedIn.first().innerText()), await resolvedIn.first().innerText().catch(() => ''))
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((x) => document.documentElement.setAttribute('data-theme', x), theme)
+      await page.locator('.dialog [data-section="for-you"]').screenshot({ path: path.join(lib.WORK, `foryou-resolved-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await page.keyboard.press('Escape')
+    // The third, answered in For you the ordinary way: none waits now, and the lane goes on.
+    await inv('tasks:answer', t, third, { outcome: 'answered', reply: 'Ship it today.' })
+    check('the third answered in For you: none waits, and the lane runs again', !!(await lib.until(async () => (await forYouOf(t)) === 0 && (await betaLane())?.state === 'active', HUNG_MS)), JSON.stringify(await betaLane()))
     // Its builder stops at a permission prompt: an agent that needs you, on cards already counted.
+    const beforeMaker = await needCount()
     await makerSays('ask work 300')
     check('Maker waits at a prompt', !!(await lib.until(async () => (await liveIn(beta, maker.id))?.status === 'waiting', HUNG_MS)))
     await needItem.click()
     const makerRow = page.locator('.inbox-panel .inbox-row', { hasText: 'Maker' })
-    check('…listed under one of its cards, not counted again', !!(await lib.until(async () => (await makerRow.count()) === 1 && (await makerRow.evaluate((el) => el.classList.contains('inbox-under') && !!el.closest('[data-card-group]'))), HUNG_MS)) && (await needCount()) === before + 1, JSON.stringify({ count: await needCount(), under: await makerRow.evaluate((el) => el.className).catch(() => '') }))
+    check('…listed under one of its cards, not counted again', !!(await lib.until(async () => (await makerRow.count()) === 1 && (await makerRow.evaluate((el) => el.classList.contains('inbox-under') && !!el.closest('[data-card-group]'))), HUNG_MS)) && (await needCount()) === beforeMaker, JSON.stringify({ count: await needCount(), was: beforeMaker, under: await makerRow.evaluate((el) => el.className).catch(() => '') }))
     for (const theme of ['dark', 'light']) {
       await page.evaluate((x) => document.documentElement.setAttribute('data-theme', x), theme)
       await page.locator('.inbox-panel').screenshot({ path: path.join(lib.WORK, `foryou-grouped-agent-${theme}.png`) })
