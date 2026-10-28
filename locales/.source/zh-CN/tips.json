@@ -142,6 +142,8 @@
   "tips.conflictHunks.title": "See a returned card's conflicts",
   "tips.connectionOrder.text": "Drag each CLI's connections into your order in Settings → Connections: new agents use the first one that's on in the workspace. Make Default moves one to the top without turning it on; running agents keep theirs.",
   "tips.connectionOrder.title": "Put your connections in order",
+  "tips.connectionTrust.text": "A new connection's Set Up asks Claude Code once, in the workspace folder, to trust every project in it. Codex agents never ask: each trusts its own folder for that launch (Settings → Advanced → Codex).",
+  "tips.connectionTrust.title": "Trust a workspace in one answer",
   "tips.connections.text": "Settings → Connections keeps several Claude Code and Codex sign-ins, or a server such as Ollama on this PC. Each workspace chooses which are on, new agents use the first one on in your order, and any agent can run on its own: pick it in Agent Settings.",
   "tips.connections.title": "Run agents on different sign-ins",
   "tips.consoleRecording.text": "In the developer console, Record writes what an agent's CLI sends Hive to a file, redacted unless you tick text for that recording, and Copy Diagnostics can attach it to a bug report.",

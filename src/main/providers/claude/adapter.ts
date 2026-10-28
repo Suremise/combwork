@@ -15,7 +15,7 @@ import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
-import type { ConnectionStatus, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
+import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
 import { autoCompactOf, settingsScopes } from './autoCompact'
 import { connectionsManaged } from '../../connectionSeam'
 import { hiveStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
@@ -353,7 +353,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
    * or an ancestor's entry with the trust field, forward slashes, letter case as on disk (it asked with an entry in
    * another case, and for an 8.3 path whatever the long one's entry said: unknown then).
    */
-  async connectionTrusts(home: string, targets: readonly TrustTarget[]): Promise<(boolean | null)[]> {
+  async connectionTrusts(home: string, targets: readonly TrustTarget[]): Promise<TrustReading[]> {
     let entries: Record<string, unknown>
     try {
       const j = JSON.parse(await readFile(join(home, '.claude.json'), 'utf8')) as { projects?: unknown }

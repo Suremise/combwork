@@ -268,6 +268,8 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
       shared: ['projects'],
       userHome: '.claude',
       orgs: true,
+      // A trusted folder covers the folders inside it (HI-1871, measured with 2.1.311): one answer for the workspace.
+      trustInherits: true,
       setUp: msg({ id: 'providers.claude.connections.setUp', defaultMessage: "Set Up runs Claude Code on this connection for its one-time first-run questions (its look, its notes) and to trust this workspace's folders. Answer them in the terminal.", description: "Settings → Connections, above a Claude Code connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button." }),
       // A server of the user's (HI-1772), as Claude Code's environment variables reference has it (checked 27 Oct 2026):
       // the key as a bearer token (ANTHROPIC_API_KEY would ask to be approved first, in a pane).

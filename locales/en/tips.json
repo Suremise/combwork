@@ -571,6 +571,14 @@
     "defaultMessage": "Put your connections in order",
     "description": "A tip's title."
   },
+  "tips.connectionTrust.text": {
+    "defaultMessage": "A new connection's Set Up asks Claude Code once, in the workspace folder, to trust every project in it. Codex agents never ask: each trusts its own folder for that launch (Settings → Advanced → Codex).",
+    "description": "A tip (HI-1871): how a new connection's coding agent CLIs come to trust the workspace's folders. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Set Up is a button)."
+  },
+  "tips.connectionTrust.title": {
+    "defaultMessage": "Trust a workspace in one answer",
+    "description": "A tip's title."
+  },
   "tips.connections.text": {
     "defaultMessage": "Settings → Connections keeps several Claude Code and Codex sign-ins, or a server such as Ollama on this PC. Each workspace chooses which are on, new agents use the first one on in your order, and any agent can run on its own: pick it in Agent Settings.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Ollama is a product's name."

@@ -142,6 +142,8 @@
   "tips.conflictHunks.title": "查看被退回卡片的冲突",
   "tips.connectionOrder.text": "在“设置 → 连接”中把每个 CLI 的连接拖成你的顺序：新智能体使用工作区中第一个已开启的连接。“设为默认”会把它移到最上方但不会开启它；正在运行的智能体保留各自的连接。",
   "tips.connectionOrder.title": "给连接排序",
+  "tips.connectionTrust.text": "新连接的“设置”只会在工作区文件夹中询问 Claude Code 一次，以信任其中的每个项目。Codex 智能体从不询问：每个智能体在该次启动中信任自己的文件夹（设置 → 高级 → Codex）。",
+  "tips.connectionTrust.title": "一次回答即可信任整个工作区",
   "tips.connections.text": "“设置 → 连接”可保存多个 Claude Code 和 Codex 登录，或本机上的 Ollama 等服务器。每个工作区选择开启哪些连接，新智能体使用你的顺序中第一个已开启的连接，任何智能体也可以用自己的连接：在智能体设置中选择。",
   "tips.connections.title": "让智能体使用不同的登录运行",
   "tips.consoleRecording.text": "在开发者控制台中，“录制”会把智能体的 CLI 发给 Hive 的内容写入文件，除非你为该录制勾选“文本”，否则内容会脱敏；“复制诊断信息”可以把它附到错误报告中。",

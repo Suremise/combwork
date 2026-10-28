@@ -142,6 +142,8 @@
   "tips.conflictHunks.title": "Veja os conflitos de um cartão devolvido",
   "tips.connectionOrder.text": "Arraste as conexões de cada CLI na sua ordem em Configurações → Conexões: os novos agentes usam a primeira ativada no espaço de trabalho. Tornar padrão leva uma para o topo sem ativá-la; agentes em execução mantêm a deles.",
   "tips.connectionOrder.title": "Coloque suas conexões em ordem",
+  "tips.connectionTrust.text": "Configurar uma nova conexão pergunta ao Claude Code uma vez, na pasta do espaço de trabalho, se deve confiar em cada projeto dentro dela. Os agentes do Codex nunca perguntam: cada um confia na própria pasta para aquele início (Configurações → Avançado → Codex).",
+  "tips.connectionTrust.title": "Confie em um espaço de trabalho com uma resposta",
   "tips.connections.text": "Configurações → Conexões guarda vários logins do Claude Code e do Codex, ou um servidor como o Ollama neste PC. Cada espaço de trabalho escolhe quais estão ativadas, os novos agentes usam a primeira ativada na sua ordem, e qualquer agente pode usar a própria: escolha-a nas Configurações do agente.",
   "tips.connections.title": "Rode agentes em logins diferentes",
   "tips.consoleRecording.text": "No console do desenvolvedor, Gravar grava em um arquivo o que a CLI de um agente envia ao Hive, com dados sensíveis ocultos, a menos que você marque Texto para essa gravação, e Copiar diagnóstico pode anexá-la a um relatório de bug.",

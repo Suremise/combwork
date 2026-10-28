@@ -21,7 +21,7 @@ import { plainHttpsJson } from '../../plainHttpsJson'
 import { findSecretWarnings } from '../../mcpSecrets'
 import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import { storePwshFirst, storePwshIssue } from './storePwsh'
-import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, TrustTarget, ExternalSession, KeySteps, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
+import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, TrustReading, TrustTarget, ExternalSession, KeySteps, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
 import { codexBackgroundMemo, codexBackgroundTasks, type CodexBackgroundMemo } from './background'
 import { codexSafeguards } from './safeguards'
 import { codexTranscriptTurns } from './turns'
@@ -715,7 +715,9 @@ export class CodexAdapter implements ProviderAdapter {
    * with `trust_level = "trusted"` for the main repository root's real path, in any letter case (8.3 paths it expands).
    * It asks only in a Git repository, so a folder without Git needs none. Its own file only: launches pass no trust.
    */
-  async connectionTrusts(home: string, targets: readonly TrustTarget[]): Promise<(boolean | null)[]> {
+  async connectionTrusts(home: string, targets: readonly TrustTarget[]): Promise<TrustReading[]> {
+    // Each launch trusts its own folder (HI-1871: the Advanced switch, on by default): none of Hive's folders asks.
+    if (advanced.get<boolean>('codex.trust.perLaunch')) return targets.map(() => true)
     let projects: Record<string, unknown>
     try {
       const t = parseToml(await readFile(join(home, 'config.toml'), 'utf8')) as Record<string, unknown>
@@ -725,8 +727,15 @@ export class CodexAdapter implements ProviderAdapter {
       projects = {}
     }
     const norm = (p: string): string => p.replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase()
-    const trusted = new Set(Object.entries(projects).filter(([, v]) => (v as Record<string, unknown> | null)?.trust_level === 'trusted').map(([k]) => norm(k)))
-    return targets.map((t) => (!t.git ? true : t.root ? trusted.has(norm(t.root)) : null))
+    // Each entry's trust level, by its path as Codex compares it (get_active_project: the cwd's entry, then the main
+    // root's; source pinned at 6aaac69).
+    const levels = new Map(Object.entries(projects).map(([k, v]) => [norm(k), (v as Record<string, unknown> | null)?.trust_level]))
+    return targets.map((t): TrustReading => {
+      if (!t.git) return true
+      // The project's own folder's entry first (a worktree project's own, say): it decides, and is where to ask.
+      if (t.folder && levels.has(norm(t.folder))) return levels.get(norm(t.folder)) === 'trusted' ? true : { at: t.folder }
+      return t.root ? levels.get(norm(t.root)) === 'trusted' : null
+    })
   }
 
   accountSharedTarget(name: string): string {
@@ -912,6 +921,10 @@ export class CodexAdapter implements ProviderAdapter {
     // On a connection (HI-1757): its login kept in its own folder, and the Windows sandbox this PC has (set up once, in
     // ~/.codex's config: its accounts are the machine's), unless the connection's own config names one.
     args.push(...launchConnectionArgs(ctx))
+    // Its own folder trusted for this launch (HI-1871, Darren 27 Oct: on by default, an Advanced off switch): Codex
+    // looks its cwd up first, so it never asks in Hive's folders. The table merges into the home's own for this launch
+    // (config overrides.rs, merge.rs at 6aaac69) and nothing is written.
+    if (advanced.get<boolean>('codex.trust.perLaunch')) args.push('-c', `projects=${toToml({ [ctx.cwd]: { trust_level: 'trusted' } })}`)
     const files = [join(ctx.connectionHome ?? codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
     const developer = this.developerOverride(ctx)
     const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveHiveTools'), trusted: ctx.trustedHiveTools }

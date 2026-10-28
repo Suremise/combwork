@@ -109,7 +109,9 @@ describe('the variables Codex would read as a login (withoutAccountEnv)', () => 
 
 describe("a Codex connection's folder", () => {
   it('has CODEX_HOME as its home, and sessions and archived_sessions shared', () => {
-    expect(CODEX_DESCRIPTOR.capabilities.connections).toEqual({ homeEnv: 'CODEX_HOME', shared: ['sessions', 'archived_sessions'], userHome: '.codex', orgs: false })
+    // Its Set Up wording (HI-1870's setUp) aside; no trustInherits: a trusted folder above a repository doesn't cover it (HI-1871).
+    expect(CODEX_DESCRIPTOR.capabilities.connections).toMatchObject({ homeEnv: 'CODEX_HOME', shared: ['sessions', 'archived_sessions'], userHome: '.codex', orgs: false })
+    expect(CODEX_DESCRIPTOR.capabilities.connections?.trustInherits).toBeUndefined()
   })
   it('takes on a sign-in by its email alone (Codex names no organisation); Claude Code still needs both', () => {
     const o = { at: 'now', loggedIn: true as const, email: 'one@example.com', plan: 'plus' }

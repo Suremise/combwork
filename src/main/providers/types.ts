@@ -139,7 +139,15 @@ export interface TrustTarget {
   root: string | null
   git: boolean
   short: boolean
+  /** The project's own folder, real path (a linked worktree's own, when the project is one): Codex looks it up first. */
+  folder?: string | null
 }
+
+/**
+ * A CLI's trust of one target (HI-1871): trusted, not (asked at its root), unknown (null), or not and asked at another
+ * folder (`at`: Codex's own entry for the project's folder, which it looks up before the main root, says no).
+ */
+export type TrustReading = boolean | null | { at: string }
 
 export interface CommandSpec {
   file: string
@@ -398,7 +406,7 @@ export interface ProviderAdapter {
    * there say, read only: true, false (not trusted, or no record), or null when it can't be told (a file it can't
    * read, a folder Hive couldn't resolve). Absent: the CLI keeps no trust to tell.
    */
-  connectionTrusts?(home: string, targets: readonly TrustTarget[]): Promise<(boolean | null)[]>
+  connectionTrusts?(home: string, targets: readonly TrustTarget[]): Promise<TrustReading[]>
   /** Where a shared folder of an account (capabilities.connections.shared) links to: that folder of the CLI's own home. */
   accountSharedTarget?(name: string): string
   /** Whether a file in an account's folder is one that changes when the CLI signs in or out there: watched, never read. */

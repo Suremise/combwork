@@ -45,7 +45,12 @@ const check = (name, ok, extra = '') => {
   env.HIVE_TEST_HOLD_TRUST = trustGo
   fs.mkdirSync(path.dirname(conversation), { recursive: true })
   fs.writeFileSync(conversation, '{"kept":true}\n')
-  for (const w of [ws1, ws2]) fs.mkdirSync(path.join(w, 'alpha'), { recursive: true })
+  // Each project with a Claude Code agent: "Needs set up" counts only projects a connection would be used in (HI-1871).
+  const projectWithAgent = (dir) => {
+    fs.mkdirSync(path.join(dir, '.hive'), { recursive: true })
+    fs.writeFileSync(path.join(dir, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'claude-code' }] }))
+  }
+  for (const w of [ws1, ws2]) projectWithAgent(path.join(w, 'alpha'))
   // `hold`: the fake's sign-in waits (for a browser that never comes) until its terminal is closed.
   const loginAs = (email, hold = false) => {
     fs.mkdirSync(accountsRoot, { recursive: true })
@@ -171,52 +176,43 @@ const check = (name, ok, extra = '') => {
     check('turned on here, it is this workspace’s default (workspace.json)', !!(await lib.until(async () => JSON.stringify(wsJson(ws1)) === JSON.stringify({ 'claude-code': { on: [personal.id], default: personal.id } }), HUNG_MS)), JSON.stringify(wsJson(ws1)))
     check('…and its row says so', !!(await lib.until(async () => (await row('Personal').locator('.account-default').count()) === 1, HUNG_MS)))
 
-    // --- Set up for this workspace (HI-1870): on here, its CLI must trust the workspace's folders too, read from its
-    // .claude.json (never written by Hive). Set Up opens where it doesn't yet, and the fake records the trust answered.
-    const alpha1 = fs.realpathSync.native(path.join(ws1, 'alpha'))
+    // --- Set up for this workspace (HI-1870): on here, its CLI must trust the folders it would be used in too, read
+    // from its .claude.json (never written by Hive). Claude Code's trust of a folder covers those inside it (HI-1871),
+    // so Set Up asks once, in the workspace's folder; the fake records the trust answered there.
+    const ws1Real = fs.realpathSync.native(ws1)
     const trustOf = async (invoke, id) => (await invoke('connections:list')).connections.find((a) => a.id === id)?.trust ?? null
     check('on in a workspace whose project it doesn’t trust, it needs set up again, naming the project', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1 && /Not trusted yet in this workspace: alpha/.test(await row('Personal').locator('[data-not-trusted]').innerText().catch(() => '')), HUNG_MS)) && (await row('Personal').locator('[data-set-up].primary').count()) === 1)
     await shots('not-trusted')
     const launchesBefore = fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).length
     await row('Personal').locator('[data-set-up]').click()
-    check('…its Set Up opens in that project’s folder, saying so', !!(await lib.until(async () => /alpha's folder/.test(await page.locator('.account-signin [data-set-up-in]').innerText().catch(() => '')), HUNG_MS)))
+    check('…its Set Up opens once, in the workspace’s folder, saying it covers every project in it', !!(await lib.until(async () => /this workspace's folder.*every project in it/.test(await page.locator('.account-signin [data-set-up-in]').innerText().catch(() => '')), HUNG_MS)))
+    check('…its sentence said once, above the terminal, not on the row too', (await row('Personal').locator('[data-set-up-note]').count()) === 0 && (await page.locator('.account-signin .hint').count()) >= 1)
+    await shots('set-up-workspace')
     const trustRun = await lib.until(async () => {
       const all = fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
       return all.length > launchesBefore ? all.at(-1) : null
     }, HUNG_MS)
-    check('…the CLI run there, on the connection', !!trustRun && path.resolve(trustRun.cwd).toLowerCase() === alpha1.toLowerCase(), JSON.stringify(trustRun))
+    check('…the CLI run there, on the connection', !!trustRun && path.resolve(trustRun.cwd).toLowerCase() === ws1Real.toLowerCase(), JSON.stringify(trustRun))
+    // The hint names the folder it actually opened in (HI-1871 round 1: main's answer, not the row's last view).
+    check('…its hint names the folder the CLI was started in', !!trustRun && (await page.locator('.account-signin [data-set-up-in]').innerText()).toLowerCase().includes(path.resolve(trustRun.cwd).toLowerCase()))
+    const wsKey = ws1Real.replace(/\\/g, '/')
+    await lib.until(async () => JSON.parse(fs.readFileSync(path.join(folder, '.claude.json'), 'utf8')).projects?.[wsKey]?.hasTrustDialogAccepted === true, HUNG_MS)
     await closeRunning(true)
-    check('…its trust answered (the fake records it), the row says it is set up', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)) && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }))
-    // A project added afterwards, its trust read held: Checking…, never Set up, until it is in (HI-1870 round 3).
+    check('…its trust answered once (the fake records it), the row says it is set up: alpha and the Assistant’s home covered', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)) && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }))
+    // A project added afterwards, its trust read held: Checking…, never Set up, until it is in (HI-1870 round 3). It is
+    // inside the trusted workspace folder, so then Set up by itself, with no new answer (the same answer as before, for
+    // a new set of projects: the window is told, HI-1870 round 4), the list never asked here.
     fs.rmSync(trustGo)
-    fs.mkdirSync(path.join(ws1, 'gamma'), { recursive: true })
+    projectWithAgent(path.join(ws1, 'gamma'))
     await inv('workspace:refresh')
     check('while its trust of a new project is read, the row says Checking…, not Set up', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="checking"]').count()) === 1, HUNG_MS)) && (await row('Personal').locator('[data-set-up-state="done"]').count()) === 0)
     await shots('checking')
     fs.writeFileSync(trustGo, '')
-    // Then needed again, for it alone.
-    check('a project added later brings Needs set up back, for it alone', !!(await lib.until(async () => JSON.stringify((await trustOf(inv, personal.id))?.pending.map((p) => p.project)) === '["gamma"]' && (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1, HUNG_MS)))
-    // Its Set Up opens in the new project's folder, where its trust is answered (the fake records it): set up again.
-    await row('Personal').locator('[data-set-up]').click()
-    check('…its Set Up opens in the new project’s folder', !!(await lib.until(async () => /gamma's folder/.test(await page.locator('.account-signin [data-set-up-in]').innerText().catch(() => '')), HUNG_MS)))
-    // Its trust answered there (the fake records it as it starts) before the terminal is closed: closed sooner, it would
-    // rightly still need set up.
-    const gammaKey = fs.realpathSync.native(path.join(ws1, 'gamma')).replace(/\\/g, '/')
-    await lib.until(async () => JSON.parse(fs.readFileSync(path.join(folder, '.claude.json'), 'utf8')).projects?.[gammaKey]?.hasTrustDialogAccepted === true, HUNG_MS)
-    await closeRunning(true)
-    check('…and, trusted there, it is set up again', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
-    // A project it already trusts, added while the read is held (round 3): Checking…, then, released, the row clears to
-    // Set up by itself (the same answer as before, for the new projects: the window is told), the list never asked here.
-    const delta = path.join(ws1, 'delta')
-    fs.mkdirSync(delta, { recursive: true })
-    const pj = path.join(folder, '.claude.json')
-    const cj = JSON.parse(fs.readFileSync(pj, 'utf8'))
-    fs.writeFileSync(pj, JSON.stringify({ ...cj, projects: { ...cj.projects, [fs.realpathSync.native(delta).replace(/\\/g, '/')]: { hasTrustDialogAccepted: true } } }))
-    fs.rmSync(trustGo)
+    check('…then Set up by itself: the workspace folder’s trust covers it, no new answer', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
+    // A project with no agent on Claude Code doesn't count (HI-1871, Darren): no read for it, nothing pending.
+    fs.mkdirSync(path.join(ws1, 'delta'), { recursive: true })
     await inv('workspace:refresh')
-    check('a project it already trusts, added: Checking… while read', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="checking"]').count()) === 1, HUNG_MS)))
-    fs.writeFileSync(trustGo, '')
-    check('…then Set up by itself once read, the same answer as before', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
+    check('a project with no agent on this CLI isn’t counted', (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1 && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }))
 
     // --- Rename: the name only.
     await row('Personal').getByRole('button', { name: 'Rename…' }).click()
@@ -298,11 +294,11 @@ const check = (name, ok, extra = '') => {
     check('a new workspace starts with the top of the order on (HI-1875), the one used there', JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [personal.id], default: personal.id } }), JSON.stringify(wsJson(ws2)))
     // One connection, two workspaces (HI-1870): set up for the first one's folders, not yet for this one's.
     const alpha2 = fs.realpathSync.native(path.join(ws2, 'alpha'))
-    check('one connection in two workspaces: each window says its own (here alpha untrusted, set up in the first)', !!(await lib.until(async () => JSON.stringify((await trustOf(invOn(p2), personal.id))?.pending) === JSON.stringify([{ project: 'alpha', folder: alpha2 }]), HUNG_MS)) && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }), JSON.stringify([await trustOf(invOn(p2), personal.id), await trustOf(inv, personal.id), alpha2]))
+    check('one connection in two workspaces: each window says its own (here alpha untrusted, set up in the first)', !!(await lib.until(async () => !!(await trustOf(invOn(p2), personal.id))?.pending.some((p) => p.project === 'alpha' && p.folder === alpha2), HUNG_MS)) && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }), JSON.stringify([await trustOf(invOn(p2), personal.id), await trustOf(inv, personal.id), alpha2]))
     await invOn(p2)('connections:setOn', personal.id, false)
     check('…off there, its trust there no longer counts', !!(await lib.until(async () => (await trustOf(invOn(p2), personal.id)) === null, HUNG_MS)))
     await invOn(p2)('connections:setOn', personal.id, true)
-    check('…turned on there again, it needs set up there again', !!(await lib.until(async () => (await trustOf(invOn(p2), personal.id))?.pending.length === 1, HUNG_MS)))
+    check('…turned on there again, it needs set up there again', !!(await lib.until(async () => !!(await trustOf(invOn(p2), personal.id))?.pending.some((p) => p.project === 'alpha'), HUNG_MS)))
     await invOn(p2)('connections:setOn', personal.id, false)
     await invOn(p2)('connections:setOn', work.id, true)
     check('a second window’s workspace has Work on, as its default', !!(await lib.until(async () => JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [work.id], default: work.id } }), HUNG_MS)), JSON.stringify(wsJson(ws2)))
