@@ -14,6 +14,7 @@ import { notify, useStore } from '../store'
 import { agentFolder, awayFromProject } from '../agentPlace'
 import { cx, timeAgo } from '../util'
 import { CardQueue, SHOW_QUEUE_WORK } from './CardQueue'
+import { CardRoundCostTable } from './CardCost'
 import { Icon, Tooltip } from './ui'
 
 // A card's work (#1224, SPEC §16.4; #1223's work view): the dialog's Work section and the board card's badges. What the
@@ -209,6 +210,7 @@ function WorkDetails({ card, view: v, project, short, agentName, reveal }: { car
           ))}
         </>
       )}
+      <CardRoundCostTable card={card} />
     </>
   )
 }

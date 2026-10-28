@@ -121,6 +121,8 @@ export interface CheckRanData {
    */
   changes?: string[]
   isolated?: boolean
+  /** The merge queue's entry it ran for (a merge check or the focused tests, HI-1924): the queue history's time taken. */
+  entry?: string
 }
 
 /** The paths a `CheckRan` keeps of what stopped it counting (#1654). */

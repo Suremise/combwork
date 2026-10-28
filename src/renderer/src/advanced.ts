@@ -2,12 +2,12 @@ import { AGENTS_PER_PROJECT, advancedDef, advancedRow, rightClickToCliId } from 
 import { INBOX_SWITCH_ID, inboxSwitchOn, type InboxSwitch } from '@shared/inboxSwitches'
 import type { ProjectConfig } from '@shared/types'
 import { call } from './api'
-import { set, useStore } from './store'
+import { setLoaded, useStore } from './store'
 
 /** Settings → Advanced's state (#367), read again when it changes (an override, advanced.json, the workspace's own). */
 export async function loadAdvanced(): Promise<void> {
   try {
-    set({ advanced: await call('advanced:state') })
+    setLoaded({ advanced: await call('advanced:state') })
   } catch {
     // A window closing meanwhile: nothing to show.
   }

@@ -115,6 +115,8 @@ interface HiveMessageValues {
   'tips.cardAttachmentsCleanup.title': undefined
   'tips.cardCost.text': { example: string | number }
   'tips.cardCost.title': undefined
+  'tips.cardCostRounds.text': undefined
+  'tips.cardCostRounds.title': undefined
   'tips.cardDecisions.text': undefined
   'tips.cardDecisions.title': undefined
   'tips.cardLinks.text': undefined
@@ -192,6 +194,8 @@ interface HiveMessageValues {
   'tips.forYou.title': undefined
   'tips.forYouActions.text': undefined
   'tips.forYouActions.title': undefined
+  'tips.generalistRole.text': undefined
+  'tips.generalistRole.title': undefined
   'tips.gitCheck.text': undefined
   'tips.gitCheck.title': undefined
   'tips.gitHistory.text': undefined
@@ -282,6 +286,8 @@ interface HiveMessageValues {
   'tips.mergeQueueFolder.title': undefined
   'tips.mergeQueuePanel.text': undefined
   'tips.mergeQueuePanel.title': undefined
+  'tips.mergeQueueRecent.text': undefined
+  'tips.mergeQueueRecent.title': undefined
   'tips.mergeRebase.text': undefined
   'tips.mergeRebase.title': undefined
   'tips.mergeSlot.text': undefined

@@ -348,10 +348,10 @@ export function cleanRole(role: unknown): string {
   return r
 }
 
-/** A workflow role as saved (#1430): builder, reviewer or either, else refused. */
+/** A workflow role as saved (#1430): builder, reviewer, either or generalist (HI-686), else refused. */
 export function cleanWorkflowRole(role: unknown): WorkflowRole {
   if (isWorkflowRole(role)) return role
-  throw hiveError(msg({ id: 'worktrees.agent.badWorkflowRole', defaultMessage: 'A role in the workflow is builder, reviewer or either.', description: "An error: an agent's role in the workflow was given as something else. builder, reviewer and either are values: keep them in English." }), undefined, { kind: 'invalid' })
+  throw hiveError(msg({ id: 'worktrees.agent.badWorkflowRole', defaultMessage: 'A role in the workflow is builder, reviewer, either or generalist.', description: "An error: an agent's role in the workflow was given as something else. builder, reviewer, either and generalist are values: keep them in English." }), undefined, { kind: 'invalid' })
 }
 
 export async function updateAgent(projectPath: string, agentId: string, patch: AgentPatch, opts: { check?: (current: AgentDef) => void } = {}): Promise<AgentDef> {

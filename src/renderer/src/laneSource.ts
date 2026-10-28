@@ -3,7 +3,7 @@ import { panelOrder } from '@shared/laneBar'
 import { columnSince, type LaneOrderView } from '@shared/tasks'
 import type { LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '@shared/types'
 import { call } from './api'
-import { get, set, useStore } from './store'
+import { get, set, setLoaded, useStore } from './store'
 
 /**
  * Where the Progress panel's lanes come from (#484): the one place that knows the lane data's shape (#483's
@@ -82,9 +82,9 @@ export function useLanes(load = true): Lane[] {
   useEffect(() => {
     if (!ws || !load) return
     let current = true
-    void call('lanes:list').then((lanes) => current && set({ lanes }))
+    void call('lanes:list').then((lanes) => current && setLoaded({ lanes }))
     // The order as saved now: another window may have changed it while it had this workspace open.
-    void call('ui:get').then((ui) => current && set({ laneOrder: ui.laneOrder ?? {} }), () => undefined)
+    void call('ui:get').then((ui) => current && setLoaded({ laneOrder: ui.laneOrder ?? {} }), () => undefined)
     return () => {
       current = false
     }

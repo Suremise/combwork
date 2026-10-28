@@ -455,6 +455,14 @@
     "defaultMessage": "What a card cost",
     "description": "A tip's title."
   },
+  "tips.cardCostRounds.text": {
+    "defaultMessage": "A card's Work section ends with its cost by round: the builder's and reviewer's parts in each round, adding up to the card's cost. See whether extra rounds or one long read drove it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Work is a section of the card dialog)."
+  },
+  "tips.cardCostRounds.title": {
+    "defaultMessage": "What each review round cost",
+    "description": "A tip's title."
+  },
   "tips.cardDecisions.text": {
     "defaultMessage": "A card's Decisions, above its comments, hold what you decided: agents check their work against them before Review, and reviewers fail work that ignores one. Tell the Assistant a decision and it records it there; an agent waiting for your answer is told.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -762,6 +770,14 @@
   "tips.forYouActions.title": {
     "defaultMessage": "Answer with one click",
     "description": "A tip's title (#1630)."
+  },
+  "tips.generalistRole.text": {
+    "defaultMessage": "Give an agent the Generalist role in the workflow (Agent Settings) and it does whatever you ask in its pane: it is never put in a lane or asked to review. A card it takes still follows the project’s workflow.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Generalist is a role's name (Glossary: generalist)."
+  },
+  "tips.generalistRole.title": {
+    "defaultMessage": "An agent for whatever you ask",
+    "description": "A tip's title."
   },
   "tips.gitCheck.text": {
     "defaultMessage": "Help → Provider Setup… shows the git Hive found and its version. Worktree agents, merging and the Version Control tab’s Git sections need Git for Windows 2.38 or later.",
@@ -1121,6 +1137,14 @@
   },
   "tips.mergeQueuePanel.title": {
     "defaultMessage": "Watch the merge queue",
+    "description": "A tip's title (glossary 2.5: merge queue)."
+  },
+  "tips.mergeQueueRecent.text": {
+    "defaultMessage": "Under each merge queue in the Progress panel's Merges tab, Recent merges lists its latest merges, returns and pauses, with why, when and how long each took. Click one to open its card.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary 2.5: merge queue; 2.4: returned."
+  },
+  "tips.mergeQueueRecent.title": {
+    "defaultMessage": "See what the merge queue did lately",
     "description": "A tip's title (glossary 2.5: merge queue)."
   },
   "tips.mergeRebase.text": {

@@ -5555,19 +5555,30 @@ h2.section#unused-worktrees {
 .split-list.sessions-list {
   width: 320px;
 }
-/* While searching: how many sessions and matches, after the Archived box. */
+/* While searching: how many sessions and matches, after the Archived box; the note while the CLIs' own sessions are read
+   (HI-1681). Each goes under the box when it doesn't fit beside it, and wraps within the list when it doesn't fit there
+   either (a long count in another language, the note), never past its edge (HI-1941); its spinner kept at its first line. */
 .sessions-scope {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
   margin-left: auto;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
+.sessions-scope > .codicon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+/* What doesn't fit beside the Archived box goes under it, never past the list's edge, at any width it is resized to. */
 .sessions-filters {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
   padding: 0 10px 6px 14px;
   font-size: 12px;
+  min-width: 0;
 }
 .session-row {
   position: relative;
@@ -10368,6 +10379,45 @@ textarea.input.task-blocked-input {
   color: var(--fg-muted);
   margin-block-start: 4px;
 }
+/* A card's cost by round and role (HI-1906): amounts right-aligned in their columns, the totals set apart. */
+.card-work-costs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card-work-costs table {
+  border-collapse: collapse;
+  width: max-content;
+  max-width: 100%;
+}
+.card-work-costs th,
+.card-work-costs td {
+  padding: 2px 10px;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.card-work-costs th:first-child {
+  padding-inline-start: 0;
+  text-align: start;
+}
+.card-work-costs thead th {
+  color: var(--fg-muted);
+  font-weight: normal;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.card-work-costs tbody th {
+  font-weight: normal;
+}
+.card-work-costs tfoot th,
+.card-work-costs tfoot td,
+.card-work-costs td[data-role='total'] {
+  font-weight: 600;
+}
+.card-work-costs tfoot th,
+.card-work-costs tfoot td {
+  border-top: 1px solid var(--border-subtle);
+}
 .card-work-rev {
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
@@ -12607,6 +12657,90 @@ button.progress-card-key:hover {
 }
 .progress-queue-link:hover {
   text-decoration: underline;
+}
+/* A queue's Recent merges (HI-1924), under its card: a row an outcome or a pause, newest first, each opening its card.
+   Its icon and words say the outcome; colour is never the only cue. */
+.progress-queue-with-history + .progress-queue-with-history,
+.progress-queue-with-history + .progress-merge-card,
+.progress-merge-card + .progress-queue-with-history {
+  margin-top: 10px;
+}
+.progress-queue-history {
+  margin: 6px 0 0;
+  padding: 0 6px 0 10px;
+  min-width: 0;
+}
+.progress-queue-history-h {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+.progress-queue-history-list {
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.progress-queue-history-row {
+  padding: 4px 4px 4px 0;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+.progress-queue-history-row.opens {
+  cursor: pointer;
+}
+.progress-queue-history-row.opens:hover {
+  background: var(--bg-hover);
+}
+.progress-queue-history-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.progress-queue-history-top > .codicon {
+  flex-shrink: 0;
+}
+.progress-queue-history-row[data-outcome='merged'] .progress-queue-history-top > .codicon {
+  color: var(--success);
+}
+.progress-queue-history-row[data-outcome='returned'] .progress-queue-history-top > .codicon {
+  color: var(--error);
+}
+.progress-queue-history-row.pause .progress-queue-history-top > .codicon {
+  color: var(--warning);
+}
+.progress-queue-history-top > .progress-run-card {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.progress-queue-history-row.pause .progress-queue-outcome {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-queue-when {
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.progress-queue-history-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 2px;
+  margin: 2px 0 0 22px;
+  min-width: 0;
+}
+.progress-queue-history-detail > .progress-queue-outcome {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 /* Pulse's line per merge queue testing or paused (#1356): a click shows the Merges tab. */
 .progress-queue-lines {

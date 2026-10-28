@@ -36,7 +36,7 @@ import { ProgressPanel, progressRunsChanged } from './components/Progress'
 import { queueBoardChanged, queueChangedEvent } from './queueSource'
 import { AssistantMain } from './components/AssistantView'
 import { reloadAssistantChanges } from './assistantUndo'
-import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, noteAssistantAction, setWithLive, showWorkspace, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, dismissToast, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
+import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, noteAssistantAction, flushLiveStates, setLoaded, setWithLive, showWorkspace, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, dismissToast, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
 import { DocsView, McpView, NotesView, SkillView, WelcomeView } from './views/OtherViews'
 import { TemplatesView } from './components/Templates'
 import { ProjectView } from './views/ProjectView'
@@ -88,11 +88,11 @@ let chimesPlayed = 0
 function handleEvent(e: HiveEvent): void {
   switch (e.type) {
     case 'workspace-progress':
-      set({ openProgress: e.progress })
+      setLoaded({ openProgress: e.progress })
       break
     case 'recent-changed':
       // Opened, removed or cleared (in any window): this window's view of the list, asked for again (#144).
-      void call('workspace:recent').then((recent) => set({ recent })).catch(() => undefined)
+      void call('workspace:recent').then((recent) => setLoaded({ recent })).catch(() => undefined)
       break
     case 'workspace-changed': {
       const sel = get().selectedProject
@@ -241,10 +241,10 @@ function handleEvent(e: HiveEvent): void {
       }
       break
     case 'skills-changed':
-      set((s) => ({ skillsVersion: s.skillsVersion + 1 }))
+      setLoaded((s) => ({ skillsVersion: s.skillsVersion + 1 }))
       break
     case 'modes-changed':
-      set((s) => ({ modesVersion: s.modesVersion + 1 }))
+      setLoaded((s) => ({ modesVersion: s.modesVersion + 1 }))
       break
     case 'journal-changed':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set((s) => ({ journalVersion: s.journalVersion + 1 }))
@@ -277,7 +277,7 @@ function handleEvent(e: HiveEvent): void {
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) progressRunsChanged(e)
       break
     case 'merge-slots-changed':
-      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set({ mergeSlots: e.slots })
+      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) setLoaded({ mergeSlots: e.slots })
       break
     case 'queue-changed':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) queueChangedEvent(e.projectPath)
@@ -289,9 +289,11 @@ function handleEvent(e: HiveEvent): void {
       void loadTasks()
       break
     case 'lanes-changed':
-      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set({ lanes: e.lanes })
+      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) setLoaded({ lanes: e.lanes })
       break
     case 'assistant-questions': {
+      // A load's questions still waiting (setLoaded) count as shown: they are never notified again.
+      flushLiveStates()
       const before = get().assistantQuestions
       set({ assistantQuestions: e.questions })
       // With the panel hidden, the question comes as a notification the user can answer.

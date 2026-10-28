@@ -360,6 +360,8 @@
   "agents.workflowRole.builderText": "カードに取り組み、レビューに送ります。",
   "agents.workflowRole.either": "どちらも",
   "agents.workflowRole.eitherText": "作業もレビューもしますが、自分の作業はレビューしません。",
+  "agents.workflowRole.generalist": "ゼネラリスト",
+  "agents.workflowRole.generalistText": "そのペインで頼まれたことを何でもします。ワークフローではどちらの側にも付きません。",
   "agents.workflowRole.label": "ワークフローでの役割",
   "agents.workflowRole.reviewer": "レビュアー",
   "agents.workflowRole.reviewerText": "ビルダーのカードをレビューし、合格か不合格かを判定します。"

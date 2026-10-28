@@ -271,7 +271,7 @@ describe('the lanes service', () => {
   beforeAll(async () => {
     const p = join(wsPath, 'alpha')
     mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2' }] }))
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2' }, { id: 'g1', name: 'G1', workflowRole: 'generalist' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     lanes.startLanes()
@@ -288,6 +288,23 @@ describe('the lanes service', () => {
     while (!(await fn()) && Date.now() - t < ms) await new Promise((r) => setTimeout(r, 50))
     return fn()
   }
+
+  it("a generalist is never a lane's builder or reviewer: a new lane, a reviewer change and a join are refused, nothing changed (HI-686)", async () => {
+    const [c1, c2] = [await make('Gen one'), await make('Gen two')]
+    const generalist = /G1 is a generalist: it takes no side in the workflow/
+    await expect(lanes.startLane(w, { project: 'alpha', builder: 'g1', reviewer: 'r1', cards: [c1.number], by: 'the Assistant' })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(generalist) })
+    await expect(lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'g1', cards: [c1.number], by: 'the Assistant' })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(generalist) })
+    expect((await lanes.listLanes(w)).filter((l) => l.builder.id === 'g1' || l.reviewer?.id === 'g1' || l.builder.id === 'b2')).toEqual([])
+    // A running lane: its reviewer not changed to the generalist, and a generalist can't join it.
+    const kept = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'B2 (alpha)' })
+    await expect(lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'g1', cards: [c1.number, c2.number], by: 'the Assistant' })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(generalist) })
+    await expect(lanes.joinLane(w, { project: 'alpha', builder: 'b2', reviewer: 'g1', cards: [c1.number], by: 'G1 (alpha)' })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(generalist) })
+    const now = (await lanes.listLanes(w)).find((l) => l.id === kept.lane.id)
+    expect([now?.reviewer?.id, now?.cards.map((x) => x.number)]).toEqual(['r1', [c1.number]])
+    // The other roles as before: an either-role or guessed reviewer still reviews.
+    expect((await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number, c2.number], by: 'B2 (alpha)' })).did).toBe('updated')
+    await lanes.endLane(w, kept.lane.id, { abandoned: true })
+  })
 
   it('starts a lane, updates it when started again with a card in common, and starts anew with none', async () => {
     // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).

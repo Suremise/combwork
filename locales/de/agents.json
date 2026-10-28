@@ -360,6 +360,8 @@
   "agents.workflowRole.builderText": "Arbeitet an Karten und schickt sie in Review.",
   "agents.workflowRole.either": "Beides",
   "agents.workflowRole.eitherText": "Bearbeitet oder reviewt Karten, aber nie die eigene Arbeit.",
+  "agents.workflowRole.generalist": "Generalist",
+  "agents.workflowRole.generalistText": "Erledigt alles, worum du in seinem Bereich bittest; steht im Workflow auf keiner Seite.",
   "agents.workflowRole.label": "Rolle im Workflow",
   "agents.workflowRole.reviewer": "Reviewer",
   "agents.workflowRole.reviewerText": "Reviewt die Karten der Bearbeiter: bestanden oder nicht bestanden."

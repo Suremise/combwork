@@ -62,9 +62,9 @@ async function diffTooLarge(ctx) {
   if (await picker.count()) await picker.first().selectOption({ index: (await picker.first().locator('option').count()) - 1 })
   const rows = page.locator('.split-list .pane-body .row')
   const shownFile = page.locator('.split-main .editor-toolbar .path strong').first()
-  // Its own row, by the file's name (the same in every language), once the list has it: never each row in turn, which
-  // ran out of time behind the files earlier screens left changed (HI-1914). Clicked again until its diff is the one shown.
-  const own = rows.filter({ hasText: BIG }).first()
+  // Its own row, by the file's path (data-path, never its text: HI-1935), once the list has it: never each row in turn,
+  // which ran out of time behind the files earlier screens left changed (HI-1914). Clicked again until its diff is the one shown.
+  const own = page.locator(`.split-list .pane-body .row[data-path$="${BIG}"]`).first()
   const started = Date.now()
   const opened = await ctx.lib.until(async () => {
     if (!(await own.count())) return false

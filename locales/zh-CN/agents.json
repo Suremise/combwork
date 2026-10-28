@@ -360,6 +360,8 @@
   "agents.workflowRole.builderText": "处理卡片并将其送去评审。",
   "agents.workflowRole.either": "均可",
   "agents.workflowRole.eitherText": "可构建也可评审，但从不评审自己的工作。",
+  "agents.workflowRole.generalist": "通才",
+  "agents.workflowRole.generalistText": "在它的窗格中做你要求的任何事；在工作流程中不站任何一边。",
   "agents.workflowRole.label": "工作流程中的角色",
   "agents.workflowRole.reviewer": "评审者",
   "agents.workflowRole.reviewerText": "评审构建者的卡片，给出通过或未通过。"

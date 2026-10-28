@@ -1201,10 +1201,10 @@ route('GET', '/v1/connections/:ref', async ({ params }) => {
   return connectionShown(c, ws, !agentCaller(), all)
 })
 
-/** A workflowRole argument (#1430): builder, reviewer or either. */
+/** A workflowRole argument (#1430): builder, reviewer, either or generalist (HI-686). */
 function workflowRoleArg(v: unknown): WorkflowRole {
   if (isWorkflowRole(v)) return v
-  throw new HttpError(400, 'workflowRole is "builder", "reviewer" or "either".')
+  throw new HttpError(400, 'workflowRole is "builder", "reviewer", "either" or "generalist".')
 }
 
 /** Why a worktree of an agent's own is refused (#1451): the Agent API's short note. */
@@ -2019,10 +2019,10 @@ async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promi
 }
 
 /** A queue as the Agent API gives it: no folder (a stuck advance's neither), and whether an outcome has a log rather than the log itself (lean). */
-const publicQueue = ({ projectPath: _p, paused, hiveMerges: _h, inFlight: _i, returns: _r, returnsMore: _more, ...v }: QueueView): QueuePublic => ({
+const publicQueue = ({ projectPath: _p, paused, hiveMerges: _h, inFlight: _i, returns: _r, returnsMore: _more, pauses: _pauses, ...v }: QueueView): QueuePublic => ({
   ...v,
   paused: paused ? (({ stuck, message: _m, ...p }) => (stuck ? { ...p, stuck: (({ folder: _f, ...s }) => s)(stuck) } : p))(paused) : null,
-  recent: v.recent.map(({ log: output, seen: _s, revision: _rev, ...r }) => (output ? { ...r, hasLog: true as const } : r))
+  recent: v.recent.map(({ log: output, seen: _s, revision: _rev, tookMs: _took, push: _push, logPath: _lp, ...r }) => (output ? { ...r, hasLog: true as const } : r))
 })
 
 /** A project agent asking to change a queue: refused, saying whose controls these are. */

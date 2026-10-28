@@ -19,6 +19,7 @@ import { FOCUSED_SKIP_GATE, MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, pass
 import { changedSince, changePaths, choiceStands, chosenTests, FOCUSED_CHECK, FOCUSED_MAX_RESULTS_BYTES, focusedCheckName, readResults, reviewProved, type FocusedResult, type FocusedTest } from '../../shared/workflow/focused'
 import { FOCUSED_PICK, FOCUSED_RUN } from '../../shared/workflow/options'
 import { boundedRead, pathChanges, runPick } from './focusedRun'
+import { pushesSettled, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf, type PushPending, type PushSettled } from './queueLogs'
 import type { TransientFailure } from '../../shared/types'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
@@ -654,16 +655,49 @@ export class MergeQueue {
 
   /** In a merge's `Integrated` write: the push of its target owed, when the options push it (G18). */
   private owePush(w: Write, entry: string, target: string, result: string): void {
-    if (this.pushes()) w.tx.setMeta(pushOwedKey(target), JSON.stringify({ result, card: w.card.key, entry } satisfies PushOwed))
+    if (!this.pushes()) return
+    w.tx.setMeta(pushOwedKey(target), JSON.stringify({ result, card: w.card.key, entry } satisfies PushOwed))
+    // The merge pending its push, for the queue's history (HI-1924), until a push settles it.
+    const pending = pushPendingOf(w.tx.meta(pushPendingKey(target))).filter((p) => p.entry !== entry)
+    w.tx.setMeta(pushPendingKey(target), JSON.stringify([...pending, { entry, result } satisfies PushPending]))
   }
 
-  /** Clears the owed push of a target, only if it is still the one for `result` (a newer merge's is kept). */
-  private clearOwed(target: string, result: string): Promise<void> {
+  /**
+   * Clears the owed push of a target, only if it is still the one for `result` (a newer merge's is kept), and settles
+   * the pending merges in `settled` (HI-1924) in the same write: only those, as they were captured before the push, so
+   * a merge made meanwhile stays pending.
+   */
+  private clearOwed(target: string, result: string, settled: PushSettled[] = []): Promise<void> {
     return this.wf.locked(() =>
       this.wf.store.tx((tx) => {
         if (pushOwedOf(tx.meta(pushOwedKey(target)))?.result === result) tx.setMeta(pushOwedKey(target), '')
+        if (!settled.length) return
+        const done = new Set(settled.map((s) => s.entry))
+        const pending = pushPendingOf(tx.meta(pushPendingKey(target)))
+        tx.setMeta(pushPendingKey(target), JSON.stringify(pending.filter((p) => !done.has(p.entry))))
+        tx.setMeta(pushLogKey(target), JSON.stringify(pushesSettled(pushLogOf(tx.meta(pushLogKey(target))), settled)))
       })
     )
+  }
+
+  /**
+   * The pending merges a push of `head` settles (HI-1924): each one `head` holds is pushed; one it doesn't (reset away)
+   * is `reset`. An ancestry that can't be read leaves that merge pending (said as Not pushed yet), never pushed.
+   */
+  private async pushedBy(pending: PushPending[], head: string): Promise<PushSettled[]> {
+    const at = new Date().toISOString()
+    const out: PushSettled[] = []
+    for (const p of pending) {
+      const has = p.result === head ? true : await G.isAncestor(this.project, p.result, head)
+      if (!isUnknown(has)) out.push({ entry: p.entry, state: has ? 'pushed' : 'reset', at })
+    }
+    return out
+  }
+
+  /** The pending merges, settled as not pushed (`why`): pushing turned off, or the target no longer has them. */
+  private notPushed(pending: PushPending[], why: 'off' | 'reset'): PushSettled[] {
+    const at = new Date().toISOString()
+    return pending.map((p) => ({ entry: p.entry, state: why, at }))
   }
 
   /**
@@ -676,8 +710,10 @@ export class MergeQueue {
   private async settlePush(target: string): Promise<QueueOutcome | null> {
     const owed = pushOwedOf(this.wf.store.meta(pushOwedKey(target)))
     if (!owed) return null
+    // The merges pending their push as they are now (HI-1924): only these are settled below.
+    const pending = pushPendingOf(this.wf.store.meta(pushPendingKey(target)))
     if (!this.pushes()) {
-      await this.clearOwed(target, owed.result)
+      await this.clearOwed(target, owed.result, this.notPushed(pending, 'off'))
       return null
     }
     // Unreadable now (HR2's #1179 round 1): never taken for settled. Still owed, and the queue pauses saying so in its
@@ -688,19 +724,25 @@ export class MergeQueue {
     const has = head ? await G.isAncestor(this.project, owed.result, head) : false
     if (isUnknown(has)) return this.pausePush(target, owed, 'pushUnreadable')
     if (!has) {
-      await this.clearOwed(target, owed.result)
+      // Nothing is pushed: the merges the target no longer has are settled as reset; one it still has stays pending,
+      // for the next push to settle (never taken for pushed on the local target alone).
+      const gone: PushPending[] = []
+      for (const p of pending) if (!head || (await G.isAncestor(this.project, p.result, head)) === false) gone.push(p)
+      await this.clearOwed(target, owed.result, this.notPushed(gone, 'reset'))
       return null
     }
     const dest = await this.pushDest(target)
     // The off switch as it is now, just before the push begins (HR2's #1179 round 1: the reads above take time).
     if (!this.pushes()) {
-      await this.clearOwed(target, owed.result)
+      await this.clearOwed(target, owed.result, this.notPushed(pending, 'off'))
       return null
     }
     if (!dest) return this.pausePush(target, owed, 'pushNoRemote')
-    const r = await this.git(this.project, ['push', '--', dest.remote, `refs/heads/${target}:${dest.ref}`], { env: pushEnv(), timeoutMs: PUSH_MS })
+    // The head read above, by its commit (HI-1924): what was pushed is exactly what the settled merges are checked against.
+    const pushed = head as string
+    const r = await this.git(this.project, ['push', '--', dest.remote, `${pushed}:${dest.ref}`], { env: pushEnv(), timeoutMs: PUSH_MS })
     if (r.ok) {
-      await this.clearOwed(target, owed.result)
+      await this.clearOwed(target, owed.result, await this.pushedBy(pending, pushed))
       return null
     }
     const said = `${r.err}\n${r.out}`.trim()
@@ -1211,7 +1253,8 @@ export class MergeQueue {
         durationMs: Math.max(0, Date.now() - start.t0),
         by: HIVE_RUNS,
         counted: b.counted,
-        ...(b.whyNot ? { whyNot: b.whyNot } : {})
+        ...(b.whyNot ? { whyNot: b.whyNot } : {}),
+        entry: entry.id
       }
       await this.write(card, (w) => w.fact('CheckRan', data))
       r.note?.({ name, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}) })
@@ -1295,7 +1338,7 @@ export class MergeQueue {
       const read = raw === null ? { bad: 'it wrote no results file' } : raw === false ? { bad: `its results file is over ${FOCUSED_MAX_RESULTS_BYTES} bytes` } : readResults(raw, ids) // i18n-ignore: a check's output, agent-facing
       // A runner that didn't exit 0 failed, whatever its results say (finding 6): skips are reported with exit 0.
       const failed = !r.ok || 'bad' in read || read.failed.length > 0
-      const data: FactData['CheckRan'] = { name: FOCUSED_CHECK, command: r.command ?? run, revision: result, tested: b.tested, result: failed ? 'failed' : 'passed', run: r.run ?? randomUUID(), durationMs: Math.max(0, Date.now() - start.t0), by: HIVE_RUNS, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}) }
+      const data: FactData['CheckRan'] = { name: FOCUSED_CHECK, command: r.command ?? run, revision: result, tested: b.tested, result: failed ? 'failed' : 'passed', run: r.run ?? randomUUID(), durationMs: Math.max(0, Date.now() - start.t0), by: HIVE_RUNS, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}), entry: entry.id }
       await this.write(card, (w) => w.fact('CheckRan', data))
       r.note?.({ name: FOCUSED_CHECK, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}) })
       if (failed) {

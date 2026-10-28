@@ -462,7 +462,7 @@
   "assistant.template.badName": "Son nom manque ou dépasse {max} caractères.",
   "assistant.template.badPairs": "Ses binômes d’auteurs et de relecteurs nomment des agents qu’il n’a pas, ou un agent deux fois.",
   "assistant.template.badProvider": "Le fournisseur de l’agent {name} n’est pas utilisable par Hive ({given, select, yes {{provider}} other {aucun}}).",
-  "assistant.template.badRole": "Le rôle de l’agent {name} dans le flux de travail n’est ni builder, ni reviewer, ni either.",
+  "assistant.template.badRole": "Le rôle de l’agent {name} dans le flux de travail n’est ni builder, ni reviewer, ni either, ni generalist.",
   "assistant.template.badSetting": "{setting, select, model {Le modèle} effort {L’effort} other {Le permissionMode}} de l’agent {name} n’est pas utilisable par Hive.",
   "assistant.template.badToken": "{name} utilise {token} : le nom d’un agent ne peut contenir que '{key}' (la clé du projet) et '{n}' (son numéro parmi les agents de ce nom).",
   "assistant.template.from09": "Ce modèle vient de Hive 0.9 et ne peut pas être chargé dans la 1.0. Recrée-le à partir de tes agents avec « Enregistrer le modèle… ».",

@@ -1,6 +1,6 @@
 {
   "worktrees.agent.badPlacement": "このレイアウトではペインをそのように配置できません。",
-  "worktrees.agent.badWorkflowRole": "ワークフローでの役割は builder、reviewer、either のいずれかです。",
+  "worktrees.agent.badWorkflowRole": "ワークフローでの役割は builder、reviewer、either、generalist のいずれかです。",
   "worktrees.agent.chooseMove": "エージェントの移動先を選んでください。",
   "worktrees.agent.enterName": "名前を入力してください。",
   "worktrees.agent.gone": "そのエージェントはもう存在しません。",

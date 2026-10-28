@@ -296,6 +296,25 @@ describe('the usage worker', () => {
     expect(rows.map((r) => [r.session, r.agentId, r.row.role, r.row.outputTokens])).toEqual([['abc', 'a1', 'review', 200]])
     await t.close()
   })
+
+  it("answers only the named sessions' timelines, of that scope alone (HI-1906: a card's)", async () => {
+    const t = await setup()
+    const other = join(t.transcript, '..', 'def.jsonl')
+    writeFileSync(t.transcript, prompt(0) + line(1) + line(2))
+    writeFileSync(other, prompt(0) + line(5))
+    await t.ingest()
+    await t.ingest({ session: 'def', path: other })
+    // The same session id in another scope (another host's session): never one of p1's.
+    await t.ingest({ scope: 'p2', path: other })
+    type Timeline = { scope: string; session: string; timeline: { rows: unknown[] } | null }
+    const timelines = async (scope: string, sessions?: string[]) => ((await call({ type: 'timelines', file: t.file, scope, ...(sessions ? { sessions } : {}) })) as Timeline[]).map((s) => [s.scope, s.session, s.timeline?.rows.length ?? 0]).sort()
+    expect(await timelines('p1')).toEqual([['p1', 'abc', 2], ['p1', 'def', 1]])
+    expect(await timelines('p1', ['abc'])).toEqual([['p1', 'abc', 2]])
+    expect(await timelines('p2', ['abc'])).toEqual([['p2', 'abc', 1]])
+    expect(await timelines('p1', ['abc', 'nope'])).toEqual([['p1', 'abc', 2]])
+    expect(await timelines('p1', [])).toEqual([])
+    await t.close()
+  })
 })
 
 // Reads for main (#1147): a running session's footer and context gauge, read here rather than in main's thread.

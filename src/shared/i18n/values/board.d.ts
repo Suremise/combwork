@@ -158,14 +158,23 @@ interface HiveMessageValues {
   'board.cost.tokens': { estimated: string; input: string | number; output: string | number; cacheWrite: string | number; cacheRead: string | number; unknown: string; requests: number }
   'board.cost.tokensUnknown': { requests: number }
   'board.costs.builder': undefined
+  'board.costs.byRound': undefined
+  'board.costs.byRoundFailed': undefined
+  'board.costs.byRoundHourly': { days: number }
+  'board.costs.byRoundNote': undefined
   'board.costs.cost': undefined
   'board.costs.laneFailed': undefined
   'board.costs.laneLoading': undefined
   'board.costs.note': { zero: string | number }
   'board.costs.onCards': undefined
+  'board.costs.outsideRow': undefined
   'board.costs.overhead': undefined
   'board.costs.overheadNote': undefined
   'board.costs.reviewer': undefined
+  'board.costs.roundColumn': undefined
+  'board.costs.roundRow': { round: number }
+  'board.costs.roundVerdict': { verdict: string }
+  'board.costs.totalColumn': undefined
   'board.costs.unmatched': { n: number }
   'board.decision.add': undefined
   'board.decision.blank': undefined
@@ -652,6 +661,17 @@ interface HiveMessageValues {
   'board.queue.pauseTip': undefined
   'board.queue.pulse': { target: string | number; state: string; card: string | number; n: number }
   'board.queue.queued': { n: number; cards: string | number }
+  'board.queue.recent.cancelled': { reason: string }
+  'board.queue.recent.heading': undefined
+  'board.queue.recent.lasted': { duration: string | number }
+  'board.queue.recent.merged': undefined
+  'board.queue.recent.more': undefined
+  'board.queue.recent.none': undefined
+  'board.queue.recent.paused': { reason: string; code: string | number }
+  'board.queue.recent.push': { state: string }
+  'board.queue.recent.returned': { why: string | number }
+  'board.queue.recent.stillPaused': undefined
+  'board.queue.recent.took': { duration: string | number }
   'board.queue.remove': undefined
   'board.queue.removeConfirm': undefined
   'board.queue.removeFailed': undefined

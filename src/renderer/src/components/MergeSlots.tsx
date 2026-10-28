@@ -3,7 +3,7 @@ import type { MergeSlotInfo } from '@shared/types'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { attempt } from '../actions'
 import { call } from '../api'
-import { cardLabelOf, confirm, get, set, useLanguage, useStore } from '../store'
+import { cardLabelOf, confirm, get, setLoaded, useLanguage, useStore } from '../store'
 import { useNow } from '../usage'
 import { Icon, Tooltip } from './ui'
 
@@ -20,7 +20,7 @@ export function useMergeSlots(): MergeSlotInfo[] {
   useEffect(() => {
     if (!ws) return
     let current = true
-    void call('mergeSlots:list').then((slots) => current && set({ mergeSlots: slots }))
+    void call('mergeSlots:list').then((slots) => current && setLoaded({ mergeSlots: slots }))
     return () => {
       current = false
     }
