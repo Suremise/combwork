@@ -10906,6 +10906,27 @@ textarea.input.task-blocked-input {
   height: 24px;
   font-size: 12px;
 }
+/* Quick filters above the table (HI-1878: the shortcuts editor): each named by its heading, wrapping in a narrow view. */
+.table-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin-bottom: 8px;
+}
+.table-filter-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.table-filter-item .select,
+.table-filter-item .input {
+  height: 24px;
+  font-size: 12px;
+  field-sizing: content;
+  min-width: fit-content;
+}
 /* The archived cards' and shortcuts' filters never cut their choice short under a narrow heading (#886, #890: "All" is
    longer in most languages). */
 :is(.archived-cards, .kb-table) .table tr.table-filters .select {
