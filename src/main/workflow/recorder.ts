@@ -332,6 +332,25 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
         }
       })
     }
+    let verdict: number | null = null
+    let verdictFailed = false
+    // A verdict before the move it makes (HI-1946: a failed card back to Doing, a pass on to Passed), as the runtime
+    // writes them: Verdict, then Moved.
+    for (const h of moves ? history : []) {
+      if (h.whatText?.id !== HISTORY.reviewPassed.id && h.whatText?.id !== HISTORY.reviewFailed.id) continue
+      const s = facts()
+      const reviewer = before?.review?.agent ?? (ctx?.actor.kind === 'agent' ? (ctx.actor.self?.agentId ?? ctx.actor.name) : 'unknown')
+      // The generation the reviewer had received (HR4's round 1 finding 4): never decisions it hasn't seen.
+      verdictFailed = h.whatText.id === HISTORY.reviewFailed.id
+      verdict = tx.append(n, {
+        kind: 'Verdict', // i18n-ignore: a fact's kind and codes, not text
+        actor,
+        source: 'recorded',
+        ...ruleset(),
+        data: { reviewer, submission: s.latest?.id ?? 0, revision: s.latest?.revision ?? null, pass: h.whatText.id === HISTORY.reviewPassed.id, round: roundOf(before ?? after), generation: s.received[reviewer] ?? 0, comment }
+      }).seq
+    }
+    if (verdictFailed) roundLimit(tx, n, `${after.project}-${n}`, ruleset())
     let moved: number | null = null
     if (was !== to && moves) {
       moved = tx.append(n, { kind: 'Moved', actor, source: 'recorded', ...ruleset(), data: { from: was, to, cause: causeOf(ctx?.actor) } }).seq // i18n-ignore: a fact's kind and codes, not text
@@ -341,8 +360,6 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
     // wake is the runtime's own).
     if (!moves) moved = ctx?.byRuntime?.moved ?? null
     let submitted: number | null = null
-    let verdict: number | null = null
-    let verdictFailed = false
     if (intoReview && moves) {
       const s = facts()
       const builder = after.agent ?? s.started?.builder ?? null
@@ -371,21 +388,6 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
       const s = facts()
       tx.append(n, { kind: 'ReviewStarted', actor, source: 'recorded', ...ruleset(), data: { reviewer: after.review.agent, submission: s.latest?.id ?? 0, revision: s.latest?.revision ?? null } })
     }
-    for (const h of moves ? history : []) {
-      if (h.whatText?.id !== HISTORY.reviewPassed.id && h.whatText?.id !== HISTORY.reviewFailed.id) continue
-      const s = facts()
-      const reviewer = before?.review?.agent ?? (ctx?.actor.kind === 'agent' ? (ctx.actor.self?.agentId ?? ctx.actor.name) : 'unknown')
-      // The generation the reviewer had received (HR4's round 1 finding 4): never decisions it hasn't seen.
-      verdictFailed = h.whatText.id === HISTORY.reviewFailed.id
-      verdict = tx.append(n, {
-        kind: 'Verdict', // i18n-ignore: a fact's kind and codes, not text
-        actor,
-        source: 'recorded',
-        ...ruleset(),
-        data: { reviewer, submission: s.latest?.id ?? 0, revision: s.latest?.revision ?? null, pass: h.whatText.id === HISTORY.reviewPassed.id, round: roundOf(before ?? after), generation: s.received[reviewer] ?? 0, comment }
-      }).seq
-    }
-    if (verdictFailed) roundLimit(tx, n, `${after.project}-${n}`, ruleset())
     if ((before?.blocked ?? null) !== after.blocked) {
       if (after.blocked) tx.append(n, { kind: 'Blocked', actor, source: 'recorded', ...ruleset(), data: { reason: after.blocked } }) // i18n-ignore: a fact's kind and codes, not text
       else if (before?.blocked) tx.append(n, { kind: 'Unblocked', actor, source: 'recorded', ...ruleset(), data: {} }) // i18n-ignore: a fact's kind and codes, not text

@@ -30,7 +30,7 @@ interface HiveMessageValues {
   'tasks.error.decisionsUsers': undefined
   'tasks.error.emptyComment': undefined
   'tasks.error.emptyDecision': undefined
-  'tasks.error.failedStays': { card: string | number }
+  'tasks.error.failedToDoing': { card: string | number }
   'tasks.error.holdCard': { card: string | number }
   'tasks.error.holdNew': undefined
   'tasks.error.inDoingWith': { card: string | number; active: string | number; agent: string | number; stage: string | number; review: string | number }

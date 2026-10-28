@@ -28,7 +28,7 @@
   "tasks.error.decisionsUsers": "Só o usuário altera ou remove as decisões de um cartão.",
   "tasks.error.emptyComment": "O comentário está vazio.",
   "tasks.error.emptyDecision": "A decisão está vazia.",
-  "tasks.error.failedStays": "Uma revisão reprovada deixa {card} em Revisão: dê o veredito sem column.",
+  "tasks.error.failedToDoing": "Uma revisão reprovada devolve {card} para Fazendo, ao executor: dê o veredito sem column.",
   "tasks.error.holdCard": "Só o usuário ou o Assistente põe cartões em Em espera: peça ao usuário para pôr {card} em espera.",
   "tasks.error.holdNew": "Só o usuário ou o Assistente põe cartões em Em espera: peça ao usuário para pô-lo em espera.",
   "tasks.error.inDoingWith": "{card} está em {active} com o agente {agent}, que está trabalhando nele: há trabalho mais recente em andamento, então outro agente não pode movê-lo para {stage}. Deixe-o onde está; o agente {agent} o move para {review} ao terminar, e o usuário pode movê-lo.",

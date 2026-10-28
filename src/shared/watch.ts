@@ -377,6 +377,7 @@ export interface WakeAbout {
 const NEW_ROUND = /^(Moved to (the (top|bottom) of )?(On Hold|Todo|Doing|Review)\b|Created in |Given to |Taken from |Moved to the workspace|Started reviewing|Returned for review)/
 
 const INTO_REVIEW = /^(Moved to (the (top|bottom) of )?Review\b|Created in Review\b|Returned for review\b)/
+const TO_DOING = /^Moved to (the (top|bottom) of )?Doing\b/
 
 /** A wake's context for the agent `watcher` (its id), from the card as it is now. */
 export function wakeAbout(card: TaskCard | null, changes: WatchChange[] | 'gone', watcher: string): WakeAbout {
@@ -385,7 +386,9 @@ export function wakeAbout(card: TaskCard | null, changes: WatchChange[] | 'gone'
   // The latest verdict, only while nothing has started another round since (back to Doing, reviewed again, reassigned):
   // one from an earlier build never speaks for work done after it. History is in the order it happened.
   const i = card.history.findLastIndex((h) => VERDICT.test(h.what))
-  const current = i >= 0 && !card.history.slice(i + 1).some((h) => NEW_ROUND.test(h.what)) ? card.history[i] : null
+  // A failed card's move back to Doing in the verdict's own change is its verdict's doing (HI-1946), not another round.
+  const itsMove = (h: TaskCard['history'][number]): boolean => h.at === card.history[i].at && h.by === card.history[i].by && TO_DOING.test(h.what)
+  const current = i >= 0 && !card.history.slice(i + 1).some((h) => NEW_ROUND.test(h.what) && !itsMove(h)) ? card.history[i] : null
   const passed = current ? VERDICT.exec(current.what)![1] === 'passed' : false
   // Passed or Done on another agent's card names its review only when that review passed it; moved there by hand, none.
   const wanted = changes.includes('verdict') || (!!owner && (card.column === 'passed' || card.column === 'done') && passed)

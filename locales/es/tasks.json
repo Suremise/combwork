@@ -28,7 +28,7 @@
   "tasks.error.decisionsUsers": "Solo el usuario cambia o quita las decisiones de una tarjeta.",
   "tasks.error.emptyComment": "El comentario está vacío.",
   "tasks.error.emptyDecision": "La decisión está vacía.",
-  "tasks.error.failedStays": "Una revisión no superada deja la tarjeta {card} en Revisión: da el veredicto sin column.",
+  "tasks.error.failedToDoing": "Una revisión no superada devuelve la tarjeta {card} a En curso, a su autor: da el veredicto sin column.",
   "tasks.error.holdCard": "Solo el usuario o el Asistente ponen tarjetas En espera: pide al usuario que aparque la tarjeta {card}.",
   "tasks.error.holdNew": "Solo el usuario o el Asistente ponen tarjetas En espera: pide al usuario que la aparque.",
   "tasks.error.inDoingWith": "La tarjeta {card} está en {active} con el agente {agent}, que trabaja en ella: hay trabajo más reciente en marcha, así que otro agente no puede pasarla a {stage}. Déjala donde está; el agente {agent} la pasa a {review} cuando termine, y el usuario puede moverla.",

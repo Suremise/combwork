@@ -28,7 +28,7 @@
   "tasks.error.decisionsUsers": "只有用户能更改或删除卡片的决定。",
   "tasks.error.emptyComment": "评论为空。",
   "tasks.error.emptyDecision": "决定为空。",
-  "tasks.error.failedStays": "评审未通过时 {card} 会留在“评审”中：给出结论时不要带 column。",
+  "tasks.error.failedToDoing": "评审未通过时 {card} 会回到“进行中”，交还给它的构建者：给出结论时不要带 column。",
   "tasks.error.holdCard": "只有用户或助手能把卡片移到“搁置”：请让用户搁置 {card}。",
   "tasks.error.holdNew": "只有用户或助手能把卡片放到“搁置”：请让用户搁置它。",
   "tasks.error.inDoingWith": "{card} 在“{active}”，由智能体 {agent} 处理：有更新的工作正在进行，其他智能体不能把它移到“{stage}”。请保持原样；智能体 {agent} 完成后会把它移到“{review}”，用户也可以移动它。",
