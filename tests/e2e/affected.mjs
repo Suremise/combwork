@@ -666,6 +666,10 @@ export const UNIT_SCANS = [
   { test: 'tests/searchBoxes.test.ts', paths: ['src/renderer/src/'], lines: ['<input', 'placeholder', 'aria-label'] },
   { test: 'tests/trash.test.ts', paths: ['src/'], lines: ['trashItem'] },
   { test: 'tests/exitLog.test.ts', paths: ['src/main/'], lines: ['app\\.quit', 'app\\.exit', 'process\\.exit', 'app\\.relaunch', 'quitAndInstall', 'exitBy'] },
+  // Each function in main taking the board's lock or a database lease is listed by file and name (HI-1368): a new
+  // one, or a change to a listed file (a rename of its function), can break it.
+  { test: 'tests/dbWrites.test.ts', paths: ['src/main/'], lines: ['withFileLock', 'boardLock', 'leaseDb', 'withLeasedDb'] },
+  { test: 'tests/dbWrites.test.ts', paths: ['src/main/boardStore.ts', 'src/main/deliveries.ts', 'src/main/sessionStore.ts', 'src/main/storeRows.ts', 'src/main/storeTables.ts'] },
   { test: 'tests/legacyWorktreeGate.test.ts', paths: ['src/'], lines: ['worktree'] },
   { test: 'tests/i18nFormatting.test.ts', paths: ['src/'], lines: ['toLocale', 'Intl\\.', 'i18n-ignore'] },
   { test: 'tests/userGuide.test.ts', paths: ['src/renderer/src/'], lines: ['openGuideAt'] },

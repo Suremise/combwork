@@ -129,6 +129,7 @@ describe("an agent's request for the Assistant (HI-1866)", () => {
     expect((await deliveries.readInbox(w.assistantHome, 'assistant')).items).toEqual([])
     await vi.waitFor(() => expect(asked(w).map((r) => r.state)).toEqual(['cancelled']), { timeout: HUNG_MS })
     await vi.waitFor(async () => expect((await read(w, card)).history.map((h) => h.what)).toContain("The Hive Assistant couldn't be told of B1 (alpha)'s request on this card: read it in the card's comments and act on it yourself if it needs doing"), { timeout: HUNG_MS })
-    expect(notice).toHaveBeenCalledWith(join(w.path!, 'alpha'), expect.anything(), expect.anything())
+    // The notice follows the card's note, once its write has let go of the board's lock: the history can be read first.
+    await vi.waitFor(() => expect(notice).toHaveBeenCalledWith(join(w.path!, 'alpha'), expect.anything(), expect.anything()), { timeout: HUNG_MS })
   })
 })
