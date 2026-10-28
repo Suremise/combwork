@@ -3559,7 +3559,8 @@ Whether a conversation may resume there is its **hold** (none: it may):
     keeps in its profile's `leftovers.json` (`ended`) the runs it saw end, each run whose release couldn't be written
     (its workspace closed), and, as it quits, the stopped launches whose jobs it sees empty: their jobs are looked at
     until empty for at most 5 s (`recordEndedLaunches`), so a CLI slow to exit as Hive quits for an install still
-    counts. Kept forward until the writer is settled, at most 100; never offered as leftovers. When a writer's Hive is
+    counts; only from the helper that held its job as the look began, never a run lost meanwhile (a helper started in
+    its place has none of the old jobs and lists any as empty: HR2's round 2). Kept forward until the writer is settled, at most 100; never offered as leftovers. When a writer's Hive is
     known to have gone (`alive` false) and its run is kept as ended, it is cleared and drained. A list of the run's
     processes taken earlier (the last run's marker, a crash's) never settles it, even with none of them still running:
     what they started after it isn't in it (HR2's round 1). Nothing kept, a job not seen empty by the quit's end, or

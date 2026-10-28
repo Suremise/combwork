@@ -8,6 +8,53 @@ import { describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 
 vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: () => undefined }))
+/**
+ * The job host as a stand-in (HR2's round 2): its helper (`instance`) and what each request answers. `onList` runs as
+ * a job is listed, before its answer: a test loses the helper there (`lose`), as one ending mid-request does, and the
+ * next request starts another, which holds none of the old jobs and lists any as empty, as the real one does.
+ */
+const jobs = vi.hoisted(() => ({
+  instance: 1 as number | null,
+  listed: [] as string[],
+  onList: (_run: string) => undefined as void,
+  lose: (): void => undefined
+}))
+vi.mock('../src/main/processSupervisor', async (orig) => {
+  class JobHost {
+    constructor(private readonly opts: { onLost: (why: string) => void }) {
+      jobs.lose = () => {
+        jobs.instance = null
+        this.opts.onLost('the helper ended (test)')
+      }
+    }
+    get pid(): number | null {
+      return jobs.instance === null ? null : 4242
+    }
+    get instance(): number | null {
+      return jobs.instance
+    }
+    get usable(): boolean {
+      return true
+    }
+    async ensure(): Promise<boolean> {
+      return true
+    }
+    close(): Promise<void> {
+      return Promise.resolve()
+    }
+    async request(cmd: string, run?: string): Promise<unknown> {
+      // A request with no helper starts a new one.
+      if (jobs.instance === null) jobs.instance = 2
+      if (cmd === 'add') return 'ok'
+      if (cmd !== 'list') return null
+      jobs.listed.push(run!)
+      jobs.onList(run!)
+      if (jobs.instance === null) return null
+      return { processes: [], more: 0, adopted: 0 }
+    }
+  }
+  return { ...((await orig()) as object), JobHost }
+})
 const profile = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', async (importOriginal) => {
   const stub = await importOriginal<typeof import('./electron-stub')>()
@@ -53,5 +100,41 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       { timeout: HUNG_MS }
     )
     expect(await (await restarted()).endedEarlier('r-unwritten')).toBe(true)
+  })
+
+  it.runIf(process.platform === 'win32')("the quit's look keeps a launch as ended only from the helper that held its job: one lost meanwhile keeps none (HR2's round 2)", async () => {
+    writeFileSync(file, JSON.stringify({ version: 1, launches: [] }))
+    const track = async (m: typeof import('../src/main/agentProcesses'), runId: string) => expect(await m.trackLaunch({ runId, projectPath: profile.dir, agentId: runId, agentName: runId }, 100)).toEqual({ tracked: true })
+    // The helper holding both jobs answers: both empty, both kept.
+    jobs.instance = 1
+    jobs.onList = () => undefined
+    let m = await restarted()
+    await track(m, 'q-1')
+    await track(m, 'q-2')
+    await m.recordEndedLaunches()
+    expect([await m.endedEarlier('q-1'), await m.endedEarlier('q-2')]).toEqual([true, true])
+    // The helper ends as the first job is listed: both lost (unknown), and the helper started for the next request has
+    // neither job, so lists any as empty. Neither is kept as ended, and the look asks no more of it.
+    writeFileSync(file, JSON.stringify({ version: 1, launches: [] }))
+    jobs.instance = 1
+    m = await restarted()
+    await track(m, 'r-1')
+    await track(m, 'r-2')
+    jobs.listed.length = 0
+    jobs.onList = (run) => {
+      if (run === 'r-1') jobs.lose()
+    }
+    await m.recordEndedLaunches()
+    expect([m.runOutcome('r-1'), m.runOutcome('r-2')]).toEqual(['unknown', 'unknown'])
+    expect([await m.endedEarlier('r-1'), await m.endedEarlier('r-2')]).toEqual([false, false])
+    expect(jobs.listed).toEqual(['r-1'])
+    // The helper replaced before the look begins (its jobs lost with the old one): nothing kept either.
+    jobs.instance = 1
+    m = await restarted()
+    await track(m, 's-1')
+    jobs.lose()
+    jobs.onList = () => undefined
+    await m.recordEndedLaunches()
+    expect(await m.endedEarlier('s-1')).toBe(false)
   })
 })

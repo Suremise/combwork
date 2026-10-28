@@ -753,17 +753,31 @@ const QUIT_LOOK_EVERY_MS = 250
  * Hive quitting (HI-1886): the runs seen ended are kept for a later start, so their slot writers are settled if their
  * releases aren't written before Hive exits. Those already known (`ended`), and the launches whose CLI hasn't been seen
  * to exit yet, or whose job is being looked at: their jobs looked at until empty, for at most QUIT_LOOK_MS. A job seen
- * empty is the proof, as when a CLI exits (its whole membership: what its processes started joined it); one that isn't
- * by then is kept for nothing, so its writer stays held. Before the kept list's last write.
+ * empty is the proof, as when a CLI exits (its whole membership: what its processes started joined it), and only from the
+ * helper that held it as the look began; one not seen empty by then, or lost meanwhile, is kept for nothing, so its
+ * writer stays held. Before the kept list's last write.
  */
 export async function recordEndedLaunches(): Promise<void> {
   await readRecords()
   const ended = [...outcomes].filter(([, o]) => o === 'ended').map(([r]) => r)
   const pending = new Set([...running.keys(), ...looking.keys()].filter((r) => !outcomes.has(r)))
   const until = Date.now() + QUIT_LOOK_MS
-  while (pending.size && host.pid) {
+  // Only the helper holding their jobs can say they're empty (HR2's round 2): one started in its place has none of them
+  // and lists any as empty. The look stops once it changes, and a run settled meanwhile (lost: `unknown`) is let go.
+  const helper = host.instance
+  const tracked = (run: string): boolean => host.instance === helper && (running.has(run) || looking.has(run)) && !outcomes.has(run)
+  scan: while (pending.size && helper !== null) {
     for (const run of [...pending]) {
-      if (!emptyJob(await listJob(run).catch(() => null))) continue
+      if (!tracked(run)) {
+        if (host.instance !== helper) break scan
+        // Settled meanwhile: kept if its own look saw it end.
+        if (outcomes.get(run) === 'ended') ended.push(run)
+        pending.delete(run)
+        continue
+      }
+      const list = await listJob(run).catch(() => null)
+      if (host.instance !== helper) break scan
+      if (!emptyJob(list) || !tracked(run)) continue
       pending.delete(run)
       ended.push(run)
     }
