@@ -1,6 +1,6 @@
 import { msg, type Msg } from './i18n/msg'
 import { withAttachmentPaths, type CardAttachment } from './cardAttachments'
-import type { BoardColumnId, BoardFold, ContextProblem, TaskCard, TaskColumn } from './types'
+import type { AgentInfo, BoardColumnId, BoardFold, ContextProblem, TaskCard, TaskColumn } from './types'
 import { cardLabel, cardName, cardRef } from './projectKeys'
 
 /**
@@ -165,6 +165,29 @@ export function stalledReason(card: Pick<TaskCard, 'column' | 'archived' | 'agen
   if (!agentNow) return removedText(card.agentName, tr)
   if (!agentNow.running) return notRunningText(agentNow.name, tr)
   return null
+}
+
+/** A card's agent as the stall check reads it: its name, whether it runs (or starts), and why its start failed when it does (HI-1976). */
+export interface StallAgent {
+  name: string
+  running: boolean
+  failed?: string | null
+}
+
+/** An agent of the window's project info as the stall check reads it (HI-1977): starting counts as running, as main's agentNowOf has it. */
+export function stallAgentOf(agent: Pick<AgentInfo, 'name' | 'live' | 'start'>): StallAgent {
+  const running = !!agent.live || (!!agent.start && 'starting' in agent.start)
+  return { name: agent.name, running, failed: !running && agent.start && 'failed' in agent.start ? agent.start.failed : null }
+}
+
+/**
+ * A Doing card's agent whose start failed (HI-1976): stalled with the failure, which "isn't running" would hide. The
+ * failure is the CLI's or Hive's own words (English), shown as they are. In the window's language with tr, else English.
+ */
+export function startFailedReason(c: Pick<TaskCard, 'column' | 'archived' | 'agent'>, agentNow: StallAgent | null, tr?: Tr): string | null {
+  if (c.archived || c.column !== 'doing' || !c.agent || !agentNow || agentNow.running || !agentNow.failed) return null
+  if (tr) return tr(msg({ id: 'board.stalled.startFailed', defaultMessage: "{agent}'s start failed: {why}", description: "Why a card in the Active column is stalled: its agent couldn't be started. {agent} is the agent's name; {why} is the reason, in English as Hive or the agent's CLI gave it." }), { agent: agentNow.name, why: agentNow.failed })
+  return `${agentNow.name}'s start failed: ${agentNow.failed}` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
 
 /** "<agent> was removed." (no name kept: "Its agent was removed."), in the window's language with tr, else English. */

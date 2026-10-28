@@ -72,6 +72,13 @@ describe('agent state marks (#973)', () => {
     expect(boardExtras('alpha', agent('a1', null), none)).toEqual({ blocked: false, stalled: false })
   })
 
+  it("an agent whose start is under way (main's start state, HI-1977) isn't stalled on its Doing card; one whose start failed is", () => {
+    const starting = { ...agent('a1', null), start: { starting: true as const } }
+    expect(boardExtras('alpha', starting, [card('a1', 'doing')])).toEqual({ blocked: false, stalled: false })
+    const failed = { ...agent('a1', null), start: { failed: "Hive couldn't get slot-b ready: busy" } }
+    expect(boardExtras('alpha', failed, [card('a1', 'doing')])).toEqual({ blocked: false, stalled: true })
+  })
+
   it('a launch that failed to start is stalled while it has no session (#975)', () => {
     expect(agentState(null, { failedToStart: true })).toBe('stalled')
     expect(agentState(live('ready'), { failedToStart: true })).toBe('idle')

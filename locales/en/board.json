@@ -3331,6 +3331,10 @@
     "defaultMessage": "{agent} is watching {card} but hasn't started reviewing it (it shows working, but has been silent for {silent}: state unknown): in Review for {waited}.",
     "description": "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started, and Hive can't tell what the reviewer is doing. {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {silent} minutes, {waited} how long it has waited (\"40 min\", \"2 h 5 min\"). {silent} is a duration too, written like {waited}."
   },
+  "board.stalled.startFailed": {
+    "defaultMessage": "{agent}'s start failed: {why}",
+    "description": "Why a card in the Active column is stalled: its agent couldn't be started. {agent} is the agent's name; {why} is the reason, in English as Hive or the agent's CLI gave it."
+  },
   "board.stalled.wakeUntaken": {
     "defaultMessage": "{agent} hasn't taken the wake Hive typed for {card}: it waits in its prompt.",
     "description": "Why a card in a card loop is stalled: the agent watched the card, and Hive typed its wake line into the agent's terminal, but the agent's CLI never sent it. {agent} is its name, {card} the card's name: its key, such as AM-12, or #12 for a card with none."

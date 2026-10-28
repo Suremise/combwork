@@ -27,6 +27,20 @@ interface Entry {
 }
 
 const entries = new Map<string, Entry>()
+
+/** Told of each change to an agent's start (HI-1977: the window's agent info carries it, and is told at once). */
+const listeners = new Set<(projectPath: string, agentId: string) => void>()
+
+/** Calls `fn` with the agent of each change to its start, and of a hold running out. Returns its removal. */
+export function onAgentStartChange(fn: (projectPath: string, agentId: string) => void): () => void {
+  listeners.add(fn)
+  return () => listeners.delete(fn)
+}
+
+function changed(projectPath: string, agentId: string): void {
+  for (const fn of listeners) fn(projectPath, agentId)
+}
+
 const keyOf = (projectPath: string, agentId: string): string => `${resolve(projectPath).toLowerCase()}|${agentId}`
 
 function entryOf(projectPath: string, agentId: string): Entry {
@@ -48,6 +62,9 @@ export function startBegun(projectPath: string, agentId: string, tag: string, o:
   const e = entryOf(projectPath, agentId)
   e.holds.set(tag, Date.now())
   if (o.fresh) e.failed = undefined
+  changed(projectPath, agentId)
+  // A hold never ended stops counting after START_HOLD_MS: the window is told then too.
+  if (listeners.size) setTimeout(() => changed(projectPath, agentId), START_HOLD_MS + 1000).unref?.()
 }
 
 /**
@@ -62,11 +79,13 @@ export function startEnded(projectPath: string, agentId: string, tag: string, ou
   if (outcome && 'failed' in outcome) entry.failed = { why: oneLine(outcome.failed), by: tag }
   else if (outcome && entry.failed?.by === tag) entry.failed = undefined
   tidy(projectPath, agentId)
+  changed(projectPath, agentId)
 }
 
 /** The agent's CLI exited before its session started (sessions.ts): its start failed, for this reason. */
 export function startFailed(projectPath: string, agentId: string, why: string): void {
   entryOf(projectPath, agentId).failed = { why: oneLine(why), by: 'cli' }
+  changed(projectPath, agentId)
 }
 
 /**
@@ -75,9 +94,10 @@ export function startFailed(projectPath: string, agentId: string, why: string): 
  */
 export function startBegins(projectPath: string, agentId: string): void {
   const e = entries.get(keyOf(projectPath, agentId))
-  if (!e) return
+  if (!e?.failed) return
   e.failed = undefined
   tidy(projectPath, agentId)
+  changed(projectPath, agentId)
 }
 
 /** The agent's start as the stall check reads it: failed (why), else starting (a hold not older than START_HOLD_MS). */

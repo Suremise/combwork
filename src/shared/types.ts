@@ -1661,7 +1661,15 @@ export interface AgentInfo extends AgentDef {
   heldSlot?: string
   /** Where it works now (#1442): its running session's folder, else where its next conversation starts. */
   place: ShownPlace
+  /**
+   * Main's record of its start while it isn't running (HI-1977, HI-1976's): under way (a Start, its slot being prepared,
+   * its session spawning, a restart's resume), or why its last one failed. Absent: neither, or it runs.
+   */
+  start?: AgentStart
 }
+
+/** An agent's start as the stall check reads it (HI-1977): under way, or why it failed. */
+export type AgentStart = { starting: true } | { failed: string }
 
 export interface ResumeTarget {
   id: string
@@ -3298,6 +3306,8 @@ export type HiveEvent =
   | { type: 'assistant-questions'; projectPath: string; questions: AssistantQuestion[] }
   /** An agent was added by the Hive Assistant: the view doesn't move to it. */
   | { type: 'agent-added'; projectPath: string; agentId: string }
+  /** An agent's start changed (HI-1977): under way, failed with why, or neither (null), as its AgentInfo's `start`. */
+  | { type: 'agent-start'; projectPath: string; agentId: string; start: AgentStart | null }
   /** A worktree agent's unmerged work changed (null: git couldn't check it). */
   | { type: 'branch-status'; projectPath: string; agentId: string; status: AgentBranchStatus | null }
   | { type: 'plan-usage'; provider: ProviderId; usage: PlanUsage; connection?: string }

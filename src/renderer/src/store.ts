@@ -25,7 +25,7 @@ import type { RunsFilter } from '@shared/progressTabs'
 import { loadActivityView, saveActivityView, type ActivityView } from './activityView'
 import { currentCard, type ActivityCardAgent } from '@shared/activity'
 import { boardReader } from './boardReads'
-import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkflowForm, WorkspaceUsage, RecentWorkspace } from '@shared/types'
+import type { AgentBranchStatus, AgentStart, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkflowForm, WorkspaceUsage, RecentWorkspace } from '@shared/types'
 import type { PresetId } from '@shared/workflow/options'
 import type { TemplateWorkflow, TemplateWorkflows } from '@shared/workflow/templateOptions'
 import type { PlatformId } from '@shared/platform/descriptors'
@@ -1814,6 +1814,24 @@ export const NO_IDS: string[] = []
  * The Assistant added an agent. The user's view doesn't move: on the project they're looking at, its page's
  * button gets a dot; another project opens on the new agent's page next time.
  */
+/**
+ * An agent's start changed (HI-1977): its AgentInfo's `start`, set at once (not with the agents' batched states), so the
+ * card's move it comes before never shows without it.
+ */
+export function agentStartChanged(path: string, agentId: string, start: AgentStart | null): void {
+  set((s) => {
+    const project = findProject(s, path)
+    if (!s.workspace || !project) return {}
+    return { workspace: { ...s.workspace, projects: s.workspace.projects.map((p) => (p !== project ? p : { ...p, agents: p.agents.map((a) => (a.id === agentId ? withStart(a, start) : a)) })) } }
+  })
+}
+
+function withStart(a: AgentInfo, start: AgentStart | null): AgentInfo {
+  if (start) return { ...a, start }
+  const { start: _, ...rest } = a
+  return rest
+}
+
 export function noteAgentAdded(path: string, agentId: string): void {
   set((s) => {
     const shown = s.selectedProject?.toLowerCase() === path.toLowerCase() && s.activity === 'projects'

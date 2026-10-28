@@ -832,6 +832,7 @@
   "board.stalled.reviewWait": "Agent {agent} beobachtet {card}, hat das Review aber nicht begonnen: seit {waited} in Review.",
   "board.stalled.reviewWaitBusy": "Agent {agent} beobachtet {card}, hat das Review aber nicht begonnen (der Agent arbeitet an etwas anderem): seit {waited} in Review.",
   "board.stalled.reviewWaitSilent": "Agent {agent} beobachtet {card}, hat das Review aber nicht begonnen (der Agent zeigt „arbeitet“, ist aber seit {silent} still: Status unbekannt): seit {waited} in Review.",
+  "board.stalled.startFailed": "Agent {agent} konnte nicht gestartet werden: {why}",
   "board.stalled.wakeUntaken": "Agent {agent} hat den Weckruf, den Hive für {card} getippt hat, nicht übernommen: Er wartet in der Eingabe des Agenten.",
   "board.start.busy": "{status}. Wähle den Agenten, sobald er untätig ist.",
   "board.start.idle": "{status}: bekommt die Karte als nächste Nachricht.",
