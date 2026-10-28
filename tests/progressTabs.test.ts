@@ -95,6 +95,19 @@ describe('the Progress panel tabs (#1309)', () => {
     expect(runDayLabel(before, NOW, tr)).toMatch(/Sunday.*18|18.*Sunday/)
   })
 
+  it('rolls over at midnight (HI-1925): a run ended late today is Today, and after midnight Yesterday, Today then empty', () => {
+    const midnight = new Date(2026, 9, 22, 0, 0, 0).getTime()
+    const late = run({ startedAt: midnight - 5 * 60_000, finishedAt: midnight - 60_000 })
+    // Started yesterday, ended today: today's (by when it ended).
+    const across = run({ startedAt: midnight - 10 * 60_000, finishedAt: midnight + 60_000 })
+    expect(runDays([late], midnight - 30_000).map((d) => d.day)).toEqual([0])
+    expect(runDays([late], midnight + 30_000).map((d) => d.day)).toEqual([1])
+    expect(runDays([late, across], midnight + 2 * 60_000).map((d) => [d.day, d.groups.flatMap((g) => g.runs.map((r) => r.id))])).toEqual([
+      [0, [across.id]],
+      [1, [late.id]]
+    ])
+  })
+
   it("a group's line: its card and title, how many times, how many failed and how the last ended", () => {
     const g = (states: ProgressRun['state'][]) => runDays(states.map((state, i) => run({ state, startedAt: NOW - (10 - i) * 60_000, finishedAt: NOW - (10 - i) * 60_000 + 1000 })), NOW)[0].groups[0]
     expect(runGroupLabel(g(['failed', 'failed', 'failed', 'passed']), 'AL-12', tr)).toBe('AL-12 unit ×4 · 3 failed, then passed')

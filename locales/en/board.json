@@ -2875,9 +2875,25 @@
     "defaultMessage": "Clear",
     "description": "A button in the Progress panel's Runs tab: clears its filters and search."
   },
+  "board.runs.dockEdge": {
+    "defaultMessage": "Finished runs’ height",
+    "description": "Accessible name of the handle on the top edge of the Progress panel's Runs tab's finished runs (docked at the bottom): drag it to make them taller or shorter."
+  },
+  "board.runs.dockEdgeTip": {
+    "defaultMessage": "Drag to make the finished runs taller or shorter; double-click for {rows, plural, one {# lane row} other {# lane rows}}",
+    "description": "Tooltip of the handle on the top edge of the Progress panel's Runs tab's finished runs. {rows} is their default height in the Pulse tab's lane rows (6.5)."
+  },
+  "board.runs.dockEdgeValue": {
+    "defaultMessage": "{rows, plural, one {# lane row high} other {# lane rows high}}",
+    "description": "The value of the handle on the top edge of the Progress panel's Runs tab's finished runs, for screen readers: how tall they are, in the height of the Pulse tab's lane rows ({rows}, may be a fraction such as 6.5)."
+  },
   "board.runs.failedOnly": {
     "defaultMessage": "Failed",
     "description": "A toggle in the Progress panel's Runs tab: shows only the runs that failed."
+  },
+  "board.runs.finished": {
+    "defaultMessage": "Finished runs",
+    "description": "Accessible name of the Progress panel's Runs tab's finished runs, docked at the bottom (Today, then older days)."
   },
   "board.runs.group": {
     "defaultMessage": "{what} ×{n, number} · {outcome, select, passed {{failed, plural, =0 {all passed} one {# failed, then passed} other {# failed, then passed}}} failed {{failed, plural, one {# failed} other {# failed}}} other {{failed, plural, =0 {last stopped} one {# failed, last stopped} other {# failed, last stopped}}}}",
@@ -2887,6 +2903,10 @@
     "defaultMessage": "Lane",
     "description": "Accessible name of the Progress panel's Runs tab filter by lane: only the runs for a lane's cards."
   },
+  "board.runs.noFinished": {
+    "defaultMessage": "No finished runs",
+    "description": "The Progress panel's Runs tab's finished runs (docked at the bottom) when Hive has none."
+  },
   "board.runs.none": {
     "defaultMessage": "No runs yet. When an agent runs tests or a build with progress reporting, every run shows here, kept by day.",
     "description": "The Progress panel's Runs tab when Hive has no runs."
@@ -2894,6 +2914,10 @@
   "board.runs.noneMatch": {
     "defaultMessage": "No runs match.",
     "description": "The Progress panel's Runs tab when no run matches its filters or search."
+  },
+  "board.runs.noneToday": {
+    "defaultMessage": "No runs today",
+    "description": "Under Today in the Progress panel's Runs tab's finished runs: no run ended today (older days follow)."
   },
   "board.runs.other": {
     "defaultMessage": "Other",
@@ -2910,10 +2934,6 @@
   "board.runs.today": {
     "defaultMessage": "Today",
     "description": "A heading in the Progress panel's Runs tab: the runs that ended today follow."
-  },
-  "board.runs.toggleCard": {
-    "defaultMessage": "{open, select, yes {Hide the runs of {card}} other {Show the runs of {card}}}",
-    "description": "Tooltip of the chevron on a card's heading in the Progress panel's Runs tab: hides or shows the card's runs ({card}: its key, such as HI-12, or Other for the runs for no card). Keep the select keys."
   },
   "board.runs.yesterday": {
     "defaultMessage": "Yesterday",
