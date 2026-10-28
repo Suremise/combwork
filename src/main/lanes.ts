@@ -703,12 +703,6 @@ export interface StartLane {
   briefNotIn?: string | null
   /** Who starts it, as the board names them. */
   by: string
-  /**
-   * Asked once this call is decided to record a new lane (not to update the builder's running one), under the lanes'
-   * lock and before anything changes: a reason refuses it (409), the running lane it would have replaced kept (HR2's
-   * HI-1900 round 2: the Assistant's start over a busy agent).
-   */
-  beforeNew?: () => string | null
 }
 
 /**
@@ -779,8 +773,6 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
       also.push((db) => noteLaneIn(db, ws.path!, before, was))
       return { rec: was, did: 'updated' as const, replaced: null }
     }
-    const refused = s.beforeNew?.()
-    if (refused) throw new LaneError(409, refused)
     let replaced: LaneRecord | null = null
     if (was) {
       const v = (await views(ws, [was]))[0]

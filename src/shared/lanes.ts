@@ -50,8 +50,9 @@ export interface LaneRecord {
   /**
    * Started from the window with no slot free (#1438, §16.10.2): its agents start once one is lent to it, with the user's
    * note in their brief. Kept with the lane (its row's `extra`), so it waits through a restart; cleared once it starts.
+   * `stoppedOnly`: recorded by the Assistant or a script (HI-1934), so only its agents stopped then are started.
    */
-  slotWait?: { since: string; note: string }
+  slotWait?: { since: string; note: string; stoppedOnly?: true }
   /**
    * The lane's brief for its builder (HI-1795: `hive_lane start`'s `brief`), kept with the lane (its row's `extra`).
    * `text` null: cleared. `rev` goes up at each change of text and each clear, never reused. In slots, every placement
@@ -373,7 +374,7 @@ export function readLane(v: unknown): LaneRecord | null {
     ...(text(v.ruleset, 128) ? { ruleset: v.ruleset } : {}),
     ...(pending ? { pending } : {}),
     ...(whole(v.inFlight, 1e9) ? { inFlight: v.inFlight as number } : {}),
-    ...(isObj(v.slotWait) && time(v.slotWait.since) && typeof v.slotWait.note === 'string' ? { slotWait: { since: v.slotWait.since as string, note: (v.slotWait.note as string).slice(0, 4000) } } : {}),
+    ...(isObj(v.slotWait) && time(v.slotWait.since) && typeof v.slotWait.note === 'string' ? { slotWait: { since: v.slotWait.since as string, note: (v.slotWait.note as string).slice(0, 4000), ...(v.slotWait.stoppedOnly === true ? { stoppedOnly: true as const } : {}) } } : {}),
     ...(isObj(v.brief) && whole(v.brief.rev, 1e9) && (v.brief.text === null || typeof v.brief.text === 'string') && (v.brief.out === null || whole(v.brief.out, 1e9)) ? { brief: { text: v.brief.text === null ? null : (v.brief.text as string).slice(0, LANE_BRIEF_MAX), rev: v.brief.rev as number, out: v.brief.out as number | null, ...(text(v.brief.notIn, 128) ? { notIn: v.brief.notIn as string } : {}) } } : {}),
     ...(v.pool === true && !reviewer ? { pool: true as const } : {})
   }
