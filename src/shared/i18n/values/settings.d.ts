@@ -279,6 +279,10 @@ interface HiveMessageValues {
   'settings.advanced.copilot.override.preApproveHiveTools.title': undefined
   'settings.advanced.copilot.override.stripGitHubTokens.desc': undefined
   'settings.advanced.copilot.override.stripGitHubTokens.title': undefined
+  'settings.advanced.copilot.question.field.desc': undefined
+  'settings.advanced.copilot.question.field.title': undefined
+  'settings.advanced.copilot.question.tool.desc': undefined
+  'settings.advanced.copilot.question.tool.title': undefined
   'settings.advanced.copilot.ready.footer.desc': undefined
   'settings.advanced.copilot.ready.footer.title': undefined
   'settings.advanced.copilot.signIn.errorMessage.desc': undefined

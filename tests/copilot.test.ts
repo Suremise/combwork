@@ -1,6 +1,7 @@
-import { mkdirSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { advanced } from '../src/main/advanced'
 import { copilot, copilotHooks, copilotMcpServer, HIVE_TOOL_NAMES } from '../src/main/providers/copilot/adapter'
 import { COPILOT_ENV_STRIP, copilotEnv } from '../src/main/providers/copilot/home'
 import { parseCopilotModels } from '../src/main/providers/copilot/models'
@@ -190,7 +191,6 @@ describe('Copilot launch', () => {
   it('writes the plugin (hooks with the token), the MCP config and the instructions in the launch’s private folder', async () => {
     const ctx = context({ instructions: 'Role: assistant.', privateDir: join(base, 'private-2') })
     await copilot.prepareLaunch(ctx)
-    const { readFileSync } = await import('fs')
     const hooks = JSON.parse(readFileSync(join(ctx.privateDir, 'plugin', 'hooks.json'), 'utf8'))
     expect(hooks).toEqual(copilotHooks(ctx.hookUrl, 'tok123'))
     expect(JSON.parse(readFileSync(join(ctx.privateDir, 'plugin', 'plugin.json'), 'utf8')).name).toBe('hive-launch')
@@ -220,7 +220,6 @@ describe('Copilot launch', () => {
   })
 
   it('takes its exit grace from Settings → Advanced (copilot.exit.graceSeconds), at each stop (#727)', async () => {
-    const { advanced } = await import('../src/main/advanced')
     const { stopWaitMs } = await import('../src/main/sessions')
     advanced.load(tempDir('hive-copilot-advanced-'))
     try {
@@ -284,6 +283,51 @@ describe('Copilot hooks', () => {
     expect(h({ hook_event_name: 'Notification', notification_type: 'agent_idle', message: 'Done' }).event).toEqual({ kind: 'ignore' })
     // Sent also when Allow all approves the call itself: not a person being asked.
     expect(h({ hookName: 'permissionRequest', toolName: 'powershell' }).event).toEqual({ kind: 'ignore' })
+  })
+
+  describe("a question's text (HI-1945)", () => {
+    // Copilot 1.0.105's hooks for ask_user, as recorded: PreToolUse (AskUserQuestion), the Notification saying only
+    // "Information requested", PostToolUse. The question is the PreToolUse's, until the call ends.
+    const [pre, notification, post] = readFileSync(join(__dirname, 'fixtures', 'advanced', 'question-copilot-1.0.105.jsonl'), 'utf8').trim().split(/\r?\n/).map((l) => JSON.parse(l) as Record<string, unknown>)
+    const asked = (message: string) => ({ kind: 'ask', ask: { kind: 'question', blocking: true, message } })
+    // Overridden in a profile of its own, never the user's.
+    beforeAll(() => advanced.load(tempDir('hive-copilot-question-')))
+    afterAll(async () => {
+      await advanced.set('copilot.question.tool', null)
+      await advanced.set('copilot.question.field', null)
+    })
+
+    it("shows the asking tool's question, not Copilot's notice, until the call ends", () => {
+      expect(notification.message).toBe('Information requested')
+      h(pre)
+      expect(h(notification).event).toEqual(asked('Which one should I use?'))
+      // Another session's question isn't this one's.
+      expect(h({ ...notification, sessionId: 'other' }).event).toEqual(asked('Information requested'))
+      h(post)
+      expect(h(notification).event).toEqual(asked('Information requested'))
+      // Stop ends it too, as an unanswered question's turn ends.
+      h(pre)
+      h({ hook_event_name: 'Stop', session_id: pre.session_id })
+      expect(h(notification).event).toEqual(asked('Information requested'))
+    })
+
+    it('follows the advanced settings: the tool name and the question field', async () => {
+      const renamed = { ...pre, tool_name: 'AskHuman', tool_input: { prompt: 'Which file?', message: 'old field' } }
+      h(renamed)
+      expect(h(notification).event).toEqual(asked('Information requested'))
+      await advanced.set('copilot.question.tool', '^AskHuman$')
+      h(renamed)
+      expect(h(notification).event).toEqual(asked('old field'))
+      h({ ...post, tool_name: 'AskHuman' })
+      await advanced.set('copilot.question.field', 'prompt')
+      h(renamed)
+      expect(h(notification).event).toEqual(asked('Which file?'))
+      // The renamed tool's end clears it; the default's name no longer counts.
+      h(post)
+      expect(h(notification).event).toEqual(asked('Which file?'))
+      h({ ...post, tool_name: 'AskHuman' })
+      expect(h(notification).event).toEqual(asked('Information requested'))
+    })
   })
 
   it('tells a refused sign-in from another error that ends the turn', () => {
