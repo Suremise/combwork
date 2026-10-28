@@ -527,6 +527,10 @@
     "defaultMessage": "Hive couldn't record what the session used, so it is kept.",
     "description": "Purge left a session alone: Hive couldn't save its usage in the usage history, which the totals keep."
   },
+  "session.restartMode.didntStop": {
+    "defaultMessage": "{agent} didn't stop in time, so it wasn't restarted in the new mode. Try again once it has stopped.",
+    "description": "Switching a running agent's permission mode (it restarts in the new mode) is refused: the agent ({agent}, its name) was told to stop but hadn't ended yet, so nothing was started."
+  },
   "session.setup.failed": {
     "defaultMessage": "The setup command exited with code {code}. Its output is in the agent's terminal. Fix it and start the agent again, or start it without setup.",
     "description": "The notice that a worktree setup command failed. {code} is its exit code."

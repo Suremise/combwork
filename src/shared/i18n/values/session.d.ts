@@ -133,6 +133,7 @@ interface HiveMessageValues {
   'session.purge.reading': undefined
   'session.purge.running': undefined
   'session.purge.unread': undefined
+  'session.restartMode.didntStop': { agent: string | number }
   'session.setup.failed': { code: string | number }
   'session.setup.failedTitle': { project: string | number; agent: string | number }
   'session.signIn.again': { provider: string | number }

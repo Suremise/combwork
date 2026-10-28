@@ -131,6 +131,7 @@
   "session.purge.reading": "Hive liest gerade das Transkript (ein Export oder eine Suche). Versuche es gleich noch einmal.",
   "session.purge.running": "Sie läuft.",
   "session.purge.unread": "Hive konnte die Nutzung der Sitzung nicht erfassen, daher bleibt sie erhalten.",
+  "session.restartMode.didntStop": "Agent {agent} hat nicht rechtzeitig angehalten und wurde daher nicht im neuen Modus neu gestartet. Versuche es erneut, sobald er angehalten hat.",
   "session.setup.failed": "Der Einrichtungsbefehl wurde mit Code {code} beendet. Seine Ausgabe steht im Terminal des Agenten. Behebe den Fehler und starte den Agenten erneut, oder starte ihn ohne Einrichtung.",
   "session.setup.failedTitle": "{project} · {agent}: Einrichtung fehlgeschlagen",
   "session.signIn.again": "Wieder bei {provider} angemeldet",
