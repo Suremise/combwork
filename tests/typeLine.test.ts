@@ -5,7 +5,7 @@
 import { createRequire } from 'module'
 import { writeFileSync, appendFileSync } from 'fs'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 
 type Lost = { attempt: number; lost: string[] }
@@ -38,9 +38,7 @@ describe('typeLine waits for its readiness (HI-1918)', () => {
     let asked = 0
     const going = typeLine(t.inv, 'k', t.home, 'B1', 'shell: echo hi', { strict: true, taken: t.taken, hungMs: HUNG_MS, ready: async () => (asked++, !pending) })
     // It has asked several times and typed nothing while the doorbell is pending.
-    const until = Date.now() + HUNG_MS
-    while (asked < 5 && Date.now() < until) await new Promise((r) => setTimeout(r, 20))
-    expect(asked).toBeGreaterThanOrEqual(5)
+    await vi.waitFor(() => expect(asked).toBeGreaterThanOrEqual(5), { timeout: HUNG_MS })
     expect(t.writes).toEqual([])
     const drained = Date.now()
     pending = false
