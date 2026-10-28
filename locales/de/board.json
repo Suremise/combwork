@@ -359,6 +359,8 @@
   "board.forYou.offerReason": "Begründung (optional)",
   "board.forYou.offerTip": "{action, select, done {Verschiebt die Karte in deinem Namen nach Erledigt und übergeht dabei, wo nötig, die Regeln ihres Projekts (als Ausnahme vermerkt, mit der Begründung daneben), und beantwortet die Frage.} noCode {Macht die Karte in deinem Namen zu einer Karte ohne Code (als Ausnahme vermerkt, mit der Begründung daneben), und beantwortet die Frage.} skipReview {Lässt die Review der Karte in deinem Namen überspringen (mit der Begründung daneben), und beantwortet die Frage.} other {Hebt die Blockierung der Karte auf (die Begründung daneben kommt als dein Kommentar dazu), und beantwortet die Frage.}}",
   "board.forYou.reply": "Deine Antwort",
+  "board.forYou.resolvedBy": "{gone, select, yes {Durch eine inzwischen entfernte Entscheidung} other {Durch deine Entscheidung: „{decision}“}}, {who, select, you {festgehalten von dir} assistant {festgehalten vom Assistenten} other {festgehalten von {name}}}",
+  "board.forYou.resolvedHeading": "Durch deine Entscheidungen beantwortet",
   "board.forYou.rounds": "Weitere Runden",
   "board.forYou.saveAndMerge": "Speichern und Merge fortsetzen",
   "board.forYou.send": "Antwort senden",

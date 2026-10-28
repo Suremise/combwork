@@ -359,6 +359,8 @@
   "board.forYou.offerReason": "Reason (optional)",
   "board.forYou.offerTip": "{action, select, done {Moves the card to Done as you, skipping its project's rules where needed (recorded as an override, with the reason beside it), and answers the question.} noCode {Makes the card no code as you (recorded as an override, with the reason beside it), and answers the question.} skipReview {Skips the card's review as you (with the reason beside it), and answers the question.} other {Unblocks the card (the reason beside it is added as your comment), and answers the question.}}",
   "board.forYou.reply": "Your answer",
+  "board.forYou.resolvedBy": "{gone, select, yes {By a decision since removed} other {By your decision: “{decision}”}}, {who, select, you {recorded by you} assistant {recorded by the Assistant} other {recorded by {name}}}",
+  "board.forYou.resolvedHeading": "Answered by your decisions",
   "board.forYou.rounds": "More rounds",
   "board.forYou.saveAndMerge": "Save and Carry On Merging",
   "board.forYou.send": "Send Reply",

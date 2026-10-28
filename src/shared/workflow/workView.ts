@@ -290,6 +290,8 @@ export interface WorkView {
   rounds: number
   /** Open requests to the user (For you). */
   forYou: number
+  /** Requests answered by a decision of the user's (HI-1932), newest first, at most RESOLVED_SHOWN: For you's resolved list. */
+  resolvedByDecision: WorkResolved[]
   /**
    * A card loop's step waiting for its reviewer (a design, or a follow-up of reviewed work), null when none: until it is
    * answered, Retry merge is refused (HI-1667), so the window doesn't offer it.
@@ -304,6 +306,23 @@ export interface WorkView {
   /** When its current cycle started (its Started's or Adopted's time); null before its first start. */
   startedAt: string | null
 }
+
+/**
+ * A request answered by a decision the user made (HI-1932): its words as asked (an agent's own, or Hive's request as data
+ * for the window, `shown`), the decision it names (the card's decision's id: its text is the card's, joined in the window),
+ * who recorded it (the authenticated recorder: "You", "Assistant") and when.
+ */
+export interface WorkResolved {
+  request: string
+  question: string
+  shown?: StoredText
+  decision: string
+  recordedBy: string
+  at: string
+}
+
+/** How many of a card's resolved requests its view keeps (HI-1932). */
+export const RESOLVED_SHOWN = 10
 
 /**
  * A refused request (a `Refused` fact, #1279): its rule and values, from which the window says it in its language as the
@@ -443,6 +462,14 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     decisions: { generation: s.generation, received: s.received },
     rounds: s.rounds,
     forYou: s.requests.length,
+    resolvedByDecision: facts
+      .flatMap((f) => {
+        const d = f.kind === 'Approval' ? (f.data as FactData['Approval']) : null
+        const made = d?.byDecision ? s.made[d.request] : undefined
+        return d?.byDecision ? [{ request: d.request, question: made?.text ?? '', ...(made?.requestText ? { shown: made.requestText } : {}), decision: d.byDecision.decision, recordedBy: d.byDecision.recordedBy, at: d.byDecision.at }] : []
+      })
+      .reverse()
+      .slice(0, RESOLVED_SHOWN),
     loopStep: s.step?.step ?? null,
     retried: s.entries.some((x) => x.seq > (latest ?? 0) && x.requeue === 'retry'),
     lastSeq: s.lastSeq,

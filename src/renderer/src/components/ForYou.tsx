@@ -5,7 +5,9 @@ import { LANE_MAX_ROUNDS } from '@shared/lanes'
 import { MERGE_CHOICE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type AskActionKind, type CardKind, type RoundChoice } from '@shared/workflow/facts'
 import { FOR_YOU_KIND, ROUND_CHOICE, workflowLine } from '@shared/workflow/texts'
 import { gist } from '@shared/gist'
-import { askActionAvailable, type ForYouAnswer, type ForYouItem } from '@shared/workflow/workView'
+import { askActionAvailable, type ForYouAnswer, type ForYouItem, type WorkResolved } from '@shared/workflow/workView'
+import { formatDateTime } from '@shared/dates'
+import { useCardWork } from '../cardWork'
 import { call, errorMessage } from '../api'
 import { MARKDOWN_CARDS } from '../cardLinks'
 import { loadTasks, notify, prompt, useLanguage, useStore } from '../store'
@@ -100,15 +102,56 @@ export function ForYouChip({ items }: { items: ForYouItem[] | undefined }) {
  */
 export function ForYouSection({ card, kind, items, drafts, setDraft, setAnswering }: { card: TaskCard; kind?: CardKind; items: ForYouItem[] | undefined; drafts: Record<string, string>; setDraft: (request: string, text: string) => void; setAnswering: (busy: boolean) => void }) {
   useLanguage()
-  if (!items?.length) return null
+  const resolved = useCardWork(card.number).view?.resolvedByDecision ?? NO_RESOLVED
+  if (!items?.length && !resolved.length) return null
   return (
     <div className="for-you-section" data-section="for-you">
       <div className="task-section-h">
         <Icon name="bell-dot" /> {tr(M.heading)}
       </div>
-      {items.map((i) => (
+      {items?.map((i) => (
         <ForYouRequest key={i.request} card={card} kind={kind} item={i} reply={drafts[i.request] ?? ''} setReply={(t) => setDraft(i.request, t)} setAnswering={setAnswering} />
       ))}
+      {resolved.length > 0 && <ResolvedList card={card} rows={resolved} />}
+    </div>
+  )
+}
+
+const NO_RESOLVED: WorkResolved[] = []
+
+const R = {
+  heading: msg({ id: 'board.forYou.resolvedHeading', defaultMessage: 'Answered by your decisions', description: "A heading in the card dialog's For you section (HI-1932): the requests that waited for the user (questions) and were answered by a decision the user made, recorded on the card. Glossary: For you, decision." }),
+  by: msg({
+    id: 'board.forYou.resolvedBy',
+    defaultMessage: '{gone, select, yes {By a decision since removed} other {By your decision: “{decision}”}}, {who, select, you {recorded by you} assistant {recorded by the Assistant} other {recorded by {name}}}',
+    description: "Under a request in the card dialog's For you section answered by a decision (HI-1932): the user's decision that answered it ({decision}: its words, cut short; gone yes: the user has removed that decision from the card since), and who wrote the decision down: the user, the Hive Assistant (recording the user's own words), or another ({name}). Keep the select keys."
+  })
+}
+
+/**
+ * For you's resolved list (HI-1932): the card's requests a decision of the user's answered, newest first, each with its
+ * question (Hive's own request in the window's language), the decision (its text is the card's, by its id), who recorded
+ * it and when. Display only: nothing to answer.
+ */
+function ResolvedList({ card, rows }: { card: TaskCard; rows: readonly WorkResolved[] }) {
+  return (
+    <div className="for-you-resolved" data-resolved="">
+      <div className="for-you-resolved-h faint">{tr(R.heading)}</div>
+      {rows.map((r) => {
+        const d = card.decisions?.find((x) => x.id === r.decision)
+        const question = requestText({ text: r.question, ...(r.shown ? { shown: r.shown } : {}) })
+        const who = r.recordedBy === 'You' ? 'you' : r.recordedBy === 'Assistant' ? 'assistant' : 'other' // i18n-ignore: select keys, never shown
+        return (
+          <div key={`${r.request}:${r.at}`} className="for-you-resolved-row" data-request={r.request} data-decision={r.decision}>
+            <div className="for-you-resolved-q" title={question}>
+              {gist(question, 160)}
+            </div>
+            <div className="faint for-you-resolved-by">
+              <span>{tr(R.by, { gone: d ? 'no' : 'yes', decision: d ? gist(d.text, 200) : '', who, name: r.recordedBy })}</span> <span className="for-you-resolved-when" title={formatDateTime(r.at)}>{timeAgo(r.at)}</span>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

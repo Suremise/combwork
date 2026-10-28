@@ -19,6 +19,18 @@
     "defaultMessage": "You can add cards only to your project ({project}).",
     "description": "An error: an agent tried to add a card to another project, or to the whole workspace; it adds cards only to its own project ({project}, its folder name)."
   },
+  "tasks.error.answersNot": {
+    "defaultMessage": "{why, select, open {{request} isn't an open request on {card}.} other {A decision can't answer {request} on {card}: approve, decline or choose it in For you.}}",
+    "description": "An error (HI-1932): a decision named a request ({request}: its id, such as r12) of card {card} (its key) that it can't answer: it isn't open on the card (answered or closed meanwhile), or it is an approval or one of Hive's own requests (a review, the OK before merging, the round limit), which the user answers in For you. Keep the select keys."
+  },
+  "tasks.error.answersNotAgents": {
+    "defaultMessage": "Only the user, or the Assistant recording the user's decision, closes a request for the user.",
+    "description": "An error (HI-1932): an agent recorded a decision naming the card's requests it answers (For you); only the user, or the Hive Assistant writing down the user's own decision, may close them that way."
+  },
+  "tasks.error.answersShape": {
+    "defaultMessage": "answers takes the ids of 1 to {max, number} of the card’s open requests, with a decision and nothing else in the same change.",
+    "description": "An error (HI-1932): a decision naming the card's requests it answers was sent wrongly: answers must list between 1 and {max} request ids (For you's requests), together with the decision's text and no other change. Keep answers as it is (a field's name)."
+  },
   "tasks.error.archiveNone": {
     "defaultMessage": "cards: list the cards to archive.",
     "description": "An error: a call to archive cards listed none. \"cards:\" is the name of the call's field: keep it as it is."
@@ -390,6 +402,10 @@
   "tasks.history.blocked": {
     "defaultMessage": "Blocked: {reason}",
     "description": "A line in a card's history: the card was marked blocked, with this reason ({reason}, written by whoever blocked it)."
+  },
+  "tasks.history.closedByDecision": {
+    "defaultMessage": "Closed a question for you with your decision: \"{question}\"",
+    "description": "A line in a card's history (HI-1932): a question waiting for the user (For you) was answered by a decision the user made, recorded on the card (by the user, or by the Hive Assistant writing down the user's words: the history line's author says who). {question} is the question, cut short."
   },
   "tasks.history.context": {
     "defaultMessage": "Read first: {refs}",

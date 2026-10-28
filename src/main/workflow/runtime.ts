@@ -10,7 +10,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
@@ -1641,6 +1641,52 @@ export class Workflow {
     })
     if (out) return this.refuse(card, 'user', 'answer', out)
     return this.ok(card, from, this.state(card).stage)
+  }
+
+  /**
+   * A decision the user made answers some of a card's open requests (HI-1932, Darren's decision): the questions it names,
+   * each answered by it, in one write. Each must still be open and one a decision may answer (`decisionAnswers`), checked
+   * under the write: any that isn't refuses the whole of it, nothing written. Each request's asker (else the builder) is
+   * woken once with the requests it answers; nothing moves. The caller adds the decision itself in the same write
+   * (runIntent's patch) and checks who may (tasks.ts: the user or the Assistant, never an agent).
+   */
+  async answerByDecision(ref: unknown, requests: readonly string[], d: { text: string; decision: string; recordedBy: string }): Promise<Reply> {
+    const card = this.resolve(ref)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    const r = this.rulesetOf(card, s)
+    const notOpen = (st: CardState, request: string): GuardRefusal | null => {
+      const req = st.requests.find((x) => x.request === request)
+      return req && decisionAnswers(req) ? null : { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: `answer ${request}`, moves: '' } } // i18n-ignore: an intent's name and a request id
+    }
+    for (const id of requests) {
+      const no = notOpen(s, id)
+      if (no) return this.refuse(card, 'user', 'answer', no)
+    }
+    const at = new Date().toISOString()
+    const out = await this.write(card, r, 'user', (w) => {
+      const st = w.state()
+      // Under the transaction: every request still open and answerable, or none is answered.
+      for (const id of requests) {
+        const no = notOpen(st, id)
+        if (no) return no
+      }
+      const byAgent = new Map<string, string[]>()
+      for (const id of requests) {
+        const req = st.requests.find((x) => x.request === id)!
+        w.fact('Approval', { request: id, answer: 'answered', note: d.text, generation: st.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}), byDecision: { decision: d.decision, recordedBy: d.recordedBy, at } }) // i18n-ignore: a fact's kind and codes, not text
+        const asked = [...req.text.replace(/\s+/g, ' ').trim()]
+        const quoted = asked.length > QUESTION_QUOTE_MAX ? `${asked.slice(0, QUESTION_QUOTE_MAX - 1).join('')}…` : asked.join('')
+        const who = req.asker ?? st.started?.builder
+        if (who) byAgent.set(who, [...(byAgent.get(who) ?? []), `"${quoted}"`])
+      }
+      const said = (qs: string[]): string => `${card.key}: the user answered ${qs.join(' and ')} with a decision (recorded by ${d.recordedBy}): ${d.text}` // i18n-ignore: a wake, agent-facing
+      w.answer = said([...byAgent.values()].flat())
+      for (const [agent, qs] of byAgent) this.wake(w, agent, said(qs), 'answer')
+      return null
+    })
+    if (out) return this.refuse(card, 'user', 'answer', out)
+    return this.ok(card, s.stage, this.state(card).stage, { answered: [...requests] })
   }
 
   /** report merge (§16.9.3): the builder merged; Hive checks containment (unless Not checked), then Done. */

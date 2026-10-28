@@ -1125,6 +1125,13 @@ export interface TaskPatch {
   /** Records a decision the user made (#357), attributed to the user whoever records it. Editing or removing one is the user's (tasks:editDecision). */
   decision?: string
   /**
+   * HI-1932: the card's open requests (For you, their ids) the `decision` answers, closed with it in one write. Only with
+   * a decision and no other field; only the user's or the Assistant's (never an agent's).
+   */
+  answers?: string[]
+  /** HI-1932, set by Hive itself: the id the decision is recorded with (the one its answers name). */
+  decisionId?: string
+  /**
    * A column move across workflow rules (#1265, SPEC §16.8.4), with why: the Assistant's, required when its move skips
    * a rule (else refused, naming them); the user's reason, optional. Never an agent's.
    */

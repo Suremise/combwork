@@ -206,6 +206,17 @@ export function answerFits(req: Pick<FactData['ApprovalRequested'], 'kind' | 'ga
   return a.outcome === 'answered' && (!!a.reply || !!a.decision)
 }
 
+/**
+ * Whether a decision the user made may answer a request (HI-1932, Darren's decision: the Assistant records it naming
+ * the requests it answers): a question someone asked (an agent, the Assistant, a rule it couldn't keep), answered with a
+ * decision. Never one of Hive's own gates (a review, the OK before merging, the round limit's choice, the merge queue's),
+ * the merge queue's merge choice, or an approval: those are approved, declined or chosen in For you.
+ */
+export const decisionAnswers = (r: Pick<FactData['ApprovalRequested'], 'kind' | 'gate' | 'actions'>): boolean => askedQuestion(r) && r.gate !== MERGE_CHOICE_GATE && answerFits(r, { outcome: 'answered', decision: true }, 1)
+
+/** The most requests one decision answers (HI-1932). */
+export const DECISION_ANSWERS_MAX = 20
+
 export type IntegrationFailReason = 'conflict' | 'checks' | 'targetMoved' | 'folderBusy' | 'notUpToDate' | 'hook' | 'focused'
 
 /**
@@ -284,7 +295,8 @@ export interface FactData {
    */
   RequestClosed: { request: string; why: 'done' | 'carriedOn' }
   /** An answer (§16.8.5): `note` the user's reply; at the round limit, their `choice` and the rounds a carry on adds; `action`, an action the question offered, done (#1630; `note` its reason). */
-  Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number; action?: AskActionKind }
+  /** `byDecision` (HI-1932): answered by a decision the user made, recorded on the card (its id), by whom (the authenticated recorder), when. */
+  Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number; action?: AskActionKind; byDecision?: { decision: string; recordedBy: string; at: string } }
   IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash' | 'rebase'; requeue?: 'transient' | 'retry' }
   /** `followUp`: a follow-up posted on the queued card (#1623), so the queue can't merge the revision while its line changes. */
   IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' | 'followUp' }

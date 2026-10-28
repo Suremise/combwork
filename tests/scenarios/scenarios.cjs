@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 96
+const FIXTURES_VERSION = 97
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -3263,6 +3263,46 @@ module.exports.SCENARIOS = [
       ]
     }
   },
+  // HI-1932: the user's answer to a card's open questions, told the Assistant in chat, is recorded as a decision naming
+  // the requests it answers (hive_update_task's answers), so Hive closes them; a pair, the answer covering both questions
+  // or only one of them, and the Assistant names those and only those.
+  ...[
+    { id: 'assistant-decision-answers', both: true, prompt: (c) => `About card #${c.cards.s}: Coder asked me two questions there. My answer to both: the bee icon, in amber. That's final.` },
+    { id: 'assistant-decision-answers-one', both: false, prompt: (c) => `About card #${c.cards.s}: Coder asked me which icon to use. Use the bee icon. I'll answer its colour question myself later.` }
+  ].map((v) => ({
+    id: v.id,
+    title: v.both
+      ? "The Assistant told the user's answer to two of a card's open questions (HI-1932): records it as a decision naming both requests (answers), so they close"
+      : "The Assistant told the user's answer to one of a card's two open questions (HI-1932): its decision names only that request, the other stays open",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      const n = await c.card('s', { title: 'Pick the app icon', description: 'The app needs an icon and its colour.', agent: 'coder', column: 'doing' })
+      await c.startAgent('coder')
+      c.asked = []
+      for (const text of ['Which icon: the bee, the honeycomb or the hive cell?', 'Which colour: amber or blue?']) {
+        const r = await c.as('coder', 'POST', `/v1/tasks/%23${n}/ask`, { kind: 'decide', text })
+        if (r.status !== 200) throw new Error(`ask: ${JSON.stringify(r.body)}`)
+      }
+      const card = await c.as('coder', 'GET', `/v1/tasks/%23${n}`)
+      c.asked = (card.body?.forYou ?? []).map((x) => x.request)
+      if (c.asked.length !== 2) throw new Error(`two requests expected: ${JSON.stringify(card.body?.forYou)}`)
+    },
+    prompt: v.prompt,
+    fake: (c) => `skill coordinate-agents then hive hive_read_task {"number":${c.cards.s}} then hive hive_update_task ${JSON.stringify({ number: c.cards.s, decision: v.both ? 'The bee icon, in amber.' : 'Use the bee icon.', answers: v.both ? c.asked : [c.asked[0]] })}`,
+    expect: (o, c) => {
+      const updates = ran(o, 'hive_update_task').filter((x) => field(x.args, 'number', c.cards.s))
+      const named = updates.flatMap((x) => (Array.isArray(argsOf(x).answers) ? argsOf(x).answers : []))
+      const want = v.both ? c.asked : [c.asked[0]]
+      const decisions = (o.cards.s?.decisions ?? []).map((d) => d.text)
+      return [
+        ["recorded the user's answer as the card's decision", decisions.some((t) => /bee/i.test(t)), decisions.join(' | ')],
+        [v.both ? 'named both open requests in answers' : 'named only the request the answer covers in answers', want.every((id) => named.includes(id)) && named.every((id) => want.includes(id)), JSON.stringify({ named, want })],
+        ["didn't ask the user again", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0],
+        ["didn't type it into Coder (Hive tells it)", called(o, 'hive_prompt_agent').length === 0]
+      ]
+    }
+  })),
   {
     id: 'assistant-look-lanes',
     title: 'The Assistant at Look and advise asked which card loops are running (#500): lists the lanes, changes none',

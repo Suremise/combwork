@@ -27,7 +27,7 @@ import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCar
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
-import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, STAGE_CATEGORY, type AskActionKind, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
+import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, STAGE_CATEGORY, type AskActionKind, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
@@ -1340,6 +1340,8 @@ async function createTaskLocked(
 export async function updateTask(...args: Parameters<typeof updateTaskLocked>): Promise<TaskCard> {
   const [n, patch, actor, opts = {}] = args
   const ws = workspace
+  // HI-1932: a decision naming the requests it answers, its own path (one write with its answers).
+  if (patch.answers !== undefined) return decideAndAnswer(n, patch, actor, opts)
   checkOverride(patch, actor)
   // The user's or the Assistant's column move, through the card's workflow rules (#1265): its reads made by the runtime,
   // before its own lock; the rest of the change saved with the move, in its transaction.
@@ -1959,6 +1961,70 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   })
 }
 
+const DECIDE = {
+  agents: msg({ id: 'tasks.error.answersNotAgents', defaultMessage: "Only the user, or the Assistant recording the user's decision, closes a request for the user.", description: "An error (HI-1932): an agent recorded a decision naming the card's requests it answers (For you); only the user, or the Hive Assistant writing down the user's own decision, may close them that way." }),
+  shape: msg({ id: 'tasks.error.answersShape', defaultMessage: 'answers takes the ids of 1 to {max, number} of the card’s open requests, with a decision and nothing else in the same change.', description: "An error (HI-1932): a decision naming the card's requests it answers was sent wrongly: answers must list between 1 and {max} request ids (For you's requests), together with the decision's text and no other change. Keep answers as it is (a field's name)." }),
+  not: msg({ id: 'tasks.error.answersNot', defaultMessage: "{why, select, open {{request} isn't an open request on {card}.} other {A decision can't answer {request} on {card}: approve, decline or choose it in For you.}}", description: "An error (HI-1932): a decision named a request ({request}: its id, such as r12) of card {card} (its key) that it can't answer: it isn't open on the card (answered or closed meanwhile), or it is an approval or one of Hive's own requests (a review, the OK before merging, the round limit), which the user answers in For you. Keep the select keys." })
+}
+
+/**
+ * Who may send a decision's `answers` and its shape (HI-1932), checked before anything is written: the user's or the
+ * Assistant's only; 1 to DECISION_ANSWERS_MAX ids, each a string as sent (never coerced); `wrong` when anything else
+ * comes with it or the decision is missing. The Agent API checks its raw body with it too, as some of its fields
+ * (kind, skipReview, attachments) are changed outside the card's patch.
+ */
+export function checkDecisionAnswers(actor: TaskActor, answers: unknown, wrong: boolean): asserts answers is string[] {
+  if (actor.kind !== 'user' && actor.kind !== 'assistant') throw new TaskPermissionError(DECIDE.agents)
+  if (wrong || !Array.isArray(answers) || !answers.length || answers.length > DECISION_ANSWERS_MAX || answers.some((x) => typeof x !== 'string' || !x.trim() || x.length > 64)) throw hiveError(DECIDE.shape, { max: DECISION_ANSWERS_MAX }, { kind: 'invalid' })
+}
+
+/**
+ * A decision the user made answers some of a card's open requests (HI-1932, Darren's decision of 28 Oct: the Assistant
+ * records it naming the requests it answers, and Hive closes them). The user's or the Assistant's only, never an
+ * agent's: no agent closes its own request. `answers`: 1 to DECISION_ANSWERS_MAX request ids (duplicates once), with a
+ * non-empty decision and nothing else. Each must be an open request a decision may answer (`decisionAnswers`), checked
+ * here and again under the write: any that isn't refuses all of it, the decision included. The decision (its id fixed
+ * here, the one each answer names), the answers and a history line each are one write; the agents asking are woken once
+ * it commits.
+ */
+async function decideAndAnswer(n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3] = {}): Promise<TaskCard> {
+  const ws = workspace
+  const { answers, decision, ...rest } = patch
+  const t = typeof decision === 'string' ? text(decision, MAX_DECISION, 'decision').trim() : ''
+  checkDecisionAnswers(actor, answers, !t || Object.entries(rest).some(([, v]) => v !== undefined) || !!opts.comment)
+  const requests = [...new Set(answers.map((x) => x.trim()))]
+  const head = ws.path ? cardHeads(ws, [n])[0] : undefined
+  if (!head) throw unknownTask(n)
+  const { workflowFor } = await import('./workflow/service')
+  const wf = typeof head.project === 'string' && head.project && ws.path ? await workflowFor(ws, join(ws.path, head.project)).catch(() => null) : null
+  const open = (() => {
+    try {
+      return wf ? wf.state(wf.store.card(n)).requests : []
+    } catch {
+      return []
+    }
+  })()
+  for (const id of requests) {
+    const req = open.find((r) => r.request === id)
+    if (!req || !decisionAnswers(req)) throw hiveError(DECIDE.not, { why: req ? 'kind' : 'open', request: id, card: cardRef(n) }, { kind: req ? 'invalid' : 'conflict' }) // i18n-ignore: select keys, never shown
+  }
+  const decisionId = entryId()
+  const recordedBy = actorName(actor)
+  const lines = requests.map((id) => storedText(HISTORY.closedByDecision, { question: clip(open.find((r) => r.request === id)!.text) }))
+  const { reply } = await runIntent(
+    wf!,
+    n,
+    actor,
+    (w) => w.answerByDecision(n, requests, { text: t, decision: decisionId, recordedBy }),
+    // The decision and the history's lines with the answers' write: one transaction, with the Assistant's change record
+    // (assistantChange's commit: Control, its session, the change limit) in it.
+    // Only with the write that holds its answers: a refusal is written too (its Refused fact), and takes no decision.
+    (w) => (w.written.some((f) => f.kind === 'Approval' && !!(f.data as { byDecision?: unknown }).byDecision) ? { patch: { decision: t, decisionId }, opts: { note: lines, ...(opts.commit ? { commit: opts.commit } : {}) } } : {})
+  )
+  if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
+  return getTask(n, ws)
+}
+
 /**
  * HI-1734: the user's answer to an agent's question that Hive didn't carry out, given to the Assistant too
  * (answerRelay.ts), with what only someone other than its agent can do on the card as it is now, if anything: an action
@@ -2165,7 +2231,7 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
       if (!t) throw hiveError(ERR.emptyDecision)
       const list = card.decisions ?? []
       if (list.length >= MAX_DECISIONS) throw hiveError(msg({ id: 'tasks.error.tooManyDecisions', defaultMessage: 'A card can have up to {max} decisions.', description: 'An error: a card already has as many decisions as it may have ({max}, a number).' }), { max: MAX_DECISIONS }, { kind: 'invalid' })
-      card.decisions = [...list, { id: entryId(), text: t, decidedBy: 'user', recordedBy: by, at: new Date().toISOString() }]
+      card.decisions = [...list, { id: patch.decisionId ?? entryId(), text: t, decidedBy: 'user', recordedBy: by, at: new Date().toISOString() }]
       said.push(storedText(HISTORY.decision, { decision: clip(t) }))
     }
     if (patch.context !== undefined) {

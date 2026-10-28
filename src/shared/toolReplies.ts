@@ -32,6 +32,11 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
   /** For a project agent: the cards in blockedBy and links that are another project's (it sees only their numbers). */
   elsewhere?: number[]
   /**
+   * Its requests waiting for the user (For you, HI-1932), oldest first: each one's id (what a decision's `answers` names),
+   * kind, gate, words and who asked. Absent when none waits.
+   */
+  forYou?: { request: string; kind: string; gate: string; text: string; asker?: string }[]
+  /**
    * Files kept with the card (HI-1700), newest first: full path (open it with your tools), name, size, who added it and
    * when, and where it came (a comment's author and time, the description, a session). `missing`: its file is gone.
    */
