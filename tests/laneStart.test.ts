@@ -4,7 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 type Live = { status: string; sessionId: string }
-const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[] }))
+const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[], onGetTask: null as null | (() => void), beforeLaunch: null as null | ((agentId: string) => void) }))
 
 vi.mock('../src/main/sessions', () => ({
   sessions: {
@@ -27,7 +27,9 @@ vi.mock('../src/main/sessions', () => ({
 }))
 vi.mock('../src/main/deliveries', () => ({
   deliveriesOf: async () => [],
-  launchWith: async (_p: string, nd: { body: string }, start: (line: string) => Promise<unknown>) => {
+  launchWith: async (_p: string, nd: { agentId: string; body: string }, start: (line: string) => Promise<unknown>) => {
+    // As its delivery is saved (an await before its start): what changes meanwhile.
+    state.beforeLaunch?.(nd.agentId)
     state.briefs.push(nd.body)
     return { record: null, launched: await start(nd.body) }
   }
@@ -57,7 +59,7 @@ vi.mock('../src/main/slotCards', () => ({
   }
 }))
 vi.mock('../src/main/tasks', () => ({
-  getTask: async (n: number) => ({ number: n, key: `AL-${n}`, title: `Card ${n}`, project: 'alpha', column: 'todo', archived: false })
+  getTask: async (n: number) => (state.onGetTask?.(), { number: n, key: `AL-${n}`, title: `Card ${n}`, project: 'alpha', column: 'todo', archived: false })
 }))
 vi.mock('../src/main/workflow/service', () => ({ workflowEnforced: () => state.enforced }))
 vi.mock('../src/main/workflow/rulesets', () => ({ resolvedOf: () => ({ options: state.options }) }))
@@ -85,6 +87,8 @@ beforeEach(() => {
   state.lend = { slot: 'slot-c' }
   state.slotWaits.length = 0
   state.waits.length = 0
+  state.onGetTask = null
+  state.beforeLaunch = null
 })
 
 describe('Start Lane… with the reviewer pool (#1443)', () => {
@@ -311,6 +315,28 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     expect(state.calls).toEqual(['start b2'])
     expect(recordedLaneNote(l)).toBe("Started B2 with the lane's brief. R1 is running, so Hive left it as it is: tell it about the lane.")
   })
+
+  it("its builder running when it looked and stopped meanwhile (HR6's round 1, finding 1): left out of this start, never started with no slot", async () => {
+    recorded()
+    inSlots()
+    state.live.set('b2', { status: 'ready', sessionId: 's-b2' })
+    // B2 stops while the lane's cards are read, after the look that decided no slot is lent for it.
+    state.onGetTask = () => void state.live.delete('b2')
+    const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+    expect(state.calls).toEqual(['start r1'])
+    expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Hive left it as it is: tell it about the lane.")
+  })
+
+  for (const status of ['working', 'watching']) {
+    it(`an agent found ${status} as its brief's delivery is saved (HR6's round 1, finding 2): left as it is, named as running, not as failed`, async () => {
+      recorded()
+      state.beforeLaunch = (id) => void (id === 'r1' && state.live.set('r1', { status, sessionId: 's-r1' }))
+      const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+      expect(state.calls).toEqual(['start b2'])
+      expect(l?.started.map((s) => [s.name, s.how])).toEqual([['B2', 'started']])
+      expect(recordedLaneNote(l)).toBe("Started B2 with the lane's brief. R1 is running, so Hive left it as it is: tell it about the lane.")
+    })
+  }
 
   it("waiting for a slot it was recorded with (stoppedOnly): once lent, an agent running by then keeps its conversation", async () => {
     state.lanes = [{ id: 'lane-9', state: 'active', builder: { id: 'b2', name: 'B2' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1], rounds: 3, slotWait: { since: '2026-10-28T09:00:00.000Z', note: '', stoppedOnly: true } }]

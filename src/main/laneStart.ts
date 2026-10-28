@@ -172,16 +172,17 @@ const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired
  * An agent whose brief for this lane was already given (`lane-brief`, `<lane>:<role>`: a start cut short by a crash, made
  * again) isn't started again. `over` (Hive quitting, #1628): no agent is started from then on, the ones not started left
  * out of the result, so the lane's next start (its next pass) starts them. `stoppedOnly` (a lane the Assistant or a
- * script recorded, HI-1934): an agent running is left out, never given a new conversation, and one that started
- * meanwhile is reported as not started.
+ * script recorded, HI-1934): an agent running, or in `left` (running when the caller looked, so its slot was decided
+ * without it, HR6's round 1), is left out and never given a new conversation; one found running at its launch, idle or
+ * busy, is left out too, never reported as failed.
  */
-async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: string, builder: AgentDef, reviewer: AgentDef | null, brief: (role: LaneRole) => string, over: () => boolean = () => false, stoppedOnly = false): Promise<LaneStartResult['started']> {
+async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: string, builder: AgentDef, reviewer: AgentDef | null, brief: (role: LaneRole) => string, over: () => boolean = () => false, stoppedOnly?: { left: ReadonlySet<string> }): Promise<LaneStartResult['started']> {
   const project = basename(projectPath)
   const started: LaneStartResult['started'] = []
   for (const [a, role] of [[builder, 'builder'], ...(reviewer ? [[reviewer, 'reviewer']] : [])] as [AgentDef, LaneRole][]) {
     let how: 'fresh' | 'started' = 'started'
     if (over()) break
-    if (stoppedOnly && sessions.liveFor(projectPath, a.id)) continue
+    if (stoppedOnly && (stoppedOnly.left.has(a.id) || sessions.liveFor(projectPath, a.id))) continue
     try {
       // Still the project's agent, read again after the awaits above.
       if (!projectAgents(await ws.projectConfig(projectPath)).some((x) => x.id === a.id)) throw hiveError(M.unknownAgent, { agent: a.name, project }, { kind: 'notFound' })
@@ -205,9 +206,10 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
         if (st && BUSY.has(st.status)) throw hiveError(M.busy, { agent: a.name, status: st.status }, { kind: 'conflict' })
       }
       const launched = await launchWith(projectPath, { agentId: a.id, agentName: a.name, kind: 'task', from: { kind: 'user', name: 'the user' }, body: brief(role), source: BRIEF, ref }, (line) => { // i18n-ignore: who the brief is from, as agents read it
+        // Running by now (stoppedOnly), whatever it is doing: left as it is, before the busy check would call it failed.
+        if (stoppedOnly && !over() && sessions.liveFor(projectPath, a.id)) throw new StartedMeanwhile()
         free()
         if (!sessions.liveFor(projectPath, a.id)) return sessions.start(projectPath, { agentId: a.id, prompt: line })
-        if (stoppedOnly) throw new StartedMeanwhile()
         how = 'fresh'
         // Its first call is just before the agent is stopped; later ones (as the new conversation starts) aren't ours.
         let first = true
@@ -258,10 +260,13 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
   const builder = agents.find((a) => a.id === lane.builder.id)
   const reviewer = lane.reviewer ? (agents.find((a) => a.id === lane.reviewer!.id) ?? null) : null
   if (!builder) return null
-  const running = [builder, reviewer].filter((a): a is AgentDef => !!a && !!sessions.liveFor(projectPath, a.id)).map((a) => a.name)
-  if (running.length === (reviewer ? 2 : 1)) return { started: [], running }
-  // Left out of the start (running then, or started meanwhile) and running now: the caller tells them.
-  const runningOf = (started: LaneStartResult['started']): string[] => [builder, reviewer].filter((a): a is AgentDef => !!a && !started.some((x) => x.agentId === a.id) && !!sessions.liveFor(projectPath, a.id)).map((a) => a.name)
+  // Running now: left out of this start whatever they do meanwhile (its slot is decided from it), and named to the caller.
+  const left = [builder, reviewer].filter((a): a is AgentDef => !!a && !!sessions.liveFor(projectPath, a.id))
+  const running = left.map((a) => a.name)
+  if (left.length === (reviewer ? 2 : 1)) return { started: [], running }
+  const only = { left: new Set(left.map((a) => a.id)) }
+  // Those left out, and those found running at their launch (started meanwhile): the caller tells them.
+  const runningOf = (started: LaneStartResult['started']): string[] => [builder, reviewer].filter((a): a is AgentDef => !!a && !started.some((x) => x.agentId === a.id) && (only.left.has(a.id) || !!sessions.liveFor(projectPath, a.id))).map((a) => a.name)
   const cards: { key: string; title: string }[] = []
   for (const n of lane.cards) {
     const c = await getTask(n).catch(() => null)
@@ -272,19 +277,19 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
   const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
   const where = await builderWhere(projectPath, builder, options)
   // A running builder takes its slot as it starts the lane's card, as before HI-1900: none is lent for it here.
-  if (where.inSlots && !running.includes(builder.name)) {
+  if (where.inSlots && !only.left.has(builder.id)) {
     const got = await lendLane(ws, projectPath, laneId, builder.id, options?.target || null)
     if ('waiting' in got) {
       await setLaneSlotWait(ws, laneId, { since: new Date().toISOString(), note: '', stoppedOnly: true })
       return { started: [], waitingForSlot: got.waiting, running }
     }
     const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, where, got.slot, '')
-    const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, undefined, true)
+    const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, undefined, only)
     log.info(`Lane ${laneId} lent ${userText(got.slot)}: ${started.map((s) => `${userText(s.name)} ${s.how}`).join(', ')}`)
     return { started, slot: got.slot, running: runningOf(started) }
   }
   const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, where, null, '')
-  const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, undefined, true)
+  const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, undefined, only)
   log.info(`Lane ${laneId} started: ${started.map((s) => `${userText(s.name)} ${s.how}`).join(', ')}`)
   return { started, running: runningOf(started) }
 }
@@ -344,7 +349,7 @@ export async function startWaitingLane(ws: WorkspaceService, projectPath: string
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
   const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
   const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, { legacy: null }, slot, lane.slotWait?.note ?? '')
-  const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, over, lane.slotWait?.stoppedOnly === true)
+  const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, over, lane.slotWait?.stoppedOnly === true ? { left: new Set() } : undefined)
   if (over()) return false
   log.info(`Lane ${laneId} got ${userText(slot)}: ${started.map((s) => `${userText(s.name)} ${s.how}`).join(', ')}`)
   return started.every((s) => s.how !== 'failed')
