@@ -11875,6 +11875,10 @@ button.progress-run-show:focus-visible {
   text-align: start;
   cursor: pointer;
 }
+/* Above the runs (HI-1923): never shrunk away as the runs and the lanes take the room. */
+.progress-tab-pulse > .progress-attention {
+  flex-shrink: 0;
+}
 .progress-attention > span {
   flex: 1 1 auto;
 }
