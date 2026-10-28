@@ -1,7 +1,7 @@
 import { join } from 'path'
 import { projectAgents } from '../shared/defaults'
-import type { AgentDef, AgentPatch, AssistantUndoResult, LaneInfo, TaskCard, TaskPatch } from '../shared/types'
-import { CARD_FIELDS, cardValue, markUndone, notRecording, PROVIDER_DEPENDENTS, recordedChanges, REVIEW, reviewOf, sameValue, type CardField, type FieldChange, type RecordedChange, type Value } from './assistantChanges'
+import type { AgentDef, AgentPatch, AssistantUndoResult, LaneInfo, PageLayout, ProjectConfig, TaskCard, TaskPatch, WorkflowForm } from '../shared/types'
+import { AGENT_FIELDS, CARD_FIELDS, cardValue, markUndone, notRecording, PROVIDER_DEPENDENTS, recordedChanges, REVIEW, reviewOf, sameValue, type CardField, type FieldChange, type RecordedChange, type Value } from './assistantChanges'
 import * as assistant from './assistantControl'
 import { boardWrite } from './boardStore'
 import { config } from './config'
@@ -11,6 +11,8 @@ import { sessions } from './sessions'
 import { applySetting, entryOf, removedPrices } from './settingsTools'
 import * as tasks from './tasks'
 import { isWorkflowRole } from '../shared/workflow/roles'
+import { restoreProjectAgents } from './templates'
+import { setWorkflowOptions, workflowForm, WorkflowStale } from './workflow/optionsForm'
 import { inWorkspace, workspaceOf, type WorkspaceService } from './workspace'
 
 /**
@@ -128,6 +130,8 @@ function readBack(rest: readonly FieldChange[], now: (field: string) => unknown)
 }
 
 function undoOne(ws: WorkspaceService, c: RecordedChange, by: UndoBy, guard: Guard): Promise<Outcome> {
+  // A template's load (HI-1502): its agents and its workflow, recorded as agent changes of the project, named by their act.
+  if (c.act === 'load-template') return undoLoaded(ws, c, guard)
   switch (c.kind) {
     case 'card':
       return undoCard(ws, c, by, guard)
@@ -350,6 +354,73 @@ function agentPatch(back: readonly FieldChange[]): AgentPatch {
 
 const PROVIDER_SET: readonly string[] = ['provider', ...PROVIDER_DEPENDENTS]
 const AGENT_RUNNING = 'Stop the agent before its provider goes back.' // i18n-ignore: an Agent API reply (English)
+
+/** What of an agent a template's load made undo compares (HI-1502): who it is and its settings, never its conversation. */
+const loadedFields = (a: AgentDef): Value => {
+  const r = a as unknown as Record<string, unknown>
+  return Object.fromEntries(['id', 'role', 'pairedWith', 'connection', ...AGENT_FIELDS].map((f) => [f, (r[f] ?? null) as Value]))
+}
+const sameAgents = (list: readonly AgentDef[], recorded: unknown): boolean => Array.isArray(recorded) && sameValue(list.map(loadedFields), (recorded as AgentDef[]).map(loadedFields))
+
+/**
+ * A template's load (HI-1502): its two changes, each undone alone. The agents and layout (`agents`, `layout`) go back
+ * through the load's own replacement (templates.ts `restoreProjectAgents`: one at a time, the project's starts fenced,
+ * the names checked against other projects' holding the names lock, the agents and layout checked under the project
+ * file's lock to be exactly those the load left, none running or starting); an old name another project's agent has now
+ * is never renamed: the change stays, said, to try again. The workflow options (`workflow`) go back through the Workflow
+ * form's save, only while they are still those the load saved (`base`). Undo's guard is checked inside each write.
+ */
+async function undoLoaded(ws: WorkspaceService, c: RecordedChange, guard: Guard): Promise<Outcome> {
+  if (!ws.path || !c.project) return goneAll(c.fields)
+  const projectPath = join(ws.path, c.project)
+  const field = (f: string): FieldChange | undefined => c.values.find((v) => v.field === f)
+  const wf = field('workflow')
+  if (wf) return undoLoadedWorkflow(ws, projectPath, wf, guard)
+  const agents = field('agents')
+  const layout = field('layout')
+  if (!agents || !layout) return { undone: [], skipped: [] }
+  const fields = ['agents', 'layout']
+  const cfg = await ws.projectConfig(projectPath).catch(() => null)
+  if (!cfg) return goneAll(fields)
+  const now = (c2: ProjectConfig): { agents: AgentDef[]; layout: Value } => ({ agents: projectAgents(c2), layout: c2.layout ?? 'auto' })
+  const cur = now(cfg)
+  if (sameAgents(cur.agents, agents.old) && sameValue(cur.layout, layout.old)) return { undone: fields, skipped: [] }
+  if (!sameAgents(cur.agents, agents.new) || !sameValue(cur.layout, layout.new)) return { undone: [], skipped: changed(fields) }
+  try {
+    await restoreProjectAgents(
+      projectPath,
+      { agents: agents.old as AgentDef[], layout: layout.old as PageLayout },
+      (list, c2) => {
+        if (!sameAgents(list, agents.new) || !sameValue(c2.layout ?? 'auto', layout.new)) throw new ChangedSince(fields)
+        guard?.()
+      },
+      (clash) => new Error(`${clash.map((t) => `${t.name} is now ${t.project}'s agent`).join('; ')}: its agents weren't put back (agent names are unique across the workspace).`) // i18n-ignore: an Agent API reply (English)
+    )
+  } catch (e) {
+    if (e instanceof ChangedSince) return { undone: [], skipped: changed(fields) }
+    return failedOr(fields, e)
+  }
+  const saved = await ws.projectConfig(projectPath)
+  return readBack([agents, layout], (f) => (f === 'agents' ? (sameAgents(projectAgents(saved), agents.old) ? agents.old : null) : (saved.layout ?? 'auto')))
+}
+
+/** A load's workflow options, set back through the Workflow form's save while they are still those the load saved. */
+async function undoLoadedWorkflow(ws: WorkspaceService, projectPath: string, wf: FieldChange, guard: Guard): Promise<Outcome> {
+  const own = (f: WorkflowForm): Value => ({ platform: f.platform, preset: f.preset, options: f.own as Value })
+  const form = await workflowForm(ws, projectPath).catch(() => null)
+  if (!form) return goneAll(['workflow'])
+  if (sameValue(own(form), wf.old)) return { undone: ['workflow'], skipped: [] }
+  if (!sameValue(own(form), wf.new)) return { undone: [], skipped: changed(['workflow']) }
+  const old = wf.old as { preset: WorkflowForm['preset']; options: WorkflowForm['own'] }
+  const was = wf.new as { preset: WorkflowForm['preset']; options: WorkflowForm['own'] }
+  try {
+    const saved = await setWorkflowOptions(ws, projectPath, { preset: old.preset, options: old.options, base: { preset: was.preset, options: was.options } }, { check: () => guard?.() })
+    return readBack([wf], () => own(saved))
+  } catch (e) {
+    if (e instanceof WorkflowStale) return { undone: [], skipped: changed(['workflow']) }
+    return failedOr(['workflow'], e)
+  }
+}
 
 /**
  * An agent's settings, each checked under the project's lock. Its provider goes back only with every setting a provider

@@ -443,7 +443,9 @@ export const AREAS = [
   { paths: ['src/shared/startFailure.ts'], suites: ['startfail'] },
   // A stopped agent's look (HI-1881): its pane's bar, its dimmed terminal, its header and tile.
   { paths: ['src/shared/sessionEnd.ts', 'src/renderer/src/stopped.ts'], suites: ['stoppedpane', 'image', 'startfail', 'tilesview'] },
-  { paths: ['src/main/templates.ts', 'src/shared/templates.ts', 'src/shared/templateLoad.ts', 'src/renderer/src/components/TemplatePlan.tsx', 'src/renderer/src/components/TemplateLoad.tsx', 'src/shared/templateDefaults.ts'], suites: ['templatenames', 'templates', 'templateshare', 'templatesv2', 'templateworkflow'] },
+  { paths: ['src/main/templates.ts', 'src/shared/templates.ts', 'src/shared/templateLoad.ts', 'src/renderer/src/components/TemplatePlan.tsx', 'src/renderer/src/components/TemplateLoad.tsx', 'src/shared/templateDefaults.ts'], suites: ['templateapi', 'templatenames', 'templates', 'templateshare', 'templatesv2', 'templateworkflow'] },
+  // The Assistant's template load (HI-1502): its routes, the shared replacement and undo of a load.
+  { paths: ['src/main/templateApi.ts', 'tests/e2e/templateapi.cjs'], suites: ['templateapi', 'replysize'] },
   { paths: ['src/shared/workflow/templateOptions.ts', 'src/renderer/src/components/TemplateLoadWorkflow.tsx', 'src/renderer/src/components/TemplateWorkflowView.tsx', 'tests/e2e/templateworkflow.cjs'], suites: ['templateworkflow'] },
   { paths: ['src/main/templateUpgrade.ts', 'tests/e2e/templatesv2.cjs'], suites: ['templatesv2'] },
   { paths: ['src/main/agentNames.ts', 'src/shared/agentNames.ts'], suites: ['agents', 'agents-ui', 'templatenames', 'templates'] },

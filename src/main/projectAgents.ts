@@ -457,15 +457,27 @@ export async function removeAgent(projectPath: string, agentId: string, opts: { 
     const gone = result.worktree?.deleted ? [result.worktree.path] : []
     return { agents: left, ...pendingSetupPatch(now, { add: pending, drop: gone }) }
   })
-  if (opts.releaseCards) await releaseAgentCards(basename(projectPath), agentId, { kind: 'user' })
-  // A review it left going (from before Hive last started) ends with it.
-  await endReviews(basename(projectPath), agentId, 'the agent was removed', workspaceOf(projectPath)) // i18n-ignore: the reason's key (ReviewEnd): the history line is a message (#846)
-  // Its lanes, as builder or reviewer, are abandoned (#483).
-  await laneAgentRemoved(workspaceOf(projectPath), basename(projectPath), agentId).catch((e) => log.warn('abandoning the lanes of a removed agent', e))
-  // Its terminal's kept size and output go: a new agent never has its id (#489).
-  forgetPtys(agentPtyKey(projectPath, agentId))
-  await workspaceOf(projectPath).refresh()
+  await agentsGone(projectPath, [agentId], { releaseCards: !!opts.releaseCards })
   return result
+}
+
+/**
+ * What follows an agent's removal, once project.json no longer has it (Remove Agent, a template's load, undo of one:
+ * HI-1502): its open cards go back (unless `releaseCards` is false: Remove Agent's Keep them), a review it left going ends,
+ * its lanes are abandoned and its terminal's kept size and output go; then the workspace is read again.
+ */
+export async function agentsGone(projectPath: string, agentIds: readonly string[], opts: { releaseCards?: boolean } = {}): Promise<void> {
+  const project = basename(projectPath)
+  for (const agentId of agentIds) {
+    if (opts.releaseCards !== false) await releaseAgentCards(project, agentId, { kind: 'user' }).catch((e) => log.warn('Could not take back the cards of a removed agent', e))
+    // A review it left going (from before Hive last started) ends with it.
+    await endReviews(project, agentId, 'the agent was removed', workspaceOf(projectPath)).catch((e) => log.warn('Could not end the reviews of a removed agent', e)) // i18n-ignore: the reason's key (ReviewEnd): the history line is a message (#846)
+    // Its lanes, as builder or reviewer, are abandoned (#483).
+    await laneAgentRemoved(workspaceOf(projectPath), project, agentId).catch((e) => log.warn('abandoning the lanes of a removed agent', e))
+    // Its terminal's kept size and output go: a new agent never has its id (#489).
+    forgetPtys(agentPtyKey(projectPath, agentId))
+  }
+  await workspaceOf(projectPath).refresh()
 }
 
 /**

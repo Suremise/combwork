@@ -255,6 +255,14 @@
     "defaultMessage": "The Assistant runs your team",
     "description": "A tip's title."
   },
+  "tips.assistantTemplates.text": {
+    "defaultMessage": "Ask the Assistant to load a template into a project, naming any agent you like: it shows what would change first, applies the template's workflow, and Undo puts the old agents back.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.assistantTemplates.title": {
+    "defaultMessage": "Have the Assistant set up a team",
+    "description": "A tip's title."
+  },
   "tips.assistantToldWaiting.text": {
     "defaultMessage": "While the Assistant watches the lanes, an agent showing a permission prompt or asking you something wakes it, and it tells you which agent, its card and what it asks. It never answers for you. Its watch can follow a release card outside the lanes too.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

@@ -65,6 +65,8 @@ interface HiveMessageValues {
   'tips.assistantStatus.title': undefined
   'tips.assistantTeam.text': undefined
   'tips.assistantTeam.title': undefined
+  'tips.assistantTemplates.text': undefined
+  'tips.assistantTemplates.title': undefined
   'tips.assistantToldWaiting.text': undefined
   'tips.assistantToldWaiting.title': undefined
   'tips.assistantUndo.text': undefined

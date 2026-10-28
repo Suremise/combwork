@@ -63,6 +63,8 @@
   "tips.assistantStatus.title": "What the Assistant is doing",
   "tips.assistantTeam.text": "With three or more agents, or builders and reviewers, ask the Assistant in Coordinator mode to run your cards as lanes: it splits them by the files they touch, briefs each pair and watches every lane to the end. With one or two agents it keeps out of the way.",
   "tips.assistantTeam.title": "The Assistant runs your team",
+  "tips.assistantTemplates.text": "Ask the Assistant to load a template into a project, naming any agent you like: it shows what would change first, applies the template's workflow, and Undo puts the old agents back.",
+  "tips.assistantTemplates.title": "Have the Assistant set up a team",
   "tips.assistantToldWaiting.text": "While the Assistant watches the lanes, an agent showing a permission prompt or asking you something wakes it, and it tells you which agent, its card and what it asks. It never answers for you. Its watch can follow a release card outside the lanes too.",
   "tips.assistantToldWaiting.title": "The Assistant tells you when an agent needs you",
   "tips.assistantUndo.text": "Done by the Assistant lists its changes by your message. Undo on a change puts it back, and Undo on a message puts back all of them; whatever you or an agent changed since is kept.",

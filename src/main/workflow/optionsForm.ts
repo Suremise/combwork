@@ -250,10 +250,10 @@ export class WorkflowRefused extends HiveError {
 /**
  * Saves a change to a project's options: checked again under the project's lock (the window's check may be stale), and
  * refused whole with its reasons. `applyTo`: the user's cards in flight to work under the new options from now, each
- * recorded with an Override naming what changed (OP-38: the user only, per change, the cards listed first). Returns the
- * form as it is now.
+ * recorded with an Override naming what changed (OP-38: the user only, per change, the cards listed first). `check`: the
+ * caller's, run under the save's locks before anything is read (its throw saves nothing). Returns the form as it is now.
  */
-export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[] } = {}): Promise<WorkflowForm> {
+export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; check?: () => void } = {}): Promise<WorkflowForm> {
   // Checked against the levels as they are now and written in the same turn of workflow writes (#1422), holding the
   // project's repository lock first (#1642 round 5): its target can't move while a clean-up checks a branch against it,
   // from this Hive or another.
@@ -293,9 +293,11 @@ export async function chooseMerge(ws: WorkspaceService, projectPath: string, raw
  * file from it (at the workspace's open, before the queue goes on, before the next save). The board decides; the file
  * follows.
  */
-async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answer?: MergeAnswer }): Promise<WorkflowForm> {
+async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answer?: MergeAnswer; check?: () => void }): Promise<WorkflowForm> {
   const project = projectOf(ws, projectPath)
   await settleLocked(ws, project)
+  // The caller's own check, under the save's locks (HI-1502: the Assistant's undo re-checks its guard here).
+  o.check?.()
   const cfg = await ws.projectConfig(project.path)
   const asking = !!cfg.workflow?.mergeAsk && !mergeChoiceOf(ws, project.name)
   if (o.answer && !asking) throw await refusedAnswer(ws, project, o.answer)

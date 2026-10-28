@@ -18,7 +18,7 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, templateListText, templatePlanText, templateLoadedText, type TemplatePlanPublic, type TemplateLoadPublic, agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import type { QueuePublic } from '../../shared/workflow/queue'
 import { LOOP_STEPS } from '../../shared/workflow/facts'
@@ -682,6 +682,33 @@ const tools: Tool[] = [
       if (a.action !== 'release') throw new Error('action must be list or release')
       if (typeof a.slot !== 'string' || !a.slot) throw new Error('slot is required: the name list gives')
       return slotReleasedText((await api('POST', `${base}/${enc(a.slot)}/release`, Object.fromEntries(['kind', 'confirm', 'end'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]])))) as Parameters<typeof slotReleasedText>[0])
+    }
+  },
+  {
+    name: 'hive_template',
+    description:
+      "A project's agent templates. list: those it can use (Hive's own, the workspace's, its own). plan: what loading one would do, changing nothing: who it removes and creates, names another project's agent has (each with a free one), what stops it, and the workflow options it would set. load: replaces every agent of the project with the template's and sets its workflow options for the project's version control (workflow: false leaves them); refused while an agent runs, and when its workflow needs Git the project hasn't (setting up Git is the user's). hive_undo puts the agents, layout and options back. Only when the user asked for it.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list', 'plan', 'load'] },
+        project: projectArg,
+        template: { type: 'string', description: 'plan, load: its file or name, as list gives them.' },
+        scope: { type: 'string', enum: ['hive', 'workspace', 'project'], description: 'When a name is in several.' },
+        from: { type: 'string', description: "A project's template kept in another project: that project." },
+        names: { type: 'object', additionalProperties: { type: 'string' }, description: "New names for some of its agents: its place (\"1\") or name (AL-B2) → the name. Names are unique across the workspace." },
+        workflow: { type: 'boolean', description: 'Set its workflow options (default true).' }
+      },
+      required: ['action', 'project']
+    },
+    run: async (a) => {
+      if (typeof a.project !== 'string' || !a.project) throw new Error('project is required')
+      const base = `/v1/projects/${enc(a.project)}/templates`
+      if (a.action === 'list') return templateListText((await api('GET', base)) as Parameters<typeof templateListText>[0])
+      if (a.action !== 'plan' && a.action !== 'load') throw new Error('action must be list, plan or load')
+      const body = Object.fromEntries(['template', 'scope', 'from', 'names', 'workflow'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
+      if (a.action === 'plan') return templatePlanText((await api('POST', `${base}/plan`, body)) as TemplatePlanPublic)
+      return templateLoadedText((await api('POST', `${base}/load`, body)) as TemplateLoadPublic)
     }
   },
   {

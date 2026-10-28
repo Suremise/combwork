@@ -63,6 +63,8 @@
   "tips.assistantStatus.title": "Co robi Asystent",
   "tips.assistantTeam.text": "Przy trzech lub więcej agentach albo przy wykonawcach i recenzentach poproś Asystenta w trybie Koordynator, żeby prowadził Twoje karty jako tory: dzieli je według plików, których dotyczą, instruuje każdą parę i pilnuje każdego toru do końca. Przy jednym czy dwóch agentach nie wchodzi w drogę.",
   "tips.assistantTeam.title": "Asystent kieruje Twoim zespołem",
+  "tips.assistantTemplates.text": "Poproś Asystenta o wczytanie szablonu do projektu i nazwij agentów, jak chcesz: najpierw pokaże, co się zmieni, zastosuje przepływ pracy szablonu, a Cofnij przywróci dawnych agentów.",
+  "tips.assistantTemplates.title": "Niech Asystent przygotuje zespół",
   "tips.assistantToldWaiting.text": "Gdy Asystent obserwuje tory, agent, który pokazuje pytanie o uprawnienia lub o coś Cię pyta, wybudza go, a Asystent mówi Ci, który to agent, jaka karta i o co pyta. Nigdy nie odpowiada za Ciebie. Może też obserwować kartę wydania poza torami.",
   "tips.assistantToldWaiting.title": "Asystent powie, gdy agent Cię potrzebuje",
   "tips.assistantUndo.text": "Wykonane przez Asystenta pokazuje jego zmiany według Twoich wiadomości. Cofnij przy zmianie przywraca ją, a Cofnij przy wiadomości przywraca wszystkie jej zmiany; zmiany wprowadzone od tego czasu przez Ciebie lub agenta zostają.",

@@ -63,6 +63,8 @@
   "tips.assistantStatus.title": "Was der Assistent gerade tut",
   "tips.assistantTeam.text": "Mit drei oder mehr Agenten, oder mit Bearbeitern und Reviewern, bitte den Assistenten im Modus „Koordinator“, deine Karten als Lanes laufen zu lassen: Er teilt sie nach den Dateien auf, die sie betreffen, weist jedes Paar ein und begleitet jede Lane bis zum Ende. Mit einem oder zwei Agenten hält er sich heraus.",
   "tips.assistantTeam.title": "Der Assistent führt dein Team",
+  "tips.assistantTemplates.text": "Bitte den Assistenten, eine Vorlage in ein Projekt zu laden, und benenne jeden Agenten, wie du magst: Er zeigt zuerst, was sich ändern würde, übernimmt den Workflow der Vorlage, und Rückgängig bringt die alten Agenten zurück.",
+  "tips.assistantTemplates.title": "Lass den Assistenten ein Team einrichten",
   "tips.assistantToldWaiting.text": "Während der Assistent die Lanes beobachtet, weckt ihn ein Agent, der eine Berechtigungsabfrage zeigt oder dich etwas fragt, und er sagt dir, welcher Agent es ist, welche Karte und was gefragt wird. Er antwortet nie für dich. Er kann auch eine Release-Karte außerhalb der Lanes beobachten.",
   "tips.assistantToldWaiting.title": "Der Assistent sagt dir, wenn ein Agent dich braucht",
   "tips.assistantUndo.text": "„Vom Assistenten erledigt“ listet seine Änderungen nach deiner Nachricht. „Rückgängig“ bei einer Änderung stellt sie wieder her, „Rückgängig“ bei einer Nachricht alle ihre Änderungen; was du oder ein Agent seitdem geändert habt, bleibt erhalten.",

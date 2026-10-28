@@ -324,7 +324,7 @@ Hive's settings, as Settings and Project Settings describe them (one catalog of 
 
 ### Undoing the Assistant's changes
 
-From api.version 8 (#1282, SPEC §16.14). Hive keeps each change the Hive Assistant makes through this API for 7 days, grouped by the user's message it came from: a card's fields (title, description, labels, blocked, links, agent, column, project) and the cards it made, a lane it started or changed, an agent's settings, a Hive setting, and an agent it started. It keeps them with what each replaced. Prompts, messages and comments, and what can't be taken back (a project made, an agent added), are listed with why.
+From api.version 8 (#1282, SPEC §16.14). Hive keeps each change the Hive Assistant makes through this API for 7 days, grouped by the user's message it came from: a card's fields (title, description, labels, blocked, links, agent, column, project) and the cards it made, a lane it started or changed, an agent's settings, a Hive setting, an agent it started, and a template it loaded (the project's agents and layout, and its workflow options: from api.version 11, HI-1502). It keeps them with what each replaced. Prompts, messages and comments, and what can't be taken back (a project made, an agent added), are listed with why.
 
 `GET /v1/assistant/changes` — the Assistant only (others: `403`): its newest 10 messages' changes, newest first: `[{ "group", "at", "changes": [{ "id", "what", "card"?, "fields": ["labels"], "final"?: "why it can't be undone", "undone"?: true }] }]`.
 
@@ -334,6 +334,7 @@ From api.version 8 (#1282, SPEC §16.14). Hive keeps each change the Hive Assist
 - A column move goes back through the card's rules, as a move with the override reason `undo`.
 - A lane it started is abandoned; a lane's list, reviewer, rounds, wait or name go back.
 - An agent it started is stopped only while the launch it started still runs (what it did stays).
+- A template it loaded: the project's agents (with their ids, so their conversations come back) and layout go back only while they are exactly as the load left them, none of them runs and no other project's agent has one of their names now (then it fails, said, to try again); its workflow options only while they are those it saved. The replaced agents' cards and lanes stay as the load left them.
 - A Hive setting goes back only while Change settings is on. A provider's removed models go back only if they too are unchanged.
 - Its control level and its launch are checked again at each write: turned down to Look and advise, or its session ended, partway through a message's changes, the undo stops there and is refused, the changes undone so far kept.
 - A card's decision, comment or place in its column can't be undone: those changes are listed with why. So is every change of its that changed nothing undo puts back (an intent's facts, withdrawn messages): none is left out.
@@ -612,6 +613,52 @@ From api.version 9 (#1561). The two releases an agent's ⋯ menu offers in Hive'
 - A held writer needs `confirm`, the slot and the run the user agreed to release, as the listing gave them (`400` without it). `end: true` ends the processes listed for its run first; if Windows doesn't let Hive end them, nothing is released (`409`). Refused (`409`) while its run is still live in this Hive (its session, or the processes it left still followed), while another Hive holding it still runs (or can't be told), and when its writer is no longer that run (a release or a start meanwhile: one of them wins, the other is refused).
 - Replies `{ "project", "kind", "slot", "agent", "ended"? }` (`ended`: the listed processes were ended first).
 
+### Templates
+
+From api.version 11 (HI-1502, SPEC §16.10.6). The Hive Assistant's alone: it lists a project's agent templates, plans a load and loads one, as **Load template** does in Hive's window. A script, the user's token or a project agent is refused (`403`) before any template is read. Listing and planning are reads; loading needs **Control agents** (Settings → Assistant → Control) and is undoable (`POST /v1/assistant/undo`).
+
+`GET /v1/projects/{name}/templates` — the templates the project can use: Hive's own, the workspace's and its own.
+
+```json
+{ "project": "alpha",
+  "templates": [{ "scope": "hive", "file": "team-3x3.json", "name": "Team 3×3", "agents": 6, "workflow": ["none", "git"] },
+                { "scope": "project", "from": "alpha", "file": "pair.json", "name": "Pair", "agents": 2, "workflow": ["git"] }] }
+```
+
+`POST /v1/projects/{name}/templates/plan` — what loading one would do; nothing is changed. The body names it and what to load with it:
+- `template` (required): its file, else its name (any case). `scope` (`hive`, `workspace`, `project`) narrows it; `from` is the project a project's template is kept in, when it isn't this one. None is `404`; several of one name are `409`, naming each one's scope and file: name one by them.
+- `names`: new names for some of its agents, `{ "<key>": "<name>" }`. A key is the agent's place (`"1"` for the first), its name as made for this project (`AL-B2`), or its name in the template (`{key}-B2`) when only one agent has it. A key that names no agent or several, two keys for one agent, a place out of range and a name that isn't text are `400`, listing the keys there are. The names are checked as the window checks them (none empty, none too long, none twice).
+- `workflow` (default `true`): whether its workflow options would be set.
+
+```json
+{ "project": "alpha",
+  "template": { "scope": "hive", "file": "team-3x3.json", "name": "Team 3×3" },
+  "remove": ["Ann", "Rob"],
+  "create": [{ "name": "Coder", "template": "AL-B1", "role": "builder", "provider": "claude-code", "pairedWith": "AL-R1" }],
+  "taken": [{ "name": "Bea", "project": "beta", "suggestion": "Bea 2" }],
+  "connections": [],
+  "blocked": [],
+  "workflow": { "platform": "git", "applies": true, "needsGit": false, "dropped": [],
+                "changes": [{ "key": "review", "now": "none", "next": "agent" }],
+                "missingCommands": ["unit"], "identityOff": false, "problems": [] } }
+```
+
+`taken` is each name another project's agent has, with a free one to give in `names` (agent names are unique across the workspace). `connections` names the agents whose own connection can't be used here: they get the workspace's default. `blocked` is why it can't be loaded now: an agent running or starting, a provider off or not installed, more agents than the project may have, and, with `workflow` on, a workflow for Git only in a project with no version control (`needsGit`: setting up Git is the user's, in the window) or options that can't be saved here (`problems`). `workflow` is null when the template has none for this project; `changes` is each option it sets that isn't so now, `missingCommands` the checks it names that the project has no command for (kept, for the user to set), `identityOff` that it turns the commit identity on and the project's git config has none.
+
+`POST /v1/projects/{name}/templates/load` — the same body: **replaces every agent of the project** with the template's, and its layout. Refused (`409`) with a free name for each one taken, and for whatever `blocked` would list. It is the window's load: the project's agents can't start while it runs, and it publishes only if they are still those the plan read and none runs. With `workflow` on, the template's options for the project's version control are saved as the project's (Version Control → Workflow), from the same read of the template as its agents, once they are published; lanes and cards already under way keep their rules. Options changed meanwhile aren't saved, and the reply says so.
+
+```json
+{ "project": "alpha",
+  "template": { "scope": "hive", "file": "team-3x3.json", "name": "Team 3×3" },
+  "removed": ["Ann", "Rob"],
+  "created": ["Coder", "AL-B2", "AL-B3", "AL-R1", "AL-R2", "AL-R3"],
+  "renamed": [{ "template": "AL-B1", "name": "Coder" }],
+  "connections": [],
+  "workflow": { "platform": "git", "applies": true, "saved": true, "changes": [{ "key": "review", "now": "none", "next": "agent" }], "missingCommands": ["unit"], "identityOff": false, "needsGit": false, "dropped": [], "problems": [] } }
+```
+
+The removed agents' conversations stay in Sessions, their open cards go back and their lanes end, as when an agent is removed. **Undo** puts back the project's agents (with their ids, so their conversations are theirs again) and layout, and its workflow options: two changes, each undone only while it is still as the load left it, and while none of the agents runs. An old name another project's agent has now is never renamed: that change stays, said, to try again. The removed agents' cards and lanes stay as the load left them.
+
 ### Skills and MCP
 
 `GET /v1/skills[?project=name]` — the workspace's Hive skills, each provider's user (`level: "machine"`) and plugin skills, plus, if a project is given, the project's local skills, and then only the Hive skills its agents get (not those whose audience is `assistant`): `{ name, description, level, provider?, plugin?, audience?, bundled?, updateAvailable? }`, without folder paths. `audience` (Hive skills) is who gets it: `agents`, `assistant` or `all` (its `SKILL.md`'s `metadata.audience`; `agents` without one). `problem` (Hive skills) says why nobody gets it: its header can't be read, or its audience isn't `agents`, `assistant` or `all`. `bundled` is `same` or `changed` for Hive skills that ship with Hive, and `updateAvailable` marks a changed copy made from a version this Hive knows to be older than its own. A project agent may list only its own project's skills (`403` for another's).
@@ -781,6 +828,7 @@ Nothing private is added: no prompt or message text and no setting's value, the 
 | `queue-pause` | Paused a project's merge queue | `{ "kind": "queue-pause", "ok": true, "project": "alpha" }` |
 | `queue-resume` | Resumed a project's merge queue (`ok: true` also when it stayed paused for its cause) | `{ "kind": "queue-resume", "ok": true, "project": "alpha" }` |
 | `release-slot` | Released a slot: a carried slot, or a held writer once the user agreed (`agent`: whose it was) | `{ "kind": "release-slot", "ok": true, "project": "alpha", "agent": { "id": "a-7b21e4aa", "name": "B1" } }` |
+| `load-template` | Loaded a template into a project, replacing its agents (and, unless told not to, set its workflow options) | `{ "kind": "load-template", "ok": true, "project": "alpha" }` |
 | `create-project` | Created a project | `{ "kind": "create-project", "ok": true, "project": "apiary" }` |
 | `activate-project` | Turned a project on | `{ "kind": "activate-project", "ok": true, "project": "apiary" }` |
 | `deactivate-project` | Was refused turning a project off (only refusals are listed) | `{ "kind": "deactivate-project", "ok": false, "error": "Not allowed by Settings → Assistant → Control", "project": "apiary" }` |
@@ -850,6 +898,7 @@ The Hive Assistant's `hive` server always runs (even with this setting or the Ag
 | `hive_undo` | `GET /v1/assistant/changes` (`list`), `POST /v1/assistant/undo`: what was undone, what was left and why | Control agents |
 | `hive_queue` | `GET /v1/queue` (`list`: any), `POST /v1/queue/pause`, `…/resume`, `…/remove`, `…/retry` (Control agents): the queue in a few lines, or the card and where it went | any (list); Control agents |
 | `hive_release_slot` | `GET /v1/projects/{name}/slots/releasable` (`list`: a line per carried slot and held writer, with the `confirm` a writer's release needs), `POST /v1/projects/{name}/slots/{slot}/release` (`release`): what was released | any (list); Control agents |
+| `hive_template` | `GET /v1/projects/{name}/templates` (`list`: a line per template, with the scope and file to name it by), `POST /v1/projects/{name}/templates/plan` (`plan`: who goes and comes, names taken with free ones, what stops it, the workflow's changes), `POST /v1/projects/{name}/templates/load` (`load`: what was loaded, names given, the workflow saved or why not) | any (list, plan); Control agents (load) |
 
 It also has the board tools above (the card intents too, but not `hive_start_card`: it starts cards on agents with `hive_start_task`); Claude Code runs `hive_create_task`, `hive_update_task`, `hive_update_tasks`, `hive_reorder_tasks`, the card intents and `hive_lane` without asking from Control agents up. Claude Code runs these without asking (they are Hive's own, and limited by the control level); Codex gets a 15-minute tool timeout for them, since waiting and asking the user can take minutes.
 

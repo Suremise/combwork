@@ -316,6 +316,7 @@ export const SUITES = [
   { name: 'tabstrip' },
   { name: 'taskbar', serial: 'window focus' },
   { name: 'taskoverview' },
+  { name: 'templateapi' },
   { name: 'templatenames' },
   { name: 'templates' },
   { name: 'templateshare' },
