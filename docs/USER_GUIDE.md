@@ -672,9 +672,20 @@ It's on by default: **Settings → Sessions → Record performance metrics** tur
 - cards: Agent API requests (per hour recorded) and how many failed or were cancelled (an isolated check asking again while it waits for a check copy is a **wait**, counted but never a failure; before 1.0's HI-1831 those showed as failures, as client errors, and older hours still do), their latency (p50 and p95), the data sent and received, the characters Hive's tools gave the models, and what each session got at launch;
 - a chart of requests per hour (24 hours) or per day, failures in red, waits in grey and hours not recorded hatched; hover a bar for its tool calls and launches;
 - tables of Hive's tools (sorted by the characters they cost a model's context), Agent API routes, the guidance given at launch in parts (Hive's core instructions, what it adds for the project, the Assistant's role and mode, the skills' catalog), and the providers' own usage for project agents and the Assistant apart: tokens, requests, context (each session's latest, not added up), compactions, **safeguard stops** (responses a CLI's safety classifier stopped; *not detected* for Copilot) and API-equivalent cost (≈ where Hive estimated it, **unknown** where a session reported nothing; not a bill), and, when there were any, the safeguard stops per agent and model. If a project's session history couldn't be read, the page says the totals are partial;
-- for the whole workspace, the skill service's scans and cache, and Hive-wide event streams.
+- for the whole workspace, the skill service's scans and cache, Hive's [main process stalls](#main-process-stalls), and Hive-wide event streams.
 
 It refreshes every minute while you look at it (and **Refresh** at once); reading it doesn't add to the numbers. A note says when measurements were dropped because a limit was full, and **What isn't measured** lists what it can't see. **Export** saves what the page shows (its scope, range and filters) as a JSON file with its units, coverage and Hive's version; **Shift+click** Export to replace project names with project-1, project-2… and leave out the workspace's path, before sharing it.
+
+### Main process stalls <a id="main-process-stalls"></a>
+
+Every pane's typing goes through Hive's main process, so when it is busy for more than a quarter of a second, you feel it as lag. The workspace's **Performance** page lists those times under **Main process stalls**, newest first: the last 50 since Hive started (kept in memory only, so a restart clears them; no range or filter applies). Each row says:
+
+- **When** it ended, and its **Length**;
+- **Main thread CPU**: how much of it the main process spent working. **mostly waiting** (under half its length) means it was waiting on the disk, a lock or another program rather than working. It's measured from half a second before, so it can be a little more than the length;
+- **Step**: the database or file step that held the main process, where Hive knows one;
+- **During it**: what else was under way, such as a window's call (`ipc …`), an Agent API request (`api …`) or a hook (`hook …`), with how long each took. Some of these may only have waited behind the stall rather than caused it.
+
+The names are Hive's own for its work, never your text. Hive's log (**Help → Open Logs Folder**, `hive.log`) notes the same stalls, at most one line a minute. If Hive feels slow, a screenshot of this table with **Help → Copy Diagnostics…** helps find why.
 
 ### Cost per card <a id="cost-per-card"></a>
 

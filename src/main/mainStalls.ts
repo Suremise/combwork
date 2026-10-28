@@ -7,6 +7,7 @@ import { ended, running, stallClock, type Work } from './stallWork'
 import { pausedAlongside, slowProbe, WATCHDOG_SLOTS } from './stallWatchdog'
 import { threadPoolSize } from './threadPool'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
+import { MAIN_STALLS_KEPT, type MainStall, type MainStalls, type MainStallWork } from '../shared/mainStalls'
 
 export { beginWork, stallClock, timedStep } from './stallWork'
 
@@ -78,6 +79,41 @@ export function workDuring(from: number, to: number, max = NAMED, held: Work[] =
   return { work, more: found.length - work.length }
 }
 
+/**
+ * A stall as the Performance view keeps it (HI-1135), its work found as the warning finds it, copied now (labels made,
+ * times fixed), so later changes to the work can't change it: the synchronous steps apart from the other work, at most
+ * NAMED each, with how many more.
+ */
+export function stallOf(from: number, to: number, ms: number, cpuMs: number | null, held: Work[] = []): Omit<MainStall, 'at'> {
+  const now = stallClock.mono()
+  const found = overlapping(from, to, held)
+  const shown = (ws: Work[]): MainStallWork[] => ws.slice(0, NAMED).map((w) => ({ label: labelOf(w), ms: Math.round((w.end ?? now) - w.start), running: w.end === null }))
+  const steps = found.filter((w) => w.step)
+  const work = found.filter((w) => !w.step)
+  return { ms, cpuMs, steps: shown(steps), stepsMore: Math.max(0, steps.length - NAMED), work: shown(work), workMore: Math.max(0, work.length - NAMED) }
+}
+
+/** The stalls kept since Hive started (HI-1135): the last MAIN_STALLS_KEPT, and how many in all. */
+const recent: MainStall[] = []
+let stallsSeen = 0
+let watchingSince = Date.now()
+
+export function keepStall(s: MainStall): void {
+  stallsSeen++
+  recent.push(s)
+  if (recent.length > MAIN_STALLS_KEPT) recent.shift()
+}
+
+/** The Performance view's stalls (performance:stalls): newest first. */
+export function recentStalls(): MainStalls {
+  return { stalls: [...recent].reverse(), total: stallsSeen, since: watchingSince }
+}
+
+export function resetStallsForTests(): void {
+  recent.length = 0
+  stallsSeen = 0
+}
+
 export interface StallDeps {
   now(): number
   /** The longest event loop delay since the last call, in ms (and starts measuring afresh). */
@@ -89,6 +125,8 @@ export interface StallDeps {
   info(line: string): void
   /** Whether Hive's other threads stopped over [from, to] too (the watchdog's ticks): the whole process paused. */
   pausedAlongside?(from: number, to: number): boolean
+  /** Keeps a stall for the Performance view (HI-1135), `end` its end on `now`'s clock: every one, logged or not, but not a pause. */
+  record?(stall: Omit<MainStall, 'at'>, end: number): void
 }
 
 export const STALL_TIMING = { every: 500, over: 250, settleMs: 3000, quietMs: 60_000 }
@@ -124,13 +162,16 @@ export function stallWatcher(d: StallDeps, t = STALL_TIMING): { tick(): void; po
         const ms = Math.round(delay)
         if (power.some((p) => p >= from - 1000)) return d.info(`The main process was paused for ${ms} ms while the PC slept: not counted as busy`)
         if (d.pausedAlongside?.(now - delay, now)) return d.info(`The main process was paused for ${ms} ms with the rest of Hive's process (its watchdog thread stopped too: the PC or the process was paused): not counted as busy`)
+        const cpuMs = cpuUsed === null ? null : Math.round(Math.min(cpuUsed, delay + t.every))
+        // Kept before the log's quiet minute: the view lists the stalls the log leaves out too.
+        d.record?.(stallOf(...span, ms, cpuMs, held), now)
         if (d.now() - logged < t.quietMs) {
           unlogged++
           return
         }
         logged = d.now()
         const { work, more } = workDuring(...span, NAMED, held)
-        const parts = [cpuUsed === null ? '' : ` (main thread CPU ${Math.round(Math.min(cpuUsed, delay + t.every))} ms)`]
+        const parts = [cpuMs === null ? '' : ` (main thread CPU ${cpuMs} ms)`]
         parts.push(work.length ? `; during it: ${work.join(', ')}${more ? ` and ${more} more` : ''}` : '; nothing marked was under way (no IPC call, Agent API request or hook, nor a database or kept file step)')
         if (unlogged) parts.push(`; ${unlogged} more stall(s) since the last warning, not logged`)
         unlogged = 0
@@ -217,6 +258,7 @@ function startWatchdog(): void {
 }
 
 export function watchMainStalls(): void {
+  watchingSince = Date.now()
   startWatchdog()
   const delays = monitorEventLoopDelay({ resolution: 20 })
   delays.enable()
@@ -239,7 +281,8 @@ export function watchMainStalls(): void {
     defer: (fn, ms) => setTimeout(fn, ms).unref(),
     warn: (line) => log.warn(line),
     info: (line) => log.info(line),
-    pausedAlongside: (from, to) => (watchdog ? pausedAlongside(watchdog, performance.timeOrigin + from, performance.timeOrigin + to) : false)
+    pausedAlongside: (from, to) => (watchdog ? pausedAlongside(watchdog, performance.timeOrigin + from, performance.timeOrigin + to) : false),
+    record: (s, end) => keepStall({ at: Math.round(performance.timeOrigin + end), ...s })
   }, { ...STALL_TIMING, quietMs })
   powerMonitor.on('suspend', () => watch.power())
   powerMonitor.on('resume', () => watch.power())

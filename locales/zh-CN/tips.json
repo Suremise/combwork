@@ -252,6 +252,8 @@
   "tips.loopLanes.title": "Hive 把卡片循环记为通道",
   "tips.loopWakes.text": "卡片进入“评审”时，Hive 会唤醒它的评审者；有了结论后，再唤醒它的构建者，即使有一方忘了等待。若要手动推进评审，可在项目的“版本控制”→“工作流程”→“卡片循环”中关闭“唤醒评审者和构建者”。",
   "tips.loopWakes.title": "循环会自行继续",
+  "tips.mainProcessStalls.text": "输入卡了一下？“性能”→“主进程卡顿”列出自启动以来 Hive 主进程忙碌的时刻：持续多久、是在工作还是在等待，以及当时在进行什么。",
+  "tips.mainProcessStalls.title": "查看 Hive 变慢的原因",
   "tips.mcpFromFile.text": "拿到一个 .json 定义或其文件夹的 .zip 形式的服务器？“MCP”视图中的“从文件添加 MCP 服务器”会显示它运行什么，并以关闭状态添加：在那里启用它即可选择它的项目。",
   "tips.mcpFromFile.title": "从文件添加 MCP 服务器",
   "tips.mcpPerAgent.text": "在智能体的设置中，“MCP 服务器：仅限以下”只为它提供需要的服务器（例如为发布测试者提供沙盒服务器），并让其他服务器的工具不进入它的上下文。",

@@ -1447,6 +1447,78 @@
     "defaultMessage": "all of it: not per role or provider",
     "description": "After the Skill service heading when the page's filters are set: they don't apply to it. Lower case."
   },
+  "performance.stalls.count": {
+    "defaultMessage": "{total, plural, one {# stall since Hive started} other {# stalls since Hive started}}{listed, select, all {} other {; the last {kept, number} are listed}}.",
+    "description": "Under the Performance page's Main process stalls table: how many stalls there were since Hive started, and that only the last {kept} are listed when there were more. {listed} is a key (all or some): don't translate the keys, only the texts."
+  },
+  "performance.stalls.cpu": {
+    "defaultMessage": "Main thread CPU",
+    "description": "Column header of the Performance page's Main process stalls table: the main thread's CPU time during the stall."
+  },
+  "performance.stalls.cpuUnknown": {
+    "defaultMessage": "unknown",
+    "description": "A stall's CPU time in the Performance page's Main process stalls table when it couldn't be measured. Lower case."
+  },
+  "performance.stalls.during": {
+    "defaultMessage": "During it",
+    "description": "Column header of the Performance page's Main process stalls table: the other work under way during the stall (calls from the window, Agent API requests, hooks)."
+  },
+  "performance.stalls.empty": {
+    "defaultMessage": "No stalls since Hive started.",
+    "description": "The Performance page's Main process stalls table when there were none."
+  },
+  "performance.stalls.heading": {
+    "defaultMessage": "Main process stalls",
+    "description": "Heading of the Performance page's table of the times Hive's main process was busy long enough to be felt."
+  },
+  "performance.stalls.length": {
+    "defaultMessage": "Length",
+    "description": "Column header of the Performance page's Main process stalls table: how long the main process was busy."
+  },
+  "performance.stalls.loadTarget": {
+    "defaultMessage": "the main process's stalls",
+    "description": "What could not be read on the Performance page: shown in \"Could not load {what}: {error}\"."
+  },
+  "performance.stalls.more": {
+    "defaultMessage": "and {n, number} more",
+    "description": "The last line of a stall's Step or During it cell in the Performance page's Main process stalls table: how many more were under way. Lower case."
+  },
+  "performance.stalls.ms": {
+    "defaultMessage": "{ms, number} ms",
+    "description": "A length in milliseconds (\"750 ms\") in the Performance page's Main process stalls table."
+  },
+  "performance.stalls.none": {
+    "defaultMessage": "none known",
+    "description": "A stall's Step or During it cell in the Performance page's Main process stalls table when Hive knows of none. Lower case."
+  },
+  "performance.stalls.running": {
+    "defaultMessage": "{length}, still running",
+    "description": "A work's length in a stall's During it or Step cell, while it was still under way when the stall was recorded ({length}: \"1.5 s\")."
+  },
+  "performance.stalls.seconds": {
+    "defaultMessage": "{s} s",
+    "description": "A length in seconds (\"1.5 s\", the number already formatted) in the Performance page's Main process stalls table."
+  },
+  "performance.stalls.since": {
+    "defaultMessage": "since Hive started",
+    "description": "After the Main process stalls heading: the table covers the time since Hive started, not the page's range. Lower case."
+  },
+  "performance.stalls.step": {
+    "defaultMessage": "Step",
+    "description": "Column header of the Performance page's Main process stalls table: the database or file step that held the main process."
+  },
+  "performance.stalls.tip": {
+    "defaultMessage": "Times Hive's main process was busy for more than 250 ms. Every pane's typing goes through it, so a stall is felt as lag. Step is the work that held it, where Hive knows it (a database or file step); During it is what else was under way, which may only have waited behind it. Little CPU means it was waiting (on the disk, a lock, another program); it is measured from half a second before, so it can be a little more than the length. The last {kept, number} since Hive started, kept in memory only; hive.log notes them too, at most one line a minute.",
+    "description": "Info tip beside the Main process stalls heading of the Performance page. Step and During it are its columns: keep them as named there. hive.log is a file name."
+  },
+  "performance.stalls.waiting": {
+    "defaultMessage": "mostly waiting",
+    "description": "Under a stall's CPU time in the Performance page's Main process stalls table: it used under half its length, so it was waiting. Lower case."
+  },
+  "performance.stalls.when": {
+    "defaultMessage": "When",
+    "description": "Column header of the Performance page's Main process stalls table: when the stall ended (a time)."
+  },
   "performance.toolList": {
     "defaultMessage": "The hive tools’ list, as each session got it: {list}.",
     "description": "A line on the Performance page. {list} is one or two items such as \"agents 23 tools, 4 KB a start\", separated by semicolons."

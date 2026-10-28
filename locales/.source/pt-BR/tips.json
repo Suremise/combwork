@@ -252,6 +252,8 @@
   "tips.loopLanes.title": "Hive keeps your card loops as lanes",
   "tips.loopWakes.text": "When a card arrives in Review, Hive wakes its reviewer, and on the verdict its builder, even if one forgot to wait. To drive reviews by hand, turn off Wake reviewers and builders in the project's Version Control → Workflow → Card loops.",
   "tips.loopWakes.title": "Loops keep going on their own",
+  "tips.mainProcessStalls.text": "Typing lagged a moment? Performance → Main process stalls lists the times Hive's main process was busy since it started: how long, whether it was working or waiting, and what was under way.",
+  "tips.mainProcessStalls.title": "See why Hive felt slow",
   "tips.mcpFromFile.text": "Got a server as a .json definition or a .zip of its folder? Add MCP Server from File in the MCP view shows what it runs and adds it turned off: switch it on there to choose its projects.",
   "tips.mcpFromFile.title": "Add an MCP server from a file",
   "tips.mcpPerAgent.text": "In an agent's settings, MCP servers: Only these gives it just the servers it needs, such as a sandbox server for a release tester, and keeps the others' tools out of its context.",

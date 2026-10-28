@@ -11317,6 +11317,15 @@ textarea.input.task-blocked-input {
   font-size: 12px;
   font-weight: normal;
 }
+/* A stall's Step and During it (HI-1135): a line per work, its fixed name then its length. */
+.perf-stall-work {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.perf-stall-item code {
+  font-size: 12px;
+}
 /* A filter and the sections it changes, framed together, so what it doesn't change isn't under it (#270): Who around
    the cards, chart and tables; Provider, inside it, around launches and the providers' usage. */
 .perf-group {

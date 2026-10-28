@@ -2,7 +2,8 @@
 // here around a block of the main process) logs an info line, not a warning; an IPC call that holds the main process
 // (HIVE_TEST_BLOCK_IPC) is named in the warning. Main's thread pool has 16 threads, not Node's 4 (HI-1702): with eight held
 // a file call still ends, and with all of them held the slow file call is noted in hive.log, timed off main's thread (main
-// held with the pool free gives no such line). Dev build, throwaway profile, no workspace.
+// held with the pool free gives no such line). The blocked call's stall is kept for the Performance view, which lists
+// it with its cause in a throwaway workspace (HI-1135). Dev build, throwaway profile.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -22,7 +23,7 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
 ;(async () => {
   fs.rmSync(userData, { recursive: true, force: true })
   // A warning a second at most, so one from Hive's own start doesn't hide the suite's.
-  const { app, inv } = await lib.launch({ userData, env: { HIVE_TEST_STALL_QUIET_MS: '1000' } })
+  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_TEST_STALL_QUIET_MS: '1000' } })
   try {
     // The PC sleeps: suspend, the main process held, resume.
     const before = busyLines().length
@@ -45,6 +46,22 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
     check('a blocking IPC call is named in the warning', !!warned, busyLines().slice(mark).join(' | '))
     check('with its time and the CPU used', /ipc app:info \(\d+\.\d s\)/.test(warned ?? '') && /\(main thread CPU \d+ ms\)/.test(warned ?? ''), warned)
     if (warned) console.log(`  ${warned.trim()}`)
+
+    // The Performance view's stalls (HI-1135): the same stall kept, with its cause, and listed in the workspace's page.
+    const kept = await lib.until(async () => (await inv('performance:stalls')).stalls.find((s) => s.ms >= 1000 && s.work.some((w) => w.label === 'ipc app:info')) ?? null, HUNG_MS)
+    check('performance:stalls keeps it, naming the IPC call during it, and its CPU', !!kept && kept.work.find((w) => w.label === 'ipc app:info').ms >= 1000 && (kept.cpuMs === null || kept.cpuMs >= 0) && kept.at <= Date.now(), JSON.stringify(kept))
+    const ws = path.join(lib.WORK, 'stalls-ws')
+    fs.rmSync(ws, { recursive: true, force: true })
+    fs.mkdirSync(path.join(ws, 'alpha'), { recursive: true })
+    await lib.openWorkspace(inv, page, ws)
+    await page.locator('.activitybar button[aria-label="Performance"]').click()
+    const table = page.locator('.performance-page:visible .table:has(th .th-sort:text-is("During it"))')
+    const row = table.locator('tbody tr', { hasText: 'ipc app:info' })
+    const shown = await lib.until(async () => ((await row.count()) >= 1 ? (await row.first().innerText()).replace(/\s+/g, ' ') : null), HUNG_MS)
+    check('the Performance view lists it: its length and the IPC call during it', !!shown && /\b1\.\d s\b/.test(shown) && shown.includes('ipc app:info'), shown ?? (await page.locator('.performance-page:visible').innerText().catch(() => '')).slice(-600))
+    check('…and how many there were since Hive started', /stalls? since Hive started/.test(await page.locator('[data-stalls-count]').innerText().catch(() => '')))
+    await table.scrollIntoViewIfNeeded().catch(() => undefined)
+    await page.screenshot({ path: path.join(lib.WORK, 'stalls-performance.png') })
 
     // Main's thread pool (HI-1702): wider than Node's 4, and a wait for it is noted. Each read of a pipe nobody writes to
     // holds one of the pool's threads, using no CPU, until the test writes to it.

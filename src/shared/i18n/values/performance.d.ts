@@ -363,6 +363,24 @@ interface HiveMessageValues {
   'performance.skills.tooBig': undefined
   'performance.skills.tooBigSub': undefined
   'performance.skills.unfiltered': undefined
+  'performance.stalls.count': { total: number; listed: string; kept: number }
+  'performance.stalls.cpu': undefined
+  'performance.stalls.cpuUnknown': undefined
+  'performance.stalls.during': undefined
+  'performance.stalls.empty': undefined
+  'performance.stalls.heading': undefined
+  'performance.stalls.length': undefined
+  'performance.stalls.loadTarget': undefined
+  'performance.stalls.more': { n: number }
+  'performance.stalls.ms': { ms: number }
+  'performance.stalls.none': undefined
+  'performance.stalls.running': { length: string | number }
+  'performance.stalls.seconds': { s: string | number }
+  'performance.stalls.since': undefined
+  'performance.stalls.step': undefined
+  'performance.stalls.tip': { kept: number }
+  'performance.stalls.waiting': undefined
+  'performance.stalls.when': undefined
   'performance.toolList': { list: string | number }
   'performance.toolList.item': { role: string; tools: number; size: string | number }
   'performance.tools.calls': undefined

@@ -19,6 +19,7 @@ import { ComparePanel } from './PerformanceCompare'
 import { AntivirusLine } from '../components/Antivirus'
 import { Card } from './WorkspaceOverview'
 import { CardsTable } from './PerformanceCards'
+import { StallsTable } from './PerformanceStalls'
 
 /**
  * Performance: what Hive's own parts cost (shared/metrics.ts, recorded by main/metrics.ts), for the whole workspace (the
@@ -494,6 +495,8 @@ function PerformancePage({ workspacePath, scope, filters, setFilters, projects, 
               />
             )}
             {!isTab && report.skills && <SkillService report={report} filtered={filters.role !== 'all'} />}
+            {/* Hive's own main process (HI-1135): app-wide, since it started, so the workspace's page only. */}
+            {!isTab && <StallsTable refreshAt={loaded.at} />}
             {!isTab && report.app && <AppWide report={report} />}
             <details className="perf-limits">
               <summary>{tr(M.limits)}</summary>
