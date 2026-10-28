@@ -3463,6 +3463,7 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   the branch not moved, the error naming its path to look at and remove in Unused worktrees), and one that can't be
   removed is said (the reply's second line, or after the error). A card's pass then follows §16.4.4's reconcile (carried over or stale). A user
   action only: no Agent API route or hive tool.
+- **A branch row's layout** (HI-1897): its name (no minimum of its own, at most 45% of the row), its middle (`.git-branch-info`: badges, card, status, last commit; `flex: 1 1 0`, the last commit giving way first, each part cut with …, the whole in its tooltip, joined with ·), and its tail (`.git-row-tail`, `flex: none`): the time, then each action in a place of its own on every row (an empty slot where a row has none, the current branch's Switch kept unseen), so the time and actions never shrink, leave the row or move, with or without a remote's Track and Stop tracking. Remote branches likewise.
 - **Branches by state, and Clean Up Merged Branches** (#1642; Darren's decision: the list stays a list, its rows as they
   were). `git:info` measures each branch against the project's target (its options' `target`, else the default branch;
   none counted when that branch doesn't exist): merged into it (`for-each-ref --merged`), else how many commits it has

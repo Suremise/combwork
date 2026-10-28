@@ -130,6 +130,47 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitrem
       await trackX.getByRole('button', { name: 'Track', exact: true }).click()
       check('…pushes it there and tracks it', !!(await lib.until(() => upstreamOf('feature/x') === 'origin/feature/x', HUNG_MS)) && has(origin, 'feature/x') === has(alpha, 'feature/x'))
 
+      // --- Rows with a remote's actions (Track…, Stop tracking) beside a long branch tracking origin (HR5's HI-1897
+      // round 1): every row's time and actions whole, inside its row and lined up, Switch where it can be clicked, at
+      // this width and a narrow one.
+      const long = 'hive/HI/HI-9999-a-branch-name-long-enough-to-crowd-its-row-out-of-its-own-room'
+      g(alpha, 'branch', long, 'main')
+      g(alpha, 'branch', `--set-upstream-to=origin/main`, long)
+      await page.locator('[data-action="reload-branches"]').click()
+      await lib.until(async () => (await branches.locator(`[data-branch="${long}"] [data-action="untrack"]`).count()) === 1, HUNG_MS)
+      const rowsFit = () =>
+        branches.locator('.git-rows', { has: page.locator('.git-row.git-branch') }).first().evaluate((list) => {
+          const box = (e) => e.getBoundingClientRect()
+          const out = [...list.querySelectorAll('.git-row.git-branch:not(.remote)')].map((r) => {
+            const rb = box(r)
+            const tail = r.querySelector('.git-row-tail')
+            const parts = [...(tail?.querySelectorAll('button, .git-meta') ?? [])].map(box)
+            const sw = tail?.lastElementChild ? box(tail.lastElementChild) : null
+            const btn = tail?.lastElementChild?.querySelector('button')
+            const visible = btn && getComputedStyle(btn.closest('.git-switch-slot') ?? btn).visibility !== 'hidden'
+            const hit = visible ? document.elementFromPoint(sw.left + sw.width / 2, sw.top + sw.height / 2) : null
+            return { name: r.dataset.branch, whole: !!tail && parts.every((b) => b.left >= rb.left - 0.5 && b.right <= rb.right + 0.5), switchRight: sw ? Math.round(sw.right) : null, clickable: !visible || !!hit?.closest('button') }
+          })
+          return { rows: out.length, whole: out.every((o) => o.whole), lined: new Set(out.map((o) => o.switchRight)).size === 1, clickable: out.every((o) => o.clickable), out }
+        })
+      const fits = async () => { const f = await rowsFit(); return f.rows > 2 && f.whole && f.lined && f.clickable }
+      await branches.locator(`[data-branch="${long}"]`).scrollIntoViewIfNeeded()
+      check('with a remote, a long branch tracking it: every row’s time and actions whole, lined up, Switch clickable', !!(await lib.until(fits, HUNG_MS)), JSON.stringify(await rowsFit()))
+      await lib.fitWindow(app, page, { width: 900, height: 820 })
+      await branches.locator(`[data-branch="${long}"]`).scrollIntoViewIfNeeded()
+      check('…at a narrow width too', !!(await lib.until(fits, HUNG_MS)), JSON.stringify(await rowsFit()))
+      for (const look of ['dark', 'light']) {
+        await inv('settings:update', { appearance: { theme: look } })
+        await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === look, HUNG_MS)
+        await page.mouse.move(5, 5)
+        await page.screenshot({ path: path.join(lib.WORK, `gitremotes-rows-narrow-${look}.png`) })
+      }
+      await inv('settings:update', { appearance: { theme: 'dark' } })
+      await lib.fitWindow(app, page, { width: 1500, height: 900 })
+      g(alpha, 'branch', '-D', long)
+      await page.locator('[data-action="reload-branches"]').click()
+      await lib.until(async () => (await branches.locator(`[data-branch="${long}"]`).count()) === 0, HUNG_MS)
+
       // --- Stop tracking.
       await lib.until(async () => (await featureRow.locator('[data-action="untrack"]').count()) === 1, HUNG_MS)
       await featureRow.locator('[data-action="untrack"]').click()

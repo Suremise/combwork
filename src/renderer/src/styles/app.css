@@ -13402,9 +13402,13 @@ button.progress-lane-why:focus-visible,
  * width and is cut with "…" only once the middle has given way; the middle's parts are cut with "…" in turn, its last
  * commit first.
  */
+/* Its whole name while the middle can give way (the middle takes only the room left: flex-basis 0); a very long name
+   at most 45% of the row, so the middle keeps a share; and short of room, no minimum of its own, so the time and the
+   actions always fit (HR5's HI-1897 round 1: a remote's Track and Stop tracking widened them past a fixed minimum). */
 .git-row.git-branch > .git-name {
   flex: 0 1 auto;
-  min-inline-size: min(14em, 32%);
+  min-inline-size: 0;
+  max-inline-size: 45%;
   overflow: hidden;
   text-overflow: ellipsis;
 }
