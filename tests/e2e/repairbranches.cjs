@@ -99,7 +99,7 @@ const samePath = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toL
       await page.screenshot({ path: path.join(lib.WORK, 'repairbranches-plan.png') })
 
       await dialog.getByRole('button', { name: 'Repair', exact: true }).click()
-      check('Repair renames JB1’s and JB2’s, and keeps JB3’s', !!(await lib.until(async () => /branch hive\/Scratch\/juniper\/jb1 of agent JB1 is now hive\/Tools\/juniper\/jb1\./.test(await text()) && /branch hive\/Scratch\/juniper\/jb2 of agent JB2 is now hive\/Tools\/juniper\/jb2; it still tracks hive\/Scratch\/juniper\/jb2 on origin/.test(await text()) && /branch hive\/Scratch\/juniper\/jb3 of agent JB3 keeps its name/.test(await text()), HUNG_MS)), await text())
+      check('Repair renames JB1’s and JB2’s, and keeps JB3’s', !!(await lib.until(async () => /branch hive\/Scratch\/juniper\/jb1 of agent JB1 is now hive\/Tools\/juniper\/jb1\./.test(await text()) && /branch hive\/Scratch\/juniper\/jb2 of agent JB2 is now hive\/Tools\/juniper\/jb2; it still tracks hive\/Scratch\/juniper\/jb2 on remote origin/.test(await text()) && /branch hive\/Scratch\/juniper\/jb3 of agent JB3 keeps its name/.test(await text()), HUNG_MS)), await text())
       await page.screenshot({ path: path.join(lib.WORK, 'repairbranches-report.png') })
       const now = branches(proj)
       // The report's Now column is each branch as it is after Repair (#1313 round 2): the new name once renamed, the old

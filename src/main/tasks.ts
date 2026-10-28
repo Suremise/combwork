@@ -26,7 +26,7 @@ import { alongside, isRefusal, type Reply, type Workflow, type Write } from './w
 import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCardFolder, type CleanupFile, type Staging } from './cardAttachments'
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, skipReviewOf } from '../shared/workflow/compile'
-import { isStageId, STAGE_TEXT, stageName } from '../shared/workflow/stages'
+import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
 import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, STAGE_CATEGORY, type AskActionKind, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
@@ -1949,6 +1949,17 @@ async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, o
   return recordingAs(actor, () => updateTaskAs(n, patch, actor, opts))
 }
 
+/**
+ * The names stages have on a project's board (HI-1585): its own where it renamed them (N5, the options in force, as the
+ * board shows them: projectStages), null for none (the defaults), or for a project with no version control yet.
+ */
+async function stageNamesOf(ws: WorkspaceService, project: string | null | undefined): Promise<StageNames | null> {
+  if (!ws.path || !project) return null
+  const { projectStages } = await import('./workflow/optionsForm')
+  const names = (await projectStages(ws, join(ws.path, project)).catch(() => null))?.names
+  return names && Object.keys(names).length ? names : null
+}
+
 async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; note?: StoredText[] }): Promise<TaskCard> {
   await taskTestHooks.beforeUpdate?.(n)
   const ws = workspace
@@ -1976,8 +1987,10 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     const moving = patch.review === undefined && (patch.column === 'review' || patch.column === 'passed' || patch.column === 'done')
     if (actor.kind === 'agent' && actor.self && moving && card.column === 'doing' && card.agent && card.agent !== actor.self.agentId) {
       const column = patch.column!
-      // Stages by the names the board shows (#1604: agents read "Active", never the column's id), as refusals name them.
-      const stages = { active: stageName('active'), review: stageName('review'), stage: stageName(column === 'passed' ? 'approved' : column) }
+      // Stages by the names the board shows (#1604: agents read "Active", never the column's id): the project's own where
+      // it renamed them (HR5's HI-1585 round 1), in English by default.
+      const names = await stageNamesOf(ws, card.project)
+      const stages = { active: stageName('active', names), review: stageName('review', names), stage: stageName(column === 'passed' ? 'approved' : column, names) }
       throw new TaskConflictError(
         card.agentName
           ? withValues(msg({ id: 'tasks.error.inDoingWith', defaultMessage: "{card} is in {active} with agent {agent}, who is working on it: newer work is in progress, so another agent can't move it to {stage}. Leave it where it is; agent {agent} moves it to {review} when done, and the user can move it.", description: 'An error, read by agents: an agent tried to move card {card} (its key, such as HI-12) on to the stage {stage}, but the card is in {active} with another agent ({agent}, its name), whose work is in progress. {active}, {review} and {stage} are stage names as the board shows them (glossary 2.2).' }), { card: cardRef(n), agent: card.agentName, ...stages })

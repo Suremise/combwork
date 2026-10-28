@@ -123,7 +123,7 @@
   "main.move.branchGone": "{host}: branch {from} of agent {agent} is gone, so it isn't renamed.",
   "main.move.branchQueued": "a queued step still uses it; Repair renames it next time",
   "main.move.branchRenamed": "{host}: branch {from} of agent {agent} is now {to}.",
-  "main.move.branchRenamedRemote": "{host}: branch {from} of agent {agent} is now {to}; it still tracks {from} on {remote}, so push it under the new name when you're ready.",
+  "main.move.branchRenamedRemote": "{host}: branch {from} of agent {agent} is now {to}; it still tracks {from} on remote {remote}, so push it under the new name when you're ready.",
   "main.move.branchTaken": "{host}: branch {from} of agent {agent} keeps its name: {to} is already a branch.",
   "main.move.branchUnrecorded": "{host}: the branch of agent {agent} is now {to}, but Hive couldn't record it yet ({why}). Repair finishes it.",
   "main.move.cards": "{n, plural, one {# card of {from} now belongs to {to}, with its agents.} other {# cards of {from} now belong to {to}, with their agents.}}",

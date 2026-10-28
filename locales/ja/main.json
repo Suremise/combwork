@@ -123,7 +123,7 @@
   "main.move.branchGone": "{host}：エージェント{agent}のブランチ{from}はもうないため、名前を変更しません。",
   "main.move.branchQueued": "待機中の処理がまだ使用しています。次の修復で名前を変更します",
   "main.move.branchRenamed": "{host}：エージェント{agent}のブランチ{from}は{to}になりました。",
-  "main.move.branchRenamedRemote": "{host}：エージェント{agent}のブランチ{from}は{to}になりました。{remote}の{from}を追跡したままなので、準備ができたら新しい名前でプッシュしてください。",
+  "main.move.branchRenamedRemote": "{host}：エージェント{agent}のブランチ{from}は{to}になりました。リモート{remote}の{from}を追跡したままなので、準備ができたら新しい名前でプッシュしてください。",
   "main.move.branchTaken": "{host}：エージェント{agent}のブランチ{from}の名前は変更しません。ブランチ{to}が既にあります。",
   "main.move.branchUnrecorded": "{host}：エージェント{agent}のブランチは{to}になりましたが、Hiveはまだ記録できていません（{why}）。修復で完了します。",
   "main.move.cards": "{n, plural, other {{from}のカード#件が、エージェントとともに{to}に移りました。}}",

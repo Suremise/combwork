@@ -123,7 +123,7 @@
   "main.move.branchGone": "{host} : la branche {from} de l’agent {agent} n’existe plus, elle n’est donc pas renommée.",
   "main.move.branchQueued": "une étape en attente l’utilise encore ; la réparation suivante la renomme",
   "main.move.branchRenamed": "{host} : la branche {from} de l’agent {agent} s’appelle maintenant {to}.",
-  "main.move.branchRenamedRemote": "{host} : la branche {from} de l’agent {agent} s’appelle maintenant {to} ; elle suit encore {from} sur {remote}, fais-en donc un push sous le nouveau nom quand tu veux.",
+  "main.move.branchRenamedRemote": "{host} : la branche {from} de l’agent {agent} s’appelle maintenant {to} ; elle suit encore {from} sur le dépôt distant {remote}, fais-en donc un push sous le nouveau nom quand tu veux.",
   "main.move.branchTaken": "{host} : la branche {from} de l’agent {agent} garde son nom : {to} existe déjà.",
   "main.move.branchUnrecorded": "{host} : la branche de l’agent {agent} s’appelle maintenant {to}, mais Hive n’a pas encore pu l’enregistrer ({why}). Réparer le termine.",
   "main.move.cards": "{n, plural, one {# carte sous l’ancien nom {from} appartient désormais au projet {to}, avec ses agents.} many {# cartes sous l’ancien nom {from} appartiennent désormais au projet {to}, avec leurs agents.} other {# cartes sous l’ancien nom {from} appartiennent désormais au projet {to}, avec leurs agents.}}",

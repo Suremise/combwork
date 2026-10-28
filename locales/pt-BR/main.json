@@ -123,7 +123,7 @@
   "main.move.branchGone": "{host}: o branch {from} do agente {agent} não existe mais, então não é renomeado.",
   "main.move.branchQueued": "um passo na fila ainda o usa; Reparar o renomeia na próxima vez",
   "main.move.branchRenamed": "{host}: o branch {from} do agente {agent} agora é {to}.",
-  "main.move.branchRenamedRemote": "{host}: o branch {from} do agente {agent} agora é {to}; ele ainda acompanha {from} em {remote}, então faça push com o novo nome quando estiver pronto.",
+  "main.move.branchRenamedRemote": "{host}: o branch {from} do agente {agent} agora é {to}; ele ainda acompanha {from} no remoto {remote}, então faça push com o novo nome quando estiver pronto.",
   "main.move.branchTaken": "{host}: o branch {from} do agente {agent} mantém o nome: {to} já existe.",
   "main.move.branchUnrecorded": "{host}: o branch do agente {agent} agora é {to}, mas o Hive ainda não conseguiu registrar isso ({why}). Reparar conclui isso.",
   "main.move.cards": "{n, plural, one {# cartão de {from} agora pertence ao projeto {to}, com os agentes dele.} other {# cartões de {from} agora pertencem ao projeto {to}, com os agentes deles.}}",

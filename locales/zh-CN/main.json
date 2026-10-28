@@ -123,7 +123,7 @@
   "main.move.branchGone": "{host}：智能体 {agent} 的分支 {from} 已不存在，因此不重命名。",
   "main.move.branchQueued": "队列中的步骤仍在使用它；下一次修复会为其重命名",
   "main.move.branchRenamed": "{host}：智能体 {agent} 的分支 {from} 现名为 {to}。",
-  "main.move.branchRenamedRemote": "{host}：智能体 {agent} 的分支 {from} 现名为 {to}；它仍跟踪 {remote} 上的 {from}，准备好后请用新名称推送。",
+  "main.move.branchRenamedRemote": "{host}：智能体 {agent} 的分支 {from} 现名为 {to}；它仍跟踪远程 {remote} 上的 {from}，准备好后请用新名称推送。",
   "main.move.branchTaken": "{host}：智能体 {agent} 的分支 {from} 保留原名：{to} 已存在。",
   "main.move.branchUnrecorded": "{host}：智能体 {agent} 的分支现名为 {to}，但 Hive 尚未能记录（{why}）。修复会完成它。",
   "main.move.cards": "{n, plural, other {{from} 的 # 张卡片及其智能体现在归 {to} 所有。}}",
