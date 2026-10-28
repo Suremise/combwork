@@ -145,7 +145,13 @@ const lines = (file) => {
     const assigned = await until(async () => (await facts(c1)).find((f) => f.kind === 'ReviewerAssigned')?.data?.reviewer, HUNG_MS)
     check('the pool gives the card to R1', assigned === r1.id, String(assigned))
     const tr1 = await tokenOf(r1.id)
-    const started = await intent(tr1, c1, 'start-review')
+    let started = await intent(tr1, c1, 'start-review')
+    // Under load the copy's setup can outlast start review's first wait: it answers "Waiting for a review copy" and Hive
+    // tells R1 later (HI-1955). Once copy-1 is leased to R1 for the card, starting again answers with its folder.
+    if ((started.body?.data?.reviewCopy ?? '').startsWith('Waiting for a review copy')) {
+      await until(async () => (await inv('copies:list', alpha)).some((c) => c.name === 'copy-1' && c.state === 'leased' && c.lease?.kind === 'review' && c.lease.card === c1 && c.lease.agent === r1.id && !c.lease.returned), HUNG_MS)
+      started = await intent(tr1, c1, 'start-review')
+    }
     const copy = (started.body?.data?.reviewCopy ?? '').match(/Review in (.+?) at /)?.[1] ?? null
     check('R1 reviews in copy-1', started.status === 200 && !!copy && copy.endsWith('copy-1'), JSON.stringify(started.body))
     await until(async () => ['ready', 'finished'].includes((await live(r1.id))?.status), HUNG_MS)
@@ -225,6 +231,10 @@ const lines = (file) => {
 
   // --- The same in Japanese: the profile started again with HIVE_LANG=ja; the lane's hover and the copy's run.
   if (laneId && runId && !failed) {
+    // B1 was in a running lane as the first start quit, so the quit recorded it to resume (restart.json in the profile)
+    // and this start would offer it: that toast, shown or not depending on the reload, covered the lane row (HI-1955).
+    // Resuming isn't this pass's subject: it starts with nothing to resume.
+    fs.rmSync(path.join(userData, 'restart.json'), { force: true })
     const ja = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', HIVE_LANG: 'ja' } })
     try {
       ja.page.on('pageerror', (e) => check('no page errors (ja)', false, e.message))
