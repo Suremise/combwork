@@ -2,6 +2,7 @@
 // to it, and what is shown is the total's cents (or dollars) allocated once, so every row and column adds up as shown.
 import { describe, expect, it } from 'vitest'
 import { costCells, emptyPart, shareRole, unknownPart, type CostPart } from '../src/shared/cardCosts'
+import { moneyLabel } from '../src/shared/usageTotals'
 
 /** Costs keep "≈ $1.00 + ?" on one line (#241). */
 const NB = String.fromCharCode(0xa0)
@@ -79,8 +80,15 @@ describe('costCells', () => {
       ['$0.50', '$0.30', '$0.80']
     ])
     expect([t.build.text, t.review.text, t.total.text]).toEqual(['$1.71', '$0.70', '$2.41'])
-    // A total just under a half cent is rounded as the card's line rounds it: $2.405 is $2.40.
-    expect(costCells(priced(2.405), [{ build: priced(2.405), review: emptyPart() }]).total.text).toBe('$2.40')
+  })
+
+  it('its total is the card’s line, as moneyLabel rounds it: half cents, under a cent, either side of $100 (HR4, round 1)', () => {
+    for (const cost of [2.405, 1.005, 0.015, 0.125, 2.675, 0.005, 0.0099, 0.01, 99.994, 99.995, 99.999, 100, 100.5, 199.5, 1234.5]) {
+      // Split unevenly, so the cells' own rounding would differ from the total's.
+      const t = costCells(priced(cost), [{ build: priced(cost * 0.37), review: priced(cost * 0.63) }])
+      expect(t.total.text, `$${cost}`).toBe(moneyLabel(cost))
+      expect(t.rounds[0].build.units + t.rounds[0].review.units, `$${cost}`).toBe(t.total.units)
+    }
   })
 
   it('fractional cents (HR4’s case): $0.006 + $0.006 shows one cent in all, never two', () => {

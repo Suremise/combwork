@@ -256,6 +256,25 @@ describe('cardRoundCosts (#1226)', () => {
     expect(c.rounds[0]).toMatchObject({ from: iso(0), to: iso(20), submitted: iso(10) })
   })
 
+  it('sessions that can’t be read: the known charges stay, each with unknown beside it, and still add up (HR4, round 1)', async () => {
+    const w = opened[0] ?? (await world())
+    vi.mocked(usageHistory.timelines).mockRejectedValueOnce(new Error('disk'))
+    vi.mocked(usageHistory.sessionsWho).mockRejectedValueOnce(new Error('disk'))
+    const c = (await cardRoundCosts(w, 1))!
+    // No timelines to go by: each agent's charges shared by how long it held the card (B1: 10, 10 and 5 minutes).
+    const close = (n: number) => expect.closeTo(n, 9)
+    expect(c.rounds.map((r) => [r.build.cost, r.review.cost])).toEqual([
+      [close(0.6), close(0.3)],
+      [close(0.6), close(0.4)]
+    ])
+    expect(c.outside?.build.cost).toEqual(close(0.3))
+    // Known in part: a cost and + ?, never Unknown alone.
+    expect(c.rounds.flatMap((r) => [r.build, r.review]).every((p) => p.priced === 1 && p.unpriced === 1)).toBe(true)
+    expect(c.total).toMatchObject({ cost: close(2.2), unpriced: 3 })
+    const parts = [...c.rounds, c.outside!].flatMap((r) => [r.build, r.review])
+    expect(parts.reduce((a, p) => a + p.cost, 0)).toBeCloseTo(c.total!.cost, 9)
+  })
+
   it('a card from before 1.0 reports no rounds; a card that isn’t there, null', async () => {
     const w = opened[0] ?? (await world())
     await store.boardWrite(w, async () => store.boardWriteOp(w, (db) => db.prepare('UPDATE cards SET pre_workflow = 1 WHERE number = 2').run()))

@@ -3,7 +3,7 @@ import { estimateCost, usesOwnPrices } from './prices'
 import { fmt, msg, tr } from './i18n'
 import { TASK_COLUMNS } from './tasks'
 import { reviewRounds } from './laneBar'
-import { costText, money, moneyUnit, unitMoneyLabel } from './usageTotals'
+import { costText, money, moneyUnit, moneyUnits, unitMoneyLabel } from './usageTotals'
 import { TOKENS_SPREAD, TOKENS_UNKNOWN, chargeShares, rowModel, type UsageRow, type UsageTimeline } from './usageTimeline'
 import type { Fact, FactData, StageId } from './workflow/facts'
 
@@ -575,8 +575,8 @@ export interface CostTable {
  */
 export function costCells(total: CostPart, rounds: { build: CostPart; review: CostPart }[]): CostTable {
   const unit = moneyUnit(total.cost)
-  // Rounded as the card's line shows it (toFixed, like Intl, rounds the amount itself, not its quotient by a cent).
-  const whole = total.cost > 0 && total.cost < unit ? 0 : unit >= 1 ? Number(total.cost.toFixed(0)) : Math.round(Number(total.cost.toFixed(2)) * 100)
+  // Rounded as the card's line rounds it; under one unit, nothing (the line says "< $0.01").
+  const whole = total.cost > 0 && total.cost < unit ? 0 : moneyUnits(total.cost)
   const parts = rounds.flatMap((r) => [r.build, r.review])
   const exact = parts.map((p) => Math.max(0, p.cost) / unit)
   const units = exact.map((e) => Math.floor(e))

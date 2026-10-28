@@ -90,6 +90,16 @@ export function moneyLabel(n: number): string {
 /** The unit moneyLabel shows an amount in: a cent, or a dollar from $100. */
 export const moneyUnit = (n: number): number => (n >= 100 ? 1 : 0.01)
 
+// Rounding as moneyLabel's currency formatting rounds (Intl's, on the amount's decimal form: $2.405 is $2.41), whatever
+// the window's language: only the digits are read back.
+const CENTS = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
+const DOLLARS = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0, useGrouping: false })
+
+/** An amount in whole moneyUnits, as moneyLabel rounds it (HI-1906: a table whose total must match the card's line). */
+export function moneyUnits(n: number): number {
+  return n >= 100 ? Number(DOLLARS.format(n)) : Math.round(Number(CENTS.format(n)) * 100)
+}
+
 /**
  * A number of `unit`s (moneyUnit's) as the window shows money, always in that unit's precision, so amounts shown together
  * add up as shown (HI-1906: a table of parts); none of them, for an amount that isn't nothing, "< $0.01" (or "< $1").

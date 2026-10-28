@@ -259,7 +259,10 @@ export async function cardRoundCosts(ws: WorkspaceService, n: number): Promise<C
         if (!theirs.length) continue
         const own = left.filter((r) => holdIsSessions(g.who, r, named))
         left = left.filter((r) => !own.includes(r))
-        give(theirs, p?.hasSessions(g.who) ? partOfRows(own) : unknownPart())
+        // Its rows as they are, and unknown beside them for no session Hive knows of (as costOf counts it), so a session
+        // list that couldn't be read never loses a known charge.
+        const part = partOfRows(own)
+        give(theirs, p?.hasSessions(g.who) ? part : addPart(part, unknownPart()))
       }
       const rest = partOfRows(left)
       if (!rest.priced && !rest.unpriced) continue
