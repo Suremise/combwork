@@ -1,0 +1,15 @@
+Claude Code 2.1.312 (claude -p, --permission-mode default, --output-format stream-json, --max-turns 8) in a non-Git
+folder C:\work\proj, CLAUDE_CONFIG_DIR a copy of the signed-in test home's login (C:\work\acct), whose projects folder is
+a junction to C:\work\cli\.claude\projects, as a connection's is to ~/.claude/projects (HI-1899 trial, 28 Oct 2026).
+The project's memory folder C:\work\cli\.claude\projects\C--work-proj\memory was seeded with MEMORY.md and marker.md
+(the word PERIWINKLE). Asked each time to read marker.md, then write trial-<run>.md beside it.
+
+run base: as Claude Code runs on a connection today
+  Read  C:\work\acct\projects\C--work-proj\memory\marker.md        denied: Claude requested permissions to read
+  Write C:\work\acct\projects\C--work-proj\memory\trial-base.md    denied: Claude requested permissions to edit
+  permission_denials: Read, Write; the memory folder unchanged
+run fix: --settings {"autoMemoryDirectory":"C:\work\cli\.claude\projects\C--work-proj\memory"} (Hive's, the same folder by its resolved path)
+  Read  C:\work\cli\.claude\projects\C--work-proj\memory\marker.md      ok: The marker word is PERIWINKLE.
+  Write C:\work\cli\.claude\projects\C--work-proj\memory\trial-fix.md   ok
+  Edit  C:\work\cli\.claude\projects\C--work-proj\memory\MEMORY.md      ok
+  permission_denials: none; memory saved without asking, beside the seeded files

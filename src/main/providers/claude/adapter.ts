@@ -19,6 +19,7 @@ import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEv
 import { autoCompactOf, settingsScopes } from './autoCompact'
 import { connectionsManaged } from '../../connectionSeam'
 import { hiveStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
+import { MEMORY_ENV_OVERRIDES, connectionMemoryDir, memoryBase } from './memoryDir'
 import { claudeBackgroundTasks } from './background'
 import { claudeSafeguards } from './safeguards'
 import { claudeTranscriptTurns } from './turns'
@@ -516,10 +517,19 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // The status line forwards Claude Code's status JSON (model, effort, cost, plan limits) to Hive and
     // prints nothing, so no line is added to the terminal. Switched off (#1285), the user's own runs after it, given the
     // same JSON, and shows its output: Hive still reads the status.
-    const own = launchOverrides(ctx.overrides, CLAUDE_CODE, 'statusLine') ? null : ownStatusLine(settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs))
+    const scopes = settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
+    const own = launchOverrides(ctx.overrides, CLAUDE_CODE, 'statusLine') ? null : ownStatusLine(scopes)
     const statusLine = hiveStatusLine((echo) => hookForwardCommand(`${ctx.hookUrl}&statusline${echo ? '&echo' : ''}`, ctx.hookAuthFile, timeout), own)
+    // On a connection, its auto memory written without asking, as without one (HI-1899): the home's `projects` is a link,
+    // so Claude Code is given the memory folder by its resolved path. Not where something else names the folder.
+    const home = ctx.env.CLAUDE_CONFIG_DIR
+    // A settings file Hive can't read may name one too: none then.
+    const named = MEMORY_ENV_OVERRIDES.some((v) => ctx.env[v]) || scopes.some((s) => s.unsure !== undefined || (s.json && typeof s.json === 'object' && (s.json as Record<string, unknown>).autoMemoryDirectory != null))
+    const memoryDir = home && !named && advanced.get<boolean>('claude-code.memory.realPath') ? await connectionMemoryDir(home, () => memoryBase(ctx.cwd)) : null
     // The user's --settings merged in: Hive passes only this file (#330).
-    await writeJsonAtomic(join(ctx.privateDir, 'settings.json'), mergeLaunchSettings({ hooks, statusLine }, theirs, { url: ctx.hookUrl, envVar: 'HIVE_HOOK_TOKEN' }))
+    const settings = mergeLaunchSettings({ hooks, statusLine }, theirs, { url: ctx.hookUrl, envVar: 'HIVE_HOOK_TOKEN' })
+    if (memoryDir) settings.autoMemoryDirectory = memoryDir
+    await writeJsonAtomic(join(ctx.privateDir, 'settings.json'), settings)
     await writeJsonAtomic(join(dir, 'sync.json'), { launchedAt: new Date().toISOString(), hashes })
     // Instructions for this launch (the Hive Assistant's, and the Workspace notes note, #1433) are appended to Claude Code's
     // system prompt from a file.

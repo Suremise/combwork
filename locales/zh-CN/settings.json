@@ -105,6 +105,8 @@
   "settings.advanced.claude-code.hooks.preToolUseTimeoutSeconds.title": "钩子：工具运行前超时",
   "settings.advanced.claude-code.hooks.timeoutSeconds.desc": "Claude Code 等待 Hive 接收其钩子（回合开始或结束、通知）的时长。Hive 会立即回应；仅当 Hive 的日志显示钩子在较慢的机器上超时时才调高。",
   "settings.advanced.claude-code.hooks.timeoutSeconds.title": "钩子：超时",
+  "settings.advanced.claude-code.memory.realPath.desc": "连接的 projects 文件夹是指向 Claude Code 自身文件夹的链接，因此 Claude Code 每次在其中保存记忆前都会询问你。连接上的每个 Claude Code 智能体都会按实际路径获得其项目的自动记忆文件夹：同一个文件夹，因此会像没有连接时一样不经询问地保存记忆。不会允许更多内容，也不会向 Claude Code 的文件写入任何内容。关闭后，Claude Code 在连接上每次保存记忆前都会询问。",
+  "settings.advanced.claude-code.memory.realPath.title": "在连接上按实际路径使用自动记忆",
   "settings.advanced.claude-code.mouse.rightClickToCli.desc": "Claude Code 窗格中的右键单击和其他所有窗格一样由 Hive 处理：复制终端的所选内容，否则粘贴。开启后，Hive 会把右键单击交给 Claude Code。Claude Code 在输入框中不使用鼠标，因此在那里右键单击不会有任何作用：请用 Ctrl+C 和 Ctrl+V 复制和粘贴。",
   "settings.advanced.claude-code.mouse.rightClickToCli.title": "将右键单击交给 Claude Code",
   "settings.advanced.claude-code.override.mcpIsolation.desc": "Hive 以 --strict-mcp-config 启动 Claude Code，让它的会话只获得工作区提供的 MCP 服务器。关闭后，你自己的 Claude Code 配置和项目的 .mcp.json 中的服务器也会一并加载，就像在 Hive 之外一样（Claude Code 可能会先请你批准项目的新服务器）。工作区的服务器（包括 Hive 自己的 hive 服务器）优先于你的同名服务器。",
