@@ -1778,9 +1778,8 @@ class SessionManager {
     const agent = projectAgents(cfg).find((a) => a.id === agentId)
     if (!agent) return { is: 'none' }
     const provider = agentLaunchSettings(agent, cfg, config.settings).provider
-    const rec = (await workspace.sessionsFile(projectPath)).sessions
-      .filter((r) => r.agentId === agentId && r.lease === lease && !r.archived && !r.sub && recordProvider(r) === provider)
-      .sort((x, y) => (y.lastActiveAt ?? '').localeCompare(x.lastActiveAt ?? ''))[0]
+    // The agent's records alone, newest first (HI-1236: by its index, not every record of the project).
+    const rec = (await workspace.sessionsOfAgent(projectPath, agentId)).find((r) => r.lease === lease && !r.archived && !r.sub && recordProvider(r) === provider)
     if (!rec) return { is: 'none' }
     // A provider this version doesn't know: nothing it could resume. A lookup that fails throws (unknown: tried again).
     const adapter = allProviders().find((p) => p.id === provider)

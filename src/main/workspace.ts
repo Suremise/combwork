@@ -26,7 +26,7 @@ import { admit, dismiss, setFenceReason } from './openingFence'
 import { AfterOpen } from './openProgress'
 import { whenAll } from '../shared/atMost'
 import { createLogger, userText } from './logger'
-import { changeSessionRecord, changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
+import { changeSessionRecord, changeSessions, exportSessions, readAgentSessions, readCardSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
 import { worktreesRoot } from './worktrees'
 import { ensureHiveExcluded, gitDirOf, hiveVcs } from './hiveVcs'
@@ -1327,6 +1327,16 @@ export class WorkspaceService {
   /** One of a host's session records by its id (#1211: read by its key, not with every record), or undefined. */
   async sessionRecord(projectPath: string, id: string): Promise<SessionRecord | undefined> {
     return readSession(await this.sessionsPlace(projectPath), id)
+  }
+
+  /** A host's session records of one agent, most recently active first (HI-1236: by the agent's index, not every record). */
+  async sessionsOfAgent(projectPath: string, agentId: string): Promise<SessionRecord[]> {
+    return readAgentSessions(await this.sessionsPlace(projectPath), agentId)
+  }
+
+  /** A host's session records that worked on a card, in their order (HI-1236: by the cards' index, not every record). */
+  async sessionsOfCard(projectPath: string, card: number): Promise<SessionRecord[]> {
+    return readCardSessions(await this.sessionsPlace(projectPath), card)
   }
 
   /** Changes a host's session records from what is saved now, one change at a time; only what changed is written. */

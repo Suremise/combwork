@@ -12,8 +12,8 @@ import { BOARD_MIGRATIONS } from '../src/main/boardStore'
 import { openDb, schemaVersion } from '../src/main/db'
 import { readDelivery } from '../src/shared/deliveries'
 import { deliveryFromRow, deliveryToRow, keptUsageFromRow, keptUsageToRow, sessionFromRows, sessionToRows } from '../src/main/schema/sessionDeliveryCodec'
-import { addDeliveries, addSessionRecords, moveStoreRows, readDeleted, readDeletedUsage, readDeliveries, readSessionRecord, readSessionRecords, writeDeliveries, writeSessionRecords } from '../src/main/schema/sessionDeliveryTables'
-import { V1_0_STEPS } from '../src/main/schema/v1_0'
+import { addDeliveries, addSessionRecords, moveStoreRows, readAgentSessionRecords, readCardSessionRecords, readDeleted, readDeletedUsage, readDeliveries, readSessionRecord, readSessionRecords, writeDeliveries, writeSessionRecords } from '../src/main/schema/sessionDeliveryTables'
+import { QUERIES, V1_0_STEPS } from '../src/main/schema/v1_0'
 
 const base = tempDir('hive-store-tables-')
 let n = 0
@@ -175,6 +175,37 @@ describe("a host's records in the tables (storeTables.ts)", () => {
     expect(written().sort()).toEqual(['session_cards DELETE', 'session_cards DELETE', 'session_cards INSERT', 'session_cards INSERT', 'sessions DELETE', 'sessions INSERT', 'sessions UPDATE'])
     expect(readSessionRecords(db, 'p1').map((r) => r.id)).toEqual(['a', 'b', 'd'])
     expect(readDeleted(db, 'p1')).toEqual(['g1', 'g2'])
+  })
+
+  it("an agent's records and a card's (HI-1236): read by their indexes, the same as filtering every record", () => {
+    const db = tables()
+    const day = (d: number): string => `2026-10-${String(d).padStart(2, '0')}T10:00:00.000Z`
+    const card = (k: number) => ({ number: k, title: `Card ${k}` })
+    const recs = [
+      fullSession('z1', { agentId: 'a1', lastActiveAt: day(3), cards: [card(5)] }),
+      fullSession('m2', { agentId: 'a2', lastActiveAt: day(9), cards: [card(5), card(7)] }),
+      fullSession('b3', { agentId: 'a1', lastActiveAt: day(8), cards: [] }),
+      fullSession('k4', { agentId: 'a1', lastActiveAt: day(1), cards: [card(7), card(5)] })
+    ]
+    db.exec('BEGIN')
+    writeSessionRecords(db, 'p1', { sessions: recs })
+    // Another host's, with the same agent and card: never read for p1.
+    writeSessionRecords(db, 'p2', { sessions: [fullSession('o1', { agentId: 'a1', lastActiveAt: day(20), cards: [card(5)] })] })
+    db.exec('COMMIT')
+    const all = readSessionRecords(db, 'p1') as { id: string; agentId?: string; lastActiveAt: string; cards?: { number: number }[] }[]
+    const newest = (list: typeof all) => [...list].sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt))
+    expect(readAgentSessionRecords(db, 'p1', 'a1')).toEqual(newest(all.filter((r) => r.agentId === 'a1')))
+    expect(readAgentSessionRecords(db, 'p1', 'a1').map((r) => r.id)).toEqual(['b3', 'z1', 'k4'])
+    expect(readAgentSessionRecords(db, 'p1', 'nobody')).toEqual([])
+    expect(readCardSessionRecords(db, 'p1', 5)).toEqual(all.filter((r) => r.cards?.some((c) => c.number === 5)))
+    expect(readCardSessionRecords(db, 'p1', 7).map((r) => r.id)).toEqual(['m2', 'k4'])
+    expect(readCardSessionRecords(db, 'p1', 99)).toEqual([])
+    // Through their indexes, not a scan of the host's records.
+    const plan = (sql: string, ...args: (string | number)[]): string => (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...args) as { detail: string }[]).map((r) => r.detail).join('; ')
+    expect(plan(QUERIES['sessions.byAgent'].sql, 'p1', 'a1')).toMatch(/USING (COVERING )?INDEX sessions_agent/)
+    expect(plan(QUERIES['sessions.byCard'].sql, 5, 'p1')).toMatch(/USING (COVERING )?INDEX session_cards_card/)
+    expect(plan(QUERIES['sessions.byIds'].sql, 'p1', '["z1"]')).toMatch(/USING PRIMARY KEY/)
+    expect(plan(QUERIES['sessions.cardsOf'].sql, 'p1', '["z1"]')).toMatch(/USING PRIMARY KEY/)
   })
 
   it("a file's records moved in beside the host's: one it has wins, and one its deleted list holds is never written back (HI-1736)", () => {

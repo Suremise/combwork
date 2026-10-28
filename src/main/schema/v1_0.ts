@@ -1067,11 +1067,13 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'board.decided': { sql: 'SELECT DISTINCT card FROM card_decisions WHERE card IN (SELECT value FROM json_each(?))', args: ['[1]'], index: 'PRIMARY KEY' },
   'board.holds': { sql: 'SELECT * FROM card_holds WHERE card = ? ORDER BY ord', args: [1], index: 'PRIMARY KEY' },
   'board.context': { sql: 'SELECT ref FROM card_context WHERE card = ? ORDER BY ord', args: [1], index: 'PRIMARY KEY' },
-  // sessionStore.ts: a host's sessions, one by id, an agent's, a card's.
+  // sessionStore.ts: a host's sessions, one by id, some by their ids and their cards, an agent's, a card's.
   'sessions.host': { sql: 'SELECT * FROM sessions WHERE host = ? ORDER BY ord', args: ['p1'], index: 'PRIMARY KEY' },
   'sessions.byId': { sql: 'SELECT * FROM sessions WHERE host = ? AND id = ?', args: ['p1', 's1'], index: 'PRIMARY KEY' },
   'sessions.byAgent': { sql: 'SELECT id FROM sessions WHERE host = ? AND agent_id = ? ORDER BY last_active_at DESC', args: ['p1', 'a1'], index: 'sessions_agent' },
-  'sessions.byCard': { sql: 'SELECT host, session FROM session_cards WHERE card = ?', args: [1], index: 'session_cards_card' },
+  'sessions.byIds': { sql: 'SELECT * FROM sessions WHERE host = ? AND id IN (SELECT value FROM json_each(?))', args: ['p1', '["s1"]'], index: 'PRIMARY KEY' },
+  'sessions.cardsOf': { sql: 'SELECT * FROM session_cards WHERE host = ? AND session IN (SELECT value FROM json_each(?)) ORDER BY session, ord', args: ['p1', '["s1"]'], index: 'PRIMARY KEY' },
+  'sessions.byCard': { sql: 'SELECT session FROM session_cards WHERE card = ? AND host = ?', args: [1, 'p1'], index: 'session_cards_card' },
   'sessions.deletedUsage': { sql: 'SELECT * FROM sessions_deleted_usage WHERE host = ? AND id = ?', args: ['p1', 's1'], index: 'PRIMARY KEY' },
   // deliveries.ts: an agent's inbox, a state's, a source's, a card round's, the 7-day expiry, an action's wake.
   'deliveries.byAgent': { sql: 'SELECT * FROM deliveries WHERE host = ? AND agent_id = ? ORDER BY seq', args: ['p1', 'a1'], index: 'deliveries_agent' },
