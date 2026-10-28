@@ -105,31 +105,32 @@ const log = () => {
 
     // The opening view, from the click until the adoption and the slots are done (HI-1694), each text it shows.
     const view = h.page.locator('.workspace-opening')
-    // Recorded in the window as the view changes, not read from here now and then: under load a step can come and go
-    // between two reads (HI-1988). Each text it shows, and each step it had (data-step, the one it left too).
+    // The workspace's own opening ended first (its view, "Opening …", can still be up while the question shows).
+    check('…its opening ended', !!(await until(async () => /opening .*: projects took \d+ ms; \d+ ms in all/.test(log()) && (await view.count()) === 0, HUNG_MS)))
+    // Recorded in the window, not read from here now and then (HI-1988): the steps main tells it, and each text the view
+    // shows with its step. The adoption and slots can take 50 ms in all: under load the window, busy with the upgraded
+    // board, takes all three events before it renders again, so a step it was told need not be painted.
     await h.page.evaluate(() => {
-      const seen = (window.__opening = { texts: [], steps: [] })
-      const note = (step) => step && seen.steps.at(-1) !== step && seen.steps.push(step)
-      new MutationObserver((records) => {
-        for (const r of records) {
-          if (r.type === 'attributes' && r.target.classList?.contains('workspace-opening')) note(r.oldValue)
-          for (const n of r.removedNodes) note(n.classList?.contains('workspace-opening') ? n.dataset.step : null)
-        }
+      const seen = (window.__opening = { told: [], shown: [] })
+      window.hive.onEvent((e) => e.type === 'workspace-progress' && seen.told.push(e.progress))
+      new MutationObserver(() => {
         const el = document.querySelector('.workspace-opening')
-        if (!el) return
-        note(el.dataset.step)
-        const t = el.innerText.replace(/\s+/g, ' ').trim()
-        if (t && seen.texts.at(-1) !== t) seen.texts.push(t)
-      }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['data-step'], attributeOldValue: true })
+        const t = el?.innerText.replace(/\s+/g, ' ').trim()
+        const last = seen.shown.at(-1)
+        if (t && (last?.text !== t || last?.step !== el.dataset.step)) seen.shown.push({ step: el.dataset.step, text: t })
+      }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['data-step'] })
     })
     await ask.getByRole('button', { name: 'Upgrade', exact: true }).click()
     check('Upgrade upgrades it', !!(await until(async () => (await h.inv('board:state')).readOnly === null, HUNG_MS)))
     // The adoption runs once after the upgrade, in the background: the project's options are set after it.
     check('…then the adoption, once', !!(await until(() => rows("SELECT value FROM board_meta WHERE key = 'adoption'").length === 1, HUNG_MS)))
     check('…and the opening view goes once its steps are done', !!(await until(async () => (await view.count()) === 0, HUNG_MS)))
-    const { texts, steps } = await h.page.evaluate(() => window.__opening)
+    const { told, shown } = await h.page.evaluate(() => window.__opening)
     const name = path.basename(fx.ws)
-    check("…having shown the steps after the upgrade, with the workspace's name", texts.length > 0 && texts.every((t) => t.includes(`Upgrading ${name} to Hive 1.0`)) && steps.some((s) => s === 'adoption' || s === 'slots'), `${steps.join(', ')}: ${texts.join(' | ')}`)
+    const toldSteps = told.map((p) => p?.step ?? null)
+    check("…the window told the upgrade's steps, with the workspace's name, then that they ended", toldSteps.join() === 'upgrade,adoption,slots,' && told.slice(0, 3).every((p) => p.name === name), JSON.stringify(told))
+    const STEP_TEXT = { upgrade: 'Upgrading its board.', adoption: 'Adopting its cards and projects…', slots: "Adopting its agents' worktrees as slots…" }
+    check("…having shown each, as far as it was painted, under the workspace's name", shown.length > 0 && shown.every((s) => s.text.includes(`Upgrading ${name} to Hive 1.0`) && s.text.includes(STEP_TEXT[s.step] ?? '\0')), shown.map((s) => `${s.step}: ${s.text}`).join(' | '))
     const skipped = log().split(/\r?\n/).filter((l) => /\[(WARN|ERROR)\]/.test(l) && /no such table|This board is from Hive 0\.9|readonly database|Could not save the performance metrics|bringing builders/.test(l))
     check('while it waited, nothing failed on the read-only board (no "no such table", "readonly", nor "This board is from Hive 0.9")', skipped.length === 0, skipped.join(' | '))
     const timed = log().split(/\r?\n/).filter((l) => /schema step|\[workspace\] opening |upgraded the board/.test(l))
