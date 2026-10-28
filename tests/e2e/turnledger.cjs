@@ -7,6 +7,7 @@
 //   (after a silence, HIVE_TEST_SILENT_MS here) ends it;
 // - with no sign of the end at all, the state is unknown (never idle): the pane says how long it has been silent, with
 //   Mark idle, and it takes a task once marked;
+// - Codex running a turn under the id of a compaction it began itself (HI-1916) is heard, and ends at its Stop;
 // - the hook journal (logs/hooks.log) has each hook with its launch, turn id, call id, order and statuses.
 // Idle compactions and recaps (#612) are the idlestatus suite's. Dev build, throwaway profile, workspace and CLI homes.
 const lib = require('./lib.cjs')
@@ -149,6 +150,13 @@ const check = (name, ok, extra = '') => {
   await header.getByRole('button', { name: 'Mark idle' }).click()
   check('Mark idle makes it idle', !!(await is(codex, 'ready', 'over')))
   check('and it takes a task', !!(await turn(codex, 'work 1')) && !!(await is(codex, 'finished', 'over')))
+
+  // Codex 0.164 compacting by itself, then running its turn under that compaction's id (HI-1916: HR5's "no hooks" on 27
+  // Oct): heard as a turn, and finished at its Stop, with nothing of it stale.
+  check("Codex: a turn under the id of a compaction it began itself is heard working", !!(await turn(codex, 'selfcompact then work 1')))
+  check('…and finished at its Stop', !!(await is(codex, 'finished', 'over')))
+  const sc = await live(codex)
+  check("…the journal has its prompt beginning that turn, and nothing stale under the compaction's id", !!(await journal(sc, /UserPromptSubmit .*a turn under the id of a compaction the CLI began itself/)) && !hooksLog().split('\n').some((l) => l.includes(`run=${sc.runId} `) && l.includes("under a compaction's id")), hooksLog().split('\n').filter((l) => l.includes(`run=${sc.runId} `)).slice(-12).join(' | '))
 
   // The journal: launch, receive order, turn and call ids, and the statuses before and after.
   const st = await live(codex)

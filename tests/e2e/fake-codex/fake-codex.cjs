@@ -38,6 +38,8 @@
 // - While fake-nohooks-<agent> is in CODEX_HOME it sends no hook at all, as when a Codex update broke them (#1336). A
 //   wake it read is answered with the next line of fake-wakes-<agent>.txt there, when there is one. With
 //   FAKE_CODEX_VERSION 0.162.1 or later, a turn draws Codex's Working line as it begins.
+// - "selfcompact" (HI-1916): a compaction it begins itself (PreCompact, PostCompact), then the turn under the same turn_id,
+//   as Codex 0.164.0 did.
 // - "compacting N" (#1514): a turn that compacts its conversation for N seconds first, as Codex's auto-compaction does
 //   at a turn's start, sending no hook meanwhile (no UserPromptSubmit: Hive sees no prompt, as with RR2 on 23 Oct). With
 //   fake-queue-<agent> in CODEX_HOME, a line typed while a turn runs is queued (as Codex queues input) and taken in the
@@ -517,6 +519,14 @@ async function runPrompt(text) {
     userLine(text)
     await takeQueued()
   } else {
+    // "selfcompact" (HI-1916): as Codex 0.164 did for HR5 (27 Oct), a compaction it begins itself, then the turn run under
+    // that compaction's id: PreCompact and PostCompact, then its prompt, all under this turn's id.
+    if (/^selfcompact\b/.test(text)) {
+      await hook('PreCompact', { trigger: 'auto' })
+      await sleep(300)
+      await hook('PostCompact')
+      await sleep(200)
+    }
     userLine(text)
     await hook('UserPromptSubmit', { prompt: text })
   }
