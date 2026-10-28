@@ -422,10 +422,10 @@ describe('watches (main/watches.ts)', async () => {
    */
   const failedInReview = async (w: Parameters<typeof watches.evaluateWatches>[0], num: number, by: string): Promise<void> => {
     const doc = readCard(w, num)
-    const at = new Date().toISOString()
-    const history = [...(doc.history as unknown[]), { at, by, what: 'Review failed', whatText: { id: 'tasks.history.reviewFailed' }, id: `failed-${num}-${Date.now()}` }]
+    const when = new Date().toISOString()
+    const history = [...(doc.history as unknown[]), { at: when, by, what: 'Review failed', whatText: { id: 'tasks.history.reviewFailed' }, id: `failed-${num}-${Date.now()}` }]
     const { review: _review, ...rest } = doc
-    await writeCard(w, num, { ...rest, history, updatedAt: at })
+    await writeCard(w, num, { ...rest, history, updatedAt: when })
   }
   const { sessions } = await import('../src/main/sessions')
   const { tableTestHooks: storeTestHooks } = await import('../src/main/storeTables')
