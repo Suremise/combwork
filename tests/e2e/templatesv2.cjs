@@ -94,7 +94,7 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     check("one of Hive's own is read-only: Load, Duplicate and Export, no Edit, Rename or Delete", actions.map((t) => t.trim()).join() === 'Load into Project…,Duplicate…,Export…' && (await detail.locator('[aria-label="Delete template"]').count()) === 0, JSON.stringify(actions))
     const team = (await detail.locator('table tbody tr').allInnerTexts()).map((r) => r.split('\t').map((c) => c.trim()))
     // (Named as the selected project, alpha, would get them: its key's, #1123 names.)
-  check("…its agents: builders on Claude Code, each paired with a reviewer on Codex, named from the selected project's key", team.length === 6 && /^[A-Z]{2,4}-B1$/.test(team[0][0]) && /^Builder\s+with [A-Z]{2,4}-R1$/.test(team[0][1]) && team[0][2] === 'Claude Code' && /^Reviewer\s+with [A-Z]{2,4}-B3$/.test(team[5][1]) && team[5][2] === 'Codex', JSON.stringify(team))
+  check("…its agents: builders on Claude Code, each paired with a reviewer on Codex, named from the selected project's key", team.length === 6 && /^[A-Z]{2,4}-B1$/.test(team[0][0]) && /^Builder\s+paired: [A-Z]{2,4}-R1$/.test(team[0][1]) && team[0][2] === 'Claude Code' && /^Reviewer\s+paired: [A-Z]{2,4}-B3$/.test(team[5][1]) && team[5][2] === 'Codex', JSON.stringify(team))
     // Its preset as its workflow (HI-1910: Hive's own carry their preset's sections), shown under None | Git.
     check('…and the preset it carries, as its workflow', /From the preset Team\./.test(await detail.innerText()))
     await shoot('hive-templates', () => page)

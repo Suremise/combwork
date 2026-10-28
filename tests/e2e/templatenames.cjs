@@ -158,7 +158,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // --- The fixed-name template into apiary: every name is amberlight's, so free ones are filled in (AP-B1…).
     await select('apiary')
     let d = await openLoad('AM fixed')
-    check('every name taken by amberlight: free names filled in (the key swapped), none marked, Load template ready', JSON.stringify(await boxes(d)) === JSON.stringify(team.map((n) => `AP-${n}`)) && (await d.locator('.template-plan-table .field-error').count()) === 0 && (await loadButton(d).isEnabled()) && /free names are filled in below/.test(await d.locator('[data-names-taken]').innerText()), JSON.stringify(await boxes(d)))
+    check('every name taken by amberlight: free names filled in (the key swapped), none marked, Load template ready', JSON.stringify(await boxes(d)) === JSON.stringify(team.map((n) => `AP-${n}`)) && (await d.locator('.template-plan-table .field-error').count()) === 0 && (await loadButton(d).isEnabled()) && /Free names are filled in below/.test(await d.locator('[data-names-taken]').innerText()), JSON.stringify(await boxes(d)))
     // One edited to a name amberlight has: marked, Load template greyed out; fixed, ready again.
     const second = d.locator('.template-plan-name-input').nth(1)
     await second.fill('AM-B2')
