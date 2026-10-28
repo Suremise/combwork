@@ -178,6 +178,8 @@
   "tips.filesTab.title": "Edytuj pliki bez wychodzenia z Hive",
   "tips.flightRecorder.text": "Włącz wyzwalacz rejestratora lotu (Ustawienia → Zaawansowane: zatrzymanie przez zabezpieczenia, coś nieznanego z CLI, zmiana wersji CLI, agent, który milczy), a gdy to nastąpi, Hive od razu zapisze ostatnie zdarzenia konsoli deweloperskiej agenta, z ukrytymi danymi, i pokaże komunikat.",
   "tips.flightRecorder.title": "Wyłapuj rzadkie zdarzenia automatycznie",
+  "tips.focusedTests.text": "Gdy scala Hive, Kontrola wersji → Przepływ pracy może uruchamiać testy ukierunkowane każdej karty na scalonym wyniku: polecenie twojego projektu wybiera testy potrzebne zmianie, gdy karta jest przekazywana, a kolejka scalania uruchamia je przed scaleniem.",
+  "tips.focusedTests.title": "Własne testy każdej karty przed scaleniem",
   "tips.followUpCheck.text": "Gdy prosisz o zmianę karty w kolumnie Recenzja albo Zatwierdzone, którą ma sprawdzić jej recenzent, wykonawca publikuje zmianę jako poprawki do sprawdzenia: Hive budzi recenzenta, a odpowiedź budzi wykonawcę. Poprawki bez odpowiedzi przez 15 minut oznaczają kartę jako utkniętą.",
   "tips.followUpCheck.title": "Poprawki do sprawdzenia bez nowej rundy",
   "tips.forYou.text": "Karta z etykietą Dla Ciebie czeka na Ciebie: prośba o zgodę, decyzja albo pytanie. Ikona Tablicy zadań je liczy, a Dla Ciebie na tablicy pokazuje tylko je. Otwórz kartę, aby zatwierdzić, odrzucić lub odpowiedzieć: czekający agent dowie się od razu.",

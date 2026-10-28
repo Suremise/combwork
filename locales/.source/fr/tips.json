@@ -178,6 +178,8 @@
   "tips.filesTab.title": "Edit files without leaving Hive",
   "tips.flightRecorder.text": "Turn on a flight recorder trigger in Settings → Advanced (safeguard stops, something unknown from a CLI, a CLI version change, an agent gone silent), and Hive saves the agent's recent developer console events, redacted, the moment it happens, with a notice.",
   "tips.flightRecorder.title": "Catch rare events by themselves",
+  "tips.focusedTests.text": "With Hive merging, Version Control → Workflow can run each card’s focused tests on the merged result: your project’s command chooses the tests a change needs when the card is submitted, and the merge queue runs them before it merges.",
+  "tips.focusedTests.title": "Each card’s own tests before it merges",
   "tips.followUpCheck.text": "When you ask for a change to a card in Review or Approved for its reviewer to check, its builder posts the change as a follow-up: Hive wakes the reviewer, and the answer wakes the builder. One left unanswered for 15 minutes shows its card as stalled.",
   "tips.followUpCheck.title": "Have a follow-up checked without a new round",
   "tips.forYou.text": "A card with a For you chip waits for you: an approval, a decision or a question. The Task Board icon counts them, and For you on the board shows only those. Open the card to approve, decline or answer: the agent waiting on it hears at once.",

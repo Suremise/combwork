@@ -178,6 +178,8 @@
   "tips.filesTab.title": "Edite arquivos sem sair do Hive",
   "tips.flightRecorder.text": "Ative um gatilho do gravador de voo em Configurações → Avançado (paradas de segurança, algo desconhecido vindo de uma CLI, uma mudança de versão da CLI, um agente em silêncio), e o Hive salva os eventos recentes do console do desenvolvedor do agente, com dados sensíveis ocultos, no momento em que acontece, com um aviso.",
   "tips.flightRecorder.title": "Capture eventos raros automaticamente",
+  "tips.focusedTests.text": "Quando o Hive faz o merge, Controle de versão → Fluxo de trabalho pode rodar os testes específicos de cada cartão no resultado mesclado: o comando do seu projeto escolhe os testes de que uma mudança precisa quando o cartão é enviado, e a fila de merge os executa antes do merge.",
+  "tips.focusedTests.title": "Os testes de cada cartão antes do merge",
   "tips.followUpCheck.text": "Quando você pede uma mudança em um cartão em Revisão ou Aprovado para o revisor verificar, o executor publica a mudança como acompanhamento: o Hive acorda o revisor, e a resposta acorda o executor. Um acompanhamento sem resposta por 15 minutos mostra o cartão como travado.",
   "tips.followUpCheck.title": "Peça a verificação de um acompanhamento sem nova rodada",
   "tips.forYou.text": "Um cartão com o selo Para você aguarda você: uma aprovação, uma decisão ou uma pergunta. O ícone do Quadro de tarefas conta esses cartões, e Para você no quadro mostra só eles. Abra o cartão para aprovar, recusar ou responder: o agente que aguarda fica sabendo na hora.",

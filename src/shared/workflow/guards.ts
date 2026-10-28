@@ -7,6 +7,7 @@
 import { awaitsAgentMerge, type Ruleset } from './compile'
 import { approvedByUser, passingReviewers, transientRequeues, type CardKind, type CardState, type CheckRanData } from './facts'
 import { reviewByYou, reviewerAgent } from './options'
+import { choiceStands, type FocusedChoice } from './focused'
 import type { GuardId } from './pieces'
 import type { RefusalValues, RuleId } from './refusals'
 import type { StoredText } from '../types'
@@ -51,6 +52,8 @@ export interface GuardInputs {
   target?: string
   upToDate?: Ans<boolean>
   mergeChecks?: 'passed' | 'failed'
+  /** G20 (HI-1367): the submission's focused tests, as its pick and the builder's list left them. */
+  focused?: FocusedChoice
 }
 
 export interface GuardRefusal {
@@ -134,6 +137,8 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
     if (isUnknownAnswer(u)) return unknownRefusal(i, 'submit.trailer', u)
     return { rule: 'submit.trailer', values: { card: i.card.key, commit: short(u), command: `git commit --amend --no-edit --trailer "Hive-Card: ${i.card.key}"` } } // i18n-ignore: a git command, as typed
   },
+  // G20 (HI-1367): a pick that failed or said "every test" stands only with the builder's own list (`tests`).
+  'submit.focusedChosen': (i) => (!i.focused || choiceStands(i.focused) ? null : { rule: 'submit.focusedChosen', values: { card: i.card.key, revision: short(i.revision), state: i.focused.state, why: i.focused.why ?? 'none' } }), // i18n-ignore: codes (a why, a check name), never shown as text
   'submit.checksPassed': (i) => {
     const missing = i.checksMissing ?? []
     if (!missing.length) return null

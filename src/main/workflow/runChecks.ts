@@ -139,6 +139,8 @@ export async function checkStart(r: CheckRunFor, log: WriteLog = appObserver, no
  */
 function whichCheck(r: CheckRunFor): { name: string | null; ran: boolean } {
   const command = r.command?.trim() || null
+  // A focused test's check (HI-1367) runs the reviewer's own command, recorded as run: any command counts.
+  if (r.check && r.checkCommand === '') return { name: r.check, ran: command !== null }
   if (r.check) return { name: r.check, ran: command !== null && command === r.checkCommand?.trim() }
   const name = command ? (Object.entries(r.commands).find(([, c]) => c === command)?.[0] ?? null) : null
   return { name, ran: name !== null }

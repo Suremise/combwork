@@ -178,6 +178,8 @@
   "tips.filesTab.title": "Dateien bearbeiten, ohne Hive zu verlassen",
   "tips.flightRecorder.text": "Schalte in Einstellungen → Erweitert einen Auslöser des Flugschreibers ein (Sicherheitsstopps, Unbekanntes von einer CLI, ein Wechsel der CLI-Version, ein still gewordener Agent), und Hive speichert die letzten Ereignisse der Entwicklerkonsole des Agenten in dem Moment, in dem es passiert, geschwärzt und mit einer Meldung.",
   "tips.flightRecorder.title": "Seltene Ereignisse von selbst festhalten",
+  "tips.focusedTests.text": "Wenn Hive mergt, kann Versionsverwaltung → Workflow die gezielten Tests jeder Karte auf dem gemergten Ergebnis ausführen: Der Befehl deines Projekts wählt beim Einreichen der Karte die Tests aus, die eine Änderung braucht, und die Merge-Warteschlange führt sie vor dem Merge aus.",
+  "tips.focusedTests.title": "Die eigenen Tests jeder Karte vor ihrem Merge",
   "tips.followUpCheck.text": "Wenn du für eine Karte in Review oder Genehmigt eine Änderung verlangst, die ihr Reviewer prüfen soll, postet der Bearbeiter die Änderung als Follow-up: Hive weckt den Reviewer, und die Antwort weckt den Bearbeiter. Bleibt eines 15 Minuten unbeantwortet, wird die Karte als festgefahren angezeigt.",
   "tips.followUpCheck.title": "Ein Follow-up ohne neue Runde prüfen lassen",
   "tips.forYou.text": "Eine Karte mit dem Chip „Für dich“ wartet auf dich: eine Zustimmung, eine Entscheidung oder eine Frage. Das Symbol „Aufgabenboard“ zählt sie, und „Für dich“ auf dem Board zeigt nur diese. Öffne die Karte, um zuzustimmen, abzulehnen oder zu antworten: Der wartende Agent erfährt es sofort.",

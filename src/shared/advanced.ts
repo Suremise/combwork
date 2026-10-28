@@ -183,6 +183,10 @@ export const QUEUE_NETWORK_CODES = 'hive.queue.networkCodes'
 
 /** The longest the merge queue's signed merge commit takes before its signer is ended (#1350): read by main's queueHost. */
 export const QUEUE_SIGN_SECONDS = 'hive.queue.signSeconds'
+/** G20 (HI-1367): the parallel jobs the merge queue gives a project's focused-tests runner (HIVE_FOCUSED_JOBS). */
+export const QUEUE_FOCUSED_JOBS = 'hive.queue.focusedJobs'
+/** G20 (HI-1367): the longest a project's focused-tests picker runs, at a submit or at the merge. */
+export const FOCUSED_PICK_SECONDS = 'hive.focused.pickSeconds'
 
 /** Whether the merge queue asks before updating a target checked out in a folder (#1351, OP-40): read by main's queueHost. */
 export const QUEUE_CHECKED_OUT_TARGET = 'hive.queue.checkedOutTarget'
@@ -653,6 +657,31 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 1440,
     unit: 'min',
+    applies: 'now'
+  },
+  // G20 (HI-1367): how many tests at once a card's focused tests run with at the merge (CPU-friendly: the machine is shared).
+  {
+    id: QUEUE_FOCUSED_JOBS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.queue.focusedJobs.title', defaultMessage: 'Merge queue: focused tests run at once', description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by a number: how many of a card's focused tests (the tests its change needs) the merge queue runs in parallel." }),
+    desc: msg({ id: 'settings.advanced.hive.queue.focusedJobs.desc', defaultMessage: 'How many tests at once the merge queue’s run of a card’s focused tests may use, passed to the project’s command that runs them. More finishes sooner but loads the computer, which agents and your own work share.', description: 'What the advanced setting "Merge queue: focused tests run at once" does, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'number',
+    default: 2,
+    min: 1,
+    max: 16,
+    applies: 'now'
+  },
+  // G20 (HI-1367): a picker past this is ended with its whole tree, and its pick is unknown (never "nothing needed").
+  {
+    id: FOCUSED_PICK_SECONDS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.focused.pickSeconds.title', defaultMessage: 'Focused tests: longest the choice of tests runs', description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in seconds: how long the project's command that chooses a card's focused tests may run, when the card is submitted and at its merge." }),
+    desc: msg({ id: 'settings.advanced.hive.focused.pickSeconds.desc', defaultMessage: 'How long the project’s command that chooses a card’s focused tests may run, when it is submitted and at its merge. Past it, the command is ended and no tests count as chosen: the builder then names them itself.', description: 'What the advanced setting "Focused tests: longest the choice of tests runs" does (Settings → Advanced).' }),
+    kind: 'number',
+    default: 180,
+    min: 10,
+    max: 1800,
+    unit: 's',
     applies: 'now'
   },
   // Which failed merge checks count as the network's (#1362, Darren's decision on #1121): Node's and npm's own error

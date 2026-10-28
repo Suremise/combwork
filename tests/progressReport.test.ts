@@ -134,6 +134,10 @@ describe('the hive-progress command line', () => {
     expect(parseArgs(['--title', 'e2e', '--', 'npm', 'run', 'e2e'])).toEqual({ title: 'e2e', command: ['npm', 'run', 'e2e'] })
     expect(parseArgs(['--title=Build', 'npm', 'run', 'dist'])).toEqual({ title: 'Build', command: ['npm', 'run', 'dist'] })
     expect(parseArgs(['--', 'node', '--version'])).toEqual({ title: undefined, command: ['node', '--version'] })
+    // A focused test's check (HI-1367) runs your command; any other check refuses one.
+    expect(parseArgs(['--check', 'focused:board', '--', 'npm', 'run', 'e2e', '--', 'board'])).toMatchObject({ check: 'focused:board', command: ['npm', 'run', 'e2e', '--', 'board'] })
+    expect(parseArgs(['--check', 'focused:board'])).toHaveProperty('error')
+    expect(parseArgs(['--check', 'lint', '--', 'npm', 'run', 'lint'])).toHaveProperty('error')
     expect(parseArgs(['--help'])).toEqual({ help: true })
     expect(parseArgs([])).toHaveProperty('error')
     expect(parseArgs(['--'])).toHaveProperty('error')

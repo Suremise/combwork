@@ -351,6 +351,8 @@ describe("the Version Control tab's Workflow section (#1418)", () => {
       okWithReview: { ...allOff('git'), review: 'you', okBefore: { mode: 'every', labels: [] } },
       hiveMergesNeedsGit: { ...allOff('none'), finish: 'hiveMerges' },
       noneHasNoSlots: { ...allOff('none'), folder: 'slots' },
+      // G20 on with no runner (HI-1367).
+      focusedNeedsRunner: { ...allOff('git'), finish: 'hiveMerges', folder: 'slots', focusedTests: true },
       // A project inside a larger repository (#1419), its target not its own: known where the save checks it.
       subfolderTarget: { ...allOff('git'), finish: 'agentMerges', folder: 'slots', target: 'main' }
     }

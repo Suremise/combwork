@@ -715,6 +715,14 @@
     "defaultMessage": "Catch rare events by themselves",
     "description": "A tip's title."
   },
+  "tips.focusedTests.text": {
+    "defaultMessage": "With Hive merging, Version Control → Workflow can run each card’s focused tests on the merged result: your project’s command chooses the tests a change needs when the card is submitted, and the merge queue runs them before it merges.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: merge queue."
+  },
+  "tips.focusedTests.title": {
+    "defaultMessage": "Each card’s own tests before it merges",
+    "description": "A tip's title: the workflow option that has Hive's merge queue run the tests a card's change needs on the merged result (G20)."
+  },
   "tips.followUpCheck.text": {
     "defaultMessage": "When you ask for a change to a card in Review or Approved for its reviewer to check, its builder posts the change as a follow-up: Hive wakes the reviewer, and the answer wakes the builder. One left unanswered for 15 minutes shows its card as stalled.",
     "description": "A tip (#1467). Review and Approved are board columns. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

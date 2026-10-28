@@ -14,6 +14,7 @@ import { ProgressError, admitReport, type ProgressCaller, type ProgressGate } fr
 import type { RunRevision } from '../platform/adapter'
 import type { TaskColumn } from '../../shared/types'
 import { cardRefText, shortRevision } from '../../shared/progress'
+import { focusedCheckName, validTestId } from '../../shared/workflow/focused'
 
 /** What a request names (any of it may be missing; `card: null` says the run is for no card, so none is defaulted). */
 export interface RunLinkAsked {
@@ -27,6 +28,7 @@ export interface RunLink {
   card: number | null
   revision: string | null
   testedCheckout: string | null
+  /** `command` empty: a focused test's check (`focused:<test>`, HI-1367), which runs the command given after `--`. */
   check: { name: string; command: string } | null
   folder: string | null
   /** The review or check copy it runs in (#1435): its card and revision are the copy's lease's. */
@@ -156,7 +158,13 @@ export async function resolveRunLink(caller: ProgressCaller, asked: RunLinkAsked
   }
 
   let check: RunLink['check'] = null
-  if (asked.check !== undefined && asked.check !== null) {
+  // A focused test's check (G20, HI-1367: a reviewer proving a real-CLI or packaged test at the revision submitted): its
+  // own command, the one after `--`, recorded with its run; it counts as any check does, at exactly the revision.
+  const focused = typeof asked.check === 'string' && asked.check.trim().startsWith(focusedCheckName('')) ? asked.check.trim().slice(focusedCheckName('').length) : null
+  if (focused !== null) {
+    if (!validTestId(focused)) throw refused('A focused test\'s check is "focused:<test>", the test\'s id as its card lists it')
+    check = { name: focusedCheckName(focused), command: '' }
+  } else if (asked.check !== undefined && asked.check !== null) {
     if (typeof asked.check !== 'string' || !CHECK_NAME.test(asked.check.trim())) throw refused('check is the name of one of the project\'s checks, such as "typecheck"')
     const name = asked.check.trim()
     const project = own !== null ? deps.projectName((caller as { projectPath: string }).projectPath) : cardProject

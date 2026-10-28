@@ -1039,6 +1039,17 @@ You stay in charge of each queue:
 
 The Hive Assistant can do these for you within **Settings → Assistant → Control** (it gives your reason when it takes a card out or retries one), and lists them among its actions. Agents can see a queue but never change it. You see each queue in the Progress panel's **Merges** tab, in the project's Version Control tab (**Merge queue**, with its history), and on each card in its **Work** section.
 
+### Each card's focused tests <a id="each-cards-focused-tests"></a>
+
+**Each card's focused tests pass on the merged result** (Version Control → Workflow, shown when Hive merges; on in Team when the project has the command that runs them) runs the tests a card's change needs on the merged result too, not only the project's merge checks. The project gives two commands under the option:
+
+- **Command that chooses the tests** (optional): given the paths a change touches, it prints the tests the change needs. When a card is submitted, Hive runs it in the card's folder at exactly the revision submitted; if the folder changes while it runs, its answer doesn't count. Without it, the builder names the tests.
+- **Command that runs them**: given a list of tests, it runs them and writes each one's result. Hive passes the list and where to write the results in a file, and **Merge queue: focused tests run at once** (Settings → Advanced, 2) as how many to run in parallel.
+
+The tests a card's change needs are kept with its submission, and its reviewer sees them. A choice never passes by default: if the command fails, takes longer than **Focused tests: longest the choice of tests runs** (Settings → Advanced, 180 s), or says the change needs every test, the submit is refused until the builder names the tests itself (`tests` on its submit), for its reviewer to check.
+
+The merge queue runs the list after the merge checks, once, and moves the target only when every test passed. For any file the merge changed differently from the reviewed work (a target that changed the same file, say), the tests are chosen again there. Tests that need a real CLI or the installed app aren't run by the queue: they count from the reviewer's run at the revision submitted (`hive-progress --check "focused:<test>"`), shown as review evidence, and a card without that run goes back to its builder. A test skipped for its environment (a usage limit, a sign-in, the network) pauses the queue: the card's reviewer decides whether it merges with it skipped, and you can answer first under **For you**. A test that failed, or one the command gave no result for, returns the card with the output.
+
 ### When the merge queue pauses <a id="when-the-merge-queue-pauses"></a>
 
 When Hive merges cards itself, it commits each merge with your repository's own setup. Its commits run the repository's hooks and are signed as the repository says; Hive never skips or overrides either.
