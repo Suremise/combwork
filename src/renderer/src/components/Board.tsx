@@ -298,12 +298,13 @@ export async function moveCard(c: Pick<TaskCard, 'number' | 'project'>, column: 
 // Cards being archived from the menu: a second click while one runs is ignored.
 const archiving = new Set<number>()
 
-async function archive(c: TaskCard, archived: boolean): Promise<void> {
+/** Archives a card or brings it back; `reload` false leaves the board's read to its caller (a bulk change reads it once, HI-1864). */
+async function archive(c: TaskCard, archived: boolean, reload = true): Promise<void> {
   if (archiving.has(c.number)) return
   archiving.add(c.number)
   try {
     await call('tasks:archive', c.number, archived)
-    await loadTasks()
+    if (reload) await loadTasks()
   } catch (e) {
     notify('error', archived ? tr(msg({ id: 'board.error.archive', defaultMessage: 'Could not archive the card', description: "An error toast's title: archiving a card failed." })) : tr(msg({ id: 'board.error.unarchive', defaultMessage: 'Could not bring the card back', description: "An error toast's title: bringing an archived card back to the board failed." })), errorMessage(e))
   } finally {
@@ -1166,10 +1167,12 @@ function ArchivedTable({ cards: archivedCards, project, query }: { cards: TaskCa
   const unarchiveSelected = async (): Promise<void> => {
     setBringing(true)
     try {
+      // Each brought back in turn, the board read once after them all (HI-1864: a read and a render per card before).
       for (const k of picked) {
         const c = cards.find((x) => String(x.number) === k)
-        if (c) await archive(c, false)
+        if (c) await archive(c, false, false)
       }
+      await loadTasks()
       setSelected(new Set())
     } finally {
       setBringing(false)
