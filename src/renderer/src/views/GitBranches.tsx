@@ -527,7 +527,12 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                 return (
                   <div key={b.name} className={cx('git-row', 'git-branch', b.current && 'current')} data-branch={b.name}>
                     <Icon name={b.current ? 'check' : b.worktree ? 'repo' : 'git-branch'} />
-                    <span className="git-name">{b.name}</span>
+                    <span className="git-name" title={b.name}>
+                      {b.name}
+                    </span>
+                    {/* What it is and where it stands, then its last commit: what gives way to the time and the actions
+                        when the row is short of room (HI-1897), cut with "…", the whole of it in its tooltip. */}
+                    <span className="git-branch-info" onMouseEnter={(e) => fullTip(e.currentTarget)}>
                     {b.worktree &&
                       (slot ? (
                         <span className="badge" data-worktree="" data-slot={slot.name} title={leaseText(slot)}>
@@ -555,17 +560,21 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                       </span>
                     )}
                     <span className="git-subject faint">{b.subject}</span>
+                    </span>
+                    {/* The time and the actions never shrink, each action in its own place on every row (an empty one
+                        where the row has none), so they line up down the list (HI-1897). */}
+                    <span className="git-row-tail">
                     <span className="git-meta faint">{at(b.date)}</span>
                     {info.remotes.length > 0 && (
                       <span className="git-row-actions">
                         <IconButton icon={busy === `track:${b.name}` ? 'loading' : 'link'} spin={busy === `track:${b.name}`} title={tr(M.trackTip, { branch: b.name })} action="track" disabled={off} onClick={() => setForm({ make: () => trackForm(project, latest.current ?? info, b) })} />
-                        {b.upstream && <IconButton icon="debug-disconnect" title={tr(M.untrackTip, { upstream: b.upstream })} action="untrack" disabled={off} onClick={() => void untrack(b.name, b.upstream!)} />}
+                        {b.upstream ? <IconButton icon="debug-disconnect" title={tr(M.untrackTip, { upstream: b.upstream })} action="untrack" disabled={off} onClick={() => void untrack(b.name, b.upstream!)} /> : <span className="git-act-slot" />}
                       </span>
                     )}
-                    {updatable(b) && <IconButton icon="repo-pull" title={tr(U.tip, { branch: b.name, target: target! })} action="update-branch" disabled={!!ro} onClick={() => void updateFrom(b)} />}
-                    {!b.current && <IconButton icon="git-merge" title={tr(M.mergeBranch, { branch: b.name })} action="merge-branch" disabled={!!ro} onClick={() => set({ branchMergeFor: { project: project.path, branch: b.name } })} />}
-                    {free && <IconButton icon="trash" title={tr(C.deleteTip, { branch: b.name })} action="delete-branch" disabled={off} onClick={() => void deleteBranch(project, b, target!)} />}
-                    {!b.current && (
+                    {updatable(b) ? <IconButton icon="repo-pull" title={tr(U.tip, { branch: b.name, target: target! })} action="update-branch" disabled={!!ro} onClick={() => void updateFrom(b)} /> : <span className="git-act-slot" />}
+                    {!b.current ? <IconButton icon="git-merge" title={tr(M.mergeBranch, { branch: b.name })} action="merge-branch" disabled={!!ro} onClick={() => set({ branchMergeFor: { project: project.path, branch: b.name } })} /> : <span className="git-act-slot" />}
+                    {free ? <IconButton icon="trash" title={tr(C.deleteTip, { branch: b.name })} action="delete-branch" disabled={off} onClick={() => void deleteBranch(project, b, target!)} /> : <span className="git-act-slot" />}
+                    {!b.current ? (
                       <Tooltip content={why ?? tr(M.switchTip, { branch: b.name })}>
                         <span>
                           <button className="btn small subtle" disabled={!!why || off} onClick={() => void switchTo(b.name, s.branch)}>
@@ -573,7 +582,15 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                           </button>
                         </span>
                       </Tooltip>
+                    ) : (
+                      // The current branch has no Switch: its place kept, unseen, so the others line up with it.
+                      <span className="git-switch-slot" aria-hidden="true">
+                        <button className="btn small subtle" tabIndex={-1} disabled>
+                          {tr(M.switch)}
+                        </button>
+                      </span>
                     )}
+                    </span>
                   </div>
                 )
               })}
@@ -589,19 +606,25 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                   return (
                   <div key={r} className="git-row git-branch remote" data-remote-branch={r}>
                     <Icon name="cloud" />
-                    <span className="git-name">{r}</span>
-                    {!!toTarget && remoteGroup(item.row, info) === 'unmerged' && (
-                      <span className="faint git-track" data-to-target={toTarget}>
-                        {tr(C.ahead, { n: toTarget, target: target ?? '' })}
-                      </span>
-                    )}
-                    <Tooltip content={switchBlocked ?? tr(M.trackLocal, { branch: r.slice(r.indexOf('/') + 1), remote: r })}>
-                      <span>
-                        <button className="btn small subtle" disabled={!!switchBlocked || off} onClick={() => void switchTo(r, s.branch)}>
-                          {tr(M.switch)}
-                        </button>
-                      </span>
-                    </Tooltip>
+                    <span className="git-name" title={r}>
+                      {r}
+                    </span>
+                    <span className="git-branch-info" onMouseEnter={(e) => fullTip(e.currentTarget)}>
+                      {!!toTarget && remoteGroup(item.row, info) === 'unmerged' && (
+                        <span className="faint git-track" data-to-target={toTarget}>
+                          {tr(C.ahead, { n: toTarget, target: target ?? '' })}
+                        </span>
+                      )}
+                    </span>
+                    <span className="git-row-tail">
+                      <Tooltip content={switchBlocked ?? tr(M.trackLocal, { branch: r.slice(r.indexOf('/') + 1), remote: r })}>
+                        <span>
+                          <button className="btn small subtle" disabled={!!switchBlocked || off} onClick={() => void switchTo(r, s.branch)}>
+                            {tr(M.switch)}
+                          </button>
+                        </span>
+                      </Tooltip>
+                    </span>
                   </div>
                   )
                 })}
@@ -985,6 +1008,15 @@ const CARDS = {
  * review (with a copy button) or, Done, that it was merged and as what; and how many earlier cards worked on the same
  * branch. A worktree's: its agent's card, the same way.
  */
+/**
+ * A branch row's middle part (HI-1897) shows the whole of what it says in its tooltip, read as the pointer comes to it:
+ * cut with "…" when the row is short of room, it can still be read.
+ */
+function fullTip(el: HTMLElement): void {
+  const text = [...el.children].map((c) => (c.textContent ?? '').replace(/\s+/g, ' ').trim()).filter(Boolean).join(' · ')
+  if (el.title !== text) el.title = text
+}
+
 export function BranchCards({ cards, project, names, inTarget }: { cards: BranchCard[]; project: ProjectInfo; names: Partial<Record<BranchCard['stage'], string>> | undefined; inTarget?: boolean }) {
   const tasks = useStore((st) => st.tasks)
   const [copied, setCopied] = useState(false)
