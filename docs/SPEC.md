@@ -4553,8 +4553,9 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   run with no later run of the same thing, a card's check or a command, that passed; dismissing doesn't resolve one).
   Pulse lays out top to bottom, its lanes at the bottom of the panel growing upwards (#484; HI-1673 brought it back
   after #1309 had them follow the runs, which left empty space under them), and holds no finished runs (the Assistant for Darren, 21 Oct: a run
-  that ended stays a few seconds, then lives in Runs): the merge, the runs going on, a line for the unresolved failures
-  (it opens Runs on them), then the lanes, each with a dot for its current card's latest run. Runs: what runs, then
+  that ended stays a few seconds, then lives in Runs): the merge, a line for the unresolved failures (it opens Runs on
+  them; above the runs and outside their scrolling list, so it stays in sight however many there are: HI-1923), the
+  runs going on, then the lanes, each with a dot for its current card's latest run. Runs: what runs, then
   every kept run by day, the same thing's runs on a day folded into one line ("AL-12 cardwork ×4 · 2 failed, then
   passed"), with search and filters (failures, a lane's cards, an agent). Each day is grouped by card (HI-1701, Darren
   26 Oct): a heading per card, the card with the newest run first and **Other** (runs for no card) last, with its key
