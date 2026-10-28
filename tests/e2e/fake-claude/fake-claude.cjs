@@ -392,6 +392,24 @@ const write = (entry) => {
   lastUuid = uuid
 }
 
+/**
+ * "ratelimited" (HI-1973): its model request refused with a 429 twice, as Claude Code 2.1.312 records each try in its
+ * transcript (a system api_error entry: its try of 10, the wait before the next, the error's status; tests/fixtures/
+ * advanced/retry-claude-2.1.312.jsonl), sending no hook. It waits, as Claude Code does for its retry, until
+ * fake-retried-<agent> is in its home (taken), then goes on with its turn.
+ */
+async function rateLimited() {
+  const error = { message: '429 {"type":"error","error":{"type":"rate_limit_error","message":"Number of request tokens has exceeded your per-minute rate limit"}}', status: 429, formatted: '429 Number of request tokens has exceeded your per-minute rate limit', connection: null, isNetworkDown: false, rateLimits: null, noResponse: null }
+  // Its first wait, then the second try: written apart, as Claude Code's are.
+  for (const [attempt, wait] of [[1, 1000], [2, 600_000]]) {
+    write({ isSidechain: false, type: 'system', subtype: 'api_error', level: 'error', error, retryInMs: wait, retryAttempt: attempt, maxRetries: 10, source: 'request_retry', userType: 'external', entrypoint: 'cli', version: '2.1.312' })
+    if (attempt === 1) await sleep(wait)
+  }
+  const go = path.join(home, `fake-retried-${String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')}`)
+  while (!fs.existsSync(go)) await sleep(100)
+  fs.rmSync(go, { force: true })
+}
+
 /** The turn under way: each prompt's own id, which its hooks carry (prompt_id), as Claude Code 2.1.296's do (#648). */
 let promptId = null
 /** The model its replies are on: "fallback" switches it after a safeguard stop (#606). */
@@ -631,6 +649,7 @@ async function runPrompt(text, enter = null) {
     const call = parseHiveStep(step)
     if (call) await hiveCall(call.tool, call.args)
     if (/\bcheckpoint\b/i.test(step)) await checkpoint()
+    if (/\bratelimited\b/i.test(step)) await rateLimited()
     // "shell: <command line>": runs it in cmd with the session's environment (PATH, HIVE_*), as an agent's shell
     // would; the agent, command, exit code and output go to fake-shell.jsonl in its home.
     const sh = /\bshell:\s*(.+)$/i.exec(step)

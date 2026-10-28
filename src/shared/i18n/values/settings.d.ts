@@ -125,6 +125,18 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.override.promptSnapshotOff.title': undefined
   'settings.advanced.claude-code.override.statusLine.desc': undefined
   'settings.advanced.claude-code.override.statusLine.title': undefined
+  'settings.advanced.claude-code.retry.attemptField.desc': undefined
+  'settings.advanced.claude-code.retry.attemptField.title': undefined
+  'settings.advanced.claude-code.retry.checkAfterSeconds.desc': undefined
+  'settings.advanced.claude-code.retry.checkAfterSeconds.title': undefined
+  'settings.advanced.claude-code.retry.maxField.desc': undefined
+  'settings.advanced.claude-code.retry.maxField.title': undefined
+  'settings.advanced.claude-code.retry.statusField.desc': undefined
+  'settings.advanced.claude-code.retry.statusField.title': undefined
+  'settings.advanced.claude-code.retry.subtype.desc': undefined
+  'settings.advanced.claude-code.retry.subtype.title': undefined
+  'settings.advanced.claude-code.retry.waitField.desc': undefined
+  'settings.advanced.claude-code.retry.waitField.title': undefined
   'settings.advanced.claude-code.safeguard.note.desc': undefined
   'settings.advanced.claude-code.safeguard.note.title': undefined
   'settings.advanced.claude-code.safeguard.prompt.desc': undefined
@@ -297,6 +309,10 @@ interface HiveMessageValues {
   'settings.advanced.copilot.question.tool.title': undefined
   'settings.advanced.copilot.ready.footer.desc': undefined
   'settings.advanced.copilot.ready.footer.title': undefined
+  'settings.advanced.copilot.retry.context.desc': undefined
+  'settings.advanced.copilot.retry.context.title': undefined
+  'settings.advanced.copilot.retry.message.desc': undefined
+  'settings.advanced.copilot.retry.message.title': undefined
   'settings.advanced.copilot.signIn.errorMessage.desc': undefined
   'settings.advanced.copilot.signIn.errorMessage.title': undefined
   'settings.advanced.copilot.signIn.errorType.desc': undefined
@@ -434,6 +450,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.restart.resumeAfterUpdate.title': undefined
   'settings.advanced.hive.restart.resumeReadySeconds.desc': undefined
   'settings.advanced.hive.restart.resumeReadySeconds.title': undefined
+  'settings.advanced.hive.retry.tellAssistantAfterSeconds.desc': undefined
+  'settings.advanced.hive.retry.tellAssistantAfterSeconds.title': undefined
   'settings.advanced.hive.showDeveloperFeatures.desc': undefined
   'settings.advanced.hive.showDeveloperFeatures.title': undefined
   'settings.advanced.hive.skills.removeIdleCopies.desc': undefined

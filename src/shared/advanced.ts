@@ -525,6 +525,18 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
+    id: 'hive.retry.tellAssistantAfterSeconds',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.retry.tellAssistantAfterSeconds.title', defaultMessage: 'Retry wait: tell the Assistant after', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\"). A retry wait: an agent's coding agent waiting to try its model request again." }),
+    desc: msg({ id: 'settings.advanced.hive.retry.tellAssistantAfterSeconds.desc', defaultMessage: "How long an agent's coding agent may keep waiting to retry its model request (rate-limited, or its service unreachable) in one turn before Hive tells the Hive Assistant, once a turn. 0: never.", description: 'What the advanced setting "Retry wait: tell the Assistant after" does (Settings → Advanced).' }),
+    kind: 'number',
+    default: 300,
+    min: 0,
+    max: 3600,
+    unit: 's',
+    applies: 'now'
+  },
+  {
     id: 'hive.hooks.missingSeconds',
     group: 'hive',
     title: msg({ id: 'settings.advanced.hive.hooks.missingSeconds.title', defaultMessage: 'Hooks missing: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Hooks: the calls an agent's coding agent makes to Hive as it works." }),
@@ -1548,6 +1560,70 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/subagent-resume-claude-2.1.309.jsonl`, version: '2.1.309', fields: ['success', 'message', 'resumedAgentId', 'revivedAgentId', 'pin'] }]
   },
+  // Claude Code waiting to retry its model request (HI-1973): its transcript's entry for each try.
+  {
+    id: 'claude-code.retry.subtype',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.retry.subtype.title', defaultMessage: 'Transcript: retry entry', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry: the coding agent trying its model request again after it failed." }),
+    desc: msg({ id: 'settings.advanced.claude-code.retry.subtype.desc', defaultMessage: "The kind of transcript entry Claude Code writes each time its model request fails and it tries again (rate-limited, or the service unreachable). Hive reads the latest and shows the wait as the agent's status. Wrong, a waiting agent just shows Working.", description: 'What the advanced setting "Transcript: retry entry" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'api_error',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/retry-claude-2.1.312.jsonl`, version: '2.1.312', text: 'api_error' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'claude-code.retry.attemptField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.retry.attemptField.title', defaultMessage: "Transcript: retry entry's try field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.retry.attemptField.desc', defaultMessage: "The field of that entry with which try it is (1, 2…). Wrong, a waiting agent just shows Working.", description: 'What the advanced setting "Transcript: retry entry\'s try field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'retryAttempt',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/retry-claude-2.1.312.jsonl`, version: '2.1.312', fields: ['parentUuid', 'isSidechain', 'type', 'subtype', 'level', 'error', 'retryInMs', 'retryAttempt', 'maxRetries', 'source', 'timestamp', 'uuid', 'userType', 'entrypoint', 'cwd', 'sessionId', 'version', 'gitBranch'] }]
+  },
+  {
+    id: 'claude-code.retry.maxField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.retry.maxField.title', defaultMessage: "Transcript: retry entry's tries field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.retry.maxField.desc', defaultMessage: 'The field of that entry with how many tries it makes in all. Wrong, a waiting agent just shows Working.', description: 'What the advanced setting "Transcript: retry entry\'s tries field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'maxRetries',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/retry-claude-2.1.312.jsonl`, version: '2.1.312', fields: ['parentUuid', 'isSidechain', 'type', 'subtype', 'level', 'error', 'retryInMs', 'retryAttempt', 'maxRetries', 'source', 'timestamp', 'uuid', 'userType', 'entrypoint', 'cwd', 'sessionId', 'version', 'gitBranch'] }]
+  },
+  {
+    id: 'claude-code.retry.waitField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.retry.waitField.title', defaultMessage: "Transcript: retry entry's wait field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.retry.waitField.desc', defaultMessage: 'The field of that entry with how long Claude Code waits before the next try, in milliseconds. Wrong, a waiting agent just shows Working.', description: 'What the advanced setting "Transcript: retry entry\'s wait field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'retryInMs',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/retry-claude-2.1.312.jsonl`, version: '2.1.312', fields: ['parentUuid', 'isSidechain', 'type', 'subtype', 'level', 'error', 'retryInMs', 'retryAttempt', 'maxRetries', 'source', 'timestamp', 'uuid', 'userType', 'entrypoint', 'cwd', 'sessionId', 'version', 'gitBranch'] }]
+  },
+  {
+    id: 'claude-code.retry.statusField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.retry.statusField.title', defaultMessage: "Transcript: retry error's status field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.retry.statusField.desc', defaultMessage: "The field of that entry's error with the HTTP status that refused the request (429: rate-limited). With none, the service couldn't be reached. Wrong, every wait shows as the service unreachable.", description: 'What the advanced setting "Transcript: retry error\'s status field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'status',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/retry-claude-2.1.312.jsonl`, version: '2.1.312', fields: ['message', 'status', 'formatted', 'connection', 'isNetworkDown', 'rateLimits', 'noResponse'] }]
+  },
+  {
+    id: 'claude-code.retry.checkAfterSeconds',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.retry.checkAfterSeconds.title', defaultMessage: 'Retry wait: look after', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"20 s\"). A retry wait: the coding agent waiting to try its model request again." }),
+    desc: msg({ id: 'settings.advanced.claude-code.retry.checkAfterSeconds.desc', defaultMessage: "How long a working Claude Code session has to go without a hook before Hive looks at the end of its transcript for a wait to retry its model request, then every 15 seconds while it stays quiet.", description: 'What the advanced setting "Retry wait: look after" does (Settings → Advanced).' }),
+    kind: 'number',
+    default: 20,
+    min: 5,
+    max: 600,
+    unit: 's',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/retry-claude-2.1.312.jsonl`, version: '2.1.312', text: 'api_error', shows: "Claude Code's transcript entry for a try it makes again, which Hive looks for once a session has been quiet this long" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   {
     id: 'claude-code.hooks.timeoutSeconds',
     group: 'claude-code',
@@ -2253,10 +2329,39 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.copilot.turnFailed.errorType.title', defaultMessage: 'Turn failed: error type', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
     desc: msg({ id: 'settings.advanced.copilot.turnFailed.errorType.desc', defaultMessage: "A session error's type, in Copilot's session file, that means its turn ended because a model call failed after Copilot's retries (it sends no Stop then): Hive ends the turn as failed, with Copilot's message. Wrong, such an agent shows working until you look.", description: 'What the advanced setting "Turn failed: error type" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
-    default: '^query$',
+    // rate_limit (HI-1973): a turn refused as too many requests (429) after its retries ends with that type.
+    default: '^(query|rate_limit)$',
     flags: 'i',
     applies: 'now',
-    samples: [{ from: `${FIX}/advanced/connection-error-copilot-1.0.105.jsonl`, version: '1.0.105', text: 'query' }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [
+      { from: `${FIX}/advanced/connection-error-copilot-1.0.105.jsonl`, version: '1.0.105', text: 'query' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/rate-limit-copilot-1.0.105.jsonl`, version: '1.0.105', text: 'rate_limit' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  // Copilot trying a failed model call again (HI-1973): an ErrorOccurred hook that says recoverable, for each try.
+  {
+    id: 'copilot.retry.context',
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.retry.context.title', defaultMessage: 'Retry: error context', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry: the coding agent trying its model request again after it failed." }),
+    desc: msg({ id: 'settings.advanced.copilot.retry.context.desc', defaultMessage: "Where Copilot's error hook says a recoverable error happened when it is a model call it tries again (rate-limited, or the service unreachable). Hive shows the agent's status as waiting to retry until Copilot goes on. Wrong, a waiting agent just shows Working.", description: 'What the advanced setting "Retry: error context" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'pattern',
+    default: '^model_call$',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/errorhooks-copilot-1.0.105.json`, version: '1.0.105', text: 'model_call' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'copilot.retry.message',
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.retry.message.title', defaultMessage: 'Retry: error message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.copilot.retry.message.desc', defaultMessage: "How that hook words why the call failed: a regular expression whose named group status is the HTTP status that refused it, whose group limited matches the words of a rate limit (429), or whose group network matches when the service couldn't be reached. Copilot's hook gives the service's own error, often with no status. Wrong, the wait shows without its reason.", description: 'What the advanced setting "Retry: error message" is for, and what goes wrong when it is wrong (Settings → Advanced). status, limited and network are the names of the regular expression\'s groups: keep them.' }),
+    kind: 'pattern',
+    default: String.raw`(?<network>ECONNREFUSED|ENOTFOUND|ETIMEDOUT|ECONNRESET|EAI_AGAIN|tcp connect error|dns error)|(?<limited>rate[ _-]?limit|too many requests)|(?:^|[^\d.])(?<status>[1-5]\d\d)(?=\s)`,
+    flags: 'i',
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/advanced/errorhooks-copilot-1.0.105.json`, version: '1.0.105', text: 'tcp connect error' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/retry-hooks-copilot-1.0.105.json`, version: '1.0.105', text: 'Rate limit reached for requests' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
   },
   {
     id: 'copilot.signIn.errorMessage',

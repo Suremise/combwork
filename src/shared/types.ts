@@ -2122,6 +2122,7 @@ export interface LiveSessionState {
   /**
    * Its CLI is waiting to retry its model request in the running turn (HI-1972: Codex's log after a 429), as Hive last
    * read it: shown as its status while `retryAt` is ahead (retryWaitCurrent), cleared by its next hook or the turn's end.
+   * With no `retryAt` (HI-1973: Copilot doesn't say), it stands until one of those.
    */
   retryWait?: RetryWait
   /**

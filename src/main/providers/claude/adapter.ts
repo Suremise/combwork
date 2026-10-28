@@ -3,7 +3,7 @@ import { msg, tr } from '../../../shared/i18n'
 import { join, basename } from 'path'
 import { mkdir, open, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, readFileSync, realpathSync } from 'original-fs'
-import type { AgentInstallInfo, AutoCompactSetting, McpServerDef, MemorySource, PathDataCopy, PlanLimit, PlanUsage, ReadinessIssue, SubSession } from '../../../shared/types'
+import type { AgentInstallInfo, AutoCompactSetting, McpServerDef, MemorySource, PathDataCopy, PlanLimit, PlanUsage, ReadinessIssue, RetryWait, SubSession } from '../../../shared/types'
 import { HIVE_DIR, assertSessionId, isSessionId } from '../../../shared/defaults'
 import { isCliOwnMode } from '../../../shared/cliOwnMode'
 import { CLAUDE_CODE, CLAUDE_DESCRIPTOR, CLAUDE_FOOTER_MODES, baseModel, canSwitchLive, footerMode, hookMode } from '../../../shared/claude'
@@ -23,6 +23,7 @@ import { connectionsManaged } from '../../connectionSeam'
 import { hiveStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
 import { MEMORY_ENV_OVERRIDES, connectionMemoryDir, memoryBase } from './memoryDir'
 import { claudeBackgroundTasks } from './background'
+import { claudeRetryWait } from './retry'
 import { claudeSafeguards } from './safeguards'
 import { claudeTranscriptTurns } from './turns'
 import type { SafeguardEvent } from '../../../shared/safeguards'
@@ -827,6 +828,15 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   }
 
   /** What Claude Code's screen shows of its turn (claudeTurnScreen), for the versions it was checked with (#648). */
+  /** Claude Code waiting to retry its model request (HI-1973): its transcript's newest record of it (retry.ts). */
+  retryWait(q: { sessionId: string; env: NodeJS.ProcessEnv; transcriptPath?: string; since: number }): Promise<RetryWait | null> {
+    return claudeRetryWait(q.transcriptPath, q.since)
+  }
+
+  retryLookAfterMs(): number {
+    return advanced.number('claude-code.retry.checkAfterSeconds') * 1000
+  }
+
   turnScreen(version: string | null): ((screen: string) => 'idle' | 'working' | null) | null {
     if (!version || compareVersions(version, TURN_SCREEN_SINCE) < 0) return null
     return claudeTurnScreen

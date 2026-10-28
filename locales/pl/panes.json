@@ -75,6 +75,7 @@
   "panes.header.notRunning": "Nie działa",
   "panes.header.retryLarge": "Ta rozmowa jest duża, a każde zapytanie wysyła ją w całości. Nowa rozmowa (przekazanie, potem nowa sesja) wysyła mniej, co może pomóc przy limicie zapytań.",
   "panes.header.retryTip": "{provider} czeka, by ponownie wysłać zapytanie do modelu: {why, select, limited {usługa odrzuciła je z powodu zbyt wielu zapytań (limit zapytań).} network {nie udało się połączyć z usługą.} other {zapytanie się nie powiodło.}} Spróbuje ponownie sam{when, select, at { o {time}} other {}}; nic nie musisz robić.",
+  "panes.header.retrySince": "Ponawia od {time}.",
   "panes.header.stopTip": "Zatrzymaj tego agenta (rozmowa zostaje zachowana; możesz ją wznowić w każdej chwili)",
   "panes.header.unknownTip": "Hive od dłuższego czasu nie ma wieści o turze tego agenta i nie widzi znaku, że się skończyła: brak Stop od jego CLI, nic w zapisach CLI, brak bezczynnego promptu na ekranie. Dopóki nie dowie się więcej, agent liczy się jako zajęty i nic nie jest do niego wpisywane. Jeśli jego terminal pokazuje, że czeka przy prompcie, oznacz go jako bezczynnego.",
   "panes.header.untaken": "Wiersz wpisany przez Hive nie został przyjęty",

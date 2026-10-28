@@ -13,6 +13,8 @@
 //   question                   its ask_user tool (a question for the person)
 //   say TEXT…                  the turn's last reply (default: "Done.")
 //   checkpoint                 a view of README.md: a tool call after which Hive's notice may come (#650)
+//   ratelimited                every request refused with a 429 (a request-rate limit, HI-1973): Copilot tries again
+//                              5 times, its error hook each time, then gives up (a rate_limit session error)
 // Hive's notices (#650: "[Hive] New in your inbox…" added to a tool's result, "[Hive] Before you finish…" as the prompt
 // its Stop carried the turn on with) and its doorbell (the prompt "[Hive] New in your inbox…") are followed as a model does:
 // hive_inbox, then hive_inbox with ack for its ids; new work read so (a task, a handover) is then the prompt's steps.
@@ -199,6 +201,12 @@ function startFakeCopilotApi({ port = 0, log = null, systems = false } = {}) {
       }
       const id = `fake${++n}`
       const d = decide(body)
+      // "ratelimited" (HI-1973): refused as too many requests, as an OpenAI-style API says it.
+      if (/\bratelimited\b/i.test(d.prompt ?? '')) {
+        if (log) fs.appendFileSync(log, `${JSON.stringify({ at: new Date().toISOString(), id, prompt: d.prompt, step: 'ratelimited', status: 429 })}\n`)
+        res.writeHead(429, { 'content-type': 'application/json', 'retry-after': '1' })
+        return res.end(JSON.stringify({ error: { message: 'Rate limit reached for requests', type: 'requests', code: 'rate_limit_exceeded' } }))
+      }
       if (log) {
         const system = (body.messages ?? []).find((m) => m.role === 'system')
         // The system prompt (about 27 KB) in full only with the first request (each, with `systems`); its length with each.

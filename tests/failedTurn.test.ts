@@ -230,6 +230,8 @@ describe('a turn that ended on an error (#1632, #1658)', () => {
       for (const h of COPILOT[which].hooks) await hook(st, h)
       expect(COPILOT[which].hooks.filter((h) => h.hook_event_name === 'ErrorOccurred').map((h) => h.recoverable)).toEqual([true, true, true, true, true, true])
       expect(st.status).toBe('working')
+      // Each try is shown as the wait to retry (HI-1973): its service unreachable, the sixth try, nothing made up.
+      expect((st as unknown as { retryWait?: Record<string, unknown> }).retryWait).toMatchObject({ attempt: 6, max: null, retryAt: null, status: null, network: true })
       // Its events.jsonl read, as readDetails passes it on: no Stop comes, so the record ends the turn. Stamped now, after
       // the hooks this test sent (the recording's own time is before them, which would make it an older turn's).
       await read(st, eventsDetails(JSON.stringify({ ...COPILOT[which].sessionError, timestamp: new Date(Date.now() + 1000).toISOString() })))
@@ -260,6 +262,20 @@ describe('a turn that ended on an error (#1632, #1658)', () => {
     await settled(st)
     expect(st.status).toBe('working')
     expect(needs(st)).toEqual([])
+  })
+
+  it("Copilot rate-limited (HI-1973): the session error it gives up with (rate_limit, 429) ends the turn failed with its words, its wait gone", async () => {
+    const line = readFileSync(join(__dirname, 'fixtures', 'advanced', 'rate-limit-copilot-1.0.105.jsonl'), 'utf8').trim()
+    const err = JSON.parse(line) as { data: { message: string }; timestamp: string }
+    expect(eventsDetails(line)).toMatchObject({ turnFailed: err.data.message.trim(), turnFailedAt: err.timestamp })
+    const st = agent('cp-429', copilot, 'copilot')
+    await hook(st, { hook_event_name: 'UserPromptSubmit', prompt: 'go' })
+    await hook(st, { hook_event_name: 'ErrorOccurred', error: { message: '429 Number of request tokens has exceeded your per-minute rate limit' }, error_context: 'model_call', recoverable: true })
+    expect((st as unknown as { retryWait?: Record<string, unknown> }).retryWait).toMatchObject({ attempt: 1, status: 429 })
+    await read(st, eventsDetails(JSON.stringify({ ...JSON.parse(line), timestamp: new Date(Date.now() + 1000).toISOString() })))
+    await vi.waitFor(() => expect(st.status).toBe('finished'), HANG)
+    expect(st.failedTurn?.message).toBe(err.data.message.trim())
+    expect((st as unknown as { retryWait?: unknown }).retryWait).toBeUndefined()
   })
 
   it('7. Codex: a good end is no blocker; a failure from before the launch is history; no words still needs you', async () => {

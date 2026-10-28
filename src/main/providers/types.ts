@@ -239,6 +239,12 @@ export type HookEvent =
   | { kind: 'stop'; lastMessage: string | null; failed?: true }
   /** The turn ended because the CLI's sign-in was refused (expired, revoked, an invalid key): `message` is the CLI's. */
   | { kind: 'signIn'; message: string | null }
+  /**
+   * The CLI's model request failed and it tries again by itself (HI-1973: Copilot's recoverable ErrorOccurred): the turn
+   * goes on. `status`: the HTTP status that refused it (429: rate-limited), when the CLI names one; `network`: the
+   * service couldn't be reached at all.
+   */
+  | { kind: 'retry'; status: number | null; network: boolean }
   | { kind: 'interrupt' }
   /**
    * The CLI says it is idle at its prompt, waiting for input, with nothing running (Claude Code's idle_prompt

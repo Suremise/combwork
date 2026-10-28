@@ -45,6 +45,8 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
+  // HI-1973: the developer console with its text, so the error hooks of a rate-limited turn can be kept as Copilot sent them.
+  fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'hive.showDeveloperFeatures': true, 'hive.console.showText': true } }))
 
   const api = await startFakeCopilotApi({ log: apiLog })
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47823), ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })
@@ -374,6 +376,29 @@ const check = (name, ok, extra = '') => {
     const projFiles = fs.readdirSync(proj, { recursive: true }).map(String).filter((f) => !f.startsWith('.git' + path.sep) && f !== '.git')
     check('no hooks.json or MCP config in the project', !projFiles.some((f) => /hooks\.json|mcp\.json/i.test(f)), projFiles.filter((f) => /json/i.test(f)).join(', '))
     check('no requests went anywhere but the stand-in (offline), and some did', api.requests > 0)
+
+    // HI-1973: its model refusing every request with a 429 (the stand-in's "ratelimited"). Copilot tries again (an error
+    // hook each try, recoverable): its pane says it is rate-limited and which try, not Working…; then it gives up with a
+    // rate_limit session error, which ends its turn failed with its words. The hooks are kept as Copilot sent them.
+    const sources = await lib.until(async () => { const l = await inv('console:sources'); return l.some((x) => x.agentId === a.id) ? l : null }, 20000, 300)
+    const source = sources?.find((x) => x.agentId === a.id)?.id
+    if (source) await inv('console:subscribe', [source])
+    const seqBefore = source ? Math.max(0, ...(await inv('console:snapshot', source, 0)).map((e) => e.seq)) : 0
+    check('A: a rate-limited prompt makes it working', (await send(a.id, 'ratelimited', ['working'])) > 0, await status(a.id))
+    const aHeader = page.locator('.pane-header-bar', { hasText: 'Cop A' })
+    const retryText = () => aHeader.locator('.pane-status.retrying').innerText().catch(() => '')
+    const retrying = await lib.until(async () => { const l = await live(a.id); return l?.retryWait?.status === 429 ? l : null }, 30000, 150)
+    check("A: Copilot's tries are its wait to retry, rate-limited (429), with no retry time or total it doesn't say", !!retrying && retrying.retryWait.retryAt === null && retrying.retryWait.max === null && retrying.status === 'working', JSON.stringify(retrying?.retryWait))
+    const shownRetry = await lib.until(async () => /^Rate-limited \(429\) · retrying… \(try \d+\)$/.test((await retryText()).trim()), 30000, 150)
+    check('A: its pane says it is rate-limited and which try, not Working…', !!shownRetry, await retryText())
+    await page.screenshot({ path: path.join(lib.WORK, 'copilot-4-ratelimited.png') })
+    const gaveUp = await lib.until(async () => { const l = await live(a.id); return l?.status === 'finished' && l.failedTurn ? l : null }, 60000, 300)
+    check("A: once Copilot gives up (rate_limit, 429), its turn ends failed with its words, the wait gone", !!gaveUp && /429/.test(gaveUp.failedTurn.message) && !gaveUp.retryWait, JSON.stringify(gaveUp && { failedTurn: gaveUp.failedTurn, retryWait: gaveUp.retryWait }))
+    if (source) {
+      const hooks = (await inv('console:snapshot', source, seqBefore)).filter((e) => e.kind === 'hook' && e.name === 'ErrorOccurred').map((e) => e.raw)
+      fs.writeFileSync(path.join(lib.WORK, 'copilot-ratelimit-hooks.json'), JSON.stringify(hooks, null, 2))
+      check('A: its error hooks, recoverable, kept for the record', hooks.length > 0 && hooks.every((h) => h?.recoverable === true), `${hooks.length} hook(s)`)
+    }
 
     // B stopped from Hive in the middle of a turn: the turn is cancelled and Copilot still exits by itself, with its totals.
     await send(b.id, 'work 20 then say Never said.', ['working'])

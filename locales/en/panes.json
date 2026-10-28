@@ -299,6 +299,10 @@
     "defaultMessage": "This conversation is large, and each request sends all of it. A new conversation (a handover, then a fresh session) sends less, which can help under a rate limit.",
     "description": "Tooltip of a pane's status while its coding agent is rate-limited and its conversation is large: a suggestion, not something Hive does."
   },
+  "panes.header.retrySince": {
+    "defaultMessage": "Retrying since {time}.",
+    "description": "Tooltip of a pane's status while its coding agent waits to retry its model request: when its first try in this run of failures was ({time}, a clock time)."
+  },
   "panes.header.retryTip": {
     "defaultMessage": "{provider} is waiting to send its model request again: {why, select, limited {its service refused it as too many requests (rate-limited).} network {it couldn't reach its service.} other {the request failed.}} It tries again by itself{when, select, at { at {time}} other {}}; nothing is needed from you.",
     "description": "Tooltip of a pane's status while its coding agent ({provider}, a product name) waits to retry its model request. why: rate-limited, the service unreachable, or failed otherwise. {time} is when it tries again (a clock time)."

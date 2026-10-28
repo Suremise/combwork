@@ -75,6 +75,7 @@
   "panes.header.notRunning": "Arrêté",
   "panes.header.retryLarge": "Cette conversation est longue, et chaque requête l’envoie en entier. Une nouvelle conversation (une passation, puis une nouvelle session) envoie moins, ce qui peut aider face à une limite de débit.",
   "panes.header.retryTip": "{provider} attend pour renvoyer sa requête au modèle : {why, select, limited {le service l’a refusée pour trop de requêtes (limite de débit).} network {il n’a pas pu joindre le service.} other {la requête a échoué.}} Il réessaie tout seul{when, select, at { à {time}} other {}} ; tu n’as rien à faire.",
+  "panes.header.retrySince": "Nouveaux essais depuis {time}.",
   "panes.header.stopTip": "Arrêter cet agent (la conversation est conservée ; reprends-la quand tu veux)",
   "panes.header.unknownTip": "Hive n’a rien appris du tour de cet agent depuis un moment et ne voit aucun signe de sa fin : pas de Stop de sa CLI, rien dans les enregistrements de sa CLI, pas de prompt inactif à l’écran. Tant que Hive n’en sait pas plus, l’agent compte comme occupé et rien n’y est tapé. Si son terminal montre qu’il attend à son prompt, marque-le comme inactif.",
   "panes.header.untaken": "Une ligne tapée par Hive n’a pas été prise",

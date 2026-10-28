@@ -116,6 +116,7 @@ import { checkLastRun, startRunMarker, startupStep, tellUnexpectedClose } from '
 import { initRestartRecovery, loadRestartRecord, recordClosing, startRestartRecovery, stopRestartRecovery, stopWatchingRestartRequests, watchRestartRequests } from './restartResume'
 import type { RestartReason } from '../shared/restartResume'
 import { startOutageResume } from './outageResume'
+import { startRetryNotice } from './retryNotice'
 import { chooseStartLanguage, languageInfo, startI18n, switchLanguage } from './i18n'
 import { fmt, msg, tr } from '../shared/i18n'
 
@@ -912,6 +913,8 @@ app.whenReady().then(async () => {
   initRestartRecovery()
   // Agents whose turn a dropped connection ended, resumed once it is back (HI-1612; Settings → Advanced, off by default).
   startOutageResume()
+  // An agent waiting long to retry its model request: the Assistant told (HI-1973).
+  startRetryNotice()
   // An installer asking Hive to close for an install (installer.nsh): the agents are recorded and told, then Hive quits.
   watchRestartRequests(() => {
     quitReason = 'install'

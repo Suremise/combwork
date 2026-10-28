@@ -75,6 +75,7 @@
   "panes.header.notRunning": "未运行",
   "panes.header.retryLarge": "这个对话很大，每次请求都会发送全部内容。新的对话（先交接，再开新会话）发送的内容更少，在限流时可能有帮助。",
   "panes.header.retryTip": "{provider} 正在等待重新发送它的模型请求：{why, select, limited {服务因请求过多而拒绝了它（限流）。} network {无法连接到服务。} other {请求失败。}}它会{when, select, at {在 {time} } other {}}自动重试，你无需操作。",
+  "panes.header.retrySince": "自 {time} 起一直在重试。",
   "panes.header.stopTip": "停止此智能体（对话会保留，可随时恢复）",
   "panes.header.unknownTip": "Hive 已有一段时间没有收到此智能体这一轮的任何消息，也没有看到它结束的迹象：CLI 没有发出 Stop，CLI 的记录中没有内容，屏幕上也没有空闲的提示符。在收到更多消息之前，此智能体视为忙碌，Hive 不会向它输入任何内容。如果它的终端显示正在提示符处等待，请将它标记为空闲。",
   "panes.header.untaken": "CLI 未接收 Hive 输入的一行",
