@@ -110,6 +110,13 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     check('One launches on the default connection, Max 1', !!(await lib.until(async () => launchedIn(max1.id).some((l) => l.env.HIVE_AGENT === 'One'), HUNG_MS)))
     check('…Two on its own, Max 2, at the same time', !!(await lib.until(async () => launchedIn(max2.id).some((l) => l.env.HIVE_AGENT === 'Two'), HUNG_MS)))
     check('…each with its connection’s folder as its home', launchedIn(max1.id).every((l) => l.env.CLAUDE_CONFIG_DIR === path.join(accountsRoot, max1.id)))
+    // Its auto memory by its real path (HI-1899): the connection's projects folder is a junction to the CLI home's, and
+    // the launch names exactly that project's memory folder there, allowing nothing more.
+    const oneLaunch = launchedIn(max1.id).find((l) => l.env.HIVE_AGENT === 'One')
+    const oneSettings = oneLaunch?.opts['--settings'] ? JSON.parse(fs.readFileSync(oneLaunch.opts['--settings'], 'utf8')) : {}
+    const linkedProjects = fs.realpathSync(path.join(accountsRoot, max1.id, 'projects'))
+    const memoryDir = path.join(linkedProjects, alpha.replace(/[^a-zA-Z0-9]/g, '-'), 'memory')
+    check('…its projects folder a junction, its auto memory named by the real path', linkedProjects.toLowerCase() !== path.join(accountsRoot, max1.id, 'projects').toLowerCase() && oneSettings.autoMemoryDirectory === memoryDir && oneSettings.permissions === undefined, JSON.stringify({ got: oneSettings.autoMemoryDirectory, memoryDir, permissions: oneSettings.permissions }))
     check('…and its run says so', (await live('a-two'))?.launchedConnection?.id === max2.id && (await live('a-one'))?.launchedConnection?.id === max1.id)
     check('the footer names the connection', !!(await lib.until(async () => (await page.locator(`.foot-connection[data-connection="${max1.id}"]`).count()) >= 1, HUNG_MS)))
     await shots('running')

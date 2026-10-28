@@ -107,6 +107,10 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.hooks.preToolUseTimeoutSeconds.title': undefined
   'settings.advanced.claude-code.hooks.timeoutSeconds.desc': undefined
   'settings.advanced.claude-code.hooks.timeoutSeconds.title': undefined
+  'settings.advanced.claude-code.memory.realPath.desc': undefined
+  'settings.advanced.claude-code.memory.realPath.title': undefined
+  'settings.advanced.claude-code.memory.setting.desc': undefined
+  'settings.advanced.claude-code.memory.setting.title': undefined
   'settings.advanced.claude-code.mouse.rightClickToCli.desc': undefined
   'settings.advanced.claude-code.mouse.rightClickToCli.title': undefined
   'settings.advanced.claude-code.override.mcpIsolation.desc': undefined

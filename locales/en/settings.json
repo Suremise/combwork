@@ -423,6 +423,22 @@
     "defaultMessage": "Hooks: timeout",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.claude-code.memory.realPath.desc": {
+    "defaultMessage": "A connection's projects folder is a link to Claude Code's own, so Claude Code asked you before each memory it saved there. Each Claude Code agent on a connection is given its project's auto memory folder by its real path: the same folder, so it saves memories without asking, as it does without a connection. Nothing more is allowed, and nothing is written to Claude Code's files. Off, Claude Code asks before each memory on a connection.",
+    "description": "What the advanced setting \"Auto memory by its real path on connections\" is for, and what happens when it is off (Settings → Advanced, HI-1899). Auto memory is Claude Code's own notes it keeps per project; a connection is an account Hive signs a CLI in with; \"projects\" is a folder's name: keep it."
+  },
+  "settings.advanced.claude-code.memory.realPath.title": {
+    "defaultMessage": "Auto memory by its real path on connections",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto memory is Claude Code's own notes it keeps per project; a connection is an account Hive signs a CLI in with."
+  },
+  "settings.advanced.claude-code.memory.setting.desc": {
+    "defaultMessage": "The Claude Code setting that names its auto memory folder, which Hive sets on a connection (Auto memory by its real path on connections) and leaves alone where you set it yourself. Wrong, Claude Code ignores it and asks before each memory on a connection.",
+    "description": "What the advanced setting \"Auto memory folder setting\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1899). \"Auto memory by its real path on connections\" is another advanced setting's title: keep it as translated there."
+  },
+  "settings.advanced.claude-code.memory.setting.title": {
+    "defaultMessage": "Auto memory folder setting",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto memory is Claude Code's own notes it keeps per project."
+  },
   "settings.advanced.claude-code.mouse.rightClickToCli.desc": {
     "defaultMessage": "Right-click in a Claude Code pane is Hive's, as in every pane: it copies the terminal's selection, or pastes. Turned on, Hive passes right-clicks to Claude Code instead. Claude Code doesn't use the mouse at its prompt, so there a right-click then does nothing: copy and paste with Ctrl+C and Ctrl+V.",
     "description": "What the advanced setting \"Pass right-click to Claude Code\" is for (Settings → Advanced, under Claude Code). Ctrl+C and Ctrl+V name keys: use the key names your language uses."
