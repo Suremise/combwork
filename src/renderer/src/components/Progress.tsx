@@ -279,6 +279,21 @@ export function ProgressPanel() {
             <MergeCards slots={merging} projectName={nameOf} showProject={multi} stepOf={stepOf} now={now} />
             <QueueLines views={pulseQueues} showProject={multi} onOpen={() => setTab('merges')} />
             {(merging.length > 0 || pulseQueues.length > 0) && <div className="progress-divider" role="separator" />}
+            {/* Needs attention (#1309): failures nothing has passed since, a line that shows them in Runs. Above the runs, out of their scrolling list, so however many there are it stays in sight (HI-1923). */}
+            {failures.length > 0 && (
+              <button
+                type="button"
+                className="progress-attention"
+                onClick={() => {
+                  setRunsFilter({ ...NO_RUNS_FILTER, failedOnly: true })
+                  setTab('runs')
+                }}
+              >
+                <Icon name="error" />
+                <span>{tr(msg({ id: 'board.progress.attention', defaultMessage: '{n, plural, one {# run failed} other {# runs failed}}', description: "A line in the Progress panel's Pulse tab: runs failed and no later run of the same thing passed since; a click shows them in the Runs tab." }), { n: failures.length })}</span>
+                <Icon name="arrow-right" />
+              </button>
+            )}
             <div className="progress-body">
               {listed.length === 0 && !merging.length && !pulseQueues.length && !failures.length && (
                 <div className="pane-empty progress-empty">
@@ -288,21 +303,6 @@ export function ProgressPanel() {
               {listed.map((r) => (
                 <RunRow key={r.id} run={r} now={now} open={detail === r.id} onToggle={toggle} />
               ))}
-              {/* Needs attention (#1309): failures nothing has passed since, a line that shows them in Runs. */}
-              {failures.length > 0 && (
-                <button
-                  type="button"
-                  className="progress-attention"
-                  onClick={() => {
-                    setRunsFilter({ ...NO_RUNS_FILTER, failedOnly: true })
-                    setTab('runs')
-                  }}
-                >
-                  <Icon name="error" />
-                  <span>{tr(msg({ id: 'board.progress.attention', defaultMessage: '{n, plural, one {# run failed} other {# runs failed}}', description: "A line in the Progress panel's Pulse tab: runs failed and no later run of the same thing passed since; a click shows them in the Runs tab." }), { n: failures.length })}</span>
-                  <Icon name="arrow-right" />
-                </button>
-              )}
             </div>
             <LanesSection lanes={shownLanes} all={lanes} width={width} runs={shown} />
           </>

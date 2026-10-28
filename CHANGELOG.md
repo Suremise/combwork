@@ -169,6 +169,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **The Progress panel's "runs failed" line stays in sight.** On the Pulse tab it sat under the runs going on, so with several runs it was pushed out of view. It now sits above them, under the merge going on (HI-1923).
 - **No control characters in prompts Hive types.** A prompt Hive typed into Codex (or a slash command, or Compact's focus) kept control characters such as Ctrl+C, which Codex could take as an interrupt. They're left out now, as they were from pasted prompts (HI-1920).
 - **Switching a running agent to a mode that needs a restart waits for it to stop.** A CLI slow to exit (more than 8 seconds) made the switch fail with *This agent is already running or starting*. Hive now waits as long as that CLI may take to end, and in a slot for its earlier session to release it. If the agent still hasn't stopped, it says so and starts nothing (HI-1869).
 - **A Codex agent resumed into a full context is heard again.** Codex can compact a conversation by itself and then run its next turn under the same turn id. Hive took that turn's hooks for old news, so the agent stayed ready with "no hooks from Codex" and wasn't given work until it was restarted. Hive now follows that turn (HI-1916).

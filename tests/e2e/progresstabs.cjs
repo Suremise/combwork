@@ -169,6 +169,15 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     // line counting them; only the run going on stays.
     const pulseRuns = () => panel.locator('.progress-tab-pulse .progress-run').evaluateAll((els) => els.map((e) => e.getAttribute('data-run')))
     check('…and the failed runs leave Pulse: only the run going on is a card there', !!(await until(async () => JSON.stringify(await pulseRuns()) === JSON.stringify([e2e]), HUNG_MS)), JSON.stringify(await pulseRuns()))
+    // HI-1923: the line sits above the runs, after the merge, out of their scrolling list: it stays in sight however many.
+    const order = await panel.locator('.progress-tab-pulse').evaluate((el) => {
+      const box = (sel) => el.querySelector(sel)?.getBoundingClientRect() ?? null
+      const line = box(':scope > .progress-attention')
+      const merge = box('.progress-merge-card')
+      const runs = box(':scope > .progress-body')
+      return { line: line && { top: line.top, bottom: line.bottom }, merge: merge && { bottom: merge.bottom }, runs: runs && { top: runs.top } }
+    })
+    check('…the line above the runs, after the merge, outside their scrolling list', !!order.line && !!order.merge && !!order.runs && order.merge.bottom <= order.line.top && order.line.bottom <= order.runs.top, JSON.stringify(order))
     const dot = panel.locator('.progress-tab-pulse .lane-run-dot')
     check("…the lane, with a dot for its current card's latest run: e2e, running", !!(await until(async () => (await dot.count()) === 1 && ((await dot.getAttribute('class')) ?? '').includes('running'), HUNG_MS)) && (await dot.getAttribute('aria-label')) === `${a.key}'s latest run: e2e, running`, await dot.getAttribute('aria-label').catch(() => ''))
     const runsBox = await panel.locator('.progress-tab-pulse > .progress-body').boundingBox()
