@@ -4,7 +4,6 @@
 import { describe, expect, it } from 'vitest'
 import { finalWhys, UNDO_FINAL, type UndoFinalWhy } from '../src/shared/assistantActivity'
 import { ACTIONS_KEPT, lineOf, messageGroups, undoable, withAction, withSnapshot } from '../src/shared/assistantChangeList'
-import type { AssistantAction } from '../src/shared/types'
 import type { AssistantAction, AssistantChangeGroup, AssistantChangeRow } from '../src/shared/types'
 
 const change = (id: string, at: string, over: Partial<AssistantChangeRow> = {}): AssistantChangeRow => ({ id, group: 'g1', at, kind: 'card', act: 'update-task', what: 'change #1 on the board', card: 1, fields: ['labels'], ...over })
