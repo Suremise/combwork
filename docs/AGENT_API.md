@@ -73,8 +73,8 @@ Errors return a non-2xx status and `{ "error": "message" }`. The message is in E
 | 401 | Missing or wrong token |
 | 403 | Blocked (cross-origin request, a disabled feature such as session input, a change only the user makes, such as archiving a card or putting Done in order, or any request but a GET with a viewer token) |
 | 404 | Unknown route, project, card, skill or file, or one outside the caller's scope (another project's card looks missing to its agents) |
-| 409 | Conflict with the current state (no workspace open, the project has no agents, agent already running or starting or busy, conversation open in another agent, session archived, provider turned off or not installed…) |
-| 500 | Unexpected error; details are in Hive's log |
+| 409 | Conflict with the current state (no workspace open, the project has no agents or already as many as Agents per project allows, agent already running or starting or busy, conversation open in another agent, session archived, provider turned off or not installed…) |
+| 500 | Unexpected error; details are in Hive's log. A refusal by a rule or limit is never a 500 (HI-1952): one is a fault to report |
 | 413 | Body larger than 2 MB, or a skill file larger than 512 KB |
 
 ---

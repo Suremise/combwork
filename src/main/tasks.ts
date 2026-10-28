@@ -736,7 +736,7 @@ export async function legacyCards(ws: WorkspaceService): Promise<{ number: numbe
 export function moveOrphanCards(ws: WorkspaceService, m: { from: string; to: string; cards: number[] }): Promise<number> {
   return boardLock(ws, async () => {
     const projectId = projectIdNamed(await ws.projectIds(), m.to)
-    if (!projectId) throw hiveError(msg({ id: 'tasks.error.repairNoProject', defaultMessage: "{project} isn't a project of the workspace now", description: "An error from Repair: the project {project} (a folder name) it was to give cards to isn't in the workspace any more." }), { project: m.to })
+    if (!projectId) throw hiveError(msg({ id: 'tasks.error.repairNoProject', defaultMessage: "{project} isn't a project of the workspace now", description: "An error from Repair: the project {project} (a folder name) it was to give cards to isn't in the workspace any more." }), { project: m.to }, { kind: 'notFound' })
     let n = 0
     for (const x of m.cards) {
       const moved = await (async () => {
@@ -985,7 +985,7 @@ export function labelChange(labels: readonly string[], add: unknown, remove: unk
  */
 async function cardRefs(v: unknown, self: number | null, what: 'blockedBy' | 'links', scope: string | null = null, kept: number[] = []): Promise<number[]> {
   // `what` is the call's field, named as it is in every language.
-  if (!Array.isArray(v)) throw hiveError(msg({ id: 'tasks.error.refsList', defaultMessage: '{field} must be a list of card numbers', description: 'An error: the call gave {field} (the name of its field: blockedBy or links, kept as it is) as something other than a list of card numbers.' }), { field: what })
+  if (!Array.isArray(v)) throw hiveError(msg({ id: 'tasks.error.refsList', defaultMessage: '{field} must be a list of card numbers', description: 'An error: the call gave {field} (the name of its field: blockedBy or links, kept as it is) as something other than a list of card numbers.' }), { field: what }, { kind: 'invalid' })
   const nums = [...new Set(v.map((x) => Number(String(x).replace(/^#/, ''))))]
   const hidden = await refsOutside(kept, scope)
   const noCard = (n: number): HiveError => hiveError(msg({ id: 'tasks.error.refsNoCard', defaultMessage: '{field}: there is no card {card}', description: 'An error: the list {field} (the name of the call\'s field: blockedBy or links, kept as it is) names card #{n} (a number), which there is not.' }), { field: what, card: cardRef(n) }, { kind: 'invalid' })
@@ -2153,7 +2153,7 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
       const t = text(patch.decision, MAX_DECISION, 'decision').trim()
       if (!t) throw hiveError(ERR.emptyDecision)
       const list = card.decisions ?? []
-      if (list.length >= MAX_DECISIONS) throw hiveError(msg({ id: 'tasks.error.tooManyDecisions', defaultMessage: 'A card can have up to {max} decisions.', description: 'An error: a card already has as many decisions as it may have ({max}, a number).' }), { max: MAX_DECISIONS })
+      if (list.length >= MAX_DECISIONS) throw hiveError(msg({ id: 'tasks.error.tooManyDecisions', defaultMessage: 'A card can have up to {max} decisions.', description: 'An error: a card already has as many decisions as it may have ({max}, a number).' }), { max: MAX_DECISIONS }, { kind: 'invalid' })
       card.decisions = [...list, { id: entryId(), text: t, decidedBy: 'user', recordedBy: by, at: new Date().toISOString() }]
       said.push(storedText(HISTORY.decision, { decision: clip(t) }))
     }
@@ -2294,24 +2294,24 @@ async function reviewChange(card: TaskCard, patch: TaskPatch, actor: TaskActor, 
   const n = card.number
   if (patch.review === 'start') {
     // (The runtime's own start review, #1267, writes the column its stage leaves, which is Review: the card stays.)
-    if ((patch.column !== undefined && !(changeByRuntime() && patch.column === card.column)) || patch.agent !== undefined) throw hiveError(msg({ id: 'tasks.error.reviewOnItsOwn', defaultMessage: 'Start a review on its own: the card stays where it is, with its agent.', description: 'An error: a call started a review and also moved the card or gave it to an agent; a review starts on its own.' }))
-    if (card.column !== 'review') throw hiveError(msg({ id: 'tasks.error.reviewNotInReview', defaultMessage: '{card} is in {column, select, hold {On Hold} todo {Todo} doing {Doing} passed {Passed} done {Done} other {{column}}}. A card is reviewed in Review; if it needs more work, that is work on it (move it to doing).', description: 'An error: an agent tried to review card {card} (its key, such as HI-12), which is in the column {column} (select: a board column; translate each), not in Review. "doing" is the value the call takes: keep it as it is.' }), { card: cardRef(n), column: card.column })
-    if (card.review && card.review.agent !== me && !changeByRuntime()) throw hiveError(msg({ id: 'tasks.error.reviewTaken', defaultMessage: '{agent} is already reviewing {card} (since {since} UTC).', description: 'An error: another agent ({agent}, its name) is already reviewing card {card} (its key, such as HI-12), since {since} (a date and time, UTC).' }), { agent: card.review.agentName, card: cardRef(n), since: since(card.review) })
+    if ((patch.column !== undefined && !(changeByRuntime() && patch.column === card.column)) || patch.agent !== undefined) throw hiveError(msg({ id: 'tasks.error.reviewOnItsOwn', defaultMessage: 'Start a review on its own: the card stays where it is, with its agent.', description: 'An error: a call started a review and also moved the card or gave it to an agent; a review starts on its own.' }), undefined, { kind: 'invalid' })
+    if (card.column !== 'review') throw hiveError(msg({ id: 'tasks.error.reviewNotInReview', defaultMessage: '{card} is in {column, select, hold {On Hold} todo {Todo} doing {Doing} passed {Passed} done {Done} other {{column}}}. A card is reviewed in Review; if it needs more work, that is work on it (move it to doing).', description: 'An error: an agent tried to review card {card} (its key, such as HI-12), which is in the column {column} (select: a board column; translate each), not in Review. "doing" is the value the call takes: keep it as it is.' }), { card: cardRef(n), column: card.column }, { kind: 'invalid' })
+    if (card.review && card.review.agent !== me && !changeByRuntime()) throw hiveError(msg({ id: 'tasks.error.reviewTaken', defaultMessage: '{agent} is already reviewing {card} (since {since} UTC).', description: 'An error: another agent ({agent}, its name) is already reviewing card {card} (its key, such as HI-12), since {since} (a date and time, UTC).' }), { agent: card.review.agentName, card: cardRef(n), since: since(card.review) }, { kind: 'invalid' })
     const a = await agentOf(card.project, me)
     if (!card.review) said.push(storedText(HISTORY.reviewStarted))
     card.review = { agent: a.id, agentName: a.name, since: new Date().toISOString() }
     return true
   }
-  if (patch.review !== 'passed' && patch.review !== 'failed') throw hiveError(msg({ id: 'tasks.error.unknownReview', defaultMessage: 'Unknown review "{review}": start, passed or failed.', description: 'An error: the call\'s review was {review}, which it doesn\'t take. "start", "passed" and "failed" are the values it takes: keep them as they are.' }), { review: String(patch.review) })
+  if (patch.review !== 'passed' && patch.review !== 'failed') throw hiveError(msg({ id: 'tasks.error.unknownReview', defaultMessage: 'Unknown review "{review}": start, passed or failed.', description: 'An error: the call\'s review was {review}, which it doesn\'t take. "start", "passed" and "failed" are the values it takes: keep them as they are.' }), { review: String(patch.review) }, { kind: 'invalid' })
   // A failed card goes back to Doing for its fixes, its builder's (HI-1946: as the verdict intent does, whatever the
   // rules): never anywhere else with its verdict. (The runtime's own verdict, #1267, moves a failed card itself: its
   // column is the stage it left.)
   if (patch.review === 'failed' && patch.column !== undefined && patch.column !== 'doing' && !changeByRuntime()) throw hiveError(msg({ id: 'tasks.error.failedToDoing', defaultMessage: 'A failed review sends {card} back to Doing, to its builder: give the verdict without column.', description: 'An error: a failed review also tried to move card {card} (its key, such as HI-12) somewhere other than Doing; a failed card goes back to Doing, to the agent that built it. "column" is the name of the call\'s field: keep it as it is.' }), { card: cardRef(n) }, { kind: 'invalid' })
   // The runtime's own verdict (#1267, #1268) was checked by its guards (who reviews, which submission): the card's review
   // mark, a 0.9 field, may be missing (its session ended since) or another reviewer's.
-  if (card.review && card.review.agent !== me && !changeByRuntime()) throw hiveError(msg({ id: 'tasks.error.verdictNotYours', defaultMessage: '{agent} is reviewing {card}: its verdict is its own.', description: "An error: an agent tried to give a verdict on card {card} (its key, such as HI-12), which another agent ({agent}, its name) is reviewing." }), { agent: card.review.agentName, card: cardRef(n) })
+  if (card.review && card.review.agent !== me && !changeByRuntime()) throw hiveError(msg({ id: 'tasks.error.verdictNotYours', defaultMessage: '{agent} is reviewing {card}: its verdict is its own.', description: "An error: an agent tried to give a verdict on card {card} (its key, such as HI-12), which another agent ({agent}, its name) is reviewing." }), { agent: card.review.agentName, card: cardRef(n) }, { kind: 'invalid' })
   if ((!card.review || card.column !== 'review') && !changeByRuntime()) {
-    throw hiveError(msg({ id: 'tasks.error.notReviewing', defaultMessage: 'You aren\'t reviewing {card} now: its review ended (the card moved, or your session ended) or never started. Start one with review "start" if it is in Review.', description: 'An error: an agent tried to give a verdict on card {card} (its key, such as HI-12), but it has no review going on it. "review" and "start" are the call\'s field and value: keep them as they are.' }), { card: cardRef(n) })
+    throw hiveError(msg({ id: 'tasks.error.notReviewing', defaultMessage: 'You aren\'t reviewing {card} now: its review ended (the card moved, or your session ended) or never started. Start one with review "start" if it is in Review.', description: 'An error: an agent tried to give a verdict on card {card} (its key, such as HI-12), but it has no review going on it. "review" and "start" are the call\'s field and value: keep them as they are.' }), { card: cardRef(n) }, { kind: 'invalid' })
   }
   said.push(storedText(patch.review === 'passed' ? HISTORY.reviewPassed : HISTORY.reviewFailed))
   delete card.review
@@ -2597,11 +2597,11 @@ export async function editDecision(n: number, id: string, newText: string | null
   if (actor.kind !== 'user') throw new TaskPermissionError(msg({ id: 'tasks.error.decisionsUsers', defaultMessage: "Only the user changes or removes a card's decisions.", description: "An error: an agent or the Assistant tried to change or remove a decision on a card; only the user does that (they only record them)." }))
   const ws = workspace
   const t = newText === null ? null : text(newText, MAX_DECISION, 'decision').trim()
-  if (t === '') throw hiveError(msg({ id: 'tasks.error.decisionEmptied', defaultMessage: 'The decision is empty: remove it instead.', description: "An error: the user emptied a decision's text; to take it off the card, remove it." }))
+  if (t === '') throw hiveError(msg({ id: 'tasks.error.decisionEmptied', defaultMessage: 'The decision is empty: remove it instead.', description: "An error: the user emptied a decision's text; to take it off the card, remove it." }), undefined, { kind: 'invalid' })
   return recordingAs(actor, () => boardLock(ws, async () => {
     const c = await getTask(n, ws)
     const d = c.decisions?.find((x) => x.id === id)
-    if (!d) throw hiveError(msg({ id: 'tasks.error.decisionGone', defaultMessage: 'That decision is no longer on {card}.', description: 'An error: the decision being changed was removed from card {card} (its key, such as HI-12) meanwhile.' }), { card: cardRef(n) })
+    if (!d) throw hiveError(msg({ id: 'tasks.error.decisionGone', defaultMessage: 'That decision is no longer on {card}.', description: 'An error: the decision being changed was removed from card {card} (its key, such as HI-12) meanwhile.' }), { card: cardRef(n) }, { kind: 'notFound' })
     if (t === null) {
       c.decisions = c.decisions!.filter((x) => x.id !== id)
       if (!c.decisions.length) delete c.decisions

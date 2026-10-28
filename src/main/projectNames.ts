@@ -187,7 +187,7 @@ export async function noteFormerName(ws: WorkspaceService, id: string, folder: s
     if (gone()) throw hiveError(CLOSED, undefined, { kind: 'conflict' })
     const now = ws.projectIdsNow().byId.get(id)
     const p = j.projects[id] ?? (now ? (j.projects[id] = { name: basename(now), former: [] }) : null)
-    if (!p) throw hiveError(msg({ id: 'worktrees.names.projectGone', defaultMessage: 'That project is no longer in the workspace.', description: "An error: the project whose name was being recorded was removed from the workspace meanwhile." }))
+    if (!p) throw hiveError(msg({ id: 'worktrees.names.projectGone', defaultMessage: 'That project is no longer in the workspace.', description: "An error: the project whose name was being recorded was removed from the workspace meanwhile." }), undefined, { kind: 'notFound' })
     if (same(p.name, folder) || p.former.some((n) => same(n, folder))) return remember(ws, life, j)
     // The oldest of its names: it had it before any Hive saw it renamed from.
     p.former = [...p.former.slice(0, MAX_FORMER - 1), folder]

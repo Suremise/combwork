@@ -84,6 +84,9 @@ afterEach(() => {
   setLanguage('en', {})
 })
 
+/** A refusal HI-1952 gave a kind: its English matched no statusFor pattern, so it answered 500 until then. */
+const NOW_REFUSED = (english: string): boolean => /^(blockedBy must be a list|#\d+ is in Todo\. A card is reviewed in Review|You aren't reviewing #\d+ now)/.test(english)
+
 /** What a call threw. */
 async function caught(p: Promise<unknown>): Promise<Error> {
   try {
@@ -274,7 +277,7 @@ describe("the board's refusals: English for agents as before, the window's langu
       [await caught(run(() => tasks.createTask({ title: 'x', project: 'alpha', agent: 'zed' }, user))), 'Unknown agent "zed" in alpha', 404, null],
       [await caught(run(() => tasks.updateTask(todo.number, { labels: 'a' as never }, user))), 'labels must be a list', 400, null],
       [await caught(run(() => tasks.updateTask(todo.number, { labels: Array.from({ length: 13 }, (_, i) => `l${i}`) }, user))), 'A card can have up to 12 labels.', 400, null],
-      [await caught(run(() => tasks.updateTask(todo.number, { blockedBy: 3 as never }, user))), 'blockedBy must be a list of card numbers', 500, null],
+      [await caught(run(() => tasks.updateTask(todo.number, { blockedBy: 3 as never }, user))), 'blockedBy must be a list of card numbers', 400, null],
       [await caught(run(() => tasks.updateTask(todo.number, { links: [todo.number] }, user))), "links: a card can't refer to itself", 400, null],
       [await caught(run(() => tasks.updateTask(todo.number, { links: ['x'] as never }, user))), 'links: "NaN" is not a card number', 400, null],
       [await caught(run(() => tasks.updateTask(todo.number, { blockedBy: [999] }, user))), 'blockedBy: there is no card #999', 400, null],
@@ -291,8 +294,8 @@ describe("the board's refusals: English for agents as before, the window's langu
       [await caught(run(() => tasks.updateTask(archived.number, { title: 'x' }, assistant))), `#${archived.number} is archived. Only the user can bring it back.`, 403, null],
       [await caught(run(() => tasks.commentTask(todo.number, ' ', user))), 'The comment is empty.', 400, null],
       [await caught(run(() => tasks.updateTask(todo.number, { review: 'start' }, user))), "Only an agent of the card's project reviews it, through its own hive tools.", 403, 'Nur ein Agent des Projekts prüft die Karte.'],
-      [await caught(run(() => tasks.updateTask(todo.number, { review: 'start' }, agent))), `#${todo.number} is in Todo. A card is reviewed in Review; if it needs more work, that is work on it (move it to doing).`, 500, null],
-      [await caught(run(() => tasks.updateTask(todo.number, { review: 'passed' }, agent))), `You aren't reviewing #${todo.number} now: its review ended (the card moved, or your session ended) or never started. Start one with review "start" if it is in Review.`, 500, null],
+      [await caught(run(() => tasks.updateTask(todo.number, { review: 'start' }, agent))), `#${todo.number} is in Todo. A card is reviewed in Review; if it needs more work, that is work on it (move it to doing).`, 400, null],
+      [await caught(run(() => tasks.updateTask(todo.number, { review: 'passed' }, agent))), `You aren't reviewing #${todo.number} now: its review ended (the card moved, or your session ended) or never started. Start one with review "start" if it is in Review.`, 400, null],
       [await caught(run(() => tasks.editDecision(todo.number, 'x', 'y', assistant))), "Only the user changes or removes a card's decisions.", 403, null],
       [await caught(run(() => tasks.archiveBatch([todo.number], { label: '', column: null, project: null, query: '', includeBusy: false }, assistant))), 'Only the user archives cards.', 403, null],
       [await caught(Promise.resolve().then(() => tasks.batchNumbers([]))),'cards: list the card numbers to change.', 400, null],
@@ -304,7 +307,8 @@ describe("the board's refusals: English for agents as before, the window's langu
       expect(apiErrorReply(e).body.error).toBe(english)
       expect(apiErrorReply(e).status, english).toBe(status)
       // A permission refusal was always 403 by its class; any other, by its English: the same status as before either way.
-      if (!(e instanceof tasks.TaskPermissionError)) expect(apiErrorReply(new Error(english)).status, `${english}: the status its English always gave`).toBe(status)
+      // Except the refusals HI-1952 gave a kind, which answered 500 (no pattern matched their English): now 400.
+      if (!(e instanceof tasks.TaskPermissionError) && !NOW_REFUSED(english)) expect(apiErrorReply(new Error(english)).status, `${english}: the status its English always gave`).toBe(status)
       // The window (IPC's conversion): in its language, or English where this test has no translation.
       expect((windowError(e) as Error).message).toBe(german ?? english)
       expect(shownError(e)).toBe(german ?? english)
@@ -312,6 +316,7 @@ describe("the board's refusals: English for agents as before, the window's langu
   })
 
   it('the window says card where agents and the Agent API keep the words they always read (#910)', async () => {
+    // A busy Start answered 500 by its English (no statusFor pattern for it) until HI-1952 gave it a kind: 409.
     // The status: what it always was (a busy Start's from its English: servers.ts statusFor).
     const cases: [Error, string, string, number, string?][] = [
       // A refusal naming a column (#1458; Start's "was moved to … meanwhile"): the window says Active and Approved,
@@ -321,8 +326,8 @@ describe("the board's refusals: English for agents as before, the window's langu
       [await caught(run(() => tasks.getTask(99))), 'Unknown task #99', 'Unknown card #99', 404, 'Unbekannte Aufgabe #99'],
       [await caught(run(() => tasks.createTask({ title: ' ' }, user))), 'A task needs a title.', 'A card needs a title.', 400, 'Eine Aufgabe braucht einen Titel.'],
       [await caught(run(() => tasks.createTask({ title: 'x', agent: 'a1' }, user))), 'Choose a project before giving the task to an agent.', 'Choose a project before giving the card to an agent.', 400],
-      [agentBusyError('B1', 'working'), "B1 is working. Start the task once it's idle, or give it to another agent.", "B1 is working. Start the card once it's idle, or give it to another agent.", apiErrorReply(new Error("B1 is working. Start the task once it's idle, or give it to another agent.")).status],
-      [agentBusyError('B1', 'watching'), "B1 is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header). Start the task once it's idle, or give it to another agent.", "B1 is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header). Start the card once it's idle, or give it to another agent.", apiErrorReply(new Error("B1 is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header). Start the task once it's idle, or give it to another agent.")).status]
+      [agentBusyError('B1', 'working'), "B1 is working. Start the task once it's idle, or give it to another agent.", "B1 is working. Start the card once it's idle, or give it to another agent.", 409],
+      [agentBusyError('B1', 'watching'), "B1 is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header). Start the task once it's idle, or give it to another agent.", "B1 is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header). Start the card once it's idle, or give it to another agent.", 409]
     ]
     for (const lang of ['en', 'de'] as const) {
       setLanguage(lang, lang === 'de' ? GERMAN : {})

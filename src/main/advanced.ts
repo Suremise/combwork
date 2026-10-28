@@ -252,7 +252,7 @@ export class AdvancedStore {
       delete madeFor[id]
     } else {
       const checked = checkAdvanced(def, raw)
-      if ('error' in checked) throw new HiveError(checked.errorText)
+      if ('error' in checked) throw new HiveError(checked.errorText, { kind: 'invalid' })
       if (JSON.stringify(checked.value) === JSON.stringify(def.default)) {
         // The default itself is no override.
         delete values[id]
@@ -270,7 +270,7 @@ export class AdvancedStore {
     return this.serial(async () => {
       const def = advancedDef(id)
       if (!def || !cliFacing(def) || this.values[id] === undefined) return
-      if (this.fileError) throw new HiveError(this.fileText())
+      if (this.fileError) throw new HiveError(this.fileText(), { kind: 'conflict' })
       await this.write(this.values, { ...this.madeFor, [id]: { version: this.cli[def.group as ProviderId] ?? null, value: this.values[id] } })
     })
   }
