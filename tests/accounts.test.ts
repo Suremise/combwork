@@ -1123,10 +1123,14 @@ describe("a workspace's accounts", () => {
       })
       for (let i = 0; i < 3; i++) expect(await accounts.confirmAccount(a.id)).toMatchObject({ fresh: true, observed: { email: 'busy@example.com' } })
       // The login itself rewritten during a check, among the busy folder's other writes and events, its own reported
-      // with no name: checked again, the answer after it taken.
+      // with no name: checked again, the answer after it taken. Who is signed in is the login on disk, never the call's
+      // count: the watch sees the rewrite too and may check, or make confirm ask once more, in between (HI-1888).
+      const onDisk = () => (readFileSync(join(folderOf(a), '.credentials.json'), 'utf8').includes('someone else') ? 'else@example.com' : 'busy@example.com')
       let n = 0
       status.set(folderOf(a), async () => {
         n++
+        // The login as the check reads it, at its start: one overlapping the rewrite answers with the old one.
+        const email = onDisk()
         writeFileSync(join(folderOf(a), 'logs_2.sqlite-wal'), String(Math.random()))
         for (let i = 0; i < 5; i++) accounts.accountFolderEvent(a.id, null)
         if (n === 1) {
@@ -1134,9 +1138,11 @@ describe("a workspace's accounts", () => {
           accounts.accountFolderEvent(a.id, null)
         }
         for (let i = 0; i < 5; i++) accounts.accountFolderEvent(a.id, 'logs_2.sqlite-wal')
-        return { ok: true, loggedIn: true, email: `v${n}@example.com`, orgId: 'org-1' }
+        return { ok: true, loggedIn: true, email, orgId: 'org-1' }
       })
-      expect(await accounts.confirmAccount(a.id)).toMatchObject({ fresh: true, observed: { email: 'v2@example.com' } })
+      // Fresh, and of the login as it is now: asked again after the rewrite, not the answer read during it.
+      expect(await accounts.confirmAccount(a.id)).toMatchObject({ fresh: true, observed: { email: 'else@example.com' } })
+      expect(n).toBeGreaterThanOrEqual(2)
       // Rewritten during every check: never fresh.
       status.set(folderOf(a), async () => {
         writeFileSync(join(folderOf(a), '.credentials.json'), `{"token":"${Math.random()}${Date.now()}"}`)
