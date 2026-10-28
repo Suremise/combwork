@@ -389,6 +389,49 @@ const check = (name, ok, extra = '') => {
       await zoom(1)
     }
     check('…and goes once it fits again', !!(await lib.until(async () => (await fMore.count()) === 0, HUNG_MS)), String(await fMore.count()))
+
+    // HI-1931: "need you" counts things, not requests. A card with three questions counts once, and shows "3 questions"
+    // in the popover with each under it; its builder stopped at a prompt (on its own cards, which are counted) isn't
+    // counted again, and shows under one of them.
+    await page.keyboard.press('Escape')
+    await lib.until(async () => (await fDialog.count()) === 0, HUNG_MS)
+    const needCount = async () => Number(((await needItem.innerText().catch(() => '')).match(/\d+/) ?? ['0'])[0])
+    await lib.until(async () => (await needCount()) > 0, HUNG_MS)
+    const before = await needCount()
+    const t = (await inv('tasks:create', { title: 'Three questions', project: 'beta' })).number
+    await inv('tasks:move', t, 'doing', { agent: maker.id })
+    for (const text of ['First: which icon?', 'Second: which colour?', 'Third: ship it today?']) await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${t}`, kind: 'decide', text })}`)
+    const forYouOf = async (n) => ((await inv('tasks:forYou')).items ?? []).filter((i) => i.card === n).length
+    check('three requests on one card', !!(await lib.until(async () => (await forYouOf(t)) === 3, HUNG_MS)), String(await forYouOf(t)))
+    check('…the status bar counts the card once', !!(await lib.until(async () => (await needCount()) === before + 1, HUNG_MS)), JSON.stringify({ before, now: await needCount() }))
+    const tip = await lib.hoverTip(page, needItem, (x) => /need/.test(x), HUNG_MS)
+    check('…its tooltip says cards (and agents), not requests', /\d+ cards? (and \d+ agents? )?needs? you\. Click to see them\./.test(tip), tip)
+    await page.mouse.move(5, 5)
+    if (!(await page.locator('.inbox-panel').count())) await needItem.click()
+    const group = page.locator(`.inbox-panel [data-card-group="${t}"]`)
+    check('…the popover: the card once, "3 questions", each under it', !!(await lib.until(async () => (await group.count()) === 1 && /3 questions/.test(await group.innerText()) && (await group.locator('.inbox-under[data-request]').count()) === 3, HUNG_MS)), await group.innerText().catch(() => ''))
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((x) => document.documentElement.setAttribute('data-theme', x), theme)
+      await page.locator('.inbox-panel').screenshot({ path: path.join(lib.WORK, `foryou-grouped-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await group.locator('.inbox-under[data-request]').nth(1).click()
+    const tDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
+    check('…a request under it opens its card', !!(await lib.until(async () => (await tDialog.count()) === 1 && (await tDialog.locator('.task-title-input').inputValue()) === 'Three questions', HUNG_MS)))
+    await page.keyboard.press('Escape')
+    await lib.until(async () => (await tDialog.count()) === 0, HUNG_MS)
+    // Its builder stops at a permission prompt: an agent that needs you, on cards already counted.
+    await makerSays('ask work 300')
+    check('Maker waits at a prompt', !!(await lib.until(async () => (await liveIn(beta, maker.id))?.status === 'waiting', HUNG_MS)))
+    await needItem.click()
+    const makerRow = page.locator('.inbox-panel .inbox-row', { hasText: 'Maker' })
+    check('…listed under one of its cards, not counted again', !!(await lib.until(async () => (await makerRow.count()) === 1 && (await makerRow.evaluate((el) => el.classList.contains('inbox-under') && !!el.closest('[data-card-group]'))), HUNG_MS)) && (await needCount()) === before + 1, JSON.stringify({ count: await needCount(), under: await makerRow.evaluate((el) => el.className).catch(() => '') }))
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((x) => document.documentElement.setAttribute('data-theme', x), theme)
+      await page.locator('.inbox-panel').screenshot({ path: path.join(lib.WORK, `foryou-grouped-agent-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await page.keyboard.press('Escape')
   } finally {
     await app.close()
   }

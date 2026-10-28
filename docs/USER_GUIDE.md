@@ -1831,7 +1831,7 @@ Hive reads this from Claude Code's and Codex's session records. GitHub Copilot's
 
 ### Agents that need you <a id="agents-that-need-you"></a>
 
-With agents working in several projects, the status bar tells you what is waiting on you: **2 need you**. It counts exactly what its list shows, so a click always explains the number: first the requests on cards that wait for you (see [For you](#for-you): an approval, a decision, a question an agent asked through Hive; a click opens the card to answer it), then the agents stopped in their own panes, oldest first, with how long each has been waiting:
+With agents working in several projects, the status bar tells you what is waiting on you: **2 need you**. It counts things, not requests: each card with requests that wait for you once, however many it has, and each agent stopped in its pane once (hover it: *2 cards and 1 agent need you*). A click shows them: first the cards (see [For you](#for-you): an approval, a decision, a question an agent asked through Hive; a click opens the card to answer it). A card with several requests, or an agent stopped on it, shows *3 questions* on its row with each one under it, answered on its own; an agent stopped on such a card (it asked one of them, or works on or reviews the card) is listed under it and not counted again. Then the other agents stopped in their own panes, oldest first, with how long each has been waiting:
 
 - **Needs input**: an agent waiting for your answer, such as a permission. It stays in the list until you answer it.
 - **Asks**: an agent that asked you a question but carries on working meanwhile (Codex can). Its pane says **has a question for you**, and it stays in the list until you answer the question in its terminal.

@@ -139,7 +139,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   // #1632's case: one agent at a prompt, another finished: 1 needs you, and the finish told apart.
   check('the status bar says 1 needs you: the finish is not a need', !!(await until(async () => (await itemText()) === '1 needs you' && (await finishedText()) === '1 finished', 5000)), `${await itemText()} | ${await finishedText()}`)
   const needTip = await lib.hoverTip(page, item, (t) => t.includes('requests on cards'))
-  check('…its tooltip says what it counts', needTip.includes('requests on cards and agents stopped in their panes'), needTip)
+  check('…its tooltip says what it counts: cards and agents, each once (HI-1931)', needTip.includes('1 agent needs you'), needTip)
   const finishedTip = await lib.hoverTip(page, finishedItem, (t) => t.startsWith('Agents that finished'))
   check('…and the quiet item what it counts', finishedTip.startsWith('Agents that finished since you last looked'), finishedTip)
   await page.mouse.move(5, 5)
