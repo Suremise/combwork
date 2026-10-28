@@ -139,6 +139,8 @@
   "tips.cliOverrides.title": "Zachowaj CLI takie jak poza Hive",
   "tips.cliOwnMode.text": "Wybierz „Własne ustawienie CLI” jako tryb uprawnień agenta lub projektu, a Hive żadnego nie przekaże: CLI uruchomi się w trybie ustawionym w jej własnej konfiguracji. Plakietka pokazuje „Z CLI”, a przełączenie działającej sesji uruchamia ją ponownie.",
   "tips.cliOwnMode.title": "Niech tryb wybierze konfiguracja CLI",
+  "tips.closeCommands.text": "Ustawienia → Obszar roboczy → Przy zamykaniu tego obszaru roboczego uruchom: Hive uruchamia Twoje polecenie, gdy zamknie obszar roboczy i skończy zapisywać jego pliki, i pokazuje, że działa, dopóki się nie zakończy.",
+  "tips.closeCommands.title": "Uruchom kopię zapasową przy zamykaniu obszaru roboczego",
   "tips.closeWindow.text": "Gdy otwartych jest kilka okien, Plik → Zamknij okno ({key}) zamyka tylko to jedno, tak jak jego X. Zakończ Hive (wszystkie okna) zamyka wszystkie okna i zatrzymuje wszystkich ich agentów.",
   "tips.closeWindow.title": "Zamknij jedno okno albo wszystkie",
   "tips.codexSandboxConnections.text": "Połączenia Codex wciąż proszą o uprawnienia administratora? Konfiguracja piaskownicy administratora każdego z nich resetuje pozostałe. Ustawienia → Zaawansowane → Codex → Połączenia: używaj piaskownicy Codex bez uprawnień administratora uruchamia je wszystkie bez tego, kosztem osobnych kont piaskownicy.",

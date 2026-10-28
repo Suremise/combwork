@@ -139,6 +139,8 @@
   "tips.cliOverrides.title": "让 CLI 保持与 Hive 之外相同",
   "tips.cliOwnMode.text": "将智能体或项目的权限模式选为“CLI 自身的设置”，Hive 就不传递任何模式：CLI 以其自身配置设定的模式启动。徽章显示“CLI 自身”，在运行中的会话里切换会重启它。",
   "tips.cliOwnMode.title": "让 CLI 自身的配置选择模式",
+  "tips.closeCommands.text": "“设置”→“工作区”→“此工作区关闭时运行”：Hive 在关闭工作区并写完其文件后运行你的命令，并在命令结束前一直显示它正在运行。",
+  "tips.closeCommands.title": "关闭工作区时运行备份",
   "tips.closeWindow.text": "打开多个窗口时，“文件”→“关闭窗口”（{key}）只关闭当前窗口，与点击窗口的 X 相同。“退出 Hive（所有窗口）”会关闭所有窗口并停止其中的所有智能体。",
   "tips.closeWindow.title": "关闭一个窗口，或全部关闭",
   "tips.codexSandboxConnections.text": "Codex 连接总是请求管理员权限？每个连接的管理员沙盒设置都会重置其他连接的设置。“设置”→“高级”→“Codex”→“连接：使用 Codex 的非管理员沙盒”可让它们都无需管理员权限运行，代价是不再使用独立的沙盒账户。",

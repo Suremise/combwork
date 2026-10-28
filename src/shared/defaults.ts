@@ -51,7 +51,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     dateFormat: 'ymd',
     timeFormat: '24h',
     userName: 'User', // i18n-ignore: a stored default name, which agents' wake lines quote
-    language: 'auto'
+    language: 'auto',
+    onQuit: { command: '', onUpdate: false }
   },
   appearance: {
     theme: 'dark',

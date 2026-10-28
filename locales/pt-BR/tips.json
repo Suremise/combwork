@@ -139,6 +139,8 @@
   "tips.cliOverrides.title": "Mantenha uma CLI como ela é fora do Hive",
   "tips.cliOwnMode.text": "Escolha “A configuração própria da CLI” como modo de permissão de um agente ou projeto e o Hive não passa nenhum: a CLI começa no modo definido pela própria configuração dela. O selo diz “Da CLI”, e mudar uma sessão em execução a reinicia.",
   "tips.cliOwnMode.title": "Deixe a configuração da CLI escolher o modo",
+  "tips.closeCommands.text": "Configurações → Espaço de trabalho → Ao fechar este espaço de trabalho, rodar: o Hive roda seu comando depois de fechar o espaço de trabalho e terminar de gravar seus arquivos, e mostra que ele está rodando até terminar.",
+  "tips.closeCommands.title": "Rode um backup ao fechar um espaço de trabalho",
   "tips.closeWindow.text": "Com várias janelas abertas, Arquivo → Fechar janela ({key}) fecha só esta, como o X dela. Sair do Hive (todas as janelas) fecha todas as janelas e para todos os agentes delas.",
   "tips.closeWindow.title": "Feche uma janela, ou todas",
   "tips.codexSandboxConnections.text": "Suas conexões do Codex vivem pedindo permissão de administrador? A configuração da sandbox de administrador de cada uma redefine a das outras. Configurações → Avançado → Codex → Conexões: usar a sandbox do Codex sem administrador roda todas sem isso, ao custo das contas de sandbox separadas.",

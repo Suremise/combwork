@@ -1,5 +1,6 @@
 import { WorkflowLevelForm } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
+import { QuitCommand, WorkspaceCloseCommand } from '../components/CloseCommandSettings'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, McpServerInfo, ModelPrice, PermissionMode, ProviderId, TaskColumn } from '@shared/types'
 import { DEFAULT_COLUMN_COLORS, TASK_COLUMNS, columnColor, columnName } from '@shared/tasks'
@@ -53,6 +54,7 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'providers.list': () => <ProvidersList />,
   'providers.defaultProvider': () => <DefaultProviderPicker />,
   'general.language': () => <LanguagePicker />,
+  'general.onQuit': () => <QuitCommand />,
   'notifications.chimeSound': () => <ChimePicker />,
   'sessions.usageCacheClear': () => <ClearUsageCacheButton />,
   'sessions.resetPerformance': () => <ResetMetricsButton />,
@@ -60,6 +62,7 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'workspace.hiddenProjects': () => <HiddenProjectsList />,
   'workspace.storage': () => <WorkspaceStorageList />,
   'workspace.antivirus': () => <AntivirusPanel />,
+  'workspace.onClose': () => <WorkspaceCloseCommand />,
   'board.colors': () => <ColumnColors />,
   'assistant.provider': () => <AssistantProviderPicker />,
   'assistant.connection': () => <AssistantConnectionPicker />,

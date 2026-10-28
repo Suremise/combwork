@@ -20,6 +20,8 @@ import type {
   SetAsideCard,
   ArchiveRequest,
   ArchiveResult,
+  CloseCommandRun,
+  CloseCommandSetting,
   UnarchiveResult,
   BoardFold,
   UpdateState,
@@ -170,6 +172,14 @@ export interface HiveRequests {
   'app:restart': () => void
   'app:quitDecision': (choice: QuitChoice, dontAskAgain: boolean) => void
   'app:cancelPendingQuit': () => void
+  /** This window's close command (HI-1368), for a window that reloads while its panel is up; null: none. */
+  'closeCommand:state': () => CloseCommandRun | null
+  /** The panel's Don't wait: Hive stops waiting for this window's close command and goes on; the command carries on. */
+  'closeCommand:dontWait': (id: string) => void
+  /** The panel's Close, on a failed close command: Hive goes on. */
+  'closeCommand:dismiss': (id: string) => void
+  /** Settings → Workspace → When this workspace closes, run (HI-1368): saved in workspace.json; returns it as saved. */
+  'closeCommand:setWorkspace': (setting: CloseCommandSetting) => CloseCommandSetting
   /** Current quit state, for a window that reloads while a quit dialog or pending quit is open. */
   'app:quitState': () => { request: QuitSession[] | null; unsaved: string[]; scope: QuitScope; pending: boolean; working: number }
   'app:openExternal': (url: string) => void

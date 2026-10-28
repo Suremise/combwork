@@ -49,7 +49,7 @@
       "rules": { "unicorn/require-post-message-target-origin": "off" }
     },
     {
-      "files": ["src/main/mcp/hive-mcp.ts", "src/main/progressReporters/hive-progress.ts", "src/main/progressReporters/wrapper.ts", "src/main/progressReporters/report.mts"],
+      "files": ["src/main/mcp/hive-mcp.ts", "src/main/progressReporters/hive-progress.ts", "src/main/progressReporters/wrapper.ts", "src/main/progressReporters/report.mts", "src/main/closeCommand/hive-close-runner.ts", "src/main/closeCommand/runner.ts"],
       "rules": { "no-restricted-imports": "off" }
     }
   ],

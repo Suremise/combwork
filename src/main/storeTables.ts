@@ -1,6 +1,7 @@
 import { existsSync } from 'original-fs'
 import { resolve } from 'path'
 import { boardLock, boardOpen, dbGenerationAt, inBoardWrite, leaseDb, noteLanesSaved, onDbReplaced, upgradeWaiting, workspaceDb, type DbLease } from './boardStore'
+import { countedWrite } from './dbWrites'
 import { transaction } from './db'
 import { placeKey, withFileLock } from './fsutil'
 import { createLogger, userText } from './logger'
@@ -101,6 +102,12 @@ export async function saveTable(workspacePath: string, store: TableStore, docs: 
   const path = resolve(workspacePath)
   // Its lock is the board's: inside a board change it would wait for itself.
   if (inBoardWrite(path)) throw new Error(`The ${store} were saved inside a change of the board`) // i18n-ignore: a mistake in Hive's code, never shown
+  // Under way from here, its wait for the lock included (HI-1368: a close command waits for it).
+  await countedWrite(path, () => saveTableLocked(path, store, docs, meta, guard, also))
+}
+
+/** saveTable's save, once it is counted. */
+async function saveTableLocked(path: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null>, guard?: () => void, also?: (db: ReturnType<typeof workspaceDb>['writer']) => void): Promise<void> {
   await tableTestHooks.beforeSave?.(store)
   await withFileLock(boardLock(path), async () => {
     guard?.()
@@ -206,8 +213,8 @@ export async function openTable(workspacePath: string, store: TableStore, file: 
   const first = !moved()
   if (first) {
     const got = await readFile()
-    // Moved in under the lock, checked again there: a second open meanwhile moved it already.
-    await withFileLock(boardLock(path), async () => {
+    // Moved in under the lock, checked again there: a second open meanwhile moved it already. Counted as a write (HI-1368).
+    await countedWrite(path, () => withFileLock(boardLock(path), async () => {
       if (moved()) return
       const db = workspaceDb(path).writer
       transaction(db, () => {
@@ -218,7 +225,7 @@ export async function openTable(workspacePath: string, store: TableStore, file: 
       })
       committed.delete(cacheKey(path, store))
       if (got) log.info(`moved ${got.docs.length} ${store} entr${got.docs.length === 1 ? 'y' : 'ies'} from ${userText(file)} into the workspace database`)
-    })
+    }))
   }
   if (existsSync(file)) {
     if (!first) log.warn(`${userText(file)} was found after the ${store} moved into the workspace database (an older Hive's, or a rename refused before): kept as a backup, not read`)

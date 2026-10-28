@@ -150,6 +150,20 @@ describe('the settings catalog', () => {
     expect(entry('assistant.control').readOnly).toMatch(/only the user can change it, in Settings → Assistant → Control/)
   })
 
+  it('keeps the close commands to the user (HI-1368): sensitive, and the tools read the command but never set it', () => {
+    for (const id of ['workspace.onClose', 'general.onQuit']) {
+      expect(entry(id).sensitive, id).toBe(true)
+      expect(entry(id).readOnly, id).toMatch(/It is a command Hive runs as a workspace closes or Hive quits: only the user can change it/)
+      expect(settingKind(entry(id)), id).toBeNull()
+      expect(entry(id).docs, id).toBe('close-commands')
+      expect(settingDefault(entry(id)), id).toBe('')
+    }
+    const settings = { ...DEFAULT_SETTINGS, general: { ...DEFAULT_SETTINGS.general, onQuit: { command: ' backup.cmd ', onUpdate: true } } }
+    expect(settingValue(entry('general.onQuit'), settings)).toBe('backup.cmd')
+    expect(settingValue(entry('workspace.onClose'), settings, null, { onClose: { command: 'sync.cmd "{workspace}"', onUpdate: false } })).toBe('sync.cmd "{workspace}"')
+    expect(settingValue(entry('workspace.onClose'), settings, null, {})).toBe('')
+  })
+
   it('keeps buttons, statuses and lists of things out of the values the tools set; keybindings are read-only', () => {
     for (const id of ['advanced.reset', 'agentApi.token', 'workspace.hiddenProjects', 'claude-code.status', 'project.reset', 'assistant.provider:claude-code']) expect(entry(id).action, id).toBe(true)
     expect(settingKind(entry('keybindings.editor'))).toBeNull()

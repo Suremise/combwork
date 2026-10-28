@@ -559,6 +559,14 @@
     "defaultMessage": "Let the CLI's own config choose the mode",
     "description": "A tip's title."
   },
+  "tips.closeCommands.text": {
+    "defaultMessage": "Settings → Workspace → When this workspace closes, run: Hive runs your command once it has closed the workspace and finished writing its files, and shows it running until it ends.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.closeCommands.title": {
+    "defaultMessage": "Run a backup as a workspace closes",
+    "description": "A tip's title."
+  },
   "tips.closeWindow.text": {
     "defaultMessage": "With several windows open, File → Close Window ({key}) closes just this one, as its X does. Exit Hive (all windows) closes every window and stops all their agents.",
     "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

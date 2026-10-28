@@ -332,6 +332,11 @@ export class WorkspaceService {
     return this.wsConfig
   }
 
+  /** The place its window recorded as it opened (#1395): its real location, lower-cased; null while none is open. */
+  get openPlace(): string | null {
+    return this.place
+  }
+
   async open(path: string): Promise<WorkspaceInfo> {
     const abs = resolve(path)
     if (!(await isDir(abs))) throw hiveError(msg({ id: 'service.workspace.notFound', defaultMessage: 'Folder not found: {folder}', description: 'An error opening a workspace: the folder {folder} is not there.' }), { folder: abs })

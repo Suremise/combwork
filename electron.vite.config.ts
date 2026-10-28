@@ -42,6 +42,8 @@ export default defineConfig({
           index: resolve(__dirname, 'src/main/index.ts'),
           'hive-mcp': resolve(__dirname, 'src/main/mcp/hive-mcp.ts'),
           'hive-progress': resolve(__dirname, 'src/main/progressReporters/hive-progress.ts'),
+          // The close commands' runner (HI-1368), run as Node outside the asar.
+          'hive-close-runner': resolve(__dirname, 'src/main/closeCommand/hive-close-runner.ts'),
           // The usage history's worker thread (#1106).
           'usage-worker': resolve(__dirname, 'src/main/usageWorker.ts'),
           // The repository lock's worker thread (HI-1680).

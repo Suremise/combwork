@@ -2695,6 +2695,30 @@
     "defaultMessage": "Soft",
     "description": "A sound of Settings → Notifications → Chime sound."
   },
+  "settings.closeCommand.command": {
+    "defaultMessage": "Command",
+    "description": "The label of the text box of \"When this workspace closes, run\" and \"When Hive quits, run\" (Settings): the command Hive runs."
+  },
+  "settings.closeCommand.hint": {
+    "defaultMessage": "Hive waits for it, showing it running. A command that shouldn't hold Hive up can start its job and return, e.g. start \"\" \"backup.cmd\".",
+    "description": "A hint under the close command in Settings. start \"\" \"backup.cmd\" is a Windows command (cmd.exe starts the file and returns at once): keep it as it is."
+  },
+  "settings.closeCommand.noWorkspace": {
+    "defaultMessage": "Open a workspace to set its close command.",
+    "description": "Settings → Workspace → When this workspace closes, run, with no workspace open."
+  },
+  "settings.closeCommand.onUpdate": {
+    "defaultMessage": "Also when Hive restarts to install an update",
+    "description": "A checkbox under the close command (Settings → Workspace → When this workspace closes, run, and Settings → General → When Hive quits, run): run it too when Hive restarts to install an update (by default it is skipped then)."
+  },
+  "settings.closeCommand.runs": {
+    "defaultMessage": "Runs: {command}",
+    "description": "Under the close command in Settings: the command exactly as Hive would run it, its placeholders filled in. {command} is that command: keep it as it is."
+  },
+  "settings.closeCommand.saveFailed": {
+    "defaultMessage": "Couldn't save the command",
+    "description": "An error's title: saving the command Hive runs as the workspace closes or as Hive quits (Settings) failed (why follows)."
+  },
   "settings.columnColors.pick": {
     "defaultMessage": "{column} colour",
     "description": "The name, for screen readers, of a board column's colour picker (Settings → Board → Column colours). {column} is the column's name."
@@ -3202,6 +3226,18 @@
   "settings.general.minimizeToTray.title": {
     "defaultMessage": "Minimise to tray",
     "description": "A setting's title (Settings → General)."
+  },
+  "settings.general.onQuit.desc": {
+    "defaultMessage": "A command Hive runs as it quits, once every window's workspace has closed. Hive waits for it, showing it running.",
+    "description": "What the setting \"When Hive quits, run\" does, under its title (Settings → General)."
+  },
+  "settings.general.onQuit.tip": {
+    "defaultMessage": "cmd.exe runs it. '{reason}' becomes quit, or update when Hive restarts to install an update (only with that box ticked). Don't wait, in the panel Hive shows, lets Hive go on while the command carries on. Only you can set it: the Assistant can't change it.",
+    "description": "The info tip of the setting \"When Hive quits, run\" (Settings → General). '{reason}' is a placeholder the user writes in the command, and quit and update are the values it becomes: keep all three as they are (the quotes around {reason} keep it from being read as a placeholder of this text). Don't wait is the name of a button of the panel."
+  },
+  "settings.general.onQuit.title": {
+    "defaultMessage": "When Hive quits, run",
+    "description": "A setting's title (Settings → General): a command of the user's that Hive runs as it quits."
   },
   "settings.general.progressCommands.desc": {
     "defaultMessage": "Agents run tests, builds and other commands that take more than about 30 seconds through hive-progress without being asked, so they show in the panel. Off: only when you ask.",
@@ -5218,6 +5254,18 @@
   "settings.workspace.hiddenProjects.title": {
     "defaultMessage": "Hidden and removed projects",
     "description": "A setting's title (Settings → Workspace)."
+  },
+  "settings.workspace.onClose.desc": {
+    "defaultMessage": "A command Hive runs as this workspace closes: its window closes, another workspace opens in it, or Hive quits. Hive waits for it, showing it running.",
+    "description": "What the setting \"When this workspace closes, run\" does, under its title (Settings → Workspace)."
+  },
+  "settings.workspace.onClose.tip": {
+    "defaultMessage": "cmd.exe runs it. '{workspace}' becomes the workspace's folder, '{name}' its name and '{reason}' why it closes: window, switch, quit, or update when Hive restarts to install an update (only with that box ticked). Saved in the workspace's .hive/workspace.json. Only you can set it: the Assistant can't change it.",
+    "description": "The info tip of the setting \"When this workspace closes, run\" (Settings → Workspace). '{workspace}', '{name}' and '{reason}' are placeholders the user writes in the command, and window, switch, quit and update are the values {reason} becomes: keep them all as they are (the quotes around each placeholder keep it from being read as one of this text). Keep the file path as it is."
+  },
+  "settings.workspace.onClose.title": {
+    "defaultMessage": "When this workspace closes, run",
+    "description": "A setting's title (Settings → Workspace): a command of the user's that Hive runs as the open workspace closes."
   },
   "settings.workspace.storage.desc": {
     "defaultMessage": "What Hive keeps for each of the workspace's projects (the biggest first) and the Hive Assistant: transcript backups, archived sessions, attachments and worktrees. Storage opens a project's page, with Clean Up… and Purge…; Purge… here removes everything Hive keeps for the sessions of the whole workspace.",

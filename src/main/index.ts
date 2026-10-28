@@ -22,7 +22,7 @@ import { appendFileSync, createReadStream, existsSync } from 'original-fs'
 import { basename, join, resolve, sep } from 'path'
 import { appendFile, readFile, stat } from 'original-fs/promises'
 import { Readable } from 'stream'
-import type { AppInfo, McpServerDef, QuitChoice, QuitScope, QuitSession, TaskCard, WindowState } from '../shared/types'
+import type { AppInfo, CloseReason, McpServerDef, QuitChoice, QuitScope, QuitSession, TaskCard, WindowState } from '../shared/types'
 import { providerService } from './providerService'
 import { initConnections } from './accounts'
 import { initConnectionMoves } from './connectionMoves'
@@ -100,6 +100,7 @@ import { flushMetrics } from './metrics'
 import { watchMainStalls } from './mainStalls'
 import { fileHolders } from './fileHolders'
 import { createWorkspaceService, disposeWorkspaceService, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
+import { closeWithCommand, quitCommandPlanned, quitRunsAny, runQuitCommand, type RunOutcome } from './closeCommand/closeCommands'
 import { journalSettingsOf } from './journalService'
 import { assistantStartView } from './startView'
 import { hiveWindows, lastFocused, TITLE_BAR_OVERLAY, registerWindow, unregisterWindow, windowForPath, type HiveWindow } from './windows'
@@ -560,8 +561,10 @@ async function requestCloseWindow(e: HiveWindow, done: AlreadyAsked = {}): Promi
   e.ws.closing = true
   await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000, 'closed')
   saveWindowsWithout(e)
+  // Its workspace closed here, its close command run in it while it is still shown (HI-1368), then the window goes.
+  await closeWithCommand(e.ws, 'window', e.win).catch((err) => log.warn("closing the window's workspace", err))
   e.closing = true
-  e.win.close()
+  if (!e.win.isDestroyed()) e.win.close()
 }
 
 /**
@@ -651,6 +654,8 @@ async function quitNow(tellUser: boolean): Promise<void> {
   await usageHistory.stop()
   await progress.saveNow().catch(() => undefined)
   await flushMetrics().catch(() => undefined)
+  // The close commands (HI-1368), each window's and then When Hive quits, waited for as their panels say.
+  await closeCommandsOnQuit(reason === 'update' ? 'update' : 'quit').catch((e) => log.warn('running the close commands as Hive quits', e))
   await config.flush()
   // Apps that find Hive by its discovery file stop looking for this one (#620).
   await clearDiscovery()
@@ -661,6 +666,24 @@ async function quitNow(tellUser: boolean): Promise<void> {
     if (relaunchOnQuit) relaunch()
     exitBy('app.quit', relaunchOnQuit ? 'quitting to restart' : 'quitting', () => app.quit())
   }
+}
+
+/**
+ * The close commands as Hive quits (HI-1368): only when a window's workspace or When Hive quits has one; otherwise the
+ * quit goes on as before, its databases closed by will-quit. Every window's workspace closes at once, each command run
+ * in its window once its saving step is done, then When Hive quits in the last one used: not run if a workspace's close
+ * failed, or the user didn't wait for one to finish saving (its Don't wait, the only way past a saving step).
+ */
+async function closeCommandsOnQuit(reason: CloseReason): Promise<void> {
+  const entries = hiveWindows()
+  const global = config.settings.general.onQuit
+  if (!quitRunsAny(entries.map((e) => e.ws), global)) return
+  // When Hive quits runs only once every workspace has closed and drained, theirs with a command or not (HR6's round 1).
+  // No timer: each window's saving step shows, and its Don't wait is the user's (Darren's decision, 28 Oct ~14:15).
+  const drain = quitCommandPlanned(global, reason)
+  const outcomes = await Promise.all(entries.map((e) => closeWithCommand(e.ws, reason, e.win, { drain }).catch((err): RunOutcome => (log.warn("closing a window's workspace as Hive quits", err), 'notDrained'))))
+  const last = lastFocused() ?? entries[0]
+  await runQuitCommand(global, reason, last?.win ?? null, outcomes.includes('notDrained') ? 'failed' : outcomes.includes('leftSaving') ? 'left' : null)
 }
 
 /** Starts Hive again once this one has quit, as it was started but for the once-only --disable-gpu. */

@@ -139,6 +139,8 @@
   "tips.cliOverrides.title": "Eine CLI so lassen wie außerhalb von Hive",
   "tips.cliOwnMode.text": "Wähle „Die Einstellung der CLI“ als Berechtigungsmodus eines Agenten oder Projekts, und Hive übergibt keinen: Die CLI startet in dem Modus, den ihre eigene Konfiguration festlegt. Das Abzeichen zeigt „CLI-eigen“, und ein Wechsel in einer laufenden Sitzung startet sie neu.",
   "tips.cliOwnMode.title": "Lass die Konfiguration der CLI den Modus wählen",
+  "tips.closeCommands.text": "Einstellungen → Arbeitsbereich → Beim Schließen dieses Arbeitsbereichs ausführen: Hive führt deinen Befehl aus, sobald es den Arbeitsbereich geschlossen und seine Dateien fertig geschrieben hat, und zeigt ihn an, bis er endet.",
+  "tips.closeCommands.title": "Beim Schließen eines Arbeitsbereichs eine Sicherung ausführen",
   "tips.closeWindow.text": "Sind mehrere Fenster offen, schließt Datei → Fenster schließen ({key}) nur dieses, wie sein X. „Hive beenden (alle Fenster)“ schließt jedes Fenster und stoppt alle ihre Agenten.",
   "tips.closeWindow.title": "Ein Fenster schließen oder alle",
   "tips.codexSandboxConnections.text": "Deine Codex-Verbindungen fragen immer wieder nach Administratorrechten? Die Einrichtung der Admin-Sandbox einer Verbindung setzt die der anderen zurück. Einstellungen → Erweitert → Codex → Verbindungen: Codex-Sandbox ohne Administratorrechte nutzen führt sie alle ohne aus, verzichtet dafür aber auf separate Sandbox-Konten.",
