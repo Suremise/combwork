@@ -25,7 +25,6 @@ import { Sidebar } from './components/Sidebar'
 import { TitleBar } from './components/TitleBar'
 import { enabledProviders } from '@shared/providers'
 import { tipsState } from '@shared/tips'
-import { withAction } from '@shared/assistantChangeList'
 import { CornerPlacement, TipCard, TipsDialog } from './components/Tips'
 import { applyTipsState, showTodaysTip } from './tips'
 import { startupReplay } from './startupReplay'
@@ -35,7 +34,7 @@ import { ProgressPanel, progressRunsChanged } from './components/Progress'
 import { queueBoardChanged, queueChangedEvent } from './queueSource'
 import { AssistantMain } from './components/AssistantView'
 import { reloadAssistantChanges } from './assistantUndo'
-import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, setWithLive, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, dismissToast, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
+import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, noteAssistantAction, setWithLive, showWorkspace, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, dismissToast, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
 import { DocsView, McpView, NotesView, SkillView, WelcomeView } from './views/OtherViews'
 import { TemplatesView } from './components/Templates'
 import { ProjectView } from './views/ProjectView'
@@ -99,12 +98,10 @@ function handleEvent(e: HiveEvent): void {
       const ws = movesShown.keep(e.workspace)
       // Another workspace in this window: its Assistant panel shows as that workspace left it, and its board.
       const other = ws?.path !== get().workspace?.path
-      // Another workspace's Assistant actions go: its panel loads this one's (and keeps those told meanwhile, HI-1863).
-      if (other) set({ assistantOpen: assistantWasOpen(ws?.path), assistantActions: [], tasks: [], boardProject: null, taskOpen: null, taskStartFor: null, laneStartFor: null, taskDoing: null })
+      if (other) set({ assistantOpen: assistantWasOpen(ws?.path), tasks: [], boardProject: null, taskOpen: null, taskStartFor: null, laneStartFor: null, taskDoing: null })
       if (other) void loadLeftovers()
       if (other) void loadAdvanced()
-      // Drop warnings about projects that belong to a workspace that is no longer open.
-      set((s) => ({ workspace: ws, toasts: s.toasts.filter((t) => !t.id.startsWith('mcp-') || !!ws?.projects.some((p) => t.id === `mcp-${p.path}`)) }))
+      showWorkspace(ws, other)
       if (ws && (!sel || !ws.projects.some((p) => p.path === sel))) set({ selectedProject: (ws.projects.find((p) => p.active) ?? ws.projects[0])?.path ?? null })
       if (!ws) set({ selectedProject: null })
       if (other) void loadTasks()
@@ -251,13 +248,8 @@ function handleEvent(e: HiveEvent): void {
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set((s) => ({ journalVersion: s.journalVersion + 1 }))
       break
     case 'assistant-activity': {
-      // One action each: a message changing many cards sends many at once, shown together with the agents' states (HI-1863).
-      const action = e.action
-      // By id: one the panel's snapshot brought meanwhile isn't added twice (HR3's HI-1863 round 1).
-      setWithLive((s) => {
-        const actions = withAction(s.assistantActions, action)
-        return actions === s.assistantActions ? {} : { assistantActions: actions }
-      })
+      // One action each: a message changing many cards sends many at once, shown together (HI-1863).
+      noteAssistantAction(e.action)
       // What it changed is kept for undo as it is made (#1283): the panel's list follows, read again once per burst.
       reloadAssistantChanges()
       break
