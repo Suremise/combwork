@@ -266,19 +266,19 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
 }
 
 /**
- * Why a new lane the Assistant or a script asks for can't start now (HR2's HI-1900 round 1), checked before anything is
- * recorded, as the window's Start Lane checks: its builder or reviewer busy (working, waiting on cards…), with each agent
- * of the lane then named, none started. Null when it may start, or when the builder has a running lane in the project
- * (the call updates that lane, whose builder needn't be idle).
+ * Why a new lane the Assistant or a script asks for can't start now (HR2's HI-1900 rounds 1 and 2), as the window's Start
+ * Lane refuses it: its builder or reviewer busy (working, waiting on cards…), with each agent of the lane then named,
+ * none started. A check `startLane` makes once it has decided the call records a new lane (`beforeNew`, under its lock,
+ * before anything changes), never for an update of the builder's running lane, whose builder needn't be idle.
  */
-export async function laneStartBusy(ws: WorkspaceService, projectPath: string, builderId: string, reviewerId: string | null | undefined): Promise<string | null> {
-  const project = basename(projectPath).toLowerCase()
-  if ((await rawLanes(ws)).some((l) => l.state === 'active' && l.project.toLowerCase() === project && l.builder.id === builderId)) return null
+export async function laneBusyCheck(ws: WorkspaceService, projectPath: string, builderId: string, reviewerId: string | null | undefined): Promise<() => string | null> {
   const agents = projectAgents(await ws.projectConfig(projectPath))
   const lane = [builderId, reviewerId].flatMap((id) => agents.filter((a) => id && a.id === id))
-  const busy = lane.filter((a) => BUSY.has(sessions.liveFor(projectPath, a.id)?.status ?? ''))
-  if (!busy.length) return null
-  return `${busy.map((a) => `${a.name} is ${sessions.liveFor(projectPath, a.id)?.status ?? 'busy'}`).join(' and ')}, so the lane wasn't started, nor ${lane.map((a) => a.name).join(' or ')}: start it again once ${busy.length > 1 ? 'they are' : `${busy[0].name} is`} idle.` // i18n-ignore: the lane start's refusal (the Assistant and scripts read it)
+  return () => {
+    const busy = lane.filter((a) => BUSY.has(sessions.liveFor(projectPath, a.id)?.status ?? ''))
+    if (!busy.length) return null
+    return `${busy.map((a) => `${a.name} is ${sessions.liveFor(projectPath, a.id)?.status ?? 'busy'}`).join(' and ')}, so the lane wasn't started, nor ${lane.map((a) => a.name).join(' or ')}: start it again once ${busy.length > 1 ? 'they are' : `${busy[0].name} is`} idle.` // i18n-ignore: the lane start's refusal (the Assistant and scripts read it)
+  }
 }
 
 /**

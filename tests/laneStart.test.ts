@@ -59,7 +59,7 @@ vi.mock('../src/main/tasks', () => ({
 vi.mock('../src/main/workflow/service', () => ({ workflowEnforced: () => state.enforced }))
 vi.mock('../src/main/workflow/rulesets', () => ({ resolvedOf: () => ({ options: state.options }) }))
 
-const { laneStartBusy, launchRecordedLane, laneStartInfo, recordedLaneNote, resumeLaneBuilder, startLaneFromWindow, startWaitingLane } = await import('../src/main/laneStart')
+const { laneBusyCheck, launchRecordedLane, laneStartInfo, recordedLaneNote, resumeLaneBuilder, startLaneFromWindow, startWaitingLane } = await import('../src/main/laneStart')
 const { allOff } = await import('../src/shared/workflow/options')
 
 const ws = {
@@ -271,21 +271,15 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
 describe("a lane the Assistant or a script asks for while an agent can't start it (HR2's HI-1900 round 1)", () => {
   const ALPHA = 'D:\\ws\\alpha'
 
-  it('a new lane over a busy agent is refused before anything is recorded, naming every agent of the lane as not started', async () => {
-    state.live.set('r1', { status: 'watching', sessionId: 's-r1' })
-    expect(await laneStartBusy(ws, ALPHA, 'b2', 'r1')).toBe("R1 is watching, so the lane wasn't started, nor B2 or R1: start it again once R1 is idle.")
-    state.live.set('b2', { status: 'working', sessionId: 's-b2' })
-    expect(await laneStartBusy(ws, ALPHA, 'b2', 'r1')).toBe("B2 is working and R1 is watching, so the lane wasn't started, nor B2 or R1: start it again once they are idle.")
+  it('a new lane over a busy agent is refused, naming every agent of the lane as not started; read as it is when asked', async () => {
+    const check = await laneBusyCheck(ws, ALPHA, 'b2', 'r1')
     // Both stopped or idle: it may start (and its agents are started with it).
-    state.live.clear()
     state.live.set('r1', { status: 'ready', sessionId: 's-r1' })
-    expect(await laneStartBusy(ws, ALPHA, 'b2', 'r1')).toBeNull()
-  })
-
-  it("the builder's running lane is updated whatever it is doing (its builder needn't be idle)", async () => {
-    state.lanes = [{ id: 'lane-9', state: 'active', project: 'alpha', builder: { id: 'b2', name: 'B2' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1], rounds: 3 }]
+    expect(check()).toBeNull()
+    state.live.set('r1', { status: 'watching', sessionId: 's-r1' })
+    expect(check()).toBe("R1 is watching, so the lane wasn't started, nor B2 or R1: start it again once R1 is idle.")
     state.live.set('b2', { status: 'working', sessionId: 's-b2' })
-    expect(await laneStartBusy(ws, ALPHA, 'b2', 'r1')).toBeNull()
+    expect(check()).toBe("B2 is working and R1 is watching, so the lane wasn't started, nor B2 or R1: start it again once they are idle.")
   })
 
   it('a running lane updated while its builder is stopped: its builder is started on the lane; one running is left as it is', async () => {

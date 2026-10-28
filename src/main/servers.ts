@@ -61,7 +61,7 @@ import { listMcp } from './mcp'
 import { assertInShared, createHandover, handoversFor, NoteConflict, notesTree, readNote, writeNote } from './notes'
 import { mergeSlots, slotTestEvent } from './mergeSlotHost'
 import * as lanes from './lanes'
-import { laneStartBusy, launchRecordedLane, recordedLaneNote, resumeLaneBuilder } from './laneStart'
+import { laneBusyCheck, launchRecordedLane, recordedLaneNote, resumeLaneBuilder } from './laneStart'
 import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber } from '../shared/lanes'
 import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
@@ -1899,10 +1899,9 @@ route('POST', '/v1/lanes', async ({ body }) =>
     }
     const start = async () => {
       // A new lane over a busy agent is refused before anything is recorded, as Start Lane… refuses it (HR2's HI-1900
-      // round 1: recorded with nobody started, it sat active).
-      const busyNow = a ? null : await laneStartBusy(ws, p, builder, reviewer)
-      if (busyNow) throw new HttpError(409, busyNow)
-      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: args.brief !== undefined ? (sessions.liveFor(p, builder)?.sessionId ?? null) : null, by: await laneBy() })
+      // rounds 1 and 2: recorded with nobody started, it sat active): checked where startLane decides it is a new lane.
+      const beforeNew = a ? undefined : await laneBusyCheck(ws, p, builder, reviewer)
+      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: args.brief !== undefined ? (sessions.liveFor(p, builder)?.sessionId ?? null) : null, by: await laneBy(), ...(beforeNew ? { beforeNew } : {}) })
       // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
       const told = args.brief !== undefined ? await briefNote(ws, (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id) ?? { project: basename(p) }) : null
       if (args.brief !== undefined) await settleLaneBriefs(ws)
