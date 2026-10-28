@@ -491,6 +491,22 @@ describe('the move checked again at its boundary (#1271 round 2)', () => {
       expect(git(wt, 'status', '--porcelain')).toBe('')
       expect(lineMoved(w, cards[0])).toEqual([])
     })
+
+    // HI-1970: a moving pass asked git 12 times, four of them for paths its `.git` files say (the repository lock's
+    // common dir, each line read's markers and target). The three status reads stay: the line is checked again before
+    // the move.
+    it('a moving pass reads its git paths and the target from the .git files, with no git process', async () => {
+      const { repo, wt, cards, w } = await squashed()
+      const ran: (readonly string[])[] = []
+      gitTestHooks.started = (_cwd, args) => void ran.push(args)
+      await update(w)
+      gitTestHooks.started = undefined
+      expect(git(wt, 'rev-parse', 'HEAD')).toBe(git(repo, 'rev-parse', 'main'))
+      expect(lineMoved(w, cards[0])).toHaveLength(1)
+      expect(ran.filter((a) => a.includes('--path-format=absolute'))).toEqual([])
+      expect(ran.filter((a) => a[0] === 'status')).toHaveLength(3)
+      expect(ran.length).toBeLessThanOrEqual(8)
+    })
   })
 })
 
