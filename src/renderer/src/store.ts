@@ -952,9 +952,15 @@ export const tilesPageSize = (p: Pick<ProjectInfo, 'path'>, s: Pick<State, 'tile
 /** The page of tiles a project's Tiles view shows. */
 export const tilePage = (p: Pick<ProjectInfo, 'path' | 'agents'>, s: Pick<State, 'tilePage' | 'tilesFit'> = get()): number => tilePageShown(s.tilePage[p.path] ?? 0, p.agents.length, tilesPageSize(p, s))
 
-/** Shows a page of a project's tiles. */
+/**
+ * Shows a page of a project's tiles: the user's (or a command's) choice, so a return from the focus view still waiting for
+ * the grid's measure (`tileReturn`) no longer decides the page (HR1's HI-1951 round 2).
+ */
 export function showTilePage(p: Pick<ProjectInfo, 'path' | 'agents'>, page: number): void {
-  set((s) => ({ tilePage: { ...s.tilePage, [p.path]: tilePageShown(page, p.agents.length, tilesPageSize(p, s)) } }))
+  set((s) => {
+    const { [p.path]: _, ...tileReturn } = s.tileReturn
+    return { tilePage: { ...s.tilePage, [p.path]: tilePageShown(page, p.agents.length, tilesPageSize(p, s)) }, tileReturn }
+  })
 }
 
 /**

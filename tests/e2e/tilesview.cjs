@@ -108,6 +108,9 @@ const check = (name, ok, extra = '') => {
       page.evaluate(([c, r]) => {
         document.getElementById('tiles-fit-test')?.remove()
         if (!c) return
+        // Worked out once per size while a grid is drawn, then reused (the focus view has none).
+        const kept = (window.__tilesFit ??= {})[`${c}x${r}`]
+        if (kept) return void document.head.append(Object.assign(document.createElement('style'), { id: 'tiles-fit-test', textContent: kept }))
         const g = document.querySelector('.tile-grid')
         const css = getComputedStyle(g)
         const px = (v) => parseFloat(v) || 0
@@ -115,8 +118,9 @@ const check = (name, ok, extra = '') => {
         // c columns as wide as the suite's tiles were (short of room for one more: 200 px over, a column takes 238) and r rows.
         const width = c * (230 + px(css.columnGap)) + px(css.paddingLeft) + px(css.paddingRight) + 200
         const height = r * h + (r - 1) * px(css.rowGap) + px(css.paddingTop) + px(css.paddingBottom) + 10
-        const style = Object.assign(document.createElement('style'), { id: 'tiles-fit-test', textContent: `.agent-tiles { right: auto !important; bottom: auto !important; width: ${width}px !important; height: ${height}px !important; }` })
-        document.head.append(style)
+        const text = `.agent-tiles { right: auto !important; bottom: auto !important; width: ${width}px !important; height: ${height}px !important; }`
+        window.__tilesFit[`${c}x${r}`] = text
+        document.head.append(Object.assign(document.createElement('style'), { id: 'tiles-fit-test', textContent: text }))
       }, [cols, rows])
     // A smaller area, room for 12 (4 × 3): the page holds 12, so two pages, as the rest of the suite has them. M, which
     // has the keyboard, keeps its page (2) as it shrinks; the suite goes on from page 1.
@@ -126,6 +130,21 @@ const check = (name, ok, extra = '') => {
     check('a smaller Tiles area that holds 12: 12 tiles on page 1, in the panes order', !!(await lib.until(async () => (await tileNames()).join() === NAMES.slice(0, 12).join(), HUNG_MS)), (await tileNames()).join())
     check('…all on screen, no scrolling', await page.locator('.agent-tiles').evaluate((el) => el.scrollHeight <= el.clientHeight))
     check('…no terminal drawn for them (none on screen)', (await page.locator('.terminal-host:not(.hidden)').count()) === 0)
+    // A page chosen after a resize in the focus view is the page shown (HR1's HI-1951 round 2): in the small window (6 a
+    // page), M's focus view from page 3; the area made room for 12 meanwhile; page 1's button shows page 1 (A to L), not
+    // M's page.
+    await fitTiles(null)
+    await lib.fitWindow(app, page, { width: 1100, height: 650 })
+    await lib.until(async () => (await pageButtons()).startsWith('1') && (await pageButtons()).split(' ').length === 3, HUNG_MS)
+    await page.locator('.session-toolbar .tile-pages button').nth(2).click()
+    await lib.until(async () => (await tileNames()).join() === 'M', HUNG_MS)
+    await page.locator('.agent-tile', { has: page.locator('.tile-name', { hasText: /^M$/ }) }).click()
+    await lib.until(async () => (await page.locator('.tile-strip-back').count()) === 1, HUNG_MS)
+    await fitTiles(4, 3)
+    await page.locator('.session-toolbar .tile-pages button').nth(0).click()
+    check("…M's focus view, the area resized to hold 12, then page 1's button: page 1 (A to L), not M's", !!(await lib.until(async () => (await tileNames()).join() === NAMES.slice(0, 12).join() && (await pageButtons()) === '1* 2(1)', HUNG_MS)), JSON.stringify({ tiles: await tileNames(), pages: await pageButtons().catch(() => '') }))
+    await lib.fitWindow(app, page, { width: 1500, height: 900 })
+    await lib.until(async () => (await tileNames()).join() === NAMES.slice(0, 12).join() && (await pageButtons()) === '1* 2(1)', HUNG_MS)
     const tile = (name) => page.locator('.agent-tile', { has: page.locator('.tile-name', { hasText: new RegExp(`^${name}$`) }) })
     const aTile = await tile('A').evaluate((el) => ({ mark: [...(el.querySelector('.state-mark')?.classList ?? [])].join(' '), provider: el.querySelector('.tile-provider')?.textContent, reply: el.querySelector('.tile-reply')?.textContent }))
     check("A's tile: idle (a ring), Claude Code, the start of its reply", aTile.mark.includes('idle') && aTile.provider === 'Claude Code' && aTile.reply === 'Done: hello tiles', JSON.stringify(aTile))
