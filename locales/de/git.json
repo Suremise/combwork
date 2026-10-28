@@ -377,6 +377,8 @@
   "git.vc.switch.title": "{project} auf „{platform}“ umstellen?",
   "git.vc.switch.what": "Ab der nächsten Karte verwendet {project} „{to}“ und die eigenen Workflow-Optionen von „{to}“. Bereits gestartete Karten behalten die Regeln von „{from}“.",
   "git.vc.switchTip": "Dieses Projekt ab der nächsten Karte auf „{platform}“ umstellen. Hive zeigt zuerst, was sich ändert.",
+  "git.vc.templateNotApplied": "{project} verwendet weiterhin None, daher wurde der Git-Workflow von {template} nicht angewendet. Stelle das Projekt auf Git um und lade die Vorlage dann erneut.",
+  "git.vc.templatePending": "Für die Vorlage {template}: Sobald das Repository angelegt ist und dieses Projekt Git verwendet, öffnet sich ihr Ladedialog erneut.",
   "git.vc.useParent": "Dieses Repository verwenden…",
   "git.vc.workflow": "Workflow: {platform} · {state, select, preset {{preset}} custom {Benutzerdefiniert (aus {preset})} other {keine Voreinstellung gewählt}}",
   "git.vc.workflowTip": "Workflow-Optionen anzeigen",

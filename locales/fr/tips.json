@@ -426,6 +426,8 @@
   "tips.teamTemplates.title": "Commence avec un modèle de Hive",
   "tips.templateNames.text": "Les noms d’agents sont uniques dans tout l’espace de travail. En chargeant un modèle d’un autre projet, donne de nouveaux noms à ses agents dans la liste, à côté de ceux du modèle : Charger le modèle attend qu’aucun ne soit déjà pris.",
   "tips.templateNames.title": "Nommer les agents d’un modèle au chargement",
+  "tips.templateWorkflow.text": "Enregistrer le modèle… peut aussi garder le flux de travail du projet : ses règles, jamais sa branche ni ses commandes. Le charger montre ce qui change, puis ouvre Gestion de versions → Flux de travail rempli, à enregistrer là.",
+  "tips.templateWorkflow.title": "Garde ton flux de travail dans un modèle",
   "tips.testedClis.text": "Claude Code, Codex et Copilot se mettent à jour d’eux-mêmes. Configuration des fournisseurs montre la version avec laquelle cette version de Hive a été testée à côté de la tienne, et indique quand la tienne est plus récente ou plus ancienne.",
   "tips.testedClis.title": "Voir avec quelles versions des CLI Hive a été testé",
   "tips.tileStrip.text": "Dans la vue focalisée d’un agent (Tuiles), le bandeau de gauche montre la carte de chaque agent sous forme de petite pastille, teintée de la couleur de la colonne du tableau où elle se trouve ; clique sur une pastille pour ouvrir la carte. Fais glisser le bord du bandeau pour l’élargir, et double-clique sur le bord pour le réinitialiser.",

@@ -3245,6 +3245,52 @@ p.hint {
   margin: 8px 0 0;
   color: var(--fg-muted);
 }
+.template-plan-note.warn {
+  color: var(--warning);
+}
+/* A template's workflow (HI-1910): in the Load template dialog, under its agents; in the Templates view, under its agents too. */
+.template-workflow {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+.template-workflow-h {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.template-workflow-apply {
+  gap: 6px;
+}
+.template-workflow-git {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.template-workflow-list {
+  margin: 6px 0 0;
+  padding-inline-start: 18px;
+}
+.template-workflow-list li {
+  padding-block: 2px;
+}
+.template-workflow-view {
+  margin-top: 16px;
+}
+.template-workflow-panel {
+  padding-top: 8px;
+}
+.template-workflow-panel > p {
+  margin: 0 0 4px;
+}
+.template-workflow-edit {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
 /* A confirm's list (the folders an antivirus change covers, #347): one item per line, a long path wrapping inside itself. */
 .dialog-body .dialog-list {
   display: flex;

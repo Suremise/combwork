@@ -7,6 +7,8 @@ import { tr } from './i18n'
 import { TEMPLATE_VERSION, type AgentTemplate, type SuggestedPreset, type TemplateAgent, type TemplatePair } from './templates'
 import type { PageLayout } from './types'
 import type { ReviewerMode } from './workflow/roles'
+import { preset } from './workflow/options'
+import { templateWorkflowOf, type TemplateWorkflows } from './workflow/templateOptions'
 
 /** One of Hive's templates: its file name in the Hive scope (how calls name it), its name and description as messages. */
 export interface HiveTemplate {
@@ -23,7 +25,19 @@ const paired = (n: number): TemplatePair[] => Array.from({ length: n }, (_, i) =
 
 function hive(file: string, name: Msg, description: Msg, layout: PageLayout, agents: TemplateAgent[], suggestedPreset: SuggestedPreset, extra: { pairs?: TemplatePair[]; reviewerMode?: ReviewerMode } = {}): HiveTemplate {
   // Its name in English: what a copy is called before the window's language names it (main names copies in its own).
-  return { file, name, description, template: { version: TEMPLATE_VERSION, name: name.defaultMessage, savedAt: '', layout, description: description.defaultMessage, agents, suggestedPreset, ...extra } }
+  return { file, name, description, template: { version: TEMPLATE_VERSION, name: name.defaultMessage, savedAt: '', layout, description: description.defaultMessage, agents, suggestedPreset, ...extra, workflow: presetWorkflow(suggestedPreset, extra.reviewerMode) } }
+}
+
+/**
+ * A preset as a template's sections (HI-1910: Hive's own carry their preset's), for None and Git, with its reviewer
+ * mode on Git (Team 6 + pool's pool). Its checks are the preset's for no project (none): loading it into a project
+ * makes them that project's (the plan reads the preset as the project's form offers it, `hiveSections`).
+ */
+export function presetWorkflow(id: SuggestedPreset, reviewerMode?: ReviewerMode): TemplateWorkflows {
+  return {
+    none: templateWorkflowOf(preset('none', id), id),
+    git: templateWorkflowOf({ ...preset('git', id), ...(reviewerMode ? { reviewerMode } : {}) }, id)
+  }
 }
 
 /** Hive's templates, in the order they are listed. */

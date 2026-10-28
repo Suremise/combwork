@@ -1511,6 +1511,14 @@
     "defaultMessage": "Switch this project to {platform}, from its next card. Hive shows what changes first.",
     "description": "Tooltip of the version control not in use, in the None · Git choice atop the Version Control tab: clicking it asks before switching. {platform} is None or Git."
   },
+  "git.vc.templateNotApplied": {
+    "defaultMessage": "{project} still uses None, so the Git workflow of {template} wasn’t applied. Switch the project to Git, then load the template again.",
+    "description": "A notice (HI-1910): the repository was made from Git’s page for a template ({template}) whose workflow needs Git, but the project ({project}) wasn’t switched to Git (refused, or the warning cancelled). None and Git as Hive names them."
+  },
+  "git.vc.templatePending": {
+    "defaultMessage": "For the template {template}: once the repository is made and this project uses Git, its Load dialog opens again.",
+    "description": "Git’s page in the Version Control tab (HI-1910), opened from the Load template dialog because the template’s workflow needs Git. {template} is its name."
+  },
   "git.vc.useParent": {
     "defaultMessage": "Use that repository…",
     "description": "Button on Git’s page in the Version Control tab of a project inside another repository: switches the project to Git on that repository, after the warning (the … says it asks first: keep it)."

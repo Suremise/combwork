@@ -55,6 +55,7 @@ interface HiveMessageValues {
   'workflow.form.from.preset': undefined
   'workflow.form.from.project': undefined
   'workflow.form.from.workspace': undefined
+  'workflow.form.fromTemplate': { template: string | number }
   'workflow.form.heir': { project: string | number; options: string | number }
   'workflow.form.heirCards': { n: number }
   'workflow.form.heirElsewhere': { project: string | number; workspace: string | number; options: string | number }
@@ -118,6 +119,9 @@ interface HiveMessageValues {
   'workflow.form.stageNamesValue': { n: number }
   'workflow.form.startedFrom': { preset: string | number }
   'workflow.form.stepWaitNote': undefined
+  'workflow.form.templateIdentityOff': undefined
+  'workflow.form.templateNoCommand': { count: number; checks: string | number }
+  'workflow.form.templateOtherPlatform': { template: string | number; platform: string | number; project: string | number }
   'workflow.form.use': { preset: string | number }
   'workflow.group.checks': undefined
   'workflow.group.loops': undefined

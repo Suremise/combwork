@@ -215,6 +215,10 @@
     "defaultMessage": "From the workspace",
     "description": "Where a workflow option’s value comes from: the workspace’s default."
   },
+  "workflow.form.fromTemplate": {
+    "defaultMessage": "Filled in from the template {template}: nothing is saved yet. Check the options, then Save… (they apply from the next card), or Discard Changes.",
+    "description": "A note atop the Workflow section (HI-1910) after loading a template whose workflow was applied: its options are filled in but not saved. Save… and Discard Changes are the buttons below: as translated there."
+  },
   "workflow.form.heir": {
     "defaultMessage": "Project {project}: {options}",
     "description": "A project inheriting a change of workflow defaults, in the dialog before saving them: its name, then the options that change for it, as a list."
@@ -466,6 +470,18 @@
   "workflow.form.stepWaitNote": {
     "defaultMessage": "A design left unchecked longer shows its card as stalled; one already posted keeps its wait.",
     "description": "Under the workflow option “Design check wait (minutes)” (Card loops), when a change applies."
+  },
+  "workflow.form.templateIdentityOff": {
+    "defaultMessage": "The template turns the project identity on, but this project’s git config has no name and email, so it stays off.",
+    "description": "A note atop the Workflow section (HI-1910), with a template's options filled in: it turns the project identity (G12) on, but the project's git config has none. Glossary: identity."
+  },
+  "workflow.form.templateNoCommand": {
+    "defaultMessage": "{count, plural, one {This project has no command for the check {checks} yet: add it under Checks before cards need it.} other {This project has no commands for the checks {checks} yet: add them under Checks before cards need them.}}",
+    "description": "A note atop the Workflow section (HI-1910), with the template's options filled in: checks ({checks}, a list of names; {count} of them) have no command in this project. Checks is the group below: as translated there. Glossary: check."
+  },
+  "workflow.form.templateOtherPlatform": {
+    "defaultMessage": "The workflow of {template} is for {platform}, and {project} doesn’t use it now, so it wasn’t filled in.",
+    "description": "A notification (HI-1910): a loaded template's workflow ({template}) is for a version control ({platform}: None or Git) the project ({project}) no longer uses (switched meanwhile)."
   },
   "workflow.form.use": {
     "defaultMessage": "Use {preset}",

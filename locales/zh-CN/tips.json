@@ -426,6 +426,8 @@
   "tips.teamTemplates.title": "从 Hive 自带的模板开始",
   "tips.templateNames.text": "智能体名称在整个工作区内唯一。从其他项目加载模板时，在模板自带名称旁边的列表中为其智能体取新名称：“加载模板”会等到没有名称被占用时才可用。",
   "tips.templateNames.title": "加载模板时为其智能体命名",
+  "tips.templateWorkflow.text": "“保存模板…”也可以保留项目的工作流程：只有规则，绝不包含分支或命令。加载时会显示会更改什么，然后打开已填好的“版本控制 → 工作流程”，在那里保存。",
+  "tips.templateWorkflow.title": "在模板中保留工作流程",
   "tips.testedClis.text": "Claude Code、Codex 和 Copilot 会自行更新。“配置提供方”会在你的版本旁边显示此 Hive 版本测试时使用的版本，并在你的版本更新或更旧时告诉你。",
   "tips.testedClis.title": "查看 Hive 测试过的 CLI 版本",
   "tips.tileStrip.text": "在智能体的聚焦视图（磁贴）中，左侧的边栏以小标签显示每个智能体的卡片，并以卡片所在看板列的颜色着色；点击标签即可打开卡片。拖动边栏的边缘可以加宽，双击边缘可恢复原宽度。",

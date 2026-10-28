@@ -3,8 +3,9 @@
 // leaves them as they were and never lists them, and says so once in the Notifications panel; importing a 0.9 file is refused, saying why; the Templates view lists
 // Hive's six, read-only, with the preset each suggests; Team 3×3 loaded into a project from the view makes six agents
 // named from its key, builders and reviewers paired both ways, in a grid of six, none in a worktree, Codex's agents on
-// Claude Code with a note on their rows; Pair loaded from + Add ▾ → Templates with "Also switch this project to Pair…"
-// ticked lands in Version Control → Workflow with Pair chosen and not saved. Screenshots of the Hive templates, and of
+// Claude Code with a note on their rows, its workflow unticked; Pair loaded from + Add ▾ → Templates with "Also apply its
+// workflow" (HI-1910: Hive's own carry their preset's) ticked lands in Version Control → Workflow with Pair chosen and not
+// saved. Screenshots of the Hive templates, and of
 // the load dialog's suggestion and swap note, in both themes. Dev build (or HIVE_EXE), throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR; a quiet test copy. (0.9's templates copied at the board's real upgrade, and the upgrade waiting:
 // tests/upgradeTemplates.test.ts, on boards made 0.9's.)
@@ -94,7 +95,8 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     const team = (await detail.locator('table tbody tr').allInnerTexts()).map((r) => r.split('\t').map((c) => c.trim()))
     // (Named as the selected project, alpha, would get them: its key's, #1123 names.)
   check("…its agents: builders on Claude Code, each paired with a reviewer on Codex, named from the selected project's key", team.length === 6 && /^[A-Z]{2,4}-B1$/.test(team[0][0]) && /^Builder\s+with [A-Z]{2,4}-R1$/.test(team[0][1]) && team[0][2] === 'Claude Code' && /^Reviewer\s+with [A-Z]{2,4}-B3$/.test(team[5][1]) && team[5][2] === 'Codex', JSON.stringify(team))
-    check('…and the preset it suggests', /Suggests the Team preset/.test(await detail.innerText()))
+    // Its preset as its workflow (HI-1910: Hive's own carry their preset's sections), shown under None | Git.
+    check('…and the preset it carries, as its workflow', /From the preset Team\./.test(await detail.innerText()))
     await shoot('hive-templates', () => page)
 
     // --- Export… and Duplicate… of Hive's own, clicked (HR3's round 1, 2), while the workspace has another template in
@@ -146,7 +148,10 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     const want = ['B1', 'B2', 'B3', 'R1', 'R2', 'R3'].map((n) => `${key}-${n}`)
     check("…its agents named from alpha's key (#1123 names)", /^[A-Z]{2,4}$/.test(key) && JSON.stringify(names) === JSON.stringify(want), JSON.stringify(names))
     check('…its reviewers on Claude Code, Codex being off, said on their rows', (await teamLoad.locator('.template-plan-swapped').allInnerTexts()).map((t) => t.trim()).join('|') === Array(3).fill('Codex is turned off (Settings → Providers): Claude Code instead.').join('|'), JSON.stringify(await teamLoad.locator('.template-plan-swapped').allInnerTexts()))
-    check('…and offers its preset, unticked', (await teamLoad.locator('.dialog-check').innerText().catch(() => '')).trim().startsWith('Also switch this project to Team…') && !(await teamLoad.locator('.dialog-check input').isChecked()))
+    // Its preset as its workflow (HI-1910), ticked by default; unticked here, so only its agents load.
+    const teamApply = teamLoad.locator('[data-template-workflow] [data-workflow-apply]')
+    check('…and shows its workflow, ticked', (await teamApply.count()) === 1 && (await teamApply.isChecked()) && (await teamLoad.locator('.dialog-check').count()) === 0)
+    await teamApply.uncheck()
     await teamLoad.getByRole('button', { name: 'Load template' }).click()
     const loaded = await until(async () => {
       const c = projectCfg()
@@ -160,18 +165,17 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     await page.getByText('alpha', { exact: true }).first().click()
     check('…all six shown at once', !!(await until(async () => (await lib.agentCount(page)) === 6, HUNG_MS)))
 
-    // --- Pair from + Add ▾ → Templates: its suggestion and its swap note; ticked, Version Control → Workflow with Pair
-    // chosen, not saved.
+    // --- Pair from + Add ▾ → Templates: its workflow and its swap note; ticked, Version Control → Workflow with Pair
+    // chosen, not saved (HI-1910: its workflow, as its suggestion was).
     await lib.addMenuRun(page, 'Templates')
     const item = (label) => page.locator('.menu .menu-item').filter({ has: page.getByText(label, { exact: true }) }).first()
     await until(async () => (await item('Pair').count()) === 1, HUNG_MS)
     await item('Pair').click()
     const pairLoad = page.locator('.dialog', { hasText: 'Load "Pair"?' })
     check('Pair: the load dialog shows', !!(await until(async () => (await pairLoad.locator('.template-plan-swapped').count()) === 1, HUNG_MS)))
-    const tick = pairLoad.locator('.dialog-check')
-    check('…offering to switch the project to Pair', /^Also switch this project to Pair… \(opens Version Control → Workflow with it chosen, to save there\)$/.test((await tick.innerText()).trim()), await tick.innerText())
+    const tick = pairLoad.locator('[data-template-workflow] [data-workflow-apply]')
+    check('…its workflow, ticked', (await tick.count()) === 1 && (await tick.isChecked()) && (await pairLoad.locator('[data-template-workflow] li').count()) > 0, await pairLoad.locator('[data-template-workflow]').innerText().catch(() => ''))
     await shoot('load-suggestion', () => pairLoad)
-    await tick.locator('input').check()
     await pairLoad.getByRole('button', { name: 'Load template' }).click()
     check('Pair loaded', !!(await until(async () => JSON.stringify(projectCfg().agents.map((a) => a.name)) === JSON.stringify([`${key}-B1`, `${key}-R1`]), HUNG_MS)), JSON.stringify(projectCfg().agents.map((a) => a.name)))
     const presetNow = page.locator('.workflow-preset-now')

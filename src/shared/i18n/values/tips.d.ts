@@ -428,6 +428,8 @@ interface HiveMessageValues {
   'tips.teamTemplates.title': undefined
   'tips.templateNames.text': undefined
   'tips.templateNames.title': undefined
+  'tips.templateWorkflow.text': undefined
+  'tips.templateWorkflow.title': undefined
   'tips.testedClis.text': undefined
   'tips.testedClis.title': undefined
   'tips.tileStrip.text': undefined

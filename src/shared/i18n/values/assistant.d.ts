@@ -512,6 +512,17 @@ interface HiveMessageValues {
   'assistant.templatePlan.stateReplaced': undefined
   'assistant.templatePlan.stateReplacedTip': undefined
   'assistant.templatePlan.withNote': { thing: string | number; note: string | number }
+  'assistant.templateWorkflow.alsoGit': undefined
+  'assistant.templateWorkflow.apply': undefined
+  'assistant.templateWorkflow.change': { option: string | number; now: string | number; next: string | number }
+  'assistant.templateWorkflow.changes': { n: number; platform: string | number }
+  'assistant.templateWorkflow.dropped': { count: number; platforms: string | number }
+  'assistant.templateWorkflow.head': undefined
+  'assistant.templateWorkflow.identityOff': undefined
+  'assistant.templateWorkflow.needsGit': undefined
+  'assistant.templateWorkflow.noCommand': { count: number; checks: string | number }
+  'assistant.templateWorkflow.noSection': { platform: string | number }
+  'assistant.templateWorkflow.setUpGit': undefined
   'assistant.templates.aProject': undefined
   'assistant.templates.addAgent': undefined
   'assistant.templates.addProjectFirst': undefined
@@ -643,6 +654,16 @@ interface HiveMessageValues {
   'assistant.templates.unknownProvider': { provider: string | number }
   'assistant.templates.unsavedTip': undefined
   'assistant.templates.where': { name: string | number; scope: string; project: string | number }
+  'assistant.templates.workflowAbsent': undefined
+  'assistant.templates.workflowAllOff': undefined
+  'assistant.templates.workflowEditHint': undefined
+  'assistant.templates.workflowFill': undefined
+  'assistant.templates.workflowFillChoose': undefined
+  'assistant.templates.workflowHead': undefined
+  'assistant.templates.workflowNone': { platform: string | number }
+  'assistant.templates.workflowPlatforms': undefined
+  'assistant.templates.workflowPreset': { preset: string; name: string | number }
+  'assistant.templates.workflowRemove': undefined
   'assistant.templates.workspace': undefined
   'assistant.undo.askFinal': { n: number }
   'assistant.undo.askMessage': undefined

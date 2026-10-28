@@ -1063,7 +1063,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'agents:swap': (p, id, other) => projectAgents.swapAgents(p, id, other),
     'agents:place': (p, layout, cells) => projectAgents.placePanes(p, layout, cells),
     'templates:list': (p) => templates.listTemplates(p),
-    'templates:save': (p, scope, name, overwrite, usePatterns) => templates.saveTemplate(p, scope, name, overwrite, usePatterns === true),
+    'templates:save': (p, scope, name, overwrite, usePatterns, includeWorkflow) => templates.saveTemplate(p, scope, name, overwrite, usePatterns === true, includeWorkflow !== false),
     'templates:plan': (p, scope, file, from, names) => templates.templatePlan(p, scope, file, from, names),
     'templates:load': (p, scope, file, expected, from, names, connections) => templates.loadTemplate(p, scope, file, expected, from, names, connections),
     'templates:addAgent': (p, scope, file, index, from, name) => templates.addAgentFromTemplate(p, scope, file, index, from, name),
