@@ -370,7 +370,8 @@ class ProviderService {
     // The connection's own sign-in where the CLI has one (HI-1757), without the variables it would read as a login. A
     // server connection's Set Up (HI-1772) runs the CLI itself instead, with its server's variables, for its first-run
     // screens: the user answers them in the CLI's own way.
-    const cmd = setUp ? { file: info.path, args: [] as string[] } : (adapter.accountLoginCommand?.(info.path) ?? adapter.loginCommand(info.path))
+    const home = env[adapter.descriptor.capabilities.connections?.homeEnv ?? '']
+    const cmd = setUp ? { file: info.path, args: (home && adapter.connectionSetUpArgs?.(home)) || [] } : (adapter.accountLoginCommand?.(info.path) ?? adapter.loginCommand(info.path))
     const s = toSpawnable(cmd.file, cmd.args)
     log.info(`${adapter.descriptor.name} ${setUp ? 'set-up' : 'sign-in'} for account ${accountId}`)
     spawnPty(key, { file: s.file, args: s.args, cwd: setUp?.cwd ?? homedir(), env: withServerEnv(setUp?.env, withoutAccountEnv(adapter, childEnv(env))), onExit })

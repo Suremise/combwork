@@ -88,13 +88,15 @@ if (args[0] === 'login') {
   console.log('Logged in using ChatGPT')
   process.exit(0)
 }
-// Started plainly in a connection's folder (HI-1870: its Set Up) with no sandbox there or given: its one-time Windows
-// sandbox setup, answered at once (the non-admin one), written to the folder's config.toml as Codex keeps it.
-if (inConnection && args.length === 0) {
+// Started plainly in a connection's folder (HI-1870: its Set Up, no agent's, with only `-c` overrides: HI-1893) with no
+// sandbox there or given: its one-time Windows sandbox setup, answered at once (the non-admin one), written to the
+// folder's config.toml as Codex keeps it.
+const setUpRun = inConnection && !process.env.HIVE_AGENT && args.length % 2 === 0 && args.every((a, i) => i % 2 === 1 || a === '-c')
+if (setUpRun) {
   const toml = path.join(connectionHome, 'config.toml')
   const now = fs.existsSync(toml) ? fs.readFileSync(toml, 'utf8') : ''
   let next = now
-  if (!/^\s*sandbox\s*=/m.test(next)) next = `${next}${next && !next.endsWith('\n') ? '\n' : ''}[windows]\nsandbox = "unelevated"\n`
+  if (!/^\s*sandbox\s*=/m.test(next) && !args.some((a) => a.startsWith('windows.sandbox='))) next = `${next}${next && !next.endsWith('\n') ? '\n' : ''}[windows]\nsandbox = "unelevated"\n`
   // Run in a project's folder (HI-1870: Set Up opened where it isn't trusted yet): its trust question answered Yes, for
   // the folder's real path, as Codex records it (the suites' projects are their repositories' roots).
   const cwd = fs.realpathSync.native(process.cwd())
@@ -116,8 +118,10 @@ if (inConnection) {
 }
 if (args[0] === 'app-server') {
   // Hive asks how this version names and hashes its hooks (none), or who its connection's folder is signed in as. Its
-  // pid goes to FAKE_CODEX_APPSERVER_LOG when a suite names one (HI-1757: none may be left running).
+  // pid goes to FAKE_CODEX_APPSERVER_LOG when a suite names one (HI-1757: none may be left running); its arguments to
+  // fake-appservers.jsonl in a connection's folder (HI-1893: the sandbox its checks are given).
   if (process.env.FAKE_CODEX_APPSERVER_LOG) fs.appendFileSync(process.env.FAKE_CODEX_APPSERVER_LOG, `${process.pid}\n`)
+  if (inConnection) fs.appendFileSync(path.join(connectionHome, 'fake-appservers.jsonl'), JSON.stringify({ args }) + '\n')
   let buf = ''
   process.stdin.on('data', (d) => {
     buf += d

@@ -639,6 +639,14 @@
     "defaultMessage": "Connections: sign-in check timeout",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.codex.accounts.unelevatedSandbox.desc": {
+    "defaultMessage": "Turned on, Hive runs Codex on a connection (its agents, its Set Up and its checks) in Codex's non-admin Windows sandbox, passing -c windows.sandbox=\"unelevated\" each time, unless the connection's own config.toml chooses a sandbox. Nothing is written to Codex's config, and Codex on its own folder (~/.codex) runs as you've set it up. What it gains: no Administrator (UAC) prompts, and setting up one Codex folder no longer resets the sandbox's shared password, which makes the others ask for Administrator permission again. What it loses: commands run as you rather than as separate sandbox accounts, and their network is blocked by environment settings only, not by the firewall. Unchanged: writes outside the project's folders are still refused, and the first time a connection works in a project it still grants its permissions over the project's files once. Either way, Codex's commands can still read other connections' login files. Windows only.",
+    "description": "What the advanced setting \"Connections: use Codex's non-admin sandbox\" does (Settings → Advanced, under Codex). -c windows.sandbox=\"unelevated\" is a command-line option, and config.toml and ~/.codex are a file and a folder: keep them as they are. UAC is Windows' User Account Control."
+  },
+  "settings.advanced.codex.accounts.unelevatedSandbox.title": {
+    "defaultMessage": "Connections: use Codex's non-admin sandbox",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Codex's non-admin sandbox is its Windows sandbox that needs no Administrator permission."
+  },
   "settings.advanced.codex.appServer.closeSeconds.desc": {
     "defaultMessage": "How long Codex's app server gets to end by itself once Hive has its answer (a connection's sign-in check, its hooks' check). Past it, Hive ends it with everything it started. Too short, Codex is cut off as it ends; too long, its processes stay a little longer.",
     "description": "What the advanced setting \"App server: time to close\" is for, and what goes wrong when it is wrong (Settings → Advanced)."

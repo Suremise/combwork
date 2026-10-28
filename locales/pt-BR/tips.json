@@ -129,6 +129,8 @@
   "tips.cliOwnMode.title": "Deixe a configuração da CLI escolher o modo",
   "tips.closeWindow.text": "Com várias janelas abertas, Arquivo → Fechar janela ({key}) fecha só esta, como o X dela. Sair do Hive (todas as janelas) fecha todas as janelas e para todos os agentes delas.",
   "tips.closeWindow.title": "Feche uma janela, ou todas",
+  "tips.codexSandboxConnections.text": "Suas conexões do Codex vivem pedindo permissão de administrador? A configuração da sandbox de administrador de cada uma redefine a das outras. Configurações → Avançado → Codex → Conexões: usar a sandbox do Codex sem administrador roda todas sem isso, ao custo das contas de sandbox separadas.",
+  "tips.codexSandboxConnections.title": "Várias conexões do Codex sem pedidos de administrador",
   "tips.commandName": "“{command}”",
   "tips.compactFocus.text": "Compactar resume a conversa para que cada mensagem seguinte custe menos. Dê um foco (“mantenha as decisões da API, descarte a saída dos testes”) e o agente guarda o que importa. {key}",
   "tips.compactFocus.title": "Compacte com um foco",

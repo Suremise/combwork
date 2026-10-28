@@ -1632,6 +1632,22 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions',
     samples: [{ from: `${FIX}/advanced/ambient-auth-codex-0.164.0.txt`, version: '0.164.0', text: 'CODEX_ACCESS_TOKEN alone: "Error checking login status: invalid agent identity JWT format"', shows: 'A token in the environment taken over a connection home that is signed out' }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  // Codex's non-admin Windows sandbox on connections (HI-1893, HI-1874's findings), passed per launch: off by default.
+  {
+    id: 'codex.accounts.unelevatedSandbox',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.accounts.unelevatedSandbox.title', defaultMessage: "Connections: use Codex's non-admin sandbox", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Codex's non-admin sandbox is its Windows sandbox that needs no Administrator permission." }),
+    desc: msg({
+      id: 'settings.advanced.codex.accounts.unelevatedSandbox.desc',
+      defaultMessage:
+        "Turned on, Hive runs Codex on a connection (its agents, its Set Up and its checks) in Codex's non-admin Windows sandbox, passing -c windows.sandbox=\"unelevated\" each time, unless the connection's own config.toml chooses a sandbox. Nothing is written to Codex's config, and Codex on its own folder (~/.codex) runs as you've set it up. What it gains: no Administrator (UAC) prompts, and setting up one Codex folder no longer resets the sandbox's shared password, which makes the others ask for Administrator permission again. What it loses: commands run as you rather than as separate sandbox accounts, and their network is blocked by environment settings only, not by the firewall. Unchanged: writes outside the project's folders are still refused, and the first time a connection works in a project it still grants its permissions over the project's files once. Either way, Codex's commands can still read other connections' login files. Windows only.",
+      description: 'What the advanced setting "Connections: use Codex\'s non-admin sandbox" does (Settings → Advanced, under Codex). -c windows.sandbox="unelevated" is a command-line option, and config.toml and ~/.codex are a file and a folder: keep them as they are. UAC is Windows\' User Account Control.'
+    }),
+    kind: 'boolean',
+    default: false,
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/windows-sandbox-codex-0.164.0.txt`, version: '0.164.0', text: 'Unelevated,', shows: "Codex's own config type for windows.sandbox, whose kebab-case values include \"unelevated\" (its source, not a run)" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   {
     id: 'codex.appServer.closeSeconds',
     group: 'codex',

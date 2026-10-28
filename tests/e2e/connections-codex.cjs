@@ -4,7 +4,8 @@
 // folder, its login kept there (the file store) and a token in Hive's environment never passed on; a conversation
 // carried from one connection to the other (its rollout in the shared sessions folder, resumed), its plan usage then
 // the connection's own, in the status bar (HI-1882); a login changed in a
-// connection's folder warned of; a signed-out connection refused; and a removal that leaves the shared rollouts in the
+// connection's folder warned of; Advanced's non-admin sandbox on connections passed to each Codex there (HI-1893), and
+// left out while it is off; a signed-out connection refused; and a removal that leaves the shared rollouts in the
 // CLI home untouched.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -32,8 +33,8 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
 ;(async () => {
   for (const d of [userData, ws, claudeHome, codexHome]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [userData, claudeHome, codexHome]) fs.mkdirSync(d, { recursive: true })
-  // Codex's own home: its Windows sandbox set up (the PC's), as Codex keeps it.
-  fs.writeFileSync(path.join(codexHome, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
+  // Codex's own home: its Windows sandbox set up (the PC's, the default admin one), as Codex keeps it.
+  fs.writeFileSync(path.join(codexHome, 'config.toml'), '[windows]\nsandbox = "elevated"\n')
   lib.gitProject(alpha)
   fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
   fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'codex' }, { id: 'a-two', name: 'Two', provider: 'codex' }, { id: 'a-three', name: 'Three', provider: 'codex' }] }))
@@ -99,6 +100,9 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     check('…and it says where it opened: the project’s folder', !!opened && opened.folder.toLowerCase() === root.toLowerCase(), JSON.stringify(opened))
     await inv('pty:kill', key)
     check('…read again as it ends: nothing pending', !!(await lib.until(async () => JSON.stringify(await trustOf(work.id)) === JSON.stringify({ pending: [], unknown: false }), HUNG_MS)))
+    // HI-1893: Set Up runs Codex as the connection's launches do, its login store and the PC's sandbox passed on.
+    const setUps = (id) => lines(path.join(accountsRoot, id, 'fake-launches.jsonl')).filter((l) => !l.agent && l.args.every((a, i) => i % 2 === 1 || a === '-c'))
+    check("…its Set Up given the connection's login store and the PC's sandbox", setUps(work.id).some((l) => l.args.includes('cli_auth_credentials_store="file"') && l.args.includes('windows.sandbox="elevated"')), JSON.stringify(setUps(work.id).map((l) => l.args)))
     // Home: no agent here uses it yet (One has none of its own, so the first on, Work), so it counts nothing (HI-1871).
     check('…the other connection, which no agent here would use, counts no project', JSON.stringify(await trustOf(home.id)) === JSON.stringify({ pending: [], unknown: false }))
     await inv('advanced:set', 'codex.trust.perLaunch', null)
@@ -112,9 +116,10 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     const all = [...launchedIn(work.id), ...launchedIn(home.id)]
     check("…each with its connection's folder as CODEX_HOME", launchedIn(work.id).every((l) => l.home === path.join(accountsRoot, work.id)) && launchedIn(home.id).every((l) => l.home === path.join(accountsRoot, home.id)))
     check('…its login kept in that folder (the file store)', all.every((l) => l.args.join(' ').includes('cli_auth_credentials_store="file"')))
-    // Home has none of its own, so the PC's is passed on; Work has its own since its Set Up (HI-1870), so none is.
     check("…each with its own folder trusted for that launch (Hive's per-launch trust, HI-1871), written nowhere", all.every((l) => l.args.some((a) => a.startsWith('projects=') && a.includes('trust_level="trusted"'))) && !(fs.existsSync(path.join(accountsRoot, home.id, 'config.toml')) && fs.readFileSync(path.join(accountsRoot, home.id, 'config.toml'), 'utf8').includes('[projects.')))
-    check("…the PC's Windows sandbox passed on where the connection has none of its own", launchedIn(home.id).every((l) => l.args.includes('windows.sandbox="unelevated"')) && launchedIn(work.id).every((l) => !l.args.some((x) => x.startsWith('windows.sandbox='))))
+    // Neither has one of its own (Work's Set Up was given the PC's, so it chose none), so the PC's is passed on, and with
+    // Advanced's non-admin sandbox off (HI-1893) never "unelevated".
+    check("…the PC's Windows sandbox passed on where the connection has none of its own, and not the non-admin one", all.every((l) => l.args.includes('windows.sandbox="elevated"') && !l.args.includes('windows.sandbox="unelevated"')), JSON.stringify(all.map((l) => l.args.filter((x) => x.startsWith('windows.')))))
     check("…and never the token in Hive's environment", all.every((l) => l.loginVars.length === 0), JSON.stringify(all.map((l) => l.loginVars)))
     check('…and its run says so', (await live('a-one'))?.launchedConnection?.id === work.id && (await live('a-two'))?.launchedConnection?.id === home.id)
 
@@ -161,6 +166,36 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     check('a third agent starts on a connection two others are busy on, every time (3 of 3)', refusedBusy.length === 0, JSON.stringify(refusedBusy))
     fs.rmSync(path.join(accountsRoot, work.id, 'fake-busy'))
     await stop('a-two')
+
+    // --- Advanced's non-admin sandbox on (HI-1893): every Codex on a connection is given -c windows.sandbox="unelevated"
+    // over the PC's (an agent, its Set Up, its checks), one whose own config.toml chooses keeps its own, and nothing is
+    // written to either config.
+    const pcToml = fs.readFileSync(path.join(codexHome, 'config.toml'), 'utf8')
+    const appServerRuns = (id) => lines(path.join(accountsRoot, id, 'fake-appservers.jsonl'))
+    const serversBefore = appServerRuns(work.id).length
+    await inv('advanced:set', 'codex.accounts.unelevatedSandbox', true)
+    const threesBefore = threes()
+    await inv('session:start', alpha, { agentId: 'a-three' })
+    await lib.until(async () => threes() > threesBefore, HUNG_MS)
+    const three = launchedIn(work.id).filter((l) => l.agent === 'Three').at(-1)
+    check('with the non-admin sandbox on, an agent on a connection is given -c windows.sandbox="unelevated", not the PC\'s', three.args.includes('windows.sandbox="unelevated"') && !three.args.includes('windows.sandbox="elevated"'), JSON.stringify(three.args))
+    await stop('a-three')
+    await inv('connections:list', true)
+    const servedOn = await lib.until(async () => appServerRuns(work.id).slice(serversBefore).find((l) => l.args.includes('windows.sandbox="unelevated"')) ?? null, HUNG_MS)
+    check("…its checks too (Codex's app server)", !!servedOn, JSON.stringify(appServerRuns(work.id).slice(serversBefore).map((l) => l.args)))
+    const homeSetUps = setUps(home.id).length
+    const { key: homeKey } = await inv('connections:setUp', home.id)
+    check('…and its Set Up', !!(await lib.until(async () => setUps(home.id).slice(homeSetUps).some((l) => l.args.includes('windows.sandbox="unelevated"')), HUNG_MS)), JSON.stringify(setUps(home.id).map((l) => l.args)))
+    await inv('pty:kill', homeKey)
+    check('…the PC\'s config untouched, and no sandbox written to the connection\'s', fs.readFileSync(path.join(codexHome, 'config.toml'), 'utf8') === pcToml && !(fs.existsSync(path.join(accountsRoot, home.id, 'config.toml')) && /sandbox\s*=/.test(fs.readFileSync(path.join(accountsRoot, home.id, 'config.toml'), 'utf8'))))
+    // A connection whose own config chooses a sandbox keeps it: nothing passed.
+    fs.appendFileSync(path.join(accountsRoot, home.id, 'config.toml'), '\n[windows]\nsandbox = "elevated"\n')
+    await inv('agents:update', alpha, 'a-three', { connection: home.id })
+    await inv('session:start', alpha, { agentId: 'a-three' })
+    const threeHome = await lib.until(async () => launchedIn(home.id).filter((l) => l.agent === 'Three').at(-1) ?? null, HUNG_MS)
+    check("…one whose own config.toml chooses a sandbox keeps its own: none passed", !!threeHome && !threeHome.args.some((x) => x.startsWith('windows.sandbox=')), JSON.stringify(threeHome?.args))
+    await stop('a-three')
+    await inv('advanced:set', 'codex.accounts.unelevatedSandbox', false)
 
     // --- A login changed in Home's folder (signed in as someone else there): warned of, not taken on.
     fs.writeFileSync(path.join(accountsRoot, home.id, 'fake-account.json'), JSON.stringify({ email: 'other@example.com', plan: 'plus' }))

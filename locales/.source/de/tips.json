@@ -129,6 +129,8 @@
   "tips.cliOwnMode.title": "Let the CLI's own config choose the mode",
   "tips.closeWindow.text": "With several windows open, File → Close Window ({key}) closes just this one, as its X does. Exit Hive (all windows) closes every window and stops all their agents.",
   "tips.closeWindow.title": "Close one window, or all of them",
+  "tips.codexSandboxConnections.text": "Codex connections keep asking for Administrator permission? Each one's admin sandbox setup resets the others'. Settings → Advanced → Codex → Connections: use Codex's non-admin sandbox runs them all without it, at the cost of separate sandbox accounts.",
+  "tips.codexSandboxConnections.title": "Several Codex connections, no admin prompts",
   "tips.commandName": "“{command}”",
   "tips.compactFocus.text": "Compact summarises the conversation so every later message costs less. Give it a focus (\"keep the API decisions, drop the test output\") and the agent keeps what matters. {key}",
   "tips.compactFocus.title": "Compact with a focus",

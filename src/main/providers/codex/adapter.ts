@@ -264,11 +264,18 @@ export const CONNECTION_STORE = ['-c', 'cli_auth_credentials_store="file"']
  */
 export function launchConnectionArgs(ctx: Pick<LaunchContext, 'connectionHome'>): string[] {
   if (!ctx.connectionHome) return []
-  const args = [...CONNECTION_STORE]
-  const own = configOf(ctx.connectionHome).windows?.sandbox
-  const pc = userConfig().windows?.sandbox
-  if (process.platform === 'win32' && !own && typeof pc === 'string' && /^[\w-]{1,24}$/.test(pc)) args.push('-c', `windows.sandbox=${toToml(pc)}`)
-  return args
+  return [...CONNECTION_STORE, ...connectionSandboxArgs(ctx.connectionHome)]
+}
+
+/**
+ * The Windows sandbox a connection's Codex runs in, passed with -c and never written: none when its own config.toml
+ * names one (it keeps its own); Codex's non-admin one when Advanced turns it on for connections (HI-1893); else this
+ * PC's, from ~/.codex's config. None off Windows.
+ */
+function connectionSandboxArgs(home: string): string[] {
+  if (process.platform !== 'win32' || configOf(home).windows?.sandbox) return []
+  const mode = advanced.get<boolean>('codex.accounts.unelevatedSandbox') ? 'unelevated' : userConfig().windows?.sandbox
+  return typeof mode === 'string' && /^[\w-]{1,24}$/.test(mode) ? ['-c', `windows.sandbox=${toToml(mode)}`] : []
 }
 
 /**
@@ -684,19 +691,23 @@ export class CodexAdapter implements ProviderAdapter {
 
   /** Who a connection's CODEX_HOME (in `env`) is signed in as: its app server's account answer, never a token. */
   async accountStatus(executable: string, env: NodeJS.ProcessEnv): Promise<ConnectionStatus> {
-    const answer = await appServerAnswer(executable, CONNECTION_STORE, homedir(), advanced.get<string>('codex.accounts.readMethod'), {}, env, advanced.number('codex.accounts.statusSeconds') * 1000)
+    const answer = await appServerAnswer(executable, launchConnectionArgs({ connectionHome: env.CODEX_HOME }), homedir(), advanced.get<string>('codex.accounts.readMethod'), {}, env, advanced.number('codex.accounts.statusSeconds') * 1000)
     return codexAccountStatus(answer, { account: advanced.get<string>('codex.accounts.accountField'), email: advanced.get<string>('codex.accounts.emailField'), plan: advanced.get<string>('codex.accounts.planField') })
   }
 
   /**
    * Its Windows sandbox set up for the folder (HI-1870), as its launches have it: the folder's own `windows.sandbox`,
-   * or else this PC's, which launches pass on (launchConnectionArgs). Nothing to set up off Windows.
+   * or else the one launches pass on (launchConnectionArgs: this PC's, or the non-admin one). Nothing to set up off Windows.
    */
   async connectionSetUp(home: string): Promise<boolean | null> {
     if (process.platform !== 'win32') return true
     const own = configOf(home).windows?.sandbox
-    const pc = userConfig().windows?.sandbox
-    return (typeof own === 'string' && !!own) || (typeof pc === 'string' && /^[\w-]{1,24}$/.test(pc))
+    return (typeof own === 'string' && !!own) || connectionSandboxArgs(home).length > 0
+  }
+
+  /** Its Set Up runs Codex as the connection's launches do (HI-1893): its login store and its sandbox. */
+  connectionSetUpArgs(home: string): string[] {
+    return launchConnectionArgs({ connectionHome: home })
   }
 
   /**
