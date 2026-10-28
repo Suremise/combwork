@@ -28,7 +28,7 @@
   "tasks.error.decisionsUsers": "カードの決定事項を変更・削除できるのはユーザーだけです。",
   "tasks.error.emptyComment": "コメントが空です。",
   "tasks.error.emptyDecision": "決定事項が空です。",
-  "tasks.error.failedStays": "レビューが不合格のとき、{card}は「レビュー」に残ります。columnを指定せずに判定を送ってください。",
+  "tasks.error.failedToDoing": "レビューが不合格のとき、{card}は「進行中」に戻り、ビルダーの担当になります。columnを指定せずに判定を送ってください。",
   "tasks.error.holdCard": "カードを「保留」にできるのはユーザーかアシスタントだけです。{card}を保留にするよう、ユーザーに頼んでください。",
   "tasks.error.holdNew": "カードを「保留」にできるのはユーザーかアシスタントだけです。保留にするよう、ユーザーに頼んでください。",
   "tasks.error.inDoingWith": "{card}は「{active}」で、エージェント{agent}が作業しています。新しい作業が進んでいるため、別のエージェントが「{stage}」に移動することはできません。そのままにしてください。作業が終わればエージェント{agent}が「{review}」に移動します。ユーザーも移動できます。",

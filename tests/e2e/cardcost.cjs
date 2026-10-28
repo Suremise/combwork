@@ -84,8 +84,10 @@ const plain = (s) => (s ?? '').replace(/ /g, ' ')
   check('the reviewer starts', (await api(tr, 'PATCH', `/v1/tasks/${n}`, { review: 'start' })).status === 200)
   check("the reviewer's turn", await turn(r))
   // Round 1 fails (HI-1906: a card's cost by round), round 2 passes.
-  const failedIt = await api(tr, 'POST', `/v1/tasks/${encodeURIComponent(await lib.cardLabel(inv, n))}/verdict`, { pass: false, comment: 'Fix it.' })
-  check('…and fails it: back in Doing', failedIt.status === 200 && failedIt.body?.to === 'active', JSON.stringify(failedIt.body))
+  // Its project has no workflow chosen (no Review stage in its rules): the old move, which sends it back to Doing as the
+  // verdict intent does (HI-1946), its builder holding it for round 2.
+  const failedIt = await api(tr, 'PATCH', `/v1/tasks/${n}`, { review: 'failed', comment: 'Fix it.' })
+  check('…and fails it: back in Doing, its builder’s', failedIt.status === 200 && failedIt.body?.column === 'doing' && failedIt.body?.agent?.name === 'B1', JSON.stringify(failedIt.body))
   check("the builder's turn on round 2", await turn(b))
   check('…to Review again', (await api(tb, 'PATCH', `/v1/tasks/${n}`, { column: 'review', comment: 'Fixed.' })).status === 200)
   check('the reviewer starts round 2', (await api(tr, 'PATCH', `/v1/tasks/${n}`, { review: 'start' })).status === 200)

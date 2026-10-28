@@ -28,7 +28,7 @@
   "tasks.error.decisionsUsers": "Decyzje karty zmienia i usuwa tylko użytkownik.",
   "tasks.error.emptyComment": "Komentarz jest pusty.",
   "tasks.error.emptyDecision": "Decyzja jest pusta.",
-  "tasks.error.failedStays": "Po nieudanej recenzji {card} zostaje w Recenzji: podaj werdykt bez column.",
+  "tasks.error.failedToDoing": "Po nieudanej recenzji {card} wraca do kolumny Aktywne, do swojego wykonawcy: podaj werdykt bez column.",
   "tasks.error.holdCard": "Tylko użytkownik lub Asystent przenosi karty do Wstrzymanych: poproś użytkownika o odłożenie {card}.",
   "tasks.error.holdNew": "Tylko użytkownik lub Asystent umieszcza karty we Wstrzymanych: poproś użytkownika o jej odłożenie.",
   "tasks.error.inDoingWith": "Karta {card} jest w kolumnie {active} u agenta {agent}, który nad nią pracuje: trwa nowsza praca, więc inny agent nie może przenieść jej do kolumny {stage}. Zostaw ją tam, gdzie jest; agent {agent} przeniesie ją do kolumny {review} po skończeniu, a użytkownik może ją przenieść.",

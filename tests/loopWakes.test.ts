@@ -123,18 +123,18 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await typedUntil(st, 1)
     expect(st.typed).toEqual([{ agent: 'r1', text: `[Hive] #${c} (B1's card) is in Review. You review this card in its loop: carry on with it (hive_read_task with latestComment for the comment in full).` }])
     await vi.waitFor(async () => expect(await history(w, c)).toContain('Hive: Woke R1 (alpha) to review it (a loop wake)'), HANG)
-    // Failed: the builder is woken with the verdict.
+    // Failed: the builder is woken with the verdict, the card back in Doing (HI-1946).
     st.status.set('r1', 'working')
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'failed' }, r1, { comment: 'Round 1: FAILED. 1. No delay.' }))
     await typedUntil(st, 2)
-    expect(st.typed.at(-1)).toEqual({ agent: 'b1', text: `[Hive] #${c} is in Review: R1 (alpha) failed it; latest comment by R1 (alpha): "Round 1: FAILED. 1. No delay.". This is your card in its loop: carry on (hive_read_task with latestComment for the comment in full).` })
+    expect(st.typed.at(-1)).toEqual({ agent: 'b1', text: `[Hive] #${c} is in Doing: R1 (alpha) failed it; latest comment by R1 (alpha): "Round 1: FAILED. 1. No delay.". This is your card in its loop: carry on (hive_read_task with latestComment for the comment in full).` })
     await vi.waitFor(async () => expect(await history(w, c)).toContain('Hive: Woke B1 (alpha) with its verdict (a loop wake)'), HANG)
-    // Returned for round 2 by the builder: the reviewer again; passed: the builder again.
+    // Round 2 submitted by the builder: the reviewer again; passed: the builder again.
     st.status.set('r1', 'ready')
     await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
     await typedUntil(st, 3)
-    expect(st.typed.at(-1)).toEqual({ agent: 'r1', text: `[Hive] #${c} (B1's card) was returned for review (round 2); latest comment by R1 (alpha): "Round 1: FAILED. 1. No delay.". You review this card in its loop: carry on with it (hive_read_task with latestComment for the comment in full).` })
+    expect(st.typed.at(-1)).toEqual({ agent: 'r1', text: `[Hive] #${c} (B1's card) is in Review; latest comment by R1 (alpha): "Round 1: FAILED. 1. No delay.". You review this card in its loop: carry on with it (hive_read_task with latestComment for the comment in full).` })
     st.status.set('b1', 'ready')
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 2: PASSED.' }))
@@ -262,7 +262,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
       await typedUntil(st, 3)
       await settled()
       expect(st.typed).toHaveLength(3)
-      expect(st.typed[2]).toMatchObject({ agent: 'r1', text: expect.stringMatching(/was returned for review \(round 2\)/) })
+      expect(st.typed[2]).toMatchObject({ agent: 'r1', text: expect.stringMatching(/\(B1's card\) is in Review/) })
       expect(loopWakes.pendingLoopWakes()).toEqual([])
     } finally {
       vi.useRealTimers()
@@ -400,12 +400,12 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await typedUntil(st, 1)
     await drained()
     expect(st.typed.map((t) => t.agent)).toEqual(['b1'])
-    // The builder returns it: that new round wakes the reviewer.
+    // The builder submits it again (HI-1946: from Doing): that new round wakes the reviewer.
     st.status.set('b1', 'ready')
     await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
     await typedUntil(st, 2)
     expect(st.typed.map((t) => t.agent)).toEqual(['b1', 'r1'])
-    expect(st.typed[1].text).toMatch(/was returned for review \(round 2\)/)
+    expect(st.typed[1].text).toMatch(/\(B1's card\) is in Review/)
     await disposeWorkspaceService(w)
   })
 

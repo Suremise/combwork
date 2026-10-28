@@ -28,7 +28,7 @@
   "tasks.error.decisionsUsers": "Only the user changes or removes a card's decisions.",
   "tasks.error.emptyComment": "The comment is empty.",
   "tasks.error.emptyDecision": "The decision is empty.",
-  "tasks.error.failedStays": "A failed review leaves {card} in Review: give the verdict without column.",
+  "tasks.error.failedToDoing": "A failed review sends {card} back to Doing, to its builder: give the verdict without column.",
   "tasks.error.holdCard": "Only the user or the Assistant puts cards On Hold: ask the user to park {card}.",
   "tasks.error.holdNew": "Only the user or the Assistant puts cards On Hold: ask the user to park it.",
   "tasks.error.inDoingWith": "{card} is in {active} with agent {agent}, who is working on it: newer work is in progress, so another agent can't move it to {stage}. Leave it where it is; agent {agent} moves it to {review} when done, and the user can move it.",

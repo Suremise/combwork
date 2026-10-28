@@ -52,6 +52,19 @@ describe('reviewing a card', () => {
   /** A card Coder did, waiting in Review. */
   const done = (title = 'Fix it') => run(() => tasks.createTask({ title, project: 'alpha', agent: 'c1', column: 'review' }, user))
   const history = (c: { history: { by: string; what: string }[] }) => c.history.map((h) => `${h.by}: ${h.what}`)
+  /**
+   * Reviewed and failed as before HI-1946, when a failed card stayed in Review for its fixes: a card failed then is still
+   * there, and is returned for review by its agent's move (#214). Today's verdict sends it back to Doing; the card is put
+   * back as that rule left it (in Review, no move to Doing, no builder hold from it).
+   */
+  const failedInReview = async (n: number): Promise<void> => {
+    await run(() => tasks.updateTask(n, { review: 'start' }, reviewer))
+    await run(() => tasks.updateTask(n, { review: 'failed' }, reviewer))
+    const doc = readCard(w, n)
+    const lines = doc.history as { what: string }[]
+    const held = (doc.held as { role: string; to?: string }[] | undefined) ?? []
+    await writeCard(w, n, { ...doc, column: 'review', history: lines.filter((h, i) => !(i === lines.length - 1 && h.what.startsWith('Moved to Doing'))), held: held.filter((h) => h.role !== 'build' || h.to) })
+  }
 
   it('a reviewer marks the card it reviews; the card stays in Review with the agent that did the work', async () => {
     const c = await done()
@@ -76,12 +89,14 @@ describe('reviewing a card', () => {
     await expect(run(() => tasks.updateTask(c.number, { review: 'failed' }, third))).rejects.toThrow(/Reviewer is reviewing/)
   })
 
-  it('the verdict ends the review; the card stays in Review, or goes to Done when asked in the same change', async () => {
+  it('the verdict ends the review; failed, the card goes back to Doing with its builder (HI-1946); passed, it stays in Review or goes to Done when asked in the same change', async () => {
     const a = await done()
     await run(() => tasks.updateTask(a.number, { review: 'start' }, reviewer))
     const failed = await run(() => tasks.updateTask(a.number, { review: 'failed' }, reviewer))
-    expect([failed.column, failed.agent, failed.review]).toEqual(['review', 'c1', undefined])
-    expect(history(failed).at(-1)).toBe('Reviewer (alpha): Review failed')
+    expect([failed.column, failed.agent, failed.review]).toEqual(['doing', 'c1', undefined])
+    expect(history(failed).slice(-2)).toEqual(['Reviewer (alpha): Review failed', 'Reviewer (alpha): Moved to Doing'])
+    // Its builder holds it again for its fixes; the reviewer's hold ended.
+    expect(failed.held?.map((h) => [h.name, h.role, !!h.to])).toEqual([['Reviewer', 'review', true], ['Coder', 'build', false]])
     const b = await done()
     await run(() => tasks.updateTask(b.number, { review: 'start' }, reviewer))
     const passed = await run(() => tasks.updateTask(b.number, { review: 'passed', column: 'done' }, reviewer))
@@ -91,10 +106,7 @@ describe('reviewing a card', () => {
 
   it('a failed card its agent (or the user) moves to Review without it leaving is returned for review, round by round (#214)', async () => {
     const c = await done('Returned')
-    const fail = async () => {
-      await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
-      await run(() => tasks.updateTask(c.number, { review: 'failed' }, reviewer))
-    }
+    const fail = () => failedInReview(c.number)
     const move = async (who: Parameters<typeof tasks.updateTask>[2]) => {
       const said: string[] = []
       const card = await run(() => tasks.updateTask(c.number, { column: 'review' }, who, { said }))
@@ -114,7 +126,7 @@ describe('reviewing a card', () => {
     // Under review again: not returnable meanwhile.
     await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
     expect((await move(coder)).said).toEqual([])
-    await run(() => tasks.updateTask(c.number, { review: 'failed' }, reviewer))
+    await fail()
     // Fixed through Doing as before: an ordinary move back, and nothing to return after it.
     await run(() => tasks.updateTask(c.number, { column: 'doing' }, coder))
     expect((await move(coder)).said).toEqual(['Moved to Review'])
@@ -134,10 +146,7 @@ describe('reviewing a card', () => {
       await run(() => tasks.updateTask(c.number, patch, who, { said: out }))
       return out
     }
-    const fail = async () => {
-      await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
-      await run(() => tasks.updateTask(c.number, { review: 'failed' }, reviewer))
-    }
+    const fail = () => failedInReview(c.number)
     await fail()
     // Another agent giving it to itself: the assignment doesn't make the return its own.
     expect(await said({ agent: 't1', column: 'review' }, third)).toEqual(['Given to Third'])

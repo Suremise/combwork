@@ -692,6 +692,9 @@ describe('notices (#1266, §16.11.4)', () => {
       const card = await inWorkspace(w, () => tasks.getTask(c, w))
       expect(JSON.stringify(card.history.filter((h) => /failed/i.test(JSON.stringify(h))))).not.toContain('Narrow card chips')
       expect((await lanesOf(c)).map((l) => l.state).sort()).toEqual(['abandoned', 'active'])
+      // Closed with its test (HI-1946): its failed card is back in Doing, its builder's, and a later test's stand-in
+      // sessions don't run that builder, so the lane's next look would tell its card stalled in that test.
+      await disposeWorkspaceService(w)
     }
   })
 
@@ -1371,7 +1374,7 @@ describe("a lane builder whose watch a decision's notice ended, and that ends it
       await deliveries.offerAllForTests()
       expect(st.typed.filter((t) => t.agent === 'b1')).toHaveLength(2)
     }, HANG)
-    expect(st.typed.filter((t) => t.agent === 'b1')[1].text).toMatch(new RegExp(`^\\[Hive\\] #${c} is in Doing; latest comment by R1 \\(alpha\\): "Round 1: FAILED`))
+    expect(st.typed.filter((t) => t.agent === 'b1')[1].text).toMatch(new RegExp(`^\\[Hive\\] #${c} is in Doing: R1 \\(alpha\\) failed it; latest comment by R1 \\(alpha\\): "Round 1: FAILED`))
     // Its move now: idle again with no watch, it is flagged, and the user told (in Hive the grace lets the wake land
     // first; here, with none, a check can also flag it in the moment before it is typed).
     await idleChecked('b1')

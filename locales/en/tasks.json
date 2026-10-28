@@ -115,9 +115,9 @@
     "defaultMessage": "The decision is empty.",
     "description": "An error: a decision recorded on a card has no text."
   },
-  "tasks.error.failedStays": {
-    "defaultMessage": "A failed review leaves {card} in Review: give the verdict without column.",
-    "description": "An error: a failed review also moved card {card} (its key, such as HI-12) out of Review; a failed card stays in Review. \"column\" is the name of the call's field: keep it as it is."
+  "tasks.error.failedToDoing": {
+    "defaultMessage": "A failed review sends {card} back to Doing, to its builder: give the verdict without column.",
+    "description": "An error: a failed review also tried to move card {card} (its key, such as HI-12) somewhere other than Doing; a failed card goes back to Doing, to the agent that built it. \"column\" is the name of the call's field: keep it as it is."
   },
   "tasks.error.holdCard": {
     "defaultMessage": "Only the user or the Assistant puts cards On Hold: ask the user to park {card}.",

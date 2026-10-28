@@ -1424,6 +1424,8 @@ async function agentGateOf(ws: WorkspaceService, n: number, patch: TaskPatch, ac
   const review = patch.review === 'start' || patch.review === 'passed' || patch.review === 'failed' ? patch.review : undefined
   // A review's start with a move or an agent is refused by P3's checks (a review starts on its own); one of another value too.
   if (patch.review !== undefined && (!review || (review === 'start' && (patch.column !== undefined || patch.agent !== undefined)))) return null
+  // A failed review moved anywhere but Doing: refused by P3's check (HI-1946), before anything is written, on either path.
+  if (review === 'failed' && patch.column !== undefined && patch.column !== 'doing') return null
   const column = patch.column
   if (!review && (column === undefined || !isTaskColumn(column) || column === 'hold')) return null
   const { workflowEnforced, workflowFor } = await import('./workflow/service')
@@ -2062,6 +2064,10 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     // by whoever has it now, so giving it to the caller in the same change never makes it the caller's to return.
     const returning = patch.column === 'review' && patch.review === undefined && returnsCard(actor, card) ? returnRound(card) : null
     const { agent: hadAgent, project: hadProject } = card
+    // A failed review (P3's path: HI-1946) sends the card back to Doing, still its builder's, as the verdict intent does:
+    // checked first in reviewChange (who reviews, a column other than Doing refused), then moved as any change moves it.
+    const failing = patch.review === 'failed' && !changeByRuntime()
+    if (failing && patch.column === undefined) patch = { ...patch, column: 'doing' }
     // A card moved within its column: saved, but not worth a line in its history.
     let reordered = false
     let transferred = false
@@ -2101,7 +2107,7 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     // change): also from another agent, who wasn't working on it since it wasn't in Doing ("Given to …" in its history).
     // Not when the change keeps its agent (#1267: a reviewer's failed verdict moves the card back into Doing, its builder's
     // still, whoever it is given to by then), nor the card's reviewer's own move back (HI-1832: it stays its builder's).
-    const own = !opts.keepAgent && !transferred && patch.agent === undefined && patch.column === 'doing' && card.column !== 'doing' && !reviewerMovesBack(ws, card, actor) ? selfIn(actor, card.project) : null
+    const own = !opts.keepAgent && !failing && !transferred && patch.agent === undefined && patch.column === 'doing' && card.column !== 'doing' && !reviewerMovesBack(ws, card, actor) ? selfIn(actor, card.project) : null
     const agent = patch.agent !== undefined ? patch.agent : (own ?? undefined)
     if (agent !== undefined && !(transferred && !agent)) {
       if (agent) {
@@ -2297,9 +2303,10 @@ async function reviewChange(card: TaskCard, patch: TaskPatch, actor: TaskActor, 
     return true
   }
   if (patch.review !== 'passed' && patch.review !== 'failed') throw hiveError(msg({ id: 'tasks.error.unknownReview', defaultMessage: 'Unknown review "{review}": start, passed or failed.', description: 'An error: the call\'s review was {review}, which it doesn\'t take. "start", "passed" and "failed" are the values it takes: keep them as they are.' }), { review: String(patch.review) })
-  // A failed card stays in Review for its fixes: never on to Passed or Done with its verdict.
-  // (The runtime's own verdict, #1267, moves a failed card on itself: its column is the stage it left.)
-  if (patch.review === 'failed' && patch.column !== undefined && patch.column !== 'review' && !changeByRuntime()) throw hiveError(msg({ id: 'tasks.error.failedStays', defaultMessage: 'A failed review leaves {card} in Review: give the verdict without column.', description: 'An error: a failed review also moved card {card} (its key, such as HI-12) out of Review; a failed card stays in Review. "column" is the name of the call\'s field: keep it as it is.' }), { card: cardRef(n) }, { kind: 'invalid' })
+  // A failed card goes back to Doing for its fixes, its builder's (HI-1946: as the verdict intent does, whatever the
+  // rules): never anywhere else with its verdict. (The runtime's own verdict, #1267, moves a failed card itself: its
+  // column is the stage it left.)
+  if (patch.review === 'failed' && patch.column !== undefined && patch.column !== 'doing' && !changeByRuntime()) throw hiveError(msg({ id: 'tasks.error.failedToDoing', defaultMessage: 'A failed review sends {card} back to Doing, to its builder: give the verdict without column.', description: 'An error: a failed review also tried to move card {card} (its key, such as HI-12) somewhere other than Doing; a failed card goes back to Doing, to the agent that built it. "column" is the name of the call\'s field: keep it as it is.' }), { card: cardRef(n) }, { kind: 'invalid' })
   // The runtime's own verdict (#1267, #1268) was checked by its guards (who reviews, which submission): the card's review
   // mark, a 0.9 field, may be missing (its session ended since) or another reviewer's.
   if (card.review && card.review.agent !== me && !changeByRuntime()) throw hiveError(msg({ id: 'tasks.error.verdictNotYours', defaultMessage: '{agent} is reviewing {card}: its verdict is its own.', description: "An error: an agent tried to give a verdict on card {card} (its key, such as HI-12), which another agent ({agent}, its name) is reviewing." }), { agent: card.review.agentName, card: cardRef(n) })
