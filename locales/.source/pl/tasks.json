@@ -169,7 +169,7 @@
   "tasks.start.movedProject": "{card} moved to {project} meanwhile. Start it again.",
   "tasks.start.movedWorkspace": "{card} moved to the workspace meanwhile. Start it again.",
   "tasks.start.noProject": "{card} has no project. Give it one first: the agent works in that project.",
-  "tasks.start.noSlot": "{card} wasn't started: its project builds each card in a slot, and this start got none, so its agent would have worked in the project folder. The card is back where it was: start it again.",
+  "tasks.start.noSlot": "{card} wasn't started: its project builds each card in a slot, and {active, select, yes {its start has none} other {this start got none}}, so its agent would have worked in the project folder. {active, select, yes {Put it back to Todo, then start it again.} other {The card is back where it was: start it again.}}",
   "tasks.start.notGiven": "{agent} wasn't given {card}: {why}.",
   "tasks.start.noteTooLong": "The note is too long (at most {max, number} characters).",
   "tasks.start.reassigned": "{card} was given to {who, select, another {another agent} other {nobody}} meanwhile. Start it again if it's still to do.",

@@ -44,7 +44,7 @@ export function agentBusyError(agent: string, status: string): HiveError {
 }
 
 /** A Start undone because the card's start got no slot where its project builds in slots (HI-1966). */
-const NO_SLOT = msg({ id: 'tasks.start.noSlot', defaultMessage: "{card} wasn't started: its project builds each card in a slot, and this start got none, so its agent would have worked in the project folder. The card is back where it was: start it again.", description: "An error: a Start of the card {card} (its key, such as HI-12) was undone. The card's project has each card built in a slot (a working folder of its own), but this start wasn't given one, so the agent would have worked in the project's own folder instead. The card was moved back to its column." })
+const NO_SLOT = msg({ id: 'tasks.start.noSlot', defaultMessage: "{card} wasn't started: its project builds each card in a slot, and {active, select, yes {its start has none} other {this start got none}}, so its agent would have worked in the project folder. {active, select, yes {Put it back to Todo, then start it again.} other {The card is back where it was: start it again.}}", description: "An error: a Start of the card {card} (its key, such as HI-12) was refused. The card's project has each card built in a slot (a working folder of its own), but the card's start has no slot, so the agent would have worked in the project's own folder instead. {active} (select): yes, the card was already Active (in work) with no slot, and must be put back to Todo and started again; other, this start was undone and the card moved back to its column. Translate both." })
 
 /** Cards being started now ("<workspace>#<n>"): a second Start of the same card is refused, not run twice. */
 const starting = new Set<string>()
@@ -216,7 +216,8 @@ async function giveCard(
     }
     // A start that got no slot where its project builds in slots (HI-1966) is undone, never its agent launched in the project
     // folder; the user's Start across the rules (with its reason) starts where the agent is, as they chose.
-    if (before.column !== 'doing' && !(reason && actor.kind === 'user') && (await startedOutsideSlots(workspaceOf(p), p, n))) throw hiveError(NO_SLOT, { card: cardRef(n) }, { kind: 'conflict' })
+    // Already Active with no slot (HR2's round 1: a start from before this fix, given again) is refused the same way.
+    if (!(reason && actor.kind === 'user') && (await startedOutsideSlots(workspaceOf(p), p, n))) throw hiveError(NO_SLOT, { card: cardRef(n), active: before.column === 'doing' ? 'yes' : 'no' }, { kind: 'conflict' })
     const prompt = advanced.get<boolean>(RAW_CARD_START) ? rawTaskPrompt(card, note) : taskPrompt(card, !!sessions.hiveMcp(p), { from: before.column, note, context, attachments: await cardAttachments(workspace, n) })
     // Started in a slot (#1438): Hive gives it to the agent there once the slot is ready (a new conversation where the
     // agent isn't running there), so nothing is typed where it is now. Only while that placement is still to come: a card

@@ -164,7 +164,7 @@
   "tasks.start.archived": "{card} ist archiviert. Hol die Karte zuerst zurück.",
   "tasks.start.beingGiven": "Agent {agent} bekommt gerade eine andere Karte. Starte diese, sobald der Agent untätig ist, oder gib sie einem anderen Agenten.",
   "tasks.start.changed": "{card} wurde geändert, während es gestartet wurde (archiviert, verschoben, einem anderen Agenten gegeben oder „Zuerst lesen“ bearbeitet): Starte es erneut, wenn es noch starten soll.",
-  "tasks.start.noSlot": "{card} wurde nicht gestartet: Sein Projekt baut jede Karte in einem eigenen Slot, und dieser Start hat keinen bekommen, sein Agent hätte also im Projektordner gearbeitet. Die Karte ist wieder dort, wo sie war: Starte sie erneut.",
+  "tasks.start.noSlot": "{card} wurde nicht gestartet: Sein Projekt baut jede Karte in einem eigenen Slot, und {active, select, yes {sein Start hat keinen} other {dieser Start hat keinen bekommen}}, sein Agent hätte also im Projektordner gearbeitet. {active, select, yes {Lege die Karte zurück nach Offen und starte sie dann erneut.} other {Die Karte ist wieder dort, wo sie war: Starte sie erneut.}}",
   "tasks.start.movedColumn": "{card} wurde inzwischen nach {column, select, hold {Geparkt} todo {Offen} doing {In Arbeit} review {Review} passed {Genehmigt} done {Erledigt} other {{column}}} verschoben. Starte die Karte erneut, wenn sie noch zu erledigen ist.",
   "tasks.start.movedDone": "{card} wurde inzwischen nach Erledigt verschoben. Starte die Karte erneut, wenn noch etwas zu tun ist.",
   "tasks.start.movedProject": "{card} wurde inzwischen nach {project} verschoben. Starte die Karte erneut.",

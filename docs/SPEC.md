@@ -1573,7 +1573,9 @@ that starts after the upgrade loses the mark and is a 1.0 card from then on [Dar
   write, as P3's start recorded them. Its other moves keep P3's path until it starts. As well, a Start whose card still
   started with no slot in a project that builds in slots (not a slot's folder, nor its builder's 0.9 worktree not yet
   migrated) is undone, the card back where it was, "wasn't started: its project builds each card in a slot…", never its
-  agent launched in the project folder; the user's Start across the rules, with its reason, starts where the agent is.
+  agent launched in the project folder. A Start of a card already Active with no slot (a start from before this fix) is
+  refused the same way, the card left Active: "Put it back to Todo, then start it again" [HR2's round 1]. The user's
+  Start across the rules, with its reason, starts where the agent is.
 
 **P3 records facts from today's moves, refusing nothing** [#1216]: every card change writes its facts in its own
 transaction (into Doing with an agent `Started`; into Review `Submitted`; a review's start and verdict; each column change

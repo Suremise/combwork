@@ -164,7 +164,7 @@
   "tasks.start.archived": "{card} 已归档。请先恢复它。",
   "tasks.start.beingGiven": "{agent} 正在接收另一张卡片。请等它空闲后再开始这张，或交给其他智能体。",
   "tasks.start.changed": "{card} 在启动过程中被修改了（已归档、已移动、已交给其他智能体，或它的“先读”被编辑）：如果仍要开始，请重新启动。",
-  "tasks.start.noSlot": "{card} 没有启动：它的项目在各自的槽位中构建每张卡片，而这次启动没有得到槽位，所以它的智能体本会在项目文件夹中工作。卡片已回到原处：请重新启动它。",
+  "tasks.start.noSlot": "{card} 没有启动：它的项目在各自的槽位中构建每张卡片，而{active, select, yes {它的启动没有槽位} other {这次启动没有得到槽位}}，所以它的智能体本会在项目文件夹中工作。{active, select, yes {请把它放回待办，然后重新启动。} other {卡片已回到原处：请重新启动它。}}",
   "tasks.start.movedColumn": "在此期间 {card} 已被移到“{column, select, hold {搁置} todo {待办} doing {进行中} review {评审} passed {已批准} done {已完成} other {{column}}}”。如果仍需处理，请重新开始。",
   "tasks.start.movedDone": "在此期间 {card} 已被移到“已完成”。如果还有工作要做，请重新开始。",
   "tasks.start.movedProject": "在此期间 {card} 已移到 {project}。请重新开始。",

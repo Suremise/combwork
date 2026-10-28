@@ -20,7 +20,8 @@ const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
 const { advanced } = await import('../src/main/advanced')
-const { setSlotStarts } = await import('../src/main/workflow/service')
+const { setSlotStarts, workflowFor } = await import('../src/main/workflow/service')
+const { sessions } = await import('../src/main/sessions')
 const { startTask } = await import('../src/main/taskStart')
 const { allOff } = await import('../src/shared/workflow/options')
 
@@ -122,5 +123,28 @@ describe("a card from before 1.0 started by the board, in a project that builds 
     expect(lending.asked).toBe(1)
     const now = await inWorkspace(w, () => tasks.getTask(card))
     expect([now.column, now.agent]).toEqual(['todo', null])
+  })
+
+  it("a Start of a card already Active with no slot (a start from before the fix) is refused, its builder never launched (HR2's round 1)", async () => {
+    const w = await workspace()
+    const card = await inWorkspace(w, async () => (await tasks.createTask({ title: 'Started with none', project: 'p' }, user)).number)
+    // Its start as rc.9 left it: Active for a1, with no lease (where the agent was).
+    lending.slot = false
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.start(`#${card}`, 'agent:a1'))
+    expect(facts(w, card).find((f) => f.kind === 'Started')?.data).toMatchObject({ folder: 'project', builder: 'a1' })
+    const s = sessions as unknown as { start: (p: string, o: { agentId: string }) => Promise<unknown> }
+    const original = s.start
+    const launched: string[] = []
+    s.start = async (p) => void launched.push(p)
+    try {
+      await expect(inWorkspace(w, () => startTask(card, { kind: 'agent', agentId: 'a1' }, assistant))).rejects.toThrow(/its start has none.*Put it back to Todo/)
+    } finally {
+      s.start = original
+    }
+    expect(launched).toEqual([])
+    // Left as it was: Active, its agent as before the Start (the runtime's start alone gave it none on the board).
+    const now = await inWorkspace(w, () => tasks.getTask(card))
+    expect([now.column, now.agent]).toEqual(['doing', null])
   })
 })
