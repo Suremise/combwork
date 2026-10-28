@@ -225,6 +225,10 @@ const lines = (file) => {
 
   // --- The same in Japanese: the profile started again with HIVE_LANG=ja; the lane's hover and the copy's run.
   if (laneId && runId && !failed) {
+    // B1 was in a running lane as the first start quit, so the quit recorded it to resume (restart.json in the profile)
+    // and this start would offer it: that toast, shown or not depending on the reload, covered the lane row (HI-1955).
+    // Resuming isn't this pass's subject: it starts with nothing to resume.
+    fs.rmSync(path.join(userData, 'restart.json'), { force: true })
     const ja = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', HIVE_LANG: 'ja' } })
     try {
       ja.page.on('pageerror', (e) => check('no page errors (ja)', false, e.message))
