@@ -68,13 +68,13 @@ export interface Totals {
  * A total cost as the window shows it: "≈ $1.20" when every session in it has a cost, "≈ $1.20 + ?" when some have none (a known
  * subtotal, incomplete), "Unknown" when none has: sessions Hive couldn't price never count as $0.
  */
-export function costText(t: { cost: number; estimated: boolean; priced: number; unpriced: number; free?: number }): string {
+export function costText(t: { cost: number; estimated: boolean; priced: number; unpriced: number; free?: number }, label: (n: number) => string = moneyLabel): string {
   // Only free sessions (HI-1772): free (local); free ones beside others: said after the others' cost.
   if (t.free && !t.priced && !t.unpriced) return tr(FREE_LOCAL)
-  if (t.free) return tr(M.withFree, { cost: costText({ ...t, free: 0 }) })
+  if (t.free) return tr(M.withFree, { cost: costText({ ...t, free: 0 }, label) })
   if (t.unpriced && !t.priced) return tr(M.unknown)
   // Non-breaking spaces: "≈ $1.00 + ?" is one value, never split over lines (#241).
-  return `${t.estimated ? '≈ ' : ''}${moneyLabel(t.cost)}${t.unpriced ? ' + ?' : ''}`
+  return `${t.estimated ? '≈ ' : ''}${label(t.cost)}${t.unpriced ? ' + ?' : ''}`
 }
 
 /**
@@ -85,6 +85,19 @@ export function moneyLabel(n: number): string {
   if (n >= 100) return fmt.number(n, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
   if (n > 0 && n < 0.01) return tr(M.belowCent, { cent: fmt.usd(0.01) })
   return fmt.usd(n)
+}
+
+/** The unit moneyLabel shows an amount in: a cent, or a dollar from $100. */
+export const moneyUnit = (n: number): number => (n >= 100 ? 1 : 0.01)
+
+/**
+ * A number of `unit`s (moneyUnit's) as the window shows money, always in that unit's precision, so amounts shown together
+ * add up as shown (HI-1906: a table of parts); none of them, for an amount that isn't nothing, "< $0.01" (or "< $1").
+ */
+export function unitMoneyLabel(units: number, unit: number, exact: number): string {
+  const label = (n: number): string => (unit >= 1 ? fmt.number(n, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : fmt.usd(n))
+  if (units === 0 && exact > 0) return tr(M.belowCent, { cent: label(unit) })
+  return label(units * unit)
 }
 
 /** Every token counted: new input, cache writes, input read from cache, and output. */

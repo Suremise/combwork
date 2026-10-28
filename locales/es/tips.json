@@ -113,6 +113,8 @@
   "tips.cardAttachmentsCleanup.title": "Las capturas de las tarjetas archivadas se limpian solas",
   "tips.cardCost.text": "El panel de una tarjeta dice lo que usaron sus agentes mientras la tenían, “{example}”, con las partes del autor y del revisor y los tokens al pasar el puntero. Rendimiento muestra el costo de cada tarjeta, y al pasar el puntero por un carril en el panel Progreso, sus gastos generales.",
   "tips.cardCost.title": "Lo que costó una tarjeta",
+  "tips.cardCostRounds.text": "La sección Trabajo de una tarjeta termina con su costo por ronda: las partes del autor y del revisor en cada ronda, que suman el costo de la tarjeta. Mira si lo causaron rondas de más o una lectura larga.",
+  "tips.cardCostRounds.title": "Lo que costó cada ronda de revisión",
   "tips.cardDecisions.text": "Las Decisiones de una tarjeta, encima de sus comentarios, guardan lo que decidiste: los agentes comprueban su trabajo con ellas antes de Revisión, y los revisores rechazan el trabajo que ignore alguna. Dile una decisión al Asistente y la anota ahí; si un agente espera tu respuesta, se le avisa.",
   "tips.cardDecisions.title": "Pon en la tarjeta lo que decides",
   "tips.cardLinks.text": "Los números de tarjeta que imprime un agente o el Asistente, como #12, son enlaces: pasa el puntero por uno para ver su título y su columna, y haz Ctrl+clic para abrir la tarjeta.",

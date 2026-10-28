@@ -10368,6 +10368,45 @@ textarea.input.task-blocked-input {
   color: var(--fg-muted);
   margin-block-start: 4px;
 }
+/* A card's cost by round and role (HI-1906): amounts right-aligned in their columns, the totals set apart. */
+.card-work-costs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card-work-costs table {
+  border-collapse: collapse;
+  width: max-content;
+  max-width: 100%;
+}
+.card-work-costs th,
+.card-work-costs td {
+  padding: 2px 10px;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.card-work-costs th:first-child {
+  padding-inline-start: 0;
+  text-align: start;
+}
+.card-work-costs thead th {
+  color: var(--fg-muted);
+  font-weight: normal;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.card-work-costs tbody th {
+  font-weight: normal;
+}
+.card-work-costs tfoot th,
+.card-work-costs tfoot td,
+.card-work-costs td[data-role='total'] {
+  font-weight: 600;
+}
+.card-work-costs tfoot th,
+.card-work-costs tfoot td {
+  border-top: 1px solid var(--border-subtle);
+}
 .card-work-rev {
   border: 1px solid var(--border-subtle);
   border-radius: 6px;

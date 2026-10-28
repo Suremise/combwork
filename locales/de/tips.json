@@ -113,6 +113,8 @@
   "tips.cardAttachmentsCleanup.title": "Screenshots archivierter Karten räumen sich selbst auf",
   "tips.cardCost.text": "Das Panel einer Karte zeigt, was ihre Agenten verbraucht haben, während sie sie hatten, „{example}“, mit den Anteilen von Bearbeiter und Reviewer und den Tokens beim Darüberfahren. „Leistung“ listet die Kosten jeder Karte, und beim Darüberfahren über eine Lane im Fortschrittspanel siehst du ihren Overhead.",
   "tips.cardCost.title": "Was eine Karte gekostet hat",
+  "tips.cardCostRounds.text": "Der Abschnitt „Arbeit“ einer Karte endet mit ihren Kosten nach Runde: die Anteile von Bearbeiter und Reviewer in jeder Runde, die zusammen die Kosten der Karte ergeben. So siehst du, ob zusätzliche Runden oder ein langes Einlesen sie verursacht haben.",
+  "tips.cardCostRounds.title": "Was jede Review-Runde gekostet hat",
   "tips.cardDecisions.text": "Die Entscheidungen einer Karte, über ihren Kommentaren, halten fest, was du entschieden hast: Agenten prüfen ihre Arbeit vor dem Review daran, und Reviewer lassen Arbeit durchfallen, die eine davon missachtet. Sag dem Assistenten eine Entscheidung, und er trägt sie dort ein; ein Agent, der auf deine Antwort wartet, erfährt es.",
   "tips.cardDecisions.title": "Was du entscheidest, gehört auf die Karte",
   "tips.cardLinks.text": "Kartennummern, die ein Agent oder der Assistent ausgibt, etwa #12, sind Links: Fahre mit der Maus darüber für Titel und Spalte, und öffne die Karte mit Strg+Klick.",

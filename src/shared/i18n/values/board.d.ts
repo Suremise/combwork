@@ -158,14 +158,23 @@ interface HiveMessageValues {
   'board.cost.tokens': { estimated: string; input: string | number; output: string | number; cacheWrite: string | number; cacheRead: string | number; unknown: string; requests: number }
   'board.cost.tokensUnknown': { requests: number }
   'board.costs.builder': undefined
+  'board.costs.byRound': undefined
+  'board.costs.byRoundFailed': undefined
+  'board.costs.byRoundHourly': { days: number }
+  'board.costs.byRoundNote': undefined
   'board.costs.cost': undefined
   'board.costs.laneFailed': undefined
   'board.costs.laneLoading': undefined
   'board.costs.note': { zero: string | number }
   'board.costs.onCards': undefined
+  'board.costs.outsideRow': undefined
   'board.costs.overhead': undefined
   'board.costs.overheadNote': undefined
   'board.costs.reviewer': undefined
+  'board.costs.roundColumn': undefined
+  'board.costs.roundRow': { round: number }
+  'board.costs.roundVerdict': { verdict: string }
+  'board.costs.totalColumn': undefined
   'board.costs.unmatched': { n: number }
   'board.decision.add': undefined
   'board.decision.blank': undefined

@@ -113,6 +113,8 @@
   "tips.cardAttachmentsCleanup.title": "Archived cards' screenshots clean up after themselves",
   "tips.cardCost.text": "A card's panel says what its agents used while they held it, \"{example}\", with the builder's and reviewer's parts and tokens on hover. Performance lists every card's cost, and a lane's hover in the Progress panel its overhead.",
   "tips.cardCost.title": "What a card cost",
+  "tips.cardCostRounds.text": "A card's Work section ends with its cost by round: the builder's and reviewer's parts in each round, adding up to the card's cost. See whether extra rounds or one long read drove it.",
+  "tips.cardCostRounds.title": "What each review round cost",
   "tips.cardDecisions.text": "A card's Decisions, above its comments, hold what you decided: agents check their work against them before Review, and reviewers fail work that ignores one. Tell the Assistant a decision and it records it there; an agent waiting for your answer is told.",
   "tips.cardDecisions.title": "Put what you decide on the card",
   "tips.cardLinks.text": "Card numbers an agent or the Assistant prints, like #12, are links: hover one for its title and column, and Ctrl+click it to open the card.",

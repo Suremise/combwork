@@ -61,7 +61,7 @@ export type WorkerRequest = { id: number } & (
   | { type: 'kept'; file: string; job: KeptJob }
   | { type: 'sessions'; file: string; scopes: string[] | null }
   | { type: 'cards'; file: string; cards: number[] }
-  | { type: 'timelines'; file: string; scope: string }
+  | { type: 'timelines'; file: string; scope: string; sessions?: string[] }
   | { type: 'ids'; file: string; scope: string }
   | { type: 'meta'; file: string; scope: string; key: string; value?: string }
   | { type: 'forgetStates'; file: string; before: string }
@@ -597,7 +597,7 @@ export async function handleRequest(m: WorkerRequest): Promise<unknown> {
     case 'cards':
       return cardRows(dbOf(m.file).reader, m.cards)
     case 'timelines':
-      return storedTimelines(dbOf(m.file).reader, m.scope)
+      return storedTimelines(dbOf(m.file).reader, m.scope, m.sessions)
     case 'ids':
       return sessionIds(dbOf(m.file).reader, m.scope)
     case 'meta': {

@@ -113,6 +113,8 @@
   "tips.cardAttachmentsCleanup.title": "As capturas dos cartões arquivados se limpam sozinhas",
   "tips.cardCost.text": "O painel de um cartão diz o que os agentes dele usaram enquanto estavam com ele, “{example}”, com as partes e os tokens do executor e do revisor ao passar o mouse. Desempenho lista o custo de cada cartão, e a dica de uma raia no painel Progresso mostra o custo extra dela.",
   "tips.cardCost.title": "Quanto um cartão custou",
+  "tips.cardCostRounds.text": "A seção Trabalho de um cartão termina com o custo por rodada: as partes do executor e do revisor em cada rodada, que somam o custo do cartão. Veja se foram rodadas a mais ou uma leitura longa que o aumentaram.",
+  "tips.cardCostRounds.title": "Quanto custou cada rodada de revisão",
   "tips.cardDecisions.text": "As Decisões de um cartão, acima dos comentários, guardam o que você decidiu: os agentes conferem o trabalho com elas antes da Revisão, e os revisores reprovam o trabalho que ignora alguma. Diga uma decisão ao Assistente e ele a registra ali; um agente que espera a sua resposta é avisado.",
   "tips.cardDecisions.title": "Registre no cartão o que você decide",
   "tips.cardLinks.text": "Números de cartão que um agente ou o Assistente imprime, como #12, são links: passe o mouse sobre um para ver o título e a coluna, e use Ctrl+clique para abrir o cartão.",

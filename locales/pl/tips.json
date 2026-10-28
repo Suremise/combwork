@@ -113,6 +113,8 @@
   "tips.cardAttachmentsCleanup.title": "Zrzuty ekranu zarchiwizowanych kart same się sprzątają",
   "tips.cardCost.text": "Panel karty pokazuje, ile zużyli jej agenci, gdy nad nią pracowali: „{example}”, a po najechaniu kursorem części wykonawcy i recenzenta oraz tokeny. Wydajność pokazuje koszt każdej karty, a dymek toru w panelu Postęp – jego narzut.",
   "tips.cardCost.title": "Ile kosztowała karta",
+  "tips.cardCostRounds.text": "Sekcja Praca karty kończy się jej kosztem według rund: części wykonawcy i recenzenta w każdej rundzie, sumujące się do kosztu karty. Zobacz, czy podniosły go dodatkowe rundy, czy jedno długie wczytywanie.",
+  "tips.cardCostRounds.title": "Ile kosztowała każda runda recenzji",
   "tips.cardDecisions.text": "Decyzje karty, nad jej komentarzami, zawierają to, co postanowiono: agenci sprawdzają z nimi swoją pracę przed Recenzją, a recenzenci odrzucają pracę, która którąś pomija. Powiedz Asystentowi o decyzji, a zapisze ją tam; agent czekający na Twoją odpowiedź dostanie informację.",
   "tips.cardDecisions.title": "Zapisz decyzje na karcie",
   "tips.cardLinks.text": "Numery kart, które wypisuje agent lub Asystent, np. #12, są linkami: najedź na numer, żeby zobaczyć tytuł i kolumnę, i kliknij z Ctrl, żeby otworzyć kartę.",
