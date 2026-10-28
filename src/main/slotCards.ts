@@ -840,8 +840,8 @@ async function ensure(ws: WorkspaceService, projectPath: string, wf: Workflow, p
       setTimeout(() => void settleSlotCards(ws, projectPath), Math.min(60_000, 1000 * 2 ** (tries - 1))).unref?.()
     } else {
       attempts.delete(key)
-      // Given its card and running: an earlier try's failure is over.
-      startEnded(projectPath, l.agent, hold, placed && sessions.liveFor(projectPath, l.agent) ? { ok: true } : undefined)
+      // Given its card: its own earlier tries' failure is over (a CLI's that exited meanwhile stands: agentStarts.ts).
+      startEnded(projectPath, l.agent, hold, placed ? { ok: true } : undefined)
     }
   }
 }

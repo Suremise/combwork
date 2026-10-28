@@ -17,8 +17,13 @@ export const START_HOLD_MS = 10 * 60_000
 interface Entry {
   /** Each start under way, by tag: when it began. */
   holds: Map<string, number>
-  /** Why its last start failed: kept until a start of it succeeds, or a new Start begins. */
-  failed?: string
+  /**
+   * Why its last start failed, and what recorded it (`by`: a start's tag, or `cli` for its CLI exiting before its session
+   * started). Cleared only as a new attempt begins (a new Start, a new launch of its session), and by a start's success
+   * only where that start recorded it itself: a completion never clears a CLI's failure, which may land while a placement
+   * or a launch is still finishing (HR6's rounds 1 and 2).
+   */
+  failed?: { why: string; by: string }
 }
 
 const entries = new Map<string, Entry>()
@@ -45,20 +50,23 @@ export function startBegun(projectPath: string, agentId: string, tag: string, o:
   if (o.fresh) e.failed = undefined
 }
 
-/** The start under `tag` has ended: `ok`, its agent given its work (an earlier failure over); `failed`, why it couldn't start. */
+/**
+ * The start under `tag` has ended: `ok`, its agent given its work (a failure of its own earlier tries over, never another's);
+ * `failed`, why it couldn't start.
+ */
 export function startEnded(projectPath: string, agentId: string, tag: string, outcome?: { ok: true } | { failed: string }): void {
   const e = entries.get(keyOf(projectPath, agentId))
   if (!e && !(outcome && 'failed' in outcome)) return
   const entry = e ?? entryOf(projectPath, agentId)
   entry.holds.delete(tag)
-  if (outcome && 'failed' in outcome) entry.failed = oneLine(outcome.failed)
-  else if (outcome) entry.failed = undefined
+  if (outcome && 'failed' in outcome) entry.failed = { why: oneLine(outcome.failed), by: tag }
+  else if (outcome && entry.failed?.by === tag) entry.failed = undefined
   tidy(projectPath, agentId)
 }
 
 /** The agent's CLI exited before its session started (sessions.ts): its start failed, for this reason. */
 export function startFailed(projectPath: string, agentId: string, why: string): void {
-  entryOf(projectPath, agentId).failed = oneLine(why)
+  entryOf(projectPath, agentId).failed = { why: oneLine(why), by: 'cli' }
 }
 
 /**
@@ -76,7 +84,7 @@ export function startBegins(projectPath: string, agentId: string): void {
 export function startNow(projectPath: string, agentId: string, now = Date.now()): { starting: boolean; failed: string | null } {
   const e = entries.get(keyOf(projectPath, agentId))
   if (!e) return { starting: false, failed: null }
-  if (e.failed) return { starting: false, failed: e.failed }
+  if (e.failed) return { starting: false, failed: e.failed.why }
   return { starting: [...e.holds.values()].some((at) => now - at < START_HOLD_MS), failed: null }
 }
 

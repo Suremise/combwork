@@ -65,4 +65,20 @@ describe('a start that failed (HI-1976)', () => {
     startEnded(p, 'b1', '#12', { ok: true })
     expect(startNow(p, 'b1')).toEqual({ starting: false, failed: null })
   })
+
+  it("a start's success clears only a failure of its own tries, never its CLI's, which may land while it finishes (HR6's round 2)", () => {
+    // The placement's launch spawned the CLI, which failed; the placement then ends well, its exit's clean-up still going.
+    startBegun(p, 'b1', '#12', { fresh: true })
+    startFailed(p, 'b1', 'error: unknown option --bogus')
+    startEnded(p, 'b1', '#12', { ok: true })
+    expect(startNow(p, 'b1')).toEqual({ starting: false, failed: 'error: unknown option --bogus' })
+    // Another start's success leaves a failure it didn't record, too.
+    startEnded(p, 'b1', '#13', { failed: 'its slot could not be prepared' })
+    startEnded(p, 'b1', '#12', { ok: true })
+    expect(startNow(p, 'b1').failed).toBe('its slot could not be prepared')
+    // Only a new attempt clears a CLI's: a new launch of its session, or a new Start.
+    startFailed(p, 'b1', 'error: unknown option --bogus')
+    startBegins(p, 'b1')
+    expect(startNow(p, 'b1').failed).toBeNull()
+  })
 })
