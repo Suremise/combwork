@@ -11928,9 +11928,6 @@ button.progress-run-show:focus-visible {
   font-size: 12px;
   cursor: pointer;
 }
-.progress-card-head:hover {
-  background: var(--bg-hover);
-}
 .progress-card-head > .codicon,
 .progress-card-key,
 .progress-card-summary,
@@ -12027,8 +12024,34 @@ button.progress-card-key:hover {
   align-items: center;
   gap: 6px;
 }
-.progress-recent-took {
+.progress-recent-took,
+.progress-recent-at {
   flex-shrink: 0;
+}
+.progress-recent-at {
+  font-variant-numeric: tabular-nums;
+}
+/* Runs (HI-1925): what runs now on top, scrolling in what the dock leaves, down to nothing; the finished runs docked at
+   the bottom behind the lanes' edge, scrolling in their own height. */
+.progress-tab-runs > .progress-runs-body {
+  min-height: 0;
+}
+.progress-runs-dock {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-subtle);
+}
+.progress-runs-dock-list {
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+}
+.progress-runs-none {
+  padding: 3px 12px;
+  font-size: 12px;
 }
 .progress-recent:hover,
 .progress-recent-item.open > .progress-recent {

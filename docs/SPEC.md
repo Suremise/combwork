@@ -4586,15 +4586,22 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   after #1309 had them follow the runs, which left empty space under them), and holds no finished runs (the Assistant for Darren, 21 Oct: a run
   that ended stays a few seconds, then lives in Runs): the merge, a line for the unresolved failures (it opens Runs on
   them; above the runs and outside their scrolling list, so it stays in sight however many there are: HI-1923), the
-  runs going on, then the lanes, each with a dot for its current card's latest run. Runs: what runs, then
-  every kept run by day, the same thing's runs on a day folded into one line ("AL-12 cardwork ×4 · 2 failed, then
+  runs going on, then the lanes, each with a dot for its current card's latest run. Runs: what runs on top,
+  scrolling in what's left; every kept run docked at the bottom (HI-1925, Darren 28 Oct: "make today fixed to the
+  bottom like lanes on the pulse panel"), behind Pulse's lanes edge (one splitter, `DockEdge`: the lanes snap to whole
+  lanes, this one doesn't), by day, Today first, then Yesterday and older, scrolling in its own height: about 6.5 lane
+  rows by default, 1 to 10, unsnapped, kept per workspace (`progress-runs-today:<workspace>`), and on a short panel
+  what fits while the runs going on keep RUNS_KEEP_PX (its height back as the panel grows; its separator's range and
+  value say what shows). Today always heads it: "No runs today", "No runs match." (a filter matching only older runs),
+  or the dock's one line "No finished runs" when there are none; days roll over at midnight by the panel's clock. Every
+  run in the dock is its own line, only its details folded (several open at once, closed whenever Runs leaves the
+  screen or the workspace changes; nothing kept). The same thing's runs on a day fold into one line ("AL-12 cardwork ×4 · 2 failed, then
   passed"), with search and filters (failures, a lane's cards, an agent). Each day is grouped by card (HI-1701, Darren
   26 Oct): a heading per card, the card with the newest run first and **Other** (runs for no card) last, with its key
   (it opens the card), title, how many runs and how they went ("7 runs · 1 failed", "all passed", " · running" while
   one runs) and when the last ended; its icon shows a failure (✗ when a run's last try failed, ⚠ when one failed before
-  it passed). A card is open while one of its runs runs or failed and closed once all passed, unless the user chose,
-  which is kept per card for the session. Under it a line per run: its icon, who, what (the card's key left out of the
-  title) and how long; a run's retries fold as before ("B1 unit ×3 · 2 failed, then passed", the same failure-aware
+  it passed). A card's runs always show (HI-1925: never a whole card folded). Under it a line per run: its icon, who,
+  what (the card's key left out of the title), how long and when it ended; a run's retries fold as before ("B1 unit ×3 · 2 failed, then passed", the same failure-aware
   icon), and the merge queue's checks for the card into one line ("Hive (merge queue) lint, typecheck"). The commit,
   the copy, the command go in the hover, all of it in the details. The filters filter runs within cards and hide a card
   left with none; what runs stays on top, ungrouped. Merges and Lanes show theirs alone. #1228's

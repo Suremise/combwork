@@ -49,7 +49,7 @@ const rowsKey = (ws: string): string => `progress-lanes-rows:${ws.toLowerCase()}
 /** The room a bar has inside the panel: the panel's width less the row's margins and padding. */
 const BAR_INSET_PX = 38
 /** A lane's height with its margin, until one is measured. */
-const PITCH_PX = 61
+export const PITCH_PX = 61
 
 /** A lane's state in a word, in its header: none while it runs. */
 const stateWord = (state: Lane['state']): string | null =>
@@ -333,12 +333,35 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
 }
 
 /**
- * The section's top edge (#569): a window splitter (WAI-ARIA) whose value is the lanes shown now and whose maximum is
- * the most that fit (the runs above keep RUNS_KEEP_PX), not the choice kept. Dragging snaps to whole lanes from what
- * shows; a double-click goes back to the default; focused, Up and Down change it by a lane, Home and End to one and to
- * all that fit. A drag or key sets the choice to what it shows, also where a short panel had shown fewer than chosen.
+ * The lanes' top edge (#569): the shared dock edge (DockEdge) in whole lanes, from what shows; its maximum the most that
+ * fit (the runs above keep RUNS_KEEP_PX), not the choice kept.
  */
 function LanesEdge({ rowsKey: key, chosen, shown, min, max, count, pitch, fallback }: { rowsKey: string; chosen: number; shown: number; min: number; max: number; count: number; pitch: number; fallback: number }) {
+  return (
+    <DockEdge
+      paneKey={key}
+      chosen={chosen}
+      shown={shown}
+      min={min}
+      max={max}
+      pitch={pitch}
+      snap
+      label={tr(msg({ id: 'board.lanes.edge', defaultMessage: 'Lanes shown', description: "Accessible name of the handle on the top edge of the Progress panel's lanes: drag it for more or fewer lanes." }))}
+      valueText={tr(msg({ id: 'board.lanes.edgeValue', defaultMessage: '{shown} of {count, plural, one {# lane} other {# lanes}} shown', description: "The value of the handle on the top edge of the Progress panel's lanes, for screen readers: {shown} of the {count} lanes show." }), { shown, count })}
+      tip={tr(msg({ id: 'board.lanes.edgeTip', defaultMessage: 'Drag to show more or fewer lanes; double-click for {lanes}', description: "Tooltip of the handle on the top edge of the Progress panel's lanes. {lanes} is the default number of lanes shown." }), { lanes: fallback })}
+    />
+  )
+}
+
+/**
+ * The top edge of a section docked at the bottom of a Progress panel tab (#569; HI-1925: Pulse's lanes and Runs'
+ * finished runs share it): a window splitter (WAI-ARIA) whose value is the height shown now, in lane rows (`pitch` px
+ * each), and whose maximum is the most that fits, not the choice kept. `snap`: whole rows (the lanes); else it follows
+ * the pointer (Runs' dock: they aren't lanes). A double-click goes back to the default; focused, Up and Down change it
+ * by a row, Home and End to the least and the most that fit. A drag or key sets the choice, kept per workspace under
+ * `paneKey`, to what it shows, also where a short panel had shown less than chosen.
+ */
+export function DockEdge({ paneKey: key, chosen, shown, min, max, pitch, snap = false, label, valueText, tip }: { paneKey: string; chosen: number; shown: number; min: number; max: number; pitch: number; snap?: boolean; label: string; valueText: string; tip: string }) {
   const [dragging, setDragging] = useState(false)
   const put = (rows: number | null): void => {
     set((s) => {
@@ -349,6 +372,8 @@ function LanesEdge({ rowsKey: key, chosen, shown, min, max, count, pitch, fallba
     })
   }
   const save = (): void => void call('ui:setPane', key, get().panes[key] ?? null)
+  // Unsnapped, to a hundredth of a row: the same height for the same place, and nothing kept finer than a pixel.
+  const rowsAt = (dyPx: number): number => (snap ? draggedLaneRows(shown, dyPx, pitch, max, min) : Math.max(min, Math.min(max, Math.round((shown - dyPx / pitch) * 100) / 100)))
   const start = (e: React.PointerEvent<HTMLDivElement>): void => {
     if (e.button !== 0) return
     e.preventDefault()
@@ -359,7 +384,7 @@ function LanesEdge({ rowsKey: key, chosen, shown, min, max, count, pitch, fallba
     setDragging(true)
     document.body.classList.add('pane-resizing-v')
     const move = (ev: PointerEvent): void => {
-      const rows = draggedLaneRows(shown, ev.clientY - startY, pitch, max, min)
+      const rows = rowsAt(ev.clientY - startY)
       if (rows === last) return
       last = rows
       put(rows)
@@ -380,25 +405,27 @@ function LanesEdge({ rowsKey: key, chosen, shown, min, max, count, pitch, fallba
     put(null)
     save()
   }
+  // Said as shown: to a tenth of a row.
+  const round = (n: number): number => Math.round(n * 10) / 10
   return (
     <div
       className={cx('progress-lanes-edge', dragging && 'dragging')}
       role="separator"
       aria-orientation="horizontal"
-      aria-label={tr(msg({ id: 'board.lanes.edge', defaultMessage: 'Lanes shown', description: "Accessible name of the handle on the top edge of the Progress panel's lanes: drag it for more or fewer lanes." }))}
-      aria-valuemin={min}
-      aria-valuemax={max}
-      aria-valuenow={shown}
-      aria-valuetext={tr(msg({ id: 'board.lanes.edgeValue', defaultMessage: '{shown} of {count, plural, one {# lane} other {# lanes}} shown', description: "The value of the handle on the top edge of the Progress panel's lanes, for screen readers: {shown} of the {count} lanes show." }), { shown, count })}
+      aria-label={label}
+      aria-valuemin={round(min)}
+      aria-valuemax={round(max)}
+      aria-valuenow={round(shown)}
+      aria-valuetext={valueText}
       tabIndex={0}
-      title={tr(msg({ id: 'board.lanes.edgeTip', defaultMessage: 'Drag to show more or fewer lanes; double-click for {lanes}', description: "Tooltip of the handle on the top edge of the Progress panel's lanes. {lanes} is the default number of lanes shown." }), { lanes: fallback })}
+      title={tip}
       onPointerDown={start}
       onDoubleClick={reset}
       onKeyDown={(e) => {
         const rows = keyedLaneRows(shown, e.key, max, min)
         if (rows === null) return
         e.preventDefault()
-        // Against the choice kept: on a short panel showing fewer than chosen, End keeps what fits.
+        // Against the choice kept: on a short panel showing less than chosen, End keeps what fits.
         if (rows === chosen) return
         put(rows)
         save()
