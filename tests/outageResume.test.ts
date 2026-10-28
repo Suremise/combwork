@@ -67,6 +67,9 @@ describe('the note (resumeNote)', () => {
 /** A host of the test's own: a clock and timers it moves, a network it says is up or down, and what the wait did. */
 function fakeHost(o: { on?: boolean; up?: boolean; perHour?: number; waitMs?: number } = {}) {
   let now = Date.parse('2026-10-25T11:47:00')
+  let waitMs = o.waitMs ?? 2 * 3_600_000
+  /** Run as a check asks the network, before it answers (a check that takes long: the clock moved on meanwhile). */
+  let duringCheck: (() => void) | null = null
   const timers: { at: number; fn: () => void; live: boolean }[] = []
   const h = {
     on: o.on ?? true,
@@ -84,6 +87,7 @@ function fakeHost(o: { on?: boolean; up?: boolean; perHour?: number; waitMs?: nu
     dropped: (provider, words) => dropped(provider, words),
     reachable: async () => {
       h.checks++
+      duringCheck?.()
       return h.up
     },
     stillStopped: () => h.stopped,
@@ -105,7 +109,7 @@ function fakeHost(o: { on?: boolean; up?: boolean; perHour?: number; waitMs?: nu
     },
     checkFirstMs: () => 30_000,
     checkMostMs: () => 300_000,
-    waitMs: () => o.waitMs ?? 2 * 3_600_000,
+    waitMs: () => waitMs,
     resumesPerHour: () => o.perHour ?? 3
   }
   /** Moves the clock on, running the timers due, and lets each check's promises settle. */
@@ -114,7 +118,8 @@ function fakeHost(o: { on?: boolean; up?: boolean; perHour?: number; waitMs?: nu
     for (;;) {
       const next = timers.filter((t) => t.live && t.at <= end).sort((a, b) => a.at - b.at)[0]
       if (!next) break
-      now = next.at
+      // A timer held by sleep runs late: the clock never goes back.
+      now = Math.max(now, next.at)
       next.live = false
       next.fn()
       for (let i = 0; i < 5; i++) await Promise.resolve()
@@ -122,7 +127,18 @@ function fakeHost(o: { on?: boolean; up?: boolean; perHour?: number; waitMs?: nu
     now = end
   }
   const pending = (): number => timers.filter((t) => t.live).length
-  return { h, host, advance, pending, at: () => now }
+  /** The clock moved on with no timer run: the PC asleep, its timers held until it wakes. */
+  const sleep = (ms: number): void => void (now += ms)
+  return {
+    h,
+    host,
+    advance,
+    pending,
+    sleep,
+    at: () => now,
+    setWait: (ms: number) => void (waitMs = ms),
+    onCheck: (fn: (() => void) | null) => void (duringCheck = fn)
+  }
 }
 
 const agent = (o: Partial<OutageAgent> = {}): OutageAgent => ({ key: 'c:\\work\\alpha|a1', projectPath: 'C:\\work\\alpha', agentId: 'a1', runId: 'r1', provider: 'claude-code', turn: '2026-10-25T11:47:00.000Z', assistant: false, ...o })
@@ -244,6 +260,68 @@ describe('the wait (OutageResume)', () => {
     o.failed(agent({ turn: 't4' }), REFUSED)
     await advance(30_000)
     expect(h.notes).toHaveLength(4)
+  })
+
+  it('keeps the resumes after giving up: another drop within the hour gives up again, one after it resumes (HR2 round 1, finding 1)', async () => {
+    const { h, host, advance } = fakeHost({ up: true })
+    const o = new OutageResume(host)
+    for (let i = 0; i < 3; i++) {
+      o.failed(agent({ turn: `t${i}` }), REFUSED)
+      await advance(30_000)
+    }
+    o.failed(agent({ turn: 't3' }), REFUSED)
+    expect(h.ended).toEqual(['resumed', 'resumed', 'resumed', 'gaveUp'])
+    // The user carries it on by hand, and it drops again at 2 minutes: still within the hour of the three.
+    await advance(30_000)
+    o.failed(agent({ turn: 't4' }), REFUSED)
+    await advance(60_000)
+    expect(h.notes).toHaveLength(3)
+    expect(h.endsSeen.at(-1)).toEqual({ kind: 'gaveUp', resumes: 3 })
+    expect(h.waiting).toHaveLength(3)
+    // An hour after the first resume, it has fallen out: two are left, so a drop waits and resumes again.
+    await advance(3_600_000 - 3 * 30_000 - 30_000)
+    o.failed(agent({ turn: 't5' }), REFUSED)
+    await advance(30_000)
+    expect(h.notes).toHaveLength(4)
+    expect(h.ended.at(-1)).toBe('resumed')
+  })
+
+  it('never resumes past the wait: a timer the PC slept through times out, the host up or not (HR2 round 1, finding 2)', async () => {
+    const { h, host, advance, sleep, pending } = fakeHost({ up: true })
+    const o = new OutageResume(host)
+    o.failed(agent(), REFUSED)
+    sleep(12 * 3_600_000)
+    await advance(0)
+    expect(h.checks).toBe(0)
+    expect(h.notes).toEqual([])
+    expect(h.endsSeen).toEqual([{ kind: 'timedOut', minutes: 120 }])
+    expect(pending()).toBe(0)
+  })
+
+  it('never resumes when the check itself ends past the wait, though the host answered', async () => {
+    const { h, host, advance, sleep, onCheck } = fakeHost({ up: true })
+    const o = new OutageResume(host)
+    o.failed(agent(), REFUSED)
+    onCheck(() => sleep(2 * 3_600_000))
+    await advance(30_000)
+    expect(h.checks).toBe(1)
+    expect(h.notes).toEqual([])
+    expect(h.endsSeen).toEqual([{ kind: 'timedOut', minutes: 120 }])
+  })
+
+  it('takes a wait shortened while it runs at its next check', async () => {
+    const { h, host, advance, setWait } = fakeHost({ up: false })
+    const o = new OutageResume(host)
+    o.failed(agent(), REFUSED)
+    await advance(90_000)
+    expect(h.checks).toBe(2)
+    // Down to a minute: 90 s have passed, so the next check (due at 3.5 min) ends the wait without asking the network.
+    setWait(60_000)
+    h.up = true
+    await advance(120_000)
+    expect(h.checks).toBe(2)
+    expect(h.notes).toEqual([])
+    expect(h.endsSeen).toEqual([{ kind: 'timedOut', minutes: 1 }])
   })
 
   it('ends every wait when the switch is turned off', async () => {

@@ -102,8 +102,8 @@ export class OutageResume {
     const recent = (this.resumes.get(a.key) ?? []).filter((t) => now - t < HOUR_MS)
     this.resumes.set(a.key, recent)
     if (recent.length >= this.host.resumesPerHour()) {
+      // The resumes are kept: until the hour since them has passed, another drop gives up again, never a fourth resume.
       log.warn(`${userText(a.projectPath)} · ${a.agentId}: its connection dropped again after ${recent.length} resumes in an hour; Hive stops resuming it`)
-      this.resumes.delete(a.key)
       this.host.ended(a, { kind: 'gaveUp', resumes: recent.length })
       return
     }
@@ -143,14 +143,29 @@ export class OutageResume {
     w.cancel = this.host.later(() => void this.check(w), delay)
   }
 
+  /** Past the wait's limit (the setting as it is now): a timer the PC's sleep held, or a check that took long, ends it. */
+  private expired(w: Waiting): boolean {
+    if (this.host.now() - w.droppedAt < this.host.waitMs()) return false
+    this.timedOut(w)
+    return true
+  }
+
+  private timedOut(w: Waiting): void {
+    this.stop(w)
+    log.warn(`${userText(w.agent.projectPath)} · ${w.agent.agentId}: the connection didn't come back within the wait; Hive stops waiting`)
+    this.host.ended(w.agent, { kind: 'timedOut', minutes: Math.round(this.host.waitMs() / 60_000) })
+  }
+
   private async check(w: Waiting): Promise<void> {
     if (this.waits.get(w.agent.key) !== w || w.checking) return
     if (!this.host.stillStopped(w.agent)) return this.cleared(w.agent.key)
+    if (this.expired(w)) return
     w.checking = true
     const up = await this.host.reachable(w.agent)
     w.checking = false
     if (this.waits.get(w.agent.key) !== w) return
     if (!this.host.stillStopped(w.agent)) return this.cleared(w.agent.key)
+    if (this.expired(w)) return
     const now = this.host.now()
     w.checks++
     if (up) {
@@ -167,12 +182,8 @@ export class OutageResume {
       return
     }
     const next = checkDelay(w.checks, this.host.checkFirstMs(), this.host.checkMostMs())
-    if (now - w.droppedAt + next > this.host.waitMs()) {
-      this.stop(w)
-      log.warn(`${userText(w.agent.projectPath)} · ${w.agent.agentId}: the connection didn't come back within the wait; Hive stops waiting`)
-      this.host.ended(w.agent, { kind: 'timedOut', minutes: Math.round(this.host.waitMs() / 60_000) })
-      return
-    }
+    // No check is scheduled past the limit: the last one is the last before it.
+    if (now - w.droppedAt + next > this.host.waitMs()) return this.timedOut(w)
     this.schedule(w)
   }
 }

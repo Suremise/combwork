@@ -204,4 +204,3 @@ export function startOutageResume(host: OutageHost = hiveHost): OutageResume {
   })
   return o
 }
-
