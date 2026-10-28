@@ -70,6 +70,7 @@
   "shell.command.layout": "Layout: {layout}",
   "shell.command.mcp.import": "Copiar servidores MCP do projeto para o espaço de trabalho",
   "shell.command.notes.open": "Abrir nota compartilhada",
+  "shell.command.notice.openTarget": "Abrir o destino de uma notificação",
   "shell.command.palette.show": "Mostrar todos os comandos",
   "shell.command.progress.toggle": "Alternar painel Progresso",
   "shell.command.project.focus": "Focar projeto",
@@ -252,6 +253,8 @@
   "shell.modes.nothingDetail": "Todos os agentes em execução já estão no modo que as configurações pedem.",
   "shell.modes.someSkipped": "Alguns agentes não foram trocados de modo",
   "shell.modes.switched": "Modo de permissão trocado",
+  "shell.noticeTarget.agentGone": "{agent} não está mais em {project}",
+  "shell.noticeTarget.cardGone": "{card} não está mais no quadro",
   "shell.notifications.clearAll": "Limpar tudo",
   "shell.notifications.none": "Nenhuma notificação",
   "shell.notifications.title": "Notificações",
@@ -396,5 +399,7 @@
   "shell.tip.workspace.repairMove": "O espaço de trabalho ou um projeto foi movido para outra pasta: reparar o que ainda aponta para a antiga",
   "shell.titlebar.pin": "Sempre visível",
   "shell.titlebar.pinTip": "{on, select, yes {Sempre visível (ativado)} other {Sempre visível (desativado)}}",
-  "shell.toast.dismiss": "Dispensar"
+  "shell.toast.dismiss": "Dispensar",
+  "shell.toast.openAgent": "Mostrar {agent} em {project}",
+  "shell.toast.openCard": "Abrir {card}"
 }

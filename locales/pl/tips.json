@@ -53,6 +53,8 @@
   "tips.assistantMcp.title": "Serwery MCP tylko dla Asystenta",
   "tips.assistantMessages.text": "Asystent nie może dać nowego zadania agentowi, który czeka lub pracuje, ale może zostawić mu wiadomość, na przykład Twoją odpowiedź: trafi do agenta, gdy tylko będzie mógł ją przyjąć. Do tego czasu panel agenta pokazuje ją jako nieprzeczytaną (✉); kliknij to, żeby ją anulować.",
   "tips.assistantMessages.title": "Asystent dotrze do zajętego agenta",
+  "tips.assistantNoticeOpens.text": "Powiadomienie od Asystenta lub agenta dotyczące jednego agenta albo jednej karty otwiera po kliknięciu to, czego dotyczy: panel agenta albo kartę. Starsze są w panelu Powiadomienia i tam też się otwierają.",
+  "tips.assistantNoticeOpens.title": "Kliknij powiadomienie, aby przejść do tego, czego dotyczy",
   "tips.assistantReplies.text": "Gdy odpowiadasz agentowi w jego panelu, a Asystent obserwuje tego agenta lub jego kartę, Asystent dostaje pierwszy wiersz odpowiedzi, więc nie pyta Cię ponownie. Ustawienia → Ogólne → Twoje imię określa, jak Cię nazywa; w Ustawienia → Asystent możesz to wyłączyć.",
   "tips.assistantReplies.title": "Asystent słyszy Twoje odpowiedzi agentom",
   "tips.assistantSettings.text": "Nie wiesz, które ustawienie pomoże? Zapytaj Asystenta: objaśni każde z nich i powie, gdzie je znaleźć. Gdy Ustawienia → Asystent → Kontrola → Zmiana ustawień jest włączone, może sam wprowadzić zmianę, którą cofniesz z jego panelu.",

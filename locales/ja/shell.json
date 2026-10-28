@@ -70,6 +70,7 @@
   "shell.command.layout": "レイアウト：{layout}",
   "shell.command.mcp.import": "プロジェクトのMCPサーバーをワークスペースにコピー",
   "shell.command.notes.open": "共有ノートを開く",
+  "shell.command.notice.openTarget": "通知の対象を開く",
   "shell.command.palette.show": "すべてのコマンドを表示",
   "shell.command.progress.toggle": "進捗パネルの表示を切り替え",
   "shell.command.project.focus": "プロジェクトにフォーカス",
@@ -252,6 +253,8 @@
   "shell.modes.nothingDetail": "実行中のエージェントはすべて、設定どおりのモードになっています。",
   "shell.modes.someSkipped": "一部のエージェントは切り替わりませんでした",
   "shell.modes.switched": "権限モードを切り替えました",
+  "shell.noticeTarget.agentGone": "{agent}はもう{project}にいません",
+  "shell.noticeTarget.cardGone": "{card}はもうボードにありません",
   "shell.notifications.clearAll": "すべてクリア",
   "shell.notifications.none": "通知はありません",
   "shell.notifications.title": "通知",
@@ -396,5 +399,7 @@
   "shell.tip.workspace.repairMove": "ワークスペースかプロジェクトが別のフォルダーに移動したときに、古い場所を指したままのものを修復します",
   "shell.titlebar.pin": "常に手前に表示",
   "shell.titlebar.pinTip": "{on, select, yes {常に手前に表示（オン）} other {常に手前に表示（オフ）}}",
-  "shell.toast.dismiss": "閉じる"
+  "shell.toast.dismiss": "閉じる",
+  "shell.toast.openAgent": "{project}の{agent}を表示",
+  "shell.toast.openCard": "{card}を開く"
 }

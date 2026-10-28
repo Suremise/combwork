@@ -53,6 +53,8 @@
   "tips.assistantMcp.title": "仅供助手使用的 MCP 服务器",
   "tips.assistantMessages.text": "助手无法给等待中或工作中的智能体布置新任务，但可以给它留一条消息，比如你的回答：智能体一能接收就会送达。在此之前，它的窗格会将其显示为未读（✉）；点击即可取消。",
   "tips.assistantMessages.title": "助手可以联系忙碌的智能体",
+  "tips.assistantNoticeOpens.text": "助手或智能体发来的、关于某个智能体或某张卡片的通知，点击即可打开它：智能体的窗格，或那张卡片。较早的通知在“通知”面板中，也能从那里打开。",
+  "tips.assistantNoticeOpens.title": "点击通知即可前往",
   "tips.assistantReplies.text": "当你在智能体的窗格中回答它，而助手正在监视它或它的卡片时，助手会得知你回答的第一行，就不会再问你一遍。“设置”→“常规”→“你的名字”决定它如何称呼你；在“设置”→“助手”中可以关闭此功能。",
   "tips.assistantReplies.title": "助手能听到你对智能体的回答",
   "tips.assistantSettings.text": "不确定哪个设置有用？问问助手：它能解释任何一项设置，并告诉你在哪里。打开“设置”→“助手”→“控制”→“更改设置”后，它还能替你更改，你可以在它的面板中撤销。",

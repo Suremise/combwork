@@ -201,6 +201,7 @@ export const SUITES = [
   { name: 'models' },
   { name: 'narrowmain' },
   { name: 'nocode' },
+  { name: 'notifytarget' },
   { name: 'numbers' },
   { name: 'openguard' },
   { name: 'openspeed' },

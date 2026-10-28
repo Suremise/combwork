@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   MAX_ROWS,
   messageQueuedText,
+  notifiedText,
   changedText,
   createdText,
   noteText,
@@ -208,5 +209,13 @@ describe("hive_message_agent's queued reply (#1497)", () => {
   })
   it("says the card's round it is tied to", () => {
     expect(messageQueuedText({ who: 'B1', id: 'm7', tied: ', for HI-12 (#40) round 2', status: 'watching', queued: 1, tells: ['idleWakes'] })).toBe('Queued for B1 (m7, for HI-12 (#40) round 2, watching): Hive tells it once it is idle; 1 waiting. hive_agent_activity says when it is received and acked.')
+  })
+})
+
+describe('hive_notify (HI-1961)', () => {
+  it('says what a click opens, only when the notice has a target', () => {
+    expect(notifiedText({})).toBe('Notification shown.')
+    expect(notifiedText({ opens: 'HB4' })).toBe('Notification shown; a click opens HB4.')
+    expect(notifiedText({ opens: 'HI-12' })).toBe('Notification shown; a click opens HI-12.')
   })
 })

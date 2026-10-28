@@ -3679,6 +3679,25 @@ p.hint {
   font-size: 11px;
   margin-top: 2px;
 }
+/* A notice that opens what it is about (HI-1961): its text is a button that looks like the text. */
+.toast-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.toast-open:hover .toast-title {
+  text-decoration: underline;
+}
+.toast-open:focus-visible {
+  outline-offset: 2px;
+  border-radius: 3px;
+}
 
 /* ---------- Welcome ---------- */
 .welcome {

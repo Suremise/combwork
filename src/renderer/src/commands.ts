@@ -2,7 +2,7 @@ import { PROJECT_KEYBINDING_CATEGORIES, SESSION_LAYOUTS, projectSessionView, res
 import { PROVIDERS, providerDescriptor } from '@shared/providers'
 import { batchCounts, type BatchCounts } from '@shared/startAll'
 import { appTakesTerminalKey } from '@shared/terminalInput'
-import type { ProjectInfo, ProviderId, SessionLayout } from '@shared/types'
+import type { ProjectInfo, ProviderId, SessionLayout, ToastTarget } from '@shared/types'
 import { tilePageCount } from '@shared/tiles'
 import { APP_NAME } from '@shared/appName'
 import { msg, tr, type Msg, type Values } from '@shared/i18n'
@@ -13,6 +13,7 @@ import { checkForUpdates, openReleaseNotes } from './components/Updates'
 import { openModeMenu } from './components/PermissionMode'
 import * as actions from './actions'
 import { noteCommandUsed } from './tips'
+import { showNoticeTarget } from './noticeTarget'
 import { requestStripMenu, type StripMenu } from './stripMenus'
 import { showAntivirus } from './components/Antivirus'
 import { focusTileAfter } from './components/AgentTiles'
@@ -558,6 +559,16 @@ const COMMAND_DEFS: CommandDef[] = [
       actions.selectProject(p.path)
       showAgent(p, agentId)
       setProjectTab(p.path, 'session')
+    }
+  },
+  {
+    id: 'notice.openTarget',
+    name: msg({ id: 'shell.command.notice.openTarget', defaultMessage: 'Open What a Notification Is About', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: a click on a notification runs it by its name, to show the agent's pane or the card it names." }),
+    category: 'session',
+    // A notice's target (HI-1961), in the window that has its project: notice:action brings it here.
+    internal: true,
+    run: (target?: unknown) => {
+      if (target && typeof target === 'object') showNoticeTarget(target as ToastTarget)
     }
   },
   {

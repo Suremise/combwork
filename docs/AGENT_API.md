@@ -759,6 +759,12 @@ What each CLI sends Hive (its hooks, status lines, transcript records, the termi
 
 `level` is `info` (default), `success`, `warning` or `error`.
 
+`target` (optional, HI-1961) is what a click on the notification opens, in the toast and in its row in the Notifications panel: an agent's pane, `{ "agent": "HB4", "project": "hive" }` (its name or id; `project` defaults to the calling agent's own, and the Assistant and scripts must give it), or a card's dialog, `{ "card": "HI-12" }`. At most one. A target that isn't there is refused (404), as is one naming both (400). The reply says what a click opens: `{ "ok": true, "opens": "HB4" }`. If the agent or card is gone by the time of the click, Hive says so ("HB4 isn't in hive any more") instead.
+
+```json
+{ "title": "HB4 needs an Enter in its pane", "level": "warning", "target": { "agent": "HB4", "project": "hive" } }
+```
+
 ### Events (server-sent events)
 
 `GET /v1/events` — a stream of events as they happen:

@@ -70,6 +70,7 @@
   "shell.command.layout": "Layout: {layout}",
   "shell.command.mcp.import": "Copy Project MCP Servers to Workspace",
   "shell.command.notes.open": "Open Shared Note",
+  "shell.command.notice.openTarget": "Open What a Notification Is About",
   "shell.command.palette.show": "Show All Commands",
   "shell.command.progress.toggle": "Toggle Progress Panel",
   "shell.command.project.focus": "Focus Project",
@@ -253,6 +254,8 @@
   "shell.modes.nothingDetail": "Every running agent is already in the mode its settings ask for.",
   "shell.modes.someSkipped": "Some agents were not switched",
   "shell.modes.switched": "Permission mode switched",
+  "shell.noticeTarget.agentGone": "{agent} isn't in {project} any more",
+  "shell.noticeTarget.cardGone": "{card} isn't on the board any more",
   "shell.notifications.clearAll": "Clear all",
   "shell.notifications.none": "No notifications",
   "shell.notifications.title": "Notifications",
@@ -397,5 +400,7 @@
   "shell.tip.workspace.repairMove": "The workspace or a project moved to another folder: repair what still points to the old one",
   "shell.titlebar.pin": "Always on Top",
   "shell.titlebar.pinTip": "{on, select, yes {Always on Top (on)} other {Always on Top (off)}}",
-  "shell.toast.dismiss": "Dismiss"
+  "shell.toast.dismiss": "Dismiss",
+  "shell.toast.openAgent": "Show {agent} in {project}",
+  "shell.toast.openCard": "Open {card}"
 }

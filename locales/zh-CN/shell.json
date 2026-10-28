@@ -70,6 +70,7 @@
   "shell.command.layout": "布局：{layout}",
   "shell.command.mcp.import": "将项目的 MCP 服务器复制到工作区",
   "shell.command.notes.open": "打开共享笔记",
+  "shell.command.notice.openTarget": "打开通知所指的内容",
   "shell.command.palette.show": "显示所有命令",
   "shell.command.progress.toggle": "显示/隐藏进度面板",
   "shell.command.project.focus": "聚焦项目",
@@ -252,6 +253,8 @@
   "shell.modes.nothingDetail": "所有运行中的智能体都已处于其设置所要求的模式。",
   "shell.modes.someSkipped": "部分智能体未切换",
   "shell.modes.switched": "已切换权限模式",
+  "shell.noticeTarget.agentGone": "{agent} 已不在 {project} 中",
+  "shell.noticeTarget.cardGone": "{card} 已不在看板上",
   "shell.notifications.clearAll": "全部清除",
   "shell.notifications.none": "没有通知",
   "shell.notifications.title": "通知",
@@ -396,5 +399,7 @@
   "shell.tip.workspace.repairMove": "工作区或项目已移到其他文件夹：修复仍指向旧位置的内容",
   "shell.titlebar.pin": "窗口置顶",
   "shell.titlebar.pinTip": "{on, select, yes {窗口置顶（开）} other {窗口置顶（关）}}",
-  "shell.toast.dismiss": "关闭"
+  "shell.toast.dismiss": "关闭",
+  "shell.toast.openAgent": "显示 {project} 中的 {agent}",
+  "shell.toast.openCard": "打开 {card}"
 }

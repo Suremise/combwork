@@ -215,6 +215,14 @@
     "defaultMessage": "The Assistant can reach a busy agent",
     "description": "A tip's title."
   },
+  "tips.assistantNoticeOpens.text": {
+    "defaultMessage": "A notification from the Assistant or an agent about one agent or one card opens it when you click it: the agent's pane, or the card. Older ones are in the Notifications panel, and open from there too.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.assistantNoticeOpens.title": {
+    "defaultMessage": "Click a notification to go to it",
+    "description": "A tip's title."
+  },
   "tips.assistantReplies.text": {
     "defaultMessage": "When you answer an agent in its pane while the Assistant watches it or its card, the Assistant is told the first line, so it doesn't ask you again. Settings → General → Your name sets how it names you; Settings → Assistant turns it off.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

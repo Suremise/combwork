@@ -70,6 +70,7 @@
   "shell.command.layout": "Layout: {layout}",
   "shell.command.mcp.import": "MCP-Server des Projekts in den Arbeitsbereich kopieren",
   "shell.command.notes.open": "Gemeinsame Notiz öffnen",
+  "shell.command.notice.openTarget": "Ziel einer Benachrichtigung öffnen",
   "shell.command.palette.show": "Alle Befehle anzeigen",
   "shell.command.progress.toggle": "Fortschrittspanel ein-/ausblenden",
   "shell.command.project.focus": "Projekt fokussieren",
@@ -252,6 +253,8 @@
   "shell.modes.nothingDetail": "Jeder laufende Agent ist schon in dem Modus, den seine Einstellungen verlangen.",
   "shell.modes.someSkipped": "Einige Agenten wurden nicht umgestellt",
   "shell.modes.switched": "Berechtigungsmodus gewechselt",
+  "shell.noticeTarget.agentGone": "{agent} ist nicht mehr in {project}",
+  "shell.noticeTarget.cardGone": "{card} ist nicht mehr auf dem Board",
   "shell.notifications.clearAll": "Alle löschen",
   "shell.notifications.none": "Keine Benachrichtigungen",
   "shell.notifications.title": "Benachrichtigungen",
@@ -396,5 +399,7 @@
   "shell.tip.workspace.repairMove": "Der Arbeitsbereich oder ein Projekt wurde in einen anderen Ordner verschoben: reparieren, was noch auf den alten zeigt",
   "shell.titlebar.pin": "Immer im Vordergrund",
   "shell.titlebar.pinTip": "{on, select, yes {Immer im Vordergrund (an)} other {Immer im Vordergrund (aus)}}",
-  "shell.toast.dismiss": "Schließen"
+  "shell.toast.dismiss": "Schließen",
+  "shell.toast.openAgent": "{agent} in {project} anzeigen",
+  "shell.toast.openCard": "{card} öffnen"
 }
