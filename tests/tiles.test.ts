@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { REPLY_START_MAX, TILES_PER_PAGE, isUrgent, replyStart, tileOrder, tilePageCount, tilePageOf, tilePageShown, tilesOnPage, tilesPerPage, tilesThatFit, urgentByPage } from '../src/shared/tiles'
+import { REPLY_START_MAX, TILES_PER_PAGE, isUrgent, replyStart, tileOrder, tilePageCount, tilePageOf, tilePageShown, tilesOnPage, tilesPerPage, tilesThatFit, TILES_PER_PAGE_MIN, urgentByPage } from '../src/shared/tiles'
 import type { AgentState } from '../src/shared/agentState'
 
 describe('the Tiles view (#976)', () => {
@@ -32,6 +32,11 @@ describe('the Tiles view (#976)', () => {
     expect(TILES_PER_PAGE).toBe(12)
     expect([tilesPerPage(null), tilesPerPage(0), tilesPerPage(undefined), tilesPerPage(7.9)]).toEqual([12, 12, 12, 7])
     expect(tilePageCount(13, 0)).toBe(2)
+    // Never fewer than 6 a page (Darren's decision: as Panes' largest page), however few fit: a small window scrolls.
+    expect(TILES_PER_PAGE_MIN).toBe(6)
+    expect([1, 4, 6].map(tilesPerPage)).toEqual([6, 6, 6])
+    expect(tilePageCount(13, 2)).toBe(3)
+    expect(tilesOnPage(ids, 0, 4)).toHaveLength(6)
   })
 
   it('fits columns × whole rows of tiles in the area, at least one row; null when it cannot be measured', () => {

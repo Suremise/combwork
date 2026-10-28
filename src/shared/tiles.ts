@@ -3,10 +3,13 @@ import type { TileOrder } from './types'
 
 /**
  * The Session tab's Tiles view (#976): a tile per agent, in the order Settings → Sessions → Tile order chooses, as many
- * to a page as fit its area (HI-1951): all on one page when they fit, pages only when they don't. TILES_PER_PAGE is the
+ * to a page as fit its area (HI-1951, Darren's decision): all on one page when they fit, pages only when they don't, and
+ * never fewer than TILES_PER_PAGE_MIN, as Panes' largest page (a window too small for them scrolls). TILES_PER_PAGE is the
  * page while the area can't be measured (not laid out yet, hidden).
  */
 export const TILES_PER_PAGE = 12
+/** The fewest tiles a page holds, however small the area: as many as Panes' largest page, the 3×2 grid. */
+export const TILES_PER_PAGE_MIN = 6
 
 /**
  * How many tiles fit the Tiles area: its columns (the grid's tracks) times the whole rows its height holds at the tile's
@@ -18,8 +21,8 @@ export function tilesThatFit(area: { columns: number; height: number; tileHeight
   return Math.floor(columns) * Math.max(1, Math.floor((height + Math.max(0, gap)) / (tileHeight + Math.max(0, gap))))
 }
 
-/** A page size to use: the measured one, else TILES_PER_PAGE. */
-export const tilesPerPage = (measured: number | null | undefined): number => (measured && measured >= 1 ? Math.floor(measured) : TILES_PER_PAGE)
+/** A page size to use: the measured one, at least TILES_PER_PAGE_MIN; else TILES_PER_PAGE. */
+export const tilesPerPage = (measured: number | null | undefined): number => (measured && measured >= 1 ? Math.max(TILES_PER_PAGE_MIN, Math.floor(measured)) : TILES_PER_PAGE)
 
 /** The tiles that stand out (their border and mark), and that the page control counts on other pages: waiting for you or stalled. */
 export const isUrgent = (s: AgentState): boolean => s === 'waiting' || s === 'stalled'

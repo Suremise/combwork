@@ -66,6 +66,7 @@ const check = (name, ok, extra = '') => {
     await page.locator('.view-switch [data-view="tiles"]').click()
     const tileNames = () => page.locator('.agent-tile .tile-name').allInnerTexts().catch(() => [])
     const pager = page.locator('.session-toolbar .tile-pages')
+    const pageButtons = () => page.locator('.session-toolbar .tile-pages button').evaluateAll((els) => els.map((b) => `${b.childNodes[0].textContent}${b.classList.contains('active') ? '*' : ''}${b.querySelector('.tile-page-count') ? `(${b.querySelector('.tile-page-count').textContent})` : ''}`).join(' '))
     check('Tiles: all 13 tiles on one page at 1500×900, in the panes order, no page buttons (HI-1951)', !!(await lib.until(async () => (await tileNames()).join() === NAMES.join() && (await pager.count()) === 0, HUNG_MS)), (await tileNames()).join())
     check('…all on screen, no scrolling', await page.locator('.agent-tiles').evaluate((el) => el.scrollHeight <= el.clientHeight))
     /** Both themes' screenshots of the window, for the Assistant's OK (HI-1951). */
@@ -79,9 +80,11 @@ const check = (name, ok, extra = '') => {
       await inv('settings:update', { appearance: { theme: 'dark' } })
     }
     await themed('tilesview-onepage')
-    // A smaller window (1100×650): fewer fit, so the tiles page, the pager on the toolbar; back at 1500×900, one page again.
+    // A smaller window (1100×650): 4 fit, so the tiles page, 6 to a page (the floor, Darren's decision: as Panes' largest
+    // page), the area scrolling; the pager on the toolbar. Back at 1500×900, one page again.
     await lib.fitWindow(app, page, { width: 1100, height: 650 })
-    check('a smaller window: the tiles page (the pager shows, fewer than 13 on page 1)', !!(await lib.until(async () => (await pager.count()) === 1 && (await tileNames()).length < 13, HUNG_MS)), (await tileNames()).join())
+    check('a smaller window: the tiles page, 6 to a page (the floor), the pager showing three pages', !!(await lib.until(async () => (await pager.count()) === 1 && (await tileNames()).join() === NAMES.slice(0, 6).join() && (await pageButtons()).startsWith('1* 2 3'), HUNG_MS)), JSON.stringify({ tiles: await tileNames(), pages: await pageButtons().catch(() => '') }))
+    check('…the area scrolls to show them', await page.locator('.agent-tiles').evaluate((el) => el.scrollHeight > el.clientHeight))
     await themed('tilesview-paged')
     await lib.fitWindow(app, page, { width: 1500, height: 900 })
     check('…the window back at 1500×900: one page of 13 again', !!(await lib.until(async () => (await pager.count()) === 0 && (await tileNames()).length === 13, HUNG_MS)), (await tileNames()).join())
@@ -114,7 +117,6 @@ const check = (name, ok, extra = '') => {
     check("A's tile: idle (a ring), Claude Code, the start of its reply", aTile.mark.includes('idle') && aTile.provider === 'Claude Code' && aTile.reply === 'Done: hello tiles', JSON.stringify(aTile))
     check("B's tile: working (its mark)", (await tile('B').locator('.state-mark.working').count()) === 1)
     check("C's tile: Not running", (await tile('C').locator('.tile-status').innerText()) === 'Not running')
-    const pageButtons = () => page.locator('.session-toolbar .tile-pages button').evaluateAll((els) => els.map((b) => `${b.childNodes[0].textContent}${b.classList.contains('active') ? '*' : ''}${b.querySelector('.tile-page-count') ? `(${b.querySelector('.tile-page-count').textContent})` : ''}`).join(' '))
     check('two tile pages; page 2 counts M, waiting there', !!(await lib.until(async () => (await pageButtons()) === '1* 2(1)', HUNG_MS)), await pageButtons())
     // The count is said as well as shown: page 2's accessible name, while page 1 is chosen (the badge itself is hidden).
     const pageNames = () => page.locator('.session-toolbar .tile-pages button').evaluateAll((els) => els.map((b) => `${b.getAttribute('aria-label')}${b.getAttribute('aria-current') ? ' (current)' : ''}`).join(' | '))
