@@ -1087,6 +1087,22 @@
     "defaultMessage": "Keep GH_TOKEN and GITHUB_TOKEN from Copilot",
     "description": "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default. GH_TOKEN and GITHUB_TOKEN are environment variables: keep them."
   },
+  "settings.advanced.copilot.question.field.desc": {
+    "defaultMessage": "The field of the question tool's input, in Copilot's hooks, with the question's text. When it is wrong, the agent shows only Copilot's own notice while it waits for your answer.",
+    "description": "What the advanced setting \"Question: text field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.question.field.title": {
+    "defaultMessage": "Question: text field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.copilot.question.tool.desc": {
+    "defaultMessage": "The name Copilot's hooks give its tool that asks you a question. Hive shows that tool's question while the agent waits for your answer; when it doesn't match, the agent shows only Copilot's own notice.",
+    "description": "What the advanced setting \"Question: tool name\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.question.tool.title": {
+    "defaultMessage": "Question: tool name",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.copilot.ready.footer.desc": {
     "defaultMessage": "Copilot only says it has started with the first prompt, so Hive takes its footer on screen to mean it is ready.",
     "description": "What the advanced setting \"Ready footer\" is for, and what goes wrong when it is wrong (Settings → Advanced)."

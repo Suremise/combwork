@@ -2048,6 +2048,29 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/signin-error-copilot-1.0.95.jsonl`, version: '1.0.95', text: 'Authentication failed with provider at http://127.0.0.1:50713/v1 (HTTP 401).' }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  // A question's text (HI-1945): from 1.0.104 the question's Notification says only "Information requested", so Hive
+  // takes the question from the asking tool's PreToolUse.
+  {
+    id: 'copilot.question.tool',
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.question.tool.title', defaultMessage: 'Question: tool name', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.copilot.question.tool.desc', defaultMessage: "The name Copilot's hooks give its tool that asks you a question. Hive shows that tool's question while the agent waits for your answer; when it doesn't match, the agent shows only Copilot's own notice.", description: 'What the advanced setting "Question: tool name" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'pattern',
+    default: '^(ask_user|AskUserQuestion)$',
+    flags: 'i',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/question-copilot-1.0.105.jsonl`, version: '1.0.105', text: 'AskUserQuestion' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'copilot.question.field',
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.question.field.title', defaultMessage: 'Question: text field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.copilot.question.field.desc', defaultMessage: "The field of the question tool's input, in Copilot's hooks, with the question's text. When it is wrong, the agent shows only Copilot's own notice while it waits for your answer.", description: 'What the advanced setting "Question: text field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'message',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/question-copilot-1.0.105.jsonl`, version: '1.0.105', fields: ['message', 'requestedSchema'] }]
+  },
   // A compaction's context before and after (#454): the three parts Copilot counts it in, in its compaction_start and
   // compaction_complete events, added up.
   {

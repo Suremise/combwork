@@ -43,9 +43,6 @@ export const HIVE_TOOL_NAMES = 'This CLI names the hive tools "hive-<tool>": whe
 /** Copilot's file tools, as its hooks name them (Edit: path, old_str, new_str; Write: path, file_text; 1.0.93). */
 const EDIT_TOOL = /^(edit|write|create|str_replace\w*|multi_?edit)$/i
 
-/** Copilot's tool that asks the user a question: ask_user (message, requestedSchema), which its hooks name AskUserQuestion (1.0.105). */
-const QUESTION_TOOL = /^(ask_user|AskUserQuestion)$/i
-
 /** The hooks.json of the launch's plugin: Hive's hook server for every event, with the launch's token. */
 export function copilotHooks(hookUrl: string, token: string): Record<string, unknown> {
   const hooks: Record<string, unknown[]> = {}
@@ -367,16 +364,18 @@ export class CopilotAdapter implements ProviderAdapter {
         out.event = { kind: 'toolStart' }
         const file: unknown = input.path ?? input.file_path
         if (EDIT_TOOL.test(tool) && typeof file === 'string' && file) out.editedPaths = [file]
-        if (QUESTION_TOOL.test(tool) && typeof input.message === 'string' && input.message) {
+        // ask_user, which its hooks name AskUserQuestion (1.0.105): its question in tool_input.message. Both advanced settings.
+        const question: unknown = input[advanced.get<string>('copilot.question.field')]
+        if (advanced.pattern('copilot.question.tool').test(tool) && typeof question === 'string' && question) {
           // At most a few sessions ask at once: one never answered (a CLI killed mid-question) mustn't grow it for ever.
           if (this.questions.size >= 50) this.questions.delete(this.questions.keys().next().value!)
-          this.questions.set(session, input.message)
+          this.questions.set(session, question)
         }
         break
       }
       case 'PostToolUse':
       case 'PostToolUseFailure':
-        if (QUESTION_TOOL.test(tool)) this.questions.delete(session)
+        if (advanced.pattern('copilot.question.tool').test(tool)) this.questions.delete(session)
         out.event = { kind: 'toolEnd' }
         break
       case 'Notification': {
