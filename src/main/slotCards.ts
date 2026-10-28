@@ -559,13 +559,19 @@ export function expectStartPrompt(projectPath: string, n: number): (prompt: stri
   }
 }
 
-/** The slot a card was started in (its latest start's), or null: a card outside slots, or not started. */
-export async function startedSlot(ws: WorkspaceService, projectPath: string, n: number): Promise<{ slot: string; lease: string } | null> {
+/**
+ * The slot whose placement will give the card to its builder (its current cycle in a slot, active and not placed yet),
+ * or null: a card outside slots, not started, or already placed. A card back from Review or Approved for more work keeps
+ * its placed cycle (no new start is written), so nothing would deliver a prompt offered for it (HI-1953).
+ */
+export async function placementDue(ws: WorkspaceService, projectPath: string, n: number): Promise<{ slot: string; lease: string } | null> {
+  // With the rules off nothing is placed.
+  if (!workflowEnforced()) return null
   const wf = await workflowFor(ws, projectPath).catch(() => null)
   const card = wf ? cardOf(wf, n) : null
   if (!wf || !card) return null
-  const s = wf.state(card)
-  return s.stage !== 'todo' && s.started?.lease && s.started.slot ? { slot: s.started.slot, lease: s.started.lease } : null
+  const cycle = cycleIn(wf.store.facts(n))
+  return cycle && !cycle.placed && wf.state(card).stage === 'active' ? { slot: cycle.started.slot, lease: cycle.started.lease } : null
 }
 
 // --- Quiet builders.

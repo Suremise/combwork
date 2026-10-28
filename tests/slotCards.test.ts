@@ -201,7 +201,7 @@ vi.mock('../src/main/deliveries', async (orig) => {
 const { tellListeners } = await import('../src/main/events')
 const { withWriteFence } = await import('../src/main/workflow/factStore')
 const { LeaseLost } = await import('../src/main/workflow/queueRunner')
-const { cycleIn, deleteMergedLine, expectStartPrompt, laneSlotIn, place, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
+const { cycleIn, deleteMergedLine, expectStartPrompt, laneSlotIn, place, placementDue, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
 
 let env: Env | null = null
 afterEach(() => {
@@ -437,6 +437,46 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
     expect(state.calls).toEqual(['start'])
     expect(state.deliveries).toHaveLength(1)
     expect(e.store.facts(n).find((f) => f.kind === 'BuilderPlaced')?.data).toMatchObject({ delivery: 'm9', how: 'started' })
+  })
+})
+
+describe("a Start's prompt goes to the slot's placement only while one is due (HI-1953)", { timeout: 60_000 }, () => {
+  // taskStart hands a Start's prompt to the slot's placement when placementDue says one will come; otherwise it gives the
+  // card itself (typed in, or its agent started with it). A card back from Review keeps its placed cycle: no new start is
+  // written, so no placement comes, and a prompt handed over then was given to nobody.
+  async function inSlot(): Promise<{ e: Env; n: number; cycle: NonNullable<ReturnType<typeof cycleIn>>; ws: never }> {
+    const e = (env = setup({ platform: 'git', review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    const card = e.wf.createCard({ title: 'Back for more' })
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: join(tempDir('slot-'), 'slot-a'), lease: 'l-1', fresh: true })
+    moved(await e.wf.start(card.key, B1))
+    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'hive/AM/x', revision: 'r' }))
+    const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
+    return { e, n: card.id, cycle: cycleIn(e.store.facts(card.id))!, ws }
+  }
+  const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'card', card: 0, lane: null, project: 'p', from: '', to: null, why: null, endRev: null } as never
+
+  it('a card just started in its slot: due, in its slot and lease', async () => {
+    const { e, n, ws } = await inSlot()
+    expect(await placementDue(ws, e.project, n)).toEqual({ slot: 'slot-a', lease: 'l-1' })
+  })
+
+  it('placed, then in Review and moved back to Doing by a Start: none due (no new start), so the Start gives the card itself', async () => {
+    const { e, n, cycle, ws } = await inSlot()
+    await place(ws, e.project, e.wf, n, cycle, lease)
+    expect(await placementDue(ws, e.project, n)).toBeNull()
+    const card = e.store.card(n)
+    await e.wf.write(card, null, 'hive', (w) => void w.move('review', 'intent'))
+    moved(await e.wf.move(n, 'active', 'assistant'))
+    expect(e.wf.state(e.store.card(n)).stage).toBe('active')
+    expect(e.kinds(n).filter((k) => k === 'Started')).toHaveLength(1)
+    expect(await placementDue(ws, e.project, n)).toBeNull()
+  })
+
+  it('with the rules off: none due (nothing is placed)', async () => {
+    const { e, n, ws } = await inSlot()
+    state.enforced = false
+    expect(await placementDue(ws, e.project, n)).toBeNull()
   })
 })
 
