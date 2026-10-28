@@ -55,7 +55,7 @@ describe('what runs now in many session hosts (activity:nowAll)', () => {
   it('reads each host once, however spelt, in one call: its launches and background tasks', async () => {
     const rows = await run(() => activityNowAll([alpha, alpha.toUpperCase(), beta, 42]))
     expect(rows.map((r) => r.path.toLowerCase())).toEqual([alpha.toLowerCase(), beta.toLowerCase()])
-    expect(rows[1].now).toEqual({ launches: [{ agentId: 'b1', runId: `run:${beta.toLowerCase()}`, cli: [], processes: [], more: 0 }], tasks: [{ agentId: 'b1', sessionId: sid(1), id: `t:${beta.toLowerCase()}`, at: 1 }] })
+    expect(rows[1].now).toEqual({ launches: [{ agentId: 'b1', runId: `run:${beta.toLowerCase()}`, cli: [], processes: [], more: 0 }], tasks: [{ agentId: 'b1', sessionId: sid(1), id: `t:${beta.toLowerCase()}`, at: 1 }], blocks: [] })
   })
 
   it("reads the Assistant's home as a host", async () => {
