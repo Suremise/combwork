@@ -3377,7 +3377,7 @@ class SessionManager {
       const paste = !!l?.screen?.bracketedPaste() && l.adapter.descriptor.capabilities.bracketedPaste && !line.startsWith('/')
       // Typed as written into a CLI with a new-line key (HI-1327, Settings → Advanced): its line breaks are that key. A
       // slash command keeps spaces.
-      const newline = !paste && asTyped && !line.startsWith('/') ? l?.adapter.typedNewline?.() : null
+      const newline = !paste && asTyped && !line.startsWith('/') && l ? l.adapter.typedNewline?.(providerService.info(l.adapter.id).version ?? null) : null
       const segments = newline ? typedPrompt(line, TYPED_NEWLINE_KEYS[newline]) : null
       const out = segments ? segments.flatMap((s) => ('text' in s ? [s.text] : [])).at(-1) ?? '' : promptInput(line, paste, asTyped)
       const drawn = l?.screen && l.adapter.descriptor.capabilities.enterOnceDrawn ? drawnLine(l.screen, out) : null

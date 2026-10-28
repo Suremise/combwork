@@ -67,3 +67,9 @@ Codex's failed turn (26 Oct, #1658): `codex exec --skip-git-repo-check "say ok"`
 Values Hive gives a CLI (hook timeouts, Codex's title items and tool timeout) are checked against recordings of the CLI taking them: the hooks arriving (`tests/fixtures/turns-*.json`, `tests/fixtures/console/copilot.json`), Codex's title spinner (`tests/fixtures/codex-startup-0.160.0.json`) and the list above.
 
 Codex's Windows sandbox values (27 Oct, HI-1893) aren't a recording: running Codex's sandbox set off admin prompts on the maintainer's PC (HI-1874), so `windows-sandbox-codex-0.164.0.txt` is an excerpt of Codex's own source at the `rust-v0.164.0` tag (commit `6aaac69480`), the config type that names `unelevated`. Hive's fake-Codex e2e (`connections-codex`) checks the `-c windows.sandbox="unelevated"` it passes; a real run of it belongs in Windows Sandbox.
+
+Codex's new-line keys (28 Oct, HI-1327): `newline-keys-codex-0.164.0.txt` holds two things, each labelled as what it is.
+- **Source:** an excerpt of Codex's keymap source at `rust-v0.164.0` (`6aaac69480`).
+- **A console probe:** Hive's node-pty spawning a PowerShell `[Console]::ReadKey` loop, which reads the key events crossterm reads, with the bytes Hive types written into it. No Codex was run.
+
+What Codex does with those keys is checked by the real-tier suite `codex-newline`, in the Codex test home with its non-admin sandbox (Darren's OK). The adapter's `NEWLINE_TRIED` lists the versions it passed on.

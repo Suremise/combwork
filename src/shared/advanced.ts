@@ -1807,18 +1807,19 @@ const SOURCES: readonly AdvancedSource[] = [
     desc: msg({
       id: 'settings.advanced.codex.prompt.newlineKey.desc',
       defaultMessage:
-        "With Send prompts as typed on, what Hive presses in Codex for each line break of a prompt it types. Spaces puts the prompt on one line, as before. Alt+Enter and Ctrl+J are keys Codex takes as a new line rather than sending, so the prompt arrives as written; they haven't been tried on real Codex yet. If you changed Codex's own new-line keys, choose Spaces. A slash command always gets spaces.",
-      description: 'What the advanced setting "Typed prompts: line breaks" does (Settings → Advanced, under Codex). Send prompts as typed is another setting\'s title: use it as Settings shows it. Spaces, Alt+Enter and Ctrl+J are the setting\'s choices: use the words its list shows (Alt+Enter and Ctrl+J are keys: name them as your language does).'
+        "With Send prompts as typed on, what Hive presses in Codex for each line break of a prompt it types. Alt+Enter and Ctrl+J are keys Codex takes as a new line rather than sending, so the prompt arrives as written (tried with Codex 0.164.0). Automatic uses Alt+Enter with a Codex version it was tried with, and spaces with others; a key you choose is used with any version. Spaces puts the prompt on one line. If you changed Codex's own new-line keys, choose Spaces. A slash command always gets spaces.",
+      description: 'What the advanced setting "Typed prompts: line breaks" does (Settings → Advanced, under Codex). Send prompts as typed is another setting\'s title: use it as Settings shows it. Automatic, Spaces, Alt+Enter and Ctrl+J are the setting\'s choices: use the words its list shows (Alt+Enter and Ctrl+J are keys: name them as your language does). Keep 0.164.0 as it is (a version).'
     }),
     kind: 'choice',
     choices: [
+      { value: 'auto', label: msg({ id: 'settings.advanced.codex.prompt.newlineKey.auto', defaultMessage: 'Automatic', description: 'A choice of the advanced setting "Typed prompts: line breaks": Alt+Enter with a Codex version it was tried with, spaces with others.' }) },
       { value: 'spaces', label: msg({ id: 'settings.advanced.codex.prompt.newlineKey.spaces', defaultMessage: 'Spaces', description: 'A choice of the advanced setting "Typed prompts: line breaks": each line break becomes a space.' }) },
       { value: 'alt-enter', label: msg({ id: 'settings.advanced.codex.prompt.newlineKey.altEnter', defaultMessage: 'Alt+Enter', description: 'A choice of the advanced setting "Typed prompts: line breaks": Hive presses Alt+Enter for each line break (a key: name it as your language does).' }) },
       { value: 'ctrl-j', label: msg({ id: 'settings.advanced.codex.prompt.newlineKey.ctrlJ', defaultMessage: 'Ctrl+J', description: 'A choice of the advanced setting "Typed prompts: line breaks": Hive presses Ctrl+J for each line break (a key: name it as your language does).' }) }
     ],
-    default: 'spaces',
+    default: 'auto',
     applies: 'now',
-    samples: [{ from: `${FIX}/advanced/newline-keys-codex-0.164.0.txt`, version: '0.164.0', text: 'alt(KeyCode::Enter)', shows: "Codex's own keymap taking Alt+Enter and Ctrl+J as a new line (its source, not a run), and Windows' console delivering each as one key (HI-1327's probe)" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/newline-keys-codex-0.164.0.txt`, version: '0.164.0', text: 'alt(KeyCode::Enter)', shows: "Codex's own keymap taking Alt+Enter and Ctrl+J as a new line (its source), and Windows' console delivering each as one key (HI-1327's probe); the real-tier suite codex-newline saw both prompts arrive as written in Codex 0.164.0" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'codex.turnScreen.working',

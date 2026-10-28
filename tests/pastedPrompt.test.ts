@@ -17,6 +17,8 @@ const { advanced } = await import('../src/main/advanced')
 const { PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId } = await import('../src/shared/advanced')
 const { promptInput, typedPrompt, withoutInvisible } = await import('../src/main/sessions')
 const { TYPED_NEWLINE_KEYS } = await import('../src/shared/terminalInput')
+const { providerService } = await import('../src/main/providerService')
+const { NEWLINE_TRIED } = await import('../src/main/providers/codex/adapter')
 
 describe('a prompt Hive puts into a CLI (#597)', () => {
   const p = 'C:/hive-test/pasted-prompt'
@@ -131,19 +133,51 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
       /** The prompt as Codex would read it: Hive's writes between Ctrl+U and Enter, each key back as a line break. */
       const asRead = (key: string): string => writes.slice(1, -1).join('').split(key).join('\n')
 
-      it('is off by default (spaces) until tried on real Codex: the prompt goes on one line as before', async () => {
-        expect(advanced.get<string>(NEWLINE)).toBe('spaces')
-        expect(codex.typedNewline()).toBeNull()
+      /** Runs `fn` with Codex's installed version reported as `version`. */
+      const onVersion = async (version: string | null, fn: () => Promise<void>): Promise<void> => {
+        const info = providerService.info.bind(providerService)
+        const spy = vi.spyOn(providerService, 'info').mockImplementation(((pid: Parameters<typeof info>[0]) => ({ ...info(pid), version })) as typeof providerService.info)
+        try {
+          await fn()
+        } finally {
+          spy.mockRestore()
+        }
+      }
+      /** Runs `fn` with the line-break choice `key` and the switches given. */
+      const chosen = (key: string, values: Record<string, boolean | string>, fn: () => Promise<void>): Promise<void> => withSwitches({ ...values, [NEWLINE]: key }, fn)
+
+      it('defaults to Automatic: Alt+Enter with a Codex version it was tried with (0.164.0); with another, or one not known, spaces as before', async () => {
+        expect(advanced.get<string>(NEWLINE)).toBe('auto')
+        expect(NEWLINE_TRIED).toEqual(['0.164.0'])
+        expect([codex.typedNewline('0.164.0'), codex.typedNewline('0.165.0'), codex.typedNewline(null)]).toEqual(['alt-enter', null, null])
         echo.to = await running(codex, '')
-        await withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written))
+        await onVersion('0.164.0', () => withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written)))
+        expect(asRead(ALT_ENTER)).toBe('A plan:\n  1. one\n\n 2. two  ')
+        writes.length = 0
+        echo.to = await running(codex, '')
+        await onVersion('0.165.0', () => withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written)))
         expect(typedText()).toBe('A plan:   1. one   2. two  ')
         expect(writes.some((w) => w.includes('\x1b'))).toBe(false)
+      })
+
+      it('a key chosen is used with any version, Alt+Enter too; Spaces chosen, never a key', async () => {
+        echo.to = await running(codex, '')
+        await onVersion('0.165.0', () => chosen('ctrl-j', { [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written)))
+        expect(asRead(CTRL_J)).toBe('A plan:\n  1. one\n\n 2. two  ')
+        writes.length = 0
+        echo.to = await running(codex, '')
+        await onVersion(null, () => chosen('alt-enter', { [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written)))
+        expect(asRead(ALT_ENTER)).toBe('A plan:\n  1. one\n\n 2. two  ')
+        writes.length = 0
+        echo.to = await running(codex, '')
+        await onVersion('0.164.0', () => chosen('spaces', { [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written)))
+        expect(typedText()).toBe('A plan:   1. one   2. two  ')
       })
 
       for (const [choice, key] of [['alt-enter', ALT_ENTER], ['ctrl-j', CTRL_J]] as const) {
         it(`${choice}: each line break is that key, written whole; indentation and blank lines kept, a tab a space, other control characters out, one Enter at the end`, async () => {
           echo.to = await running(codex, '')
-          await withSwitches({ [PROMPT_AS_TYPED]: true, [NEWLINE]: choice }, () => sessions.sendPrompt(p, id, written))
+          await chosen(choice, { [PROMPT_AS_TYPED]: true },() => sessions.sendPrompt(p, id, written))
           expect(asRead(key)).toBe('A plan:\n  1. one\n\n 2. two  ')
           // Each key its own write; no other write has an escape in it; the one Enter is the last write.
           expect(writes.filter((w) => w === key)).toHaveLength(3)
@@ -156,7 +190,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
       it("escapes and control characters in the text never reach Codex, beside line breaks and across a chunk's end", async () => {
         echo.to = await running(codex, '')
         // CRLF, a lone CR and an LF; an escape sequence spanning the first chunk's end (8 characters), and ones beside breaks.
-        await withSwitches({ [PROMPT_AS_TYPED]: true, [NEWLINE]: 'alt-enter' }, () => sessions.sendPrompt(p, id, 'abcdefg\x1b[31m\x1b\r\nx\x1b\x07\ry\x1b\nz\x9b'))
+        await chosen('alt-enter', { [PROMPT_AS_TYPED]: true },() => sessions.sendPrompt(p, id, 'abcdefg\x1b[31m\x1b\r\nx\x1b\x07\ry\x1b\nz\x9b'))
         expect(asRead(ALT_ENTER)).toBe('abcdefg[31m\nx\ny\nz')
         // Between Hive's own Ctrl+U and Enter: nothing but text and the keys.
         expect(writes.slice(1, -1).filter((w) => w !== ALT_ENTER).some((w) => /[\x00-\x1f\x7f-\x9f]/.test(w))).toBe(false)
@@ -164,17 +198,17 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
 
       it('leading and trailing line breaks are keys too', async () => {
         echo.to = await running(codex, '')
-        await withSwitches({ [PROMPT_AS_TYPED]: true, [NEWLINE]: 'alt-enter' }, () => sessions.sendPrompt(p, id, '\nmiddle\n'))
+        await chosen('alt-enter', { [PROMPT_AS_TYPED]: true },() => sessions.sendPrompt(p, id, '\nmiddle\n'))
         expect(asRead(ALT_ENTER)).toBe('\nmiddle\n')
       })
 
       it('a slash command, and the prompt with Send prompts as typed off, still go on one line', async () => {
         echo.to = await running(codex, '')
-        await withSwitches({ [PROMPT_AS_TYPED]: true, [NEWLINE]: 'alt-enter' }, () => sessions.sendPrompt(p, id, '/review the\nwork'))
+        await chosen('alt-enter', { [PROMPT_AS_TYPED]: true },() => sessions.sendPrompt(p, id, '/review the\nwork'))
         expect(typedText()).toBe('/review the work')
         writes.length = 0
         echo.to = await running(codex, '')
-        await withSwitches({ [PROMPT_AS_TYPED]: false, [NEWLINE]: 'alt-enter' }, () => sessions.sendPrompt(p, id, 'A plan:\r\n  1. one\n\n\t2. two'))
+        await chosen('alt-enter', { [PROMPT_AS_TYPED]: false },() => sessions.sendPrompt(p, id, 'A plan:\r\n  1. one\n\n\t2. two'))
         expect(typedText()).toBe('A plan: 1. one 2. two')
         expect(writes.some((w) => w.includes('\x1b'))).toBe(false)
       })
@@ -183,7 +217,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
         const screen = await running(codex, '')
         // The session goes as the first key reaches it.
         echo.to = { write: (d: string) => (screen.write(d), d === ALT_ENTER && s.live.delete(liveKey)) }
-        await expect(withSwitches({ [PROMPT_AS_TYPED]: true, [NEWLINE]: 'alt-enter' }, () => sessions.sendPrompt(p, id, 'one\ntwo\nthree'))).rejects.toThrow()
+        await expect(chosen('alt-enter', { [PROMPT_AS_TYPED]: true },() => sessions.sendPrompt(p, id, 'one\ntwo\nthree'))).rejects.toThrow()
         const at = writes.indexOf(ALT_ENTER)
         expect(at).toBeGreaterThan(0)
         expect(writes.slice(at + 1)).toEqual([])

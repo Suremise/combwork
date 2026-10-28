@@ -4785,9 +4785,13 @@ under Hive in Advanced (no CLI's recording to check it against), defaulting to w
   `bracketedPaste`, a slash command) each line break or tab becomes a space: Codex's prompts stay flat with the switch
   on (the Assistant's decision on #1286). Other control characters stay out either way,
   so nothing in a prompt can end a paste or press a key (`promptInput`).
-- `codex.prompt.newlineKey` (HI-1327; `spaces`, `alt-enter` or `ctrl-j`; default `spaces` until a real-Codex trial
-  proves a key): with `hive.prompt.asTyped` on, a prompt typed into a CLI whose descriptor lists `typedNewlines` gets
-  each line break as the key its adapter's `typedNewline()` picks.
+- `codex.prompt.newlineKey` (HI-1327; `auto`, `spaces`, `alt-enter` or `ctrl-j`; default `auto`): with
+  `hive.prompt.asTyped` on, a prompt typed into a CLI whose descriptor lists `typedNewlines` gets each line break as
+  the key its adapter's `typedNewline(version)` picks.
+  - **Tried in real Codex:** the real-tier suite `codex-newline` (Codex test home, its non-admin sandbox; Darren's OK, 28
+    Oct) saw Alt+Enter and Ctrl+J prompts each recorded as written in one prompt by Codex 0.164.0.
+  - **Gated by version:** `auto` is Alt+Enter only for a version in the adapter's `NEWLINE_TRIED` (0.164.0); another
+    version, or one not known, gets spaces. A key chosen (`alt-enter`, `ctrl-j`) applies to any version.
   - **The keys:** Codex 0.164.0's editor takes `ctrl(J)`, `ctrl(M)`, `shift(Enter)` and `alt(Enter)` as a new line;
     its composer sends only on plain Enter (`tui/src/keymap.rs`). Windows' console turns a written LF into
     Ctrl+Enter, which Codex doesn't bind. It delivers `ESC CR` as one Alt+Enter key, and win32-input-mode Ctrl+J as J

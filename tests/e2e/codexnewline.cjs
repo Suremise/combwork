@@ -1,9 +1,9 @@
 // A typed prompt's line breaks for Codex (HI-1327), on the fake Codex, which takes Alt+Enter (ESC CR) as a new line in
 // its prompt and Enter as a send, as Codex 0.164's editor does. A card the user starts on a running Codex agent without
 // hive tools is typed into its CLI:
-// 1. with Send prompts as typed on and Typed prompts: line breaks at Spaces (its default, until tried on real Codex),
-//    the prompt goes in on one line, as before;
-// 2. with Alt+Enter chosen, Codex records the prompt as written, its line breaks, blank lines and indentation kept, in
+// 1. with Send prompts as typed on and Typed prompts: line breaks at its default (Automatic: Alt+Enter only with a Codex
+//    version it was tried with; the fake says 0.160.0), the prompt goes in on one line, as before;
+// 2. with Alt+Enter chosen (any version), Codex records the prompt as written, its line breaks, blank lines and indentation kept, in
 //    one prompt (one turn), with nothing sent early;
 // 3. with the switch off, one line again.
 // Dev build, throwaway profile, workspace and Codex home; nothing signs in or spends tokens.
@@ -92,11 +92,11 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').
     }
     const written = 'Plan one:\r\n  step A\n\nstep B'
 
-    // 1. As typed, at the default (Spaces): one line, as before.
+    // 1. As typed, at the default, with a Codex version it wasn't tried with: one line, as before.
     await inv('advanced:set', AS_TYPED, true)
     let r = await startCard('Card one', written)
     check('a card started on the Codex agent is typed into it', r.started === true, String(r.started))
-    check('at the default (Spaces), Codex gets it on one line, as before', r.got.length === 1 && !r.got[0].includes('\n') && r.got[0].includes('Plan one:   step A  step B'), JSON.stringify(r.got))
+    check("at the default, with a Codex version it wasn't tried with (0.160.0), Codex gets it on one line, as before",r.got.length === 1 && !r.got[0].includes('\n') && r.got[0].includes('Plan one:   step A  step B'), JSON.stringify(r.got))
 
     // 2. Alt+Enter: as written, in one prompt.
     await inv('advanced:set', NEWLINE, 'alt-enter')
@@ -108,7 +108,6 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').
     await inv('advanced:set', AS_TYPED, false)
     r = await startCard('Card three', written)
     check('with Send prompts as typed off, one line again', r.got.length === 1 && !r.got[0].includes('\n') && r.got[0].includes('Card three Plan one: step A step B'), JSON.stringify(r.got))
-    await inv('advanced:set', NEWLINE, 'spaces')
   } catch (e) {
     check('the suite ran to its end', false, e.stack)
   } finally {

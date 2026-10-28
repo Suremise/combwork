@@ -202,6 +202,7 @@ interface HiveMessageValues {
   'settings.advanced.codex.prompt.drawnSeconds.desc': undefined
   'settings.advanced.codex.prompt.drawnSeconds.title': undefined
   'settings.advanced.codex.prompt.newlineKey.altEnter': undefined
+  'settings.advanced.codex.prompt.newlineKey.auto': undefined
   'settings.advanced.codex.prompt.newlineKey.ctrlJ': undefined
   'settings.advanced.codex.prompt.newlineKey.desc': undefined
   'settings.advanced.codex.prompt.newlineKey.spaces': undefined

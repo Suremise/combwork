@@ -413,10 +413,10 @@ export interface ProviderAdapter {
   /** Whether a file in an account's folder is one that changes when the CLI signs in or out there: watched, never read. */
   accountLoginFile?(name: string): boolean
   /**
-   * The key Hive presses for a line break in a prompt it types (HI-1327): one of the descriptor's `typedNewlines`, as
-   * Settings → Advanced chooses it; null: a space (as before). Absent: always a space.
+   * The key Hive presses for a line break in a prompt it types (HI-1327), for the CLI at `version`: one of the
+   * descriptor's `typedNewlines`, as Settings → Advanced chooses it; null: a space (as before). Absent: always a space.
    */
-  typedNewline?(): TypedNewline | null
+  typedNewline?(version: string | null): TypedNewline | null
   /** A connection's sign-in, when it differs from loginCommand (HI-1757: Codex keeps the login in the connection's folder). */
   accountLoginCommand?(executable: string): CommandSpec
   /**
