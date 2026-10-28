@@ -1074,13 +1074,44 @@ function logFakeInput(home) {
  * - taken(): true once the line was taken, instead (a run it starts showing in Progress, the agent working on a
  *   held turn): something seen as the line starts, never as its work ends. One of live and taken is required.
  * - ready(): waited for before each attempt; with live and no ready, until the fake takes prompts (idle, its turn not
- *   running, as fakePrompts has it). Not ready within `hungMs`, the line is typed anyway (and said why).
+ *   running, as fakePrompts has it). Not ready within `hungMs`, the line is typed anyway (and said why); with `strict`
+ *   (HI-1918), never: that attempt is lost unready, nothing typed, and the next one waits again.
  * - A slash command (/rename, /compact) starts no turn: taken once it was read intact and not dropped.
  * - disturb: for the suite that shows the helper types again (progressreport), the first attempt disturbed as a wake
  *   would: 'enter', a Ctrl+U between the line and its Enter; 'before', a wake's text on the line (read) before it.
  * Returns { attempt, lost }: the attempt taken (1 = the first; 0 if none of `tries` was), and why each before it wasn't.
  */
-async function typeLine(inv, key, home, agent, text, { live = null, taken = null, ready = null, tries = 3, hungMs = TURN_HUNG_MS, disturb = null } = {}) {
+/**
+ * Whether Hive has nothing waiting to type into an agent (HI-1918): none of its deliveries waiting to be offered (queued,
+ * or uncertain: to be offered again), as GET …/deliveries reads them with a token of its project (its own). One offered
+ * is typed already (a doorbell, or a launch's first prompt, which stays offered until the agent reads its inbox: never
+ * waited for). With the agent idle and its composer free (Hive not typing a line into it now, `agentQuiet`), for
+ * typeLine's ready with `strict`.
+ */
+async function inboxQuiet(apiPort, project, agent, token) {
+  const rows = await inboxPending(apiPort, project, agent, token)
+  return !!rows && rows.every((d) => d.state === 'offered')
+}
+
+/**
+ * Whether Hive will type nothing into an agent now or next (HI-1918): idle (ready or finished), its composer free (no
+ * line of Hive's being typed, just typed or confirmed: RuntimeFacts.composer), and nothing waiting to be offered
+ * (inboxQuiet). `state` is its session:live entry.
+ */
+async function agentQuiet(apiPort, project, state, token) {
+  if (!state || !['ready', 'finished'].includes(state.status) || state.runtime?.composer !== 'free') return false
+  return inboxQuiet(apiPort, project, state.agentName, token)
+}
+
+/** An agent's unread deliveries (id, kind, state, offered), or null when they can't be read. */
+async function inboxPending(apiPort, project, agent, token) {
+  const res = await fetch(`http://127.0.0.1:${apiPort}/v1/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agent)}/deliveries?limit=200`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null)
+  if (!res?.ok) return null
+  const v = await res.json().catch(() => null)
+  return v ? (v.deliveries ?? []).filter((d) => d.state === 'queued' || d.state === 'offered' || d.state === 'uncertain').map((d) => ({ id: d.id, kind: d.kind, state: d.state, offered: d.offered ?? null, text: d.text })) : null
+}
+
+async function typeLine(inv, key, home, agent, text, { live = null, taken = null, ready = null, strict = false, tries = 3, hungMs = TURN_HUNG_MS, disturb = null } = {}) {
   if (!live && !taken) throw new Error('typeLine: give it live or taken')
   if (!fs.existsSync(path.join(home, 'fake-log-input.txt'))) throw new Error(`typeLine: the fake's input log is off in ${home} (lib.logFakeInput before it starts)`)
   const name = agent ?? (live ? (await live())?.agentName : null)
@@ -1092,7 +1123,14 @@ async function typeLine(inv, key, home, agent, text, { live = null, taken = null
   const readAll = () => jsonl('fake-input.jsonl').map((r) => r.data).join('').replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
   const lost = []
   for (let attempt = 1; attempt <= tries; attempt++) {
-    if (ready && !(await until(ready, hungMs, 250))) lost.push(`not ready within ${hungMs / 1000} s, typed anyway`)
+    if (ready && !(await until(ready, hungMs, 250))) {
+      // Strict: a line typed while it isn't ready is the race it waits out, so none is (HI-1918).
+      if (strict) {
+        lost.push(`not ready within ${hungMs / 1000} s, not typed`)
+        continue
+      }
+      lost.push(`not ready within ${hungMs / 1000} s, typed anyway`)
+    }
     const turn = async () => (await live())?.turn?.id ?? null
     const turnBefore = live && !taken ? await turn() : null
     const took = async () => (taken ? await taken() : text.startsWith('/') || (await turn()) !== turnBefore)
@@ -1565,4 +1603,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { projectConfig, commitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, typeLine, fakePrompts, skip }
+module.exports = { projectConfig, commitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, inboxQuiet, inboxPending, agentQuiet, typeLine, fakePrompts, skip }
