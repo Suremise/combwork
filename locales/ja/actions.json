@@ -277,7 +277,7 @@
   "actions.template.savedMessage": "「{name}」（エージェント{n, plural, other {#個}}）を{scope, select, workspace {ワークスペース} other {このプロジェクト}}用に保存しました。",
   "actions.template.switchPreset": "このプロジェクトも{preset}に切り替える…（「バージョン管理」→「ワークフロー」をそれを選んだ状態で開きます。保存はそこで行います）",
   "actions.template.usePatterns": "名前にプロジェクトキーを使う（{example}は{pattern}になり、読み込み先のプロジェクトのキーで名前が付きます）",
-  "actions.template.workflowChanged": "{template}は読み込み中に変更されたため、ワークフローは入力されませんでした。現在のワークフローを見るには、もう一度読み込んでください。",
+  "actions.template.workflowChanged": "テンプレート「{template}」は読み込み中に変更されたため、ワークフローは入力されませんでした。現在のワークフローを見るには、もう一度読み込んでください。",
   "actions.template.workflowKept": "{count, plural, other {以前あった{platforms}のワークフローは残しました。}}",
   "actions.template.workflowNone": "ワークフローは含まれていません。",
   "actions.template.workflowSaved": "このプロジェクトの{platform}のワークフローを含みます。",

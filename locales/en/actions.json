@@ -1112,7 +1112,7 @@
     "description": "A tick box in the Save as Template dialog (#1440): agent names that start with this project's key ({example}, e.g. HI-B1) are saved as a pattern ({pattern}: {key}-B{n}), so a project loading the template names them with its own key. Keep {key} and {n} as they are."
   },
   "actions.template.workflowChanged": {
-    "defaultMessage": "{template} changed while it loaded, so its workflow wasn’t filled in. Load it again to see its workflow as it is now.",
+    "defaultMessage": "The template \"{template}\" changed while it loaded, so its workflow wasn’t filled in. Load it again to see its workflow as it is now.",
     "description": "A warning after loading a template (HI-1910): its workflow section changed between the Load dialog's preview and the load ({template}: its name), so the Workflow form isn't filled in with it."
   },
   "actions.template.workflowKept": {

@@ -277,7 +277,7 @@
   "actions.template.savedMessage": "« {name} » ({n, plural, one {# agent} many {# agents} other {# agents}}), pour {scope, select, workspace {l’espace de travail} other {ce projet}}.",
   "actions.template.switchPreset": "Passer aussi ce projet en {preset}… (ouvre Gestion de versions → Flux de travail avec ce préréglage choisi, à enregistrer là)",
   "actions.template.usePatterns": "Utiliser la clé du projet dans les noms ({example} devient {pattern}, nommé d’après la clé du projet où il est chargé)",
-  "actions.template.workflowChanged": "{template} a changé pendant son chargement, donc son flux de travail n’a pas été rempli. Charge-le à nouveau pour voir son flux de travail tel qu’il est maintenant.",
+  "actions.template.workflowChanged": "Le modèle « {template} » a changé pendant son chargement, donc son flux de travail n’a pas été rempli. Charge-le à nouveau pour voir son flux de travail tel qu’il est maintenant.",
   "actions.template.workflowKept": "{count, plural, one {Le flux de travail pour {platforms} qu’il avait est conservé.} many {Les flux de travail pour {platforms} qu’il avait sont conservés.} other {Les flux de travail pour {platforms} qu’il avait sont conservés.}}",
   "actions.template.workflowNone": "Il ne contient aucun flux de travail.",
   "actions.template.workflowSaved": "Il contient le flux de travail de ce projet pour {platform}.",

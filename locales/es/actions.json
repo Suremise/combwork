@@ -277,7 +277,7 @@
   "actions.template.savedMessage": "“{name}” ({n, plural, one {# agente} many {# agentes} other {# agentes}}), para {scope, select, workspace {el espacio de trabajo} other {este proyecto}}.",
   "actions.template.switchPreset": "Cambiar también este proyecto a {preset}… (abre Control de versiones → Flujo de trabajo con él elegido, para guardarlo allí)",
   "actions.template.usePatterns": "Usar la clave del proyecto en los nombres ({example} pasa a ser {pattern}, con la clave del proyecto en el que se cargue)",
-  "actions.template.workflowChanged": "{template} cambió mientras se cargaba, así que su flujo de trabajo no se rellenó. Vuelve a cargarla para ver su flujo de trabajo tal como es ahora.",
+  "actions.template.workflowChanged": "La plantilla «{template}» cambió mientras se cargaba, así que su flujo de trabajo no se rellenó. Vuelve a cargarla para ver su flujo de trabajo tal como es ahora.",
   "actions.template.workflowKept": "{count, plural, one {Se conserva el flujo de trabajo para {platforms} que tenía.} many {Se conservan los flujos de trabajo para {platforms} que tenía.} other {Se conservan los flujos de trabajo para {platforms} que tenía.}}",
   "actions.template.workflowNone": "No incluye ningún flujo de trabajo.",
   "actions.template.workflowSaved": "Incluye el flujo de trabajo de este proyecto para {platform}.",

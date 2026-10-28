@@ -277,7 +277,7 @@
   "actions.template.savedMessage": "\"{name}\" ({n, plural, one {# agent} other {# agents}}), for {scope, select, workspace {the workspace} other {this project}}.",
   "actions.template.switchPreset": "Also switch this project to {preset}… (opens Version Control → Workflow with it chosen, to save there)",
   "actions.template.usePatterns": "Use the project key in names ({example} becomes {pattern}, named from the key of the project it is loaded into)",
-  "actions.template.workflowChanged": "{template} changed while it loaded, so its workflow wasn’t filled in. Load it again to see its workflow as it is now.",
+  "actions.template.workflowChanged": "The template \"{template}\" changed while it loaded, so its workflow wasn’t filled in. Load it again to see its workflow as it is now.",
   "actions.template.workflowKept": "{count, plural, one {The workflow for {platforms} it had is kept.} other {The workflows for {platforms} it had are kept.}}",
   "actions.template.workflowNone": "It holds no workflow.",
   "actions.template.workflowSaved": "It holds this project's workflow for {platform}.",

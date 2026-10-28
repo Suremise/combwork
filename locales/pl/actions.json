@@ -277,7 +277,7 @@
   "actions.template.savedMessage": "„{name}” ({n, plural, one {# agent} few {# agentów} many {# agentów} other {# agenta}}), dla {scope, select, workspace {obszaru roboczego} other {tego projektu}}.",
   "actions.template.switchPreset": "Przełącz też ten projekt na {preset}… (otwiera Kontrola wersji → Przepływ pracy z tym wyborem, do zapisania tam)",
   "actions.template.usePatterns": "Używaj klucza projektu w nazwach ({example} staje się {pattern}, z kluczem projektu, do którego zostanie wczytany)",
-  "actions.template.workflowChanged": "Szablon {template} zmienił się podczas wczytywania, więc jego przepływ pracy nie został wypełniony. Wczytaj go ponownie, aby zobaczyć jego obecny przepływ pracy.",
+  "actions.template.workflowChanged": "Szablon „{template}” zmienił się podczas wczytywania, więc jego przepływ pracy nie został wypełniony. Wczytaj go ponownie, aby zobaczyć jego obecny przepływ pracy.",
   "actions.template.workflowKept": "{count, plural, one {Przepływ pracy dla: {platforms}, który miał, został zachowany.} few {Przepływy pracy dla: {platforms}, które miał, zostały zachowane.} many {Przepływy pracy dla: {platforms}, które miał, zostały zachowane.} other {Przepływy pracy dla: {platforms}, które miał, zostały zachowane.}}",
   "actions.template.workflowNone": "Nie zawiera przepływu pracy.",
   "actions.template.workflowSaved": "Zawiera przepływ pracy tego projektu dla: {platform}.",
