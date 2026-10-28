@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { keptLive, nextFold, queueKey, withKept, type KeptReturn } from '@shared/progressQueue'
 import type { QueueRecent, QueueView } from '@shared/workflow/queue'
 import { call, callShared } from './api'
-import { get, set, setProgressOpen, useStore } from './store'
+import { get, set, setLoaded, setProgressOpen, useStore } from './store'
 import { PROGRESS_TABS } from '@shared/progressTabs'
 
 /**
@@ -25,7 +25,7 @@ async function loadProject(projectPath: string): Promise<void> {
   reads.set(key, n)
   const views = await callShared('queue:list', projectPath).catch(() => null)
   if (!views || reads.get(key) !== n || get().workspace?.path !== ws) return
-  set((s) => ({ queues: [...s.queues.filter((q) => !same(q.projectPath, projectPath)), ...views] }))
+  setLoaded((s) => ({ queues: [...s.queues.filter((q) => !same(q.projectPath, projectPath)), ...views] }))
   // Returns wait beyond the list (#1356's returns policy): read again once the first one seen folds and frees its slot,
   // with no other event needed (an idle or paused queue pages on). Checked again when it fires.
   const fold = views.map(nextFold).filter((t): t is number => t !== null)
@@ -50,7 +50,7 @@ function loadAll(): void {
   }
   const projects = get().workspace?.projects ?? []
   const inWs = (path: string): boolean => projects.some((p) => same(p.path, path))
-  set((s) => ({ queues: s.queues.filter((q) => inWs(q.projectPath)), queueKept: s.queueKept.filter((x) => inWs(x.queue.split('\n')[0])) }))
+  setLoaded((s) => ({ queues: s.queues.filter((q) => inWs(q.projectPath)), queueKept: s.queueKept.filter((x) => inWs(x.queue.split('\n')[0])) }))
   for (const p of projects) void loadProject(p.path)
 }
 
