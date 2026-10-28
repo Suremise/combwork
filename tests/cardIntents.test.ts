@@ -719,7 +719,7 @@ describe("the intents' routes and tools (#1267)", () => {
   }
 
   it("each route takes its intent's arguments and refuses missing or wrong ones (400)", () => {
-    expect(Object.keys(INTENT_ROUTES).sort()).toEqual(['ask', 'cannot', 'declare-paths', 'loop-step', 'put-back', 'report-merge', 'request', 'start-review', 'submit', 'verdict'])
+    expect(Object.keys(INTENT_ROUTES).sort()).toEqual(['ask', 'cannot', 'declare-paths', 'focused-skip', 'loop-step', 'put-back', 'report-merge', 'request', 'start-review', 'submit', 'verdict'])
     expect(parse('loop-step', { step: 'design', text: ' Plan ' })).toEqual({ kind: 'loopStep', step: 'design', text: 'Plan' })
     expect(parse('loop-step', { step: 'review', text: 'x' })).toBe(400)
     expect(parse('loop-step', { step: 'ok' })).toBe(400)
@@ -735,6 +735,10 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(parse('verdict', { comment: 'ok' })).toBe(400)
     expect(parse('verdict', { pass: false, comment: 'No', failKind: 'style' })).toBe(400)
     expect(parse('verdict', { pass: false, comment: 'No', failKind: 'explanation' })).toEqual({ kind: 'verdict', pass: false, comment: 'No', submission: undefined, failKind: 'explanation' })
+    // HI-1367: a reviewer's decision on focused tests a merge skipped.
+    expect(parse('focused-skip', { request: ' HI-12/r40 ', merge: false, why: ' Signed out ' })).toEqual({ kind: 'focusedSkip', request: 'HI-12/r40', merge: false, why: 'Signed out' })
+    expect(parse('focused-skip', { request: 'HI-12/r40', why: 'x' })).toBe(400)
+    expect(parse('focused-skip', { request: 'HI-12/r40', merge: true })).toBe(400)
     expect(parse('ask', { text: 'Which name?' })).toEqual({ kind: 'ask', askKind: 'other', text: 'Which name?' })
     expect(parse('ask', { kind: 'sign-in', text: 'x' })).toBe(400)
     // HR1's round 1 probe: the revision and the Test checklist are kept.
