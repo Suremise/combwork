@@ -165,6 +165,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **No control characters in prompts Hive types.** A prompt Hive typed into Codex (or a slash command, or Compact's focus) kept control characters such as Ctrl+C, which Codex could take as an interrupt. They're left out now, as they were from pasted prompts (HI-1920).
 - **Switching a running agent to a mode that needs a restart waits for it to stop.** A CLI slow to exit (more than 8 seconds) made the switch fail with *This agent is already running or starting*. Hive now waits as long as that CLI may take to end, and in a slot for its earlier session to release it. If the agent still hasn't stopped, it says so and starts nothing (HI-1869).
 - **A Codex agent resumed into a full context is heard again.** Codex can compact a conversation by itself and then run its next turn under the same turn id. Hive took that turn's hooks for old news, so the agent stayed ready with "no hooks from Codex" and wasn't given work until it was restarted. Hive now follows that turn (HI-1916).
 - **A lane the Hive Assistant starts gets going.** Started for agents that weren't running, it was recorded as active and nothing happened: no slot was lent and no agent started. It now starts as **Start Lane** in the window does: its slot first, then the builder and reviewer with their brief. If no slot is free it waits for one, as the window's does, and the Assistant is told who is busy when an agent can't start now (HI-1900).

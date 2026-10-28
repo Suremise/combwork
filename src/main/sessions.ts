@@ -723,14 +723,15 @@ export function rollbackKeys(typed: readonly number[]): number {
 }
 
 /**
- * What Hive writes for a prompt's line (sendPrompt): pasted (bracketed), without control characters, so nothing in it
- * can end the paste or press a key; typed, as it is. Kept as written (`asTyped`, #1286), its line breaks go into a
- * paste as the Enter a terminal pastes them with, and typed, each line break or tab becomes a space (typed, a line
- * break would send the prompt early and a tab complete a word); its other control characters are left out either way.
+ * What Hive writes for a prompt's line (sendPrompt), without control characters, pasted (bracketed) or typed, so
+ * nothing in it can end the paste or press a key (HI-1920: typed, a Ctrl+C in it reached Codex as Ctrl+C). Kept as
+ * written (`asTyped`, #1286), its line breaks go into a paste as the Enter a terminal pastes them with, and typed, each
+ * line break or tab becomes a space (typed, a line break would send the prompt early and a tab complete a word); its
+ * other control characters are left out either way.
  */
 export function promptInput(line: string, paste: boolean, asTyped: boolean): string {
   line = withoutInvisible(line)
-  if (!asTyped) return paste ? line.replace(/[\x00-\x1f\x7f-\x9f]/g, '') : line
+  if (!asTyped) return line.replace(/[\x00-\x1f\x7f-\x9f]/g, '')
   const kept = paste ? line.replace(/\r\n?|\n/g, '\r') : line.replace(/\r\n?|[\n\t]/g, ' ')
   return kept.replace(paste ? /[\x00-\x08\x0a-\x0c\x0e-\x1f\x7f-\x9f]/g : /[\x00-\x1f\x7f-\x9f]/g, '')
 }
@@ -2771,7 +2772,8 @@ class SessionManager {
         writePty(key, '\x15')
         await pause(150)
       }
-      const text = l.adapter.descriptor.capabilities.compactFocus ? withoutInvisible(focus ?? '').replace(/\s+/g, ' ').trim() : ''
+      // On one line, without control characters (HI-1920): typed key by key, one would press a key.
+      const text = l.adapter.descriptor.capabilities.compactFocus ? promptInput((focus ?? '').replace(/\s+/g, ' ').trim(), false, false) : ''
       // Written in one go, a long line counts as a paste, and pasted input is sent as a message even when
       // it starts with "/compact". So type the command on its own, then the focus in small pieces.
       writePty(key, '/compact')
