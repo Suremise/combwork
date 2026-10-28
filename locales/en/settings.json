@@ -495,6 +495,54 @@
     "defaultMessage": "Hive's status line in place of yours",
     "description": "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default. The status line is the line Claude Code shows under its input."
   },
+  "settings.advanced.claude-code.retry.attemptField.desc": {
+    "defaultMessage": "The field of that entry with which try it is (1, 2…). Wrong, a waiting agent just shows Working.",
+    "description": "What the advanced setting \"Transcript: retry entry's try field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.claude-code.retry.attemptField.title": {
+    "defaultMessage": "Transcript: retry entry's try field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.retry.checkAfterSeconds.desc": {
+    "defaultMessage": "How long a working Claude Code session has to go without a hook before Hive looks at the end of its transcript for a wait to retry its model request, then every 15 seconds while it stays quiet.",
+    "description": "What the advanced setting \"Retry wait: look after\" does (Settings → Advanced)."
+  },
+  "settings.advanced.claude-code.retry.checkAfterSeconds.title": {
+    "defaultMessage": "Retry wait: look after",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"20 s\"). A retry wait: the coding agent waiting to try its model request again."
+  },
+  "settings.advanced.claude-code.retry.maxField.desc": {
+    "defaultMessage": "The field of that entry with how many tries it makes in all. Wrong, a waiting agent just shows Working.",
+    "description": "What the advanced setting \"Transcript: retry entry's tries field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.claude-code.retry.maxField.title": {
+    "defaultMessage": "Transcript: retry entry's tries field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.retry.statusField.desc": {
+    "defaultMessage": "The field of that entry's error with the HTTP status that refused the request (429: rate-limited). With none, the service couldn't be reached. Wrong, every wait shows as the service unreachable.",
+    "description": "What the advanced setting \"Transcript: retry error's status field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.claude-code.retry.statusField.title": {
+    "defaultMessage": "Transcript: retry error's status field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.retry.subtype.desc": {
+    "defaultMessage": "The kind of transcript entry Claude Code writes each time its model request fails and it tries again (rate-limited, or the service unreachable). Hive reads the latest and shows the wait as the agent's status. Wrong, a waiting agent just shows Working.",
+    "description": "What the advanced setting \"Transcript: retry entry\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.claude-code.retry.subtype.title": {
+    "defaultMessage": "Transcript: retry entry",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry: the coding agent trying its model request again after it failed."
+  },
+  "settings.advanced.claude-code.retry.waitField.desc": {
+    "defaultMessage": "The field of that entry with how long Claude Code waits before the next try, in milliseconds. Wrong, a waiting agent just shows Working.",
+    "description": "What the advanced setting \"Transcript: retry entry's wait field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.claude-code.retry.waitField.title": {
+    "defaultMessage": "Transcript: retry entry's wait field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.claude-code.safeguard.note.desc": {
     "defaultMessage": "Claude Code's note in its transcript when its safety classifier stops a response, and the notice it adds for the model (#606). Wrong, Hive misses such stops: no shield on the agent's pane, and Performance doesn't count them.",
     "description": "What the advanced setting \"Safeguard stop: transcript note\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -1183,6 +1231,22 @@
     "defaultMessage": "Ready footer",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.copilot.retry.context.desc": {
+    "defaultMessage": "Where Copilot's error hook says a recoverable error happened when it is a model call it tries again (rate-limited, or the service unreachable). Hive shows the agent's status as waiting to retry until Copilot goes on. Wrong, a waiting agent just shows Working.",
+    "description": "What the advanced setting \"Retry: error context\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.retry.context.title": {
+    "defaultMessage": "Retry: error context",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry: the coding agent trying its model request again after it failed."
+  },
+  "settings.advanced.copilot.retry.message.desc": {
+    "defaultMessage": "How that hook words why the call failed: a regular expression whose named group status is the HTTP status that refused it, whose group limited matches the words of a rate limit (429), or whose group network matches when the service couldn't be reached. Copilot's hook gives the service's own error, often with no status. Wrong, the wait shows without its reason.",
+    "description": "What the advanced setting \"Retry: error message\" is for, and what goes wrong when it is wrong (Settings → Advanced). status, limited and network are the names of the regular expression's groups: keep them."
+  },
+  "settings.advanced.copilot.retry.message.title": {
+    "defaultMessage": "Retry: error message",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.copilot.signIn.errorMessage.desc": {
     "defaultMessage": "A session error's message, in Copilot's session file, that means its sign-in was refused, when its type doesn't say so.",
     "description": "What the advanced setting \"Sign-in refused: error message\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -1730,6 +1794,14 @@
   "settings.advanced.hive.restart.resumeReadySeconds.title": {
     "defaultMessage": "Resuming after a restart: ready within",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"90 s\")."
+  },
+  "settings.advanced.hive.retry.tellAssistantAfterSeconds.desc": {
+    "defaultMessage": "How long an agent's coding agent may keep waiting to retry its model request (rate-limited, or its service unreachable) in one turn before Hive tells the Hive Assistant, once a turn. 0: never.",
+    "description": "What the advanced setting \"Retry wait: tell the Assistant after\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.retry.tellAssistantAfterSeconds.title": {
+    "defaultMessage": "Retry wait: tell the Assistant after",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\"). A retry wait: an agent's coding agent waiting to try its model request again."
   },
   "settings.advanced.hive.showDeveloperFeatures.desc": {
     "defaultMessage": "Show Help → Developer Console (Ctrl+Alt+J): what each CLI sends Hive, next to what Hive made of it.",

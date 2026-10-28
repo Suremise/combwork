@@ -75,6 +75,7 @@
   "panes.header.notRunning": "No está en ejecución",
   "panes.header.retryLarge": "Esta conversación es grande y cada solicitud la envía entera. Una conversación nueva (un traspaso y luego una sesión nueva) envía menos, lo que puede ayudar con un límite de solicitudes.",
   "panes.header.retryTip": "{provider} está esperando para volver a enviar su solicitud al modelo: {why, select, limited {el servicio la rechazó por demasiadas solicitudes (límite de solicitudes).} network {no pudo conectar con el servicio.} other {la solicitud falló.}} Lo vuelve a intentar por sí solo{when, select, at { a las {time}} other {}}; no necesitas hacer nada.",
+  "panes.header.retrySince": "Reintentando desde las {time}.",
   "panes.header.stopTip": "Detener este agente (la conversación se conserva; puedes reanudarla cuando quieras)",
   "panes.header.unknownTip": "Hive no sabe nada del turno de este agente desde hace un rato y no ve señales de que haya terminado: ningún Stop de su CLI, nada en los registros de su CLI, ningún prompt inactivo en su pantalla. Hasta que sepa más, el agente cuenta como ocupado y no se escribe nada en él. Si su terminal muestra que espera en su prompt, márcalo como inactivo.",
   "panes.header.untaken": "No se tomó una línea que escribió Hive",

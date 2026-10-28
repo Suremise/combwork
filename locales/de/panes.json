@@ -75,6 +75,7 @@
   "panes.header.notRunning": "Läuft nicht",
   "panes.header.retryLarge": "Diese Unterhaltung ist groß, und jede Anfrage sendet sie ganz. Eine neue Unterhaltung (eine Übergabe, dann eine neue Sitzung) sendet weniger, was bei einem Ratenlimit helfen kann.",
   "panes.header.retryTip": "{provider} wartet darauf, seine Modellanfrage erneut zu senden: {why, select, limited {der Dienst hat sie wegen zu vieler Anfragen abgelehnt (Ratenlimit).} network {der Dienst war nicht erreichbar.} other {die Anfrage ist fehlgeschlagen.}} Es versucht es von selbst erneut{when, select, at { um {time}} other {}}; von dir wird nichts gebraucht.",
+  "panes.header.retrySince": "Neue Versuche seit {time}.",
   "panes.header.stopTip": "Diesen Agenten stoppen (die Unterhaltung bleibt erhalten und lässt sich jederzeit fortsetzen)",
   "panes.header.unknownTip": "Hive hat seit einer Weile nichts vom aktuellen Durchgang dieses Agenten gehört und sieht kein Zeichen, dass er beendet ist: kein Stop von der CLI, nichts in den Aufzeichnungen der CLI, keine Eingabeaufforderung im Terminal. Bis Hive mehr erfährt, gilt der Agent als beschäftigt, und Hive tippt nichts hinein. Wartet der Agent im Terminal sichtbar an der Eingabeaufforderung, markiere ihn als untätig.",
   "panes.header.untaken": "Eine von Hive getippte Zeile wurde nicht angenommen",

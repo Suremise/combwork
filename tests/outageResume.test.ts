@@ -42,6 +42,12 @@ describe('a dropped connection, by what the CLI said (connectionDropped)', () =>
     expect(dropped(provider, words)).toBe(false)
   })
 
+  it('never takes a turn its CLI gave up on for a rate limit (429) as a dropped connection: no resume adds to the throttle (HI-1973)', () => {
+    // Claude Code 2.1.312's words after its ten tries against a 429 (HI-1973's recording, its last assistant message).
+    expect(dropped('claude-code', 'API Error: Request rejected (429) · Number of request tokens has exceeded your per-minute rate limit')).toBe(false)
+    for (const line of fixture('rate-limit-copilot-1.0.105.jsonl').split('\n').filter(Boolean)) expect(dropped('copilot', JSON.parse(line).data.message)).toBe(false)
+  })
+
   it("keeps each CLI's words to its own pattern, and Hive's exclusions win", () => {
     // Codex's dropped stream isn't how Claude Code says it, nor Copilot's.
     expect(dropped('claude-code', 'stream disconnected before completion: Transport error')).toBe(false)

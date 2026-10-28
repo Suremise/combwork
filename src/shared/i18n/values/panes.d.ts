@@ -76,6 +76,7 @@ interface HiveMessageValues {
   'panes.header.more': undefined
   'panes.header.notRunning': undefined
   'panes.header.retryLarge': undefined
+  'panes.header.retrySince': { time: string | number }
   'panes.header.retryTip': { provider: string | number; why: string; when: string; time: string | number }
   'panes.header.stopTip': undefined
   'panes.header.unknownTip': undefined

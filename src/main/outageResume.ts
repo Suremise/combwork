@@ -1,13 +1,11 @@
-import { access } from 'original-fs/promises'
-import { join } from 'path'
-import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { OUTAGE_CHECK_FIRST_SECONDS, OUTAGE_CHECK_MOST_SECONDS, OUTAGE_RESUME, OUTAGE_RESUMES_PER_HOUR, OUTAGE_WAIT_MINUTES, outageCheckUrlId } from '../shared/advanced'
 import { formatTime } from '../shared/dates'
 import { msg, tr } from '../shared/i18n'
 import type { LiveSessionState } from '../shared/types'
 import { getAccount } from './accounts'
 import { advanced } from './advanced'
-import { createDelivery, deliverNow } from './deliveries'
+import { noteForAssistant } from './assistantNotes'
+import { deliverNow } from './deliveries'
 import { onHiveEvent, toast } from './events'
 import { createLogger } from './logger'
 import { clock, connectionDropped, OutageResume, reachable, type OutageAgent, type OutageHost } from './outageCore'
@@ -66,29 +64,10 @@ function nameOf(a: OutageAgent): string {
 /** Each waiting agent's Progress run. */
 const runs = new Map<string, { id: string; caller: Parameters<typeof progress.start>[0] }>()
 
-/** Lines for each workspace's Assistant, gathered for a few seconds so agents resumed together come in one notice. */
-const forAssistant = new Map<string, { lines: string[]; timer: ReturnType<typeof setTimeout> }>()
-const GATHER_MS = 5000
-
+/** A line for the Assistant (agents resumed together come in one notice: assistantNotes.ts). */
 function tellAssistant(a: OutageAgent, line: string): void {
   if (a.assistant) return
-  const ws = workspaceOf(a.projectPath)
-  const home = ws.assistantHome
-  const k = home.toLowerCase()
-  const was = forAssistant.get(k)
-  if (was) {
-    was.lines.push(line)
-    return
-  }
-  const timer = setTimeout(() => {
-    const lines = forAssistant.get(k)?.lines ?? []
-    forAssistant.delete(k)
-    void access(join(home, '.hive', 'project.json'))
-      .then(() => createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body: `${lines.join(' ')} (Settings → Advanced: Resume agents after a connection drops.)` })) // i18n-ignore: the Assistant's inbox (agent-facing, English)
-      .catch(() => undefined)
-  }, GATHER_MS)
-  timer.unref?.()
-  forAssistant.set(k, { lines: [line], timer })
+  noteForAssistant(a.projectPath, line, '(Settings → Advanced: Resume agents after a connection drops.)') // i18n-ignore: the Assistant's inbox (agent-facing, English)
 }
 
 function startRun(a: OutageAgent): void {

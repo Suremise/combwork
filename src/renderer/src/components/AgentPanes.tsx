@@ -775,6 +775,12 @@ function RetryTip({ live, large }: { live: LiveSessionState; large: boolean }) {
           {tr(msg({ id: 'panes.header.retryLarge', defaultMessage: 'This conversation is large, and each request sends all of it. A new conversation (a handover, then a fresh session) sends less, which can help under a rate limit.', description: "Tooltip of a pane's status while its coding agent is rate-limited and its conversation is large: a suggestion, not something Hive does." }))}
         </div>
       )}
+      {/* How long it has been at it (HI-1973): since this wait's first try, when that was before the latest. */}
+      {w.since !== w.at && (
+        <div className="faint" data-retry-since>
+          {tr(msg({ id: 'panes.header.retrySince', defaultMessage: 'Retrying since {time}.', description: "Tooltip of a pane's status while its coding agent waits to retry its model request: when its first try in this run of failures was ({time}, a clock time)." }), { time: formatTime(w.since) })}
+        </div>
+      )}
     </>
   )
 }

@@ -331,6 +331,8 @@ export function hookStep(ev: HookEvent, s: HookStatusInput): HookStep {
     case 'end':
       return { next: 'stopped', question: null, review: null, ...RESOLVED, actions: ['releaseAllLocks', 'clearTasks'] }
     case 'ignore':
+    // A model call the CLI tries again (HI-1973): still working; sessions shows the wait (retryWait).
+    case 'retry':
       return { next: null, actions: [] }
   }
 }

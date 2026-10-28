@@ -508,6 +508,8 @@ interface LiveSession {
   retryLooking?: boolean
   retryLookedAt?: number
   retryTurn?: object
+  /** The turn whose retry wait the Assistant was told of (HI-1973): once a turn. */
+  retryTold?: object
   /** Its transcript says its background task ended, which starts a turn of the CLI's own (backgroundWakes), not begun yet in the ledger. */
   woke?: boolean
   /**
@@ -2499,6 +2501,7 @@ class SessionManager {
       void this.backup(projectPath, agent.id)
         .catch((e) => log.warn('transcript look failed', e))
         .then(() => this.checkRetry(projectPath, agent.id))
+        .then(() => this.checkRetryNotice(projectPath, agent.id))
         .then(() => this.checkSilence(projectPath, agent.id))
         .then(() => this.checkHooks(projectPath, agent.id))
         .catch((e) => log.warn('hooks check failed', e))
@@ -5497,8 +5500,21 @@ class SessionManager {
     const was = ledger.active
     const took = admit(ledger, hook.event, ids, { hiveContinued: continued, woke, now: at })
     if (ledger.active !== was) l.woke = false
+    // Its CLI tries a failed model request again (HI-1973: Copilot's recoverable error): the turn's wait, kept from try to
+    // try while nothing else is heard (its first try's time, the tries counted). The CLI says neither when it tries again
+    // nor how often it will: both unknown, never made up.
+    if (took.verdict !== 'stale' && hook.event.kind === 'retry') {
+      const turn = ledger.active
+      if (turn?.state === 'running') {
+        const prev = l.retryTurn === turn ? st.retryWait : undefined
+        const told = new Date(at).toISOString()
+        st.retryWait = { at: told, since: prev?.since ?? told, retryAt: null, attempt: (prev?.attempt ?? 0) + 1, max: null, status: hook.event.status, ...(hook.event.network ? { network: true as const } : {}) }
+        l.retryTurn = turn
+        this.emitState(st)
+      }
+    }
     // Its CLI is heard from again (HI-1972): whatever it waited to retry has gone on.
-    if (took.verdict !== 'stale' && st.retryWait) {
+    else if (took.verdict !== 'stale' && st.retryWait) {
       st.retryWait = undefined
       this.emitState(st)
     }
@@ -5679,13 +5695,15 @@ class SessionManager {
   private checkRetry(projectPath: string, agentId: string): void {
     const id = liveId(projectPath, agentId)
     const l = this.live.get(id)
-    if (!l?.ledger || !l.adapter.retryWait || !l.launchEnv) return
+    if (!l?.ledger) return
     const st = l.state
     const now = Date.now()
+    // A wait past (a pushed one too: HI-1973's Copilot, whose adapter has nothing to look at) is cleared here.
     if (st.retryWait && !retryWaitCurrent(st.retryWait, now)) {
       st.retryWait = undefined
       this.emitState(st)
     }
+    if (!l.adapter.retryWait || !l.launchEnv) return
     const turn = l.ledger.active
     const sessionId = st.sessionId
     if (!sessionId || !turn || turn.state !== 'running' || st.status !== 'working' || l.retryLooking) return
@@ -5721,6 +5739,26 @@ class SessionManager {
       .finally(() => {
         l.retryLooking = false
       })
+  }
+
+  /**
+   * Who is told of a retry wait that goes on (HI-1973): retryNotice.ts sets it, telling the Assistant. Null: nobody.
+   */
+  retryOverdue: ((st: LiveSessionState) => void) | null = null
+
+  /**
+   * A retry wait that has gone on past Settings → Advanced's while (HI-1973, `hive.retry.tellAssistantAfterSeconds`; 0:
+   * never), counted from the turn's first retry: told once a turn (retryOverdue). One that ends sooner tells nothing, and
+   * a later turn's is told again.
+   */
+  private checkRetryNotice(projectPath: string, agentId: string, now = Date.now()): void {
+    const l = this.live.get(liveId(projectPath, agentId))
+    const w = l?.state.retryWait
+    const after = advanced.number('hive.retry.tellAssistantAfterSeconds') * 1000
+    if (!l || !w || !after || !l.retryTurn || l.retryTold === l.retryTurn || !retryWaitCurrent(w, now)) return
+    if (now - Date.parse(w.since) < after) return
+    l.retryTold = l.retryTurn
+    this.retryOverdue?.(l.state)
   }
 
   /**

@@ -54,6 +54,18 @@ export function copilotHooks(hookUrl: string, token: string): Record<string, unk
   return { version: 1, hooks }
 }
 
+/**
+ * Why a Copilot model call it tries again failed, from its message (HI-1973, `copilot.retry.message`'s named groups): the
+ * HTTP status (a valid one only, 100–599), or 429 for a rate limit's words (Copilot 1.0.105's hook gives the service's
+ * own error body, with no status: "Rate limit reached for requests"), and whether its service couldn't be reached.
+ * None: a failure Hive can't name.
+ */
+export function copilotRetryOf(message: string): { status: number | null; network: boolean } {
+  const m = advanced.pattern('copilot.retry.message').exec(message)
+  const status = Number(m?.groups?.status)
+  return { status: Number.isInteger(status) && status >= 100 && status <= 599 ? status : m?.groups?.limited ? 429 : null, network: !!m?.groups?.network }
+}
+
 /** A workspace MCP server (Claude Code's JSON format, as Hive keeps them) in Copilot's mcp-config format. */
 export function copilotMcpServer(def: McpServerDef): Record<string, unknown> | null {
   if (typeof def.url === 'string' && def.url) {
@@ -397,6 +409,8 @@ export class CopilotAdapter implements ProviderAdapter {
         const recoverable = body.recoverable ?? body.is_recoverable
         if (message && advanced.pattern('copilot.signIn.hookMessage').test(message)) out.event = { kind: 'signIn', message }
         else if (recoverable === false) out.event = { kind: 'stop', lastMessage: message, failed: true }
+        // A model call it tries again (HI-1973): the turn goes on, waiting to retry; why, from its message.
+        else if (recoverable === true && advanced.pattern('copilot.retry.context').test(String(body.error_context ?? ''))) out.event = { kind: 'retry', ...copilotRetryOf(message ?? '') }
         break
       }
       case 'PreCompact':

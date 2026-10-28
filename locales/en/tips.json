@@ -1516,12 +1516,12 @@
     "description": "A tip's title."
   },
   "tips.retryWait.text": {
-    "defaultMessage": "When Codex's requests are refused, often by a rate limit, Codex waits minutes before trying again while its screen says only Working. Hive reads the wait from Codex's log, and the agent's status says when it tries again.",
-    "description": "A tip (HI-1972). Codex is a product name; Working is what its screen shows."
+    "defaultMessage": "When a Codex, Claude Code or Copilot agent's requests are refused, often by a rate limit, it waits and tries again while its screen says only Working. Hive reads the wait from the agent's own records, and its status says so.",
+    "description": "A tip (HI-1972, HI-1973). Codex, Claude Code and Copilot are product names; Working is what their screens show."
   },
   "tips.retryWait.title": {
-    "defaultMessage": "See when Codex is rate-limited",
-    "description": "A tip's title (HI-1972). Codex is a product name."
+    "defaultMessage": "See when an agent is rate-limited",
+    "description": "A tip's title (HI-1972, HI-1973): when an agent's coding agent has its model requests refused as too many."
   },
   "tips.reviewCopies.text": {
     "defaultMessage": "A reviewer reviews in a review copy: a folder at exactly the submitted revision, which nothing else writes, so the builder can carry on meanwhile. Its checks there count for that submission. Settings → Advanced turns it off.",

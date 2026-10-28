@@ -75,6 +75,7 @@
   "panes.header.notRunning": "Parado",
   "panes.header.retryLarge": "Esta conversa é grande, e cada solicitação a envia inteira. Uma conversa nova (uma passagem de bastão e depois uma sessão nova) envia menos, o que pode ajudar sob um limite de taxa.",
   "panes.header.retryTip": "{provider} está esperando para reenviar sua solicitação ao modelo: {why, select, limited {o serviço a recusou por excesso de solicitações (limite de taxa).} network {não foi possível acessar o serviço.} other {a solicitação falhou.}} Ele tenta de novo sozinho{when, select, at { às {time}} other {}}; você não precisa fazer nada.",
+  "panes.header.retrySince": "Tentando de novo desde {time}.",
   "panes.header.stopTip": "Parar este agente (a conversa é mantida; retome quando quiser)",
   "panes.header.unknownTip": "O Hive não recebe notícias do turno deste agente há algum tempo e não vê sinal de que ele terminou: nenhum Stop da CLI, nada nos registros da CLI, nenhum prompt ocioso na tela. Até receber mais notícias, o agente conta como ocupado e nada é digitado nele. Se o terminal mostrar que ele está esperando no prompt, marque-o como ocioso.",
   "panes.header.untaken": "Uma linha digitada pelo Hive não foi aceita",

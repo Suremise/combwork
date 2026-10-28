@@ -38,7 +38,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(codexHome, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
   // HI-1972: Codex's log is looked at for a retry wait after its shortest quiet while, not 20 s.
   fs.mkdirSync(userData, { recursive: true })
-  fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'codex.retry.checkAfterSeconds': 5 } }))
+  fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'codex.retry.checkAfterSeconds': 5, 'claude-code.retry.checkAfterSeconds': 5 } }))
   lib.gitProject(proj)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([proj.toLowerCase()]))
   lib.enableProviders(userData, ['claude-code', 'codex'])
@@ -173,6 +173,23 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(codexHome, 'fake-retried-Codex'), '')
   const over = await is(codex, 'finished', 'over')
   check('its retry going through clears it: the turn ends as usual', !!over && !over.retryWait, JSON.stringify(over?.retryWait))
+
+  // HI-1973: Claude Code's 429 tries, recorded only in its transcript, no hook while it waits: read after its quiet while
+  // (5 s here), its pane says it is rate-limited, which try of how many and when it retries; its next hook clears it.
+  await turn(claude, 'ratelimited')
+  const cWaiting = await until(async () => {
+    const s = await live(claude)
+    return s?.retryWait?.status === 429 && s
+  }, HUNG_MS)
+  const cw = cWaiting?.retryWait
+  check("Claude Code: its transcript's 429 tries are read as its wait to retry (try 2 of 10), its first try the wait's start", cw?.attempt === 2 && cw.max === 10 && Date.parse(cw.since) < Date.parse(cw.at) && cWaiting.status === 'working', JSON.stringify(cw))
+  const cHeader = page.locator('.pane-header-bar', { hasText: 'Claude' })
+  const cText = () => cHeader.locator('.pane-status.retrying').innerText().catch(() => '')
+  check("its pane says it was rate-limited, when it retries and which try of 10, not Working…", !!(await until(async () => /^Rate-limited \(429\) · retrying at .+ \(2 of 10\)$/.test((await cText()).trim()), HUNG_MS)), await cText())
+  await page.screenshot({ path: path.join(lib.WORK, 'turnledger-retrying-claude.png') })
+  fs.writeFileSync(path.join(claudeHome, 'fake-retried-Claude'), '')
+  const cOver = await is(claude, 'finished', 'over')
+  check("Claude Code: its retry going through clears it: the turn ends as usual", !!cOver && !cOver.retryWait, JSON.stringify(cOver?.retryWait))
 
   // Codex 0.164 compacting by itself, then running its turn under that compaction's id (HI-1916: HR5's "no hooks" on 27
   // Oct): heard as a turn, and finished at its Stop, with nothing of it stale.
