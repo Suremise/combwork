@@ -418,6 +418,7 @@ interface HiveMessageValues {
   'assistant.skills.shipped.boardHygiene': undefined
   'assistant.skills.shipped.cardLoop': undefined
   'assistant.skills.shipped.coordinateAgents': undefined
+  'assistant.skills.shipped.generalist': undefined
   'assistant.skills.shipped.handover': undefined
   'assistant.skills.shipped.journal': undefined
   'assistant.skills.shipped.licenceAudit': undefined
