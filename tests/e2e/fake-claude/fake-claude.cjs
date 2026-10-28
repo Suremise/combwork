@@ -1072,10 +1072,21 @@ function drawTrust() {
   out(`\r\nQuick safety check: Do you trust the files in ${cwd}?\r\n ${trustMenu.on === 'No' ? '>' : ' '} No, exit\r\n ${trustMenu.on === 'Yes' ? '>' : ' '} Yes, I trust this folder\r\n Enter to confirm · Esc to cancel\r\n`)
 }
 let ctrlC = 0
-/** The screen rows the input line takes (begun at the row's start), wrapped at the terminal's width and at its line breaks. */
+/**
+ * The screen rows the input line takes, wrapped at the terminal's width and at its line breaks: begun after the box's
+ * `❯ ` (inputBox), else at the row's start.
+ */
 const lineRows = () => {
   const cols = process.stdout.columns || 80
-  return line.split('\n').reduce((n, part) => n + Math.max(1, Math.ceil(part.length / cols)), 0)
+  return line.split('\n').reduce((n, part, i) => n + Math.max(1, Math.ceil((part.length + (i === 0 && inputBox ? 2 : 0)) / cols)), 0)
+}
+/** How many characters of the input line are on its last screen row (lineRows): 0 at a row begun by a line break. */
+const lastRowChars = () => {
+  const cols = process.stdout.columns || 80
+  const parts = line.split('\n')
+  const last = parts[parts.length - 1]
+  const first = cols - (parts.length === 1 && inputBox ? 2 : 0)
+  return last.length <= first ? last.length : (last.length - first) % cols || cols
 }
 /** Inside a bracketed paste, which can come in several reads. */
 let inPaste = false
@@ -1124,10 +1135,15 @@ process.stdin.on('data', (data) => {
     ctrlC = 0
     // What is typed shows on its input line, as in Claude Code (a pasted image's path too, #195).
     if (ch === '\x15') {
-      // The whole line goes, as in Claude Code, the rows it wrapped onto too (#1398: a narrow pane kept a line's first row).
-      if (line) out(`\r${lineRows() > 1 ? `\x1b[${lineRows() - 1}A` : ''}\x1b[J${inputBox ? `❯ ${boxBelow()}` : ''}`)
-      line = ''
-      enters = 0
+      // Only the screen row the cursor is on goes, as in Claude Code 2.1.312 (HI-1974: a narrow pane kept a stopped
+      // wake's first rows, sent with the next): the rows before it stay. At a row begun by a line break, that break goes.
+      if (line) {
+        const rows = lineRows()
+        const n = lastRowChars()
+        line = n ? line.slice(0, line.length - n) : line.slice(0, -1)
+        out(`\r${rows > 1 ? `\x1b[${rows - 1}A` : ''}\x1b[J${inputBox ? '❯ ' : ''}${line.replace(/\n/g, '\r\n')}${inputBox ? boxBelow() : ''}`)
+      }
+      if (!line) enters = 0
     } else if ((ch === '\r' || ch === '\n') && !onEnter && Date.now() < drawingUntil) {
       // Still drawing the resumed conversation: the Enter is lost, what was typed stays on the line (#334).
       continue

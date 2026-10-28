@@ -4997,6 +4997,18 @@ under Hive in Advanced (no CLI's recording to check it against), defaulting to w
 - `hive.prompt.clearDraft` (on; at once): off, no Ctrl+U on any of `sessions.ts`'s paths (before a prompt, taking back
   one stopped part-way, before `/compact`). Codex's `/permissions` menu steps keep theirs: the menu can't open behind
   a draft.
+  - **A wrapped line stopped part-way** (HI-1974): Claude Code 2.1.312's Ctrl+U deletes only the row the cursor is on
+    of a line wrapped onto several (Codex and Copilot clear the line: each tried in a 50-column terminal). A wake put
+    off as it was typed (no longer wanted, the agent busy) kept its first rows in LB1's input, and the next wake was
+    sent after them. A CLI whose descriptor says `ctrlUClearsRow` (Claude Code) gets one Ctrl+U for each row the
+    stopped line took (`rowKeys`: its length over the terminal's width less 6, one more once it wraps), each its own
+    key. One too many deletes the row before it, which can only be a draft the switch was clearing anyway, and does
+    nothing in an empty input.
+  - **Still checked as it is typed:** a line's `wanted()` (deliveries.ts) is asked before each piece and before Enter,
+    as before: idle wakes turned off, Deliver Now made again (#1504) and a user's own task whose reason changed stop
+    it part-way, and it is taken back. The suites `wakeputoff` (fake Claude Code and Codex) and `wakepaste-codex` /
+    `wakepaste-copilot` (the real CLIs) hold a wrapped doorbell before its Enter (`HIVE_TEST_HOLD_TYPED`) and turn
+    idle wakes off.
 **Group E's rows 26, 27 and 30** (#1292; Darren's choices on #1120 point 5), each as Hive did by default, at once:
 - `hive.terminal.allKeysToCli` (off): on, every key in an agent's pane goes to its CLI but the command palette's
   shortcut (Show All Commands, as the user bound it), so every command stays in reach (`appTakesTerminalKey` in

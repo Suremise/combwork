@@ -352,6 +352,7 @@ export const SUITES = [
   { name: 'wakepaste' },
   { name: 'wakepaste-codex', needs: ['codex'] },
   { name: 'wakepaste-copilot', needs: ['copilot'] },
+  { name: 'wakeputoff' },
   { name: 'wakeuntaken' },
   { name: 'watchrelease' },
   { name: 'welcomefit' },

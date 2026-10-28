@@ -6,8 +6,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // The CLI's echo (#600): with `echo.to` set, what Hive types is drawn on that screen, as a CLI reading its input draws it.
-const { writes, echo } = vi.hoisted(() => ({ writes: [] as string[], echo: { to: null as null | { write(d: string): void } } }))
-vi.mock('../src/main/ptyHost', async (original) => ({ ...((await original()) as object), writePty: (_key: string, data: string) => void (writes.push(data), echo.to?.write(data)) }))
+// The pane's width (HI-1974): with `pane.cols` set, the terminal's process is that wide.
+const { writes, echo, pane } = vi.hoisted(() => ({ writes: [] as string[], echo: { to: null as null | { write(d: string): void } }, pane: { cols: 0 } }))
+vi.mock('../src/main/ptyHost', async (original) => {
+  const real = (await original()) as { ptySize: (key: string) => { cols: number; rows: number } | null }
+  return { ...real, writePty: (_key: string, data: string) => void (writes.push(data), echo.to?.write(data)), ptySize: (key: string) => (pane.cols ? { cols: pane.cols, rows: 20 } : real.ptySize(key)) }
+})
 const { sessions } = await import('../src/main/sessions')
 const { claudeCode } = await import('../src/main/providers/claude/adapter')
 const { codex } = await import('../src/main/providers/codex/adapter')
@@ -15,7 +19,7 @@ const { copilot } = await import('../src/main/providers/copilot/adapter')
 const { TerminalScreen } = await import('../src/main/terminalScreen')
 const { advanced } = await import('../src/main/advanced')
 const { PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId } = await import('../src/shared/advanced')
-const { promptInput, rollbackKeys, typedPrompt, withoutInvisible } = await import('../src/main/sessions')
+const { promptInput, rollbackKeys, rowKeys, typedPrompt, withoutInvisible } = await import('../src/main/sessions')
 const { TYPED_NEWLINE_KEYS } = await import('../src/shared/terminalInput')
 const { providerService } = await import('../src/main/providerService')
 const { NEWLINE_TRIED } = await import('../src/main/providers/codex/adapter')
@@ -38,6 +42,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
     s.live.delete(liveKey)
     writes.length = 0
     echo.to = null
+    pane.cols = 0
     vi.useRealTimers()
     // A test that failed while Hive was typing mustn't leave the next one refused as busy.
     ;(sessions as unknown as { delivering: Set<string> }).delivering.clear()
@@ -368,6 +373,36 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
         await withSwitches({ [PROMPT_CLEAR_DRAFT]: clear }, () => expect(sessions.sendPrompt(p, id, 'hello', guard)).rejects.toThrow('busy now'))
         expect(writes, `clear ${clear}`).toEqual(clear ? ['\x15', '\x1b[200~hello\x1b[201~', '\x15'] : ['\x1b[200~hello\x1b[201~'])
       }
+    })
+
+    // HI-1974: Claude Code 2.1.312's Ctrl+U deletes only the wrapped row the cursor is on. One Ctrl+U left a stopped
+    // wake's first rows in LB1's input, and the next wake was sent after them.
+    it('a long line stopped part-way in Claude Code is taken back row by row, where one Ctrl+U deletes one wrapped row', async () => {
+      const line = '[Hive] New in your inbox: 1 card event (LE-191) (m315). Call hive_inbox to read it. (Your watch is still on, waiting for LE-191: do what this asks, then end your turn, and Hive wakes you when it changes.)'
+      for (const [adapter, cols, keys] of [[claudeCode, 50, 6], [claudeCode, 300, 1], [copilot, 50, 1]] as const) {
+        writes.length = 0
+        pane.cols = cols
+        await running(adapter, '\x1b[?2004h')
+        let checks = 0
+        const guard = (): void => {
+          if (++checks > 2) throw new Error('It is no longer wanted.')
+        }
+        await expect(sessions.sendPrompt(p, id, line, guard)).rejects.toThrow('no longer wanted')
+        expect(writes[1], `${adapter.id} ${cols}`).toContain('[Hive] New in your inbox')
+        expect(writes.slice(2), `${adapter.id} ${cols}`).toEqual(Array(keys).fill('\x15'))
+      }
+    })
+
+    it('rowKeys: the rows a line takes, one more once it wraps; nothing for nothing typed', () => {
+      expect(rowKeys(0, 80)).toBe(0)
+      expect(rowKeys(5, 80)).toBe(1)
+      expect(rowKeys(74, 80)).toBe(1)
+      expect(rowKeys(75, 80)).toBe(3)
+      // The wake above, 204 characters in a 50-column pane: 5 rows of 44, and one more for words moved whole to the next row.
+      expect(rowKeys(204, 50)).toBe(6)
+      // A pane narrower than the prompt's mark and margin counts rows of 10.
+      expect(rowKeys(25, 8)).toBe(4)
+      expect(rollbackKeys([75, 0, 5], (c) => rowKeys(c, 80))).toBe(3 + 2 + 1)
     })
   })
 

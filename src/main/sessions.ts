@@ -99,7 +99,7 @@ import { agentGetsMcp, serverOnIn } from '../shared/agentMcp'
 import { launchEnded, leftoversOf, noteUntracked, settleLeftovers, STOPPED_BEFORE_START, trackingProblemText, trackingReady, trackLaunch, type TrackResult } from './agentProcesses'
 import type { GateWord } from './launchGate'
 import { leftoversSummary, processCount } from '../shared/agentProcesses'
-import { childEnv, killPty, refreshPty, spawnPty, startSize, writePty } from './ptyHost'
+import { childEnv, killPty, ptySize, refreshPty, spawnPty, startSize, writePty } from './ptyHost'
 import { refreshPathBeforeStart } from './freshPath'
 import { TerminalScreen } from './terminalScreen'
 import { heldLineLost } from './heldLine'
@@ -760,10 +760,39 @@ async function typeSegments(key: string, segments: readonly TypedSegment[], stil
  * How many Ctrl+U take back what typeSegments typed (`typed`: the characters on each of its lines, the cursor after
  * the last), in an input box where Ctrl+U deletes to the line's start, or the line break before it at a line's start
  * (Codex 0.164's kill_line_start: HR6's round 1 of HI-1327): one for each line with text, and one for each line break.
- * Never more, so nothing before Hive's own text is touched.
+ * Never more, so nothing before Hive's own text is touched. `keysFor` gives a line's own count, for an input box whose
+ * Ctrl+U deletes one wrapped row (rowKeys).
  */
-export function rollbackKeys(typed: readonly number[]): number {
-  return typed.reduce((n, chars, i) => n + (chars > 0 ? 1 : 0) + (i > 0 ? 1 : 0), 0)
+export function rollbackKeys(typed: readonly number[], keysFor: (chars: number) => number = (chars) => (chars > 0 ? 1 : 0)): number {
+  return typed.reduce((n, chars, i) => n + keysFor(chars) + (i > 0 ? 1 : 0), 0)
+}
+
+/**
+ * How many Ctrl+U take back `chars` characters Hive put in an input box `cols` wide whose Ctrl+U deletes only the row the
+ * cursor is on (capabilities.ctrlUClearsRow, HI-1974: Claude Code 2.1.312 kept a stopped wake's first rows, and the
+ * next wake was sent after them). The rows it took, counted narrower than the box (its prompt mark and margin), and
+ * one more once it wraps (words moved whole to the next row): enough for all of it. One too many deletes the row
+ * before it, which can only be a draft clearing the input was to remove (Settings → Advanced); on an empty input it
+ * does nothing.
+ */
+export function rowKeys(chars: number, cols: number): number {
+  if (chars <= 0) return 0
+  const rows = Math.ceil(chars / Math.max(10, cols - 6))
+  return rows > 1 ? rows + 1 : rows
+}
+
+/**
+ * For the wakeputoff suite (unpackaged builds only, HI-1974): a line Hive has typed waits before its Enter while
+ * HIVE_TEST_HOLD_TYPED's file exists, checked as it waits, so what stops a line part-way can stop it there.
+ */
+async function heldTyped(label: string, check: () => void): Promise<void> {
+  const file = app.isPackaged ? undefined : process.env.HIVE_TEST_HOLD_TYPED
+  if (!file || !existsSync(file)) return
+  log.info(`${userText(label)}: the line Hive typed is held before its Enter (a test's)`)
+  while (existsSync(file)) {
+    await new Promise((r) => setTimeout(r, 50))
+    check()
+  }
 }
 
 /**
@@ -3464,6 +3493,8 @@ class SessionManager {
     let typed = false
     // What a multi-line prompt typed so far, by line (HI-1327): taken back as exactly that if stopped part-way.
     let lines: number[] | null = null
+    // What a one-line prompt writes (pasted, or typed in pieces): taken back as that many rows where Ctrl+U deletes one.
+    let typedOut = ''
     let sent: { at: number; prompts: number; from: number } | null = null
     // Settings → Advanced (#1286): whether Hive clears the CLI's input first (and takes back a prompt it stopped), and
     // whether it keeps the prompt as written.
@@ -3493,11 +3524,13 @@ class SessionManager {
       // find); none, no wait, as for an empty line.
       const out = segments ? segments.flatMap((s) => ('text' in s && s.text.trim() ? [s.text] : [])).at(-1) ?? '' : promptInput(line, paste, asTyped)
       const drawn = l?.screen && l.adapter.descriptor.capabilities.enterOnceDrawn && out.trim() ? drawnLine(l.screen, out) : null
+      typedOut = out
       if (paste) writePty(key, `\x1b[200~${out}\x1b[201~`)
       else if (segments) {
         lines = [0]
         await typeSegments(key, segments, () => (check(), true), lines)
       } else await typeInto(key, out, () => (check(), true))
+      if (l) await heldTyped(this.label(l.state), check)
       await new Promise((r) => setTimeout(r, 300))
       check()
       if (drawn && !drawn()) {
@@ -3545,8 +3578,10 @@ class SessionManager {
     } catch (e) {
       if (clearDraft && typed && same() && this.userTypedAt(projectPath, agentId) < since) {
         // A multi-line prompt: one Ctrl+U for each of its lines with text and each line break, each its own key, so no
-        // line of it is left to go with a later prompt (HR6's round 1 of HI-1327); none past it.
-        const n = lines ? rollbackKeys(lines) : 1
+        // line of it is left to go with a later prompt (HR6's round 1 of HI-1327); none past it. A CLI whose Ctrl+U
+        // deletes one wrapped row gets one for each row (HI-1974).
+        const cols = l?.adapter.descriptor.capabilities.ctrlUClearsRow ? ptySize(key)?.cols ?? startSize(key).cols : 0
+        const n = lines ? rollbackKeys(lines, cols ? (chars) => rowKeys(chars, cols) : undefined) : cols ? Math.max(1, rowKeys(typedOut.length, cols)) : 1
         for (let i = 0; i < n; i++) {
           if (!same() || this.userTypedAt(projectPath, agentId) >= since) break
           writePty(key, '\x15')
