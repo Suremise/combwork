@@ -1,7 +1,7 @@
 import { basename } from './util'
 import { call, errorMessage } from './api'
 import { agentLimit } from './advanced'
-import { agentOf, agentProviderOf, cardLabelOf, choose, openVersionControl, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
+import { agentOf, cancelDialog, agentProviderOf, cardLabelOf, choose, openVersionControl, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
 import { MANY_AGENTS, agentLimitText, chosenLayout, layoutColumns, layoutPanes, moveAgentTo, projectLayout, projectSessionView, sessionInAgentFolder, swapAgentsIn } from '@shared/defaults'
 import { moveToCell, neighbourCell, orderByCells, type CellDirection } from '@shared/paneCells'
 import { defaultProviderPending, isProviderEnabled, projectDefaultProvider, providerName } from '@shared/providers'
@@ -19,6 +19,7 @@ import { msg } from '@shared/i18n/msg'
 import { HAND_OVER_TEXT } from '@shared/handOver'
 import type { McpServerInfo, ProjectInfo, ProjectProviderConfig, ProviderId, SessionLayout, SessionListItem, SessionView, ToastAction } from '@shared/types'
 import { TEMPLATE_NAME_MAX, namesFollowKey, templateAgentNames, usesKey, type TemplateEntry, type TemplateScope } from '@shared/templates'
+import { PLATFORM_NAME } from '@shared/platform/switching'
 import { templateLoadDetail } from '@shared/templateLoad'
 import { PRESET_TEXT } from '@shared/workflow/optionTexts'
 import { WORKFLOW_ROLE_TEXT } from '@shared/workflow/roles'
@@ -1303,9 +1304,17 @@ export function moveAgentPane(dir: CellDirection, path: string | null = get().se
 // Agent templates (#126)
 // ---------------------------------------------------------------------------
 
+/** What a save says it did with the template's workflow (HI-1910): saved for the project's version control, kept from before. */
+const TW = {
+  saved: msg({ id: 'actions.template.workflowSaved', defaultMessage: "It holds this project's workflow for {platform}.", description: "Under the notification that a template was saved (HI-1910): it holds the project's workflow options for its version control ({platform}: None or Git, as Hive names them)." }),
+  kept: msg({ id: 'actions.template.workflowKept', defaultMessage: "{count, plural, one {The workflow for {platforms} it had is kept.} other {The workflows for {platforms} it had are kept.}}", description: "Under the notification that a template was saved over one of the same name (HI-1910): the workflow sections it had for {platforms} (None, Git: a list) are kept, {count} of them." }),
+  none: msg({ id: 'actions.template.workflowNone', defaultMessage: 'It holds no workflow.', description: "Under the notification that a template was saved (HI-1910): saved without the project's workflow, and it had none." })
+}
+
 /**
  * Save Template…: the project's agents and layout under a name, in the project (private) or, ticked, the workspace (for
- * every project). A name already there asks before it is replaced.
+ * every project). A name already there asks before it is replaced. HI-1910: ticked (by default), the project's workflow
+ * too, as its section for the project's version control; the notice says what it holds, and what it kept from before.
  */
 export async function saveTemplate(path: string): Promise<void> {
   const p = project(path)
@@ -1316,19 +1325,22 @@ export async function saveTemplate(path: string): Promise<void> {
   const key = get().projectKeys.find((k) => k.projectPath.toLowerCase() === path.toLowerCase())?.key ?? null
   const offerPatterns = namesFollowKey(p.agents.map((a) => a.name), key)
   let usePatterns = offerPatterns
+  let includeWorkflow = true
+  const platform = p.platform?.id ?? 'none'
   const name = await prompt({
     title: tr(msg({ id: 'actions.template.saveTitle', defaultMessage: 'Save as template', description: 'Title of the Save as Template dialog.' })),
-    message: tr(msg({ id: 'actions.template.saveMessage', defaultMessage: "A template keeps the project's {n, plural, one {agent} other {# agents}} (settings, roles and notes), its layout and its preset, to load into any project later. Sessions and worktrees aren't saved.", description: "The Save as Template dialog: what a template keeps of the project's {n} agents. Glossary: preset." }), { n: p.agents.length }),
+    message: tr(msg({ id: 'actions.template.saveMessage2', defaultMessage: "A template keeps the project's {n, plural, one {agent} other {# agents}} (settings, roles and notes), its layout and, ticked below, its workflow, to load into any project later. Sessions and worktrees aren't saved.", description: "The Save as Template dialog: what a template keeps of the project's {n} agents (HI-1910: its workflow options, when the box below is ticked). Glossary: workflow." }), { n: p.agents.length }),
     placeholder: tr(msg({ id: 'actions.template.namePlaceholder', defaultMessage: 'Template name', description: "Placeholder of the Save as Template dialog's name box." })),
     confirmLabel: tr(msg({ id: 'actions.template.save', defaultMessage: 'Save', description: 'Button: saves the template.' })),
     validate: (v) => (!v.trim() ? tr(msg({ id: 'actions.template.nameEmpty', defaultMessage: 'Enter a name.', description: "Why a template's name can't be used: it is empty." })) : v.trim().length > TEMPLATE_NAME_MAX ? tr(msg({ id: 'actions.template.nameTooLong', defaultMessage: 'At most {max} characters.', description: "Why a template's name can't be used: it is longer than {max} characters." }), { max: TEMPLATE_NAME_MAX }) : null),
     check: { label: tr(msg({ id: 'actions.template.everyProject', defaultMessage: 'For every project in the workspace (else for this project only)', description: "A tick box in the Save as Template dialog: the template is the workspace's (ticked) or this project's." })), initial: false, set: (v) => (workspaceScope = v) },
-    check2: offerPatterns ? { label: tr(msg({ id: 'actions.template.usePatterns', defaultMessage: 'Use the project key in names ({example} becomes {pattern}, named from the key of the project it is loaded into)', description: "A tick box in the Save as Template dialog (#1440): agent names that start with this project's key ({example}, e.g. HI-B1) are saved as a pattern ({pattern}: {key}-B{n}), so a project loading the template names them with its own key. Keep {key} and {n} as they are." }), { example: p.agents.map((a) => a.name).find((n) => n.toUpperCase().startsWith(`${key}-`)) ?? `${key}-B1`, pattern: '{key}-B{n}' }), initial: true, set: (v) => (usePatterns = v) } : undefined
+    check2: offerPatterns ? { label: tr(msg({ id: 'actions.template.usePatterns', defaultMessage: 'Use the project key in names ({example} becomes {pattern}, named from the key of the project it is loaded into)', description: "A tick box in the Save as Template dialog (#1440): agent names that start with this project's key ({example}, e.g. HI-B1) are saved as a pattern ({pattern}: {key}-B{n}), so a project loading the template names them with its own key. Keep {key} and {n} as they are." }), { example: p.agents.map((a) => a.name).find((n) => n.toUpperCase().startsWith(`${key}-`)) ?? `${key}-B1`, pattern: '{key}-B{n}' }), initial: true, set: (v) => (usePatterns = v) } : undefined,
+    check3: { label: tr(msg({ id: 'actions.template.includeWorkflow', defaultMessage: "Include this project's workflow (its rules for {platform}: review, checks by name, merging, stages; never its target branch, check commands or identity's name)", description: "A tick box in the Save as Template dialog (HI-1910), ticked by default: the template keeps the project's workflow options for its version control ({platform}: None or Git, as Hive names them), the rules only. Glossary: workflow, check, target branch, identity." }), { platform: tr(PLATFORM_NAME[platform]) }), initial: true, set: (v) => (includeWorkflow = v) }
   })
   if (name === null) return
   const scope: TemplateScope = workspaceScope ? 'workspace' : 'project'
   const saveFailed = (): string => tr(msg({ id: 'actions.template.saveFailed', defaultMessage: 'Could not save the template', description: "An error's title: saving a template failed." }))
-  let r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, false, usePatterns))
+  let r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, false, usePatterns, includeWorkflow))
   if (r && 'exists' in r) {
     const ok = await confirm({
       title: tr(msg({ id: 'actions.template.replaceTitle', defaultMessage: 'Replace the template?', description: 'Title of the question when a template of that name exists.' })),
@@ -1337,10 +1349,20 @@ export async function saveTemplate(path: string): Promise<void> {
       confirmLabel: tr(msg({ id: 'actions.template.replace', defaultMessage: 'Replace', description: 'Button: replaces the template of that name.' }))
     })
     if (!ok) return
-    r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, true, usePatterns))
+    r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, true, usePatterns, includeWorkflow))
   }
   if (r && 'saved' in r) set((s) => ({ templatesVersion: s.templatesVersion + 1 }))
-  if (r && 'saved' in r) notify('success', tr(msg({ id: 'actions.template.saved', defaultMessage: 'Template saved', description: "A notification's title: the template was saved." })), tr(msg({ id: 'actions.template.savedMessage', defaultMessage: '"{name}" ({n, plural, one {# agent} other {# agents}}), for {scope, select, workspace {the workspace} other {this project}}.', description: "Under the notification that a template ({name}) of {n} agents was saved for the workspace (workspace) or this project (other)." }), { name: r.saved.name, n: r.saved.agents.length, scope }))
+  if (r && 'saved' in r) {
+    // What it holds of the workflow (HI-1910): the section saved now, those kept from the template it replaced, or none.
+    const w = r.workflow
+    const lines = [
+      tr(msg({ id: 'actions.template.savedMessage', defaultMessage: '"{name}" ({n, plural, one {# agent} other {# agents}}), for {scope, select, workspace {the workspace} other {this project}}.', description: "Under the notification that a template ({name}) of {n} agents was saved for the workspace (workspace) or this project (other)." }), { name: r.saved.name, n: r.saved.agents.length, scope }),
+      ...(w.saved ? [tr(TW.saved, { platform: tr(PLATFORM_NAME[w.saved]) })] : []),
+      ...(w.kept.length ? [tr(TW.kept, { count: w.kept.length, platforms: fmt.list(w.kept.map((k) => tr(PLATFORM_NAME[k]))) })] : []),
+      ...(!w.saved && !w.kept.length ? [tr(TW.none)] : [])
+    ]
+    notify('success', tr(msg({ id: 'actions.template.saved', defaultMessage: 'Template saved', description: "A notification's title: the template was saved." })), lines.join(' '))
+  }
 }
 
 /**
@@ -1349,7 +1371,10 @@ export async function saveTemplate(path: string): Promise<void> {
  * into Provider Setup or Settings). `from`: the project a project's template is kept in, when it isn't this one (the Templates
  * view loads any template into any project). A preset it suggests that the project's options didn't start from is
  * offered (#1436): ticked, the Version Control tab's Workflow section opens with it chosen, not saved, so what it changes
- * shows before anything is.
+ * shows before anything is. HI-1910: a template's workflow for the project's version control is shown, and applied the
+ * same way (ticked by default): the Workflow section opens with it laid over the project's options as it reads them, to
+ * save there. A Git-only workflow in a project with no version control waits for Git: Set Up Git… closes the dialog and
+ * opens Version Control on Git's page (`templatePending`), and the dialog opens again once the project is Git.
  */
 export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'scope' | 'file' | 'name'>, from?: string): Promise<void> {
   const plan = await attempt(tr(msg({ id: 'actions.template.readFailed', defaultMessage: 'Could not read the template', description: "An error's title: reading a template failed." })), () => call('templates:plan', path, entry.scope, entry.file, from))
@@ -1376,8 +1401,13 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
   let names = plan.create.map((a) => a.name)
   // The connection chosen for each agent whose own can't be used here (HI-1769), by its index in the plan.
   let connections: Record<number, string | null> = Object.fromEntries(plan.connections.map((c) => [c.index, null]))
-  const suggested = plan.suggestedPreset
+  // Its workflow (HI-1910) replaces the suggestion: shown and applied where it has a section for this project's version
+  // control, waiting for Git where it has only Git's, said where one can't be used (never replaced by the suggestion).
+  const wf = plan.workflow
+  const suggested = wf ? null : plan.suggestedPreset
   let switchPreset = false
+  let applyWorkflow = true
+  let setUpGit = false
   const ok = await confirm({
     title: tr(msg({ id: 'actions.template.loadTitle', defaultMessage: 'Load "{name}"?', description: 'Title of the question before loading a template ({name}) into a project.' }), { name: plan.name }),
     message: plan.remove.length
@@ -1386,7 +1416,21 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
     // Who goes and who comes: each new agent's settings, and its new worktree's branch and folder in this project (#268),
     // as a table (#511), with their names to choose (#702).
     detail: templateLoadDetail(plan, p.config, get().settings, (id) => get().providers[id]),
-    content: createElement(TemplateLoadNames, { path, scope: entry.scope, file: entry.file, from, initial: plan, onChange: (now: string[]) => void (names = now), onConnections: (now: Record<number, string | null>) => void (connections = now) }),
+    content: createElement(TemplateLoadNames, {
+      path,
+      scope: entry.scope,
+      file: entry.file,
+      from,
+      initial: plan,
+      onChange: (now: string[]) => void (names = now),
+      onConnections: (now: Record<number, string | null>) => void (connections = now),
+      onWorkflow: (v: boolean) => void (applyWorkflow = v),
+      // Closes this dialog (nothing loaded) for Version Control's Git page: never a dialog over a dialog.
+      onSetUpGit: () => {
+        setUpGit = true
+        cancelDialog()
+      }
+    }),
     wide: true,
     scrollDetail: true,
     confirmLabel: tr(msg({ id: 'actions.template.load', defaultMessage: 'Load template', description: 'Button: loads the template into the project.' })),
@@ -1398,9 +1442,19 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
       await call('templates:load', path, entry.scope, entry.file, expected, from, names, connections)
     }
   })
-  if (!ok) return
+  if (!ok) {
+    if (setUpGit) {
+      set({ templatePending: { path, entry: { scope: entry.scope, file: entry.file, name: entry.name }, ...(from ? { from } : {}) }, vcGitPreview: path })
+      openVersionControl(path, 'workflow')
+    }
+    return
+  }
   await refreshWorkspace()
-  if (suggested && switchPreset) {
+  if (applyWorkflow && wf?.section) {
+    // Laid over the project's options as the Workflow form reads them, and left for the user to save (HR5: never here).
+    set({ workflowPrefill: { path, preset: wf.section.preset, template: { name: plan.name, platform: wf.platform, section: wf.section } } })
+    openVersionControl(path, 'workflow')
+  } else if (suggested && switchPreset) {
     // Filled in once the form has read the project's options (#1423's way), and left for the user to save.
     set({ workflowPrefill: { path, preset: suggested } })
     openVersionControl(path, 'workflow')

@@ -3,8 +3,8 @@ import type { ProjectInfo } from '@shared/types'
 import type { QueueView } from '@shared/workflow/queue'
 import { msg, tr } from '@shared/i18n'
 import { gitStatusText, gitStatusTip, VC_SECTIONS, vcSections, vcSectionShown, type GitRepoSummary } from '@shared/gitRepo'
-import { showVersionControl, useStore } from '../store'
-import { refreshWorkspace } from '../actions'
+import { get, notify, set, showVersionControl, useStore } from '../store'
+import { loadTemplate, refreshWorkspace } from '../actions'
 import { Icon, Tooltip } from '../components/ui'
 import { tabIds, Tabs } from '../components/Tabs'
 import { INIT_TEXT, InitRepoButton, InitRepoHost, type InitRepoEvents } from '../components/InitRepo'
@@ -22,7 +22,8 @@ import { PresetStep } from '../components/PresetStep'
  * sections: for Git, Changes, History, Branches & remotes (GitBranches.tsx) and Merge queue. A None project shows
  * Workflow, and the Merge queue while an old Git ruleset's queue is still there (#1356's rule). Where its folder has no
  * repository of its own, Git can still be chosen (HI-1905): a view of Git's page, only Initialise repository…, saving
- * nothing; once the repository is made with its first commit, the project switches to Git.
+ * nothing; once the repository is made with its first commit, the project switches to Git. HI-1910: a template's Load
+ * dialog opens Git's page (`vcGitPreview`) for a workflow that needs Git, and opens again once the project is Git.
  */
 
 const NO_QUEUES: QueueView[] = []
@@ -36,6 +37,8 @@ const M = {
   noCommitYet: msg({ id: 'git.vc.noCommitYet', defaultMessage: "This folder's Git repository has no first commit yet.", description: 'Git’s page in the Version Control tab, when Initialise repository… made the repository but stopped before its first commit: above the Make first commit… button.' }),
   parentButton: msg({ id: 'git.vc.useParent', defaultMessage: 'Use that repository…', description: 'Button on Git’s page in the Version Control tab of a project inside another repository: switches the project to Git on that repository, after the warning (the … says it asks first: keep it).' }),
   initOwnHint: msg({ id: 'git.vc.initOwnHint', defaultMessage: 'Initialise its own repository… makes this folder a Git repository of its own on a branch called main, keeps its .hive out of git and commits its files.', description: 'Git’s page in the Version Control tab of a project inside another repository, under its buttons. Initialise its own repository… is the button’s name: keep it as translated there. Keep main (the branch name).' }),
+  templatePending: msg({ id: 'git.vc.templatePending', defaultMessage: 'For the template {template}: once the repository is made and this project uses Git, its Load dialog opens again.', description: 'Git’s page in the Version Control tab (HI-1910), opened from the Load template dialog because the template’s workflow needs Git. {template} is its name.' }),
+  templateNotApplied: msg({ id: 'git.vc.templateNotApplied', defaultMessage: '{project} still uses None, so the Git workflow of {template} wasn’t applied. Switch the project to Git, then load the template again.', description: 'A notice (HI-1910): the repository was made from Git’s page for a template ({template}) whose workflow needs Git, but the project ({project}) wasn’t switched to Git (refused, or the warning cancelled). None and Git as Hive names them.' }),
   initHint: msg({ id: 'git.vc.initHint', defaultMessage: 'Initialise repository… makes this folder a Git repository on a branch called main, keeps its .hive out of git and commits its files.', description: 'Under the header of the Version Control tab of a project whose folder has no repository, beside the button. Initialise repository… is the button’s name: keep it as translated there. Keep main (the branch name).' })
 }
 
@@ -70,7 +73,7 @@ function useDetectionCatchUp(project: ProjectInfo, s: GitRepoSummary | null): vo
  * using that one (the switch, after its warning) or making its own; a repository made with no commit yet, its first
  * commit; and the last init's failure, after its dialog has closed.
  */
-function GitPreview({ project, s, error }: { project: ProjectInfo; s: GitRepoSummary | null; error: string | null }) {
+function GitPreview({ project, s, error, template }: { project: ProjectInfo; s: GitRepoSummary | null; error: string | null; template: string | null }) {
   const parent = s?.parentRepo
   // A repository made by an init that stopped before its first commit: the dialog carries on from there.
   const noCommit = !!s?.isRepo && !parent && !s.head
@@ -86,6 +89,11 @@ function GitPreview({ project, s, error }: { project: ProjectInfo; s: GitRepoSum
         <InitRepoButton project={project} small {...(parent ? { label: tr(INIT_TEXT.ownRepoButton) } : noCommit ? { label: tr(INIT_TEXT.firstCommitButton) } : {})} />
       </div>
       {!noCommit && <span className="hint">{tr(parent ? M.initOwnHint : M.initHint)}</span>}
+      {template && (
+        <div className="banner info" data-vc-template-pending="">
+          <Icon name="info" /> {tr(M.templatePending, { template })}
+        </div>
+      )}
       {error && (
         <div className="banner danger" data-vc-init-error="">
           <Icon name="error" /> {error}
@@ -118,9 +126,31 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
     setPreviewFor(null)
     setInitError(null)
   }, [project.path])
+  // A template waiting for this project's Git (HI-1910): its Load dialog's Set Up Git… opened Git's page here.
+  const pending = useStore((st) => (st.templatePending?.path === project.path ? st.templatePending : null))
+  const wantsGit = useStore((st) => st.vcGitPreview === project.path)
+  useEffect(() => {
+    if (!wantsGit || !s) return
+    set({ vcGitPreview: null })
+    if (noRepo) setPreviewFor(project.path)
+  }, [wantsGit, s, noRepo, project.path])
+  // Given up (None chosen): the template no longer waits. Leaving the tab keeps it waiting, said on Git's page while it
+  // does (never on unmount: StrictMode mounts twice in development).
+  const givenUp = (path: string): void => {
+    if (get().templatePending?.path === path) set({ templatePending: null })
+  }
   const onPreview = (on: boolean): void => {
     setPreviewFor(on ? project.path : null)
     setInitError(null)
+    if (!on) givenUp(project.path)
+  }
+  /** After Initialise repository… and the switch: the waiting template's Load dialog again, or why its workflow wasn't applied. */
+  const afterGit = (p: ProjectInfo, switched: boolean): void => {
+    const waiting = get().templatePending
+    if (!waiting || waiting.path !== p.path) return
+    set({ templatePending: null })
+    if (switched) void loadTemplate(p.path, waiting.entry, waiting.from)
+    else notify('warning', tr(M.templateNotApplied, { project: p.name, template: waiting.entry.name }))
   }
   const status = platform === 'git' && !!s?.isRepo
   useDetectionCatchUp(project, s)
@@ -131,7 +161,7 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
     ? {
         onInitialised: (p) => {
           setPreviewFor(null)
-          void switchAfterInit(p)
+          void switchAfterInit(p).then((switched) => afterGit(p, switched))
         },
         onFailed: (error) => setInitError({ path: project.path, error })
       }
@@ -139,7 +169,7 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
   return (
     <div className="git-view vc-view" data-platform={platform}>
       <VersionControlHeader project={project} platform={platform} form={form} preview={preview} {...(noRepo || preview ? { onPreview } : {})} />
-      {preview ? <GitPreview project={project} s={s} error={initError?.path === project.path ? initError.error : null} /> : <PresetStep project={project} platform={platform} form={form} />}
+      {preview ? <GitPreview project={project} s={s} error={initError?.path === project.path ? initError.error : null} template={pending?.entry.name ?? null} /> : <PresetStep project={project} platform={platform} form={form} />}
       {!preview && (
         <>
           <div className="git-head">

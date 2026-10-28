@@ -8,6 +8,7 @@ import { call, errorMessage } from '../api'
 import { set, useStore } from '../store'
 import { TemplatePlan } from './TemplatePlan'
 import { useConnections } from './ConnectionChoice'
+import { TemplateLoadWorkflowPart, workflowBlocks } from './TemplateLoadWorkflow'
 
 /**
  * The Load template dialog's plan with its agents' names to choose (#702, Darren's decision of 12 Oct; #1440): beside
@@ -17,7 +18,8 @@ import { useConnections } from './ConnectionChoice'
  * edited to any free one. One another project's agent has, one used twice or an empty one is marked, saying what it
  * clashes with, and the dialog's button stays greyed out (`dialogBlocked`) until none is; this project's own agents
  * don't count, as the load replaces them. The plan (who replaces whom) is asked for again once typing pauses.
- * `onChange` hears the names the button loads.
+ * `onChange` hears the names the button loads. HI-1910: under it, the template's workflow (TemplateLoadWorkflow.tsx):
+ * `onWorkflow` hears whether to apply it; a Git-only one, ticked in a project with no version control, holds the button.
  */
 const M = {
   sameTwice: msg({ id: 'assistant.loadNames.sameTwice', defaultMessage: 'Another of its agents has this name.', description: "Load template, under a name box: another of the template's agents is given the same name." }),
@@ -26,7 +28,7 @@ const M = {
   takenNote: msg({ id: 'assistant.loadNames.filledNote', defaultMessage: 'Agent names are unique across the workspace, and {count, plural, one {this name is} other {these names are}} taken already: {names} (projects: {projects}). {count, plural, one {A free name is} other {Free names are}} filled in below. Change any name you like.', description: "Load template, above the plan: some of the template's names are taken by other projects' agents ({projects} lists the projects, {names} the names; {count} how many), so free names were filled in for them. Each sentence whole, the verb never agreeing with a list (HI-1585: glossary §1 rules 3 and 4)." })
 }
 
-export function TemplateLoadNames({ path, scope, file, from, initial, onChange, onConnections }: { path: string; scope: TemplateScope; file: string; from?: string; initial: TemplateLoadPlan; onChange: (names: string[]) => void; onConnections?: (choices: Record<number, string | null>) => void }) {
+export function TemplateLoadNames({ path, scope, file, from, initial, onChange, onConnections, onWorkflow, onSetUpGit }: { path: string; scope: TemplateScope; file: string; from?: string; initial: TemplateLoadPlan; onChange: (names: string[]) => void; onConnections?: (choices: Record<number, string | null>) => void; onWorkflow?: (apply: boolean) => void; onSetUpGit?: () => void }) {
   const project = useStore((s) => s.workspace?.projects.find((p) => p.path === path) ?? null)
   const projects = useStore((s) => s.workspace?.projects)
   const settings = useStore((s) => s.settings)
@@ -61,7 +63,10 @@ export function TemplateLoadNames({ path, scope, file, from, initial, onChange, 
   })
   // Names the plan can't be made for (empty, too long, used twice): marked here, never asked about.
   const unusable = names.some((n, i) => !!agentNameProblem(n) || names.findIndex((m) => sameAgentName(m, n)) !== i)
-  const blocked = problems.some(Boolean) ? tr(M.blocked) : planError
+  // Its workflow applied, unless unticked (HI-1910).
+  const [apply, setApply] = useState(true)
+  useEffect(() => onWorkflow?.(apply), [apply, onWorkflow])
+  const blocked = problems.some(Boolean) ? tr(M.blocked) : (planError ?? workflowBlocks(plan.workflow, apply))
   const key = names.join('\n')
   useEffect(() => onChange(key.split('\n')), [key, onChange])
   useEffect(() => set({ dialogBlocked: blocked }), [blocked])
@@ -104,6 +109,7 @@ export function TemplateLoadNames({ path, scope, file, from, initial, onChange, 
         connections={connections ? { view: connections, own: plan.create.map((a) => a.connection), flagged: plan.connections, choices, onChoice: (i, id) => setChoices((x) => ({ ...x, [i]: id })) } : undefined}
       />
       {planError && <div className="field-error">{planError}</div>}
+      {plan.workflow && <TemplateLoadWorkflowPart workflow={plan.workflow} apply={apply} onApply={setApply} onSetUpGit={() => onSetUpGit?.()} />}
     </>
   )
 }

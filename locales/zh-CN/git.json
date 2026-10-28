@@ -377,6 +377,8 @@
   "git.vc.switch.title": "将 {project} 切换到“{platform}”？",
   "git.vc.switch.what": "从下一张卡片起，{project} 使用“{to}”及其自己的工作流程选项。已开始的卡片保持“{from}”的规则。",
   "git.vc.switchTip": "从下一张卡片起将此项目切换到“{platform}”。Hive 会先显示有哪些变化。",
+  "git.vc.templateNotApplied": "{project} 仍在使用 None，因此 {template} 的 Git 工作流程未应用。请将项目切换到 Git，然后再次加载模板。",
+  "git.vc.templatePending": "用于模板 {template}：仓库创建完成且此项目使用 Git 后，它的加载对话框会再次打开。",
   "git.vc.useParent": "使用该仓库…",
   "git.vc.workflow": "工作流程：{platform} · {state, select, preset {{preset}} custom {自定义（基于{preset}）} other {未选择预设}}",
   "git.vc.workflowTip": "显示工作流程选项",

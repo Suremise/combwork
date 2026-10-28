@@ -616,7 +616,8 @@ export interface HiveRequests {
   'templates:list': (projectPath: string) => TemplateEntry[]
   /** Saves the project's agents and layout; a name already there is replaced only with `overwrite` (else `exists`). */
   /** `usePatterns` (#1440): the project's key in its agents' names kept as a pattern (`HI-B1` as `{key}-B{n}`). */
-  'templates:save': (projectPath: string, scope: TemplateScope, name: string, overwrite: boolean, usePatterns?: boolean) => { saved: TemplateEntry } | { exists: string }
+  /** `includeWorkflow` (HI-1910): the project's workflow as the template's section for its version control (unset: true). */
+  'templates:save': (projectPath: string, scope: TemplateScope, name: string, overwrite: boolean, usePatterns?: boolean, includeWorkflow?: boolean) => { saved: TemplateEntry; workflow: { saved: PlatformId | null; kept: PlatformId[] } } | { exists: string }
   /** What loading a template would do, and what stops it now. `from`: the project a project's template is kept in, if not this one. */
   'templates:plan': (projectPath: string, scope: TemplateScope, file: string, from?: string, names?: string[]) => TemplateLoadPlan
   /** Replaces the project's agents and layout with a template's; `expected` is the agents' ids as the user saw them. */
@@ -628,7 +629,7 @@ export interface HiveRequests {
   /** Renames a template where it is kept (another of that name there refuses it). */
   'templates:rename': (ref: TemplateRef, name: string) => TemplateEntry
   /** An edited template (#271), saved where it is kept; `savedAt`: as it was when the editor opened it. */
-  'templates:update': (ref: TemplateRef, edited: Pick<AgentTemplate, 'name' | 'description' | 'layout' | 'agents' | 'pairs'>, savedAt: string | null) => TemplateEntry
+  'templates:update': (ref: TemplateRef, edited: Pick<AgentTemplate, 'name' | 'description' | 'layout' | 'agents' | 'pairs' | 'workflow'>, savedAt: string | null) => TemplateEntry
   /** Copies a template into the workspace or a project; a name taken there gets a number ("Pair (2)"). */
   'templates:duplicate': (ref: TemplateRef, to: TemplateDest) => TemplateEntry
   /** Deletes a template (to the Recycle Bin); Hive's own can't be (#1436). */

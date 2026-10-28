@@ -19,7 +19,7 @@ import { chooseFocus, deferredFocus } from './deferredFocus'
 import type { ProjectTab } from '@shared/projectTabs'
 import type { VcSection } from '@shared/gitRepo'
 import type { ProgressFilter } from '@shared/progress'
-import type { TemplateAgent, TemplateRef } from '@shared/templates'
+import type { TemplateAgent, TemplateEntry, TemplateRef } from '@shared/templates'
 import type { GitTool } from '@shared/gitTool'
 import type { RunsFilter } from '@shared/progressTabs'
 import { loadActivityView, saveActivityView, type ActivityView } from './activityView'
@@ -27,6 +27,8 @@ import { cardWorker } from '@shared/activity'
 import { boardReader } from './boardReads'
 import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkflowForm, WorkspaceUsage, RecentWorkspace } from '@shared/types'
 import type { PresetId } from '@shared/workflow/options'
+import type { TemplateWorkflow, TemplateWorkflows } from '@shared/workflow/templateOptions'
+import type { PlatformId } from '@shared/platform/descriptors'
 import type {
   AgentApiInfo,
   AgentInfo,
@@ -69,7 +71,7 @@ export type { ProjectTab } from '@shared/projectTabs'
  */
 /** A template being edited (#510): its revision and content as saved (what a save expects there), and the draft. */
 /** A template being edited: `pairs` by the agents' places (#1440), so they follow a move, a removal or a renumbering. */
-export type TemplateDraft = { name: string; description: string; layout: PageLayout; agents: TemplateAgent[]; pairs?: { builder: number; reviewer: number }[] }
+export type TemplateDraft = { name: string; description: string; layout: PageLayout; agents: TemplateAgent[]; pairs?: { builder: number; reviewer: number }[]; workflow?: TemplateWorkflows }
 export interface TemplateEdit {
   /** The template (where it is kept). */
   ref: TemplateRef
@@ -156,6 +158,8 @@ export interface PromptRequest {
   check?: { label: string; initial: boolean; set: (checked: boolean) => void }
   /** A second tick box under the first (Save Template's "Use the project key in names", #1440), alike. */
   check2?: { label: string; initial: boolean; set: (checked: boolean) => void }
+  /** A third (Save Template's "Include this project's workflow", HI-1910), alike. */
+  check3?: { label: string; initial: boolean; set: (checked: boolean) => void }
   /** A drop-down under the field (where to turn a new MCP server on, #713); `set` gets the pick before the dialog resolves with a value. */
   select?: { label: string; options: { label: string; value: string }[]; initial: string; set: (value: string) => void }
   /**
@@ -436,8 +440,18 @@ interface State {
   changesRoot: Record<string, string>
   /** Per project: the Version Control tab's section shown (#607, #1416; none: Changes for Git, Workflow for None). */
   vcSection: Record<string, VcSection>
-  /** "How do you work?"'s Customise… (#1423): the Workflow section opens with this preset filled in, not saved. */
-  workflowPrefill: { path: string; preset: PresetId } | null
+  /**
+   * "How do you work?"'s Customise… (#1423): the Workflow section opens with this preset filled in, not saved. A loaded
+   * template's workflow (HI-1910): its section for `platform`, laid over the project's options as the form reads them.
+   */
+  workflowPrefill: { path: string; preset: PresetId | null; template?: { name: string; platform: PlatformId; section: TemplateWorkflow } } | null
+  /**
+   * A template waiting for its project's Git (HI-1910): its Load dialog's Set up Git… opened Version Control on Git's
+   * page; once Initialise repository… has made the repository and the project is Git, its Load dialog opens again.
+   */
+  templatePending: { path: string; entry: Pick<TemplateEntry, 'scope' | 'file' | 'name'>; from?: string } | null
+  /** Version Control opens on Git's page for this project (HI-1905's view, before its repository: HI-1910's Set up Git…). */
+  vcGitPreview: string | null
   /** Projects added from this window (Add Project, New Project): their Version Control tab shows the step, so no notice (#1423). */
   presetStepShown: string[]
   /** Per project: bumped after a Git action in this window, so the Version Control tab and the status bar read git again. */
@@ -641,6 +655,8 @@ export const useStore = create<State>(() => ({
   changesRoot: {},
   vcSection: {},
   workflowPrefill: null,
+  templatePending: null,
+  vcGitPreview: null,
   presetStepShown: [],
   gitVersion: {},
   unusedVersion: {},
@@ -1530,6 +1546,15 @@ function openDialog(d: DialogRequest): void {
 /** Closes the dialog shown (its caller resolves it) and shows the next one waiting, if any. */
 export function closeDialog(): void {
   set({ dialog: dialogQueue.shift() ?? null, dialogBlocked: null })
+}
+
+/** Closes the dialog shown as its Cancel would (from what it shows: HI-1910's Set up Git…), its caller told so. */
+export function cancelDialog(): void {
+  const d = get().dialog
+  if (!d) return
+  closeDialog()
+  if (d.kind === 'confirm') d.resolve(false)
+  else if (d.kind === 'prompt' || d.kind === 'choice') d.resolve(null)
 }
 
 export function confirm(opts: Omit<ConfirmRequest, 'kind' | 'resolve'>): Promise<boolean> {

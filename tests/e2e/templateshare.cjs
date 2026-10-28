@@ -132,7 +132,7 @@ const check = (name, ok, extra = '') => {
   check('Export… writes the template file', !!(await lib.until(async () => fs.existsSync(exported), 5000)) && !!(await toast(/Template exported/)))
   const text = fs.readFileSync(exported, 'utf8')
   const json = JSON.parse(text)
-  check('the exported file holds the template and nothing personal (no paths, ids, sessions, user names)', JSON.stringify(Object.keys(json).sort()) === '["agents","layout","name","savedAt","version"]' && !/templateshare|Users|"id"|lastSessionId/i.test(text) && !text.toLowerCase().includes(os.userInfo().username.toLowerCase()), text.slice(0, 200))
+  check('the exported file holds the template and nothing personal (no paths, ids, sessions, user names; its workflow the rules only, HI-1910)', JSON.stringify(Object.keys(json).sort()) === '["agents","layout","name","savedAt","version","workflow"]' && !/"target"|"commands"|"email"/.test(JSON.stringify(json.workflow)) && !/templateshare|Users|"id"|lastSessionId/i.test(text) && !text.toLowerCase().includes(os.userInfo().username.toLowerCase()), text.slice(0, 200))
 
   // Import it into alpha: where to keep it asked; again, a clash: Keep Both.
   const importInto = async (label) => {

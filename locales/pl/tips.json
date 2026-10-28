@@ -420,6 +420,8 @@
   "tips.teamTemplates.title": "Zacznij od szablonu Hive",
   "tips.templateNames.text": "Nazwy agentów są unikalne w całym obszarze roboczym. Wczytując szablon z innego projektu, nadaj jego agentom nowe nazwy na liście obok nazw z szablonu: Wczytaj szablon czeka, aż żadna nie będzie zajęta.",
   "tips.templateNames.title": "Nazwij agentów szablonu przy wczytywaniu",
+  "tips.templateWorkflow.text": "Zapisz szablon… może zachować też przepływ pracy projektu: jego reguły, nigdy gałąź ani polecenia. Wczytanie pokazuje, co się zmieni, a potem otwiera wypełnioną sekcję Kontrola wersji → Przepływ pracy, do zapisania tam.",
+  "tips.templateWorkflow.title": "Zachowaj przepływ pracy w szablonie",
   "tips.testedClis.text": "Claude Code, Codex i Copilot aktualizują się same. Konfiguracja dostawców pokazuje wersję, z którą przetestowano to wydanie Hive, obok Twojej i mówi, czy Twoja jest nowsza, czy starsza.",
   "tips.testedClis.title": "Sprawdź, z jakimi wersjami CLI testowano Hive",
   "tips.tileStrip.text": "W widoku skupienia agenta (Kafelki) pasek po lewej pokazuje kartę każdego agenta jako mały znacznik w kolorze kolumny tablicy, w której się znajduje; kliknij go, aby otworzyć kartę. Przeciągnij krawędź paska, aby go poszerzyć, a kliknij ją dwukrotnie, aby przywrócić szerokość.",

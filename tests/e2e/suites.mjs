@@ -317,6 +317,7 @@ export const SUITES = [
   { name: 'templates' },
   { name: 'templateshare' },
   { name: 'templatesv2' },
+  { name: 'templateworkflow' },
   { name: 'terminalinput' },
   { name: 'termsize' },
   { name: 'testedclis' },

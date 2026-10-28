@@ -17,6 +17,8 @@ import { clearEditorDraft, editorDraft, onEditorDrafts, setEditorDraft } from '.
 import { PaneResizer, usePaneSize } from './Resizer'
 import { BusyButton, Icon, IconButton, InfoTip, LoadFailed, StaleNote, Tooltip, useBusy } from './ui'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
+import { hasWorkflow, type TemplateWorkflows } from '@shared/workflow/templateOptions'
+import { TemplateWorkflowSection } from './TemplateWorkflowView'
 
 /**
  * Agent templates' own places (#127): the Templates view (activity bar: the workspace's templates and each project's)
@@ -167,7 +169,7 @@ const templatesViewLink = (c: React.ReactNode[]): React.ReactNode => <a onClick=
 export const templateKey = (t: TemplateRef): string => `${t.scope}|${(t.project ?? '').toLowerCase()}|${t.file}`
 /** The key of a template's open editor (#510): the workspace's folder and the template. */
 const editKey = (t: TemplateRef): string => `${(get().workspace?.path ?? '').toLowerCase()}|${templateKey(t)}`
-const draftOf = (t: TemplateEntry): TemplateDraft => ({ name: t.name, description: t.description ?? '', layout: t.layout, agents: t.agents.map((a) => ({ ...a })), pairs: (t.pairs ?? []).map((p) => ({ builder: pairIndex(t.agents, p.builder), reviewer: pairIndex(t.agents, p.reviewer) })).filter((p) => p.builder >= 0 && p.reviewer >= 0) })
+const draftOf = (t: TemplateEntry): TemplateDraft => ({ name: t.name, description: t.description ?? '', layout: t.layout, agents: t.agents.map((a) => ({ ...a })), pairs: (t.pairs ?? []).map((p) => ({ builder: pairIndex(t.agents, p.builder), reviewer: pairIndex(t.agents, p.reviewer) })).filter((p) => p.builder >= 0 && p.reviewer >= 0), ...(t.workflow ? { workflow: JSON.parse(JSON.stringify(t.workflow)) as TemplateWorkflows } : {}) })
 
 /**
  * A draft's pairs as a template keeps them (#1440): by the agents' numbered names as the draft has them now, each only
@@ -215,7 +217,8 @@ onEditorDrafts(() => {
 async function saveEdit(key: string, d: TemplateDraft): Promise<TemplateEntry> {
   const now = get().templateEdits[key]
   if (!now) throw new Error(tr(M.noLongerEdited))
-  const saved = await call('templates:update', now.ref, { name: d.name, description: d.description.trim() || undefined, layout: d.layout, agents: d.agents, pairs: draftPairs(d) }, now.savedAt ?? null)
+  // Its workflow as the editor has it (HI-1910): every section, {} when none is left (main reads it through the whitelist).
+  const saved = await call('templates:update', now.ref, { name: d.name, description: d.description.trim() || undefined, layout: d.layout, agents: d.agents, pairs: draftPairs(d), workflow: d.workflow ?? {} }, now.savedAt ?? null)
   const after = get().templateEdits[key] ?? now
   putEdit(key, { ...after, savedAt: saved.savedAt, was: now.savedAt ?? null, saved: draftOf(saved), draft: JSON.stringify(after.draft) === JSON.stringify(d) ? draftOf(saved) : after.draft })
   bump()
@@ -606,6 +609,7 @@ function TemplateEditor({ t, project, onDone }: { t: TemplateEntry; project?: Pr
           </tbody>
         </table>
         <p className="hint">{Children.toArray(tRich<React.ReactNode>(M.editorHint, { b: bold }))}</p>
+        <TemplateWorkflowSection workflow={draft.workflow} dropped={t.workflowDropped} edit={{ disabled: busy, onChange: (workflow) => put({ workflow }) }} />
       </div>
     </div>
   )
@@ -680,7 +684,8 @@ export function TemplateDetail({ t: entry, project, onGone, onSelect }: { t: Tem
                 ? Children.toArray(tRich<React.ReactNode>(M.hiveSummary, { count: t.agents.length, layout: layoutPhrase(t.layout), b: bold }))
                 : Children.toArray(tRich<React.ReactNode>(M.summary, { count: t.agents.length, layout: layoutPhrase(t.layout), hasSaved: t.savedAt ? 'yes' : 'no', when: t.savedAt ? timeAgo(t.savedAt) : '', ...placeOf(t), b: bold }))}
             </p>
-            {t.suggestedPreset && (
+            {/* A suggestion only where it has no workflow of its own (HI-1910: its sections say more). */}
+            {t.suggestedPreset && !hasWorkflow(t.workflow) && (
               <p className="muted template-suggests" data-suggests={t.suggestedPreset}>
                 {tr(M.suggests, { preset: tr(PRESET_TEXT[t.suggestedPreset]), pool: t.reviewerMode === 'pool' ? 'yes' : 'no' })}
               </p>
@@ -720,6 +725,7 @@ export function TemplateDetail({ t: entry, project, onGone, onSelect }: { t: Tem
                 ))}
               </tbody>
             </table>
+            {(hasWorkflow(t.workflow) || !!t.workflowDropped?.length) && <TemplateWorkflowSection workflow={t.workflow} dropped={t.workflowDropped} />}
           </>
         )}
       </div>

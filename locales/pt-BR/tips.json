@@ -420,6 +420,8 @@
   "tips.teamTemplates.title": "Comece com um modelo do Hive",
   "tips.templateNames.text": "Os nomes de agentes são únicos no espaço de trabalho. Ao carregar um modelo de outro projeto, dê novos nomes aos agentes dele na lista, ao lado dos nomes do modelo: Carregar modelo espera até que nenhum esteja em uso.",
   "tips.templateNames.title": "Dê nomes aos agentes de um modelo ao carregá-lo",
+  "tips.templateWorkflow.text": "Salvar modelo… também pode guardar o fluxo de trabalho do projeto: as regras, nunca o branch nem os comandos. Ao carregar, ele mostra o que muda e abre Controle de versão → Fluxo de trabalho preenchido, para salvar lá.",
+  "tips.templateWorkflow.title": "Guarde seu fluxo de trabalho num modelo",
   "tips.testedClis.text": "O Claude Code, o Codex e o Copilot se atualizam sozinhos. A Configuração de provedores mostra a versão com que esta versão do Hive foi testada ao lado da que você tem, e avisa quando a sua é mais nova ou mais antiga.",
   "tips.testedClis.title": "Veja com quais versões de CLI o Hive foi testado",
   "tips.tileStrip.text": "Na visão de foco de um agente (Blocos), a faixa à esquerda mostra o cartão de cada agente como um pequeno chip, com a cor da coluna do quadro em que ele está; clique em um para abrir o cartão. Arraste a borda da faixa para alargá-la e clique duas vezes na borda para redefini-la.",

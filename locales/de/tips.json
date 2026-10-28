@@ -420,6 +420,8 @@
   "tips.teamTemplates.title": "Mit einer Vorlage von Hive beginnen",
   "tips.templateNames.text": "Agentennamen sind im ganzen Arbeitsbereich eindeutig. Lädst du eine Vorlage aus einem anderen Projekt, gib ihren Agenten neue Namen in der Liste neben den Namen der Vorlage: „Vorlage laden“ wartet, bis keiner mehr vergeben ist.",
   "tips.templateNames.title": "Die Agenten einer Vorlage beim Laden benennen",
+  "tips.templateWorkflow.text": "„Vorlage speichern…“ kann auch den Workflow des Projekts behalten: seine Regeln, nie seinen Branch oder seine Befehle. Beim Laden siehst du, was sich ändert; dann öffnet sich Versionsverwaltung → Workflow ausgefüllt, zum Speichern dort.",
+  "tips.templateWorkflow.title": "Den Workflow in einer Vorlage behalten",
   "tips.testedClis.text": "Claude Code, Codex und Copilot aktualisieren sich selbst. Die Anbieter-Einrichtung zeigt die Version, mit der dieses Hive-Release getestet wurde, neben deiner und sagt, wenn deine neuer oder älter ist.",
   "tips.testedClis.title": "Sehen, mit welchen CLI-Versionen Hive getestet wurde",
   "tips.tileStrip.text": "In der Fokusansicht eines Agenten (Kacheln) zeigt die Leiste links die Karte jedes Agenten als kleinen Chip, eingefärbt in der Farbe der Board-Spalte, in der sie liegt; ein Klick öffnet die Karte. Zieh den Rand der Leiste, um sie zu verbreitern, und doppelklicke auf den Rand, um sie zurückzusetzen.",

@@ -251,6 +251,7 @@ interface HiveMessageValues {
   'actions.template.connectionFallback': { agent: string | number }
   'actions.template.connectionFallbackWhy': { name: string | number; problem: string }
   'actions.template.everyProject': undefined
+  'actions.template.includeWorkflow': { platform: string | number }
   'actions.template.load': undefined
   'actions.template.loadAdds': { project: string | number }
   'actions.template.loadReplaces': { project: string | number }
@@ -272,12 +273,15 @@ interface HiveMessageValues {
   'actions.template.replaceTitle': undefined
   'actions.template.save': undefined
   'actions.template.saveFailed': undefined
-  'actions.template.saveMessage': { n: number }
+  'actions.template.saveMessage2': { n: number }
   'actions.template.saveTitle': undefined
   'actions.template.saved': undefined
   'actions.template.savedMessage': { name: string | number; n: number; scope: string }
   'actions.template.switchPreset': { preset: string | number }
   'actions.template.usePatterns': { example: string | number; pattern: string | number }
+  'actions.template.workflowKept': { count: number; platforms: string | number }
+  'actions.template.workflowNone': undefined
+  'actions.template.workflowSaved': { platform: string | number }
   'actions.unsaved.changedMessage': { action: string }
   'actions.unsaved.changedTitle': undefined
   'actions.unsaved.message': { n: number; file: string | number; action: string }

@@ -420,6 +420,8 @@
   "tips.teamTemplates.title": "Start from one of Hive’s templates",
   "tips.templateNames.text": "Agent names are unique across the workspace. Loading a template from another project, give its agents new names in the list beside the template's own: Load template waits until none is taken.",
   "tips.templateNames.title": "Name a template's agents as you load it",
+  "tips.templateWorkflow.text": "Save Template… can keep the project's workflow too: its rules, never its branch or commands. Loading it shows what changes, then opens Version Control → Workflow filled in, to save there.",
+  "tips.templateWorkflow.title": "Keep your workflow in a template",
   "tips.testedClis.text": "Claude Code, Codex and Copilot update on their own. Provider Setup shows the version this Hive release was tested with next to the one you have, and says when yours is newer or older.",
   "tips.testedClis.title": "See which CLI versions Hive was tested with",
   "tips.tileStrip.text": "In an agent's focus view (Tiles), the strip on the left shows each agent's card as a small chip, tinted with the colour of the board column it is in; click one to open the card. Drag the strip's edge to make it wider, and double-click the edge to reset it.",

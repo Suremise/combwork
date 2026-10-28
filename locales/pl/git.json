@@ -377,6 +377,8 @@
   "git.vc.switch.title": "Przełączyć projekt {project} na {platform}?",
   "git.vc.switch.what": "Od następnej karty projekt {project} używa opcji {to} i jej własnych opcji przepływu pracy. Karty już rozpoczęte zachowują reguły opcji {from}.",
   "git.vc.switchTip": "Przełącz ten projekt na {platform} od następnej karty. Hive najpierw pokaże, co się zmieni.",
+  "git.vc.templateNotApplied": "{project} nadal używa None, więc przepływ pracy Git szablonu {template} nie został zastosowany. Przełącz projekt na Git, a następnie wczytaj szablon ponownie.",
+  "git.vc.templatePending": "Dla szablonu {template}: gdy repozytorium zostanie utworzone, a ten projekt będzie używać Git, jego okno wczytywania otworzy się ponownie.",
   "git.vc.useParent": "Użyj tego repozytorium…",
   "git.vc.workflow": "Przepływ pracy: {platform} · {state, select, preset {{preset}} custom {Własne (na podstawie: {preset})} other {nie wybrano ustawienia wstępnego}}",
   "git.vc.workflowTip": "Pokaż opcje przepływu pracy",

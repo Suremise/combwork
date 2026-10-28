@@ -1683,6 +1683,14 @@
     "defaultMessage": "Name a template's agents as you load it",
     "description": "A tip's title."
   },
+  "tips.templateWorkflow.text": {
+    "defaultMessage": "Save Template… can keep the project's workflow too: its rules, never its branch or commands. Loading it shows what changes, then opens Version Control → Workflow filled in, to save there.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.templateWorkflow.title": {
+    "defaultMessage": "Keep your workflow in a template",
+    "description": "A tip's title."
+  },
   "tips.testedClis.text": {
     "defaultMessage": "Claude Code, Codex and Copilot update on their own. Provider Setup shows the version this Hive release was tested with next to the one you have, and says when yours is newer or older.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

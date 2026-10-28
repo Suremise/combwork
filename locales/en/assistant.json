@@ -2043,6 +2043,50 @@
     "defaultMessage": "{thing} <faint>{note}</faint>",
     "description": "Load template: a name or a setting ({thing}), then a note about it in brackets ({note}, which brings its brackets: \"(default)\"), greyed. Keep the <faint> tags around {note}. Japanese and Chinese: no space before full-width brackets."
   },
+  "assistant.templateWorkflow.alsoGit": {
+    "defaultMessage": "It has a workflow for Git too, used once this project uses Git.",
+    "description": "The Load template dialog (HI-1910): a project with no version control loads the template's None workflow; it also has a Git one."
+  },
+  "assistant.templateWorkflow.apply": {
+    "defaultMessage": "Also apply its workflow (Version Control → Workflow opens with it filled in, to save there)",
+    "description": "A tick box in the Load template dialog (HI-1910), ticked by default: after loading the agents, the project's Version Control tab opens at Workflow with the template's options filled in but not saved. Glossary: workflow."
+  },
+  "assistant.templateWorkflow.change": {
+    "defaultMessage": "{option}: {now} → {next}",
+    "description": "The Load template dialog (HI-1910): a workflow option ({option}, its title) with its value now ({now}) and the template's ({next})."
+  },
+  "assistant.templateWorkflow.changes": {
+    "defaultMessage": "{n, plural, =0 {Its workflow for {platform} matches this project’s options.} one {Its workflow for {platform} changes # option:} other {Its workflow for {platform} changes # options:}}",
+    "description": "The Load template dialog (HI-1910): how many of the project's workflow options the template's would change ({n}); the list follows. {platform}: None or Git, as Hive names them."
+  },
+  "assistant.templateWorkflow.dropped": {
+    "defaultMessage": "{count, plural, one {Its workflow for {platforms} can’t be used (made by another version of Hive, or changed by hand), so it isn’t applied.} other {Its workflows for {platforms} can’t be used (made by another version of Hive, or changed by hand), so they aren’t applied.}}",
+    "description": "The Load template dialog and the Templates view (HI-1910): the template's workflow sections for {platforms} (None, Git: a list; {count} of them) have values Hive can't use, so they are left out."
+  },
+  "assistant.templateWorkflow.head": {
+    "defaultMessage": "Workflow",
+    "description": "The Load template dialog (HI-1910): the heading of the part about the template's workflow options. Glossary: workflow."
+  },
+  "assistant.templateWorkflow.identityOff": {
+    "defaultMessage": "It turns the project identity on, but this project’s git config has no name and email, so it stays off.",
+    "description": "The Load template dialog (HI-1910): the template's workflow has the project identity on (G12: commits as the repository's identity), but this project's git config has none. Glossary: identity."
+  },
+  "assistant.templateWorkflow.needsGit": {
+    "defaultMessage": "Its workflow is for Git, and this project has no version control yet. Set up Git first, or untick the box above to load only its agents.",
+    "description": "The Load template dialog (HI-1910): the template has only a Git workflow and the project has no version control. Set up Git… is the button beside it. Glossary: workflow."
+  },
+  "assistant.templateWorkflow.noCommand": {
+    "defaultMessage": "{count, plural, one {This project has no command for the check {checks}: add it in Version Control → Workflow before cards need it.} other {This project has no commands for the checks {checks}: add them in Version Control → Workflow before cards need them.}}",
+    "description": "The Load template dialog (HI-1910): the template's workflow names checks ({checks}, a list of names; {count} of them) this project has no command for. A template keeps check names, never commands. Glossary: check."
+  },
+  "assistant.templateWorkflow.noSection": {
+    "defaultMessage": "It has no workflow for {platform}, so this project’s options stay as they are.",
+    "description": "The Load template dialog (HI-1910): the template's workflow sections don't include the project's version control ({platform}: None or Git)."
+  },
+  "assistant.templateWorkflow.setUpGit": {
+    "defaultMessage": "Set Up Git…",
+    "description": "A button in the Load template dialog (HI-1910): closes it and opens the project's Version Control tab on Git's page, with Initialise repository…; once Git is set up, the dialog opens again. The … says another step follows: keep it."
+  },
   "assistant.templates.aProject": {
     "defaultMessage": "a project",
     "description": "A template's project when its name isn't known."
@@ -2566,6 +2610,46 @@
   "assistant.templates.where": {
     "defaultMessage": "\"{name}\", in {scope, select, workspace {the workspace} other {{project}}}.",
     "description": "Under Template duplicated or Template imported: the template and where it is kept ({project}: a project's name)."
+  },
+  "assistant.templates.workflowAbsent": {
+    "defaultMessage": "none",
+    "description": "The Templates view (HI-1910): a short word after a version control's tab (None, Git) whose workflow section the template doesn't have."
+  },
+  "assistant.templates.workflowAllOff": {
+    "defaultMessage": "All off",
+    "description": "The Templates view's template editor (HI-1910): a drop-down entry filling the workflow section with every check and balance off (as the Workflow section's All off)."
+  },
+  "assistant.templates.workflowEditHint": {
+    "defaultMessage": "To set options one by one, set them in a project’s Version Control → Workflow, then save its agents as a template under this name. A preset fills in its rules here, keeping the check names.",
+    "description": "The Templates view's template editor (HI-1910), under the workflow section: how to set individual options (in a project, then Save as Template), and what Fill from a preset does. Glossary: workflow, preset, check."
+  },
+  "assistant.templates.workflowFill": {
+    "defaultMessage": "Fill from a preset",
+    "description": "The Templates view's template editor (HI-1910): the accessible name of the drop-down that fills this version control's workflow section from a preset (Solo, Pair, Team, All off), its check names kept."
+  },
+  "assistant.templates.workflowFillChoose": {
+    "defaultMessage": "Fill from a preset…",
+    "description": "The Templates view's template editor (HI-1910): the drop-down's first entry, before a preset is chosen."
+  },
+  "assistant.templates.workflowHead": {
+    "defaultMessage": "Workflow",
+    "description": "The Templates view (HI-1910): the heading of a template's workflow options, a tab for each version control (None, Git). Glossary: workflow."
+  },
+  "assistant.templates.workflowNone": {
+    "defaultMessage": "No workflow for {platform}: loading it leaves a {platform} project’s options as they are.",
+    "description": "The Templates view (HI-1910): the template has no workflow section for this version control ({platform}: None or Git)."
+  },
+  "assistant.templates.workflowPlatforms": {
+    "defaultMessage": "Workflow for",
+    "description": "The Templates view (HI-1910): the accessible name of the tabs choosing which version control's workflow (None, Git) a template's section shows."
+  },
+  "assistant.templates.workflowPreset": {
+    "defaultMessage": "{preset, select, none {Not from a preset.} other {From the preset {name}.}}",
+    "description": "The Templates view (HI-1910): which preset a template's workflow section started from ({name}: Solo, Pair, Team), or none. Glossary: preset."
+  },
+  "assistant.templates.workflowRemove": {
+    "defaultMessage": "Remove",
+    "description": "The Templates view's template editor (HI-1910): a button removing this version control's workflow section from the template."
   },
   "assistant.templates.workspace": {
     "defaultMessage": "Workspace",

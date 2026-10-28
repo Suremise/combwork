@@ -107,7 +107,7 @@ const check = (name, ok, extra = '') => {
   await saveTemplate()
   await shown(dialog, 'dialog')
   await dialog.locator('input.input').fill('Pair')
-  await dialog.locator('input[type="checkbox"]').check()
+  await dialog.locator('input[type="checkbox"]').first().check()
   await page.screenshot({ path: path.join(lib.WORK, 'templates-1-save.png') })
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   const file = path.join(ws, '.hive', 'templates', 'pair.json')
@@ -116,7 +116,7 @@ const check = (name, ok, extra = '') => {
   // The same name again: asks before replacing.
   await saveTemplate()
   await dialog.locator('input.input').fill('pair')
-  await dialog.locator('input[type="checkbox"]').check()
+  await dialog.locator('input[type="checkbox"]').first().check()
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   const replace = page.locator('.dialog', { hasText: 'Replace the template?' })
   check('saving over a name asks first', !!(await lib.until(async () => (await replace.count()) === 1, 5000)))

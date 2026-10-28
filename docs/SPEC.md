@@ -4072,6 +4072,33 @@ repeating them (#533) [note §8].
   Once the board is upgraded, at each open until done (board_meta `templates.v09`), each version-1 template of the
   workspace's and each project's `.hive/templates` is **copied** into `.hive/backups/templates-0.9/workspace` and
   `…/projects/<project id>`; the originals are never moved, deleted or rewritten, and `.bak` files aren't copied.
+- **A template's workflow** [HI-1910] **Built [HI-1910]** (Darren's decisions of 28 Oct): `AgentTemplate.workflow`, an
+  optional section per version control (`{ none?, git? }`, each `{ preset, options }`; `shared/workflow/templateOptions.ts`),
+  additive to v2. Every option is on one side (`TEMPLATE_CARRIED`, `TEMPLATE_NOT_CARRIED`; a unit test fails on one on
+  neither): carried are review, reviewers, reviewerMode, noSelfReview, sameness, okBefore, preChecks and mergeChecks (names
+  only), mergeInstall, finish, style, strict, dependenciesDone, folder, slotsUpToDate, identity (**on/off only**, made from
+  the loading project's git identity), stopOwnRuns, sharedFolderWarning, fileLocks, the loops' four and stageNames; never
+  target, targetOwn, pushTarget, commands, commitMessage, excluded. A platform carries only its form's (`carriedFor`).
+  **Whitelisted at every boundary**: saving (`templateWorkflowOf`, from the options in force; none when they fell back to
+  all off), reading a file, an import or an edit (`readTemplateWorkflow`: options it doesn't carry left out; a value its
+  option doesn't take, an identity that isn't a boolean, a carried option the platform lacks, a preset it doesn't offer, a
+  contradiction or stage names that can't be saved make the section unusable: dropped, said as `workflowDropped`, the
+  other section and the agents kept), exporting, and loading (`overlayTemplateWorkflow`). **Save as Template** has
+  **Include this project's workflow** (ticked; `templates:save`'s `includeWorkflow`); replacing a template keeps its other
+  section, and unticked all of them, said in the notice (`SavedWorkflow`). An edit keeps the sections unless it sends them.
+  **Hive's own** carry their preset's (`presetWorkflow`), made in the plan from the preset as the project's form offers it
+  (its suggested checks, its identity) with their reviewer mode. **The plan** (`TemplateLoadWorkflow`): the section for the
+  project's version control laid over its options now (each change, check names without a command here, an identity it
+  can't turn on), `needsGit` (Git-only, a None project), `alsoGit` (a None project, both sections). The Load dialog's
+  Workflow part: **Also apply its workflow** (ticked); applied, Version Control → Workflow opens with the section laid over
+  the options as the form reads them again (`workflowPrefill.template`), its draft unsaved, a note naming the template and
+  the checks with no command (from the draft) until Save… or Discard Changes; nothing is written by the load. Git-only in a
+  None project: Load is greyed out while ticked; **Set Up Git…** closes the dialog (`cancelDialog`) for Git's page
+  (`vcGitPreview`, HI-1905's), the template waiting (`templatePending`, said on the page); after Initialise repository… and
+  `switchAfterInit`, its Load dialog opens again, or a notice says its Git workflow wasn't applied; None gives it up. A
+  template with a workflow drops the suggested preset's tick box. **The Templates view**: a Workflow section under None |
+  Git tabs; the editor fills a section from a preset (its check names kept) or removes it; options one by one are set in a
+  project and saved as the template. Not built: "Custom (from template X)" naming.
 - **Names: patterns and the names table** [#1440] **Built [#1440]**: an agent's name in a template may hold `{key}` (the
   project's key, `projectKeyOf`; never guessed: a plan, load or added agent whose names hold `{key}` is refused when the
   key can't be read, `content.templates.noKey`, and the window shows `{key}` unexpanded) and `{n}` (its number among the template's agents with the same

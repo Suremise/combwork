@@ -32,7 +32,10 @@ import {
   type TemplateScope
 } from '../shared/templates'
 import { HIVE_TEMPLATES, hiveTemplate, type HiveTemplate } from '../shared/templateDefaults'
-import type { AgentBranchStatus, AgentDef, ConnectionProblem, ProjectConfig, ProviderId, TemplateLoadPlan } from '../shared/types'
+import type { AgentBranchStatus, AgentDef, ConnectionProblem, ProjectConfig, ProviderId, TemplateLoadPlan, TemplateLoadWorkflow } from '../shared/types'
+import { hasWorkflow, overlayTemplateWorkflow, readTemplateWorkflow, templateWorkflowOf, TEMPLATE_PLATFORMS, type TemplateWorkflow, type TemplateWorkflows } from '../shared/workflow/templateOptions'
+import type { PlatformId } from '../shared/platform/descriptors'
+import { workflowForm } from './workflow/optionsForm'
 import { config } from './config'
 import { placeKey, readKeptJson, withFileLock, writeKeptJson, writeTextAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
@@ -60,7 +63,9 @@ import { AGENT_NAME_MAX, agentNameProblem, nameTaken, sameAgentName } from '../s
  * all or nothing; adding one agent from a template leaves the others alone. #127: listing every scope, rename,
  * duplicate, delete (to the Recycle Bin), and export and import as files, read as untrusted. #1436: Hive's own templates
  * (the Hive scope, read-only, `shared/templateDefaults.ts`), and agents created in the project folder with their role
- * in the workflow, note and pairing.
+ * in the workflow, note and pairing. HI-1910: its workflow, a section per version control (the rules of the project's
+ * options, never its own facts: workflow/templateOptions.ts), saved with the agents when asked, shown and laid over a
+ * project's options when it is loaded, to save in its Workflow form.
  */
 
 const log = createLogger('templates')
@@ -108,8 +113,14 @@ function folder(d: TemplateDest): string {
 /** The place a template is kept, as listed (a project's path only for a project's templates). */
 const place = (d: TemplateDest): TemplateDest => (d.scope === 'project' ? { scope: 'project', project: workspace.assertProject(String(d.project ?? '')) } : { scope: d.scope === 'hive' ? 'hive' : 'workspace' })
 
-/** What a template suggests and pairs, as an entry carries it (#1436). */
-const extras = (t: Pick<AgentTemplate, 'suggestedPreset' | 'reviewerMode' | 'pairs'>): Pick<TemplateEntry, 'suggestedPreset' | 'reviewerMode' | 'pairs'> => ({ ...(t.suggestedPreset ? { suggestedPreset: t.suggestedPreset } : {}), ...(t.reviewerMode ? { reviewerMode: t.reviewerMode } : {}), ...(t.pairs?.length ? { pairs: t.pairs } : {}) })
+/** What a template suggests and pairs, and its workflow (HI-1910), as an entry carries it (#1436). */
+const extras = (t: Pick<AgentTemplate, 'suggestedPreset' | 'reviewerMode' | 'pairs' | 'workflow' | 'workflowDropped'>): Pick<TemplateEntry, 'suggestedPreset' | 'reviewerMode' | 'pairs' | 'workflow' | 'workflowDropped'> => ({
+  ...(t.suggestedPreset ? { suggestedPreset: t.suggestedPreset } : {}),
+  ...(t.reviewerMode ? { reviewerMode: t.reviewerMode } : {}),
+  ...(t.pairs?.length ? { pairs: t.pairs } : {}),
+  ...(hasWorkflow(t.workflow) ? { workflow: t.workflow } : {}),
+  ...(t.workflowDropped?.length ? { workflowDropped: t.workflowDropped } : {})
+})
 
 /** Whether a template file's content is Hive 0.9's: a version under 1.0's (#1436). */
 const isV09 = (raw: unknown): boolean => {
@@ -236,11 +247,19 @@ async function write(d: TemplateDest, file: string, t: AgentTemplate): Promise<T
   return (await readOne(d, file))!
 }
 
+/** What a save did with the template's workflow (HI-1910): the section saved, and the ones kept from the template it replaced. */
+export interface SavedWorkflow {
+  saved: PlatformId | null
+  kept: PlatformId[]
+}
+
 /**
  * Saves the project's agents and layout as a template in `scope`. A template of that name already there (case aside) is
- * replaced only with `overwrite`; otherwise the answer says it exists, so the user can be asked.
+ * replaced only with `overwrite`; otherwise the answer says it exists, so the user can be asked. `includeWorkflow`
+ * (HI-1910, Save as Template's tick box, on by default): the project's options in force, as a section for its version
+ * control. Replacing a template keeps its other sections (and, unticked, all of them), and says which.
  */
-export async function saveTemplate(projectPath: string, scope: TemplateScope, name: string, overwrite = false, usePatterns = false): Promise<{ saved: TemplateEntry } | { exists: string }> {
+export async function saveTemplate(projectPath: string, scope: TemplateScope, name: string, overwrite = false, usePatterns = false, includeWorkflow = true): Promise<{ saved: TemplateEntry; workflow: SavedWorkflow } | { exists: string }> {
   projectPath = workspace.assertProject(projectPath)
   const d: TemplateDest = { scope: checkScope(scope), project: projectPath }
   const clean = cleanName(name)
@@ -251,18 +270,30 @@ export async function saveTemplate(projectPath: string, scope: TemplateScope, na
   // can't be read, never saved with fixed names unasked.
   const key = usePatterns ? await keyFor(projectPath) : null
   if (usePatterns && !key) throw refusal(M.noKeySave, { project: basename(projectPath) })
+  // The project's workflow as a section (HI-1910): its options in force, never options that fell back to all off.
+  const own = includeWorkflow ? await projectSection(projectPath) : null
   const t = templateFrom(clean, agents, cfg.layout, (a) => agentProvider(a, cfg, config.settings), new Date(), presetOf(cfg), key ?? undefined)
   // What is saved must load: read as a file is.
-  const checked = readTemplate(JSON.parse(JSON.stringify(t)))
+  const checked = readTemplate(JSON.parse(JSON.stringify({ ...t, ...(own ? { workflow: { [own.platform]: own.section } } : {}) })))
   if (!isAgentTemplate(checked)) throw new TemplateError(checked, { kind: 'invalid' })
   return changing(d, async () => {
     // The same name: its file (replaced when asked). Another name whose file name would be the same: a file of its own.
     const same = (await listIn(d)).find((e) => e.name.toLowerCase() === clean.toLowerCase())
     if (same && !overwrite) return { exists: same.file }
-    const saved = await write(d, same?.file ?? (await newFile(d, clean)), t)
-    log.info(`Saved template ${userText(clean)} (${scope}, ${t.agents.length} agents)`)
-    return { saved }
+    // The sections of the template it replaces stay, but for the one saved now.
+    const kept = TEMPLATE_PLATFORMS.filter((p) => !!same?.workflow?.[p] && p !== own?.platform)
+    const workflow: TemplateWorkflows = { ...Object.fromEntries(kept.map((p) => [p, same!.workflow![p]])), ...(own ? { [own.platform]: own.section } : {}) }
+    const saved = await write(d, same?.file ?? (await newFile(d, clean)), { ...checked, ...(hasWorkflow(workflow) ? { workflow } : {}) })
+    log.info(`Saved template ${userText(clean)} (${scope}, ${t.agents.length} agents${own ? `, ${own.platform}'s workflow` : ''}${kept.length ? `, kept ${kept.join(' and ')}'s` : ''})`)
+    return { saved, workflow: { saved: own?.platform ?? null, kept } }
   })
+}
+
+/** A project's workflow as a template's section (HI-1910): its options in force and preset, or null when they fell back to all off. */
+async function projectSection(projectPath: string): Promise<{ platform: PlatformId; section: TemplateWorkflow } | null> {
+  const form = await workflowForm(workspaceOf(projectPath), projectPath)
+  if (form.invalid) return null
+  return { platform: form.platform, section: templateWorkflowOf(form.options, form.preset) }
 }
 
 /** The preset a project's options started from, as a template suggests it (#1436): P4's Pair (the agent merges) as Pair. */
@@ -304,6 +335,8 @@ export async function updateTemplate(ref: TemplateRef, edited: unknown, savedAt:
     // only while it fits the agents as edited (an agent removed or given a role on the other side drops its own pair
     // only: templatePairs keeps the others, each agent in one pair).
     const kept = { ...(now.suggestedPreset ? { suggestedPreset: now.suggestedPreset } : {}), ...(now.reviewerMode ? { reviewerMode: now.reviewerMode } : {}) }
+    // Its workflow (HI-1910): as the editor sends it (read through the whitelist), else the one it had.
+    const workflow = 'workflow' in rest ? checked.workflow : now.workflow
     const given = Array.isArray(sent) ? sent.filter((p): p is { builder: string; reviewer: string } => !!p && typeof p === 'object' && typeof (p as { builder?: unknown }).builder === 'string' && typeof (p as { reviewer?: unknown }).reviewer === 'string') : (now.pairs ?? [])
     const numbered = pairNames(checked.agents)
     const pairs = templatePairs(given.flatMap((p) => {
@@ -311,7 +344,8 @@ export async function updateTemplate(ref: TemplateRef, edited: unknown, savedAt:
       const r = pairIndex(checked.agents, p.reviewer)
       return b >= 0 && r >= 0 ? [{ name: numbered[b], role: checked.agents[b].role, pairedWith: numbered[r] }, { name: numbered[r], role: checked.agents[r].role }] : []
     }))
-    const t = { ...checked, ...kept, ...(pairs.length ? { pairs } : {}) }
+    const { workflow: _sent, workflowDropped: _dropped, ...edit } = checked
+    const t = { ...edit, ...kept, ...(pairs.length ? { pairs } : {}), ...(hasWorkflow(workflow) ? { workflow } : {}) }
     if ((now.savedAt ?? null) !== (savedAt ?? null)) throw refusal(msg({ id: 'content.templates.editedMeanwhile', defaultMessage: '"{name}" changed since you started editing it (saved again meanwhile): nothing was saved. Close the editor to see it as it is now.', description: 'An error saving an edited template: it was saved again elsewhere after the editor opened it.' }), { name: now.name }, 'conflict')
     if ((await listIn(ref)).some((e) => e.file !== ref.file && e.name.toLowerCase() === clean.toLowerCase())) throw refusal(M.nameTaken, { name: clean }, 'conflict')
     const saved = await write(ref, ref.file, t)
@@ -538,8 +572,35 @@ async function planFor(projectPath: string, scope: TemplateScope, file: string, 
     const name = a.connection ? (getAccount(a.connection)?.name ?? a.connectionName) : undefined
     return a.connection && problem ? [{ index, id: a.connection, ...(name ? { name } : {}), problem }] : []
   })
-  const plan: TemplateLoadPlan = { scope: t.scope, file: t.file, name: t.name, layout: t.layout, remove, create, templateNames: expanded, taken: takenNames, pairs, swaps, suggestedPreset, reviewerMode: original.reviewerMode ?? null, missing, connections, blocked: blocked.map(shownText) }
+  const workflow = await planWorkflow(projectPath, original)
+  const plan: TemplateLoadPlan = { scope: t.scope, file: t.file, name: t.name, layout: t.layout, remove, create, templateNames: expanded, taken: takenNames, pairs, swaps, suggestedPreset, reviewerMode: original.reviewerMode ?? null, missing, connections, blocked: blocked.map(shownText), workflow }
   return { plan, why: blocked }
+}
+
+/**
+ * A template's workflow as it meets a project (HI-1910): the section for its version control laid over its options as
+ * they are now, or why none applies (a Git-only template in a None project needs Git first). Hive's own carry their
+ * preset's, made here as the project's form offers it (its suggested checks, its identity), with their reviewer mode.
+ */
+async function planWorkflow(projectPath: string, t: Pick<TemplateEntry, 'scope' | 'workflow' | 'workflowDropped' | 'suggestedPreset' | 'reviewerMode'>): Promise<TemplateLoadWorkflow | null> {
+  if (!hasWorkflow(t.workflow) && !t.workflowDropped?.length) return null
+  const form = await workflowForm(workspaceOf(projectPath), projectPath)
+  const sections = TEMPLATE_PLATFORMS.filter((p) => !!t.workflow?.[p])
+  let section = t.workflow?.[form.platform] ?? null
+  if (section && t.scope === 'hive' && t.suggestedPreset) {
+    const offered = form.presets.find((p) => p.id === t.suggestedPreset)?.options
+    // Read again as any section is: what Hive makes goes through the same whitelist.
+    if (offered) section = readTemplateWorkflow(templateWorkflowOf({ ...offered, ...(form.platform === 'git' && t.reviewerMode ? { reviewerMode: t.reviewerMode } : {}) }, t.suggestedPreset), form.platform) ?? section
+  }
+  return {
+    platform: form.platform,
+    sections,
+    dropped: t.workflowDropped ?? [],
+    section,
+    overlay: section ? overlayTemplateWorkflow(section, form) : null,
+    needsGit: form.platform === 'none' && !section && sections.includes('git'),
+    alsoGit: form.platform === 'none' && !!section && sections.includes('git')
+  }
 }
 
 /** An error's first line as text (git's message can run on), its descriptor when it is Hive's and one line. */

@@ -420,6 +420,8 @@
   "tips.teamTemplates.title": "Empieza con una plantilla de Hive",
   "tips.templateNames.text": "Los nombres de los agentes son únicos en todo el espacio de trabajo. Al cargar una plantilla de otro proyecto, da nombres nuevos a sus agentes en la lista, junto a los de la plantilla: Cargar plantilla espera hasta que ninguno esté en uso.",
   "tips.templateNames.title": "Pon nombre a los agentes de una plantilla al cargarla",
+  "tips.templateWorkflow.text": "Guardar plantilla… puede guardar también el flujo de trabajo del proyecto: sus reglas, nunca su rama ni sus comandos. Al cargarla se ve qué cambia, y luego se abre Control de versiones → Flujo de trabajo rellenado, para guardarlo allí.",
+  "tips.templateWorkflow.title": "Guarda tu flujo de trabajo en una plantilla",
   "tips.testedClis.text": "Claude Code, Codex y Copilot se actualizan solos. Configuración de proveedores muestra la versión con la que se probó esta versión de Hive junto a la que tienes, y avisa cuando la tuya es más nueva o más antigua.",
   "tips.testedClis.title": "Mira con qué versiones de las CLI se probó Hive",
   "tips.tileStrip.text": "En la vista enfocada de un agente (Mosaicos), la franja de la izquierda muestra la tarjeta de cada agente como un pequeño chip, teñido con el color de la columna del tablero en la que está; haz clic en uno para abrir la tarjeta. Arrastra el borde de la franja para ensancharla, y haz doble clic en el borde para restablecerla.",

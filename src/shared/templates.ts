@@ -3,6 +3,7 @@
 // state, the Assistant's mode: those belong to the project), checked as untrusted input when read. #127 adds the places
 // to manage them (the Templates view, a project's Templates tab) and sharing them as files (export, import). #1436: the
 // format's version 2 (no worktrees, each agent's role in the workflow, a suggested preset and pairs) and Hive's own.
+// HI-1910: its workflow, a section per version control (workflow/templateOptions.ts), read through its whitelist.
 import { AGENT_LIMIT_MAX, ROLE_MAX, SESSION_LAYOUTS, projectAgents } from './defaults'
 import { isKnownProvider } from './providers'
 import { cleanMcpServers } from './agentMcp'
@@ -10,6 +11,8 @@ import type { AgentDef, EffortLevel, PageLayout, PermissionMode, ProviderId } fr
 import { msg } from './i18n/msg'
 import { shownText, withValues, type Text } from './advanced'
 import { agentWorkflowRole, buildsWork, isWorkflowRole, reviewsWork, type ReviewerMode, type WorkflowRole } from './workflow/roles'
+import { hasWorkflow, readTemplateWorkflows, TEMPLATE_PLATFORMS, type TemplateWorkflows } from './workflow/templateOptions'
+import type { PlatformId } from './platform/descriptors'
 
 /** The format's version: a template made by a newer Hive (a higher one) is refused rather than half read; 0.9's (1) too (#1436). */
 export const TEMPLATE_VERSION = 2
@@ -92,6 +95,10 @@ export interface AgentTemplate {
   reviewerMode?: ReviewerMode
   /** Builders and their reviewers (#1436; optional), kept as the agents' pairing when it is loaded. */
   pairs?: TemplatePair[]
+  /** Its workflow (HI-1910; optional): a section per version control, the rules a project's options set. */
+  workflow?: TemplateWorkflows
+  /** The sections it had that can't be used (as read: said where it is shown, never written back). */
+  workflowDropped?: PlatformId[]
 }
 
 /** A template as listed: where it is kept and what it holds, or why it can't be used. */
@@ -109,6 +116,8 @@ export interface TemplateEntry {
   suggestedPreset?: SuggestedPreset
   reviewerMode?: ReviewerMode
   pairs?: TemplatePair[]
+  workflow?: TemplateWorkflows
+  workflowDropped?: PlatformId[]
   /** It can't be used (damaged, made by a newer Hive…): why, in English (the log, a refusal's message). */
   problem?: string
   /** Why, as text for the window to show in its language (#870), following a change of language. */
@@ -266,7 +275,10 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
   const description = typeof raw.description === 'string' && raw.description.length <= TEMPLATE_DESCRIPTION_MAX ? raw.description.trim() : ''
   const suggestedPreset = SUGGESTED_PRESETS.find((p) => p === raw.suggestedPreset)
   const reviewerMode = raw.reviewerMode === 'lane' || raw.reviewerMode === 'pool' ? raw.reviewerMode : undefined
-  return { version, name: raw.name.trim(), savedAt, layout, ...(description ? { description } : {}), agents, ...(suggestedPreset ? { suggestedPreset } : {}), ...(reviewerMode ? { reviewerMode } : {}), ...(pairs.length ? { pairs } : {}) }
+  // Its workflow (HI-1910) through the whitelist: a section that can't be used is left out and said (`workflowDropped`),
+  // never refusing the template nor its other section.
+  const { workflow, dropped } = raw.workflow === undefined ? { workflow: {}, dropped: [] } : readTemplateWorkflows(raw.workflow)
+  return { version, name: raw.name.trim(), savedAt, layout, ...(description ? { description } : {}), agents, ...(suggestedPreset ? { suggestedPreset } : {}), ...(reviewerMode ? { reviewerMode } : {}), ...(pairs.length ? { pairs } : {}), ...(hasWorkflow(workflow) ? { workflow } : {}), ...(dropped.length ? { workflowDropped: dropped } : {}) }
 }
 
 /**
@@ -321,9 +333,20 @@ export function exportable(t: AgentTemplate): AgentTemplate {
     agents: t.agents.map((a) => ({ ...a })),
     ...(t.suggestedPreset ? { suggestedPreset: t.suggestedPreset } : {}),
     ...(t.reviewerMode ? { reviewerMode: t.reviewerMode } : {}),
-    ...(t.pairs?.length ? { pairs: t.pairs.map((p) => ({ ...p })) } : {})
+    ...(t.pairs?.length ? { pairs: t.pairs.map((p) => ({ ...p })) } : {}),
+    // Its sections as read (HI-1910): whitelisted again, whatever the object holds.
+    ...exportedWorkflow(t.workflow)
   }
 }
+
+/** A template's sections as written (HI-1910): whitelisted again, whatever the object holds; none, nothing. */
+function exportedWorkflow(w: TemplateWorkflows | undefined): { workflow?: TemplateWorkflows } {
+  const read = hasWorkflow(w) ? readTemplateWorkflows(JSON.parse(JSON.stringify(w))).workflow : undefined
+  return hasWorkflow(read) ? { workflow: read } : {}
+}
+
+/** A template's sections in their order (HI-1910), for whatever lists them. */
+export const workflowPlatforms = (w: TemplateWorkflows | undefined): PlatformId[] => TEMPLATE_PLATFORMS.filter((p) => !!w?.[p])
 
 /** The tokens a template's agent names may hold (#1123 names): the project's key, and the agent's number among its role. */
 const NAME_TOKENS = /\{(key|n)\}/g

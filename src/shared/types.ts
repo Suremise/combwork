@@ -25,6 +25,7 @@ import type { Refusal } from './workflow/refusals'
 import type { ReviewerMode, WorkflowRole } from './workflow/roles'
 import type { NamedFolder, ResumeHold, ShownPlace } from './agentFolders'
 import type { StageNameProblem } from './workflow/stages'
+import type { TemplateWorkflow, TemplateWorkflowOverlay } from './workflow/templateOptions'
 import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
 
@@ -1573,6 +1574,28 @@ export interface TemplateLoadPlan {
   connections: { index: number; id: string; name?: string; problem: ConnectionProblem }[]
   /** Why it can't be loaded now (empty: it can). */
   blocked: string[]
+  /** Its workflow (HI-1910) as it meets this project's: null when it has none. */
+  workflow: TemplateLoadWorkflow | null
+}
+
+/**
+ * A template's workflow in the Load template dialog (HI-1910): the section for the project's version control, laid
+ * over its options as they are now (`overlay`: the preview; the Workflow form lays the section over them again once it
+ * reads them, to save there), or why none applies.
+ */
+export interface TemplateLoadWorkflow {
+  /** The project's version control. */
+  platform: PlatformId
+  /** The template's usable sections, and those it had that can't be used (said). */
+  sections: PlatformId[]
+  dropped: PlatformId[]
+  /** The section used (Hive's own: its preset as this project's form offers it), or null. */
+  section: TemplateWorkflow | null
+  overlay: TemplateWorkflowOverlay | null
+  /** It has only a Git section and the project has no version control: its workflow needs Git first. */
+  needsGit: boolean
+  /** A None project, the template with both sections: None's is used, and it has a Git one too. */
+  alsoGit: boolean
 }
 
 export interface AgentInfo extends AgentDef {

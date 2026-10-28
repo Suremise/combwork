@@ -377,6 +377,8 @@
   "git.vc.switch.title": "¿Cambiar el proyecto {project} a {platform}?",
   "git.vc.switch.what": "A partir de su próxima tarjeta, el proyecto {project} usa {to} y las opciones del flujo de trabajo propias de {to}. Las tarjetas ya iniciadas mantienen las reglas de {from}.",
   "git.vc.switchTip": "Cambia este proyecto a {platform} a partir de su próxima tarjeta. Hive muestra antes qué cambia.",
+  "git.vc.templateNotApplied": "{project} sigue usando None, así que no se aplicó el flujo de trabajo de Git de {template}. Cambia el proyecto a Git y vuelve a cargar la plantilla.",
+  "git.vc.templatePending": "Para la plantilla {template}: cuando el repositorio esté creado y este proyecto use Git, su diálogo de carga se abrirá de nuevo.",
   "git.vc.useParent": "Usar ese repositorio…",
   "git.vc.workflow": "Flujo de trabajo: {platform} · {state, select, preset {{preset}} custom {Personalizado (a partir de {preset})} other {ningún ajuste predefinido elegido}}",
   "git.vc.workflowTip": "Mostrar las opciones del flujo de trabajo",
