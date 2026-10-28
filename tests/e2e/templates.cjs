@@ -16,6 +16,11 @@ const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
+// Only its agents (HI-1910): its workflow, ticked by default, would open Version Control → Workflow after the load.
+const agentsOnly = async (d) => {
+  const box = d.locator('[data-workflow-apply]')
+  if (await box.count()) await box.uncheck()
+}
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
 // A load's confirmation shows once the template's plan is read, with git checks of the agents it removes: the 12-agent
@@ -215,6 +220,7 @@ const check = (name, ok, extra = '') => {
   check('an emptied name is marked, and Load template greyed out', !!(await lib.until(async () => /Enter a name/.test(await warn.locator('.template-plan-table .field-error').first().innerText().catch(() => '')) && (await warnLoad.isDisabled()), HUNG_MS)))
   await firstName.fill('Builder')
   check('…put back, Load template can be clicked again', !!(await lib.until(async () => (await warn.locator('.template-plan-table .field-error').count()) === 0 && (await warnLoad.isEnabled()), HUNG_MS)))
+  await agentsOnly(warn)
   await warnLoad.click()
   // The layout with them: this user's view, saved a moment after the agents (HI-1749).
   const loaded = await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Builder","Reviewer"]' && projectCfg(beta).layout === 'columns3', 15000)
@@ -449,6 +455,7 @@ const check = (name, ok, extra = '') => {
   await nameInputs.nth(1).fill('BAR')
   check('…all free: Load template can be clicked, the template names unchanged', !!(await lib.until(async () => (await errors()).length === 0 && (await loadButton.isEnabled()), HUNG_MS)) && JSON.stringify(await fromNames()) === '["Alpha builder","Alpha reviewer","Tree"]', JSON.stringify(await errors()))
   await page.screenshot({ path: path.join(lib.WORK, 'templates-7-cross-project.png') })
+  await agentsOnly(crossLoad)
   await loadButton.click()
   check("loaded into beta: alpha's agents, with the names chosen", !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["BAB","BAR","Tree"]', 15000)), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
   check("…each in beta's folder: no worktree or branch made", projectCfg(beta).agents.every((a) => !a.worktree) && lib.git(beta, ['branch', '--list']) === betaBranches && lib.git(beta, ['worktree', 'list', '--porcelain']) === betaTrees)
