@@ -129,6 +129,7 @@ if (process.argv[4] === '--stay') {
     const ran = join(dir, 'orphan-ran.txt')
     const cliPid = join(dir, 'orphan-pid.txt')
     let gatePid = 0
+    let gateEnded = false
     const exited = new Promise<void>((resolve) => {
       spawnPty('gate-orphan', {
         file: process.execPath,
@@ -139,12 +140,16 @@ if (process.argv[4] === '--stay') {
           gatePid = pid
           return trackLaunch({ runId: 'gate5', projectPath: dir, agentId: 'g5', agentName: 'Orphan', gated: true }, pid, cancelled).then((t): GateWord => (t.tracked ? { go: true } : { go: false, reason: t.reason }))
         },
-        onExit: () => resolve()
+        onExit: () => {
+          gateEnded = true
+          resolve()
+        }
       })
     })
     await vi.waitFor(() => expect(existsSync(cliPid) && Number(readFileSync(cliPid, 'utf8')) > 0).toBe(true), { timeout: 30_000, interval: 50 })
     const pid = Number(readFileSync(cliPid, 'utf8'))
-    process.kill(gatePid)
+    expect(gateEnded).toBe(false)
+    process.kill(gatePid) // its handle is held (node-pty's, until its onExit, which hasn't come): the pid can't be another's
     await exited
     expect(alive(pid)).toBe(true)
     // Its launch ends with nothing left: the CLI is ended, not listed to keep.
@@ -161,6 +166,7 @@ if (process.argv[4] === '--stay') {
     const wrapper = join(dir, 'wrapper.cmd')
     writeFileSync(wrapper, `@echo off\r\n"${process.execPath}" "${cli}" "${join(dir, 'wrapped-ran.txt')}" "${cliPid}" --stay\r\n`)
     let gatePid = 0
+    let gateEnded = false
     const exited = new Promise<void>((resolve) => {
       spawnPty('gate-wrapped', {
         file: process.env.ComSpec || 'cmd.exe',
@@ -171,12 +177,16 @@ if (process.argv[4] === '--stay') {
           gatePid = pid
           return trackLaunch({ runId: 'gate6', projectPath: dir, agentId: 'g6', agentName: 'Wrapped', gated: true }, pid, cancelled).then((t): GateWord => (t.tracked ? { go: true } : { go: false, reason: t.reason }))
         },
-        onExit: () => resolve()
+        onExit: () => {
+          gateEnded = true
+          resolve()
+        }
       })
     })
     await vi.waitFor(() => expect(existsSync(cliPid) && Number(readFileSync(cliPid, 'utf8')) > 0).toBe(true), { timeout: 30_000, interval: 50 })
     const pid = Number(readFileSync(cliPid, 'utf8'))
-    process.kill(gatePid)
+    expect(gateEnded).toBe(false)
+    process.kill(gatePid) // its handle is held (node-pty's, until its onExit, which hasn't come): the pid can't be another's
     await exited
     expect(alive(pid)).toBe(true)
     expect(await launchEnded('gate6')).toBeNull()
