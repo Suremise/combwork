@@ -617,8 +617,9 @@ export function rollUpCandidates(db: DatabaseSync, before: string, step: number,
  */
 export function rollUpSession(db: DatabaseSync, scope: string, session: string, before: string, step: number, merge: (t: UsageTimeline) => UsageTimeline): { rows: number; merged: number } | null {
   return transaction(db, () => {
-    const s = db.prepare('SELECT timeline_step, last_activity FROM usage_sessions WHERE scope = ? AND session = ?').get(scope, session) as { timeline_step: number | null; last_activity: string | null } | undefined // i18n-ignore: SQL
-    if (!s || s.timeline_step === null || s.timeline_step >= step || !(Date.parse(s.last_activity ?? '') < Date.parse(before))) return null
+    // Old as rollUpCandidates tells it (julianday), so a session it picks is never refused here for how its time is written.
+    const s = db.prepare('SELECT timeline_step, coalesce(julianday(last_activity) < julianday(?), 0) AS old FROM usage_sessions WHERE scope = ? AND session = ?').get(before, scope, session) as { timeline_step: number | null; old: number } | undefined // i18n-ignore: SQL
+    if (!s || s.timeline_step === null || s.timeline_step >= step || !s.old) return null
     const where = { scope, session }
     const k = `${scope}\0${session}`
     const t = timelineOf(s.timeline_step, grouped(db, 'usage_timeline', where, 'seq', (r) => r).get(k) ?? [], grouped(db, 'usage_charges', where, 'seq', (r) => r.usd as number).get(k) ?? [])

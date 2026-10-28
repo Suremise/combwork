@@ -511,8 +511,12 @@ function attribute(file: string, scope: string, sessions: { session: string; hol
   return n
 }
 
-/** What one roll-up batch did (HI-1648): sessions merged, their rows before and after, and whether more are left. */
+/**
+ * What one roll-up batch did (HI-1648): sessions it tried (each it looked at, not running) and merged, their rows before
+ * and after, and whether more may be left.
+ */
 export interface RollUpResult {
+  tried: number
   sessions: number
   rows: number
   merged: number
@@ -527,10 +531,11 @@ const ROLL_UP_LIMIT = 500
 /**
  * A batch of ended sessions' timelines merged into 1-hour steps (HI-1648, Darren 27 Oct): those last active before
  * Settings → Advanced's days of full detail, oldest first, each in a transaction of its own, for ROLL_UP_BATCH_MS at
- * most; never one running (`live`: their ids). Main sends batches until none are left.
+ * most, but always one (review round 1: a slow lookup used the time up, and the batch that tried none read as the end);
+ * never one running (`live`: their ids). Main sends batches until one tries none or none are left.
  */
 function rollUp(file: string, live: string[], now = Date.now()): RollUpResult {
-  const out: RollUpResult = { sessions: 0, rows: 0, merged: 0, more: false }
+  const out: RollUpResult = { tried: 0, sessions: 0, rows: 0, merged: 0, more: false }
   if (readOnly(file)) return out
   const db = dbOf(file).writer
   const days = advancedValues.get<number>(USAGE_TIMELINE_DETAIL_DAYS)
@@ -542,10 +547,11 @@ function rollUp(file: string, live: string[], now = Date.now()): RollUpResult {
   out.more = found.length === ROLL_UP_LIMIT
   for (const c of found) {
     if (running.has(c.session)) continue
-    if (Date.now() - t0 > ROLL_UP_BATCH_MS) {
+    if (out.tried && Date.now() - t0 > ROLL_UP_BATCH_MS) {
       out.more = true
       break
     }
+    out.tried++
     const r = rollUpSession(db, c.scope, c.session, before, COARSE_STEP, (t) => coarsenTimeline(t, COARSE_STEP))
     if (r) Object.assign(out, { sessions: out.sessions + 1, rows: out.rows + r.rows, merged: out.merged + r.merged })
   }

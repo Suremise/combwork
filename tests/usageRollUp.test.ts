@@ -5,7 +5,7 @@
 // incremental).
 import { statSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { handleRequest, type IngestJob, type IngestResult, type RollUpResult } from '../src/main/usageWorker'
 import type { StoredSession } from '../src/main/usageDb'
@@ -43,14 +43,16 @@ async function setup(advanced: Record<string, unknown> = {}) {
   const timeline = async (name: string): Promise<UsageTimeline> => (await timelines()).find((s) => s.session === name)!.timeline!
   const rows = async (name: string) => ((await call({ type: 'sessions', file, scopes: ['p1'] })) as StoredSession[]).find((s) => s.session === name)!.rows
   /** Every batch until none is left, as main sends them. */
-  const rollUp = async (live: string[] = []): Promise<RollUpResult> => {
-    const total: RollUpResult = { sessions: 0, rows: 0, merged: 0, more: false }
+  const rollUp = async (live: string[] = [], now?: number): Promise<RollUpResult & { batches: number[] }> => {
+    const total = { tried: 0, sessions: 0, rows: 0, merged: 0, more: false, batches: [] as number[] }
     for (;;) {
-      const r = (await call({ type: 'rollUp', file, live })) as RollUpResult
+      const r = (await call({ type: 'rollUp', file, live, ...(now ? { now } : {}) })) as RollUpResult
+      total.tried += r.tried
       total.sessions += r.sessions
       total.rows += r.rows
       total.merged += r.merged
-      if (!r.more || !r.sessions) return total
+      total.batches.push(r.sessions)
+      if (!r.more || !r.tried) return total
     }
   }
   return { dir, file, session, timelines, timeline, rows, rollUp, close: () => call({ type: 'close', file }) }
@@ -144,6 +146,25 @@ describe("an ended session's timeline in 1-hour steps (HI-1648)", () => {
 
     // Nothing left to merge: a second roll-up does nothing.
     expect(await t.rollUp(['running'])).toMatchObject({ sessions: 0 })
+    await t.close()
+  })
+
+  it('merges one session a batch at least, whatever the lookup took: a batch that used its time up never reads as the end (review round 1)', async () => {
+    const t = await setup()
+    const now = Date.now()
+    for (const name of ['one', 'two', 'three']) await t.session(name, now - 30 * DAY, 50)
+    // A clock that has gone 60 ms on at each look: the batch's time is used up before its first session.
+    let clock = now
+    const slow = vi.spyOn(Date, 'now').mockImplementation(() => (clock += 60))
+    try {
+      const r = await t.rollUp([], now)
+      // Each batch one, the last finding no more after it.
+      expect(r.batches).toEqual([1, 1, 1])
+      expect(r.sessions).toBe(3)
+    } finally {
+      slow.mockRestore()
+    }
+    for (const name of ['one', 'two', 'three']) expect((await t.timeline(name)).step).toBe(COARSE_STEP)
     await t.close()
   })
 

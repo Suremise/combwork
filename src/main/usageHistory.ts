@@ -753,14 +753,15 @@ class UsageHistory {
     const t0 = Date.now()
     const total = { sessions: 0, rows: 0, merged: 0 }
     for (;;) {
-      const live = sessions.liveStates().flatMap((s) => (s.sessionId ? [s.sessionId] : []))
-      const r = await this.enqueue<RollUpResult>(`rollUp|${key}`, 2, async () => (this.live(ws, run) ? { type: 'rollUp', file, live } : null))
+      // The running sessions as the batch goes to the worker, not as it was queued (review round 1: one resumed while it
+      // waited behind other jobs, still last active long ago, was merged as it ran).
+      const r = await this.enqueue<RollUpResult>(`rollUp|${key}`, 2, async () => (this.live(ws, run) ? { type: 'rollUp', file, live: sessions.liveStates().flatMap((s) => (s.sessionId ? [s.sessionId] : [])) } : null))
       if (!r || !this.live(ws, run)) return
       total.sessions += r.sessions
       total.rows += r.rows
       total.merged += r.merged
-      // A batch that merged none has nothing left it may merge (the rest are running).
-      if (!r.more || !r.sessions) break
+      // A batch that tried none has nothing left it may merge (the rest are running).
+      if (!r.more || !r.tried) break
     }
     if (total.sessions) log.info(`usage history of ${userText(run.path)}: ${total.sessions} ended session(s) rolled up into 1-hour steps, ${total.rows} timeline rows → ${total.merged}, in ${Date.now() - t0} ms`)
     await this.enqueue(`spaceBack|${key}`, 2, async () => (this.live(ws, run) ? { type: 'spaceBack', file } : null))
