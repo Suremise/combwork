@@ -53,7 +53,11 @@ function englishLeft(english, translations) {
     // Plain placeholders only: {name}, with no ICU format (plural, select, number) and no markup or quoting.
     if (/[<'#]/.test(e) || /\{[^}]*,/.test(e)) continue
     const parts = norm(e).split(/\{\w+\}/)
-    if (parts.join('').replace(/[^\p{L}]/gu, '').length < PATTERN_LETTERS) continue
+    const literal = parts.join('')
+    if (literal.replace(/[^\p{L}]/gu, '').length < PATTERN_LETTERS) continue
+    // A placeholder and one bare word ("{provider} version") matches any phrase ending in that word, translated or not
+    // ("Notes de version", HI-1590): only a pattern with two words, or marks around its words ("{agent} (removed)").
+    if ((literal.match(/\p{L}+/gu) ?? []).length < 2 && !/[^\p{L}\s]/u.test(literal)) continue
     patterns.push({ id, source: `^${parts.map(escapeRegex).join('.+?')}$` })
   }
   return { exact: [...exact].sort(), patterns }
@@ -253,14 +257,16 @@ function inspectLayout([root, english]) {
     // A block of text in a narrow column.
     if (lines >= SQUEEZED_LINES && box.right - box.left < SQUEEZED_WIDTH && text.trim().length / lines < SQUEEZED_CHARS) add('squeezed', el, text, { detail: `${lines} lines of about ${Math.round(text.trim().length / lines)} characters, ${Math.round(box.right - box.left)} px wide` })
     // A word broken across lines (only where the text wraps at all). Paths, addresses and ids (a run of text with \ / @
-    // _ . or : inside) may break anywhere, and a hyphenated word at its hyphen.
+    // _ . or : inside) may break anywhere, and a hyphenated word at its hyphen. Chinese and Japanese have no spaces
+    // between words, so a line may break between any two of their characters (HI-1590): a word is a run of other
+    // letters (a Latin word inside Japanese text is still one), never of Han, Hiragana, Katakana or full-width forms.
     if (lines > 1) {
       for (const n of el.childNodes) {
         if (n.nodeType !== 3) continue
         const tokens = /\S+/g
         for (let tok; (tok = tokens.exec(n.nodeValue)); ) {
           if (/[\\/@_.:]/.test(tok[0].replace(/[.,:;!?)\]"'’”]+$/, '')) || /\p{Ll}\p{Lu}/u.test(tok[0])) continue
-          const re = /[\p{L}\p{N}'’]{4,}/gu
+          const re = /(?:(?![\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Bopomofo}\u3000-\u303f\u30fc\uff00-\uffef])[\p{L}\p{N}'’]){4,}/gu
           for (let m; (m = re.exec(tok[0])); ) {
             const r = document.createRange()
             r.setStart(n, tok.index + m.index)

@@ -7,7 +7,10 @@
 // word broken at its hyphens, an id in camelCase, a sticky header over its rows, a fixed dialog in a narrow scrolling box, text for screen
 // readers, a long description cut to one line, a path cut with "…", a popup menu over its bar, a document's own
 // English, a word of an id that is also a message, a list's row half scrolled out of view) must not be. Round 1 of
-// the review added a short label cut to a few letters and a line cut in half at the bottom of its box. The page runs in a bare Electron window (no Hive), hidden.
+// the review added a short label cut to a few letters and a line cut in half at the bottom of its box. HI-1590 added
+// Japanese and Chinese text wrapping between characters (not mid-word: they have no spaces between words), a Latin word
+// broken inside Japanese text (mid-word), and a translation ending in a word a placeholder message ends in ("Notes de
+// version", not English left). The page runs in a bare Electron window (no Hive), hidden.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -27,10 +30,12 @@ const ENGLISH = {
   'board.agent.notRunning': 'Not running',
   'board.agent.removed': '{agent} (removed)',
   'board.column.todo': 'To do',
+  // A placeholder and one bare word (HI-1590): it would match any phrase ending in "version", so it is no pattern.
+  'providers.version': '{provider} version',
   'shell.ok': 'OK',
   'workspace.kind': 'project'
 }
-const TRANSLATIONS = { 'board.agent.notRunning': 'Nie działa', 'board.agent.removed': '{agent} (usunięty)', 'shell.ok': 'OK', 'workspace.kind': 'projekt' }
+const TRANSLATIONS = { 'board.agent.notRunning': 'Nie działa', 'board.agent.removed': '{agent} (usunięty)', 'providers.version': 'Wersja {provider}', 'shell.ok': 'OK', 'workspace.kind': 'projekt' }
 
 const LONG = 'Ask before each edit or command, and remember what the user allowed for the rest of the session.'
 const PAGE = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><style>
@@ -58,7 +63,7 @@ section { margin: 8px; }
 <section><div class="archive"><table><tr><td>Karta</td><td>Zarchiwizowano</td><td>Przywróć kartę</td></tr></table></div></section>
 <section><div class="prices"><table><tr><th>Model</th><th>Wejście</th><th>Wyjście</th><th>Pamięć podręczna</th></tr></table></div></section>
 <section><div class="banner"><div class="text">Folder .hive jest zatwierdzony w repozytorium, więc jego pliki trafiają do historii projektu i widzą je wszyscy.</div><div class="space"></div></div></section>
-<section><table class="keys"><tr><td class="cmd">Einstellungen</td><td>Ctrl+,</td></tr></table></section>
+<section style="display: flex; gap: 20px"><table class="keys"><tr><td class="cmd">Einstellungen</td><td>Ctrl+,</td></tr></table><div lang="ja" style="width: 70px; word-break: break-all">設定のArbeitsbereichを開く</div></section>
 <section><div class="mode"><span>Domyślny tryb pracy</span><span class="badge">W użyciu</span></div></section>
 <section style="position: relative; height: 30px"><button class="edge">Wznów w agencie</button></section>
 <section><span>Not running</span> <span>Alice (removed)</span></section>
@@ -81,6 +86,7 @@ section { margin: 8px; }
   <span class="sr-only">Tylko dla czytnika ekranu</span>
   <div class="markdown"><p><strong>Not running</strong> is what the skill's own English says.</p><h2>Not running</h2></div>
   <div class="kb-id">workspace.<wbr>new.<wbr>project</div>
+  <div style="display: flex; gap: 20px; align-items: flex-start"><div lang="ja" style="width: 90px">エージェントではなくスクリプトが報告したため</div><div lang="zh-CN" style="width: 60px">报告的进度已经更新了</div><span>Notes de version</span></div>
 </section>
 </body></html>`
 
@@ -120,13 +126,14 @@ app.whenReady().then(() => {
     check('a table scrolling sideways (#887, #892: the API prices table)', has('sideways', 'Pamięć podręczna'), said())
     check('a banner squeezed into a narrow column (#886: the .hive committed banner)', has('squeezed', 'Folder .hive'), said())
     check('a word broken across lines (#887, #892: the shortcuts table)', has('mid-word', 'Einstellungen'), said())
+    check('a Latin word broken inside Japanese text (HI-1590)', has('mid-word', 'Arbeitsbereich'), said())
     check('a badge over its label (#890, #892: the mode row)', has('overlaps', 'W użyciu') || has('overlaps', 'Domyślny tryb'), said())
     check("a button past the window's edge", has('outside', 'Wznów w agencie'), said())
     check('a short label cut to a few letters with "…" (#899 round 1: however much is cut)', has('ellipsis', 'Berechtigungsmodus'), said())
     check('a line cut in half by the box around it (#899 round 1: at the bottom)', has('cut-off', 'Druga linia'), said())
     check('English left: a translated message shown in English', has('english', 'Not running'), said())
     check('English left: a message with a placeholder', has('english', 'Alice (removed)'), said())
-    const clean = ['To jest zwykły', 'Ustawienia', 'Zapisz', 'Nowy', 'npm run', 'Pierwszy', 'Drugi', 'Trzeci', 'Nie działa', 'Bob (usunięty)', 'OK', 'To do', 'hive-test', 'Users', 'przyciskiem', 'Nagłówek', 'Wiersz', 'Okno dialogowe', 'Tylko dla', 'Opis umiejętności', 'Someone', 'applyPermissionModes', 'Etykieta paska', 'Menu nad']
+    const clean = ['To jest zwykły', 'Ustawienia', 'Zapisz', 'Nowy', 'npm run', 'Pierwszy', 'Drugi', 'Trzeci', 'Nie działa', 'Bob (usunięty)', 'OK', 'To do', 'hive-test', 'Users', 'przyciskiem', 'Nagłówek', 'Wiersz', 'Okno dialogowe', 'Tylko dla', 'Opis umiejętności', 'Someone', 'applyPermissionModes', 'Etykieta paska', 'Menu nad', 'エージェント', '报告', 'Notes de version']
     const wrong = issues.filter((i) => clean.some((c) => i.text.includes(c)) || /markdown|kb-id/.test(i.where))
     check('nothing reported in the clean part', !wrong.length, layout.summarize({ pl: { page: { image: '', issues: wrong } } }))
     // The report's lines name the screen, the language and the screenshot to open.
