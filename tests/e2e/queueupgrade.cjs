@@ -105,26 +105,31 @@ const log = () => {
 
     // The opening view, from the click until the adoption and the slots are done (HI-1694), each text it shows.
     const view = h.page.locator('.workspace-opening')
-    const shown = []
-    const watching = { on: true }
-    const watch = (async () => {
-      while (watching.on) {
-        const t = (await view.innerText().catch(() => '')).replace(/\s+/g, ' ')
-        if (t && shown.at(-1) !== t) shown.push(t)
-        await lib.sleep(20)
-      }
-    })()
+    // Recorded in the window as the view changes, not read from here now and then: under load a step can come and go
+    // between two reads (HI-1988). Each text it shows, and each step it had (data-step, the one it left too).
+    await h.page.evaluate(() => {
+      const seen = (window.__opening = { texts: [], steps: [] })
+      const note = (step) => step && seen.steps.at(-1) !== step && seen.steps.push(step)
+      new MutationObserver((records) => {
+        for (const r of records) {
+          if (r.type === 'attributes' && r.target.classList?.contains('workspace-opening')) note(r.oldValue)
+          for (const n of r.removedNodes) note(n.classList?.contains('workspace-opening') ? n.dataset.step : null)
+        }
+        const el = document.querySelector('.workspace-opening')
+        if (!el) return
+        note(el.dataset.step)
+        const t = el.innerText.replace(/\s+/g, ' ').trim()
+        if (t && seen.texts.at(-1) !== t) seen.texts.push(t)
+      }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['data-step'], attributeOldValue: true })
+    })
     await ask.getByRole('button', { name: 'Upgrade', exact: true }).click()
     check('Upgrade upgrades it', !!(await until(async () => (await h.inv('board:state')).readOnly === null, HUNG_MS)))
     // The adoption runs once after the upgrade, in the background: the project's options are set after it.
     check('…then the adoption, once', !!(await until(() => rows("SELECT value FROM board_meta WHERE key = 'adoption'").length === 1, HUNG_MS)))
     check('…and the opening view goes once its steps are done', !!(await until(async () => (await view.count()) === 0, HUNG_MS)))
-    watching.on = false
-    await watch
-    // The upgrade's own step can't be seen from here: Playwright reaches the window through main, busy with the upgrade
-    // while it runs (the window, a process of its own, shows it meanwhile). The steps after it are seen.
+    const { texts, steps } = await h.page.evaluate(() => window.__opening)
     const name = path.basename(fx.ws)
-    check("…having shown the steps after the upgrade, with the workspace's name", shown.length > 0 && shown.every((t) => t.includes(`Upgrading ${name} to Hive 1.0`)) && shown.some((t) => /Adopting its cards and projects…|Adopting its agents' worktrees as slots…/.test(t)), shown.join(' | '))
+    check("…having shown the steps after the upgrade, with the workspace's name", texts.length > 0 && texts.every((t) => t.includes(`Upgrading ${name} to Hive 1.0`)) && steps.some((s) => s === 'adoption' || s === 'slots'), `${steps.join(', ')}: ${texts.join(' | ')}`)
     const skipped = log().split(/\r?\n/).filter((l) => /\[(WARN|ERROR)\]/.test(l) && /no such table|This board is from Hive 0\.9|readonly database|Could not save the performance metrics|bringing builders/.test(l))
     check('while it waited, nothing failed on the read-only board (no "no such table", "readonly", nor "This board is from Hive 0.9")', skipped.length === 0, skipped.join(' | '))
     const timed = log().split(/\r?\n/).filter((l) => /schema step|\[workspace\] opening |upgraded the board/.test(l))
