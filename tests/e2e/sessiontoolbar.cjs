@@ -63,7 +63,7 @@ const check = (name, ok, extra = '') => {
     check('no agent tabs are left (#975)', (await page.locator('.agent-tab, .agent-strip').count()) === 0)
     const chip = page.locator('.session-toolbar .summary-chip')
     const chipText = () => page.locator('.session-toolbar .summary-chip-text').innerText().catch(() => '')
-    check('the summary chip: 1 waiting · 1 working · 2 idle', !!(await lib.until(async () => (await chipText()) === '1 waiting · 1 working · 2 idle', HUNG_MS)), await chipText())
+    check('the summary chip: 1 waiting · 1 working · 2 stopped (Y and Z not running, as the header counts them: HI-1908)', !!(await lib.until(async () => (await chipText()) === '1 waiting · 1 working · 2 stopped', HUNG_MS)), await chipText())
     check("…with the most urgent state's mark, a diamond", (await chip.locator('.state-mark.waiting').count()) === 1 && /\bwaiting\b/.test((await chip.getAttribute('class')) ?? ''))
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
@@ -197,7 +197,7 @@ const check = (name, ok, extra = '') => {
     const f = await lib.addAgent(inv, alpha, { name: 'F', model: 'fail-start' })
     await inv('session:start', alpha, { agentId: f.id }).catch(() => undefined)
     const headerLine = () => page.locator('.project-header .project-state .badge-text').innerText().catch(() => '')
-    check('a failed launch: the chip counts it stalled', !!(await lib.until(async () => (await chipText()) === '1 waiting · 1 stalled · 1 working · 2 idle', HUNG_MS)), await chipText())
+    check('a failed launch: the chip counts it stalled', !!(await lib.until(async () => (await chipText()) === '1 waiting · 1 stalled · 1 working · 2 stopped', HUNG_MS)), await chipText())
     // Y and Z never started: the header counts them stopped, apart from the idle ones Stop counts (#1035).
     check("…and so does the header's state line, Y and Z counted as stopped", (await headerLine()) === '1 waiting · 1 stalled · 1 working · 2 stopped', await headerLine())
     await chip.click()
