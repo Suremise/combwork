@@ -719,6 +719,14 @@
     "defaultMessage": "Compacting the conversation…",
     "description": "An agent's status while its CLI summarises the conversation to free up context space."
   },
+  "session.status.connectionKeepsDropping": {
+    "defaultMessage": "Stopped: its connection keeps dropping",
+    "description": "An agent's status once Hive stopped resuming it: its connection dropped again after several resumes in an hour."
+  },
+  "session.status.connectionNotBack": {
+    "defaultMessage": "Stopped: its connection didn't come back",
+    "description": "An agent's status once Hive stopped waiting for its connection to come back."
+  },
   "session.status.failedTurn": {
     "defaultMessage": "The turn ended on an error",
     "description": "An agent's status when its CLI ended its turn on an error (an API connection error, say) without saying what."
@@ -746,6 +754,10 @@
   "session.status.tasksDropped": {
     "defaultMessage": "{minutes, plural, one {Stopped counting its background tasks after # minute} other {Stopped counting its background tasks after # minutes}}",
     "description": "An agent's status: Hive stopped counting the background tasks it started after the time limit in Settings. {minutes} is that limit."
+  },
+  "session.status.waitingForConnection": {
+    "defaultMessage": "Waiting for the connection…",
+    "description": "An agent's status while Hive waits for its CLI's connection to come back, to resume it (Settings → Advanced, Resume agents after a connection drops)."
   },
   "session.tracker.body": {
     "defaultMessage": "{reason}. {detail} Help → Copy Diagnostics says why.",

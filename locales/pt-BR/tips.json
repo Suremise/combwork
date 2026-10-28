@@ -312,6 +312,8 @@
   "tips.noCodeCards.title": "Cartões sem código",
   "tips.off.message": "Ajuda → Dicas… continua com elas, e Configurações → Geral as reativa.",
   "tips.off.title": "Dicas desativadas",
+  "tips.outageResume.text": "Ative Configurações → Avançado → Retomar os agentes após uma queda de conexão, e um agente parado por um reinício do roteador ou uma oscilação do Wi-Fi aguarda a conexão e depois executa de novo, sozinho, o que foi interrompido. Nunca para um limite de uso ou um login expirado.",
+  "tips.outageResume.title": "Os agentes podem continuar após uma queda de conexão",
   "tips.overview.text": "A Visão geral do espaço de trabalho mostra o que cada projeto usou, o que está rodando agora e o quadro, por dia. {key}",
   "tips.overview.title": "Todo o espaço de trabalho num relance",
   "tips.ownShortcuts.text": "Configurações → Atalhos de teclado altera qualquer atalho, e Configurações do projeto pode alterá-los para um só projeto.",

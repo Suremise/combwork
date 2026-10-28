@@ -1826,6 +1826,16 @@ To sign in again:
 
 Hive notices the sign-in when an agent of that CLI works again, when Provider Setup's **Sign in** finishes, or at its next check (every minute while agents wait). The agents that are still stopped then read **Stopped while signed out**, and **Resume (n)** in the project header counts them: it types a short "carry on" into each, so a card loop picks up where it stopped. Agents that already carried on aren't prompted again. A Codex agent you prompt again right after signing in shows **working**: Hive reads Codex's refusal from its session after the fact, and that late read can't turn it back to **Needs sign-in**.
 
+### When the connection drops <a id="when-the-connection-drops"></a>
+
+A router restarting or Wi-Fi dropping makes every agent's requests fail. Each CLI retries for a while (Claude Code for about three minutes), then ends the turn on an error such as *API Error: Connection refused — a firewall or proxy may be blocking it (ECONNREFUSED)*, and the agent waits for you.
+
+Turn on **Settings → Advanced → Resume agents after a connection drops** (off by default) and Hive carries such agents on by itself. The agent shows **Waiting for the connection…**, and the Progress panel has a run for it. Hive checks the CLI's own API host now and then (after 30 seconds, then less and less often, at most every 5 minutes). Once it answers, Hive gives the agent's conversation one note: *The connection dropped at 11:47 (UTC+01:00) and came back at 11:57 (UTC+01:00): check what was cut off, rerun it, and carry on.* A card loop picks up where it stopped. If you prompt the agent yourself meanwhile, Hive stops waiting.
+
+Hive only does this for connection errors. A usage limit, an expired sign-in (see [When a sign-in expires](#when-a-sign-in-expires)) or an overloaded server is never resumed, since resuming wouldn't help.
+
+Hive stops and tells you when the connection doesn't come back within 2 hours, or when an agent's turn ends on a connection error again after three resumes in an hour. Then other apps may reach the internet while this PC's network hasn't recovered: try renewing the network adapter's addresses (`ipconfig /renew`), flushing DNS (`ipconfig /flushdns`) or restarting the PC, then resume the agent. If the Hive Assistant is set up, it is told what was resumed and what wasn't. The limits, the address checked for each CLI and the errors each CLI counts as a dropped connection are in Settings → Advanced too.
+
 ### When a safety classifier stops an agent <a id="when-a-safety-classifier-stops-an-agent"></a>
 
 A CLI's safety classifier can stop an agent's response part way (Claude Code's model safeguards, Codex's cyber checks), carry on with another model, or ask you what to do. Hive spots it in the agent's session and tells you, so a false positive doesn't go unnoticed and an agent doesn't carry on with a weaker model without your knowing:

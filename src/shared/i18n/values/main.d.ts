@@ -198,6 +198,13 @@ interface HiveMessageValues {
   'main.move.watches': { n: number }
   'main.move.workingMoved': { projects: string | number }
   'main.move.workingRenamed': { n: number; projects: string | number }
+  'main.outage.gaveUpBody': { n: number }
+  'main.outage.gaveUpTitle': { agent: string | number }
+  'main.outage.progressTitle': { agent: string | number }
+  'main.outage.progressWaiting': undefined
+  'main.outage.resumedSummary': { dropped: string | number; back: string | number }
+  'main.outage.timedOutBody': { minutes: number }
+  'main.outage.timedOutTitle': { agent: string | number }
   'main.plan.close': undefined
   'main.plan.pause': undefined
   'main.plan.resetsAt': { time: string | number }

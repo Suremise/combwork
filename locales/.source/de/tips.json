@@ -312,6 +312,8 @@
   "tips.noCodeCards.title": "Cards with no code",
   "tips.off.message": "Help → Tips… still has them, and Settings → General turns them back on.",
   "tips.off.title": "Tips are off",
+  "tips.outageResume.text": "Turn on Settings → Advanced → Resume agents after a connection drops, and an agent stopped by a router restart or a Wi-Fi blip waits for the connection, then reruns what was cut off by itself. Never for a usage limit or an expired sign-in.",
+  "tips.outageResume.title": "Agents can carry on after a connection drops",
   "tips.overview.text": "The Workspace Overview shows what every project used, what runs now and the board, by day. {key}",
   "tips.overview.title": "The whole workspace at a glance",
   "tips.ownShortcuts.text": "Settings → Keyboard Shortcuts changes any shortcut, and Project Settings can change them for one project.",

@@ -101,6 +101,9 @@
 //   mode its system prompt is in ("# Your mode: <name>", the Hive Assistant's) at the end of its reply. With
 //   fake-resume-draw.json ({ "ms": N }) in CLAUDE_CONFIG_DIR, a resumed session loses each Enter for its first N ms,
 //   keeping what was typed, as Claude Code can while it draws a long conversation.
+// - A prompt with "netdown" ends its turn as Claude Code 2.1.312 does when its API can't be reached after its retries
+//   (HI-1612, tests/fixtures/advanced/stopfailure-connection-claude-2.1.312.json): the ECONNREFUSED message, then a
+//   StopFailure hook (error server_error) instead of Stop.
 // - Ctrl+C twice, or "/exit", ends it with SessionEnd.
 // - With fake-signin.json in CLAUDE_CONFIG_DIR saying { "expired": true } (read each time; one test home, so one sign-in
 //   for all its agents, #309), it acts out an expired sign-in as Claude Code 2.1.291 does: `auth status --json` says
@@ -549,6 +552,15 @@ async function runPrompt(text, enter = null) {
   busyDrawn = writes
   write({ type: 'user', uuid: randomUUID(), message: { role: 'user', content: text } })
   await hook('UserPromptSubmit', { prompt: text, ...(/\bnewfield\b/i.test(text) ? { hive_test_new_field: true } : {}) })
+  if (/\bnetdown\b/i.test(text)) {
+    const said = 'API Error: Connection refused — a firewall or proxy may be blocking it (ECONNREFUSED)'
+    write({ type: 'assistant', requestId: `req_${randomUUID().slice(0, 8)}`, message: { model: '<synthetic>', content: [{ type: 'text', text: said }] }, isApiErrorMessage: true })
+    out(`\r\n● ${said}\r\n`)
+    await hook('StopFailure', { error: 'server_error', last_assistant_message: said })
+    busy = false
+    promptLine()
+    return
+  }
   if (signedOut()) {
     const said = 'Login expired · Please run /login'
     refused = text

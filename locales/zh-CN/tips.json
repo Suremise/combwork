@@ -312,6 +312,8 @@
   "tips.noCodeCards.title": "无代码卡片",
   "tips.off.message": "“帮助”→“提示…”中仍可查看，“设置”→“常规”可以重新打开。",
   "tips.off.title": "提示已关闭",
+  "tips.outageResume.text": "开启“设置”→“高级”→“连接中断后恢复智能体”后，因路由器重启或 Wi-Fi 短暂断开而停止的智能体会等待连接恢复，然后自动重新运行被中断的内容。用量限制或登录过期时不会恢复。",
+  "tips.outageResume.title": "连接中断后，智能体可以继续工作",
   "tips.overview.text": "“工作区概览”按天显示每个项目的用量、当前正在运行的内容和看板。{key}",
   "tips.overview.title": "整个工作区一目了然",
   "tips.ownShortcuts.text": "“设置”→“键盘快捷键”可以更改任何快捷键，“项目设置”可以为单个项目更改它们。",

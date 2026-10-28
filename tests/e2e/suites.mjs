@@ -204,6 +204,7 @@ export const SUITES = [
   { name: 'numbers' },
   { name: 'openguard' },
   { name: 'openspeed' },
+  { name: 'outage' },
   { name: 'overview' },
   { name: 'p4lane' },
   { name: 'p5lane' },

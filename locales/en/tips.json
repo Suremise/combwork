@@ -1251,6 +1251,14 @@
     "defaultMessage": "Tips are off",
     "description": "A notice after \"Don't show tips\" on the tip card."
   },
+  "tips.outageResume.text": {
+    "defaultMessage": "Turn on Settings → Advanced → Resume agents after a connection drops, and an agent stopped by a router restart or a Wi-Fi blip waits for the connection, then reruns what was cut off by itself. Never for a usage limit or an expired sign-in.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.outageResume.title": {
+    "defaultMessage": "Agents can carry on after a connection drops",
+    "description": "A tip's title."
+  },
   "tips.overview.text": {
     "defaultMessage": "The Workspace Overview shows what every project used, what runs now and the board, by day. {key}",
     "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
