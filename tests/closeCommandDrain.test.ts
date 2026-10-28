@@ -21,6 +21,8 @@ const { dismiss: dismissPlace } = await import('../src/main/openingFence')
 const { placeKey } = await import('../src/main/fsutil')
 const { drainWorkspace } = await import('../src/main/closeCommand/drain')
 const writes = await import('../src/main/dbWrites')
+const rows = await import('../src/main/storeRows')
+const sessions = await import('../src/main/sessionStore')
 
 let n = 0
 const dismissals: (() => void)[] = []
@@ -45,6 +47,7 @@ const gate = (): { wait: Promise<void>; open: () => void } => {
 
 afterEach(() => {
   tables.tableTestHooks.beforeSave = null
+  rows.storeTestHooks.beforeSave = null
 })
 afterAll(() => {
   board.closeAllBoards()
@@ -78,6 +81,36 @@ describe('the drain, with the real stores', () => {
     const db = new DatabaseSync(board.boardFile(ws))
     try {
       expect(readEntries(db as never, 'lanes').map((e) => (e.doc as { id: string }).id)).toEqual(['last'])
+    } finally {
+      db.close()
+    }
+  })
+
+  it("a session's last change, held on its way to the board's lock as the workspace closes: the drain waits, and ends once it has committed (HR6's round 1)", async () => {
+    const ws = workspace()
+    const held = gate()
+    const entered = gate()
+    rows.storeTestHooks.beforeSave = async (store) => {
+      if (store !== 'sessions') return
+      entered.open()
+      await held.wait
+    }
+    const place = { workspace: ws, scope: 'p-drain', file: join(ws, 'alpha', '.hive', 'sessions.json') }
+    const saving = sessions.changeSessions(place as never, (f) => void f.sessions.push({ id: 'last-change', provider: 'claude-code' } as never))
+    await entered.wait
+    close(ws)
+    let drained: boolean | null = null
+    const draining = drainWorkspace(ws, placeKey(ws), { ms: 30_000 }).then((r) => (drained = r.drained))
+    await Promise.resolve()
+    expect(writes.writesAt(placeKey(ws), ws)).toBeGreaterThan(0)
+    expect(drained).toBeNull()
+    held.open()
+    await saving
+    await draining
+    expect(drained).toBe(true)
+    const db = new DatabaseSync(board.boardFile(ws))
+    try {
+      expect(db.prepare("SELECT id FROM sessions WHERE id = 'last-change'").all()).toHaveLength(1)
     } finally {
       db.close()
     }

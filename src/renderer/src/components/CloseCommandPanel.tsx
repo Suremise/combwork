@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { CloseCommandRun } from '@shared/types'
 import { msg, tr } from '@shared/i18n'
 import { durationText } from '@shared/tasks'
@@ -39,15 +40,46 @@ export function CloseCommandPanel() {
   return <Panel run={run} />
 }
 
+/**
+ * Keeps the keyboard in the panel while it is up (HR6's round 1, finding 4): Tab stays on its button, focus that leaves
+ * the panel comes back, and no other key reaches the window behind (its shortcuts included). Escape does nothing: it is
+ * never an implicit Don't wait. Enter and Space press the button, as usual.
+ */
+function useKeyboardModal(card: React.RefObject<HTMLDivElement | null>, button: React.RefObject<HTMLButtonElement | null>): void {
+  useEffect(() => {
+    const inside = (t: EventTarget | null): boolean => !!card.current && t instanceof Node && card.current.contains(t)
+    const onKey = (e: KeyboardEvent): void => {
+      const own = e.target === button.current && (e.key === 'Enter' || e.key === ' ')
+      if (own) return
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.key === 'Tab' || !inside(e.target)) button.current?.focus()
+    }
+    const onFocus = (e: FocusEvent): void => {
+      if (!inside(e.target)) button.current?.focus()
+    }
+    window.addEventListener('keydown', onKey, true)
+    window.addEventListener('focusin', onFocus, true)
+    if (!inside(document.activeElement)) button.current?.focus()
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('focusin', onFocus, true)
+    }
+  }, [card, button])
+}
+
 function Panel({ run }: { run: CloseCommandRun }) {
   useLanguage()
+  const card = useRef<HTMLDivElement>(null)
+  const button = useRef<HTMLButtonElement>(null)
+  useKeyboardModal(card, button)
   const running = run.state === 'running'
   const now = useNow(running ? 1000 : 60000)
   const started = Date.parse(run.startedAt)
   const lines = run.lines.slice(-8)
   return (
     <div className="overlay close-command" data-state={run.state} data-kind={run.kind}>
-      <div className="dialog close-command-card" role="alertdialog" aria-modal="true" aria-labelledby="close-command-title" aria-describedby="close-command-state">
+      <div ref={card} className="dialog close-command-card" role="alertdialog" aria-modal="true" aria-labelledby="close-command-title" aria-describedby="close-command-state">
         <div className="dialog-header">
           {running ? <Icon name="loading" spin /> : <Icon name="error" className="close-command-error" />}
           <h2 id="close-command-title" aria-live="polite">
@@ -70,11 +102,11 @@ function Panel({ run }: { run: CloseCommandRun }) {
         </div>
         <div className="dialog-footer">
           {running ? (
-            <button className="btn" autoFocus onClick={() => void call('closeCommand:dontWait', run.id)}>
+            <button ref={button} className="btn" autoFocus onClick={() => void call('closeCommand:dontWait', run.id)}>
               {tr(M.dontWait)}
             </button>
           ) : (
-            <button className="btn primary" autoFocus onClick={() => void call('closeCommand:dismiss', run.id)}>
+            <button ref={button} className="btn primary" autoFocus onClick={() => void call('closeCommand:dismiss', run.id)}>
               {tr(M.close)}
             </button>
           )}

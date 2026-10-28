@@ -59,16 +59,36 @@ async function shots(page, name) {
   cfg.settings.appearance = { ...cfg.settings.appearance, theme: 'dark' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47973), HIVE_TEST_RUN_ON_CLOSE: '1' } })
+  // The settings rows' first two saves each slowed (HR6's round 1, finding 5): a tick right after typing must not save
+  // the old command over the new one.
+  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47973), HIVE_TEST_RUN_ON_CLOSE: '1', HIVE_TEST_SLOW_IPC: 'closeCommand:setWorkspace=1500*2,settings:update=1500*2' } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, wsA)
+
+  // --- 0. Typing a command, then ticking the update box at once, with each save slow: both land, the command typed.
+  await page.keyboard.press('Control+,')
+  for (const [section, typed, saved] of [
+    ['workspace', 'echo typed-for-the-workspace', async () => (await inv('workspace:get'))?.config?.onClose],
+    ['general', 'echo typed-for-quit', async () => (await inv('settings:get'))?.general?.onQuit]
+  ]) {
+    await page.locator(`.settings-nav .row[data-section="${section}"]`).click()
+    const input = page.locator('.close-command-input')
+    await input.fill(typed)
+    await page.locator('.close-command-update').click()
+    const landed = await lib.until(async () => {
+      const v = await saved()
+      return v?.command === typed && v.onUpdate === true ? v : null
+    }, HUNG_MS)
+    check(`${section}: typing then ticking at once saves both, the command as typed`, !!landed, JSON.stringify(await saved()))
+    check(`…and the row still shows them once the saves are in`, (await input.inputValue()) === typed && (await page.locator('.close-command-update').isChecked()))
+  }
+  await inv('settings:update', { general: { onQuit: { command: command('global', 'quick', '-'), onUpdate: false } } })
 
   // --- 1. A switch: the panel while it runs, Don't wait, the next workspace opens, the command finishes by itself.
   const goA = path.join(marks, 'go-a')
   const savedA = await inv('closeCommand:setWorkspace', { command: command('a-switch', `wait:${goA}`), onUpdate: false })
   check('the setting is saved as given', savedA.command === command('a-switch', `wait:${goA}`) && savedA.onUpdate === false, JSON.stringify(savedA))
-  // The settings rows: what it will run here, its placeholders filled in.
-  await page.keyboard.press('Control+,')
+  // The settings rows (Settings still open from step 0): what it will run here, its placeholders filled in.
   await page.locator('.settings-nav .row[data-section="workspace"]').click()
   const preview = page.locator('.close-command-preview')
   check('Settings shows exactly what it will run here', !!(await lib.until(async () => ((await preview.textContent().catch(() => '')) ?? '').includes(`"${wsA}" `), HUNG_MS)), await preview.textContent().catch(() => ''))
@@ -87,6 +107,15 @@ async function shots(page, name) {
   check('switching: the panel is up, with its spinner and the command', !!(await lib.until(async () => (await panel(page, 'running').count()) === 1, HUNG_MS)) && (await page.locator('.close-command .spin').count()) > 0 && ((await page.locator('.close-command-text').textContent()) ?? '').includes('a-switch switch'))
   check("…its output's last lines", !!(await lib.until(async () => /step \d+/.test((await page.locator('.close-command-output').textContent().catch(() => '')) ?? ''), HUNG_MS)))
   check('…and the window waits for it: still on the old workspace', !switched && (await page.evaluate(() => document.title)).includes(path.basename(wsA)))
+  // Keyboard-modal (HR6's round 1, finding 4): Tab stays in the panel, a shortcut reaches nothing behind it, Escape
+  // doesn't stand for Don't wait.
+  const focusInPanel = () => page.evaluate(() => !!document.activeElement?.closest('.close-command-card'))
+  for (let i = 0; i < 3; i++) await page.keyboard.press('Tab')
+  check('keyboard: Tab stays in the panel', await focusInPanel())
+  await page.keyboard.press('Control+Shift+P')
+  await page.keyboard.press('Escape')
+  await inv('app:quitState') // a round trip, so the page has handled the keys
+  check("…a shortcut reaches nothing behind it (no palette), and Escape isn't Don't wait", (await page.locator('.palette').count()) === 0 && (await panel(page, 'running').count()) === 1 && !switched)
   await shots(page, 'running')
   await page.locator('.close-command .dialog-footer button').click()
   await switching
@@ -103,6 +132,9 @@ async function shots(page, name) {
   const closing = inv('workspace:close').then((r) => (closed = r))
   check('a failed command: the panel says so, with its exit code and output', !!(await lib.until(async () => (await panel(page, 'failed').count()) === 1, HUNG_MS)) && /3/.test((await page.locator('.close-command #close-command-title, .close-command .dialog-header').first().textContent()) ?? '') && ((await page.locator('.close-command-output').textContent()) ?? '').includes('the backup target is missing'))
   check('…and Close Workspace waits for it', closed === null)
+  for (let i = 0; i < 3; i++) await page.keyboard.press('Shift+Tab')
+  await page.keyboard.press('Escape')
+  check('keyboard, failed: focus stays in the panel, and Escape leaves it up', (await page.evaluate(() => !!document.activeElement?.closest('.close-command-card'))) && (await panel(page, 'failed').count()) === 1 && closed === null)
   await shots(page, 'failed')
   await page.locator('.close-command .dialog-footer button').click()
   await closing

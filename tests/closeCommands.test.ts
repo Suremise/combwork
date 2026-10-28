@@ -24,8 +24,8 @@ vi.mock('../src/main/closeCommand/runs', async (orig) => {
 
 const { closeWithCommand, quitRunsAny, runQuitCommand } = await import('../src/main/closeCommand/closeCommands')
 
-/** A window's workspace service, as far as the close commands use it. */
-function fakeWs(path: string | null, command = '') {
+/** A window's workspace service, as far as the close commands use it; `held`: its close waits for the gate. */
+function fakeWs(path: string | null, command = '', held?: Promise<void>) {
   const ws = {
     path,
     openPlace: path ? path.toLowerCase() : null,
@@ -33,11 +33,17 @@ function fakeWs(path: string | null, command = '') {
     closes: 0,
     close: vi.fn(async () => {
       ws.closes++
+      await held
       ws.path = null
       ws.openPlace = null
     })
   }
   return ws
+}
+/** A gate a test opens: what waits on it goes on then. */
+const gate = (): { wait: Promise<void>; open: () => void } => {
+  let open!: () => void
+  return { wait: new Promise<void>((r) => (open = r)), open }
 }
 const flush = async (): Promise<void> => {
   for (let i = 0; i < 5; i++) await Promise.resolve()
@@ -97,6 +103,70 @@ describe('a workspace closing with its command', () => {
   it('a workspace already closed: nothing to run', async () => {
     const ws = fakeWs(null)
     await expect(closeWithCommand(ws as never, 'window', null)).resolves.toBe('skipped')
+  })
+})
+
+describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3)", () => {
+  it('a workspace with no command of its own is drained all the same, and one not drained blocks it', async () => {
+    const ws = fakeWs('D:\\ws\\Plain')
+    const r = closeWithCommand(ws as never, 'quit', null, { drain: true })
+    await flush()
+    expect(state.drains.map((d) => d.path)).toEqual(['D:\\ws\\Plain'])
+    state.drains[0].resolve({ drained: false, left: ['1 write(s) under way'] })
+    await expect(r).resolves.toBe('notDrained')
+    const ok = fakeWs('D:\\ws\\Plain2')
+    const r2 = closeWithCommand(ok as never, 'quit', null, { drain: true })
+    await flush()
+    state.drains[1].resolve({ drained: true })
+    await expect(r2).resolves.toBe('skipped')
+    expect(state.started).toHaveLength(0)
+  })
+
+  it('an update restart whose workspace command is skipped is still drained before the global one', async () => {
+    const ws = fakeWs('D:\\ws\\Work', 'backup')
+    const r = closeWithCommand(ws as never, 'update', null, { drain: true })
+    await flush()
+    expect(state.drains).toHaveLength(1)
+    state.drains[0].resolve({ drained: true })
+    await expect(r).resolves.toBe('skipped')
+    expect(state.started).toHaveLength(0)
+  })
+
+  it('a close that fails is not drained: nothing after it runs', async () => {
+    const ws = fakeWs('D:\\ws\\Work')
+    ws.close.mockRejectedValueOnce(new Error('a closing task failed'))
+    await expect(closeWithCommand(ws as never, 'quit', null, { drain: true })).resolves.toBe('notDrained')
+    expect(state.drains).toHaveLength(0)
+  })
+
+  it("a close held past quit's bound ends it at once, not drained; released later, it starts nothing", async () => {
+    const held = gate()
+    const withCommand = fakeWs('D:\\ws\\Work', 'backup', held.wait)
+    const plain = fakeWs('D:\\ws\\Plain', '', held.wait)
+    const bound = new AbortController()
+    const a = closeWithCommand(withCommand as never, 'quit', null, { cancelled: bound.signal, drain: true })
+    const b = closeWithCommand(plain as never, 'quit', null, { cancelled: bound.signal, drain: true })
+    await flush()
+    bound.abort()
+    await expect(Promise.all([a, b])).resolves.toEqual(['notDrained', 'notDrained'])
+    held.open()
+    await flush()
+    expect(state.drains).toHaveLength(0)
+    expect(state.started).toHaveLength(0)
+  })
+
+  it('a plain close under way when the quit joins it: drained after it, before the global one', async () => {
+    const held = gate()
+    const ws = fakeWs('D:\\ws\\Plain', '', held.wait)
+    const closing = closeWithCommand(ws as never, 'window', null)
+    const joined = closeWithCommand(ws as never, 'quit', null, { drain: true })
+    held.open()
+    await expect(closing).resolves.toBe('skipped')
+    await flush()
+    expect(ws.close).toHaveBeenCalledTimes(1)
+    expect(state.drains.map((d) => d.path)).toEqual(['D:\\ws\\Plain'])
+    state.drains[0].resolve({ drained: true })
+    await expect(joined).resolves.toBe('skipped')
   })
 })
 

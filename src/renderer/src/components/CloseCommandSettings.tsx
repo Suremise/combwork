@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CloseCommandSetting } from '@shared/types'
 import { closeCommandOf, fillCloseCommand, type CloseCommandValues } from '@shared/closeCommand'
 import { DEFAULT_SETTINGS } from '@shared/defaults'
 import { msg, tr } from '@shared/i18n'
 import * as actions from '../actions'
 import { call } from '../api'
-import { set, useLanguage, useStore } from '../store'
+import { useLanguage, useStore } from '../store'
 import { basename } from '../util'
 
 /**
@@ -29,20 +29,53 @@ const M = {
 
 const NO_SETTING: CloseCommandSetting = { command: '', onUpdate: false }
 
-/** The text box, the update checkbox, what it runs here, and the hint. */
-function CloseCommandControl({ value, values, onSave }: { value: CloseCommandSetting; values: CloseCommandValues; onSave: (next: CloseCommandSetting) => void }) {
+/**
+ * The text box, the update checkbox, what it runs here, and the hint. The command and the tick are one value, saved
+ * whole and in order (HR6's round 1, finding 5: a tick right after typing saved the old command over the new one); the
+ * value saved comes back from main, and is taken as the shown one only once no save of this control's is pending, so a
+ * reply or event for an older save never undoes a newer edit.
+ */
+function CloseCommandControl({ value, values, onSave }: { value: CloseCommandSetting; values: CloseCommandValues; onSave: (next: CloseCommandSetting) => Promise<unknown> }) {
   useLanguage()
   const [draft, setDraft] = useState(value.command)
-  useEffect(() => setDraft(value.command), [value.command])
-  const commit = (): void => {
-    if (draft.trim() !== value.command) onSave({ command: draft.trim(), onUpdate: value.onUpdate })
+  const [onUpdate, setOnUpdate] = useState(value.onUpdate)
+  const saved = useRef<CloseCommandSetting>(value)
+  const pending = useRef(0)
+  const queue = useRef<Promise<unknown>>(Promise.resolve())
+  useEffect(() => {
+    if (pending.current) return
+    saved.current = value
+    setDraft(value.command)
+    setOnUpdate(value.onUpdate)
+  }, [value])
+  const save = (next: CloseCommandSetting): void => {
+    if (next.command === saved.current.command && next.onUpdate === saved.current.onUpdate) return
+    saved.current = next
+    pending.current++
+    queue.current = queue.current
+      .then(() => onSave(next))
+      .catch(() => undefined)
+      .finally(() => {
+        pending.current--
+      })
   }
+  const commit = (): void => save({ command: draft.trim(), onUpdate })
   const shown = closeCommandOf({ command: draft })
   return (
     <div className="close-command-settings">
       <input className="input close-command-input" spellCheck={false} aria-label={tr(M.command)} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && commit()} />
       <label className="flex">
-        <input type="checkbox" className="checkbox close-command-update" checked={value.onUpdate} onChange={(e) => onSave({ command: value.command, onUpdate: e.target.checked })} /> {tr(M.onUpdate)}
+        <input
+          type="checkbox"
+          className="checkbox close-command-update"
+          checked={onUpdate}
+          onChange={(e) => {
+            setOnUpdate(e.target.checked)
+            // The command as typed now, not as last saved: one value, the tick with it.
+            save({ command: draft.trim(), onUpdate: e.target.checked })
+          }}
+        />{' '}
+        {tr(M.onUpdate)}
       </label>
       {shown && <div className="close-command-preview">{tr(M.runs, { command: fillCloseCommand(shown, values) })}</div>}
       <div className="s-desc muted">{tr(M.hint)}</div>
@@ -55,18 +88,15 @@ export function WorkspaceCloseCommand() {
   const path = useStore((s) => s.workspace?.path ?? null)
   const value = useStore((s) => s.workspace?.config.onClose ?? NO_SETTING)
   if (!path) return <div className="muted">{tr(M.noWorkspace)}</div>
-  const save = (next: CloseCommandSetting): void => {
-    // The window gets workspace-changed with the saved config; until then, no copy of our own to keep in step.
-    void actions.attempt(tr(M.saveFailed), () => call('closeCommand:setWorkspace', next))
-  }
+  // The window gets workspace-changed with the saved config.
+  const save = (next: CloseCommandSetting): Promise<unknown> => actions.attempt(tr(M.saveFailed), () => call('closeCommand:setWorkspace', next))
   return <CloseCommandControl value={value} values={{ workspace: path, name: basename(path), reason: 'window' }} onSave={save} /> // i18n-ignore: {reason}'s value, as main fills it in
 }
 
 /** Settings → General → When Hive quits, run: Hive's settings (general.onQuit). */
 export function QuitCommand() {
   const value = useStore((s) => s.settings?.general.onQuit ?? DEFAULT_SETTINGS.general.onQuit)
-  const save = (next: CloseCommandSetting): void => {
-    void actions.attempt(tr(M.saveFailed), () => call('settings:update', { general: { onQuit: next } })).then((s) => void (s && set({ settings: s })))
-  }
+  // Every window gets settings-changed with what was saved: no reply written here, which could be an older save's.
+  const save = (next: CloseCommandSetting): Promise<unknown> => actions.attempt(tr(M.saveFailed), () => call('settings:update', { general: { onQuit: next } }))
   return <CloseCommandControl value={value} values={{ reason: 'quit' }} onSave={save} /> // i18n-ignore: {reason}'s value, as main fills it in
 }

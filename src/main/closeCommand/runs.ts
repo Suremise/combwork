@@ -1,5 +1,6 @@
 import { spawn as nodeSpawn, type ChildProcess, type SpawnOptions } from 'child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'original-fs'
+import { createHash, randomBytes } from 'crypto'
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'original-fs'
 import { open, rm } from 'original-fs/promises'
 import { basename, join } from 'path'
 import { closeCommandOf, fillCloseCommand } from '../../shared/closeCommand'
@@ -43,12 +44,19 @@ export function planRun(setting: Partial<CloseCommandSetting> | null | undefined
   return { command: fillCloseCommand(raw, { workspace: values.workspace, name: values.workspace ? basename(values.workspace) : undefined, reason }) }
 }
 
-/** A run's folder name: what it is for (its workspace's folder name, or quit) and when, sortable. */
-export function runFolderName(kind: 'workspace' | 'quit', name: string | null, at: Date): string {
-  const stamp = at.toISOString().replace(/[:.]/g, '-')
-  const safe = (name ?? '').replace(/[^\w.-]+/g, '_').slice(0, 60) || 'workspace'
-  return kind === 'quit' ? `quit-${stamp}` : `ws-${safe}-${stamp}`
+/**
+ * What a run is for, as its folder's name starts (HR6's round 1, finding 2): `quit-`, or a workspace's `ws-<its folder
+ * name, made safe>-<a hash of its real place>-`, so two workspaces of the same name (or names alike once made safe)
+ * never share runs, nor their retention.
+ */
+export function runPrefix(kind: 'workspace' | 'quit', place: string | null): string {
+  if (kind === 'quit' || !place) return kind === 'quit' ? 'quit-' : 'ws-workspace-'
+  const safe = basename(place).replace(/[^\w.-]+/g, '_').slice(0, 40) || 'workspace'
+  return `ws-${safe}-${createHash('sha256').update(place).digest('hex').slice(0, 10)}-`
 }
+
+/** A run's folder name: what it is for, then when (sortable); startRun makes it unique. */
+export const runFolderName = (prefix: string, at: Date): string => `${prefix}${at.toISOString().replace(/[:.]/g, '-')}`
 
 /** What starting a runner needs: Hive's executable as Node, the runner's script, the command's environment. */
 export interface StartDeps {
@@ -63,13 +71,25 @@ export interface StartDeps {
  * it breaks when Hive stops waiting or exits). Throws as spawn does; a later failure shows in the folder (no status).
  */
 export function startRun(root: string, folder: string, command: string, cwd: string, deps: StartDeps): string {
-  const dir = join(root, folder)
-  mkdirSync(dir, { recursive: true })
+  mkdirSync(root, { recursive: true })
+  // A folder of its own, made exclusively: two runs started in the same millisecond never share one (round 1, finding 2).
+  let dir = ''
+  for (;;) {
+    dir = join(root, `${folder}-${randomBytes(4).toString('hex')}`)
+    try {
+      mkdirSync(dir)
+      break
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e
+    }
+  }
   writeFileSync(join(dir, 'job.json'), JSON.stringify({ command, cwd }))
   const spawn = deps.spawn ?? nodeSpawn
   const child = spawn(deps.exec, [deps.script, dir], { cwd, env: { ...deps.env, ELECTRON_RUN_AS_NODE: '1' }, detached: true, windowsHide: true, stdio: 'ignore' })
   child.on('error', () => undefined)
   child.unref()
+  // Whose run it is until its first status: pruning keeps it while that runner lives.
+  if (child.pid) writeFileSync(join(dir, 'runner.pid'), String(child.pid))
   return dir
 }
 
@@ -137,15 +157,24 @@ export async function pruneRuns(root: string, prefix: string, keep = KEEP_RUNS):
     .sort()
     .reverse()
   const ended = mine.filter((n) => {
+    const dir = join(root, n)
     try {
-      const s = JSON.parse(readFileSync(join(root, n, 'status.json'), 'utf8')) as RunStatus
+      const s = JSON.parse(readFileSync(join(dir, 'status.json'), 'utf8')) as RunStatus
       return s.state !== 'running' || !alive(s.runnerPid)
     } catch {
-      return true
+      // No status yet (still starting), or one being replaced: kept while its runner lives, or while it is new enough
+      // that its runner's pid may not be written yet (round 1, finding 2).
+      try {
+        return !alive(Number(readFileSync(join(dir, 'runner.pid'), 'utf8')))
+      } catch {
+        try {
+          return Date.now() - statSync(dir).mtimeMs > START_MS
+        } catch {
+          return true
+        }
+      }
     }
   })
   for (const n of ended.slice(keep)) await rm(join(root, n), { recursive: true, force: true }).catch(() => undefined)
 }
 
-/** A run's prefix for pruning, by what it is for. */
-export const runPrefix = (kind: 'workspace' | 'quit', name: string | null): string => (kind === 'quit' ? 'quit-' : `ws-${(name ?? '').replace(/[^\w.-]+/g, '_').slice(0, 60) || 'workspace'}-`)

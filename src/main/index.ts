@@ -100,7 +100,7 @@ import { flushMetrics } from './metrics'
 import { watchMainStalls } from './mainStalls'
 import { fileHolders } from './fileHolders'
 import { createWorkspaceService, disposeWorkspaceService, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
-import { closeWithCommand, quitRunsAny, runQuitCommand, type RunOutcome } from './closeCommand/closeCommands'
+import { closeWithCommand, quitCommandPlanned, quitRunsAny, runQuitCommand, type RunOutcome } from './closeCommand/closeCommands'
 import { journalSettingsOf } from './journalService'
 import { assistantStartView } from './startView'
 import { hiveWindows, lastFocused, TITLE_BAR_OVERLAY, registerWindow, unregisterWindow, windowForPath, type HiveWindow } from './windows'
@@ -680,10 +680,12 @@ async function closeCommandsOnQuit(reason: CloseReason): Promise<void> {
   const entries = hiveWindows()
   const global = config.settings.general.onQuit
   if (!quitRunsAny(entries.map((e) => e.ws), global)) return
+  // When Hive quits runs only once every workspace has closed and drained, theirs with a command or not (HR6's round 1).
+  const drain = quitCommandPlanned(global, reason)
   const bound = new AbortController()
   const timer = setTimeout(() => bound.abort(), QUIT_DRAIN_MS)
   try {
-    const outcomes = await Promise.all(entries.map((e) => closeWithCommand(e.ws, reason, e.win, { cancelled: bound.signal }).catch((err): RunOutcome => (log.warn("closing a window's workspace as Hive quits", err), 'failed'))))
+    const outcomes = await Promise.all(entries.map((e) => closeWithCommand(e.ws, reason, e.win, { cancelled: bound.signal, drain }).catch((err): RunOutcome => (log.warn("closing a window's workspace as Hive quits", err), 'notDrained'))))
     const last = lastFocused() ?? entries[0]
     await runQuitCommand(global, reason, last?.win ?? null, outcomes.includes('notDrained'))
   } finally {

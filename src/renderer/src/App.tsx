@@ -434,7 +434,9 @@ export function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (get().dialog || get().paletteOpen || get().recordingKeys) return
+      // The close command's panel is up (HI-1368): nothing behind it runs, its own keys included.
+      const closing = get().closeCommand
+      if (get().dialog || get().paletteOpen || get().recordingKeys || closing?.state === 'running' || closing?.state === 'failed') return
       const cmd = matchKeybinding(e)
       if (!cmd) return
       e.preventDefault()

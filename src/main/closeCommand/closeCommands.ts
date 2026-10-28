@@ -100,16 +100,17 @@ export type RunOutcome = 'ok' | 'failed' | 'left' | 'skipped' | 'notDrained'
  * Runs `command` for its window, following its runner until it ends, the user stops waiting (Don't wait), or the window
  * goes. A failure stays on the panel until the user closes it. Never throws.
  */
-export async function runInWindow(win: BrowserWindow | null, kind: 'workspace' | 'quit', name: string | null, command: string, cwd: string): Promise<RunOutcome> {
+export async function runInWindow(win: BrowserWindow | null, kind: 'workspace' | 'quit', name: string | null, place: string | null, command: string, cwd: string): Promise<RunOutcome> {
   const startedAt = new Date()
   const run: CloseCommandRun = { id: `cc${++runs}-${startedAt.getTime()}`, kind, command, startedAt: startedAt.toISOString(), state: 'running', lines: [], exitCode: null }
   const panel = showPanel(win, run)
   const root = runsRoot()
   const said = `${kind === 'quit' ? 'When Hive quits' : `${userText(name ?? '')}'s close`} command ${userText(command)}` // i18n-ignore: for the log
-  await pruneRuns(root, runPrefix(kind, name)).catch((e) => log.warn('pruning the close commands kept', e))
+  const prefix = runPrefix(kind, place)
+  await pruneRuns(root, prefix).catch((e) => log.warn('pruning the close commands kept', e))
   let dir: string
   try {
-    dir = startRun(root, runFolderName(kind, name, startedAt), command, cwd, { exec: process.execPath, script: runnerScript(), env: checkEnv(childEnv()) })
+    dir = startRun(root, runFolderName(prefix, startedAt), command, cwd, { exec: process.execPath, script: runnerScript(), env: checkEnv(childEnv()) })
   } catch (e) {
     log.warn(`${said} couldn't start`, e)
     panel.update({ state: 'failed', failure: 'spawn', error: (e as Error).message })
@@ -178,42 +179,81 @@ async function drainFailed(win: BrowserWindow | null, kind: 'workspace' | 'quit'
 }
 
 /** The close in progress for each workspace service: a second close of the same open joins it (s11). */
-const closing = new WeakMap<WorkspaceService, { path: string; done: Promise<RunOutcome> }>()
+const closing = new WeakMap<WorkspaceService, { path: string; place: string | null; drains: boolean; done: Promise<RunOutcome> }>()
 
 /**
  * Closes a window's workspace for `reason`, running its close command once it has closed and drained, and waiting for
- * it as its panel says. With no command (or none for this reason, or a test copy), it is an ordinary close. A second
- * call for the same open joins the first (its reason wins).
+ * it as its panel says. With no command (or none for this reason, or a test copy), it is an ordinary close, unless
+ * `drain` (When Hive quits will run after it, HR6's round 1, finding 1): then it is drained all the same, and is
+ * 'notDrained' if it couldn't be. `cancelled` bounds the close and its drain together (quit's bound), never a command:
+ * past it, nothing of this close starts. A second call for the same open joins the first (its reason wins), drained
+ * after it if this one needs that and the first didn't.
  */
-export function closeWithCommand(ws: WorkspaceService, reason: CloseReason, win: BrowserWindow | null, o: { cancelled?: AbortSignal } = {}): Promise<RunOutcome> {
+export function closeWithCommand(ws: WorkspaceService, reason: CloseReason, win: BrowserWindow | null, o: { cancelled?: AbortSignal; drain?: boolean } = {}): Promise<RunOutcome> {
   const path = ws.path
   const was = closing.get(ws)
-  if (was && (!path || was.path === path)) return was.done
+  if (was && (!path || was.path === path)) {
+    if (!o.drain || was.drains) return was.done
+    return was.done.then(async (r) => (r === 'notDrained' || !(await drained(was.path, was.place, o.cancelled)).ok ? 'notDrained' : r))
+  }
   if (!path) return ws.close().then(() => 'skipped' as const)
-  const done = closeAndRun(ws, path, reason, win, o.cancelled)
-  closing.set(ws, { path, done })
+  const place = ws.openPlace
+  const plan = planRun(ws.config.onClose, reason, { workspace: path }, { runs: closeCommandsRun() })
+  const drains = !('skip' in plan) || !!o.drain
+  const done = closeAndRun(ws, path, place, plan, drains, win, o.cancelled)
+  closing.set(ws, { path, place, drains, done })
   void done.finally(() => {
     if (closing.get(ws)?.done === done) closing.delete(ws)
   })
   return done
 }
 
-async function closeAndRun(ws: WorkspaceService, path: string, reason: CloseReason, win: BrowserWindow | null, cancelled?: AbortSignal): Promise<RunOutcome> {
-  // As the close began: the setting and place this open had, whatever opens next.
-  const setting: CloseCommandSetting | undefined = ws.config.onClose
-  const place = ws.openPlace
-  const plan = planRun(setting, reason, { workspace: path }, { runs: closeCommandsRun() })
-  await ws.close()
-  if ('skip' in plan) {
-    if (plan.skip !== 'none') log.info(`${userText(basename(path))}'s close command not run: ${plan.skip === 'test' ? 'a test copy of Hive' : 'Hive is restarting for an update'}`)
+/** Why a close and its drain weren't done in time, or not done at all: nothing of it may start. */
+type Eligible = { ok: true } | { ok: false; why: string }
+
+/** A closed workspace drained (its place as it opened), bounded by `cancelled`. */
+async function drained(path: string, place: string | null, cancelled?: AbortSignal): Promise<Eligible> {
+  if (!place) return { ok: true }
+  const d: DrainResult = await drainWorkspace(path, place, { cancelled })
+  return d.drained ? { ok: true } : { ok: false, why: d.left.join(', ') }
+}
+
+/**
+ * The close, then (when `drains`) its drain, as one phase bounded by `cancelled` (HR6's round 1, finding 3: a close held
+ * by a closing task kept a quit waiting with no panel). Past the bound it answers at once, not eligible; the close goes on
+ * by itself, and nothing waits on it to start anything.
+ */
+async function closeAndDrain(ws: WorkspaceService, path: string, place: string | null, drains: boolean, cancelled?: AbortSignal): Promise<Eligible> {
+  const closed = ws.close().then(
+    (): Eligible => ({ ok: true }),
+    (e): Eligible => ({ ok: false, why: `its close failed: ${(e as Error).message}` }) // i18n-ignore: for the log
+  )
+  const stopped = new Promise<Eligible>((resolve) => {
+    if (!cancelled) return
+    const say = (): void => resolve({ ok: false, why: 'it was still closing when Hive stopped waiting' }) // i18n-ignore: for the log
+    if (cancelled.aborted) return say()
+    cancelled.addEventListener('abort', say, { once: true })
+  })
+  const first = await Promise.race([closed, stopped])
+  if (!first.ok || !drains) return first
+  return drained(path, place, cancelled)
+}
+
+async function closeAndRun(ws: WorkspaceService, path: string, place: string | null, plan: ReturnType<typeof planRun>, drains: boolean, win: BrowserWindow | null, cancelled?: AbortSignal): Promise<RunOutcome> {
+  const name = userText(basename(path))
+  if ('skip' in plan && plan.skip !== 'none') log.info(`${name}'s close command not run: ${plan.skip === 'test' ? 'a test copy of Hive' : 'Hive is restarting for an update'}`)
+  // Nothing to run and nothing waiting on its drain: an ordinary close, as before.
+  if (!drains) {
+    await ws.close()
     return 'skipped'
   }
-  const drained: DrainResult = place ? await drainWorkspace(path, place, { cancelled }) : { drained: true }
-  if (!drained.drained) {
-    log.warn(`${userText(basename(path))}'s close command not run: Hive hadn't finished writing it (${drained.left.join(', ')})`)
-    return drainFailed(win, 'workspace', plan.command)
+  const eligible = await closeAndDrain(ws, path, place, drains, cancelled)
+  if (!eligible.ok) {
+    log.warn(`${name} wasn't closed and written in time, so ${'command' in plan ? 'its close command' : 'When Hive quits, run'} won't run: ${eligible.why}`)
+    return 'command' in plan ? drainFailed(win, 'workspace', plan.command) : 'notDrained'
   }
-  return runInWindow(win, 'workspace', basename(path), plan.command, path)
+  if ('skip' in plan) return 'skipped'
+  return runInWindow(win, 'workspace', basename(path), place ?? path.toLowerCase(), plan.command, path)
 }
 
 /** When Hive quits, run: in `win`, once every window's workspace has closed; `blocked`: one didn't drain, so it doesn't run. */
@@ -227,8 +267,11 @@ export async function runQuitCommand(setting: CloseCommandSetting | undefined, r
     log.warn("When Hive quits, run: not run, as a workspace's databases weren't closed in time")
     return drainFailed(win, 'quit', plan.command)
   }
-  return runInWindow(win, 'quit', null, plan.command, homedir())
+  return runInWindow(win, 'quit', null, null, plan.command, homedir())
 }
+
+/** Whether When Hive quits, run will run for this quit (set, not a test copy, not skipped for an update). */
+export const quitCommandPlanned = (setting: CloseCommandSetting | undefined, reason: CloseReason): boolean => 'command' in planRun(setting, reason, {}, { runs: closeCommandsRun() })
 
 /** Whether a quit has anything to run: a window's workspace with a command, or When Hive quits. */
 export function quitRunsAny(workspaces: WorkspaceService[], global: CloseCommandSetting | undefined): boolean {

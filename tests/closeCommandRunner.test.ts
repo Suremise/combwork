@@ -9,7 +9,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { runJob, TailRing, TAIL_BYTES, WRITE_MS, type RunnerDeps } from '../src/main/closeCommand/runner'
-import { planRun, pruneRuns, runFolderName, runPrefix, runsCloseCommands, tailLines, READ_TAIL_BYTES, PANEL_LINES, LINE_CHARS } from '../src/main/closeCommand/runs'
+import { planRun, pruneRuns, runFolderName, runPrefix, runsCloseCommands, startRun, tailLines, READ_TAIL_BYTES, PANEL_LINES, LINE_CHARS } from '../src/main/closeCommand/runs'
 import { fillCloseCommand } from '../src/shared/closeCommand'
 
 const base = tempDir('hive-close-runner-')
@@ -169,22 +169,67 @@ describe('what runs', () => {
 })
 
 describe('the runs kept', () => {
-  it('the newest five per name, never one still running, and none of another name', async () => {
+  const A = 'd:/one/work'
+  const B = 'd:/two/work'
+  it('the newest five per workspace, never one still running, and none of another workspace of the same name, nor quit', async () => {
     const root = folder()
-    const made = (name: string, i: number, status: object | null): string => {
-      const f = runFolderName('workspace', name, new Date(Date.UTC(2026, 9, 28, 12, 0, i)))
+    const made = (place: string, i: number, status: object | null): string => {
+      const f = `${runFolderName(runPrefix('workspace', place), new Date(Date.UTC(2026, 9, 28, 12, 0, i)))}-0000000${i}`
       mkdirSync(join(root, f), { recursive: true })
       if (status) writeFileSync(join(root, f, 'status.json'), JSON.stringify(status))
       return f
     }
     const ended = { state: 'exited', runnerPid: 1 }
     // The oldest still running (its runner alive: this test's own process); seven ended after it.
-    const running = made('Work', 0, { state: 'running', runnerPid: process.pid })
-    const old = Array.from({ length: 7 }, (_, i) => made('Work', i + 1, ended))
-    const other = made('Work-2', 1, ended)
-    const quit = runFolderName('quit', null, new Date())
+    const running = made(A, 0, { state: 'running', runnerPid: process.pid })
+    const old = Array.from({ length: 7 }, (_, i) => made(A, i + 1, ended))
+    // Another workspace named Work, elsewhere: its runs are its own.
+    const other = Array.from({ length: 7 }, (_, i) => made(B, i + 1, ended))
+    const quit = runFolderName(runPrefix('quit', null), new Date())
     mkdirSync(join(root, quit))
-    await pruneRuns(root, runPrefix('workspace', 'Work'))
-    expect(readdirSync(root).sort()).toEqual([running, ...old.slice(2), other, quit].sort())
+    await pruneRuns(root, runPrefix('workspace', A))
+    expect(readdirSync(root).sort()).toEqual([running, ...old.slice(2), ...other, quit].sort())
+  })
+
+  it('two workspaces of the same name: their runs apart, by their real places', () => {
+    expect(runPrefix('workspace', A)).toMatch(/^ws-work-[0-9a-f]{10}-$/)
+    expect(runPrefix('workspace', A)).not.toBe(runPrefix('workspace', B))
+    expect(runPrefix('quit', null)).toBe('quit-')
+  })
+
+  it('two runs started in the same millisecond: a folder each, never one shared', () => {
+    const root = folder()
+    const at = new Date(Date.UTC(2026, 9, 28, 12, 0, 0))
+    const spawn = vi.fn(() => Object.assign(new EventEmitter(), { pid: 0, unref: () => undefined }) as never)
+    const deps = { exec: 'hive.exe', script: 'runner.js', env: {}, spawn }
+    const one = startRun(root, runFolderName(runPrefix('workspace', A), at), 'backup one', 'D:/one/work', deps)
+    const two = startRun(root, runFolderName(runPrefix('workspace', A), at), 'backup two', 'D:/one/work', deps)
+    expect(one).not.toBe(two)
+    expect(JSON.parse(readFileSync(join(one, 'job.json'), 'utf8')).command).toBe('backup one')
+    expect(JSON.parse(readFileSync(join(two, 'job.json'), 'utf8')).command).toBe('backup two')
+  })
+
+  it('a run still starting (no status yet) is kept while its runner lives, and while too new to have its pid; one gone is not', async () => {
+    const root = folder()
+    const prefix = runPrefix('workspace', A)
+    const run = (i: number): string => {
+      const f = `${runFolderName(prefix, new Date(Date.UTC(2026, 9, 28, 12, 0, i)))}-0000000${i}`
+      mkdirSync(join(root, f))
+      return f
+    }
+    const ended = Array.from({ length: 6 }, (_, i) => run(i + 10))
+    for (const f of ended) writeFileSync(join(root, f, 'status.json'), JSON.stringify({ state: 'exited', runnerPid: 1 }))
+    // The oldest: still starting, its runner alive; another just made, its pid not written yet; one whose runner is gone.
+    const starting = run(1)
+    writeFileSync(join(root, starting, 'runner.pid'), String(process.pid))
+    const fresh = run(2)
+    const gone = run(3)
+    writeFileSync(join(root, gone, 'runner.pid'), '999999999')
+    await pruneRuns(root, prefix)
+    const left = readdirSync(root)
+    expect(left).toContain(starting)
+    expect(left).toContain(fresh)
+    expect(left).not.toContain(gone)
+    expect(left.filter((f) => ended.includes(f))).toHaveLength(5)
   })
 })
