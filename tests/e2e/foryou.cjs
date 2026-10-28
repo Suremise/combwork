@@ -128,7 +128,8 @@ const check = (name, ok, extra = '') => {
     await dialog.waitFor({ timeout: HUNG_MS })
     await dialog.locator('[data-section="history"]').click()
     const history = dialog.locator('.task-history')
-    check('the answer moved nothing: the card is not returned for review by it', (await card(n))?.column === 'review' && !(await card(n))?.history.some((h) => /Returned for review/.test(h.what)), JSON.stringify((await card(n))?.history.map((h) => `${h.by}: ${h.what}`)))
+    // Failed, it went back to Doing with its builder (HI-1946): the answer leaves it there.
+    check('the answer moved nothing: the card is not returned for review by it', (await card(n))?.column === 'doing' && !(await card(n))?.history.some((h) => /Returned for review/.test(h.what)), JSON.stringify((await card(n))?.history.map((h) => `${h.by}: ${h.what}`)))
     check('…and the card dialog shows it', !!(await lib.until(async () => (await history.innerText().catch(() => '')).includes(toldLine), HUNG_MS)))
     await history.screenshot({ path: path.join(lib.WORK, 'foryou-history.png') })
 
