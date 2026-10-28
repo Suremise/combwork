@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AGENT_STATE_LABEL, AGENT_STATES, agentState, boardExtras, mostUrgent, projectAgentStates, projectStateShort, projectStateSummary, stateCounts, stateSummary, type AgentState } from '../src/shared/agentState'
+import { AGENT_STATE_LABEL, AGENT_STATES, agentState, allStopped, boardExtras, mostUrgent, projectAgentStates, projectStateShort, projectStateSummary, stateCounts, stateSummary, type AgentState } from '../src/shared/agentState'
 import { tr } from '../src/shared/i18n'
 import type { AgentInfo, LiveSessionState, SessionStatus, TaskCard } from '../src/shared/types'
 
@@ -113,5 +113,17 @@ describe('agent state marks (#973)', () => {
     const none = [agent('a1', null), agent('a2', null)]
     expect(projectStateShort(none, projectAgentStates({ name: 'alpha', agents: none }, []))).toBe('2 stopped')
     expect(projectStateShort([], [])).toBe('')
+  })
+})
+
+describe("every agent stopped (HI-1908): the summary's mark grey", () => {
+  const stoppedAgent = { live: null } as unknown as Pick<AgentInfo, 'live'>
+  const running = { live: live('ready') } as unknown as Pick<AgentInfo, 'live'>
+  it('only when every agent is idle with no session running', () => {
+    expect(allStopped([stoppedAgent, stoppedAgent], ['idle', 'idle'])).toBe(true)
+    expect(allStopped([stoppedAgent, running], ['idle', 'idle'])).toBe(false)
+    // A stalled agent with no session (a Doing card) is stalled, not merely stopped.
+    expect(allStopped([stoppedAgent], ['stalled'])).toBe(false)
+    expect(allStopped([], [])).toBe(false)
   })
 })

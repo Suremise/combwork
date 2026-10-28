@@ -279,7 +279,7 @@ const check = (name, ok, extra = '') => {
 
   // --- The session toolbar beside them (#975: the agent strip went): its summary chip counts every agent, idle ones too.
   const chipText = () => page.locator('.session-toolbar .summary-chip-text').innerText().catch(() => '')
-  check("the summary chip: 1 working · 2 idle", !!(await until(async () => (await chipText()) === '1 working · 2 idle', HUNG_MS)), await chipText())
+  check("the summary chip: 1 working · 1 idle · 1 stopped, as the header (HI-1908)", !!(await until(async () => (await chipText()) === '1 working · 1 idle · 1 stopped', HUNG_MS)), await chipText())
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
     await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)

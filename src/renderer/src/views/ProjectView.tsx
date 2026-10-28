@@ -6,7 +6,7 @@ import { agentsToResume, stalledOnSignIn } from '@shared/resumeAll'
 import { batchCounts } from '@shared/startAll'
 import { hooksMissingNote } from '@shared/runtime'
 import { MAIN_TABS, MORE_TABS, tabCommand } from '@shared/projectTabs'
-import { mostUrgent, projectAgentStates, projectStateShort, projectStateSummary } from '@shared/agentState'
+import { allStopped, mostUrgent, projectAgentStates, projectStateShort, projectStateSummary } from '@shared/agentState'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import hexUrl from '../assets/icon.svg'
 import * as actions from '../actions'
@@ -514,7 +514,8 @@ export function ProjectView({ visible }: { visible: boolean }) {
           {states.length > 0 && (
             <Tooltip content={<ProjectAgentsTable project={project} />} className="agents-tip" focus>
               <span tabIndex={0} aria-description={agentsDescription || undefined} className="badge project-state">
-                <StateMark state={mostUrgent(states)} decorative />
+                {/* Every agent stopped: the stopped mark, grey (HI-1908), as the session toolbar's chip has it. */}
+                <StateMark state={mostUrgent(states)} decorative className={allStopped(project.agents, states) ? 'stopped' : undefined} />
                 <span className="badge-text">{shortState ? projectStateShort(project.agents, states) : projectStateSummary(project.agents, states)}</span>
               </span>
             </Tooltip>

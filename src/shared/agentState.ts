@@ -113,6 +113,14 @@ export function projectStateSummary(agents: readonly Pick<AgentInfo, 'live'>[], 
 }
 
 /**
+ * Whether every agent shown is stopped (idle, with no session running; HI-1908): its summary's mark is then the stopped
+ * one, grey, as its pane's and tile's marks are (HI-1881). Presentation only: the states stay as they are.
+ */
+export function allStopped(agents: readonly Pick<AgentInfo, 'live'>[], states: readonly AgentState[]): boolean {
+  return states.length > 0 && states.every((s, i) => s === 'idle' && !agents[i]?.live)
+}
+
+/**
  * The project header's summary at its narrowest (#1051): only its most urgent count ("1 waiting"; "2 stopped" when no
  * agent runs), the rest in its tooltip.
  */

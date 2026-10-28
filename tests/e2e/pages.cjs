@@ -62,7 +62,7 @@ const check = (name, ok, extra = '') => {
   await choose('Three columns')
   check('four agents in three columns: two page buttons, at once', (await buttons()) === 2, String(await buttons()))
   check('page 1 shows agents 1–3', (await shown()) === 'Agent 1,Agent 2,Agent 3', await shown())
-  check('the summary chip counts the four agents (#975)', (await page.locator('.session-toolbar .summary-chip').innerText()).trim() === '4 idle', await page.locator('.session-toolbar .summary-chip').innerText())
+  check('the summary chip counts the four agents (#975), none running: stopped, as the header counts them (HI-1908)', (await page.locator('.session-toolbar .summary-chip').innerText()).trim() === '4 stopped', await page.locator('.session-toolbar .summary-chip').innerText())
   await go(2)
   check('page 2 has the fourth agent, its spare panes empty', (await shown()) === 'Agent 4' && (await panes()) === 3, `${await shown()} / ${await panes()}`)
   check('saved as the project layout', (await cfg()).layout === 'columns3', JSON.stringify(await cfg()))

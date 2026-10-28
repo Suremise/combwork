@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { CardChip, useAgentCards, useAgentReviews } from './CardChip'
 import { StateMark } from './StateMark'
-import { AGENT_STATE_LABEL, AGENT_STATES, agentState, mostUrgent as mostUrgentState, projectAgentStates, stateSummary } from '@shared/agentState'
+import { AGENT_STATE_LABEL, AGENT_STATES, agentState, allStopped, mostUrgent as mostUrgentState, projectAgentStates, projectStateSummary } from '@shared/agentState'
 import { agentDoingCards } from '@shared/tasks'
 import { cardsText } from '@shared/agentTable'
 import { cardLabel } from '@shared/projectKeys'
@@ -1117,8 +1117,9 @@ export function SessionToolbar({ project, view }: { project: ProjectInfo; view: 
       {project.agents.length > 0 && (
         <Tooltip content={tr(msg({ id: 'panes.chip.tip', defaultMessage: "The project's agents by state: choose one to go to it", description: "Tooltip of the session toolbar's summary chip (\"1 waiting · 2 working\"), which opens a list of the agents." }))}>
           <button ref={chip} className={cx('summary-chip', urgent)} aria-haspopup="menu" aria-expanded={chipMenu.shown} onClick={(e) => openChip(e.detail === 0)}>
-            <StateMark state={urgent} decorative />
-            <span className="summary-chip-text">{stateSummary(states, true)}</span>
+            {/* Its count as the project header's (HI-1908): the agents with no session running are stopped, not idle. */}
+            <StateMark state={urgent} decorative className={allStopped(project.agents, states) ? 'stopped' : undefined} />
+            <span className="summary-chip-text">{projectStateSummary(project.agents, states)}</span>
             {!bare && <Icon name="chevron-down" />}
           </button>
         </Tooltip>
