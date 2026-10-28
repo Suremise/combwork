@@ -326,6 +326,7 @@
   "git.vc.fact.subfolder": "此文件夹位于 {root} 的 Git 仓库内：分支和合并操作会影响整个仓库。",
   "git.vc.git": "Git",
   "git.vc.initHint": "“初始化仓库…”会把此文件夹变成 main 分支上的 Git 仓库，将其 .hive 排除在 git 之外，并提交其中的文件。",
+  "git.vc.initOwnHint": "“初始化独立的仓库…”会把此文件夹变成 main 分支上独立的 Git 仓库，将其 .hive 排除在 git 之外，并提交其中的文件。",
   "git.vc.insideRepo": "此文件夹位于 {root} 的 Git 仓库内：可以使用该仓库，或为此文件夹创建独立的仓库。",
   "git.vc.noCommitYet": "此文件夹的 Git 仓库还没有首次提交。",
   "git.vc.none": "无",

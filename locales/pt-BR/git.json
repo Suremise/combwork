@@ -326,6 +326,7 @@
   "git.vc.fact.subfolder": "Esta pasta está dentro de um repositório Git em {root}: ações de branch e de merge afetam todo esse repositório.",
   "git.vc.git": "Git",
   "git.vc.initHint": "Inicializar repositório… transforma esta pasta em um repositório Git em um branch chamado main, mantém o .hive dela fora do git e faz commit dos arquivos.",
+  "git.vc.initOwnHint": "Inicializar um repositório próprio… transforma esta pasta em um repositório Git próprio em um branch chamado main, mantém o .hive dela fora do git e faz commit dos arquivos.",
   "git.vc.insideRepo": "Esta pasta está dentro do repositório Git em {root}: use esse ou dê a esta pasta um repositório próprio.",
   "git.vc.noCommitYet": "O repositório Git desta pasta ainda não tem o primeiro commit.",
   "git.vc.none": "Nenhum",

@@ -326,6 +326,7 @@
   "git.vc.fact.subfolder": "Ce dossier se trouve dans un dépôt Git situé dans {root} : les actions sur les branches et les fusions concernent tout ce dépôt.",
   "git.vc.git": "Git",
   "git.vc.initHint": "Initialiser le dépôt… fait de ce dossier un dépôt Git sur une branche nommée main, garde son .hive hors de git et commite ses fichiers.",
+  "git.vc.initOwnHint": "Initialiser son propre dépôt… fait de ce dossier un dépôt Git à part entière sur une branche nommée main, garde son .hive hors de git et commite ses fichiers.",
   "git.vc.insideRepo": "Ce dossier se trouve dans le dépôt Git situé dans {root} : utilisez celui-ci ou donnez à ce dossier son propre dépôt.",
   "git.vc.noCommitYet": "Le dépôt Git de ce dossier n’a pas encore de premier commit.",
   "git.vc.none": "Aucune",

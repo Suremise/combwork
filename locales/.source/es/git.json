@@ -327,6 +327,7 @@
   "git.vc.fact.subfolder": "This folder is inside a Git repository at {root}: branch and merge actions affect that whole repository.",
   "git.vc.git": "Git",
   "git.vc.initHint": "Initialise repository… makes this folder a Git repository on a branch called main, keeps its .hive out of git and commits its files.",
+  "git.vc.initOwnHint": "Initialise its own repository… makes this folder a Git repository of its own on a branch called main, keeps its .hive out of git and commits its files.",
   "git.vc.insideRepo": "This folder is inside the Git repository at {root}: use that one, or give this folder its own.",
   "git.vc.noCommitYet": "This folder's Git repository has no first commit yet.",
   "git.vc.none": "None",

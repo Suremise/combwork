@@ -35,6 +35,7 @@ const M = {
   insideRepo: msg({ id: 'git.vc.insideRepo', defaultMessage: 'This folder is inside the Git repository at {root}: use that one, or give this folder its own.', description: 'Git’s page in the Version Control tab of a project inside another repository, chosen before it has its own: above the buttons Use that repository… and Initialise its own repository…. {root} is the outer repository’s folder.' }),
   noCommitYet: msg({ id: 'git.vc.noCommitYet', defaultMessage: "This folder's Git repository has no first commit yet.", description: 'Git’s page in the Version Control tab, when Initialise repository… made the repository but stopped before its first commit: above the Make first commit… button.' }),
   parentButton: msg({ id: 'git.vc.useParent', defaultMessage: 'Use that repository…', description: 'Button on Git’s page in the Version Control tab of a project inside another repository: switches the project to Git on that repository, after the warning (the … says it asks first: keep it).' }),
+  initOwnHint: msg({ id: 'git.vc.initOwnHint', defaultMessage: 'Initialise its own repository… makes this folder a Git repository of its own on a branch called main, keeps its .hive out of git and commits its files.', description: 'Git’s page in the Version Control tab of a project inside another repository, under its buttons. Initialise its own repository… is the button’s name: keep it as translated there. Keep main (the branch name).' }),
   initHint: msg({ id: 'git.vc.initHint', defaultMessage: 'Initialise repository… makes this folder a Git repository on a branch called main, keeps its .hive out of git and commits its files.', description: 'Under the header of the Version Control tab of a project whose folder has no repository, beside the button. Initialise repository… is the button’s name: keep it as translated there. Keep main (the branch name).' })
 }
 
@@ -84,7 +85,7 @@ function GitPreview({ project, s, error }: { project: ProjectInfo; s: GitRepoSum
         )}
         <InitRepoButton project={project} small {...(parent ? { label: tr(INIT_TEXT.ownRepoButton) } : noCommit ? { label: tr(INIT_TEXT.firstCommitButton) } : {})} />
       </div>
-      {!noCommit && <span className="hint">{tr(M.initHint)}</span>}
+      {!noCommit && <span className="hint">{tr(parent ? M.initOwnHint : M.initHint)}</span>}
       {error && (
         <div className="banner danger" data-vc-init-error="">
           <Icon name="error" /> {error}

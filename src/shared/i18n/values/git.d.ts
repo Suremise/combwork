@@ -328,6 +328,7 @@ interface HiveMessageValues {
   'git.vc.fact.subfolder': { root: string | number }
   'git.vc.git': undefined
   'git.vc.initHint': undefined
+  'git.vc.initOwnHint': undefined
   'git.vc.insideRepo': { root: string | number }
   'git.vc.noCommitYet': undefined
   'git.vc.none': undefined

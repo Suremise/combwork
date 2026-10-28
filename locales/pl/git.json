@@ -326,6 +326,7 @@
   "git.vc.fact.subfolder": "Ten folder jest wewnątrz repozytorium Git w {root}: działania na gałęziach i scalanie dotyczą całego tego repozytorium.",
   "git.vc.git": "Git",
   "git.vc.initHint": "Zainicjuj repozytorium… zmienia ten folder w repozytorium Git na gałęzi main, wyklucza jego .hive z gita i commituje jego pliki.",
+  "git.vc.initOwnHint": "Zainicjuj osobne repozytorium… zmienia ten folder w osobne repozytorium Git na gałęzi main, wyklucza jego .hive z gita i commituje jego pliki.",
   "git.vc.insideRepo": "Ten folder jest wewnątrz repozytorium Git w {root}: użyj go albo utwórz dla tego folderu osobne.",
   "git.vc.noCommitYet": "Repozytorium Git tego folderu nie ma jeszcze pierwszego commita.",
   "git.vc.none": "Brak",

@@ -153,7 +153,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitini
     await lib.until(async () => (await head.locator('[data-platform="none"][aria-checked="true"]').count()) === 1, HUNG_MS)
     check("inside the workspace repository, None's page offers nothing", (await notes.count()) === 0)
     await head.locator('[data-platform="git"]').click()
-    check("Git's page: that repository, or one of its own", !!(await lib.until(async () => (await parent.locator('[data-git-init]').count()) === 1 && (await parent.locator('[data-action="vc-use-parent"]').count()) === 1 && (await text(parent)).includes(`inside the Git repository at ${ws}`), HUNG_MS)), await text(parent))
+    check("Git's page: that repository, or one of its own", !!(await lib.until(async () => (await parent.locator('[data-git-init]').count()) === 1 && (await parent.locator('[data-action="vc-use-parent"]').count()) === 1 && (await text(parent)).includes(`inside the Git repository at ${ws}`) && (await text(parent)).includes('Initialise its own repository… makes this folder a Git repository of its own'), HUNG_MS)), await text(parent))
     await shot(page, '2-parent')
     await parent.locator('[data-action="vc-use-parent"]').click()
     const useWarning = page.locator('.dialog', { hasText: 'Switch late to Git?' })

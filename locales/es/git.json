@@ -326,6 +326,7 @@
   "git.vc.fact.subfolder": "Esta carpeta está dentro de un repositorio Git en {root}: las acciones de rama y de fusión afectan a todo ese repositorio.",
   "git.vc.git": "Git",
   "git.vc.initHint": "Inicializar repositorio… convierte esta carpeta en un repositorio Git en una rama llamada main, deja su .hive fuera de git y hace commit de sus archivos.",
+  "git.vc.initOwnHint": "Inicializar su propio repositorio… convierte esta carpeta en un repositorio Git propio en una rama llamada main, deja su .hive fuera de git y hace commit de sus archivos.",
   "git.vc.insideRepo": "Esta carpeta está dentro del repositorio Git en {root}: usa ese o dale a esta carpeta uno propio.",
   "git.vc.noCommitYet": "El repositorio Git de esta carpeta aún no tiene su primer commit.",
   "git.vc.none": "Ninguno",
