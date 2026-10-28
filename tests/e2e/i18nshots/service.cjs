@@ -65,11 +65,14 @@ async function diffTooLarge(ctx) {
   // Its own row, by the file's name (the same in every language), once the list has it: never each row in turn, which
   // ran out of time behind the files earlier screens left changed (HI-1914). Clicked again until its diff is the one shown.
   const own = rows.filter({ hasText: BIG }).first()
+  const started = Date.now()
   const opened = await ctx.lib.until(async () => {
     if (!(await own.count())) return false
     await own.click({ timeout: 2000 }).catch(() => undefined)
     return ((await shownFile.textContent({ timeout: 500 }).catch(() => null)) ?? '').endsWith(BIG)
   }, ctx.hungMs)
+  // How long finding its diff took, for comparing runs (HI-1914).
+  console.log(`${ctx.lang}: diff-too-large: its diff ${opened ? 'shown' : 'not shown'} after ${Date.now() - started} ms, ${await rows.count()} rows`)
   if (!opened) {
     // What the tab showed instead: its rows, the file shown, and the picker's choice.
     const seen = { rows: await rows.allTextContents().catch(() => []), shown: await shownFile.textContent({ timeout: 500 }).catch(() => null), picker: (await picker.count()) ? await picker.first().inputValue().catch(() => null) : null }
