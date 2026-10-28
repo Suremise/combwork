@@ -230,6 +230,9 @@ export interface WorkQueueEntry {
   /** A conflict's hunks, file by file, as the queue's folder had them (HI-1181), bounded. */
   conflicts?: ConflictsRecord
   log?: string
+  /** A red check's return (HI-1924): the check that failed and its run's log, as the outcome recorded them. */
+  check?: string
+  logPath?: string
   transient?: boolean
   at?: string
   /** Queued again unchanged: after a temporary failure, or the user's Retry merge. */
@@ -457,7 +460,7 @@ function queueEntryOf(entry: QueueEntry, facts: readonly Fact[]): WorkQueueEntry
     revision: entry.revision,
     target: entry.target,
     state: entry.state,
-    ...(f ? { failure: f.reason, transient: f.transient, ...(f.files?.length ? { files: f.files } : {}), ...(f.conflicts ? { conflicts: f.conflicts } : {}), ...(f.log ? { log: f.log } : {}) } : {}),
+    ...(f ? { failure: f.reason, transient: f.transient, ...(f.files?.length ? { files: f.files } : {}), ...(f.conflicts ? { conflicts: f.conflicts } : {}), ...(f.check ? { check: f.check } : {}), ...(f.logPath ? { logPath: f.logPath } : {}), ...(f.log ? { log: f.log } : {}) } : {}),
     ...(entry.cancelled ? { cancelled: entry.cancelled } : {}),
     ...(end ? { at: end.at } : {}),
     ...(entry.requeue ? { requeue: entry.requeue } : {})
@@ -529,6 +532,8 @@ export interface WorkBadge {
   underReview: string | null
   /** When its current cycle (on `line`) started: what orders a branch's cards, one after another (#1424). */
   startedAt: string | null
+  /** When this cycle's change was integrated (its merge), else accepted (no merge); null while neither (HI-1926). */
+  endedAt: string | null
   lastSeq: number
 }
 
@@ -591,6 +596,7 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     lines: v.lines,
     underReview: v.stage === 'review' && v.kind !== 'no-code' ? (latest?.revision ?? null) : null,
     startedAt: v.startedAt,
+    endedAt: v.integration?.at ?? v.accepted?.at ?? null,
     lastSeq: v.lastSeq
   }
 }

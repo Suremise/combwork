@@ -66,6 +66,8 @@ Codex's failed turn (26 Oct, #1658): `codex exec --skip-git-repo-check "say ok"`
 
 Values Hive gives a CLI (hook timeouts, Codex's title items and tool timeout) are checked against recordings of the CLI taking them: the hooks arriving (`tests/fixtures/turns-*.json`, `tests/fixtures/console/copilot.json`), Codex's title spinner (`tests/fixtures/codex-startup-0.160.0.json`) and the list above.
 
+Codex's hook listing request (28 Oct, HI-982: `codex.hooks.listMethod` and `codex.hooks.listSeconds`) isn't a recording either: the lane ran no real Codex that night, so `hooks-list-codex-0.164.0.txt` is an excerpt of Codex's source at `rust-v0.164.0` (commit `6aaac69480`), the app server's request named `hooks/list`. The real tier's `codexownhooks` asks the installed Codex's `hooks/list` itself; the fake-Codex e2e (`hooksview`) checks the dialog's request, its timeout and an unknown request's error.
+
 Codex's Windows sandbox values (27 Oct, HI-1893) aren't a recording: running Codex's sandbox set off admin prompts on the maintainer's PC (HI-1874), so `windows-sandbox-codex-0.164.0.txt` is an excerpt of Codex's own source at the `rust-v0.164.0` tag (commit `6aaac69480`), the config type that names `unelevated`. Hive's fake-Codex e2e (`connections-codex`) checks the `-c windows.sandbox="unelevated"` it passes; a real run of it belongs in Windows Sandbox.
 
 Codex's new-line keys (28 Oct, HI-1327): `newline-keys-codex-0.164.0.txt` holds two things, each labelled as what it is.

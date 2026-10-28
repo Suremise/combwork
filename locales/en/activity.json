@@ -7,6 +7,22 @@
     "defaultMessage": "All",
     "description": "The first entry of the Activity tab's Agents and Cards menus: no filter, everything."
   },
+  "activity.block.asked": {
+    "defaultMessage": "{other, select, yes {Edit waiting for your OK: {file} is locked by an agent of another project} other {Edit waiting for your OK: {file} is locked by {holder}}}",
+    "description": "In the Activity tab, under Now: Hive's file lock (Ask me) holds the agent's edit of a file another agent is editing until the user allows it. {file} is the file's path; {holder} the agent editing it."
+  },
+  "activity.block.blocked": {
+    "defaultMessage": "{other, select, yes {Edit blocked: {file} is locked by an agent of another project} other {Edit blocked: {file} is locked by {holder}}}",
+    "description": "In the Activity tab, under Now: Hive's file lock blocked the agent's edit of a file another agent is editing, while that stands. {file} is the file's path; {holder} the agent editing it."
+  },
+  "activity.block.for": {
+    "defaultMessage": "Hive's file lock · {time}",
+    "description": "The second line of a lock block in the Activity tab: what blocked the edit, and for how long it has stood ({time}, such as \"2 min\")."
+  },
+  "activity.block.tip": {
+    "defaultMessage": "Shown while the lock stands: it goes once the other agent finishes, the agent tries again or moves on, or its turn ends. Its history is in the agent's ⋯ → Hooks…",
+    "description": "Tooltip on a lock block in the Activity tab. ⋯ → Hooks… is the agent menu item: keep the arrow and the dots."
+  },
   "activity.cards": {
     "defaultMessage": "{n, plural, =0 {All cards} one {# card} other {# cards}}",
     "description": "A menu button above the Activity tab: only the agents working on these cards in progress have a tab (several can be ticked); with none ticked, all."
@@ -214,6 +230,62 @@
   "activity.toolFor": {
     "defaultMessage": "{summary} · {time}",
     "description": "A tool call node's second line in the Activity tab while it runs: what it does ({summary}, from the agent, such as a command) and how long it has run so far ({time}: \"40 s\", \"4 min\")."
+  },
+  "activity.workspace.agentIn": {
+    "defaultMessage": "{project} · {agent}",
+    "description": "An entry of the Activity view's Agents menu: an agent ({agent}) and its project ({project})."
+  },
+  "activity.workspace.assistant": {
+    "defaultMessage": "Assistant",
+    "description": "The Assistant's group heading among the Activity view's agent tabs (its tabs grouped by project; the Hive Assistant is its own group)."
+  },
+  "activity.workspace.cardNobody": {
+    "defaultMessage": "Nobody is working on {card} now. The card has its history.",
+    "description": "Activity's workspace level opened from a card ({card}: its key) when no running agent works on it now: past work is read on the card itself."
+  },
+  "activity.workspace.clearCard": {
+    "defaultMessage": "Show every agent",
+    "description": "Tooltip of the button on Activity's \"Working on HI-12\" chip: drops the card's filter."
+  },
+  "activity.workspace.empty": {
+    "defaultMessage": "Nothing is running in this workspace. Start an agent to see what it runs here.",
+    "description": "Activity's workspace level when no agent of any project runs anything."
+  },
+  "activity.workspace.forCard": {
+    "defaultMessage": "Card {card}",
+    "description": "A chip above Activity's workspace level when it was opened from a card, naming the filter (not saying anyone works on it): only the agents working on that card ({card}: its key, such as HI-12) now have tabs."
+  },
+  "activity.workspace.heading": {
+    "defaultMessage": "Activity",
+    "description": "Activity's workspace level (the activity bar's Activity view): what every project's agents run now, their tabs grouped by project."
+  },
+  "activity.workspace.noWorkspace": {
+    "defaultMessage": "Open a workspace to see what its agents run.",
+    "description": "The Activity view's sidebar with no workspace open."
+  },
+  "activity.workspace.panelTip": {
+    "defaultMessage": "What the workspace's agents run now. The whole workspace shows every project's running agents together; a project opens its own Activity tab.",
+    "description": "The info tip beside the Activity view's sidebar heading."
+  },
+  "activity.workspace.projectTip": {
+    "defaultMessage": "Open {project}'s Activity tab.",
+    "description": "Tooltip of a project's row in the Activity view's sidebar: opens that project's own Activity tab. {project} is its name."
+  },
+  "activity.workspace.projects": {
+    "defaultMessage": "Projects",
+    "description": "A section heading in the Activity view's sidebar, over a row per project."
+  },
+  "activity.workspace.showIn": {
+    "defaultMessage": "Show in Activity",
+    "description": "A button in a Progress panel run's details, and an entry of a lane's menu: opens Activity's workspace level on that run's agent (or the lane's builder and reviewer), what it runs now."
+  },
+  "activity.workspace.whole": {
+    "defaultMessage": "Whole workspace",
+    "description": "A row of the Activity view's sidebar: every project's running agents together (as Performance's Whole workspace)."
+  },
+  "activity.workspace.wholeTip": {
+    "defaultMessage": "Every project's running agents, grouped by project, and the Assistant when it runs.",
+    "description": "Tooltip of the Activity view's Whole workspace row."
   },
   "activity.writing": {
     "defaultMessage": "Writing…",

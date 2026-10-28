@@ -3613,6 +3613,9 @@ async function team(c) {
 /**
  * Two running lanes: Coder and Implementer on greet.js (#a, #b), Builder2 and Reviewer2 on the README (#c, and #d if
  * given). Nothing in Doing unless asked (`aColumn`): the agents aren't running, and a card in Doing would be stalled.
+ * Each lane is registered as its builder registers its own (hive_lane start, with its own token), which starts nobody:
+ * since HI-1900 a lane a script records is launched, its agents started on its brief (HI-1939). So each builder is
+ * started for its token, registers its lane, and is stopped again, as the scenarios expect them.
  */
 async function twoLanes(c, { d = false, aColumn = 'todo' } = {}) {
   await team(c)
@@ -3620,9 +3623,14 @@ async function twoLanes(c, { d = false, aColumn = 'todo' } = {}) {
   await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
   await c.card('c', { title: 'README: usage', description: 'README.md: a Usage section with one example of greet().', agent: 'builder2' })
   if (d) await c.card('d', { title: 'README: licence line', description: 'README.md: a line saying the licence is MIT.', agent: 'builder2' })
-  for (const [builder, reviewer, cards] of [['Coder', 'Implementer', [c.cards.a, c.cards.b]], ['Builder2', 'Reviewer2', [c.cards.c, ...(d ? [c.cards.d] : [])]]]) {
-    const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder, reviewer, cards, name: `${builder}'s lane` })
-    if (r.status !== 200) throw new Error(`lane: ${r.text}`)
+  for (const [key, builder, reviewer, cards] of [['coder', 'Coder', 'Implementer', [c.cards.a, c.cards.b]], ['builder2', 'Builder2', 'Reviewer2', [c.cards.c, ...(d ? [c.cards.d] : [])]]]) {
+    await c.startAgent(key)
+    const r = await c.as(key, 'POST', '/v1/lanes', { project: 'alpha', builder, reviewer, cards, name: `${builder}'s lane` })
+    if (r.status !== 200) throw new Error(`lane: ${r.status} ${JSON.stringify(r.body)}`)
+    const id = c.agents[key].id
+    await c.inv('session:stop', c.alpha, id)
+    const lib = require('../e2e/lib.cjs')
+    if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error(`setup: ${builder} didn't stop after registering its lane`)
   }
 }
 /** What Hive's card wake to the Assistant ends with while lanes run (src/shared/watch.ts, the same: a unit test checks). */

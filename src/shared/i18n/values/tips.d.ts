@@ -3,10 +3,14 @@
 interface HiveMessageValues {
   'tips.activityTab.text': undefined
   'tips.activityTab.title': undefined
+  'tips.activityWorkspace.text': undefined
+  'tips.activityWorkspace.title': undefined
   'tips.advancedSettings.text': undefined
   'tips.advancedSettings.title': undefined
   'tips.agentConsole.text': undefined
   'tips.agentConsole.title': undefined
+  'tips.agentHooks.text': undefined
+  'tips.agentHooks.title': undefined
   'tips.agentInSlot.text': undefined
   'tips.agentInSlot.title': undefined
   'tips.agentLayouts.text': undefined
@@ -111,6 +115,8 @@ interface HiveMessageValues {
   'tips.cardAttachmentsCleanup.title': undefined
   'tips.cardCost.text': { example: string | number }
   'tips.cardCost.title': undefined
+  'tips.cardCostRounds.text': undefined
+  'tips.cardCostRounds.title': undefined
   'tips.cardDecisions.text': undefined
   'tips.cardDecisions.title': undefined
   'tips.cardLinks.text': undefined
@@ -180,6 +186,8 @@ interface HiveMessageValues {
   'tips.filesTab.title': undefined
   'tips.flightRecorder.text': undefined
   'tips.flightRecorder.title': undefined
+  'tips.focusedTests.text': undefined
+  'tips.focusedTests.title': undefined
   'tips.followUpCheck.text': undefined
   'tips.followUpCheck.title': undefined
   'tips.forYou.text': undefined
@@ -278,6 +286,8 @@ interface HiveMessageValues {
   'tips.mergeQueueFolder.title': undefined
   'tips.mergeQueuePanel.text': undefined
   'tips.mergeQueuePanel.title': undefined
+  'tips.mergeQueueRecent.text': undefined
+  'tips.mergeQueueRecent.title': undefined
   'tips.mergeRebase.text': undefined
   'tips.mergeRebase.title': undefined
   'tips.mergeSlot.text': undefined
@@ -424,6 +434,8 @@ interface HiveMessageValues {
   'tips.teamTemplates.title': undefined
   'tips.templateNames.text': undefined
   'tips.templateNames.title': undefined
+  'tips.templateWorkflow.text': undefined
+  'tips.templateWorkflow.title': undefined
   'tips.testedClis.text': undefined
   'tips.testedClis.title': undefined
   'tips.tileStrip.text': undefined

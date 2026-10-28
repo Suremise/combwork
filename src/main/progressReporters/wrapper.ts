@@ -16,7 +16,8 @@ with the time it usually takes, and the card and revision it ran for.
   --card <card>       the card it runs for ("#1061", quoted); without it, the card you are working on (yours in Doing)
   --revision <commit> the commit it runs on: it must be what is checked out here, or nothing runs; without it,
                       what is checked out when it starts
-  --check <name>      runs the project's command for that check (the project's options name it), not one of yours
+  --check <name>      runs the project's command for that check (the project's options name it), not one of yours;
+                      focused:<test> (a card's focused test) runs your command after -- as that test's check
   --isolated          with --check: runs it in a check copy of its own at the card's revision, which nothing else
                       writes, so another agent's edits here can't spoil it (waits for a copy when none is free)
 A line the command prints like
@@ -47,6 +48,8 @@ const VALUED = /^--(title|card|revision|check)(?:=([\s\S]*))?$/
 export function parseArgs(argv: string[]): WrapperArgs {
   const opts: WrapperOptions = {}
   const done = (command: string[], afterDashes: boolean): WrapperArgs => {
+    // A focused test's check (HI-1367, `focused:<test>`) runs a command of your own; any other check, the project's.
+    if (opts.check !== undefined && opts.check.startsWith('focused:')) return command.length ? { ...opts, command } : { error: `--check ${opts.check} runs the command you give after -- for that test.` }
     if (opts.check !== undefined) return command.length ? { error: `--check runs the project's command for ${opts.check || 'the check'}: give no command of your own.` } : { ...opts, command }
     if (opts.isolated) return { error: '--isolated runs a check in a copy of its own: use it with --check <name>.' }
     if (command.length) return { ...opts, command }
@@ -615,7 +618,8 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
       return 2
     }
   }
-  const checkCommand = link?.check?.command
+  // A focused test's check (HI-1367) has no configured command: the one given after `--` runs.
+  const checkCommand = link?.check?.command || undefined
   const command = checkCommand !== undefined ? [checkCommand] : parsed.command
   const spec = checkCommand !== undefined ? shellSpec(checkCommand, io.env) : spawnSpec(parsed.command, io.env, io.cwd)
   const env = commandEnv(io.env, io.viaElectron ?? !!process.versions.electron)

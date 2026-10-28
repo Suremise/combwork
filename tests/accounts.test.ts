@@ -897,8 +897,14 @@ describe("a workspace's accounts", () => {
           mkdirSync(join(f, '.hive'), { recursive: true })
           writeFileSync(join(f, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: `a-${i}`, name: `Agent ${i}`, provider: 'claude-code' }] }))
         }
-        await w.refresh()
+        const want = names.slice(0, n).join()
+        await refreshedTo((info) => info.projects.filter((p) => p.agents.length).map((p) => p.name).sort().join() === want)
       }
+      // The workspace as written: a refresh can hand back the info it had, when Hive wrote a project's config after the
+      // refresh read it (a new project given its id: #999's guard), with a refresh of its own to follow (HI-1919).
+      const refreshedTo = (shows: (info: Awaited<ReturnType<typeof w.refresh>>) => boolean): Promise<void> => vi.waitFor(async () => expect(shows(await w.refresh())).toBe(true), { timeout: HUNG_MS })
+      /** alpha's agent's own connection, as the workspace shows it (none: undefined). */
+      const alphaConnection = (info: Awaited<ReturnType<typeof w.refresh>>) => info.projects.find((p) => p.name === 'alpha')?.agents[0]?.connection
       beforeEach(async () => {
         held = []
         spy = vi.spyOn(provider('claude-code'), 'connectionTrusts').mockImplementation((dir, targets) => new Promise((answer) => held.push({ home: dir, projects: targets.length, answer })))
@@ -929,7 +935,7 @@ describe("a workspace's accounts", () => {
           mkdirSync(join(f, '.hive'), { recursive: true })
           writeFileSync(join(f, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: `a-${i}`, name: `Agent ${i}`, ...agentsOf[i] }] }))
         }
-        await w.refresh()
+        await refreshedTo((info) => info.projects.filter((p) => p.agents.length).length === 3)
         await vi.waitFor(() => expect(row().trust?.checking).toBe(true), { timeout: HUNG_MS })
         // Its set unchanged by them: no read of them, and its answer, once in, names alpha alone.
         mine()[0].answer([false, true])
@@ -954,7 +960,7 @@ describe("a workspace's accounts", () => {
         expect(others(other)).toHaveLength(0)
         // alpha's agent given Other as its own: alpha now counts for Other, and no longer for this one.
         writeFileSync(join(folders[0], '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-0', name: 'Agent 0', provider: 'claude-code', connection: other.id }] }))
-        await w.refresh()
+        await refreshedTo((info) => alphaConnection(info) === other.id)
         rowOf(other.id)
         await vi.waitFor(() => expect(others(other).map((h) => h.projects)).toEqual([1]), { timeout: HUNG_MS })
         await vi.waitFor(() => expect(mine().at(-1)!.projects).toBe(1), { timeout: HUNG_MS })
@@ -963,7 +969,7 @@ describe("a workspace's accounts", () => {
         // and the Assistant's home are Other's now, this one counts none.
         writeFileSync(join(folders[0], '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-0', name: 'Agent 0', provider: 'claude-code' }] }))
         accounts.moveConnection(other.id, 0)
-        await w.refresh()
+        await refreshedTo((info) => alphaConnection(info) === undefined)
         rowOf(other.id)
         await vi.waitFor(() => expect(others(other).at(-1)!.projects).toBe(2), { timeout: HUNG_MS })
         await vi.waitFor(() => expect(rowOf(a.id).trust).toEqual({ pending: [], unknown: false }), { timeout: HUNG_MS })

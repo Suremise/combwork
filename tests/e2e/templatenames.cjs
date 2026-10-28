@@ -12,6 +12,11 @@ const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
+// Only its agents (HI-1910): its workflow, ticked by default, would open Version Control → Workflow after the load.
+const agentsOnly = async (d) => {
+  const box = d.locator('[data-workflow-apply]')
+  if (await box.count()) await box.uncheck()
+}
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 30000
 
@@ -103,6 +108,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
       const d = await openLoad('Team 3×3')
       const want = team.map((n) => `${key}-${n}`)
       check(`${name}: Team 3×3's names are ${key}-B1…, none marked, Load template ready`, JSON.stringify(await boxes(d)) === JSON.stringify(want) && (await d.locator('.template-plan-table .field-error').count()) === 0 && (await loadButton(d).isEnabled()), JSON.stringify(await boxes(d)))
+      await agentsOnly(d)
       await loadButton(d).click()
       check(`${name}: loaded with those names`, !!(await until(async () => JSON.stringify(names(p)) === JSON.stringify(want), HUNG_MS)), JSON.stringify(names(p)))
     }
@@ -128,7 +134,8 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await save('AM fixed', false)
     const file = (f) => JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'templates', f), 'utf8'))
     check('…ticked: patterns, and the pairs by numbered name', !!(await until(async () => fs.existsSync(path.join(ws, '.hive', 'templates', 'am-team.json')), HUNG_MS)) && JSON.stringify(file('am-team.json').agents.map((a) => a.name)) === JSON.stringify(['{key}-B{n}', '{key}-B{n}', '{key}-B{n}', '{key}-R{n}', '{key}-R{n}', '{key}-R{n}']) && file('am-team.json').pairs?.[0]?.builder === '{key}-B1', JSON.stringify(file('am-team.json').agents.map((a) => a.name)))
-    check('…unticked: fixed names', JSON.stringify(file('am-fixed.json').agents.map((a) => a.name)) === JSON.stringify(team.map((n) => `AM-${n}`)))
+    // Written once the save is done (HI-1910: it reads the project's workflow first), never read before.
+    check('…unticked: fixed names', !!(await until(async () => fs.existsSync(path.join(ws, '.hive', 'templates', 'am-fixed.json')), HUNG_MS)) && JSON.stringify(file('am-fixed.json').agents.map((a) => a.name)) === JSON.stringify(team.map((n) => `AM-${n}`)))
 
     // --- The pattern template edited in the Templates view, its description only: shown with amberlight's names, edited
     // as its patterns, saved with them and its pairs unchanged (HR3, #1440 round 1: the editor once saved the names shown).
@@ -151,7 +158,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // --- The fixed-name template into apiary: every name is amberlight's, so free ones are filled in (AP-B1…).
     await select('apiary')
     let d = await openLoad('AM fixed')
-    check('every name taken by amberlight: free names filled in (the key swapped), none marked, Load template ready', JSON.stringify(await boxes(d)) === JSON.stringify(team.map((n) => `AP-${n}`)) && (await d.locator('.template-plan-table .field-error').count()) === 0 && (await loadButton(d).isEnabled()) && /free names are filled in below/.test(await d.locator('[data-names-taken]').innerText()), JSON.stringify(await boxes(d)))
+    check('every name taken by amberlight: free names filled in (the key swapped), none marked, Load template ready', JSON.stringify(await boxes(d)) === JSON.stringify(team.map((n) => `AP-${n}`)) && (await d.locator('.template-plan-table .field-error').count()) === 0 && (await loadButton(d).isEnabled()) && /Free names are filled in below/.test(await d.locator('[data-names-taken]').innerText()), JSON.stringify(await boxes(d)))
     // One edited to a name amberlight has: marked, Load template greyed out; fixed, ready again.
     const second = d.locator('.template-plan-name-input').nth(1)
     await second.fill('AM-B2')
@@ -193,12 +200,14 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await until(async () => await loadButton(d).isDisabled(), HUNG_MS)
     await d.locator('.template-plan-name-input').nth(1).fill('AP-B2')
     check('…fixed: Load template ready again', !!(await until(async () => (await d.locator('.template-plan-table .field-error').count()) === 0 && (await loadButton(d).isEnabled()), HUNG_MS)))
+    await agentsOnly(d)
     await loadButton(d).click()
     check('loaded into apiary with its own names', !!(await until(async () => JSON.stringify(names(apiary)) === JSON.stringify(team.map((n) => `AP-${n}`)), HUNG_MS)), JSON.stringify(names(apiary)))
     check('…paired under those names', JSON.stringify(agentsOf(apiary).map((a) => a.pairedWith ?? null)) === JSON.stringify(['AP-R1', 'AP-R2', 'AP-R3', 'AP-B1', 'AP-B2', 'AP-B3']), JSON.stringify(agentsOf(apiary).map((a) => a.pairedWith ?? null)))
     // The edited pattern template into apiary: apiary's key, paired the same, Load template ready at once.
     d = await openLoad('AM team')
     check('the edited pattern template loads into apiary with its names', JSON.stringify(await boxes(d)) === JSON.stringify(team.map((n) => `AP-${n}`)) && (await loadButton(d).isEnabled()), JSON.stringify(await boxes(d)))
+    await agentsOnly(d)
     await loadButton(d).click()
     check('…paired as saved', !!(await until(async () => JSON.stringify(agentsOf(apiary).map((a) => a.pairedWith ?? null)) === JSON.stringify(['AP-R1', 'AP-R2', 'AP-R3', 'AP-B1', 'AP-B2', 'AP-B3']), HUNG_MS)), JSON.stringify(agentsOf(apiary).map((a) => a.pairedWith ?? null)))
 

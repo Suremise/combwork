@@ -169,9 +169,9 @@ function intentTools(): Tool[] {
       'hive_submit',
       'submit',
       'Submit a card in Doing for review: hands its committed work to review (a code card in Git needs its work committed; submitting never commits), and it moves on (to Review, or past it where its project has no review). Writes summary as a comment. A revision already reviewed needs note (what is different). In Review, a commit asked for while it is reviewed goes in with followUp. As a lane\'s builder, Hive then watches it for you, for its review. Replies with warnings (files outside its paths, other agents\' changes in a shared folder) and the watch.',
-      { summary: { type: 'string', description: 'What was done, a line first.' }, revision, note: { type: 'string', description: 'For a revision already reviewed: what this submission adds (an explanation).' }, paths: { type: 'array', items: { type: 'string' }, description: 'The files the work changed, relative to the project, for a project with no version control.' }, followUp: { type: 'boolean', description: 'Its builder, the card in Review: a commit its reviewer asked for becomes the revision under review. It stays in Review, no round counted; its reviewer is woken to start its review again.' } },
+      { summary: { type: 'string', description: 'What was done, a line first.' }, revision, note: { type: 'string', description: 'For a revision already reviewed: what this submission adds (an explanation).' }, paths: { type: 'array', items: { type: 'string' }, description: 'The files the work changed, relative to the project, for a project with no version control.' }, followUp: { type: 'boolean', description: 'Its builder, the card in Review: a commit its reviewer asked for becomes the revision under review. It stays in Review, no round counted; its reviewer is woken to start its review again.' }, tests: { type: 'array', items: { type: ['string', 'object'] }, description: "Where the project runs each card's focused tests at merge: tests the change needs beyond those its picker chooses, or, when it can't choose, all of them (reviewed with the change). Each the project's test id, or { id, needs } (needs: unit, fake, real, packaged)." } },
       ['summary'],
-      (a) => ({ summary: a.summary, revision: a.revision, note: a.note, paths: a.paths, followUp: a.followUp })
+      (a) => ({ summary: a.summary, revision: a.revision, note: a.note, paths: a.paths, followUp: a.followUp, tests: a.tests })
     ),
     intent('hive_declare_paths', 'declare-paths', "Declare the paths a card's work will change (relative to the project), for a folder shared with other agents. Moves nothing.", { paths: { type: 'array', items: { type: 'string' } } }, ['paths'], (a) => ({ paths: a.paths })),
     intent('hive_start_review', 'start-review', "Start reviewing a card in Review: you are its reviewer; it stays where it is. Replies with the revision, base and files to review, and the review copy to read and run commands in, when the project has them.", { submission }, [], (a) => ({ submission: a.submission })),
@@ -182,6 +182,14 @@ function intentTools(): Tool[] {
       { pass: { type: 'boolean' }, comment: { type: 'string', description: 'The verdict, a line first; findings numbered.' }, failKind: { type: 'string', enum: ['content', 'explanation'], description: 'A fail: the work itself (content) or only how it was explained (explanation).' }, submission },
       ['pass', 'comment'],
       (a) => ({ pass: a.pass, comment: a.comment, failKind: a.failKind, submission: a.submission })
+    ),
+    intent(
+      'hive_focused_skip',
+      'focused-skip',
+      "As a card's reviewer, decide on focused tests its merge skipped for their environment (a usage limit, a sign-in, the network), when Hive asks you: merge true merges it with them skipped, false returns it to its builder. why is recorded; the user can override.",
+      { request: { type: 'string', description: 'The request Hive named ("HI-12/r40").' }, merge: { type: 'boolean' }, why: { type: 'string', description: 'Why, in a sentence.' } },
+      ['request', 'merge', 'why'],
+      (a) => ({ request: a.request, merge: a.merge, why: a.why })
     ),
     intent('hive_report_merge', 'report-merge', "Report a card's work merged, where its agent merges it or merges aren't checked: Hive checks the merge is in its target (unless the project doesn't check merges) and moves it to Done.", { result: { type: 'string', description: 'The merge commit.' } }, [], (a) => ({ result: a.result })),
     intent(

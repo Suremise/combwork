@@ -6,7 +6,7 @@ import { durationText } from '@shared/tasks'
 import type { ProjectInfo, SessionListItem } from '@shared/types'
 import { call, errorMessage } from '../api'
 import * as actions from '../actions'
-import { confirm, notify, openInSessionsTab, revealAgent, set, useStore } from '../store'
+import { confirm, isAssistantPath, notify, openInSessionsTab, revealAgent, set, setAssistantOpen, useStore } from '../store'
 import { Icon, IconButton, statusText, useContextMenu, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, saveActivityView, type ActivityView } from '../activityView'
@@ -15,17 +15,17 @@ import { boundedQueue, latestOnly } from '@shared/coalesce'
 import { fmt, msg, tr } from '@shared/i18n'
 
 /** How often what runs now is read, and live changes are drawn, while the tab is shown (#1254: batched, about once a second). */
-const TICK_MS = 1000
+export const TICK_MS = 1000
 /** The session list read again every this many ticks (and when an agent starts or stops). */
-const LIST_EVERY = 5
+export const LIST_EVERY = 5
 /** Sessions whose turns are read at once. */
-const TURNS_AT_ONCE = 4
+export const TURNS_AT_ONCE = 4
 /** Live, how long what ended takes to fade out before it leaves (HI-1743); the CSS fade is as long. */
-const FADE_MS = 1500
+export const FADE_MS = 1500
 
 /** Each project's session list as last read here: the tab opens on it at once and draws the fresh one when it comes. */
 const lastLists = new Map<string, SessionListItem[]>()
-const NO_NOW: ActivityNow = { launches: [], tasks: [] }
+export const NO_NOW: ActivityNow = { launches: [], tasks: [] }
 
 /**
  * Render times of the tab (ms, from its render to its layout effect), the latest last: the Activity tab's measurement
@@ -44,7 +44,7 @@ interface Reads {
 }
 
 /** An activity state as an agent state mark: failed is stalled, done idle. */
-const markOf = (s: ActivityState): AgentState => (s === 'failed' ? 'stalled' : s === 'done' ? 'idle' : s)
+export const markOf = (s: ActivityState): AgentState => (s === 'failed' ? 'stalled' : s === 'done' ? 'idle' : s)
 
 /**
  * A project's Activity tab (#1254, HI-1743): what runs now, a tab per running agent, each its current work as a list:
@@ -410,14 +410,14 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
 }
 
 /** One agent's work (HI-1743): Now (its prompt, then what it does), its subagents and background tasks, its processes. */
-function PartView({ project, part: p, many, selected, onSelect, showOwn, onShowOwn }: { project: ProjectInfo; part: ActivityPart; many: boolean; selected: string | null; onSelect: (key: string) => void; showOwn: boolean; onShowOwn: (v: boolean) => void }) {
+export function PartView({ project, part: p, many, selected, onSelect, showOwn, onShowOwn }: { project: ProjectInfo; part: ActivityPart; many: boolean; selected: string | null; onSelect: (key: string) => void; showOwn: boolean; onShowOwn: (v: boolean) => void }) {
   const row = (n: ActivityNode) => <Row key={n.key} node={n} selected={selected === n.key} onSelect={onSelect} />
   return (
     <section className="activity-part" data-part={p.agentId}>
       {many && (
         <div className="activity-part-head">
           <StateMark state={markOf(p.state)} />
-          <button className="link" onClick={() => revealAgent(project, p.agentId)}>
+          <button className="link" onClick={() => showActivityAgent(project, p.agentId)}>
             {p.name}
           </button>
           {p.role && <span className="faint">{tr(M.role, { role: p.role })}</span>}
@@ -445,6 +445,16 @@ function PartView({ project, part: p, many, selected, onSelect, showOwn, onShowO
           </div>
         </div>
       )}
+      {p.blocks.map((b) => (
+        // A lock block standing now (HI-982): live only, gone once its decision ends; the Hooks dialog keeps the history.
+        <div key={b.key} className="activity-row act-waiting" data-block={b.kind} title={tr(M.blockTip)}>
+          <Icon name="lock" />
+          <div className="activity-row-text">
+            <div className="activity-row-title">{tr(b.kind === 'asked' ? M.blockAsked : M.blockBlocked, { file: b.file, holder: b.holder ?? '', other: b.holder === null ? 'yes' : 'no' })}</div>
+            <div className="activity-row-sub faint">{tr(M.blockFor, { time: ranFor(b.at) })}</div>
+          </div>
+        </div>
+      ))}
       {p.subagents.length > 0 && (
         <>
           <h3 className="activity-group" data-group="subagents">
@@ -468,6 +478,12 @@ function PartView({ project, part: p, many, selected, onSelect, showOwn, onShowO
       )}
     </section>
   )
+}
+
+/** Shows an agent of a session host: a project's pane, or the Assistant's panel (HI-1664: the workspace level has it). */
+function showActivityAgent(project: ProjectInfo, agentId: string): void {
+  if (isAssistantPath(project.path)) setAssistantOpen(true)
+  else revealAgent(project, agentId)
 }
 
 /** An item as a row: its icon, what it is, a line about it, and a pulse while it works. */
@@ -540,7 +556,7 @@ const fmtWhen = (iso: string | undefined | null): string => {
 }
 
 /** The selected node's details: its status, its input exactly (masked like the log), its last action, and what can be done. */
-function Details({ project, node, onClose }: { project: ProjectInfo; node: ActivityNode; onClose: () => void }) {
+export function Details({ project, node, onClose }: { project: ProjectInfo; node: ActivityNode; onClose: () => void }) {
   const { title, state } = describe(node)
   const [detail, setDetail] = useState<ActivityDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -652,7 +668,7 @@ function EndProcessButton({ project, agentId, pid, created, label }: { project: 
 }
 
 /** Whether the window is shown (not minimised or hidden). */
-function usePageVisible(): boolean {
+export function usePageVisible(): boolean {
   const [v, setV] = useState(document.visibilityState === 'visible')
   useEffect(() => {
     const on = (): void => setV(document.visibilityState === 'visible')
@@ -676,6 +692,10 @@ const M = {
   showOwn: msg({ id: 'activity.showOwn', defaultMessage: '{n, plural, =0 {Show the agent’s own processes} one {Show the agent’s own process (#)} other {Show the agent’s own processes (#)}}', description: "A checkbox beside the Activity tab's Processes heading: also shows the agent's own processes (its CLI, the terminal hosting it, Hive's tool server for it), hidden by default. {n}: how many are hidden." }),
   thinking: msg({ id: 'activity.thinking', defaultMessage: 'Thinking…', description: 'In the Activity tab, what an agent is doing when it works with no tool call under way and nothing written yet in its turn.' }),
   writing: msg({ id: 'activity.writing', defaultMessage: 'Writing…', description: 'In the Activity tab, what an agent is doing when it works with no tool call under way, after it started writing its reply.' }),
+  blockBlocked: msg({ id: 'activity.block.blocked', defaultMessage: '{other, select, yes {Edit blocked: {file} is locked by an agent of another project} other {Edit blocked: {file} is locked by {holder}}}', description: "In the Activity tab, under Now: Hive's file lock blocked the agent's edit of a file another agent is editing, while that stands. {file} is the file's path; {holder} the agent editing it." }),
+  blockAsked: msg({ id: 'activity.block.asked', defaultMessage: '{other, select, yes {Edit waiting for your OK: {file} is locked by an agent of another project} other {Edit waiting for your OK: {file} is locked by {holder}}}', description: "In the Activity tab, under Now: Hive's file lock (Ask me) holds the agent's edit of a file another agent is editing until the user allows it. {file} is the file's path; {holder} the agent editing it." }),
+  blockFor: msg({ id: 'activity.block.for', defaultMessage: "Hive's file lock · {time}", description: 'The second line of a lock block in the Activity tab: what blocked the edit, and for how long it has stood ({time}, such as "2 min").' }),
+  blockTip: msg({ id: 'activity.block.tip', defaultMessage: "Shown while the lock stands: it goes once the other agent finishes, the agent tries again or moves on, or its turn ends. Its history is in the agent's ⋯ → Hooks…", description: 'Tooltip on a lock block in the Activity tab. ⋯ → Hooks… is the agent menu item: keep the arrow and the dots.' }),
   notRunning: msg({ id: 'activity.notRunning', defaultMessage: 'Not running', description: "In the Activity tab, under Now, for an agent that isn't running." }),
   role: msg({ id: 'activity.role', defaultMessage: '{role, select, builder {builder} other {reviewer}}', description: "Beside an agent's name in the Activity tab when a card's builder and reviewer are both shown: its role on the card. Lower case." }),
   promptFor: msg({ id: 'activity.promptFor', defaultMessage: 'Prompt · {time} ago', description: "The line under an agent's prompt in the Activity tab: when it was given, as a duration ({time}: \"4 min\")." }),
@@ -719,3 +739,6 @@ const M = {
   ended: msg({ id: 'activity.ended', defaultMessage: 'Ended {label}', description: 'A notification: the process ({label}: what it ran) was ended from the Activity tab.' }),
   notEnded: msg({ id: 'activity.notEnded', defaultMessage: '{why, select, notOwn {{label} is no longer one of this agent\'s processes: nothing was ended.} cli {{label} is the agent\'s CLI: use Stop to end it.} other {{label} could not be ended: it may still run.}}', description: "A notification after End Process in the Activity tab when it didn't end it: it had ended or isn't the agent's (notOwn), it is the agent's CLI (cli), or ending it failed. {label} is what it runs." })
 }
+
+/** The tab's messages, for the workspace level's (HI-1664) same rows and details. */
+export const ACTIVITY_M = M

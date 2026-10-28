@@ -183,6 +183,10 @@ interface HiveMessageValues {
   'settings.advanced.codex.hooks.knownEvents.title': undefined
   'settings.advanced.codex.hooks.knownFields.desc': undefined
   'settings.advanced.codex.hooks.knownFields.title': undefined
+  'settings.advanced.codex.hooks.listMethod.desc': undefined
+  'settings.advanced.codex.hooks.listMethod.title': undefined
+  'settings.advanced.codex.hooks.listSeconds.desc': undefined
+  'settings.advanced.codex.hooks.listSeconds.title': undefined
   'settings.advanced.codex.hooks.preToolUseTimeoutSeconds.desc': undefined
   'settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title': undefined
   'settings.advanced.codex.hooks.timeoutSeconds.desc': { most: number }
@@ -310,6 +314,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.copies.review.title': undefined
   'settings.advanced.hive.disableHardwareAcceleration.desc': undefined
   'settings.advanced.hive.disableHardwareAcceleration.title': undefined
+  'settings.advanced.hive.focused.pickSeconds.desc': undefined
+  'settings.advanced.hive.focused.pickSeconds.title': undefined
   'settings.advanced.hive.guidance.desc': undefined
   'settings.advanced.hive.guidance.title': undefined
   'settings.advanced.hive.heapSnapshotNearLimit.desc': undefined
@@ -328,6 +334,10 @@ interface HiveMessageValues {
   'settings.advanced.hive.lanes.endWaitMinutes.title': undefined
   'settings.advanced.hive.lanes.gentleEnd.desc': undefined
   'settings.advanced.hive.lanes.gentleEnd.title': undefined
+  'settings.advanced.hive.lanes.waitReviewerMinutes.desc': undefined
+  'settings.advanced.hive.lanes.waitReviewerMinutes.title': undefined
+  'settings.advanced.hive.lanes.waitYouMinutes.desc': undefined
+  'settings.advanced.hive.lanes.waitYouMinutes.title': undefined
   'settings.advanced.hive.mcp.connectSeconds.desc': undefined
   'settings.advanced.hive.mcp.connectSeconds.title': undefined
   'settings.advanced.hive.mcp.replySeconds.desc': undefined
@@ -354,6 +364,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.queue.checkedOutTarget.auto': undefined
   'settings.advanced.hive.queue.checkedOutTarget.desc': undefined
   'settings.advanced.hive.queue.checkedOutTarget.title': undefined
+  'settings.advanced.hive.queue.focusedJobs.desc': undefined
+  'settings.advanced.hive.queue.focusedJobs.title': undefined
   'settings.advanced.hive.queue.networkCodes.desc': undefined
   'settings.advanced.hive.queue.networkCodes.title': undefined
   'settings.advanced.hive.queue.signSeconds.desc': undefined

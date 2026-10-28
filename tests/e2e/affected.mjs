@@ -5,8 +5,14 @@
 // tests/e2e/README.md). Suites that start a real CLI (the real tier) are picked only when a change touches what they
 // cover (an area naming them, or REAL_TIER), which is when a merge also needs the real tier. tests/e2esuites.test.ts
 // checks that every suite is in an area, every source file is covered, and what no area names falls back to every suite.
-import { execFileSync } from 'child_process'
+//
+// `node tests/e2e/affected.mjs --pick` is the hive project's focused-test picker (HI-1367, the merge queue's "each
+// card's focused tests"): see pickTests and UNIT_SCANS below. Imported (run.mjs, the unit tests), it does nothing.
+import { execFileSync, spawnSync } from 'child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { createRequire } from 'module'
+import { join, resolve } from 'path'
+import { pathToFileURL } from 'url'
 
 const runContext = createRequire(import.meta.url)('./runContext.cjs')
 
@@ -194,7 +200,8 @@ export const AREAS = [
   { paths: ['src/shared/connectionDefaults.ts', 'src/main/connectionMoves.ts', 'src/renderer/src/components/ConnectionDefaults.tsx', 'tests/e2e/connectiondefaults.cjs'], suites: ['connectiondefaults', 'connections', 'context'] },
   // The agent rows and templates name connections (HI-1769).
   { paths: ['src/shared/connectionLabel.ts', 'src/renderer/src/components/TemplatePlan.tsx', 'src/renderer/src/components/TemplateLoad.tsx', 'tests/e2e/connectionrows.cjs'], suites: ['connectionrows', 'templates', 'templatesv2'] },
-  { paths: ['src/shared/activity.ts', 'src/renderer/src/views/ActivityTab.tsx', 'src/renderer/src/activityView.ts', 'src/main/agentProcesses.ts'], suites: ['activitytab'] },
+  { paths: ['src/shared/activity.ts', 'src/renderer/src/views/ActivityTab.tsx', 'src/renderer/src/activityView.ts', 'src/main/agentProcesses.ts'], suites: ['activitytab', 'activityworkspace'] },
+  { paths: ['src/renderer/src/views/WorkspaceActivity.tsx', 'src/main/activityWorkspace.ts'], suites: ['activityworkspace'] },
   { paths: ['src/main/compaction.ts'], suites: ['compact', 'overview', 'paneheader', 'idlestatus'] },
   { paths: ['src/shared/safeguards.ts', 'src/main/providers/claude/safeguards.ts', 'src/main/providers/codex/safeguards.ts', 'src/main/cardSessions.ts'], suites: ['safeguards'] },
   { paths: ['src/main/diagnostics.ts', 'src/shared/redact.ts'], suites: ['about', 'testedclis'] },
@@ -240,6 +247,8 @@ export const AREAS = [
   { paths: ['src/main/workflow/queueHost.ts', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/mergeMessage.ts', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts', 'src/main/workflow/queueChecksApp.ts', 'src/main/repoLock.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergequeue.cjs'], suites: ['mergequeue', 'queueagents', 'queueupgrade'] },
   // Agents under Hive merges (#1354): the refusals, the wakes and the card's queue state.
   { paths: ['src/main/workflow/queueState.ts', 'src/shared/workflow/refusals.ts', 'src/main/mergeSlots.ts', 'tests/e2e/queueagents.cjs'], suites: ['queueagents'] },
+  // Each card's focused tests (G20, HI-1367): chosen at submit, run by the merge queue; the hive project's picker and runner.
+  { paths: ['tests/e2e/queuefocused.cjs', 'scripts/focusedTests.mjs'], suites: ['queuefocused'] },
   // The queue's controls (#1353): its model, Pause/Resume, Remove from queue and Retry merge, hive_queue.
   { paths: ['src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueHost.ts', 'src/main/workflow/queueControls.ts', 'src/main/folderFence.ts', 'src/shared/workflow/facts.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergequeuefolder.cjs', 'tests/e2e/mergequeuecrash.cjs'], suites: ['mergequeuecrash', 'mergequeuefolder'] },
   { paths: ['src/main/workflow/mergeQueue.ts', 'src/shared/workflow/options.ts', 'src/shared/workflow/optionTexts.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergestrict.cjs'], suites: ['mergestrict', 'workflowoptions'] },
@@ -434,7 +443,8 @@ export const AREAS = [
   { paths: ['src/shared/startFailure.ts'], suites: ['startfail'] },
   // A stopped agent's look (HI-1881): its pane's bar, its dimmed terminal, its header and tile.
   { paths: ['src/shared/sessionEnd.ts', 'src/renderer/src/stopped.ts'], suites: ['stoppedpane', 'image', 'startfail', 'tilesview'] },
-  { paths: ['src/main/templates.ts', 'src/shared/templates.ts', 'src/shared/templateLoad.ts', 'src/renderer/src/components/TemplatePlan.tsx', 'src/renderer/src/components/TemplateLoad.tsx', 'src/shared/templateDefaults.ts'], suites: ['templatenames', 'templates', 'templateshare', 'templatesv2'] },
+  { paths: ['src/main/templates.ts', 'src/shared/templates.ts', 'src/shared/templateLoad.ts', 'src/renderer/src/components/TemplatePlan.tsx', 'src/renderer/src/components/TemplateLoad.tsx', 'src/shared/templateDefaults.ts'], suites: ['templatenames', 'templates', 'templateshare', 'templatesv2', 'templateworkflow'] },
+  { paths: ['src/shared/workflow/templateOptions.ts', 'src/renderer/src/components/TemplateLoadWorkflow.tsx', 'src/renderer/src/components/TemplateWorkflowView.tsx', 'tests/e2e/templateworkflow.cjs'], suites: ['templateworkflow'] },
   { paths: ['src/main/templateUpgrade.ts', 'tests/e2e/templatesv2.cjs'], suites: ['templatesv2'] },
   { paths: ['src/main/agentNames.ts', 'src/shared/agentNames.ts'], suites: ['agents', 'agents-ui', 'templatenames', 'templates'] },
   { paths: ['tests/e2e/templatenames.cjs'], suites: ['templatenames'] },
@@ -470,8 +480,12 @@ export const AREAS = [
   { paths: ['src/shared/cliOwnMode.ts', 'src/renderer/src/components/PermissionMode.tsx', 'src/main/providers/claude/', 'tests/e2e/cliownmode.cjs'], suites: ['cliownmode'] },
   // The run context: every suite (above); isolation checks what it gives a test Hive and the children a suite starts.
   { paths: ['tests/e2e/runContext.cjs', 'src/main/testQuiet.ts'], suites: ['isolation'] },
+  // A typed prompt's line breaks for Codex (HI-1327): the fake Codex's (codexnewline) and the real one's (codex-newline).
+  { paths: ['tests/e2e/codexnewline.cjs', 'tests/e2e/codex-newline.cjs', 'src/shared/terminalInput.ts', 'src/main/providers/codex/'], suites: ['codexnewline', 'codex-newline'] },
+  // An agent's Hooks dialog and Activity's lock blocks (HI-982), on the fake Claude Code and the fake Codex.
+  { paths: ['tests/e2e/hooksview.cjs', 'src/main/hookListing.ts', 'src/shared/hooks.ts', 'src/renderer/src/components/HooksDialog.tsx', 'src/main/servers.ts', 'src/main/providers/codex/', 'src/main/providers/claude/', 'src/main/providers/copilot/'], suites: ['hooksview'] },
   // The fake Codex CLI: every suite that runs it.
-  { paths: ['tests/e2e/fake-codex/'], suites: ['accounts', 'attachread','carryingon', 'codexqueued', 'attention', 'footerfit', 'skilldelivery', 'models', 'sessiontree', 'termsize', 'freshpath', 'defaultprovider', 'providerdetect', 'codexfolder', 'turnledger', 'flightrecorder', 'hookshealth', 'hookstranscript', 'workspacenotes', 'reviewcopies', 'slotguidance', 'p7lane'] },
+  { paths: ['tests/e2e/fake-codex/'], suites: ['accounts', 'attachread','carryingon', 'codexqueued', 'attention', 'footerfit', 'skilldelivery', 'models', 'sessiontree', 'termsize', 'freshpath', 'defaultprovider', 'providerdetect', 'codexfolder', 'turnledger', 'flightrecorder', 'hookshealth', 'hookstranscript', 'workspacenotes', 'reviewcopies', 'slotguidance', 'p7lane', 'codexnewline', 'hooksview'] },
   // Hive's bundled skills and modes, read at runtime (not documentation).
   { paths: ['resources/skills/', 'src/main/bundledHistory.json'], suites: ['skills', 'skillaudience', 'skilldelivery', 'cardloop', 'replysize', 'slotguidance'] },
   { paths: ['resources/modes/', 'src/main/assistantMode.ts'], suites: ['assistant', 'assistant-control', 'assistantend', 'assistantmode', 'assistantresume'] },
@@ -595,4 +609,232 @@ export const mergeBase = (base = 'main', cwd = process.cwd()) => gitLines(cwd, '
 /** The files changed against a base (default main): committed since the merge base, uncommitted and untracked. */
 export function changedFiles(base = 'main', cwd = process.cwd()) {
   return [...new Set([...gitLines(cwd, 'diff', '--name-only', mergeBase(base, cwd)), ...gitLines(cwd, 'ls-files', '--others', '--exclude-standard')])]
+}
+
+// --- The focused-test picker (HI-1367): which unit tests and e2e suites a change needs.
+//
+// Hive's merge queue calls the project's `focused.pick` command in a clean checkout of the revision, with the base
+// commit in HIVE_FOCUSED_BASE and the changed paths on stdin, and reads one JSON line per test (or {"every":true}).
+// The unit tests come from three places: a changed test file itself; Vitest's import graph (`vitest list --changed`,
+// which the CLI runs, so a change to code a test imports selects it); and UNIT_SCANS, for the tests that read the
+// repository by `git ls-files`, folder scans or file reads rather than imports, which the import graph can't see.
+// The e2e suites are affectedSuites' (above): a change it can't place means every test.
+
+/**
+ * The unit tests that read the repository rather than import it, and the changes that can break them. Each entry:
+ * `test` (its repo path; a test may have several entries), `paths` (as under() takes them: a file, or a folder ending
+ * in /; none: anywhere), and what change to a file under them selects it: `adds` (one added, deleted or renamed),
+ * `lines` (RegExp sources, matched case-insensitively against the diff's added and removed lines), or, with
+ * neither, any change. tests/focusedPick.test.ts checks that every test file scanning the repository is here.
+ */
+export const UNIT_SCANS = [
+  // Every AREAS and EVERYTHING path must exist, every suite file is listed, every tracked file is placed (ls-files);
+  // the suites' own sources are read for their rules (headers, waits, ports, CLI steps); the seams src reads.
+  { test: 'tests/e2esuites.test.ts', adds: true },
+  { test: 'tests/e2esuites.test.ts', paths: ['tests/e2e/'] },
+  { test: 'tests/e2esuites.test.ts', paths: ['src/'], lines: ['HIVE_TEST_'] },
+  // No suite or scenario loads a unit test's helper (tests/*.ts).
+  { test: 'tests/e2esuites.test.ts', paths: ['tests/scenarios/'], lines: ['require\\(', '\\bimport\\b', '\\bfrom\\s+[\'"`]'] },
+  // Every source file: no control character (#1040), no mixed line endings (#149).
+  { test: 'tests/controlCharacters.test.ts', lines: ['[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]'] },
+  { test: 'tests/lineEndings.test.ts' },
+  // Test tooling and Hive end processes by identity (#603).
+  { test: 'tests/folderProcesses.test.ts', paths: ['tests/', 'scripts/', 'src/'], lines: ['process\\.kill', 'task[k]ill'] },
+  // Test tooling starts nothing through the shell (#599).
+  { test: 'tests/windowsExits.test.ts', paths: ['tests/', 'scripts/'], lines: ['start-process', 'invoke-item', 'shell\\.open(path|external)', '\\bstart\\b'] },
+  // Tests name the temp folder only through tests/tempDir.ts (#448).
+  { test: 'tests/tempDir.test.ts', paths: ['tests/'], lines: ['\\btmpdir\\b', '\\benv\\s*(\\.\\s*|\\[\\s*[\'"`])(temp|tmp)\\b'] },
+  // Every e2e suite and scenario starts Hive with a test profile, quiet.
+  { test: 'tests/testQuiet.test.ts', paths: ['tests/e2e/', 'tests/scenarios/'], lines: ['_electron\\.launch\\(', 'HIVE_USER_DATA', 'HIVE_TEST_QUIET'] },
+  // Every caller of copilotTestEnv gives it `above` (#1308).
+  { test: 'tests/fakeCopilotApi.test.ts', paths: ['tests/'], lines: ['copilotTestEnv'] },
+  // Source scans of src/ for one rule each.
+  { test: 'tests/admission.test.ts', paths: ['src/main/'], lines: ['openingFence'] },
+  { test: 'tests/networkDecoding.test.ts', paths: ['src/main/', 'src/preload/', 'src/shared/'], lines: ['fetch', 'undici', 'brotli', 'DecompressionStream', 'zlib'] },
+  { test: 'tests/searchBoxes.test.ts', paths: ['src/renderer/src/'], lines: ['<input', 'placeholder', 'aria-label'] },
+  { test: 'tests/trash.test.ts', paths: ['src/'], lines: ['trashItem'] },
+  { test: 'tests/exitLog.test.ts', paths: ['src/main/'], lines: ['app\\.quit', 'app\\.exit', 'process\\.exit', 'app\\.relaunch', 'quitAndInstall', 'exitBy'] },
+  { test: 'tests/legacyWorktreeGate.test.ts', paths: ['src/'], lines: ['worktree'] },
+  { test: 'tests/i18nFormatting.test.ts', paths: ['src/'], lines: ['toLocale', 'Intl\\.', 'i18n-ignore'] },
+  { test: 'tests/userGuide.test.ts', paths: ['src/renderer/src/'], lines: ['openGuideAt'] },
+  { test: 'tests/userGuide.test.ts', paths: ['docs/USER_GUIDE.md', 'README.md'] },
+  { test: 'tests/tips.test.ts', paths: ['docs/USER_GUIDE.md'] },
+  // The translations and the messages they come from (#768): extracted catalogues current, files well formed, the
+  // guard against new hard-coded text over every file in src/ and its allowlists.
+  { test: 'tests/i18n.test.ts', paths: ['locales/'] },
+  { test: 'tests/i18n/numbers.test.ts', paths: ['locales/en/'] },
+  { test: 'tests/i18nCatalogues.test.ts', paths: ['locales/', 'src/shared/i18n/values/'] },
+  { test: 'tests/i18nCatalogues.test.ts', paths: ['src/'], lines: ['msg\\(', '\\btr\\(', 'tRich\\(', 'defaultMessage', 'description', '\\bid:'] },
+  { test: 'tests/i18nGuard.test.ts', paths: ['src/', 'i18n/allow/'] },
+  { test: 'tests/i18nshots.test.ts', paths: ['tests/e2e/i18nshots/', 'tests/e2e/i18nshots.cjs'] },
+  // German or Polish read from locales/ to check a screen in that language.
+  { test: 'tests/actionHandlers.test.ts', paths: ['locales/de/'] },
+  { test: 'tests/gitInit.test.ts', paths: ['locales/de/'] },
+  { test: 'tests/progressQueue.test.ts', paths: ['locales/de/'] },
+  { test: 'tests/skillDescriptions.test.ts', paths: ['locales/de/', 'resources/skills/'] },
+  { test: 'tests/benchmark.test.ts', paths: ['locales/pl/'] },
+  { test: 'tests/flightRecorder.test.ts', paths: ['locales/pl/'] },
+  { test: 'tests/buildFacts.test.ts', paths: ['locales/'] },
+  { test: 'tests/laneBar.test.ts', paths: ['locales/'] },
+  // The bundled skills and modes (resources/), and the guidance that names them.
+  { test: 'tests/assistant.test.ts', paths: ['resources/modes/'] },
+  { test: 'tests/modeDescriptions.test.ts', paths: ['resources/modes/'] },
+  { test: 'tests/skills.test.ts', paths: ['resources/skills/'] },
+  { test: 'tests/retention.test.ts', paths: ['resources/skills/'] },
+  { test: 'tests/bundled.test.ts', paths: ['resources/', 'src/main/bundledHistory.json'] },
+  { test: 'tests/bundledrace.test.ts', paths: ['resources/'] },
+  { test: 'tests/guidance.test.ts', paths: ['resources/skills/', 'resources/modes/', '.claude/skills/', '.agents/skills/', 'AGENTS.md', 'RELEASING.md', 'docs/AGENT_API.md', 'tests/scenarios/scenarios.cjs', 'src/main/mcp/hive-mcp.ts'] },
+  // THIRD_PARTY_NOTICES.md is generated from what ships (package.json's dependencies, the renderer's libraries).
+  { test: 'tests/licenses.test.ts', paths: ['package.json', 'package-lock.json', 'THIRD_PARTY_NOTICES.md', 'LICENSE', 'scripts/thirdPartyNotices.mjs', 'scripts/licenseText.mjs', 'scripts/licenses.mjs', 'scripts/notices/'] },
+  // Advanced settings (#367): the list, and the recorded fixtures each CLI-facing default is checked against.
+  { test: 'tests/advanced.test.ts', paths: ['src/shared/advanced.ts', 'tests/fixtures/'] },
+  { test: 'tests/settingsWorkspace.test.ts', paths: ['src/shared/advanced.ts'] },
+  // This table's own check: a test file added, or one starting to scan the repository.
+  { test: 'tests/focusedPick.test.ts', paths: ['tests/'], adds: true },
+  { test: 'tests/focusedPick.test.ts', paths: ['tests/'], lines: ['ls-files', 'readdir', '\\bglob'] }
+]
+
+const slashes = (p) => p.replace(/\\/g, '/')
+
+/** Whether a UNIT_SCANS entry selects its test for a changed file (moved: added, deleted or renamed; lines: the diff's). */
+export function scanSelects(entry, file, { moved = false, lines = [] } = {}) {
+  if (entry.paths && !under(file, entry.paths)) return false
+  if (!entry.adds && !entry.lines) return true
+  if (entry.adds && moved) return true
+  if (!entry.lines) return false
+  const res = entry.lines.map((s) => new RegExp(s, 'i'))
+  return lines.some((l) => res.some((re) => re.test(l)))
+}
+
+/** Whether a UNIT_SCANS entry needs a file's diff lines (it has `lines` and covers the file). */
+export const needsLines = (file) => UNIT_SCANS.some((e) => e.lines && (!e.paths || under(file, e.paths)))
+
+/** A unit test's id: a test file under tests/ (tests/x.test.ts, tests/i18n/y.test.ts). */
+export const isUnitTestFile = (f) => /^tests\/(?:[^/]+\/)*[^/]+\.test\.ts$/.test(f) && !f.startsWith('tests/e2e/')
+
+/**
+ * The tests a change needs, from what the CLI gathered: { every: true, why } when the change needs every test (one
+ * affectedSuites can't place), else { tests: [{ test, needs }], why } (why: a line per reason, for stderr). paths: the
+ * changed files (repo-relative, /); added and deleted: those of them new or gone (a rename is both, by its two paths);
+ * diffLines: { path: the diff's added and removed lines } for the files needsLines names; suites: the e2e suites' names
+ * (realNames: the real tier's, packagedNames: the installer's); vitestRelated: the unit test files Vitest's import
+ * graph relates to the change. Unit tests first (sorted), then suites (in suites' order).
+ */
+export function pickTests({ paths, added = [], deleted = [], diffLines = {}, suites, realNames = [], packagedNames = [], vitestRelated = [] }) {
+  const files = [...new Set(paths.map(slashes).filter(Boolean))]
+  const affected = affectedSuites(files, suites, realNames)
+  if (affected.all) return { every: true, why: affected.why }
+  const unit = unitPicks({ paths: files, added, deleted, diffLines, vitestRelated })
+  const tests = [
+    ...[...unit.keys()].map((test) => ({ test, needs: ['unit'] })),
+    ...affected.suites.map((s) => ({ test: s, needs: [realNames.includes(s) ? 'real' : packagedNames.includes(s) ? 'packaged' : 'fake'] }))
+  ]
+  const ids = tests.map((t) => t.test)
+  if (ids.some((id) => !id) || new Set(ids).size !== ids.length) throw new Error(`picked an empty or repeated test id: ${ids.join(', ')}`)
+  return { tests, why: [...unit.values(), ...affected.why] }
+}
+
+/**
+ * The unit tests a change needs, sorted, each with why: a changed test file that still exists, one Vitest's import
+ * graph relates to the change (vitestRelated), and each UNIT_SCANS entry a changed file meets. pickTests' unit part.
+ */
+export function unitPicks({ paths, added = [], deleted = [], diffLines = {}, vitestRelated = [] }) {
+  const files = [...new Set(paths.map(slashes).filter(Boolean))]
+  const moved = new Set([...added, ...deleted].map(slashes))
+  const gone = new Set(deleted.map(slashes).filter((f) => !added.map(slashes).includes(f)))
+  const unit = new Map()
+  const pick = (test, why) => {
+    if (!unit.has(test)) unit.set(test, why)
+  }
+  for (const f of files) if (isUnitTestFile(f) && !gone.has(f)) pick(f, `${f}: changed`)
+  for (const f of vitestRelated.map(slashes)) if (isUnitTestFile(f)) pick(f, `${f}: imports what changed (vitest --changed)`)
+  for (const f of files) {
+    const lines = diffLines[f] ?? []
+    for (const e of UNIT_SCANS) if (!gone.has(e.test) && scanSelects(e, f, { moved: moved.has(f), lines })) pick(e.test, `${e.test}: reads ${f}${e.lines ? ' (a line it checks)' : e.adds && moved.has(f) ? ' (added or removed)' : ''}`)
+  }
+  return new Map([...unit.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+}
+
+/** The picker's output: one JSON line per test, or {"every":true} alone; nothing for nothing needed. */
+export const pickLines = (picked) => (picked.every ? [JSON.stringify({ every: true })] : picked.tests.map((t) => JSON.stringify(t)))
+
+/** A unified diff's (-U0) added and removed lines per file, the +++/--- headers aside. */
+export function diffLinesOf(diff) {
+  const out = {}
+  let file = null
+  let from = null
+  for (const raw of diff.split('\n')) {
+    const line = raw.replace(/\r$/, '')
+    if (line.startsWith('diff --git ')) {
+      file = from = null
+      continue
+    }
+    if (line.startsWith('--- ')) {
+      from = line === '--- /dev/null' ? null : line.slice(4).replace(/^a\//, '')
+      continue
+    }
+    if (line.startsWith('+++ ')) {
+      file = line === '+++ /dev/null' ? from : line.slice(4).replace(/^b\//, '')
+      continue
+    }
+    if (file && (line.startsWith('+') || line.startsWith('-'))) (out[file] ??= []).push(line.slice(1))
+  }
+  return out
+}
+
+/** The unit test files Vitest relates to the changes since base (its import graph), repo-relative; throws on failure. */
+function listVitestRelated(cwd, base) {
+  const vitest = join(cwd, 'node_modules', 'vitest', 'vitest.mjs')
+  if (!existsSync(vitest)) throw new Error(`no ${vitest}: the checkout needs its packages (npm install) to pick unit tests`)
+  mkdirSync(join(runContext.TEST_ROOT, 'tmp'), { recursive: true })
+  const dir = mkdtempSync(join(runContext.TEST_ROOT, 'tmp', 'focused-pick-'))
+  try {
+    const out = join(dir, 'list.json')
+    // Its output goes to stderr: stdout is the picker's answer alone.
+    const r = spawnSync(process.execPath, [vitest, 'list', '--filesOnly', '--passWithNoTests', '--changed', base, `--json=${out}`], { cwd, env: runContext.baseEnv(), stdio: ['ignore', 2, 2] })
+    if (r.error) throw r.error
+    if (r.status !== 0) throw new Error(`vitest list --changed ${base} exited with ${r.status}`)
+    const root = slashes(resolve(cwd)).toLowerCase() + '/'
+    return JSON.parse(readFileSync(out, 'utf8')).map((e) => slashes(e.file ?? e)).map((f) => (f.toLowerCase().startsWith(root) ? f.slice(root.length) : f))
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+const git = (cwd, args) => execFileSync('git', ['-c', 'core.quotepath=false', ...args], { cwd, encoding: 'utf8', env: runContext.baseEnv(), maxBuffer: 512 * 1024 * 1024 })
+
+/** The CLI: gathers pickTests' inputs in the checkout (cwd) and prints its lines. Diagnostics go to stderr. */
+async function pickCli() {
+  const cwd = process.cwd()
+  const base = process.env.HIVE_FOCUSED_BASE
+  if (!base) throw new Error('HIVE_FOCUSED_BASE (the base commit) is not set')
+  git(cwd, ['rev-parse', '--verify', '--quiet', `${base}^{commit}`])
+  const paths = [...new Set(readFileSync(0, 'utf8').split(/\r?\n/).map((l) => slashes(l.trim())).filter(Boolean))]
+  if (!paths.length) return
+  const { SUITES } = await import('./suites.mjs')
+  const { isRealCli } = await import('./runner.mjs')
+  const suites = SUITES.map((s) => s.name)
+  const realNames = SUITES.filter(isRealCli).map((s) => s.name)
+  const packagedNames = SUITES.filter((s) => (s.needs ?? []).includes('packaged')).map((s) => s.name)
+  // Every suite: no need to look further.
+  if (affectedSuites(paths, suites, realNames).all) {
+    const picked = pickTests({ paths, suites, realNames, packagedNames })
+    for (const w of picked.why) console.error(w)
+    for (const l of pickLines(picked)) console.log(l)
+    return
+  }
+  const atBase = new Set(git(cwd, ['ls-tree', '-r', '--name-only', '-z', base]).split('\0').filter(Boolean))
+  const added = paths.filter((p) => !atBase.has(p))
+  const deleted = paths.filter((p) => atBase.has(p) && !existsSync(join(cwd, p)))
+  const diffLines = paths.some(needsLines) ? diffLinesOf(git(cwd, ['diff', '--no-ext-diff', '--no-color', '--no-renames', '-U0', base, '--'])) : {}
+  const picked = pickTests({ paths, added, deleted, diffLines, suites, realNames, packagedNames, vitestRelated: listVitestRelated(cwd, base) })
+  for (const w of picked.why) console.error(w)
+  for (const l of pickLines(picked)) console.log(l)
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href && process.argv.includes('--pick')) {
+  pickCli().catch((e) => {
+    console.error(`The pick failed: ${e.message}`)
+    process.exit(2)
+  })
 }

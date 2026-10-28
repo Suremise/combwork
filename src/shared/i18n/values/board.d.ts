@@ -158,14 +158,23 @@ interface HiveMessageValues {
   'board.cost.tokens': { estimated: string; input: string | number; output: string | number; cacheWrite: string | number; cacheRead: string | number; unknown: string; requests: number }
   'board.cost.tokensUnknown': { requests: number }
   'board.costs.builder': undefined
+  'board.costs.byRound': undefined
+  'board.costs.byRoundFailed': undefined
+  'board.costs.byRoundHourly': { days: number }
+  'board.costs.byRoundNote': undefined
   'board.costs.cost': undefined
   'board.costs.laneFailed': undefined
   'board.costs.laneLoading': undefined
   'board.costs.note': { zero: string | number }
   'board.costs.onCards': undefined
+  'board.costs.outsideRow': undefined
   'board.costs.overhead': undefined
   'board.costs.overheadNote': undefined
   'board.costs.reviewer': undefined
+  'board.costs.roundColumn': undefined
+  'board.costs.roundRow': { round: number }
+  'board.costs.roundVerdict': { verdict: string }
+  'board.costs.totalColumn': undefined
   'board.costs.unmatched': { n: number }
   'board.decision.add': undefined
   'board.decision.blank': undefined
@@ -477,17 +486,20 @@ interface HiveMessageValues {
   'board.lanes.alreadyEnd': { where: string; lane: string | number }
   'board.lanes.bar': { pair: string | number; finished: string | number; total: number }
   'board.lanes.barUnrecorded': { pair: string | number; total: number }
+  'board.lanes.copyMerge': { commit: string | number }
   'board.lanes.edge': undefined
   'board.lanes.edgeTip': { lanes: string | number }
   'board.lanes.edgeValue': { shown: string | number; count: number }
   'board.lanes.end': undefined
   'board.lanes.endFailed': { lane: string | number }
+  'board.lanes.expand': { open: string; lane: string | number }
   'board.lanes.fold': undefined
   'board.lanes.latestRun': { card: string | number; run: string | number; state: string }
   'board.lanes.legendButton': undefined
   'board.lanes.legendHold': { category: string | number }
   'board.lanes.legendLine': { category: string | number; stages: string | number }
   'board.lanes.legendTitle': undefined
+  'board.lanes.mergeCopied': undefined
   'board.lanes.moveDown': undefined
   'board.lanes.moveUp': undefined
   'board.lanes.moved': { lane: string | number; at: string | number; n: number }
@@ -498,17 +510,24 @@ interface HiveMessageValues {
   'board.lanes.poolPair': { builder: string | number }
   'board.lanes.poolReviewing': { reviewing: string; name: string | number }
   'board.lanes.projectLink': { project: string | number }
+  'board.lanes.queue': { lane: string | number }
+  'board.lanes.queueState': { state: string }
+  'board.lanes.round': { round: string | number }
   'board.lanes.show': undefined
   'board.lanes.slotLine': { line: string | number }
   'board.lanes.slotLink': { slot: string | number }
   'board.lanes.slotTip': { state: string; carried: string; since: string | number }
+  'board.lanes.soFar': { time: string | number }
   'board.lanes.stalled': undefined
   'board.lanes.start': undefined
   'board.lanes.state': { state: string }
   'board.lanes.title': undefined
+  'board.lanes.took': { time: string | number }
   'board.lanes.usualOrder': undefined
   'board.lanes.usualOrderDetail': undefined
   'board.lanes.usualOrderSaid': undefined
+  'board.lanes.waitedAtLeast': { time: string | number }
+  'board.lanes.waitedAtLeastTip': undefined
   'board.lanes.waitingForYou': { n: number }
   'board.lanes.waits': { reason: string; card: string | number; ask: string; agent: string | number }
   'board.lanes.waitsLink': undefined
@@ -642,6 +661,17 @@ interface HiveMessageValues {
   'board.queue.pauseTip': undefined
   'board.queue.pulse': { target: string | number; state: string; card: string | number; n: number }
   'board.queue.queued': { n: number; cards: string | number }
+  'board.queue.recent.cancelled': { reason: string }
+  'board.queue.recent.heading': undefined
+  'board.queue.recent.lasted': { duration: string | number }
+  'board.queue.recent.merged': undefined
+  'board.queue.recent.more': undefined
+  'board.queue.recent.none': undefined
+  'board.queue.recent.paused': { reason: string; code: string | number }
+  'board.queue.recent.push': { state: string }
+  'board.queue.recent.returned': { why: string | number }
+  'board.queue.recent.stillPaused': undefined
+  'board.queue.recent.took': { duration: string | number }
   'board.queue.remove': undefined
   'board.queue.removeConfirm': undefined
   'board.queue.removeFailed': undefined
@@ -720,16 +750,21 @@ interface HiveMessageValues {
   'board.runs.cardRun': { card: string | number; run: string | number }
   'board.runs.cardSummary': { n: number; failed: number; stopped: number; running: string }
   'board.runs.clear': undefined
+  'board.runs.dockEdge': undefined
+  'board.runs.dockEdgeTip': { rows: number }
+  'board.runs.dockEdgeValue': { rows: number }
   'board.runs.failedOnly': undefined
+  'board.runs.finished': undefined
   'board.runs.group': { what: string | number; n: number; outcome: string; failed: number }
   'board.runs.lane': undefined
+  'board.runs.noFinished': undefined
   'board.runs.none': undefined
   'board.runs.noneMatch': undefined
+  'board.runs.noneToday': undefined
   'board.runs.other': undefined
   'board.runs.queueChecks': { checks: string | number; failed: number }
   'board.runs.search': undefined
   'board.runs.today': undefined
-  'board.runs.toggleCard': { open: string; card: string | number }
   'board.runs.yesterday': undefined
   'board.setAside.add': undefined
   'board.setAside.added': { n: string | number }

@@ -38,6 +38,7 @@ import { docOutline, findHeading, sectionText, type DocHeading } from '../shared
 import { providerService } from './providerService'
 import { config } from './config'
 import { refusal, type Refusal } from '../shared/workflow/refusals'
+import { testsGiven, type FocusedTest } from '../shared/workflow/focused'
 import { askAssistant, AskRefused } from './assistantAsk'
 import { agentWorkflowRole, isWorkflowRole, workflowPairs, type WorkflowRole } from '../shared/workflow/roles'
 import { deleteEntry, JournalBusy, JournalError, readEntry, recall, updateEntry, writeEntry } from './journal'
@@ -67,7 +68,7 @@ import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
 import { writePty } from './ptyHost'
 import { isResuming } from './restartResume'
-import { sessions } from './sessions'
+import { sessions, type HookObservation } from './sessions'
 import { agentPlace, folderFacts } from './agentFolders'
 import { releasableSlots, releaseSlot, SlotReleaseRefused, type HeldRow } from './slotRelease'
 import { slotAt } from '../shared/agentFolders'
@@ -194,9 +195,19 @@ export async function startHookServer(): Promise<string> {
       return send(res, 200, {})
     }
     let done: (() => void) | null = null
+    // What Hive observes of it, for the launch's Hooks dialog (HI-982): from here, on its own authenticated route, so
+    // a body Hive can't read is recorded too.
+    let obs: HookObservation | null = null
+    let step = 'read'
     try {
       const raw = await readBody(req)
-      const body = JSON.parse(raw || '{}')
+      let body: Record<string, any>
+      try {
+        body = JSON.parse(raw || '{}')
+      } catch (e) {
+        obs = query.has('statusline') ? null : sessions.observeHook(run, {})
+        throw e
+      }
       done = beginWork(hookLabel(query.has('statusline'), body))
       if (query.has('statusline')) {
         // The reply becomes Claude Code's status line, so send nothing; or, chaining the user's own status line (#1285),
@@ -216,17 +227,25 @@ export async function startHookServer(): Promise<string> {
       // decides whose turn they are (#650: a notice of what is unread, or the drain carrying the turn on); other hooks
       // are answered at once so they never slow the agent down. Each is handled in the launch's order from when it came,
       // with its reply: the turn ledger learns what the Stop was told (#648).
+      obs = sessions.observeHook(run, body)
+      step = 'reply'
       const reply = sessions.hookReply(run, body)
+      step = 'handle'
       const handled = sessions.handleHook(run, body, reply)
+      let failed: { step: string; error: unknown } | undefined
       const answer = await reply.catch((e) => {
         log.warn('hook reply', e)
+        failed = { step: 'reply', error: e }
         return null
       })
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(answer ?? {}))
       await handled
+      if (obs) sessions.hookHandled(obs, answer, failed)
+      obs = null
     } catch (e) {
       log.warn('hook error', e)
+      if (obs) sessions.hookHandled(obs, null, { step, error: e })
       if (!res.headersSent) send(res, 400, { error: 'bad request' })
     } finally {
       done?.()
@@ -2002,10 +2021,10 @@ async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promi
 }
 
 /** A queue as the Agent API gives it: no folder (a stuck advance's neither), and whether an outcome has a log rather than the log itself (lean). */
-const publicQueue = ({ projectPath: _p, paused, hiveMerges: _h, inFlight: _i, returns: _r, returnsMore: _more, ...v }: QueueView): QueuePublic => ({
+const publicQueue = ({ projectPath: _p, paused, hiveMerges: _h, inFlight: _i, returns: _r, returnsMore: _more, pauses: _pauses, ...v }: QueueView): QueuePublic => ({
   ...v,
   paused: paused ? (({ stuck, message: _m, ...p }) => (stuck ? { ...p, stuck: (({ folder: _f, ...s }) => s)(stuck) } : p))(paused) : null,
-  recent: v.recent.map(({ log: output, seen: _s, revision: _rev, ...r }) => (output ? { ...r, hasLog: true as const } : r))
+  recent: v.recent.map(({ log: output, seen: _s, revision: _rev, tookMs: _took, push: _push, logPath: _lp, ...r }) => (output ? { ...r, hasLog: true as const } : r))
 })
 
 /** A project agent asking to change a queue: refused, saying whose controls these are. */
@@ -2993,6 +3012,7 @@ const INTENT_WORDS: Record<CardIntent['kind'], string> = {
   cannot: 'report a rule blocking',
   request: 'ask the builder of',
   loopStep: 'take a card loop step on',
+  focusedSkip: 'decide on the skipped focused tests of',
   removeFromQueue: 'take out of the merge queue',
   retryMerge: 'retry the merge of'
 }
@@ -3010,6 +3030,7 @@ const INTENT_DONE: Record<CardIntent['kind'], string> = {
   cannot: 'reported a rule blocking it',
   request: 'asked its builder',
   loopStep: 'took a card loop step',
+  focusedSkip: 'decided on its skipped focused tests',
   removeFromQueue: 'taken out of the merge queue',
   retryMerge: 'queued again (Retry merge)'
 }
@@ -3105,6 +3126,14 @@ function pathsField(body: any, required: boolean): string[] | undefined {
   return v.map((p: string) => p.trim())
 }
 
+/** A submit's focused tests (G20, HI-1367), when given: ids or { id, needs }, unique, each a valid id. */
+function testsField(body: any): FocusedTest[] | undefined {
+  if (body?.tests === undefined || body?.tests === null) return undefined
+  const t = testsGiven(body.tests)
+  if ('bad' in t) throw new HttpError(400, `tests: ${t.bad}. Give the test ids the change needs, each a string or { id, needs } (needs: unit, fake, real, packaged).`) // i18n-ignore: agent-facing
+  return t.tests
+}
+
 /** A body's submission number (start-review, verdict), when given. */
 function submissionField(body: any): number | undefined {
   const v = body?.submission
@@ -3151,7 +3180,8 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
   'put-back': (body) => ({ kind: 'putBack', why: textField(body, 'why', true) }),
   submit: (body) => {
     if (body?.followUp !== undefined && body?.followUp !== null && typeof body.followUp !== 'boolean') throw new HttpError(400, 'followUp is true or false.')
-    return { kind: 'submit', summary: textField(body, 'summary', true), revision: textField(body, 'revision'), note: textField(body, 'note'), paths: pathsField(body, false), ...(body?.followUp === true ? { followUp: true } : {}) }
+    const tests = testsField(body)
+    return { kind: 'submit', summary: textField(body, 'summary', true), revision: textField(body, 'revision'), note: textField(body, 'note'), paths: pathsField(body, false), ...(body?.followUp === true ? { followUp: true } : {}), ...(tests ? { tests } : {}) }
   },
   'declare-paths': (body) => ({ kind: 'declarePaths', paths: pathsField(body, true)! }),
   'start-review': (body) => ({ kind: 'startReview', submission: submissionField(body) }),
@@ -3162,6 +3192,10 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
     return { kind: 'verdict', pass: body.pass, comment: textField(body, 'comment', true), submission: submissionField(body), failKind }
   },
   'report-merge': (body) => ({ kind: 'reportMerge', result: textField(body, 'result') }),
+  'focused-skip': (body) => {
+    if (body?.merge !== true && body?.merge !== false) throw new HttpError(400, 'merge is true or false.')
+    return { kind: 'focusedSkip', request: textField(body, 'request', true)!, merge: body.merge, why: textField(body, 'why', true)! }
+  },
   ask: (body) => {
     const askKind = body?.kind ?? 'other'
     if (!ASK_KINDS.includes(askKind)) throw new HttpError(400, `Unknown kind "${String(askKind)}": ${ASK_KINDS.join(', ')}.`)

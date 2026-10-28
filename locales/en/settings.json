@@ -727,6 +727,22 @@
     "defaultMessage": "Hooks: known fields",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.codex.hooks.listMethod.desc": {
+    "defaultMessage": "The request Hive sends Codex's app server for the hooks a session has. Wrong, an agent's Hooks dialog lists only Hive's own and says Codex couldn't list the rest, and Hive trusts its hooks by its own hashes.",
+    "description": "What the advanced setting \"Hooks: listing request\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.hooks.listMethod.title": {
+    "defaultMessage": "Hooks: listing request",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.codex.hooks.listSeconds.desc": {
+    "defaultMessage": "How long Hive gives Codex's app server to list a session's hooks (`hooks/list`). Past it, an agent's Hooks dialog lists only Hive's own and says Codex couldn't list the rest.",
+    "description": "What the advanced setting \"Hooks: listing timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `hooks/list` as it is (a request's name)."
+  },
+  "settings.advanced.codex.hooks.listSeconds.title": {
+    "defaultMessage": "Hooks: listing timeout",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.codex.hooks.preToolUseTimeoutSeconds.desc": {
     "defaultMessage": "How long Codex waits for Hive's answer before a tool runs (an edit waits for a file lock). If Hive doesn't answer in time, the tool goes ahead.",
     "description": "What the advanced setting \"Hooks: before a tool, timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -1235,6 +1251,14 @@
     "defaultMessage": "Disable hardware acceleration",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.hive.focused.pickSeconds.desc": {
+    "defaultMessage": "How long the project’s command that chooses a card’s focused tests may run, when it is submitted and at its merge. Past it, the command is ended and no tests count as chosen: the builder then names them itself.",
+    "description": "What the advanced setting \"Focused tests: longest the choice of tests runs\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.focused.pickSeconds.title": {
+    "defaultMessage": "Focused tests: longest the choice of tests runs",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in seconds: how long the project's command that chooses a card's focused tests may run, when the card is submitted and at its merge."
+  },
   "settings.advanced.hive.guidance.desc": {
     "defaultMessage": "With Hive's tools, each project agent gets Hive's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the hive server's instructions, Codex after your own developer_instructions. Turned off, agents still get Hive's tools, without the guidance, from their next session. The Hive Assistant always gets its own: they are its role.",
     "description": "What the advanced setting \"Hive's guidance for agents\" does (Settings → Advanced, under Hive). Claude Code, Copilot and Codex are CLIs' names, hive the name of Hive's MCP server and developer_instructions a Codex setting: keep them."
@@ -1306,6 +1330,22 @@
   "settings.advanced.hive.lanes.gentleEnd.title": {
     "defaultMessage": "Lanes: let the builder finish when its lane ends",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. A lane is a card loop: a builder and a reviewer taking cards in turn."
+  },
+  "settings.advanced.hive.lanes.waitReviewerMinutes.desc": {
+    "defaultMessage": "After how long a lane whose card waits in Review with nobody reviewing it has its wait marked in the Progress panel's Lanes. Too short marks every review; too long, a card can sit unreviewed.",
+    "description": "What the advanced setting \"Lanes: a long wait for a reviewer\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.lanes.waitReviewerMinutes.title": {
+    "defaultMessage": "Lanes: a long wait for a reviewer",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.hive.lanes.waitYouMinutes.desc": {
+    "defaultMessage": "After how long a lane waiting for you (a request in For you, or a card at its round limit) has its wait marked in the Progress panel's Lanes. Too short marks every wait; too long, a lane can sit unnoticed.",
+    "description": "What the advanced setting \"Lanes: a long wait for you\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.lanes.waitYouMinutes.title": {
+    "defaultMessage": "Lanes: a long wait for you",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.hive.mcp.connectSeconds.desc": {
     "defaultMessage": "How long Hive waits, once an agent is ready, for its CLI to connect Hive's tools before it tells the agent of new work anyway. A resumed session can be ready before its tools are, and a message then is a turn spent without them (#865). Lower it if messages reach agents late when their CLI doesn't connect Hive's tools.",
@@ -1410,6 +1450,14 @@
   "settings.advanced.hive.queue.checkedOutTarget.title": {
     "defaultMessage": "Merge queue: merge into a checked-out branch",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive: what the merge queue does when the branch it merges into (main, say) is checked out in a folder, usually the project folder, whose files then change."
+  },
+  "settings.advanced.hive.queue.focusedJobs.desc": {
+    "defaultMessage": "How many tests at once the merge queue’s run of a card’s focused tests may use, passed to the project’s command that runs them. More finishes sooner but loads the computer, which agents and your own work share.",
+    "description": "What the advanced setting \"Merge queue: focused tests run at once\" does, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.queue.focusedJobs.title": {
+    "defaultMessage": "Merge queue: focused tests run at once",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by a number: how many of a card's focused tests (the tests its change needs) the merge queue runs in parallel."
   },
   "settings.advanced.hive.queue.networkCodes.desc": {
     "defaultMessage": "A failed merge check whose last 40 lines of output this regular expression finds failed for the network, not the work: the card is returned to its builder marked temporary, and the builder may submit the same revision again (at most twice in a row) instead of a new one. The default finds Node's and npm's network error codes (ENOTFOUND, EAI_AGAIN, ECONNRESET, ECONNREFUSED, ETIMEDOUT). A project's check can also say so itself by exiting with code 75. (?!) finds nothing: then only a check that couldn't start, ran out of time or was ended counts as temporary.",

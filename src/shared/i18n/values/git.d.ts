@@ -379,6 +379,8 @@ interface HiveMessageValues {
   'git.vc.switch.title': { project: string | number; platform: string | number }
   'git.vc.switch.what': { project: string | number; to: string | number; from: string | number }
   'git.vc.switchTip': { platform: string | number }
+  'git.vc.templateNotApplied': { project: string | number; template: string | number }
+  'git.vc.templatePending': { template: string | number }
   'git.vc.useParent': undefined
   'git.vc.workflow': { platform: string | number; state: string; preset: string | number }
   'git.vc.workflowTip': undefined

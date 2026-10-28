@@ -69,19 +69,20 @@ const CHOICES: PlatformId[] = ['none', 'git']
 /**
  * Asks before switching a project's version control (§16.6.5's warning), then switches it, from its next card: refused
  * when it changed meanwhile (`from`, the platform shown) or what is detected doesn't allow it (said in the dialog).
+ * Whether it switched.
  */
-export async function switchPlatform(project: ProjectInfo, from: PlatformId, to: PlatformId): Promise<void> {
+export async function switchPlatform(project: ProjectInfo, from: PlatformId, to: PlatformId): Promise<boolean> {
   let check: PlatformSwitchCheck
   try {
     check = await call('workflow:checkPlatform', project.path, to)
   } catch (e) {
     notify('error', errorMessage(e))
-    return
+    return false
   }
   if (check.refused) {
     const t = switchRefusalText(check.refused)
     notify('error', tr(t.m, t.values))
-    return
+    return false
   }
   const names = { project: project.name, from: tr(PLATFORM_NAME[check.from]), to: tr(PLATFORM_NAME[to]) }
   const ok = await confirm({
@@ -95,40 +96,39 @@ export async function switchPlatform(project: ProjectInfo, from: PlatformId, to:
     }
   })
   if (ok) notify('success', tr(S.done, { project: project.name, platform: names.to }))
+  return ok
 }
 
 /**
  * After Initialise repository… chosen from Git's page (HI-1905): the repository is made with its first commit, so the
  * project the dialog initialised switches to Git, as the user chose. Quietly, unless lanes or cards in flight keep None's
  * rules (then the switch's warning, which they can cancel). Refused, changed meanwhile or failed: the repository stays,
- * and the notice says it wasn't switched. Already Git (someone else switched it): nothing to do.
+ * and the notice says it wasn't switched. Already Git (someone else switched it): nothing to do. Whether it is Git now.
  */
-export async function switchAfterInit(project: ProjectInfo): Promise<void> {
+export async function switchAfterInit(project: ProjectInfo): Promise<boolean> {
   const notSwitched = (error: string): void => notify('error', tr(S.notSwitched, { project: project.name, error }))
   let check: PlatformSwitchCheck
   try {
     check = await call('workflow:checkPlatform', project.path, 'git')
   } catch (e) {
     notSwitched(errorMessage(e))
-    return
+    return false
   }
-  if (check.from === 'git') return
+  if (check.from === 'git') return true
   if (check.refused) {
     const t = switchRefusalText(check.refused)
     notSwitched(tr(t.m, t.values))
-    return
+    return false
   }
-  if (check.lanes.length || check.inFlight.length) {
-    await switchPlatform(project, 'none', 'git')
-    return
-  }
+  if (check.lanes.length || check.inFlight.length) return switchPlatform(project, 'none', 'git')
   try {
     await call('workflow:setPlatform', project.path, 'git', { expected: 'none' })
   } catch (e) {
     notSwitched(errorMessage(e))
-    return
+    return false
   }
   notify('success', tr(S.done, { project: project.name, platform: tr(PLATFORM_NAME.git) }))
+  return true
 }
 
 /** What else the switch does: the options restored or none, a Git folder under None, and what keeps the old rules. */

@@ -4,6 +4,7 @@ import type { StartHint } from '../../shared/startFailure'
 import type { SafeguardEvent } from '../../shared/safeguards'
 import type { Text } from '../../shared/advanced'
 import type { TypedNewline } from '../../shared/terminalInput'
+import type { HookListing } from '../../shared/hooks'
 
 export interface LaunchSkill {
   name: string
@@ -19,6 +20,16 @@ export interface SkillDelivery {
   revision: string | null
   problem?: string
   lasting?: true
+}
+
+/** A launch's hooks for its Hooks dialog (HI-982: ProviderAdapter.launchHooks). */
+export interface LaunchHooks {
+  /** As established at launch. */
+  listing: HookListing
+  /** Listed again for the dialog (the CLI's own listing asked now, or its files compared with the launch's); absent: `listing`. */
+  now?(): Promise<HookListing>
+  /** Hive's own hook for each event (its form: http, command), by the event's name: what a hook it received came through. */
+  receivers: Readonly<Record<string, string>>
 }
 
 export interface LaunchContext {
@@ -514,6 +525,12 @@ export interface ProviderAdapter {
    * never changed: the settings' name in the window's language, or null when none does (or Hive can't tell).
    */
   hooksOffIn?(ctx: LaunchContext): string | null
+  /**
+   * The launch's hooks for its Hooks dialog (HI-982), once its command is built: Hive's own as passed for it, and the CLI's
+   * others as far as this provider can establish them. Read-only, never changing a hook or a CLI's config. Absent: the
+   * dialog lists none.
+   */
+  launchHooks?(ctx: LaunchContext, cmd: CommandSpec): LaunchHooks
   /**
    * Details from lines appended to the session's transcript (Codex: model, preset, Plan mode, plan limits). `memo` is
    * the launch's own, kept between reads (and emptied when the reading starts again), for what a later line completes.

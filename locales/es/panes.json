@@ -98,6 +98,7 @@
   "panes.menu.compact": "Compactar…",
   "panes.menu.discard": "Descartar el worktree y la rama…",
   "panes.menu.handOver": "Traspasar a…",
+  "panes.menu.hooks": "Hooks…",
   "panes.menu.moveDown": "Mover abajo",
   "panes.menu.moveLeft": "Mover a la izquierda",
   "panes.menu.moveRight": "Mover a la derecha",

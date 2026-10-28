@@ -610,7 +610,7 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
   const io = deps.logIo ?? FILE_IO
 
   /** Runs a command to its end or its time limit, its output into the log; never throws. */
-  const exec = (command: string, folder: string, log: BoundedLog): Promise<CheckEnd> => execCommand({ spawn, platform, timeoutMs: deps.timeoutMs(), env: () => checkEnv(deps.env()) }, command, folder, log)
+  const exec = (command: string, folder: string, log: BoundedLog, own: Record<string, string> = {}): Promise<CheckEnd> => execCommand({ spawn, platform, timeoutMs: deps.timeoutMs(), env: () => ({ ...checkEnv(deps.env()), ...own }) }, command, folder, log)
 
   /**
    * Runs one command as one of Hive's runs, in the folder. Its run is always finished and its log always closed, also
@@ -641,7 +641,7 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
         end = { spawnError: true, exitCode: null, signal: null, output: '' }
         return { ok: false, transient: true, cause: { cause: 'spawn' }, output: '', command, run: id ?? randomUUID() }
       }
-      end = await exec(command, folder, log)
+      end = await exec(command, folder, log, ctx.env)
     } finally {
       output = log.close()
       const ok = !end.spawnError && !end.timedOut && end.exitCode === 0
@@ -663,7 +663,7 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
   }
 
   return {
-    runCheck: (name, command, folder, ctx) => run(name, command, folder, ctx),
+    runCheck: (name, command, folder, ctx) => run(ctx.label ?? name, command, folder, ctx),
     // The install's title is its command line, which can hold a token: withheld from the Agent API (#620).
     install: async (folder, _clean, ctx) => {
       const plan = installPlan(await deps.setupCommand(), folder)

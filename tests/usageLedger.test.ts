@@ -2,6 +2,8 @@
 // a session's rows add up to its days and price as its usage always did; a card's rows are its share of the session.
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { serialize } from 'v8'
+import { brotliDecompressSync } from 'zlib'
 import { describe, expect, it } from 'vitest'
 import { newUsageParser, parserShape, restoreParser, saveParser } from '../src/main/usageParsers'
 import { copilotEventsPath } from '../src/main/providers/copilot/events'
@@ -72,6 +74,26 @@ describe("a parser's saved state", () => {
     expect(restoreParser('claude-code', 'c1', new Uint8Array([1, 2, 3]), parserShape(a))).toBeNull()
     // Another provider's state: not its shape.
     expect(restoreParser('codex', 'c1', saveParser(a), parserShape(a))).toBeNull()
+    // Saved uncompressed, as before HI-1912: its shape had no format, so it's read afresh.
+    const own = Object.getOwnPropertySymbols(a).map((s) => (a as unknown as Record<symbol, object>)[s])[0]
+    expect(restoreParser('claude-code', 'c1', serialize(own), parserShape(a).replace(/^[^;]*;/, ''))).toBeNull()
+  })
+
+  it("is small for a long session: a request's tokens, not its usage block as written (HI-1912)", () => {
+    // Claude Code's usage block as it writes it now (Oct 2026), most of it fields the parser doesn't read.
+    const block = (i: number) => ({ input_tokens: 2, cache_creation_input_tokens: 13783 + i, cache_read_input_tokens: 29539 + i, output_tokens: 180 + i, output_tokens_details: { thinking_tokens: 62 }, server_tool_use: { web_search_requests: 0, web_fetch_requests: 0 }, service_tier: 'standard', cache_creation: { ephemeral_1h_input_tokens: 13783 + i, ephemeral_5m_input_tokens: 0 }, inference_geo: 'global', iterations: [{ input_tokens: 2, output_tokens: 180 + i, cache_read_input_tokens: 29539 + i, cache_creation_input_tokens: 13783 + i, cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 13783 + i }, type: 'message' }], speed: 'standard', fallback_credit: null })
+    const n = 2000
+    const lines = Array.from({ length: n }, (_, i) => JSON.stringify({ type: 'assistant', requestId: `req_011CgC69q7QPG5ogvMf${String(i).padStart(5, '0')}`, timestamp: at(30 * i), message: { model: 'claude-opus-5-5', usage: block(i) } }))
+    const a = newUsageParser('claude-code', 'c1')!
+    a.feed(lines.join('\n') + '\n')
+    const state = saveParser(a)
+    // Uncompressed, about 900 bytes a request with the whole block kept, 215 with its tokens; compressed, about 12. The
+    // largest of a workspace's states was 3.4 MB, for a session of 4,693 requests.
+    expect(brotliDecompressSync(state).length / n).toBeLessThan(300)
+    expect(state.length / n).toBeLessThan(60)
+    const b = restoreParser('claude-code', 'c1', state, parserShape(a))!
+    expect(b.result()).toEqual(a.result())
+    expect(b.result().cacheTtlSeconds).toBe(3600)
   })
 })
 

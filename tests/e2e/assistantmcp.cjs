@@ -16,7 +16,8 @@ const userData = path.join(lib.WORK, 'assistantmcp-profile')
 const ws = path.join(lib.WORK, 'assistantmcp-ws')
 const proj = path.join(ws, 'demo')
 const home = path.join(lib.WORK, 'assistantmcp-claude-home')
-const PORT = Number(lib.port(47939))
+// Its own default, below the lanes' ports (47939 on, lanes.mjs) and no other suite's (HI-1921).
+const PORT = Number(lib.port(47703))
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

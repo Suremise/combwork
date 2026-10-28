@@ -15,6 +15,11 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
+// Only its agents (HI-1910): its workflow, ticked by default, would open Version Control → Workflow after the load.
+const agentsOnly = async (d) => {
+  const box = d.locator('[data-workflow-apply]')
+  if (await box.count()) await box.uncheck()
+}
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
 
@@ -92,7 +97,7 @@ const check = (name, ok, extra = '') => {
   await userRow(sidebar, 'Pair').click()
   await detail.waitFor({ timeout: 5000 })
   const table = (await detail.locator('table tbody tr').allInnerTexts()).map((r) => r.split('\t').map((c) => c.trim()))
-  check('selecting one shows its agents (role in the workflow with its note, coding agent, model) and layout; nothing of worktrees', table.length === 2 && table[0][0] === 'Builder' && /^Builder\s+builder$/.test(table[0][1]) && table[1][1] === 'Reviewer' && table[0][3] === 'opus' && table[0].length === 6 && !/worktree|project folder/i.test(await detail.innerText()) && /2 agents, two columns layout/i.test(await detail.innerText()), JSON.stringify(table))
+  check('selecting one shows its agents (role in the workflow with its note, coding agent, model) and layout; nothing of worktrees', table.length === 2 && table[0][0] === 'Builder' && /^Builder\s+builder$/.test(table[0][1]) && table[1][1] === 'Reviewer' && table[0][3] === 'opus' && table[0].length === 6 && !/worktree|project folder/i.test((await detail.innerText()).replace(await detail.locator('[data-template-workflow-view]').innerText().catch(() => ''), '')) && /2 agents, two columns layout/i.test(await detail.innerText()), JSON.stringify(table))
   await shot('1-view')
 
   // Rename: in place, the file kept.
@@ -122,6 +127,7 @@ const check = (name, ok, extra = '') => {
   await nameBoxes(confirmLoad).nth(0).fill('BBuilder')
   await nameBoxes(confirmLoad).nth(1).fill('BReviewer')
   await lib.until(() => loadOf(confirmLoad).isEnabled(), 5000)
+  await agentsOnly(confirmLoad)
   await loadOf(confirmLoad).click()
   check('Load into Project… replaces that project\'s agents and layout', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["BBuilder","BReviewer"]' && projectCfg(beta).layout === 'columns2', 10000)), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
 
@@ -132,7 +138,7 @@ const check = (name, ok, extra = '') => {
   check('Export… writes the template file', !!(await lib.until(async () => fs.existsSync(exported), 5000)) && !!(await toast(/Template exported/)))
   const text = fs.readFileSync(exported, 'utf8')
   const json = JSON.parse(text)
-  check('the exported file holds the template and nothing personal (no paths, ids, sessions, user names)', JSON.stringify(Object.keys(json).sort()) === '["agents","layout","name","savedAt","version"]' && !/templateshare|Users|"id"|lastSessionId/i.test(text) && !text.toLowerCase().includes(os.userInfo().username.toLowerCase()), text.slice(0, 200))
+  check('the exported file holds the template and nothing personal (no paths, ids, sessions, user names; its workflow the rules only, HI-1910)', JSON.stringify(Object.keys(json).sort()) === '["agents","layout","name","savedAt","version","workflow"]' && !/"target"|"commands"|"email"/.test(JSON.stringify(json.workflow)) && !/templateshare|Users|"id"|lastSessionId/i.test(text) && !text.toLowerCase().includes(os.userInfo().username.toLowerCase()), text.slice(0, 200))
 
   // Import it into alpha: where to keep it asked; again, a clash: Keep Both.
   const importInto = async (label) => {
@@ -183,6 +189,7 @@ const check = (name, ok, extra = '') => {
   await tabDetail.getByRole('button', { name: 'Load into This Project…' }).click()
   const confirmTab = page.locator('.dialog', { hasText: 'Load "Solo"?' })
   await confirmTab.waitFor({ timeout: 5000 })
+  await agentsOnly(confirmTab)
   await confirmTab.getByRole('button', { name: 'Load template' }).click()
   check("Load into This Project… loads into the tab's project (new agents, as the template has them)", !!(await lib.until(async () => JSON.stringify(projectCfg(alpha).agents.map((a) => a.id)) !== ids, 10000)) && JSON.stringify(projectCfg(alpha).agents.map((a) => a.name)) === '["Builder","Reviewer"]')
 
@@ -272,6 +279,7 @@ const check = (name, ok, extra = '') => {
   // (Reviewer is alpha's agent's name: changed. Tester is free.)
   await nameBoxes(loadEdited).nth(1).fill('BReviewer')
   await lib.until(() => loadOf(loadEdited).isEnabled(), 5000)
+  await agentsOnly(loadEdited)
   await loadOf(loadEdited).click()
   check('loaded into beta: exactly those agents, in order, with that layout', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => [a.name, a.workflowRole, a.role ?? '', !!a.worktree])) === '[["Tester","builder","",false],["BReviewer","either","checker",false]]' && projectCfg(beta).layout === 'columns3', 15000)), JSON.stringify(projectCfg(beta).agents))
   // A save made while the editor is open is never overwritten (#271): the draft (a new name) is open; "Team edited" is

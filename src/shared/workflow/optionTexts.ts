@@ -55,6 +55,10 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
     title: msg({ id: 'workflow.option.mergeChecks.title', defaultMessage: 'Checks pass on the merged result', description: 'A workflow option (glossary 2.6, G9): named commands Hive’s merge queue runs on a card’s work merged with the target branch.' }),
     desc: msg({ id: 'workflow.option.mergeChecks.desc', defaultMessage: 'Hive’s merge queue runs these named commands on the card’s work merged with the target branch, and moves the target only once each one has passed.', description: 'What the workflow option “Checks pass on the merged result” does (glossary 2.1: merge queue).' })
   },
+  focusedTests: {
+    title: msg({ id: 'workflow.option.focusedTests.title', defaultMessage: 'Each card’s focused tests pass on the merged result', description: 'A workflow option (glossary 2.6, G20): the tests a card’s change needs are chosen when it is submitted, and Hive’s merge queue runs them on its work merged with the target branch.' }),
+    desc: msg({ id: 'workflow.option.focusedTests.desc', defaultMessage: 'When a card is submitted, the project’s command chooses the tests its change needs (or its builder names them, for its reviewer to check), and the merge queue runs them on the merged result, moving the target only once they pass.', description: 'What the workflow option “Each card’s focused tests pass on the merged result” does (glossary 2.1: merge queue).' })
+  },
   strict: {
     title: msg({ id: 'workflow.option.strict.title', defaultMessage: 'Work is up to date with its target branch before it merges', description: 'A workflow option (glossary 2.6, G8, strict): a card’s work must contain the target branch’s latest commit before it is merged; Hive’s merge queue brings it up to date itself.' }),
     desc: msg({ id: 'workflow.option.strict.desc', defaultMessage: 'When the target branch has moved on since the review, the merge queue brings the work up to date in its own folder first, and returns the card if that conflicts or makes a different change.', description: 'What the workflow option “Work is up to date with its target branch before it merges” does (glossary 2.1: merge queue; Squash is the merge style’s value).' })
@@ -196,7 +200,7 @@ export const PRESET_TEXT: Record<PresetId | 'custom', Msg> = {
 
 /** What a preset leaves for a later version, said under the preset choice while it is chosen (#1361). */
 export const PRESET_NOTE_TEXT: Partial<Record<PresetId, Msg>> = {
-  team: msg({ id: 'workflow.preset.note.team', defaultMessage: 'Team checks the merged result with the quick checks and the unit tests. Running each card’s own focused tests there too comes in a later version.', description: 'Under the preset choice of Project Settings → Workflow while Team is chosen (glossary 2.1: Team; G9: the merged result).' })
+  team: msg({ id: 'workflow.preset.note.teamFocused', defaultMessage: 'Team runs each card’s focused tests on the merged result when the project has a command that runs them: set it under Each card’s focused tests.', description: 'Under the preset choice of Project Settings → Workflow while Team is chosen (glossary 2.1: Team; G20: Each card’s focused tests is an option’s name, as translated there).' })
 }
 
 /**
@@ -242,6 +246,7 @@ export const OPTION_WHY: Partial<Record<OptionKey, Msg>> = {
   pushTarget: msg({ id: 'workflow.why.pushTarget', defaultMessage: 'Pushing reaches your remote and its sign-in, so it stays yours unless you turn it on.', description: 'Why the presets leave “Push the target branch after merging” off.' }),
   commitMessage: msg({ id: 'workflow.why.commitMessage', defaultMessage: 'The card’s key in the history links each merge to its card; a project that keeps card numbers out of its history uses the branch’s own.', description: 'Why the presets set “Commit message” to Hive’s (the card’s key and title, with trailers).' }),
   mergeChecks: msg({ id: 'workflow.why.mergeChecks', defaultMessage: 'The checks run on the work as it will be once merged, not only as it was built.', description: 'Why the presets set “Checks pass on the merged result” when Hive merges.' }),
+  focusedTests: msg({ id: 'workflow.why.focusedTests', defaultMessage: 'Each card’s own tests on the merged result catch what its change breaks there, without running every test for every card.', description: 'Why Team turns on “Each card’s focused tests pass on the merged result” when the project has the command that runs them.' }),
   mergeInstall: msg({ id: 'workflow.why.mergeInstall', defaultMessage: 'A clean install before every merge catches a dependency that only worked on the builder’s machine.', description: 'Why Team installs dependencies from scratch before every merge.' }),
   okBefore: msg({ id: 'workflow.why.okBefore', defaultMessage: 'Some work needs your eyes before it ships, such as screenshots and release steps.', description: 'Why Team asks for your OK on cards labelled ui or release.' }),
   folder: msg({ id: 'workflow.why.folder', defaultMessage: 'Pairs and teams build in parallel, each card apart from the others.', description: 'Why the presets set “Where cards are built” as they do (Solo: the project folder).' }),

@@ -7,6 +7,7 @@ import type { HiveEvent } from '@shared/types'
 import { call } from './api'
 import { playChime } from './chime'
 import { matchKeybinding, runCommand } from './commands'
+import { HooksDialog } from './components/HooksDialog'
 import { AboutDialog, AgentSetupDialog, DiagnosticsDialog, CommandPalette, CompactDialog, Dialogs, NotificationCenter, ProvidersBanner, QuitDialog, QuitPendingBanner, ShortcutsDialog, Toasts } from './components/Overlays'
 import { ConnectionsIntroBanner } from './components/ConnectionChoice'
 import { AddAgentDialog, AgentSettingsDialog, HandOverDialog, MergeDialog, TemplateAgentDialog } from './components/AgentDialogs'
@@ -17,6 +18,7 @@ import { ArchiveAllDialog, BoardView, MoveToDoingDialog, TaskDialog, TaskStartDi
 import { LaneStartDialog } from './components/LaneStartDialog'
 import { WorkspaceOverviewView } from './views/WorkspaceOverview'
 import { PerformanceView } from './views/Performance'
+import { WorkspaceActivityView } from './views/WorkspaceActivity'
 import { RemoveProjectDialog } from './components/ProjectRemoval'
 import { UpdateDialog } from './components/Updates'
 import { ModeMenuHost } from './components/PermissionMode'
@@ -34,7 +36,7 @@ import { ProgressPanel, progressRunsChanged } from './components/Progress'
 import { queueBoardChanged, queueChangedEvent } from './queueSource'
 import { AssistantMain } from './components/AssistantView'
 import { reloadAssistantChanges } from './assistantUndo'
-import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, noteAssistantAction, setWithLive, showWorkspace, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, dismissToast, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
+import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, noteAssistantAction, flushLiveStates, setLoaded, setWithLive, showWorkspace, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, dismissToast, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
 import { DocsView, McpView, NotesView, SkillView, WelcomeView } from './views/OtherViews'
 import { TemplatesView } from './components/Templates'
 import { ProjectView } from './views/ProjectView'
@@ -86,11 +88,11 @@ let chimesPlayed = 0
 function handleEvent(e: HiveEvent): void {
   switch (e.type) {
     case 'workspace-progress':
-      set({ openProgress: e.progress })
+      setLoaded({ openProgress: e.progress })
       break
     case 'recent-changed':
       // Opened, removed or cleared (in any window): this window's view of the list, asked for again (#144).
-      void call('workspace:recent').then((recent) => set({ recent })).catch(() => undefined)
+      void call('workspace:recent').then((recent) => setLoaded({ recent })).catch(() => undefined)
       break
     case 'workspace-changed': {
       const sel = get().selectedProject
@@ -239,10 +241,10 @@ function handleEvent(e: HiveEvent): void {
       }
       break
     case 'skills-changed':
-      set((s) => ({ skillsVersion: s.skillsVersion + 1 }))
+      setLoaded((s) => ({ skillsVersion: s.skillsVersion + 1 }))
       break
     case 'modes-changed':
-      set((s) => ({ modesVersion: s.modesVersion + 1 }))
+      setLoaded((s) => ({ modesVersion: s.modesVersion + 1 }))
       break
     case 'journal-changed':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set((s) => ({ journalVersion: s.journalVersion + 1 }))
@@ -275,7 +277,7 @@ function handleEvent(e: HiveEvent): void {
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) progressRunsChanged(e)
       break
     case 'merge-slots-changed':
-      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set({ mergeSlots: e.slots })
+      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) setLoaded({ mergeSlots: e.slots })
       break
     case 'queue-changed':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) queueChangedEvent(e.projectPath)
@@ -287,9 +289,11 @@ function handleEvent(e: HiveEvent): void {
       void loadTasks()
       break
     case 'lanes-changed':
-      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set({ lanes: e.lanes })
+      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) setLoaded({ lanes: e.lanes })
       break
     case 'assistant-questions': {
+      // A load's questions still waiting (setLoaded) count as shown: they are never notified again.
+      flushLiveStates()
       const before = get().assistantQuestions
       set({ assistantQuestions: e.questions })
       // With the panel hidden, the question comes as a notification the user can answer.
@@ -344,6 +348,7 @@ export function App() {
   useLanguage()
   // Whether one is open, not the workspace itself: its every change would render the whole window again (HI-1806).
   const workspace = useStore((s) => !!s.workspace)
+  const workspacePath = useStore((s) => s.workspace?.path ?? null)
   useAntivirusOffer()
   const assistantLeft = useStore(assistantOnLeft)
   const activity = useStore((s) => s.activity)
@@ -482,6 +487,8 @@ export function App() {
         return <WorkspaceOverviewView />
       case 'performance':
         return <PerformanceView />
+      case 'activity':
+        return workspacePath ? <WorkspaceActivityView key={workspacePath} workspacePath={workspacePath} /> : null
       default:
         return workspace ? null : <WelcomeView />
     }
@@ -536,6 +543,7 @@ export function App() {
       <CommandPalette />
       <QuitDialog />
       <CompactDialog />
+      <HooksDialog />
       <MoveRepairDialog />
       <SetAsideDialog />
       <BoardUpgradeAsk />

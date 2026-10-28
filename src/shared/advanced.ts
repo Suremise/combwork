@@ -183,6 +183,10 @@ export const QUEUE_NETWORK_CODES = 'hive.queue.networkCodes'
 
 /** The longest the merge queue's signed merge commit takes before its signer is ended (#1350): read by main's queueHost. */
 export const QUEUE_SIGN_SECONDS = 'hive.queue.signSeconds'
+/** G20 (HI-1367): the parallel jobs the merge queue gives a project's focused-tests runner (HIVE_FOCUSED_JOBS). */
+export const QUEUE_FOCUSED_JOBS = 'hive.queue.focusedJobs'
+/** G20 (HI-1367): the longest a project's focused-tests picker runs, at a submit or at the merge. */
+export const FOCUSED_PICK_SECONDS = 'hive.focused.pickSeconds'
 
 /** Whether the merge queue asks before updating a target checked out in a folder (#1351, OP-40): read by main's queueHost. */
 export const QUEUE_CHECKED_OUT_TARGET = 'hive.queue.checkedOutTarget'
@@ -578,6 +582,34 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
+    id: 'hive.lanes.waitYouMinutes',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.lanes.waitYouMinutes.title', defaultMessage: 'Lanes: a long wait for you', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.hive.lanes.waitYouMinutes.desc', defaultMessage: "After how long a lane waiting for you (a request in For you, or a card at its round limit) has its wait marked in the Progress panel's Lanes. Too short marks every wait; too long, a lane can sit unnoticed.", description: 'What the advanced setting "Lanes: a long wait for you" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'number',
+    // HI-1926 (Darren's card): For you over an hour.
+    default: 60,
+    min: 1,
+    max: 1440,
+    unit: 'min',
+    workspace: true,
+    applies: 'now'
+  },
+  {
+    id: 'hive.lanes.waitReviewerMinutes',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.lanes.waitReviewerMinutes.title', defaultMessage: 'Lanes: a long wait for a reviewer', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.hive.lanes.waitReviewerMinutes.desc', defaultMessage: "After how long a lane whose card waits in Review with nobody reviewing it has its wait marked in the Progress panel's Lanes. Too short marks every review; too long, a card can sit unreviewed.", description: 'What the advanced setting "Lanes: a long wait for a reviewer" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'number',
+    // HI-1926 (Darren's card): a reviewer over 15 minutes.
+    default: 15,
+    min: 1,
+    max: 1440,
+    unit: 'min',
+    workspace: true,
+    applies: 'now'
+  },
+  {
     id: AGENTS_PER_PROJECT,
     group: 'hive',
     title: msg({ id: 'settings.advanced.hive.agents.perProject.title', defaultMessage: 'Agents per project', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
@@ -653,6 +685,31 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 1440,
     unit: 'min',
+    applies: 'now'
+  },
+  // G20 (HI-1367): how many tests at once a card's focused tests run with at the merge (CPU-friendly: the machine is shared).
+  {
+    id: QUEUE_FOCUSED_JOBS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.queue.focusedJobs.title', defaultMessage: 'Merge queue: focused tests run at once', description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by a number: how many of a card's focused tests (the tests its change needs) the merge queue runs in parallel." }),
+    desc: msg({ id: 'settings.advanced.hive.queue.focusedJobs.desc', defaultMessage: 'How many tests at once the merge queue’s run of a card’s focused tests may use, passed to the project’s command that runs them. More finishes sooner but loads the computer, which agents and your own work share.', description: 'What the advanced setting "Merge queue: focused tests run at once" does, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'number',
+    default: 2,
+    min: 1,
+    max: 16,
+    applies: 'now'
+  },
+  // G20 (HI-1367): a picker past this is ended with its whole tree, and its pick is unknown (never "nothing needed").
+  {
+    id: FOCUSED_PICK_SECONDS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.focused.pickSeconds.title', defaultMessage: 'Focused tests: longest the choice of tests runs', description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in seconds: how long the project's command that chooses a card's focused tests may run, when the card is submitted and at its merge." }),
+    desc: msg({ id: 'settings.advanced.hive.focused.pickSeconds.desc', defaultMessage: 'How long the project’s command that chooses a card’s focused tests may run, when it is submitted and at its merge. Past it, the command is ended and no tests count as chosen: the builder then names them itself.', description: 'What the advanced setting "Focused tests: longest the choice of tests runs" does (Settings → Advanced).' }),
+    kind: 'number',
+    default: 180,
+    min: 10,
+    max: 1800,
+    unit: 's',
     applies: 'now'
   },
   // Which failed merge checks count as the network's (#1362, Darren's decision on #1121): Node's and npm's own error
@@ -1744,6 +1801,30 @@ const SOURCES: readonly AdvancedSource[] = [
     unit: 's',
     applies: 'sessions',
     samples: [HOOKS_TAKEN['codex']]
+  },
+  // What Hive asks Codex's app server for a launch's hooks (HI-982: the Hooks dialog; the hook hashes it trusts at launch).
+  {
+    id: 'codex.hooks.listMethod',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.hooks.listMethod.title', defaultMessage: 'Hooks: listing request', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.hooks.listMethod.desc', defaultMessage: "The request Hive sends Codex's app server for the hooks a session has. Wrong, an agent's Hooks dialog lists only Hive's own and says Codex couldn't list the rest, and Hive trusts its hooks by its own hashes.", description: 'What the advanced setting "Hooks: listing request" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'hooks/list',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/hooks-list-codex-0.164.0.txt`, version: '0.164.0', text: 'hooks/list' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'codex.hooks.listSeconds',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.hooks.listSeconds.title', defaultMessage: 'Hooks: listing timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.hooks.listSeconds.desc', defaultMessage: "How long Hive gives Codex's app server to list a session's hooks (`hooks/list`). Past it, an agent's Hooks dialog lists only Hive's own and says Codex couldn't list the rest.", description: 'What the advanced setting "Hooks: listing timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `hooks/list` as it is (a request\'s name).' }),
+    kind: 'number',
+    default: 20,
+    min: 2,
+    max: 120,
+    unit: 's',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/hooks-list-codex-0.164.0.txt`, version: '0.164.0', text: 'hooks/list', shows: "Codex's app server taking the request Hive sends for a session's hooks (its source: not a run)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   // How long Hive waits for Codex to render a session's prompt (#1285): it reads the developer_instructions Hive's guidance
   // follows from it. Past it, Hive adds none of its guidance rather than replace instructions it couldn't read.

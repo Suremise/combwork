@@ -72,7 +72,8 @@ import { recacheEstimate, withoutAccountEnv, withServerEnv } from './providers/c
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage, withCostFree } from '../shared/usageDays'
-import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchSkill, ProviderAdapter, SkillDelivery } from './providers/types'
+import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchHooks, LaunchSkill, ProviderAdapter, SkillDelivery } from './providers/types'
+import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
 import { config } from './config'
 import { emit, emitTo, onHiveEvent, tellListeners, toast } from './events'
@@ -212,6 +213,28 @@ const retentionDays = (): number | null => {
 const COST_INTERVAL_MS = 30_000
 /** How many of a launch's latest hooks are kept for the log (LiveSession.recentHooks). */
 const RECENT_HOOKS = 8
+
+/** A lock block of a launch (HI-982: LiveSession.hookBlock): its tool call, the file (its lock's key) and the holder's launch. */
+interface HookBlock {
+  runId: string
+  toolUseId: string | null
+  key: string
+  file: string
+  holderLiveId: string
+  holderRunId: string
+  kind: 'blocked' | 'asked'
+  at: number
+}
+
+/**
+ * A hook Hive is handling (HI-982), as it observes it: made when it arrives (observeHook) for its launch, filled in by
+ * its lock decision and the turn ledger, recorded in the launch's history once it is handled (hookHandled).
+ */
+export interface HookObservation {
+  l: LiveSession
+  fired: HookFired
+  started: number
+}
 /** How long after an ask its CLI's screen may take to show it is a safeguard prompt (LiveSession.guardAsk, #606). */
 const GUARD_ASK_MS = 10_000
 /** How many stops seen only on screen a session's record keeps (SessionRecord.screenStops). */
@@ -454,6 +477,14 @@ interface LiveSession {
   lastReply?: string
   /** Its latest hooks (what they were, when, and the status they left), for the log when the CLI turns out idle (#612). */
   recentHooks?: { kind: HookEvent['kind']; at: number; status: SessionStatus }[]
+  /** Its hooks for its Hooks dialog (HI-982): what its launch has (adapter.launchHooks), and what Hive received, newest last. */
+  hooks?: LaunchHooks
+  hookHistory?: HookFired[]
+  /**
+   * Its edit Hive's file lock blocked (or asked the user about) and whose decision stands (HI-982, Activity): the latest
+   * one only, by the tool call, the file and the holder's launch; dropped by what ends that decision (hookBlockNow).
+   */
+  hookBlock?: HookBlock
   /** Its CLI's turns as Hive knows them (#648): which runs and which are over, by the CLI's ids, and when it was last heard. */
   ledger?: TurnLedger
   /** The CLI's own latest record of a turn's end read from its transcript (LiveDetails.turnEnded). */
@@ -2338,6 +2369,14 @@ class SessionManager {
     const modelsFor = (running?: string): string[] => (running ? [running] : [chosenModel && resolvedModel(info, chosenModel), chosenModel].filter((m): m is string => !!m))
     l.autoCompactFor = adapter.autoCompact ? (running) => adapter.autoCompact!(ctx, cmd, modelsFor(running)) : undefined
     state.autoCompact = l.autoCompactFor?.()
+    // Its hooks, for its Hooks dialog (HI-982): never a reason for the launch to fail.
+    try {
+      l.hooks = adapter.launchHooks?.(ctx, cmd)
+    } catch (e) {
+      log.warn(`${userText(this.label(state))}: its hooks couldn't be listed`, e)
+    }
+    l.hookHistory = []
+    l.hookBlock = undefined
     l.titleAttention = adapter.titleAttention?.(info.version, ctx) ?? undefined
     l.turnScreen = adapter.turnScreen?.(info.version) ?? undefined
     l.ledger = newLedger()
@@ -4842,13 +4881,24 @@ class SessionManager {
     if (!found) return null
     const [id, l] = found
     const hook = l.adapter.normalizeHook(body)
+    // Any tool call of its own ends the block its last edit had (HI-982): it went on with something, or tries again.
+    if (hook.event.kind === 'toolStart' && !hook.ids.sub) l.hookBlock = undefined
     if (hook.event.kind !== 'toolStart' || !hook.editedPaths.length) return null
+    const obs = this.hookObs.get(body)
+    // Its decision, as the launch's Hooks dialog shows it, and the block it leaves (Activity, while it stands).
+    const decided = (response: HookFired['response'], why?: string, block?: Omit<HookBlock, 'runId' | 'toolUseId' | 'at'>): void => {
+      if (obs) Object.assign(obs.fired, { response }, why ? { why: clip(why, HOOK_SHORT_MAX).text } : {})
+      if (block) l.hookBlock = { ...block, runId: l.state.runId, toolUseId: hook.ids.call, at: Date.now() }
+    }
     const mode = this.lockMode(l.state.projectPath)
     const base = typeof body.cwd === 'string' && body.cwd ? body.cwd : l.state.cwd
     const files = hook.editedPaths.map((f) => resolve(isAbsolute(f) ? f : join(base, f)))
     // The folder's write log (#1214): a check running there meanwhile doesn't count, whatever the lock mode.
     observer.markEdits(files)
-    if (mode === 'off') return this.editAccepted(id, files, null)
+    if (mode === 'off') {
+      decided('allowed')
+      return this.editAccepted(id, files, null)
+    }
     const now = Date.now()
     // Each file's identity resolved once (HI-1909: a realpath on main's thread each, three times a file before).
     const keys = new Map(files.map((abs) => [abs, lockKey(abs)]))
@@ -4859,7 +4909,9 @@ class SessionManager {
       const rel = placeRelative(holder.state.cwd, abs) || basename(abs)
       const who = holder.state.agentName ?? 'Another agent' // i18n-ignore: in the lock's replies to the agent (agent-facing)
       log.info(`Lock: ${userText(l.state.agentName)} → ${userText(rel)} held by ${userText(who)} (${mode})`)
+      const block = { key: keys.get(abs)!, file: abs, holderLiveId: held!.liveId, holderRunId: holder.state.runId }
       if (mode === 'warn') {
+        decided('warned', who)
         // i18n-ignore: the lock's reply to the agent (agent-facing)
         return this.editAccepted(id, files, l.adapter.lockReply({ kind: 'warn', context: `Note: ${who} is also editing ${rel} right now. Check the file's current content before changing it, and keep your edit small.` }), keys)
       }
@@ -4877,14 +4929,14 @@ class SessionManager {
             l.state.projectPath
           )
         }
-        return l.adapter.lockReply({
-          kind: 'deny',
-          // i18n-ignore: the lock's reply to the agent (agent-facing)
-          reason: `${who} is editing ${rel} right now (Hive file lock). Hive has asked the user whether you may edit it too. Stop and wait: don't work around this. When the user says go ahead, try the edit again.`
-        })
+        // i18n-ignore: the lock's reply to the agent (agent-facing)
+        const asked = `${who} is editing ${rel} right now (Hive file lock). Hive has asked the user whether you may edit it too. Stop and wait: don't work around this. When the user says go ahead, try the edit again.`
+        decided('asked', asked, { ...block, kind: 'asked' })
+        return l.adapter.lockReply({ kind: 'deny', reason: asked })
       }
       // i18n-ignore: the lock's reply to the agent, or its CLI's own question (agent- and CLI-facing)
       const reason = `${who} is editing ${rel} right now (Hive file lock). Work on something else, or wait until ${who} has finished its task, then try again.`
+      decided(mode === 'ask' ? 'asked' : 'blocked', reason, { ...block, kind: mode === 'ask' ? 'asked' : 'blocked' })
       return l.adapter.lockReply({ kind: mode === 'ask' ? 'ask' : 'deny', reason })
     }
     let fresh = false
@@ -4895,6 +4947,7 @@ class SessionManager {
       this.locks.set(key, { liveId: id, at: now, seq: ++this.lockSeq, path: abs })
     }
     if (fresh) this.publishLocks(id)
+    decided('allowed')
     return this.editAccepted(id, files, null, keys)
   }
 
@@ -4919,6 +4972,8 @@ class SessionManager {
     const l = this.live.get(id)
     if (!l) return
     const key = `${id}|${lockKey(resolve(path))}`
+    // The user's answer ends the block it asked about (HI-982).
+    if (l.hookBlock && `${id}|${l.hookBlock.key}` === key) l.hookBlock = undefined
     this.lockAllowed.set(key, ++this.lockSeq)
     this.lockGoAhead.set(key, path)
     this.sendGoAheads(id, l)
@@ -5071,6 +5126,69 @@ class SessionManager {
     }
   }
 
+  /** What Hive observes of each hook it handles (HI-982), by its body, while it handles it. */
+  private hookObs = new WeakMap<object, HookObservation>()
+
+  /**
+   * A hook arriving on its launch's own authenticated route (the hook server, HI-982): its observation, which its lock
+   * decision and the turn ledger fill in, for the launch's Hooks dialog; null when no launch of Hive's has it.
+   */
+  observeHook(runId: string | null, body: Record<string, any>): HookObservation | null {
+    const l = this.findLaunch(runId, body.session_id)?.[1]
+    if (!l?.hookHistory) return null
+    const event = clip(typeof body.hook_event_name === 'string' ? body.hook_event_name : '?', HOOK_SHORT_MAX).text
+    const obs: HookObservation = { l, started: performance.now(), fired: { at: Date.now(), event, receiver: l.hooks?.receivers[event] ?? 'hive', response: 'none', ledger: 'none', ms: 0 } }
+    this.hookObs.set(body, obs)
+    return obs
+  }
+
+  /**
+   * A hook handled (HI-982): its reply (context, where its lock decision said nothing) or its error, and how long Hive
+   * took, kept in its launch's history (the newest HOOK_FIRED_MAX). Never logged: the history is the dialog's alone.
+   */
+  hookHandled(obs: HookObservation, reply: unknown, error?: { step: string; error: unknown }): void {
+    const f = obs.fired
+    if (error) Object.assign(f, { response: 'error', why: clip(`${error.step}: ${error.error instanceof Error ? error.error.message : String(error.error)}`, HOOK_SHORT_MAX).text })
+    else if (f.response === 'none' && reply && typeof reply === 'object' && Object.keys(reply).length) f.response = 'context'
+    f.ms = Math.round(performance.now() - obs.started)
+    const history = obs.l.hookHistory
+    if (!history) return
+    history.push(f)
+    if (history.length > HOOK_FIRED_MAX) history.splice(0, history.length - HOOK_FIRED_MAX)
+  }
+
+  /**
+   * An agent's hooks for its Hooks dialog (HI-982): its launch's (runId), what it has (listed again: the CLI asked now, or
+   * its files compared with the launch's) and what Hive received, newest first. Null when it isn't running.
+   */
+  async sessionHooks(projectPath: string, agentId: string): Promise<SessionHooks | null> {
+    const l = this.live.get(liveId(projectPath, agentId))
+    if (!l?.hooks || !l.hookHistory) return null
+    const { runId, provider } = l.state
+    const listing = l.hooks.now ? await l.hooks.now().catch((e: Error) => ({ ...l.hooks!.listing, notes: [...l.hooks!.listing.notes, { kind: 'cliUnknown' as const, why: clip(e.message, HOOK_SHORT_MAX).text }] })) : l.hooks.listing
+    return { runId, provider, listing, fired: [...l.hookHistory].reverse() }
+  }
+
+  /**
+   * The project's lock blocks standing now (HI-982, Activity): each agent's latest blocked (or asked) edit while the
+   * holder whose lock blocked it, in that launch, still holds the file and the blocked launch hasn't moved on since
+   * (another tool call, the call's end, its turn's end, the user's answer: those drop it). The holder is named only when
+   * it is in the same project.
+   */
+  hookBlocks(projectPath: string): ActivityHookBlock[] {
+    return this.projectStates(projectPath).flatMap((state): ActivityHookBlock[] => {
+      const l = this.live.get(liveId(projectPath, state.agentId))
+      const b = l?.hookBlock
+      if (!l || !b || b.runId !== state.runId) return []
+      const held = this.locks.get(b.key)
+      const holder = held?.liveId === b.holderLiveId ? this.live.get(b.holderLiveId) : undefined
+      if (!holder || holder.state.runId !== b.holderRunId || Date.now() - held!.at >= LOCK_TTL_MS) return []
+      const file = (placeRelative(state.cwd, b.file) || basename(b.file)).replace(/\\/g, '/')
+      const same = holder.state.projectPath.toLowerCase() === projectPath.toLowerCase()
+      return [{ key: `${b.runId}|${b.toolUseId ?? ''}|${b.key}|${b.holderRunId}`, agentId: state.agentId, file, holder: same ? (holder.state.agentName ?? holder.state.agentId) : null, kind: b.kind, at: b.at }]
+    })
+  }
+
   /** Hook calls whose reply waits for its place in the launch's hook order (hookReply), by their body. */
   private noticeReplies = new WeakMap<object, (reply: Record<string, unknown> | null) => void>()
 
@@ -5204,6 +5322,13 @@ class SessionManager {
     const was = ledger.active
     const took = admit(ledger, hook.event, ids, { hiveContinued: continued, woke, now: at })
     if (ledger.active !== was) l.woke = false
+    // What the ledger made of it, for the Hooks dialog (HI-982), apart from Hive's reply: an ignored hook may have had one.
+    const obs = this.hookObs.get(body)
+    if (obs) Object.assign(obs.fired, took.verdict === 'stale' ? { ledger: 'ignored', ledgerWhy: clip(took.why, HOOK_SHORT_MAX).text } : { ledger: took.verdict === 'apply' ? 'applied' : 'continued' })
+    // What ends a lock block's decision (HI-982): the blocked call's end, or its turn's (a new prompt, a stop, the end).
+    const b = l.hookBlock
+    const kind = hook.event.kind
+    if (b && ((kind === 'toolEnd' && !!b.toolUseId && ids.call === b.toolUseId) || (took.verdict !== 'stale' && ['prompt', 'stop', 'signIn', 'interrupt', 'end'].includes(kind)))) l.hookBlock = undefined
     // A current turn's hook (#1336): the prompt watched is answered, and missing hooks are back. A late hook of a turn
     // that is over says nothing of a prompt sent since.
     if (l.hooksWatch) {

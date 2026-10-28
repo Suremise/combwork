@@ -16,6 +16,11 @@ const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
+// Only its agents (HI-1910): its workflow, ticked by default, would open Version Control → Workflow after the load.
+const agentsOnly = async (d) => {
+  const box = d.locator('[data-workflow-apply]')
+  if (await box.count()) await box.uncheck()
+}
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
 // A load's confirmation shows once the template's plan is read, with git checks of the agents it removes: the 12-agent
@@ -107,7 +112,7 @@ const check = (name, ok, extra = '') => {
   await saveTemplate()
   await shown(dialog, 'dialog')
   await dialog.locator('input.input').fill('Pair')
-  await dialog.locator('input[type="checkbox"]').check()
+  await dialog.locator('input[type="checkbox"]').first().check()
   await page.screenshot({ path: path.join(lib.WORK, 'templates-1-save.png') })
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   const file = path.join(ws, '.hive', 'templates', 'pair.json')
@@ -116,7 +121,7 @@ const check = (name, ok, extra = '') => {
   // The same name again: asks before replacing.
   await saveTemplate()
   await dialog.locator('input.input').fill('pair')
-  await dialog.locator('input[type="checkbox"]').check()
+  await dialog.locator('input[type="checkbox"]').first().check()
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   const replace = page.locator('.dialog', { hasText: 'Replace the template?' })
   check('saving over a name asks first', !!(await lib.until(async () => (await replace.count()) === 1, 5000)))
@@ -215,6 +220,7 @@ const check = (name, ok, extra = '') => {
   check('an emptied name is marked, and Load template greyed out', !!(await lib.until(async () => /Enter a name/.test(await warn.locator('.template-plan-table .field-error').first().innerText().catch(() => '')) && (await warnLoad.isDisabled()), HUNG_MS)))
   await firstName.fill('Builder')
   check('…put back, Load template can be clicked again', !!(await lib.until(async () => (await warn.locator('.template-plan-table .field-error').count()) === 0 && (await warnLoad.isEnabled()), HUNG_MS)))
+  await agentsOnly(warn)
   await warnLoad.click()
   // The layout with them: this user's view, saved a moment after the agents (HI-1749).
   const loaded = await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Builder","Reviewer"]' && projectCfg(beta).layout === 'columns3', 15000)
@@ -238,7 +244,7 @@ const check = (name, ok, extra = '') => {
   // Agent, Change, Role, Coding agent, Model, Effort, Mode; what the template leaves to the defaults marked "(default)".
   const builderCells = await cells(treesWarn, 'Builder')
   const helperCells = await cells(treesWarn, 'Helper')
-  check("…gives each new agent's role, pairing and settings in a row (inherited ones as their default)", builderCells[0] === 'Builder' && builderCells[2] === 'Builder with Helper' && builderCells[3] === 'Claude Code' && builderCells[4] === 'Opus 5.5' && builderCells[5] === 'High' && builderCells[6].endsWith(' (default)') && helperCells[0] === 'Helper checks UI' && helperCells[2] === 'Reviewer with Builder' && helperCells[4] === 'Opus 5.5 (default)' && helperCells[6].endsWith(' (default)'), JSON.stringify([builderCells, helperCells]))
+  check("…gives each new agent's role, pairing and settings in a row (inherited ones as their default)", builderCells[0] === 'Builder' && builderCells[2] === 'Builder paired: Helper' && builderCells[3] === 'Claude Code' && builderCells[4] === 'Opus 5.5' && builderCells[5] === 'High' && builderCells[6].endsWith(' (default)') && helperCells[0] === 'Helper checks UI' && helperCells[2] === 'Reviewer paired: Builder' && helperCells[4] === 'Opus 5.5 (default)' && helperCells[6].endsWith(' (default)'), JSON.stringify([builderCells, helperCells]))
   check('…and nothing of worktrees for the new agents: no Where column, no setup command', (await treesWarn.locator('.template-plan-table thead th').allInnerTexts()).join().toLowerCase() === 'agent,change,role,coding agent,model,effort,mode' && !/own worktree|setup command/.test(tw), tw)
   const planBox = treesWarn.locator('.detail.rich')
   check('the table fits the dialog: no scrolling sideways', await planBox.evaluate((el) => el.scrollWidth <= el.clientWidth + 1))
@@ -436,7 +442,7 @@ const check = (name, ok, extra = '') => {
   const loadButton = crossLoad.getByRole('button', { name: 'Load template' })
   // #1440: the two names alpha's agents have start as free ones, so loading is one click; the others as they are.
   check("each name in the template beside a box for its new one: alpha's two filled in free", JSON.stringify(await fromNames()) === '["Alpha builder","Alpha reviewer","Tree"]' && JSON.stringify(await namesNow()) === '["Alpha builder (beta)","Alpha reviewer (beta)","Tree"]', JSON.stringify([await fromNames(), await namesNow()]))
-  check("…saying why, none marked, Load template ready", (await errors()).length === 0 && /alpha already has agents called Alpha builder, Alpha reviewer: free names are filled in below/.test(await crossLoad.locator('[data-names-taken]').innerText()) && (await loadButton.isEnabled()), JSON.stringify(await errors()))
+  check("…saying why, none marked, Load template ready", (await errors()).length === 0 && /these names are taken already: Alpha builder, Alpha reviewer \(projects: alpha\)\. Free names are filled in below\./.test(await crossLoad.locator('[data-names-taken]').innerText()) && (await loadButton.isEnabled()), JSON.stringify([await errors(), await crossLoad.locator('[data-names-taken]').innerText()]))
   // One edited back to alpha's: marked, saying so, and Load template greyed out.
   await nameInputs.nth(0).fill('Alpha builder')
   check("…one edited to alpha's agent's name is marked, Load template greyed out", !!(await lib.until(async () => JSON.stringify(await errors()) === '["alpha has an agent called Alpha builder."]' && (await loadButton.isDisabled()), HUNG_MS)), JSON.stringify(await errors()))
@@ -449,6 +455,7 @@ const check = (name, ok, extra = '') => {
   await nameInputs.nth(1).fill('BAR')
   check('…all free: Load template can be clicked, the template names unchanged', !!(await lib.until(async () => (await errors()).length === 0 && (await loadButton.isEnabled()), HUNG_MS)) && JSON.stringify(await fromNames()) === '["Alpha builder","Alpha reviewer","Tree"]', JSON.stringify(await errors()))
   await page.screenshot({ path: path.join(lib.WORK, 'templates-7-cross-project.png') })
+  await agentsOnly(crossLoad)
   await loadButton.click()
   check("loaded into beta: alpha's agents, with the names chosen", !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["BAB","BAR","Tree"]', 15000)), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
   check("…each in beta's folder: no worktree or branch made", projectCfg(beta).agents.every((a) => !a.worktree) && lib.git(beta, ['branch', '--list']) === betaBranches && lib.git(beta, ['worktree', 'list', '--porcelain']) === betaTrees)

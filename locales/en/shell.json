@@ -119,6 +119,10 @@
     "defaultMessage": "Focus Agent {n}",
     "description": "A command per agent number (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. {n} is the agent's place in the strip, 1 to 9."
   },
+  "shell.command.agent.hooks": {
+    "defaultMessage": "Agent Hooks…",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the focused agent's Hooks dialog (the hooks its session has, and what Hive received). The … says it opens a dialog first: keep it."
+  },
   "shell.command.agent.menu": {
     "defaultMessage": "Agent Menu…",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the focused agent's ⋯ menu on its pane (everything its pane header doesn't show). The … says it opens a menu first: keep it."
@@ -562,6 +566,10 @@
   "shell.command.update.show": {
     "defaultMessage": "Show Hive Update",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category."
+  },
+  "shell.command.view.activity": {
+    "defaultMessage": "Show Activity",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category: Activity's workspace level, what every project's agents run now."
   },
   "shell.command.view.alwaysOnTop": {
     "defaultMessage": "Always on Top",

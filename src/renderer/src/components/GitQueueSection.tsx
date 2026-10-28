@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { fmt, msg, tr } from '@shared/i18n'
 import { formatDateTime } from '@shared/dates'
 import { revisionShort } from '@shared/platform/descriptors'
-import { nextChange, queueShown, returnRun, returnWhy, runCheckName } from '@shared/progressQueue'
+import { nextChange, queueShown, returnCheck, returnRun, returnWhy } from '@shared/progressQueue'
 import type { ProgressRun, ProjectInfo } from '@shared/types'
 import type { QueueRecent, QueueView } from '@shared/workflow/queue'
 import { call, callShared } from '../api'
@@ -113,7 +113,7 @@ function historyColumns(v: QueueView, runs: readonly ProgressRun[], short: (id: 
   // A red check named by its run, as the panel names it (when Hive still keeps the run).
   const why = (r: QueueRecent): string => {
     const run = returnRun(v, r, runs)
-    return returnWhy(r, run ? runCheckName(run) : null, v.target, tr, list)
+    return returnWhy(r, returnCheck(r, run), v.target, tr, list)
   }
   const detail = (r: QueueRecent): string => (r.outcome === 'merged' ? tr(M.merged, { result: r.result ? short(r.result) : '' }) : r.outcome === 'returned' ? tr(M.returned, { why: why(r) }) : tr(M.cancelled, { reason: r.reason ?? 'other' /* i18n-ignore: a select's key, never shown */ }))
   const revision = (id: string | undefined): React.ReactNode => (id ? <RevisionButton revision={id} short={short} /> : <span className="faint">–</span>)

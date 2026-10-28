@@ -180,8 +180,17 @@ describe('cardRoundCosts (#1226)', () => {
   const session = (agentId: string, at: [number, number][]) => {
     const b = new TimelineBuilder()
     for (const [m, out] of at) b.add(t(m), { outputTokens: out }, 1)
-    return { scope: 'p', session: `s-${agentId}`, provider: 'claude-code' as const, agentId, agentName: agentId, summary: { provider: 'claude-code', model: 'claude-sonnet-5-5' } as never, timeline: b.timeline([]), firstActivity: iso(0), lastActivity: iso(45) }
+    return { scope: 'p', session: `s-${agentId}`, provider: 'claude-code' as const, agentId, agentName: agentId, summary: { provider: 'claude-code', model: 'claude-sonnet-5-5' } as never, timeline: b.timeline([]), firstActivity: iso(-10), lastActivity: iso(45) }
   }
+  /** A session's row on card 1 in the ledger: output tokens and the provider's charge for them. */
+  const ledger = (agentId: string, role: 'build' | 'review', out: number, usd: number) => ({
+    scope: 'p',
+    session: `s-${agentId}`,
+    provider: 'claude-code' as const,
+    agentId,
+    agentName: agentId,
+    row: { day: '2026-10-12', model: 'claude-sonnet-5-5', card: 1, role, inputTokens: 0, outputTokens: out, cacheWriteTokens: 0, cacheReadTokens: 0, requests: 1, prompts: 0, compactions: 0, fixedUsd: usd, fixedEstimated: false, covered: { inputTokens: 0, outputTokens: out, cacheWriteTokens: 0, cacheReadTokens: 0 }, tokensUnknown: 0, shared: false }
+  })
   const hold = (agent: string, role: 'build' | 'review', from: number, to: number) => ({ agent, name: agent.toUpperCase(), role, from: iso(from), to: iso(to) })
   const doc = (number: number, held: unknown[], more: Record<string, unknown> = {}): Record<string, unknown> => ({ number, title: `Card ${number}`, description: '', project: 'p', agent: 'b1', column: 'passed', order: number, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: iso(0), createdBy: 'You', updatedAt: iso(0), held, ...more })
 
@@ -192,8 +201,9 @@ describe('cardRoundCosts (#1226)', () => {
     const w = createWorkspaceService()
     await w.open(ws)
     opened.push(w)
-    // B1 builds rounds 1 and 2; R1 reviews round 1 and R2 round 2 (a reviewer swap).
-    await writeCard(w, 1, doc(1, [hold('b1', 'build', 0, 10), hold('r1', 'review', 10, 20), hold('b1', 'build', 20, 30), hold('r2', 'review', 30, 40)]))
+    // B1 builds rounds 1 and 2; R1 reviews round 1 and R2 round 2 (a reviewer swap). B1 held it before its work began too
+    // (a card adopted at the upgrade): outside its rounds.
+    await writeCard(w, 1, doc(1, [hold('b1', 'build', -10, -5), hold('b1', 'build', 0, 10), hold('r1', 'review', 10, 20), hold('b1', 'build', 20, 30), hold('r2', 'review', 30, 40)]))
     // B1 also held a live card in round 2's last five minutes of building (shared 1/2), and an archived one in round 1 (not read).
     await writeCard(w, 2, doc(2, [hold('b1', 'build', 25, 30)], { column: 'doing' }))
     await writeCard(w, 3, doc(3, [hold('b1', 'build', 0, 10)], { archived: true }))
@@ -213,29 +223,62 @@ describe('cardRoundCosts (#1226)', () => {
       })
     })
     vi.spyOn(usageHistory, 'freshen').mockResolvedValue(undefined as never)
-    vi.spyOn(usageHistory, 'timelines').mockResolvedValue([session('b1', [[5, 100], [27, 50]]), session('r1', [[15, 30]]), session('r2', [[35, 40]])] as never)
+    vi.spyOn(usageHistory, 'timelines').mockResolvedValue([session('b1', [[-8, 25], [5, 100], [27, 50]]), session('r1', [[15, 30]]), session('r2', [[35, 40]])] as never)
+    vi.spyOn(usageHistory, 'sessionsWho').mockResolvedValue([{ agentId: 'b1' }, { agentId: 'r1' }, { agentId: 'r2' }])
+    // The card's total as cost per card counts it: B1's $1.50 (150 tokens: 25 of round 2's 50 went to card 2), R1's
+    // $0.30 and R2's $0.40, reported charges.
+    vi.spyOn(usageHistory, 'cardRows').mockResolvedValue([ledger('b1', 'build', 150, 1.5), ledger('r1', 'review', 30, 0.3), ledger('r2', 'review', 40, 0.4)] as never)
     return w
   }
 
-  it('splits a card by round and role, a reviewer swap and shared time included', async () => {
+  it('splits a card by round and role, a reviewer swap and shared time included, adding up to its total (HI-1906)', async () => {
     const w = await world()
     const c = (await cardRoundCosts(w, 1))!
     expect(c.preWorkflow).toBe(false)
-    expect(c.rounds.map((r) => [r.round, r.verdict, r.reviewers, r.build.outputTokens, r.review.outputTokens])).toEqual([
-      [1, 'failed', ['r1'], 100, 30],
-      [2, 'passed', ['r2'], 25, 40]
+    // Only the card's own sessions' timelines are read (by its ledger rows, each with its scope).
+    expect(vi.mocked(usageHistory.timelines).mock.calls.at(-1)![1]).toEqual([{ scope: 'p', session: 's-b1' }, { scope: 'p', session: 's-r1' }, { scope: 'p', session: 's-r2' }])
+    // B1's $1.50 shared by its use in each (100, 25 of 50 shared with card 2, 25 before round 1); each reviewer's its own.
+    const close = (n: number) => expect.closeTo(n, 9)
+    expect(c.rounds.map((r) => [r.round, r.verdict, r.reviewers, r.build.outputTokens, r.build.cost, r.review.outputTokens, r.review.cost])).toEqual([
+      [1, 'failed', ['r1'], 100, close(1), 30, close(0.3)],
+      [2, 'passed', ['r2'], 25, close(0.25), 40, close(0.4)]
     ])
+    expect(c.outside).toMatchObject({ build: { outputTokens: 25, cost: close(0.25) }, review: { priced: 0, unpriced: 0 }, agents: [{ agent: 'b1', role: 'build' }] })
     expect(c.rounds[0].agents.map((a) => [a.agent, a.role, a.part.outputTokens])).toEqual([['b1', 'build', 100], ['r1', 'review', 30]])
     expect(c.rounds[1].agents.map((a) => [a.agent, a.role, a.part.outputTokens])).toEqual([['b1', 'build', 25], ['r2', 'review', 40]])
-    // Shared time is Hive's share: ≈.
-    expect(c.rounds[1].build.tokensEstimated).toBe(true)
+    // The parts add up to the total, exactly as cost per card counts it.
+    expect(c.total).toMatchObject({ outputTokens: 220, cost: close(2.2) })
+    const parts = [...c.rounds, c.outside!].flatMap((r) => [r.build, r.review])
+    expect(parts.reduce((a, p) => a + p.cost, 0)).toBeCloseTo(c.total!.cost, 9)
+    // A share of a role's part is Hive's: ≈; a reviewer's whole part is as reported.
+    expect(c.rounds[1].build).toMatchObject({ estimated: true, tokensEstimated: true })
+    expect(c.rounds[1].review).toMatchObject({ estimated: false })
     expect(c.rounds[0]).toMatchObject({ from: iso(0), to: iso(20), submitted: iso(10) })
+  })
+
+  it('sessions that can’t be read: the known charges stay, each with unknown beside it, and still add up (HR4, round 1)', async () => {
+    const w = opened[0] ?? (await world())
+    vi.mocked(usageHistory.timelines).mockRejectedValueOnce(new Error('disk'))
+    vi.mocked(usageHistory.sessionsWho).mockRejectedValueOnce(new Error('disk'))
+    const c = (await cardRoundCosts(w, 1))!
+    // No timelines to go by: each agent's charges shared by how long it held the card (B1: 10, 10 and 5 minutes).
+    const close = (n: number) => expect.closeTo(n, 9)
+    expect(c.rounds.map((r) => [r.build.cost, r.review.cost])).toEqual([
+      [close(0.6), close(0.3)],
+      [close(0.6), close(0.4)]
+    ])
+    expect(c.outside?.build.cost).toEqual(close(0.3))
+    // Known in part: a cost and + ?, never Unknown alone.
+    expect(c.rounds.flatMap((r) => [r.build, r.review]).every((p) => p.priced === 1 && p.unpriced === 1)).toBe(true)
+    expect(c.total).toMatchObject({ cost: close(2.2), unpriced: 3 })
+    const parts = [...c.rounds, c.outside!].flatMap((r) => [r.build, r.review])
+    expect(parts.reduce((a, p) => a + p.cost, 0)).toBeCloseTo(c.total!.cost, 9)
   })
 
   it('a card from before 1.0 reports no rounds; a card that isn’t there, null', async () => {
     const w = opened[0] ?? (await world())
     await store.boardWrite(w, async () => store.boardWriteOp(w, (db) => db.prepare('UPDATE cards SET pre_workflow = 1 WHERE number = 2').run()))
-    expect(await cardRoundCosts(w, 2)).toEqual({ number: 2, preWorkflow: true, rounds: [] })
+    expect(await cardRoundCosts(w, 2)).toEqual({ number: 2, preWorkflow: true, rounds: [], outside: null, total: null })
     expect(await cardRoundCosts(w, 999)).toBeNull()
   })
 })

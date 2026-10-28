@@ -202,6 +202,7 @@ const RESUME = msg({ id: 'panes.resume.button', defaultMessage: 'Resume', descri
 const NEW_SESSION = msg({ id: 'panes.session.new', defaultMessage: 'New Session', description: 'Button and menu item (an agent\'s pane): starts the agent in a new conversation. Keep it short.' })
 const RESUME_SESSION = msg({ id: 'panes.resume.pick', defaultMessage: 'Resume a Session…', description: "Menu item (an agent's pane): opens the session picker to resume one of its sessions." })
 const MERGE = msg({ id: 'panes.agent.merge', defaultMessage: 'Merge…', description: "Button and menu item (a worktree agent's pane): opens the merge dialog for its branch." })
+const HOOKS = msg({ id: 'panes.menu.hooks', defaultMessage: 'Hooks…', description: "Menu item (an agent's menu): opens its Hooks dialog: the hooks its session has, and what Hive received from them. The … says it opens a dialog: keep it." })
 const AGENT_SETTINGS = msg({ id: 'panes.agent.settings', defaultMessage: 'Agent Settings…', description: "Menu item and button (an agent's pane): opens the agent's settings." })
 const STOP = msg({ id: 'panes.agent.stop', defaultMessage: 'Stop', description: "Button and menu item (an agent's pane): stops the agent's session (the conversation is kept). Keep it short." })
 
@@ -477,6 +478,8 @@ function agentMenu(project: ProjectInfo, a: AgentInfo, pick: () => void, usage?:
     ...sessionItems(project, a.live, usage?.session),
     // Its work in the project's Activity tab (#1254); the Assistant has none.
     ...(isAssistantPath(project.path) ? [] : [{ label: tr(msg({ id: 'panes.menu.activity', defaultMessage: 'Activity', description: "Menu item (an agent's menu): opens the project's Activity tab showing this agent's work: its sessions, turns, tool calls and processes." })), icon: 'type-hierarchy', onClick: () => openActivity(project.path, { agentId: a.id }) }]),
+    // Its hooks (HI-982): what its session has and what Hive received; while it runs.
+    { label: tr(HOOKS), icon: 'plug', disabled: !a.live, onClick: () => set({ hooksFor: { project: project.path, agentId: a.id } }) },
     { label: tr(msg({ id: 'panes.menu.handOver', defaultMessage: 'Hand Over to…', description: "Menu item (an agent's menu): hands its work over to another agent or a new conversation." })), icon: 'arrow-swap', onClick: () => set({ handOverFor: { project: project.path, agentId: a.id } }) },
     ...moveItems(project, a),
     // A slot its ended run still holds (#1506): the same item, for the user's explicit recovery; a carried slot's after it.

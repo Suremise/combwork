@@ -6,6 +6,7 @@
 // In the app since P3: hive.db's `card_facts` (main/workflow/factStore.ts), folded wherever a card's state is read.
 
 import type { ConflictsRecord } from './conflicts'
+import type { FocusedChoice, FocusedTest } from './focused'
 import type { StoredText, TransientCause } from '../types'
 import { samePath } from '../movePaths'
 
@@ -94,6 +95,8 @@ export interface SubmittedData {
   adopted?: boolean
   /** Warnings that didn't refuse (G16). */
   warnings?: string[]
+  /** G20 (HI-1367): the tests this submission's change needs, as picked or named by its builder, and the change itself. */
+  focused?: FocusedChoice
   platform?: Record<string, unknown>
 }
 
@@ -108,6 +111,8 @@ export interface CheckRanData {
   run: string
   durationMs: number
   by: string
+  /** The agent that ran it (its id), when an agent did: a focused test's proof is its reviewer's own run (HI-1367). */
+  agent?: string
   counted: boolean
   whyNot?: 'notCheck' | 'notContained' | 'dirty' | 'changed' | 'moved' | 'revisionChanged'
   /**
@@ -116,6 +121,8 @@ export interface CheckRanData {
    */
   changes?: string[]
   isolated?: boolean
+  /** The merge queue's entry it ran for (a merge check or the focused tests, HI-1924): the queue history's time taken. */
+  entry?: string
 }
 
 /** The paths a `CheckRan` keeps of what stopped it counting (#1654). */
@@ -148,6 +155,12 @@ export const MERGE_CHOICE_KEY = 'mergeChoice'
 export const QUEUE_STUCK_GATE = 'queueStuck'
 
 /**
+ * G20 (HI-1367): the merge queue's question when a card's focused tests were skipped for their environment, bound to
+ * the entry and those tests (`tests`): answered by the card's reviewer agent (hive_focused_skip) or the user.
+ */
+export const FOCUSED_SKIP_GATE = 'focusedSkip'
+
+/**
  * What an agent's question may offer the user to do on its card (#1630): move it to Done, make it no code, unblock it,
  * skip its review (HI-1734), each with the agent's suggested reason. One click does it as the user, with the reason, and
  * answers the question.
@@ -167,7 +180,7 @@ export const ASK_ACTIONS_MAX = 3
  * A request under any other gate is a question someone asked: an agent, the Assistant (`ask`), or a rule it couldn't
  * keep. A question settled another way is closed (#1638); Hive's own requests stay until met.
  */
-const HIVE_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, 'decision'])
+const HIVE_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, FOCUSED_SKIP_GATE, 'decision'])
 export const askedQuestion = (r: Pick<FactData['ApprovalRequested'], 'gate'>): boolean => !HIVE_GATES.has(r.gate)
 
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds, or an action offered (#1630). */
@@ -193,7 +206,19 @@ export function answerFits(req: Pick<FactData['ApprovalRequested'], 'kind' | 'ga
   return a.outcome === 'answered' && (!!a.reply || !!a.decision)
 }
 
-export type IntegrationFailReason = 'conflict' | 'checks' | 'targetMoved' | 'folderBusy' | 'notUpToDate' | 'hook'
+export type IntegrationFailReason = 'conflict' | 'checks' | 'targetMoved' | 'folderBusy' | 'notUpToDate' | 'hook' | 'focused'
+
+/**
+ * Why the queue returned a card for its focused tests (G20, HI-1367), with `IntegrationFailed.focused`: none chosen for
+ * its submission (`notChosen`); the result's own changes couldn't be picked (`repick`: their `paths`); a real-CLI or
+ * packaged test with no counted review run at the submitted revision (`noProof`), or one only the result's pick added
+ * (`newProof`): their `tests`; its runner missing from the project (`noRunner`).
+ */
+export interface FocusedReturn {
+  why: 'notChosen' | 'repick' | 'noProof' | 'newProof' | 'noRunner'
+  tests?: string[]
+  paths?: string[]
+}
 
 /** The data of each kind (§16.4.2). */
 export interface FactData {
@@ -252,7 +277,7 @@ export interface FactData {
   Stale: { approved: string | null; current: string | null; why: 'change' | 'decision' | 'exact' }
   /** `text` in English (agents, the Agent API); `requestText`, Hive's own request as data for the window (an agent's words have none). */
   /** `entry` and `result`: the queue entry a merge queue's request is about, and its test merge's result (#1351). */
-  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number; for?: 'user'; asker?: string; checklist?: string[]; entry?: string; result?: string; actions?: AskAction[] }
+  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number; for?: 'user'; asker?: string; checklist?: string[]; entry?: string; result?: string; actions?: AskAction[]; tests?: string[] }
   /**
    * A request closed without an answer (#1638): its card reached Done (`done`), or the agent that asked moved the card
    * on itself (`carriedOn`: answered some other way, such as in its pane). It leaves For you as an answer does.
@@ -268,7 +293,17 @@ export interface FactData {
   /** `cause` and `code`: why a transient failure was one (#1362), as codes; `code` is the network error code found. */
   /** `check`: the merge check that failed (`install` for the install before them), `logPath` its log (#1354). */
   /** `conflicts` (HI-1181): a conflict's files and hunks as the queue's folder had them, bounded (shared/workflow/conflicts.ts). */
-  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean; cause?: TransientCause; code?: string; check?: string; logPath?: string; conflicts?: ConflictsRecord }
+  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean; cause?: TransientCause; code?: string; check?: string; logPath?: string; conflicts?: ConflictsRecord; focused?: FocusedReturn }
+  /**
+   * G20 (HI-1367): the tests the merge queue picked at a test merge's result for the paths whose change isn't exactly the
+   * submission's (`paths`), run with the approved selection there; `tests` empty when the pick needed none.
+   */
+  FocusedPicked: { entry: string; revision: string; result: string; paths: string[]; tests: FocusedTest[] }
+  /**
+   * G20, realProof = review (the user's decision, 28 Oct): a real-CLI or packaged test accepted as proved by its reviewer's
+   * counted run at the submitted revision (`run`), review evidence at that revision, never a run at the merged result.
+   */
+  FocusedAccepted: { entry: string; revision: string; result: string; test: string; run: string }
   Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'hive' | 'agent' | 'outside'; outsideRules?: string[] }
   /** Some of an unfinished card's work found in the target (a partial hand merge): a mark, not a move (§16.4.4). */
   MergedInPart: { revision: string; target: string }
@@ -412,6 +447,8 @@ export interface CardState {
   /** The paths the builder locked this cycle (`FilesLocked`, #1481), in order, each once. */
   locked: string[]
   checks: FactData['CheckRan'][]
+  /** G20 (HI-1367): real-CLI and packaged focused tests accepted from their review at the merge (realProof = review). */
+  focusedAccepted: FactData['FocusedAccepted'][]
   marks: { mergedInPart?: FactData['MergedInPart']; leftTarget?: FactData['LeftTarget']; outsideRules?: string[] }
   blocked: string | null
   /**
@@ -468,6 +505,7 @@ export const emptyState = (): CardState => ({
   attributed: [],
   locked: [],
   checks: [],
+  focusedAccepted: [],
   marks: {},
   blocked: null,
   step: null,
@@ -699,6 +737,9 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         break
       case 'CheckRan':
         s.checks.push(f.data as FactData['CheckRan'])
+        break
+      case 'FocusedAccepted':
+        s.focusedAccepted.push(f.data as FactData['FocusedAccepted'])
         break
       default:
         break

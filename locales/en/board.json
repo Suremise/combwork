@@ -625,7 +625,23 @@
   },
   "board.costs.builder": {
     "defaultMessage": "Builder",
-    "description": "In a card's cost hover, before what the agent that built it used. Keep it short."
+    "description": "In a card's cost hover, before what the agent that built it used; and a column of its cost-by-round table (card dialog, Work section). Keep it short."
+  },
+  "board.costs.byRound": {
+    "defaultMessage": "Cost by round",
+    "description": "A heading in the card dialog's Work section, above a table of what the card cost in each review round, its builder's and reviewers' parts apart."
+  },
+  "board.costs.byRoundFailed": {
+    "defaultMessage": "Its cost by round couldn’t be worked out.",
+    "description": "The card dialog's Work section, in place of the cost-by-round table, when Hive couldn't work it out."
+  },
+  "board.costs.byRoundHourly": {
+    "defaultMessage": "Rounds from more than {days, plural, one {# day} other {# days}} ago may be split to the hour: Hive keeps older sessions’ use in 1-hour steps.",
+    "description": "Under the card's cost-by-round table (card dialog, Work section), when a round ended before Settings → Advanced's days of full detail: such a round's split may be only to the hour."
+  },
+  "board.costs.byRoundNote": {
+    "defaultMessage": "Each role’s cost is shared between its rounds by when its agents used it (≈); the rows and columns add up to the card’s cost.",
+    "description": "Under the card's cost-by-round table (card dialog, Work section): how the split is made. Keep ≈."
   },
   "board.costs.cost": {
     "defaultMessage": "Cost",
@@ -647,6 +663,10 @@
     "defaultMessage": "On cards",
     "description": "A lane's cost hover (Progress panel), before what its agents used while holding a card. Keep it short."
   },
+  "board.costs.outsideRow": {
+    "defaultMessage": "Before its rounds",
+    "description": "A row of the card's cost-by-round table (card dialog, Work section): what its agents used holding it before its work began under Hive 1.0's rules (a card taken on at the upgrade). Keep it short."
+  },
   "board.costs.overhead": {
     "defaultMessage": "Overhead",
     "description": "A lane's cost hover (Progress panel), before what its agents used holding no card (merges, watching). Keep it short."
@@ -657,7 +677,23 @@
   },
   "board.costs.reviewer": {
     "defaultMessage": "Reviewer",
-    "description": "In a card's cost hover, before what the agent that reviewed it used. Keep it short."
+    "description": "In a card's cost hover, before what the agent that reviewed it used; and a column of its cost-by-round table (card dialog, Work section). Keep it short."
+  },
+  "board.costs.roundColumn": {
+    "defaultMessage": "Round",
+    "description": "The card's cost-by-round table (card dialog, Work section): the heading of its first column, naming each row's round. Keep it short."
+  },
+  "board.costs.roundRow": {
+    "defaultMessage": "Round {round, number}",
+    "description": "A row of the card's cost-by-round table (card dialog, Work section): one review round (1, 2…)."
+  },
+  "board.costs.roundVerdict": {
+    "defaultMessage": "{verdict, select, passed {Passed} failed {Failed} other {Not reviewed yet}}",
+    "description": "Hover of a round in the card's cost-by-round table (card dialog, Work section): how its review ended, passed or failed, or not reviewed yet. Keep the select keys."
+  },
+  "board.costs.totalColumn": {
+    "defaultMessage": "Total",
+    "description": "The card's cost-by-round table (card dialog, Work section): the last row and column, what each round, role and the whole card cost. Keep it short."
   },
   "board.costs.unmatched": {
     "defaultMessage": "{n, plural, one {One agent that held it has} other {# agents that held it have}} no session Hive knows of: unknown.",
@@ -1903,6 +1939,10 @@
     "defaultMessage": "{pair}: {total, plural, one {# card} other {# cards}}, not recorded",
     "description": "Accessible name of a lane's bar (Progress panel) when the lane ended before Hive recorded where its cards were: the builder / reviewer ({pair}) and how many cards."
   },
+  "board.lanes.copyMerge": {
+    "defaultMessage": "Copy the merge commit {commit}",
+    "description": "Tooltip of a Done card's merge commit in a lane's cards (Progress panel → Lanes): copies its whole id ({commit})."
+  },
   "board.lanes.edge": {
     "defaultMessage": "Lanes shown",
     "description": "Accessible name of the handle on the top edge of the Progress panel's lanes: drag it for more or fewer lanes."
@@ -1922,6 +1962,10 @@
   "board.lanes.endFailed": {
     "defaultMessage": "Couldn't end {lane}",
     "description": "A toast's title: ending a lane from the Progress panel failed ({lane}: its builder / reviewer and name). The reason follows."
+  },
+  "board.lanes.expand": {
+    "defaultMessage": "{open, select, yes {Hide the cards of {lane}} other {Show the cards of {lane}}}",
+    "description": "Tooltip of the chevron before a lane's name in the Progress panel's Lanes tab: shows or hides its cards in order ({lane}: its builder / reviewer). Keep the select keys."
   },
   "board.lanes.fold": {
     "defaultMessage": "Fold the lanes",
@@ -1946,6 +1990,10 @@
   "board.lanes.legendTitle": {
     "defaultMessage": "Each colour is a category, with the stages in it",
     "description": "The heading of the lanes' legend (Progress panel, on the Lanes bar's hover): what each colour and pattern of a lane's card segments means, by the board's categories and the stages in them. Glossary: stage, category."
+  },
+  "board.lanes.mergeCopied": {
+    "defaultMessage": "Merge commit copied",
+    "description": "A notification after copying a Done card's merge commit from a lane's cards (Progress panel → Lanes)."
   },
   "board.lanes.moveDown": {
     "defaultMessage": "Move Down",
@@ -1987,6 +2035,18 @@
     "defaultMessage": "{project}: open its workflow in Version Control",
     "description": "Accessible name and tooltip of the project's name in a lane's header (Progress panel): opens that project's Version Control tab (a tab's name) at its Workflow section. {project} is the project's name."
   },
+  "board.lanes.queue": {
+    "defaultMessage": "Cards of {lane}",
+    "description": "Accessible name of a lane's cards in order, opened under it in the Progress panel's Lanes tab ({lane}: its builder / reviewer)."
+  },
+  "board.lanes.queueState": {
+    "defaultMessage": "{state, select, done {Done} doing {Doing} review {In review} todo {To do} waiting {Waiting for you} gone {Gone} other {Not recorded}}",
+    "description": "A card's state in a lane's cards, opened in the Progress panel's Lanes tab (its icon's name): done, being worked on, in review, not started, waiting for the user (blocked, on hold or at its round limit), gone from the board, or not recorded by the lane. Keep the select keys."
+  },
+  "board.lanes.round": {
+    "defaultMessage": "r{round}",
+    "description": "A card's round in a lane's cards (Progress panel → Lanes), short: r1 for its first, r3 after two failed reviews."
+  },
   "board.lanes.show": {
     "defaultMessage": "Show the lanes",
     "description": "Tooltip of the Progress panel's Lanes bar when the lanes are folded away."
@@ -2002,6 +2062,10 @@
   "board.lanes.slotTip": {
     "defaultMessage": "{state, select, preparing {being prepared} other {ready}} · {carried, select, yes {its builder’s own since {since}} other {lent to the lane since {since}}}",
     "description": "A lane's slot in its hover (Progress panel, #1446), after the slot's name (slot-b): whether it is ready or being prepared (its setup or a dependency install), then since when it was lent to the lane, or, for a builder's own worktree kept from before 1.0 (carried), since when it has had it. {since} is a date and time. Keep the select keys."
+  },
+  "board.lanes.soFar": {
+    "defaultMessage": "{time} so far",
+    "description": "How long a lane's card has been worked on so far, in its cards (Progress panel → Lanes). {time}: 4 min, 1 h 5 min."
   },
   "board.lanes.stalled": {
     "defaultMessage": "stalled",
@@ -2019,6 +2083,10 @@
     "defaultMessage": "Lanes",
     "description": "The Progress panel's section of lanes (a builder and its reviewer working through cards in turn): its bar's label and accessible name."
   },
+  "board.lanes.took": {
+    "defaultMessage": "took {time}",
+    "description": "How long a lane's Done card took, from its start to its merge, in its cards (Progress panel → Lanes). {time}: 4 min, 1 h 5 min."
+  },
   "board.lanes.usualOrder": {
     "defaultMessage": "Usual Order",
     "description": "A lane's context menu item in the Progress panel: puts the lanes back in their usual order, undoing the user's own."
@@ -2030,6 +2098,14 @@
   "board.lanes.usualOrderSaid": {
     "defaultMessage": "Lanes back in the usual order",
     "description": "Said to screen readers after the Progress panel's lanes go back to their usual order (Usual Order, in a lane's menu)."
+  },
+  "board.lanes.waitedAtLeast": {
+    "defaultMessage": "{time}+",
+    "description": "How long a lane has waited, in its header (Progress panel), when Hive didn't see its wait begin (it was already waiting when Hive started): at least {time} (4 min, 1 h 5 min)."
+  },
+  "board.lanes.waitedAtLeastTip": {
+    "defaultMessage": "It was already waiting when Hive first saw it: it has waited at least this long.",
+    "description": "Tooltip of a lane's wait time with a + in its header (Progress panel): Hive didn't see the wait begin."
   },
   "board.lanes.waitingForYou": {
     "defaultMessage": "{n, plural, one {# waiting for you} other {# waiting for you}}",
@@ -2563,6 +2639,50 @@
     "defaultMessage": "{n, plural, one {{cards} waiting} other {{cards} waiting}}",
     "description": "The cards waiting in a merge queue, in order, on its card in the Progress panel: {cards} is their keys as a list (HI-107, HI-108), {n} how many."
   },
+  "board.queue.recent.cancelled": {
+    "defaultMessage": "Taken out: {reason, select, removed {Remove from queue} stale {its pass no longer counted} hold {put On Hold} decision {a decision} integratedOutside {merged outside Hive} followUp {a follow-up} other {cancelled}}",
+    "description": "An outcome in the Progress panel's Recent merges (Merges tab): the card's entry was taken out of the merge queue, and why (Remove from queue is a button's name; On Hold a column's). Keep the select keys."
+  },
+  "board.queue.recent.heading": {
+    "defaultMessage": "Recent merges",
+    "description": "A heading under a merge queue's card in the Progress panel's Merges tab (HI-1924): the queue's latest outcomes (merged, returned, taken out) and pauses follow, newest first."
+  },
+  "board.queue.recent.lasted": {
+    "defaultMessage": "lasted {duration}",
+    "description": "Beside a pause in the Progress panel's Recent merges: how long the merge queue stayed paused ({duration}: “12 min”, “under a minute”). Lower case."
+  },
+  "board.queue.recent.merged": {
+    "defaultMessage": "Merged",
+    "description": "An outcome in the Progress panel's Recent merges (Merges tab): the merge queue merged the card. Its merge commit follows, as a short commit id."
+  },
+  "board.queue.recent.more": {
+    "defaultMessage": "More in Version Control",
+    "description": "A link after a merge queue's Recent merges in the Progress panel: its full history, in the project's Version Control tab (Merge queue section). Version Control is a place in Hive."
+  },
+  "board.queue.recent.none": {
+    "defaultMessage": "No merges yet.",
+    "description": "Under Recent merges in the Progress panel's Merges tab, when the merge queue has merged, returned or paused nothing yet (or nothing of the agent the panel is filtered to)."
+  },
+  "board.queue.recent.paused": {
+    "defaultMessage": "Paused: {reason, select, user {by you} assistant {by the Assistant} pushRejected {the remote refused the push} pushFailed {the push failed} pushNoRemote {no remote to push to} pushUnreadable {couldn’t read the branch to push it} targetMovesFast {the branch kept moving} folderBusy {its folder was busy} wrongBranch {its folder changed branch} staged {changes staged in its folder} unstagedChanges {changes in its folder} identity {no commit identity} needsYou {needs you} uncounted {the checks didn’t count} checkedOut {the branch was checked out} rulesOff {the rules were off} signingWaits {signing waited for you} signing {signing failed} hookTimedOut {a hook ran too long} subfolderTarget {no target branch named} mergeChoice {waiting for how to merge} approval {waiting for your OK} focusedSkip {waiting for your OK to skip focused tests} other {{code}}}",
+    "description": "A pause in the Progress panel's Recent merges (Merges tab): the merge queue paused, and why in a few words (by the user or the Assistant; the push of the target branch refused, failed, with no remote or unreadable (G18); the branch moving, its checked-out folder busy, on another branch, with staged or other changes; no git identity; needs the user; checks that didn't count; rules off; commit signing; a git hook; no target branch for a project in a subfolder; the merge style choice after the upgrade; the user's approval; skipping focused tests). Else {code}, Hive's code for it. Lower case after the colon. Keep the select keys."
+  },
+  "board.queue.recent.push": {
+    "defaultMessage": "{state, select, pushed {Pushed} pending {Not pushed yet} off {Not pushed: pushing was turned off} reset {Not pushed: the branch no longer had it} other {Push not recorded}}",
+    "description": "Beside a merge in the Progress panel's Recent merges (Merges tab), when the workflow pushes the target branch after merging (G18): pushed; not pushed yet; not pushed because the option was turned off, or because the branch was reset and no longer had the merge; or Hive has no record of its push (an older merge). Keep the select keys."
+  },
+  "board.queue.recent.returned": {
+    "defaultMessage": "Returned: {why}",
+    "description": "An outcome in the Progress panel's Recent merges (Merges tab): the merge queue returned the card to its builder, and why ({why}: conflict in tasks.ts, checks failed: unit…). Glossary 2.4: returned."
+  },
+  "board.queue.recent.stillPaused": {
+    "defaultMessage": "still paused",
+    "description": "Beside a pause in the Progress panel's Recent merges: the merge queue is paused now (the pause hasn't ended). Lower case."
+  },
+  "board.queue.recent.took": {
+    "defaultMessage": "took {duration}",
+    "description": "Beside an outcome in the Progress panel's Recent merges: how long the merge queue took over the card, its merge checks and merge ({duration}: “12 min”, “under a minute”). Lower case."
+  },
   "board.queue.remove": {
     "defaultMessage": "Remove",
     "description": "A button beside a queued card on a merge queue's card in the Progress panel: Remove from queue (asks first). Keep it short."
@@ -2596,8 +2716,8 @@
     "description": "An error's title: Resume queue failed (Progress panel)."
   },
   "board.queue.returnWhy": {
-    "defaultMessage": "{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} other {{why}}}",
-    "description": "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target; else {why} as Hive recorded it. Lower case. Keep the select keys and the word none."
+    "defaultMessage": "{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} focused {its focused tests couldn’t be chosen or proved} other {{why}}}",
+    "description": "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target, or its focused tests (G20: the tests its change needs) couldn't be chosen or proved by its review; else {why} as Hive recorded it. Lower case. Keep the select keys and the word none."
   },
   "board.queue.returned": {
     "defaultMessage": "{card} returned: {why}",
@@ -2875,9 +2995,25 @@
     "defaultMessage": "Clear",
     "description": "A button in the Progress panel's Runs tab: clears its filters and search."
   },
+  "board.runs.dockEdge": {
+    "defaultMessage": "Finished runs’ height",
+    "description": "Accessible name of the handle on the top edge of the Progress panel's Runs tab's finished runs (docked at the bottom): drag it to make them taller or shorter."
+  },
+  "board.runs.dockEdgeTip": {
+    "defaultMessage": "Drag to make the finished runs taller or shorter; double-click for {rows, plural, one {# lane row} other {# lane rows}}",
+    "description": "Tooltip of the handle on the top edge of the Progress panel's Runs tab's finished runs. {rows} is their default height in the Pulse tab's lane rows (6.5)."
+  },
+  "board.runs.dockEdgeValue": {
+    "defaultMessage": "{rows, plural, one {# lane row high} other {# lane rows high}}",
+    "description": "The value of the handle on the top edge of the Progress panel's Runs tab's finished runs, for screen readers: how tall they are, in the height of the Pulse tab's lane rows ({rows}, may be a fraction such as 6.5)."
+  },
   "board.runs.failedOnly": {
     "defaultMessage": "Failed",
     "description": "A toggle in the Progress panel's Runs tab: shows only the runs that failed."
+  },
+  "board.runs.finished": {
+    "defaultMessage": "Finished runs",
+    "description": "Accessible name of the Progress panel's Runs tab's finished runs, docked at the bottom (Today, then older days)."
   },
   "board.runs.group": {
     "defaultMessage": "{what} ×{n, number} · {outcome, select, passed {{failed, plural, =0 {all passed} one {# failed, then passed} other {# failed, then passed}}} failed {{failed, plural, one {# failed} other {# failed}}} other {{failed, plural, =0 {last stopped} one {# failed, last stopped} other {# failed, last stopped}}}}",
@@ -2887,6 +3023,10 @@
     "defaultMessage": "Lane",
     "description": "Accessible name of the Progress panel's Runs tab filter by lane: only the runs for a lane's cards."
   },
+  "board.runs.noFinished": {
+    "defaultMessage": "No finished runs",
+    "description": "The Progress panel's Runs tab's finished runs (docked at the bottom) when Hive has none."
+  },
   "board.runs.none": {
     "defaultMessage": "No runs yet. When an agent runs tests or a build with progress reporting, every run shows here, kept by day.",
     "description": "The Progress panel's Runs tab when Hive has no runs."
@@ -2894,6 +3034,10 @@
   "board.runs.noneMatch": {
     "defaultMessage": "No runs match.",
     "description": "The Progress panel's Runs tab when no run matches its filters or search."
+  },
+  "board.runs.noneToday": {
+    "defaultMessage": "No runs today",
+    "description": "Under Today in the Progress panel's Runs tab's finished runs: no run ended today (older days follow)."
   },
   "board.runs.other": {
     "defaultMessage": "Other",
@@ -2910,10 +3054,6 @@
   "board.runs.today": {
     "defaultMessage": "Today",
     "description": "A heading in the Progress panel's Runs tab: the runs that ended today follow."
-  },
-  "board.runs.toggleCard": {
-    "defaultMessage": "{open, select, yes {Hide the runs of {card}} other {Show the runs of {card}}}",
-    "description": "Tooltip of the chevron on a card's heading in the Progress panel's Runs tab: hides or shows the card's runs ({card}: its key, such as HI-12, or Other for the runs for no card). Keep the select keys."
   },
   "board.runs.yesterday": {
     "defaultMessage": "Yesterday",

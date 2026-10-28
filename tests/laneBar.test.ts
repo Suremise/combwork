@@ -4,7 +4,8 @@
 import { describe, expect, it } from 'vitest'
 import { cardSegment as segmentIn, chosenLaneRows, laneRowsRange, MORE_LANE_ROWS, currentCard, DEFAULT_LANE_ROWS, draggedLaneRows, droppedLaneOrder, failedVerdictGist, fitSegments as fitIn, frozenSegment as frozenIn, keptLaneOrder, keyedLaneRows, LANE_ORDER_MAX, laneCards as laneCardsIn, laneRowsNow, laneRunning, lanesShown, laneSummary, maxLaneRows, mergedLaneOrder, nudgedLaneOrder, panelOrder, reviewRounds, SEGMENT_NOTE_MAX, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, workNotes, type CardSegment, type SegmentState } from '../src/shared/laneBar'
 import type { WorkBadge } from '../src/shared/workflow/workView'
-import { cardOldRulesNote, laneOldRulesNote, pulseLanes } from '../src/shared/laneBar'
+import { cardOldRulesNote, laneCardTime, laneOldRulesNote, laneWaitTime, pulseLanes } from '../src/shared/laneBar'
+import { stampWait } from '../src/shared/lanes'
 import { laneLegend, legendSources, segmentStage } from '../src/shared/laneStages'
 import { mustCompile } from '../src/shared/workflow/compile'
 import { preset } from '../src/shared/workflow/options'
@@ -408,7 +409,7 @@ describe("the lanes section's height (#569)", () => {
 
 describe("a segment's hover: what the card's facts say (#1225)", () => {
   const short = (id: string): string => id.slice(0, 7)
-  const badge = (over: Partial<WorkBadge> = {}): WorkBadge => ({ card: 7, stage: 'review', preWorkflow: false, adopted: false, revision: 'a3f2c1d9e8', verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, reviewSkip: null, reviewSkipProposed: null, decisionSince: false, oldRules: false, stages: null, line: null, lines: [], underReview: null, startedAt: null, lastSeq: 3, ...over })
+  const badge = (over: Partial<WorkBadge> = {}): WorkBadge => ({ card: 7, stage: 'review', preWorkflow: false, adopted: false, revision: 'a3f2c1d9e8', verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, reviewSkip: null, reviewSkipProposed: null, decisionSince: false, oldRules: false, stages: null, line: null, lines: [], underReview: null, startedAt: null, endedAt: null, lastSeq: 3, ...over })
 
   it('the revision under review, the last verdict on its revision, and the checks on it', () => {
     expect(workNotes(badge({ verdict: { pass: false, revision: 'b71e09a4cc', current: true }, checks: { passed: 2, failed: 1, notCounted: 4 } }), 'review', null, short, tr)).toEqual(['Under review: a3f2c1d', 'Last verdict: failed on b71e09a', 'Checks on it: 2 passed, 1 failed'])
@@ -619,7 +620,7 @@ describe('stages in a lane (#1421): names over the categories, the divider, the 
     expect(laneOldRulesNote(false, tr)).toMatch(/Workflow rules aren’t enforced now/)
     const seg = cardSegment(7, card(7, 'doing'))
     const names = { list: (items: string[]) => items.join(', '), ruleName: (id: string) => id }
-    const b: WorkBadge = { card: 7, stage: 'active', preWorkflow: false, adopted: false, revision: null, verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, reviewSkip: null, reviewSkipProposed: null, decisionSince: false, oldRules: true, stages: null, line: null, lines: [], underReview: null, startedAt: null, lastSeq: 3 }
+    const b: WorkBadge = { card: 7, stage: 'active', preWorkflow: false, adopted: false, revision: null, verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, reviewSkip: null, reviewSkipProposed: null, decisionSince: false, oldRules: true, stages: null, line: null, lines: [], underReview: null, startedAt: null, endedAt: null, lastSeq: 3 }
     expect(segmentMarks({ frozen: null }, b, seg, (x) => x, tr, names).oldRules).toBe(cardOldRulesNote(true, tr))
     expect(segmentMarks({ frozen: null }, b, seg, (x) => x, tr, names, false).oldRules).toMatch(/aren’t enforced now/)
     // An ended lane's segments have no marks; nor a card without it.
@@ -700,5 +701,69 @@ describe('refusals name the user as you in the window, as the user to agents (HI
     expect(refusalLines(r.rule, r.values, inCard).change).toBe('These rules are set in Version Control, where you can change them.')
     // A recorded value never chooses for the window.
     expect(refusalLines('move.needsOverride', { ...override, reader: 'agent' }, inCard).change).toBe('These rules are set in Version Control, where you can change them.')
+  })
+})
+
+describe("a lane's wait and its cards' times (HI-1926)", () => {
+  const T = Date.parse('2026-10-28T10:00:00.000Z')
+  const MIN = 60_000
+
+  it('a wait is stamped when it begins, kept while its reason, card and ask stay, reset when one changes', () => {
+    const reviewer = { reason: 'reviewer' as const, card: 5 }
+    // The lane listed before: the wait was seen to begin.
+    const a = stampWait(undefined, reviewer, T, true)!
+    expect(a).toMatchObject({ since: T, observed: true })
+    // Later, the same wait (a comment on the card changes nothing in it): kept.
+    expect(stampWait(a, { ...reviewer, blocked: undefined }, T + 10 * MIN, true)).toBe(a)
+    // Another reason, another card, another ask: a new wait.
+    expect(stampWait(a, { reason: 'you', card: 5 }, T + 11 * MIN, true)).toMatchObject({ since: T + 11 * MIN })
+    expect(stampWait(a, { reason: 'reviewer', card: 6 }, T + 12 * MIN, true)).toMatchObject({ since: T + 12 * MIN })
+    const you = stampWait(undefined, { reason: 'you', card: 5, ask: 'approve' }, T, true)!
+    expect(stampWait(you, { reason: 'you', card: 5, ask: 'decide' }, T + MIN, true)).toMatchObject({ since: T + MIN })
+    // No longer waiting: none; a wait with no card (a slot) is stamped too.
+    expect(stampWait(a, null, T + MIN, true)).toBeUndefined()
+    expect(stampWait(undefined, { reason: 'slot', card: null }, T, true)).toMatchObject({ since: T, observed: true })
+    // The first listing (Hive just started, or the workspace opened): not seen to begin, so at least that long.
+    expect(stampWait(undefined, reviewer, T, false)).toMatchObject({ since: T, observed: false })
+  })
+
+  it("its time, marked past its bound: for you (a request, a round limit) and a reviewer, each its own", () => {
+    expect(laneWaitTime(null, T, 60, 15)).toBeNull()
+    expect(laneWaitTime({ reason: 'reviewer' }, T, 60, 15)).toBeNull()
+    expect(laneWaitTime({ reason: 'reviewer', since: T - 14 * MIN }, T, 60, 15)).toEqual({ ms: 14 * MIN, long: false })
+    expect(laneWaitTime({ reason: 'reviewer', since: T - 15 * MIN }, T, 60, 15)).toEqual({ ms: 15 * MIN, long: true })
+    expect(laneWaitTime({ reason: 'you', since: T - 59 * MIN }, T, 60, 15)!.long).toBe(false)
+    expect(laneWaitTime({ reason: 'roundLimit', since: T - 60 * MIN }, T, 60, 15)!.long).toBe(true)
+    // The bounds are the settings': changed, they apply.
+    expect(laneWaitTime({ reason: 'you', since: T - 5 * MIN }, T, 5, 15)!.long).toBe(true)
+    expect(laneWaitTime({ reason: 'reviewer', since: T - 5 * MIN }, T, 60, 30)!.long).toBe(false)
+    // Other reasons are never marked long.
+    expect(laneWaitTime({ reason: 'slot', since: T - 999 * MIN }, T, 60, 15)!.long).toBe(false)
+  })
+
+  it("a card's time: so far while in progress, took and its commit once Done, from its own cycle; nothing it can't know", () => {
+    const iso = (ms: number) => new Date(ms).toISOString()
+    const badge = (start: number | null, end: number | null, merged: string | null = null) => ({ startedAt: start === null ? null : iso(start), endedAt: end === null ? null : iso(end), merged })
+    expect(laneCardTime('doing', badge(T - 20 * MIN, null), null, T)).toEqual({ soFar: 20 * MIN })
+    expect(laneCardTime('review', badge(T - 20 * MIN, null), null, T)).toEqual({ soFar: 20 * MIN })
+    expect(laneCardTime('done', badge(T - 50 * MIN, T - 10 * MIN, 'abc1234def'), null, T)).toEqual({ took: 40 * MIN, merged: 'abc1234def' })
+    // Done with no integration or acceptance known, Todo, or no start known: nothing.
+    expect(laneCardTime('done', badge(T - 50 * MIN, null), null, T)).toBeNull()
+    expect(laneCardTime('todo', badge(null, null), null, T)).toBeNull()
+    expect(laneCardTime('doing', undefined, null, T)).toBeNull()
+  })
+
+  it("an ended lane's card: what happened before the lane ended only; a later completion or a reopened cycle shows nothing, an unfinished card's time doesn't run on", () => {
+    const iso = (ms: number) => new Date(ms).toISOString()
+    const ended = iso(T - 60 * MIN)
+    const badge = (start: number, end: number | null, merged: string | null = null) => ({ startedAt: iso(start), endedAt: end === null ? null : iso(end), merged })
+    // Done before the lane ended: took, and its commit.
+    expect(laneCardTime('done', badge(T - 120 * MIN, T - 90 * MIN, 'abc'), ended, T)).toEqual({ took: 30 * MIN, merged: 'abc' })
+    // Completed after the lane ended: never rewrites the lane's history.
+    expect(laneCardTime('done', badge(T - 120 * MIN, T - 30 * MIN, 'late'), ended, T)).toBeNull()
+    // Reopened later (a cycle that started after the lane ended).
+    expect(laneCardTime('doing', badge(T - 10 * MIN, null), ended, T)).toBeNull()
+    // Unfinished when the lane ended: no growing "so far".
+    expect(laneCardTime('doing', badge(T - 120 * MIN, null), ended, T)).toBeNull()
   })
 })

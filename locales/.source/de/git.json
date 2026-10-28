@@ -379,6 +379,8 @@
   "git.vc.switch.title": "Switch {project} to {platform}?",
   "git.vc.switch.what": "From its next card, {project} uses {to} and {to}’s own workflow options. Cards already started keep {from}’s rules.",
   "git.vc.switchTip": "Switch this project to {platform}, from its next card. Hive shows what changes first.",
+  "git.vc.templateNotApplied": "{project} still uses None, so the Git workflow of {template} wasn’t applied. Switch the project to Git, then load the template again.",
+  "git.vc.templatePending": "For the template {template}: once the repository is made and this project uses Git, its Load dialog opens again.",
   "git.vc.useParent": "Use that repository…",
   "git.vc.workflow": "Workflow: {platform} · {state, select, preset {{preset}} custom {Custom (from {preset})} other {no preset chosen}}",
   "git.vc.workflowTip": "Show the workflow options",

@@ -377,6 +377,8 @@
   "git.vc.switch.title": "{project}を「{platform}」に切り替えますか？",
   "git.vc.switch.what": "次のカードから、{project}は「{to}」と「{to}」独自のワークフローのオプションを使います。開始済みのカードは「{from}」のルールを維持します。",
   "git.vc.switchTip": "このプロジェクトを次のカードから「{platform}」に切り替えます。Hiveは先に変更内容を表示します。",
+  "git.vc.templateNotApplied": "{project}は引き続きNoneを使っているため、{template}のGitワークフローは適用されませんでした。プロジェクトをGitに切り替えてから、もう一度テンプレートを読み込んでください。",
+  "git.vc.templatePending": "テンプレート{template}用：リポジトリが作成され、このプロジェクトがGitを使うようになると、読み込みダイアログがもう一度開きます。",
   "git.vc.useParent": "そのリポジトリを使う…",
   "git.vc.workflow": "ワークフロー：{platform} · {state, select, preset {{preset}} custom {カスタム（{preset}から）} other {プリセット未選択}}",
   "git.vc.workflowTip": "ワークフローのオプションを表示",

@@ -16,7 +16,7 @@ import { commandKeybinding } from '../commands'
 import { legacyOf, placeText, placeTip } from '../agentPlace'
 import { connectionCellText, NoConnectionBanner, useConnections, useLaunchConnection } from './ConnectionChoice'
 import { assistantDefaults } from '@shared/connectionDefaults'
-import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingKey, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
+import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setLoaded, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingKey, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
 import { cardLabel } from '@shared/projectKeys'
 import { loadAssistantChanges } from '../assistantUndo'
 import { useInbox } from '../inbox'
@@ -290,7 +290,7 @@ export function AssistantPanel() {
     // Another workspace opened before this loaded: its own load is on the way.
     let current = true
     // Those told by events meanwhile are kept, never twice (HI-1863).
-    void Promise.all([call('assistant:actions'), call('assistant:questions')]).then(([snapshot, assistantQuestions]) => current && set((s) => ({ assistantActions: withSnapshot(s.assistantActions, snapshot), assistantQuestions })))
+    void Promise.all([call('assistant:actions'), call('assistant:questions')]).then(([snapshot, assistantQuestions]) => current && setLoaded((s) => ({ assistantActions: withSnapshot(s.assistantActions, snapshot), assistantQuestions })))
     // Its changes kept for undo (#1283), by message.
     void loadAssistantChanges()
     return () => {

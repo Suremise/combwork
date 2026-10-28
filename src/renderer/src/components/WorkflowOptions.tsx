@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { OwnWorkflowProblem, ProjectInfo, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
 import type { PlatformId } from '@shared/platform/descriptors'
-import { allOff, CONTRADICTIONS, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, isAllOff, liveContradictions, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
+import { allOff, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, isAllOff, liveContradictions, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { GROUP_TEXT, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import { FILE_LOCK_MODES } from '@shared/defaults'
 import { NumberField } from './NumberField'
@@ -20,6 +20,8 @@ import { OriginText } from './OriginText'
 import { providerDescriptor } from '@shared/providers'
 import { agentWorkflowRole, reviewsWork } from '@shared/workflow/roles'
 import { Icon, Switch, Tooltip } from './ui'
+import { overlayTemplateWorkflow } from '@shared/workflow/templateOptions'
+import { PLATFORM_NAME } from '@shared/platform/switching'
 
 /**
  * The Version Control tab's Workflow section (#1418, SPEC §16.6; P4's plain form before it, #1278): the presets, each
@@ -56,6 +58,8 @@ const T = {
   inheritTip: msg({ id: 'workflow.form.inheritTip', defaultMessage: 'Use the inherited value: {value}', description: 'The tooltip of the Inherit button of a workflow option. {value} is the value it would have.' }),
   on: msg({ id: 'workflow.form.on', defaultMessage: 'On', description: 'A workflow option’s value: on.' }),
   off: msg({ id: 'workflow.form.off', defaultMessage: 'Off', description: 'A workflow option’s value: off.' }),
+  focusedPick: msg({ id: 'workflow.form.focusedPick', defaultMessage: 'Command that chooses the tests (optional)', description: 'The placeholder and label of a field under “Each card’s focused tests” (G20) in Project Settings → Workflow: the project’s command that lists the tests a change needs. Left empty, each card’s builder names its tests.' }),
+  focusedRun: msg({ id: 'workflow.form.focusedRun', defaultMessage: 'Command that runs them', description: 'The placeholder and label of a field under “Each card’s focused tests” (G20) in Project Settings → Workflow: the project’s command that runs a list of tests.' }),
   defaultBranch: msg({ id: 'workflow.form.defaultBranch', defaultMessage: 'The repository’s default branch', description: 'The placeholder of the target branch field in Project Settings → Workflow: left empty, the default branch.' }),
   labels: msg({ id: 'workflow.form.labels', defaultMessage: 'Labels, separated by commas', description: 'The placeholder of the labels field of “Your OK before merging”.' }),
   noIdentity: msg({ id: 'workflow.form.noIdentity', defaultMessage: 'No name and email are set in git config yet.', description: 'Under “Commits use the project’s identity” when git has no identity configured.' }),
@@ -102,6 +106,10 @@ const T = {
   lane: msg({ id: 'workflow.form.lane', defaultMessage: 'Builder {builder}: {name}', description: 'A running lane in the dialog before saving workflow options: its builder agent and its name.' }),
   laneUnnamed: msg({ id: 'workflow.form.laneUnnamed', defaultMessage: 'Builder {builder}', description: 'A running lane without a name in the dialog before saving workflow options: its builder agent.' }),
   inFlight: msg({ id: 'workflow.form.inFlight', defaultMessage: '{n, plural, one {This card in flight keeps the old rules. Tick it to apply the new options to it now.} other {These cards in flight keep the old rules. Tick one to apply the new options to it now.}}', description: 'In the dialog before saving workflow options, above the cards already started (glossary 2.1: old rules). Ticking a card records an override on it.' }),
+  fromTemplate: msg({ id: 'workflow.form.fromTemplate', defaultMessage: 'Filled in from the template {template}: nothing is saved yet. Check the options, then Save… (they apply from the next card), or Discard Changes.', description: "A note atop the Workflow section (HI-1910) after loading a template whose workflow was applied: its options are filled in but not saved. Save… and Discard Changes are the buttons below: as translated there." }),
+  templateNoCommand: msg({ id: 'workflow.form.templateNoCommand', defaultMessage: '{count, plural, one {This project has no command for the check {checks} yet: add it under Checks before cards need it.} other {This project has no commands for the checks {checks} yet: add them under Checks before cards need them.}}', description: "A note atop the Workflow section (HI-1910), with the template's options filled in: checks ({checks}, a list of names; {count} of them) have no command in this project. Checks is the group below: as translated there. Glossary: check." }),
+  templateIdentityOff: msg({ id: 'workflow.form.templateIdentityOff', defaultMessage: 'The template turns the project identity on, but this project’s git config has no name and email, so it stays off.', description: "A note atop the Workflow section (HI-1910), with a template's options filled in: it turns the project identity (G12) on, but the project's git config has none. Glossary: identity." }),
+  templateOtherPlatform: msg({ id: 'workflow.form.templateOtherPlatform', defaultMessage: 'The workflow of {template} is for {platform}, and {project} doesn’t use it now, so it wasn’t filled in.', description: "A notification (HI-1910): a loaded template's workflow ({template}) is for a version control ({platform}: None or Git) the project ({project}) no longer uses (switched meanwhile)." }),
   saved: msg({ id: 'workflow.form.saved', defaultMessage: 'Workflow options saved', description: 'A notification: the workflow options were saved.' }),
   inheritor: msg({ id: 'workflow.form.inheritor', defaultMessage: 'Project {project} inherits these options, and the change would make its options contradict each other:', description: 'Why saving workflow defaults was refused: a project inheriting them would have contradictory options. Its reason follows on its own line. {project} is its name.' }),
   levelConfirm: msg({ id: 'workflow.form.levelConfirm', defaultMessage: 'Projects that don’t set these options themselves use the new defaults from their next card.', description: 'The message of the dialog before saving workflow defaults (Settings → Workflow defaults or Settings → Workspace).' }),
@@ -295,14 +303,32 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     if (again && dirtyRef.current) return
     void load(again)
   }, [load, source.key, version])
-  // "How do you work?"'s Customise… (#1423): the preset filled in once the project's form is read, not saved.
+  // "How do you work?"'s Customise… (#1423): the preset filled in once the project's form is read, not saved. A loaded
+  // template's workflow (HI-1910): the project's options read again, its section laid over them, not saved either.
   const prefill = useStore((s) => s.workflowPrefill)
+  const [fromTemplate, setFromTemplate] = useState<{ for: string; name: string; identityOff: boolean } | null>(null)
   useEffect(() => {
     if (!prefill || source.level || prefill.path !== source.key || loaded?.for !== source.key) return
     setStore({ workflowPrefill: null })
-    const p = loaded.form.presets.find((x) => x.id === prefill.preset)?.options
+    const t = prefill.template
+    if (t) {
+      const path = source.key
+      void source.read().then(
+        (f) => {
+          if (pathRef.current !== path) return
+          show(path, f)
+          if (f.platform !== t.platform) return notify('warning', tr(T.templateOtherPlatform, { template: t.name, platform: tr(PLATFORM_NAME[t.platform]), project: project?.name ?? '' }))
+          const o = overlayTemplateWorkflow(t.section, { platform: f.platform, options: f.options, own: f.own, identity: f.identity })
+          setDraft({ preset: o.preset, options: o.own })
+          setFromTemplate({ for: path, name: t.name, identityOff: o.identityOff })
+        },
+        (e) => notify('error', errorMessage(e))
+      )
+      return
+    }
+    const p = prefill.preset ? loaded.form.presets.find((x) => x.id === prefill.preset)?.options : null
     if (p) setDraft({ preset: prefill.preset, options: withUnpreset(ownOptions(p), loaded.draft.options) })
-  }, [prefill, loaded, source])
+  }, [prefill, loaded, source, show, project])
 
   const effective = useMemo((): WorkflowOptions | null => (form && draft ? ({ ...form.inherited, ...draft.options, platform: form.platform } as WorkflowOptions) : null), [form, draft])
   const dirty = !!form && !!draft && (draft.preset !== form.preset || !same(draft.options, form.own))
@@ -535,11 +561,26 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
         // Empty inherits: the box shows the inherited value as its placeholder.
         return <NumberField value={draft.options[key] ?? null} min={1} max={max} step={key === 'loopStepWaitMinutes' ? 5 : 1} label={tr(optionTitle(key, platform)!)} inherit={valueText(key, form.inherited[key])} onCommit={(v) => (v === null ? inheritKey(key) : set(key, v))} />
       }
+      case 'focusedTests': {
+        // G20 (HI-1367): its picker and runner are commands of their own, kept in the same map as the checks'.
+        const command = (name: string, v: string): void => {
+          const { [name]: _gone, ...rest } = effective.commands
+          set('commands', v.trim() ? { ...rest, [name]: v.trim() } : rest)
+        }
+        return (
+          <div className="workflow-stack">
+            <Switch checked={effective.focusedTests} onChange={(v) => set('focusedTests', v)} />
+            {effective.focusedTests && <DraftText value={effective.commands[FOCUSED_PICK] ?? ''} placeholder={tr(T.focusedPick)} label={tr(T.focusedPick)} onCommit={(v) => command(FOCUSED_PICK, v)} />}
+            {effective.focusedTests && <DraftText value={effective.commands[FOCUSED_RUN] ?? ''} placeholder={tr(T.focusedRun)} label={tr(T.focusedRun)} onCommit={(v) => command(FOCUSED_RUN, v)} />}
+          </div>
+        )
+      }
       case 'preChecks':
       case 'mergeChecks': {
-        // One commands map for both lists (§16.13): the other list's commands are kept through this one's change.
+        // One commands map for both lists (§16.13): the other list's commands are kept through this one's change, and
+        // G20's picker and runner (HI-1367).
         const other = effective[key === 'preChecks' ? 'mergeChecks' : 'preChecks']
-        const kept = Object.fromEntries(Object.entries(effective.commands).filter(([n]) => other.includes(n)))
+        const kept = Object.fromEntries(Object.entries(effective.commands).filter(([n]) => other.includes(n) || n === FOCUSED_PICK || n === FOCUSED_RUN))
         return <ChecksEditor names={effective[key]} commands={effective.commands} onChange={(names, commands) => setDraft({ ...draft, options: { ...draft.options, [key]: names, commands: { ...kept, ...commands } } })} />
       }
       case 'excluded':
@@ -551,6 +592,10 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     }
   }
 
+  // A template's options filled in (HI-1910), while unsaved: its name, and the checks this project can't run yet, from the
+  // draft as it is (never the dialog's list: a command added here clears it).
+  const filled = fromTemplate?.for === source.key && dirty ? fromTemplate : null
+  const noCommand = filled ? [...new Set([...effective.preChecks, ...(platform === 'git' ? effective.mergeChecks : [])])].filter((n) => !effective.commands[n]?.trim()) : []
   const choices: Choice[] = [...form.presets.map((p) => p.id), 'allOff']
   const choiceName = (c: Choice): string => tr(c === 'allOff' ? T.allOff : PRESET_TEXT[c])
   const presetNow = draft.preset ? (custom ? tr(T.startedFrom, { preset: tr(PRESET_TEXT[draft.preset]) }) : tr(PRESET_TEXT[draft.preset])) : tr(T.noPreset)
@@ -564,6 +609,16 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
           <button className="btn subtle small" onClick={() => (setStore({ settingsSection: 'advanced', settingsQuery: '' }), setActivity('settings'))}>
             {tr(msg({ id: 'workflow.form.openAdvanced', defaultMessage: 'Open Advanced', description: 'A button beside the note that workflow rules aren’t enforced: opens Settings → Advanced.' }))}
           </button>
+        </div>
+      )}
+      {filled && (
+        <div className="banner info workflow-note" role="status" data-from-template={filled.name}>
+          <Icon name="info" />
+          <span>
+            {tr(T.fromTemplate, { template: filled.name })}
+            {noCommand.length > 0 && <span data-template-no-command={noCommand.join(' ')}> {tr(T.templateNoCommand, { count: noCommand.length, checks: fmt.list(noCommand) })}</span>}
+            {filled.identityOff && <span data-template-identity-off=""> {tr(T.templateIdentityOff)}</span>}
+          </span>
         </div>
       )}
       {form.invalid && (

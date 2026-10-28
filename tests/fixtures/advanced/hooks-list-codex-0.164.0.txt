@@ -1,0 +1,8 @@
+Codex 0.164.0's request for a session's hooks (HI-982): its source at rust-v0.164.0 = 6aaac694803004a63c6f393d153c96d22521a6b9,
+codex-rs/app-server-protocol/src/protocol/common.rs lines 917-921 (the app server's ClientRequest list: its method name). Not a run of Codex.
+
+    HooksList => "hooks/list" {
+        params: v2::HooksListParams,
+        serialization: global_shared_read("config"),
+        response: v2::HooksListResponse,
+    },

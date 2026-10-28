@@ -83,6 +83,7 @@ import * as projectAgents from './projectAgents'
 import * as templates from './templates'
 import * as branchWatch from './branchWatch'
 import { sessions } from './sessions'
+import { activityCardAgents, activityNowAll } from './activityWorkspace'
 import { usageHistory } from './usageHistory'
 import { mayHandOverNow } from './handOverCheck'
 import { transcripts } from './transcripts'
@@ -1013,6 +1014,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'session:clearUsageCache': () => sessions.forgetUsageCache(),
     'session:adopt': (p, id) => sessions.adopt(p, id),
     'session:usage': (p, id) => sessions.usage(workspace.assertSessionHost(p), id),
+    'session:hooks': (p, agentId) => sessions.sessionHooks(workspace.assertSessionHost(p), agentId),
     'session:markSeen': (p, ids) => sessions.markSeen(p, ids),
     'session:live': () => sessions.liveStates(),
     'session:setMode': (p, agentId, mode) => sessions.setPermissionMode(p, agentId, mode),
@@ -1061,7 +1063,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'agents:swap': (p, id, other) => projectAgents.swapAgents(p, id, other),
     'agents:place': (p, layout, cells) => projectAgents.placePanes(p, layout, cells),
     'templates:list': (p) => templates.listTemplates(p),
-    'templates:save': (p, scope, name, overwrite, usePatterns) => templates.saveTemplate(p, scope, name, overwrite, usePatterns === true),
+    'templates:save': (p, scope, name, overwrite, usePatterns, includeWorkflow) => templates.saveTemplate(p, scope, name, overwrite, usePatterns === true, includeWorkflow !== false),
     'templates:plan': (p, scope, file, from, names) => templates.templatePlan(p, scope, file, from, names),
     'templates:load': (p, scope, file, expected, from, names, connections) => templates.loadTemplate(p, scope, file, expected, from, names, connections),
     'templates:addAgent': (p, scope, file, index, from, name) => templates.addAgentFromTemplate(p, scope, file, index, from, name),
@@ -1152,14 +1154,17 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'attachments:trashGroup': (p, id) => files.trashAttachmentGroup(p, id),
     'transcript:read': (p, id, opts) => transcripts.read(p, id, opts ?? {}),
     'transcript:tool': (p, id, itemId) => transcripts.tool(p, id, itemId),
+    // A project or the Assistant's home (HI-1664: Activity's workspace level shows the Assistant too).
     'activity:now': async (p) => {
-      p = workspace.assertProject(p)
-      return { launches: await projectLaunches(p), tasks: sessions.backgroundTasks(p) }
+      p = workspace.assertSessionHost(p)
+      return { launches: await projectLaunches(p), tasks: sessions.backgroundTasks(p), blocks: sessions.hookBlocks(p) }
     },
+    'activity:nowAll': (paths) => activityNowAll(paths),
+    'activity:cardAgents': (card) => activityCardAgents(card),
     'activity:turns': (p, id, known) => transcripts.turns(p, id, known),
-    'activity:sessions': (p, hours) => sessions.activitySessions(workspace.assertProject(p), Math.max(1, Math.min(24 * 7, Number(hours) || 24))),
+    'activity:sessions': (p, hours) => sessions.activitySessions(workspace.assertSessionHost(p), Math.max(1, Math.min(24 * 7, Number(hours) || 24))),
     'activity:detail': (p, id, itemId) => transcripts.detail(p, id, Number(itemId)),
-    'activity:endProcess': (p, agentId, pid, created) => endAgentProcess(workspace.assertProject(p), String(agentId), Number(pid), String(created)),
+    'activity:endProcess': (p, agentId, pid, created) => endAgentProcess(workspace.assertSessionHost(p), String(agentId), Number(pid), String(created)),
     'transcript:image': (p, id, imageId) => transcripts.image(p, id, imageId),
     'transcript:search': (p, query, id) => transcripts.search(p, query, id),
     'transcript:compactions': (p, id) => transcripts.compactions(p, id),
