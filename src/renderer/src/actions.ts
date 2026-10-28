@@ -951,27 +951,39 @@ export async function archiveCurrent(path: string | null = get().selectedProject
 /**
  * Turns a workspace MCP server on or off in the workspace (#1093, its master switch). On asks first, showing what it
  * runs (#550) and which projects to turn it on in: those that have it on (their choices, kept while it was off) and the
- * selected project are ticked. Off turns it off everywhere at once and keeps the projects' choices.
+ * selected project are ticked, and the Hive Assistant where it has it on (HI-1472). Off turns it off everywhere at once
+ * and keeps the projects' and the Assistant's choices.
  */
-export async function setMcpServerEnabled(server: Pick<McpServerInfo, 'name' | 'def' | 'revision' | 'runs' | 'secretWarnings'>, on: boolean): Promise<boolean> {
+export async function setMcpServerEnabled(server: Pick<McpServerInfo, 'name' | 'def' | 'revision' | 'runs' | 'secretWarnings' | 'assistant'>, on: boolean): Promise<boolean> {
   let picks: Record<string, boolean> | undefined
+  let forAssistant: boolean | undefined
   if (on) {
     const s = get()
     const projects = s.workspace?.projects ?? []
     const initial = projects.filter((p) => p.config.mcp.enabled.includes(server.name) || p.path === s.selectedProject).map((p) => p.path)
     picks = Object.fromEntries(projects.map((p) => [p.path, initial.includes(p.path)]))
+    forAssistant = server.assistant
     const ok = await confirm({
       title: tr(msg({ id: 'mcp.enable.confirmTitle', defaultMessage: 'Turn on {name}?', description: 'Title of the confirmation before an MCP server is turned on in the workspace. {name} is the server.' }), { name: server.name }),
-      message: tr(msg({ id: 'mcp.enable.confirmMessage', defaultMessage: 'New sessions in the projects you tick start it. It runs:', description: 'The confirmation before an MCP server is turned on in the workspace, above the command it runs and the projects to tick.' })),
+      message: tr(msg({ id: 'mcp.enable.confirmMessage', defaultMessage: 'New sessions start it wherever you tick. It runs:', description: 'The confirmation before an MCP server is turned on in the workspace, above the command it runs and the projects (and the Hive Assistant) to tick.' })),
       list: server.runs,
-      content: createElement(McpProjectPicker, { projects, initial, warnings: server.secretWarnings, onChange: (now: Record<string, boolean>) => void (picks = now) }),
+      content: createElement(McpProjectPicker, {
+        projects,
+        initial,
+        assistant: server.assistant,
+        warnings: server.secretWarnings,
+        onChange: (now: Record<string, boolean>, assistant: boolean) => {
+          picks = now
+          forAssistant = assistant
+        }
+      }),
       confirmLabel: tr(msg({ id: 'mcp.enable.confirmButton', defaultMessage: 'Turn On', description: 'Button: turns the MCP server on in the workspace and the projects ticked.' }))
     })
     if (!ok) return false
   }
   const done = await attempt(tr(msg({ id: 'actions.mcp.updateFailed', defaultMessage: 'Could not update the server', description: "An error's title: turning an MCP server on or off in the workspace failed." })), async () => {
     // The definition shown: if it was replaced or edited meanwhile, Hive refuses, and the user looks again.
-    await call('mcp:setGlobal', server.name, on, on ? { def: server.def, revision: server.revision } : undefined, picks)
+    await call('mcp:setGlobal', server.name, on, on ? { def: server.def, revision: server.revision } : undefined, picks, forAssistant)
     return true
   })
   set((s) => ({ skillsVersion: s.skillsVersion + 1 }))
@@ -993,16 +1005,45 @@ export async function setMcpServerInProject(target: Pick<ProjectInfo, 'path' | '
   return !!done
 }
 
+/**
+ * Turns a workspace MCP server on or off for the Hive Assistant (HI-1472, Settings → Assistant), its own choice as a
+ * project's: it runs for it while it is on in the workspace too. On asks first, showing what it runs and what to know
+ * about its definition, and is refused if that definition was replaced or edited meanwhile; off is at once.
+ */
+export async function setMcpServerForAssistant(server: Pick<McpServerInfo, 'name' | 'def' | 'revision' | 'runs' | 'secretWarnings'>, on: boolean): Promise<boolean> {
+  if (on) {
+    const ok = await confirm({
+      title: tr(msg({ id: 'mcp.assistant.confirmTitle', defaultMessage: 'Turn on {name} for the Assistant?', description: 'Title of the confirmation before an MCP server is turned on for the Hive Assistant (Settings → Assistant). {name} is the server.' }), { name: server.name }),
+      message: tr(msg({ id: 'mcp.assistant.confirmMessage', defaultMessage: "The Assistant's next session starts it. It runs:", description: 'The confirmation before an MCP server is turned on for the Hive Assistant, above the command it runs.' })),
+      list: server.runs,
+      detail: server.secretWarnings.length ? server.secretWarnings.join('\n') : undefined,
+      confirmLabel: tr(msg({ id: 'mcp.assistant.confirmButton', defaultMessage: 'Turn On', description: 'Button: turns the MCP server on for the Hive Assistant.' }))
+    })
+    if (!ok) return false
+  }
+  const done = await attempt(tr(msg({ id: 'mcp.assistant.updateFailed', defaultMessage: 'Could not update the server', description: "An error's title: turning an MCP server on or off for the Hive Assistant failed." })), async () => {
+    // The definition shown: if it was replaced or edited meanwhile, Hive refuses, and the user looks again.
+    await call('mcp:setAssistant', server.name, on, on ? { def: server.def, revision: server.revision } : undefined)
+    return true
+  })
+  set((s) => ({ skillsVersion: s.skillsVersion + 1 }))
+  return !!done
+}
+
 /** Why a workspace MCP server can't be used, in the window's language (#849): Hive's own words, else the JSON reader's as it gave them. */
 export const mcpErrorText = (server: Pick<McpServerInfo, 'error' | 'errorText'>): string | undefined => (server.errorText ? shownText(server.errorText) : server.error)
 
 /**
  * Where a workspace MCP server runs (#1093), in words, from the projects as the window has them: "Off in the
- * workspace", "On in Amberlight" or "On in no project".
+ * workspace", "On in Amberlight", "On in Amberlight and for the Hive Assistant", "On for the Hive Assistant only"
+ * (HI-1472) or "On in no project".
  */
-export function mcpWhereText(server: Pick<McpServerInfo, 'name' | 'def' | 'globallyEnabled'>, projects: readonly ProjectInfo[]): string {
+export function mcpWhereText(server: Pick<McpServerInfo, 'name' | 'def' | 'globallyEnabled' | 'assistant'>, projects: readonly ProjectInfo[]): string {
   if (!server.globallyEnabled) return tr(MCP_OFF_IN_WORKSPACE)
   const on = projects.filter((p) => serverOnIn(server, p.config.mcp)).map((p) => p.name)
+  const assistant = !!server.def && server.assistant
+  if (on.length && assistant) return tr(msg({ id: 'mcp.where.someAndAssistant', defaultMessage: 'On in {projects} and for the Hive Assistant', description: 'Where an MCP server is on, under it in the MCP view: in some projects and for the Hive Assistant. {projects} lists the projects.' }), { projects: fmt.list(on) })
+  if (assistant) return tr(msg({ id: 'mcp.where.assistantOnly', defaultMessage: 'On for the Hive Assistant only', description: 'Where an MCP server is on, under it in the MCP view: for the Hive Assistant, in no project.' }))
   return on.length
     ? tr(msg({ id: 'mcp.where.some', defaultMessage: 'On in {projects}', description: 'Where an MCP server is on, under it in the MCP view. {projects} lists the projects.' }), { projects: fmt.list(on) })
     : tr(msg({ id: 'mcp.where.none', defaultMessage: 'On in no project', description: 'Where an MCP server is on, under it in the MCP view: on in the workspace, but no project has it on.' }))

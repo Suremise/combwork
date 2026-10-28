@@ -47,6 +47,8 @@ interface HiveMessageValues {
   'tips.assistantLaneWatch.title': undefined
   'tips.assistantLanes.text': undefined
   'tips.assistantLanes.title': undefined
+  'tips.assistantMcp.text': undefined
+  'tips.assistantMcp.title': undefined
   'tips.assistantMessages.text': undefined
   'tips.assistantMessages.title': undefined
   'tips.assistantReplies.text': undefined

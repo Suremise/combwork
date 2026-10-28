@@ -45,6 +45,8 @@
   "tips.assistantLaneWatch.title": "一次监视所有通道",
   "tips.assistantLanes.text": "助手让智能体开始处理下一组卡片时，会在同一步中为它开启新对话（旧对话保留在“会话历史”标签页中）。短对话的费用要低得多：有任何新卡片时，也可以让它这样做。",
   "tips.assistantLanes.title": "每个通道一个新对话",
+  "tips.assistantMcp.text": "与项目一样，只有为助手开启的工作区 MCP 服务器才会提供给它：在“设置 → 助手 → MCP 服务器”中选择，或在 MCP 视图中开启服务器时勾选“Hive 助手”。包含你个人笔记的服务器可以只提供给助手，而不提供给任何项目。",
+  "tips.assistantMcp.title": "仅供助手使用的 MCP 服务器",
   "tips.assistantMessages.text": "助手无法给等待中或工作中的智能体布置新任务，但可以给它留一条消息，比如你的回答：智能体一能接收就会送达。在此之前，它的窗格会将其显示为未读（✉）；点击即可取消。",
   "tips.assistantMessages.title": "助手可以联系忙碌的智能体",
   "tips.assistantReplies.text": "当你在智能体的窗格中回答它，而助手正在监视它或它的卡片时，助手会得知你回答的第一行，就不会再问你一遍。“设置”→“常规”→“你的名字”决定它如何称呼你；在“设置”→“助手”中可以关闭此功能。",

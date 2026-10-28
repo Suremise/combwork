@@ -3,7 +3,7 @@ import { watch, type FSWatcher } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { readFileSync } from 'original-fs'
 import { join } from 'path'
-import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedRegExp, advancedRow, checkAdvanced, cliFacing, literalRegExp, parseAdvancedFile, withValues, type AdvancedDef, type AdvancedState, type MadeFor, type Text } from '../shared/advanced'
+import { ADVANCED_DEFS, LEGACY_ADVANCED, advancedDef, advancedFileText, advancedRegExp, advancedRow, checkAdvanced, cliFacing, literalRegExp, parseAdvancedFile, withValues, type AdvancedDef, type AdvancedState, type MadeFor, type Text } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { HiveError, hiveError } from './hiveError'
 import type { AppSettings, ProviderId } from '../shared/types'
@@ -279,6 +279,11 @@ export class AdvancedStore {
    * Removes every override (Settings → Advanced → Reset all settings), keeping ids this Hive doesn't know. Refused while
    * the file can't be read, which it would overwrite.
    */
+  /** A setting no longer listed but kept in advanced.json (LEGACY_ADVANCED), as the file has it: undefined when unset. */
+  legacy(id: string): unknown {
+    return LEGACY_ADVANCED.has(id) ? this.values[id] : undefined
+  }
+
   resetAll(): Promise<void> {
     return this.serial(async () => {
       if (this.fileError) throw hiveError(msg({ id: 'service.advanced.fixOrDelete', defaultMessage: '{problem} Fix or delete advanced.json first (Settings → Advanced → Open advanced.json).', description: "An error resetting every advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() })

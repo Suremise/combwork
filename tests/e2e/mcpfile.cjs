@@ -134,7 +134,7 @@ const check = (name, ok, extra = '') => {
 
   // --- All ticks every project; off keeps their choices, and on again shows them ticked.
   const enableNotes = await enableDialog('notes')
-  await enableNotes.getByRole('button', { name: 'All', exact: true }).click()
+  await enableNotes.getByRole('button', { name: 'All projects', exact: true }).click()
   check('All ticks every project', (await ticked(enableNotes, 'demo')) && (await ticked(enableNotes, 'other')))
   await enableNotes.getByRole('button', { name: 'Turn On', exact: true }).click()
   check('notes is on in both', !!(await lib.until(async () => (await where('notes')) === 'On in demo and other', HUNG_MS)), await where('notes'))

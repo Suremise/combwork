@@ -218,6 +218,13 @@ export const LANES_END_WAIT_MINUTES = 'hive.lanes.endWaitMinutes'
  */
 export const RETIRED_ADVANCED: ReadonlySet<string> = new Set(['hive.accounts.preview'])
 
+/**
+ * Settings Hive no longer lists but keeps in advanced.json as they are, never listed as unknown, read once more where a
+ * workspace still needs to move them to its own settings: `hive.assistant.otherMcpServers` (HI-1472, each workspace's
+ * Assistant MCP choices).
+ */
+export const LEGACY_ADVANCED: ReadonlySet<string> = new Set(['hive.assistant.otherMcpServers'])
+
 /** Whether reviewers review in review copies (#1435, SPEC §16.10.5): read by main's copiesApp. */
 export const COPIES_REVIEW = 'hive.copies.review'
 
@@ -257,7 +264,11 @@ export const OSC52_POLICY = 'hive.terminal.osc52'
 /** A card started on an agent is typed as its own words, without Hive's wrapper (#1292, #966 row 30): taskStart's prompt. */
 export const RAW_CARD_START = 'hive.prompt.rawCardStart'
 
-/** The Hive Assistant gets the workspace's other MCP servers, as its home's agents would (#1284, #966 row 7): effectiveHere. */
+/**
+ * The Hive Assistant got every server on in the workspace (#1284, #966 row 7), until HI-1472 gave it a choice of its own
+ * per server in each workspace: no longer listed, but kept in advanced.json (LEGACY_ADVANCED) so a workspace opened
+ * later still moves an "on" to its own choices (workspace.ts's migrateAssistantMcp).
+ */
 export const ASSISTANT_OTHER_MCP = 'hive.assistant.otherMcpServers'
 
 /** Project agents get Hive's guidance with Hive's tools (#1285, #966 row 13): index.ts's hiveGuidance and the hive MCP server. */
@@ -948,21 +959,6 @@ const SOURCES: readonly AdvancedSource[] = [
     kind: 'boolean',
     default: false,
     applies: 'now'
-  },
-  // The Assistant's other MCP servers (#1284, #966 row 7, Darren's decision on #1120 point 3): off, as before, it gets
-  // only Hive's own. Control governs only Hive's tools either way; another server's tools ask as its CLI's mode says.
-  {
-    id: ASSISTANT_OTHER_MCP,
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.assistant.otherMcpServers.title', defaultMessage: "The Assistant uses the workspace's other MCP servers", description: "An advanced setting's title (Settings → Advanced), listed under Hive. MCP is a protocol's name; the Assistant is the Hive Assistant." }),
-    desc: msg({
-      id: 'settings.advanced.hive.assistant.otherMcpServers.desc',
-      defaultMessage: "The Hive Assistant looks after the workspace with Hive's own tools only: the workspace's other MCP servers aren't given to it. Turned on, it gets every server that is on in the workspace (its switch in the MCP view), from its next session, as it works across every project. Its Control setting still decides what it may do with Hive's tools; another server's tools ask as its CLI's permission mode says. Whether its CLI's own servers load too is the CLI's \"Only the workspace's MCP servers\" setting.",
-      description: "What the advanced setting \"The Assistant uses the workspace's other MCP servers\" does (Settings → Advanced, under Hive). Control is the name of an Assistant setting, MCP the name of a view in Hive and \"Only the workspace's MCP servers\" another setting's title: use them as Hive shows them."
-    }),
-    kind: 'boolean',
-    default: false,
-    applies: 'sessions'
   },
   // Hive's guidance for project agents (#1285, #966 row 13), separate from giving them Hive's tools. The Assistant's role
   // and its own guidance have no switch (row 14): without them it is no Assistant, only an agent.
@@ -2639,7 +2635,7 @@ export function parseAdvancedFile(text: string): { values: Record<string, unknow
   const madeFor: Record<string, MadeFor> = {}
   if (isPlainObject(raw.madeFor))
     for (const [k, m] of Object.entries(raw.madeFor)) if (isPlainObject(m) && k in values) madeFor[k] = { version: typeof m.version === 'string' ? m.version : null, value: m.value }
-  return { values, madeFor, unknown: Object.keys(values).filter((k) => !BY_ID.has(k)) }
+  return { values, madeFor, unknown: Object.keys(values).filter((k) => !BY_ID.has(k) && !LEGACY_ADVANCED.has(k)) }
 }
 
 /** What a value takes, in words, in English (the Assistant's tools). */

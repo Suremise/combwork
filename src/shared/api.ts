@@ -727,7 +727,9 @@ export interface HiveRequests {
    * `expected` (the server the user was shown): refused if it has been replaced or edited since; `projects` (path → on)
    * sets those projects' own choices in the same change.
    */
-  'mcp:setGlobal': (name: string, enabled: boolean, expected?: McpShown, projects?: Record<string, boolean>) => void
+  'mcp:setGlobal': (name: string, enabled: boolean, expected?: McpShown, projects?: Record<string, boolean>, assistant?: boolean) => void
+  /** The Hive Assistant's own choice for a workspace server (HI-1472). */
+  'mcp:setAssistant': (name: string, enabled: boolean, expected?: McpShown) => void
   /** On or off in one project, its own choice (#1093: it runs there while it is on in the workspace too); `expected` as for mcp:setGlobal. */
   'mcp:setProject': (projectPath: string, name: string, enabled: boolean, expected?: McpShown) => void
   'mcp:create': (name: string) => McpServerInfo

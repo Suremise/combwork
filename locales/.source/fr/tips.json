@@ -45,6 +45,8 @@
   "tips.assistantLaneWatch.title": "One watch for all the lanes",
   "tips.assistantLanes.text": "When the Assistant starts an agent on its next set of cards, it gives it a new conversation in the same step (the old one stays in the Sessions tab). Short conversations cost much less: ask it to do the same for any new card.",
   "tips.assistantLanes.title": "A new conversation for each lane",
+  "tips.assistantMcp.text": "The Assistant gets a workspace MCP server only once you turn it on for it, as for a project: Settings → Assistant → MCP servers, or tick Hive Assistant when turning a server on in the MCP view. A server with your own notes can reach it and no project.",
+  "tips.assistantMcp.title": "MCP servers for the Assistant only",
   "tips.assistantMessages.text": "The Assistant can't give a waiting or working agent a new task, but it can leave it a message, such as your answer: delivered as soon as the agent can take it. Its pane shows it as unread (✉) until then; click that to cancel it.",
   "tips.assistantMessages.title": "The Assistant can reach a busy agent",
   "tips.assistantReplies.text": "When you answer an agent in its pane while the Assistant watches it or its card, the Assistant is told the first line, so it doesn't ask you again. Settings → General → Your name sets how it names you; Settings → Assistant turns it off.",

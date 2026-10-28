@@ -45,6 +45,8 @@
   "tips.assistantLaneWatch.title": "Una sola vigilancia para todos los carriles",
   "tips.assistantLanes.text": "Cuando el Asistente pone a un agente con su siguiente grupo de tarjetas, le da una conversación nueva en el mismo paso (la anterior sigue en la pestaña Sesiones). Las conversaciones cortas cuestan mucho menos: pídele lo mismo para cualquier tarjeta nueva.",
   "tips.assistantLanes.title": "Una conversación nueva para cada carril",
+  "tips.assistantMcp.text": "El Asistente recibe un servidor MCP del espacio de trabajo solo cuando lo activas para él, como para un proyecto: en Configuración → Asistente → Servidores MCP, o marcando Asistente de Hive al activar un servidor en la vista MCP. Un servidor con tus propias notas puede llegar al Asistente y a ningún proyecto.",
+  "tips.assistantMcp.title": "Servidores MCP solo para el Asistente",
   "tips.assistantMessages.text": "El Asistente no puede dar una tarea nueva a un agente que espera o trabaja, pero puede dejarle un mensaje, como tu respuesta: se entrega en cuanto el agente puede recibirlo. Hasta entonces, su panel lo muestra como sin leer (✉); haz clic ahí para cancelarlo.",
   "tips.assistantMessages.title": "El Asistente puede llegar a un agente ocupado",
   "tips.assistantReplies.text": "Cuando respondes a un agente en su panel mientras el Asistente lo vigila a él o a su tarjeta, el Asistente recibe la primera línea, así no te vuelve a preguntar. Configuración → General → Tu nombre define cómo te nombra; Configuración → Asistente lo desactiva.",
