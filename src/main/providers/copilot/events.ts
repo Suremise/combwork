@@ -68,8 +68,9 @@ export const copilotDetailsMemo = (): CopilotDetailsMemo => ({ denied: false })
  * Session details from appended events: model, effort, the credits used so far and the premium requests (running
  * totals), a refused sign-in, when its Stop hooks were answered, and when the user last interrupted a turn (`interruptedAt`), for which no hook fires: an
  * abort (Esc on a command's dialog, or while it works), or a turn that ends on the user's refusal of a path prompt
- * (Esc on "Path permission needed": permission.completed denied interactively, then assistant.turn_end, and neither
- * an abort nor agentStop; #475). An interrupt the user's next prompt follows in the same events is history: that
+ * (Esc on "Path permission needed": permission.completed denied interactively, then assistant.turn_end, and no
+ * agentStop; #475. Up to 1.0.98 no abort followed; 1.0.104 and 1.0.105 add one, user_initiated, after the turn's end,
+ * which moves interruptedAt to it: tests/fixtures/copilot/refusal-1.0.105.jsonl, HI-1945). An interrupt the user's next prompt follows in the same events is history: that
  * prompt's hook has already said the agent works again. `memo` is the launch's own, kept between reads (a refusal and
  * its turn's end can come in two).
  */
