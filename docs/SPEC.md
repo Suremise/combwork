@@ -5037,8 +5037,16 @@ under Hive in Advanced (no CLI's recording to check it against), defaulting to w
     - **Tried on 2.1.312:** a typed draft of four rows took four Ctrl+U, then read empty
       (`tests/fixtures/advanced/input-clear-claude-2.1.312.txt`). A multi-line paste is one row there (`[Pasted text
       #1 +44 lines]`), cleared by one.
+    - **The box read is the bottom one.** "Screen: input box"'s default takes its closing rule as a lookahead, so a
+      rule can close one box and open the next. A stray rule and prompt mark higher on the screen no longer swallow
+      the bottom box's top rule into a span of their own, which read an old prompt as the input.
     - **The fake Claude Code draws 2.1.312's box by default** (Darren's decision on HI-1979; `fake-plain-prompt.txt`
-      for the old prompt). It redraws the whole box after each change, top rule included.
+      for the old prompt), as the real CLI keeps it:
+      - only one, always at the bottom: what it prints while idle goes above the box, and a prompt sent or a turn
+        begun takes it away;
+      - empty under its spinner while it works (typing then goes after the busy lines, as before);
+      - redrawn whole after each change, top rule included, and replaced by its own question;
+      - the cursor moved back to the line's end relatively, as a line feed at the bottom scrolls.
 **Group E's rows 26, 27 and 30** (#1292; Darren's choices on #1120 point 5), each as Hive did by default, at once:
 - `hive.terminal.allKeysToCli` (off): on, every key in an agent's pane goes to its CLI but the command palette's
   shortcut (Show All Commands, as the user bound it), so every command stays in reach (`appTakesTerminalKey` in

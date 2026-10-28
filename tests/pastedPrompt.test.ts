@@ -551,6 +551,14 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
         }
       })
 
+      it('the box read is the one at the bottom, with a rule and a prompt mark left on the screen above it', () => {
+        // A rule shared as one box's bottom and the next one's top: the last box is the bottom one, not a span from the
+        // stray rule above down to its top rule (which then matched no box of its own).
+        const shown = `${RULE}\n❯ \n\n> [Hive] New in your inbox: 1 task (m2). Call hive_inbox to read it.\n\n${RULE}\n❯ \n${RULE}\n  ? for shortcuts`
+        expect(claudeCode.promptText!(shown)).toBe('')
+        expect(claudeCode.promptText!(shown.replace(/❯ \n(?=─+\n {2}\?)/, '❯ a draft\n'))).toBe('a draft')
+      })
+
       it("the recorded screens: Claude Code 2.1.312's box read row by row as each Ctrl+U took one, then empty", () => {
         const screensRead = readFileSync(join(__dirname, 'fixtures', 'advanced', 'input-clear-claude-2.1.312.txt'), 'utf8').replace(/\r\n/g, '\n').split(/^== .*$/m).slice(1)
         const read = screensRead.map((x) => claudeCode.promptText!(x))

@@ -374,9 +374,33 @@ fs.mkdirSync(path.dirname(transcript), { recursive: true })
 
 /** Writes to its screen; counts the writes, so a busy line can be taken back only if nothing came after it. */
 let writes = 0
-const out = (s) => {
+/**
+ * Whether the idle input box is drawn, the cursor at its line's end (HI-1979): what is written meanwhile goes above it
+ * and the box is drawn again under it, as Claude Code keeps its box at the bottom (a notice written into the box's
+ * rule made two boxes read as one). liftBox and dropBox draw it (set once the input line's layout is known, below).
+ */
+let boxShown = false
+let liftBox = () => ''
+let dropBox = () => ''
+/** Writes as it is, the box or not (what draws the box itself). */
+const rawOut = (s) => {
   writes++
   return process.stdout.write(s)
+}
+const out = (s) => {
+  if (!boxShown) return rawOut(s)
+  rawOut(liftBox())
+  const r = rawOut(s)
+  rawOut(dropBox())
+  // The box drawn again holds the whole line, what was typed and not drawn yet too.
+  undrawn = null
+  return r
+}
+/** The box goes (a prompt sent, a turn begun): what comes next is written where it was, with no box under it. */
+const takeBox = () => {
+  if (!boxShown) return
+  rawOut(liftBox())
+  boxShown = false
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const now = () => new Date().toISOString()
@@ -565,6 +589,7 @@ let refused = null
 /** Which Enter since its line was begun sent the prompt running now (#664): 1 for the first, null for one not typed. */
 let promptEnter = null
 async function runPrompt(text, enter = null) {
+  takeBox()
   busy = true
   promptEnter = enter
   promptId = randomUUID()
@@ -756,6 +781,8 @@ async function safeguardPrompt(switchTo) {
 let envSetupOpen = false
 function envSetup() {
   envSetupOpen = true
+  // In place of its input box, which the cleared screen takes with it (HI-1979: not drawn back under the question).
+  boxShown = false
   out("\x1b[2J\x1b[H Teach auto mode about your environment?\r\n\r\n Auto mode works better when it knows your environment. Takes about a minute.\r\n\r\n ❯ 1. Yes\r\n   2. Not now\r\n   3. Don't show again\r\n\r\n Enter to select · ↑/↓ to navigate · Esc to cancel\r\n")
 }
 function envSetupAnswered(answer) {
@@ -996,12 +1023,27 @@ async function startSubagent(secs, k) {
  * With fake-plain-prompt.txt in its home at its start, `❯ ` on its own, as before.
  */
 const inputBox = !(home && fs.existsSync(path.join(home, 'fake-plain-prompt.txt')))
+/**
+ * Whether what is typed goes into the box now (HI-1979): while it works, typing goes after its busy lines, as before
+ * (the box under its spinner stays as drawn), so the box is drawn round the line only while it is idle.
+ */
+const boxed = () => inputBox && !busy
 const RULE = '─'.repeat(40)
-const boxBelow = () => `\x1b7\r\n${RULE}\r\n  ? for shortcuts\x1b8`
-const promptLine = () => out(inputBox ? `\r\n${RULE}\r\n❯ ${boxBelow()}` : '\r\n❯ \r\n  ? for shortcuts\r\n')
-/** While it works: its spinner, then its input and footer below (BUSY_LINES lines down from where it starts). */
-const BUSY = '\r\n✻ Brewing… (esc to interrupt)\r\n❯ \r\n  ? for shortcuts\r\n'
-const BUSY_LINES = 4
+/**
+ * The box's rule and footer under its line, the cursor taken back to where the line ends (`col`, its cells on its last
+ * row): moved back two rows rather than saved and restored, as a line feed at the bottom of the screen scrolls it,
+ * and a restored place is then a row lower (HI-1979: a box at the bottom left its rule and footer behind).
+ */
+const boxBelow = (col = lineEnd()) => `\r\n${RULE}\r\n  ? for shortcuts\x1b[2A\r${col > 0 ? `\x1b[${col}C` : ''}`
+const promptLine = () => {
+  // One box: one already shown goes first (HI-1979: an idle compaction's end drew a second over it).
+  takeBox()
+  rawOut(inputBox ? `\r\n${RULE}\r\n❯ ${boxBelow(2)}` : '\r\n❯ \r\n  ? for shortcuts\r\n')
+  boxShown = inputBox
+}
+/** While it works: its spinner, then its input (the box, empty: HI-1979) and footer below (BUSY_LINES lines down from where it starts). */
+const BUSY = inputBox ? `\r\n✻ Brewing… (esc to interrupt)\r\n${RULE}\r\n❯ \r\n${RULE}\r\n  ? for shortcuts\r\n` : '\r\n✻ Brewing… (esc to interrupt)\r\n❯ \r\n  ? for shortcuts\r\n'
+const BUSY_LINES = inputBox ? 6 : 4
 /** The write after which the busy lines were drawn (taken back at the turn's end only if nothing came since). */
 let busyDrawn = -1
 
@@ -1104,7 +1146,7 @@ const cells = (ch) => (/\p{M}|\u200d|[\ufe00-\ufe0f]/u.test(ch) ? 0 : /[\u1100-\
 const lineLayout = () => {
   const cols = process.stdout.columns || 80
   const rows = [[]]
-  let x = inputBox ? 2 : 0
+  let x = boxed() ? 2 : 0
   for (const ch of line) {
     if (ch === '\n') {
       rows.push([])
@@ -1123,15 +1165,25 @@ const lineLayout = () => {
 }
 /** The screen rows the input line takes (lineLayout). */
 const lineRows = () => lineLayout().length
+/** The column where the input line ends on its last row (lineLayout): what boxBelow takes the cursor back to. */
+const lineEnd = () => {
+  const rows = lineLayout()
+  const cells0 = rows.length === 1 && boxed() ? 2 : 0
+  return Math.min((process.stdout.columns || 80) - 1, cells0 + rows[rows.length - 1].reduce((n, ch) => n + cells(ch), 0))
+}
 /**
  * Draws the input line again (after a key took some of it back), from its first row: `rows`, the rows it took before.
  * In the box, from its top rule, as Claude Code draws its whole box again (HI-1979: a draft taller than the screen
  * scrolled the rule off, and the box drawn back without it could never be read again).
  */
 const redrawLine = (rows) => {
-  const up = rows - 1 + (inputBox ? 1 : 0)
-  out(`\r${up > 0 ? `\x1b[${up}A` : ''}\x1b[J${inputBox ? `${RULE}\r\n❯ ` : ''}${line.replace(/\n/g, '\r\n')}${inputBox ? boxBelow() : ''}`)
+  const box = boxed()
+  const up = rows - 1 + (box ? 1 : 0)
+  rawOut(`\r${up > 0 ? `\x1b[${up}A` : ''}\x1b[J${box ? `${RULE}\r\n❯ ` : ''}${line.replace(/\n/g, '\r\n')}${box ? boxBelow() : ''}`)
+  boxShown = box
 }
+liftBox = () => `\r\x1b[${lineRows()}A\x1b[J`
+dropBox = () => `\r\n${RULE}\r\n❯ ${line.replace(/\n/g, '\r\n')}${boxBelow()}`
 /** In the box (inputBox): the rows its line took as last drawn, while what was typed since isn't drawn yet. */
 let undrawn = null
 /** Draws what was typed into the box since it was last drawn (a read's end, or a key that changes the line otherwise). */
@@ -1175,9 +1227,9 @@ process.stdin.on('data', (data) => {
     }
     // A line break or tab in a bracketed paste is text, as in Claude Code: the line keeps it (#1286).
     if (inPaste && (ch === '\r' || ch === '\n' || ch === '\t')) {
-      if (inputBox && undrawn === null) undrawn = lineRows()
+      if (boxed() && undrawn === null) undrawn = lineRows()
       line += ch === '\t' ? ch : '\n'
-      if (!inputBox) out(ch === '\t' ? ch : '\r\n')
+      if (!boxed()) out(ch === '\t' ? ch : '\r\n')
       continue
     }
     // A Ctrl+U or an Enter in a paste is text: nothing is cleared or sent.
@@ -1220,7 +1272,10 @@ process.stdin.on('data', (data) => {
       }
       const text = line.trim()
       const enter = enters
-      if (line) out('\r\n')
+      // Sent, the box goes from its top rule (HI-1979): an old one left on screen with its prompt would be read as the
+      // input, as Claude Code's isn't. The prompt shows in the conversation (runPrompt), as before.
+      if (line && boxShown) takeBox()
+      else if (line) out('\r\n')
       line = ''
       enters = 0
       if (onEnter) {
@@ -1249,9 +1304,9 @@ process.stdin.on('data', (data) => {
       }
     } else if (ch >= ' ') {
       if (!line) enters = 0
-      if (inputBox && undrawn === null) undrawn = lineRows()
+      if (boxed() && undrawn === null) undrawn = lineRows()
       line += ch
-      if (!inputBox) out(ch)
+      if (!boxed()) out(ch)
     }
   }
   drawTyped()

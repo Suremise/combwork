@@ -3526,7 +3526,7 @@ class SessionManager {
         box = read()
         if (box === '' || (box !== before && box !== null)) break
         if (before === null && box === null && shown !== null && screen!.text() !== shown) break
-        if (Date.now() - since > waitMs) throw notCleared(before === null ? "its input box isn't on the screen" : `a Ctrl+U wasn't answered within ${waitMs} ms`) // i18n-ignore: why, for the log
+        if (Date.now() - since > waitMs) throw notCleared(before === null ? "its input box isn't on the screen" : `a Ctrl+U wasn't answered within ${waitMs} ms (the box read "${userText(before.replace(/\s+/g, ' ').trim().slice(0, 60))}")`) // i18n-ignore: why, for the log
       }
     }
     check()
