@@ -51,6 +51,7 @@ import { isUnknown } from './platform/types'
 import { withRepoLock } from './repoLock'
 import { isResuming, onResumeEntry } from './restartResume'
 import { sessions } from './sessions'
+import { startBegun, startEnded } from './agentStarts'
 import { holder, poolFor, setSlotFreed } from './slotsApp'
 import { quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool } from './slots'
 import { carriedOf, keptFor, keptGoing } from './slotMigration'
@@ -812,25 +813,41 @@ async function ensure(ws: WorkspaceService, projectPath: string, wf: Workflow, p
   const key = `${projectPath.toLowerCase()}#${n}#${cycle.seq}`
   if (ensuring.has(key) || failed.has(key)) return
   ensuring.add(key)
+  // Its builder is starting while the cycle is prepared and placed (HI-1976): its Start's hold taken over, so the card
+  // isn't stalled meanwhile; a try that failed START_FAIL_TRIES times stalls it with why.
+  const hold = `#${n}`
+  startBegun(projectPath, l.agent, hold)
   let retry = false
+  let why = ''
+  let placed = false
   try {
     const prepared = cycle.prepared ?? (await prepare(ws, projectPath, wf, pool, n, cycle, l, key))
     if (!prepared) return
     if (!cycle.placed) await place(ws, projectPath, wf, n, cycle, l)
+    placed = true
   } catch (e) {
     failedStep(`#${n}'s slot ${userText(l.slot)}`, e) // i18n-ignore: a log line (failedStep logs it)
     // Its workspace opened again meanwhile (another lifetime's runtime), a write refused, a delivery not given or a launch
     // that failed: another pass once this ends, after a pause that grows with each try (1 s, doubling, at most a minute).
     retry = !ended(ws) && !!ws.path
+    why = e instanceof Error ? e.message : String(e)
   } finally {
     ensuring.delete(key)
     if (retry) {
       const tries = (attempts.get(key) ?? 0) + 1
       attempts.set(key, tries)
+      if (tries >= START_FAIL_TRIES) startEnded(projectPath, l.agent, hold, { failed: why })
       setTimeout(() => void settleSlotCards(ws, projectPath), Math.min(60_000, 1000 * 2 ** (tries - 1))).unref?.()
-    } else attempts.delete(key)
+    } else {
+      attempts.delete(key)
+      // Given its card: its own earlier tries' failure is over (a CLI's that exited meanwhile stands: agentStarts.ts).
+      startEnded(projectPath, l.agent, hold, placed ? { ok: true } : undefined)
+    }
   }
 }
+
+/** Failed tries of a cycle's preparation or placement before its card is stalled with the failure (HI-1976). */
+const START_FAIL_TRIES = 3
 
 /** The cycle's line made in its slot once its builder is quiet, and `SlotPrepared` written; null: not now, or not possible. */
 async function prepare(ws: WorkspaceService, projectPath: string, first: Workflow, pool: SlotPool, n: number, cycle: Cycle, l: SlotLease, key: string): Promise<FactData['SlotPrepared'] | null> {
@@ -869,6 +886,7 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
     if ('error' in r) {
       failed.add(key)
       log.warn(`Slot ${userText(st.slot)} couldn't be prepared for #${n}: ${userText(r.error)}`)
+      startEnded(projectPath, builder, `#${n}`, { failed: `Hive couldn't get ${st.slot} ready: ${r.error}` }) // i18n-ignore: agent-facing (a card's stall)
       await wf.write(card.card, null, 'hive', (w) => {
         const english = `Hive couldn't get ${st.slot} ready for ${card.card.key}: ${r.error}` // i18n-ignore: agent-facing, and the notice's English
         w.action('notify', { text: english, shown: workflowText(SLOT_NOTICES.notPrepared, { slot: st.slot, card: card.card.key, why: r.error }) })
@@ -1067,6 +1085,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
         track.failures = 0
         const why = e instanceof Error ? e.message : String(e)
         log.warn(`#${n}: ${userText(agent.name)}'s conversation in ${userText(cycle.started.slot)} didn't resume (${tries} tries): ${userText(why)}`)
+        startEnded(projectPath, agentId, `#${n}`, { failed: `its conversation in ${cycle.started.slot} didn't resume (${tries} tries): ${why}` }) // i18n-ignore: agent-facing (a card's stall)
         await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeFailed, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why }), `Hive couldn't resume ${agent.name}'s conversation in ${cycle.started.slot} for ${card.key ?? `#${n}`} (three tries): ${why}. Resume ${agent.name} from Sessions, or start it fresh, and Hive gives it ${card.key ?? `#${n}`}.`) // i18n-ignore: agent-facing, and the notice's English
         throw new GaveUp()
       }

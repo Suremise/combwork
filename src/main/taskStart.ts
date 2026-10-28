@@ -18,6 +18,7 @@ import { workspace, workspaceOf } from './workspace'
 import { cardAttachments } from './cardAttachments'
 import { checkDocRef, type DocRefCheck } from './docSections'
 import { expectStartPrompt, placementDue, startedOutsideSlots } from './slotCards'
+import { startBegun, startEnded } from './agentStarts'
 import type { ContextLine } from '../shared/tasks'
 import { cardRef } from '../shared/projectKeys'
 
@@ -130,12 +131,19 @@ async function startReserved(n: number, target: TaskStartTarget, actor: TaskActo
     agentId = def.id
     agentName = def.name
   }
+  // The agent is starting from here (HI-1976): not stalled while its card is given, nor, where its card starts in a slot,
+  // until the slot's placement has given it (that takes this hold over); a new Start's agent has no earlier failure.
+  const hold = `#${n}`
+  startBegun(p, agentId, hold, { fresh: true })
   let typed = false
+  let slotted = false
   try {
-    const { typed: t, ...result } = await giveCard(n, before, p, agentId, agentName, target.kind !== 'agent', actor, note, reason)
+    const { typed: t, slotted: s, ...result } = await giveCard(n, before, p, agentId, agentName, target.kind !== 'agent', actor, note, reason)
     typed = t
+    slotted = s
     return result
   } finally {
+    if (!slotted) startEnded(p, agentId, hold)
     // A prompt typed into a running agent: kept a moment, until the agent's own status says it's working (an agent
     // started with the card is "starting" at once).
     if (reserved) {
@@ -156,7 +164,7 @@ async function giveCard(
   actor: TaskActor,
   note: string | undefined,
   reason?: string
-): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; typed: boolean }> {
+): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; typed: boolean; slotted: boolean }> {
   const undoAgent = async (): Promise<void> => {
     if (added) await removeAgent(p, agentId, { deleteWorktree: true }).catch((e) => log.warn(`Could not remove ${userText(agentName)} after #${n} didn't start`, e))
   }
@@ -226,7 +234,7 @@ async function giveCard(
       slotted = true
       toSlot(prompt)
       if (added && actor.kind !== 'user') emit({ type: 'agent-added', projectPath: p, agentId })
-      return { card, agentId, agentName, added, typed: false }
+      return { card, agentId, agentName, added, typed: false, slotted: true }
     }
     // Again now: the agent may have started work, or the user typed in it, while the card was taken.
     live = availability(p, agentId, agentName, actor).live
@@ -256,7 +264,7 @@ async function giveCard(
   toSlot(null)
   // The view stays where the user has it; the new agent is marked for them.
   if (added && actor.kind !== 'user') emit({ type: 'agent-added', projectPath: p, agentId })
-  return { card, agentId, agentName, added, typed: live, ...(run ? { run } : {}) }
+  return { card, agentId, agentName, added, typed: live, slotted: false, ...(run ? { run } : {}) }
 }
 
 /** A card's context references (#818) with each section's size, or why it doesn't resolve now (#819). */

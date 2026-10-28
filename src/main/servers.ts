@@ -73,7 +73,7 @@ import { agentPlace, folderFacts } from './agentFolders'
 import { releasableSlots, releaseSlot, SlotReleaseRefused, type HeldRow } from './slotRelease'
 import { findTemplate, loadForAssistant, planReply, templateRows } from './templateApi'
 import { slotAt } from '../shared/agentFolders'
-import { cardStall, laneOrderView, stepWaitOf } from './cardStall'
+import { agentNowOf, cardStall, laneOrderView, stepWaitOf, type StallAgent } from './cardStall'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
 import { ackDeliveries, ackThenRead, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
 import { INBOX_SWITCHES, type InboxSwitch } from '../shared/inboxSwitches'
@@ -2358,7 +2358,7 @@ async function queueLineFor(project: string, n: number): Promise<string | null> 
 
 async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>(), waitingOf?: ReadonlyMap<number, ForYouItem[]>): Promise<TaskView> {
   let agent: { id: string; name: string; status: string; backgroundTasks: number } | null = null
-  let now: { name: string; running: boolean } | null = null
+  let now: StallAgent | null = null
   if (c.agent && c.project) {
     try {
       const p = projectByName(c.project)
@@ -2367,7 +2367,7 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
       const def = (await agents.get(key)!).find((a) => a.id === c.agent)
       const st = sessions.liveFor(p, c.agent)
       agent = { id: c.agent, name: def?.name ?? c.agentName ?? c.agent, status: def ? (st?.status ?? 'stopped') : 'removed', backgroundTasks: st?.backgroundTasks ?? 0 }
-      now = def ? { name: def.name, running: !!st || isResuming(p, c.agent) } : null
+      now = def ? agentNowOf(p, c.agent, def.name) : null
     } catch {
       agent = { id: c.agent, name: c.agentName ?? c.agent, status: 'removed', backgroundTasks: 0 }
     }

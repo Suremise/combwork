@@ -7,6 +7,7 @@ import { LOOP_STEP_WAIT_MINUTES } from '../shared/lanes'
 import { projectPreferences } from './workflow/preferences'
 import { queueReturnOf, staleApprovalOf } from './queueReturn'
 import { isResuming } from './restartResume'
+import { startNow } from './agentStarts'
 import { sessions } from './sessions'
 import { workspaceOf, type WorkspaceService } from './workspace'
 
@@ -104,25 +105,49 @@ function liveOf(wsPath: string): { name: string; project: string; agentId: strin
     .map((s) => ({ name: s.agentName ?? s.agentId, project: basename(s.projectPath), agentId: s.agentId, notWatching: s.notWatching, untaken: !!s.untakenLine, cards: s.watch?.cards ?? [], watchSince: s.watch?.since, status: s.status, silentMinutes: agentRuntime(s).silentMinutes }))
 }
 
+/** A card's agent as the stall check reads it: its name, whether it runs, and why its start failed when it does (HI-1976). */
+export interface StallAgent {
+  name: string
+  running: boolean
+  failed?: string | null
+}
+
 /**
- * Why a card is stalled, given its agent as it is now (null: removed; its name and whether it runs), its workspace's
- * folder, its running lane (none: no lane's deadlock is looked for), and how long a design waits for its check
- * (stepWaitMs: its project's workflow option Design check wait, HI-1766).
+ * An agent as it is now, for the stall check: running while its session runs, while this run's restart resume will
+ * bring it back (HI-1707), and while a start of it is under way (HI-1976: a Start, its slot being prepared and its
+ * builder placed, its session spawning); else why its last start failed, if it did.
  */
-export function cardStall(c: TaskCard, agentNow: { name: string; running: boolean } | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null): string | null {
+export function agentNowOf(projectPath: string, agentId: string, name: string): StallAgent {
+  const start = startNow(projectPath, agentId)
+  const running = !!sessions.liveFor(projectPath, agentId) || isResuming(projectPath, agentId) || sessions.startingFor(projectPath, agentId) || start.starting
+  return { name, running, ...(!running && start.failed ? { failed: start.failed } : {}) }
+}
+
+/** A Doing card's agent whose start failed (HI-1976): stalled with the failure, which "isn't running" would hide. Agent-facing. */
+function startFailedReason(c: Pick<TaskCard, 'column' | 'archived' | 'agent'>, agentNow: StallAgent | null): string | null {
+  if (c.archived || c.column !== 'doing' || !c.agent || !agentNow || agentNow.running || !agentNow.failed) return null
+  return `${agentNow.name}'s start failed: ${agentNow.failed}` // i18n-ignore: agent-facing (the Agent API's stalled)
+}
+
+/**
+ * Why a card is stalled, given its agent as it is now (null: removed; its name, whether it runs, why its start failed),
+ * its workspace's folder, its running lane (none: no lane's deadlock is looked for), and how long a design waits for its
+ * check (stepWaitMs: its project's workflow option Design check wait, HI-1766).
+ */
+export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null): string | null {
   const live = wsPath ? liveOf(wsPath) : []
   const watchers = live.filter((a) => a.cards.length)
   const builder = (returned || stale) && c.agent && c.project ? live.find((a) => a.agentId === c.agent && a.project.toLowerCase() === c.project!.toLowerCase()) : undefined
   const now = builder ? { name: builder.name, status: builder.status, watching: builder.cards.length > 0 } : null
   const back = now ? (returnedWaitReason(c, returned, now) ?? staleWaitReason(c, stale, now)) : null
-  return stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? reviewWaitReason(c, watchers) ?? reviewVerdictWaitReason(c, watchers) ?? laneOrderWaitReason(c, lane, watchers) ?? loopStepWaitReason(c, watchers, stepWaitMs) ?? laneNext(c, lane, live, agentNow) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
+  return startFailedReason(c, agentNow) ?? stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? reviewWaitReason(c, watchers) ?? reviewVerdictWaitReason(c, watchers) ?? laneOrderWaitReason(c, lane, watchers) ?? loopStepWaitReason(c, watchers, stepWaitMs) ?? laneNext(c, lane, live, agentNow) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
 }
 
 /**
  * The lane-next stall (laneNextWaitReason) with its builder as it is: running (live, by the card's project), else not
  * running only as the card's own agent says (agentNow: a builder queued to resume counts as running); unknown: none.
  */
-function laneNext(c: TaskCard, lane: LaneOrderView | null | undefined, live: ReturnType<typeof liveOf>, agentNow: { name: string; running: boolean } | null): string | null {
+function laneNext(c: TaskCard, lane: LaneOrderView | null | undefined, live: ReturnType<typeof liveOf>, agentNow: StallAgent | null): string | null {
   if (!lane || c.column !== 'todo' || !c.project) return null
   const b = live.find((a) => a.agentId === lane.builder && a.project.toLowerCase() === c.project!.toLowerCase())
   if (b) return laneNextWaitReason(c, lane, { name: b.name, status: b.status })
@@ -153,14 +178,14 @@ export async function stepWaitOf(ws: WorkspaceService, c: TaskCard): Promise<num
  * `agents`). For callers that don't have the agent at hand (lane watches).
  */
 export async function cardStallIn(ws: WorkspaceService, c: TaskCard, agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>(), lane?: LaneOrderView | null): Promise<string | null> {
-  let now: { name: string; running: boolean } | null = null
+  let now: StallAgent | null = null
   if (c.agent && c.project && ws.path) {
     const p = join(ws.path, c.project)
     const key = p.toLowerCase()
     if (!agents.has(key)) agents.set(key, ws.projectConfig(p).then(projectAgents, () => []))
     const def = (await agents.get(key)!).find((a) => a.id === c.agent)
-    // An agent queued to resume after a restart (HI-1707) isn't stalled meanwhile.
-    now = def ? { name: def.name, running: !!sessions.liveFor(p, c.agent) || isResuming(p, c.agent) } : null
+    // An agent queued to resume after a restart (HI-1707), or being started (HI-1976), isn't stalled meanwhile.
+    now = def ? agentNowOf(p, c.agent, def.name) : null
   }
   // A card in Doing with its agent: has the merge queue returned it (HI-1721)?
   const returned = c.column === 'doing' && c.agent && c.project && ws.path ? await queueReturnOf(ws, join(ws.path, c.project), c.number) : null

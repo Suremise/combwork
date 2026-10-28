@@ -15,6 +15,7 @@ import { copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, writeFi
 import { constants as fsConstants, existsSync, realpathSync } from 'original-fs'
 import { TYPED_NEWLINE_KEYS, typedText } from '../shared/terminalInput'
 import { failedStart, type StartFailure } from '../shared/startFailure'
+import { startBegins, startFailed } from './agentStarts'
 import { BrowserWindow, Notification, app, clipboard } from 'electron'
 import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { formatDateTime } from '../shared/dates'
@@ -1682,6 +1683,9 @@ class SessionManager {
     if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw hiveError(msg({ id: 'session.start.cleaning', defaultMessage: "Hive is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Hive is moving or removing its files." }), undefined, { kind: 'conflict' })
     const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve(), outcome: Promise.resolve(null as never), runId: randomBytes(12).toString('hex') }
     this.starting.set(id, pending)
+    // A new start: an earlier one's failure is over (HI-1976). Cleared here, before it runs, never once it settles: its
+    // CLI may exit meanwhile, and that failure (onExit's) must stand (HR6's round 1).
+    startBegins(projectPath, agentId)
     // A start that takes over a second says where the time went (#1177: a resume waited ~45 s after an upgrade).
     const times = new StepTimes()
     const run = this.startReserved(projectPath, agentId, id, opts, times)
@@ -3918,7 +3922,11 @@ class SessionManager {
           { name: l.adapter.descriptor.name, startHint: l.adapter.startHint?.bind(l.adapter) }
         )
       : undefined
-    if (failure) log.warn(`${userText(this.label(l!.state))}: exited with code ${code} before it started: ${userText(failure.reason.replace(/\n/g, ' | '))}`)
+    if (failure) {
+      log.warn(`${userText(this.label(l!.state))}: exited with code ${code} before it started: ${userText(failure.reason.replace(/\n/g, ' | '))}`)
+      // A card's stall says why (HI-1976).
+      startFailed(projectPath, agentId, failure.reason)
+    }
     if (l) {
       if (l.backupTimer) clearInterval(l.backupTimer)
       l.compacting?.end()

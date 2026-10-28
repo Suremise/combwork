@@ -26,6 +26,7 @@ const deliveries = await import('../src/main/deliveries')
 const { startTask } = await import('../src/main/taskStart')
 const { sessions } = await import('../src/main/sessions')
 const { claudeCode } = await import('../src/main/providers/claude/adapter')
+const { resetAgentStartsForTests, startNow } = await import('../src/main/agentStarts')
 
 const user = { kind: 'user' } as const
 const assistant = { kind: 'assistant' } as const
@@ -58,6 +59,7 @@ describe("a Start of a card started before in a slot, its builder stopped (HI-19
   beforeEach(() => {
     Object.assign(slot, { due: null, offered: [], asked: 0 })
     launched.length = 0
+    resetAgentStartsForTests()
   })
 
   const cardIn = (column: 'review' | 'doing' | 'todo', title: string) => run(() => tasks.createTask({ title, project: 'slotted', agent: 'b1', column }, user))
@@ -75,6 +77,8 @@ describe("a Start of a card started before in a slot, its builder stopped (HI-19
     expect(task?.body).toMatch(/It was in Review and is back in Doing for more work\.\n\nRun the model trials now\.$/)
     // Nothing was left for a placement to give: the slot's offer was withdrawn (null), never filled.
     expect(slot.offered).toEqual([null])
+    // Its start is over here, so a stopped B1 would be stalled again, as HI-1953's was (HI-1976).
+    expect(startNow(p, 'b1').starting).toBe(false)
   })
 
   it('in Doing, its slot held: B1 is launched with the card and the note, and the slot is not asked', async () => {
@@ -94,5 +98,7 @@ describe("a Start of a card started before in a slot, its builder stopped (HI-19
     expect(launched).toEqual([])
     expect(slot.offered).toHaveLength(1)
     expect(slot.offered[0]).toMatch(/Start with the parser\.$/)
+    // B1 is starting until the placement gives it the card (HI-1976): its card isn't stalled meanwhile.
+    expect(startNow(p, 'b1')).toEqual({ starting: true, failed: null })
   })
 })

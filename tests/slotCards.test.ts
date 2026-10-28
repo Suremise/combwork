@@ -202,11 +202,13 @@ const { tellListeners } = await import('../src/main/events')
 const { withWriteFence } = await import('../src/main/workflow/factStore')
 const { LeaseLost } = await import('../src/main/workflow/queueRunner')
 const { cycleIn, deleteMergedLine, expectStartPrompt, laneSlotIn, place, placementDue, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
+const { resetAgentStartsForTests, startBegun, startNow } = await import('../src/main/agentStarts')
 
 let env: Env | null = null
 afterEach(() => {
   env?.close()
   env = null
+  resetAgentStartsForTests()
   Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false })
 })
 
@@ -492,9 +494,13 @@ describe("a slot that couldn't be prepared (HI-1796)", { timeout: 60_000 }, () =
     let tries = 0
     state.pool = { openLeases: () => [lease], lease: () => lease, prepare: async () => (tries++, { error: 'git checkout failed (test)' }) }
     const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
+    // Its Start's hold (HI-1976): starting until the preparation fails, then a failed start, with why.
+    startBegun(e.project, 'B1', `#${card.id}`, { fresh: true })
+    expect(startNow(e.project, 'B1')).toEqual({ starting: true, failed: null })
     await settleSlotCards(ws, e.project)
     const notices = () => e.store.pendingActions().filter((a) => a.kind === 'notify')
     await vi.waitFor(() => expect(notices()).toHaveLength(1), { timeout: HUNG_MS })
+    await vi.waitFor(() => expect(startNow(e.project, 'B1')).toEqual({ starting: false, failed: "Hive couldn't get slot-a ready: git checkout failed (test)" }), { timeout: HUNG_MS })
     const shown = notices()[0].payload.shown as { id: string; values: Record<string, string> }
     expect(shown).toEqual({ id: 'service.slots.notPrepared', values: { slot: 'slot-a', card: card.key, why: 'git checkout failed (test)' } })
     // A message the workflow knows: what the card's history line and the window resolve it by.
@@ -648,6 +654,8 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     const placing = place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)
     await vi.waitFor(() => expect(notices(e)).toHaveLength(1), { timeout: HUNG_MS })
     expect(notices(e)[0]).toMatch(/couldn't resume B1's conversation in slot-a for AM-\d+ \(three tries\): its conversation couldn't resume \(test\)\. Resume B1 from Sessions/)
+    // Its card's stall says why (HI-1976), not only that B1 isn't running.
+    expect(startNow(e.project, 'B1').failed).toMatch(/^its conversation in slot-a didn't resume \(3 tries\): its conversation couldn't resume \(test\)/)
     // A look while it is still stopped launches nothing more.
     status()
     await vi.waitFor(() => expect(state.logged.some((l) => /didn't resume \(3 tries\)/.test(l))).toBe(true), { timeout: HUNG_MS })
