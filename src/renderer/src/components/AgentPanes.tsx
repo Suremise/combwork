@@ -23,7 +23,7 @@ import { formatDateTime, formatWhen } from '@shared/dates'
 import * as actions from '../actions'
 import { HAND_OVER_TEXT, handOverNow, onRunningLane } from '@shared/handOver'
 import { call, errorMessage } from '../api'
-import { NO_IDS, NO_PROJECTS, agentPage, get, agentProviderOf, clearStartFailure, closeTile, focusAgent, focusedAgentId, isAssistantPath, notify, openActivity, openInSessionsTab, paneAssignment, paneCells, projectKey, prompt, revealAgent, seenAgents, set, setProjectTab, showAgent, openVersionControl, showAttachments, showInOverview, showPage, shownLayout, startingKey, startingLabel, useLanguage, useStarting, useStore } from '../store'
+import { NO_IDS, NO_PROJECTS, agentPage, get, projectKeyOf, agentProviderOf, clearStartFailure, closeTile, focusAgent, focusedAgentId, isAssistantPath, notify, openActivity, openInSessionsTab, paneAssignment, paneCells, projectKey, prompt, revealAgent, seenAgents, set, setProjectTab, showAgent, openVersionControl, showAttachments, showInOverview, showPage, shownLayout, startingKey, startingLabel, useLanguage, useStarting, useStore } from '../store'
 import { useLiveUsage, useLiveUsageState } from '../usage'
 import { commandKeybinding } from '../commands'
 import { cx, formatKeybinding, formatTokens, sessionLabel, timeAgo } from '../util'
@@ -519,7 +519,7 @@ export function AddAgentButton({ project, className, label, iconOnly }: { projec
   const tip = full ? agentLimitText(limit, tr) : tr(msg({ id: 'panes.add.tip', defaultMessage: 'Configure Agent and Add…: choose its provider, where it works and its settings', description: 'Tooltip of the Add Agent button (an empty project or pane). "Configure Agent and Add…" names the dialog it opens: use its translation.' }))
   const fromTemplate = async (keyboard: boolean): Promise<void> => {
     const at = caret.current && below(caret.current)
-    const all = await templateList(project.path)
+    const [all] = await Promise.all([templateList(project.path), keyKnown(project.path)])
     if (at && all) menu.openAt(...at, addFromTemplateItems(project, all), keyboard)
   }
   const open = (keyboard: boolean): void => {
@@ -707,6 +707,18 @@ const templateList = (path: string): Promise<TemplateEntry[] | null> =>
     notify('error', tr(msg({ id: 'panes.template.listFailed', defaultMessage: 'Could not list the templates', description: "An error's title: Hive couldn't read the templates (+ Add ▾ → Templates, Add Agent from Template)." })), errorMessage(e))
     return null
   })
+
+/**
+ * The project's key (#704) in the window before a menu names agents with it (HI-1948): the board's read brings the keys,
+ * and a menu opened before that read (just after the workspace opened, or a busy machine) named Hive's own agents
+ * `{key}-B1`. Not there yet, the keys are read from main; a project main hasn't keyed yet still shows `{key}`, never a
+ * guessed key.
+ */
+async function keyKnown(path: string): Promise<void> {
+  if (projectKeyOf(get(), path)) return
+  const keys = await call('project:keys').catch(() => null)
+  if (keys?.some((k) => k.projectPath.toLowerCase() === path.toLowerCase())) set({ projectKeys: keys })
+}
 
 /** Add Agent from Template: each usable template's agents, under its name and scope (#126). */
 function addFromTemplateItems(project: ProjectInfo, list: TemplateEntry[]): MenuEntry[] {
@@ -961,7 +973,7 @@ export function SessionToolbar({ project, view }: { project: ProjectInfo; view: 
   // + Add ▾: the dialog, the quick add, one agent of a template, and the templates themselves.
   const fromTemplate = async (keyboard: boolean): Promise<void> => {
     const at = add.current && below(add.current)
-    const all = await templateList(project.path)
+    const [all] = await Promise.all([templateList(project.path), keyKnown(project.path)])
     if (at && all) addMenu.openAt(...at, addFromTemplateItems(project, all), keyboard)
   }
   const templates = async (keyboard: boolean): Promise<void> => {
