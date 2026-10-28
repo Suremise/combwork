@@ -5,7 +5,7 @@ import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { newUsageParser, parserShape, restoreParser, saveParser } from '../src/main/usageParsers'
 import { copilotEventsPath } from '../src/main/providers/copilot/events'
-import { holdIndex, holdIsSessions, holdsOfCard, keptRows, ledgerRows, rowCost, rowsPart, sessionHolds, summaryOf, usageFromRows, type LedgerRow, type SessionHold, type SessionWho } from '../src/shared/usageLedger'
+import { cardHoldsKey, holdIndex, holdIsSessions, holdsOfCard, keptRows, ledgerRows, rowCost, rowsPart, sessionHolds, summaryOf, usageFromRows, type LedgerRow, type SessionHold, type SessionWho } from '../src/shared/usageLedger'
 import { priceUsage } from '../src/shared/usageDays'
 import { mergeSpans, sliceSession, sharedSpans } from '../src/shared/cardCosts'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
@@ -250,5 +250,15 @@ describe('the cards a session held', () => {
         }
       }
     }
+  })
+
+  it("a card's holds key is the same for another read of it whose holds didn't change, and differs when they did (HI-1887)", () => {
+    const holds: TaskCard['held'] = [{ agent: 'a1', name: 'HB1', role: 'build', from: at(0) }]
+    const key = cardHoldsKey(card(4, holds))
+    // Read again after a comment: another object, other fields changed, the same holds.
+    expect(cardHoldsKey({ ...card(4, structuredClone(holds)), comments: [{ at: at(5), by: 'HB1', text: 'note' }] } as TaskCard)).toBe(key)
+    expect(cardHoldsKey(card(4, [{ ...holds[0], to: at(60) }]))).not.toBe(key)
+    expect(cardHoldsKey(card(4, [{ ...holds[0], role: 'review' }]))).not.toBe(key)
+    expect(cardHoldsKey(card(5, holds))).not.toBe(key)
   })
 })

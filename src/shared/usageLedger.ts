@@ -634,12 +634,29 @@ const spanOf = (h: TimedHold, now: number): Span => [at(h.from, now), at(h.to, n
 
 /** Each card's holds as holdsOfCard works them out, kept by the card's object (one the board read keeps until it changes). */
 const derived = new WeakMap<CardHoldFields, TaskHold[]>()
+const derivedOf = (c: CardHoldFields): TaskHold[] => {
+  let own = derived.get(c)
+  if (!own) derived.set(c, (own = holdsOfCard(c)))
+  return own
+}
+
+/** Each card's holdsKey, kept by the card's object as `derived` is. */
+const keyed = new WeakMap<CardHoldFields, string>()
+
+/**
+ * A card's holds as text (whose, which role, from when to when): equal for two reads of a card whose holds didn't change,
+ * whatever else of it did (HI-1887: a comment), so a project's cards' keys tell whether its holdIndex is as it was.
+ */
+export function cardHoldsKey(c: CardHoldFields): string {
+  let key = keyed.get(c)
+  if (key === undefined) keyed.set(c, (key = JSON.stringify([c.number, derivedOf(c).map((h) => [h.agent ?? null, h.name, h.role, h.from, h.to ?? null])])))
+  return key
+}
 
 export function holdIndex(cards: CardHoldFields[]): HoldIndex {
   const index: HoldIndex = { cards: [], byName: new Map() }
   for (const c of cards) {
-    let own = derived.get(c)
-    if (!own) derived.set(c, (own = holdsOfCard(c)))
+    const own = derivedOf(c)
     const holds = own.map((hold) => ({ hold, from: parsed(hold.from), to: parsed(hold.to) }))
     index.cards.push({ number: c.number, holds })
     for (const h of holds) {

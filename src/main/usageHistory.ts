@@ -6,7 +6,7 @@ import { createHash } from 'crypto'
 import { basename, join } from 'path'
 import type { KeptUsage, ProviderId, SessionRecord, UsageHistoryProgress } from '../shared/types'
 import { projectAgents } from '../shared/defaults'
-import { heldAt, holdIndex, sessionHolds, usageFromRows, type HoldIndex, type SessionHold, type SessionWho } from '../shared/usageLedger'
+import { cardHoldsKey, heldAt, holdIndex, sessionHolds, usageFromRows, type HoldIndex, type SessionHold, type SessionWho } from '../shared/usageLedger'
 import type { UsageSummary } from '../shared/usageLedger'
 import { advanced } from './advanced'
 import { resolvedValues } from './advancedValues'
@@ -49,8 +49,10 @@ const CARDS_MS = 30_000
 interface ProjectHolds {
   index: HoldIndex
   named: (name: string) => string[]
-  /** Each agent's holds key, by whoKey. */
-  keys: Map<string, string>
+  /** Each agent's holds key, by whoKey (null: it held none of them, once none starts later: holdsKeyOf). */
+  keys: Map<string, string | null>
+  /** When the latest hold starts (-Infinity: none has a start). */
+  latestFrom: number
 }
 
 /** A workspace's cards' holds as read at `at`, and each project's worked out from them (UsageHistory.projectHolds). */
@@ -66,12 +68,24 @@ interface BoardCards {
 interface ProjectEntry {
   index: HoldIndex | null
   fp: string
+  latestFrom: number
   agents: string | null
-  keys: Map<string, string>
+  keys: Map<string, string | null>
 }
 
-/** A project's holds as they are (each card's: whose, which role, from when to when): equal, its agents' keys are too. */
-const holdsFingerprint = (index: HoldIndex): string => createHash('sha1').update(JSON.stringify(index.cards.map((c) => [c.number, c.holds.map(({ hold: h }) => [h.agent ?? null, h.name, h.role, h.from, h.to ?? null])]))).digest('hex')
+/**
+ * A project's holds as they are (each card's: whose, which role, from when to when): equal, its agents' keys are too.
+ * From each card's key, kept with the card's object (cardHoldsKey): a board change reads again only the cards it
+ * touched, so the rest cost nothing (HI-1887: worked out whole, after each of a dozen agents' comments).
+ */
+const holdsFingerprint = (cards: CardHolds[]): string => cards.map(cardHoldsKey).join('\n')
+
+/** When the latest of an index's holds starts. */
+const latestFromOf = (index: HoldIndex): number => {
+  let latest = Number.NEGATIVE_INFINITY
+  for (const c of index.cards) for (const h of c.holds) if (h.from > latest) latest = h.from
+  return latest
+}
 
 const whoKey = (who: SessionWho): string => `${who.agentId ?? ''}\0${who.agentName ?? ''}`
 
@@ -288,7 +302,7 @@ class UsageHistory {
     // the place admits it, records the file and closes it. A close is sent a file recorded so, resolved again never.
     const spelt = body.type === 'close' ? null : 'file' in body ? body.file : body.type === 'read' ? (body.seed?.file ?? null) : null
     const file = spelt ? realPath(spelt) : null
-    const place = file ? ownerOf(file) : null
+    const place = file ? ownerOf(file, true) : null
     if (file) body = body.type === 'read' && body.seed ? { ...body, seed: { ...body.seed, file } } : ({ ...body, file } as Body)
     const admitted = (b: Body): Body => {
       const ok = place !== null && isAdmitted(place)
@@ -432,9 +446,10 @@ class UsageHistory {
       const run = ws && runOf(ws)
       if (!ws || !run) return null
       const { workspace, scope } = await ws.sessionScope(projectPath)
-      // The host's records, the job's own read or those its freshen shares between its jobs (HI-1790).
+      // The host's records its freshen shares between its jobs (HI-1790), or the job's own record by its key (HI-1887: a
+      // turn's end read every record, and its transcript's look again).
       const ctx = o.context ? await o.context() : undefined
-      const rec = (ctx?.records ?? (await ws.sessionsFile(projectPath, run.signal)).sessions).find((s) => s.id === sessionId)
+      const rec = ctx ? ctx.records.find((s) => s.id === sessionId) : await ws.sessionRecord(projectPath, sessionId)
       if (!rec) return null
       const path = o.path && existsSync(o.path) ? o.path : await sessions.anyTranscript(projectPath, sessionId, ctx).catch(() => null)
       const { holds, holdsKey } = await this.holdsFor(ws, run, projectPath, rec)
@@ -500,10 +515,14 @@ class UsageHistory {
     let kept = c.projects.get(project)
     if (!kept) {
       const own = all.filter((card) => card.project.toLowerCase() === project)
-      const index = own.length ? holdIndex(own) : null
-      const fp = index ? holdsFingerprint(index) : ''
+      const fp = holdsFingerprint(own)
       const was = c.prior?.get(project)
-      c.projects.set(project, (kept = was && was.fp === fp ? was : { index, fp, agents: null, keys: new Map() }))
+      if (was && was.fp === fp) kept = was
+      else {
+        const index = own.length ? holdIndex(own) : null
+        kept = { index, fp, latestFrom: index ? latestFromOf(index) : Number.NEGATIVE_INFINITY, agents: null, keys: new Map() }
+      }
+      c.projects.set(project, kept)
     }
     const index = kept.index
     if (!index) return null
@@ -513,8 +532,15 @@ class UsageHistory {
     // A hold with only a name is its agent's by the agents named so now: their keys are kept while those are the same.
     const names = agents.map((a) => `${a.id}\0${a.name}`).join('\n')
     if (kept.agents !== names) Object.assign(kept, { agents: names, keys: new Map() })
-    const named = (name: string): string[] => agents.filter((a) => a.name.toLowerCase() === name.toLowerCase()).map((a) => a.id)
-    return { index, named, keys: kept.keys }
+    // Each name looked up once: every hold with only a name asks, for each agent's key.
+    const byName = new Map<string, string[]>()
+    const named = (name: string): string[] => {
+      const k = name.toLowerCase()
+      let ids = byName.get(k)
+      if (!ids) byName.set(k, (ids = agents.filter((a) => a.name.toLowerCase() === k).map((a) => a.id)))
+      return ids
+    }
+    return { index, named, keys: kept.keys, latestFrom: kept.latestFrom }
   }
 
   /** The workspace's cards' holds kept (read again after a board change, which is told as it commits, or half a minute). */
@@ -542,13 +568,20 @@ class UsageHistory {
 
   /**
    * An agent's holds key: its holds with open ones ending "never", so one going on doesn't change it and one ending
-   * does; null while it holds no card. The worker shares a session's cards out again only when its key changed.
+   * does; null while it holds no card. The worker shares a session's cards out again only when its key changed. Null is
+   * kept too once every hold has started (HI-1887: each of the history's agents asks after every board change): a hold
+   * only ever starts holding later, so one that held none of them by then never will.
    */
   private holdsKeyOf(p: ProjectHolds, who: SessionWho, now: number): string | null {
-    if (!heldAt(p.index, who, p.named, now)) return null
     const k = whoKey(who)
-    let key = p.keys.get(k)
-    if (key === undefined) p.keys.set(k, (key = createHash('sha1').update(JSON.stringify(sessionHolds(p.index, who, p.named, Number.MAX_SAFE_INTEGER))).digest('hex')))
+    const had = p.keys.get(k)
+    if (had !== undefined) return had
+    if (!heldAt(p.index, who, p.named, now)) {
+      if (now > p.latestFrom) p.keys.set(k, null)
+      return null
+    }
+    const key = createHash('sha1').update(JSON.stringify(sessionHolds(p.index, who, p.named, Number.MAX_SAFE_INTEGER))).digest('hex')
+    p.keys.set(k, key)
     return key
   }
 

@@ -169,6 +169,32 @@ describe('changes', () => {
     expect((await run(() => workspace.sessionsFile(p))).sessions.find((s) => s.id === 's3')?.lastActiveAt).toBe('2026-10-19T12:00:00.000Z')
   })
 
+  it('a saved record is changed by its key alone, in its place, its cards kept; a new one is added after the rest (HI-1887)', async () => {
+    const p = project('bykey', oldFile())
+    await run(() => workspace.ensureProject(p))
+    await run(() => workspace.projectIds({ fresh: true }))
+    await run(() => workspace.sessionsFile(p))
+    const db = workspaceDb(wsPath).writer
+    const prepare = vi.spyOn(db, 'prepare')
+    try {
+      await run(() => workspace.upsertSession(p, { id: 's2', name: 'Renamed' }))
+      // Never every record of the host: that record's row, by its key.
+      expect(prepare.mock.calls.filter(([sql]) => /FROM sessions WHERE host = \?( ORDER|$)/.test(String(sql)))).toEqual([])
+      expect(prepare.mock.calls.filter(([sql]) => String(sql).startsWith('SELECT * FROM sessions WHERE host = ? AND id = ?'))).toHaveLength(1)
+    } finally {
+      prepare.mockRestore()
+    }
+    let f = await run(() => workspace.sessionsFile(p))
+    expect(f.sessions.map((s) => [s.id, s.name])).toEqual([['s1', 'Session s1'], ['s2', 'Renamed'], ['s3', 'Session s3']])
+    expect(f.sessions[1].cards).toEqual([{ number: 5, title: 'Five' }])
+    await run(() => workspace.upsertSession(p, { id: 's2', cards: [{ number: 5, title: 'Five' }, { number: 6, title: 'Six' }] }))
+    await run(() => workspace.upsertSession(p, { id: 'new2' }))
+    f = await run(() => workspace.sessionsFile(p))
+    expect(f.sessions.map((s) => s.id)).toEqual(['s1', 's2', 's3', 'new2'])
+    expect(f.sessions[1].cards?.map((c) => c.number)).toEqual([5, 6])
+    expect(f.deleted).toEqual(['gone1', 'gone2'])
+  })
+
   it("a record saved with the Assistant's mode as its persona (#1084) is saved with its mode by the next change, as before", async () => {
     const p = join(wsPath, 'gamma')
     await run(() => workspace.mutateSessions(p, (f) => void f.sessions.push({ ...rec('old1'), persona: 'planner' } as unknown as SessionRecord)))

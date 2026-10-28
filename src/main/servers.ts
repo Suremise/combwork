@@ -2400,14 +2400,22 @@ const attachedLines = (c: TaskCard & { attached?: { name: string; path: string; 
 /** The short reply a hive tool asks for (reply: "short") instead of the whole card or column. */
 const shortReply = (body: any): boolean => body?.reply === 'short'
 
-/** A change to a card, for a short reply: what changed (in its history's words) and where the card is now. */
+/**
+ * A change to a card, for a short reply: what changed (in its history's words) and where the card is now. Its column's
+ * places alone (HI-1887): every agent's comment reads them, and composing each card in full cost main 15 ms a time.
+ */
 async function taskChange(c: TaskCard, changes: string[]): Promise<TaskChange> {
-  const list = c.archived ? [] : await tasks.listTasks({ column: c.column, scope: callerScope() })
-  return changeRow(c, changes, list)
+  return changeRow(c, changes, c.archived ? [] : await columnList(c.column))
+}
+
+/** The caller's live cards in a column, in board order: their places alone. */
+async function columnList(column: TaskColumn): Promise<Pick<TaskCard, 'number'>[]> {
+  const scope = callerScope()
+  return (await tasks.columnPlaces(workspace, column)).filter((x) => tasks.inScope(x, scope))
 }
 
 /** A card's change, given its column's list (where it is in that list is its place). */
-function changeRow(c: TaskCard, changes: string[], list: TaskCard[]): TaskChange {
+function changeRow(c: TaskCard, changes: string[], list: Pick<TaskCard, 'number'>[]): TaskChange {
   const i = list.findIndex((x) => x.number === c.number)
   return { number: c.number, ...(c.key ? { key: c.key } : {}), title: c.title, column: c.column, position: i >= 0 ? i + 1 : null, of: list.length, project: c.project, agent: c.agent ? (c.agentName ?? c.agent) : null, changes }
 }
@@ -2676,12 +2684,12 @@ async function batchReply(items: tasks.BatchItem[], short: boolean, unknown: str
     const agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()
     return { changed: await Promise.all(done.map((i) => taskView(i.card, agents))), refused }
   }
-  const lists = new Map<TaskColumn, TaskCard[]>()
+  const lists = new Map<TaskColumn, Pick<TaskCard, 'number'>[]>()
   const changed: TaskChange[] = []
   for (const i of done) {
     const c = i.card
-    if (!lists.has(c.column)) lists.set(c.column, c.archived ? [] : await tasks.listTasks({ column: c.column, scope: callerScope() }))
-    changed.push(changeRow(c, i.said, lists.get(c.column)!))
+    if (!c.archived && !lists.has(c.column)) lists.set(c.column, await columnList(c.column))
+    changed.push(changeRow(c, i.said, c.archived ? [] : lists.get(c.column)!))
   }
   return { changed, refused, ...withNames(refused.map((r) => r.number)) }
 }

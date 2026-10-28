@@ -28,8 +28,8 @@ import { randomBytes } from 'crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { existsSync } from 'original-fs'
 import { mkdir } from 'original-fs/promises'
-import { basename, join } from 'path'
-import { samePlace } from './fsutil'
+import { basename, join, resolve } from 'path'
+import { placeMatcher, samePlace } from './fsutil'
 import { git } from './git'
 import { createLogger, userText } from './logger'
 import { deletingIn, folderThere, IDLE_MS, lockHash, OpLost, quiet, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRunner, type SlotRunEnd } from './slots'
@@ -433,9 +433,15 @@ export class CopyPool {
     return this.store.unfreed()
   }
 
-  /** The copy a folder is in (its own folder or inside it), with its lease not freed, if any. */
+  /**
+   * The copy a folder is in (its own folder or inside it), with its lease not freed, if any. By spelling first, then by
+   * real location with `folder` resolved once (HI-1887: every Progress run's resolve asks, and most folders are no copy).
+   */
   at(folder: string): { copy: Copy; lease: CopyLease | null } | null {
-    const copy = this.store.copies().find((c) => samePlace(c.folder, folder) || folder.toLowerCase().startsWith(`${c.folder.toLowerCase()}\\`) || folder.toLowerCase().startsWith(`${c.folder.toLowerCase()}/`))
+    const copies = this.store.copies()
+    const spelt = resolve(folder).toLowerCase()
+    const same = placeMatcher(folder)
+    const copy = copies.find((c) => resolve(c.folder).toLowerCase() === spelt || folder.toLowerCase().startsWith(`${c.folder.toLowerCase()}\\`) || folder.toLowerCase().startsWith(`${c.folder.toLowerCase()}/`)) ?? copies.find((c) => same(c.folder))
     return copy ? { copy, lease: this.store.leaseOn(copy.name) } : null
   }
 

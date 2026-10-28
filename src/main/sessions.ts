@@ -1509,15 +1509,23 @@ class SessionManager {
    * worktree agent's sessions ran in its worktree. The session's own record comes first.
    */
   async providerTranscript(projectPath: string, sessionId: string, ctx?: ListContext): Promise<{ path: string; provider: ProviderId } | null> {
-    const records = ctx?.records ?? (await workspace.sessionsFile(projectPath)).sessions
-    const rec = records.find((s) => s.id === sessionId)
+    // Its own record by its key (HI-1887: a turn's end asks, and read every record each time).
+    const rec = ctx ? ctx.records.find((s) => s.id === sessionId) : await workspace.sessionRecord(projectPath, sessionId)
     const live = this.projectStates(projectPath).find((s) => s.sessionId === sessionId)
     const ids = rec ? [recordProvider(rec)] : live ? [live.provider] : allProviders().map((p) => p.id)
-    const cfg = ctx?.cfg ?? (await workspace.projectConfig(projectPath))
     // Its own folder first, then every folder the host's sessions run in (sessionFolders, where list() finds them: a
-    // sub-session started in a removed agent's worktree, or the Assistant's workspace folder).
-    const folders = [rec?.cwd, ...this.sessionFolders(projectPath, records, cfg)].filter((f): f is string => !!f)
-    const unique = [...new Map(folders.map((f) => [resolve(f).toLowerCase(), f])).values()]
+    // sub-session started in a removed agent's worktree, or the Assistant's workspace folder): those, and the host's
+    // records and settings they come from, read only when its own folder hasn't it.
+    const own = rec?.cwd ? [rec.cwd] : []
+    let others: string[] | undefined
+    const othersOf = async (): Promise<string[]> => {
+      if (others) return others
+      const records = ctx?.records ?? (await workspace.sessionsFile(projectPath)).sessions
+      const cfg = ctx?.cfg ?? (await workspace.projectConfig(projectPath))
+      const seen = new Set(own.map((f) => resolve(f).toLowerCase()))
+      others = [...new Map(this.sessionFolders(projectPath, records, cfg).map((f) => [resolve(f).toLowerCase(), f])).entries()].filter(([k]) => !seen.has(k)).map(([, f]) => f)
+      return others
+    }
     for (const id of ids) {
       let adapter: ProviderAdapter
       try {
@@ -1525,7 +1533,11 @@ class SessionManager {
       } catch {
         continue
       }
-      for (const f of unique) {
+      for (const f of own) {
+        const t = await adapter.transcriptPath(f, sessionId, rec?.transcriptPath)
+        if (t) return { path: t, provider: id }
+      }
+      for (const f of await othersOf()) {
         const t = await adapter.transcriptPath(f, sessionId, rec?.transcriptPath)
         if (t) return { path: t, provider: id }
       }

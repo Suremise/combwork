@@ -424,12 +424,24 @@ export async function boardPlaces(ws: WorkspaceService): Promise<CardPlace[]> {
   if (!ws.path) return []
   const ids = await ws.projectIds()
   if (!ws.path) return []
-  return sortCards(
-    cardPlaces(ws).map(({ number, raw }) => {
-      const c = clean(raw as Partial<TaskCard> & { projectId?: unknown }, number, ids)
-      return { number, column: c.column, order: c.order, archived: c.archived, project: c.project }
-    })
-  )
+  return sortCards(placesOf(cardPlaces(ws), ids))
+}
+
+const placesOf = (rows: ReturnType<typeof cardPlaces>, ids: ProjectIdIndex): CardPlace[] =>
+  rows.map(({ number, raw }) => {
+    const c = clean(raw as Partial<TaskCard> & { projectId?: unknown }, number, ids)
+    return { number, column: c.column, order: c.order, archived: c.archived, project: c.project }
+  })
+
+/**
+ * The live cards in a column, in board order, by their places alone (HI-1887): where a changed card is in its column,
+ * which every agent's comment is told (reading the whole board for it cost main 15 ms a comment).
+ */
+export async function columnPlaces(ws: WorkspaceService, column: TaskColumn): Promise<CardPlace[]> {
+  if (!ws.path) return []
+  const ids = await ws.projectIds()
+  if (!ws.path) return []
+  return sortCards(placesOf(cardPlaces(ws, { column, known: TASK_COLUMNS.map((c) => c.id) }), ids).filter((c) => !c.archived && c.column === column))
 }
 
 /** Cards on the board, filtered; with `scope`, only that project's (asking for another project is refused). */
