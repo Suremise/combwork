@@ -1,4 +1,5 @@
 import { app } from 'electron'
+import { realpath } from 'original-fs/promises'
 import { basename, join } from 'path'
 import { Worker } from 'worker_threads'
 import { msg, tr } from '../shared/i18n'
@@ -9,6 +10,7 @@ import { toast } from './events'
 import { withFileLock } from './fsutil'
 import { git } from './git'
 import { hiveError } from './hiveError'
+import { commonDirSync } from './platform/git'
 import { createLogger, userText } from './logger'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 import { REPO_LOCK_FILE } from './repoLockCore'
@@ -123,12 +125,17 @@ const profile = (): string => {
   }
 }
 
-/** The repository's common git dir (its worktrees share it), absolute; throws when git can't say. */
+/**
+ * The repository's common git dir (its worktrees share it), absolute and real (one spelling for this Hive's own lock,
+ * however the folder was reached); throws when git can't say. Read from `.git` with no git process where it says
+ * (HI-1970: every line move asked it), else git's answer.
+ */
 export async function commonGitDir(folder: string): Promise<string> {
-  const r = await git(folder, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
-  const dir = r.ok ? r.out.trim() : ''
-  if (!dir) throw hiveError(msg({ id: 'git.repoLock.noGitDir', defaultMessage: "Hive couldn't find the git folder of {folder}, so nothing was changed: {why}", description: "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Hive's merge lock lives). {why} is git's message." }), { folder, why: r.err || r.out }, { kind: 'conflict' })
-  return dir
+  const known = commonDirSync(folder)
+  const r = known ? null : await git(folder, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
+  const dir = known ?? (r?.ok ? r.out.trim() : '')
+  if (dir) return realpath(dir).catch(() => dir)
+  throw hiveError(msg({ id: 'git.repoLock.noGitDir', defaultMessage: "Hive couldn't find the git folder of {folder}, so nothing was changed: {why}", description: "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Hive's merge lock lives). {why} is git's message." }), { folder, why: r?.err || r?.out || '' }, { kind: 'conflict' })
 }
 
 export interface RepoLockOptions {

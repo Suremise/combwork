@@ -2,9 +2,10 @@
 // as branch(), head(), dirty() and lineHead() answer them one git each. And an intent's evidence with fewer gits
 // (#1373): the git dir read from `.git`, the index listed once.
 import { execFileSync } from 'child_process'
-import { existsSync, realpathSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
+import { junction } from '../pathAliases'
 import { tempDir } from '../tempDir'
 import { B1, commit, gitRepo, moved, setup, sh } from './harness'
 import * as G from '../../src/main/platform/git'
@@ -37,6 +38,55 @@ describe('worktreeNow', () => {
     sh(wt, 'checkout', '-q', '--detach')
     expect(await G.worktreeNow(wt, { target: 'gone', gitPaths: ['index'] })).toMatchObject({ line: null, head: await G.head(wt), dirty: [], target: null, gitPaths: [expect.stringMatching(/index$/)] })
     expect(await G.branch(wt)).toBeNull()
+  })
+
+  it('its markers and a line the ref files name are read from .git with no git process, a merge under way still seen; git where they can\'t say (HI-1970)', async () => {
+    const repo = gitRepo(join(tempDir('git-'), 'r'))
+    const wt = join(repo, '..', 'wt')
+    sh(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
+    commit(wt, { 'a.txt': 'mine\n' }, 'mine')
+    commit(repo, { 'a.txt': 'theirs\n' }, 'theirs')
+    expect(() => sh(wt, 'merge', '-q', 'main')).toThrow()
+    const asked: string[] = []
+    gitTestHooks.started = (_cwd, args) => void asked.push(args[0])
+    try {
+      expect(await G.worktreeNow(wt, { target: 'main' })).toMatchObject({ line: 'card', target: sh(repo, 'rev-parse', 'main'), dirty: expect.arrayContaining(['(MERGE_HEAD)']) })
+      expect(asked).toEqual(['status'])
+      // Packed: still read from the files.
+      sh(repo, 'pack-refs', '--all')
+      asked.length = 0
+      expect(await G.worktreeNow(wt, { target: 'main' })).toMatchObject({ target: sh(repo, 'rev-parse', 'main') })
+      expect(asked).toEqual(['status'])
+      // A line the files don't name: git's answer.
+      asked.length = 0
+      expect(await G.worktreeNow(wt, { target: 'gone' })).toMatchObject({ target: null })
+      expect(asked).toContain('rev-parse')
+    } finally {
+      gitTestHooks.started = undefined
+    }
+  })
+
+  it("the repository lock's git folder from .git, one real path however the folder is reached (HI-1970)", async () => {
+    const repo = gitRepo(join(tempDir('git-'), 'r'))
+    const wt = join(repo, '..', 'wt')
+    sh(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
+    const viaJunction = junction(repo, join(repo, '..', 'j'))
+    const { commonGitDir } = await import('../../src/main/repoLock')
+    const asked: string[] = []
+    gitTestHooks.started = (_cwd, args) => void asked.push(args[0])
+    try {
+      const real = realpathSync.native(join(repo, '.git'))
+      expect(await commonGitDir(repo)).toBe(real)
+      expect(await commonGitDir(wt)).toBe(real)
+      expect(await commonGitDir(viaJunction)).toBe(real)
+      expect(asked).toEqual([])
+      // A subfolder has no `.git` of its own: git says, the same path.
+      const sub = join(repo, 'sub')
+      mkdirSync(sub)
+      expect(await commonGitDir(sub)).toBe(real)
+    } finally {
+      gitTestHooks.started = undefined
+    }
   })
 
   it('a branch with a diverged upstream: the same branch, head and files, with no ahead/behind count asked of git (#1377)', async () => {

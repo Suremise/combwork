@@ -110,7 +110,7 @@ export function gitDirSync(folder: string): string | null {
  * A folder's repository's common git dir, read from its `.git` (a linked worktree's git dir names it in `commondir`)
  * with no git process; null where `gitDirSync` can't say.
  */
-function commonDirSync(folder: string): string | null {
+export function commonDirSync(folder: string): string | null {
   const own = gitDirSync(folder)
   if (!own) return null
   try {
@@ -321,7 +321,15 @@ export async function worktreeNow(folder: string, o: { target?: string; gitPaths
   const asked = [...MARKERS, ...(o.gitPaths ?? [])]
   const where = (target?: string) => git(folder, ['rev-parse', '--path-format=absolute', ...asked.flatMap((m) => ['--git-path', m]), ...(target ? ['--revs-only', `refs/heads/${target}`, '--'] : [])])
   // --no-ahead-behind (#1377): `--branch` would otherwise count the upstream's ahead and behind, a walk nothing here reads.
-  const [r, first] = await Promise.all([git(folder, ['status', '--porcelain=v2', '-z', '--branch', '--no-ahead-behind', '--untracked-files=all']), where(o.target)])
+  const status = git(folder, ['status', '--porcelain=v2', '-z', '--branch', '--no-ahead-behind', '--untracked-files=all'])
+  // HI-1970: the markers are in the folder's own git dir and the line's head in the ref files, read from `.git` with no
+  // git process (as lineHead), read now as the rev-parse would be; git where they can't say (other paths asked, a git
+  // dir moved by GIT_DIR, a line the ref files don't name).
+  const own = o.gitPaths?.length || process.env.GIT_DIR ? null : gitDirSync(folder)
+  const common = own && o.target && plainBranch(o.target) ? commonDirSync(folder) : null
+  const known = common && o.target ? branchRefSync(common, o.target) : null
+  const fast = own && (!o.target || known)
+  const [r, first] = await Promise.all([status, fast ? { ok: true, out: [...MARKERS.map((m) => join(own, m)), ...(known ? [known] : [])].join('\n') } : where(o.target)])
   if (!r.ok) return unknown(U.uncommitted, { folder })
   let line: string | null = null
   let oid: string | null = null
