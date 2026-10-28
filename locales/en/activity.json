@@ -236,8 +236,8 @@
     "description": "Activity's workspace level when no agent of any project runs anything."
   },
   "activity.workspace.forCard": {
-    "defaultMessage": "Working on {card}",
-    "description": "A chip above Activity's workspace level when it was opened from a card: only the agents working on that card ({card}: its key, such as HI-12) now."
+    "defaultMessage": "Card {card}",
+    "description": "A chip above Activity's workspace level when it was opened from a card, naming the filter (not saying anyone works on it): only the agents working on that card ({card}: its key, such as HI-12) now have tabs."
   },
   "activity.workspace.heading": {
     "defaultMessage": "Activity",

@@ -58,7 +58,7 @@
   "activity.workspace.cardNobody": "现在没有人在处理 {card}。历史记录在卡片上。",
   "activity.workspace.clearCard": "显示所有智能体",
   "activity.workspace.empty": "此工作区中没有正在运行的内容。启动一个智能体，即可在此看到它运行的内容。",
-  "activity.workspace.forCard": "正在处理 {card}",
+  "activity.workspace.forCard": "卡片 {card}",
   "activity.workspace.heading": "活动",
   "activity.workspace.noWorkspace": "打开一个工作区，即可查看其智能体运行的内容。",
   "activity.workspace.panelTip": "工作区中的智能体现在运行的内容。“整个工作区”一起显示每个项目正在运行的智能体；选择某个项目会打开它自己的“活动”标签页。",

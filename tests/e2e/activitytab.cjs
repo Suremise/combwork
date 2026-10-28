@@ -253,7 +253,7 @@ function transcript(sid, startMin) {
     await dialogActivity.click()
     // The workspace level (HI-1664), on its builder; the project's tab is as it was.
     const wsTab = page.locator('.activity-workspace .activity-agent-tab[data-agent="hb1"]')
-    check("the card dialog's Activity: the workspace level on its builder, frozen", !!(await lib.until(async () => /Working on/.test(await page.locator('.activity-workspace .activity-for-card').innerText().catch(() => '')) && (await wsTab.getAttribute('aria-selected').catch(() => null)) === 'true', HUNG_MS, 250)) && (await page.locator('.activity-workspace .activity-live').getAttribute('aria-pressed')) === 'false')
+    check("the card dialog's Activity: the workspace level on its builder, frozen", !!(await lib.until(async () => /Card \w+-\d+/.test(await page.locator('.activity-workspace .activity-for-card').innerText().catch(() => '')) && (await wsTab.getAttribute('aria-selected').catch(() => null)) === 'true', HUNG_MS, 250)) && (await page.locator('.activity-workspace .activity-live').getAttribute('aria-pressed')) === 'false')
     await page.locator('.activity-btn[aria-label="Projects"]').click()
     await page.locator('.tab', { hasText: 'Activity' }).click()
     check("…and the project's tab is unchanged: all agents, all cards", !!(await lib.until(async () => /All agents/.test(await agentsPick.innerText().catch(() => '')) && /All cards/.test(await head.locator('.activity-pick').nth(1).innerText().catch(() => '')), HUNG_MS, 250)))

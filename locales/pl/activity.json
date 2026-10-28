@@ -58,7 +58,7 @@
   "activity.workspace.cardNobody": "Nikt teraz nie pracuje nad {card}. Historia jest na karcie.",
   "activity.workspace.clearCard": "Pokaż wszystkich agentów",
   "activity.workspace.empty": "W tym obszarze roboczym nic nie działa. Uruchom agenta, aby zobaczyć tutaj, co uruchamia.",
-  "activity.workspace.forCard": "Pracuje nad {card}",
+  "activity.workspace.forCard": "Karta {card}",
   "activity.workspace.heading": "Aktywność",
   "activity.workspace.noWorkspace": "Otwórz obszar roboczy, aby zobaczyć, co uruchamiają jego agenci.",
   "activity.workspace.panelTip": "Co teraz uruchamiają agenci obszaru roboczego. Cały obszar roboczy pokazuje razem działających agentów wszystkich projektów; projekt otwiera własną kartę Aktywność.",

@@ -166,7 +166,7 @@ const AGENTS = [
     await card.click()
     await page.locator('.dialog[role="dialog"]').getByRole('button', { name: 'Activity', exact: true }).click()
     const forCard = head.locator('.activity-for-card')
-    check("a card's Activity: the workspace level on its builder alone, Working on its key, frozen", !!(await fresh(async () => /Working on/.test(await forCard.innerText().catch(() => '')) && JSON.stringify(await groups()) === JSON.stringify(['alpha:hb1']))) && (await head.locator('.activity-live').getAttribute('aria-pressed')) === 'false', JSON.stringify(await groups()))
+    check("a card's Activity: the workspace level on its builder alone, its Card chip, frozen", !!(await fresh(async () => /Card \w+-\d+/.test(await forCard.innerText().catch(() => '')) && JSON.stringify(await groups()) === JSON.stringify(['alpha:hb1']))) && (await head.locator('.activity-live').getAttribute('aria-pressed')) === 'false', JSON.stringify(await groups()))
     await page.mouse.move(5, 5)
     await shoot('2-for-card-dark')
     // Another view chosen while its agents are found: it doesn't open over it.

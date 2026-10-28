@@ -58,7 +58,7 @@
   "activity.workspace.cardNobody": "Nobody is working on {card} now. The card has its history.",
   "activity.workspace.clearCard": "Show every agent",
   "activity.workspace.empty": "Nothing is running in this workspace. Start an agent to see what it runs here.",
-  "activity.workspace.forCard": "Working on {card}",
+  "activity.workspace.forCard": "Card {card}",
   "activity.workspace.heading": "Activity",
   "activity.workspace.noWorkspace": "Open a workspace to see what its agents run.",
   "activity.workspace.panelTip": "What the workspace's agents run now. The whole workspace shows every project's running agents together; a project opens its own Activity tab.",

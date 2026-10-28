@@ -566,7 +566,7 @@ const M = {
   assistant: msg({ id: 'activity.workspace.assistant', defaultMessage: 'Assistant', description: "The Assistant's group heading among the Activity view's agent tabs (its tabs grouped by project; the Hive Assistant is its own group)." }),
   agentIn: msg({ id: 'activity.workspace.agentIn', defaultMessage: '{project} · {agent}', description: "An entry of the Activity view's Agents menu: an agent ({agent}) and its project ({project})." }),
   empty: msg({ id: 'activity.workspace.empty', defaultMessage: 'Nothing is running in this workspace. Start an agent to see what it runs here.', description: "Activity's workspace level when no agent of any project runs anything." }),
-  forCard: msg({ id: 'activity.workspace.forCard', defaultMessage: 'Working on {card}', description: "A chip above Activity's workspace level when it was opened from a card: only the agents working on that card ({card}: its key, such as HI-12) now." }),
+  forCard: msg({ id: 'activity.workspace.forCard', defaultMessage: 'Card {card}', description: "A chip above Activity's workspace level when it was opened from a card, naming the filter (not saying anyone works on it): only the agents working on that card ({card}: its key, such as HI-12) now have tabs." }),
   clearCard: msg({ id: 'activity.workspace.clearCard', defaultMessage: 'Show every agent', description: "Tooltip of the button on Activity's \"Working on HI-12\" chip: drops the card's filter." }),
   cardNobody: msg({ id: 'activity.workspace.cardNobody', defaultMessage: 'Nobody is working on {card} now. The card has its history.', description: "Activity's workspace level opened from a card ({card}: its key) when no running agent works on it now: past work is read on the card itself." })
 }
