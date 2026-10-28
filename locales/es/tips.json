@@ -75,6 +75,8 @@
   "tips.attachFiles.title": "Adjunta cualquier archivo a un prompt",
   "tips.attachmentsTabs.text": "La pestaña Adjuntos tiene Adjuntos de paneles y Adjuntos de tarjetas. Mostrar en Adjuntos, junto a los adjuntos de una tarjeta, abre Adjuntos de tarjetas en esa tarjeta; Mostrar los adjuntos de la sesión, en el menú ⋯ de un agente, abre Adjuntos de paneles en su sesión.",
   "tips.attachmentsTabs.title": "Ir a los archivos de una tarjeta o una sesión",
+  "tips.autoModeSetup.text": "En modo Auto, Claude Code puede ofrecer enseñar al modo Auto sobre tu entorno. Hive nunca responde: el agente muestra Espera tu respuesta y no se escribe nada en él hasta que respondas. Configuración → Avanzado → Claude Code puede desactivar la oferta.",
+  "tips.autoModeSetup.title": "La oferta de Claude Code te espera",
   "tips.backupRetention.text": "Hive comprime sus copias de las transcripciones cuando termina una sesión, y Almacenamiento muestra lo que contienen. Para dejar ir las antiguas, ajusta Configuración → Sesiones → Conservar las copias de las transcripciones: solo van a la Papelera de reciclaje las copias de sesiones que la CLI aún tiene.",
   "tips.backupRetention.title": "Las copias ocupan menos y pueden caducar",
   "tips.banners.text": "Mientras usas Hive, que un agente termine o te necesite se muestra como un banner en la ventana, no como una notificación de Windows encima del Asistente. Configuración → Notificaciones elige dónde se muestra, para qué espacios de trabajo y durante cuánto tiempo.",

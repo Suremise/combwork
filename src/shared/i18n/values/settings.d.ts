@@ -93,6 +93,8 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.accounts.statusSeconds.title': undefined
   'settings.advanced.claude-code.accounts.trustField.desc': undefined
   'settings.advanced.claude-code.accounts.trustField.title': undefined
+  'settings.advanced.claude-code.autoModeSetup.offer.desc': undefined
+  'settings.advanced.claude-code.autoModeSetup.offer.title': undefined
   'settings.advanced.claude-code.connections.remoteModels.desc': undefined
   'settings.advanced.claude-code.connections.remoteModels.title': undefined
   'settings.advanced.claude-code.exit.command.desc': undefined
@@ -125,6 +127,10 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.safeguard.note.title': undefined
   'settings.advanced.claude-code.safeguard.prompt.desc': undefined
   'settings.advanced.claude-code.safeguard.prompt.title': undefined
+  'settings.advanced.claude-code.screen.idleQuestion.desc': undefined
+  'settings.advanced.claude-code.screen.idleQuestion.title': undefined
+  'settings.advanced.claude-code.screen.input.desc': undefined
+  'settings.advanced.claude-code.screen.input.title': undefined
   'settings.advanced.claude-code.signIn.stopError.desc': undefined
   'settings.advanced.claude-code.signIn.stopError.title': undefined
   'settings.advanced.claude-code.statusLine.fiveHour.desc': undefined
@@ -338,6 +344,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.lanes.waitReviewerMinutes.title': undefined
   'settings.advanced.hive.lanes.waitYouMinutes.desc': undefined
   'settings.advanced.hive.lanes.waitYouMinutes.title': undefined
+  'settings.advanced.hive.lostLine.steadySeconds.desc': undefined
+  'settings.advanced.hive.lostLine.steadySeconds.title': undefined
   'settings.advanced.hive.mcp.connectSeconds.desc': undefined
   'settings.advanced.hive.mcp.connectSeconds.title': undefined
   'settings.advanced.hive.mcp.replySeconds.desc': undefined

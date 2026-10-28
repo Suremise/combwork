@@ -75,6 +75,8 @@
   "tips.attachFiles.title": "为提示词附加任意文件",
   "tips.attachmentsTabs.text": "“附件”标签页有“窗格附件”和“卡片附件”。卡片附件旁的“在“附件”中显示”会打开该卡片的“卡片附件”；智能体 ⋯ 菜单中的“显示会话的附件”会打开其会话的“窗格附件”。",
   "tips.attachmentsTabs.title": "跳到卡片或会话的文件",
+  "tips.autoModeSetup.text": "在自动模式下，Claude Code 可能会提议让自动模式了解你的环境。Hive 从不替你回答：在你回答之前，智能体显示“需要输入”，也不会向其中输入任何内容。在“设置”→“高级”→“Claude Code”中可以关闭这个提议。",
+  "tips.autoModeSetup.title": "Claude Code 的提议会等你",
   "tips.backupRetention.text": "会话结束后，Hive 会压缩其会话记录备份，“存储”会显示它们原本的大小。要清掉旧备份，请设置“设置”→“会话”→“保留会话记录备份”：只有 CLI 仍保有的会话的副本才会移到回收站。",
   "tips.backupRetention.title": "备份占用更少空间，并可设为过期",
   "tips.banners.text": "你在使用 Hive 时，智能体结束或需要你会以窗口内的横幅提示，而不是盖住助手的 Windows 通知。“设置”→“通知”可以选择横幅显示的位置、针对哪些工作区以及显示多久。",

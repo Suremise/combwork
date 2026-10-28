@@ -158,6 +158,7 @@ export const SUITES = [
   { name: 'i18nreport' },
   { name: 'i18nshots' },
   { name: 'icons' },
+  { name: 'idlequestion' },
   { name: 'idlestatus' },
   { name: 'image' },
   { name: 'inbox', serial: 'window focus' },

@@ -75,6 +75,8 @@
   "tips.attachFiles.title": "Jede Datei an einen Prompt anhängen",
   "tips.attachmentsTabs.text": "Der Tab „Anhänge“ hat „Anhänge in Bereichen“ und „Anhänge an Karten“. „In „Anhänge“ zeigen“ neben den Anhängen einer Karte öffnet „Anhänge an Karten“ bei dieser Karte; „Anhänge der Sitzung zeigen“ im ⋯-Menü eines Agenten öffnet „Anhänge in Bereichen“ bei seiner Sitzung.",
   "tips.attachmentsTabs.title": "Direkt zu den Dateien einer Karte oder Sitzung",
+  "tips.autoModeSetup.text": "Im Auto-Modus bietet Claude Code vielleicht an, dem Auto-Modus deine Umgebung beizubringen. Hive beantwortet das nie: Der Agent zeigt „Braucht Eingabe“, und nichts wird hineingetippt, bis du antwortest. Einstellungen → Erweitert → Claude Code kann das Angebot abschalten.",
+  "tips.autoModeSetup.title": "Das Angebot von Claude Code wartet auf dich",
   "tips.backupRetention.text": "Hive komprimiert seine Transkript-Sicherungen, sobald eine Sitzung endet, und Speicher zeigt, was sie enthalten. Um alte loszuwerden, stelle Einstellungen → Sitzungen → Transkript-Sicherungen behalten ein: Nur Kopien von Sitzungen, die die CLI noch hat, kommen in den Papierkorb.",
   "tips.backupRetention.title": "Sicherungen brauchen weniger Platz und können ablaufen",
   "tips.banners.text": "Während du Hive verwendest, erscheint ein Agent, der fertig ist oder dich braucht, als Banner im Fenster, nicht als Windows-Benachrichtigung über dem Assistenten. Einstellungen → Benachrichtigungen legt fest, wo es erscheint, für welche Arbeitsbereiche und wie lange.",

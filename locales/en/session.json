@@ -431,6 +431,14 @@
     "defaultMessage": "Hive isn't hearing from {agent}'s hooks",
     "description": "A notification's title: an agent's coding agent has stopped sending Hive its hooks (the calls that tell Hive what it is doing). {agent} is the agent."
   },
+  "session.notice.lineLost": {
+    "defaultMessage": "A screen of its CLI took it before it was sent. Send it again if it is still wanted: {text}",
+    "description": "The notification that a line Hive typed into an agent was lost (a screen of its coding agent took it). {text} is the line, as Hive typed it."
+  },
+  "session.notice.lineLostTitle": {
+    "defaultMessage": "{agent} didn't get a line Hive typed",
+    "description": "A notification's title: a line Hive typed into an agent's terminal (a message, a prompt) was taken by a screen of its coding agent before it was sent, so the agent never got it. {agent} is the agent."
+  },
   "session.notice.longConversation": {
     "defaultMessage": "{agent}: long conversation",
     "description": "A notice's title: an agent's transcript has grown past the size set in Settings → Sessions. {agent} is the agent."
@@ -490,6 +498,10 @@
   "session.plan.typing": {
     "defaultMessage": "Hive is typing a line into this agent. Try again in a moment.",
     "description": "Turning Plan mode on or off is refused for a moment: Hive is typing into the terminal."
+  },
+  "session.prompt.cliAsks": {
+    "defaultMessage": "Its CLI shows a question for you: nothing is typed into it until you answer it there.",
+    "description": "Typing into an agent is refused: its coding agent shows a question of its own on its screen (such as Claude Code's offer to teach auto mode about your environment), which the keys would answer."
   },
   "session.prompt.untaken": {
     "defaultMessage": "Its CLI hasn't taken the line Hive typed before; nothing more is typed until it does.",
@@ -714,6 +726,10 @@
   "session.status.asksTrust": {
     "defaultMessage": "Asks whether to trust this folder",
     "description": "An agent's status: its CLI asks, before it starts, whether to trust the project's folder."
+  },
+  "session.status.cliAsks": {
+    "defaultMessage": "{provider} asks: {question}",
+    "description": "An agent's status: its coding agent ({provider}, e.g. Claude Code) shows a question of its own on its screen and waits for the user to answer it there. {question} is the question, in the coding agent's own words (English)."
   },
   "session.status.compacting": {
     "defaultMessage": "Compacting the conversation…",

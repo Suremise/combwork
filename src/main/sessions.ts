@@ -81,7 +81,7 @@ import { presentWindow, showOsNotification, testNotifyLog, testQuiet } from './t
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
 import { COMPACTING_TEXT, HOOKS_MISSING_NOTE } from '../shared/runtime'
-import { applyStep, compactionOver, expireTasks, failedTurnStep, hookStep, idleAfter, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
+import { applyStep, compactionOver, expireTasks, failedTurnStep, hookStep, idleAfter, idleQuestionGone, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
 import { memoModel, memoTools, memoTurn, noteSafeguard, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
 import { admit, describe as describeTurn, endRunning, expectInjected, failureTurn, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
 import { Compaction } from './compaction'
@@ -102,6 +102,7 @@ import { leftoversSummary, processCount } from '../shared/agentProcesses'
 import { childEnv, killPty, refreshPty, spawnPty, startSize, writePty } from './ptyHost'
 import { refreshPathBeforeStart } from './freshPath'
 import { TerminalScreen } from './terminalScreen'
+import { heldLineLost } from './heldLine'
 import { KeysStopped, PickNotFound, typeKeySteps } from './keySteps'
 import { withBinOnPath } from './progressReporters/shims'
 import { hiveSkills, parseSkillFrontmatter, skillFor } from './skills'
@@ -237,6 +238,8 @@ export interface HookObservation {
 }
 /** How long after an ask its CLI's screen may take to show it is a safeguard prompt (LiveSession.guardAsk, #606). */
 const GUARD_ASK_MS = 10_000
+/** An agent at its prompt, between turns: where its CLI's question by itself shows (HI-1959). */
+const AT_PROMPT: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['ready', 'finished', 'background', 'watching'])
 /** How many stops seen only on screen a session's record keeps (SessionRecord.screenStops). */
 const MAX_SCREEN_STOPS = 200
 /**
@@ -507,6 +510,16 @@ interface LiveSession {
    * for none Hive knows.
    */
   untakenFor?: readonly string[]
+  /** The line marked not taken, whole (`state.untakenLine` keeps 160 characters): told to the user if it is lost (HI-1959). */
+  untakenText?: string
+  /** Prompts its CLI had taken when the line was marked not taken: one taken since is a sign it was taken (HI-1959). */
+  untakenPrompts?: number
+  /** Its CLI's own question while idle, on its screen (HI-1959): the ask the agent waits on while it shows. */
+  idleAsk?: Ask
+  /** A look at its screen for that question and a lost line is queued (one at a time, however much the CLI draws). */
+  idleChecking?: boolean
+  /** The held line first seen lost (HI-1959): a second look after hive.lostLine.steadySeconds decides. */
+  lostSeen?: { since: string; timer: ReturnType<typeof setTimeout> }
 }
 
 /** Whose sign-in an agent depends on (HI-1755): its provider's, or its provider's and the connection it launched on. */
@@ -1198,6 +1211,8 @@ class SessionManager {
     if (!l || l.state.runId !== runId || !readyFor(l.state) || this.userMayBeTyping(projectPath, agentId) || this.delivering.has(key) || folderChanging(l.state.cwd)) return false
     // The prompt is the user's draft once they have typed in it (#652 round 1 finding 2): never sent by Hive's Enter.
     if (this.userTypedOverLine(projectPath, agentId)) return false
+    // Nor while its CLI's own question shows (HI-1959): Enter would answer it (HB4's wake answered Claude Code's offer).
+    if (this.cliAsks(projectPath, agentId)) return false
     writePty(key, '\r')
     return true
   }
@@ -2433,6 +2448,7 @@ class SessionManager {
         screen?.write(data, () => {
           this.readFooterMode(l, screen)
           this.screenDrawn(id, l)
+          this.idleScreenDrawn(id, l)
         })
         this.watchTitle(id, data)
         this.watchReadyOutput(id, data)
@@ -3272,6 +3288,8 @@ class SessionManager {
     if (!l || l.state.runId !== runId || l.state.untakenLine) return
     l.state.untakenLine = { since: new Date().toISOString(), text: text.replace(/\s+/g, ' ').trim().slice(0, 160) }
     l.untakenFor = [...rangFor]
+    l.untakenText = text
+    l.untakenPrompts = l.prompts ?? 0
     this.emitState(l.state)
     const label = this.label(l.state)
     const body = retried
@@ -3337,6 +3355,9 @@ class SessionManager {
     log.info(`${userText(this.label(l.state))}: the line Hive typed is no longer waiting (${why}, ${Math.round((Date.now() - Date.parse(u.since)) / 1000)} s after it was marked)`)
     l.state.untakenLine = undefined
     l.untakenFor = undefined
+    l.untakenText = undefined
+    l.untakenPrompts = undefined
+    this.dropLostLook(l)
     this.emitState(l.state)
   }
 
@@ -3348,6 +3369,13 @@ class SessionManager {
    * Enter there, later than any line Hive typed. main/watches.ts tells the Assistant's watches.
    */
   userReplied: (projectPath: string, agentId: string, agentName: string, text: string) => void = () => undefined
+
+  /**
+   * A line Hive typed, never taken, was lost from the CLI's input (HI-1959): the deliveries it rang for, of that launch,
+   * are queued again by the delivery service (main/deliveries.ts), so the doorbell rings once more; one read meanwhile
+   * isn't.
+   */
+  lineLost: (projectPath: string, agentId: string, runId: string, deliveries: readonly string[]) => void = () => undefined
 
   private noteUserReply(l: LiveSession, text: string | null | undefined): void {
     const st = l.state
@@ -3413,13 +3441,19 @@ class SessionManager {
     const waiting = (): void => {
       if (this.lineBlocked(this.live.get(liveId(projectPath, agentId)))) throw hiveError(msg({ id: 'session.prompt.untaken', defaultMessage: "Its CLI hasn't taken the line Hive typed before; nothing more is typed until it does.", description: "Typing into an agent is refused: its CLI hasn't taken the line Hive typed before." }), undefined, { kind: 'conflict' })
     }
+    // Its CLI's own question on its screen (HI-1959): it takes the keys, and Enter answers it.
+    const asked = (): void => {
+      if (this.cliAsks(projectPath, agentId)) throw hiveError(msg({ id: 'session.prompt.cliAsks', defaultMessage: 'Its CLI shows a question for you: nothing is typed into it until you answer it there.', description: "Typing into an agent is refused: its coding agent shows a question of its own on its screen (such as Claude Code's offer to teach auto mode about your environment), which the keys would answer." }), undefined, { kind: 'conflict' })
+    }
     waiting()
+    asked()
     this.delivering.add(key)
     this.noteComposer(l, key)
     const same = (): boolean => !!runId && this.live.get(liveId(projectPath, agentId))?.state.runId === runId
     const check = (): void => {
       if (!same()) throw hiveError(M.stoppedBeforePrompt)
       waiting()
+      asked()
       guard?.()
     }
     const since = Date.now()
@@ -4443,6 +4477,104 @@ class SessionManager {
         log.info(`${userText(this.label(st))}: its safeguard prompt was answered (gone from its screen)`)
       }
     }).catch((e) => log.warn('safeguard: screen check failed', e))
+  }
+
+  /**
+   * Whether an agent's CLI shows a question of its own on its screen now (HI-1959: Claude Code's offer to teach auto mode
+   * about the environment): nothing is typed into it meanwhile, and no Enter pressed, which would answer it.
+   */
+  cliAsks(projectPath: string, agentId: string): boolean {
+    const l = this.live.get(liveId(projectPath, agentId))
+    const ask = l?.adapter?.idleQuestion?.bind(l.adapter)
+    const screen = ask ? l!.screen?.text() : null
+    return !!screen && !!ask!(screen)
+  }
+
+  /**
+   * The CLI's screen was drawn, for its question by itself and a held line it took (HI-1959): looked at while the agent
+   * is between turns, waits on that question, or holds a line, one look at a time and in order with the hooks.
+   */
+  private idleScreenDrawn(id: string, l: LiveSession): void {
+    if (!l.adapter.idleQuestion || !l.screen || l.idleChecking) return
+    const st = l.state
+    if (!l.idleAsk && !st.untakenLine && !AT_PROMPT.has(st.status)) return
+    l.idleChecking = true
+    void this.inHookOrder(st.runId, () => {
+      l.idleChecking = false
+      if (this.live.get(id) === l) this.lookAtIdleScreen(id, l)
+    }).catch((e) => log.warn('idle question: screen check failed', e))
+  }
+
+  /**
+   * Its CLI's question by itself (HI-1959), which sends no hook: on its screen between turns, the agent waits for the user
+   * with it, as for any question (For you, a notification, the Assistant's wake); gone, it is idle again. Then the held
+   * line, if any.
+   */
+  private lookAtIdleScreen(id: string, l: LiveSession): void {
+    const st = l.state
+    const question = l.adapter.idleQuestion!(l.screen!.text())
+    if (question && !l.idleAsk && AT_PROMPT.has(st.status)) {
+      const text = withValues(msg({ id: 'session.status.cliAsks', defaultMessage: '{provider} asks: {question}', description: "An agent's status: its coding agent ({provider}, e.g. Claude Code) shows a question of its own on its screen and waits for the user to answer it there. {question} is the question, in the coding agent's own words (English)." }), { provider: l.adapter.descriptor.name, question })
+      const ask: Ask = { kind: 'question', blocking: true, message: englishText(text), text }
+      l.idleAsk = ask
+      log.info(`${userText(this.label(st))}: its CLI asks on its screen: ${question}`)
+      const ev: HookEvent = { kind: 'ask', ask }
+      this.carryOut(id, l, hookStep(ev, this.statusInput(l)), 'screen', ev)
+    } else if (!question && l.idleAsk) {
+      const ask = l.idleAsk
+      l.idleAsk = undefined
+      log.info(`${userText(this.label(st))}: its CLI's question is gone from its screen`)
+      if (st.status === 'waiting' && l.waitingOn === ask) this.carryOut(id, l, idleQuestionGone(this.statusInput(l)), 'screen')
+    }
+    this.lookAtHeldLine(id, l, !!question)
+  }
+
+  /** One look at a held line (heldLineLost): the agent, its screen with dim hints left out, and what was taken since. */
+  private heldLook(l: LiveSession, asked: boolean): boolean {
+    return heldLineLost({ asked, input: l.adapter.promptText?.(l.screen!.textWithoutDim()) ?? null, status: l.state.status, takenSince: (l.prompts ?? 0) > (l.untakenPrompts ?? 0) })
+  }
+
+  /**
+   * A line Hive typed, held as not taken, gone from the CLI's input since (HI-1959: a screen of the CLI's took it): seen
+   * lost, it is looked at again after hive.lostLine.steadySeconds, and any draw meanwhile that says otherwise (a redraw, a
+   * dialog, text in the input, a turn) calls that off.
+   */
+  private lookAtHeldLine(id: string, l: LiveSession, asked: boolean): void {
+    const u = l.state.untakenLine
+    if (!u || !l.adapter.promptText || !this.heldLook(l, asked)) return this.dropLostLook(l)
+    if (l.lostSeen?.since === u.since) return
+    this.dropLostLook(l)
+    const runId = l.state.runId
+    const timer = setTimeout(() => void this.inHookOrder(runId, () => this.lostLineSteady(id, l, u.since)).catch((e) => log.warn('lost line: check failed', e)), advanced.number('hive.lostLine.steadySeconds') * 1000)
+    timer.unref?.()
+    l.lostSeen = { since: u.since, timer }
+  }
+
+  private dropLostLook(l: LiveSession): void {
+    if (l.lostSeen) clearTimeout(l.lostSeen.timer)
+    l.lostSeen = undefined
+  }
+
+  /**
+   * The second look at a held line seen lost (HI-1959): the same launch, the same line, and everything said again (no
+   * question, its input drawn and empty, between turns, nothing taken). Then the hold goes: the deliveries it rang for are
+   * offered again (an unread one is typed again; one read meanwhile isn't), and a line that rang for none is told to the
+   * user with its words, never dropped unseen.
+   */
+  private lostLineSteady(id: string, l: LiveSession, since: string): void {
+    if (this.live.get(id) !== l || l.lostSeen?.since !== since) return
+    l.lostSeen = undefined
+    const st = l.state
+    if (st.untakenLine?.since !== since || !l.screen || !l.adapter.promptText) return
+    if (!this.heldLook(l, !!l.adapter.idleQuestion?.(l.screen.text()))) return
+    const text = l.untakenText ?? st.untakenLine.text
+    const rang = [...(l.untakenFor ?? [])]
+    this.clearUntaken(l, rang.length ? 'gone from its input, nothing taken: what it rang for is offered again' : 'gone from its input, nothing taken: told to the user') // i18n-ignore: for the log
+    // The line it typed is gone, so nothing of it is pending any more (PENDING_MS would hold the next line for it).
+    if (l.typed && (l.prompts ?? 0) <= l.typed.prompts) l.typed = undefined
+    this.noteComposer(l, this.key(st.projectPath, st.agentId))
+    if (rang.length) this.lineLost(st.projectPath, st.agentId, st.runId, rang)
+    else this.notify(st.projectPath, withValues(msg({ id: 'session.notice.lineLostTitle', defaultMessage: "{agent} didn't get a line Hive typed", description: "A notification's title: a line Hive typed into an agent's terminal (a message, a prompt) was taken by a screen of its coding agent before it was sent, so the agent never got it. {agent} is the agent." }), { agent: this.label(st) }), withValues(msg({ id: 'session.notice.lineLost', defaultMessage: 'A screen of its CLI took it before it was sent. Send it again if it is still wanted: {text}', description: "The notification that a line Hive typed into an agent was lost (a screen of its coding agent took it). {text} is the line, as Hive typed it." }), { text }), 'notice', undefined, st.agentId)
   }
 
   /** Reads the transcript for background tasks now (at a turn's end, before choosing between finished and background). */

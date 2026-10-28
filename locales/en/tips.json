@@ -303,6 +303,14 @@
     "defaultMessage": "Jump to a card's or a session's files",
     "description": "A tip's title (HI-1841)."
   },
+  "tips.autoModeSetup.text": {
+    "defaultMessage": "In auto mode, Claude Code may offer to teach auto mode about your environment. Hive never answers it: the agent shows Needs input, and nothing is typed into it, until you do. Settings → Advanced → Claude Code can turn the offer off.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Claude Code is a product name, and auto mode its permission mode."
+  },
+  "tips.autoModeSetup.title": {
+    "defaultMessage": "Claude Code's offer waits for you",
+    "description": "A tip's title. Claude Code is a product name: keep it in English."
+  },
   "tips.backupRetention.text": {
     "defaultMessage": "Hive compresses its transcript backups once a session ends, and Storage shows what they hold. To let old ones go, set Settings → Sessions → Keep transcript backups: only copies of sessions the CLI still has go to the Recycle Bin.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

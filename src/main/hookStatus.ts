@@ -235,6 +235,16 @@ export function safeguardAnswered(s: HookStatusInput): HookStep {
   return { next, ...(next === 'ready' ? { message: SAFEGUARD_IDLE_MESSAGE, messageText: SAFEGUARD_IDLE_TEXT } : { message: null }), review: null, ...RESOLVED, actions: ['releaseLocks'] }
 }
 
+/**
+ * The CLI's question by itself while idle is gone from its screen (HI-1959): answered or put off by the user there, with
+ * no hook. The agent waiting on it is idle again (on its background tasks, or ready), nothing open. Nothing while it
+ * doesn't wait.
+ */
+export function idleQuestionGone(s: HookStatusInput): HookStep {
+  if (s.status !== 'waiting') return { next: null, actions: [] }
+  return { next: idleAfter(s, 'ready'), message: null, review: null, ...RESOLVED, actions: [] }
+}
+
 export function hookStep(ev: HookEvent, s: HookStatusInput): HookStep {
   switch (ev.kind) {
     case 'start':

@@ -1834,12 +1834,31 @@ function tick(): void {
   }
 }
 
+/**
+ * A doorbell its CLI never took, lost from its input since (HI-1959: a screen of the CLI's took it): what it rang for,
+ * still offered in that launch and unread, is queued again and offered now, so it rings once more. One read meanwhile,
+ * or offered again already, is left as it is.
+ */
+async function ringLostLine(host: string, agentId: string, runId: string, ids: readonly string[]): Promise<void> {
+  const store = await load(host)
+  await transact(store, (d) => {
+    for (const id of ids) {
+      const r = byId(d.records, id)
+      const run = r ? (store.launches.get(r.id) ?? r.offerRun) : null
+      if (r && r.agentId === agentId && r.state === 'offered' && !store.offering.has(r.id) && run === runId) set(store, d, r, 'queued', 'its doorbell was lost before its CLI took it')
+    }
+  })
+  show(store, agentId)
+  await offerNow(host, agentId)
+}
+
 let started = false
 /** Wires the service in (once, at start): statuses and a tick offer and follow deliveries, workspaces restore them. */
 export function initDeliveries(): void {
   if (started) return
   started = true
   followWorkspaceCloses()
+  sessions.lineLost = (host, agentId, runId, ids) => void ringLostLine(host, agentId, runId, ids).catch((e) => log.warn('ringing a lost line again', e))
   onHiveEvent((e) => {
     if (e.type === 'workspace-changed') {
       // Restored as a workspace opens: its projects' and its Assistant's (refusals shown, panes filled in).

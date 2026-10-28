@@ -367,6 +367,14 @@
     "defaultMessage": "Connections: trusted folder field",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.claude-code.autoModeSetup.offer.desc": {
+    "defaultMessage": "Claude Code offers, now and then in auto mode, to read the project, your recent sessions and optionally your shell history and other repositories, to teach auto mode about your environment. Hive never answers it: the agent waits for you. Off, Hive's Claude Code agents are started with the offer turned off for that launch (nothing is written to Claude Code's files, and auto mode decides as before); /auto-mode-setup still runs it when you want.",
+    "description": "What the advanced setting \"Offer auto mode's environment setup\" is for, and what happens when it is off (Settings → Advanced, HI-1959). /auto-mode-setup is Claude Code's command: keep it as it is."
+  },
+  "settings.advanced.claude-code.autoModeSetup.offer.title": {
+    "defaultMessage": "Offer auto mode's environment setup",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto mode is one of Claude Code's permission modes."
+  },
   "settings.advanced.claude-code.connections.remoteModels.desc": {
     "defaultMessage": "The model names Ollama runs on ollama.com rather than on this PC (its cloud models, such as gpt-oss:120b-cloud), as a regular expression, for an Ollama connection's models typed in rather than read from Ollama (Read Models asks Ollama, which says). Such a connection's sessions aren't free (local). Wrong, a cloud model typed in is counted as free, or a local one as not free.",
     "description": "What the advanced setting \"Connections: Ollama cloud models\" is for, and what goes wrong when it is wrong (Settings → Advanced). Ollama, ollama.com and Read Models (a button) are names; \"free (local)\" is how Hive shows the cost of sessions run only on this PC."
@@ -493,6 +501,22 @@
   },
   "settings.advanced.claude-code.safeguard.prompt.title": {
     "defaultMessage": "Safeguard stop: question",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.screen.idleQuestion.desc": {
+    "defaultMessage": "A question Claude Code puts on its screen by itself after a turn, sending Hive nothing (\"Teach auto mode about your environment?\"). While it shows, Hive shows the agent waiting for you with the question, and types nothing into it: Enter would answer it. Wrong, Hive types its wakes into the question.",
+    "description": "What the advanced setting \"Screen: question while idle\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959). The quoted question is Claude Code's own, in English: keep it as it is."
+  },
+  "settings.advanced.claude-code.screen.idleQuestion.title": {
+    "defaultMessage": "Screen: question while idle",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.screen.input.desc": {
+    "defaultMessage": "Claude Code's input box, between two rules, its first group what it holds after its prompt mark. Hive reads it to tell that a line it typed is gone from the input (a screen of the CLI's took it), and then types it again. Wrong, such a line stays held, and nothing more is typed into the agent until you press Enter there.",
+    "description": "What the advanced setting \"Screen: input box\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959). A rule: a horizontal line drawn across the terminal."
+  },
+  "settings.advanced.claude-code.screen.input.title": {
+    "defaultMessage": "Screen: input box",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.claude-code.signIn.stopError.desc": {
@@ -1346,6 +1370,14 @@
   "settings.advanced.hive.lanes.waitYouMinutes.title": {
     "defaultMessage": "Lanes: a long wait for you",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.hive.lostLine.steadySeconds.desc": {
+    "defaultMessage": "A line Hive typed into an agent that its CLI didn't take, gone from its input since (a screen of the CLI's took it): how long its input must stay empty, at its prompt, with nothing taken, before Hive types it again or, with nothing to type again, tells you. Raise it if a slow machine has a line typed twice.",
+    "description": "What the advanced setting \"Lost line: wait\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959)."
+  },
+  "settings.advanced.hive.lostLine.steadySeconds.title": {
+    "defaultMessage": "Lost line: wait",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A line: a message Hive typed into an agent's terminal."
   },
   "settings.advanced.hive.mcp.connectSeconds.desc": {
     "defaultMessage": "How long Hive waits, once an agent is ready, for its CLI to connect Hive's tools before it tells the agent of new work anyway. A resumed session can be ready before its tools are, and a message then is a turn spent without them (#865). Lower it if messages reach agents late when their CLI doesn't connect Hive's tools.",

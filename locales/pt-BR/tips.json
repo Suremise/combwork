@@ -75,6 +75,8 @@
   "tips.attachFiles.title": "Anexe qualquer arquivo a um prompt",
   "tips.attachmentsTabs.text": "A aba Anexos tem Anexos dos painéis e Anexos dos cartões. Mostrar em Anexos, ao lado dos anexos de um cartão, abre Anexos dos cartões nesse cartão; Mostrar anexos da sessão, no menu ⋯ de um agente, abre Anexos dos painéis na sessão dele.",
   "tips.attachmentsTabs.title": "Ir para os arquivos de um cartão ou de uma sessão",
+  "tips.autoModeSetup.text": "No modo Auto, o Claude Code pode oferecer ensinar o modo Auto sobre o seu ambiente. O Hive nunca responde: o agente mostra Precisa de resposta, e nada é digitado nele até você responder. Configurações → Avançado → Claude Code pode desativar a oferta.",
+  "tips.autoModeSetup.title": "A oferta do Claude Code espera por você",
   "tips.backupRetention.text": "O Hive compacta os backups das transcrições quando uma sessão termina, e Armazenamento mostra o que eles contêm. Para descartar os antigos, ajuste Configurações → Sessões → Manter os backups das transcrições: só vão para a Lixeira as cópias de sessões que a CLI ainda tem.",
   "tips.backupRetention.title": "Backups ocupam menos espaço e podem expirar",
   "tips.banners.text": "Enquanto você usa o Hive, um agente que termina ou precisa de você aparece como um banner na janela, não como uma notificação do Windows por cima do Assistente. Configurações → Notificações escolhe onde ele aparece, para quais espaços de trabalho e por quanto tempo.",
