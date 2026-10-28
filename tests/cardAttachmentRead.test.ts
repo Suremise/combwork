@@ -19,7 +19,6 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const att = await import('../src/main/cardAttachments')
-const { attachmentText } = await import('../src/main/files')
 const { advanced } = await import('../src/main/advanced')
 
 advanced.load(join(base, 'profile'))
@@ -31,6 +30,7 @@ beforeAll(() => {
 afterAll(async () => {
   delete process.env.HIVE_TEST_TRASH_DIR
   att.attachmentReadSeams.afterOpen = null
+  att.attachmentReadSeams.beforeOpen = null
   advanced.stop()
   for (const w of opened) await disposeWorkspaceService(w)
   store.closeAllBoards()
@@ -225,31 +225,48 @@ describe("a card's attachment read through Hive (HI-1751)", () => {
   })
 })
 describe("a card's attachment in the attachment viewer (HI-1958)", () => {
-  it('its text by card and id, as the viewer previews it; only a file in its own card folder, never through a link', async () => {
-    const { w, root } = await workspace()
-    const c = await cardWith(w, { 'notes.md': '# Notes', 'shot.png': 'png bytes' })
+  const preview = (w: WS, card: number, id: string, max = 2 * 1024 * 1024) => inWorkspace(w, () => att.previewCardAttachment(w, card, id, max))
+  it("its text by card and id, whole; an image binary, a long one too large; never another card's, nor one gone", async () => {
+    const { w } = await workspace()
+    const c = await cardWith(w, { 'notes.md': '\uFEFF# Notes', 'shot.png': 'png bytes', 'long.txt': 'x'.repeat(100) })
     const list = await inWorkspace(w, () => att.cardAttachments(w, c.number))
-    const md = list.find((a) => a.name === 'notes.md')!
-    const path = await inWorkspace(w, () => att.cardAttachmentFile(w, c.number, md.id))
-    expect(path).toBe(md.path)
-    expect(await attachmentText(path)).toEqual({ kind: 'text', text: '# Notes' })
+    const id = (name: string): string => list.find((a) => a.name === name)!.id
+    expect(await preview(w, c.number, id('notes.md'))).toEqual({ kind: 'text', text: '# Notes' })
+    expect(await preview(w, c.number, id('shot.png'))).toEqual({ kind: 'binary', text: '' })
+    expect(await preview(w, c.number, id('long.txt'), 50)).toEqual({ kind: 'too-large', text: '' })
+    expect(await preview(w, c.number, id('long.txt'), 100)).toEqual({ kind: 'text', text: 'x'.repeat(100) })
     // Another card's id, an id it doesn't have: refused.
     const other = await cardWith(w, { 'x.txt': 'x' })
-    await expect(inWorkspace(w, () => att.cardAttachmentFile(w, other.number, md.id))).rejects.toThrow(/no such attachment/)
-    // A junction in its folder's place: refused, then read again once the real folder is back.
+    await expect(preview(w, other.number, id('notes.md'))).rejects.toThrow(/no such attachment/)
+    // Its file gone: refused (the viewer shows that it's gone, never reads it).
+    rmSync(list.find((a) => a.name === 'notes.md')!.path)
+    await expect(preview(w, c.number, id('notes.md'))).rejects.toThrow(/no such attachment/)
+  })
+
+  it("its card folder swapped for a junction to another file of the same name while it is read: refused, never that file's text (HR2's round 1)", async () => {
+    const { w, root } = await workspace()
+    const c = await cardWith(w, { 'notes.txt': 'the card notes' })
+    const [a] = await inWorkspace(w, () => att.cardAttachments(w, c.number))
     const level = folderOf(root, c.number)
-    const elsewhere = join(base, `elsewhere-${++n}`)
-    renameSync(level, elsewhere)
-    junction(elsewhere, level)
-    try {
-      await expect(inWorkspace(w, () => att.cardAttachmentFile(w, c.number, md.id))).rejects.toThrow(/no such attachment/)
-    } finally {
-      rmSync(level)
-      renameSync(elsewhere, level)
+    const aside = join(base, `aside-${++n}`)
+    const decoy = join(base, `decoy-${n}`)
+    mkdirSync(decoy, { recursive: true })
+    writeFileSync(join(decoy, a.file), 'unrelated outside text')
+    // After the checks before the open, before the open: the real folder moved aside, a junction to the decoy in its
+    // place, so the open follows it (Windows won't move a folder with the file open, so a swap can't come later).
+    att.attachmentReadSeams.beforeOpen = async () => {
+      att.attachmentReadSeams.beforeOpen = null
+      renameSync(level, aside)
+      junction(decoy, level)
     }
-    expect(await inWorkspace(w, () => att.cardAttachmentFile(w, c.number, md.id))).toBe(md.path)
-    // Its file gone: refused, as a missing one (the viewer shows that it's gone, never reads it).
-    rmSync(md.path)
-    await expect(inWorkspace(w, () => att.cardAttachmentFile(w, c.number, md.id))).rejects.toThrow(/no such attachment/)
+    try {
+      await expect(preview(w, c.number, a.id)).rejects.toThrow(/no such attachment/)
+      expect(att.attachmentReadSeams.beforeOpen).toBeNull()
+    } finally {
+      att.attachmentReadSeams.beforeOpen = null
+      rmSync(level)
+      renameSync(aside, level)
+    }
+    expect(await preview(w, c.number, a.id)).toEqual({ kind: 'text', text: 'the card notes' })
   })
 })

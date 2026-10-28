@@ -119,7 +119,7 @@ import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
 import { repairStages } from './workflow/stageRepair'
-import { attachableSource, attachToCard, cardAttachmentFile, cardAttachmentGroups, cardAttachments, recoverCardAttachments, removeCardAttachment, stageDrafts } from './cardAttachments'
+import { attachableSource, attachToCard, cardAttachmentGroups, cardAttachments, previewCardAttachment, recoverCardAttachments, removeCardAttachment, stageDrafts } from './cardAttachments'
 import { settleSlotsUpToDate } from './workflow/slotsUpToDateStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
 import { boardSlots, heldWriter, releaseHeldWriter } from './agentFolders'
@@ -826,7 +826,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'cards:attachments': (n) => cardAttachments(currentWorkspace(), n),
     'cards:projectAttachments': (p) => cardAttachmentGroups(currentWorkspace(), workspace.assertProject(p)),
     'cards:removeAttachment': (n, id) => removeCardAttachment(currentWorkspace(), n, String(id)),
-    'cards:readAttachment': async (n, id) => files.attachmentText(await cardAttachmentFile(currentWorkspace(), n, String(id))),
+    'cards:readAttachment': (n, id) => previewCardAttachment(currentWorkspace(), n, String(id), files.MAX_ATTACHMENT_TEXT),
     'cards:attachFromPane': async (n, host, path) => {
       const ws = currentWorkspace()
       const from = await attachableSource(ws, { kind: 'pane', host: workspace.assertSessionHost(host) }, String(path))

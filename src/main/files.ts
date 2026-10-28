@@ -505,18 +505,14 @@ export async function listAttachments(projectPath: string): Promise<SessionAttac
   return groups.sort((a, b) => b.attachments[0].name.localeCompare(a.attachments[0].name))
 }
 
-const MAX_ATTACHMENT_TEXT = 2 * 1024 * 1024
+/** The most of an attachment's text the viewer previews (a session's, or a card's: HI-1958). */
+export const MAX_ATTACHMENT_TEXT = 2 * 1024 * 1024
 
 /** A kept attachment's text for the viewer's previews (text, CSV, Markdown, code): 'binary' or 'too-large' otherwise. */
 export async function readAttachment(projectPath: string, path: string): Promise<AttachmentContent> {
   projectPath = workspace.assertSessionHost(projectPath)
   const { root, abs } = await attachmentAt(projectPath, path)
   await assertOwnAttachment(root, abs, 'file')
-  return attachmentText(abs)
-}
-
-/** A kept file's text as the viewer previews it (a session's attachment, or a card's: HI-1958), checked by its caller. */
-export async function attachmentText(abs: string): Promise<AttachmentContent> {
   if ((await stat(abs)).size > MAX_ATTACHMENT_TEXT) return { kind: 'too-large', text: '' }
   const buf = await readFile(abs)
   for (let i = 0; i < Math.min(buf.length, 8000); i++) if (buf[i] === 0) return { kind: 'binary', text: '' }
