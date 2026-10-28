@@ -256,6 +256,69 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     await show.click()
     const inView = () => olderGroup.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && el.closest('.scroll-page').scrollTop > 0 }).catch(() => false)
     check('…Show in Attachments: the filter back to All, the older card scrolled into view from below the fold, outlined', !!(await until(async () => (await selectedAttach()) === 'card' && (await page.locator('.attachment-filter', { hasText: 'All' }).getAttribute('aria-pressed')) === 'true' && (await inView()) && (await olderGroup.evaluate((el) => el.classList.contains('jumped')).catch(() => false)))), JSON.stringify([await selectedAttach(), await inView()]))
+    // --- A click opens the attachment viewer (HI-1958), a card's attachment as a pane's: arrows through the card
+    // attachments shown, Open in Its App for an image or a PDF and Show in Folder for any other kind (Darren's decision:
+    // #387, nothing attached is ever run), Remove from Card for a card's, Delete for a pane's, a file gone said in place.
+    // Open in Its App is never clicked here: it would start Windows' own viewer.
+    const viewer = page.locator('.dialog[role="dialog"]').filter({ has: page.locator('.image-viewer') })
+    const viewerTitle = () => viewer.getAttribute('aria-label', { timeout: 2000 }).then((x) => x ?? '', () => '')
+    const footer = async () => ({ open: await viewer.locator('[data-action="viewer-open"]').count(), show: await viewer.locator('[data-action="viewer-show"]').count(), remove: (await viewer.locator('[data-action="viewer-remove"]').innerText().catch(() => '')).trim(), position: (await viewer.locator('.dialog-footer .faint').first().innerText().catch(() => '')).trim() })
+    const otherGroup = section.locator(`[data-card="${other.number}"]`)
+    await page.locator('.attachment-filter', { hasText: 'All' }).click()
+    await otherGroup.locator('.thumb[data-kind="image"]').click()
+    check("a click on a card's image opens the viewer on it", !!(await until(async () => (await viewer.count()) === 1 && /session-shot\.png/.test(await viewerTitle()) && (await viewer.locator('.image-frame img').evaluate((img) => img.complete && img.naturalWidth > 0).catch(() => false)))), await viewerTitle())
+    const cardImage = await footer()
+    check('…Open in Its App for an image, Remove from Card, its place among the 9 card files', cardImage.open === 1 && cardImage.show === 0 && cardImage.remove === 'Remove from Card' && /^\d+ of 9 ·/.test(cardImage.position), JSON.stringify(cardImage))
+    for (const theme of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme } })
+      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
+      await page.screenshot({ path: path.join(shots, `cardattach-viewer-image-${theme}.png`) })
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+    // Its card's other file, the text file added after it, is the newer one: ← (newest first).
+    const startAt = cardImage.position
+    await page.keyboard.press('ArrowLeft')
+    check('← goes to the newer card attachment shown: the text file, previewed', !!(await until(async () => /notes\.txt/.test(await viewerTitle()) && /notes/.test(await viewer.locator('.attachment-frame').innerText().catch(() => '')))), await viewerTitle())
+    const cardText = await footer()
+    check('…Show in Folder for a text file, never Open in Its App', cardText.open === 0 && cardText.show === 1 && cardText.position !== startAt, JSON.stringify(cardText))
+    for (const theme of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme } })
+      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
+      await page.screenshot({ path: path.join(shots, `cardattach-viewer-text-${theme}.png`) })
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+    await page.keyboard.press('Escape')
+    check('Escape closes it', !!(await until(async () => (await viewer.count()) === 0)))
+    // The kind filter applies: on Text, the viewer goes through the text files alone.
+    await page.locator('.attachment-filter[data-kind="text"]').click()
+    await otherGroup.locator('.thumb[data-kind="text"]').click()
+    check('…with the Text filter on, it goes through the 7 text files only', !!(await until(async () => (await viewer.count()) === 1 && /^\d+ of 7 ·/.test((await footer()).position))), JSON.stringify(await footer()))
+    await page.keyboard.press('Escape')
+    await until(async () => (await viewer.count()) === 0)
+    await page.locator('.attachment-filter', { hasText: 'All' }).click()
+    // A file gone from disk (its row kept): the viewer says so in place, offers no open or show, and still removes it.
+    const notesKept = (await inv('cards:attachments', other.number)).find((a) => a.name === 'notes.txt')
+    fs.rmSync(notesKept.path)
+    await inv('tasks:update', other.number, { title: 'Session shot belongs here (its notes gone)' })
+    const goneTile = otherGroup.locator(`.thumb[data-attachment="${notesKept.id}"]`)
+    check('…its tile marked once the board is read again', !!(await until(async () => (await goneTile.locator('.codicon-warning').count()) === 1)))
+    await goneTile.click()
+    check("a click on it opens the viewer saying its file is gone, with neither Open nor Show", !!(await until(async () => (await viewer.locator('[data-missing]').innerText().catch(() => '')).includes('Its file is gone') && (await footer()).open === 0 && (await footer()).show === 0)), JSON.stringify(await footer()))
+    await page.screenshot({ path: path.join(shots, 'cardattach-viewer-missing-dark.png') })
+    await viewer.locator('[data-action="viewer-remove"]').click()
+    const ask = page.locator('.dialog[role="dialog"]').filter({ hasText: `Remove notes.txt from ${otherLabel}?` })
+    await ask.waitFor({ timeout: HUNG_MS })
+    await ask.locator('.dialog-footer button', { hasText: /^Remove$/ }).click()
+    check('Remove from Card asks, then takes it off the card; the viewer goes on to the next file shown', !!(await until(async () => (await inv('cards:attachments', other.number)).length === 1 && (await viewer.count()) === 1 && !/notes\.txt/.test(await viewerTitle()))), await viewerTitle())
+    await page.keyboard.press('Escape')
+    await until(async () => (await viewer.count()) === 0)
+    // A pane attachment's click opens the same viewer: Delete there, Open in Its App for its image.
+    await attachTab('pane').click()
+    await tile.click()
+    check("a click on a pane attachment opens the same viewer, with Delete", !!(await until(async () => (await viewer.count()) === 1 && /session-shot\.png/.test(await viewerTitle()) && (await footer()).remove === 'Delete' && (await footer()).open === 1)), JSON.stringify(await footer()))
+    await page.keyboard.press('Escape')
+    await until(async () => (await viewer.count()) === 0)
+
     // --- The Agent API: nothing is copied before the destination is allowed (HR4's HI-1700 round 1, finding 3).
     const post = async (body, bearer = token) => {
       const r = await fetch(`http://127.0.0.1:${PORT}/v1/tasks`, { method: 'POST', headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

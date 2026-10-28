@@ -505,7 +505,8 @@ export async function listAttachments(projectPath: string): Promise<SessionAttac
   return groups.sort((a, b) => b.attachments[0].name.localeCompare(a.attachments[0].name))
 }
 
-const MAX_ATTACHMENT_TEXT = 2 * 1024 * 1024
+/** The most of an attachment's text the viewer previews (a session's, or a card's: HI-1958). */
+export const MAX_ATTACHMENT_TEXT = 2 * 1024 * 1024
 
 /** A kept attachment's text for the viewer's previews (text, CSV, Markdown, code): 'binary' or 'too-large' otherwise. */
 export async function readAttachment(projectPath: string, path: string): Promise<AttachmentContent> {

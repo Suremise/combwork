@@ -482,6 +482,8 @@ export interface HiveRequests {
   /** A project's cards' attachments, by card (its Attachments tab). */
   'cards:projectAttachments': (projectPath: string) => CardAttachmentGroup[]
   'cards:removeAttachment': (n: number, id: string) => void
+  /** A card attachment's text, for the attachment viewer's preview (HI-1958): by card and id, as `attachments:read` gives a session's. */
+  'cards:readAttachment': (n: number, id: string) => AttachmentContent
   /** A session attachment of `host` (a pane's) copied to a card. */
   'cards:attachFromPane': (n: number, host: string, path: string) => CardAttachment
   /** Changes the words of one of a card's decisions, or removes it (text null): the user's (#357). */
