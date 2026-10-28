@@ -400,6 +400,6 @@
   "shell.titlebar.pin": "Immer im Vordergrund",
   "shell.titlebar.pinTip": "{on, select, yes {Immer im Vordergrund (an)} other {Immer im Vordergrund (aus)}}",
   "shell.toast.dismiss": "Schließen",
-  "shell.toast.openAgent": "{agent} in {project} anzeigen",
+  "shell.toast.openAgent": "Bereich von {agent} öffnen",
   "shell.toast.openCard": "{card} öffnen"
 }

@@ -1815,7 +1815,7 @@ With no Hive window focused, you get Windows notifications as always. Plan usage
 
 Hive's own messages (warnings, what an action did) are kept in the **Notifications** panel: the bell at the bottom of the activity bar, or **Ctrl+Alt+U**. While some are unread the bell shows a dot and turns orange; opening the panel marks them read.
 
-A notification the Hive Assistant or an agent sends you about one agent or one card (**HB4 needs an Enter in its pane**) opens it when you click it: the agent's pane, or the card. That works on the notification in the corner and on its row in the Notifications panel; hovering its text says what it opens. If the agent was removed or the card deleted since, Hive says so instead.
+A notification the Hive Assistant or an agent sends you about one agent or one card (**HB4 needs an Enter in its pane**) opens it when you click it: the agent's pane, or the card. That works on the notification in the corner and on its row in the Notifications panel. Such a notification shows a **›** after its text and highlights under the pointer, and hovering it says what it opens (*Open HB4's pane*); a plain one has neither. If the agent was removed or the card deleted since, Hive says so instead.
 
 ### When a sign-in expires <a id="when-a-sign-in-expires"></a>
 

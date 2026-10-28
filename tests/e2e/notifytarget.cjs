@@ -84,6 +84,24 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     check('an agent without its project is refused for a script', (await notify({ agent: 'HB4' })).status === 400)
     check('nothing was shown for a refused notice', (await page.locator('.toasts .toast-open').count()) === 0)
 
+    // --- A targeted notice looks clickable (the Assistant's change): a chevron, its tooltip, the pointer and a hover;
+    // a plain one stays as it was. Side by side, the targeted one hovered.
+    const plain = page.locator('.toasts .toast', { hasText: 'Build finished' }).last()
+    await shoot('toasts-side-by-side', async () => {
+      await closeToasts()
+      await api('POST', '/v1/notify', { title: 'Build finished', message: 'All 212 tests passed', level: 'success' })
+      await notify({ agent: 'HB4', project: 'alpha' })
+      await until(async () => (await plain.count()) === 1 && (await toast('agent').count()) === 1)
+      await toast('agent').locator('.toast-open').hover()
+      return page.locator('.toasts')
+    })
+    check('a plain notice has no button and no chevron', (await plain.locator('.toast-open, .toast-open-chevron').count()) === 0)
+    check('a targeted one has the chevron', (await toast('agent').locator('.toast-open-chevron').count()) === 1)
+    check("its tooltip says what it opens: Open HB4's pane", (await toast('agent').locator('.toast-open').getAttribute('title')) === "Open HB4's pane")
+    await toast('agent').locator('.toast-open').hover()
+    check('the pointer over it, and a hover background', !!(await toast('agent').locator('.toast-open').evaluate((el) => getComputedStyle(el).cursor === 'pointer' && getComputedStyle(el).backgroundColor !== 'rgba(0, 0, 0, 0)')))
+    await closeToasts()
+
     // --- An agent: the toast opens HB4's pane; its text as written.
     await shoot('toast-agent', async () => {
       await notify({ agent: 'HB4', project: 'alpha' })
@@ -109,6 +127,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     const sentCard = await notify({ card: key }, `${key} needs your OK`)
     check('the reply names the card', sentCard.body?.opens === key, JSON.stringify(sentCard))
     await until(async () => (await toast('card').count()) >= 1)
+    check('a card notice says it opens the card', (await toast('card').locator('.toast-open').getAttribute('title')) === `Open ${key}`)
     await toast('card').locator('.toast-open').click()
     check(`a click on the toast opens ${key}`, !!(await until(async () => await lib.cardDialog(page, key).isVisible())))
     await page.keyboard.press('Escape')

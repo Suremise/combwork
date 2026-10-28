@@ -1604,8 +1604,8 @@
     "description": "Button on a notice in the corner: closes it."
   },
   "shell.toast.openAgent": {
-    "defaultMessage": "Show {agent} in {project}",
-    "description": "Tooltip on a notification an agent or the Assistant sent about an agent (HI-1961): clicking it shows that agent's pane. {agent} and {project} are names."
+    "defaultMessage": "Open {agent}'s pane",
+    "description": "Tooltip on a notification an agent or the Assistant sent about an agent (HI-1961): clicking it shows that agent's pane (where its terminal is). {agent} is the agent's name."
   },
   "shell.toast.openCard": {
     "defaultMessage": "Open {card}",

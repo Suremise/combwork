@@ -401,6 +401,6 @@
   "shell.titlebar.pin": "Always on Top",
   "shell.titlebar.pinTip": "{on, select, yes {Always on Top (on)} other {Always on Top (off)}}",
   "shell.toast.dismiss": "Dismiss",
-  "shell.toast.openAgent": "Show {agent} in {project}",
+  "shell.toast.openAgent": "Open {agent}'s pane",
   "shell.toast.openCard": "Open {card}"
 }

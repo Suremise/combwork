@@ -433,13 +433,13 @@ export function CommandPalette() {
 }
 
 const TARGET = {
-  agent: msg({ id: 'shell.toast.openAgent', defaultMessage: 'Show {agent} in {project}', description: "Tooltip on a notification an agent or the Assistant sent about an agent (HI-1961): clicking it shows that agent's pane. {agent} and {project} are names." }),
+  agent: msg({ id: 'shell.toast.openAgent', defaultMessage: "Open {agent}'s pane", description: "Tooltip on a notification an agent or the Assistant sent about an agent (HI-1961): clicking it shows that agent's pane (where its terminal is). {agent} is the agent's name." }),
   card: msg({ id: 'shell.toast.openCard', defaultMessage: 'Open {card}', description: 'Tooltip on a notification an agent or the Assistant sent about a card (HI-1961): clicking it opens the card ({card}, its key, e.g. HI-12).' })
 }
 
 /**
  * A notice's title and message, and what goes under them. With a target (HI-1961), a button that opens it (after
- * `onOpen`), its text as written; the buttons under it (its actions) are beside it, never inside.
+ * `onOpen`), its text as written and a chevron after it; the buttons under it (its actions) are beside it, never inside.
  */
 function ToastText({ t, onOpen, children }: { t: ToastMessage; onOpen: () => void; children?: ReactNode }) {
   const text = (
@@ -450,7 +450,7 @@ function ToastText({ t, onOpen, children }: { t: ToastMessage; onOpen: () => voi
   )
   const target = t.target
   if (!target) return <div className="toast-text">{text}{children}</div>
-  const tip = target.kind === 'agent' ? tr(TARGET.agent, { agent: target.name, project: target.project }) : tr(TARGET.card, { card: target.label })
+  const tip = target.kind === 'agent' ? tr(TARGET.agent, { agent: target.name }) : tr(TARGET.card, { card: target.label })
   return (
     <div className="toast-text">
       <button
@@ -463,7 +463,9 @@ function ToastText({ t, onOpen, children }: { t: ToastMessage; onOpen: () => voi
           openNoticeTarget(target)
         }}
       >
-        {text}
+        <div className="toast-open-text">{text}</div>
+        {/* It opens something, which a plain notice doesn't: the chevron says so (with the pointer and the hover). */}
+        <Icon name="chevron-right" className="toast-open-chevron" />
       </button>
       {children}
     </div>

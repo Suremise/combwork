@@ -400,6 +400,6 @@
   "shell.titlebar.pin": "常に手前に表示",
   "shell.titlebar.pinTip": "{on, select, yes {常に手前に表示（オン）} other {常に手前に表示（オフ）}}",
   "shell.toast.dismiss": "閉じる",
-  "shell.toast.openAgent": "{project}の{agent}を表示",
+  "shell.toast.openAgent": "{agent}のペインを開く",
   "shell.toast.openCard": "{card}を開く"
 }

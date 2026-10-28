@@ -402,6 +402,6 @@ interface HiveMessageValues {
   'shell.titlebar.pin': undefined
   'shell.titlebar.pinTip': { on: string }
   'shell.toast.dismiss': undefined
-  'shell.toast.openAgent': { agent: string | number; project: string | number }
+  'shell.toast.openAgent': { agent: string | number }
   'shell.toast.openCard': { card: string | number }
 }

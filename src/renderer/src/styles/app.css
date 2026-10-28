@@ -3679,24 +3679,39 @@ p.hint {
   font-size: 11px;
   margin-top: 2px;
 }
-/* A notice that opens what it is about (HI-1961): its text is a button that looks like the text. */
+/* A notice that opens what it is about (HI-1961): its text is a button, with a chevron, the pointer and a hover. */
 .toast-open {
-  display: block;
-  width: 100%;
-  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% + 8px);
+  margin: -4px;
+  padding: 4px;
   border: 0;
+  border-radius: 4px;
   background: none;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
-.toast-open:hover .toast-title {
-  text-decoration: underline;
+.toast-open:hover {
+  /* Over the toast's own background in either theme (--bg-hover is darker than a dark toast). */
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+}
+.toast-open-text {
+  flex: 1;
+  min-width: 0;
+}
+.toast-open-chevron {
+  flex: none;
+  color: var(--fg-muted);
+}
+.toast-open:hover .toast-open-chevron {
+  color: var(--fg-strong);
 }
 .toast-open:focus-visible {
   outline-offset: 2px;
-  border-radius: 3px;
 }
 
 /* ---------- Welcome ---------- */

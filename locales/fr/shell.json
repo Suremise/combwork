@@ -400,6 +400,6 @@
   "shell.titlebar.pin": "Toujours au premier plan",
   "shell.titlebar.pinTip": "{on, select, yes {Toujours au premier plan (activé)} other {Toujours au premier plan (désactivé)}}",
   "shell.toast.dismiss": "Fermer",
-  "shell.toast.openAgent": "Afficher {agent} dans {project}",
+  "shell.toast.openAgent": "Ouvrir le volet de {agent}",
   "shell.toast.openCard": "Ouvrir {card}"
 }

@@ -400,6 +400,6 @@
   "shell.titlebar.pin": "Sempre visível",
   "shell.titlebar.pinTip": "{on, select, yes {Sempre visível (ativado)} other {Sempre visível (desativado)}}",
   "shell.toast.dismiss": "Dispensar",
-  "shell.toast.openAgent": "Mostrar {agent} em {project}",
+  "shell.toast.openAgent": "Abrir o painel de {agent}",
   "shell.toast.openCard": "Abrir {card}"
 }

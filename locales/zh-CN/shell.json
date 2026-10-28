@@ -400,6 +400,6 @@
   "shell.titlebar.pin": "窗口置顶",
   "shell.titlebar.pinTip": "{on, select, yes {窗口置顶（开）} other {窗口置顶（关）}}",
   "shell.toast.dismiss": "关闭",
-  "shell.toast.openAgent": "显示 {project} 中的 {agent}",
+  "shell.toast.openAgent": "打开 {agent} 的窗格",
   "shell.toast.openCard": "打开 {card}"
 }

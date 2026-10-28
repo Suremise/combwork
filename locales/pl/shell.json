@@ -400,6 +400,6 @@
   "shell.titlebar.pin": "Zawsze na wierzchu",
   "shell.titlebar.pinTip": "{on, select, yes {Zawsze na wierzchu (wł.)} other {Zawsze na wierzchu (wył.)}}",
   "shell.toast.dismiss": "Odrzuć",
-  "shell.toast.openAgent": "Pokaż agenta {agent} w projekcie {project}",
+  "shell.toast.openAgent": "Otwórz panel agenta {agent}",
   "shell.toast.openCard": "Otwórz kartę {card}"
 }
