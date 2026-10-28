@@ -88,6 +88,17 @@ const check = (name, ok, extra = '') => {
     await themed('tilesview-paged')
     await lib.fitWindow(app, page, { width: 1500, height: 900 })
     check('…the window back at 1500×900: one page of 13 again', !!(await lib.until(async () => (await pager.count()) === 0 && (await tileNames()).length === 13, HUNG_MS)), (await tileNames()).join())
+    // Resized while a focus view is open (HR1's HI-1951 round 1): Back to Tiles shows the page with its agent, worked out
+    // at the new size, the keyboard on its tile; resized again in the grid, it keeps them.
+    const tileOf = (name) => page.locator('.agent-tile', { has: page.locator('.tile-name', { hasText: new RegExp(`^${name}$`) }) })
+    const keyboardTile = () => page.evaluate(() => document.activeElement?.closest?.('.agent-tile')?.querySelector('.tile-name')?.textContent ?? null)
+    await tileOf('M').click()
+    check("M's focus view (all 13 on one page)", !!(await lib.until(async () => (await page.locator('.tile-grid').count()) === 0 && (await page.locator('.tile-strip-back').count()) === 1, HUNG_MS)))
+    await lib.fitWindow(app, page, { width: 1100, height: 650 })
+    await page.locator('.tile-strip-back').click()
+    check('…the window made 1100×650, then Back to Tiles: page 3 with M, the keyboard on M', !!(await lib.until(async () => (await tileNames()).join() === 'M' && (await pageButtons()) === '1 2 3*' && (await keyboardTile()) === 'M', HUNG_MS)), JSON.stringify({ tiles: await tileNames(), pages: await pageButtons().catch(() => ''), on: await keyboardTile() }))
+    await lib.fitWindow(app, page, { width: 1500, height: 900 })
+    check('…back at 1500×900: one page of 13, M still with the keyboard', !!(await lib.until(async () => (await pager.count()) === 0 && (await tileNames()).length === 13 && (await keyboardTile()) === 'M', HUNG_MS)), JSON.stringify({ tiles: await tileNames(), on: await keyboardTile() }))
     /**
      * The Tiles area made the size of `cols` columns × `rows` rows of tiles (a smaller window's, as the page measures it:
      * its columns of at least 230 px and its height over a tile's), by a style of its own so it holds while the grid is
@@ -107,8 +118,11 @@ const check = (name, ok, extra = '') => {
         const style = Object.assign(document.createElement('style'), { id: 'tiles-fit-test', textContent: `.agent-tiles { right: auto !important; bottom: auto !important; width: ${width}px !important; height: ${height}px !important; }` })
         document.head.append(style)
       }, [cols, rows])
-    // A smaller area, room for 12 (4 × 3): the page holds 12, so two pages, as the rest of the suite has them.
+    // A smaller area, room for 12 (4 × 3): the page holds 12, so two pages, as the rest of the suite has them. M, which
+    // has the keyboard, keeps its page (2) as it shrinks; the suite goes on from page 1.
     await fitTiles(4, 3)
+    await lib.until(async () => (await pager.count()) === 1, HUNG_MS)
+    await page.locator('.session-toolbar .tile-pages button').nth(0).click()
     check('a smaller Tiles area that holds 12: 12 tiles on page 1, in the panes order', !!(await lib.until(async () => (await tileNames()).join() === NAMES.slice(0, 12).join(), HUNG_MS)), (await tileNames()).join())
     check('…all on screen, no scrolling', await page.locator('.agent-tiles').evaluate((el) => el.scrollHeight <= el.clientHeight))
     check('…no terminal drawn for them (none on screen)', (await page.locator('.terminal-host:not(.hidden)').count()) === 0)

@@ -438,6 +438,11 @@ interface State {
   /** Per project: how many tiles fit its Tiles view's area, as last measured (HI-1951); none: TILES_PER_PAGE. */
   tilesFit: Record<string, number>
   /**
+   * Per project: the agent the focus view just went back from (HI-1951, HR1's round 1), until the grid drawn again has
+   * measured its page: the window may have been resized meanwhile, so its page is worked out again with it in view.
+   */
+  tileReturn: Record<string, string>
+  /**
    * Per project: whose folder the Changes and Files tabs show (a worktree agent's id; anything else = the project
    * folder). Changes also takes an unused worktree (#400): `unused:<its folder>`, or `unused` for the list of them all.
    */
@@ -658,6 +663,7 @@ export const useStore = create<State>(() => ({
   tileFocus: {},
   tilePage: {},
   tilesFit: {},
+  tileReturn: {},
   changesRoot: {},
   vcSection: {},
   workflowPrefill: null,
@@ -981,9 +987,24 @@ export function closeTile(p: ProjectInfo): string | null {
   set((s) => {
     const { [p.path]: _, ...rest } = s.tileFocus
     const at = id ? tileAgents(p, s).findIndex((t) => t.a.id === id) : -1
-    return { tileFocus: rest, ...(at >= 0 ? { tilePage: { ...s.tilePage, [p.path]: tilePageOf(at, tilesPageSize(p, s)) } } : {}) }
+    return { tileFocus: rest, ...(at >= 0 ? { tilePage: { ...s.tilePage, [p.path]: tilePageOf(at, tilesPageSize(p, s)) }, tileReturn: { ...s.tileReturn, [p.path]: id! } } : {}) }
   })
   return id
+}
+
+/** The agent a project's focus view went back from, while its grid hasn't measured its page since (null: none). */
+export function tileReturnOf(p: Pick<ProjectInfo, 'path' | 'agents'>, s: Pick<State, 'tileReturn'> = get()): string | null {
+  const id = s.tileReturn[p.path]
+  return id && p.agents.some((a) => a.id === id) ? id : null
+}
+
+/** The grid has measured with the returning agent in view: its page is the grid's own again. */
+export function clearTileReturn(p: Pick<ProjectInfo, 'path'>): void {
+  if (!get().tileReturn[p.path]) return
+  set((s) => {
+    const { [p.path]: _, ...rest } = s.tileReturn
+    return { tileReturn: rest }
+  })
 }
 
 /**

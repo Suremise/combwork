@@ -11,7 +11,7 @@ import { isUrgent, tilePageCount, tilePageOf, tilesOnPage, tilesThatFit, urgentB
 import { fmt, msg, tr } from '@shared/i18n'
 import type { AgentInfo, ProjectInfo, ProgressRun } from '@shared/types'
 import { formatSize } from '@shared/units'
-import { agentProviderOf, closeTile, openTile, projectKey, setTilesFit, showTilePage, tileAgents, tileFocusOf, tilePage, tilesPageSize, useLanguage, useStore } from '../store'
+import { agentProviderOf, clearTileReturn, closeTile, openTile, projectKey, setTilesFit, showTilePage, tileAgents, tileFocusOf, tilePage, tileReturnOf, tilesPageSize, useLanguage, useStore } from '../store'
 import * as actions from '../actions'
 import { commandKeybinding, keyIsBound } from '../commands'
 import { deferredFocus } from '../deferredFocus'
@@ -133,10 +133,12 @@ function TileGrid({ project }: { project: ProjectInfo }) {
     })
   }, [movable, project])
   // The tile that holds the grid's one tab stop: the last one the keyboard was on, while it is on this page.
-  const [current, setCurrent] = useState<string | null>(null)
+  // Back from the focus view, the agent it showed (HI-1951, HR1's round 1), whatever the first tile of its page.
+  const [current, setCurrent] = useState<string | null>(() => tileReturnOf(project))
   const stop = shown.some((t) => t.a.id === current) ? current : (shown[0]?.a.id ?? null)
   // How many tiles fit the area (HI-1951): measured as it resizes (and as its tiles are first drawn), the page keeping the
-  // tile the keyboard is on, else the first shown. Columns are the grid's tracks; rows, its height over a tile's.
+  // agent the focus view just went back from (the window may have been resized while it was open), else the tile the
+  // keyboard is on, else the tab stop. Columns are the grid's tracks; rows, its height over a tile's.
   const keep = useRef<{ project: ProjectInfo; tile: string | null }>({ project, tile: stop })
   keep.current = { project, tile: stop }
   const hasAgents = project.agents.length > 0
@@ -151,8 +153,11 @@ function TileGrid({ project }: { project: ProjectInfo }) {
       const tileHeight = g.querySelector<HTMLElement>('.agent-tile')?.offsetHeight ?? 0
       const fit = tilesThatFit({ columns, height: box.clientHeight - pad, tileHeight, gap: parseFloat(css.rowGap) || 0 })
       if (fit === null) return
+      const p = keep.current.project
+      const returning = tileReturnOf(p)
       const at = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('.agent-tile')?.dataset.agent
-      setTilesFit(keep.current.project, fit, at && g.contains(document.activeElement) ? at : keep.current.tile)
+      setTilesFit(p, fit, returning ?? (at && g.contains(document.activeElement) ? at : keep.current.tile))
+      if (returning) clearTileReturn(p)
     }
     const seen = new ResizeObserver(measure)
     seen.observe(box)
