@@ -155,20 +155,19 @@ export function queueEstimate(v: QueueView, runs: readonly ProgressRun[]): numbe
 }
 
 /**
- * The Hive run of a returned entry's failed check (its log is Show log's, #1349): the card's newest failed Hive run in
- * the project that ended by the return. Null for a return no check made (a conflict, a hook) or a run not kept.
+ * The Hive run of a returned entry's failed check (its log is Show log's, #1349): the card's Hive run in the project
+ * whose log the outcome recorded, never another attempt's found by time (HI-1924, HR1's round 1). Null for a return no
+ * check made (a conflict, a hook), an outcome that kept no log, or a run not kept.
  */
 export function returnRun(v: QueueView, r: QueueRecent, runs: readonly ProgressRun[]): ProgressRun | null {
-  if (r.reason !== 'checks') return null
+  if (r.reason !== 'checks' || !r.logPath) return null
   const project = v.projectPath.toLowerCase()
-  const by = at(r.at) + 5_000
-  let out: ProgressRun | null = null
-  for (const x of runs) {
-    if (x.source !== 'hive' || x.card !== r.card || x.state !== 'failed' || x.projectPath?.toLowerCase() !== project || x.finishedAt === null || x.finishedAt > by) continue
-    if (!out || x.finishedAt > out.finishedAt!) out = x
-  }
-  return out
+  const log = r.logPath.toLowerCase()
+  return runs.find((x) => x.source === 'hive' && x.card === r.card && x.projectPath?.toLowerCase() === project && x.logPath?.toLowerCase() === log) ?? null
 }
+
+/** The check a return names: the one its outcome recorded, else its run's (null: none known). */
+export const returnCheck = (r: QueueRecent, run: ProgressRun | null): string | null => r.check ?? (run ? runCheckName(run) : null)
 
 /** A Hive run's check as its title names it ("HI-12 · unit · a3f2c1d": unit), or its counted check's name. */
 export function runCheckName(r: ProgressRun): string {

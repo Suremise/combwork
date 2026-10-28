@@ -4680,6 +4680,10 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   under the project's first queue: what merges now first, history after), its latest outcomes (merged with the merge commit, which copies;
   returned with `returnWhy`; taken out with its reason) and pauses (why in a few words, the sentence as its tooltip; how
   long it lasted, or still paused), newest first, at most 20, then *More in Version Control* when there may be more.
+  A return names the check its own outcome recorded (`IntegrationFailed.check`, carried as `QueueRecent.check`), and
+  its run (Show log's, and the check's name when the outcome has none) is the one with the log that outcome recorded
+  (`logPath`), never another attempt's red run found by time; the queue's card, the card's Work section and the
+  Version Control history read it the same way.
   A row has the card's key and title, its time (how long ago on hover) and how long the queue took over the entry: from
   the start of its first merge check (the queue's `CheckRan` names its `entry`) to the outcome, else from its
   `IntegrationStarted` (no merge checks), else none (it ended before anything ran; old facts without `entry` count the

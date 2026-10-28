@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { fmt, msg, tr } from '@shared/i18n'
 import { formatDateTime } from '@shared/dates'
-import { pauseText, returnRun, returnWhy, runCheckName, stepText } from '@shared/progressQueue'
+import { pauseText, returnCheck, returnRun, returnWhy, stepText } from '@shared/progressQueue'
 import { QUEUE_ADVANCE_GATE } from '@shared/workflow/facts'
 import type { QueueRecent, QueueStuck, QueueView } from '@shared/workflow/queue'
 import type { WorkView } from '@shared/workflow/workView'
@@ -191,7 +191,7 @@ function Returned({ card, q, queue, short, runs, stage, retried }: { card: TaskC
   const [all, setAll] = useState(false)
   const recent: QueueRecent = { card: card.number, key: card.key ?? '', title: card.title, entry: q.entry, outcome: 'returned', at: q.at ?? '', ...(q.failure ? { reason: q.failure } : {}), ...(q.transient ? { transient: true } : {}), ...(q.files ? { files: q.files } : {}) }
   const run = queue ? returnRun(queue, recent, runs) : null
-  const why = returnWhy(recent, run ? runCheckName(run) : null, q.target, tr, list)
+  const why = returnWhy(recent, returnCheck(recent, run), q.target, tr, list)
   const lines = (q.log ?? '').replace(/\s+$/, '').split(/\r?\n/)
   const tail = lines.slice(-TAIL_LINES)
   return (

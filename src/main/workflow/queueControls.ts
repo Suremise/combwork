@@ -222,7 +222,7 @@ function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, card
     // A target that moved is tested again (a new entry), never returned.
     if (d.target !== target || !entries.has(d.entry) || d.reason === 'targetMoved') continue
     const at = seen.get(d.entry)
-    out.push({ ...named(f), entry: d.entry, outcome: 'returned', revision: d.revision, reason: d.reason, transient: d.transient, ...(d.files?.length ? { files: d.files } : {}), ...(d.log ? { log: d.log } : {}), ...(at ? { seen: at } : {}) })
+    out.push({ ...named(f), entry: d.entry, outcome: 'returned', revision: d.revision, reason: d.reason, transient: d.transient, ...(d.files?.length ? { files: d.files } : {}), ...(d.check ? { check: d.check } : {}), ...(d.logPath ? { logPath: d.logPath } : {}), ...(d.log ? { log: d.log } : {}), ...(at ? { seen: at } : {}) })
   }
   for (const f of wf.store.factsOfKind('IntegrationCancelled')) {
     const d = f.data as FactData['IntegrationCancelled']

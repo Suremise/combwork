@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { shortRevision } from '@shared/progress'
-import { historyOutcome, historyRows, justMerged, mergedText, pauseText, pauseWhyShort, pulseLine, pushStateText, queueEstimate, queueNews, queuedText, returnedText, returnRun, returnWhy, runCheckName, shownReturns, testingText, type HistoryRow } from '@shared/progressQueue'
+import { historyOutcome, historyRows, justMerged, mergedText, pauseText, pauseWhyShort, pulseLine, pushStateText, queueEstimate, queueNews, queuedText, returnCheck, returnedText, returnRun, returnWhy, shownReturns, testingText, type HistoryRow } from '@shared/progressQueue'
 import type { MergeSlotInfo, ProgressRun } from '@shared/types'
 import type { QueuePauseLogged, QueueRecent, QueueView } from '@shared/workflow/queue'
 import { fmt, msg, tr } from '@shared/i18n'
@@ -34,7 +34,7 @@ function builderOf(s: StoreState, card: number, projectPath: string): string | n
 /** Why a return happened, in the window's words (the check's name from its run, when there is one). */
 export function returnWhyText(v: QueueView, r: QueueRecent, runs: readonly ProgressRun[]): string {
   const run = returnRun(v, r, runs)
-  return returnWhy(r, run ? runCheckName(run) : null, v.target, tr, list)
+  return returnWhy(r, returnCheck(r, run), v.target, tr, list)
 }
 
 const openCard = (n: number): void => set({ taskOpen: n })
@@ -162,7 +162,7 @@ function ReturnRow({ view: v, r, runs }: { view: QueueView; r: QueueRecent; runs
   const [log, setLog] = useState(false)
   const builder = useStore((s) => builderOf(s, r.card, v.projectPath))
   const run = returnRun(v, r, runs)
-  const why = returnWhy(r, run ? runCheckName(run) : null, v.target, tr, list)
+  const why = returnWhy(r, returnCheck(r, run), v.target, tr, list)
   const showLog = (): void => {
     if (run?.logPath) void attempt(tr(msg({ id: 'board.queue.showLogFailed', defaultMessage: "Couldn't open the log", description: "An error's title: Show log on a merge queue's returned card failed (Progress panel)." })), () => call('progress:openLog', run.id))
     else setLog(!log)

@@ -104,9 +104,9 @@ async function approved(w: WS, wt: string, file = 'b.txt'): Promise<number> {
 }
 
 /** One run of the project's queue for main here, with its merge check passing or red. */
-async function drain(w: WS, repo: string, ok: boolean) {
+async function drain(w: WS, repo: string, ok: boolean, logPath?: string) {
   const wf = (await service.workflowFor(w, repo))!
-  return new MergeQueue(wf, { folder: join(repo, '..', 'queue'), runCheck: async () => ({ ok, output: ok ? '' : 'red: the check failed' }) }).drain('main')
+  return new MergeQueue(wf, { folder: join(repo, '..', 'queue'), runCheck: async () => ({ ok, output: ok ? '' : 'red: the check failed', ...(logPath ? { logPath } : {}) }) }).drain('main')
 }
 
 /** The error a change throws (its kind, or its refusal's rule), or null when it went through. */
@@ -147,15 +147,21 @@ describe("a card's Remove from queue and Retry merge (#1353, OP-9)", () => {
     const card = await approved(w, wt)
     const [v0] = await inWorkspace(w, () => queueViews(w, repo))
     expect(v0).toMatchObject({ project: 'p', target: 'main', paused: null, testing: null, queued: [{ card, revision: git(wt, 'rev-parse', 'HEAD') }] })
-    expect(await drain(w, repo, false)).toMatchObject([{ outcome: 'returned', reason: 'checks', transient: false }])
+    expect(await drain(w, repo, false, join(repo, '..', 'e1-quick.log'))).toMatchObject([{ outcome: 'returned', reason: 'checks', transient: false }])
     const [v1] = await inWorkspace(w, () => queueViews(w, repo, 'main'))
-    expect(v1.recent[0]).toMatchObject({ card, outcome: 'returned', reason: 'checks', transient: false, log: expect.stringContaining('red: the check failed') })
+    expect(v1.recent[0]).toMatchObject({ card, outcome: 'returned', reason: 'checks', transient: false, check: 'quick', logPath: join(repo, '..', 'e1-quick.log'), log: expect.stringContaining('red: the check failed') })
     // The builder can't requeue a red check (it needs a new revision); the user's Retry merge can, once.
     expect(await refusedWith(inWorkspace(w, () => queueCardChange(w, card, builder, 'retryMerge', 'again')))).toBe('forbidden')
     const r = await inWorkspace(w, () => queueCardChange(w, card, user, 'retryMerge', 'flaky, known'))
     expect(r.done).toMatchObject({ from: 'active', to: 'merging' })
     expect(facts(w, card).filter((f) => f.kind === 'IntegrationRequested').at(-1)?.data).toMatchObject({ requeue: 'retry' })
-    expect(await drain(w, repo, false)).toMatchObject([{ outcome: 'returned' }])
+    expect(await drain(w, repo, false, join(repo, '..', 'e2-quick.log'))).toMatchObject([{ outcome: 'returned' }])
+    // Each return keeps its own attempt's check and log (HI-1924, HR1's round 1): the retry's never stands in for the first's.
+    const [v2] = await inWorkspace(w, () => queueViews(w, repo, 'main'))
+    expect(v2.recent.slice(0, 2).map((x) => [x.check, x.logPath])).toEqual([
+      ['quick', join(repo, '..', 'e2-quick.log')],
+      ['quick', join(repo, '..', 'e1-quick.log')]
+    ])
     expect(await refusedWith(inWorkspace(w, () => queueCardChange(w, card, user, 'retryMerge', 'once more')))).toBe('move.notFromHere')
   })
 })

@@ -57,6 +57,10 @@ export interface QueueRecent {
   transient?: boolean
   /** returned: the files a conflict named. */
   files?: string[]
+  /** returned by a red check: the check that failed (`install` for the install before them), as its outcome recorded it. */
+  check?: string
+  /** returned by a red check: its run's log (the window's model only: Show log's run is the one with this log). */
+  logPath?: string
   /** returned: its output (the window's model only; the Agent API says whether there is one). */
   log?: string
   /** returned: when the user saw it (ISO; #1356, the window's model only): until then it shows on its queue's card. */
@@ -188,7 +192,7 @@ export interface QueueView {
  */
 export type QueuePublic = Omit<QueueView, 'projectPath' | 'recent' | 'returns' | 'returnsMore' | 'paused' | 'hiveMerges' | 'inFlight' | 'pauses'> & {
   paused: (Omit<QueuePauseInfo, 'stuck' | 'message'> & { stuck?: Omit<QueueStuck, 'folder'> }) | null
-  recent: (Omit<QueueRecent, 'log' | 'seen' | 'revision' | 'tookMs' | 'push'> & { hasLog?: true })[]
+  recent: (Omit<QueueRecent, 'log' | 'seen' | 'revision' | 'tookMs' | 'push' | 'logPath'> & { hasLog?: true })[]
 }
 
 /** How many outcomes a queue's model keeps for the panel. */

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { fmt, setLanguage, tr } from '../src/shared/i18n'
-import { ESTIMATE_OF, HISTORY_SHOWN, JUST_MERGED_MS, historyOutcome, historyRows, pauseWhyShort, pushStateText, RETURN_SEEN_SHOWN_MS, justMerged, keptLive, nextFold, queueKey, withKept, type KeptReturn, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnedText, returnRun, returnWhy, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
+import { ESTIMATE_OF, HISTORY_SHOWN, JUST_MERGED_MS, historyOutcome, historyRows, pauseWhyShort, pushStateText, RETURN_SEEN_SHOWN_MS, justMerged, keptLive, nextFold, queueKey, withKept, type KeptReturn, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnCheck, returnedText, returnRun, returnWhy, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
 import { copiesRunsKey, HIVE_RUNS, NO_RUNS_FILTER, runAgentKey, runMatches, runThing, slotRunsKey, tabBadges } from '../src/shared/progressTabs'
 import type { ProgressRun } from '../src/shared/types'
 import { RECENT_MAX, type QueuePauseLogged, type QueueRecent, type QueueView } from '../src/shared/workflow/queue'
@@ -174,15 +174,34 @@ describe('returns on a queue card', () => {
     expect(returnedText(recent({ key: 'HI-108' }), 'conflict', null, tr)).toBe('HI-108 returned: conflict')
   })
 
-  it("a red check's run is the card's newest failed Hive run in the project by the return (its log is Show log's)", () => {
-    const r = recent({ outcome: 'returned', reason: 'checks', at: iso(NOW) })
+  it("a red check's run is the card's Hive run in the project with the log its outcome recorded (Show log's)", () => {
+    const r = recent({ outcome: 'returned', reason: 'checks', at: iso(NOW), check: 'unit', logPath: 'D:\\logs\\x.log' })
     const v = view({ recent: [r] })
-    const red = run({ state: 'failed', finishedAt: NOW - 1_000, logPath: 'x.log', title: 'HI-61 · unit · 9e1f0aa' })
-    const runs = [run({ state: 'failed', finishedAt: NOW - 50_000 }), red, run({ state: 'failed', finishedAt: NOW + 60_000 }), run({ state: 'failed', finishedAt: NOW - 500, projectPath: 'D:\\ws\\beta' }), run({ state: 'failed', finishedAt: NOW - 500, source: 'agent', agentId: 'b1' })]
+    const red = run({ state: 'failed', finishedAt: NOW - 1_000, logPath: 'd:\\logs\\X.log', title: 'HI-61 · unit · 9e1f0aa' })
+    const runs = [run({ state: 'failed', finishedAt: NOW - 50_000 }), red, run({ state: 'failed', finishedAt: NOW + 60_000 }), run({ state: 'failed', finishedAt: NOW - 500, projectPath: 'D:\\ws\\beta', logPath: 'D:\\logs\\x.log' }), run({ state: 'failed', finishedAt: NOW - 500, source: 'agent', agentId: 'b1', logPath: 'D:\\logs\\x.log' })]
     expect(returnRun(v, r, runs)?.id).toBe(red.id)
     expect(runCheckName(red)).toBe('unit')
     expect(runCheckName(run({ counts: { name: 'lint', counted: true } }))).toBe('lint')
     expect(returnRun(v, recent({ outcome: 'returned', reason: 'conflict' }), runs)).toBeNull()
+  })
+
+  it("a return names its own attempt's check (HI-1924, HR1's round 1): a retry's later red check, or another target's, never stands in; kept with no run", () => {
+    setLanguage('en', {})
+    const unit = recent({ entry: 'HI-61/e1', outcome: 'returned', reason: 'checks', at: iso(NOW), check: 'unit', logPath: 'D:\\logs\\e1-unit.log' })
+    const lint = recent({ entry: 'HI-61/e2', outcome: 'returned', reason: 'checks', at: iso(NOW + 1_000), check: 'lint', logPath: 'D:\\logs\\e2-lint.log' })
+    const v = view({ recent: [lint, unit] })
+    // The retry's red lint run ended just after the first return, as another target's would.
+    const runs = [run({ state: 'failed', finishedAt: NOW - 2_000, logPath: 'D:\\logs\\e1-unit.log', title: 'HI-61 · unit · 9e1f0aa' }), run({ state: 'failed', finishedAt: NOW + 1_000, logPath: 'D:\\logs\\e2-lint.log', title: 'HI-61 · lint · 9e1f0aa' })]
+    expect(returnRun(v, unit, runs)?.logPath).toBe('D:\\logs\\e1-unit.log')
+    expect(returnWhy(unit, returnCheck(unit, returnRun(v, unit, runs)), 'main', tr, list)).toBe('checks failed: unit')
+    expect(returnWhy(lint, returnCheck(lint, returnRun(v, lint, runs)), 'main', tr, list)).toBe('checks failed: lint')
+    // Its runs gone (Hive keeps a run for a while): the outcome's own check still says which.
+    expect(returnRun(v, unit, [])).toBeNull()
+    expect(returnWhy(unit, returnCheck(unit, null), 'main', tr, list)).toBe('checks failed: unit')
+    // An outcome that kept no log never takes another run by its time.
+    const bare = recent({ outcome: 'returned', reason: 'checks', at: iso(NOW) })
+    expect(returnRun(v, bare, runs)).toBeNull()
+    expect(returnWhy(bare, returnCheck(bare, null), 'main', tr, list)).toBe('checks failed')
   })
 })
 
