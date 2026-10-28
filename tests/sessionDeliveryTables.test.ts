@@ -19,9 +19,13 @@ const base = tempDir('hive-store-tables-')
 let n = 0
 type Rec = Record<string, unknown>
 
-/** A database (in memory) with the sessions and deliveries tables, and store_meta as 0.9's step 2 makes it. */
-function tables(): DatabaseSync {
-  const db = new DatabaseSync(':memory:')
+/**
+ * A database (in memory, or with `file` in that file, in WAL mode as Hive opens its own) with the sessions and deliveries
+ * tables, and store_meta as 0.9's step 2 makes it.
+ */
+function tables(file?: string): DatabaseSync {
+  const db = new DatabaseSync(file ?? ':memory:')
+  if (file) db.exec('PRAGMA journal_mode = WAL')
   db.exec('PRAGMA foreign_keys = ON')
   for (const sql of V1_0_STEPS.find((s) => s.name === 'sessions and deliveries in tables')!.ddl) db.exec(sql)
   db.exec('CREATE TABLE store_meta (store TEXT NOT NULL, scope TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (store, scope, key)) STRICT, WITHOUT ROWID')
@@ -206,6 +210,69 @@ describe("a host's records in the tables (storeTables.ts)", () => {
     expect(plan(QUERIES['sessions.byCard'].sql, 5, 'p1')).toMatch(/USING (COVERING )?INDEX session_cards_card/)
     expect(plan(QUERIES['sessions.byIds'].sql, 'p1', '["z1"]')).toMatch(/USING PRIMARY KEY/)
     expect(plan(QUERIES['sessions.cardsOf'].sql, 'p1', '["z1"]')).toMatch(/USING PRIMARY KEY/)
+  })
+
+  it("an agent's records as new as each other: in the host's order, as a stable sort of every record gives them (HR5's round 1)", () => {
+    const db = tables()
+    // Saved z, a, m, all at the same time: by id another order.
+    db.exec('BEGIN')
+    writeSessionRecords(db, 'p1', { sessions: [fullSession('z'), fullSession('a'), fullSession('m', { lastActiveAt: '2026-10-21T00:00:00.000Z' }), fullSession('b')] })
+    db.exec('COMMIT')
+    const all = readSessionRecords(db, 'p1') as { lastActiveAt: string }[]
+    expect(readAgentSessionRecords(db, 'p1', 'a1')).toEqual([...all].sort((x, y) => y.lastActiveAt.localeCompare(x.lastActiveAt)))
+    expect(readAgentSessionRecords(db, 'p1', 'a1').map((r) => r.id)).toEqual(['m', 'z', 'a', 'b'])
+  })
+
+  it("another connection committing between an index's read and its records' (HR5's round 1): what is read is of one commit", () => {
+    // Its index's query on `db`, and right after it, `write` on another connection.
+    const between = (db: DatabaseSync, sql: string, write: () => void): DatabaseSync =>
+      new Proxy(db, {
+        get(target, key) {
+          if (key !== 'prepare') {
+            const v = Reflect.get(target, key, target)
+            return typeof v === 'function' ? v.bind(target) : v
+          }
+          return (q: string) => {
+            const st = target.prepare(q)
+            if (q !== sql) return st
+            return new Proxy(st, {
+              get(s, k) {
+                if (k === 'all') return (...args: never[]) => {
+                  const out = s.all(...args)
+                  write()
+                  return out
+                }
+                const v = Reflect.get(s, k, s)
+                return typeof v === 'function' ? v.bind(s) : v
+              }
+            })
+          }
+        }
+      })
+    const file = join(base, `between-${++n}.db`)
+    const db = tables(file)
+    const other = new DatabaseSync(file)
+    try {
+      db.exec('BEGIN')
+      writeSessionRecords(db, 'p1', { sessions: [fullSession('s', { cards: [{ number: 5, title: 'Five' }] })] })
+      db.exec('COMMIT')
+      // Moved to another agent once a1's ids are read: a1's record as it was, never a2's.
+      const moved = between(db, QUERIES['sessions.byAgent'].sql, () => other.exec("UPDATE sessions SET agent_id = 'a2' WHERE host = 'p1' AND id = 's'"))
+      expect(readAgentSessionRecords(moved, 'p1', 'a1').map((r) => [r.id, r.agentId])).toEqual([['s', 'a1']])
+      expect(readAgentSessionRecords(db, 'p1', 'a1')).toEqual([])
+      // Its card 5 taken off once the card's sessions are read: the record as it was then, with card 5.
+      const taken = between(db, QUERIES['sessions.byCard'].sql, () => other.exec("DELETE FROM session_cards WHERE host = 'p1' AND card = 5"))
+      expect(readCardSessionRecords(taken, 'p1', 5).map((r) => (r.cards as { number: number }[] | undefined)?.map((c) => c.number))).toEqual([[5]])
+      expect(readCardSessionRecords(db, 'p1', 5)).toEqual([])
+      // Inside a transaction already open: that one's snapshot, left open.
+      db.exec('BEGIN')
+      expect(readAgentSessionRecords(db, 'p1', 'a2').map((r) => r.id)).toEqual(['s'])
+      expect(db.isTransaction).toBe(true)
+      db.exec('COMMIT')
+    } finally {
+      other.close()
+      db.close()
+    }
   })
 
   it("a file's records moved in beside the host's: one it has wins, and one its deleted list holds is never written back (HI-1736)", () => {

@@ -77,19 +77,40 @@ function readSessionRecordsByIds(db: Db, host: string, ids: string[], o: { saved
   return found.map((r) => sessionFromRows(r, cards.get(r.id as string) ?? []))
 }
 
-/** An agent's records of a host, most recently active first (HI-1236: by `sessions_agent`, no other record read). */
+/**
+ * `fn`'s reads on one snapshot (inside a transaction already open, that one's): which records an index names, and those
+ * records with their cards, are of the same commit (HR5's HI-1236 round 1: another connection committing between them).
+ */
+function onOneSnapshot<T>(db: Db, fn: () => T): T {
+  if (db.isTransaction) return fn()
+  db.exec('BEGIN')
+  try {
+    const out = fn()
+    db.exec('COMMIT')
+    return out
+  } catch (e) {
+    if (db.isTransaction) db.exec('ROLLBACK')
+    throw e
+  }
+}
+
+/**
+ * An agent's records of a host, most recently active first, those active at the same time in the host's order (as a
+ * stable sort of readSessionRecords' would give them). HI-1236: by `sessions_agent`, no other record read.
+ */
 export function readAgentSessionRecords(db: Db, host: string, agentId: string): Rec[] {
-  const ids = (db.prepare(QUERIES['sessions.byAgent'].sql).all(host, agentId) as { id: string }[]).map((r) => r.id)
-  return readSessionRecordsByIds(db, host, ids)
+  return onOneSnapshot(db, () => readSessionRecordsByIds(db, host, (db.prepare(QUERIES['sessions.byAgent'].sql).all(host, agentId) as { id: string }[]).map((r) => r.id)))
 }
 
 /** The records of a host that worked on a card (its `cards`), in the host's order (HI-1236: by `session_cards_card`). */
 export function readCardSessionRecords(db: Db, host: string, card: number): Rec[] {
-  const ids = [...new Set((db.prepare(QUERIES['sessions.byCard'].sql).all(card, host) as { session: string }[]).map((r) => r.session))]
-  return readSessionRecordsByIds(db, host, ids, { saved: true })
+  return onOneSnapshot(db, () => {
+    const ids = [...new Set((db.prepare(QUERIES['sessions.byCard'].sql).all(card, host) as { session: string }[]).map((r) => r.session))]
+    return readSessionRecordsByIds(db, host, ids, { saved: true })
+  })
 }
 
-export const readDeleted =(db: Db, host: string): string[] => (db.prepare('SELECT id FROM sessions_deleted WHERE host = ? ORDER BY ord, id').all(host) as { id: string }[]).map((r) => r.id) // i18n-ignore: SQL
+export const readDeleted = (db: Db, host: string): string[] => (db.prepare('SELECT id FROM sessions_deleted WHERE host = ? ORDER BY ord, id').all(host) as { id: string }[]).map((r) => r.id) // i18n-ignore: SQL
 export const readDeletedUsage = (db: Db, host: string): Rec[] => (db.prepare('SELECT * FROM sessions_deleted_usage WHERE host = ? ORDER BY ord, id').all(host) as Rec[]).map(keptUsageFromRow) // i18n-ignore: SQL
 
 /** A session record's row and its cards' as text: what a change compares to see which of them changed. */

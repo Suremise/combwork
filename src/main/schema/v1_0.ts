@@ -1070,7 +1070,7 @@ export const QUERIES: Record<string, SchemaQuery> = {
   // sessionStore.ts: a host's sessions, one by id, some by their ids and their cards, an agent's, a card's.
   'sessions.host': { sql: 'SELECT * FROM sessions WHERE host = ? ORDER BY ord', args: ['p1'], index: 'PRIMARY KEY' },
   'sessions.byId': { sql: 'SELECT * FROM sessions WHERE host = ? AND id = ?', args: ['p1', 's1'], index: 'PRIMARY KEY' },
-  'sessions.byAgent': { sql: 'SELECT id FROM sessions WHERE host = ? AND agent_id = ? ORDER BY last_active_at DESC', args: ['p1', 'a1'], index: 'sessions_agent' },
+  'sessions.byAgent': { sql: 'SELECT id FROM sessions WHERE host = ? AND agent_id = ? ORDER BY last_active_at DESC, ord, id', args: ['p1', 'a1'], index: 'sessions_agent' },
   'sessions.byIds': { sql: 'SELECT * FROM sessions WHERE host = ? AND id IN (SELECT value FROM json_each(?))', args: ['p1', '["s1"]'], index: 'PRIMARY KEY' },
   'sessions.cardsOf': { sql: 'SELECT * FROM session_cards WHERE host = ? AND session IN (SELECT value FROM json_each(?)) ORDER BY session, ord', args: ['p1', '["s1"]'], index: 'PRIMARY KEY' },
   'sessions.byCard': { sql: 'SELECT session FROM session_cards WHERE card = ? AND host = ?', args: [1, 'p1'], index: 'session_cards_card' },
