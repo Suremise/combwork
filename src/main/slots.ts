@@ -984,11 +984,10 @@ export interface PoolDeps {
    */
   writerOver?: (w: SlotWriter) => boolean | Promise<boolean>
   /**
-   * Whether a writer of a Hive that has gone is settled (HI-1886): what was kept of its run shows its processes ended,
-   * or, its lease ended (`leaseEnded`), those still running were ended exactly. Otherwise it stays held until the user
-   * releases the slot. `cleared`: told once a refresh has cleared it.
+   * Whether a writer of a Hive that has gone is settled (HI-1886): its run's processes were seen to end (kept in Hive's
+   * profile). Otherwise it stays held until the user releases the slot. `cleared`: told once a refresh has cleared it.
    */
-  writerGone?: { settles: (w: SlotWriter, leaseEnded: boolean) => boolean | Promise<boolean>; cleared: (run: string) => void }
+  writerGone?: { settles: (w: SlotWriter) => boolean | Promise<boolean>; cleared: (run: string) => void }
   /** Removes Hive's own unchanged skill copies from a folder (skillCopies.ts removeCopiesIn), before a slot goes (#1500). */
   removeSkillCopies?: (folder: string) => Promise<unknown>
   /** A rename's steps (#1441); none: slots aren't renamed. */
@@ -1373,7 +1372,7 @@ export class SlotPool {
    */
   private async settleGone(s: Slot): Promise<boolean> {
     const w = s.writer
-    if (!w || !this.deps.writerGone || !(await this.deps.writerGone.settles(w, this.store.openLease(s.name)?.id !== w.lease))) return false
+    if (!w || !this.deps.writerGone || !(await this.deps.writerGone.settles(w))) return false
     if (await this.store.clearWriter(s.name, w.run)) {
       this.deps.writerGone.cleared(w.run)
       await this.drained(s.name)

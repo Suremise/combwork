@@ -211,6 +211,32 @@ else {
     expect(await agentsMemory()).toBeNull()
   }, 60000)
 
+  it("Hive quitting keeps a run as ended for its slot writer only once its job is seen empty, never while what its CLI started still runs (HI-1886)", async () => {
+    const { endedEarlier, launchEnded, recordEndedLaunches, runningProcesses, trackLaunch } = await import('../src/main/agentProcesses')
+    // A CLI that started a detached server and exited, its exit not yet seen (Hive quitting): its job isn't empty.
+    const out = join(dir, 'quit1.txt')
+    const cli = spawn(process.execPath, [script, 'cli', out], { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true })
+    expect(await trackLaunch({ runId: 'quit1', projectPath: dir, agentId: 'q1', agentName: 'Quitter' }, cli.pid!)).toEqual({ tracked: true })
+    cli.stdin!.write('go\n')
+    await new Promise((r) => cli.once('exit', r))
+    expect(await until(() => Object.keys(pidsIn(out)).length === 2, 10000)).toBe(true)
+    // A CLI that ended with nothing left: its job empty.
+    const holderOut = join(dir, 'quit2.txt')
+    const holder = spawn(process.execPath, [script, 'holder', holderOut], { stdio: 'ignore', windowsHide: true })
+    expect(await trackLaunch({ runId: 'quit2', projectPath: dir, agentId: 'q2', agentName: 'Done' }, holder.pid!)).toEqual({ tracked: true })
+    expect(await until(() => !!pidsIn(holderOut).holder, 10000)).toBe(true)
+    await endHeld(holder)
+    const left = (await runningProcesses()).find((l) => l.runId === 'quit1')?.processes ?? []
+    expect(left.map((p) => p.pid).sort()).toEqual(Object.values(pidsIn(out)).sort())
+    await recordEndedLaunches()
+    expect(await endedEarlier('quit2')).toBe(true)
+    expect(await endedEarlier('quit1')).toBe(false)
+    endListed(left)
+    expect(await until(() => Object.values(pidsIn(out)).every((pid) => !alive(pid)), 10000)).toBe(true)
+    await launchEnded('quit1')
+    await launchEnded('quit2')
+  }, 60000)
+
   it('tells when a process joins a running launch (#1134), once until its processes are listed again', async () => {
     const { launchEnded, onLaunchProcessJoined, runningProcesses, settleLeftovers, trackLaunch } = await import('../src/main/agentProcesses')
     // As the running marker does: each notice lists the running launches' processes (one listing at a time here too).
