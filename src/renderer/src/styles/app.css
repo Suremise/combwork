@@ -11344,6 +11344,17 @@ textarea.input.task-blocked-input {
 .inbox-row:hover {
   background: var(--bg-hover);
 }
+/* A card counted once (HI-1931): its row, then its requests and the agents stopped on it, indented under it. */
+.inbox-row.inbox-under {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-inline-start: 38px;
+}
+.inbox-group + .inbox-row,
+.inbox-row + .inbox-group,
+.inbox-group + .inbox-group {
+  border-top: 1px solid var(--border-subtle);
+}
 .inbox-text {
   flex: 1;
   min-width: 0;

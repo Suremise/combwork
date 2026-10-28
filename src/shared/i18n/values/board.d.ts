@@ -374,6 +374,7 @@ interface HiveMessageValues {
   'board.inbox.asks': undefined
   'board.inbox.asksWhat': { message: string | number }
   'board.inbox.assistant': undefined
+  'board.inbox.cardRequests': { n: number }
   'board.inbox.changes': undefined
   'board.inbox.commits': { n: number }
   'board.inbox.diff': { files: number; insertions: string | number; deletions: string | number }
@@ -389,7 +390,7 @@ interface HiveMessageValues {
   'board.inbox.needYouCount': { n: number }
   'board.inbox.needYouEmptyHeading': undefined
   'board.inbox.needYouHeading': { n: string | number }
-  'board.inbox.needYouTip': undefined
+  'board.inbox.needYouThings': { agents: number; cards: number }
   'board.inbox.needsInput': undefined
   'board.inbox.needsInputWhat': { message: string | number }
   'board.inbox.nothing': undefined

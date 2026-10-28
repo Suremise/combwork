@@ -1491,6 +1491,10 @@
     "defaultMessage": "Hive Assistant",
     "description": "The Hive Assistant, named in the attention inbox (status bar popover, tray menu) where a project name goes. Hive is the app's name: keep it."
   },
+  "board.inbox.cardRequests": {
+    "defaultMessage": "{n, plural, one {# question} other {# questions}}",
+    "description": "On a card's row in the For you popover (the status bar's \"need you\"), when it has several requests for the user (approvals, decisions, questions: all called questions here) or an agent stopped on it: how many requests ({n}). They are listed under it."
+  },
   "board.inbox.changes": {
     "defaultMessage": "Changes",
     "description": "Button on a worktree agent's row in the inbox: shows its changes in the Git tab."
@@ -1551,9 +1555,9 @@
     "defaultMessage": "Need you ({n})",
     "description": "Heading in the inbox popover above what waits for the user (requests on cards, agents stopped in their panes), with how many ({n})."
   },
-  "board.inbox.needYouTip": {
-    "defaultMessage": "For you: requests on cards and agents stopped in their panes (a prompt, a sign-in, a question, an error). Click to see them.",
-    "description": "Tooltip of the status bar's inbox item (\"2 need you\"): what it counts. Glossary: For you."
+  "board.inbox.needYouThings": {
+    "defaultMessage": "{agents, plural, =0 {{cards, plural, one {# card needs you} other {# cards need you}}} other {{cards, plural, =0 {{agents, plural, one {# agent needs you} other {# agents need you}}} one {# card and {agents, plural, one {# agent} other {# agents}} need you} other {# cards and {agents, plural, one {# agent} other {# agents}} need you}}}}. Click to see them.",
+    "description": "Tooltip of the status bar's inbox item (\"3 need you\"): what it counts, as cards with requests for the user (each once, however many requests: approvals, decisions, questions) and agents stopped in their panes (a prompt, a sign-in, a question, an error; one stopped on a counted card isn't counted again). {cards} and {agents} are how many. Glossary: For you."
   },
   "board.inbox.needsInput": {
     "defaultMessage": "Needs input",
