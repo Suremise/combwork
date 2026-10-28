@@ -328,13 +328,18 @@ interface HiveMessageValues {
   'git.vc.fact.subfolder': { root: string | number }
   'git.vc.git': undefined
   'git.vc.initHint': undefined
+  'git.vc.initOwnHint': undefined
+  'git.vc.insideRepo': { root: string | number }
+  'git.vc.noCommitYet': undefined
   'git.vc.none': undefined
+  'git.vc.notRepoYet': undefined
   'git.vc.offer.gitFound': { root: string | number }
   'git.vc.offer.notNow': undefined
   'git.vc.offer.otherFound': { vcs: string | number }
   'git.vc.offer.repositoryGone': undefined
   'git.vc.offer.switchGit': undefined
   'git.vc.offer.switchNone': undefined
+  'git.vc.previewTip': undefined
   'git.vc.sections': undefined
   'git.vc.step.cantSave': undefined
   'git.vc.step.choose': { preset: string | number }
@@ -366,6 +371,7 @@ interface HiveMessageValues {
   'git.vc.switch.laneUnnamed': { builder: string | number }
   'git.vc.switch.lanes': { n: number; from: string | number }
   'git.vc.switch.noGit': undefined
+  'git.vc.switch.notSwitched': { project: string | number; error: string | number }
   'git.vc.switch.nothing': { to: string | number }
   'git.vc.switch.otherFound': { vcs: string | number }
   'git.vc.switch.queue': undefined
@@ -373,6 +379,7 @@ interface HiveMessageValues {
   'git.vc.switch.title': { project: string | number; platform: string | number }
   'git.vc.switch.what': { project: string | number; to: string | number; from: string | number }
   'git.vc.switchTip': { platform: string | number }
+  'git.vc.useParent': undefined
   'git.vc.workflow': { platform: string | number; state: string; preset: string | number }
   'git.vc.workflowTip': undefined
   'git.worktree.agent': { agent: string | number }

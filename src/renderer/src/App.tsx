@@ -34,7 +34,7 @@ import { ProgressPanel, progressRunsChanged } from './components/Progress'
 import { queueBoardChanged, queueChangedEvent } from './queueSource'
 import { AssistantMain } from './components/AssistantView'
 import { loadAssistantChanges } from './assistantUndo'
-import { agentOnScreen, applyLeftovers, applyLiveState, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
+import { agentOnScreen, applyLeftovers, applyLiveState, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, dismissToast, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
 import { DocsView, McpView, NotesView, SkillView, WelcomeView } from './views/OtherViews'
 import { TemplatesView } from './components/Templates'
 import { ProjectView } from './views/ProjectView'
@@ -165,6 +165,9 @@ function handleEvent(e: HiveEvent): void {
     }
     case 'toast':
       pushToast(e.toast)
+      break
+    case 'toast-gone':
+      dismissToast(e.id)
       break
     case 'chime': {
       // Agents finishing together chime once: at most one every 2 seconds.

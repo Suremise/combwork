@@ -1307,9 +1307,25 @@
     "defaultMessage": "Initialise repository… makes this folder a Git repository on a branch called main, keeps its .hive out of git and commits its files.",
     "description": "Under the header of the Version Control tab of a project whose folder has no repository, beside the button. Initialise repository… is the button’s name: keep it as translated there. Keep main (the branch name)."
   },
+  "git.vc.initOwnHint": {
+    "defaultMessage": "Initialise its own repository… makes this folder a Git repository of its own on a branch called main, keeps its .hive out of git and commits its files.",
+    "description": "Git’s page in the Version Control tab of a project inside another repository, under its buttons. Initialise its own repository… is the button’s name: keep it as translated there. Keep main (the branch name)."
+  },
+  "git.vc.insideRepo": {
+    "defaultMessage": "This folder is inside the Git repository at {root}: use that one, or give this folder its own.",
+    "description": "Git’s page in the Version Control tab of a project inside another repository, chosen before it has its own: above the buttons Use that repository… and Initialise its own repository…. {root} is the outer repository’s folder."
+  },
+  "git.vc.noCommitYet": {
+    "defaultMessage": "This folder's Git repository has no first commit yet.",
+    "description": "Git’s page in the Version Control tab, when Initialise repository… made the repository but stopped before its first commit: above the Make first commit… button."
+  },
   "git.vc.none": {
     "defaultMessage": "None",
     "description": "The version control of a project without any, in the choice atop the Version Control tab and in \"Workflow: None · Solo\" (glossary 2.1: None)."
+  },
+  "git.vc.notRepoYet": {
+    "defaultMessage": "This folder isn't a Git repository yet.",
+    "description": "Git’s page in the Version Control tab of a project whose folder has no repository, chosen before it has one: above the Initialise repository… button."
   },
   "git.vc.offer.gitFound": {
     "defaultMessage": "Git found at {root}: switch to Git?",
@@ -1334,6 +1350,10 @@
   "git.vc.offer.switchNone": {
     "defaultMessage": "Switch to None…",
     "description": "A button of the offer to switch a project to None, no version control (atop the Version Control tab): shows what changes, then asks. The … says it asks first: keep it. None: glossary 2.1."
+  },
+  "git.vc.previewTip": {
+    "defaultMessage": "Git needs this folder to be a repository: Initialise repository… makes it one. Nothing changes until you do.",
+    "description": "Tooltip of Git in the None · Git choice atop the Version Control tab of a project whose folder has no repository of its own: clicking it shows Git’s page, which only offers Initialise repository… (keep it as translated on that button)."
   },
   "git.vc.sections": {
     "defaultMessage": "Version Control",
@@ -1459,6 +1479,10 @@
     "defaultMessage": "No Git repository here: Initialise repository… first.",
     "description": "Why a project can’t be switched to Git (the Version Control tab’s choice, a refusal): its folder has no Git repository. Initialise repository… is a button’s name: keep it as translated there."
   },
+  "git.vc.switch.notSwitched": {
+    "defaultMessage": "{project} is a Git repository now, but it wasn't switched to Git: {error}",
+    "description": "A notice after Initialise repository… chosen from Git’s page made the repository but switching the project to Git failed. {project} is its name, {error} why (already translated)."
+  },
   "git.vc.switch.nothing": {
     "defaultMessage": "Nothing is in flight: every card works under {to} from now.",
     "description": "In the warning before switching version control when no card has started and no lane runs. {to} is None or Git."
@@ -1486,6 +1510,10 @@
   "git.vc.switchTip": {
     "defaultMessage": "Switch this project to {platform}, from its next card. Hive shows what changes first.",
     "description": "Tooltip of the version control not in use, in the None · Git choice atop the Version Control tab: clicking it asks before switching. {platform} is None or Git."
+  },
+  "git.vc.useParent": {
+    "defaultMessage": "Use that repository…",
+    "description": "Button on Git’s page in the Version Control tab of a project inside another repository: switches the project to Git on that repository, after the warning (the … says it asks first: keep it)."
   },
   "git.vc.workflow": {
     "defaultMessage": "Workflow: {platform} · {state, select, preset {{preset}} custom {Custom (from {preset})} other {no preset chosen}}",

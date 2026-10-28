@@ -1465,9 +1465,15 @@ export class WorkspaceService {
   private sayPlatform(projectPath: string, p: ProjectPlatform): void {
     const key = projectPath.toLowerCase()
     const why = p.invalid !== undefined ? `invalid:${p.invalid}` : (p.offer?.why ?? '')
-    if ((this.platformOffers.get(key) ?? '') === why) return
+    const before = this.platformOffers.get(key) ?? ''
+    if (before === why) return
     this.platformOffers.set(key, why)
-    if (!why) return
+    // Nothing to say now (switched, or the folder back as it was): the notice said before goes (HI-1905: a project
+    // switched to Git right after Initialise repository… kept "Hive goes on treating it as … None").
+    if (!why) {
+      if (before) this.emit({ type: 'toast-gone', id: `platform:${key}` })
+      return
+    }
     if (p.invalid !== undefined) log.warn(`${userText(basename(projectPath))}'s project.json names no platform Hive has (${userText(p.invalid)}): it uses ${p.id}, as detected`)
     else log.info(`${userText(basename(projectPath))} is a ${p.id} project; its folder now says ${p.detected.platform}${p.detected.other ? ` (${p.detected.other} found)` : ''}`)
     // An offer has its button to the tab that makes it (#1419); an unknown setting is fixed in project.json.
