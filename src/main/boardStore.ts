@@ -885,13 +885,16 @@ export function boardRevision(ws: WorkspaceService): string {
 /**
  * A token for what is committed to the board now (HI-1909), for a cache of what is read from it: it moves on with every
  * commit, a quiet one (no tasks-changed) too, another process's (the writer's `data_version`), and a database replaced
- * or opened again. Null inside a write, whose reads see its own changes: nothing read there may be cached or served
- * from a cache. The same token twice: nothing was committed between.
+ * or opened again, moved as the commit ends, before anything told of it runs. Null inside a write, whose reads see its
+ * own changes, and inside a read's snapshot, which may be older: nothing read there may be cached or served from a
+ * cache. The same token twice: nothing was committed between.
  */
 export function boardReadToken(ws: WorkspaceService): string | null {
   const path = pathOf(ws)
   if (inWrite(keyOf(path))) return null
   const b = boardOf(path)
+  // Inside a read's snapshot (readSnapshot), which may be older than what the token would name.
+  if (b.db.reader.isTransaction) return null
   return `${b.generation}:${dbGenerationAt(b.place)}:${(b.version.get() as { data_version: number }).data_version}:${b.commits}`
 }
 
@@ -1007,6 +1010,9 @@ export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>, 
       if (!db.isTransaction) throw lostChange()
       timedCommit(db, b.db.file)
       committed = true
+      // Read tokens move on at once (boardReadToken): what runs after the commit (its events, afterBoardWrite) reads it.
+      const cb = boards.get(key)
+      if (cb) cb.commits++
       return out
     } catch (e) {
       state.changed = false
@@ -1035,8 +1041,6 @@ export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>, 
         }
       }
       if (committed) {
-        const cb = boards.get(keyOf(path))
-        if (cb) cb.commits++
         for (const listener of committedListeners) {
           try {
             writing.exit(() => listener(ws))
