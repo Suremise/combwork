@@ -91,9 +91,11 @@ let n = 0
 
 /** "Pair (the agent merges)": a reviewer agent, the agent merges (squash or merge commit), the builder's own worktree. */
 const PAIR = { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots' } as const
+/** The same with no review: a submission passes at once (HI-1963: a test whose subject is the merges, not the reviews). */
+const UNREVIEWED = { ...PAIR, review: 'none', noSelfReview: false } as const
 
-const workspace = () => step('workspace', makeWorkspace)
-async function makeWorkspace(): Promise<{ w: WS; repo: string; wt: string; cards: number[]; lane: string }> {
+const workspace = (options: typeof PAIR | typeof UNREVIEWED = PAIR) => step('workspace', () => makeWorkspace(options))
+async function makeWorkspace(options: typeof PAIR | typeof UNREVIEWED): Promise<{ w: WS; repo: string; wt: string; cards: number[]; lane: string }> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
   const wt = join(ws, 'p-card')
@@ -106,7 +108,7 @@ async function makeWorkspace(): Promise<{ w: WS; repo: string; wt: string; cards
   git(repo, 'commit', '-qm', 'initial')
   git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
   const agents = [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }]
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options: PAIR } }))
+  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -136,11 +138,12 @@ const commit = (wt: string, file: string): string => {
   return git(wt, 'rev-parse', 'HEAD')
 }
 
-/** A card built in the worktree (one commit, `file`), reviewed and passed: Approved. */
-async function approved(w: WS, wt: string, card: number, file: string): Promise<string> {
+/** A card built in the worktree (one commit, `file`), reviewed and passed: Approved. `reviewed` false: submitted with no review (UNREVIEWED). */
+async function approved(w: WS, wt: string, card: number, file: string, reviewed = true): Promise<string> {
   await act(w, card, builder, { kind: 'start' })
   const rev = commit(wt, file)
   await act(w, card, builder, { kind: 'submit', summary: file })
+  if (!reviewed) return rev
   await act(w, card, reviewer, { kind: 'startReview' })
   await act(w, card, reviewer, { kind: 'verdict', pass: true, comment: 'PASSED' })
   return rev
@@ -161,9 +164,11 @@ const laneStatus = async (w: WS, lane: string) => (await lanes.getLane(w, lane))
 
 describe("an agent's branch between a lane's cards (#1271)", () => {
   it('after a squash, the next card waits; Hive brings the branch up to date; two squashed cards in a row each review only their own work', async () => {
-    const { w, repo, wt, cards, lane } = await workspace()
+    // No review step (HI-1963: 16 workflow steps timed out at 20 s in a multi-file run): what each card would be reviewed
+    // on is its submission, checked below; the other tests here go through the review.
+    const { w, repo, wt, cards, lane } = await workspace(UNREVIEWED)
     const [c1, c2, c3] = cards
-    await approved(w, wt, c1, 'one.txt')
+    await approved(w, wt, c1, 'one.txt', false)
     await merged(w, repo, c1, 'squash')
     // Not in main (its commit was squashed): the next card's start waits for the branch.
     expect(await refused(act(w, c2, builder, { kind: 'start' }))).toBe('lane.lineBehind')
@@ -174,7 +179,7 @@ describe("an agent's branch between a lane's cards (#1271)", () => {
     expect(git(wt, 'rev-parse', 'HEAD')).toBe(main1)
     expect(lines.lineWaiting(w, lane)).toBeNull()
     // Started on the moved line: its base is the LineMoved's `to`; its submission only its own file.
-    await approved(w, wt, c2, 'two.txt')
+    await approved(w, wt, c2, 'two.txt', false)
     const s2 = foldCard(facts(w, c2))
     expect(s2.started?.base).toBe(main1)
     expect(s2.latest?.files.map((f) => f.path)).toEqual(['two.txt'])
