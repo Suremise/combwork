@@ -36,7 +36,10 @@ const PATTERN_LETTERS = 6
  * and the language's translations (id → text). A text is left out when the language also shows it as it is (a message
  * it doesn't translate, or translates to the same words, or another message's translation), since seeing it is then no
  * sign of a miss. Messages with plain placeholders ("{agent} (removed)") become patterns; plurals, selects and markup don't.
- * Returns { exact: [text], patterns: [{ id, source }] } (source: a RegExp's, whole text).
+ * Returns { exact: [text], patterns: [{ id, source }], authored: [] } (source: a RegExp's, whole text). authored: what
+ * the route itself wrote into Hive as a user would (a template's name, a card's blocked reason, HI-1915), each
+ * { text, within } (within: a selector for where Hive shows it), added as cases write it: English there is the user's,
+ * even where it equals a message ("Pair") or fits a placeholder message's pattern ("Waiting for {what}").
  */
 function englishLeft(english, translations) {
   const shown = new Set(Object.values(translations).map((t) => norm(t)))
@@ -60,7 +63,7 @@ function englishLeft(english, translations) {
     if ((literal.match(/\p{L}+/gu) ?? []).length < 2 && !/[^\p{L}\s]/u.test(literal)) continue
     patterns.push({ id, source: `^${parts.map(escapeRegex).join('.+?')}$` })
   }
-  return { exact: [...exact].sort(), patterns }
+  return { exact: [...exact].sort(), patterns, authored: [] }
 }
 
 const norm = (s) => String(s).replace(/\s+/g, ' ').trim()
@@ -317,6 +320,10 @@ function inspectLayout([root, english]) {
     const patterns = english.patterns.map((p) => ({ id: p.id, re: new RegExp(p.source, 'u') }))
     // Whitespace as englishLeft() reads it (in the page: nothing from outside reaches it).
     const squash = (s) => s.replace(/\s+/g, ' ').trim()
+    // The user's own words where Hive shows them (englishLeft's authored): only that text, only there, so the same
+    // words elsewhere (a message Hive left in English) are still reported.
+    const authored = (english.authored ?? []).map((a) => ({ text: squash(a.text), within: a.within }))
+    const own = (el, c) => authored.some((a) => a.text === c && !!el.closest(a.within))
     for (const t of texts) {
       // Not a document Hive renders (a skill, a mode, a note: their words are their author's, not messages).
       if (t.el.closest('.markdown')) continue
@@ -325,6 +332,7 @@ function inspectLayout([root, english]) {
       const pieces = ownText(t.el).map(squash).filter((p) => /\s|\p{Lu}/u.test(p))
       const candidates = [...new Set([squash(t.el.textContent ?? ''), ...pieces])].filter(Boolean)
       for (const c of candidates) {
+        if (own(t.el, c)) continue
         const p = exact.has(c) ? null : patterns.find((x) => x.re.test(c))
         if (exact.has(c) || p) {
           add('english', t.el, c, p ? { detail: p.id } : {})
