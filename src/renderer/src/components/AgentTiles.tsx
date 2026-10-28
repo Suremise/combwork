@@ -7,11 +7,11 @@ import { compactThreshold, pageEndIndex, transcriptWarnLimit } from '@shared/def
 import { droppedLaneOrder } from '@shared/laneBar'
 import { fractionDone, runStatusLine } from '@shared/progress'
 import { providerName } from '@shared/providers'
-import { isUrgent, TILES_PER_PAGE, tilePageCount, tilePageOf, tilesOnPage, urgentByPage } from '@shared/tiles'
+import { isUrgent, tilePageCount, tilePageOf, tilesOnPage, tilesThatFit, urgentByPage } from '@shared/tiles'
 import { fmt, msg, tr } from '@shared/i18n'
 import type { AgentInfo, ProjectInfo, ProgressRun } from '@shared/types'
 import { formatSize } from '@shared/units'
-import { agentProviderOf, closeTile, openTile, projectKey, showTilePage, tileAgents, tileFocusOf, tilePage, useLanguage, useStore } from '../store'
+import { agentProviderOf, clearTileReturn, closeTile, openTile, projectKey, setTilesFit, showTilePage, tileAgents, tileFocusOf, tilePage, tileReturnOf, tilesPageSize, useLanguage, useStore } from '../store'
 import * as actions from '../actions'
 import { commandKeybinding, keyIsBound } from '../commands'
 import { deferredFocus } from '../deferredFocus'
@@ -66,7 +66,7 @@ function moveTile(project: ProjectInfo, id: string, delta: -1 | 1): void {
   if (to < 0 || to >= project.agents.length) return
   refocusTile = { id, may: deferredFocus(() => document.querySelector(tileSelector(id))) }
   actions.nudgeAgent(delta, project.path, id)
-  showTilePage(project, tilePageOf(to))
+  showTilePage(project, tilePageOf(to, tilesPageSize(project)))
 }
 
 const tileSelector = (id: string): string => `.agent-tile[data-agent="${CSS.escape(id)}"]`
@@ -114,8 +114,10 @@ function agentRun(runs: readonly ProgressRun[], project: ProjectInfo, a: AgentIn
 function TileGrid({ project }: { project: ProjectInfo }) {
   const tiles = useTiles(project)
   const page = useStore((s) => tilePage(project, s))
-  const shown = tilesOnPage(tiles, page)
-  const pages = tilePageCount(tiles.length)
+  const perPage = useStore((s) => tilesPageSize(project, s))
+  const shown = tilesOnPage(tiles, page, perPage)
+  const pages = tilePageCount(tiles.length, perPage)
+  const area = useRef<HTMLDivElement>(null)
   const grid = useRef<HTMLDivElement>(null)
   const movable = useMovable(project)
   const menu = useContextMenu()
@@ -131,8 +133,38 @@ function TileGrid({ project }: { project: ProjectInfo }) {
     })
   }, [movable, project])
   // The tile that holds the grid's one tab stop: the last one the keyboard was on, while it is on this page.
-  const [current, setCurrent] = useState<string | null>(null)
+  // Back from the focus view, the agent it showed (HI-1951, HR1's round 1), whatever the first tile of its page.
+  const [current, setCurrent] = useState<string | null>(() => tileReturnOf(project))
   const stop = shown.some((t) => t.a.id === current) ? current : (shown[0]?.a.id ?? null)
+  // How many tiles fit the area (HI-1951): measured as it resizes (and as its tiles are first drawn), the page keeping the
+  // agent the focus view just went back from (the window may have been resized while it was open), else the tile the
+  // keyboard is on, else the tab stop. Columns are the grid's tracks; rows, its height over a tile's.
+  const keep = useRef<{ project: ProjectInfo; tile: string | null }>({ project, tile: stop })
+  keep.current = { project, tile: stop }
+  const hasAgents = project.agents.length > 0
+  useEffect(() => {
+    const box = area.current
+    const g = grid.current
+    if (!box || !g) return
+    const measure = (): void => {
+      const css = getComputedStyle(g)
+      const columns = css.gridTemplateColumns.split(' ').filter((x) => x && x !== 'none').length
+      const pad = (parseFloat(css.paddingTop) || 0) + (parseFloat(css.paddingBottom) || 0)
+      const tileHeight = g.querySelector<HTMLElement>('.agent-tile')?.offsetHeight ?? 0
+      const fit = tilesThatFit({ columns, height: box.clientHeight - pad, tileHeight, gap: parseFloat(css.rowGap) || 0 })
+      if (fit === null) return
+      const p = keep.current.project
+      const returning = tileReturnOf(p)
+      const at = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('.agent-tile')?.dataset.agent
+      setTilesFit(p, fit, returning ?? (at && g.contains(document.activeElement) ? at : keep.current.tile))
+      if (returning) clearTileReturn(p)
+    }
+    const seen = new ResizeObserver(measure)
+    seen.observe(box)
+    seen.observe(g)
+    measure()
+    return () => seen.disconnect()
+  }, [hasAgents])
   if (!project.agents.length)
     return (
       <div className="agent-tiles empty-state">
@@ -156,7 +188,7 @@ function TileGrid({ project }: { project: ProjectInfo }) {
     els[Math.max(0, Math.min(els.length - 1, to))]?.focus()
   }
   return (
-    <div className="agent-tiles">
+    <div ref={area} className="agent-tiles">
       <div
         ref={grid}
         className="tile-grid"
@@ -641,7 +673,8 @@ export function TilePager({ project }: { project: ProjectInfo }) {
   const tiles = useTiles(project)
   const page = useStore((s) => tilePage(project, s))
   const focus = useStore((s) => tileFocusOf(project, s))
-  const pages = tilePageCount(tiles.length)
+  const perPage = useStore((s) => tilesPageSize(project, s))
+  const pages = tilePageCount(tiles.length, perPage)
   const movable = useMovable(project)
   const dragging = useAgentDrag(project)
   const [dropPage, setDropPage] = useState<number | null>(null)
@@ -653,14 +686,14 @@ export function TilePager({ project }: { project: ProjectInfo }) {
     hover.current = null
   }, [dragging])
   if (pages < 2) return null
-  const urgent = urgentByPage(tiles.map((t) => t.state))
+  const urgent = urgentByPage(tiles.map((t) => t.state), perPage)
   const pageKb = commandKeybinding('agent.nextPage')
   return (
     <div className="segmented page-switch tile-pages">
       {Array.from({ length: pages }, (_, i) => {
         const counted = i !== page && urgent[i] > 0
         // A tile dropped here goes to this page's last place (#993): not a target where it already is.
-        const end = pageEndIndex(project.agents.length, i, TILES_PER_PAGE)
+        const end = pageEndIndex(project.agents.length, i, perPage)
         const moves = movable && !!dragging && end !== project.agents.findIndex((a) => a.id === dragging)
         return (
           <Tooltip

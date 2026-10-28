@@ -16,7 +16,7 @@ import { noteCommandUsed } from './tips'
 import { requestStripMenu, type StripMenu } from './stripMenus'
 import { showAntivirus } from './components/Antivirus'
 import { focusTileAfter } from './components/AgentTiles'
-import { agentPage, assistantOnLeft, closeTile, showTilePage, tileFocusOf, tilePage, focusedAgentId, get, isAssistantPath, setAssistantSide, notify, openInSessionsTab, openProjectSettings, openVersionControl, revealAgent, set, setActivity, setAssistantOpen, setProgressOpen, progressIsOpen, showAssistantView, showView, showUnusedWorktrees, setProjectTab, showAgent, showPage, panePageCount, shownLayout, toggleCompactSidebar, type ProjectTab } from './store'
+import { agentPage, assistantOnLeft, closeTile, showTilePage, tileFocusOf, tilePage, tilesPageSize, focusedAgentId, get, isAssistantPath, setAssistantSide, notify, openInSessionsTab, openProjectSettings, openVersionControl, revealAgent, set, setActivity, setAssistantOpen, setProgressOpen, progressIsOpen, showAssistantView, showView, showUnusedWorktrees, setProjectTab, showAgent, showPage, panePageCount, shownLayout, toggleCompactSidebar, type ProjectTab } from './store'
 import { STRIP_TABS } from '@shared/projectTabs'
 
 /** A command's category: an id (CATEGORY_TEXT names it), as Settings → Keyboard Shortcuts groups and filters them. */
@@ -135,7 +135,7 @@ const tilesShown = (p: ProjectInfo): boolean => projectSessionView(p.config, get
 const pageCount = (): number => {
   const p = selected()
   if (!p) return 1
-  return tilesShown(p) ? tilePageCount(p.agents.length) : panePageCount(p)
+  return tilesShown(p) ? tilePageCount(p.agents.length, tilesPageSize(p)) : panePageCount(p)
 }
 
 /** Whether the selected project's agents move: two or more (in order), or one in panes side by side (to another cell, #762). */

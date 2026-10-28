@@ -6135,6 +6135,8 @@ body.pane-resizing .monaco-editor {
   position: absolute;
   inset: 32px 0 0 0;
   overflow: auto;
+  /* Its columns, which a page's size is measured from (HI-1951), never change with a scroll bar coming and going. */
+  scrollbar-gutter: stable;
 }
 .tile-grid {
   display: grid;
