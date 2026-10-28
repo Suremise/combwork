@@ -72,7 +72,14 @@ async function shots(page, name) {
   await page.locator('.settings-nav .row[data-section="workspace"]').click()
   const preview = page.locator('.close-command-preview')
   check('Settings shows exactly what it will run here', !!(await lib.until(async () => ((await preview.textContent().catch(() => '')) ?? '').includes(`"${wsA}" `), HUNG_MS)), await preview.textContent().catch(() => ''))
+  await preview.scrollIntoViewIfNeeded()
   await page.screenshot({ path: path.join(lib.WORK, 'onclose-settings-workspace-dark.png') })
+  // When Hive quits, run, in Settings → General: what it runs, {workspace} left as written (it has none).
+  await page.locator('.settings-nav .row[data-section="general"]').click()
+  const quitPreview = page.locator('.close-command-preview')
+  check('…and When Hive quits, run, its own', !!(await lib.until(async () => ((await quitPreview.textContent().catch(() => '')) ?? '').includes('global quit -'), HUNG_MS)), await quitPreview.textContent().catch(() => ''))
+  await quitPreview.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: path.join(lib.WORK, 'onclose-settings-general-dark.png') })
   await page.keyboard.press('Escape')
   await inv('tasks:create', { title: 'Made as the workspace closed', project: 'alpha' })
   let switched = false
