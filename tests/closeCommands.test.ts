@@ -155,19 +155,38 @@ describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3)",
     expect(state.started).toHaveLength(0)
   })
 
-  it('a plain close under way when the quit joins it: drained after it, before the global one', async () => {
+  it('a plain close under way when the quit joins it: drained as part of it, before the global one', async () => {
     const held = gate()
     const ws = fakeWs('D:\\ws\\Plain', '', held.wait)
     const closing = closeWithCommand(ws as never, 'window', null)
     const joined = closeWithCommand(ws as never, 'quit', null, { drain: true })
     held.open()
-    await expect(closing).resolves.toBe('skipped')
     await flush()
     expect(ws.close).toHaveBeenCalledTimes(1)
     expect(state.drains.map((d) => d.path)).toEqual(['D:\\ws\\Plain'])
     state.drains[0].resolve({ drained: true })
-    await expect(joined).resolves.toBe('skipped')
+    await expect(Promise.all([closing, joined])).resolves.toEqual(['skipped', 'skipped'])
+    expect(state.drains).toHaveLength(1)
   })
+
+  for (const command of ['', 'backup']) {
+    it(`a close under way (${command ? 'with a command' : 'plain'}) when the quit joins it, held past quit's bound: the quit goes on at once, and released later nothing starts (HR6's round 2, finding 1)`, async () => {
+      const held = gate()
+      const ws = fakeWs('D:\\ws\\Work', command, held.wait)
+      // The window's own close, with no bound of its own; then the quit joins it, with its bound.
+      const closing = closeWithCommand(ws as never, 'window', null)
+      const limit = new AbortController()
+      const joined = closeWithCommand(ws as never, 'quit', null, { cancelled: limit.signal, drain: true })
+      await flush()
+      limit.abort()
+      await expect(joined).resolves.toBe('notDrained')
+      await expect(closing).resolves.toBe('notDrained')
+      held.open()
+      await flush()
+      expect(state.drains).toHaveLength(0)
+      expect(state.started).toHaveLength(0)
+    })
+  }
 })
 
 describe('When Hive quits, run', () => {

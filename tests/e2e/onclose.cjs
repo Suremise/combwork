@@ -140,6 +140,46 @@ async function shots(page, name) {
   await closing
   check('…Close lets it go on: the workspace closed, the panel gone', closed === true && (await panel(page, 'failed').count()) === 0)
 
+  // --- 2b. A dialog already open behind the panel (HR6's round 2, finding 2): Escape, Tab and shortcuts reach neither
+  // it nor anything else behind; it is still there, unchanged, once the panel has gone. Running, then failed.
+  const about = page.locator('.about-licence')
+  const openAbout = async () => {
+    await page.locator('.menubar .menubar-item', { hasText: 'Help' }).click()
+    await page.locator('.menu .menu-item', { hasText: 'About' }).first().click()
+    return !!(await lib.until(() => about.isVisible().catch(() => false), HUNG_MS))
+  }
+  /** Escape, Tab and a shortcut with the panel up: the panel stays, focus in it, the dialog behind still open, no palette. */
+  const keysContained = async (state) => {
+    await page.keyboard.press('Escape')
+    for (let i = 0; i < 3; i++) await page.keyboard.press('Tab')
+    await page.keyboard.press('Control+Shift+P')
+    await page.keyboard.press('Escape')
+    await inv('app:quitState') // a round trip, so the page has handled the keys
+    return (await panel(page, state).count()) === 1 && (await page.evaluate(() => !!document.activeElement?.closest('.close-command-card'))) && (await about.isVisible()) && (await page.locator('.palette').count()) === 0
+  }
+  await lib.openWorkspace(inv, page, wsB)
+  const goB = path.join(marks, 'go-b')
+  await inv('closeCommand:setWorkspace', { command: command('b-switch', `wait:${goB}`), onUpdate: false })
+  check('a dialog (About) open before the close', await openAbout())
+  let switchedB = false
+  const switchingB = lib.openWorkspace(inv, page, wsC, HUNG_MS * 2).then(() => (switchedB = true))
+  check('…the running panel over it', !!(await lib.until(async () => (await panel(page, 'running').count()) === 1, HUNG_MS)))
+  check('…Escape, Tab and a shortcut reach neither the dialog behind nor anything else; the panel stays', (await keysContained('running')) && !switchedB)
+  await page.locator('.close-command .dialog-footer button').click()
+  await switchingB
+  fs.writeFileSync(goB, 'go')
+  check('…the dialog still there once the panel has gone', switchedB && (await about.isVisible()))
+  await inv('closeCommand:setWorkspace', { command: command('c-fail', 'fail'), onUpdate: false })
+  let closedC = null
+  const closingC = inv('workspace:close').then((r) => (closedC = r))
+  check('…and the failed panel over it', !!(await lib.until(async () => (await panel(page, 'failed').count()) === 1, HUNG_MS)))
+  check('…Escape, Tab and a shortcut reach neither the dialog behind nor anything else; the failed panel stays', (await keysContained('failed')) && closedC === null)
+  await page.locator('.close-command .dialog-footer button').click()
+  await closingC
+  check('…the dialog still there once it has gone, and Escape is its own again', closedC === true && (await about.isVisible()))
+  await page.keyboard.press('Escape')
+  check('…which closes it', !!(await lib.until(async () => !(await about.isVisible().catch(() => false)), HUNG_MS)))
+
   // --- 3. Quitting with two windows: each window's command, then When Hive quits after them; one left running.
   await lib.openWorkspace(inv, page, wsA)
   await inv('closeCommand:setWorkspace', { command: command('a-quit', 'quick'), onUpdate: false })
@@ -165,7 +205,8 @@ async function shots(page, name) {
   const c = await lib.until(() => mark('c-quit'), HUNG_MS)
   check('…and finishes by itself, its workspace closed cleanly', c?.reason === 'quit' && c.integrity === 'ok', JSON.stringify(c))
   const runs = path.join(userData, 'close-commands')
-  const cRun = fs.readdirSync(runs).find((n) => n.startsWith(`ws-${path.basename(wsC)}-`))
+  // Its run's folder: the one whose job is the chatty command (wsC ran another before, in step 2b).
+  const cRun = fs.readdirSync(runs).find((n) => n.startsWith(`ws-${path.basename(wsC)}-`) && fs.readFileSync(path.join(runs, n, 'job.json'), 'utf8').includes('c-quit'))
   const status = cRun && (await lib.until(() => {
     try {
       const s = JSON.parse(fs.readFileSync(path.join(runs, cRun, 'status.json'), 'utf8'))

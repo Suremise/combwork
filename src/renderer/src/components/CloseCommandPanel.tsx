@@ -5,7 +5,7 @@ import { durationText } from '@shared/tasks'
 import { call } from '../api'
 import { useLanguage, useStore } from '../store'
 import { useNow } from '../usage'
-import { Icon } from './ui'
+import { Icon, useBackdrop } from './ui'
 
 const M = {
   running: msg({ id: 'workspace.closeCommand.running', defaultMessage: '{kind, select, quit {Running your quit command…} other {Running your close command…}}', description: "The heading of the panel Hive shows while it runs the user's own command as a workspace closes (kind other: Settings → Workspace → When this workspace closes, run) or as Hive quits (kind quit: Settings → General → When Hive quits, run)." }),
@@ -40,32 +40,52 @@ export function CloseCommandPanel() {
   return <Panel run={run} />
 }
 
+/** The panel up now: its card and its one button, which keep the keyboard while it is. */
+let modal: { card: HTMLDivElement | null; button: HTMLButtonElement | null } | null = null
+
+const inside = (t: EventTarget | null): boolean => !!modal?.card && t instanceof Node && modal.card.contains(t)
+
 /**
- * Keeps the keyboard in the panel while it is up (HR6's round 1, finding 4): Tab stays on its button, focus that leaves
- * the panel comes back, and no other key reaches the window behind (its shortcuts included). Escape does nothing: it is
- * never an implicit Don't wait. Enter and Space press the button, as usual.
+ * Keeps the keyboard in the panel while it is up (HR6's round 1, finding 4, and round 2, finding 2): Tab stays on its
+ * button, focus that leaves the panel comes back, and no other key reaches anything behind it, a dialog's or a menu's
+ * own listener included. Listening from when this module loads, before any dialog or menu adds its listener, each key is
+ * stopped here first (stopImmediatePropagation); the panel is the top backdrop too (useBackdrop), so a dialog behind it
+ * takes no Escape by its own rule either. Escape does nothing: never an implicit Don't wait. Enter and Space press the
+ * button, as usual.
  */
+window.addEventListener(
+  'keydown',
+  (e) => {
+    if (!modal) return
+    if (e.target === modal.button && (e.key === 'Enter' || e.key === ' ')) return
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    if (e.key === 'Tab' || !inside(e.target)) modal.button?.focus()
+  },
+  true
+)
+window.addEventListener(
+  'focusin',
+  (e) => {
+    if (modal && !inside(e.target)) modal.button?.focus()
+  },
+  true
+)
+
 function useKeyboardModal(card: React.RefObject<HTMLDivElement | null>, button: React.RefObject<HTMLButtonElement | null>): void {
+  useBackdrop()
   useEffect(() => {
-    const inside = (t: EventTarget | null): boolean => !!card.current && t instanceof Node && card.current.contains(t)
-    const onKey = (e: KeyboardEvent): void => {
-      const own = e.target === button.current && (e.key === 'Enter' || e.key === ' ')
-      if (own) return
-      e.preventDefault()
-      e.stopPropagation()
-      if (e.key === 'Tab' || !inside(e.target)) button.current?.focus()
-    }
-    const onFocus = (e: FocusEvent): void => {
-      if (!inside(e.target)) button.current?.focus()
-    }
-    window.addEventListener('keydown', onKey, true)
-    window.addEventListener('focusin', onFocus, true)
-    if (!inside(document.activeElement)) button.current?.focus()
+    const mine = { card: card.current, button: button.current }
+    modal = mine
+    if (!inside(document.activeElement)) mine.button?.focus()
     return () => {
-      window.removeEventListener('keydown', onKey, true)
-      window.removeEventListener('focusin', onFocus, true)
+      if (modal === mine) modal = null
     }
   }, [card, button])
+  // The button changes (Don't wait, then Close): the one to keep the focus on.
+  useEffect(() => {
+    if (modal) modal.button = button.current
+  })
 }
 
 function Panel({ run }: { run: CloseCommandRun }) {

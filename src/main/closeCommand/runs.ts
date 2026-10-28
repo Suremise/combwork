@@ -177,4 +177,3 @@ export async function pruneRuns(root: string, prefix: string, keep = KEEP_RUNS):
   })
   for (const n of ended.slice(keep)) await rm(join(root, n), { recursive: true, force: true }).catch(() => undefined)
 }
-
