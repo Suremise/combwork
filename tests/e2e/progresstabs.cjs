@@ -329,6 +329,10 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     const tabsWaited = tabsLane.locator('.progress-lane-waited')
     check('…its lane waits for you, saying for how long', !!(await until(async () => /for you|you/i.test((await tabsLane.locator('.progress-lane-why').textContent().catch(() => '')) ?? '') && /\d/.test((await tabsWaited.textContent().catch(() => '')) ?? ''), HUNG_MS)), `${await tabsLane.locator('.progress-lane-why').textContent().catch(() => '')} ${await tabsWaited.textContent().catch(() => '')}`)
     check('…not marked yet (under an hour)', !((await tabsWaited.getAttribute('class')) ?? '').includes('long'))
+    // Its card, opened in the lane's queue, waits for you too (HR5's round 1: an ordinary request, not only a block).
+    await tabsLane.locator('.progress-lane-expand').click()
+    check("…and its card in the lane's queue is waiting for you", !!(await until(async () => (await tabsLane.locator(`.progress-lane-queue-row[data-card="${a.number}"]`).getAttribute('data-state').catch(() => null)) === 'waiting', HUNG_MS)), await tabsLane.locator(`.progress-lane-queue-row[data-card="${a.number}"]`).getAttribute('data-state').catch(() => ''))
+    await tabsLane.locator('.progress-lane-expand').click()
     await shoot('lanes-wait')
     await inv('advanced:set', 'hive.lanes.waitYouMinutes', 1)
     // The bound a minute: marked once a minute has passed (a condition, bounded for a hung run).

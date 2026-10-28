@@ -748,10 +748,14 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
   )
 }
 
-/** A lane's card's state in its queue (HI-1926): as it sits now, or as the lane left it; waiting for you when held up. */
+/**
+ * A lane's card's state in its queue (HI-1926): as it sits now, or as the lane left it; waiting for you when held up
+ * (blocked, On Hold, at its round limit) or, in a running lane, with a request open in For you (`forYou`: its work
+ * badge's open requests; an ended lane's cards stay as it left them).
+ */
 type QueueState = 'done' | 'doing' | 'review' | 'todo' | 'waiting' | 'gone' | 'unrecorded'
-const queueState = (c: LaneCard): QueueState =>
-  c.column === 'gone' || c.column === 'unrecorded' ? c.column : c.blocked || c.roundLimit || c.column === 'hold' ? 'waiting' : c.column === 'done' ? 'done' : c.column === 'review' || c.column === 'passed' ? 'review' : c.column === 'doing' ? 'doing' : 'todo'
+const queueState = (c: LaneCard, forYou = 0): QueueState =>
+  c.column === 'gone' || c.column === 'unrecorded' ? c.column : c.column !== 'done' && (c.blocked || c.roundLimit || c.column === 'hold' || forYou > 0) ? 'waiting' : c.column === 'done' ? 'done' : c.column === 'review' || c.column === 'passed' ? 'review' : c.column === 'doing' ? 'doing' : 'todo'
 const QUEUE_ICON: Record<QueueState, string> = { done: 'pass', doing: 'circle-filled', review: 'eye', todo: 'circle-large-outline', waiting: 'debug-pause', gone: 'circle-slash', unrecorded: 'question' }
 
 /**
@@ -765,7 +769,7 @@ function LaneQueue({ lane: l, badges }: { lane: Lane; badges: Map<number, WorkBa
   return (
     <ol className="progress-lane-queue" aria-label={tr(msg({ id: 'board.lanes.queue', defaultMessage: 'Cards of {lane}', description: "Accessible name of a lane's cards in order, opened under it in the Progress panel's Lanes tab ({lane}: its builder / reviewer)." }), { lane: lanePair(l) })}>
       {l.info.map((c) => {
-        const state = queueState(c)
+        const state = queueState(c, l.frozen ? 0 : (badges.get(c.number)?.forYou ?? 0))
         const known = state !== 'gone' && state !== 'unrecorded'
         const time = known ? laneCardTime(c.column, badges.get(c.number), l.frozen ? l.endedAt : null, now) : null
         const label = cardLabelOf({ tasks }, c.number)
