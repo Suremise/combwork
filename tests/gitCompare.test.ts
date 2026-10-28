@@ -3,6 +3,7 @@
 // integration line), how many commits each side has that the other hasn't and a page of them, the files the branch
 // changes since it left the other, one file's diff, and a branch that isn't one refused. The repository's refs, index
 // and working tree are the same before and after.
+import { execFileSync } from 'child_process'
 import { readFileSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
@@ -20,9 +21,21 @@ function fixture(n: number): string {
   commit(repo, { 'src/a.txt': 'one\nTWO\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n', 'new.txt': 'new\n' }, 'change a, add new')
   sh(repo, 'rm', '-q', 'README.md')
   sh(repo, 'commit', '-q', '-m', 'drop readme')
-  for (let i = 2; i < n; i++) commit(repo, { 'count.txt': `${i}\n` }, `commit ${i}`)
   // Back on main, with something uncommitted: the comparison neither reads nor touches it.
   sh(repo, 'checkout', '-q', 'main')
+  // The rest of 1.0.0's commits in one git fast-import (HI-1936: a long branch's 58 commits made one at a time were over
+  // a hundred git processes, slow enough under load to reach the time limit), each a second after the one before, so
+  // newest first is their order.
+  if (n > 2) {
+    const t = Math.floor(Date.now() / 1000) + 1
+    const commits = Array.from({ length: n - 2 }, (_, k) => {
+      const msg = `commit ${k + 2}`
+      const file = `${k + 2}\n`
+      const when = `<test@hive.invalid> ${t + k} +0000`
+      return ['commit refs/heads/1.0.0', `author Hive Test ${when}`, `committer Hive Test ${when}`, `data ${Buffer.byteLength(msg)}`, msg, ...(k === 0 ? [`from ${sh(repo, 'rev-parse', '1.0.0')}`] : []), 'M 100644 inline count.txt', `data ${Buffer.byteLength(file)}`, file].join('\n')
+    })
+    execFileSync('git', ['fast-import', '--quiet'], { cwd: repo, input: `${commits.join('\n')}\n`, stdio: ['pipe', 'pipe', 'pipe'] })
+  }
   writeFileSync(join(repo, 'src', 'a.txt'), 'edited, not committed\n')
   return repo
 }
