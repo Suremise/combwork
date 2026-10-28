@@ -252,6 +252,8 @@
   "tips.loopLanes.title": "O Hive guarda seus ciclos de cartões como raias",
   "tips.loopWakes.text": "Quando um cartão chega em Revisão, o Hive acorda o revisor dele e, com o veredito, o executor, mesmo que um deles tenha esquecido de esperar. Para conduzir as revisões manualmente, desative Acordar revisores e executores em Controle de versão → Fluxo de trabalho → Ciclos de cartões do projeto.",
   "tips.loopWakes.title": "Os ciclos seguem sozinhos",
+  "tips.mainProcessStalls.text": "A digitação travou por um momento? Desempenho → Travamentos do processo principal lista as vezes em que o processo principal do Hive ficou ocupado desde que iniciou: por quanto tempo, se estava trabalhando ou esperando e o que estava em andamento.",
+  "tips.mainProcessStalls.title": "Veja por que o Hive ficou lento",
   "tips.mcpFromFile.text": "Recebeu um servidor como definição .json ou como .zip da pasta dele? Adicionar servidor MCP de arquivo, na visualização MCP, mostra o que ele executa e o adiciona desativado: ative-o ali para escolher os projetos dele.",
   "tips.mcpFromFile.title": "Adicione um servidor MCP de um arquivo",
   "tips.mcpPerAgent.text": "Nas configurações de um agente, Servidores MCP: Somente estes dá a ele só os servidores de que precisa, como um servidor de sandbox para quem testa uma release, e mantém as ferramentas dos outros fora do contexto dele.",

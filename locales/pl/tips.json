@@ -252,6 +252,8 @@
   "tips.loopLanes.title": "Hive zapisuje Twoje pętle kart jako tory",
   "tips.loopWakes.text": "Gdy karta trafia do Recenzji, Hive wybudza jej recenzenta, a po werdykcie wykonawcę, nawet jeśli któryś zapomniał czekać. Żeby prowadzić recenzje ręcznie, wyłącz Wybudzaj recenzentów i wykonawców w Kontrola wersji → Przepływ pracy → Pętle kart projektu.",
   "tips.loopWakes.title": "Pętle toczą się same",
+  "tips.mainProcessStalls.text": "Pisanie na chwilę się zacięło? Wydajność → Przestoje procesu głównego pokazuje, kiedy główny proces Hive był zajęty od uruchomienia: jak długo, czy pracował, czy czekał, i co wtedy trwało.",
+  "tips.mainProcessStalls.title": "Sprawdź, dlaczego Hive zwolnił",
   "tips.mcpFromFile.text": "Masz serwer jako definicję .json lub archiwum .zip z jego folderem? Dodaj serwer MCP z pliku w widoku MCP pokazuje, co uruchamia, i dodaje go wyłączonego: włącz go tam, aby wybrać jego projekty.",
   "tips.mcpFromFile.title": "Dodaj serwer MCP z pliku",
   "tips.mcpPerAgent.text": "W ustawieniach agenta Serwery MCP: Tylko te daje mu tylko potrzebne serwery, np. serwer piaskownicy dla testera wydań, a narzędzia pozostałych nie trafiają do jego kontekstu.",

@@ -149,6 +149,7 @@ import type { Osc52Refusal } from './osc52'
 import type { ForYouAnswer, ForYouSummary, WorkBadge, WorkView } from './workflow/workView'
 import type { BranchQueueCard, QueueRecent, QueueResumed, QueueView } from './workflow/queue'
 import type { LongTask, WindowWhere } from './windowHealth'
+import type { MainStalls } from './mainStalls'
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 export type SettingsPatch = DeepPartial<AppSettings>
@@ -270,6 +271,8 @@ export interface HiveRequests {
   'metrics:query': (q: MetricsQuery) => MetricsReport
   /** Clears the workspace's performance metrics. */
   'metrics:reset': () => void
+  /** The main process's recent stalls since Hive started, newest first (HI-1135, mainStalls.ts): Hive's, not a workspace's. */
+  'performance:stalls': () => MainStalls
   /** Saves a report as a JSON file (a save dialog): the path, or null if cancelled. `sanitize` replaces project names. */
   'metrics:export': (q: MetricsQuery, sanitize: boolean) => string | null
   /** Ends an agent's card watch (#128: Cancel Card Watch in its pane's ⋯). Whether it had one. */

@@ -254,6 +254,8 @@ interface HiveMessageValues {
   'tips.loopLanes.title': undefined
   'tips.loopWakes.text': undefined
   'tips.loopWakes.title': undefined
+  'tips.mainProcessStalls.text': undefined
+  'tips.mainProcessStalls.title': undefined
   'tips.mcpFromFile.text': undefined
   'tips.mcpFromFile.title': undefined
   'tips.mcpPerAgent.text': undefined

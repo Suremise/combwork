@@ -252,6 +252,8 @@
   "tips.loopLanes.title": "Hive führt deine Kartenschleifen als Lanes",
   "tips.loopWakes.text": "Kommt eine Karte in Review an, weckt Hive ihren Reviewer und beim Ergebnis ihren Bearbeiter, auch wenn einer vergessen hat zu warten. Um Reviews von Hand zu steuern, schalte „Reviewer und Bearbeiter wecken“ unter Versionsverwaltung → Workflow → Kartenschleifen des Projekts aus.",
   "tips.loopWakes.title": "Schleifen laufen von selbst weiter",
+  "tips.mainProcessStalls.text": "Die Eingabe hat kurz gehangen? Leistung → Stockungen des Hauptprozesses listet, wann der Hauptprozess von Hive seit dem Start beschäftigt war: wie lange, ob er gearbeitet oder gewartet hat und was gerade lief.",
+  "tips.mainProcessStalls.title": "Sehen, warum Hive langsam war",
   "tips.mcpFromFile.text": "Einen Server als .json-Definition oder als .zip seines Ordners bekommen? „MCP-Server aus Datei hinzufügen“ in der Ansicht „MCP“ zeigt, was er ausführt, und fügt ihn ausgeschaltet hinzu: Schalte ihn dort ein, um seine Projekte zu wählen.",
   "tips.mcpFromFile.title": "Einen MCP-Server aus einer Datei hinzufügen",
   "tips.mcpPerAgent.text": "In den Einstellungen eines Agenten gibt ihm „MCP-Server: Nur diese“ genau die Server, die er braucht, etwa einen Sandbox-Server für einen Release-Tester, und hält die Werkzeuge der anderen aus seinem Kontext heraus.",

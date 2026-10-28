@@ -100,7 +100,7 @@ import { cleanTasks, cleanWhere } from '../shared/windowHealth'
 import { setTitleBarBackdrops, setTitleBarColors } from './titleBar'
 import { showWindow } from './tray'
 import { resetMetrics } from './metrics'
-import { beginWork } from './mainStalls'
+import { beginWork, recentStalls } from './mainStalls'
 import { metricsExport, metricsReport } from './metricsUsage'
 import { cancelWatch, stampWatchProjects } from './watches'
 import { cancelMessages, deliverWaiting } from './agentMessages'
@@ -693,6 +693,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'metrics:query': (q) => metricsReport(currentWorkspace(), q),
     'metrics:reset': () => resetMetrics(currentWorkspace()),
+    'performance:stalls': () => recentStalls(),
     'metrics:export': async (q, sanitize) => {
       // The report is taken before the dialog: the workspace this window shows now, not whatever it shows later.
       const report = await metricsReport(currentWorkspace(), { ...q, trend: true })

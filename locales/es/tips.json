@@ -252,6 +252,8 @@
   "tips.loopLanes.title": "Hive guarda tus ciclos de tarjetas como carriles",
   "tips.loopWakes.text": "Cuando una tarjeta llega a Revisión, Hive despierta a su revisor y, con el veredicto, a su autor, aunque a alguno se le haya olvidado esperar. Para llevar las revisiones a mano, desactiva Despertar a revisores y autores en Control de versiones → Flujo de trabajo → Ciclos de tarjetas del proyecto.",
   "tips.loopWakes.title": "Los ciclos siguen solos",
+  "tips.mainProcessStalls.text": "¿La escritura se retrasó un momento? Rendimiento → Bloqueos del proceso principal muestra las veces que el proceso principal de Hive estuvo ocupado desde que se inició: cuánto duró, si trabajaba o esperaba, y qué había en curso.",
+  "tips.mainProcessStalls.title": "Descubre por qué Hive fue lento",
   "tips.mcpFromFile.text": "¿Tienes un servidor como definición .json o como .zip de su carpeta? Agregar servidor MCP desde un archivo, en la vista MCP, muestra lo que ejecuta y lo agrega desactivado: actívalo allí para elegir sus proyectos.",
   "tips.mcpFromFile.title": "Agrega un servidor MCP desde un archivo",
   "tips.mcpPerAgent.text": "En la configuración de un agente, Servidores MCP: Solo estos le da solo los servidores que necesita, como un servidor de sandbox para quien prueba una versión, y deja las herramientas de los demás fuera de su contexto.",

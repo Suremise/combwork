@@ -252,6 +252,8 @@
   "tips.loopLanes.title": "Hive garde tes boucles de cartes en couloirs",
   "tips.loopWakes.text": "Quand une carte arrive en Relecture, Hive réveille son relecteur, et au verdict son auteur, même si l’un d’eux a oublié d’attendre. Pour mener les relectures à la main, désactive Réveiller relecteurs et auteurs dans Gestion de versions → Flux de travail → Boucles de cartes du projet.",
   "tips.loopWakes.title": "Les boucles avancent toutes seules",
+  "tips.mainProcessStalls.text": "La saisie a ramé un instant ? Performances → Blocages du processus principal liste les moments où le processus principal de Hive a été occupé depuis son démarrage : combien de temps, s’il travaillait ou attendait, et ce qui était en cours.",
+  "tips.mainProcessStalls.title": "Comprends pourquoi Hive a ralenti",
   "tips.mcpFromFile.text": "Tu as un serveur sous forme de définition .json ou de .zip de son dossier ? Ajouter un serveur MCP depuis un fichier, dans la vue MCP, montre ce qu’il exécute et l’ajoute désactivé : active-le là pour choisir ses projets.",
   "tips.mcpFromFile.title": "Ajouter un serveur MCP depuis un fichier",
   "tips.mcpPerAgent.text": "Dans les paramètres d’un agent, Serveurs MCP : Seulement ceux-ci ne lui donne que les serveurs dont il a besoin, comme un serveur de sandbox pour un testeur de versions, et garde les outils des autres hors de son contexte.",

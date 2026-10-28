@@ -2,7 +2,8 @@
 // overlapped it (IPC calls, Agent API requests, hooks, and HI-1692's synchronous steps: a database's BEGIN or commit) and
 // the main thread's CPU time. A gap the watchdog thread had too is the whole process paused, not a stall (HI-1692).
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { apiLabel, beginWork, fileWaitWatcher, hookLabel, stallClock, stallWatcher, timedStep, workDuring, FILE_WAIT_TIMING, STALL_TIMING } from '../src/main/mainStalls'
+import { apiLabel, beginWork, fileWaitWatcher, hookLabel, keepStall, recentStalls, resetStallsForTests, stallClock, stallWatcher, timedStep, workDuring, FILE_WAIT_TIMING, STALL_TIMING } from '../src/main/mainStalls'
+import { MAIN_STALLS_KEPT, mostlyWaiting, type MainStall } from '../src/shared/mainStalls'
 import { noteStep } from '../src/main/stallWork'
 import { pausedAlongside, probeEnded, slowProbe, watchdogTick, PROBE_SLOW_MS, WATCHDOG_SLOTS } from '../src/main/stallWatchdog'
 
@@ -28,7 +29,10 @@ function watcher() {
   const infos: string[] = []
   /** Whether the watchdog thread stopped over a span too (the whole process paused). */
   const watchdog = { paused: false, asked: [] as [number, number][] }
+  /** The stalls kept for the Performance view (HI-1135), with their end. */
+  const recorded: { stall: Omit<MainStall, 'at'>; end: number }[] = []
   const w = stallWatcher({
+    record: (stall, end) => recorded.push({ stall, end }),
     now: () => now,
     longestDelayMs: () => {
       const d = delay
@@ -49,6 +53,7 @@ function watcher() {
     warnings,
     infos,
     watchdog,
+    recorded,
     /** The loop held for `ms` (using `cpuMs` of CPU), then the next tick. */
     stall(ms: number, cpuMs = ms) {
       now += ms
@@ -240,6 +245,112 @@ describe('main process stalls (#1109)', () => {
     done()
     now += 1000
     expect(workDuring(base + 900, base + 1200).work).toEqual(['ipc inside (0.1 s)'])
+  })
+})
+
+describe("the Performance view's stalls (HI-1135)", () => {
+  beforeEach(() => resetStallsForTests())
+
+  it('keeps a stall with its length and CPU, the step that held the thread apart from the work that overlapped it', () => {
+    const s = watcher()
+    s.tick()
+    const call = beginWork('ipc tasks:list')
+    let route = 'api POST /v1/tasks'
+    const request = beginWork(() => route)
+    timedStep('db commit hive.db', () => s.stall(900, 40))
+    call()
+    s.settle()
+    expect(s.recorded).toHaveLength(1)
+    const { stall, end } = s.recorded[0]
+    expect(end).toBe(now)
+    expect(stall).toMatchObject({ ms: 900, cpuMs: 40, stepsMore: 0, workMore: 0 })
+    expect(stall.steps).toEqual([{ label: 'db commit hive.db', count: 1, ms: 900, running: false }])
+    expect(stall.work).toEqual(expect.arrayContaining([{ label: 'ipc tasks:list', count: 1, ms: 900, running: false }, { label: 'api POST /v1/tasks', count: 1, ms: 900, running: true }]))
+    // Copied as it was: a label made later, or the work ending later, doesn't change it.
+    route = 'api POST /v1/changed'
+    now += 5000
+    request()
+    expect(stall.work.find((w) => w.label.startsWith('api'))).toEqual({ label: 'api POST /v1/tasks', count: 1, ms: 900, running: true })
+    // As the log says it, the same CPU.
+    expect(s.warnings[0]).toMatch(/^The main process was busy for 900 ms \(main thread CPU 40 ms\)/)
+  })
+
+  it("lists each label once with its count and total, the longest total first, and counts the works of those left out (the Assistant's review)", () => {
+    const s = watcher()
+    s.tick()
+    // A burst of one call, short each (a stall needs some overlap), beside one long call and six other labels.
+    for (let i = 0; i < 4; i++) ran('ipc performance:stalls', 1)
+    const long = beginWork('ipc queue:list')
+    for (let i = 0; i < 6; i++) ran(`ipc other-${i}`, 10 + i)
+    s.stall(1500, 1500)
+    long()
+    s.settle()
+    const { work, workMore } = s.recorded[0].stall
+    expect(work).toHaveLength(5)
+    expect(work[0]).toMatchObject({ label: 'ipc queue:list', count: 1 })
+    expect(new Set(work.map((w) => w.label)).size).toBe(5)
+    // Shown longest first; the four 0 ms calls are one label, its four works counted among the more.
+    expect(work.map((w) => w.ms)).toEqual([...work.map((w) => w.ms)].sort((a, b) => b - a))
+    expect(work.some((w) => w.label === 'ipc performance:stalls')).toBe(false)
+    expect(workMore).toBe(4 + 2)
+    // Ranked by total: four of them at 30 ms each outrank one at 100 ms.
+    const t = watcher()
+    t.tick()
+    noteStep('db transaction a database', now - 100)
+    for (let i = 0; i < 4; i++) noteStep('db open hive.db', now - 30)
+    t.stall(900, 0)
+    t.settle()
+    expect(t.recorded[0].stall.steps).toEqual([
+      { label: 'db open hive.db', count: 4, ms: 120, running: false },
+      { label: 'db transaction a database', count: 1, ms: 100, running: false }
+    ])
+  })
+
+  it("keeps every stall in the log's quiet minute, which the log leaves out", () => {
+    const s = watcher()
+    for (const ms of [400, 500, 600]) {
+      s.stall(ms)
+      s.settle()
+    }
+    expect(s.warnings).toHaveLength(1)
+    expect(s.recorded.map((r) => r.stall.ms)).toEqual([400, 500, 600])
+  })
+
+  it("keeps no pause: the PC's sleep, or the whole process paused", () => {
+    const s = watcher()
+    s.tick()
+    s.w.power()
+    s.stall(18_695, 3)
+    s.w.power()
+    s.settle()
+    for (let i = 0; i < 20; i++) s.tick()
+    s.watchdog.paused = true
+    s.stall(7957, 0)
+    s.settle()
+    expect(s.infos).toHaveLength(2)
+    expect(s.recorded).toEqual([])
+  })
+
+  it('keeps CPU it can\'t tell as unknown, never as waiting; little CPU is waiting', () => {
+    const kept: Omit<MainStall, 'at'>[] = []
+    let t = now
+    const w = stallWatcher({ now: () => t, longestDelayMs: () => 0, cpuMs: () => null, defer: (fn) => fn(), warn: () => undefined, info: () => undefined, record: (stall) => kept.push(stall) })
+    t += 500 + 800
+    w.tick()
+    expect(kept).toEqual([{ ms: 800, cpuMs: null, steps: [], stepsMore: 0, work: [], workMore: 0 }])
+    expect(mostlyWaiting(kept[0])).toBe(false)
+    expect(mostlyWaiting({ ms: 800, cpuMs: 399 })).toBe(true)
+    expect(mostlyWaiting({ ms: 800, cpuMs: 400 })).toBe(false)
+  })
+
+  it(`lists the last ${MAIN_STALLS_KEPT}, newest first, and counts them all`, () => {
+    const stall = (i: number): MainStall => ({ at: 1000 + i, ms: 300 + i, cpuMs: 100, steps: [], stepsMore: 0, work: [], workMore: 0 })
+    for (let i = 0; i < MAIN_STALLS_KEPT + 10; i++) keepStall(stall(i))
+    const r = recentStalls()
+    expect(r.total).toBe(MAIN_STALLS_KEPT + 10)
+    expect(r.stalls).toHaveLength(MAIN_STALLS_KEPT)
+    expect(r.stalls[0].ms).toBe(300 + MAIN_STALLS_KEPT + 9)
+    expect(r.stalls.at(-1)!.ms).toBe(310)
   })
 })
 
