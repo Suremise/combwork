@@ -92,6 +92,7 @@ Hive 1.0 adds a workflow layer: your project's options decide how a card goes fr
 - **Undo the Assistant's changes.** Hive keeps what the Assistant changes for 7 days, grouped by your message. **Done by the Assistant** in its panel lists them, each with **Undo**, and a message's **Undo** takes back all of its changes, keeping what you or an agent changed since and saying so; you can also ask the Assistant to undo. It no longer stops after 30 changes for one message (#1170, #1282, #1283).
 - **It asks you less.** Its skills and modes describe what Hive now decides (a lane's review, its round limit, who merges, a lane's end), so it doesn't ask you about them; Coordinator looks a fact up before asking you, and Release manager asks for each step that builds, versions, merges, tags or publishes (#1527, #1528).
 - **A fold button on its panel** (Ctrl+Alt+I), as the Progress panel has (#1330).
+- **It sets a team up from a template.** Ask the Assistant to load a template into a project (*"load Team 3×3 into web, and call the first builder Coder"*): it shows who goes and who comes, names another project already uses (with free ones), and what the template's workflow would change, then loads it as Load template does and saves its workflow options, never setting up Git for you. **Undo** puts the project's agents, layout and options back (HI-1502).
 
 ### Connections
 
@@ -175,6 +176,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 ### Fixes
 
 - **Starting a card back from Review starts its agent.** Starting a card in Review with its builder stopped (the Assistant's `hive_start_task`, the board's Start) moved the card to Doing and replied *Started*, but never launched the builder or gave it the card, when the card had been built in a slot. Hive now launches the builder with the card and the note, as for a card in Doing (HI-1953).
+- **Loading a template ends the replaced agents' lanes.** A card loop whose builder or reviewer a template's load removed stayed running with nobody on it; it now ends as it does when you remove the agent, and the removed agent's kept terminal output goes with it (HI-1502).
 - **The Progress panel's "runs failed" line stays in sight.** On the Pulse tab it sat under the runs going on, so with several runs it was pushed out of view. It now sits above them, under the merge going on (HI-1923).
 - **No control characters in prompts Hive types.** A prompt Hive typed into Codex (or a slash command, or Compact's focus) kept control characters such as Ctrl+C, which Codex could take as an interrupt. They're left out now, as they were from pasted prompts (HI-1920).
 - **Switching a running agent to a mode that needs a restart waits for it to stop.** A CLI slow to exit (more than 8 seconds) made the switch fail with *This agent is already running or starting*. Hive now waits as long as that CLI may take to end, and in a slot for its earlier session to release it. If the agent still hasn't stopped, it says so and starts nothing (HI-1869).

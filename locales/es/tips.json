@@ -63,6 +63,8 @@
   "tips.assistantStatus.title": "Qué está haciendo el Asistente",
   "tips.assistantTeam.text": "Con tres o más agentes, o con autores y revisores, pide al Asistente en el modo Coordinador que lleve tus tarjetas como carriles: las reparte según los archivos que tocan, instruye a cada pareja y vigila cada carril hasta el final. Con uno o dos agentes, no se mete.",
   "tips.assistantTeam.title": "El Asistente dirige tu equipo",
+  "tips.assistantTemplates.text": "Pídele al Asistente que cargue una plantilla en un proyecto y ponle a cada agente el nombre que quieras: primero muestra qué cambiaría, aplica el flujo de trabajo de la plantilla y Deshacer devuelve los agentes anteriores.",
+  "tips.assistantTemplates.title": "Haz que el Asistente prepare un equipo",
   "tips.assistantToldWaiting.text": "Mientras el Asistente vigila los carriles, un agente que muestra una solicitud de permiso o te pregunta algo lo despierta, y te dice qué agente es, su tarjeta y qué pregunta. Nunca responde por ti. Su vigilancia también puede seguir una tarjeta de versión fuera de los carriles.",
   "tips.assistantToldWaiting.title": "El Asistente te avisa cuando un agente te necesita",
   "tips.assistantUndo.text": "Hecho por el Asistente lista sus cambios por tu mensaje. Deshacer en un cambio lo revierte, y Deshacer en un mensaje revierte todos sus cambios; se conserva lo que hayan cambiado desde entonces tú o un agente.",

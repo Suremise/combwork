@@ -32,19 +32,18 @@ import {
   type TemplateScope
 } from '../shared/templates'
 import { HIVE_TEMPLATES, hiveTemplate, type HiveTemplate } from '../shared/templateDefaults'
-import type { AgentBranchStatus, AgentDef, ConnectionProblem, ProjectConfig, ProviderId, TemplateLoadPlan, TemplateLoadWorkflow } from '../shared/types'
+import type { AgentBranchStatus, AgentDef, ConnectionProblem, PageLayout, ProjectConfig, ProviderId, TemplateLoadPlan, TemplateLoadWorkflow } from '../shared/types'
 import { hasWorkflow, overlayTemplateWorkflow, readTemplateWorkflow, templateWorkflowOf, TEMPLATE_PLATFORMS, type TemplateWorkflow, type TemplateWorkflows } from '../shared/workflow/templateOptions'
 import type { PlatformId } from '../shared/platform/descriptors'
 import { workflowForm } from './workflow/optionsForm'
 import { config } from './config'
 import { placeKey, readKeptJson, withFileLock, writeKeptJson, writeTextAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
-import { addAgent, agentLimit, prepareAgent } from './projectAgents'
+import { addAgent, agentLimit, agentsGone, prepareAgent } from './projectAgents'
 import { assertConnectionHere, connectionProblem, getAccount } from './accounts'
 import { projectKeyOf } from './projectKeys'
 import { providerService } from './providerService'
 import { sessions } from './sessions'
-import { endReviews, releaseAgentCards } from './tasks'
 import { workspace, workspaceOf } from './workspace'
 import * as wt from './worktrees'
 import { legacySetupPending, legacyWorktree } from '../shared/agentFolders'
@@ -78,6 +77,9 @@ const refusal = (m: Msg, values?: TextValues, kind?: 'invalid' | 'notFound' | 'c
 
 /** Templates' refusals and the load plan's reasons, which only the window reads (#849): IPC shows them in its language. */
 const M = {
+  loading: msg({ id: 'content.templates.loading', defaultMessage: 'A template is already being loaded into this project.', description: 'An error loading a template while another load into the same project is under way.' }),
+  fenced: msg({ id: 'content.templates.fenced', defaultMessage: 'A template is being loaded into this project', description: "Why an agent can't start (followed by \", so its agents can't start now.\"): a template is replacing the project's agents. A sentence without its full stop." }),
+  restoring: msg({ id: 'content.templates.restoring', defaultMessage: "Undo is putting this project's agents back as they were before a template was loaded", description: "Why an agent can't start (followed by \", so its agents can't start now.\"): the Hive Assistant's undo is putting back the agents a template's load replaced (HI-1502). A sentence without its full stop." }),
   gone: msg({ id: 'content.templates.gone', defaultMessage: 'That template is no longer there.', description: 'An error: the template was deleted or renamed meanwhile.' }),
   nameTaken: msg({ id: 'content.templates.nameTaken', defaultMessage: 'There is already a template called "{name}" there.', description: 'An error renaming or editing a template: another template where it is kept (the workspace or a project) is called {name}.' }),
   provider: msg({ id: 'content.templates.provider', defaultMessage: '{problem, select, unknown {This Hive doesn\'t know the coding agent "{provider}" (update Hive)} off {{provider} is turned off (Settings → Providers)} other {{provider} isn\'t installed (Provider Setup)}}', description: "Why a template can't be loaded: a coding agent CLI it needs. {problem} is why: unknown ({provider} is the id the template gives, which this version of Hive doesn't know), off (turned off in Settings → Providers), or not installed (Provider Setup is a Help window). {provider} is otherwise its name (\"Codex\")." }),
@@ -505,6 +507,12 @@ export async function templatePlan(projectPath: string, scope: TemplateScope, fi
   return (await planFor(projectPath, scope, file, from, names, reads)).plan
 }
 
+/** The plan with what stops it in English (HI-1502: the Agent API's), where `blocked` says it in the window's language. */
+export async function templatePlanEnglish(projectPath: string, scope: TemplateScope, file: string, from?: string, names?: string[]): Promise<{ plan: TemplateLoadPlan; why: string[] }> {
+  const { plan, why } = await planFor(projectPath, scope, file, from, names)
+  return { plan, why: why.map((w) => englishText(w)) }
+}
+
 /** The plan, with what stops it as text (`why`, which `blocked` says in the window's language): a load refuses with it. */
 async function planFor(projectPath: string, scope: TemplateScope, file: string, from?: string, names?: string[], reads?: wt.RepoReads): Promise<{ plan: TemplateLoadPlan; why: TextPart[] }> {
   projectPath = workspace.assertProject(projectPath)
@@ -639,6 +647,19 @@ export const testHooks: {
 /** Loads under way, by project: one at a time each. */
 const loading = new Set<string>()
 
+/** Names another project's agent has, worded as the caller refuses them (HI-1502: the Agent API's with a free name for each). */
+type Taken = (clash: { name: string; project: string }[]) => Error | Promise<Error>
+
+/** A load's result as the Agent API reports it and undo records it (HI-1502): the agents and layout before and after. */
+export interface TemplateLoaded {
+  created: string[]
+  removed: string[]
+  workflow: TemplateWorkflow | null
+  plan: TemplateLoadPlan
+  before: { agents: AgentDef[]; layout: PageLayout }
+  after: { agents: AgentDef[]; layout: PageLayout }
+}
+
 /**
  * Replaces the project's agents with a template's, and its layout (#126). `expected` is the agents the user was shown
  * (their ids, in order). `from`: the project a project's template is kept in, when it isn't this one (#127: the Templates
@@ -648,32 +669,48 @@ const loading = new Set<string>()
  *   running or starting refuses it, as do the other checks of the plan.
  * - **Staged, then published at once:** the new agents are made without touching project.json, each in the project
  *   folder with its role in the workflow, note and pairing (#1436); then one write under the project file's lock swaps
- *   in the new agents and layout — only if the agents are still exactly those shown and none runs or is starting.
- *   Anything else (an agent added or removed meanwhile) refuses the load: no change made meanwhile is lost, and nothing
- *   half loaded is ever seen.
+ *   in the new agents and layout (`replaceProjectAgents`) — only if the agents are still exactly those shown and none
+ *   runs or is starting. Anything else (an agent added or removed meanwhile) refuses the load: no change made meanwhile
+ *   is lost, and nothing half loaded is ever seen.
  * - The removed agents' worktrees and branches stay (to merge or reuse), their conversations stay in the Sessions tab,
- *   and their open cards go back (nobody has them; Doing ones to Todo).
+ *   their open cards go back (nobody has them; Doing ones to Todo), and their lanes are abandoned (`agentsGone`).
  * - The template's suggested preset is only offered (the window opens the Workflow section with it), never applied here;
  *   so is its workflow (HI-1910): returned as this load read it, for the window to fill in the Workflow form with.
  */
 export async function loadTemplate(projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[], connections?: Record<number, string | null>): Promise<{ created: string[]; removed: string[]; workflow: TemplateWorkflow | null }> {
+  const r = await loadTemplateWith(projectPath, scope, file, expected, { from, names, connections })
+  return { created: r.created, removed: r.removed, workflow: r.workflow }
+}
+
+/**
+ * The load (loadTemplate), with what the Agent API needs (HI-1502): `check` runs with the plan about to be staged, inside
+ * the load's guard and fence, before anything is made (its refusal refuses the load), so what the caller does with the
+ * plan's workflow is the same read of the template as the agents it loads; `guard` runs at the publish itself, under the
+ * project file's lock (its throw publishes nothing); `taken` words a refusal for names another project's agent has, in the
+ * plan or at the names lock (the window's words without it); the result has the agents and layout before and after, for
+ * undo.
+ */
+export async function loadTemplateWith(projectPath: string, scope: TemplateScope, file: string, expected: string[], o: { from?: string; names?: string[]; connections?: Record<number, string | null>; check?: (plan: TemplateLoadPlan) => Promise<void>; guard?: () => void; taken?: Taken } = {}): Promise<TemplateLoaded> {
   projectPath = workspace.assertProject(projectPath)
-  const key = projectPath.toLowerCase()
-  if (loading.has(key)) throw refusal(msg({ id: 'content.templates.loading', defaultMessage: 'A template is already being loaded into this project.', description: 'An error loading a template while another load into the same project is under way.' }), undefined, 'conflict')
-  loading.add(key)
-  const unfence = sessions.fenceStarts(projectPath, msg({ id: 'content.templates.fenced', defaultMessage: 'A template is being loaded into this project', description: "Why an agent can't start (followed by \", so its agents can't start now.\"): a template is replacing the project's agents. A sentence without its full stop." }))
-  try {
+  return whileReplacing(projectPath, M.fenced, async () => {
     // The plan's reads of the repository, which staging goes on using (#732).
     const reads = new wt.RepoReads(projectPath)
-    const { plan, why } = await planFor(projectPath, scope, file, from, names, reads)
+    const { plan, why } = await planFor(projectPath, scope, file, o.from, o.names, reads)
     if (why.length) throw new TemplateError({ lines: [msg({ id: 'content.templates.cantLoad', defaultMessage: "The template can't be loaded yet:", description: "An error loading a template, above the list of what stops it (each line a reason)." }), ...why.map((item) => withValues(msg({ id: 'content.templates.bullet', defaultMessage: '• {item}', description: 'A line of a list of reasons: a bullet, then the reason {item}.' }), { item }))] })
     const changed = (ids: string[]): boolean => !Array.isArray(expected) || ids.length !== expected.length || ids.some((id, i) => id !== expected[i])
     if (changed(plan.remove.map((a) => a.id))) throw refusal(msg({ id: 'content.templates.changedSince', defaultMessage: "The project's agents changed since you looked: open the template again.", description: "An error loading a template: the project's agents changed after the Load template dialog showed them." }), undefined, 'conflict')
-    if (plan.taken.length) throw new TemplateError(takenText(plan.taken), { kind: 'conflict' })
-    const connectionAt = connectionsFor(projectPath, plan, connections)
+    if (plan.taken.length) throw o.taken ? await o.taken(plan.taken) : new TemplateError(takenText(plan.taken), { kind: 'conflict' })
+    const connectionAt = connectionsFor(projectPath, plan, o.connections)
+    await o.check?.(plan)
     const cfg = await workspace.projectConfig(projectPath)
     const staged: { def: AgentDef; discard: () => Promise<void> }[] = []
-    let old: AgentDef[] = []
+    // What the caller's guard threw or its names refusal made: the caller's refusals, passed on unwrapped.
+    const fromCaller = new WeakSet<object>()
+    const callers = <T>(e: T): T => {
+      if (e && typeof e === 'object') fromCaller.add(e)
+      return e
+    }
+    let before: { agents: AgentDef[]; layout: PageLayout }
     try {
       for (const [i, a] of plan.create.entries()) {
         const opts = { name: a.name, role: a.note, workflowRole: a.role, provider: a.provider, model: a.model, effort: a.effort, permissionMode: a.permissionMode, use200kContext: a.use200kContext, mcpServers: a.mcpServers, connection: connectionAt(i), location: 'project' as const }
@@ -688,48 +725,101 @@ export async function loadTemplate(projectPath: string, scope: TemplateScope, fi
         b.pairedWith = r.name
         r.pairedWith = b.name
       }
-      // Published at once, under the lock, on the agents as they are now; their names checked with it, holding the
-      // workspace's names lock (#702): another project may have taken one meanwhile.
-      await withAgentNames(projectPath, async () => {
-        const others = (await workspaceAgents(projectPath)).filter((a) => a.project.toLowerCase() !== basename(projectPath).toLowerCase())
-        const clash = staged.flatMap((s) => {
-          const owner = nameTaken(s.def.name, others)
-          return owner ? [{ name: s.def.name, project: owner.project }] : []
-        })
-        if (clash.length) throw new TemplateError(takenText(clash, true), { kind: 'conflict' })
-        await workspace.mutateProjectConfig(projectPath, (now) => {
-          const list = projectAgents(now)
+      before = await replaceProjectAgents(projectPath, {
+        next: staged.map((s) => s.def),
+        layout: plan.layout,
+        check: (list) => {
+          // The caller's guard (the Assistant's control and launch, HI-1502) at the write itself, under the lock.
+          try {
+            o.guard?.()
+          } catch (e) {
+            throw callers(e)
+          }
           if (changed(list.map((a) => a.id))) throw refusal(msg({ id: 'content.templates.changedWhile', defaultMessage: "The project's agents changed while the template was loading: nothing was changed. Open the template again.", description: "An error loading a template: the project's agents changed while it loaded, so nothing changed." }), undefined, 'conflict')
-          if (list.some((a) => busy(projectPath, a.id))) throw refusal(msg({ id: 'content.templates.started', defaultMessage: 'An agent started meanwhile: nothing was changed. Stop it first.', description: "An error loading a template: one of the project's agents started while it loaded, so nothing changed." }), undefined, 'conflict')
-          // The limit as it is now: Settings may have lowered it since the plan.
-          const limit = agentLimit(projectPath)
-          if (staged.length > limit) throw refusal(M.nothing, { problem: templateLimitText(staged.length, limit) })
-          // Each one's connection as it is now (HI-1769): one turned off or removed while they were prepared stops the load.
-          for (const { def } of staged) if (def.connection) assertConnectionHere(def.connection, def.provider!, projectPath, def.name)
-          old = list
-          // A removed agent's worktree whose setup never ran is remembered for the next agent given it (#289).
-          const pending = [...(Array.isArray(now.setupPending) ? now.setupPending.filter((p) => typeof p === 'string') : []), ...list.filter((a) => legacySetupPending(a)).map((a) => legacyWorktree(a)!.path)]
-          return { agents: staged.map((s) => s.def), layout: plan.layout, setupPending: [...new Map(pending.map((p) => [placeKey(p), p])).values()].slice(-50) }
-        })
+        },
+        taken: o.taken ? async (clash) => callers(await o.taken!(clash)) : (clash) => new TemplateError(takenText(clash, true), { kind: 'conflict' })
       })
     } catch (e) {
       for (const s of staged) await s.discard()
-      throw e instanceof TemplateError ? e : refusal(msg({ id: 'content.templates.failed', defaultMessage: 'Nothing was changed: {error}', description: "An error loading a template: making its agents failed, so nothing changed; {error} is why (often git's own words)." }), { error: errorText(e) })
+      // A refusal (Hive's, or the caller's guard's or names' own, HI-1502) goes on as it is, its kind and status kept; a
+      // failure making the agents is said as one.
+      throw e instanceof HiveError || fromCaller.has(e as object) ? e : refusal(msg({ id: 'content.templates.failed', defaultMessage: 'Nothing was changed: {error}', description: "An error loading a template: making its agents failed, so nothing changed; {error} is why (often git's own words)." }), { error: errorText(e) })
     }
-    const project = basename(projectPath)
-    for (const a of old) {
-      await releaseAgentCards(project, a.id, { kind: 'user' }).catch((err) => log.warn('Could not take back the cards of a removed agent', err))
-      await endReviews(project, a.id, 'the agent was removed', workspaceOf(projectPath)).catch(() => undefined) // i18n-ignore: a ReviewEnd key (tasks.ts words it)
-    }
-    log.info(`Loaded template ${userText(plan.name)} into ${userText(projectPath)}: ${old.length} agents removed, ${staged.length} created${plan.swaps.length ? `, ${plan.swaps.length} on another provider` : ''}`)
-    await workspaceOf(projectPath).refresh()
+    log.info(`Loaded template ${userText(plan.name)} into ${userText(projectPath)}: ${before.agents.length} agents removed, ${staged.length} created${plan.swaps.length ? `, ${plan.swaps.length} on another provider` : ''}`)
+    await agentsGone(projectPath, before.agents.map((a) => a.id))
     // The workflow section of the template as this load read it (HR5's HI-1910 round 1): the window applies it only if it
     // is the one it showed, never one read before the template changed.
-    return { created: staged.map((s) => s.def.name), removed: old.map((a) => a.name), workflow: plan.workflow?.section ?? null }
+    const after = { agents: staged.map((s) => s.def), layout: plan.layout }
+    return { created: after.agents.map((a) => a.name), removed: before.agents.map((a) => a.name), workflow: plan.workflow?.section ?? null, plan, before, after }
+  })
+}
+
+/**
+ * Runs a replacement of the project's agents (a load, undo putting them back): one per project at a time (another is
+ * refused), the project's agents unable to start for the whole of it (a fence, `fenceWhy`), lifted however it ends.
+ */
+async function whileReplacing<T>(projectPath: string, fenceWhy: Msg, fn: () => Promise<T>): Promise<T> {
+  const key = projectPath.toLowerCase()
+  if (loading.has(key)) throw refusal(M.loading, undefined, 'conflict')
+  loading.add(key)
+  const unfence = sessions.fenceStarts(projectPath, fenceWhy)
+  try {
+    return await fn()
   } finally {
     unfence()
     loading.delete(key)
   }
+}
+
+/**
+ * Publishes a new list of the project's agents and its layout at once (a template's load, undo of one: HI-1502): their
+ * names checked against the other projects' agents holding the workspace's names lock (#702: another project may have
+ * taken one meanwhile; `taken` words the refusal, never a name made up), then one write under the project file's lock,
+ * only if `check` passes on the agents as they are now (the caller's: those it expects), none of them runs or is
+ * starting, the new ones fit Agents per project as it is now and each one's connection can be used here (HI-1769). A
+ * removed agent's worktree whose setup never ran is remembered for the next agent given it (#289). Returns the agents and
+ * layout it replaced; what follows a removal (`agentsGone`) is the caller's, once it is published.
+ */
+async function replaceProjectAgents(projectPath: string, r: { next: AgentDef[]; layout: PageLayout; check: (list: AgentDef[], now: ProjectConfig) => void; taken: Taken }): Promise<{ agents: AgentDef[]; layout: PageLayout }> {
+  let before: { agents: AgentDef[]; layout: PageLayout } | null = null
+  await withAgentNames(projectPath, async () => {
+    const others = (await workspaceAgents(projectPath)).filter((a) => a.project.toLowerCase() !== basename(projectPath).toLowerCase())
+    const clash = r.next.flatMap((d) => {
+      const owner = nameTaken(d.name, others)
+      return owner ? [{ name: d.name, project: owner.project }] : []
+    })
+    if (clash.length) throw await r.taken(clash)
+    await workspace.mutateProjectConfig(projectPath, (now) => {
+      const list = projectAgents(now)
+      r.check(list, now)
+      if (list.some((a) => busy(projectPath, a.id))) throw refusal(msg({ id: 'content.templates.started', defaultMessage: 'An agent started meanwhile: nothing was changed. Stop it first.', description: "An error loading a template: one of the project's agents started while it loaded, so nothing changed." }), undefined, 'conflict')
+      // The limit as it is now: Settings may have lowered it since the plan.
+      const limit = agentLimit(projectPath)
+      if (r.next.length > limit) throw refusal(M.nothing, { problem: templateLimitText(r.next.length, limit) })
+      // Each one's connection as it is now (HI-1769): one turned off or removed while they were prepared stops it.
+      for (const def of r.next) if (def.connection) assertConnectionHere(def.connection, def.provider!, projectPath, def.name)
+      // The layout as kept (auto when none was chosen), so undo puts back exactly what was there.
+      before = { agents: list, layout: now.layout ?? 'auto' }
+      const pending = [...(Array.isArray(now.setupPending) ? now.setupPending.filter((p) => typeof p === 'string') : []), ...list.filter((a) => legacySetupPending(a)).map((a) => legacyWorktree(a)!.path)]
+      return { agents: r.next, layout: r.layout, setupPending: [...new Map(pending.map((p) => [placeKey(p), p])).values()].slice(-50) }
+    })
+  })
+  return before!
+}
+
+/**
+ * Puts a project's agents and layout back as they were before a template's load (the Assistant's undo, HI-1502): as a
+ * load publishes (`replaceProjectAgents`, one replacement at a time, the project's starts fenced for the whole of it),
+ * only if `check` passes on the agents as they are now; the agents it removes (those the load made) go as any removed
+ * agent does (`agentsGone`). The restored agents keep their ids, so their conversations are theirs again.
+ */
+export async function restoreProjectAgents(projectPath: string, back: { agents: AgentDef[]; layout: PageLayout }, check: (list: AgentDef[], now: ProjectConfig) => void, taken: Taken): Promise<void> {
+  projectPath = workspace.assertProject(projectPath)
+  await whileReplacing(projectPath, M.restoring, async () => {
+    const was = await replaceProjectAgents(projectPath, { next: back.agents, layout: back.layout, check, taken })
+    const kept = new Set(back.agents.map((a) => a.id))
+    await agentsGone(projectPath, was.agents.filter((a) => !kept.has(a.id)).map((a) => a.id))
+  })
 }
 
 /**

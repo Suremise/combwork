@@ -97,6 +97,7 @@
   "content.templates.noWorkspace": "Abre primero un espacio de trabajo.",
   "content.templates.nothing": "{problem} No se cambió nada.",
   "content.templates.provider": "{problem, select, unknown {Esta versión de Hive no conoce el agente de programación “{provider}” (actualiza Hive)} off {{provider} está desactivado (Configuración → Proveedores)} other {{provider} no está instalado (Configuración de proveedores)}}",
+  "content.templates.restoring": "Deshacer está devolviendo los agentes de este proyecto a como estaban antes de cargar una plantilla",
   "content.templates.running": "El agente {agent} está en ejecución o iniciándose: detenlo primero.",
   "content.templates.scope": "Ámbito desconocido “{scope}”: hive, workspace o project.",
   "content.templates.started": "Un agente se inició mientras tanto: no se cambió nada. Detenlo primero.",

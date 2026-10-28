@@ -250,10 +250,10 @@ export class WorkflowRefused extends HiveError {
 /**
  * Saves a change to a project's options: checked again under the project's lock (the window's check may be stale), and
  * refused whole with its reasons. `applyTo`: the user's cards in flight to work under the new options from now, each
- * recorded with an Override naming what changed (OP-38: the user only, per change, the cards listed first). Returns the
- * form as it is now.
+ * recorded with an Override naming what changed (OP-38: the user only, per change, the cards listed first). `check`: the
+ * caller's, run at the write itself, under its lock (its throw saves nothing). Returns the form as it is now.
  */
-export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[] } = {}): Promise<WorkflowForm> {
+export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; check?: () => void } = {}): Promise<WorkflowForm> {
   // Checked against the levels as they are now and written in the same turn of workflow writes (#1422), holding the
   // project's repository lock first (#1642 round 5): its target can't move while a clean-up checks a branch against it,
   // from this Hive or another.
@@ -293,7 +293,7 @@ export async function chooseMerge(ws: WorkspaceService, projectPath: string, raw
  * file from it (at the workspace's open, before the queue goes on, before the next save). The board decides; the file
  * follows.
  */
-async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answer?: MergeAnswer }): Promise<WorkflowForm> {
+async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answer?: MergeAnswer; check?: () => void }): Promise<WorkflowForm> {
   const project = projectOf(ws, projectPath)
   await settleLocked(ws, project)
   const cfg = await ws.projectConfig(project.path)
@@ -305,7 +305,11 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
   const plan = planOptions(ws, project, cfg, change, asking && !!o.answer)
   let target = change.options.target ?? ''
   if (!plan.chosen) {
-    await ws.mutateProjectConfig(project.path, (c) => ({ workflow: planOptions(ws, project, c, change, false).workflow, ...LEGACY_CONSUMED }))
+    await ws.mutateProjectConfig(project.path, (c) => {
+      // The caller's own check (HI-1502: the Assistant's guard), at the write itself: under the project file's lock.
+      o.check?.()
+      return { workflow: planOptions(ws, project, c, change, false).workflow, ...LEGACY_CONSUMED }
+    })
     if (!namesOnly(plan.changed) && o.applyTo?.length && plan.changed.length) await applyToInFlight(ws, project, [...new Set(o.applyTo)], plan.changed)
   } else {
     const store = FactStore.forBoard(ws, { project: project.name, key: project.name })
@@ -315,6 +319,8 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
       if (o.answer) target = await stillAsked(ws, project, o.answer)
       // Chosen meanwhile (another Hive's answer): this one is refused, as an answered question's is.
       else if (mergeChoiceOf(ws, project.name)) throw new WorkflowStale()
+      // The caller's own check (HI-1502), in the board change that decides the save.
+      o.check?.()
       const ruleset = mustCompile(options)
       store.saveRuleset(ruleset)
       const cards = o.answer ? (await cardsInFlight(ws, project)).map((c) => c.number) : [...(o.applyTo ?? []), ...(await askedCards(ws, project.path))]

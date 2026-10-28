@@ -63,6 +63,8 @@
   "tips.assistantStatus.title": "Ce que fait l’Assistant",
   "tips.assistantTeam.text": "Avec trois agents ou plus, ou des auteurs et des relecteurs, demande à l’Assistant en mode Coordinateur de mener tes cartes en couloirs : il les répartit selon les fichiers qu’elles touchent, donne ses consignes à chaque binôme et surveille chaque couloir jusqu’au bout. Avec un ou deux agents, il reste en retrait.",
   "tips.assistantTeam.title": "L’Assistant dirige ton équipe",
+  "tips.assistantTemplates.text": "Demande à l’Assistant de charger un modèle dans un projet, en nommant les agents comme tu veux : il montre d’abord ce qui changerait, applique le flux de travail du modèle, et Annuler remet les anciens agents.",
+  "tips.assistantTemplates.title": "Fais monter une équipe par l’Assistant",
   "tips.assistantToldWaiting.text": "Pendant que l’Assistant surveille les couloirs, un agent qui affiche une demande d’autorisation ou te pose une question le réveille, et il te dit quel agent, sa carte et ce qu’il demande. Il ne répond jamais à ta place. Sa surveillance peut aussi suivre une carte de version hors des couloirs.",
   "tips.assistantToldWaiting.title": "L’Assistant te prévient quand un agent a besoin de toi",
   "tips.assistantUndo.text": "Fait par l’Assistant liste ses modifications par message de ta part. Annuler sur une modification la défait, et Annuler sur un message les défait toutes ; les modifications faites depuis, par toi ou un agent, sont conservées.",

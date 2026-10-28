@@ -63,6 +63,8 @@
   "tips.assistantStatus.title": "O que o Assistente está fazendo",
   "tips.assistantTeam.text": "Com três ou mais agentes, ou com executores e revisores, peça ao Assistente no modo Coordenador para conduzir seus cartões como raias: ele os divide pelos arquivos que alteram, instrui cada par e acompanha cada raia até o fim. Com um ou dois agentes, ele não se intromete.",
   "tips.assistantTeam.title": "O Assistente comanda a sua equipe",
+  "tips.assistantTemplates.text": "Peça ao Assistente para carregar um modelo em um projeto, dando a qualquer agente o nome que quiser: ele mostra antes o que mudaria, aplica o fluxo de trabalho do modelo, e Desfazer traz de volta os agentes anteriores.",
+  "tips.assistantTemplates.title": "Peça ao Assistente para montar uma equipe",
   "tips.assistantToldWaiting.text": "Enquanto o Assistente observa as raias, um agente que mostra um pedido de permissão ou pergunta algo a você o acorda, e ele diz qual agente é, o cartão dele e o que pergunta. Ele nunca responde por você. A observação dele também pode acompanhar um cartão de release fora das raias.",
   "tips.assistantToldWaiting.title": "O Assistente avisa quando um agente precisa de você",
   "tips.assistantUndo.text": "Feito pelo Assistente lista as alterações dele por mensagem sua. Desfazer em uma alteração a desfaz, e Desfazer em uma mensagem desfaz todas elas; o que você ou um agente alterou desde então é mantido.",

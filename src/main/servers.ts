@@ -71,6 +71,7 @@ import { isResuming } from './restartResume'
 import { sessions, type HookObservation } from './sessions'
 import { agentPlace, folderFacts } from './agentFolders'
 import { releasableSlots, releaseSlot, SlotReleaseRefused, type HeldRow } from './slotRelease'
+import { findTemplate, loadForAssistant, planReply, templateRows } from './templateApi'
 import { slotAt } from '../shared/agentFolders'
 import { cardStall, laneOrderView, stepWaitOf } from './cardStall'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
@@ -687,7 +688,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 10
+export const API_VERSION = 11
 
 /** Who Hive takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -2089,6 +2090,46 @@ route('POST', '/v1/projects/:name/slots/:slot/release', async ({ params, body })
     await workspaceOf(p).refresh()
     const what = r.kind === 'carried' ? `${r.slot} in ${basename(p)}: no longer kept for ${r.agent.name}` : `${r.slot} in ${basename(p)} from ${r.agent.name}'s ended run${r.ended ? ', its listed processes ended first' : ''}`
     return { done: `Released ${what}`, act: { agent: { id: r.agent.id, name: r.agent.name } }, result: { project: basename(p), ...r, agent: r.agent.name } }
+  })
+})
+
+/** The Assistant's alone (HI-1502): a template's list, plan and load. Project agents, scripts and the user's token are refused before any template is read. */
+function assistantTemplates(what: string): void {
+  if (!assistantCaller()) throw new HttpError(403, `Only the Hive Assistant can ${what} through the Agent API: templates are loaded in Hive's window.`)
+}
+
+/** A body's workflow argument: true unless false (HI-1502: its workflow is applied by default, as the window's tick box is). */
+function workflowArg(body: any): boolean {
+  if (body?.workflow !== undefined && typeof body.workflow !== 'boolean') throw new HttpError(400, 'workflow is true or false')
+  return body?.workflow !== false
+}
+
+// The templates a project can use (HI-1502): Hive's own, the workspace's and its own, a row each.
+route('GET', '/v1/projects/:name/templates', async ({ params }) => {
+  assistantTemplates("list a project's templates")
+  const p = projectByName(params[0])
+  return { project: basename(p), templates: await templateRows(p) }
+})
+
+// What loading a template would do (HI-1502): nothing is changed.
+route('POST', '/v1/projects/:name/templates/plan', async ({ params, body }) => {
+  assistantTemplates('plan loading a template')
+  const p = projectByName(params[0])
+  const e = await findTemplate(p, body ?? {})
+  return (await planReply(p, e, body?.names, workflowArg(body))).reply
+})
+
+// Loading a template (HI-1502): the window's load, its names given, its workflow saved unless workflow is false; undoable.
+route('POST', '/v1/projects/:name/templates/load', async ({ params, body }) => {
+  assistantTemplates('load a template')
+  const p = projectByName(params[0])
+  const applyWorkflow = workflowArg(body)
+  const named = typeof body?.template === 'string' ? clip(body.template, 60) : 'a template'
+  return assistantChange('agents', `load the template "${named}" into ${basename(p)}`, { kind: 'load-template', project: basename(p) }, async (guard) => {
+    const e = await findTemplate(p, body ?? {})
+    const r = await loadForAssistant(p, e, body?.names, applyWorkflow, guard)
+    const wf = r.workflow ? (r.workflow.saved ? `, and its workflow (${r.workflow.changes.length} options changed)` : '; its workflow was not saved') : ''
+    return { done: `Loaded the template "${r.template.name}" into ${r.project}: ${r.created.length} agents${wf}`, stays: UNDO_FINAL.templateCards, result: r }
   })
 })
 

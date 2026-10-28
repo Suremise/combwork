@@ -511,6 +511,15 @@ const prose = (seed, n) => {
   const releasable = measure('hive_release_slot (list)', tool('hive_release_slot', { action: 'list', project: 'alpha' }, 'assistant'), 200)
   check('release slot: nothing to release, in a line', releasable.startsWith('Nothing to release in alpha: '), releasable)
   check('…the tool is the Assistant\'s, not offered to project agents', toolDescription('hive_release_slot') === '' && toolDescription('hive_release_slot', 'assistant').length > 0)
+  // Templates (HI-1502): a line per template; a plan and a load (Team 3×3 into gamma, which has no agents, one named) in
+  // a few lines each; project agents aren't given the tool.
+  const templateList = measure('hive_template (list)', tool('hive_template', { action: 'list', project: 'gamma' }, 'assistant'), 1200)
+  check('templates: a line each, with the scope and file to name it by', templateList.split('\n').some((l) => l.startsWith('Team 3×3 (scope hive, file team-3x3.json): 6 agents')), templateList)
+  const templatePlan = measure('hive_template (plan)', tool('hive_template', { action: 'plan', project: 'gamma', template: 'team-3x3.json', names: { 1: 'Gamma lead' } }, 'assistant'), 1500)
+  check('…a plan: who comes, the name given beside its own', /^"Team 3×3" into gamma: removes no agents; creates Gamma lead \([A-Z]+-B1\) builder with [A-Z]+-R1/.test(templatePlan), templatePlan)
+  const templateLoaded = measure('hive_template (load)', tool('hive_template', { action: 'load', project: 'gamma', template: 'team-3x3.json', names: { 1: 'Gamma lead' } }, 'assistant'), 1500)
+  check('…a load: what it made, the name given, and that undo puts it back', /^Loaded "Team 3×3" into gamma: removed no agents; created Gamma lead, .*hive_undo can put the agents and options back\.$/.test(templateLoaded), templateLoaded)
+  check('…the tool is the Assistant\'s, not offered to project agents', toolDescription('hive_template') === '' && toolDescription('hive_template', 'assistant').length > 0)
 
   console.log('\n--- Agent API routes not behind a tool')
   const route = async (label, method, p, body) => measure(`API ${label}`, (await api(method, p, body)).text)

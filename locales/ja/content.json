@@ -97,6 +97,7 @@
   "content.templates.noWorkspace": "先にワークスペースを開いてください。",
   "content.templates.nothing": "{problem}何も変更していません。",
   "content.templates.provider": "{problem, select, unknown {このHiveではコーディングエージェント「{provider}」を使えません（Hiveを更新してください）} off {{provider}がオフになっています（「設定」→「プロバイダー」）} other {{provider}がインストールされていません（「プロバイダーのセットアップ」）}}",
+  "content.templates.restoring": "元に戻す操作で、このプロジェクトのエージェントをテンプレート読み込み前の状態に戻しています",
   "content.templates.running": "{agent}が実行中か起動中です。先に停止してください。",
   "content.templates.scope": "不明なスコープ「{scope}」：hive、workspace、projectのいずれかです。",
   "content.templates.started": "読み込み中にエージェントが起動したため、何も変更していません。先に停止してください。",

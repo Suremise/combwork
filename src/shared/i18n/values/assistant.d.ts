@@ -720,6 +720,7 @@ interface HiveMessageValues {
   'assistant.undo.why.start': undefined
   'assistant.undo.why.startReview': undefined
   'assistant.undo.why.submit': undefined
+  'assistant.undo.why.templateCards': undefined
   'assistant.undo.why.verdict': undefined
   'assistant.undo.why.withdrawn': undefined
   'assistant.undo.working': undefined

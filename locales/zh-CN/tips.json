@@ -63,6 +63,8 @@
   "tips.assistantStatus.title": "助手在做什么",
   "tips.assistantTeam.text": "有三个或更多智能体，或者有构建者和评审者时，可以让“协调员”模式的助手以通道方式运行你的卡片：它按卡片涉及的文件拆分，向每一对交代任务，并监视每个通道直到结束。只有一两个智能体时，它不会插手。",
   "tips.assistantTeam.title": "让助手管理你的团队",
+  "tips.assistantTemplates.text": "让助手把模板加载到项目中，任意智能体都可以按你的意思命名：它会先显示将要更改的内容，再应用模板的工作流程；撤销会把原来的智能体恢复回来。",
+  "tips.assistantTemplates.title": "让助手搭建团队",
   "tips.assistantToldWaiting.text": "助手监视通道时，若有智能体显示权限提示或向你提问，助手就会被唤醒，并告诉你是哪个智能体、它的卡片以及它问了什么。助手从不替你回答。它的监视也可以跟进通道之外的发布卡片。",
   "tips.assistantToldWaiting.title": "智能体需要你时，助手会告诉你",
   "tips.assistantUndo.text": "“助手执行的操作”按你的消息列出它的更改。对某项更改点“撤销”会将其恢复，对某条消息点“撤销”会恢复它的全部更改；此后你或智能体所做的更改会保留。",

@@ -29,6 +29,7 @@ export const ACTIVITY_KINDS = [
   'queue-pause',
   'queue-resume',
   'release-slot',
+  'load-template',
   'create-project',
   'activate-project',
   'deactivate-project',
@@ -139,7 +140,8 @@ export const UNDO_FINAL = {
   retriedMerge: "Its Retry merge stays in the card's work.",
   queuePaused: "A merge queue it paused stays paused: resume it if it should run.",
   queueResumed: "A merge queue it resumed isn't paused again: pause it if it shouldn't run.",
-  slotReleased: "A slot it released isn't kept or held again: the next work that needs a slot may take it."
+  slotReleased: "A slot it released isn't kept or held again: the next work that needs a slot may take it.",
+  templateCards: "The cards and lanes of the agents a template replaced stay as the load left them (cards put back, lanes ended): undo doesn't give them back."
 } as const
 
 /** A reason a change of the Assistant's, or part of it, can't be undone (UNDO_FINAL's codes). */

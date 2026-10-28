@@ -97,6 +97,7 @@
   "content.templates.noWorkspace": "请先打开工作区。",
   "content.templates.nothing": "{problem}未做任何更改。",
   "content.templates.provider": "{problem, select, unknown {此 Hive 不认识提供方“{provider}”（请更新 Hive）} off {{provider} 已关闭（“设置”→“提供方”）} other {{provider} 未安装（“配置提供方”）}}",
+  "content.templates.restoring": "撤销正在把此项目的智能体恢复为加载模板之前的样子",
   "content.templates.running": "{agent} 正在运行或启动：请先停止它。",
   "content.templates.scope": "未知的范围“{scope}”：应为 hive、workspace 或 project。",
   "content.templates.started": "期间有智能体启动了：未做任何更改。请先停止它。",
