@@ -36,6 +36,21 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## A decision that answers a card's open requests (HI-1932): fakes, Claude Code Haiku, fixtures v97, 28 October 2026
+
+`hive_update_task` gains `answers` (the Assistant's only: the ids of the card's open requests the user's decision answers,
+closed with it in one write), and `hive_read_task` lists a card's open requests for the user (`forYou`) with their ids.
+Two new scenarios: **assistant-decision-answers** (the user's answer covers both of Coder's questions: both named) and
+**assistant-decision-answers-one** (it covers only the first: only that one named).
+- **Fakes**: the 144 scenarios both ran are the same before (`hi1932-before`, `results/2026-10-28T12-23-06-fake`, the
+  tools as they were) and after (`hi1932-after`, `results/2026-10-28T14-01-55-fake`), but for assistant-agent-watch,
+  which failed one check before the change and passes after (unrelated to it); the two new ones pass. The tool list a
+  start is given grew 55 bytes on average (39,522 to 39,577).
+- **Haiku** (CLI 2.1.312, `--repeat 5`, $0.083; `results/2026-10-28T14-57-53-claude-code`): **5 of 5** for both
+  questions, **4 of 5** for one. The miss recorded the decision and named no request: the question stays open in For
+  you, the safe side (nothing was closed that the answer doesn't cover).
+- **Claude Code's default model** (`results/2026-10-28T15-04-45-claude-code`, $0.38): both pass.
+
 ## A follow-up in Review handed over before the wait (HI-1843): fakes, Claude Code Haiku, fixtures v96, 28 October 2026
 
 HI-1832's Haiku trials of card-loop-follow-up passed 1 of 5, that one only through the plain submit's refusal. Their

@@ -449,7 +449,7 @@ const check = (name, ok, extra = '') => {
     const cardNow = await card(t)
     const decisionId = cardNow.decisions?.find((d) => d.text === 'The bee icon, in amber.')?.id
     check('…the decision on the card, recorded by the Assistant', !!decisionId && cardNow.decisions.find((d) => d.id === decisionId).recordedBy === 'Assistant', JSON.stringify(cardNow.decisions))
-    check('…a history line for each, by the Assistant', cardNow.history.filter((h) => h.by === 'Assistant' && /^Closed a question for you with your decision/.test(h.what)).length === 2, JSON.stringify(cardNow.history.slice(-4)))
+    check('…a history line for each, by the Assistant', cardNow.history.filter((h) => h.by === 'Assistant' && h.what.startsWith('Closed a question for you with your decision')).length === 2, JSON.stringify(cardNow.history.slice(-4)))
     check('…Maker is told, once', !!(await lib.until(async () => wakes('Maker').filter((x) => x.includes('with a decision (recorded by Assistant): The bee icon, in amber.')).length === 1, HUNG_MS)), JSON.stringify(wakes('Maker').slice(-3)))
     await openByTitle(page, t)
     const resolvedIn = page.locator('.dialog').filter({ has: page.locator('.task-title-input') }).locator('[data-section="for-you"] [data-resolved] .for-you-resolved-row')

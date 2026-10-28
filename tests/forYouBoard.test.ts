@@ -720,7 +720,7 @@ describe("a decision that answers a card's open requests (HI-1932)", () => {
     const wakes = actions(w, card).filter((a) => a.kind === 'wake' && a.payload.agent === 'a1').map((a) => String(a.payload.why))
     expect(wakes.filter((x) => x.includes('with a decision'))).toHaveLength(1)
     expect(wakes.at(-1)).toMatch(/"Which icon\?" and "Which colour\?" with a decision \(recorded by Assistant\): The bee icon, in amber\./)
-    expect(after.history.filter((h) => /^Closed a question for you with your decision/.test(h.what)).map((h) => [h.by, h.what])).toEqual([
+    expect(after.history.filter((h) => h.what.startsWith('Closed a question for you with your decision')).map((h) => [h.by, h.what])).toEqual([
       ['Assistant', 'Closed a question for you with your decision: "Which icon?"'],
       ['Assistant', 'Closed a question for you with your decision: "Which colour?"']
     ])
