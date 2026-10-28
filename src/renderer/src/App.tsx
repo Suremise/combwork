@@ -33,7 +33,7 @@ import { AssistantPanel, AssistantSettingsDialog } from './components/Assistant'
 import { ProgressPanel, progressRunsChanged } from './components/Progress'
 import { queueBoardChanged, queueChangedEvent } from './queueSource'
 import { AssistantMain } from './components/AssistantView'
-import { loadAssistantChanges } from './assistantUndo'
+import { reloadAssistantChanges } from './assistantUndo'
 import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, setWithLive, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, dismissToast, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
 import { DocsView, McpView, NotesView, SkillView, WelcomeView } from './views/OtherViews'
 import { TemplatesView } from './components/Templates'
@@ -248,11 +248,14 @@ function handleEvent(e: HiveEvent): void {
     case 'journal-changed':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set((s) => ({ journalVersion: s.journalVersion + 1 }))
       break
-    case 'assistant-activity':
-      set((s) => ({ assistantActions: [...s.assistantActions, e.action].slice(-200) }))
-      // What it changed is kept for undo as it is made (#1283): the panel's list follows.
-      void loadAssistantChanges()
+    case 'assistant-activity': {
+      // One action each: a message changing many cards sends many at once, shown together with the agents' states (HI-1863).
+      const action = e.action
+      setWithLive((s) => ({ assistantActions: [...s.assistantActions, action].slice(-200) }))
+      // What it changed is kept for undo as it is made (#1283): the panel's list follows, read again once per burst.
+      reloadAssistantChanges()
       break
+    }
     case 'language-changed':
       // i18n.ts has switched the text; the language setting's notes read the rest.
       set((s) => ({ appInfo: s.appInfo && { ...s.appInfo, language: e.language } }))
