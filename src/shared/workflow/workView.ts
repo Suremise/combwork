@@ -529,6 +529,8 @@ export interface WorkBadge {
   underReview: string | null
   /** When its current cycle (on `line`) started: what orders a branch's cards, one after another (#1424). */
   startedAt: string | null
+  /** When this cycle's change was integrated (its merge), else accepted (no merge); null while neither (HI-1926). */
+  endedAt: string | null
   lastSeq: number
 }
 
@@ -591,6 +593,7 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     lines: v.lines,
     underReview: v.stage === 'review' && v.kind !== 'no-code' ? (latest?.revision ?? null) : null,
     startedAt: v.startedAt,
+    endedAt: v.integration?.at ?? v.accepted?.at ?? null,
     lastSeq: v.lastSeq
   }
 }

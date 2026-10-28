@@ -582,6 +582,34 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
+    id: 'hive.lanes.waitYouMinutes',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.lanes.waitYouMinutes.title', defaultMessage: 'Lanes: a long wait for you', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.hive.lanes.waitYouMinutes.desc', defaultMessage: "After how long a lane waiting for you (a request in For you, or a card at its round limit) has its wait marked in the Progress panel's Lanes. Too short marks every wait; too long, a lane can sit unnoticed.", description: 'What the advanced setting "Lanes: a long wait for you" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'number',
+    // HI-1926 (Darren's card): For you over an hour.
+    default: 60,
+    min: 1,
+    max: 1440,
+    unit: 'min',
+    workspace: true,
+    applies: 'now'
+  },
+  {
+    id: 'hive.lanes.waitReviewerMinutes',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.lanes.waitReviewerMinutes.title', defaultMessage: 'Lanes: a long wait for a reviewer', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.hive.lanes.waitReviewerMinutes.desc', defaultMessage: "After how long a lane whose card waits in Review with nobody reviewing it has its wait marked in the Progress panel's Lanes. Too short marks every review; too long, a card can sit unreviewed.", description: 'What the advanced setting "Lanes: a long wait for a reviewer" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'number',
+    // HI-1926 (Darren's card): a reviewer over 15 minutes.
+    default: 15,
+    min: 1,
+    max: 1440,
+    unit: 'min',
+    workspace: true,
+    applies: 'now'
+  },
+  {
     id: AGENTS_PER_PROJECT,
     group: 'hive',
     title: msg({ id: 'settings.advanced.hive.agents.perProject.title', defaultMessage: 'Agents per project', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),

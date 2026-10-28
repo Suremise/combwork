@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
-import { RUNS_KEEP_PX, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSegment, keyedLaneRows, laneCards, laneOldRulesNote, laneRowsNow, laneRunning, laneSummary, mergedLaneOrder, nudgedLaneOrder, pulseLanes, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, type FoldedMarks, type LaneSegment, type SegmentMarks } from '@shared/laneBar'
+import { RUNS_KEEP_PX, laneCardTime, laneWaitTime, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSegment, keyedLaneRows, laneCards, laneOldRulesNote, laneRowsNow, laneRunning, laneSummary, mergedLaneOrder, nudgedLaneOrder, pulseLanes, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, type FoldedMarks, type LaneSegment, type SegmentMarks } from '@shared/laneBar'
 import { laneLegend, legendSources, segmentStage, type LegendGroup } from '@shared/laneStages'
 import { revisionShort } from '@shared/platform/descriptors'
 import type { WorkBadge } from '@shared/workflow/workView'
-import type { LaneStatus, ProgressRun, ProjectStages } from '@shared/types'
+import type { LaneCard, LaneStatus, ProgressRun, ProjectStages } from '@shared/types'
 import { NO_RUNS_FILTER, latestRunOf, slotRunsKey } from '@shared/progressTabs'
 import { formatDateTime } from '@shared/dates'
 import { useWorkBadges } from '../cardWork'
@@ -21,7 +21,8 @@ import { cx } from '../util'
 import { useAdvancedValue } from '../advanced'
 import { cardStalled } from './Board'
 import { usePanelFold } from './ProgressMerge'
-import { Icon, Tooltip, useContextMenu } from './ui'
+import { Icon, IconButton, Tooltip, useContextMenu } from './ui'
+import { durationText } from '@shared/tasks'
 import { LaneCostTip, useLaneCost } from './CardCost'
 
 /**
@@ -98,6 +99,10 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
   const [dragging, setDragging] = useState<string | null>(null)
   const [dropBefore, setDropBefore] = useState<string | null | undefined>(undefined)
   const [said, setSaid] = useState('')
+  // The Lanes tab's lanes opened to their cards (HI-1926): held while the tab shows, its workspace's.
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
+  useEffect(() => setExpanded(new Set()), [ws])
+  const expand = (id: string): void => setExpanded((e) => (e.has(id) ? new Set([...e].filter((x) => x !== id)) : new Set([...e, id])))
   const refocus = useRef<string | null>(null)
   const menu = useContextMenu()
   useLayoutEffect(() => {
@@ -320,7 +325,7 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
         // Whole lanes, the next one's top at the bottom edge; all of them, with the list's padding, when they fit.
         <div className="progress-lanes-list" ref={list} style={!full && shown < lanes.length ? { maxHeight: shown * pitch } : undefined} onDragOver={overList}>
           {lanes.map((l) => (
-            <LaneRow key={l.id} lane={l} max={segmentsThatFit(width - BAR_INSET_PX)} reorder={reorder(l)} badges={badges} runs={runs} stages={stages.get(l.project.toLowerCase())} enforced={enforced} />
+            <LaneRow key={l.id} lane={l} max={segmentsThatFit(width - BAR_INSET_PX)} reorder={reorder(l)} badges={badges} runs={runs} stages={stages.get(l.project.toLowerCase())} enforced={enforced} {...(full ? { expanded: expanded.has(l.id), onExpand: () => expand(l.id) } : {})} />
           ))}
         </div>
       )}
@@ -567,7 +572,7 @@ function LanePoolTip({ lane: l }: { lane: Lane }) {
  * `stages`: its project's stages and names (#1421), so its segments say their cards' stages; `enforced`: whether workflow
  * rules are enforced now, for what its old rules marks say.
  */
-function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced }: { lane: Lane; max: number; reorder: LaneReorder | null; badges: Map<number, WorkBadge>; runs: ProgressRun[]; stages: ProjectStages | undefined; enforced: boolean }) {
+function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, expanded, onExpand }: { lane: Lane; max: number; reorder: LaneReorder | null; badges: Map<number, WorkBadge>; runs: ProgressRun[]; stages: ProjectStages | undefined; enforced: boolean; expanded?: boolean; onExpand?: () => void }) {
   const tasks = useStore((s) => s.tasks)
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   // Read again each minute: a card waiting in Review becomes stalled with time (#521).
@@ -594,6 +599,11 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced }: {
   // Why it waits (#1279, from #1270's status): said in its header instead of just "paused", and in its accessible name.
   const why = l.status && !l.frozen ? laneWaitText(l.status, (n) => cardLabelOf({ tasks }, n), tr) : null
   const word = stateWord(l.state)
+  // How long it has waited (HI-1926: since main saw the wait begin), marked past its bound (Settings → Advanced).
+  const youMin = useAdvancedValue<number>('hive.lanes.waitYouMinutes')
+  const reviewerMin = useAdvancedValue<number>('hive.lanes.waitReviewerMinutes')
+  const wait = why ? laneWaitTime(l.status, Date.now(), youMin, reviewerMin) : null
+  const waited = wait ? (l.status?.atLeast ? tr(WAITED_AT_LEAST, { time: durationText(wait.ms, tr) }) : durationText(wait.ms, tr)) : null
   // Its cost on the hover of its top line (#602), read when the hover first shows.
   const cost = useLaneCost(l.id)
   // A card's revisions as its project's platform shows them (its descriptor, never a switch on its id).
@@ -634,6 +644,18 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced }: {
         }
       >
         <div className="progress-lane-top" onMouseEnter={cost.load}>
+          {onExpand && (
+            <IconButton
+              icon={expanded ? 'chevron-down' : 'chevron-right'}
+              className="progress-lane-expand"
+              title={tr(msg({ id: 'board.lanes.expand', defaultMessage: '{open, select, yes {Hide the cards of {lane}} other {Show the cards of {lane}}}', description: "Tooltip of the chevron before a lane's name in the Progress panel's Lanes tab: shows or hides its cards in order ({lane}: its builder / reviewer). Keep the select keys." }), { open: expanded ? 'yes' : 'no', lane: pair })} // i18n-ignore: a select's key, never shown
+              expanded={expanded}
+              onClick={(e) => {
+                e.stopPropagation()
+                onExpand()
+              }}
+            />
+          )}
           <span className="progress-lane-pair">{pair}</span>
           {/* Its slot (#1446): "· slot-b", or its builder's carried slot ("· hb2"), linking to the slots in Branches & remotes. */}
           {l.slot && !l.frozen && project && (
@@ -692,6 +714,11 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced }: {
               {word && <span className={cx('progress-lane-state', l.state)}>{word}</span>}
             </>
           )}
+          {waited && (
+            <span className={cx('faint', 'progress-lane-waited', wait!.long && 'long')} data-action="lane-waited" title={l.status?.atLeast ? tr(WAITED_AT_LEAST_TIP) : undefined}>
+              {waited}
+            </span>
+          )}
           {stalled && (
             <Tooltip content={`${cardLabelOf({ tasks }, stalled.n)}: ${stalled.why}`}>
               <span className="progress-lane-state stalled">{tr(msg({ id: 'board.lanes.stalled', defaultMessage: 'stalled', description: "A lane's mark in its header (Progress panel), lower case: one of its cards is stalled (nobody is working on it); its tooltip says why." }))}</span>
@@ -716,9 +743,64 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced }: {
           <Segment key={s.kind === 'card' ? s.number : `${s.kind}-${s.numbers[0]}`} segment={s} work={s.kind === 'card' ? laneSegmentWork(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : []} marks={s.kind === 'card' ? segmentMarks(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES, enforced) : {}} folded={s.kind === 'card' ? null : foldedMarks(l, badges, cards, s.numbers, shortFor, tr, OVERRIDE_NAMES, enforced)} />
         ))}
       </div>
+      {expanded && <LaneQueue lane={l} badges={badges} />}
     </div>
   )
 }
+
+/** A lane's card's state in its queue (HI-1926): as it sits now, or as the lane left it; waiting for you when held up. */
+type QueueState = 'done' | 'doing' | 'review' | 'todo' | 'waiting' | 'gone' | 'unrecorded'
+const queueState = (c: LaneCard): QueueState =>
+  c.column === 'gone' || c.column === 'unrecorded' ? c.column : c.blocked || c.roundLimit || c.column === 'hold' ? 'waiting' : c.column === 'done' ? 'done' : c.column === 'review' || c.column === 'passed' ? 'review' : c.column === 'doing' ? 'doing' : 'todo'
+const QUEUE_ICON: Record<QueueState, string> = { done: 'pass', doing: 'circle-filled', review: 'eye', todo: 'circle-large-outline', waiting: 'debug-pause', gone: 'circle-slash', unrecorded: 'question' }
+
+/**
+ * A lane opened to its cards (HI-1926, the Lanes tab): in its order, each with its state (as the lane left it, for an
+ * ended one), its key (it opens the card) and title, its round, how long it took or has taken so far, and a Done card's
+ * merge commit, copied with a click. Only what its cycle's facts say: nothing for a card gone, not recorded or unknown.
+ */
+function LaneQueue({ lane: l, badges }: { lane: Lane; badges: Map<number, WorkBadge> }) {
+  const tasks = useStore((s) => s.tasks)
+  const now = Date.now()
+  return (
+    <ol className="progress-lane-queue" aria-label={tr(msg({ id: 'board.lanes.queue', defaultMessage: 'Cards of {lane}', description: "Accessible name of a lane's cards in order, opened under it in the Progress panel's Lanes tab ({lane}: its builder / reviewer)." }), { lane: lanePair(l) })}>
+      {l.info.map((c) => {
+        const state = queueState(c)
+        const known = state !== 'gone' && state !== 'unrecorded'
+        const time = known ? laneCardTime(c.column, badges.get(c.number), l.frozen ? l.endedAt : null, now) : null
+        const label = cardLabelOf({ tasks }, c.number)
+        const stateText = tr(msg({ id: 'board.lanes.queueState', defaultMessage: '{state, select, done {Done} doing {Doing} review {In review} todo {To do} waiting {Waiting for you} gone {Gone} other {Not recorded}}', description: "A card's state in a lane's cards, opened in the Progress panel's Lanes tab (its icon's name): done, being worked on, in review, not started, waiting for the user (blocked, on hold or at its round limit), gone from the board, or not recorded by the lane. Keep the select keys." }), { state }) // i18n-ignore: a select's key, never shown
+        return (
+          <li key={c.number} className={cx('progress-lane-queue-row', state)} data-card={c.number} data-state={state}>
+            <Icon name={QUEUE_ICON[state]} className="progress-lane-queue-icon" aria-label={stateText} title={stateText} />
+            <button type="button" className="link progress-lane-queue-key" onClick={() => set({ taskOpen: c.number })}>
+              {label}
+            </button>
+            <span className="progress-lane-queue-title" title={c.title}>
+              {c.title}
+            </span>
+            {known && <span className="faint progress-lane-queue-round">{tr(msg({ id: 'board.lanes.round', defaultMessage: 'r{round}', description: "A card's round in a lane's cards (Progress panel → Lanes), short: r1 for its first, r3 after two failed reviews." }), { round: c.round })}</span>}
+            {time?.soFar !== undefined && <span className="faint progress-lane-queue-time">{tr(msg({ id: 'board.lanes.soFar', defaultMessage: '{time} so far', description: "How long a lane's card has been worked on so far, in its cards (Progress panel → Lanes). {time}: 4 min, 1 h 5 min." }), { time: durationText(time.soFar, tr) })}</span>}
+            {time?.took !== undefined && <span className="faint progress-lane-queue-time">{tr(msg({ id: 'board.lanes.took', defaultMessage: 'took {time}', description: "How long a lane's Done card took, from its start to its merge, in its cards (Progress panel → Lanes). {time}: 4 min, 1 h 5 min." }), { time: durationText(time.took, tr) })}</span>}
+            {time?.merged && (
+              <button
+                type="button"
+                className="link progress-lane-queue-commit"
+                title={tr(msg({ id: 'board.lanes.copyMerge', defaultMessage: 'Copy the merge commit {commit}', description: "Tooltip of a Done card's merge commit in a lane's cards (Progress panel → Lanes): copies its whole id ({commit})." }), { commit: time.merged })}
+                onClick={() => void navigator.clipboard.writeText(time.merged!).then(() => notify('success', tr(msg({ id: 'board.lanes.mergeCopied', defaultMessage: 'Merge commit copied', description: "A notification after copying a Done card's merge commit from a lane's cards (Progress panel → Lanes)." }))))}
+              >
+                {time.merged.slice(0, 7)}
+              </button>
+            )}
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+const WAITED_AT_LEAST = msg({ id: 'board.lanes.waitedAtLeast', defaultMessage: '{time}+', description: "How long a lane has waited, in its header (Progress panel), when Hive didn't see its wait begin (it was already waiting when Hive started): at least {time} (4 min, 1 h 5 min)." })
+const WAITED_AT_LEAST_TIP = msg({ id: 'board.lanes.waitedAtLeastTip', defaultMessage: 'It was already waiting when Hive first saw it: it has waited at least this long.', description: "Tooltip of a lane's wait time with a + in its header (Progress panel): Hive didn't see the wait begin." })
 
 /**
  * One segment: a card (a click opens it), or the finished cards folded together, or the rest of a long lane. `work`:

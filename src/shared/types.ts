@@ -3377,6 +3377,13 @@ export interface LaneStatus {
   agent?: string
   /** preparing (#1446): the slot being prepared. */
   slot?: string
+  /**
+   * When this wait began (HI-1926, epoch ms): when Hive first saw this reason for this card (and ask), kept while they
+   * stay the same. `atLeast`: Hive didn't see it begin (it was already waiting when this Hive first listed the lane), so
+   * it has waited at least that long.
+   */
+  since?: number
+  atLeast?: boolean
 }
 
 /**

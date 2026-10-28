@@ -1903,6 +1903,10 @@
     "defaultMessage": "{pair}: {total, plural, one {# card} other {# cards}}, not recorded",
     "description": "Accessible name of a lane's bar (Progress panel) when the lane ended before Hive recorded where its cards were: the builder / reviewer ({pair}) and how many cards."
   },
+  "board.lanes.copyMerge": {
+    "defaultMessage": "Copy the merge commit {commit}",
+    "description": "Tooltip of a Done card's merge commit in a lane's cards (Progress panel → Lanes): copies its whole id ({commit})."
+  },
   "board.lanes.edge": {
     "defaultMessage": "Lanes shown",
     "description": "Accessible name of the handle on the top edge of the Progress panel's lanes: drag it for more or fewer lanes."
@@ -1922,6 +1926,10 @@
   "board.lanes.endFailed": {
     "defaultMessage": "Couldn't end {lane}",
     "description": "A toast's title: ending a lane from the Progress panel failed ({lane}: its builder / reviewer and name). The reason follows."
+  },
+  "board.lanes.expand": {
+    "defaultMessage": "{open, select, yes {Hide the cards of {lane}} other {Show the cards of {lane}}}",
+    "description": "Tooltip of the chevron before a lane's name in the Progress panel's Lanes tab: shows or hides its cards in order ({lane}: its builder / reviewer). Keep the select keys."
   },
   "board.lanes.fold": {
     "defaultMessage": "Fold the lanes",
@@ -1946,6 +1954,10 @@
   "board.lanes.legendTitle": {
     "defaultMessage": "Each colour is a category, with the stages in it",
     "description": "The heading of the lanes' legend (Progress panel, on the Lanes bar's hover): what each colour and pattern of a lane's card segments means, by the board's categories and the stages in them. Glossary: stage, category."
+  },
+  "board.lanes.mergeCopied": {
+    "defaultMessage": "Merge commit copied",
+    "description": "A notification after copying a Done card's merge commit from a lane's cards (Progress panel → Lanes)."
   },
   "board.lanes.moveDown": {
     "defaultMessage": "Move Down",
@@ -1987,6 +1999,18 @@
     "defaultMessage": "{project}: open its workflow in Version Control",
     "description": "Accessible name and tooltip of the project's name in a lane's header (Progress panel): opens that project's Version Control tab (a tab's name) at its Workflow section. {project} is the project's name."
   },
+  "board.lanes.queue": {
+    "defaultMessage": "Cards of {lane}",
+    "description": "Accessible name of a lane's cards in order, opened under it in the Progress panel's Lanes tab ({lane}: its builder / reviewer)."
+  },
+  "board.lanes.queueState": {
+    "defaultMessage": "{state, select, done {Done} doing {Doing} review {In review} todo {To do} waiting {Waiting for you} gone {Gone} other {Not recorded}}",
+    "description": "A card's state in a lane's cards, opened in the Progress panel's Lanes tab (its icon's name): done, being worked on, in review, not started, waiting for the user (blocked, on hold or at its round limit), gone from the board, or not recorded by the lane. Keep the select keys."
+  },
+  "board.lanes.round": {
+    "defaultMessage": "r{round}",
+    "description": "A card's round in a lane's cards (Progress panel → Lanes), short: r1 for its first, r3 after two failed reviews."
+  },
   "board.lanes.show": {
     "defaultMessage": "Show the lanes",
     "description": "Tooltip of the Progress panel's Lanes bar when the lanes are folded away."
@@ -2002,6 +2026,10 @@
   "board.lanes.slotTip": {
     "defaultMessage": "{state, select, preparing {being prepared} other {ready}} · {carried, select, yes {its builder’s own since {since}} other {lent to the lane since {since}}}",
     "description": "A lane's slot in its hover (Progress panel, #1446), after the slot's name (slot-b): whether it is ready or being prepared (its setup or a dependency install), then since when it was lent to the lane, or, for a builder's own worktree kept from before 1.0 (carried), since when it has had it. {since} is a date and time. Keep the select keys."
+  },
+  "board.lanes.soFar": {
+    "defaultMessage": "{time} so far",
+    "description": "How long a lane's card has been worked on so far, in its cards (Progress panel → Lanes). {time}: 4 min, 1 h 5 min."
   },
   "board.lanes.stalled": {
     "defaultMessage": "stalled",
@@ -2019,6 +2047,10 @@
     "defaultMessage": "Lanes",
     "description": "The Progress panel's section of lanes (a builder and its reviewer working through cards in turn): its bar's label and accessible name."
   },
+  "board.lanes.took": {
+    "defaultMessage": "took {time}",
+    "description": "How long a lane's Done card took, from its start to its merge, in its cards (Progress panel → Lanes). {time}: 4 min, 1 h 5 min."
+  },
   "board.lanes.usualOrder": {
     "defaultMessage": "Usual Order",
     "description": "A lane's context menu item in the Progress panel: puts the lanes back in their usual order, undoing the user's own."
@@ -2030,6 +2062,14 @@
   "board.lanes.usualOrderSaid": {
     "defaultMessage": "Lanes back in the usual order",
     "description": "Said to screen readers after the Progress panel's lanes go back to their usual order (Usual Order, in a lane's menu)."
+  },
+  "board.lanes.waitedAtLeast": {
+    "defaultMessage": "{time}+",
+    "description": "How long a lane has waited, in its header (Progress panel), when Hive didn't see its wait begin (it was already waiting when Hive started): at least {time} (4 min, 1 h 5 min)."
+  },
+  "board.lanes.waitedAtLeastTip": {
+    "defaultMessage": "It was already waiting when Hive first saw it: it has waited at least this long.",
+    "description": "Tooltip of a lane's wait time with a + in its header (Progress panel): Hive didn't see the wait begin."
   },
   "board.lanes.waitingForYou": {
     "defaultMessage": "{n, plural, one {# waiting for you} other {# waiting for you}}",

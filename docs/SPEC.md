@@ -4665,6 +4665,20 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
     cards' own, else its project's now), renames included.
   - **Solo:** Pulse leaves out a project's lanes while its preset is Solo (or Custom from Solo), unless one of them
     runs. Its ended lanes stay in the Lanes tab, and so does Start Lane.
+  - **The Lanes tab** (HI-1926, Darren 28 Oct): every lane, Pulse's row (`LaneRow`), stacked from the bottom and growing
+    upwards to the top, then scrolling, with no row limit. A lane opens to its cards in order (its chevron, the tab's
+    alone; folded again when the tab is left or the workspace changes): each with its state (done, doing, review,
+    todo, waiting for the user when blocked, held or at its round limit; gone, not recorded), its key (it opens the
+    card), title, round (`LaneCard.round`), and from its cycle's facts (`laneCardTime`: the work badge's `startedAt`,
+    `endedAt`, the Integrated or Accepted time, and `merged`) how long it took and its merge commit (copied with a
+    click) or how long so far. An ended lane shows only what happened before it ended: a cycle started or finished
+    after it shows no time or commit, and an unfinished card's time doesn't run on. Nothing is shown that isn't known.
+  - **A lane's wait time** (HI-1926): main stamps each running lane's status when its key (reason, card, ask) first
+    appears (`stampWait`, kept per workspace in memory, one for every window, bounded, a lane leaving it when it stops
+    running) as `status.since`; a wait already under way at the first listing (Hive started, the workspace opened) is
+    `atLeast`, shown "23 min+" with a tooltip saying so. The header shows it after the wait's text, amber past
+    Settings → Advanced's bounds: for you or a round limit `hive.lanes.waitYouMinutes` (60), a reviewer
+    `hive.lanes.waitReviewerMinutes` (15). Drawn on the rows' minute tick; nothing more is read.
   - **Links:** a lane's header names its project, a link to its Version Control tab at Workflow. The Merges tab's
     queue card opens the Merge queue section (#1416).
   - **Old rules** (§16.5.4): `LaneInfo.oldRules` for a running lane whose recorded ruleset (`lane_runs.ruleset`) isn't

@@ -1331,6 +1331,22 @@
     "defaultMessage": "Lanes: let the builder finish when its lane ends",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. A lane is a card loop: a builder and a reviewer taking cards in turn."
   },
+  "settings.advanced.hive.lanes.waitReviewerMinutes.desc": {
+    "defaultMessage": "After how long a lane whose card waits in Review with nobody reviewing it has its wait marked in the Progress panel's Lanes. Too short marks every review; too long, a card can sit unreviewed.",
+    "description": "What the advanced setting \"Lanes: a long wait for a reviewer\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.lanes.waitReviewerMinutes.title": {
+    "defaultMessage": "Lanes: a long wait for a reviewer",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.hive.lanes.waitYouMinutes.desc": {
+    "defaultMessage": "After how long a lane waiting for you (a request in For you, or a card at its round limit) has its wait marked in the Progress panel's Lanes. Too short marks every wait; too long, a lane can sit unnoticed.",
+    "description": "What the advanced setting \"Lanes: a long wait for you\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.lanes.waitYouMinutes.title": {
+    "defaultMessage": "Lanes: a long wait for you",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.hive.mcp.connectSeconds.desc": {
     "defaultMessage": "How long Hive waits, once an agent is ready, for its CLI to connect Hive's tools before it tells the agent of new work anyway. A resumed session can be ready before its tools are, and a message then is a turn spent without them (#865). Lower it if messages reach agents late when their CLI doesn't connect Hive's tools.",
     "description": "What the advanced setting \"hive tools: wait to connect\" is for, and what goes wrong when it is wrong (Settings → Advanced)."

@@ -529,6 +529,38 @@ export function laneRowsRange(count: number, fallback = DEFAULT_LANE_ROWS): { mi
 /** The height the runs above keep (px) when the lanes are dragged up: about a run and a half. */
 export const RUNS_KEEP_PX = 120
 
+/**
+ * How long a lane has waited (HI-1926), in ms from its status's `since` to `now`; null when it doesn't wait or isn't
+ * stamped. `long`: past its bound: for you (a request, a round limit) after `youMin`, a reviewer after `reviewerMin`.
+ */
+export function laneWaitTime(s: Pick<LaneStatus, 'reason' | 'since'> | null, now: number, youMin: number, reviewerMin: number): { ms: number; long: boolean } | null {
+  if (!s || typeof s.since !== 'number') return null
+  const ms = Math.max(0, now - s.since)
+  const bound = s.reason === 'you' || s.reason === 'roundLimit' ? youMin : s.reason === 'reviewer' ? reviewerMin : null
+  return { ms, long: bound !== null && ms >= bound * 60_000 }
+}
+
+/**
+ * A lane's card's time and merge commit (HI-1926), from its cycle's facts (`startedAt`, `endedAt`, `merged`: its work
+ * badge): Done, how long it took and its merge commit; in progress, how long so far; nothing for Todo, a card gone or not
+ * recorded, or a time not known. An ended lane (`laneEnded`) shows only what its facts say happened before it ended: a
+ * cycle started after it (the card reopened) or ended after it shows no time or commit, and an unfinished card's time
+ * doesn't run on.
+ */
+export function laneCardTime(column: string, badge: { startedAt: string | null; endedAt: string | null; merged: string | null } | undefined, laneEnded: string | null, now: number): { took?: number; soFar?: number; merged?: string } | null {
+  const start = badge?.startedAt ? Date.parse(badge.startedAt) : NaN
+  if (!Number.isFinite(start)) return null
+  const end = badge?.endedAt ? Date.parse(badge.endedAt) : NaN
+  const cutoff = laneEnded ? Date.parse(laneEnded) : NaN
+  if (Number.isFinite(cutoff)) {
+    if (start > cutoff || column !== 'done' || !Number.isFinite(end) || end > cutoff) return null
+    return { took: Math.max(0, end - start), ...(badge?.merged ? { merged: badge.merged } : {}) }
+  }
+  if (column === 'done') return Number.isFinite(end) ? { took: Math.max(0, end - start), ...(badge?.merged ? { merged: badge.merged } : {}) } : null
+  if (column === 'doing' || column === 'review' || column === 'passed' || column === 'hold') return { soFar: Math.max(0, now - start) }
+  return null
+}
+
 /** A kept choice as a whole number of lanes, at least one; the default (`fallback`) when there is none (or it isn't a number). */
 export function chosenLaneRows(kept: number | null | undefined, fallback = DEFAULT_LANE_ROWS): number {
   return typeof kept === 'number' && Number.isFinite(kept) ? Math.max(1, Math.round(kept)) : fallback

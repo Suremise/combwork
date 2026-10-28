@@ -247,6 +247,28 @@ export function laneStatus(rec: Pick<LaneRecord, 'rounds' | 'pending'>, cards: r
   return null
 }
 
+/** A lane's wait as main last saw it (HI-1926): its key (reason, card, ask), when it began, and whether that was seen. */
+export interface WaitStamp {
+  key: string
+  since: number
+  observed: boolean
+}
+
+/** What makes a wait the same wait: its reason, its card and what the user is asked for; nothing else on the card. */
+export const waitKey = (s: LaneStatus): string => `${s.reason}|${s.card ?? ''}|${s.ask ?? ''}`
+
+/**
+ * A lane's wait stamp now (HI-1926): kept while its key stays the same (a comment or an edit on the card changes
+ * nothing), a new one when the reason, card or ask changes, none when it doesn't wait. `known`: the lane was listed
+ * before (with or without a wait): a wait that begins then was seen to begin; the first listing's wait wasn't.
+ */
+export function stampWait(was: WaitStamp | undefined, status: LaneStatus | null, now: number, known: boolean): WaitStamp | undefined {
+  if (!status) return undefined
+  const key = waitKey(status)
+  if (was && was.key === key) return was
+  return { key, since: now, observed: known }
+}
+
 /** Why a lane waits, in a few English words for the hive tools ("waiting: HI-11 not merged"). */
 export function laneStatusText(s: LaneStatus): string {
   const card = s.card !== null ? cardRef(s.card) : 'a card'

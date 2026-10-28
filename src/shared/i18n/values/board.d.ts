@@ -477,17 +477,20 @@ interface HiveMessageValues {
   'board.lanes.alreadyEnd': { where: string; lane: string | number }
   'board.lanes.bar': { pair: string | number; finished: string | number; total: number }
   'board.lanes.barUnrecorded': { pair: string | number; total: number }
+  'board.lanes.copyMerge': { commit: string | number }
   'board.lanes.edge': undefined
   'board.lanes.edgeTip': { lanes: string | number }
   'board.lanes.edgeValue': { shown: string | number; count: number }
   'board.lanes.end': undefined
   'board.lanes.endFailed': { lane: string | number }
+  'board.lanes.expand': { open: string; lane: string | number }
   'board.lanes.fold': undefined
   'board.lanes.latestRun': { card: string | number; run: string | number; state: string }
   'board.lanes.legendButton': undefined
   'board.lanes.legendHold': { category: string | number }
   'board.lanes.legendLine': { category: string | number; stages: string | number }
   'board.lanes.legendTitle': undefined
+  'board.lanes.mergeCopied': undefined
   'board.lanes.moveDown': undefined
   'board.lanes.moveUp': undefined
   'board.lanes.moved': { lane: string | number; at: string | number; n: number }
@@ -498,17 +501,24 @@ interface HiveMessageValues {
   'board.lanes.poolPair': { builder: string | number }
   'board.lanes.poolReviewing': { reviewing: string; name: string | number }
   'board.lanes.projectLink': { project: string | number }
+  'board.lanes.queue': { lane: string | number }
+  'board.lanes.queueState': { state: string }
+  'board.lanes.round': { round: string | number }
   'board.lanes.show': undefined
   'board.lanes.slotLine': { line: string | number }
   'board.lanes.slotLink': { slot: string | number }
   'board.lanes.slotTip': { state: string; carried: string; since: string | number }
+  'board.lanes.soFar': { time: string | number }
   'board.lanes.stalled': undefined
   'board.lanes.start': undefined
   'board.lanes.state': { state: string }
   'board.lanes.title': undefined
+  'board.lanes.took': { time: string | number }
   'board.lanes.usualOrder': undefined
   'board.lanes.usualOrderDetail': undefined
   'board.lanes.usualOrderSaid': undefined
+  'board.lanes.waitedAtLeast': { time: string | number }
+  'board.lanes.waitedAtLeastTip': undefined
   'board.lanes.waitingForYou': { n: number }
   'board.lanes.waits': { reason: string; card: string | number; ask: string; agent: string | number }
   'board.lanes.waitsLink': undefined
