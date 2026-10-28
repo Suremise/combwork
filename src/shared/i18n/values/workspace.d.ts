@@ -113,6 +113,18 @@ interface HiveMessageValues {
   'workspace.changes.aboutUnusedOne': { branch: string | number; into: string | number }
   'workspace.changes.aboutUnusedShort': { project: string | number }
   'workspace.changes.aboutUnusedTip': { known: string; into: string | number }
+  'workspace.closeCommand.close': undefined
+  'workspace.closeCommand.command': undefined
+  'workspace.closeCommand.dontWait': undefined
+  'workspace.closeCommand.dontWaitNote': undefined
+  'workspace.closeCommand.drain': undefined
+  'workspace.closeCommand.elapsed': { time: string | number }
+  'workspace.closeCommand.failed': { kind: string }
+  'workspace.closeCommand.failedExit': { kind: string; code: string | number }
+  'workspace.closeCommand.output': undefined
+  'workspace.closeCommand.runner': undefined
+  'workspace.closeCommand.running': { kind: string }
+  'workspace.closeCommand.spawn': { kind: string }
   'workspace.docs.about': { app: string | number }
   'workspace.docs.api': undefined
   'workspace.docs.changelog': undefined

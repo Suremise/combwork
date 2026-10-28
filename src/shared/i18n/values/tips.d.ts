@@ -129,6 +129,8 @@ interface HiveMessageValues {
   'tips.cliOverrides.title': undefined
   'tips.cliOwnMode.text': undefined
   'tips.cliOwnMode.title': undefined
+  'tips.closeCommands.text': undefined
+  'tips.closeCommands.title': undefined
   'tips.closeWindow.text': { key: string | number }
   'tips.closeWindow.title': undefined
   'tips.codexSandboxConnections.text': undefined

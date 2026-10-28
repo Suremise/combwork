@@ -15,6 +15,7 @@ import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
 import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
+import { beginWrite, countedWrite } from './dbWrites'
 import { timedStep } from './stallWork'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
@@ -972,6 +973,12 @@ export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>, 
   const path = pathOf(ws)
   const key = keyOf(path)
   if (inWrite(key)) return fn()
+  // Under way from here, its wait for the lock included (HI-1368: a close command waits for it).
+  return countedWrite(path, () => boardWriteLocked(ws, path, key, fn, opts))
+}
+
+/** boardWrite's change, once it is counted: under the board's lock. */
+function boardWriteLocked<T>(ws: WorkspaceService, path: string, key: string, fn: () => Promise<T>, opts: { alive?: () => boolean }): Promise<T> {
   return withFileLock(boardLock(path), async () => {
     // `alive`: the caller's workspace, as it was when it asked, is still open (a background run's, #1215 round 1): a
     // change that waited for the lock while it closed or switched is refused, and the board isn't opened again for it.
@@ -1798,6 +1805,8 @@ export interface DbLease {
 export function leaseDb(workspacePath: string): DbLease {
   const b = boardOf(workspacePath, true)
   b.leases++
+  // A write under way until the lease ends (HI-1368: a close command waits for it), its connection closed by then.
+  const written = beginWrite(workspacePath)
   let ended = false
   return {
     db: b.db,
@@ -1807,11 +1816,15 @@ export function leaseDb(workspacePath: string): DbLease {
     release() {
       if (ended) return
       ended = true
-      if (--b.leases > 0) return
-      if (b.detached) b.db.close()
-      // Whether a window has the workspace open is asked now, not when the lease began: one may have opened it since,
-      // before or after this board was opened, and uses this connection as its board.
-      else if (b.transient && !isAdmitted(b.place)) closeOne(keyOf(b.path), b)
+      try {
+        if (--b.leases > 0) return
+        if (b.detached) b.db.close()
+        // Whether a window has the workspace open is asked now, not when the lease began: one may have opened it since,
+        // before or after this board was opened, and uses this connection as its board.
+        else if (b.transient && !isAdmitted(b.place)) closeOne(keyOf(b.path), b)
+      } finally {
+        written()
+      }
     }
   }
 }
@@ -1962,7 +1975,8 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
   const key = keyOf(path)
   const started = performance.now()
   let upgraded = false
-  const out = await withFileLock(boardLock(path), async () => {
+  // Counted as a write (HI-1368): a close command waits for it.
+  const out = await countedWrite(path, () => withFileLock(boardLock(path), async () => {
     const pending = boardOf(path).db.pending
     if (!pending) return { backup: null }
     const from09 = pending.from < FIRST_10
@@ -1992,7 +2006,7 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
     replaced(path)
     upgraded = true
     return { backup: kept?.file ?? null }
-  })
+  }))
   emit({ type: 'tasks-changed', workspacePath: path })
   if (upgraded) for (const fn of upgradedListeners) {
     try {
@@ -2014,7 +2028,8 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
   const path = pathOf(ws)
   const hive = join(path, HIVE_DIR)
   const file = join(hive, DB_FILE)
-  const out = await withFileLock(boardLock(path), async () => {
+  // Counted as a write (HI-1368): a close command waits for it.
+  const out = await countedWrite(path, () => withFileLock(boardLock(path), async () => {
     // Opened first: an open is what upgrades it (a test copy's answer), and so makes its copy.
     const version = schemaVersion(boardOf(path).db.reader)
     const kept = copy09(path)
@@ -2056,7 +2071,7 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
     log.info(`put the 0.9 board back in ${userText(path)} (${basename(kept.file)}); the 1.0 board is kept as ${basename(saved)}`)
     replaced(path)
     return { saved, restored: kept.file }
-  })
+  }))
   emit({ type: 'tasks-changed', workspacePath: path })
   return out
 }

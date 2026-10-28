@@ -609,6 +609,12 @@ interface HiveMessageValues {
   'settings.chime.play': undefined
   'settings.chime.pop': undefined
   'settings.chime.soft': undefined
+  'settings.closeCommand.command': undefined
+  'settings.closeCommand.hint': undefined
+  'settings.closeCommand.noWorkspace': undefined
+  'settings.closeCommand.onUpdate': undefined
+  'settings.closeCommand.runs': { command: string | number }
+  'settings.closeCommand.saveFailed': undefined
   'settings.columnColors.pick': { column: string | number }
   'settings.columnColors.reset': { column: string | number }
   'settings.connections.add.addServer': undefined
@@ -736,6 +742,9 @@ interface HiveMessageValues {
   'settings.general.minimizeToTray.desc': undefined
   'settings.general.minimizeToTray.tip': undefined
   'settings.general.minimizeToTray.title': undefined
+  'settings.general.onQuit.desc': undefined
+  'settings.general.onQuit.tip': undefined
+  'settings.general.onQuit.title': undefined
   'settings.general.progressCommands.desc': undefined
   'settings.general.progressCommands.disabled': undefined
   'settings.general.progressCommands.tip': undefined
@@ -1240,6 +1249,9 @@ interface HiveMessageValues {
   'settings.workspace.hiddenProjects.desc': undefined
   'settings.workspace.hiddenProjects.tip': undefined
   'settings.workspace.hiddenProjects.title': undefined
+  'settings.workspace.onClose.desc': undefined
+  'settings.workspace.onClose.tip': undefined
+  'settings.workspace.onClose.title': undefined
   'settings.workspace.storage.desc': undefined
   'settings.workspace.storage.tip': undefined
   'settings.workspace.storage.title': undefined

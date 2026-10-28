@@ -22,7 +22,7 @@ import { appendFileSync, createReadStream, existsSync } from 'original-fs'
 import { basename, join, resolve, sep } from 'path'
 import { appendFile, readFile, stat } from 'original-fs/promises'
 import { Readable } from 'stream'
-import type { AppInfo, McpServerDef, QuitChoice, QuitScope, QuitSession, TaskCard, WindowState } from '../shared/types'
+import type { AppInfo, CloseReason, McpServerDef, QuitChoice, QuitScope, QuitSession, TaskCard, WindowState } from '../shared/types'
 import { providerService } from './providerService'
 import { initConnections } from './accounts'
 import { initConnectionMoves } from './connectionMoves'
@@ -100,6 +100,7 @@ import { flushMetrics } from './metrics'
 import { watchMainStalls } from './mainStalls'
 import { fileHolders } from './fileHolders'
 import { createWorkspaceService, disposeWorkspaceService, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
+import { closeWithCommand, quitRunsAny, runQuitCommand, type RunOutcome } from './closeCommand/closeCommands'
 import { journalSettingsOf } from './journalService'
 import { assistantStartView } from './startView'
 import { hiveWindows, lastFocused, TITLE_BAR_OVERLAY, registerWindow, unregisterWindow, windowForPath, type HiveWindow } from './windows'
@@ -559,8 +560,10 @@ async function requestCloseWindow(e: HiveWindow, done: AlreadyAsked = {}): Promi
   e.ws.closing = true
   await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000, 'closed')
   saveWindowsWithout(e)
+  // Its workspace closed here, its close command run in it while it is still shown (HI-1368), then the window goes.
+  await closeWithCommand(e.ws, 'window', e.win).catch((err) => log.warn("closing the window's workspace", err))
   e.closing = true
-  e.win.close()
+  if (!e.win.isDestroyed()) e.win.close()
 }
 
 /**
@@ -650,6 +653,8 @@ async function quitNow(tellUser: boolean): Promise<void> {
   await usageHistory.stop()
   await progress.saveNow().catch(() => undefined)
   await flushMetrics().catch(() => undefined)
+  // The close commands (HI-1368), each window's and then When Hive quits, waited for as their panels say.
+  await closeCommandsOnQuit(reason === 'update' ? 'update' : 'quit').catch((e) => log.warn('running the close commands as Hive quits', e))
   await config.flush()
   // Apps that find Hive by its discovery file stop looking for this one (#620).
   await clearDiscovery()
@@ -659,6 +664,30 @@ async function quitNow(tellUser: boolean): Promise<void> {
   else {
     if (relaunchOnQuit) relaunch()
     exitBy('app.quit', relaunchOnQuit ? 'quitting to restart' : 'quitting', () => app.quit())
+  }
+}
+
+/** How long Hive quitting waits for every workspace to finish being written (the drain only, never a command). */
+const QUIT_DRAIN_MS = 15_000
+
+/**
+ * The close commands as Hive quits (HI-1368): only when a window's workspace or When Hive quits has one; otherwise the
+ * quit goes on as before, its databases closed by will-quit. Every window's workspace closes at once, each command run
+ * in its window, then When Hive quits in the last one used (not run if a workspace wasn't written in time). The drains
+ * are bounded together: past it, one still draining doesn't run, and neither does When Hive quits.
+ */
+async function closeCommandsOnQuit(reason: CloseReason): Promise<void> {
+  const entries = hiveWindows()
+  const global = config.settings.general.onQuit
+  if (!quitRunsAny(entries.map((e) => e.ws), global)) return
+  const bound = new AbortController()
+  const timer = setTimeout(() => bound.abort(), QUIT_DRAIN_MS)
+  try {
+    const outcomes = await Promise.all(entries.map((e) => closeWithCommand(e.ws, reason, e.win, { cancelled: bound.signal }).catch((err): RunOutcome => (log.warn("closing a window's workspace as Hive quits", err), 'failed'))))
+    const last = lastFocused() ?? entries[0]
+    await runQuitCommand(global, reason, last?.win ?? null, outcomes.includes('notDrained'))
+  } finally {
+    clearTimeout(timer)
   }
 }
 

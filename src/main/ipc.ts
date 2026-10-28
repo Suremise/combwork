@@ -41,6 +41,7 @@ import { openExternalTerminal } from './externalTerminal'
 import { hiveWorktreeOf, mergeUnused, removalPreview, removeUnusedWorktree, unusedBranchOf, unusedBranchStatus, unusedWorktrees } from './unusedWorktrees'
 import { branchMergeStatus, lineCard, lineConfirmed, mergeBranch, mergeBranches } from './branchMerge'
 import { createLogger, logsDir, userText } from './logger'
+import { closeCommandState, closeWithCommand, dismiss, dontWait } from './closeCommand/closeCommands'
 import { diagnostics } from './diagnostics'
 import { resumeAfterClose, startupStep, stopLeftAfterClose } from './lastRun'
 import { dismissOffered, resumeOffered, workspaceRecovering } from './restartResume'
@@ -305,6 +306,8 @@ async function openHere(path: string): ReturnType<WorkspaceService['open']> {
   // request may have outlasted (HI-1694): refused while another holds it. Its steps shown as they go, until it is open.
   const claim = claimWindow(ws, path, 'projects')
   try {
+    // A switch: the workspace it had closes first, running its close command (HI-1368), then the next one opens.
+    if (ws.path) await closeWithCommand(ws, 'switch', ws.window)
     return await workspace.open(path)
   } finally {
     ws.closing = false
@@ -463,6 +466,17 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'app:restart': () => quitControl.restart(),
     'app:quitDecision': (choice, dontAskAgain) => quitControl.decide(win(), choice, dontAskAgain),
     'app:cancelPendingQuit': () => quitControl.cancelPending(),
+    'closeCommand:state': () => closeCommandState(win()),
+    'closeCommand:dontWait': (id) => dontWait(win(), String(id)),
+    'closeCommand:dismiss': (id) => dismiss(win(), String(id)),
+    'closeCommand:setWorkspace': async (setting) => {
+      const ws = currentWorkspace()
+      // Only the user sets it, from the window (HI-1368): never the Agent API (SENSITIVE).
+      const onClose = { command: typeof setting?.command === 'string' ? setting.command.slice(0, 4000) : '', onUpdate: setting?.onUpdate === true }
+      await ws.saveWorkspaceConfigWith(() => ({ onClose }))
+      ws.scheduleRefresh()
+      return onClose
+    },
     'app:quitState': () => quitControl.state(win()),
     'app:openExternal': (url) => {
       if (/^https?:\/\//i.test(url) || url.startsWith('mailto:')) void shell.openExternal(url)
@@ -671,7 +685,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       // Claimed after the agents' stop, which an open may have outlasted (HI-1694): refused while one holds the window.
       const claim = claimWindow(ws, ws.path ?? '', null)
       try {
-        await workspace.close()
+        // Its close command run once it has closed (HI-1368), the window on its welcome page after.
+        await closeWithCommand(ws, 'window', win())
       } finally {
         ws.closing = false
         releaseWindow(ws, claim)

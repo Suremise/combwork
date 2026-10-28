@@ -13,6 +13,7 @@ import { AddAgentDialog, AgentSettingsDialog, HandOverDialog, MergeDialog, Templ
 import { BranchMergeDialog } from './components/BranchMerge'
 import { BoardUpgradeAsk, BoardUpgradeBanner } from './components/BoardUpgrade'
 import { WorkspaceOpening } from './components/WorkspaceOpening'
+import { CloseCommandPanel } from './components/CloseCommandPanel'
 import { ArchiveAllDialog, BoardView, MoveToDoingDialog, TaskDialog, TaskStartDialog } from './components/Board'
 import { LaneStartDialog } from './components/LaneStartDialog'
 import { WorkspaceOverviewView } from './views/WorkspaceOverview'
@@ -204,6 +205,9 @@ function handleEvent(e: HiveEvent): void {
       break
     case 'quit-pending':
       set({ quitPending: e.pending ? { working: e.working } : null })
+      break
+    case 'close-command':
+      set({ closeCommand: e.run })
       break
     case 'keep-awake':
       set({ keepAwake: e.working })
@@ -399,6 +403,10 @@ export function App() {
       const q = await call('app:quitState')
       if (!early.active()) return
       set({ quitRequest: q.request, quitUnsaved: q.unsaved, quitScope: q.scope, quitPending: q.pending ? { working: q.working } : null })
+      // And its close command's panel (HI-1368), when it reloaded while one ran.
+      const closing = await call('closeCommand:state')
+      if (!early.active()) return
+      set({ closeCommand: closing })
       applyTheme()
       noticeUnmanagedMcp()
       // The day's tip, once the window has settled.
@@ -536,6 +544,7 @@ export function App() {
       <SetAsideDialog />
       <BoardUpgradeAsk />
       <WorkspaceOpening />
+      <CloseCommandPanel />
       <AddAgentDialog />
       <AgentSettingsDialog />
       <TemplateAgentDialog />

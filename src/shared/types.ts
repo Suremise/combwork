@@ -186,6 +186,8 @@ export interface AppSettings {
     userName: string
     /** The language Hive shows (#767): 'auto' (Windows' display languages) or a language's code (de, pl…). */
     language: string
+    /** Settings → General → When Hive quits, run (HI-1368): once, after every window's workspace has closed. */
+    onQuit: CloseCommandSetting
   }
   appearance: {
     theme: ThemeSetting
@@ -819,6 +821,41 @@ export interface WorkspaceConfig {
   workflow?: WorkflowDefaults
   /** The workspace's default slot options (HI-1765), between Hive's and each project's own. */
   slotDefaults?: SlotDefaults
+  /** Settings → Workspace → When this workspace closes, run (HI-1368); absent or an empty command: nothing runs. */
+  onClose?: CloseCommandSetting
+}
+
+/**
+ * A command Hive runs as a workspace closes, or as Hive quits (HI-1368), waiting for it with a panel. An object, not a
+ * bare string, so it can later be one of a workspace's named commands without a migration.
+ */
+export interface CloseCommandSetting {
+  /** The command, run by cmd.exe; `{workspace}`, `{name}` and `{reason}` are filled in. Empty: nothing runs. */
+  command: string
+  /** Run it too when Hive restarts to install an update (skipped by default). */
+  onUpdate: boolean
+}
+
+/** Why a close command runs: its `{reason}`. */
+export type CloseReason = 'window' | 'switch' | 'quit' | 'update'
+
+/** A close command's run as its panel shows it (HI-1368): the `close-command` event's and closeCommand:state's. */
+export interface CloseCommandRun {
+  id: string
+  /** 'workspace': this window's workspace's; 'quit': When Hive quits, run. */
+  kind: 'workspace' | 'quit'
+  /** The command as it runs, its placeholders filled in. */
+  command: string
+  startedAt: string
+  /** running: the spinner, Don't wait; failed: its exit code (or why), Close; ok and left: the panel goes. */
+  state: 'running' | 'ok' | 'failed' | 'left'
+  /** The output's last lines (at most 8, each at most 400 characters). */
+  lines: string[]
+  exitCode: number | null
+  /** Why it failed without an exit code: 'drain' (Hive couldn't finish saving in time, so it didn't run), 'spawn', 'runner'. */
+  failure?: 'drain' | 'spawn' | 'runner'
+  /** The error, for 'spawn' (the system's text). */
+  error?: string
 }
 
 /**
@@ -3164,6 +3201,8 @@ export type HiveEvent =
   | { type: 'quit-request'; sessions: QuitSession[]; unsaved: string[]; /** Anything but 'app' stops only this window's workspace's sessions. */ scope?: QuitScope }
   /** Hive is waiting for working agents to finish before quitting (or stopped waiting). */
   | { type: 'quit-pending'; pending: boolean; working: number }
+  /** This window's close command (HI-1368): the panel shows it while it runs or failed; null: none (the panel goes). */
+  | { type: 'close-command'; run: CloseCommandRun | null }
   /** How many working agents keep the PC awake (0: it may sleep). */
   | { type: 'keep-awake'; working: number }
   /** Files changed in a project that has a Files or Images tab open. dirs are relative, '' is the root. */

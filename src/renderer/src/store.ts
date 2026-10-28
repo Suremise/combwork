@@ -48,6 +48,7 @@ import type {
   ToastMessage,
   Notice,
   OpenProgress,
+  CloseCommandRun,
   WorkspaceInfo
 } from '@shared/types'
 import type { QueueView } from '@shared/workflow/queue'
@@ -207,6 +208,8 @@ interface State {
   recent: RecentWorkspace[]
   /** This window's workspace opening, its step now (HI-1694), or null. */
   openProgress: OpenProgress | null
+  /** This window's close command (HI-1368) while it runs or after it failed: CloseCommandPanel; null: none. */
+  closeCommand: CloseCommandRun | null
   /** Each provider's installed CLI (install state, version, sign-in, readiness). */
   providers: Record<ProviderId, AgentInstallInfo>
   /** Whether git itself runs (#346); null until asked. */
@@ -517,6 +520,7 @@ export const useStore = create<State>(() => ({
   workspace: null,
   recent: [],
   openProgress: null,
+  closeCommand: null,
   providers: {},
   gitTool: null,
   planUsage: {},

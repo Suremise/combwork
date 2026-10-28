@@ -1,0 +1,151 @@
+import { spawn as nodeSpawn, type ChildProcess, type SpawnOptions } from 'child_process'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'original-fs'
+import { open, rm } from 'original-fs/promises'
+import { basename, join } from 'path'
+import { closeCommandOf, fillCloseCommand } from '../../shared/closeCommand'
+import type { CloseCommandSetting, CloseReason } from '../../shared/types'
+import type { RunStatus } from './runner'
+
+// HI-1368: a close command's run, as Hive starts and follows it. Hive starts the runner (hive-close-runner.js) detached,
+// with no pipe to it; the runner starts the command and keeps its folder's status.json and tail.txt (runner.ts). Hive
+// reads those, bounded, for the panel; it never holds the command or its output.
+
+/** How much of the tail Hive reads for the panel: its end only, never the whole file. */
+export const READ_TAIL_BYTES = 16 * 1024
+/** The panel's lines: the last few, each cut short. */
+export const PANEL_LINES = 8
+export const LINE_CHARS = 400
+/** Runs kept per workspace name, and for When Hive quits: the newest; one still running is never removed. */
+export const KEEP_RUNS = 5
+/** How long a runner may take to write its first status before the run counts as not started. */
+export const START_MS = 10_000
+
+/** Why a close command doesn't run: none set, a test copy of Hive, or Hive restarting for an update without the tick. */
+export type Skip = 'none' | 'test' | 'update'
+
+/**
+ * Whether this Hive runs close commands: never a test copy, whether quiet or shown (HR6's s8 point 3: a test profile is
+ * HIVE_USER_DATA, or HIVE_TEST_QUIET=1 for a packaged one), but for an unpackaged build's HIVE_TEST_RUN_ON_CLOSE=1, the
+ * e2e suite's seam.
+ */
+export function runsCloseCommands(env: NodeJS.ProcessEnv, packaged: boolean): boolean {
+  const testProfile = !!env.HIVE_USER_DATA || env.HIVE_TEST_QUIET === '1'
+  if (!testProfile) return true
+  return !packaged && env.HIVE_TEST_RUN_ON_CLOSE === '1'
+}
+
+/** The command to run for a close, its placeholders filled in, or why none runs. */
+export function planRun(setting: Partial<CloseCommandSetting> | null | undefined, reason: CloseReason, values: { workspace?: string }, o: { runs: boolean }): { command: string } | { skip: Skip } {
+  const raw = closeCommandOf(setting)
+  if (!raw) return { skip: 'none' }
+  if (!o.runs) return { skip: 'test' }
+  if (reason === 'update' && setting?.onUpdate !== true) return { skip: 'update' }
+  return { command: fillCloseCommand(raw, { workspace: values.workspace, name: values.workspace ? basename(values.workspace) : undefined, reason }) }
+}
+
+/** A run's folder name: what it is for (its workspace's folder name, or quit) and when, sortable. */
+export function runFolderName(kind: 'workspace' | 'quit', name: string | null, at: Date): string {
+  const stamp = at.toISOString().replace(/[:.]/g, '-')
+  const safe = (name ?? '').replace(/[^\w.-]+/g, '_').slice(0, 60) || 'workspace'
+  return kind === 'quit' ? `quit-${stamp}` : `ws-${safe}-${stamp}`
+}
+
+/** What starting a runner needs: Hive's executable as Node, the runner's script, the command's environment. */
+export interface StartDeps {
+  exec: string
+  script: string
+  env: Record<string, string>
+  spawn?: (cmd: string, args: string[], opts: SpawnOptions) => ChildProcess
+}
+
+/**
+ * Starts the runner for a command in a new folder under `root`: detached, hidden, with no pipe to Hive (so nothing of
+ * it breaks when Hive stops waiting or exits). Throws as spawn does; a later failure shows in the folder (no status).
+ */
+export function startRun(root: string, folder: string, command: string, cwd: string, deps: StartDeps): string {
+  const dir = join(root, folder)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'job.json'), JSON.stringify({ command, cwd }))
+  const spawn = deps.spawn ?? nodeSpawn
+  const child = spawn(deps.exec, [deps.script, dir], { cwd, env: { ...deps.env, ELECTRON_RUN_AS_NODE: '1' }, detached: true, windowsHide: true, stdio: 'ignore' })
+  child.on('error', () => undefined)
+  child.unref()
+  return dir
+}
+
+/** A run as Hive reads it: its status (null: none written yet, or unreadable) and the tail's last lines. */
+export interface RunRead {
+  status: RunStatus | null
+  lines: string[]
+}
+
+/** Reads a run's status and the end of its tail, at most READ_TAIL_BYTES of it, never the whole file. */
+export async function readRun(dir: string): Promise<RunRead> {
+  let status: RunStatus | null = null
+  try {
+    status = JSON.parse(readFileSync(join(dir, 'status.json'), 'utf8')) as RunStatus
+  } catch {
+    // Not written yet, or being replaced this instant: the next read has it.
+  }
+  return { status, lines: await tailLines(join(dir, 'tail.txt')) }
+}
+
+/** The last PANEL_LINES lines of a file, from its last READ_TAIL_BYTES, each at most LINE_CHARS characters. */
+export async function tailLines(file: string): Promise<string[]> {
+  let text = ''
+  try {
+    const f = await open(file, 'r')
+    try {
+      const { size } = await f.stat()
+      const n = Math.min(size, READ_TAIL_BYTES)
+      const buf = Buffer.alloc(n)
+      await f.read(buf, 0, n, size - n)
+      text = buf.toString('utf8')
+    } finally {
+      await f.close()
+    }
+  } catch {
+    return []
+  }
+  const lines = text
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((l) => l.replace(/\s+$/, ''))
+  while (lines.length && !lines[lines.length - 1]) lines.pop()
+  return lines.slice(-PANEL_LINES).map((l) => (l.length > LINE_CHARS ? `${l.slice(0, LINE_CHARS - 1)}…` : l))
+}
+
+/** Whether a process is alive, by its id. */
+export function alive(pid: number | null | undefined): boolean {
+  if (!pid) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
+/**
+ * Removes all but the newest KEEP_RUNS runs of a kind (`ws-<name>-` or `quit-`) under `root`. A run still going (its
+ * status says running and its runner is alive) is never removed, nor counted.
+ */
+export async function pruneRuns(root: string, prefix: string, keep = KEEP_RUNS): Promise<void> {
+  if (!existsSync(root)) return
+  const mine = readdirSync(root)
+    .filter((n) => n.startsWith(prefix) && /^\d{4}-/.test(n.slice(prefix.length)))
+    .sort()
+    .reverse()
+  const ended = mine.filter((n) => {
+    try {
+      const s = JSON.parse(readFileSync(join(root, n, 'status.json'), 'utf8')) as RunStatus
+      return s.state !== 'running' || !alive(s.runnerPid)
+    } catch {
+      return true
+    }
+  })
+  for (const n of ended.slice(keep)) await rm(join(root, n), { recursive: true, force: true }).catch(() => undefined)
+}
+
+/** A run's prefix for pruning, by what it is for. */
+export const runPrefix = (kind: 'workspace' | 'quit', name: string | null): string => (kind === 'quit' ? 'quit-' : `ws-${(name ?? '').replace(/[^\w.-]+/g, '_').slice(0, 60) || 'workspace'}-`)

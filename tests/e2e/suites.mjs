@@ -197,6 +197,7 @@ export const SUITES = [
   { name: 'narrowmain' },
   { name: 'nocode' },
   { name: 'numbers' },
+  { name: 'onclose' },
   { name: 'openguard' },
   { name: 'openspeed' },
   { name: 'overview' },

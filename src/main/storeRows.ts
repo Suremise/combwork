@@ -1,6 +1,7 @@
 import { existsSync } from 'original-fs'
 import { resolve } from 'path'
 import { boardLock, inBoardWrite, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
+import { beginWrite, countedWrite } from './dbWrites'
 import { transaction, type Db } from './db'
 import { withFileLock } from './fsutil'
 import { keepAsBackup } from './storeBackup'
@@ -89,10 +90,16 @@ export async function writeStore<T>(workspacePath: string, store: StoreName, sco
 export async function withStoreLock<T>(workspacePath: string, store: StoreName, scope: string, fn: (db: ReturnType<typeof workspaceDb>['writer']) => Promise<T>): Promise<T> {
   const path = resolve(workspacePath)
   if (inBoardWrite(path)) throw new Error(`The ${store} were saved inside a change of the board`) // i18n-ignore: a mistake in Hive's code, never shown
-  await storeTestHooks.beforeSave?.(store, scope)
-  // Its own lease on the connection (#1383): a workspace closed meanwhile, or opened, neither closes it under `fn` nor is
-  // closed by it.
-  return withFileLock(boardLock(path), () => withLeasedDb(path, (db) => fn(db.writer)))
+  // Under way from here, its wait for the lock included (HI-1368: a close command waits for it).
+  const written = beginWrite(path)
+  try {
+    await storeTestHooks.beforeSave?.(store, scope)
+    // Its own lease on the connection (#1383): a workspace closed meanwhile, or opened, neither closes it under `fn` nor
+    // is closed by it.
+    return await withFileLock(boardLock(path), () => withLeasedDb(path, (db) => fn(db.writer)))
+  } finally {
+    written()
+  }
 }
 
 type Writer = ReturnType<typeof workspaceDb>['writer']
@@ -105,6 +112,12 @@ type Writer = ReturnType<typeof workspaceDb>['writer']
 export async function saveTable(workspacePath: string, store: StoreName, scope: string, write: (db: Writer) => void, meta: Record<string, string | null> = {}, guard?: () => void): Promise<void> {
   const path = resolve(workspacePath)
   if (inBoardWrite(path)) throw new Error(`The ${store} were saved inside a change of the board`) // i18n-ignore: a mistake in Hive's code, never shown
+  // Under way from here, its wait for the lock included (HI-1368: a close command waits for it).
+  await countedWrite(path, () => saveTableLocked(path, store, scope, write, meta, guard))
+}
+
+/** saveTable's save, once it is counted. */
+async function saveTableLocked(path: string, store: StoreName, scope: string, write: (db: Writer) => void, meta: Record<string, string | null>, guard?: () => void): Promise<void> {
   await storeTestHooks.beforeSave?.(store, scope)
   await withFileLock(boardLock(path), async () => {
     guard?.()
@@ -154,8 +167,8 @@ export async function openTable<T>(workspacePath: string, store: StoreName, scop
   if (!first && !existsSync(file)) return true
   const got = first ? await readFile() : null
   // The move and the file's rename under one hold of the lock, the refusal asked last before them: nothing that would
-  // refuse it (a removal's export, under the same lock) lands between.
-  return withFileLock(boardLock(path), async () => {
+  // refuse it (a removal's export, under the same lock) lands between. Counted as a write (HI-1368).
+  return countedWrite(path, () => withFileLock(boardLock(path), async () => {
     if (opts.refuse?.()) return false
     const db = conn().writer
     if (first && toMove(db)) {
@@ -174,7 +187,7 @@ export async function openTable<T>(workspacePath: string, store: StoreName, scop
       keepAsBackup(file)
     }
     return true
-  })
+  }))
 }
 
 function setMeta(db: ReturnType<typeof workspaceDb>['writer'], store: StoreName, scope: string, key: string, value: string | null): void {

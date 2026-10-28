@@ -1803,6 +1803,18 @@ Tick **Don't ask again** to stop the question about sessions, or change it any t
 
 The next time Hive starts, it offers to resume the agents that were working, watching their cards or in a card loop when you quit: one notice, **Resume the 3 agents that were working?**, naming them. **Resume** starts each again in its conversation, one at a time, telling it Hive was quit and started again; **Don't Resume** leaves them stopped and doesn't ask again. Nothing resumes until you choose, and closing the notice (×) without choosing asks again at the next start.
 
+### Backups and other tasks when a workspace closes <a id="close-commands"></a>
+
+Hive can run a command of yours each time a workspace closes, for a backup tool or anything else that should run once Hive has let go of the workspace's files. Set it in **Settings → Workspace → When this workspace closes, run**. For one command once Hive has closed every window, use **Settings → General → When Hive quits, run**.
+
+- **When it runs.** As the workspace closes: you close its window, switch the window to another workspace, choose **Close Workspace**, or quit Hive with it open. Two windows open means two runs, one each. Closing the last window to the tray isn't a close, and nothing runs if Hive closes unexpectedly. **When Hive quits, run** runs once, after every window's own command.
+- **After Hive has finished writing.** The command starts once the workspace's board and the Assistant's journal are closed and every save Hive had under way has landed. If that takes more than 10 seconds, the command doesn't run, and Hive says so.
+- **Hive waits for it.** The window dims with a panel: a spinner, the command, how long it has run and its last lines of output. **Don't wait** lets Hive go on (switch, close the window, quit) while the command carries on by itself. When it succeeds the panel goes; when it fails, the panel keeps its exit code and output until you close it. To keep Hive from waiting at all, write a command that starts its work and returns at once, such as `start "" "C:\Tools\backup.exe" "{workspace}"`.
+- **Placeholders.** `{workspace}` is the workspace's folder, `{name}` its folder name and `{reason}` why it runs (`window`, `switch`, `quit` or `update`); quote them where a path may hold spaces: `replica run hive --workspace "{workspace}"`. Settings shows exactly what it will run.
+- **Updates.** Restarting Hive to install an update skips both commands, unless you tick **Also when Hive restarts to install an update**.
+- **Yours alone.** The command is yours, run as you; the Hive Assistant can't set or change it. Hive keeps its last output for each workspace's last 5 runs (and When Hive quits's), the last 64 KB of each, in its profile's `close-commands` folder.
+- **After it starts,** Hive no longer guards the workspace: if you open it again while the command still runs, the two share its files. A backup that must not see changes should copy the database with SQLite's backup or take a snapshot, or you wait for it before reopening.
+
 ## Keyboard shortcuts <a id="keyboard-shortcuts"></a>
 
 | Action | Shortcut |

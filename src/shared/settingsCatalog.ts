@@ -27,6 +27,7 @@ import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
 import { AUTO_PROVIDER, DEFAULT_PROJECT_PROVIDER, PROVIDERS, dangerModes, defaultProviderSettings, modeOption, permissionLabel, projectProviderConfig, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
 import { LEGACY_CONSUMED, ownOrLegacy } from './workflow/preferences'
+import { closeCommandOf } from './closeCommand'
 
 /** Where a setting lives: Hive's own (Settings), a provider's page in Settings, the open workspace, or one project (Project Settings). */
 export type SettingScope = 'app' | 'provider' | 'workspace' | 'project'
@@ -255,6 +256,19 @@ const APP_ROWS: Row[] = [
   { section: 'general', key: 'launchAtLogin', title: msg({ id: 'settings.general.launchAtLogin.title', defaultMessage: 'Launch at login', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.launchAtLogin.desc', defaultMessage: 'Start Hive automatically when you sign in to Windows.', description: 'What the setting "Launch at login" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.launchAtLogin.tip', defaultMessage: 'Hive starts hidden in the tray when launched at login.', description: 'The info tip of the setting "Launch at login" (Settings → General): more on what it does and when it applies.' }), type: 'boolean' },
   { section: 'general', key: 'reopenLastWorkspace', title: msg({ id: 'settings.general.reopenLastWorkspace.title', defaultMessage: 'Reopen last workspace', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.reopenLastWorkspace.desc', defaultMessage: 'Open the workspace you used last when Hive starts.', description: 'What the setting "Reopen last workspace" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.reopenLastWorkspace.tip', defaultMessage: 'Sessions are never resumed automatically — only the workspace is reopened.', description: 'The info tip of the setting "Reopen last workspace" (Settings → General): more on what it does and when it applies.' }), type: 'boolean' },
   { section: 'general', key: 'confirmOnQuit', title: msg({ id: 'settings.general.confirmOnQuit.title', defaultMessage: 'Confirm before quitting', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.confirmOnQuit.desc', defaultMessage: 'When to ask before quitting stops running sessions.', description: 'What the setting "Confirm before quitting" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.confirmOnQuit.tip', defaultMessage: 'Quitting stops every running session. Their conversations are kept and can be resumed, so by default Hive only asks when an agent is in the middle of something (working, or waiting for your answer).', description: 'The info tip of the setting "Confirm before quitting" (Settings → General): more on what it does and when it applies.' }), type: 'select', options: [{ value: 'working', label: msg({ id: 'settings.general.confirmOnQuit.option.working', defaultMessage: 'When an agent is working', description: 'A choice of the setting "Confirm before quitting" (Settings → General).' }) }, { value: 'always', label: msg({ id: 'settings.general.confirmOnQuit.option.always', defaultMessage: 'Whenever sessions are running', description: 'A choice of the setting "Confirm before quitting" (Settings → General).' }) }, { value: 'never', label: msg({ id: 'settings.general.confirmOnQuit.option.never', defaultMessage: 'Never', description: 'A choice of the setting "Confirm before quitting" (Settings → General).' }) }] },
+  {
+    section: 'general',
+    key: 'onQuit',
+    title: msg({ id: 'settings.general.onQuit.title', defaultMessage: 'When Hive quits, run', description: "A setting's title (Settings → General): a command of the user's that Hive runs as it quits." }),
+    desc: msg({ id: 'settings.general.onQuit.desc', defaultMessage: "A command Hive runs as it quits, once every window's workspace has closed. Hive waits for it, showing it running.", description: 'What the setting "When Hive quits, run" does, under its title (Settings → General).' }),
+    tip: msg({
+      id: 'settings.general.onQuit.tip',
+      defaultMessage: "cmd.exe runs it. '{reason}' becomes quit, or update when Hive restarts to install an update (only with that box ticked). Don't wait, in the panel Hive shows, lets Hive go on while the command carries on. Only you can set it: the Assistant can't change it.",
+      description: "The info tip of the setting \"When Hive quits, run\" (Settings → General). '{reason}' is a placeholder the user writes in the command, and quit and update are the values it becomes: keep all three as they are (the quotes around {reason} keep it from being read as a placeholder of this text). Don't wait is the name of a button of the panel."
+    }),
+    type: 'custom',
+    wide: true
+  },
   { section: 'general', key: 'progressPanel', title: msg({ id: 'settings.general.progressPanel.title', defaultMessage: 'Progress panel', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.progressPanel.desc', defaultMessage: 'Show long runs agents report, such as tests and builds: how far along each is and the time left, in a panel on the right and on the taskbar button.', description: 'What the setting "Progress panel" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.progressPanel.tip', defaultMessage: 'Folded, the panel is a strip with a small bar per run; click it, or use Toggle Progress Panel in the command palette. Off hides the panel, the strip and the taskbar progress; agents can still report, and Hive ignores it.', description: 'The info tip of the setting "Progress panel" (Settings → General): more on what it does and when it applies.' }), type: 'boolean' },
   {
     section: 'general',
@@ -353,6 +367,19 @@ const APP_ROWS: Row[] = [
     title: msg({ id: 'settings.workspace.antivirus.title', defaultMessage: 'Antivirus scanning', description: "A setting's title (Settings → Workspace)." }),
     desc: msg({ id: 'settings.workspace.antivirus.desc', defaultMessage: "Whether Microsoft Defender scans the workspace's folders as Hive's work changes them (builds, tests, git, worktrees), and the exclusions Hive can add for them, with your consent.", description: 'What the setting "Antivirus scanning" does, under its title (Settings → Workspace).' }),
     tip: msg({ id: 'settings.workspace.antivirus.tip', defaultMessage: 'Hive checks without administrator rights, so Defender may not show its exclusions (unknown). Adding or removing exclusions asks for administrator rights once. Hive only ever offers these folders: the workspace, its worktrees folder once it exists, and its test area for people developing Hive. It never changes other antivirus products.', description: 'The info tip of the setting "Antivirus scanning" (Settings → Workspace): more on what it does and when it applies.' }),
+    type: 'custom',
+    wide: true
+  },
+  {
+    section: 'workspace',
+    key: 'onClose',
+    title: msg({ id: 'settings.workspace.onClose.title', defaultMessage: 'When this workspace closes, run', description: "A setting's title (Settings → Workspace): a command of the user's that Hive runs as the open workspace closes." }),
+    desc: msg({ id: 'settings.workspace.onClose.desc', defaultMessage: 'A command Hive runs as this workspace closes: its window closes, another workspace opens in it, or Hive quits. Hive waits for it, showing it running.', description: 'What the setting "When this workspace closes, run" does, under its title (Settings → Workspace).' }),
+    tip: msg({
+      id: 'settings.workspace.onClose.tip',
+      defaultMessage: "cmd.exe runs it. '{workspace}' becomes the workspace's folder, '{name}' its name and '{reason}' why it closes: window, switch, quit, or update when Hive restarts to install an update (only with that box ticked). Saved in the workspace's .hive/workspace.json. Only you can set it: the Assistant can't change it.",
+      description: "The info tip of the setting \"When this workspace closes, run\" (Settings → Workspace). '{workspace}', '{name}' and '{reason}' are placeholders the user writes in the command, and window, switch, quit and update are the values {reason} becomes: keep them all as they are (the quotes around each placeholder keep it from being read as one of this text). Keep the file path as it is."
+    }),
     type: 'custom',
     wide: true
   },
@@ -947,6 +974,7 @@ const SENSITIVE: [RegExp, string][] = [
   [/^(project\.)?[\w-]+\.(executablePath|extraArgs)$/, 'It decides what Hive runs: a CLI and its arguments'], // i18n-ignore: the Assistant's tools (English)
   [/^[\w-]+\.allowBackgroundSessions$/, "It lets sessions run out of Hive's reach (Hive can't see or stop them)"], // i18n-ignore: the Assistant's tools (English)
   [/^project\.worktreeSetup$/, 'It is a command Hive runs in every new worktree'], // i18n-ignore: the Assistant's tools (English)
+  [/^workspace\.onClose$|^general\.onQuit$/, 'It is a command Hive runs as a workspace closes or Hive quits'], // i18n-ignore: the Assistant's tools (English)
   [/^updates\.prerelease$/, 'It decides which builds of Hive install'] // i18n-ignore: the Assistant's tools (English)
 ]
 
@@ -1029,6 +1057,8 @@ const DOCS_BY_ID: Record<string, string> = {
   'general.language': 'language', // i18n-ignore: a user guide heading's id (#1535)
   'general.timeFormat': 'dates-and-times', // i18n-ignore: a user guide heading's id (#1535)
   'general.showTips': 'tips', // i18n-ignore: a user guide heading's id (#1535)
+  'general.onQuit': 'close-commands', // i18n-ignore: a user guide heading's id (#1535)
+  'workspace.onClose': 'close-commands', // i18n-ignore: a user guide heading's id (#1535)
   'sessions.transcriptWarnMB': 'long-conversations', // i18n-ignore: a user guide heading's id (#1535)
   'sessions.backupTranscripts': 'archiving-and-backups', // i18n-ignore: a user guide heading's id (#1535)
   'sessions.backupRetention': 'archiving-and-backups', // i18n-ignore: a user guide heading's id (#1535)
@@ -1133,8 +1163,11 @@ export function settingEntry(id: string): SettingEntry | undefined {
  * advanced value (#367) is advanced.json's override (`advanced`: its values) or the default, or the workspace's own (null:
  * Settings → Advanced's).
  */
-export function settingValue(e: SettingEntry, settings: AppSettings, project?: ProjectConfig | null, ws?: Pick<WorkspaceConfig, 'advanced' | 'workflow' | 'slotDefaults'> | null, advanced?: Record<string, unknown> | null): unknown {
+export function settingValue(e: SettingEntry, settings: AppSettings, project?: ProjectConfig | null, ws?: Pick<WorkspaceConfig, 'advanced' | 'workflow' | 'slotDefaults' | 'onClose'> | null, advanced?: Record<string, unknown> | null): unknown {
   if (e.action) return undefined
+  // The close commands (HI-1368): the command, as the tools read it (sensitive: they never set it).
+  if (e.id === 'workspace.onClose') return closeCommandOf(ws?.onClose)
+  if (e.id === 'general.onQuit') return closeCommandOf(settings.general?.onQuit)
   if (e.advanced) return e.advanced.scope === 'workspace' ? (ws?.advanced?.[e.advanced.id] ?? null) : (advanced?.[e.advanced.id] ?? advancedDef(e.advanced.id)?.default)
   // A level's workflow default (#1422): its own value, or inherit.
   if (e.workflowLevel && e.workflow) return (e.workflowLevel.level === 'global' ? settings.workflow : ws?.workflow)?.[e.workflowLevel.platform]?.[e.workflow] ?? 'inherit'
@@ -1164,6 +1197,7 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
 /** A setting's default: Hive's, or for a project's, Inherit. */
 export function settingDefault(e: SettingEntry): unknown {
   if (e.action) return undefined
+  if (e.id === 'workspace.onClose' || e.id === 'general.onQuit') return ''
   if (e.advanced) return e.advanced.scope === 'workspace' ? null : advancedDef(e.advanced.id)?.default
   if (e.workflowLevel || e.slotLevel) return 'inherit'
   // A project's provider settings inherit, but its Extra arguments are added to Hive's: empty (DEFAULT_PROJECT_PROVIDER).

@@ -127,6 +127,8 @@
   "tips.cliOverrides.title": "Keep a CLI as it is outside Hive",
   "tips.cliOwnMode.text": "Choose The CLI's own setting as an agent's or a project's permission mode and Hive passes none: the CLI starts in the mode its own config sets. The badge says CLI's own, and switching a running session restarts it.",
   "tips.cliOwnMode.title": "Let the CLI's own config choose the mode",
+  "tips.closeCommands.text": "Settings → Workspace → When this workspace closes, run: Hive runs your command once it has closed the workspace and finished writing its files, and shows it running until it ends.",
+  "tips.closeCommands.title": "Run a backup as a workspace closes",
   "tips.closeWindow.text": "With several windows open, File → Close Window ({key}) closes just this one, as its X does. Exit Hive (all windows) closes every window and stops all their agents.",
   "tips.closeWindow.title": "Close one window, or all of them",
   "tips.codexSandboxConnections.text": "Codex connections keep asking for Administrator permission? Each one's admin sandbox setup resets the others'. Settings → Advanced → Codex → Connections: use Codex's non-admin sandbox runs them all without it, at the cost of separate sandbox accounts.",
