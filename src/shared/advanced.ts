@@ -196,6 +196,9 @@ export const SLOTS_RENAME_ADOPTED = 'hive.slots.renameAdopted'
 /** Whether a Done card's line is deleted once its target contains it (#1438): read by main's slotCards. */
 export const SLOTS_DELETE_MERGED = 'hive.slots.deleteMergedLines'
 
+/** How many days after a session ends the usage history keeps its timeline's full detail (HI-1648): read by the usage worker. */
+export const USAGE_TIMELINE_DETAIL_DAYS = 'hive.usage.timelineDetailDays'
+
 /** The longest a slot's setup, install or archive command runs, in minutes (#1429): read by main's slotsApp. */
 export const SLOTS_SETUP_MINUTES = 'hive.slots.setupMinutes'
 
@@ -1070,6 +1073,23 @@ const SOURCES: readonly AdvancedSource[] = [
     }),
     kind: 'boolean',
     default: true,
+    applies: 'now'
+  },
+  // The usage history's timeline detail (HI-1648, Darren 27 Oct): sessions that ended longer ago are kept in 1-hour steps.
+  {
+    id: USAGE_TIMELINE_DETAIL_DAYS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.usage.timelineDetailDays.title', defaultMessage: 'Usage history: keep full detail for', description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in days (\"14 days\"). The usage history is the record Hive keeps of what each session used." }),
+    desc: msg({
+      id: 'settings.advanced.hive.usage.timelineDetailDays.desc',
+      defaultMessage: "How long the usage history keeps when each request happened, to the second, after a session ends. Past it, a session's use over time is kept in 1-hour steps, so the history stays small. Totals, tokens and costs stay exact; only where a card's or lane's share began or ended inside an hour is less exact, for sessions that old.",
+      description: 'What the advanced setting "Usage history: keep full detail for" does, and what is lost past it (Settings → Advanced, under Hive). A lane is a card loop: a builder and a reviewer taking cards in turn.'
+    }),
+    kind: 'number',
+    default: 14,
+    min: 1,
+    max: 3650,
+    unit: 'days',
     applies: 'now'
   },
   // Claude Code
@@ -2543,6 +2563,7 @@ const UNITS: Record<string, Msg> = {
   lanes: msg({ id: 'settings.advanced.unit.lanes', defaultMessage: '{n, plural, one {# lane} other {# lanes}}', description: "An advanced setting's value: a number of card-loop lanes the Progress panel shows." }),
   agents: msg({ id: 'settings.advanced.unit.agents', defaultMessage: '{n, plural, one {# agent} other {# agents}}', description: "An advanced setting's value: a number of agents." }),
   min: msg({ id: 'settings.advanced.unit.minutes', defaultMessage: '{n, number} min', description: 'An advanced setting\'s value in minutes, short: "10 min". {n} is the number.' }),
+  days: msg({ id: 'settings.advanced.unit.days', defaultMessage: '{n, plural, one {# day} other {# days}}', description: 'An advanced setting\'s value in days: "14 days".' }),
   captures: msg({ id: 'settings.advanced.unit.captures', defaultMessage: '{n, plural, one {# capture} other {# captures}}', description: "An advanced setting's value: a number of the flight recorder's captures (saved recordings of the developer console)." }),
   characters: msg({ id: 'settings.advanced.unit.characters', defaultMessage: '{n, plural, one {# character} other {# characters}}', description: "An advanced setting's value: a number of characters (letters, spaces and the like) in a piece of text." })
 }
@@ -2553,6 +2574,7 @@ const UNIT_LABELS: Record<string, Msg> = {
   lanes: msg({ id: 'settings.advanced.unitLabel.lanes', defaultMessage: 'lanes', description: 'Beside the box of an advanced setting that is a number of card-loop lanes the Progress panel shows (Settings → Advanced).' }),
   agents: msg({ id: 'settings.advanced.unitLabel.agents', defaultMessage: 'agents', description: 'Beside the box of an advanced setting that is a number of agents (Settings → Advanced).' }),
   min: msg({ id: 'settings.advanced.unitLabel.minutes', defaultMessage: 'min', description: 'Beside the box of an advanced setting given in minutes (Settings → Advanced): the unit, short, as in "10 min".' }),
+  days: msg({ id: 'settings.advanced.unitLabel.days', defaultMessage: 'days', description: 'Beside the box of an advanced setting given in days (Settings → Advanced), as in "14 days".' }),
   bytes: msg({ id: 'settings.advanced.unitLabel.bytes', defaultMessage: 'bytes', description: 'Beside the box of an advanced setting that is a size in bytes (Settings → Advanced), as in "4096 bytes".' }),
   captures: msg({ id: 'settings.advanced.unitLabel.captures', defaultMessage: 'captures', description: "Beside the box of an advanced setting that is a number of the flight recorder's captures (saved recordings of the developer console; Settings → Advanced)." }),
   characters: msg({ id: 'settings.advanced.unitLabel.characters', defaultMessage: 'characters', description: 'Beside the box of an advanced setting that is a number of characters in a piece of text (Settings → Advanced), as in "80 characters".' })

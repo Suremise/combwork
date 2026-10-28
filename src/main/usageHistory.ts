@@ -16,7 +16,7 @@ import { createLogger, userText } from './logger'
 import { recordProvider, sessions, type ListContext } from './sessions'
 import { boardHolds, cardHolds, type CardHolds } from './tasks'
 import { usageFile, type SessionId, type SessionMeta, type StoredSession } from './usageDb'
-import type { IngestJob, IngestResult, KeptJob, ReadResult, ReadSeed, WorkerReply, WorkerRequest } from './usageWorker'
+import type { IngestJob, IngestResult, KeptJob, ReadResult, ReadSeed, RollUpResult, WorkerReply, WorkerRequest } from './usageWorker'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
 import { isAdmitted, ownerOf, refusedOpen } from './openingFence'
 import { realPath } from './fsutil'
@@ -42,6 +42,8 @@ const TICK_MS = 60_000
 const SWEEP_TICKS = 10
 /** A parser's state kept for a session not used for this long is let go (reading it again is from the start). */
 const STATE_DAYS = 14
+/** How often each open workspace's ended sessions' timelines are rolled up (HI-1648): at its opening, then about daily. */
+const ROLL_UP_MS = 24 * 3_600_000
 /** How long the board read for holds is used again. */
 const CARDS_MS = 30_000
 
@@ -720,6 +722,7 @@ class UsageHistory {
     const key = wsKey(run.path)
     this.housekeeping.add(key)
     try {
+      await this.rollUp(ws, run).catch((e) => log.warn('rolling up the usage history', e))
       for (const host of await this.hosts(ws, run)) {
         if (!this.live(ws, run)) return
         await sessions.compressIdleBackups(host, run.signal).catch((e) => log.warn('compressing backups', e))
@@ -731,6 +734,37 @@ class UsageHistory {
     }
   }
   private housekeeping = new Set<string>()
+
+  /** When each open workspace's timelines were last rolled up (rollUp), by its key: let go as it closes. */
+  private rolledUp = new Map<string, number>()
+
+  /**
+   * Ended sessions' timelines merged into 1-hour steps once Settings → Advanced's days of full detail are past (HI-1648,
+   * Darren 27 Oct), in the worker, a batch at a time behind what is queued (each batch a job of its own, so a turn's
+   * record never waits for them all), then the space they freed given back (on a file from before, its one whole
+   * vacuum first). At a workspace's opening, then about daily. Logged when it merged any.
+   */
+  private async rollUp(ws: WorkspaceService, run: WorkspaceRun): Promise<void> {
+    const key = wsKey(run.path)
+    const last = this.rolledUp.get(key)
+    if (last !== undefined && Date.now() - last < ROLL_UP_MS) return
+    this.rolledUp.set(key, Date.now())
+    const file = usageFile(run.path)
+    const t0 = Date.now()
+    const total = { sessions: 0, rows: 0, merged: 0 }
+    for (;;) {
+      const live = sessions.liveStates().flatMap((s) => (s.sessionId ? [s.sessionId] : []))
+      const r = await this.enqueue<RollUpResult>(`rollUp|${key}`, 2, async () => (this.live(ws, run) ? { type: 'rollUp', file, live } : null))
+      if (!r || !this.live(ws, run)) return
+      total.sessions += r.sessions
+      total.rows += r.rows
+      total.merged += r.merged
+      // A batch that merged none has nothing left it may merge (the rest are running).
+      if (!r.more || !r.sessions) break
+    }
+    if (total.sessions) log.info(`usage history of ${userText(run.path)}: ${total.sessions} ended session(s) rolled up into 1-hour steps, ${total.rows} timeline rows → ${total.merged}, in ${Date.now() - t0} ms`)
+    await this.enqueue(`spaceBack|${key}`, 2, async () => (this.live(ws, run) ? { type: 'spaceBack', file } : null))
+  }
 
   // -------------------------------------------------------------------------
   // The backfill.
@@ -852,6 +886,7 @@ class UsageHistory {
    */
   private closeWorkspace(path: string, place: string): void {
     this.cards.delete(wsKey(path))
+    this.rolledUp.delete(wsKey(path))
     this.progress.delete(wsKey(path))
     this.closeAt(place)
   }

@@ -5,9 +5,11 @@ import { dirname, join } from 'path'
 import type { AppSettings, ProviderId, SessionUsage } from '../shared/types'
 import { baselineOfRows, baselineOfUsage, baselineAsFree, baselineWithoutReports, dominates, ledgerRows, mergeBaselines, reshareRows, rowsAsFree, rowsWithoutReports, sessionRows, summaryOf, unknownOnCards, type SessionHold } from '../shared/usageLedger'
 import { openDb, type Db } from './db'
-import { readAdvancedFrom, valuesReader } from './advancedValues'
+import { advancedValues, readAdvancedFrom, valuesReader } from './advancedValues'
 import type { DatabaseSync } from 'node:sqlite'
-import { baselineOf, cardRows, cursorOf, getMeta, markLocality, replaceRows, sessionIds, setMeta, storedSession, storedSessions, storedTimelines, updateMeta, USAGE_MIGRATIONS, writeSession, type SessionMeta, type SessionWrite } from './usageDb'
+import { baselineOf, cardRows, cursorOf, fileSpace, getMeta, giveSpaceBack, markLocality, replaceRows, rollUpCandidates, rollUpSession, sessionIds, setMeta, storedSession, storedSessions, storedTimelines, updateMeta, USAGE_MIGRATIONS, writeSession, type SessionMeta, type SessionWrite } from './usageDb'
+import { COARSE_STEP, coarsenTimeline } from '../shared/usageTimeline'
+import { USAGE_TIMELINE_DETAIL_DAYS } from '../shared/advanced'
 import { isGz, readTranscript } from './transcriptFiles'
 import { withoutCostReports } from '../shared/usageDays'
 import { newUsageParser, parserShape, restoreParser, saveParser, type RawUsageParser } from './usageParsers'
@@ -63,6 +65,8 @@ export type WorkerRequest = { id: number } & (
   | { type: 'ids'; file: string; scope: string }
   | { type: 'meta'; file: string; scope: string; key: string; value?: string }
   | { type: 'forgetStates'; file: string; before: string }
+  | { type: 'rollUp'; file: string; live: string[]; now?: number }
+  | { type: 'spaceBack'; file: string }
   | { type: 'attribute'; file: string; scope: string; sessions: { session: string; holds: SessionHold[]; holdsKey: string | null }[] }
   | { type: 'close'; file: string }
   | { type: 'read'; path: string; session: string; provider: ProviderId; seed: ReadSeed | null; noWait?: boolean; reportsIgnored?: boolean }
@@ -507,6 +511,63 @@ function attribute(file: string, scope: string, sessions: { session: string; hol
   return n
 }
 
+/** What one roll-up batch did (HI-1648): sessions merged, their rows before and after, and whether more are left. */
+export interface RollUpResult {
+  sessions: number
+  rows: number
+  merged: number
+  more: boolean
+}
+
+/** How long one roll-up batch goes on, so a job or query waiting behind it waits little. */
+const ROLL_UP_BATCH_MS = 50
+/** The most sessions one batch looks at. */
+const ROLL_UP_LIMIT = 500
+
+/**
+ * A batch of ended sessions' timelines merged into 1-hour steps (HI-1648, Darren 27 Oct): those last active before
+ * Settings → Advanced's days of full detail, oldest first, each in a transaction of its own, for ROLL_UP_BATCH_MS at
+ * most; never one running (`live`: their ids). Main sends batches until none are left.
+ */
+function rollUp(file: string, live: string[], now = Date.now()): RollUpResult {
+  const out: RollUpResult = { sessions: 0, rows: 0, merged: 0, more: false }
+  if (readOnly(file)) return out
+  const db = dbOf(file).writer
+  const days = advancedValues.get<number>(USAGE_TIMELINE_DETAIL_DAYS)
+  const before = new Date(now - days * 86_400_000).toISOString()
+  const running = new Set(live)
+  const t0 = Date.now()
+  const found = rollUpCandidates(db, before, COARSE_STEP, ROLL_UP_LIMIT)
+  // A full list may have more after it.
+  out.more = found.length === ROLL_UP_LIMIT
+  for (const c of found) {
+    if (running.has(c.session)) continue
+    if (Date.now() - t0 > ROLL_UP_BATCH_MS) {
+      out.more = true
+      break
+    }
+    const r = rollUpSession(db, c.scope, c.session, before, COARSE_STEP, (t) => coarsenTimeline(t, COARSE_STEP))
+    if (r) Object.assign(out, { sessions: out.sessions + 1, rows: out.rows + r.rows, merged: out.merged + r.merged })
+  }
+  return out
+}
+
+/** The space roll-ups freed given back (giveSpaceBack), logged with the file's size before and after when it changed. */
+function spaceBack(file: string): { before: number; after: number; whole: boolean } | null {
+  if (readOnly(file)) return null
+  const db = dbOf(file).writer
+  const size = (): number => {
+    const s = fileSpace(db)
+    return s.pages * s.pageSize
+  }
+  const t0 = Date.now()
+  const before = size()
+  const whole = giveSpaceBack(db)
+  const after = size()
+  if (whole || after !== before) log('info', `usage history: ${whole ? 'vacuumed once, to give space back from now on' : 'free space given back'}: ${before} → ${after} bytes in ${Date.now() - t0} ms`, file)
+  return { before, after, whole }
+}
+
 /** Jobs one at a time; queries at once. (Exported for main to run it in its own thread in unit tests: usageHistory.ts.) */
 let jobs: Promise<unknown> = Promise.resolve()
 
@@ -540,6 +601,16 @@ export async function handleRequest(m: WorkerRequest): Promise<unknown> {
     }
     case 'attribute': {
       const run = jobs.then(() => attribute(m.file, m.scope, m.sessions))
+      jobs = run.catch(() => undefined)
+      return run
+    }
+    case 'rollUp': {
+      const run = jobs.then(() => rollUp(m.file, m.live, m.now))
+      jobs = run.catch(() => undefined)
+      return run
+    }
+    case 'spaceBack': {
+      const run = jobs.then(() => spaceBack(m.file))
       jobs = run.catch(() => undefined)
       return run
     }

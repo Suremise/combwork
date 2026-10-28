@@ -107,6 +107,20 @@ export function boundTimeline(t: UsageTimeline): UsageTimeline {
   return { ...usedReports({ step, rows, reports }), ...(t.models ? { models: t.models } : {}) }
 }
 
+/** The step an ended session's timeline is kept in once it is older than Settings → Advanced says (HI-1648): an hour. */
+export const COARSE_STEP = 3600
+
+/**
+ * A timeline in steps of `step` seconds at least (HI-1648: an old session's, in an hour's), merged as boundTimeline
+ * merges them: tokens, requests and the charges' sum unchanged, only when inside a step each happened is lost. One
+ * already that coarse is returned as it is.
+ */
+export function coarsenTimeline(t: UsageTimeline, step = COARSE_STEP): UsageTimeline {
+  if (t.step >= step) return t
+  const { rows, reports } = mergeRows(t.rows, t.reports, step)
+  return { ...usedReports({ step, rows, reports }), ...(t.models ? { models: t.models } : {}) }
+}
+
 /** Rows merged into steps of `step` seconds, each step's charges merged into one (flags and models kept apart). */
 function mergeRows(rows: UsageRow[], reports: number[], step: number): { rows: UsageRow[]; reports: number[] } {
   const startOf = (r: UsageRow): number => Math.floor(r[0] / step) * step

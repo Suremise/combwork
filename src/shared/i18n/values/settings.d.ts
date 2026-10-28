@@ -396,6 +396,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.terminal.osc52.block': undefined
   'settings.advanced.hive.terminal.osc52.desc': undefined
   'settings.advanced.hive.terminal.osc52.title': undefined
+  'settings.advanced.hive.usage.timelineDetailDays.desc': undefined
+  'settings.advanced.hive.usage.timelineDetailDays.title': undefined
   'settings.advanced.hive.wait.agentsMaxSeconds.desc': undefined
   'settings.advanced.hive.wait.agentsMaxSeconds.title': undefined
   'settings.advanced.hive.wait.cardMaxSeconds.desc': undefined
@@ -428,6 +430,7 @@ interface HiveMessageValues {
   'settings.advanced.unit.agents': { n: number }
   'settings.advanced.unit.captures': { n: number }
   'settings.advanced.unit.characters': { n: number }
+  'settings.advanced.unit.days': { n: number }
   'settings.advanced.unit.lanes': { n: number }
   'settings.advanced.unit.minutes': { n: number }
   'settings.advanced.unit.seconds': { n: number }
@@ -435,6 +438,7 @@ interface HiveMessageValues {
   'settings.advanced.unitLabel.bytes': undefined
   'settings.advanced.unitLabel.captures': undefined
   'settings.advanced.unitLabel.characters': undefined
+  'settings.advanced.unitLabel.days': undefined
   'settings.advanced.unitLabel.lanes': undefined
   'settings.advanced.unitLabel.minutes': undefined
   'settings.advanced.unitLabel.seconds': undefined
