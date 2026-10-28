@@ -1709,11 +1709,13 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'unrelated-coding',
-    title: 'Ordinary coding: no Hive workflow skills, no board changes',
+    title: 'Ordinary coding: at most the generalist skill (HI-686: the contract routes other work to it), no workflow skill, no board changes',
     prompt: 'Add a function add(a, b) to math.js that returns a + b, and export it.',
-    fake: 'work 1',
+    fake: 'skill generalist then work 1',
+    // Whether it read the generalist skill: what the contract's route asks, recorded, never a failure (a short task may not).
+    observe: (o) => [['read the generalist skill', read(o, 'generalist'), o.skillsRead.join(',')]],
     expect: (o, c) => [
-      ['read no Hive workflow skill', o.skillsRead.length === 0, o.skillsRead.join(',')],
+      ['read no Hive workflow skill (the generalist skill only)', o.skillsRead.every((s) => s === 'generalist'), o.skillsRead.join(',')],
       ['changed nothing on the board', !o.hiveCalls.some((x) => /hive_(create|update|reorder)_task/.test(x.tool))],
       ['did the work', /add/.test(c.read('math.js') ?? '')]
     ],
