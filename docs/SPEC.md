@@ -4783,8 +4783,33 @@ under Hive in Advanced (no CLI's recording to check it against), defaulting to w
 - `hive.prompt.asTyped` (off; at once): on, `sendPrompt` keeps the prompt as written: in a bracketed paste its line
   breaks go in as CR (as a terminal pastes them) and tabs and spacing are kept; typed key by key (a CLI without
   `bracketedPaste`, a slash command) each line break or tab becomes a space: Codex's prompts stay flat with the switch
-  on (the Assistant's decision on #1286; a safe Codex newline is #1327). Other control characters stay out either way,
+  on (the Assistant's decision on #1286). Other control characters stay out either way,
   so nothing in a prompt can end a paste or press a key (`promptInput`).
+- `codex.prompt.newlineKey` (HI-1327; `auto`, `spaces`, `alt-enter` or `ctrl-j`; default `auto`): with
+  `hive.prompt.asTyped` on, a prompt typed into a CLI whose descriptor lists `typedNewlines` gets each line break as
+  the key its adapter's `typedNewline(version)` picks.
+  - **Tried in real Codex:** the real-tier suite `codex-newline` (Codex test home, its non-admin sandbox; Darren's OK, 28
+    Oct) saw Alt+Enter and Ctrl+J prompts each recorded as written in one prompt by Codex 0.164.0.
+  - **Gated by version:** `auto` is Alt+Enter only for a version in the adapter's `NEWLINE_TRIED` (0.164.0); another
+    version, or one not known, gets spaces. A key chosen (`alt-enter`, `ctrl-j`) applies to any version. The version
+    is the one the running agent was launched with (`LiveSession.cliVersion`), never the CLI installed since.
+  - **Stopped part-way:** Codex's Ctrl+U deletes only to the line's start, or the line break before it at a line's
+    start. So taking back a multi-line prompt Hive stopped typing (`sendPrompt`'s catch, the same conditions as
+    before: the same run, nothing the user typed since) presses Ctrl+U once for each line of it with text and once
+    for each line break (`rollbackKeys`, from what `typeSegments` recorded as written). Each press is its own key,
+    and none goes past Hive's own text, so nothing of a stopped prompt can go out with a later one.
+  - **Enter once drawn:** Enter waits to see the last piece with visible text drawn. With none (lines of spaces), there
+    is no wait.
+  - **The keys:** Codex 0.164.0's editor takes `ctrl(J)`, `ctrl(M)`, `shift(Enter)` and `alt(Enter)` as a new line;
+    its composer sends only on plain Enter (`tui/src/keymap.rs`). Windows' console turns a written LF into
+    Ctrl+Enter, which Codex doesn't bind. It delivers `ESC CR` as one Alt+Enter key, and win32-input-mode Ctrl+J as J
+    with Ctrl (HI-1327's probe, `tests/fixtures/advanced/newline-keys-codex-0.164.0.txt`).
+  - **Building the prompt:** `typedPrompt()` splits on CRLF, CR or LF, puts each line through `promptInput`'s typed
+    filter (a tab becomes a space; controls and escapes are left out), and puts Hive's fixed key between the lines
+    (`TYPED_NEWLINE_KEYS`, its one source). `typeSegments` writes each key whole, checking that the agent is still
+    there before each write.
+  - **Unchanged:** a slash command, and the switch off, still go on one line. A user who remapped Codex's new-line keys
+    chooses `spaces`. Hive never edits Codex's config.
 - `hive.prompt.clearDraft` (on; at once): off, no Ctrl+U on any of `sessions.ts`'s paths (before a prompt, taking back
   one stopped part-way, before `/compact`). Codex's `/permissions` menu steps keep theirs: the menu can't open behind
   a draft.

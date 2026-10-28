@@ -134,6 +134,9 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     // is drawn sends it (#600, checked with 0.163). disable_paste_burst would too, but loses a user's multi-line paste.
     bracketedPaste: false,
     enterOnceDrawn: true,
+    // Its editor's insert_newline keys (0.164.0's default keymap: ctrl+j, ctrl+m, enter, shift+enter, alt+enter; plain
+    // Enter sends): Alt+Enter and Ctrl+J, as Windows' console delivers them (HI-1327). Off until tried on real Codex.
+    typedNewlines: ['alt-enter', 'ctrl-j'],
     // --add-dir, added to the writable roots of its own config (0.163.0: tests/fixtures/advanced/writable-roots-codex-0.163.0.json).
     extraDirs: true,
     // Each connection a CODEX_HOME of its own (HI-1757), its rollouts shared with the others through sessions\ and

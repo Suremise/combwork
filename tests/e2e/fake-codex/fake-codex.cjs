@@ -606,8 +606,9 @@ let ctrlC = 0
 if (process.stdin.isTTY) process.stdin.setRawMode(true)
 process.stdin.setEncoding('utf8')
 process.stdin.on('data', (data) => {
-  // A lone Esc is a key; other escape sequences (focus reports) aren't.
-  const keys = data === '\x1b' ? ['\x1b'] : [...data.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')]
+  // A lone Esc is a key; other escape sequences (focus reports) aren't. Alt+Enter (ESC CR, as Windows' console hands it
+  // on) is a key of its own: a new line in the prompt, not a send, as Codex 0.164's editor takes it (HI-1327).
+  const keys = data === '\x1b' ? ['\x1b'] : data.split('\x1b\r').flatMap((part, i) => [...(i > 0 ? ['alt-enter'] : []), ...part.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')])
   for (const ch of keys) {
     if (onKey?.(ch)) continue
     if (ch === '\x03') {
@@ -622,6 +623,8 @@ process.stdin.on('data', (data) => {
       if (text && !busy) void runPrompt(text)
       // Typed while a turn runs (#1514): queued for it, as Codex queues input.
       else if (text && queues()) queued.push(text)
+    } else if (ch === 'alt-enter') {
+      if (!busy || queues()) line += '\n'
     } else if (ch === '\x7f' || ch === '\b') line = line.slice(0, -1)
     else if (ch >= ' ' && (!busy || queues())) line += ch
   }

@@ -12,6 +12,7 @@ import { assertSessionId, isSessionId } from '../../../shared/defaults'
 import type { StartHint } from '../../../shared/startFailure'
 import { CODEX, CODEX_DESCRIPTOR, CODEX_MODE_FLAGS, CODEX_PERMISSION_MODES } from '../../../shared/codex'
 import { providerSettings } from '../../../shared/providers'
+import type { TypedNewline } from '../../../shared/terminalInput'
 import { HIVE_TOOLS } from '../../../shared/assistantTools'
 import { config } from '../../config'
 import { isFile, placeMatcher } from '../../fsutil'
@@ -254,6 +255,15 @@ export function codexAccountStatus(answer: { ok: true; result: any } | { ok: fal
   const str = (k: string): string | undefined => (typeof a[k] === 'string' && a[k] ? (a[k] as string) : undefined)
   return { ok: true, loggedIn: true, email: str(f.email), plan: str(f.plan) ?? null }
 }
+
+/** Settings → Advanced's key for a typed prompt's line breaks (HI-1327). */
+const NEWLINE_KEY = 'codex.prompt.newlineKey'
+/**
+ * The Codex versions its default typed newline (Alt+Enter) was tried on, in real Codex (HI-1327: the real-tier suite
+ * codex-newline, Alt+Enter and Ctrl+J each arriving as written in one prompt; 28 Oct 2026). Add a version once the
+ * suite passes on it.
+ */
+export const NEWLINE_TRIED: readonly string[] = ['0.164.0']
 
 /** The store Codex keeps a connection's login in (HI-1757): its own folder, whatever Codex's default store is. */
 export const CONNECTION_STORE = ['-c', 'cli_auth_credentials_store="file"']
@@ -601,6 +611,17 @@ export class CodexAdapter implements ProviderAdapter {
       }
     }
     return info
+  }
+
+  /**
+   * The key for a line break in a prompt Hive types (HI-1327): Settings → Advanced's choice, if Codex takes it as one.
+   * Automatic (the default): Alt+Enter on a Codex version it was tried on (NEWLINE_TRIED: the real-tier suite
+   * codex-newline), a space on another or one not known, as before. A key chosen goes to any version.
+   */
+  typedNewline(version: string | null): TypedNewline | null {
+    const chosen = advanced.get<string>(NEWLINE_KEY)
+    const key = chosen === 'auto' ? (version && NEWLINE_TRIED.includes(version) ? 'alt-enter' : null) : chosen
+    return this.descriptor.capabilities.typedNewlines?.find((k) => k === key) ?? null
   }
 
   /** Codex's Windows sandbox is set up once (windows.sandbox in its config); without it every command needs approval. */

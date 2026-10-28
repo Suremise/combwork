@@ -13,7 +13,7 @@ import { folderChanging, folderSteady, inFolder } from './folderFence'
 import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, writeFile } from 'original-fs/promises'
 import { constants as fsConstants, existsSync, realpathSync } from 'original-fs'
-import { typedText } from '../shared/terminalInput'
+import { TYPED_NEWLINE_KEYS, typedText } from '../shared/terminalInput'
 import { failedStart, type StartFailure } from '../shared/startFailure'
 import { BrowserWindow, Notification, app, clipboard } from 'electron'
 import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
@@ -374,6 +374,11 @@ interface LiveSession {
   slotEnv?: Record<string, string>
   /** The folders its launch was granted outside its own (#1439: its project's review copies). */
   extraDirs?: string[]
+  /**
+   * The CLI's version as this run was launched (HI-1327): what a version gate goes by while it runs, not the CLI
+   * installed now (updated or switched since, it isn't this process). Null: not known.
+   */
+  cliVersion?: string | null
   /** Throws if whoever asked for this launch may no longer have it (the Assistant's authority), checked just before spawning. */
   startAllowed?: () => void
   /** The CLI asked something before it started (e.g. whether to trust the folder): shown as waiting for the user. */
@@ -661,6 +666,60 @@ async function typeInto(key: string, text: string, still: () => boolean = () => 
     writePty(key, text.slice(i, i + CHUNK))
     if (i + CHUNK < text.length) await new Promise((r) => setTimeout(r, 10))
   }
+}
+
+/** A typed prompt's pieces (HI-1327): its text, and the keys Hive presses for its line breaks. */
+export type TypedSegment = { text: string } | { key: string }
+
+/**
+ * A prompt typed as written into a CLI whose input box takes a key as a new line (HI-1327): its line breaks (CRLF, CR
+ * or LF) as that key, `newline` (a fixed sequence of Hive's, TYPED_NEWLINE_KEYS), and each line as promptInput types it
+ * (a tab a space, the other control characters, escapes included, left out). The key is its own piece, written whole,
+ * so nothing in the text can be taken for one, and no chunk can split it.
+ */
+export function typedPrompt(line: string, newline: string): TypedSegment[] {
+  const out: TypedSegment[] = []
+  line.split(/\r\n?|\n/).forEach((part, i) => {
+    if (i > 0) out.push({ key: newline })
+    const text = promptInput(part, false, true)
+    if (text) out.push({ text })
+  })
+  return out
+}
+
+/**
+ * Types a prompt's pieces (typedPrompt): its text in chunks, each key in one write; `still` checked before each write.
+ * `typed` says what reached the CLI as it goes, the characters written on each line (a key starts the next), so a stop
+ * part-way can take back exactly that (rollbackKeys).
+ */
+async function typeSegments(key: string, segments: readonly TypedSegment[], still: () => boolean, typed: number[]): Promise<void> {
+  for (const s of segments) {
+    if ('text' in s) {
+      const CHUNK = 8
+      for (let i = 0; i < s.text.length; i += CHUNK) {
+        if (!still()) throw hiveError(M.stoppedBeforePrompt)
+        const part = s.text.slice(i, i + CHUNK)
+        writePty(key, part)
+        typed[typed.length - 1] += part.length
+        if (i + CHUNK < s.text.length) await new Promise((r) => setTimeout(r, 10))
+      }
+    } else {
+      if (!still()) throw hiveError(M.stoppedBeforePrompt)
+      writePty(key, s.key)
+      typed.push(0)
+      await new Promise((r) => setTimeout(r, 10))
+    }
+  }
+}
+
+/**
+ * How many Ctrl+U take back what typeSegments typed (`typed`: the characters on each of its lines, the cursor after
+ * the last), in an input box where Ctrl+U deletes to the line's start, or the line break before it at a line's start
+ * (Codex 0.164's kill_line_start: HR6's round 1 of HI-1327): one for each line with text, and one for each line break.
+ * Never more, so nothing before Hive's own text is touched.
+ */
+export function rollbackKeys(typed: readonly number[]): number {
+  return typed.reduce((n, chars, i) => n + (chars > 0 ? 1 : 0) + (i > 0 ? 1 : 0), 0)
 }
 
 /**
@@ -2185,6 +2244,7 @@ class SessionManager {
     const granted = grantsCopies({ capable: adapter.descriptor.capabilities.extraDirs, on: advanced.get(COPIES_REVIEW) !== false, reviews: reviewsWork(agentWorkflowRole(agent)), inProjectFolder: !l.slotEnv && samePlace(cwd, projectPath), assistant: workspace.isAssistantHome(projectPath) })
     const extraDirs = granted && (await mkdir(copies, { recursive: true }).then(() => true, () => false)) ? [copies] : []
     l.extraDirs = extraDirs
+    l.cliVersion = info.version ?? null
     times?.mark('guidance')
     const ctx = {
       projectPath,
@@ -3324,6 +3384,8 @@ class SessionManager {
     }
     const since = Date.now()
     let typed = false
+    // What a multi-line prompt typed so far, by line (HI-1327): taken back as exactly that if stopped part-way.
+    let lines: number[] | null = null
     let sent: { at: number; prompts: number; from: number } | null = null
     // Settings → Advanced (#1286): whether Hive clears the CLI's input first (and takes back a prompt it stopped), and
     // whether it keeps the prompt as written.
@@ -3344,10 +3406,20 @@ class SessionManager {
       // Enter once the CLI has drawn the line (#600: a busy Codex drops an Enter it reads with the line): its end shows
       // on the screen once more than before it was typed.
       const paste = !!l?.screen?.bracketedPaste() && l.adapter.descriptor.capabilities.bracketedPaste && !line.startsWith('/')
-      const out = promptInput(line, paste, asTyped)
-      const drawn = l?.screen && l.adapter.descriptor.capabilities.enterOnceDrawn ? drawnLine(l.screen, out) : null
+      // Typed as written into a CLI with a new-line key (HI-1327, Settings → Advanced): its line breaks are that key. A
+      // slash command keeps spaces.
+      // By the CLI's version as this run was launched, never the one installed since (HR6's round 1).
+      const newline = !paste && asTyped && !line.startsWith('/') && l ? l.adapter.typedNewline?.(l.cliVersion ?? null) : null
+      const segments = newline ? typedPrompt(line, TYPED_NEWLINE_KEYS[newline]) : null
+      // What Enter waits to see drawn: the last piece with something visible in it (a line of spaces draws nothing to
+      // find); none, no wait, as for an empty line.
+      const out = segments ? segments.flatMap((s) => ('text' in s && s.text.trim() ? [s.text] : [])).at(-1) ?? '' : promptInput(line, paste, asTyped)
+      const drawn = l?.screen && l.adapter.descriptor.capabilities.enterOnceDrawn && out.trim() ? drawnLine(l.screen, out) : null
       if (paste) writePty(key, `\x1b[200~${out}\x1b[201~`)
-      else await typeInto(key, out, () => (check(), true))
+      else if (segments) {
+        lines = [0]
+        await typeSegments(key, segments, () => (check(), true), lines)
+      } else await typeInto(key, out, () => (check(), true))
       await new Promise((r) => setTimeout(r, 300))
       check()
       if (drawn && !drawn()) {
@@ -3393,7 +3465,16 @@ class SessionManager {
         writePty(key, '\r')
       }
     } catch (e) {
-      if (clearDraft && typed && same() && this.userTypedAt(projectPath, agentId) < since) writePty(key, '\x15')
+      if (clearDraft && typed && same() && this.userTypedAt(projectPath, agentId) < since) {
+        // A multi-line prompt: one Ctrl+U for each of its lines with text and each line break, each its own key, so no
+        // line of it is left to go with a later prompt (HR6's round 1 of HI-1327); none past it.
+        const n = lines ? rollbackKeys(lines) : 1
+        for (let i = 0; i < n; i++) {
+          if (!same() || this.userTypedAt(projectPath, agentId) >= since) break
+          writePty(key, '\x15')
+          if (i + 1 < n) await new Promise((r) => setTimeout(r, 10))
+        }
+      }
       throw e
     } finally {
       if (sent && l) l.typed = sent

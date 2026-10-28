@@ -46,3 +46,17 @@ export function appTakesTerminalKey(key: string, o: { allKeysToCli: boolean; pal
   if (o.reserved.has(norm)) return false
   return o.bound.includes(norm)
 }
+
+/** A key a CLI's input box takes as a new line rather than a send (HI-1327), which Hive can press for a prompt's line break. */
+export type TypedNewline = 'alt-enter' | 'ctrl-j'
+
+/**
+ * Each typed-newline key as Hive writes it into the CLI's terminal, its one source: Alt+Enter as ESC CR, which Windows'
+ * console delivers as one key (Enter with Alt); Ctrl+J in its console's win32-input-mode (J with Ctrl, pressed then
+ * released), since a bare line feed arrives as Ctrl+Enter, which Codex doesn't take (HI-1327's probe). Fixed keys Hive
+ * presses, never text from a prompt.
+ */
+export const TYPED_NEWLINE_KEYS: Readonly<Record<TypedNewline, string>> = {
+  'alt-enter': '\x1b\r',
+  'ctrl-j': '\x1b[74;36;10;1;8;1_\x1b[74;36;10;0;8;1_'
+}

@@ -1,5 +1,6 @@
 import type { AgentDef, AppSettings, AutoCompactSetting, Connection, EffortLevel, ModelAlias, PermissionMode, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, ServerModel } from './types'
 import type { AttachmentKind } from './attachments'
+import type { TypedNewline } from './terminalInput'
 import { msg, type Msg } from './i18n/msg'
 import type { Tr } from './tasks'
 import { CLAUDE_CODE, CLAUDE_DESCRIPTOR } from './claude'
@@ -138,6 +139,12 @@ export interface ProviderCapabilities {
    * (typed or bracketed alike: 0.163); Enter again sends it. Drawn, the line is in its prompt, and the Enter sends it.
    */
   enterOnceDrawn: boolean
+  /**
+   * The keys its input box takes as a new line rather than a send (HI-1327), which Hive may press for a line break in a
+   * prompt it types when prompts go as typed: the one it presses is the adapter's `typedNewline()` (an Advanced choice).
+   * Absent: a CLI whose prompts go in as a bracketed paste, or none known, and line breaks typed become spaces.
+   */
+  typedNewlines?: readonly TypedNewline[]
   /**
    * The CLI can be given folders outside its own to read and write, on its command line (#1439, `LaunchContext.extraDirs`):
    * how a reviewer reaches the project's review copies. Without it, its reviewers review the builder's folder read-only.
