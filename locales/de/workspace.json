@@ -123,7 +123,7 @@
   "workspace.closeCommand.runner": "Hive hat deinen Befehl nicht mehr verfolgt, bevor er endete. Er läuft womöglich noch.",
   "workspace.closeCommand.running": "{kind, select, quit {Dein Befehl beim Beenden läuft…} other {Dein Befehl beim Schließen läuft…}}",
   "workspace.closeCommand.saving": "Warte, bis {workspace} fertig gespeichert ist…",
-  "workspace.closeCommand.savingNote": "Wenn du nicht wartest, macht Hive weiter, ohne deinen Schließen-Befehl oder „Beim Beenden von Hive ausführen“ auszuführen: Die Dateien des Arbeitsbereichs sind womöglich nicht vollständig gespeichert.",
+  "workspace.closeCommand.savingNote": "Wenn du nicht wartest, macht Hive weiter, ohne deinen Schließen-Befehl oder den „Beim Beenden von Hive“-Befehl auszuführen: Die Dateien des Arbeitsbereichs sind womöglich nicht vollständig gespeichert.",
   "workspace.closeCommand.spawn": "{kind, select, quit {Dein Befehl beim Beenden konnte nicht gestartet werden} other {Dein Befehl beim Schließen konnte nicht gestartet werden}}",
   "workspace.docs.about": "Über {app}",
   "workspace.docs.api": "Agent API",
