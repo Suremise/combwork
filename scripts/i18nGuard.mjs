@@ -71,6 +71,7 @@ export const EXCLUDED = [
   [/^src\/main\/exitLog\.ts$/, "log lines and Copy Diagnostics' report, in English (#985)"],
   [/^src\/main\/mainStalls\.ts$/, 'log lines of hive.log, in English (#1109)'],
   [/^src\/main\/db\.ts$/, 'SQL statements and settings, no text (#1017)'],
+  [/^src\/main\/(codexLogWorker|providers\/codex\/retryLog)\.ts$/, "reading Codex's log for a retry wait (HI-1972): SQL, reasons for no answer and hive.log lines, no window text"],
   [/^src\/main\/schema\//, "hive.db's 1.0 tables and the card JSON contract: SQL, no text (#1208)"],
   [/^src\/main\/trash\.ts$/, 'test-only'],
   [/^src\/shared\/consoleFixtures\.mts$/, 'test-only'],

@@ -374,6 +374,8 @@
   "tips.resumeAfterUpdate.title": "Updates lassen deine Agenten, wo sie waren",
   "tips.resumeAll.text": "Nach einem Neustart setzt „Alle Agenten fortsetzen“ im Projektkopf die letzte Sitzung jedes gestoppten Agenten in einem Schritt fort.",
   "tips.resumeAll.title": "Alle Agenten auf einmal fortsetzen",
+  "tips.retryWait.text": "Werden die Anfragen von Codex abgelehnt, oft wegen eines Ratenlimits, wartet Codex minutenlang auf einen neuen Versuch, während sein Bildschirm nur „Working“ zeigt. Hive liest das Warten aus dem Log von Codex, und der Status des Agenten sagt, wann er es erneut versucht.",
+  "tips.retryWait.title": "Sehen, wann Codex ein Ratenlimit hat",
   "tips.reviewCopies.text": "Ein Reviewer reviewt in einer Review-Kopie: einem Ordner genau auf der eingereichten Revision, in den sonst nichts schreibt, sodass der Bearbeiter derweil weiterarbeiten kann. Seine Checks dort zählen für diese Einreichung. Einstellungen → Erweitert schaltet es aus.",
   "tips.reviewCopies.title": "Reviewer testen genau das Eingereichte",
   "tips.reviewSkip.text": "Ein Installer-Build oder ein schneller Versuch braucht keinen Reviewer? Setz im Dialog „Neue Karte“ das Häkchen bei „Review überspringen“: Das Einreichen schließt die Karte ab, und eine Karte mit Code geht weiter zu ihrem Merge, mit ihren Merge-Checks.",

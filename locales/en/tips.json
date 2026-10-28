@@ -1499,6 +1499,14 @@
     "defaultMessage": "Resume all agents at once",
     "description": "A tip's title."
   },
+  "tips.retryWait.text": {
+    "defaultMessage": "When Codex's requests are refused, often by a rate limit, Codex waits minutes before trying again while its screen says only Working. Hive reads the wait from Codex's log, and the agent's status says when it tries again.",
+    "description": "A tip (HI-1972). Codex is a product name; Working is what its screen shows."
+  },
+  "tips.retryWait.title": {
+    "defaultMessage": "See when Codex is rate-limited",
+    "description": "A tip's title (HI-1972). Codex is a product name."
+  },
   "tips.reviewCopies.text": {
     "defaultMessage": "A reviewer reviews in a review copy: a folder at exactly the submitted revision, which nothing else writes, so the builder can carry on meanwhile. Its checks there count for that submission. Settings → Advanced turns it off.",
     "description": "A tip. A review copy: a folder Hive keeps at exactly the revision under review. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

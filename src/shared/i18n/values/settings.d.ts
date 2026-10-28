@@ -233,6 +233,12 @@ interface HiveMessageValues {
   'settings.advanced.codex.rateLimits.windowMinutes.title': undefined
   'settings.advanced.codex.ready.placeholder.desc': undefined
   'settings.advanced.codex.ready.placeholder.title': undefined
+  'settings.advanced.codex.retry.checkAfterSeconds.desc': undefined
+  'settings.advanced.codex.retry.checkAfterSeconds.title': undefined
+  'settings.advanced.codex.retry.logTarget.desc': undefined
+  'settings.advanced.codex.retry.logTarget.title': undefined
+  'settings.advanced.codex.retry.pattern.desc': undefined
+  'settings.advanced.codex.retry.pattern.title': undefined
   'settings.advanced.codex.signIn.expired.desc': undefined
   'settings.advanced.codex.signIn.expired.title': undefined
   'settings.advanced.codex.subagent.item.desc': undefined

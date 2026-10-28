@@ -1,4 +1,4 @@
-import type { AgentInstallInfo, AutoCompactSetting, BackgroundTaskType, CatalogModel, EffortLevel, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
+import type { AgentInstallInfo, AutoCompactSetting, BackgroundTaskType, CatalogModel, EffortLevel, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, RetryWait, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
 import type { ProviderDescriptor } from '../../shared/providers'
 import type { StartHint } from '../../shared/startFailure'
 import type { SafeguardEvent } from '../../shared/safeguards'
@@ -513,6 +513,15 @@ export interface ProviderAdapter {
    * it doesn't show for sure. Null (or absent) for versions it wasn't checked with.
    */
   turnScreen?(version: string | null): ((screen: string) => 'idle' | 'working' | null) | null
+  /**
+   * Whether the CLI is waiting to retry its model request (HI-1972: rate-limited, its connection lost), from its own
+   * records: its newest such wait in conversation `sessionId` recorded since `since` (ms), or null (none, or Hive can't
+   * tell). `env` is the launch's environment (where its CLI keeps its records), `transcriptPath` its transcript where
+   * known. Read off main's thread and bounded in time; never changes anything of the CLI's. Absent: Hive can't tell.
+   */
+  retryWait?(q: { sessionId: string; env: NodeJS.ProcessEnv; transcriptPath?: string; since: number }): Promise<RetryWait | null>
+  /** How long a running turn goes without a hook before retryWait is asked (ms); absent: 20 s. */
+  retryLookAfterMs?(): number
   /** Claude Code's status-line JSON. */
   statusLine?(body: Record<string, any>): LiveDetails
   /**

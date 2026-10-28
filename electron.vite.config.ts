@@ -53,7 +53,9 @@ export default defineConfig({
           // The log's writer thread (HI-1730).
           'log-writer': resolve(__dirname, 'src/main/logWriter.ts'),
           // The WAL checkpoints' worker thread (HI-1691).
-          'wal-checkpoint-worker': resolve(__dirname, 'src/main/walCheckpointWorker.ts')
+          'wal-checkpoint-worker': resolve(__dirname, 'src/main/walCheckpointWorker.ts'),
+          // Codex's log's worker thread (HI-1972).
+          'codex-log-worker': resolve(__dirname, 'src/main/codexLogWorker.ts')
         }
       }
     }

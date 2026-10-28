@@ -17,7 +17,7 @@ import { changeGroups, noteAgent, noteChange, recordedHere, recordingChanges } f
 import { undoChanges, UndoNotFound } from './assistantUndo'
 import { cardAgent, knownAgent } from './activityTargets'
 import { fallbackEfforts, modelGroups } from '../shared/models'
-import { agentRuntime, hooksMissingText, unknownStateText } from '../shared/runtime'
+import { agentRuntime, hooksMissingText, retryWaitText, unknownStateText } from '../shared/runtime'
 import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { timeLeft } from '../shared/progress'
 import { ProgressError, admitReport, type ProgressCaller } from './progress'
@@ -474,7 +474,7 @@ function progressOf(projectPath: string, agentId: string) {
 
 /**
  * An agent's status message: a watching agent's is what it waits for; one whose state is unknown says so (#648), as
- * does one whose hooks aren't reaching Hive (#1336).
+ * does one whose hooks aren't reaching Hive (#1336) and one whose CLI waits to retry its model request (HI-1972).
  */
 const statusMessageOf = (live: LiveSessionState | null | undefined): string | null =>
   live?.hooksMissing
@@ -483,9 +483,11 @@ const statusMessageOf = (live: LiveSessionState | null | undefined): string | nu
     ? (live.watch?.label ?? null)
     : live?.status === 'signin'
       ? `Its CLI's sign-in has expired: the user must sign in again (${live.signIn?.message ?? 'not signed in'})`
-      : unknownStateText(live)
-        ? `${unknownStateText(live)}: Hive has heard nothing of its turn and seen no sign of its end, so it isn't given work; the user can mark it idle`
-        : (live?.statusMessage ?? live?.mergeSlot ?? null)
+      : retryWaitText(live)
+        ? `${retryWaitText(live)}: its CLI is waiting to retry its model request and carries on by itself; it isn't given work meanwhile`
+        : unknownStateText(live)
+          ? `${unknownStateText(live)}: Hive has heard nothing of its turn and seen no sign of its end, so it isn't given work; the user can mark it idle`
+          : (live?.statusMessage ?? live?.mergeSlot ?? null)
 
 async function projectSummary(p: string) {
   const info = await workspace.projectInfo(p)

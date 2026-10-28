@@ -295,6 +295,14 @@
     "defaultMessage": "Not running",
     "description": "A pane's status: the agent's session isn't running."
   },
+  "panes.header.retryLarge": {
+    "defaultMessage": "This conversation is large, and each request sends all of it. A new conversation (a handover, then a fresh session) sends less, which can help under a rate limit.",
+    "description": "Tooltip of a pane's status while its coding agent is rate-limited and its conversation is large: a suggestion, not something Hive does."
+  },
+  "panes.header.retryTip": {
+    "defaultMessage": "{provider} is waiting to send its model request again: {why, select, limited {its service refused it as too many requests (rate-limited).} network {it couldn't reach its service.} other {the request failed.}} It tries again by itself{when, select, at { at {time}} other {}}; nothing is needed from you.",
+    "description": "Tooltip of a pane's status while its coding agent ({provider}, a product name) waits to retry its model request. why: rate-limited, the service unreachable, or failed otherwise. {time} is when it tries again (a clock time)."
+  },
   "panes.header.stopTip": {
     "defaultMessage": "Stop this agent (the conversation is kept; resume it any time)",
     "description": "Tooltip of a pane's Stop button."
@@ -594,6 +602,10 @@
   "panes.runtime.needsInput": {
     "defaultMessage": "Needs your input",
     "description": "An agent's status: its CLI waits for the user's answer."
+  },
+  "panes.runtime.retrying": {
+    "defaultMessage": "{why, select, limited {Rate-limited ({status})} status {Request failed ({status})} network {Can't reach {provider}} other {Request failed}} · {when, select, at {retrying at {time}} other {retrying…}} {tries, select, of {({attempt, number} of {max, number})} other {(try {attempt, number})}}",
+    "description": "An agent's status (its pane, the agents table): its coding agent is waiting to try its model request again. why: rate-limited (the service refused it as too many requests; {status} is the HTTP status, 429), refused with another HTTP status ({status}), the service ({provider}, a product name) couldn't be reached, or failed otherwise. {time} is when it tries again (a clock time); {attempt} is which try that is, of {max}. Keep it short."
   },
   "panes.runtime.signin": {
     "defaultMessage": "Needs sign-in",

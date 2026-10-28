@@ -927,6 +927,30 @@
     "defaultMessage": "Composer placeholder",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.codex.retry.checkAfterSeconds.desc": {
+    "defaultMessage": "How long a working Codex session has to go without a hook before Hive looks in Codex's log for a wait to retry its model request, then every 15 seconds while it stays quiet.",
+    "description": "What the advanced setting \"Retry wait: look after\" does (Settings → Advanced)."
+  },
+  "settings.advanced.codex.retry.checkAfterSeconds.title": {
+    "defaultMessage": "Retry wait: look after",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"20 s\"). A retry wait: the coding agent waiting to try its model request again."
+  },
+  "settings.advanced.codex.retry.logTarget.desc": {
+    "defaultMessage": "Where in its own log (logs_2.sqlite in its home folder) Codex says it is waiting to retry its model request, after being rate-limited for example. Hive reads the latest such entry of a session's turn and shows the wait as its status. Wrong, a waiting agent just shows Working.",
+    "description": "What the advanced setting \"Retry wait: log entries\" is for, and what goes wrong when it is wrong (Settings → Advanced). logs_2.sqlite is a file name: keep it."
+  },
+  "settings.advanced.codex.retry.logTarget.title": {
+    "defaultMessage": "Retry wait: log entries",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry wait: the coding agent waiting to try its model request again (after being rate-limited)."
+  },
+  "settings.advanced.codex.retry.pattern.desc": {
+    "defaultMessage": "How Codex words that log entry: a regular expression whose named groups give the try (attempt), the tries allowed (max), the wait (seconds, or millis) and the HTTP status that refused the request (status: 429 is a rate limit). Wrong, a waiting agent just shows Working.",
+    "description": "What the advanced setting \"Retry wait: message\" is for (Settings → Advanced). attempt, max, seconds, millis and status are the names of the regular expression's groups: keep them."
+  },
+  "settings.advanced.codex.retry.pattern.title": {
+    "defaultMessage": "Retry wait: message",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry wait: the coding agent waiting to try its model request again."
+  },
   "settings.advanced.codex.signIn.expired.desc": {
     "defaultMessage": "A turn's error, in Codex's session file, that means its sign-in was refused or has expired, when Codex doesn't mark the error itself (#309).",
     "description": "What the advanced setting \"Sign-in refused: error message\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
