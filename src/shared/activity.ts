@@ -92,6 +92,13 @@ export interface ActivityNow {
 }
 
 /** What ending a process from the tab did: `notOwn`, the agent's launch no longer has it (ended, or never its). */
+/** An agent working on a card now (HI-1664): its session host's path, its id there, and the session it runs. */
+export interface ActivityCardAgent {
+  path: string
+  agentId: string
+  sessionId: string
+}
+
 export type EndProcessResult = 'ended' | 'notOwn' | 'cli' | 'failed'
 
 const cut = (s: string, n: number): string => {

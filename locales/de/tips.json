@@ -1,6 +1,8 @@
 {
-  "tips.activityTab.text": "Der Tab „Aktivität“ hat einen Tab pro laufendem Agenten: seine Karte, seinen Durchgang und Tool-Aufruf, seine Hintergrundaufgaben, Subagenten und Prozesse. Er öffnet als Momentaufnahme; „Abspielen“ folgt live. Das Menü ⋯ eines Agenten oder eine Karte in Arbeit öffnet ihn für diesen Agenten.",
+  "tips.activityTab.text": "Der Tab „Aktivität“ hat einen Tab pro laufendem Agenten: seine Karte, seinen Durchgang und Tool-Aufruf, seine Hintergrundaufgaben, Subagenten und Prozesse. Er öffnet als Momentaufnahme; „Abspielen“ folgt live. Das Menü ⋯ eines Agenten öffnet ihn für diesen Agenten.",
   "tips.activityTab.title": "Sehen, was jeder Agent ausführt",
+  "tips.activityWorkspace.text": "Aktivität in der Aktivitätsleiste zeigt die laufenden Agenten aller Projekte zusammen, ihre Tabs nach Projekt gruppiert. Eine Karte in Arbeit öffnet sie für die Agenten, die an dieser Karte arbeiten, und ein Lauf oder eine Lane im Bereich Fortschritt für ihre Agenten (In Aktivität anzeigen).",
+  "tips.activityWorkspace.title": "Alles, was läuft, an einem Ort",
   "tips.advancedSettings.text": "Nach dem Update eines Coding-Agenten erkennt Hive dessen Vertrauensfrage oder Anmeldefehler nicht mehr? Unter Einstellungen → Erweitert stehen die Texte und Felder, nach denen Hive sucht, und seine Timeouts: Ändere einen Wert (der Standard steht daneben) oder bearbeite advanced.json.",
   "tips.advancedSettings.title": "Eine CLI-Änderung selbst beheben",
   "tips.agentConsole.text": "Einstellungen → Agent API → „Agenten die Entwicklerkonsole lesen lassen“ gibt Agenten ein Werkzeug mit Lesezugriff: Es zeigt die Hooks und die Statuszeile ihrer CLI neben dem, was Hive daraus gemacht hat, geschwärzt. So können sie untersuchen, was Hive sieht.",
@@ -180,6 +182,8 @@
   "tips.filesTab.title": "Dateien bearbeiten, ohne Hive zu verlassen",
   "tips.flightRecorder.text": "Schalte in Einstellungen → Erweitert einen Auslöser des Flugschreibers ein (Sicherheitsstopps, Unbekanntes von einer CLI, ein Wechsel der CLI-Version, ein still gewordener Agent), und Hive speichert die letzten Ereignisse der Entwicklerkonsole des Agenten in dem Moment, in dem es passiert, geschwärzt und mit einer Meldung.",
   "tips.flightRecorder.title": "Seltene Ereignisse von selbst festhalten",
+  "tips.focusedTests.text": "Wenn Hive mergt, kann Versionsverwaltung → Workflow die gezielten Tests jeder Karte auf dem gemergten Ergebnis ausführen: Der Befehl deines Projekts wählt beim Einreichen der Karte die Tests aus, die eine Änderung braucht, und die Merge-Warteschlange führt sie vor dem Merge aus.",
+  "tips.focusedTests.title": "Die eigenen Tests jeder Karte vor ihrem Merge",
   "tips.followUpCheck.text": "Wenn du für eine Karte in Review oder Genehmigt eine Änderung verlangst, die ihr Reviewer prüfen soll, postet der Bearbeiter die Änderung als Follow-up: Hive weckt den Reviewer, und die Antwort weckt den Bearbeiter. Bleibt eines 15 Minuten unbeantwortet, wird die Karte als festgefahren angezeigt.",
   "tips.followUpCheck.title": "Ein Follow-up ohne neue Runde prüfen lassen",
   "tips.forYou.text": "Eine Karte mit dem Chip „Für dich“ wartet auf dich: eine Zustimmung, eine Entscheidung oder eine Frage. Das Symbol „Aufgabenboard“ zählt sie, und „Für dich“ auf dem Board zeigt nur diese. Öffne die Karte, um zuzustimmen, abzulehnen oder zu antworten: Der wartende Agent erfährt es sofort.",

@@ -1251,6 +1251,14 @@
     "defaultMessage": "Disable hardware acceleration",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.hive.focused.pickSeconds.desc": {
+    "defaultMessage": "How long the project’s command that chooses a card’s focused tests may run, when it is submitted and at its merge. Past it, the command is ended and no tests count as chosen: the builder then names them itself.",
+    "description": "What the advanced setting \"Focused tests: longest the choice of tests runs\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.focused.pickSeconds.title": {
+    "defaultMessage": "Focused tests: longest the choice of tests runs",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in seconds: how long the project's command that chooses a card's focused tests may run, when the card is submitted and at its merge."
+  },
   "settings.advanced.hive.guidance.desc": {
     "defaultMessage": "With Hive's tools, each project agent gets Hive's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the hive server's instructions, Codex after your own developer_instructions. Turned off, agents still get Hive's tools, without the guidance, from their next session. The Hive Assistant always gets its own: they are its role.",
     "description": "What the advanced setting \"Hive's guidance for agents\" does (Settings → Advanced, under Hive). Claude Code, Copilot and Codex are CLIs' names, hive the name of Hive's MCP server and developer_instructions a Codex setting: keep them."
@@ -1426,6 +1434,14 @@
   "settings.advanced.hive.queue.checkedOutTarget.title": {
     "defaultMessage": "Merge queue: merge into a checked-out branch",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive: what the merge queue does when the branch it merges into (main, say) is checked out in a folder, usually the project folder, whose files then change."
+  },
+  "settings.advanced.hive.queue.focusedJobs.desc": {
+    "defaultMessage": "How many tests at once the merge queue’s run of a card’s focused tests may use, passed to the project’s command that runs them. More finishes sooner but loads the computer, which agents and your own work share.",
+    "description": "What the advanced setting \"Merge queue: focused tests run at once\" does, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.queue.focusedJobs.title": {
+    "defaultMessage": "Merge queue: focused tests run at once",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by a number: how many of a card's focused tests (the tests its change needs) the merge queue runs in parallel."
   },
   "settings.advanced.hive.queue.networkCodes.desc": {
     "defaultMessage": "A failed merge check whose last 40 lines of output this regular expression finds failed for the network, not the work: the card is returned to its builder marked temporary, and the builder may submit the same revision again (at most twice in a row) instead of a new one. The default finds Node's and npm's network error codes (ENOTFOUND, EAI_AGAIN, ECONNRESET, ECONNREFUSED, ETIMEDOUT). A project's check can also say so itself by exiting with code 75. (?!) finds nothing: then only a check that couldn't start, ran out of time or was ended counts as temporary.",

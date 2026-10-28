@@ -1,6 +1,8 @@
 {
-  "tips.activityTab.text": "L’onglet Activité a un onglet par agent en cours : sa carte, son tour et son appel d’outil, ses tâches en arrière-plan, sous-agents et processus. Il s’ouvre comme un instantané ; Lecture le suit en direct. Le menu ⋯ d’un agent, ou une carte en cours, l’ouvre sur cet agent.",
+  "tips.activityTab.text": "L’onglet Activité a un onglet par agent en cours : sa carte, son tour et son appel d’outil, ses tâches en arrière-plan, sous-agents et processus. Il s’ouvre comme un instantané ; Lecture le suit en direct. Le menu ⋯ d’un agent l’ouvre sur cet agent.",
   "tips.activityTab.title": "Voir ce que chaque agent exécute",
+  "tips.activityWorkspace.text": "Activité, dans la barre d’activité, montre ensemble les agents en cours de chaque projet, leurs onglets groupés par projet. Une carte en cours l’ouvre sur les agents qui travaillent sur cette carte, et une exécution ou un couloir du panneau Progression sur ses agents (Afficher dans Activité).",
+  "tips.activityWorkspace.title": "Tout ce qui s’exécute, au même endroit",
   "tips.advancedSettings.text": "Après une mise à jour d’un agent de code, Hive ne voit plus sa question de confiance ou ses erreurs de connexion ? Paramètres → Avancé contient les textes et les champs que Hive recherche, et ses délais : modifie-en un, avec la valeur par défaut à côté, ou édite advanced.json.",
   "tips.advancedSettings.title": "Corriger toi-même un changement de CLI",
   "tips.agentConsole.text": "Paramètres → Agent API → Permettre aux agents de lire la console de développement donne aux agents un outil en lecture seule qui montre les hooks et la ligne d’état de leur CLI à côté de ce que Hive en a compris, expurgés, pour qu’ils puissent déboguer ce que voit Hive.",
@@ -180,6 +182,8 @@
   "tips.filesTab.title": "Modifier des fichiers sans quitter Hive",
   "tips.flightRecorder.text": "Active un déclencheur de l’enregistreur de vol dans Paramètres → Avancé (arrêts de sécurité, quelque chose d’inconnu venant d’une CLI, un changement de version d’une CLI, un agent devenu silencieux), et Hive enregistre les événements récents de la console de développement de l’agent, masqués, au moment même où cela se produit, avec une notification.",
   "tips.flightRecorder.title": "Capturer automatiquement les événements rares",
+  "tips.focusedTests.text": "Quand Hive fusionne, Gestion de versions → Flux de travail peut lancer les tests ciblés de chaque carte sur le résultat fusionné : la commande de ton projet choisit les tests dont un changement a besoin quand la carte est soumise, et la file de fusion les lance avant de fusionner.",
+  "tips.focusedTests.title": "Les tests de chaque carte avant sa fusion",
   "tips.followUpCheck.text": "Quand tu demandes une modification sur une carte en Relecture ou Validé pour que son relecteur la vérifie, son auteur publie la modification comme suivi : Hive réveille le relecteur, et la réponse réveille l’auteur. Un suivi sans réponse depuis 15 minutes affiche sa carte comme à l’arrêt.",
   "tips.followUpCheck.title": "Faire vérifier un suivi sans nouveau tour",
   "tips.forYou.text": "Une carte avec la pastille Pour toi t’attend : une approbation, une décision ou une question. L’icône du Tableau des tâches les compte, et Pour toi sur le tableau n’affiche que celles-là. Ouvre la carte pour approuver, refuser ou répondre : l’agent qui attend le sait aussitôt.",

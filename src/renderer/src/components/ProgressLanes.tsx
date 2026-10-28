@@ -12,7 +12,8 @@ import { useProjectStages } from '../projectStages'
 import { OVERRIDE_NAMES } from './CardWork'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { NO_PROJECTS, cardLabelOf, confirm, get, notify, openVersionControl, set, useLanguage, useStore } from '../store'
+import { NO_PROJECTS, activityAgentKey, cardLabelOf, confirm, get, notify, openVersionControl, openWorkspaceActivity, set, useLanguage, useStore } from '../store'
+import { SHOW_IN_ACTIVITY } from '../views/WorkspaceActivity'
 import { openLaneStart } from './LaneStartDialog'
 import { saveLaneOrder, useLaneOf, useLaneOrder, type Lane } from '../laneSource'
 import { useNow } from '../usage'
@@ -125,6 +126,9 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
     menu.open(e, [
       { label: tr(msg({ id: 'board.lanes.moveUp', defaultMessage: 'Move Up', description: "A lane's context menu item in the Progress panel: moves it up among the running lanes." })), icon: 'arrow-up', keybinding: 'Alt+Up', disabled: i <= 0, onClick: () => moved(nudgedLaneOrder(running, l.id, -1), l, true) },
       { label: tr(msg({ id: 'board.lanes.moveDown', defaultMessage: 'Move Down', description: "A lane's context menu item in the Progress panel: moves it down among the running lanes." })), icon: 'arrow-down', keybinding: 'Alt+Down', disabled: i >= running.length - 1, onClick: () => moved(nudgedLaneOrder(running, l.id, 1), l, true) },
+      { separator: true },
+      // What its builder and reviewer run now (HI-1664): Activity's workspace level on them.
+      { label: tr(SHOW_IN_ACTIVITY), icon: 'type-hierarchy', onClick: () => openWorkspaceActivity({ agents: [l.builder, ...(l.reviewer ? [l.reviewer] : [])].map((a) => activityAgentKey(l.project, a.agentId)) }) },
       { separator: true },
       { label: tr(msg({ id: 'board.lanes.usualOrder', defaultMessage: 'Usual Order', description: "A lane's context menu item in the Progress panel: puts the lanes back in their usual order, undoing the user's own." })), icon: 'list-ordered', detail: tr(msg({ id: 'board.lanes.usualOrderDetail', defaultMessage: 'Running lanes newest first, paused ones after them', description: 'Under Usual Order in a lane\'s context menu (Progress panel): what the usual order is.' })), disabled: !custom, onClick: usual },
       // Ending one needs no tool (#1280, SPEC §16.11.3): End Lane, and Abandon Lane after asking.

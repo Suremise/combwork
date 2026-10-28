@@ -141,6 +141,7 @@
   "shell.command.update.install": "Reiniciar e atualizar o Hive",
   "shell.command.update.releaseNotes": "Novidades do Hive",
   "shell.command.update.show": "Mostrar atualização do Hive",
+  "shell.command.view.activity": "Mostrar Atividade",
   "shell.command.view.alwaysOnTop": "Sempre visível",
   "shell.command.view.assistant": "Mostrar o Hive Assistant",
   "shell.command.view.assistantConversations": "Mostrar conversas do Assistente",

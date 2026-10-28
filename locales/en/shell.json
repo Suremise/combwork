@@ -567,6 +567,10 @@
     "defaultMessage": "Show Hive Update",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category."
   },
+  "shell.command.view.activity": {
+    "defaultMessage": "Show Activity",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category: Activity's workspace level, what every project's agents run now."
+  },
   "shell.command.view.alwaysOnTop": {
     "defaultMessage": "Always on Top",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category."

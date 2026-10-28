@@ -1,10 +1,18 @@
 {
   "tips.activityTab.text": {
-    "defaultMessage": "The Activity tab has a tab per running agent: its card, its turn and tool call, its background tasks, subagents and processes. It opens as a snapshot; Play follows it live. An agent's ⋯ menu, or a card in progress, opens it on that agent.",
+    "defaultMessage": "The Activity tab has a tab per running agent: its card, its turn and tool call, its background tasks, subagents and processes. It opens as a snapshot; Play follows it live. An agent's ⋯ menu opens it on that agent.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.activityTab.title": {
     "defaultMessage": "See what each agent is running",
+    "description": "A tip's title."
+  },
+  "tips.activityWorkspace.text": {
+    "defaultMessage": "Activity, in the activity bar, shows every project's running agents together, their tabs grouped by project. A card in progress opens it on the agents working on that card, and a run or a lane in the Progress panel on its agents (Show in Activity).",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.activityWorkspace.title": {
+    "defaultMessage": "Everything running, in one place",
     "description": "A tip's title."
   },
   "tips.advancedSettings.text": {
@@ -722,6 +730,14 @@
   "tips.flightRecorder.title": {
     "defaultMessage": "Catch rare events by themselves",
     "description": "A tip's title."
+  },
+  "tips.focusedTests.text": {
+    "defaultMessage": "With Hive merging, Version Control → Workflow can run each card’s focused tests on the merged result: your project’s command chooses the tests a change needs when the card is submitted, and the merge queue runs them before it merges.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: merge queue."
+  },
+  "tips.focusedTests.title": {
+    "defaultMessage": "Each card’s own tests before it merges",
+    "description": "A tip's title: the workflow option that has Hive's merge queue run the tests a card's change needs on the merged result (G20)."
   },
   "tips.followUpCheck.text": {
     "defaultMessage": "When you ask for a change to a card in Review or Approved for its reviewer to check, its builder posts the change as a follow-up: Hive wakes the reviewer, and the answer wakes the builder. One left unanswered for 15 minutes shows its card as stalled.",

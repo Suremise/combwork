@@ -314,6 +314,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.copies.review.title': undefined
   'settings.advanced.hive.disableHardwareAcceleration.desc': undefined
   'settings.advanced.hive.disableHardwareAcceleration.title': undefined
+  'settings.advanced.hive.focused.pickSeconds.desc': undefined
+  'settings.advanced.hive.focused.pickSeconds.title': undefined
   'settings.advanced.hive.guidance.desc': undefined
   'settings.advanced.hive.guidance.title': undefined
   'settings.advanced.hive.heapSnapshotNearLimit.desc': undefined
@@ -358,6 +360,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.queue.checkedOutTarget.auto': undefined
   'settings.advanced.hive.queue.checkedOutTarget.desc': undefined
   'settings.advanced.hive.queue.checkedOutTarget.title': undefined
+  'settings.advanced.hive.queue.focusedJobs.desc': undefined
+  'settings.advanced.hive.queue.focusedJobs.title': undefined
   'settings.advanced.hive.queue.networkCodes.desc': undefined
   'settings.advanced.hive.queue.networkCodes.title': undefined
   'settings.advanced.hive.queue.signSeconds.desc': undefined

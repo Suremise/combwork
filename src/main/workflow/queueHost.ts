@@ -43,7 +43,8 @@ import { defaultProbe, type ProcessProbe } from './queueProcs'
 import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import { openEntry, type FactData } from '../../shared/workflow/facts'
-import { QUEUE_CHECKED_OUT_TARGET, QUEUE_SIGN_SECONDS } from '../../shared/advanced'
+import { FOCUSED_PICK_SECONDS, QUEUE_CHECKED_OUT_TARGET, QUEUE_FOCUSED_JOBS, QUEUE_SIGN_SECONDS } from '../../shared/advanced'
+import { childEnv } from '../ptyHost'
 
 const log = createLogger('queue')
 
@@ -306,6 +307,13 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     checkedOutTarget: () => (advanced.get(QUEUE_CHECKED_OUT_TARGET) === 'auto' ? 'auto' : 'ask'),
     runCheck: checks.runCheck,
     install: checks.install,
+    // G20 (HI-1367): the pick at the result runs as a check does; its tests and results files in Hive's own folder.
+    focused: {
+      env: () => childEnv(),
+      pickTimeoutMs: () => Math.max(10, Number(advanced.get(FOCUSED_PICK_SECONDS)) || 180) * 1000,
+      jobs: () => Math.max(1, Number(advanced.get(QUEUE_FOCUSED_JOBS)) || 2),
+      dir: join(app.getPath('userData'), 'merge-queue', 'focused')
+    },
     onStep: (step) => {
       if (step?.step !== h.now?.step || step?.entry !== h.now?.entry) h.run = null
       h.now = step

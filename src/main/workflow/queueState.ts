@@ -262,11 +262,26 @@ function failureText(f: FactData['IntegrationFailed'], room: number): string {
       const lead = `${head}: a conflict in `
       return `${lead}${placedFiles(f, room - lead.length)}`
     }
+    case 'focused': {
+      // G20 (HI-1367): what stopped its focused tests, with the tests or paths named (as many as fit).
+      const q = f.focused
+      const named = (xs: string[] | undefined, lead: string): string => (xs?.length ? `${lead}${listed(xs, room - lead.length)}` : lead)
+      if (q?.why === 'repick') return named(q.paths, "its focused tests couldn't be chosen for what changed in the merge: ")
+      if (q?.why === 'noProof') return named(q.tests, 'no counted review run at the submitted revision for its real-CLI or packaged focused tests: ')
+      if (q?.why === 'newProof') return named(q.tests, 'the merge needs real-CLI or packaged focused tests its review never ran: ')
+      if (q?.why === 'noRunner') return 'the project has no command to run its focused tests'
+      return 'no focused tests were chosen for its submission'
+    }
   }
 }
 
 /** What to do next: a transient failure is the same revision submitted again; anything else a fix. */
 function nextStep(f: FactData['IntegrationFailed']): string {
+  if (f.reason === 'focused') {
+    if (f.focused?.why === 'noProof' || f.focused?.why === 'newProof') return `Have its reviewer run those tests at the revision submitted (hive-progress --check "focused:<test>"), then submit the same revision again (hive_submit).`
+    if (f.focused?.why === 'noRunner') return 'Tell the user: Version Control → Each card’s focused tests needs the command that runs them.'
+    return 'Bring your worktree up to date, then submit again naming the tests the change needs (tests on hive_submit), for review.'
+  }
   if (f.transient) return 'Submit the same revision again (hive_submit): it goes straight back into the queue, at most twice in a row.'
   if (f.reason === 'conflict') return `Merge ${f.target} into your worktree, resolve the conflict, commit and submit again (hive_submit).`
   return 'Fix it in your worktree, commit and submit again (hive_submit).'

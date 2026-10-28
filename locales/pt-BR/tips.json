@@ -1,6 +1,8 @@
 {
-  "tips.activityTab.text": "A aba Atividade tem uma aba por agente em execução: seu cartão, seu turno e chamada de ferramenta, suas tarefas em segundo plano, subagentes e processos. Ela abre como um instantâneo; Reproduzir acompanha ao vivo. O menu ⋯ de um agente, ou um cartão em andamento, a abre nesse agente.",
+  "tips.activityTab.text": "A aba Atividade tem uma aba por agente em execução: seu cartão, seu turno e chamada de ferramenta, suas tarefas em segundo plano, subagentes e processos. Ela abre como um instantâneo; Reproduzir acompanha ao vivo. O menu ⋯ de um agente a abre nesse agente.",
   "tips.activityTab.title": "Veja o que cada agente está executando",
+  "tips.activityWorkspace.text": "Atividade, na barra de atividades, mostra juntos os agentes em execução de cada projeto, com as abas agrupadas por projeto. Um cartão em andamento a abre nos agentes que trabalham nele, e uma execução ou uma raia do painel Progresso nos agentes dela (Mostrar em Atividade).",
+  "tips.activityWorkspace.title": "Tudo o que está em execução, em um só lugar",
   "tips.advancedSettings.text": "Depois de uma atualização de um agente de código, o Hive não vê mais a pergunta de confiança ou os erros de login dele? Configurações → Avançado tem os textos e os campos que o Hive procura, e os tempos limite dele: altere um, com o padrão ao lado, ou edite o advanced.json.",
   "tips.advancedSettings.title": "Corrija você mesmo uma mudança de CLI",
   "tips.agentConsole.text": "Configurações → Agent API → Permitir que agentes leiam o console do desenvolvedor dá aos agentes uma ferramenta somente leitura que mostra os hooks e a linha de status da CLI deles ao lado do que o Hive entendeu de cada um, com dados sensíveis ocultos, para que possam depurar o que o Hive vê.",
@@ -180,6 +182,8 @@
   "tips.filesTab.title": "Edite arquivos sem sair do Hive",
   "tips.flightRecorder.text": "Ative um gatilho do gravador de voo em Configurações → Avançado (paradas de segurança, algo desconhecido vindo de uma CLI, uma mudança de versão da CLI, um agente em silêncio), e o Hive salva os eventos recentes do console do desenvolvedor do agente, com dados sensíveis ocultos, no momento em que acontece, com um aviso.",
   "tips.flightRecorder.title": "Capture eventos raros automaticamente",
+  "tips.focusedTests.text": "Quando o Hive faz o merge, Controle de versão → Fluxo de trabalho pode rodar os testes específicos de cada cartão no resultado mesclado: o comando do seu projeto escolhe os testes de que uma mudança precisa quando o cartão é enviado, e a fila de merge os executa antes do merge.",
+  "tips.focusedTests.title": "Os testes de cada cartão antes do merge",
   "tips.followUpCheck.text": "Quando você pede uma mudança em um cartão em Revisão ou Aprovado para o revisor verificar, o executor publica a mudança como acompanhamento: o Hive acorda o revisor, e a resposta acorda o executor. Um acompanhamento sem resposta por 15 minutos mostra o cartão como travado.",
   "tips.followUpCheck.title": "Peça a verificação de um acompanhamento sem nova rodada",
   "tips.forYou.text": "Um cartão com o selo Para você aguarda você: uma aprovação, uma decisão ou uma pergunta. O ícone do Quadro de tarefas conta esses cartões, e Para você no quadro mostra só eles. Abra o cartão para aprovar, recusar ou responder: o agente que aguarda fica sabendo na hora.",

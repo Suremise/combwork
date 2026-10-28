@@ -140,6 +140,9 @@ describe("a run's card, revision and check (#1220)", () => {
     // A script's check is its card's project's; with no card, there's no project to ask.
     expect((await resolveRunLink(script, { check: 'test', card: '#40' }, d)).check).toEqual({ name: 'test', command: 'npm test' })
     await expect(resolveRunLink(script, { check: 'test' }, d)).rejects.toThrow('name the card too')
+    // A focused test's check (HI-1367): any test id, no configured command (the one after -- runs).
+    expect((await resolveRunLink(agent, { check: 'focused:tests/a b.test.ts' }, d)).check).toEqual({ name: 'focused:tests/a b.test.ts', command: '' })
+    await expect(resolveRunLink(agent, { check: 'focused:' }, d)).rejects.toThrow('"focused:<test>"')
   })
 })
 

@@ -1,4 +1,5 @@
 {
+  "workspace.activity.activity": "Activity",
   "workspace.activity.assistant": "Hive Assistant",
   "workspace.activity.board": "Task Board",
   "workspace.activity.docs": "Documentation",

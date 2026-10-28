@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { OwnWorkflowProblem, ProjectInfo, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
 import type { PlatformId } from '@shared/platform/descriptors'
-import { allOff, CONTRADICTIONS, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, isAllOff, liveContradictions, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
+import { allOff, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, isAllOff, liveContradictions, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { GROUP_TEXT, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import { FILE_LOCK_MODES } from '@shared/defaults'
 import { NumberField } from './NumberField'
@@ -56,6 +56,8 @@ const T = {
   inheritTip: msg({ id: 'workflow.form.inheritTip', defaultMessage: 'Use the inherited value: {value}', description: 'The tooltip of the Inherit button of a workflow option. {value} is the value it would have.' }),
   on: msg({ id: 'workflow.form.on', defaultMessage: 'On', description: 'A workflow option’s value: on.' }),
   off: msg({ id: 'workflow.form.off', defaultMessage: 'Off', description: 'A workflow option’s value: off.' }),
+  focusedPick: msg({ id: 'workflow.form.focusedPick', defaultMessage: 'Command that chooses the tests (optional)', description: 'The placeholder and label of a field under “Each card’s focused tests” (G20) in Project Settings → Workflow: the project’s command that lists the tests a change needs. Left empty, each card’s builder names its tests.' }),
+  focusedRun: msg({ id: 'workflow.form.focusedRun', defaultMessage: 'Command that runs them', description: 'The placeholder and label of a field under “Each card’s focused tests” (G20) in Project Settings → Workflow: the project’s command that runs a list of tests.' }),
   defaultBranch: msg({ id: 'workflow.form.defaultBranch', defaultMessage: 'The repository’s default branch', description: 'The placeholder of the target branch field in Project Settings → Workflow: left empty, the default branch.' }),
   labels: msg({ id: 'workflow.form.labels', defaultMessage: 'Labels, separated by commas', description: 'The placeholder of the labels field of “Your OK before merging”.' }),
   noIdentity: msg({ id: 'workflow.form.noIdentity', defaultMessage: 'No name and email are set in git config yet.', description: 'Under “Commits use the project’s identity” when git has no identity configured.' }),
@@ -535,11 +537,26 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
         // Empty inherits: the box shows the inherited value as its placeholder.
         return <NumberField value={draft.options[key] ?? null} min={1} max={max} step={key === 'loopStepWaitMinutes' ? 5 : 1} label={tr(optionTitle(key, platform)!)} inherit={valueText(key, form.inherited[key])} onCommit={(v) => (v === null ? inheritKey(key) : set(key, v))} />
       }
+      case 'focusedTests': {
+        // G20 (HI-1367): its picker and runner are commands of their own, kept in the same map as the checks'.
+        const command = (name: string, v: string): void => {
+          const { [name]: _gone, ...rest } = effective.commands
+          set('commands', v.trim() ? { ...rest, [name]: v.trim() } : rest)
+        }
+        return (
+          <div className="workflow-stack">
+            <Switch checked={effective.focusedTests} onChange={(v) => set('focusedTests', v)} />
+            {effective.focusedTests && <DraftText value={effective.commands[FOCUSED_PICK] ?? ''} placeholder={tr(T.focusedPick)} label={tr(T.focusedPick)} onCommit={(v) => command(FOCUSED_PICK, v)} />}
+            {effective.focusedTests && <DraftText value={effective.commands[FOCUSED_RUN] ?? ''} placeholder={tr(T.focusedRun)} label={tr(T.focusedRun)} onCommit={(v) => command(FOCUSED_RUN, v)} />}
+          </div>
+        )
+      }
       case 'preChecks':
       case 'mergeChecks': {
-        // One commands map for both lists (§16.13): the other list's commands are kept through this one's change.
+        // One commands map for both lists (§16.13): the other list's commands are kept through this one's change, and
+        // G20's picker and runner (HI-1367).
         const other = effective[key === 'preChecks' ? 'mergeChecks' : 'preChecks']
-        const kept = Object.fromEntries(Object.entries(effective.commands).filter(([n]) => other.includes(n)))
+        const kept = Object.fromEntries(Object.entries(effective.commands).filter(([n]) => other.includes(n) || n === FOCUSED_PICK || n === FOCUSED_RUN))
         return <ChecksEditor names={effective[key]} commands={effective.commands} onChange={(names, commands) => setDraft({ ...draft, options: { ...draft.options, [key]: names, commands: { ...kept, ...commands } } })} />
       }
       case 'excluded':

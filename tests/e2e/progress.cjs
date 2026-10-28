@@ -696,8 +696,10 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check("with the Assistant's panel open, Progress sits to its left", boxes[0] !== null && boxes[1] !== null && boxes[0] < boxes[1], JSON.stringify(boxes))
   await page.screenshot({ path: path.join(shots, 'light-with-assistant.png') })
   await panel.locator('button[aria-label^="Fold the Progress panel"]').focus()
-  // From the fold button (the tabs come before it), past the filters, to the first run.
-  for (let i = 0; i <= (await panel.locator('.progress-filter select').count()); i++) await page.keyboard.press('Tab')
+  // From the fold button (the tabs come before it), past the filters and the failures' line (above the runs, HI-1923),
+  // to the first run.
+  const stops = (await panel.locator('.progress-filter select').count()) + (await panel.locator('.progress-tab-pulse > .progress-attention').count())
+  for (let i = 0; i <= stops; i++) await page.keyboard.press('Tab')
   const firstRow = panel.locator('.progress-run').first()
   check('light: the focused run shows the focus too', (await firstRow.evaluate((el) => getComputedStyle(el).outlineStyle)) === 'solid')
   await page.screenshot({ path: path.join(shots, 'light-run-focused.png') })

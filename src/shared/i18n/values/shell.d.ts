@@ -143,6 +143,7 @@ interface HiveMessageValues {
   'shell.command.update.install': undefined
   'shell.command.update.releaseNotes': undefined
   'shell.command.update.show': undefined
+  'shell.command.view.activity': undefined
   'shell.command.view.alwaysOnTop': undefined
   'shell.command.view.assistant': undefined
   'shell.command.view.assistantConversations': undefined

@@ -7717,6 +7717,30 @@ button.agent-place:hover {
 .activity-agent-tab-card {
   font-variant-numeric: tabular-nums;
 }
+/* Activity's workspace level (HI-1664): the agent tabs grouped by project, each group after its name. */
+.activity-tab-group {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.activity-tab-group + .activity-tab-group {
+  margin-left: 8px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border-subtle);
+}
+.activity-tab-group-name {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+.activity-for-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
 .activity-pick.on,
 .activity-live.on {
   color: var(--accent);
@@ -11891,6 +11915,10 @@ button.progress-run-show:focus-visible {
   font: inherit;
   text-align: start;
   cursor: pointer;
+}
+/* Above the runs (HI-1923): never shrunk away as the runs and the lanes take the room. */
+.progress-tab-pulse > .progress-attention {
+  flex-shrink: 0;
 }
 .progress-attention > span {
   flex: 1 1 auto;

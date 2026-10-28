@@ -7,7 +7,8 @@ import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { attempt, selectProject } from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
-import { cardLabelOf, findProject, flashPane, get, notify, projectKey, projectNames, revealAgent, set, setAssistantOpen, setProgressFilter, setProgressOpen, useDateStyle, useLanguage, useProgressFilter, useProgressOpen, useStore } from '../store'
+import { SHOW_IN_ACTIVITY } from '../views/WorkspaceActivity'
+import { activityAgentKey, cardLabelOf, findProject, flashPane, get, notify, openWorkspaceActivity, projectKey, projectNames, revealAgent, set, setAssistantOpen, setProgressFilter, setProgressOpen, useDateStyle, useLanguage, useProgressFilter, useProgressOpen, useStore } from '../store'
 import { useNow } from '../usage'
 import { useShallow } from 'zustand/react/shallow'
 import { cx, formatKeybinding, timeAgo } from '../util'
@@ -59,6 +60,14 @@ function whyNotShown(s: StoreState, r: ProgressRun): string | null {
   if (!p) return tr(msg({ id: 'board.progress.projectGone', defaultMessage: 'Its project is no longer in this workspace.', description: "Why a Progress panel run's agent can't be shown: its project was removed from the workspace." }))
   if (!r.agentId || !p.agents.some((a) => a.id === r.agentId)) return tr(msg({ id: 'board.progress.agentGone', defaultMessage: '{agent} has been removed from {project}.', description: "Why a Progress panel run's agent can't be shown: the agent ({agent}) was removed from its project ({project})." }), { agent: runAgentName(r, tr), project: p.name })
   return null
+}
+
+/** Opens Activity's workspace level on the agent that reported a run (HI-1664): what it runs now, the Assistant's too. */
+function showRunActivity(r: ProgressRun): void {
+  const s = get()
+  if (whyNotShown(s, r)) return
+  const path = r.source === 'assistant' ? s.workspace!.assistant!.path : findProject(s, r.projectPath!)!.path
+  openWorkspaceActivity({ agents: [activityAgentKey(path, r.source === 'assistant' ? 'assistant' : r.agentId!)] })
 }
 
 /**
@@ -270,6 +279,21 @@ export function ProgressPanel() {
             <MergeCards slots={merging} projectName={nameOf} showProject={multi} stepOf={stepOf} now={now} />
             <QueueLines views={pulseQueues} showProject={multi} onOpen={() => setTab('merges')} />
             {(merging.length > 0 || pulseQueues.length > 0) && <div className="progress-divider" role="separator" />}
+            {/* Needs attention (#1309): failures nothing has passed since, a line that shows them in Runs. Above the runs, out of their scrolling list, so however many there are it stays in sight (HI-1923). */}
+            {failures.length > 0 && (
+              <button
+                type="button"
+                className="progress-attention"
+                onClick={() => {
+                  setRunsFilter({ ...NO_RUNS_FILTER, failedOnly: true })
+                  setTab('runs')
+                }}
+              >
+                <Icon name="error" />
+                <span>{tr(msg({ id: 'board.progress.attention', defaultMessage: '{n, plural, one {# run failed} other {# runs failed}}', description: "A line in the Progress panel's Pulse tab: runs failed and no later run of the same thing passed since; a click shows them in the Runs tab." }), { n: failures.length })}</span>
+                <Icon name="arrow-right" />
+              </button>
+            )}
             <div className="progress-body">
               {listed.length === 0 && !merging.length && !pulseQueues.length && !failures.length && (
                 <div className="pane-empty progress-empty">
@@ -279,21 +303,6 @@ export function ProgressPanel() {
               {listed.map((r) => (
                 <RunRow key={r.id} run={r} now={now} open={detail === r.id} onToggle={toggle} />
               ))}
-              {/* Needs attention (#1309): failures nothing has passed since, a line that shows them in Runs. */}
-              {failures.length > 0 && (
-                <button
-                  type="button"
-                  className="progress-attention"
-                  onClick={() => {
-                    setRunsFilter({ ...NO_RUNS_FILTER, failedOnly: true })
-                    setTab('runs')
-                  }}
-                >
-                  <Icon name="error" />
-                  <span>{tr(msg({ id: 'board.progress.attention', defaultMessage: '{n, plural, one {# run failed} other {# runs failed}}', description: "A line in the Progress panel's Pulse tab: runs failed and no later run of the same thing passed since; a click shows them in the Runs tab." }), { n: failures.length })}</span>
-                  <Icon name="arrow-right" />
-                </button>
-              )}
             </div>
             <LanesSection lanes={shownLanes} all={lanes} width={width} runs={shown} />
           </>
@@ -807,9 +816,14 @@ function RunDetails({ run: r, now }: { run: ProgressRun; now: number }) {
       {r.summary && <div className={cx('progress-summary', r.state !== 'failed' && 'plain')}>{r.summary}</div>}
       <div className="progress-detail-actions">
         {why === null ? (
-          <button type="button" className="btn small" onClick={() => showRunAgent(r)} aria-label={showLabel(r)}>
-            <Icon name="eye" /> {tr(SHOW_THE_AGENT)}
-          </button>
+          <>
+            <button type="button" className="btn small" onClick={() => showRunAgent(r)} aria-label={showLabel(r)}>
+              <Icon name="eye" /> {tr(SHOW_THE_AGENT)}
+            </button>
+            <button type="button" className="btn small subtle" onClick={() => showRunActivity(r)}>
+              <Icon name="type-hierarchy" /> {tr(SHOW_IN_ACTIVITY)}
+            </button>
+          </>
         ) : (
           <span className="progress-detail-why">{why}</span>
         )}
