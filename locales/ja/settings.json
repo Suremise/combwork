@@ -287,6 +287,8 @@
   "settings.advanced.copilot.signIn.hookMessage.title": "サインイン拒否：ErrorOccurredフック",
   "settings.advanced.copilot.trust.prompt.desc": "フォルダーで最初のセッションを始める前にCopilotが出す質問です。画面に出ている間、Hiveはエージェントを応答待ちとして表示します。",
   "settings.advanced.copilot.trust.prompt.title": "信頼の確認",
+  "settings.advanced.copilot.turnFailed.errorType.desc": "Copilotのセッションファイルにあるセッションエラーの種類のうち、Copilotの再試行の後にモデルの呼び出しが失敗してターンが終了したことを示すものです（このときCopilotはStopを送りません）。HiveはCopilotのメッセージとともに、ターンを失敗として終了します。誤っていると、そのようなエージェントは確認するまで「作業中」と表示されます。",
+  "settings.advanced.copilot.turnFailed.errorType.title": "ターン失敗：エラーの種類",
   "settings.advanced.copilotFooter.desc": "{mode}モードでのCopilotのフッターです（「{footer}」）{shared, select, yes {。AskモードとAccept editsモードで共通です（Hiveはセッション開始時のモードで区別します）} other {}}。Hiveはエージェントのモードをフッター（画面で最後に見つかったモード）から読み取り、目的のモードがフッターに出るまでShift+Tabを押してモードを切り替えます。誤っていると、Hiveはエージェントがそのモードにあることを認識できず、再起動しないとそのモードに切り替えられません。",
   "settings.advanced.copilotFooter.title": "フッター：{mode}",
   "settings.advanced.data.desc": "Hiveは設定を%APPDATA%\\Hive\\config.jsonに保存します。",

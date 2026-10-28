@@ -287,6 +287,8 @@
   "settings.advanced.copilot.signIn.hookMessage.title": "Logowanie odrzucone: hook ErrorOccurred",
   "settings.advanced.copilot.trust.prompt.desc": "Pytanie Copilot przed pierwszą sesją w folderze. Dopóki jest na ekranie, Hive pokazuje, że agent czeka na Ciebie.",
   "settings.advanced.copilot.trust.prompt.title": "Pytanie o zaufanie",
+  "settings.advanced.copilot.turnFailed.errorType.desc": "Typ błędu sesji w pliku sesji Copilot, który oznacza, że tura się zakończyła, bo wywołanie modelu nie powiodło się po ponownych próbach Copilot (nie wysyła wtedy Stop): Hive kończy turę jako nieudaną, z komunikatem Copilot. Gdy jest błędny, taki agent pokazuje „Pracuje”, dopóki go nie sprawdzisz.",
+  "settings.advanced.copilot.turnFailed.errorType.title": "Tura nieudana: typ błędu",
   "settings.advanced.copilotFooter.desc": "Stopka Copilot w trybie {mode} („{footer}”){shared, select, yes {, wspólna dla trybów Pytaj i Akceptuj edycje (Hive rozróżnia je po trybie, w którym sesja się zaczęła)} other {}}. Hive odczytuje tryb agenta ze stopki (ostatni tryb znaleziony na ekranie) i zmienia tryby, naciskając Shift+Tab, aż stopka pokaże wybrany; jeśli ustawienie jest błędne, Hive nie widzi agenta w tym trybie i nie może się na niego przełączyć bez ponownego uruchomienia.",
   "settings.advanced.copilotFooter.title": "Stopka: {mode}",
   "settings.advanced.data.desc": "Hive przechowuje ustawienia w pliku %APPDATA%\\Hive\\config.json.",

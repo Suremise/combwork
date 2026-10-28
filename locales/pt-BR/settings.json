@@ -287,6 +287,8 @@
   "settings.advanced.copilot.signIn.hookMessage.title": "Login recusado: hook ErrorOccurred",
   "settings.advanced.copilot.trust.prompt.desc": "A pergunta do Copilot antes da primeira sessão numa pasta. Enquanto ela está na tela, o Hive mostra o agente esperando por você.",
   "settings.advanced.copilot.trust.prompt.title": "Pergunta de confiança",
+  "settings.advanced.copilot.turnFailed.errorType.desc": "O tipo de um erro de sessão, no arquivo de sessão do Copilot, que indica que a rodada terminou porque uma chamada ao modelo falhou depois das novas tentativas do Copilot (ele não envia Stop nesse caso): o Hive encerra a rodada como com falha, com a mensagem do Copilot. Se estiver errado, esse agente aparece como “Trabalhando” até você conferir.",
+  "settings.advanced.copilot.turnFailed.errorType.title": "Rodada com falha: tipo de erro",
   "settings.advanced.copilotFooter.desc": "O rodapé do Copilot no modo {mode} (“{footer}”){shared, select, yes {, que Perguntar e Aceitar edições compartilham (o Hive os distingue pelo modo em que a sessão começou)} other {}}. O Hive lê o modo de um agente pelo rodapé (o último modo encontrado na tela) e troca de modo pressionando Shift+Tab até o rodapé mostrar o desejado; se estiver errado, o Hive não vê o agente nesse modo e não consegue mudar para ele sem reiniciar.",
   "settings.advanced.copilotFooter.title": "Rodapé: {mode}",
   "settings.advanced.data.desc": "O Hive guarda as configurações em %APPDATA%\\Hive\\config.json.",
