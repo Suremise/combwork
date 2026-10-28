@@ -165,7 +165,12 @@ function stream(token) {
   const documented = (method) => routesIn(docText, method)
   // The routes the reference says are the Assistant's only: the tables after a line saying so.
   const assistantTables = [...docText.matchAll(/^.*the Assistant's only.*\n\n((?:\|.*\n?)+)/gim)].map((m) => m[1]).join('\n')
-  const assistantGets = routesIn(assistantTables, 'GET')
+  // …and whole sections whose first paragraph says they are (Templates, HI-1502: "The Hive Assistant's alone").
+  const assistantSections = docText
+    .split(/^(?=#{2,3} )/m)
+    .filter((s) => /Assistant's (?:only|alone)/i.test(s.split(/\n\n/)[1] ?? ''))
+    .join('\n')
+  const assistantGets = routesIn(assistantTables + '\n' + assistantSections, 'GET')
   const gets = documented('GET').filter((r) => r !== '/v1/events' && !assistantGets.includes(r))
   check('the reference lists the GET routes', gets.length >= 20 && gets.includes('/v1/progress'), gets.join(' '))
   check("…and which are the Assistant's only", assistantGets.includes('/v1/journal/x') && !assistantGets.includes('/v1/progress'), assistantGets.join(' '))
