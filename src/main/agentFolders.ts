@@ -14,7 +14,7 @@ import { samePlace } from './fsutil'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
-import { endProcessesExactly, leftoversOfRun, onRunOutcome, runOutcome, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
+import { endedEarlier, endProcessesExactly, forgetEarlierRun, keepRunEnded, leftoversOfRun, onRunOutcome, runOutcome, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
 import { hiveError } from './hiveError'
 import { msg } from '../shared/i18n'
 import { SlotStore, type SlotConn } from './slots'
@@ -292,6 +292,8 @@ export async function claimPlace(projectPath: string, agent: FolderAgent, existi
     if (!tracked) throw new ClaimRefused({ is: 'closing' })
     const { ws, host: sessionsHost, project } = await hostOf(projectPath)
     const store = new SlotStore(boardConn(ws), project)
+    const at = slotAt(facts, folder)
+    if (at?.writer) await settleGoneWriterOf(projectPath, store, at.name, o.run)
     // What the write compares against, read before it (git): the folder's head, for the user's Resume taking a free slot.
     const head = existing && !o.auto ? await headNow(folder) : null
     const me = await writerHost.self()
@@ -390,9 +392,11 @@ export async function releaseWriter(projectPath: string, run: string): Promise<v
     const { ws, project } = await hostOf(projectPath)
     for (const slot of await new SlotStore(boardConn(ws), project).clearWriterRun(run)) await writerHost.drained(projectPath, slot)
   } catch (e) {
-    // Its workspace closed meanwhile: the row stays, held, until a refresh of this Hive clears it (writerOver).
+    // Its workspace closed meanwhile: the row stays, held, until a refresh of this Hive clears it (writerOver), or, this
+    // Hive gone by then, a later one settles it from the run's kept record (HI-1886).
     log.warn(`The slot writer ${run} wasn't released: ${userText(e instanceof Error ? e.message : String(e))}`)
     released.add(run)
+    keepRunEnded(run)
   } finally {
     writerHost.live.delete(run)
   }
@@ -467,7 +471,7 @@ export async function heldWriter(projectPath: string, slot: string): Promise<Hel
   const me = await writerHost.self()
   const self = w.pid === me.pid && w.started === me.started
   const alive = self ? true : await writerHost.alive(w.pid, w.started)
-  const left = leftoversOfRun(w.run)
+  const left = runLeftovers(w.run)
   return {
     slot,
     agent: w.agent,
@@ -476,6 +480,42 @@ export async function heldWriter(projectPath: string, slot: string): Promise<Hel
     live: self && writerHost.live.has(w.run),
     processes: left ? { list: left.processes, more: left.more, from: 'leftovers' } : !self && alive === false ? await restartList(projectPath, w) : null
   }
+}
+
+/** What a run left running, as listed: by this Hive, or kept from before it started (#614's restore names it `restored:`). */
+const runLeftovers = (run: string): ReturnType<typeof leftoversOfRun> => leftoversOfRun(run) ?? leftoversOfRun(`restored:${run}`)
+
+/**
+ * A slot writer of a Hive that has gone, settled by itself (HI-1886: after a restart, builders' slots stayed held by
+ * their own ended runs): true when it may be cleared. Only when this profile kept that its run's processes were seen to
+ * end (its job seen empty, the proof a release needs; `endedEarlier`). A list of its processes taken earlier (the last
+ * run's marker) never is: what they started since isn't in it (HR2's round 1). Nothing kept, or its Hive still running
+ * or not known to have gone: it stays held for the user's Release Slot….
+ */
+export async function goneWriterSettles(projectPath: string, w: { run: string; agent: string; pid: number; started: number }): Promise<boolean> {
+  const me = await writerHost.self()
+  if ((w.pid === me.pid && w.started === me.started) || (await writerHost.alive(w.pid, w.started)) !== false) return false
+  if (!(await endedEarlier(w.run))) return false
+  log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} of a Hive that has gone (process ${w.pid}) settled: its processes were seen to end`)
+  return true
+}
+
+/** A gone Hive's writer cleared (HI-1886): its run's kept record is no longer needed. */
+export function goneWriterCleared(run: string): void {
+  forgetEarlierRun(run)
+}
+
+/**
+ * The slot a start claims, its writer a gone Hive's (HI-1886): settled first when it may be (`goneWriterSettles`), so a
+ * restart's resume takes its own slot back.
+ */
+async function settleGoneWriterOf(projectPath: string, store: SlotStore, slot: string, run: string): Promise<void> {
+  const w = store.slot(slot)?.writer
+  if (!w || w.run === run) return
+  if (!(await goneWriterSettles(projectPath, w))) return
+  if (!(await store.clearWriter(slot, w.run))) return
+  goneWriterCleared(w.run)
+  await writerHost.drained(projectPath, slot)
 }
 
 /**

@@ -32,7 +32,7 @@ import { onHiveEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
-import { setRetiredHomes, setWriterHost, writerHeld, writerOver } from './agentFolders'
+import { goneWriterCleared, goneWriterSettles, setRetiredHomes, setWriterHost, writerHeld, writerOver } from './agentFolders'
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
 import { endLeaseJob, journalPath, LeaseJob, leaseJobGone, retireSeal, startLauncher, sweepSeals } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
@@ -276,11 +276,21 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
         if (!ws.lifetime.aborted) ws.scheduleRefresh()
       },
       writerOver: (w) => writerOver(w),
+      writerGone: {
+        settles: (w) => goneWriterSettles(projectPath, w),
+        cleared: (run) => {
+          goneWriterCleared(run)
+          // Free now: a lane waiting for a slot may get it (#1438).
+          slotFreed?.(ws, projectPath)
+        }
+      },
       removeSkillCopies: (folder) => removeCopiesIn(projectPath, folder, { always: true, why: 'slot removed' }), // i18n-ignore: the log's reason (English)
       renamer: renamerFor(ws, projectPath)
     })
     // The seals of jobs settled before this Hive started (HI-1723).
     sweepSealsOf(root, { once: true })
+    // Writers a Hive that has gone left, settled where what was kept of their runs allows (HI-1886).
+    void made.settleGoneWriters().catch((e) => log.warn(`settling the slot writers of a Hive that has gone in ${userText(projectPath)}`, e))
     return made
   })()
   pools.set(key, { life: ws.lifetime, pool })
@@ -703,7 +713,7 @@ export async function tidyOpenPools(): Promise<void> {
       const path = byId.get(id)
       if (!path) continue
       await poolFor(ws, path)
-        .then((p) => p.tidy())
+        .then(async (p) => (await p.settleGoneWriters(), p.tidy()))
         .catch((e) => log.warn(`tidying the slots of ${userText(path)}`, e))
       sweepSealsOf(join(ws.worktreesRoot, basename(path)))
     }

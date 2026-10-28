@@ -37,7 +37,12 @@ const tracker = vi.hoisted(() => ({
   /** The last run's marker's launches (the notice that Hive closed unexpectedly), and whether ending them works. */
   restart: [] as { projectPath: string; agentId: string; agentName: string; runId?: string; processes: Proc[] }[],
   endedExactly: [] as { list: Proc[]; at: string | null }[],
-  endWorks: true
+  endWorks: true,
+  /** The runs this profile kept as seen ended (HI-1886), and the records forgotten once their writers were settled. */
+  endedRuns: new Set<string>(),
+  forgotten: [] as string[],
+  /** Which of the processes asked about still run (by default every one). */
+  stillRunning: null as null | ((list: Proc[]) => Proc[] | null)
 }))
 vi.mock('../src/main/agentProcesses', async (orig) => ({
   ...((await orig()) as object),
@@ -47,8 +52,10 @@ vi.mock('../src/main/agentProcesses', async (orig) => ({
     if (run) tracker.listed.delete(run)
     return 1
   },
-  // Every one kept still runs (the job host would check each by id and start time).
-  stillRunningOf: async (list: Proc[]) => list,
+  // Every one kept still runs unless a test says (the job host would check each by id and start time).
+  stillRunningOf: async (list: Proc[]) => (tracker.stillRunning ? tracker.stillRunning(list) : list),
+  endedEarlier: async (run: string) => tracker.endedRuns.has(run),
+  forgetEarlierRun: (run: string) => void tracker.forgotten.push(run),
   endProcessesExactly: async (list: Proc[]) => (tracker.endedExactly.push({ list, at: tracker.writerAt() }), tracker.endWorks)
 }))
 vi.mock('../src/main/lastRun', async (orig) => ({ ...((await orig()) as object), lastUnexpectedClose: () => (tracker.restart.length ? { processes: tracker.restart } : null) }))
@@ -58,7 +65,7 @@ const base = tempDir('slotwriters-')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { boardFile, onBoardCommitted } = await import('../src/main/boardStore')
 const { SlotPool, SlotStore, fileSlotConn } = await import('../src/main/slots')
-const { heldSlots, heldWriter, releaseHeldWriter, setWriterHost, writerOver } = await import('../src/main/agentFolders')
+const { goneWriterCleared, goneWriterSettles, heldSlots, heldWriter, releaseHeldWriter, setWriterHost, writerOver } = await import('../src/main/agentFolders')
 const { releasableSlots, releaseSlot, SlotReleaseRefused } = await import('../src/main/slotRelease')
 const { settleRunForTests } = await import('../src/main/agentProcesses')
 const { sessions } = await import('../src/main/sessions')
@@ -143,7 +150,7 @@ afterAll(async () => {
  * another Hive (a writer's holder) still runs, as the probe says it (null: can't be told).
  */
 function hostOn(others: boolean | null = true): void {
-  pool = new SlotPool({ store, project, root: base, options: async () => ({ setup: '', archive: '', copy: '' }), builders: () => 2, cap: () => 2, runner: async () => ({ ok: true, exitCode: 0, settled: true, logPath: null }), settle: async () => true, holder: { self: async () => me, alive: async () => others, live }, writerOver: (w) => writerOver(w) })
+  pool = new SlotPool({ store, project, root: base, options: async () => ({ setup: '', archive: '', copy: '' }), builders: () => 2, cap: () => 2, runner: async () => ({ ok: true, exitCode: 0, settled: true, logPath: null }), settle: async () => true, holder: { self: async () => me, alive: async () => others, live }, writerOver: (w) => writerOver(w), writerGone: { settles: (w) => goneWriterSettles(project, w), cleared: goneWriterCleared } })
   setWriterHost({ self: async () => me, alive: async (pid) => (pid === me.pid ? true : others), live, track: async () => pool.trackWriter(), drained: async (_p, slot) => pool.drained(slot) })
 }
 const start = () => inWorkspace(ws, () => sessions.start(project, { agentId: 'b1' }))
@@ -478,6 +485,105 @@ describe('Release Slot… on a held writer (#1506)', () => {
     expect(released.status).toBe('fulfilled')
     if (started.status === 'fulfilled') expect(writer()?.run).toBe(started.value.runId)
     else expect(writer()).toBeNull()
+  })
+})
+
+describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () => {
+  afterEach(() => {
+    tracker.listed.clear()
+    tracker.restart = []
+    tracker.endedExactly.length = 0
+    tracker.endedRuns.clear()
+    tracker.forgotten.length = 0
+    tracker.stillRunning = null
+    tracker.ended.length = 0
+    tracker.writerAt = () => null
+  })
+  const node = { pid: 5150, name: 'node.exe', label: 'node serve.js', created: '133900000000000000' }
+  const claude = { pid: 6160, name: 'claude.exe', label: 'claude', created: '133900000000000001' }
+  /**
+   * slot-a's writer as a Hive that has gone (another process) left it: its run, b1's, under b1's carried lease (open), or
+   * under a lease that has ended since (`ended`: its lane abandoned, its card done).
+   */
+  const plant = (run: string, o: { ended?: boolean } = {}) => {
+    const lease = o.ended ? 'l-ended' : store.openLease('slot-a')!.id
+    return store.conn.write((db) => db.prepare('UPDATE slots SET writer_run = ?, writer_lease = ?, writer_agent = ?, writer_pid = ?, writer_started = ? WHERE project = ? AND name = ?').run(run, lease, 'b1', me.pid + 1, 5, projectId, 'slot-a'))
+  }
+  const startRefusal = () => start().then(() => 'started', (e: Error) => String(e?.message ?? e))
+
+  it('its run seen ended (its job empty, kept in the profile): freed at the slot sweep, on an ended lease or an open one, and the record forgotten', async () => {
+    hostOn(false)
+    await plant('r-quit', { ended: true })
+    tracker.endedRuns.add('r-quit')
+    await pool.settleGoneWriters()
+    expect(writer()).toBeNull()
+    expect(tracker.forgotten).toEqual(['r-quit'])
+    await plant('r-lend')
+    tracker.endedRuns.add('r-lend')
+    await pool.refresh()
+    expect(writer()).toBeNull()
+    expect(tracker.endedExactly).toEqual([])
+  })
+
+  it("its run seen ended: its own agent's start (a restart's resume) takes the slot back", async () => {
+    hostOn(false)
+    await plant('r-own')
+    tracker.endedRuns.add('r-own')
+    const state = await start()
+    expect(writer()?.run).toBe(state.runId)
+    expect(tracker.forgotten).toEqual(['r-own'])
+  })
+
+  it("a list of its processes taken earlier never frees it (HR2's round 1): none of them running, or one still running, it stays held and nothing is ended", async () => {
+    hostOn(false)
+    tracker.writerAt = () => writer()?.run ?? null
+    // The last run's marker named the CLI and a shell; the shell started a server, then exited, before the marker was
+    // written again: every process the marker lists is gone, but the server isn't in it and may still run.
+    await plant('r-snap', { ended: true })
+    tracker.restart = [{ projectPath: project, agentId: 'b1', agentName: 'B1', runId: 'r-snap', processes: [claude, node] }]
+    tracker.stillRunning = () => []
+    await pool.settleGoneWriters()
+    await pool.refresh()
+    expect(writer()?.run).toBe('r-snap')
+    expect(await startRefusal()).toMatch(/still has another session in it/)
+    expect(writer()?.run).toBe('r-snap')
+    // A listed parent still running may have started children since: its own agent's start ends nothing and is refused.
+    tracker.stillRunning = (list) => list.filter((p) => p.pid === claude.pid)
+    expect(await startRefusal()).toMatch(/still has another session in it/)
+    expect(tracker.endedExactly).toEqual([])
+    // Surfaced: held, with Release Slot… in b1's ⋯ and the slot lists, the parent still running listed.
+    expect((await heldSlots(project)).get('b1')).toBe('slot-a')
+    expect((await heldWriter(project, 'slot-a'))?.processes).toEqual({ list: [claude], more: 0, from: 'restart' })
+    await store.clearWriterRun('r-snap')
+  })
+
+  it("nothing kept of its run, or its Hive still running (or can't be told) though its run was seen ended: left held for Release…", async () => {
+    hostOn(false)
+    await plant('r-unknown', { ended: true })
+    await pool.refresh()
+    expect(writer()?.run).toBe('r-unknown')
+    expect((await heldSlots(project)).get('b1')).toBe('slot-a')
+    await store.clearWriterRun('r-unknown')
+    for (const others of [true, null]) {
+      hostOn(others)
+      await plant(`r-${others}`, { ended: true })
+      tracker.endedRuns.add(`r-${others}`)
+      await pool.refresh()
+      expect(writer()?.run).toBe(`r-${others}`)
+      await store.clearWriterRun(`r-${others}`)
+    }
+  })
+
+  it("what its run left running, kept from before this start, is listed by Release Slot… and ended by its run (#614's restored:<run>)", async () => {
+    hostOn(false)
+    await plant('r-left', { ended: true })
+    tracker.listed.set('restored:r-left', { processes: [node], more: 0, restored: true })
+    await pool.refresh()
+    expect(writer()?.run).toBe('r-left')
+    expect((await heldWriter(project, 'slot-a'))?.processes).toEqual({ list: [node], more: 0, from: 'leftovers' })
+    await releaseHeldWriter(project, 'slot-a', 'r-left', { end: true })
+    expect(tracker.ended.at(-1)?.run).toBe('r-left')
+    expect(writer()).toBeNull()
   })
 })
 

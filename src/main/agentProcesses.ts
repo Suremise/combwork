@@ -333,6 +333,18 @@ async function findLeftovers(runId: string): Promise<AgentLeftovers | null> {
   }
   await new Promise((r) => setTimeout(r, SETTLE_MS))
   running.delete(runId)
+  looking.set(runId, launch)
+  try {
+    return await lookAt(runId, launch)
+  } finally {
+    looking.delete(runId)
+  }
+}
+
+/** A launch being looked at as its CLI exits, its job listed: Hive quitting meanwhile keeps its record (HI-1886). */
+const looking = new Map<string, Launch>()
+
+async function lookAt(runId: string, launch: Launch): Promise<AgentLeftovers | null> {
   let list = await listJob(runId)
   // The gate waits for its CLI, so a CLI still running once the gate has exited lost its terminal (HI-1819): started as
   // the terminal was killed (Hive quitting just after a launch), after its console had ended what was attached to it.
@@ -488,7 +500,8 @@ export function leftoversOfRun(run: string): { processes: AgentProcess[]; more: 
  */
 export async function settleLeftovers(projectPath: string, agentId: string, how: 'end' | 'keep', run?: string): Promise<number> {
   const k = agentKey(projectPath, agentId)
-  const mine = [...left.values()].filter((l) => agentKey(l.projectPath, l.agentId) === k && (run === undefined || l.runId === run))
+  // A run's kept from before this start is listed as `restored:<run>` (#614).
+  const mine = [...left.values()].filter((l) => agentKey(l.projectPath, l.agentId) === k && (run === undefined || l.runId === run || l.runId === `restored:${run}`))
   if (!mine.length) return 0
   let done = 0
   let failed = 0
@@ -666,6 +679,12 @@ interface SavedLaunch {
 interface SavedLeftovers {
   version: 1
   launches: SavedLaunch[]
+  /**
+   * Runs whose processes Hive saw end, their jobs seen empty (HI-1886): what a slot's writer of that run, its Hive gone,
+   * is settled by at a later start (`endedEarlier`). Only a job seen empty proves it: a list of processes taken earlier
+   * says nothing of those they started since.
+   */
+  ended?: string[]
 }
 
 /** The latest write of the kept list (writes go one after another, the newest last). */
@@ -673,10 +692,27 @@ let saving: Promise<void> = Promise.resolve()
 /** Whether the kept list on disk may hold something (written with processes, or read with some at the start). */
 let keptAny = false
 
+/** Runs seen ended (HI-1886) are kept until a writer of theirs is settled, at most this many. */
+const MAX_RUN_RECORDS = 100
+/** Those read at this start (kept forward until settled) and this run's own, read once before any write. */
+let endedRuns: string[] = []
+let recordsRead: Promise<void> | null = null
+function readRecords(): Promise<void> {
+  recordsRead ??= readJson<Partial<SavedLeftovers> | null>(savedFile(), null).then(
+    (saved) => {
+      const ended = Array.isArray(saved?.ended) ? saved.ended.filter((r): r is string => typeof r === 'string' && r.length <= 100) : []
+      endedRuns = [...new Set([...ended, ...endedRuns])].slice(-MAX_RUN_RECORDS)
+      if (endedRuns.length) keptAny = true
+    },
+    () => undefined
+  )
+  return recordsRead
+}
+
 /**
  * Keeps what is listed now for the next start (#614): each launch apart, as listed (so within the bounds: bound runs
  * first), each process by id and start time (one whose start time couldn't be read can't be told from a later process
- * with its id, so it isn't kept).
+ * with its id, so it isn't kept). The runs seen ended (HI-1886) go with it, read first so none is lost.
  */
 function persist(): void {
   const launches: SavedLaunch[] = []
@@ -684,11 +720,91 @@ function persist(): void {
     const processes = l.processes.filter((p) => p.created)
     if (processes.length) launches.push({ runId: l.runId, projectPath: l.projectPath, agentId: l.agentId, agentName: l.agentName, since: l.since, processes })
   }
-  // A Hive whose agents never left anything writes no file.
-  if (!launches.length && !keptAny) return
-  keptAny = launches.length > 0
-  const data: SavedLeftovers = { version: 1, launches }
-  saving = saving.then(() => writeJsonAtomic(savedFile(), data)).catch((e) => log.warn('could not keep the list of processes agents left running', e))
+  saving = saving
+    .then(() => readRecords())
+    .then(() => {
+      const any = launches.length > 0 || endedRuns.length > 0
+      // A Hive whose agents never left anything writes no file.
+      if (!any && !keptAny) return
+      keptAny = any
+      const data: SavedLeftovers = { version: 1, launches, ...(endedRuns.length ? { ended: endedRuns } : {}) }
+      return writeJsonAtomic(savedFile(), data)
+    })
+    .catch((e) => log.warn('could not keep the list of processes agents left running', e))
+}
+
+/**
+ * A run whose processes Hive saw end but whose slot writer couldn't be released (HI-1886: its workspace closed first):
+ * kept, so a later start settles that writer once this Hive has gone.
+ */
+export function keepRunEnded(run: string): void {
+  void readRecords().then(() => {
+    if (endedRuns.includes(run)) return
+    endedRuns = [...endedRuns, run].slice(-MAX_RUN_RECORDS)
+    persist()
+  })
+}
+
+/** How long Hive's quit waits for the stopped launches' jobs to be seen empty (HI-1886), and how often it looks. */
+const QUIT_LOOK_MS = 5000
+const QUIT_LOOK_EVERY_MS = 250
+
+/**
+ * Hive quitting (HI-1886): the runs seen ended are kept for a later start, so their slot writers are settled if their
+ * releases aren't written before Hive exits. Those already known (`ended`), and the launches whose CLI hasn't been seen
+ * to exit yet, or whose job is being looked at: their jobs looked at until empty, for at most QUIT_LOOK_MS. A job seen
+ * empty is the proof, as when a CLI exits (its whole membership: what its processes started joined it), and only from the
+ * helper that held it as the look began; one not seen empty by then, or lost meanwhile, is kept for nothing, so its
+ * writer stays held. Before the kept list's last write.
+ */
+export async function recordEndedLaunches(): Promise<void> {
+  await readRecords()
+  const ended = [...outcomes].filter(([, o]) => o === 'ended').map(([r]) => r)
+  const pending = new Set([...running.keys(), ...looking.keys()].filter((r) => !outcomes.has(r)))
+  const until = Date.now() + QUIT_LOOK_MS
+  // Only the helper holding their jobs can say they're empty (HR2's round 2): one started in its place has none of them
+  // and lists any as empty. The look stops once it changes, and a run settled meanwhile (lost: `unknown`) is let go.
+  const helper = host.instance
+  const tracked = (run: string): boolean => host.instance === helper && (running.has(run) || looking.has(run)) && !outcomes.has(run)
+  // No helper as it begins: nothing can be seen empty.
+  if (helper !== null) {
+    scan: while (pending.size) {
+      for (const run of [...pending]) {
+        if (!tracked(run)) {
+          if (host.instance !== helper) break scan
+          // Settled meanwhile: kept if its own look saw it end.
+          if (outcomes.get(run) === 'ended') ended.push(run)
+          pending.delete(run)
+          continue
+        }
+        const list = await listJob(run).catch(() => null)
+        if (host.instance !== helper) break scan
+        if (!emptyJob(list) || !tracked(run)) continue
+        pending.delete(run)
+        ended.push(run)
+      }
+      if (!pending.size || Date.now() >= until) break
+      await new Promise((r) => setTimeout(r, QUIT_LOOK_EVERY_MS))
+    }
+  }
+  endedRuns = [...new Set([...endedRuns, ...ended])].slice(-MAX_RUN_RECORDS)
+  if (ended.length || pending.size) log.info(`Kept ${ended.length} ended run(s) for their slot writers as Hive quits${pending.size ? `; ${pending.size} launch(es) not seen to end` : ''}`)
+  persist()
+}
+
+/** Whether this profile kept that an earlier Hive's run was seen to end (HI-1886): its job seen empty. */
+export async function endedEarlier(run: string): Promise<boolean> {
+  await readRecords()
+  return endedRuns.includes(run)
+}
+
+/** An earlier run's record is no longer needed: the slot writer it was kept for is settled (HI-1886). */
+export function forgetEarlierRun(run: string): void {
+  void readRecords().then(() => {
+    if (!endedRuns.includes(run)) return
+    endedRuns = endedRuns.filter((r) => r !== run)
+    persist()
+  })
 }
 
 /** Once the kept list is written (Hive quitting). */
