@@ -67,6 +67,8 @@ function idle(agentId: string): { status: string } {
 // Its doorbell (#650: the task's id, never its text, which the agent reads with hive_inbox).
 const prompted = (): boolean => pty.typed.join('').includes('New in your inbox: 1 task')
 const submitted = (): boolean => pty.typed.includes('\r')
+// A write of Backspaces only: how Hive takes back a line it stopped in Claude Code (HI-1974).
+const backspaces = (d: string): boolean => /^\x7f+$/.test(d)
 
 describe('a Start typed into a running agent', () => {
   beforeAll(async () => {
@@ -118,7 +120,14 @@ describe('a Start typed into a running agent', () => {
     const { error, card } = await startWith('d2', user)
     expect(error).toMatch(/is working/)
     expect(submitted()).toBe(false)
-    expect(pty.typed.at(-1)).toBe('\x15')
+    // Claude Code's Ctrl+U deletes only one wrapped row, so what Hive typed is taken back with a Backspace for each
+    // character, eight to a write (HI-1974): never fewer than it typed, and nothing else after them.
+    const back = pty.typed.findIndex(backspaces)
+    const typedText = pty.typed.slice(1, back).join('')
+    expect(typedText).toContain('New in your inbox')
+    expect(pty.typed.slice(back).every((d) => backspaces(d) && d.length <= 8)).toBe(true)
+    expect(pty.typed.slice(back).join('').length).toBeGreaterThanOrEqual([...typedText].length)
+    expect(pty.typed.lastIndexOf('\x15')).toBe(0)
     expect([card.column, card.agent]).toEqual(['review', 'd2'])
   })
 
@@ -137,6 +146,7 @@ describe('a Start typed into a running agent', () => {
     expect(submitted()).toBe(false)
     // Nothing cleared after the prompt began: the user's text stays where they typed it.
     expect(pty.typed.lastIndexOf('\x15')).toBe(0)
+    expect(pty.typed.some((d) => d.includes('\x7f'))).toBe(false)
     expect([card.column, card.agent]).toEqual(['review', 'd3'])
   })
 
