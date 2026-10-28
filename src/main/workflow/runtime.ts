@@ -439,10 +439,32 @@ export class Workflow {
    * back in Todo or on hold.
    */
   currentCards(): Map<string, { card: CardRecord; s: CardState }> {
+    // Read again only once the board has committed something (HI-1909: each agent's PreToolUse asks); never in a write.
+    const token = this.store.readToken()
+    if (token !== null && this.current?.token === token) return new Map(this.current.cards)
+    const cards = this.readCurrentCards()
+    if (token !== null) this.current = { token, cards }
+    return new Map(cards)
+  }
+
+  /**
+   * One agent's current card (currentCards), working out that agent's alone (HI-1909: each lock event asked for every
+   * agent's, a card state each, to take one).
+   */
+  currentCard(agent: string): { card: CardRecord; s: CardState } | undefined {
+    const token = this.store.readToken()
+    if (token !== null && this.current?.token === token) return this.current.cards.get(agent)
+    return this.readCurrentCards(agent).get(agent)
+  }
+
+  private current: { token: string; cards: Map<string, { card: CardRecord; s: CardState }> } | null = null
+
+  /** The current cards (currentCards), with `only` that agent's alone. */
+  private readCurrentCards(only?: string): Map<string, { card: CardRecord; s: CardState }> {
     const last = new Map<string, Fact>()
     for (const f of this.store.factsOfKind(['Started', 'Adopted'])) { // i18n-ignore: fact kinds, not text
       const b = (f.data as FactData['Started']).builder
-      if (b && b !== 'user') last.set(b, f)
+      if (b && b !== 'user' && (only === undefined || b === only)) last.set(b, f)
     }
     const out = new Map<string, { card: CardRecord; s: CardState }>()
     for (const [b, f] of last) {
@@ -462,10 +484,10 @@ export class Workflow {
    * Returns whether anything was written.
    */
   async recordLocks(agent: string, paths: string[], seen: LockSeen): Promise<boolean> {
-    const first = this.currentCards().get(agent)
+    const first = this.currentCard(agent)
     if (!first || ('card' in seen && (first.card.id !== seen.card || first.s.cycle !== seen.cycle))) return false
     return this.write(first.card, null, agentActor(agent), (w) => {
-      const now = this.currentCards().get(agent)
+      const now = this.currentCard(agent)
       if (!now || now.card.id !== first.card.id || now.s.cycle !== first.s.cycle) return false
       // Seen when the cards weren't read: only a card started before then.
       const startedAt = 'at' in seen ? this.store.facts(now.card.id).find((f) => f.seq === now.s.cycle)?.at : null

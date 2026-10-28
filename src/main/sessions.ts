@@ -4768,8 +4768,10 @@ class SessionManager {
     observer.markEdits(files)
     if (mode === 'off') return this.editAccepted(id, files, null)
     const now = Date.now()
+    // Each file's identity resolved once (HI-1909: a realpath on main's thread each, three times a file before).
+    const keys = new Map(files.map((abs) => [abs, lockKey(abs)]))
     for (const abs of files) {
-      const held = this.locks.get(lockKey(abs))
+      const held = this.locks.get(keys.get(abs)!)
       const holder = held && held.liveId !== id ? this.live.get(held.liveId) : undefined
       if (!holder || now - held!.at >= LOCK_TTL_MS) continue
       const rel = placeRelative(holder.state.cwd, abs) || basename(abs)
@@ -4777,11 +4779,11 @@ class SessionManager {
       log.info(`Lock: ${userText(l.state.agentName)} → ${userText(rel)} held by ${userText(who)} (${mode})`)
       if (mode === 'warn') {
         // i18n-ignore: the lock's reply to the agent (agent-facing)
-        return this.editAccepted(id, files, l.adapter.lockReply({ kind: 'warn', context: `Note: ${who} is also editing ${rel} right now. Check the file's current content before changing it, and keep your edit small.` }))
+        return this.editAccepted(id, files, l.adapter.lockReply({ kind: 'warn', context: `Note: ${who} is also editing ${rel} right now. Check the file's current content before changing it, and keep your edit small.` }), keys)
       }
       if (mode === 'ask' && !l.adapter.descriptor.capabilities.lockAsk) {
         // The CLI can't show its own approval for this, so Hive asks the user and the agent waits.
-        const key = `${id}|${lockKey(abs)}`
+        const key = `${id}|${keys.get(abs)!}`
         if (this.lockAllowed.has(key)) continue
         if (!this.lockAsked.has(key)) {
           this.lockAsked.set(key, ++this.lockSeq)
@@ -4805,21 +4807,22 @@ class SessionManager {
     }
     let fresh = false
     for (const abs of files) {
-      const key = lockKey(abs)
+      const key = keys.get(abs)!
       const held = this.locks.get(key)
       if (!held || held.liveId !== id) fresh = true
       this.locks.set(key, { liveId: id, at: now, seq: ++this.lockSeq, path: abs })
     }
     if (fresh) this.publishLocks(id)
-    return this.editAccepted(id, files, null)
+    return this.editAccepted(id, files, null, keys)
   }
 
   /**
    * An edit going ahead (every file in it): the files need no go-ahead any more, whoever held them meanwhile (the
    * holder may have finished before the retry). Returns `reply`.
    */
-  private editAccepted<T>(id: string, files: string[], reply: T): T {
-    for (const abs of files) this.lockGoAhead.delete(`${id}|${lockKey(abs)}`)
+  private editAccepted<T>(id: string, files: string[], reply: T, keys?: ReadonlyMap<string, string>): T {
+    // None waiting (nearly always): no file's identity to resolve.
+    if (this.lockGoAhead.size) for (const abs of files) this.lockGoAhead.delete(`${id}|${keys?.get(abs) ?? lockKey(abs)}`)
     return reply
   }
 

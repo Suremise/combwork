@@ -19,7 +19,7 @@ import { usageFile, type SessionId, type SessionMeta, type StoredSession } from 
 import type { IngestJob, IngestResult, KeptJob, ReadResult, ReadSeed, RollUpResult, WorkerReply, WorkerRequest } from './usageWorker'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
 import { isAdmitted, ownerOf, refusedOpen } from './openingFence'
-import { realPath } from './fsutil'
+import { realPathAsync } from './places'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 
 const log = createLogger('usage')
@@ -302,8 +302,9 @@ class UsageHistory {
     // workspace's place are resolved once, as the request enters (#1456): the worker is sent that file, never the
     // spelling (a junction pointed elsewhere while this waits for the worker would take it to another workspace's), and
     // the place admits it, records the file and closes it. A close is sent a file recorded so, resolved again never.
+    // Resolved off main's thread (HI-1909: a few ms each, on every request under load); admitted only after it.
     const spelt = body.type === 'close' ? null : 'file' in body ? body.file : body.type === 'read' ? (body.seed?.file ?? null) : null
-    const file = spelt ? realPath(spelt) : null
+    const file = spelt ? await realPathAsync(spelt) : null
     const place = file ? ownerOf(file, true) : null
     if (file) body = body.type === 'read' && body.seed ? { ...body, seed: { ...body.seed, file } } : ({ ...body, file } as Body)
     const admitted = (b: Body): Body => {

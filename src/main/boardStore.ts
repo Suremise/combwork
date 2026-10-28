@@ -353,6 +353,8 @@ interface Board {
   detached: boolean
   /** Which opening of a board this is, in this process (HI-1715): a window's cursor on another opening's marks is void. */
   generation: number
+  /** Changes this process committed to it, quiet ones too (HI-1909): `boardReadToken`'s part for this process's writes. */
+  commits: number
 }
 
 /** Boards opened so far in this process: each opening's `generation`. */
@@ -755,6 +757,7 @@ function openBoard(path: string, upgrade: boolean): Board {
       leases: 0,
       detached: false,
       generation: ++openings,
+      commits: 0,
       poll: setInterval(() => pollOther(key), POLL_MS),
       presence: setInterval(() => markPresent(hive), HEARTBEAT_MS)
     }
@@ -879,6 +882,22 @@ export function boardRevision(ws: WorkspaceService): string {
   return `${dbGenerationAt(b.place)}:${(b.version.get() as { data_version: number }).data_version}:${b.revision}`
 }
 
+/**
+ * A token for what is committed to the board now (HI-1909), for a cache of what is read from it: it moves on with every
+ * commit, a quiet one (no tasks-changed) too, another process's (the writer's `data_version`), and a database replaced
+ * or opened again, moved as the commit ends, before anything told of it runs. Null inside a write, whose reads see its
+ * own changes, and inside a read's snapshot, which may be older: nothing read there may be cached or served from a
+ * cache. The same token twice: nothing was committed between.
+ */
+export function boardReadToken(ws: WorkspaceService): string | null {
+  const path = pathOf(ws)
+  if (inWrite(keyOf(path))) return null
+  const b = boardOf(path)
+  // Inside a read's snapshot (readSnapshot), which may be older than what the token would name.
+  if (b.db.reader.isTransaction) return null
+  return `${b.generation}:${dbGenerationAt(b.place)}:${(b.version.get() as { data_version: number }).data_version}:${b.commits}`
+}
+
 /** The lanes were saved (storeTables.ts, in this process): the board's revision moves on. */
 export function noteLanesSaved(path: string): void {
   const b = boards.get(keyOf(path))
@@ -991,6 +1010,9 @@ export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>, 
       if (!db.isTransaction) throw lostChange()
       timedCommit(db, b.db.file)
       committed = true
+      // Read tokens move on at once (boardReadToken): what runs after the commit (its events, afterBoardWrite) reads it.
+      const cb = boards.get(key)
+      if (cb) cb.commits++
       return out
     } catch (e) {
       state.changed = false
@@ -1608,6 +1630,26 @@ export function cardHeadDocs(ws: WorkspaceService, o: { done?: boolean } = {}): 
     const field = (k: string): string => `'${k}', doc -> '$.${k}'`
     const rows = db.prepare(`SELECT number, json_object(${HEAD_FIELDS.map(field).join(', ')}) AS doc FROM cards WHERE ${where} ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
     return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+  })
+}
+
+/**
+ * The heads (cardHeadDocs) of the live cards at revision `since` or above (every live card's when null), with every live
+ * card's number, the board's mark and its opening, from one snapshot (HI-1909: the readers of each board change, read
+ * again only for the cards it touched, as holdChanges does for the usage history). Null on a board with no revisions (a
+ * 0.9 board waiting for its upgrade): cardHeadDocs reads it whole.
+ */
+export function headChanges(ws: WorkspaceService, since: number | null): { generation: number; mark: number; live: number[]; docs: { number: number; doc: Record<string, unknown> }[] } | null {
+  return readSnapshot(ws, (b, db) => {
+    if (b.legacy) return null
+    const mark = (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g // i18n-ignore: SQL
+    const live = (db.prepare('SELECT number FROM cards WHERE archived = 0 ORDER BY number').all() as { number: number }[]).map((r) => r.number) // i18n-ignore: SQL
+    // The changed ones' numbers by the revision's index alone, then those cards by number (a condition on archived, or
+    // readCardRows' ORDER BY, makes SQLite scan every card, each row read whole: decisionChanges), archived ones dropped.
+    const changed = since === null ? null : (db.prepare('SELECT number FROM cards WHERE rev >= ?').all(since) as { number: number }[]).map((r) => r.number) // i18n-ignore: SQL
+    const sel = changed ? { numbers: changed } : { where: 'archived = 0' } // i18n-ignore: SQL
+    const docs = changed?.length === 0 ? [] : cardFields(db, HEAD_FIELDS, { ...sel, parts: [] }).filter(({ r }) => r.card.archived === 0)
+    return { generation: b.generation, mark, live, docs: docs.map(({ r, fields }) => ({ number: r.card.number, doc: fields })) }
   })
 }
 

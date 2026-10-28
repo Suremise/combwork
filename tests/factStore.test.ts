@@ -184,6 +184,75 @@ describe('the fact store in hive.db (#1215)', () => {
     expect((store.workspaceDb(ws).reader.prepare('SELECT count(*) AS n FROM deliveries WHERE action = ?').get(id) as { n: number }).n).toBe(1)
   })
 
+  it("the board's facts are read again after any commit, another connection's too, and never kept in a write (HI-1909)", async () => {
+    const { ws, w } = await workspace()
+    const facts = FactStore.forBoard(w, scope)
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Kept', project: 'p' }, user))).number
+    const seen = (dedupe: string) => ({ kind: 'HeadMoved' as const, actor: 'outside' as const, source: 'observed' as const, dedupe, data: { line: 'main', from: null, to: dedupe } })
+    expect(factsOf(facts, card)).toEqual([])
+    // A copy each time: changing one read leaves the next as it was.
+    facts.facts(card).push({} as never)
+    expect(factsOf(facts, card)).toEqual([])
+    // Another connection's commit (another Hive's): read again.
+    const other = FactStore.open(store.boardFile(ws), scope)
+    stores.push(other)
+    other.tx((tx) => tx.appendObserved(card, seen('a')))
+    expect(factsOf(facts, card)).toEqual(['HeadMoved'])
+    // This board's own write: what it appends is read inside it, and after it commits.
+    await store.boardWrite(w, async () => {
+      expect(facts.readToken()).toBeNull()
+      facts.tx((tx) => tx.appendObserved(card, seen('b')))
+      expect(factsOf(facts, card)).toEqual(['HeadMoved', 'HeadMoved'])
+    })
+    expect(facts.readToken()).not.toBeNull()
+    expect(factsOf(facts, card)).toEqual(['HeadMoved', 'HeadMoved'])
+    expect(facts.factsOfKind(['HeadMoved']).map((f) => f.data)).toEqual([{ line: 'main', from: null, to: 'a' }, { line: 'main', from: null, to: 'b' }])
+  })
+
+  it('what runs after a commit reads it, quiet writes too, and a change undone keeps what was read (HI-1909, HR5 r1)', async () => {
+    const { w } = await workspace()
+    const facts = FactStore.forBoard(w, scope)
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))).number
+    const seen = (dedupe: string) => ({ kind: 'HeadMoved' as const, actor: 'outside' as const, source: 'observed' as const, dedupe, data: { line: 'main', from: null, to: dedupe } })
+    expect(factsOf(facts, card)).toEqual([])
+    let after: string[] = []
+    await store.boardWrite(w, async () => {
+      facts.tx((tx) => tx.appendObserved(card, seen('a')))
+      store.afterBoardWrite(w, () => void (after = factsOf(facts, card)))
+    })
+    expect(after).toEqual(['HeadMoved'])
+    // A quiet write (no tasks-changed: written straight, as a quiet store write is) moves the token on too.
+    await store.boardWrite(w, async () => {
+      store.boardWriteOp(w, (db) => db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, dedupe, data) VALUES (?, 2, 'HeadMoved', ?, 'outside', 'observed', 'b', ?)").run(card, new Date().toISOString(), JSON.stringify(seen('b').data)))
+    })
+    expect(factsOf(facts, card)).toEqual(['HeadMoved', 'HeadMoved'])
+    // Undone: nothing committed, and the facts read stay what is there.
+    await expect(
+      store.boardWrite(w, async () => {
+        facts.tx((tx) => tx.appendObserved(card, seen('c')))
+        throw new Error('undone')
+      })
+    ).rejects.toThrow('undone')
+    expect(factsOf(facts, card)).toEqual(['HeadMoved', 'HeadMoved'])
+  })
+
+  it("a read's snapshot neither fills the cache nor is served from it: another connection's commit during it is read after (HI-1909, HR5 r1)", async () => {
+    const { ws, w } = await workspace()
+    const facts = FactStore.forBoard(w, scope)
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Snapshot', project: 'p' }, user))).number
+    const other = FactStore.open(store.boardFile(ws), scope)
+    stores.push(other)
+    expect(factsOf(facts, card)).toEqual([])
+    store.boardRead(w, (db) => {
+      db.prepare('SELECT count(*) FROM card_facts').get()
+      other.tx((tx) => tx.appendObserved(card, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: 'snap', data: { line: 'main', from: null, to: 'snap' } }))
+      expect(facts.readToken()).toBeNull()
+      // The snapshot's own view: before the other commit.
+      expect(factsOf(facts, card)).toEqual([])
+    })
+    expect(factsOf(facts, card)).toEqual(['HeadMoved'])
+  })
+
   it('two Hives (two connections) observing one transition write it once; the loser reads what is there', async () => {
     const { ws, w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Observed', project: 'p' }, user))).number

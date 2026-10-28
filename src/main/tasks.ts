@@ -31,7 +31,7 @@ import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, STAGE_CATEGORY, type AskAction
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
-import { afterBoardWrite, archiveBatchDocs, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, type CardQuery } from './boardStore'
+import { afterBoardWrite, archiveBatchDocs, boardReadToken, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, headChanges, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, type CardQuery } from './boardStore'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
@@ -410,7 +410,55 @@ export async function liveCardHeads(ws: WorkspaceService, o: { done?: boolean } 
   if (!ws.path) return []
   const ids = await ws.projectIds()
   if (!ws.path) return []
-  return sortCards(cardHeadDocs(ws, o).map(({ number, doc }) => clean(doc as Partial<TaskCard> & { projectId?: unknown }, number, ids)))
+  return sortCards(liveHeadDocs(ws, o).map(({ number, doc }) => ({ ...cleanHead(doc, number, ids) })))
+}
+
+/** Each head as cleaned, kept while its document read and the project ids are the ones it was cleaned with (HI-1909). */
+const cleanHeads = new WeakMap<Record<string, unknown>, { ids: ProjectIdIndex; card: TaskCard }>()
+
+function cleanHead(doc: Record<string, unknown>, number: number, ids: ProjectIdIndex): TaskCard {
+  const kept = cleanHeads.get(doc)
+  if (kept?.ids === ids) return kept.card
+  const card = clean(doc as Partial<TaskCard> & { projectId?: unknown }, number, ids)
+  cleanHeads.set(doc, { ids, card })
+  return card
+}
+
+type HeadDocs = ReturnType<typeof cardHeadDocs>
+
+/**
+ * The live cards' heads as read (HI-1909: each board change had its readers, the Doing cards' records, loop checks,
+ * watches and the fresh-start nudge, read every live card's each, ~1 ms of main's thread a time): kept by number, with
+ * the board's mark, and read again after a commit only for the cards at that mark or above (headChanges); until the
+ * board commits again, the readers share the lists (`token`, boardReadToken), the Done ones taken from all of them.
+ * Never kept or read from in a write.
+ */
+const headReads = new WeakMap<WorkspaceService, { token: string; generation: number; mark: number; heads: Map<number, Record<string, unknown>>; all?: HeadDocs; done?: HeadDocs }>()
+
+function liveHeadDocs(ws: WorkspaceService, o: { done?: boolean }): HeadDocs {
+  const token = boardReadToken(ws)
+  if (token === null) return cardHeadDocs(ws, o)
+  let kept = headReads.get(ws)
+  if (kept?.token !== token) {
+    const was = kept
+    let read = headChanges(ws, was?.mark ?? null)
+    if (read && was && read.generation !== was.generation) read = headChanges(ws, null)
+    if (!read) {
+      headReads.delete(ws)
+      return cardHeadDocs(ws, o)
+    }
+    const fresh = new Map(read.docs.map((d) => [d.number, d.doc]))
+    const heads = new Map<number, Record<string, unknown>>()
+    for (const n of read.live) {
+      const doc = fresh.get(n) ?? (read.generation === was?.generation ? was.heads.get(n) : undefined)
+      if (doc) heads.set(n, doc)
+    }
+    headReads.set(ws, (kept = { token, generation: read.generation, mark: read.mark, heads }))
+  }
+  const k = kept
+  k.all ??= [...k.heads].map(([number, doc]) => ({ number, doc }))
+  if (!o.done) return k.all
+  return (k.done ??= k.all.filter((d) => (d.doc as { column?: unknown }).column === 'done'))
 }
 
 /** A card's place on the board: all that placing another card needs of it (#458). */
