@@ -5,6 +5,29 @@ import type { AssistantAction, AssistantChangeGroup, AssistantChangeRow } from '
  * they came from, with the Assistant's actions of each message that aren't changes, and the line each change is said with.
  */
 
+/** The most actions the panel keeps. */
+export const ACTIONS_KEPT = 200
+
+/**
+ * The panel's actions with one more told by an event: added at the end (the newest), the oldest beyond ACTIONS_KEPT
+ * dropped; one it has already, by id (told twice, or in a snapshot loaded since it was told, HI-1863), leaves them as
+ * they are.
+ */
+export function withAction(actions: readonly AssistantAction[], action: AssistantAction): AssistantAction[] {
+  if (actions.some((a) => a.id === action.id)) return actions as AssistantAction[]
+  return [...actions, action].slice(-ACTIONS_KEPT)
+}
+
+/**
+ * The panel's actions once a snapshot of them is loaded: the snapshot's, then those the panel was told of since that it
+ * doesn't have (none older than its newest), so a snapshot and the events around it neither drop nor repeat one (HI-1863).
+ */
+export function withSnapshot(actions: readonly AssistantAction[], snapshot: readonly AssistantAction[]): AssistantAction[] {
+  const ids = new Set(snapshot.map((a) => a.id))
+  const newest = snapshot.reduce((t, a) => (a.at > t ? a.at : t), '')
+  return [...snapshot, ...actions.filter((a) => !ids.has(a.id) && a.at >= newest)].slice(-ACTIONS_KEPT)
+}
+
 /** Whether undo can still do something for a change: it can be undone and isn't yet (a failed attempt stays offered). */
 export const undoable = (c: AssistantChangeRow): boolean => c.kind !== 'final' && !c.undoneAt
 

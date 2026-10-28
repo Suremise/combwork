@@ -25,6 +25,7 @@ import { Sidebar } from './components/Sidebar'
 import { TitleBar } from './components/TitleBar'
 import { enabledProviders } from '@shared/providers'
 import { tipsState } from '@shared/tips'
+import { withAction } from '@shared/assistantChangeList'
 import { CornerPlacement, TipCard, TipsDialog } from './components/Tips'
 import { applyTipsState, showTodaysTip } from './tips'
 import { startupReplay } from './startupReplay'
@@ -98,7 +99,8 @@ function handleEvent(e: HiveEvent): void {
       const ws = movesShown.keep(e.workspace)
       // Another workspace in this window: its Assistant panel shows as that workspace left it, and its board.
       const other = ws?.path !== get().workspace?.path
-      if (other) set({ assistantOpen: assistantWasOpen(ws?.path), tasks: [], boardProject: null, taskOpen: null, taskStartFor: null, laneStartFor: null, taskDoing: null })
+      // Another workspace's Assistant actions go: its panel loads this one's (and keeps those told meanwhile, HI-1863).
+      if (other) set({ assistantOpen: assistantWasOpen(ws?.path), assistantActions: [], tasks: [], boardProject: null, taskOpen: null, taskStartFor: null, laneStartFor: null, taskDoing: null })
       if (other) void loadLeftovers()
       if (other) void loadAdvanced()
       // Drop warnings about projects that belong to a workspace that is no longer open.
@@ -251,7 +253,11 @@ function handleEvent(e: HiveEvent): void {
     case 'assistant-activity': {
       // One action each: a message changing many cards sends many at once, shown together with the agents' states (HI-1863).
       const action = e.action
-      setWithLive((s) => ({ assistantActions: [...s.assistantActions, action].slice(-200) }))
+      // By id: one the panel's snapshot brought meanwhile isn't added twice (HR3's HI-1863 round 1).
+      setWithLive((s) => {
+        const actions = withAction(s.assistantActions, action)
+        return actions === s.assistantActions ? {} : { assistantActions: actions }
+      })
       // What it changed is kept for undo as it is made (#1283): the panel's list follows, read again once per burst.
       reloadAssistantChanges()
       break

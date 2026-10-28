@@ -9,6 +9,7 @@ import { agentOpenRun, runWords } from '@shared/progress'
 import { columnName } from '@shared/tasks'
 import { agentProvider, providerDescriptor } from '@shared/providers'
 import type { AgentInfo, AgentPatch, EffortLevel, PermissionMode, ModeInfo, ProgressRun, ProjectInfo, ProviderId } from '@shared/types'
+import { withSnapshot } from '@shared/assistantChangeList'
 import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
@@ -288,7 +289,8 @@ export function AssistantPanel() {
     if (!ws) return
     // Another workspace opened before this loaded: its own load is on the way.
     let current = true
-    void Promise.all([call('assistant:actions'), call('assistant:questions')]).then(([assistantActions, assistantQuestions]) => current && set({ assistantActions, assistantQuestions }))
+    // Those told by events meanwhile are kept, never twice (HI-1863).
+    void Promise.all([call('assistant:actions'), call('assistant:questions')]).then(([snapshot, assistantQuestions]) => current && set((s) => ({ assistantActions: withSnapshot(s.assistantActions, snapshot), assistantQuestions })))
     // Its changes kept for undo (#1283), by message.
     void loadAssistantChanges()
     return () => {

@@ -3,7 +3,8 @@
 // changes; the line a change is said with; and the reasons a change can't be undone read back as codes the window words.
 import { describe, expect, it } from 'vitest'
 import { finalWhys, UNDO_FINAL, type UndoFinalWhy } from '../src/shared/assistantActivity'
-import { lineOf, messageGroups, undoable } from '../src/shared/assistantChangeList'
+import { ACTIONS_KEPT, lineOf, messageGroups, undoable, withAction, withSnapshot } from '../src/shared/assistantChangeList'
+import type { AssistantAction } from '../src/shared/types'
 import type { AssistantAction, AssistantChangeGroup, AssistantChangeRow } from '../src/shared/types'
 
 const change = (id: string, at: string, over: Partial<AssistantChangeRow> = {}): AssistantChangeRow => ({ id, group: 'g1', at, kind: 'card', act: 'update-task', what: 'change #1 on the board', card: 1, fields: ['labels'], ...over })
@@ -56,5 +57,45 @@ describe("the Assistant's changes in its panel (#1283)", () => {
     // A card's change records its reasons joined, in the order it found them.
     expect(finalWhys([UNDO_FINAL.decision, UNDO_FINAL.comment, UNDO_FINAL.context].join(' '))).toEqual(['decision', 'comment', 'context'])
     expect(finalWhys('Something Hive says another way.')).toEqual([])
+  })
+})
+
+// The panel's actions (HI-1863): an event's action is shown with the agents' states, a while after it came, so the
+// panel's snapshot (assistant:actions) can be loaded between the two. Applied here in the order the window applies them.
+describe("the panel's actions, told by events and loaded as a snapshot", () => {
+  const act = (id: string, at: string): AssistantAction => ({ id, at, text: id, ok: true })
+  const ids = (list: readonly AssistantAction[]) => list.map((a) => a.id)
+
+  it('an action queued, then a snapshot that has it, then the queue shown: once', () => {
+    const a = act('a', '2026-10-28T03:00:01Z')
+    const queued = (list: AssistantAction[]) => withAction(list, a)
+    // The snapshot (main records it before telling the window) is installed first, the queued append after.
+    const installed = withSnapshot([], [act('z', '2026-10-28T03:00:00Z'), a])
+    expect(ids(queued(installed))).toEqual(['z', 'a'])
+    // Nothing to change: the same list, so the store isn't touched.
+    expect(queued(installed)).toBe(installed)
+  })
+
+  it('told twice: once', () => {
+    const a = act('a', '2026-10-28T03:00:01Z')
+    expect(ids(withAction(withAction([], a), a))).toEqual(['a'])
+  })
+
+  it('a snapshot loaded after newer actions were told keeps them, after its own, in order, none twice', () => {
+    const shown = [act('a', '1'), act('b', '2'), act('c', '3')]
+    // The snapshot was read before c was told: c is kept after it.
+    expect(ids(withSnapshot(shown, [act('a', '1'), act('b', '2')]))).toEqual(['a', 'b', 'c'])
+    // A snapshot with nothing new: its own list.
+    expect(ids(withSnapshot(shown, [act('a', '1'), act('b', '2'), act('c', '3')]))).toEqual(['a', 'b', 'c'])
+    // One older than the snapshot's newest that it doesn't have (cut by its own cap): not brought back out of order.
+    expect(ids(withSnapshot([act('old', '0'), act('b', '2')], [act('b', '2')]))).toEqual(['b'])
+  })
+
+  it('a new action after a snapshot is added at the end; the list keeps the last ACTIONS_KEPT', () => {
+    const snapshot = Array.from({ length: ACTIONS_KEPT }, (_, i) => act(`s${i}`, String(1000 + i)))
+    const list = withAction(withSnapshot([], snapshot), act('new', '9999'))
+    expect(list).toHaveLength(ACTIONS_KEPT)
+    expect(list.at(-1)?.id).toBe('new')
+    expect(list[0].id).toBe('s1')
   })
 })
