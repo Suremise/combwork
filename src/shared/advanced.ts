@@ -330,7 +330,7 @@ export const cliFacing = (d: AdvancedDef): boolean => d.group !== 'hive'
 const HOOKS_TAKEN: Record<string, AdvancedSample> = {
   'claude-code': { from: `${FIX}/turns-claude-2.1.296.json`, version: '2.1.296', text: '"hook_event_name": "PreToolUse"', shows: "Claude Code sending Hive's hooks, PreToolUse too" }, // i18n-ignore: a CLI's recorded text (#367)
   codex: { from: `${FIX}/turns-codex-0.162.1.json`, version: '0.162.1', text: '"hook_event_name": "PreToolUse"', shows: "Codex running Hive's hooks (trusted, so their timeouts match the hashes Hive gave it), PreToolUse too" }, // i18n-ignore: a CLI's recorded text (#367)
-  copilot: { from: `${FIX}/console/copilot.json`, version: '1.0.95', text: '"name": "PreToolUse"', shows: "Copilot sending Hive's hooks from its launch plugin, PreToolUse too" } // i18n-ignore: a CLI's recorded text (#367)
+  copilot: { from: `${FIX}/console/copilot.json`, version: '1.0.105', text: '"name": "PreToolUse"', shows: "Copilot sending Hive's hooks from its launch plugin, PreToolUse too" } // i18n-ignore: a CLI's recorded text (#367)
 }
 
 /** The agents-per-project value's id (#562). */
@@ -2127,7 +2127,7 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 60,
     unit: 's',
     applies: 'now',
-    samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.95', text: '"type": "session.shutdown"', shows: "Copilot stopped by Hive, writing its token totals (session.shutdown) and exiting by itself (exit code 0)" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.105', text: '"type": "session.shutdown"', shows: "Copilot stopped by Hive, writing its token totals (session.shutdown) and exiting by itself (exit code 0)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   // Terminals behave the same in every pane (#737): right-click is Hive's, and this hands it to Copilot instead.
   {
@@ -2431,7 +2431,7 @@ const SOURCES: readonly AdvancedSource[] = [
     default: ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Notification', 'Stop', 'ErrorOccurred', 'PreCompact', 'SessionEnd'], // i18n-ignore: a CLI's hook event names (#698)
     max: 20,
     applies: 'now',
-    samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.95', text: '"hook_event_name": "SessionEnd"' }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.105', text: '"hook_event_name": "SessionEnd"' }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'copilot.hooks.knownFields',
@@ -2442,7 +2442,7 @@ const SOURCES: readonly AdvancedSource[] = [
     default: ['hook_event_name', 'hookEventName', 'session_id', 'sessionId', 'transcript_path', 'transcriptPath', 'cwd', 'permission_mode', 'permissionMode', 'tool_name', 'toolName', 'tool_use_id', 'toolUseId', 'source', 'trigger', 'matcher', 'notification_type', 'model', 'agent_type', 'turn_id', 'timestamp', 'tool_input', 'prompt', 'initial_prompt', 'initialPrompt', 'toolInput', 'toolArgs', 'tool_result', 'toolResult', 'stop_hook_active', 'stop_reason', 'stopReason', 'reason', 'error', 'message', 'title', 'is_recoverable', 'recoverable'],
     max: 80,
     applies: 'now',
-    samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.95', fields: ['cwd', 'hook_event_name', 'session_id', 'timestamp', 'tool_input', 'tool_name'] }, { from: `${FIX}/console/copilot.json`, version: '1.0.95', fields: ['cwd', 'hook_event_name', 'session_id', 'stop_hook_active', 'stop_reason', 'timestamp', 'transcript_path'] }]
+    samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.105', fields: ['cwd', 'hook_event_name', 'session_id', 'timestamp', 'tool_input', 'tool_name'] }, { from: `${FIX}/console/copilot.json`, version: '1.0.105', fields: ['cwd', 'hook_event_name', 'session_id', 'stop_hook_active', 'stop_reason', 'timestamp', 'transcript_path'] }]
   }
 ]
 

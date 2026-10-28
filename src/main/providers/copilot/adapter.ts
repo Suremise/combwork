@@ -43,6 +43,9 @@ export const HIVE_TOOL_NAMES = 'This CLI names the hive tools "hive-<tool>": whe
 /** Copilot's file tools, as its hooks name them (Edit: path, old_str, new_str; Write: path, file_text; 1.0.93). */
 const EDIT_TOOL = /^(edit|write|create|str_replace\w*|multi_?edit)$/i
 
+/** Copilot's tool that asks the user a question: ask_user (message, requestedSchema), which its hooks name AskUserQuestion (1.0.105). */
+const QUESTION_TOOL = /^(ask_user|AskUserQuestion)$/i
+
 /** The hooks.json of the launch's plugin: Hive's hook server for every event, with the launch's token. */
 export function copilotHooks(hookUrl: string, token: string): Record<string, unknown> {
   const hooks: Record<string, unknown[]> = {}
@@ -112,6 +115,11 @@ function mcpServersIn(file: string): Record<string, McpServerDef> {
 export class CopilotAdapter implements ProviderAdapter {
   readonly id = COPILOT
   readonly descriptor = COPILOT_DESCRIPTOR
+  /**
+   * The question an ask_user call asks, per Copilot session, from its PreToolUse until the call ends (HI-1945): from
+   * 1.0.104 its elicitation_dialog Notification says only "Information requested", so the question comes from here.
+   */
+  private readonly questions = new Map<string, string>()
   /**
    * A parent Copilot session's identity, when Hive runs inside one: none known. The sign-in tokens Copilot would use are
    * taken out of Copilot's own environment instead (home.ts COPILOT_ENV_STRIP): this list applies to every child.
@@ -347,6 +355,7 @@ export class CopilotAdapter implements ProviderAdapter {
     }
     const tool = String(body.tool_name ?? '')
     const input = body.tool_input && typeof body.tool_input === 'object' ? body.tool_input : {}
+    const session = out.sessionId ?? ''
     switch (event) {
       case 'SessionStart':
         out.event = { kind: 'start', source: typeof body.source === 'string' ? body.source : null }
@@ -358,10 +367,16 @@ export class CopilotAdapter implements ProviderAdapter {
         out.event = { kind: 'toolStart' }
         const file: unknown = input.path ?? input.file_path
         if (EDIT_TOOL.test(tool) && typeof file === 'string' && file) out.editedPaths = [file]
+        if (QUESTION_TOOL.test(tool) && typeof input.message === 'string' && input.message) {
+          // At most a few sessions ask at once: one never answered (a CLI killed mid-question) mustn't grow it for ever.
+          if (this.questions.size >= 50) this.questions.delete(this.questions.keys().next().value!)
+          this.questions.set(session, input.message)
+        }
         break
       }
       case 'PostToolUse':
       case 'PostToolUseFailure':
+        if (QUESTION_TOOL.test(tool)) this.questions.delete(session)
         out.event = { kind: 'toolEnd' }
         break
       case 'Notification': {
@@ -369,10 +384,11 @@ export class CopilotAdapter implements ProviderAdapter {
         const kind = String(body.notification_type ?? '')
         const message = typeof body.message === 'string' ? body.message : ''
         if (kind === 'permission_prompt') out.event = { kind: 'ask', ask: { kind: 'permission', blocking: true, message: message || 'Copilot asks for permission' } } // i18n-ignore: a status message in the CLI's place, which agents read (GET /v1/projects)
-        else if (kind === 'elicitation_dialog') out.event = { kind: 'ask', ask: { kind: 'question', blocking: true, message: message || 'Copilot asks a question' } } // i18n-ignore: a status message in the CLI's place, which agents read (GET /v1/projects)
+        else if (kind === 'elicitation_dialog') out.event = { kind: 'ask', ask: { kind: 'question', blocking: true, message: this.questions.get(session) || message || 'Copilot asks a question' } } // i18n-ignore: a status message in the CLI's place, which agents read (GET /v1/projects)
         break
       }
       case 'Stop':
+        this.questions.delete(session)
         out.event = { kind: 'stop', lastMessage: typeof body.last_assistant_message === 'string' ? body.last_assistant_message : null }
         break
       case 'ErrorOccurred': {
@@ -388,6 +404,7 @@ export class CopilotAdapter implements ProviderAdapter {
         out.event = { kind: 'compactStart', trigger: String(body.trigger ?? 'auto') }
         break
       case 'SessionEnd':
+        this.questions.delete(session)
         out.event = { kind: 'end' }
         break
     }

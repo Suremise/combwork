@@ -176,6 +176,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **GitHub Copilot 1.0.104 and later: a question shows what it asks.** From 1.0.104, Copilot's notice of a question says only *Information requested*, which Hive showed as the agent's waiting status. Hive now shows the question itself, as with earlier versions (HI-1945).
 - **Starting a card back from Review starts its agent.** Starting a card in Review with its builder stopped (the Assistant's `hive_start_task`, the board's Start) moved the card to Doing and replied *Started*, but never launched the builder or gave it the card, when the card had been built in a slot. Hive now launches the builder with the card and the note, as for a card in Doing (HI-1953).
 - **Loading a template ends the replaced agents' lanes.** A card loop whose builder or reviewer a template's load removed stayed running with nobody on it; it now ends as it does when you remove the agent, and the removed agent's kept terminal output goes with it (HI-1502).
 - **The Progress panel's "runs failed" line stays in sight.** On the Pulse tab it sat under the runs going on, so with several runs it was pushed out of view. It now sits above them, under the merge going on (HI-1923).

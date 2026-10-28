@@ -282,6 +282,13 @@ describe('Copilot hooks', () => {
     expect(h({ hook_event_name: 'Notification', notification_type: 'permission_prompt', title: 'Permission needed', message: 'Run command: New-Item x' }).event).toEqual({ kind: 'ask', ask: { kind: 'permission', blocking: true, message: 'Run command: New-Item x' } })
     expect(h({ hook_event_name: 'Notification', notification_type: 'elicitation_dialog', title: 'Information requested', message: 'Stub asks: pick one' }).event).toEqual({ kind: 'ask', ask: { kind: 'question', blocking: true, message: 'Stub asks: pick one' } })
     expect(h({ hook_event_name: 'Notification', notification_type: 'agent_idle', message: 'Done' }).event).toEqual({ kind: 'ignore' })
+    // From 1.0.104 the dialog's Notification only says "Information requested": the question is ask_user's, from its PreToolUse.
+    const question = (session: string) => h({ hook_event_name: 'Notification', session_id: session, notification_type: 'elicitation_dialog', title: 'Information requested', message: 'Information requested' }).event
+    h({ hook_event_name: 'PreToolUse', session_id: 'q1', tool_name: 'AskUserQuestion', tool_input: { message: 'Which one should I use?', requestedSchema: { type: 'object' } } })
+    expect(question('q1')).toEqual({ kind: 'ask', ask: { kind: 'question', blocking: true, message: 'Which one should I use?' } })
+    expect(question('q2')).toEqual({ kind: 'ask', ask: { kind: 'question', blocking: true, message: 'Information requested' } })
+    h({ hook_event_name: 'PostToolUse', session_id: 'q1', tool_name: 'AskUserQuestion', tool_input: {} })
+    expect(question('q1')).toEqual({ kind: 'ask', ask: { kind: 'question', blocking: true, message: 'Information requested' } })
     // Sent also when Allow all approves the call itself: not a person being asked.
     expect(h({ hookName: 'permissionRequest', toolName: 'powershell' }).event).toEqual({ kind: 'ignore' })
   })
