@@ -78,6 +78,28 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 150)
     check("Review: the row says under review and the revision, the same as the card's Work section", !!(await waitHung(async () => (await chip(line).getAttribute('data-stage')) === 'review' && (await chip(line).locator('[data-under-review]').getAttribute('data-under-review')) === revision)) && work?.revisions?.at(-1)?.revision === revision && (await text(chip(line))).includes(`under review: ${revision.slice(0, 7)}`), await text(chip(line)))
     check('…its copy button holds the whole revision', (await chip(line).locator('[data-copy-revision]').getAttribute('data-copy-revision')) === revision)
     await shoot('2-review')
+    // Its row is the busiest (worktree, card, Review, under review), yet its time and actions stay whole, in the same
+    // place as every other row's, its middle giving way with "…" (HI-1897); at a narrow width too.
+    const rowsFit = () =>
+      page.locator('.git-rows', { has: page.locator('.git-row.git-branch') }).first().evaluate((list) => {
+        const rows = [...list.querySelectorAll('.git-row.git-branch:not(.remote)')]
+        const box = (e) => e.getBoundingClientRect()
+        const out = rows.map((r) => {
+          const rb = box(r)
+          const tail = r.querySelector('.git-row-tail')
+          const parts = [...(tail?.querySelectorAll('button, .git-meta') ?? [])].map(box)
+          const sw = tail?.lastElementChild ? box(tail.lastElementChild) : null
+          return { name: r.dataset.branch, whole: !!tail && parts.every((b) => b.left >= rb.left - 0.5 && b.right <= rb.right + 0.5), switchRight: sw ? Math.round(sw.right) : null, infoCut: (() => { const i = r.querySelector('.git-branch-info'); return !!i && i.scrollWidth > i.clientWidth + 1 })() }
+        })
+        return { rows: out.length, whole: out.every((o) => o.whole), lined: new Set(out.map((o) => o.switchRight)).size === 1, cut: out.filter((o) => o.infoCut).map((o) => o.name) }
+      })
+    const fits = async (cutRow) => { const f = await rowsFit(); return f.rows > 2 && f.whole && f.lined && (!cutRow || f.cut.includes(cutRow)) }
+    check('every row’s time and actions whole and lined up, the busy row’s included', !!(await waitHung(() => fits(null))), JSON.stringify(await rowsFit()))
+    await lib.fitWindow(h.app, page, { width: 900, height: 820 })
+    check('…at a narrow width too, the busy row’s middle cut with … rather than its buttons', !!(await waitHung(() => fits(line))), JSON.stringify(await rowsFit()))
+    check('…its middle’s whole text in its tooltip', !!(await (async () => { await row(line).locator('.git-branch-info').dispatchEvent('mouseover'); return waitHung(async () => (await row(line).locator('.git-branch-info').getAttribute('title') ?? '').includes(`under review: ${revision.slice(0, 7)}`)) })()), await row(line).locator('.git-branch-info').getAttribute('title'))
+    await shoot('2-review-narrow')
+    await lib.fitWindow(h.app, page, { width: 1400, height: 900 })
 
     // --- Passed and merged by the queue: Done, merged as Integrated's revision.
     await q.intent(h, r1, n, 'start-review')
