@@ -70,6 +70,25 @@ const update = (db: Db, table: string, row: Row): void => {
   db.prepare(`UPDATE ${table} SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE host = ? AND id = ?`).run(...cols.map((c) => row[c]!), row.host!, row.id!) // i18n-ignore: SQL
 }
 
+/**
+ * Writes one of a host's saved records as `rec` has it, in its place, only its row or its cards if they changed: `had`,
+ * its text as saved (sessionTexts), read in the same write transaction. A record not of Hive's form, or one not saved,
+ * throws (nothing is written).
+ */
+export function writeSessionRecord(db: Db, host: string, rec: Rec, had: { row: string; cards: string }): void {
+  const id = rec.id as string
+  const saved = db.prepare('SELECT ord FROM sessions WHERE host = ? AND id = ?').get(host, id) as { ord: number } | undefined // i18n-ignore: SQL
+  if (!saved) throw new Error(`no session record with the id ${JSON.stringify(id)} to write: nothing was saved`) // i18n-ignore: a mistake in Hive's code, logged
+  const r = sessionToRows(host, saved.ord, rec)
+  if (!r) throw new Error(`a session record without the fields Hive keeps (${JSON.stringify(id)}): nothing was saved`) // i18n-ignore: as above
+  const now = sessionText(r)
+  if (now.row !== had.row) update(db, 'sessions', r.row)
+  if (now.cards !== had.cards) {
+    db.prepare('DELETE FROM session_cards WHERE host = ? AND session = ?').run(host, id) // i18n-ignore: SQL
+    for (const c of r.cards) insert(db, 'session_cards', c)
+  }
+}
+
 /** What a change of a host's records writes: each list given replaced in its order (a list left out, as it was). */
 export interface SessionsChange {
   sessions: Rec[]

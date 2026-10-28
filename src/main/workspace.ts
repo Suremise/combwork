@@ -25,7 +25,7 @@ import { admit, dismiss, setFenceReason } from './openingFence'
 import { AfterOpen } from './openProgress'
 import { whenAll } from '../shared/atMost'
 import { createLogger, userText } from './logger'
-import { changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
+import { changeSessionRecord, changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
 import { worktreesRoot } from './worktrees'
 import { ensureHiveExcluded, gitDirOf, hiveVcs } from './hiveVcs'
@@ -1309,6 +1309,9 @@ export class WorkspaceService {
 
   /** `created`: fields only a new record takes (a launch's start as its createdAt), never written over an existing one's. */
   async upsertSession(projectPath: string, rec: Partial<SessionRecord> & { id: string }, created?: Partial<SessionRecord>): Promise<SessionRecord> {
+    // A saved record changed by its key alone (HI-1887: most calls, many a turn); a new one with every record, where it's added.
+    const one = await changeSessionRecord(await this.sessionsPlace(projectPath), rec.id, (existing) => Object.assign(existing, rec))
+    if (one.found) return one.value
     return this.mutateSessions(projectPath, (f) => {
       let existing = f.sessions.find((s) => s.id === rec.id)
       if (existing) Object.assign(existing, rec)

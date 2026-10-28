@@ -99,4 +99,16 @@ describe('placing a card on a big board (#458, #1017)', () => {
     const places = await run(() => tasks.boardPlaces(w))
     expect(places).toEqual(all.map((c) => ({ number: c.number, column: c.column, order: c.order, archived: c.archived, project: c.project })))
   })
+
+  it("a column's live cards (a change's short reply, HI-1887): as the whole board read lists them, a card with no known column in To Do's, reading no card", async () => {
+    // Saved with a column Hive doesn't know (a later version's, or by hand): read as To Do.
+    writeCardOutside(wsPath, 11, card(11, { column: 'later' as TaskCard['column'], order: 2 }))
+    for (const column of ['todo', 'review', 'passed', 'hold', 'doing'] as const) {
+      const listed = (await run(() => tasks.listTasks({ column }))).map((c) => c.number)
+      let places: number[] = []
+      expect(await readsOf(async () => void (places = (await run(() => tasks.columnPlaces(w, column))).map((c) => c.number)))).toBe(0)
+      expect(places).toEqual(listed)
+    }
+    expect((await run(() => tasks.columnPlaces(w, 'todo'))).map((c) => c.number)).toContain(11)
+  })
 })

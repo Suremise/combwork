@@ -1577,12 +1577,18 @@ export function cardRevs(ws: WorkspaceService, numbers: readonly number[]): { ge
   })
 }
 
-/** Each card's place fields, from their columns (nothing else of a card read): what placing a card needs (#458). */
-export function cardPlaces(ws: WorkspaceService): { number: number; raw: { column: unknown; order: unknown; archived: boolean; project: unknown; projectId: unknown } }[] {
+/**
+ * Each card's place fields, from their columns (nothing else of a card read): what placing a card needs (#458). With
+ * `live`, only the live cards in its column and those whose column is none of `known` (a reader takes them as To Do's):
+ * where a change's card is in its column (HI-1887: every agent's comment asks).
+ */
+export function cardPlaces(ws: WorkspaceService, live?: { column: string; known: readonly string[] }): { number: number; raw: { column: unknown; order: unknown; archived: boolean; project: unknown; projectId: unknown } }[] {
+  const where = live ? 'archived = 0 AND (col IS NULL OR col = ? OR col NOT IN (SELECT value FROM json_each(?)))' : undefined // i18n-ignore: SQL
+  const args = live ? [live.column, JSON.stringify(live.known)] : []
   return readSnapshot(ws, (b, db) => {
     // Order and archived as the 0.9 index gave them (cardRows.ts): its order a number where the document's was one in another form.
-    if (!b.legacy) return cardFields(db, ['column', 'order', 'project', 'projectId'], { parts: [] }).map(({ r, fields }) => ({ number: r.card.number, raw: { column: fields.column, order: r.card.ord, archived: r.card.archived === 1, project: fields.project, projectId: fields.projectId } }))
-    const rows = db.prepare('SELECT number, col, ord, archived, project, project_id FROM cards').all() as { number: number; col: unknown; ord: unknown; archived: number; project: unknown; project_id: unknown }[] // i18n-ignore: SQL
+    if (!b.legacy) return cardFields(db, ['column', 'order', 'project', 'projectId'], { where, args, parts: [] }).map(({ r, fields }) => ({ number: r.card.number, raw: { column: fields.column, order: r.card.ord, archived: r.card.archived === 1, project: fields.project, projectId: fields.projectId } }))
+    const rows = db.prepare(`SELECT number, col, ord, archived, project, project_id FROM cards${where ? ` WHERE ${where}` : ''}`).all(...args) as { number: number; col: unknown; ord: unknown; archived: number; project: unknown; project_id: unknown }[] // i18n-ignore: SQL
     return rows.map((r) => ({ number: r.number, raw: { column: r.col, order: r.ord, archived: r.archived === 1, project: r.project, projectId: r.project_id } }))
   })
 }

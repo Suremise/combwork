@@ -61,11 +61,12 @@ export const isAdmitted = (place: string): boolean => admitted.has(place)
 /**
  * The workspace a database file is of: the folder holding its nearest `.hive` (by real path; a file not made yet by its
  * nearest existing folder's real location). Only the nearest: a database in a `.hive` of its own further down (under the
- * Assistant's home, say) is that folder's, never the workspace's above it. Null: in no `.hive`.
+ * Assistant's home, say) is that folder's, never the workspace's above it. Null: in no `.hive`. `real`: the file is
+ * already its real location (`realPath`), not resolved again (HI-1887: each usage history request's).
  */
-export function ownerOf(file: string): string | null {
+export function ownerOf(file: string, real = false): string | null {
   const hive = HIVE_DIR.toLowerCase()
-  for (let d = dirname(placeKey(file)); ; ) {
+  for (let d = dirname(real ? file.toLowerCase() : placeKey(file)); ; ) {
     if (basename(d) === hive) return dirname(d)
     const up = dirname(d)
     if (up === d) return null

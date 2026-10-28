@@ -7,7 +7,7 @@ import { placeKey, readKeptJson, writeKeptJson } from './fsutil'
 import { createLogger, userText } from './logger'
 import { keepAsBackup, openTable, readStore, rowKeys, storeValue, withStoreLock, writeStore, type StoreData, type StoreRow } from './storeRows'
 import { transaction, type Db } from './db'
-import { addSessionRecords, countSessions, readDeleted, readDeletedUsage, readSessionRecord, readSessionRecords, removeSessionRecords, sessionTexts, writeSessionRecords } from './schema/sessionDeliveryTables'
+import { addSessionRecords, countSessions, readDeleted, readDeletedUsage, readSessionRecord, readSessionRecords, removeSessionRecords, sessionTexts, writeSessionRecord, writeSessionRecords } from './schema/sessionDeliveryTables'
 import { withMode } from '../shared/defaults'
 import { timedStep } from './stallWork'
 
@@ -233,6 +233,29 @@ export async function changeSessions<T>(place: SessionsPlace, fn: (f: SessionsFi
   return withLeasedDb(resolve(place.workspace), async (db) => {
     await opening(place, db)
     return saveSessions(place, fn)
+  })
+}
+
+/**
+ * Changes one of a host's records by its id, as changeSessions does but reading and writing that record alone (HI-1887:
+ * a running agent's record changes many times a turn, and each change read and compared every record of its host,
+ * hundreds in a long-lived project). `fn` changes it in place (with nothing awaited). Not saved: `fn` isn't called and
+ * the reply is `{ found: false }` (the caller makes it with changeSessions, which can add it).
+ */
+export async function changeSessionRecord<T>(place: SessionsPlace, id: string, fn: (rec: SessionsFile['sessions'][number]) => T): Promise<{ found: true; value: T } | { found: false }> {
+  return withLeasedDb(resolve(place.workspace), async (leased) => {
+    await opening(place, leased)
+    return writeStore(place.workspace, 'sessions', place.scope, (db): { found: true; value: T } | { found: false } => {
+      const saved = readSessionRecord(db, place.scope, id)
+      if (!saved) return { found: false }
+      // Its text as saved, before recordOf's upgrade of an old record (so that upgrade is written), as saveSessions takes it.
+      const had = sessionTexts(place.scope, [saved]).get(id)
+      if (!had) throw new Error(`a saved session record without the fields Hive keeps (${JSON.stringify(id)}): nothing was saved`) // i18n-ignore: a mistake in Hive's code, logged
+      const rec = recordOf(saved)
+      const value = fn(rec)
+      writeSessionRecord(db, place.scope, rec as unknown as Record<string, unknown>, had)
+      return { found: true, value }
+    })
   })
 }
 
