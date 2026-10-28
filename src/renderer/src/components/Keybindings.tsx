@@ -229,6 +229,8 @@ export function KeybindingsEditor({ project }: { project?: ProjectInfo }) {
           pageSizes={ALL_ROWS}
           defaultPageSize={ALL_ROWS[0]}
           rowClassName={(r) => recording === r.c.id && 'recording'}
+          // Its filtered columns come last, after what a narrow editor keeps in view: above it, they are never scrolled away (HI-1878).
+          filtersAbove
           empty={tr(msg({ id: 'settings.keys.noMatch', defaultMessage: 'No commands match.', description: 'The keyboard shortcuts editor when its search finds nothing.' }))}
         />
       </TabPanel>

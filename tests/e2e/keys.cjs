@@ -123,6 +123,9 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await kbTab('session').click()
   check('the Session tab: its commands alone, without the Category column', !!(await lib.until(async () => (await selectedKb()) === 'session' && (await bodyRows()) === session.count && !(await headers()).includes('Category'), HUNG_MS)), JSON.stringify([await selectedKb(), await bodyRows(), await headers()]))
   check('…remembered in the settings', !!(await lib.until(() => configKb('shortcuts') === 'session', HUNG_MS)), String(configKb('shortcuts')))
+  // Its filters above the table (HI-1878): Set's alone, with no Category column to filter.
+  const filterBar = (k) => page.locator(`.kb-table .table-filter-bar [data-filter="${k}"]`)
+  check('…its filters above the table: Set, no Category', (await filterBar('category').count()) === 0 && (await filterBar('source').count()) === 1 && (await page.locator('.kb-table tr.table-filters').count()) === 0)
   await page.screenshot({ path: path.join(scratch, 'keys-tabs-session-dark.png') })
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
   await page.screenshot({ path: path.join(scratch, 'keys-tabs-session-light.png') })
@@ -202,9 +205,10 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
     return { inside: tabs.every((t) => t.left >= l.left - 0.5 && t.right <= l.right + 0.5), scrolls: list.scrollWidth > list.clientWidth + 1, lines: new Set(tabs.map((t) => Math.round(t.top))).size, first: list.querySelector('.hive-tab-label')?.textContent }
   })
   check('German, narrow: the tabs wrap, each whole, none scrolled away', !!(await lib.until(async () => { const f = await tabsFit(); return f.first === 'Alle' && f.inside && !f.scrolls && f.lines > 1 }, HUNG_MS)), JSON.stringify(await tabsFit()))
-  // …and the table: the command and its Shortcut whole beside the sticky actions, Category (kept, with its filter) after
-  // them, reached by scrolling sideways; the filters under their own columns; the sticky cells on the editor's own
-  // surface, the editor hovered (HR5's HI-1838 round 1, the Assistant's screenshot review).
+  // …and the table: the command and its Shortcut whole beside the sticky actions, Category kept after them, reached by
+  // scrolling sideways; its and Set's filters above the table, in view without scrolling, with no empty band under the
+  // headers (HI-1878); the sticky cells on the editor's own surface, the editor hovered (HR5's HI-1838 round 1, the
+  // Assistant's screenshot review).
   const tableFit = () => page.locator('.kb-table').evaluate((t) => {
     const wrap = t.querySelector('.table-wrap')
     const w = wrap.getBoundingClientRect()
@@ -216,18 +220,33 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
     return {
       // The values themselves, row by row: the Shortcut cell may run on under the actions, empty there.
       labelAndKeyWhole: !!label && label.left >= w.left - 0.5 && [...t.querySelectorAll('tbody tr')].slice(0, 8).every((tr) => { const v = tr.querySelector('.kb-key-value')?.getBoundingClientRect(), a = tr.querySelector('td.kb-actions')?.getBoundingClientRect(), n = tr.querySelector('td.kb-label')?.getBoundingClientRect(); return !!v && !!a && !!n && v.right <= a.left + 0.5 && n.left >= w.left - 0.5 }),
-      categoryKept: !!cat && cat.width > 0 && !!t.querySelector('tr.table-filters th.kb-category select'),
+      categoryKept: !!cat && cat.width > 0,
       categoryInView: !!cat && !!actions && cat.left >= w.left - 0.5 && cat.right <= actions.left + 0.5,
-      aligned: shownCells('thead tr:first-child') === shownCells('thead tr.table-filters'),
+      filtersAbove: !t.querySelector('tr.table-filters') && ['category', 'source'].every((k) => { const f = t.querySelector(`.table-filter-bar [data-filter="${k}"] select`)?.getBoundingClientRect(); return !!f && f.width > 0 && f.left >= w.left - 0.5 && f.right <= w.right + 0.5 && f.bottom <= w.top + 0.5 }) && shownCells('thead tr:first-child') > 0,
       surface: bg(stickyHead) === bg(document.body) && ['rgba(0, 0, 0, 0)', 'transparent'].includes(bg(t.closest('.setting'))),
       scrolls: wrap.scrollWidth > wrap.clientWidth
     }
   })
   await page.locator('.kb-table tbody tr').first().hover()
-  check('German, narrow: the command and its Shortcut whole beside the actions, Category kept after them, the filters aligned, the sticky cells on the editor’s surface', !!(await lib.until(async () => { const f = await tableFit(); return f.labelAndKeyWhole && f.categoryKept && f.aligned && f.surface }, HUNG_MS)), JSON.stringify(await tableFit()))
+  check('German, narrow: the command and its Shortcut whole beside the actions, Category kept after them, its and Set’s filters above the table in view, the sticky cells on the editor’s surface', !!(await lib.until(async () => { const f = await tableFit(); return f.labelAndKeyWhole && f.categoryKept && f.filtersAbove && f.surface }, HUNG_MS)), JSON.stringify(await tableFit()))
   for (const theme of ['light', 'dark']) {
     await page.evaluate((th) => document.documentElement.setAttribute('data-theme', th), theme)
     check(`…its sticky header on the editor’s surface in the ${theme} theme`, !!(await lib.until(async () => (await tableFit()).surface, HUNG_MS)))
+  }
+  // Usable before any sideways scroll (HI-1878): each filter narrows the rows, and All puts them back; the strip wraps
+  // inside the editor rather than widening it.
+  check('…the filters wrap inside the editor', await page.locator('.kb-editor').evaluate((e) => { const bar = e.querySelector('.table-filter-bar'); return !!bar && bar.scrollWidth <= bar.clientWidth + 1 && e.scrollWidth <= e.clientWidth + 1 }))
+  const allRows = await bodyRows()
+  for (const k of ['category', 'source']) {
+    const select = filterBar(k).locator('select')
+    const pick = await select.locator('option').nth(1).getAttribute('value')
+    await select.selectOption(pick)
+    const col = k === 'category' ? 'td.kb-category' : 'td.kb-source'
+    check(`…its ${k} filter, not scrolled to, keeps only "${pick}"`, !!(await lib.until(async () => { const n = await bodyRows(); const v = await page.locator(`.kb-table tbody ${col}`).allInnerTexts()
+      // Set may have one value here (every shortcut its default): it narrows nothing, and every row is still its.
+      return n > 0 && (k === 'source' || n < allRows) && v.every((c) => k === 'category' ? c.trim() === pick : (c.trim() || pick) === pick) }, HUNG_MS)) && (await page.locator('.kb-table .table-wrap').evaluate((w) => w.scrollLeft)) === 0, String(await bodyRows()))
+    await select.selectOption('')
+    check(`…and All shows every row again`, !!(await lib.until(async () => (await bodyRows()) === allRows, HUNG_MS)), String(await bodyRows()))
   }
   if ((await tableFit()).scrolls) {
     await page.locator('.kb-table .table-wrap').evaluate((w) => (w.scrollLeft = w.scrollWidth))
@@ -261,6 +280,10 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   check('recorded Ctrl+Alt+Y', s.keybindings['view.notifications'] === 'Mod+Alt+Y', JSON.stringify(s.keybindings))
   check('row shows Changed', /Changed/.test(await row.innerText()))
   await page.screenshot({ path: path.join(scratch, 'keys-1-settings.png') })
+  // Wide, both themes (HI-1878: the filters above the table).
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
+  await page.screenshot({ path: path.join(scratch, 'keys-1-settings-light.png') })
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
   await page.locator('.settings-top input.input').first().click()
   await page.keyboard.press('Control+Alt+Y'); await lib.until(async () => (await page.locator('.notif-panel').count()) === 1, HUNG_MS)
   check('new shortcut works', await page.locator('.notif-panel').count() === 1)
@@ -295,6 +318,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await lib.openProjectSettings(page)
   await page.locator('.settings-nav .row, .psettings-nav .row, .row', { hasText: 'Keyboard Shortcuts' }).first().click(); await lib.until(async () => (await page.locator('.kb-table').innerText().catch(() => '')).includes('Go to Files'), HUNG_MS)
   check('project editor lists only project/session commands', !(await page.locator('.kb-table').innerText()).includes('Toggle Sidebar') && (await page.locator('.kb-table').innerText()).includes('Go to Files'))
+  check('…its Category and Set filters above the table', (await filterBar('category').count()) === 1 && (await filterBar('source').count()) === 1 && (await page.locator('.kb-table tr.table-filters').count()) === 0)
   const projectTabs = await kbTabs()
   check('…its tabs: All, Project and Session, All chosen (its own remembered tab)', JSON.stringify(projectTabs.map((t) => [t.id, t.selected])) === JSON.stringify([['all', true], ['project', false], ['session', false]]), JSON.stringify(projectTabs))
   console.log('rows after kb nav', await page.locator('.project-row').count())
