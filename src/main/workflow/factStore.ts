@@ -24,7 +24,8 @@ import type { Ruleset } from '../../shared/workflow/compile'
 import { loadRuleset } from '../../shared/workflow/compile'
 import { newLane, type LaneList } from '../../shared/workflow/laneList'
 import { LOOP_ROUNDS, LOOP_WAIT_HOURS } from '../../shared/lanes'
-import { shellLine, type QueueCommand, type QueueFileSide, type QueueStuck } from '../../shared/workflow/queue'
+import { shellLine, type QueueCommand, type QueueFileSide, type QueuePauseLogged, type QueueStuck } from '../../shared/workflow/queue'
+import { pauseLogged, pauseLogKey, pauseLogOf } from './queueLogs'
 
 /** What the runtime needs of a card: the board's card, with the columns the runtime keeps beside its document. */
 export interface CardRecord {
@@ -677,11 +678,16 @@ export class FactStore {
   setQueuePause(target: string, pause: QueuePause | null, keep = false): boolean {
     const p = this.scope.project
     return this.conn.write((db) => {
-      if (keep && db.prepare('SELECT 1 FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target)) return false
+      const before = db.prepare('SELECT reason, card FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target) as { reason: string; card: string } | undefined
+      if (keep && before) return false
       db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ?').run(p, target)
+      const now = this.now().toISOString()
+      const at = pause ? (pause.at ?? now) : now
+      // Its log (HI-1924), in the same write.
+      this.logPause(db, target, before ?? null, pause ? { reason: pause.reason, card: pause.card, ...(pause.by ? { by: pause.by } : {}), ...(pause.message ? { message: pause.message } : {}), at } : null, now)
       if (!pause) return true
       const st = pause.stuck
-      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid, message, paused_by, paused_at, folder, branch, ref, expected, result, phase) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null, pause.message ?? null, pause.by ?? null, pause.at ?? this.now().toISOString(), st?.folder ?? null, st?.branch ?? null, st?.ref ?? null, st?.expected ?? null, st?.result ?? null, st?.phase ?? null)
+      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid, message, paused_by, paused_at, folder, branch, ref, expected, result, phase) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null, pause.message ?? null, pause.by ?? null, at, st?.folder ?? null, st?.branch ?? null, st?.ref ?? null, st?.expected ?? null, st?.result ?? null, st?.phase ?? null)
       const ins = db.prepare('INSERT INTO workflow_queue_pause_files (project, target, ord, path, side) VALUES (?, ?, ?, ?, ?)')
       // A stuck advance's files are its listed files, each with its side; any other pause's, the files it names.
       if (st) st.files.forEach((f, i) => ins.run(p, target, i, f.path, f.side))
@@ -698,7 +704,27 @@ export class FactStore {
 
   /** Resumes a target's queue only from a pause of this reason, in one write (a pause saved since in its place stays). */
   clearQueuePause(target: string, reason: string): boolean {
-    return this.conn.write((db) => Number(db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ? AND reason = ?').run(this.scope.project, target, reason).changes) > 0)
+    return this.conn.write((db) => {
+      const before = db.prepare('SELECT reason, card FROM workflow_queue_pauses WHERE project = ? AND target = ? AND reason = ?').get(this.scope.project, target, reason) as { reason: string; card: string } | undefined
+      if (!before) return false
+      db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ? AND reason = ?').run(this.scope.project, target, reason)
+      this.logPause(db, target, before, null, this.now().toISOString())
+      return true
+    })
+  }
+
+  /** A target's pause log (HI-1924), newest first. */
+  queuePauseLog(target: string): QueuePauseLogged[] {
+    return pauseLogOf(this.meta(pauseLogKey(target)))
+  }
+
+  /** The pause log after a pause saved or lifted, in the caller's write (`before`: the pause the target had; none, nothing ends). */
+  private logPause(db: DatabaseSync, target: string, before: { reason: string; card: string } | null, pause: Omit<QueuePauseLogged, 'ended'> | null, now: string): void {
+    if (!before && !pause) return
+    const key = this.metaKey(pauseLogKey(target))
+    const had = (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null
+    const log = pauseLogged(pauseLogOf(had), before, pause, now)
+    db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(log))
   }
 
   // --- The queue's runner (#1360): its lease, its processes, its worktrees. Quiet writes: the window shows none of them.

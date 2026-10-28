@@ -280,6 +280,8 @@
   "tips.mergeQueueFolder.title": "Scalanie do folderu, w którym pracujesz",
   "tips.mergeQueuePanel.text": "Zakładka Scalenia w panelu Postęp pokazuje każdą kolejkę scalania: kartę, którą testuje, i ile zwykle trwają jej sprawdzenia, karty, które czekają, oraz kartę, którą zwróciła, dopóki jej nie zobaczysz. Są tam też „Wstrzymaj kolejkę” i „Wznów kolejkę”.",
   "tips.mergeQueuePanel.title": "Śledź kolejkę scalania",
+  "tips.mergeQueueRecent.text": "Pod każdą kolejką scalania na zakładce Scalenia w panelu Postęp sekcja Ostatnie scalenia pokazuje jej ostatnie scalenia, zwroty i wstrzymania, z powodem, czasem i tym, ile każde trwało. Kliknij jedno, aby otworzyć jego kartę.",
+  "tips.mergeQueueRecent.title": "Zobacz, co ostatnio zrobiła kolejka scalania",
   "tips.mergeRebase.text": "Gdy scala Hive, ustaw w Kontrola wersji → Przepływ pracy sposób scalania na Rebase i przewinięcie: kolejka scalania przenosi każdą kartę na gałąź docelową, testuje dokładnie ten wynik i przesuwa do niego gałąź docelową.",
   "tips.mergeRebase.title": "Liniowa historia, bez commitów scalających",
   "tips.mergeSlot.text": "Gdy kilku agentów kończy naraz, każdy zajmuje kolejkę scalania projektu, zanim scali do siebie main, sprawdzi i scali, więc niczyje testy nie muszą się wykonywać dwa razy. Kto ją zajmuje, a kto czeka, widać w Przeglądzie i w panelu Postęp.",

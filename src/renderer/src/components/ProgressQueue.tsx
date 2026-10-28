@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { shortRevision } from '@shared/progress'
-import { justMerged, mergedText, pauseText, pulseLine, queueEstimate, queueNews, queuedText, returnedText, returnRun, returnWhy, runCheckName, shownReturns, testingText } from '@shared/progressQueue'
+import { historyOutcome, historyRows, justMerged, mergedText, pauseText, pauseWhyShort, pulseLine, pushStateText, queueEstimate, queueNews, queuedText, returnedText, returnRun, returnWhy, runCheckName, shownReturns, testingText, type HistoryRow } from '@shared/progressQueue'
 import type { MergeSlotInfo, ProgressRun } from '@shared/types'
-import type { QueueRecent, QueueView } from '@shared/workflow/queue'
+import type { QueuePauseLogged, QueueRecent, QueueView } from '@shared/workflow/queue'
 import { fmt, msg, tr } from '@shared/i18n'
+import { formatDateTime, formatWhen } from '@shared/dates'
 import { attempt } from '../actions'
 import { call } from '../api'
 import { cardLabelOf, confirm, findProject, notify, openVersionControl, set, useLanguage, useStore } from '../store'
-import { cx } from '../util'
+import { cx, timeAgo } from '../util'
 import { minutesText } from './MergeSlots'
 import { MergeCard, useMergeFold } from './ProgressMerge'
 import { Icon, Tooltip } from './ui'
@@ -115,7 +116,7 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
           <ol className="progress-queue-list">
             {v.queued.map((q) => (
               <li key={q.entry} data-entry={q.entry}>
-                <button type="button" className="progress-run-card" title={tr(msg({ id: 'board.queue.openNamed', defaultMessage: 'Open {card}', description: "Tooltip of a queued card's key on a merge queue's card in the Progress panel: opens the card ({card}: its key)." }), { card: q.key })} onClick={() => openCard(q.card)}>
+                <button type="button" className="progress-run-card" title={tr(OPEN_NAMED, { card: q.key })} onClick={() => openCard(q.card)}>
                   {q.key}
                 </button>
                 <span className="progress-queue-title faint">{q.title}</span>
@@ -237,17 +238,149 @@ async function removeFromQueue(n: number, key: string): Promise<void> {
  * The Merges tab (#1356 item 3): the merge queues' cards and the merge slot's, side by side, by project then target (a
  * slot's target is the branch it merges into).
  */
-export function MergesList({ queues, slots, runs, now, projectName, showProject, stepOf }: { queues: QueueView[]; slots: MergeSlotInfo[]; runs: readonly ProgressRun[]; now: number; projectName: (path: string) => string; showProject: boolean; stepOf: (s: MergeSlotInfo) => string | null }) {
+export function MergesList({ queues, slots, runs, now, projectName, showProject, stepOf, agent = null }: { queues: QueueView[]; slots: MergeSlotInfo[]; runs: readonly ProgressRun[]; now: number; projectName: (path: string) => string; showProject: boolean; stepOf: (s: MergeSlotInfo) => string | null; agent?: string | null }) {
   useLanguage()
   const [folded, toggle] = useMergeFold()
   const items = [
-    ...queues.map((v) => ({ key: `q:${v.projectPath}#${v.target}`, project: projectName(v.projectPath), target: v.target, el: <QueueCard key={`q:${v.projectPath}#${v.target}`} view={v} runs={runs} now={now} showProject={showProject} /> })),
+    ...queues.map((v) => ({
+      key: `q:${v.projectPath}#${v.target}`,
+      project: projectName(v.projectPath),
+      target: v.target,
+      el: (
+        <div key={`q:${v.projectPath}#${v.target}`} className="progress-queue-with-history">
+          <QueueCard view={v} runs={runs} now={now} showProject={showProject} />
+          <RecentMerges view={v} runs={runs} now={now} agent={agent} />
+        </div>
+      )
+    })),
     ...slots.map((s) => ({ key: `s:${s.project}#${s.branch}`, project: projectName(s.project), target: s.branch, el: <MergeCard key={`s:${s.project}#${s.branch}`} slot={s} project={projectName(s.project)} showProject={showProject} step={stepOf(s)} now={now} folded={folded} onFold={toggle} /> }))
   ].sort((a, b) => a.project.localeCompare(b.project) || a.target.localeCompare(b.target) || a.key.localeCompare(b.key))
   return (
     <div className="progress-merge full" role="region" aria-label={tr(msg({ id: 'board.merge.region', defaultMessage: 'Merging', description: "Accessible name of the top of the Progress panel: a card for each merge going on." }))}>
       {items.map((i) => i.el)}
     </div>
+  )
+}
+
+const H = {
+  recent: msg({ id: 'board.queue.recent.heading', defaultMessage: 'Recent merges', description: "A heading under a merge queue's card in the Progress panel's Merges tab (HI-1924): the queue's latest outcomes (merged, returned, taken out) and pauses follow, newest first." }),
+  none: msg({ id: 'board.queue.recent.none', defaultMessage: 'No merges yet.', description: "Under Recent merges in the Progress panel's Merges tab, when the merge queue has merged, returned or paused nothing yet (or nothing of the agent the panel is filtered to)." }),
+  more: msg({ id: 'board.queue.recent.more', defaultMessage: 'More in Version Control', description: "A link after a merge queue's Recent merges in the Progress panel: its full history, in the project's Version Control tab (Merge queue section). Version Control is a place in Hive." }),
+  took: msg({ id: 'board.queue.recent.took', defaultMessage: 'took {duration}', description: "Beside an outcome in the Progress panel's Recent merges: how long the merge queue took over the card, its merge checks and merge ({duration}: “12 min”, “under a minute”). Lower case." }),
+  lasted: msg({ id: 'board.queue.recent.lasted', defaultMessage: 'lasted {duration}', description: "Beside a pause in the Progress panel's Recent merges: how long the merge queue stayed paused ({duration}: “12 min”, “under a minute”). Lower case." }),
+  still: msg({ id: 'board.queue.recent.stillPaused', defaultMessage: 'still paused', description: "Beside a pause in the Progress panel's Recent merges: the merge queue is paused now (the pause hasn't ended). Lower case." })
+}
+
+const OPEN_NAMED = msg({ id: 'board.queue.openNamed', defaultMessage: 'Open {card}', description: "Tooltip of a queued card's key on a merge queue's card in the Progress panel: opens the card ({card}: its key)." })
+
+/**
+ * A queue's Recent merges (HI-1924), under its card in the Merges tab: its latest outcomes and pauses, newest first
+ * (`historyRows`), the panel's agent filter applied by each card's agent; each row opens its card. From the queue's model,
+ * which the window reads again on each queue change: nothing of its own to read, and nothing drawn while the tab is hidden.
+ */
+export function RecentMerges({ view: v, runs, now, agent }: { view: QueueView; runs: readonly ProgressRun[]; now: number; agent: string | null }) {
+  useLanguage()
+  const tasks = useStore((s) => s.tasks)
+  const agentOf = (pick: (t: (typeof tasks)[number]) => boolean): string | null => tasks.find(pick)?.agent ?? null
+  const keep = agent ? { number: (n: number) => agentOf((t) => t.number === n) === agent, key: (k: string) => agentOf((t) => t.key?.toLowerCase() === k.toLowerCase()) === agent } : undefined
+  const { rows, more } = historyRows(v, keep)
+  const label = tr(H.recent)
+  return (
+    <section className="progress-queue-history" aria-label={label} data-queue-history={`${v.project}#${v.target}`}>
+      <div className="progress-queue-history-h">{label}</div>
+      {rows.length ? (
+        <ol className="progress-queue-history-list">
+          {rows.map((row) => (
+            <HistoryItem key={row.key} view={v} row={row} runs={runs} now={now} />
+          ))}
+        </ol>
+      ) : (
+        <div className="progress-queue-line faint" data-history-empty="">
+          {tr(H.none)}
+        </div>
+      )}
+      {more && (
+        <button type="button" className="progress-queue-link" data-action="more-history" onClick={() => openVersionControl(v.projectPath, 'queue')}>
+          {tr(H.more)} <Icon name="arrow-right" />
+        </button>
+      )}
+    </section>
+  )
+}
+
+/** When a row happened: its time (with the date when not today), and how long ago on hover. */
+function When({ at, now }: { at: string; now: number }) {
+  return (
+    <span className="progress-queue-when faint" title={`${timeAgo(at)} · ${formatDateTime(at)}`}>
+      {formatWhen(at, new Date(now))}
+    </span>
+  )
+}
+
+function HistoryItem({ view: v, row, runs, now }: { view: QueueView; row: HistoryRow; runs: readonly ProgressRun[]; now: number }) {
+  if (row.kind === 'pause') return <PauseItem view={v} p={row.p} now={now} />
+  const r = row.r
+  const outcome = historyOutcome(r, r.outcome === 'returned' ? returnWhyText(v, r, runs) : '', tr)
+  const push = pushStateText(r.push, tr)
+  return (
+    <li className="progress-queue-history-row opens" data-entry={r.entry} data-outcome={r.outcome} data-push={r.push} onClick={() => openCard(r.card)}>
+      <div className="progress-queue-history-top">
+        <Icon name={r.outcome === 'merged' ? 'pass' : r.outcome === 'returned' ? 'error' : 'circle-slash'} className="progress-queue-icon" />
+        <button
+          type="button"
+          className="progress-run-card"
+          title={tr(OPEN_NAMED, { card: r.key })}
+          onClick={(e) => {
+            e.stopPropagation()
+            openCard(r.card)
+          }}
+        >
+          {r.key}
+        </button>
+        <span className="progress-queue-title faint" title={r.title}>
+          {r.title}
+        </span>
+        <When at={r.at} now={now} />
+      </div>
+      <div className="progress-queue-history-detail">
+        <span className="progress-queue-outcome" title={outcome}>
+          {outcome}
+        </span>
+        {r.outcome === 'merged' && r.result && <RevisionButton revision={r.result} />}
+        {push && <span className={cx('progress-queue-push', r.push !== 'pushed' && 'faint')}>{push}</span>}
+        {r.tookMs !== undefined && <span className="faint">{tr(H.took, { duration: minutesText(r.tookMs) })}</span>}
+      </div>
+    </li>
+  )
+}
+
+function PauseItem({ view: v, p, now }: { view: QueueView; p: QueuePauseLogged; now: number }) {
+  const n = useStore((s) => (p.card ? (s.tasks.find((t) => t.key?.toLowerCase() === p.card.toLowerCase())?.number ?? null) : null))
+  const full = pauseText({ reason: p.reason, card: p.card || null, files: [], by: p.by ?? null, at: p.at, ...(p.message ? { message: p.message } : {}) }, v.target, tr, list)
+  return (
+    <li className={cx('progress-queue-history-row', 'pause', n !== null && 'opens')} data-pause={p.reason} data-ended={p.ended ? '' : undefined} onClick={n !== null ? () => openCard(n) : undefined}>
+      <div className="progress-queue-history-top">
+        <Icon name="debug-pause" className="progress-queue-icon" />
+        {n !== null && (
+          <button
+            type="button"
+            className="progress-run-card"
+            title={tr(OPEN_NAMED, { card: p.card })}
+            onClick={(e) => {
+              e.stopPropagation()
+              openCard(n)
+            }}
+          >
+            {p.card}
+          </button>
+        )}
+        <span className="progress-queue-outcome" title={full}>
+          {pauseWhyShort(p, tr)}
+        </span>
+        <When at={p.at} now={now} />
+      </div>
+      <div className="progress-queue-history-detail faint">{p.ended ? tr(H.lasted, { duration: minutesText(Date.parse(p.ended) - Date.parse(p.at)) }) : tr(H.still)}</div>
+    </li>
   )
 }
 

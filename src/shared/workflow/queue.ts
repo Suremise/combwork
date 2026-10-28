@@ -61,7 +61,36 @@ export interface QueueRecent {
   log?: string
   /** returned: when the user saw it (ISO; #1356, the window's model only): until then it shows on its queue's card. */
   seen?: string
+  /**
+   * How long the queue took over it (HI-1924, the window's model only): from its first merge check's start (or, with
+   * none, its merge's) to the outcome. Left out when nothing began for it, or old facts can't say.
+   */
+  tookMs?: number
+  /** merged by Hive (HI-1924, the window's model only): its push (G18), as recorded; left out where nothing is to say. */
+  push?: QueuePushState
 }
+
+/**
+ * A merge's push (G18, HI-1924): pushed; owed and not yet (`pending`); not pushed because pushing was turned off
+ * (`off`) or the target no longer had it (`reset`); `unknown`: none recorded (a merge before Hive recorded pushes),
+ * said while the project pushes now.
+ */
+export type QueuePushState = 'pushed' | 'pending' | 'off' | 'reset' | 'unknown'
+
+/** A pause of a target's queue as its log keeps it (HI-1924): why, on which card, by whom, when, and when it was lifted. */
+export interface QueuePauseLogged {
+  reason: string
+  /** Its card's key ('' : a pause of the queue itself). */
+  card: string
+  by?: 'user' | 'assistant'
+  message?: string
+  at: string
+  /** When it was lifted (ISO); left out while it holds. */
+  ended?: string
+}
+
+/** How many pauses, and how many settled pushes, a target's logs keep (HI-1924: the panel's history, as RECENT_MAX). */
+export const QUEUE_LOG_MAX = 20
 
 /** Where a listed file of a begun advance stands (#1351): its index and working copy at the expected revision, at the result, or neither. */
 export type QueueFileSide = 'expected' | 'result' | 'other'
@@ -142,6 +171,8 @@ export interface QueueView {
   returns: QueueRecent[]
   /** How many returns not seen yet are beyond `returns` (the window's model only): they come as the kept ones fold. */
   returnsMore: number
+  /** Its latest pauses, newest first, at most QUEUE_LOG_MAX (HI-1924; the window's model only). */
+  pauses: QueuePauseLogged[]
   /** The project's current options have Hive merge into this target (#1356; the window's model only). */
   hiveMerges: boolean
   /**
@@ -155,9 +186,9 @@ export interface QueueView {
  * A queue as the Agent API gives it (GET /v1/queue, hive_queue): no folder (a stuck advance's folder neither), and whether
  * an outcome has a log, not the log.
  */
-export type QueuePublic = Omit<QueueView, 'projectPath' | 'recent' | 'returns' | 'returnsMore' | 'paused' | 'hiveMerges' | 'inFlight'> & {
+export type QueuePublic = Omit<QueueView, 'projectPath' | 'recent' | 'returns' | 'returnsMore' | 'paused' | 'hiveMerges' | 'inFlight' | 'pauses'> & {
   paused: (Omit<QueuePauseInfo, 'stuck' | 'message'> & { stuck?: Omit<QueueStuck, 'folder'> }) | null
-  recent: (Omit<QueueRecent, 'log' | 'seen' | 'revision'> & { hasLog?: true })[]
+  recent: (Omit<QueueRecent, 'log' | 'seen' | 'revision' | 'tookMs' | 'push'> & { hasLog?: true })[]
 }
 
 /** How many outcomes a queue's model keeps for the panel. */

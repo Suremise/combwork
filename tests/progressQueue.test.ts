@@ -5,10 +5,10 @@ import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { fmt, setLanguage, tr } from '../src/shared/i18n'
-import { ESTIMATE_OF, JUST_MERGED_MS, RETURN_SEEN_SHOWN_MS, justMerged, keptLive, nextFold, queueKey, withKept, type KeptReturn, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnedText, returnRun, returnWhy, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
+import { ESTIMATE_OF, HISTORY_SHOWN, JUST_MERGED_MS, historyOutcome, historyRows, pauseWhyShort, pushStateText, RETURN_SEEN_SHOWN_MS, justMerged, keptLive, nextFold, queueKey, withKept, type KeptReturn, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnedText, returnRun, returnWhy, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
 import { copiesRunsKey, HIVE_RUNS, NO_RUNS_FILTER, runAgentKey, runMatches, runThing, slotRunsKey, tabBadges } from '../src/shared/progressTabs'
 import type { ProgressRun } from '../src/shared/types'
-import type { QueueRecent, QueueView } from '../src/shared/workflow/queue'
+import { RECENT_MAX, type QueuePauseLogged, type QueueRecent, type QueueView } from '../src/shared/workflow/queue'
 
 const NOW = new Date(2026, 9, 22, 12, 0, 0).getTime()
 const iso = (ms: number): string => new Date(ms).toISOString()
@@ -26,6 +26,7 @@ const view = (over: Partial<QueueView> = {}): QueueView => ({
   recent: [],
   returns: [],
   returnsMore: 0,
+  pauses: [],
   hiveMerges: false,
   inFlight: [],
   ...over
@@ -321,5 +322,46 @@ describe("Hive's runs in the Runs tab (#1356 item 5)", () => {
     expect(runThing(run({ title: 'HI-61 · unit · aaaaaaa' }))).toBe(runThing(run({ title: 'HI-61 · unit · bbbbbbb' })))
     expect(runThing(run())).not.toBe(runThing(run({ command: 'npm run lint' })))
     expect(runThing(run())).not.toBe(runThing(run({ card: 62 })))
+  })
+})
+
+describe("a queue's Recent merges (HI-1924)", () => {
+  const pause = (over: Partial<QueuePauseLogged>): QueuePauseLogged => ({ reason: 'user', card: '', by: 'user', at: iso(NOW - 30_000), ...over })
+
+  it('outcomes and pauses by time, newest first, at most HISTORY_SHOWN; More in Version Control once the model is full', () => {
+    const v = view({
+      recent: [recent({ entry: 'a', at: iso(NOW - 10_000) }), recent({ entry: 'b', outcome: 'returned', reason: 'conflict', at: iso(NOW - 50_000) })],
+      pauses: [pause({ at: iso(NOW - 30_000), ended: iso(NOW - 20_000) })]
+    })
+    const { rows, more } = historyRows(v)
+    expect(rows.map((r) => r.kind)).toEqual(['outcome', 'pause', 'outcome'])
+    expect(more).toBe(false)
+    const full = view({ recent: Array.from({ length: RECENT_MAX }, (_, i) => recent({ entry: `e${i}`, at: iso(NOW - i * 1000) })), pauses: [pause({ at: iso(NOW - 500) })] })
+    const h = historyRows(full)
+    expect(h.rows).toHaveLength(HISTORY_SHOWN)
+    expect(h.rows[0].kind).toBe('outcome')
+    expect(h.rows[1].kind).toBe('pause')
+    expect(h.more).toBe(true)
+    expect(historyRows(view()).rows).toEqual([])
+  })
+
+  it("the agent filter keeps its cards' outcomes and pauses; a pause of the queue itself always shows", () => {
+    const v = view({ recent: [recent({ card: 1, entry: 'x' }), recent({ card: 2, entry: 'y' })], pauses: [pause({ card: 'HI-1' }), pause({ card: 'HI-2', at: iso(NOW - 40_000) }), pause({ card: '', at: iso(NOW - 45_000) })] })
+    const { rows } = historyRows(v, { number: (n) => n === 1, key: (k) => k === 'HI-1' })
+    expect(rows.map((r) => (r.kind === 'outcome' ? r.r.entry : r.p.card))).toEqual(['HI-1', '', 'x'])
+  })
+
+  it('says each outcome, pause and push in a few words', () => {
+    setLanguage('en')
+    expect(historyOutcome(recent({}), '', tr)).toBe('Merged')
+    expect(historyOutcome(recent({ outcome: 'returned', reason: 'conflict', files: ['a.ts'] }), 'conflict in a.ts', tr)).toBe('Returned: conflict in a.ts')
+    expect(historyOutcome(recent({ outcome: 'cancelled', reason: 'removed' }), '', tr)).toBe('Taken out: Remove from queue')
+    expect(historyOutcome(recent({ outcome: 'cancelled', reason: 'somethingNew' }), '', tr)).toBe('Taken out: cancelled')
+    expect(pauseWhyShort({ reason: 'user', by: 'user' }, tr)).toBe('Paused: by you')
+    expect(pauseWhyShort({ reason: 'user', by: 'assistant' }, tr)).toBe('Paused: by the Assistant')
+    expect(pauseWhyShort({ reason: 'pushRejected' }, tr)).toBe('Paused: the remote refused the push')
+    expect(pauseWhyShort({ reason: 'later' }, tr)).toBe('Paused: later')
+    expect(pushStateText(undefined, tr)).toBeNull()
+    expect((['pushed', 'pending', 'off', 'reset', 'unknown'] as const).map((s) => pushStateText(s, tr))).toEqual(['Pushed', 'Not pushed yet', 'Not pushed: pushing was turned off', 'Not pushed: the branch no longer had it', 'Push not recorded'])
   })
 })

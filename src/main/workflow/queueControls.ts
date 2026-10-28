@@ -27,6 +27,7 @@ import type { WorkspaceService } from '../workspace'
 import { MergeQueue } from './mergeQueue'
 import { kickQueue, queueChanged, queueHostsStamp, queueLive } from './queueHost'
 import { queueOrder } from './queueState'
+import { entryTook, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf } from './queueLogs'
 import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import type { CardRecord, QueuePause } from './factStore'
@@ -154,7 +155,9 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
   const lease = store.queueLease(target)
   // The cards in the queue again (queued or testing): their older returns aren't the panel's to show (HR3's #1356 round 3).
   const again = new Set([...open.map((o) => o.card.id), ...(testing ? [testing.card] : [])])
-  const { recent, returns, returnsMore } = recentOutcomes(wf, target, entries, cards, (id) => store.card(id), store.queueSeen(), again, scope ? testSize('HIVE_TEST_QUEUE_RETURNS', RETURNS_MAX) : RETURNS_MAX)
+  const outcomes = recentOutcomes(wf, target, entries, cards, (id) => store.card(id), store.queueSeen(), again, scope ? testSize('HIVE_TEST_QUEUE_RETURNS', RETURNS_MAX) : RETURNS_MAX)
+  const { returns, returnsMore } = outcomes
+  const recent = historyOf(wf, target, outcomes.recent)
   const p = store.queuePause(target)
   return {
     project: basename(projectPath),
@@ -168,9 +171,28 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
     recent,
     returns,
     returnsMore,
+    pauses: store.queuePauseLog(target),
     hiveMerges: scope?.current === target,
     inFlight: scope?.inFlight.get(target) ?? []
   }
+}
+
+/**
+ * The history's own detail for the latest outcomes (HI-1924, the Progress panel's Recent merges): how long the queue took
+ * over each (entryTook) and, for a merge by Hive, its push as recorded (G18). Only these few cards' facts are read.
+ */
+export function historyOf(wf: Workflow, target: string, recent: QueueRecent[]): QueueRecent[] {
+  const facts = new Map<number, Fact[]>()
+  const of = (card: number): Fact[] => facts.get(card) ?? (facts.set(card, wf.store.facts(card)), facts.get(card)!)
+  const pending = new Set(pushPendingOf(wf.store.meta(pushPendingKey(target))).map((p) => p.entry))
+  const settled = new Map(pushLogOf(wf.store.meta(pushLogKey(target))).map((p) => [p.entry, p.state]))
+  const o = wf.cfg.options()
+  const pushesNow = o.platform === 'git' && o.finish === 'hiveMerges' && o.pushTarget === true
+  return recent.map((r) => {
+    const took = r.entry ? entryTook(of(r.card), r.entry) : null
+    const push: QueueRecent['push'] = r.outcome !== 'merged' || r.by !== 'hive' || !r.entry ? undefined : pending.has(r.entry) ? 'pending' : (settled.get(r.entry) ?? (pushesNow ? 'unknown' : undefined))
+    return { ...r, ...(took !== null ? { tookMs: took } : {}), ...(push ? { push } : {}) }
+  })
 }
 
 /**

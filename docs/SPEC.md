@@ -4676,6 +4676,25 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   merged or returned (with why), a queue paused or resumed. The Runs tab's Agent filter has **Hive (merge queue)** for
   Hive's own runs, which fold by card and check like any run. Display only: it follows the queue's state; the controls
   are #1353's.
+  **Recent merges [HI-1924]:** under each queue's card, its latest outcomes (merged with the merge commit, which copies;
+  returned with `returnWhy`; taken out with its reason) and pauses (why in a few words, the sentence as its tooltip; how
+  long it lasted, or still paused), newest first, at most 20, then *More in Version Control* when there may be more.
+  A row has the card's key and title, its time (how long ago on hover) and how long the queue took over the entry: from
+  the start of its first merge check (the queue's `CheckRan` names its `entry`) to the outcome, else from its
+  `IntegrationStarted` (no merge checks), else none (it ended before anything ran; old facts without `entry` count the
+  queue's checks between the entry's request and outcome only when no other entry of the card was open then). With G18
+  on, a Hive merge says Pushed, Not pushed yet, Not pushed (pushing turned off, or the target no longer had it), or Push
+  not recorded (none kept: an older merge), never inferred from an owed push's absence. A click opens the card; the
+  panel's project and agent filters apply (an agent: its cards' rows; a pause on no card always shows); *No merges yet.*
+  when empty. From the queue's model (`queue:list`, read again on each queue change; nothing new to read, nothing
+  drawn while the tab is hidden): `QueueRecent.tookMs` and `push`, and `QueueView.pauses`, window-only (the Agent
+  API's listing is unchanged). Recorded in `board_meta` beside the owed push, no schema step: `queue.pauseLog:<target>`
+  (the newest 20, written in the pause row's own write: a pause begins a row, lifted or replaced it ends; saved again
+  as it was, it carries on), `queue.pushPending:<target>` (each merge owed a push, in the `Integrated` transaction; not
+  bounded, it drains) and `queue.pushLog:<target>` (settled, the newest 20). A push goes by the target's commit read
+  before it, and settles the pending merges captured before it, in the write that clears the owed push: those that
+  commit holds pushed, the rest reset; pushing turned off settles them off; a target without the owed merge settles
+  as reset only those it no longer has (the rest stay pending for the next push); a failed push leaves them pending.
 - **P6** [#1122 c]: stage names in hovers and accessible names over the categories' colours and patterns; the legend
   by stage; Solo shows no lanes section unless a loop runs; links to the Version Control tab; "old rules" marks.
   **Built [#1421]:**

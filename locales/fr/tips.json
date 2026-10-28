@@ -280,6 +280,8 @@
   "tips.mergeQueueFolder.title": "Fusionner dans le dossier où tu travailles",
   "tips.mergeQueuePanel.text": "L’onglet Fusions du panneau Progression montre chaque file de fusion : la carte qu’elle teste et la durée habituelle de ses vérifications, les cartes qui attendent, et une carte qu’elle a renvoyée, jusqu’à ce que tu l’aies vue. Suspendre la file et Reprendre la file y sont aussi.",
   "tips.mergeQueuePanel.title": "Suivre la file de fusion",
+  "tips.mergeQueueRecent.text": "Sous chaque file de fusion, dans l’onglet Fusions du panneau Progression, Fusions récentes liste ses dernières fusions, renvois et suspensions, avec pourquoi, quand et combien de temps chacun a pris. Clique sur l’un d’eux pour ouvrir sa carte.",
+  "tips.mergeQueueRecent.title": "Voir ce que la file de fusion a fait récemment",
   "tips.mergeRebase.text": "Quand Hive fusionne, choisis Rebase et avance rapide comme type de fusion dans Gestion de versions → Flux de travail : la file de fusion rebase chaque carte sur la cible, teste exactement cela, puis avance la cible jusqu’à ce résultat.",
   "tips.mergeRebase.title": "Un historique linéaire, sans commits de fusion",
   "tips.mergeSlot.text": "Quand plusieurs agents terminent en même temps, chacun prend le créneau de fusion du projet avant de fusionner main dans sa branche, de vérifier et de fusionner, pour que personne n’ait à relancer ses vérifications. Qui le détient et qui attend s’affiche dans la Vue d’ensemble et le panneau Progression.",
