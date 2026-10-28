@@ -108,8 +108,9 @@ export function KeybindingsEditor({ project }: { project?: ProjectInfo }) {
   const settings = useStore((s) => s.settings)
   const [query, setQuery] = useState('')
   const [recording, setRecording] = useState<string | null>(null)
-  // A tab clicked while searching narrows the search for as long as it lasts; it isn't remembered (HR5's HI-1838 design check).
-  const [searchTab, setSearchTab] = useState<KeysTab | null>(null)
+  // A tab clicked while searching narrows that search, with the query it was made for; it isn't remembered (HR5's
+  // HI-1838 design check). A changed query drops it (HI-1885, as Advanced's HI-1839).
+  const [clicked, setClicked] = useState<{ query: string; tab: KeysTab } | null>(null)
   const idBase = useId()
   const global: KeybindingOverrides = settings?.keybindings ?? NO_KEYS
   const local: KeybindingOverrides = project?.config.keybindings ?? NO_KEYS
@@ -145,12 +146,13 @@ export function KeybindingsEditor({ project }: { project?: ProjectInfo }) {
   const categories = useMemo(() => [...new Set(rows.map((r) => r.c.category))], [rows])
   const tabIds = useMemo((): KeysTab[] => [ALL, ...categories], [categories])
   const remembered = useRememberedTab<KeysTab>(project ? 'shortcuts.project' : 'shortcuts', tabIds, ALL)
-  // Searching shows All (or the tab clicked meanwhile); cleared, the tab remembered before it is back.
+  // Searching shows All (or the tab clicked during this very query); cleared, the tab remembered before it is back.
   useEffect(() => {
-    if (!q) setSearchTab(null)
+    setClicked((c) => (c && c.query !== q ? null : c))
   }, [q])
-  const tab: KeysTab = q ? (searchTab && tabIds.includes(searchTab) ? searchTab : ALL) : remembered
-  const chooseKeysTab = (id: KeysTab): void => (q ? setSearchTab(id) : chooseTab(project ? 'shortcuts.project' : 'shortcuts', id))
+  const searchTab = q && clicked?.query === q && tabIds.includes(clicked.tab) ? clicked.tab : null
+  const tab: KeysTab = q ? (searchTab ?? ALL) : remembered
+  const chooseKeysTab = (id: KeysTab): void => (q ? setClicked({ query: q, tab: id }) : chooseTab(project ? 'shortcuts.project' : 'shortcuts', id))
   // Each tab's count: its commands, or while searching its matches.
   const count = (id: KeysTab): number => (id === ALL ? matching.length : matching.filter((r) => r.c.category === id).length)
   const shown = tab === ALL ? matching : matching.filter((r) => r.c.category === tab)

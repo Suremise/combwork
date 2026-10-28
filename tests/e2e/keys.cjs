@@ -168,6 +168,13 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await kbTab(withMatches.id).click()
   check('…a category clicked meanwhile shows its matches alone', !!(await lib.until(async () => (await selectedKb()) === withMatches.id && (await bodyRows()) === withMatches.count, HUNG_MS)), String(await bodyRows()))
   check('…and isn’t remembered', configKb('shortcuts') === 'session', String(configKb('shortcuts')))
+  // The click holds for that query only (HI-1885, as Advanced's HI-1839): a changed query, not cleared first, shows All
+  // with its matches, even where the clicked tab has none; back to the first query, still All, the click gone.
+  await kbSearch.fill('compact')
+  check('…a changed query shows All with its matches, not the tab clicked before', !!(await lib.until(async () => { const t = await kbTabs(); return (await selectedKb()) === 'all' && t[0].count > 0 && (await bodyRows()) === t[0].count && t.find((x) => x.id === 'session').count > 0 }, HUNG_MS)), JSON.stringify([await selectedKb(), await bodyRows(), await kbTabs()]))
+  await kbSearch.fill('notifications')
+  check('…and the first query again: All, the old click not revived', !!(await lib.until(async () => (await selectedKb()) === 'all' && (await bodyRows()) === (await kbTabs())[0].count && (await bodyRows()) > withMatches.count - 1 && (await kbTabs())[0].count > 1, HUNG_MS)), JSON.stringify([await selectedKb(), await bodyRows()]))
+  check('…nothing remembered from the search', configKb('shortcuts') === 'session', String(configKb('shortcuts')))
   await kbSearch.fill('')
   check('cleared: the tab remembered before, Session, is back with its commands', !!(await lib.until(async () => (await selectedKb()) === 'session' && (await bodyRows()) === session.count && (await kbTabs())[0].count === t0[0].count, HUNG_MS)), JSON.stringify([await selectedKb(), await bodyRows()]))
   // A clash with a command in another tab: recording it asks, naming the command with its category; the warning says so.
