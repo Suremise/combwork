@@ -244,7 +244,7 @@ const check = (name, ok, extra = '') => {
   // Agent, Change, Role, Coding agent, Model, Effort, Mode; what the template leaves to the defaults marked "(default)".
   const builderCells = await cells(treesWarn, 'Builder')
   const helperCells = await cells(treesWarn, 'Helper')
-  check("…gives each new agent's role, pairing and settings in a row (inherited ones as their default)", builderCells[0] === 'Builder' && builderCells[2] === 'Builder with Helper' && builderCells[3] === 'Claude Code' && builderCells[4] === 'Opus 5.5' && builderCells[5] === 'High' && builderCells[6].endsWith(' (default)') && helperCells[0] === 'Helper checks UI' && helperCells[2] === 'Reviewer with Builder' && helperCells[4] === 'Opus 5.5 (default)' && helperCells[6].endsWith(' (default)'), JSON.stringify([builderCells, helperCells]))
+  check("…gives each new agent's role, pairing and settings in a row (inherited ones as their default)", builderCells[0] === 'Builder' && builderCells[2] === 'Builder paired: Helper' && builderCells[3] === 'Claude Code' && builderCells[4] === 'Opus 5.5' && builderCells[5] === 'High' && builderCells[6].endsWith(' (default)') && helperCells[0] === 'Helper checks UI' && helperCells[2] === 'Reviewer paired: Builder' && helperCells[4] === 'Opus 5.5 (default)' && helperCells[6].endsWith(' (default)'), JSON.stringify([builderCells, helperCells]))
   check('…and nothing of worktrees for the new agents: no Where column, no setup command', (await treesWarn.locator('.template-plan-table thead th').allInnerTexts()).join().toLowerCase() === 'agent,change,role,coding agent,model,effort,mode' && !/own worktree|setup command/.test(tw), tw)
   const planBox = treesWarn.locator('.detail.rich')
   check('the table fits the dialog: no scrolling sideways', await planBox.evaluate((el) => el.scrollWidth <= el.clientWidth + 1))
@@ -442,7 +442,7 @@ const check = (name, ok, extra = '') => {
   const loadButton = crossLoad.getByRole('button', { name: 'Load template' })
   // #1440: the two names alpha's agents have start as free ones, so loading is one click; the others as they are.
   check("each name in the template beside a box for its new one: alpha's two filled in free", JSON.stringify(await fromNames()) === '["Alpha builder","Alpha reviewer","Tree"]' && JSON.stringify(await namesNow()) === '["Alpha builder (beta)","Alpha reviewer (beta)","Tree"]', JSON.stringify([await fromNames(), await namesNow()]))
-  check("…saying why, none marked, Load template ready", (await errors()).length === 0 && /alpha already has agents called Alpha builder, Alpha reviewer: free names are filled in below/.test(await crossLoad.locator('[data-names-taken]').innerText()) && (await loadButton.isEnabled()), JSON.stringify(await errors()))
+  check("…saying why, none marked, Load template ready", (await errors()).length === 0 && /these names are taken already: Alpha builder, Alpha reviewer \(projects: alpha\)\. Free names are filled in below\./.test(await crossLoad.locator('[data-names-taken]').innerText()) && (await loadButton.isEnabled()), JSON.stringify([await errors(), await crossLoad.locator('[data-names-taken]').innerText()]))
   // One edited back to alpha's: marked, saying so, and Load template greyed out.
   await nameInputs.nth(0).fill('Alpha builder')
   check("…one edited to alpha's agent's name is marked, Load template greyed out", !!(await lib.until(async () => JSON.stringify(await errors()) === '["alpha has an agent called Alpha builder."]' && (await loadButton.isDisabled()), HUNG_MS)), JSON.stringify(await errors()))
