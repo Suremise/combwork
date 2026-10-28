@@ -1,5 +1,5 @@
 import { basename, dirname, isAbsolute, join, resolve } from 'path'
-import { realpath } from 'original-fs/promises'
+import { lstat, realpath, stat } from 'original-fs/promises'
 import { git } from '../../git'
 import { encodeProjectPath } from './usage'
 
@@ -54,9 +54,10 @@ export async function memoryBase(cwd: string): Promise<string | null> {
 
 /**
  * The memory folder to give Claude Code on a home whose `projects` folder is a link elsewhere: the session's memory
- * folder by its resolved path, through any link within it too (its project's folder or `memory` itself). Null where
- * `projects` is the home's own folder (Claude Code needs nothing), can't be resolved, or the base can't be told; `base`
- * (memoryBase) is only looked up when needed.
+ * folder by its resolved path, through any link within it too (its project's folder or `memory` itself). A part not made
+ * yet is named as Claude Code would make it. Null where `projects` is the home's own folder (Claude Code needs nothing),
+ * or anything on the way can't be told: a link that doesn't resolve to a folder, a file where a folder goes, the base
+ * unknown. `base` (memoryBase) is only looked up when needed.
  */
 export async function connectionMemoryDir(home: string, base: () => Promise<string | null>): Promise<string | null> {
   const projects = join(home, 'projects')
@@ -64,13 +65,21 @@ export async function connectionMemoryDir(home: string, base: () => Promise<stri
   if (!real || resolve(real).toLowerCase() === resolve(projects).toLowerCase()) return null
   const b = await base()
   if (!b) return null
-  // The deepest part that exists, resolved, and the rest as named: a folder not made yet has no link in it.
   const parts = [memoryKey(b), 'memory']
-  for (let n = parts.length; n > 0; n--) {
-    const at = join(real, ...parts.slice(0, n))
-    const resolved = await realpath(at).catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? undefined : null))
-    if (resolved === null) return null
-    if (resolved) return join(resolved, ...parts.slice(n))
+  let at = real
+  for (let i = 0; i < parts.length; i++) {
+    const next = join(at, parts[i])
+    const st = await lstat(next).catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? undefined : null))
+    // Not there: the rest is made as named. Anything else unreadable: unsure.
+    if (st === undefined) return join(next, ...parts.slice(i + 1))
+    if (st === null) return null
+    if (st.isSymbolicLink()) {
+      // A link (a junction) must lead to a folder; a dangling one isn't a folder not made yet.
+      const to = await realpath(next).catch(() => null)
+      if (!to || !(await stat(to).then((t) => t.isDirectory()).catch(() => false))) return null
+      at = to
+    } else if (st.isDirectory()) at = next
+    else return null
   }
-  return join(real, ...parts)
+  return at
 }

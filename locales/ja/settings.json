@@ -107,6 +107,8 @@
   "settings.advanced.claude-code.hooks.timeoutSeconds.title": "フック：タイムアウト",
   "settings.advanced.claude-code.memory.realPath.desc": "接続の projects フォルダーは Claude Code 自身のフォルダーへのリンクなので、Claude Code はそこにメモリを保存するたびに確認していました。接続上の各 Claude Code エージェントには、プロジェクトの自動メモリフォルダーを実際のパスで渡します。同じフォルダーなので、接続なしの場合と同様に確認せずにメモリを保存します。それ以上は許可されず、Claude Code のファイルには何も書き込まれません。オフにすると、接続上では Claude Code がメモリごとに確認します。",
   "settings.advanced.claude-code.memory.realPath.title": "接続では自動メモリを実際のパスで渡す",
+  "settings.advanced.claude-code.memory.setting.desc": "Claude Code の自動メモリフォルダーを指定する設定です。Hive は接続上でこれを設定し（接続では自動メモリを実際のパスで渡す）、自分で設定している場合はそのままにします。誤っていると、Claude Code はこれを無視し、接続上でメモリごとに確認します。",
+  "settings.advanced.claude-code.memory.setting.title": "自動メモリフォルダーの設定",
   "settings.advanced.claude-code.mouse.rightClickToCli.desc": "Claude Codeのペインでの右クリックは、他のすべてのペインと同じくHiveが処理します。ターミナルの選択範囲があればコピーし、なければ貼り付けます。オンにすると、Hiveは右クリックをClaude Codeに渡します。Claude Codeは入力欄でマウスを使わないため、そこでは右クリックしても何も起きません。コピーと貼り付けはCtrl+CとCtrl+Vで行ってください。",
   "settings.advanced.claude-code.mouse.rightClickToCli.title": "右クリックをClaude Codeに渡す",
   "settings.advanced.claude-code.override.mcpIsolation.desc": "HiveはClaude Codeを--strict-mcp-config付きで起動し、セッションがワークスペースから渡されるMCPサーバーだけを使うようにします。オフにすると、自分のClaude Codeの設定とプロジェクトの.mcp.jsonにあるサーバーも、Hiveの外と同じように一緒に読み込まれます（Claude Codeが先にプロジェクトの新しいサーバーの承認を求めることがあります）。ワークスペースのサーバー（Hive自身のhiveサーバーを含む）は、同じ名前の自分のサーバーより優先されます。",

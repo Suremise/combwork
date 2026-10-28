@@ -1417,6 +1417,16 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions',
     samples: [{ from: `${FIX}/advanced/memory-connection-claude-2.1.312.txt`, version: '2.1.312', text: 'memory saved without asking', shows: "Claude Code on a home whose projects folder is a junction, saving an auto memory with Hive's autoMemoryDirectory and asking without it" }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  {
+    id: 'claude-code.memory.setting',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.memory.setting.title', defaultMessage: 'Auto memory folder setting', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto memory is Claude Code's own notes it keeps per project." }),
+    desc: msg({ id: 'settings.advanced.claude-code.memory.setting.desc', defaultMessage: "The Claude Code setting that names its auto memory folder, which Hive sets on a connection (Auto memory by its real path on connections) and leaves alone where you set it yourself. Wrong, Claude Code ignores it and asks before each memory on a connection.", description: "What the advanced setting \"Auto memory folder setting\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1899). \"Auto memory by its real path on connections\" is another advanced setting's title: keep it as translated there." }),
+    kind: 'field',
+    default: 'autoMemoryDirectory',
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/memory-setting-claude-2.1.312.json`, version: '2.1.312', fields: ['autoMemoryDirectory'] }]
+  },
   // Codex
   {
     id: 'codex.trust.perLaunch',

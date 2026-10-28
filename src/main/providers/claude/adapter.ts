@@ -16,7 +16,7 @@ import { plainHttpsJson } from '../../plainHttpsJson'
 import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
 import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
-import { autoCompactOf, settingsScopes } from './autoCompact'
+import { autoCompactOf, effectiveEnv, settingsScopes } from './autoCompact'
 import { connectionsManaged } from '../../connectionSeam'
 import { hiveStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
 import { MEMORY_ENV_OVERRIDES, connectionMemoryDir, memoryBase } from './memoryDir'
@@ -523,12 +523,15 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // On a connection, its auto memory written without asking, as without one (HI-1899): the home's `projects` is a link,
     // so Claude Code is given the memory folder by its resolved path. Not where something else names the folder.
     const home = ctx.env.CLAUDE_CONFIG_DIR
-    // A settings file Hive can't read may name one too: none then.
-    const named = MEMORY_ENV_OVERRIDES.some((v) => ctx.env[v]) || scopes.some((s) => s.unsure !== undefined || (s.json && typeof s.json === 'object' && (s.json as Record<string, unknown>).autoMemoryDirectory != null))
+    // The launch's environment as Claude Code has it (its settings' env blocks too), and a settings file Hive can't read,
+    // may name one too, or another home: none then.
+    const field = advanced.get<string>('claude-code.memory.setting')
+    const env = effectiveEnv(ctx.env, scopes).env
+    const named = MEMORY_ENV_OVERRIDES.some((v) => env[v]) || (env.CLAUDE_CONFIG_DIR ?? '') !== (home ?? '') || scopes.some((s) => s.unsure !== undefined || (s.json && typeof s.json === 'object' && (s.json as Record<string, unknown>)[field] != null))
     const memoryDir = home && !named && advanced.get<boolean>('claude-code.memory.realPath') ? await connectionMemoryDir(home, () => memoryBase(ctx.cwd)) : null
     // The user's --settings merged in: Hive passes only this file (#330).
     const settings = mergeLaunchSettings({ hooks, statusLine }, theirs, { url: ctx.hookUrl, envVar: 'HIVE_HOOK_TOKEN' })
-    if (memoryDir) settings.autoMemoryDirectory = memoryDir
+    if (memoryDir) settings[field] = memoryDir
     await writeJsonAtomic(join(ctx.privateDir, 'settings.json'), settings)
     await writeJsonAtomic(join(dir, 'sync.json'), { launchedAt: new Date().toISOString(), hashes })
     // Instructions for this launch (the Hive Assistant's, and the Workspace notes note, #1433) are appended to Claude Code's

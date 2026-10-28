@@ -3,6 +3,7 @@
 // the launch that folder by its resolved path (autoMemoryDirectory), only on such a home and only where nothing else
 // names the folder.
 import { execFileSync } from 'child_process'
+import { createRequire } from 'module'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
@@ -14,7 +15,8 @@ import { tempDir } from './tempDir'
 const base = tempDir('hive-connection-memory-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 
-const gitIn = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'pipe' }).toString()
+const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
+const gitIn = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, env: baseEnv(), stdio: 'pipe' }).toString()
 
 /** A connection's home whose `projects` is a junction to the CLI home's, as accounts.ts makes it. */
 function connectionHome(name: string): { home: string; cliProjects: string } {
@@ -76,6 +78,30 @@ describe("a connection's memory folder for the launch", () => {
     expect(await connectionMemoryDir(home, async () => 'D:\\work\\beta')).toBe(join(cliProjects, 'D--work-beta', 'memory'))
   })
 
+  it("is none where a link on the way leads nowhere or a file stands where a folder goes: never a guess", async () => {
+    const { home, cliProjects } = connectionHome('dangling')
+    // The project's folder a junction whose target is gone.
+    const gone = join(base, 'dangling', 'gone-project')
+    mkdirSync(gone)
+    junction(gone, join(cliProjects, 'D--work-alpha'))
+    rmSync(gone, { recursive: true })
+    expect(await connectionMemoryDir(home, async () => 'D:\\work\\alpha')).toBeNull()
+    // memory itself a junction whose target is gone.
+    const goneMemory = join(base, 'dangling', 'gone-memory')
+    mkdirSync(goneMemory)
+    mkdirSync(join(cliProjects, 'D--work-beta'))
+    junction(goneMemory, join(cliProjects, 'D--work-beta', 'memory'))
+    rmSync(goneMemory, { recursive: true })
+    expect(await connectionMemoryDir(home, async () => 'D:\\work\\beta')).toBeNull()
+    // A file named memory.
+    mkdirSync(join(cliProjects, 'D--work-gamma'))
+    writeFileSync(join(cliProjects, 'D--work-gamma', 'memory'), 'x')
+    expect(await connectionMemoryDir(home, async () => 'D:\\work\\gamma')).toBeNull()
+    // A project folder made, its memory not yet: named.
+    mkdirSync(join(cliProjects, 'D--work-delta'))
+    expect(await connectionMemoryDir(home, async () => 'D:\\work\\delta')).toBe(join(cliProjects, 'D--work-delta', 'memory'))
+  })
+
   it("is none on a home with its own projects folder, a junction that can't be resolved, or a base that can't be told", async () => {
     const own = join(base, 'own')
     mkdirSync(join(own, 'projects'), { recursive: true })
@@ -125,6 +151,19 @@ describe("a Claude Code launch's settings on a connection (HI-1899)", () => {
     for (const v of ['CLAUDE_COWORK_MEMORY_PATH_OVERRIDE', 'CLAUDE_CODE_REMOTE_MEMORY_DIR', 'CLAUDE_CODE_PROJECT_DIR_NAME']) {
       expect((await launch(`env-${v}`, { env: { CLAUDE_CONFIG_DIR: home, [v]: 'x' } })).settings.autoMemoryDirectory).toBeUndefined()
     }
+    // The same variables set by a settings file's env, as Claude Code applies them: the user's --settings, the project's,
+    // Claude Code's settings.json on that home; and another home named there.
+    for (const v of ['CLAUDE_COWORK_MEMORY_PATH_OVERRIDE', 'CLAUDE_CODE_REMOTE_MEMORY_DIR', 'CLAUDE_CODE_PROJECT_DIR_NAME']) {
+      expect((await launch(`flag-${v}`, { env: { CLAUDE_CONFIG_DIR: home }, extraArgs: ['--settings', JSON.stringify({ env: { [v]: 'user-chosen-memory' } })] })).settings.autoMemoryDirectory).toBeUndefined()
+      const p = join(base, `proj-${v}-project`)
+      mkdirSync(join(p, '.claude'), { recursive: true })
+      writeFileSync(join(p, '.claude', 'settings.json'), JSON.stringify({ env: { [v]: 'user-chosen-memory' } }))
+      expect((await launch(`proj-${v}`, { env: { CLAUDE_CONFIG_DIR: home } })).settings.autoMemoryDirectory).toBeUndefined()
+    }
+    const own = connectionHome('userenv')
+    writeFileSync(join(own.home, 'settings.json'), JSON.stringify({ env: { CLAUDE_CODE_PROJECT_DIR_NAME: 'user-chosen-memory' } }))
+    expect((await launch('userenv', { env: { CLAUDE_CONFIG_DIR: own.home } })).settings.autoMemoryDirectory).toBeUndefined()
+    expect((await launch('otherhome', { env: { CLAUDE_CONFIG_DIR: home }, extraArgs: ['--settings', JSON.stringify({ env: { CLAUDE_CONFIG_DIR: 'C:\\elsewhere' } })] })).settings.autoMemoryDirectory).toBeUndefined()
     // Settings Hive can't be sure of (--bare may stop Claude Code reading some): none.
     expect((await launch('bare', { env: { CLAUDE_CONFIG_DIR: home }, extraArgs: ['--bare'] })).settings.autoMemoryDirectory).toBeUndefined()
     // The project's own settings.
