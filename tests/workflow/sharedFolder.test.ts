@@ -180,12 +180,14 @@ describe('workflow scenarios, several agents in one folder', () => {
     // B1 starts Y with X unfinished: Y is its current card, and a lock seen on X isn't put on either.
     moved(await e.wf.start(y.key, B1))
     expect([...e.wf.currentCards()].map(([a, c]) => [a, c.card.id])).toEqual([['B1', y.id]])
+    expect([e.wf.currentCard('B1')?.card.id, e.wf.currentCard('B2')]).toEqual([y.id, undefined])
     expect(await e.wf.recordLocks('B1', ['late.txt'], onX)).toBe(false)
     expect(await locked(e.wf, B1, ['one.txt'])).toBe(true)
     expect([e.wf.state(x).locked, e.wf.state(y).locked]).toEqual([['one.txt', 'two.txt'], ['one.txt']])
     // Done: B1 has no current card; X reopened and started again: a new cycle, its record empty.
     expect(await e.wf.move(y.key, 'done', 'user')).toMatchObject({ ok: true })
     expect(e.wf.currentCards().size).toBe(0)
+    expect(e.wf.currentCard('B1')).toBeUndefined()
     expect(await locked(e.wf, B1, ['after.txt'])).toBe(false)
     expect(await e.wf.move(x.key, 'todo', 'user')).toMatchObject({ ok: true })
     moved(await e.wf.start(x.key, B1))

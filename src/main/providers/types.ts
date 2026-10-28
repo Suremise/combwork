@@ -3,6 +3,8 @@ import type { ProviderDescriptor } from '../../shared/providers'
 import type { StartHint } from '../../shared/startFailure'
 import type { SafeguardEvent } from '../../shared/safeguards'
 import type { Text } from '../../shared/advanced'
+import type { TypedNewline } from '../../shared/terminalInput'
+import type { HookListing } from '../../shared/hooks'
 
 export interface LaunchSkill {
   name: string
@@ -18,6 +20,16 @@ export interface SkillDelivery {
   revision: string | null
   problem?: string
   lasting?: true
+}
+
+/** A launch's hooks for its Hooks dialog (HI-982: ProviderAdapter.launchHooks). */
+export interface LaunchHooks {
+  /** As established at launch. */
+  listing: HookListing
+  /** Listed again for the dialog (the CLI's own listing asked now, or its files compared with the launch's); absent: `listing`. */
+  now?(): Promise<HookListing>
+  /** Hive's own hook for each event (its form: http, command), by the event's name: what a hook it received came through. */
+  receivers: Readonly<Record<string, string>>
 }
 
 export interface LaunchContext {
@@ -411,6 +423,11 @@ export interface ProviderAdapter {
   accountSharedTarget?(name: string): string
   /** Whether a file in an account's folder is one that changes when the CLI signs in or out there: watched, never read. */
   accountLoginFile?(name: string): boolean
+  /**
+   * The key Hive presses for a line break in a prompt it types (HI-1327), for the CLI at `version`: one of the
+   * descriptor's `typedNewlines`, as Settings → Advanced chooses it; null: a space (as before). Absent: always a space.
+   */
+  typedNewline?(version: string | null): TypedNewline | null
   /** A connection's sign-in, when it differs from loginCommand (HI-1757: Codex keeps the login in the connection's folder). */
   accountLoginCommand?(executable: string): CommandSpec
   /**
@@ -509,6 +526,12 @@ export interface ProviderAdapter {
    */
   hooksOffIn?(ctx: LaunchContext): string | null
   /**
+   * The launch's hooks for its Hooks dialog (HI-982), once its command is built: Hive's own as passed for it, and the CLI's
+   * others as far as this provider can establish them. Read-only, never changing a hook or a CLI's config. Absent: the
+   * dialog lists none.
+   */
+  launchHooks?(ctx: LaunchContext, cmd: CommandSpec): LaunchHooks
+  /**
    * Details from lines appended to the session's transcript (Codex: model, preset, Plan mode, plan limits). `memo` is
    * the launch's own, kept between reads (and emptied when the reading starts again), for what a later line completes.
    */
@@ -539,6 +562,17 @@ export interface ProviderAdapter {
    * and the terminal's screen as it shows it.
    */
   safeguardAsk?(ask: Ask, screen: string): boolean
+  /**
+   * The question a CLI puts on its screen by itself while idle, sending no hook (HI-1959: Claude Code's offer to teach
+   * auto mode about the environment), from the screen as shown; null when none shows. The agent waits for the user
+   * while it does, and nothing is typed into it: the question takes the keys, and Enter answers it.
+   */
+  idleQuestion?(screen: string): string | null
+  /**
+   * What the CLI's ordinary input holds, from the screen with dim cells blanked (TerminalScreen.textWithoutDim: a hint in
+   * an empty input is dim): '' when empty, null when no ordinary input is drawn (a dialog, a redraw, a blank screen).
+   */
+  promptText?(screen: string): string | null
   /**
    * The installed CLI's models and what each can do (#125), when it can say (null: couldn't, or an unexpected reply).
    * Asking may start the CLI briefly, but never a session, a prompt or a sign-in. env: the sessions' environment.

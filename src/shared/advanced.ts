@@ -176,6 +176,22 @@ export const RESUME_AFTER_UPDATE = 'hive.restart.resumeAfterUpdate'
 /** How long an agent resumed after a restart has to be ready, in seconds (HI-1707): read by main's restartResume. */
 export const RESTART_READY_SECONDS = 'hive.restart.resumeReadySeconds'
 
+/** Agents whose turn a dropped connection ended are resumed once it is back (HI-1612): read by main's outageResume. */
+export const OUTAGE_RESUME = 'hive.outage.resume'
+/** Errors that are never a dropped connection (a usage limit, a sign-in, "overloaded"), whatever a CLI's pattern finds (HI-1612). */
+export const OUTAGE_NOT_CONNECTION = 'hive.outage.notConnection'
+/** The first check for the connection, in seconds, and the longest between two (HI-1612): backing off from one to the other. */
+export const OUTAGE_CHECK_FIRST_SECONDS = 'hive.outage.checkFirstSeconds'
+export const OUTAGE_CHECK_MOST_SECONDS = 'hive.outage.checkMostSeconds'
+/** How long Hive waits for the connection before it gives up, in minutes (HI-1612). */
+export const OUTAGE_WAIT_MINUTES = 'hive.outage.waitMinutes'
+/** The resumes in an hour after which a turn ending on a connection error again stops them (HI-1612). */
+export const OUTAGE_RESUMES_PER_HOUR = 'hive.outage.resumesPerHour'
+/** The address Hive checks for a CLI's connection (HI-1612): its API host. */
+export const outageCheckUrlId = (provider: ProviderId): string => `hive.outage.checkUrl.${provider}`
+/** A CLI's words for a turn that its connection's failure ended (HI-1612): `<provider>.outage.connectionError`. */
+export const outagePatternId = (provider: ProviderId): string => `${provider}.outage.connectionError`
+
 /** The longest one of the merge queue's checks or installs runs, in minutes (#1349): read by main's queueChecks. */
 export const QUEUE_CHECK_MINUTES = 'hive.queue.checkMinutes'
 /** The network error codes that make a failed merge check temporary (#1362): read by queueChecksApp.ts. */
@@ -183,6 +199,10 @@ export const QUEUE_NETWORK_CODES = 'hive.queue.networkCodes'
 
 /** The longest the merge queue's signed merge commit takes before its signer is ended (#1350): read by main's queueHost. */
 export const QUEUE_SIGN_SECONDS = 'hive.queue.signSeconds'
+/** G20 (HI-1367): the parallel jobs the merge queue gives a project's focused-tests runner (HIVE_FOCUSED_JOBS). */
+export const QUEUE_FOCUSED_JOBS = 'hive.queue.focusedJobs'
+/** G20 (HI-1367): the longest a project's focused-tests picker runs, at a submit or at the merge. */
+export const FOCUSED_PICK_SECONDS = 'hive.focused.pickSeconds'
 
 /** Whether the merge queue asks before updating a target checked out in a folder (#1351, OP-40): read by main's queueHost. */
 export const QUEUE_CHECKED_OUT_TARGET = 'hive.queue.checkedOutTarget'
@@ -195,6 +215,9 @@ export const SLOTS_RENAME_ADOPTED = 'hive.slots.renameAdopted'
 
 /** Whether a Done card's line is deleted once its target contains it (#1438): read by main's slotCards. */
 export const SLOTS_DELETE_MERGED = 'hive.slots.deleteMergedLines'
+
+/** How many days after a session ends the usage history keeps its timeline's full detail (HI-1648): read by the usage worker. */
+export const USAGE_TIMELINE_DETAIL_DAYS = 'hive.usage.timelineDetailDays'
 
 /** The longest a slot's setup, install or archive command runs, in minutes (#1429): read by main's slotsApp. */
 export const SLOTS_SETUP_MINUTES = 'hive.slots.setupMinutes'
@@ -214,6 +237,13 @@ export const LANES_END_WAIT_MINUTES = 'hive.lanes.endWaitMinutes'
  * HI-1774).
  */
 export const RETIRED_ADVANCED: ReadonlySet<string> = new Set(['hive.accounts.preview'])
+
+/**
+ * Settings Hive no longer lists but keeps in advanced.json as they are, never listed as unknown, read once more where a
+ * workspace still needs to move them to its own settings: `hive.assistant.otherMcpServers` (HI-1472, each workspace's
+ * Assistant MCP choices).
+ */
+export const LEGACY_ADVANCED: ReadonlySet<string> = new Set(['hive.assistant.otherMcpServers'])
 
 /** Whether reviewers review in review copies (#1435, SPEC §16.10.5): read by main's copiesApp. */
 export const COPIES_REVIEW = 'hive.copies.review'
@@ -254,7 +284,11 @@ export const OSC52_POLICY = 'hive.terminal.osc52'
 /** A card started on an agent is typed as its own words, without Hive's wrapper (#1292, #966 row 30): taskStart's prompt. */
 export const RAW_CARD_START = 'hive.prompt.rawCardStart'
 
-/** The Hive Assistant gets the workspace's other MCP servers, as its home's agents would (#1284, #966 row 7): effectiveHere. */
+/**
+ * The Hive Assistant got every server on in the workspace (#1284, #966 row 7), until HI-1472 gave it a choice of its own
+ * per server in each workspace: no longer listed, but kept in advanced.json (LEGACY_ADVANCED) so a workspace opened
+ * later still moves an "on" to its own choices (workspace.ts's migrateAssistantMcp).
+ */
 export const ASSISTANT_OTHER_MCP = 'hive.assistant.otherMcpServers'
 
 /** Project agents get Hive's guidance with Hive's tools (#1285, #966 row 13): index.ts's hiveGuidance and the hive MCP server. */
@@ -312,7 +346,7 @@ export const cliFacing = (d: AdvancedDef): boolean => d.group !== 'hive'
 const HOOKS_TAKEN: Record<string, AdvancedSample> = {
   'claude-code': { from: `${FIX}/turns-claude-2.1.296.json`, version: '2.1.296', text: '"hook_event_name": "PreToolUse"', shows: "Claude Code sending Hive's hooks, PreToolUse too" }, // i18n-ignore: a CLI's recorded text (#367)
   codex: { from: `${FIX}/turns-codex-0.162.1.json`, version: '0.162.1', text: '"hook_event_name": "PreToolUse"', shows: "Codex running Hive's hooks (trusted, so their timeouts match the hashes Hive gave it), PreToolUse too" }, // i18n-ignore: a CLI's recorded text (#367)
-  copilot: { from: `${FIX}/console/copilot.json`, version: '1.0.95', text: '"name": "PreToolUse"', shows: "Copilot sending Hive's hooks from its launch plugin, PreToolUse too" } // i18n-ignore: a CLI's recorded text (#367)
+  copilot: { from: `${FIX}/console/copilot.json`, version: '1.0.105', text: '"name": "PreToolUse"', shows: "Copilot sending Hive's hooks from its launch plugin, PreToolUse too" } // i18n-ignore: a CLI's recorded text (#367)
 }
 
 /** The agents-per-project value's id (#562). */
@@ -467,6 +501,18 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions'
   },
   {
+    id: 'hive.progress.replySeconds',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.progress.replySeconds.title', defaultMessage: "hive-progress: Hive's reply time", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. hive-progress is the command agents run long commands and checks through: keep it as it is." }),
+    desc: msg({ id: 'settings.advanced.hive.progress.replySeconds.desc', defaultMessage: "How long hive-progress waits for Hive to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Hive is slow. Raise it when a busy Hive makes checks fail with \"Hive is slow to answer\" (HI-1892). Kept at 2 minutes at most.", description: "What the advanced setting \"hive-progress: Hive's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)." }),
+    kind: 'number',
+    default: 15,
+    min: 1,
+    max: 120,
+    unit: 's',
+    applies: 'sessions'
+  },
+  {
     id: 'hive.mcp.connectSeconds',
     group: 'hive',
     title: msg({ id: 'settings.advanced.hive.mcp.connectSeconds.title', defaultMessage: 'hive tools: wait to connect', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
@@ -487,6 +533,18 @@ const SOURCES: readonly AdvancedSource[] = [
     default: 60,
     min: 1,
     max: 600,
+    unit: 's',
+    applies: 'now'
+  },
+  {
+    id: 'hive.lostLine.steadySeconds',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.lostLine.steadySeconds.title', defaultMessage: 'Lost line: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A line: a message Hive typed into an agent's terminal." }),
+    desc: msg({ id: 'settings.advanced.hive.lostLine.steadySeconds.desc', defaultMessage: "A line Hive typed into an agent that its CLI didn't take, gone from its input since (a screen of the CLI's took it): how long its input must stay empty, at its prompt, with nothing taken, before Hive types it again or, with nothing to type again, tells you. Raise it if a slow machine has a line typed twice.", description: 'What the advanced setting "Lost line: wait" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959).' }),
+    kind: 'number',
+    default: 2,
+    min: 1,
+    max: 30,
     unit: 's',
     applies: 'now'
   },
@@ -537,6 +595,100 @@ const SOURCES: readonly AdvancedSource[] = [
     workspace: true,
     applies: 'now'
   },
+  // Resuming agents after a connection drops (HI-1612, Darren's decision: off by default, for everyone).
+  {
+    id: OUTAGE_RESUME,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.resume.title', defaultMessage: 'Resume agents after a connection drops', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.resume.desc', defaultMessage: "When an agent's turn ends because its CLI couldn't reach its API (a router restarting, Wi-Fi dropping), Hive shows it waiting for the connection, checks the CLI's API host now and then, and once it answers tells the agent to rerun what was cut off and carry on. Never for a usage limit, an expired sign-in or an overloaded server. After three resumes in an hour that end the same way, or once the wait's limit passes, Hive stops and says what to try.", description: 'What the advanced setting "Resume agents after a connection drops" does (Settings → Advanced).' }),
+    kind: 'boolean',
+    default: false,
+    applies: 'now'
+  },
+  {
+    id: OUTAGE_WAIT_MINUTES,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.waitMinutes.title', defaultMessage: 'Resuming after a connection drops: wait at most', description: "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"120 min\")." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.waitMinutes.desc', defaultMessage: 'How long Hive waits for the connection to come back before it stops waiting and tells you.', description: 'What the advanced setting "Resuming after a connection drops: wait at most" does (Settings → Advanced).' }),
+    kind: 'number',
+    default: 120,
+    min: 5,
+    max: 1440,
+    unit: 'min',
+    applies: 'now'
+  },
+  {
+    id: OUTAGE_RESUMES_PER_HOUR,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.resumesPerHour.title', defaultMessage: 'Resuming after a connection drops: resumes in an hour', description: "An advanced setting's title (Settings → Advanced), followed by a number." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.resumesPerHour.desc', defaultMessage: "How many times in an hour Hive resumes the same agent. Once its turn ends on a connection error again after that many, Hive stops: the PC's own network may not have recovered.", description: 'What the advanced setting "Resuming after a connection drops: resumes in an hour" does (Settings → Advanced).' }),
+    kind: 'number',
+    default: 3,
+    min: 1,
+    max: 20,
+    applies: 'now'
+  },
+  {
+    id: OUTAGE_CHECK_FIRST_SECONDS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.checkFirstSeconds.title', defaultMessage: 'Resuming after a connection drops: first check after', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"30 s\")." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.checkFirstSeconds.desc', defaultMessage: 'How long after the turn ends Hive first checks the connection. Each check that finds it still down doubles the wait before the next, up to the longest wait below.', description: 'What the advanced setting "Resuming after a connection drops: first check after" does (Settings → Advanced).' }),
+    kind: 'number',
+    default: 30,
+    min: 1,
+    max: 600,
+    unit: 's',
+    applies: 'now'
+  },
+  {
+    id: OUTAGE_CHECK_MOST_SECONDS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.checkMostSeconds.title', defaultMessage: 'Resuming after a connection drops: longest wait between checks', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\")." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.checkMostSeconds.desc', defaultMessage: 'The longest Hive waits between two checks of the connection.', description: 'What the advanced setting "Resuming after a connection drops: longest wait between checks" does (Settings → Advanced).' }),
+    kind: 'number',
+    default: 300,
+    min: 1,
+    max: 3600,
+    unit: 's',
+    applies: 'now'
+  },
+  {
+    id: OUTAGE_NOT_CONNECTION,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.notConnection.title', defaultMessage: 'Resuming after a connection drops: errors that are never a dropped connection', description: "An advanced setting's title (Settings → Advanced), listed under Hive." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.notConnection.desc', defaultMessage: "A failed turn whose error this regular expression finds is never resumed, whatever a CLI's connection error pattern finds: a usage or rate limit, a sign-in, an overloaded server. Resuming wouldn't help those, and could repeat.", description: 'What the advanced setting "Resuming after a connection drops: errors that are never a dropped connection" does (Settings → Advanced).' }),
+    kind: 'pattern',
+    default: String.raw`usage limit|rate.?limit|hit your limit|quota|credit balance|billing|overloaded|\b(?:401|403|429|529)\b|too many requests|log ?in|sign.?in|authenticat|unauthori[sz]ed|forbidden|api key`,
+    flags: 'i',
+    applies: 'now'
+  },
+  {
+    id: outageCheckUrlId('claude-code'),
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.checkUrl.claude-code.title', defaultMessage: 'Resuming after a connection drops: address checked for Claude Code', description: "An advanced setting's title (Settings → Advanced), listed under Hive. Claude Code is a product name." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.checkUrl.claude-code.desc', defaultMessage: "The address Hive asks to see whether Claude Code's connection is back: its API host. Any reply counts, an error page too. An agent on a server connection is checked at its server's address instead.", description: 'What the advanced setting "Resuming after a connection drops: address checked for Claude Code" does (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'https://api.anthropic.com',
+    applies: 'now'
+  },
+  {
+    id: outageCheckUrlId('codex'),
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.checkUrl.codex.title', defaultMessage: 'Resuming after a connection drops: address checked for Codex', description: "An advanced setting's title (Settings → Advanced), listed under Hive. Codex is a product name." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.checkUrl.codex.desc', defaultMessage: "The address Hive asks to see whether Codex's connection is back: its API host. Any reply counts, an error page too.", description: 'What the advanced setting "Resuming after a connection drops: address checked for Codex" does (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'https://chatgpt.com',
+    applies: 'now'
+  },
+  {
+    id: outageCheckUrlId('copilot'),
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.checkUrl.copilot.title', defaultMessage: 'Resuming after a connection drops: address checked for GitHub Copilot', description: "An advanced setting's title (Settings → Advanced), listed under Hive. GitHub Copilot is a product name." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.checkUrl.copilot.desc', defaultMessage: "The address Hive asks to see whether GitHub Copilot's connection is back: its API host. Any reply counts, an error page too.", description: 'What the advanced setting "Resuming after a connection drops: address checked for GitHub Copilot" does (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'https://api.githubcopilot.com',
+    applies: 'now'
+  },
   {
     id: 'hive.progress.lanesShown',
     group: 'hive',
@@ -548,6 +700,34 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 24,
     unit: 'lanes',
+    workspace: true,
+    applies: 'now'
+  },
+  {
+    id: 'hive.lanes.waitYouMinutes',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.lanes.waitYouMinutes.title', defaultMessage: 'Lanes: a long wait for you', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.hive.lanes.waitYouMinutes.desc', defaultMessage: "After how long a lane waiting for you (a request in For you, or a card at its round limit) has its wait marked in the Progress panel's Lanes. Too short marks every wait; too long, a lane can sit unnoticed.", description: 'What the advanced setting "Lanes: a long wait for you" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'number',
+    // HI-1926 (Darren's card): For you over an hour.
+    default: 60,
+    min: 1,
+    max: 1440,
+    unit: 'min',
+    workspace: true,
+    applies: 'now'
+  },
+  {
+    id: 'hive.lanes.waitReviewerMinutes',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.lanes.waitReviewerMinutes.title', defaultMessage: 'Lanes: a long wait for a reviewer', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.hive.lanes.waitReviewerMinutes.desc', defaultMessage: "After how long a lane whose card waits in Review with nobody reviewing it has its wait marked in the Progress panel's Lanes. Too short marks every review; too long, a card can sit unreviewed.", description: 'What the advanced setting "Lanes: a long wait for a reviewer" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'number',
+    // HI-1926 (Darren's card): a reviewer over 15 minutes.
+    default: 15,
+    min: 1,
+    max: 1440,
+    unit: 'min',
     workspace: true,
     applies: 'now'
   },
@@ -627,6 +807,31 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 1440,
     unit: 'min',
+    applies: 'now'
+  },
+  // G20 (HI-1367): how many tests at once a card's focused tests run with at the merge (CPU-friendly: the machine is shared).
+  {
+    id: QUEUE_FOCUSED_JOBS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.queue.focusedJobs.title', defaultMessage: 'Merge queue: focused tests run at once', description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by a number: how many of a card's focused tests (the tests its change needs) the merge queue runs in parallel." }),
+    desc: msg({ id: 'settings.advanced.hive.queue.focusedJobs.desc', defaultMessage: 'How many tests at once the merge queue’s run of a card’s focused tests may use, passed to the project’s command that runs them. More finishes sooner but loads the computer, which agents and your own work share.', description: 'What the advanced setting "Merge queue: focused tests run at once" does, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'number',
+    default: 2,
+    min: 1,
+    max: 16,
+    applies: 'now'
+  },
+  // G20 (HI-1367): a picker past this is ended with its whole tree, and its pick is unknown (never "nothing needed").
+  {
+    id: FOCUSED_PICK_SECONDS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.focused.pickSeconds.title', defaultMessage: 'Focused tests: longest the choice of tests runs', description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in seconds: how long the project's command that chooses a card's focused tests may run, when the card is submitted and at its merge." }),
+    desc: msg({ id: 'settings.advanced.hive.focused.pickSeconds.desc', defaultMessage: 'How long the project’s command that chooses a card’s focused tests may run, when it is submitted and at its merge. Past it, the command is ended and no tests count as chosen: the builder then names them itself.', description: 'What the advanced setting "Focused tests: longest the choice of tests runs" does (Settings → Advanced).' }),
+    kind: 'number',
+    default: 180,
+    min: 10,
+    max: 1800,
+    unit: 's',
     applies: 'now'
   },
   // Which failed merge checks count as the network's (#1362, Darren's decision on #1121): Node's and npm's own error
@@ -869,7 +1074,7 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.hive.prompt.asTyped.title', defaultMessage: 'Send prompts as typed', description: "An advanced setting's title (Settings → Advanced), listed under Hive: the prompts Hive itself types into agents' CLIs." }),
     desc: msg({
       id: 'settings.advanced.hive.prompt.asTyped.desc',
-      defaultMessage: "Hive puts each prompt it types into an agent (a message, a wake, a card's start) on one line: runs of spaces become one, line breaks become spaces, and control characters are left out. Turned on, Claude Code and Copilot get the text as written, spacing and line breaks included. Codex, and a slash command in any CLI, still get each line break and tab as a space: Hive types those key by key, where a line break would send the prompt early and a tab complete a word. Other control characters are left out either way: they would press keys.",
+      defaultMessage: "Hive puts each prompt it types into an agent (a message, a wake, a card's start) on one line: runs of spaces become one, line breaks become spaces, and control characters are left out. Turned on, Claude Code and Copilot get the text as written, spacing and line breaks included. Codex, and a slash command in any CLI, still get each line break and tab as a space: Hive types those key by key, where a line break would send the prompt early and a tab complete a word. For Codex, Typed prompts: line breaks (under Codex) can press a new-line key instead. Other control characters are left out either way: they would press keys.",
       description: 'What the advanced setting "Send prompts as typed" does (Settings → Advanced, under Hive). Claude Code, Copilot and Codex are CLIs\' names: keep them.'
     }),
     kind: 'boolean',
@@ -933,21 +1138,6 @@ const SOURCES: readonly AdvancedSource[] = [
     kind: 'boolean',
     default: false,
     applies: 'now'
-  },
-  // The Assistant's other MCP servers (#1284, #966 row 7, Darren's decision on #1120 point 3): off, as before, it gets
-  // only Hive's own. Control governs only Hive's tools either way; another server's tools ask as its CLI's mode says.
-  {
-    id: ASSISTANT_OTHER_MCP,
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.assistant.otherMcpServers.title', defaultMessage: "The Assistant uses the workspace's other MCP servers", description: "An advanced setting's title (Settings → Advanced), listed under Hive. MCP is a protocol's name; the Assistant is the Hive Assistant." }),
-    desc: msg({
-      id: 'settings.advanced.hive.assistant.otherMcpServers.desc',
-      defaultMessage: "The Hive Assistant looks after the workspace with Hive's own tools only: the workspace's other MCP servers aren't given to it. Turned on, it gets every server that is on in the workspace (its switch in the MCP view), from its next session, as it works across every project. Its Control setting still decides what it may do with Hive's tools; another server's tools ask as its CLI's permission mode says. Whether its CLI's own servers load too is the CLI's \"Only the workspace's MCP servers\" setting.",
-      description: "What the advanced setting \"The Assistant uses the workspace's other MCP servers\" does (Settings → Advanced, under Hive). Control is the name of an Assistant setting, MCP the name of a view in Hive and \"Only the workspace's MCP servers\" another setting's title: use them as Hive shows them."
-    }),
-    kind: 'boolean',
-    default: false,
-    applies: 'sessions'
   },
   // Hive's guidance for project agents (#1285, #966 row 13), separate from giving them Hive's tools. The Assistant's role
   // and its own guidance have no switch (row 14): without them it is no Assistant, only an agent.
@@ -1072,6 +1262,23 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'now'
   },
+  // The usage history's timeline detail (HI-1648, Darren 27 Oct): sessions that ended longer ago are kept in 1-hour steps.
+  {
+    id: USAGE_TIMELINE_DETAIL_DAYS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.usage.timelineDetailDays.title', defaultMessage: 'Usage history: keep full detail for', description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in days (\"14 days\"). The usage history is the record Hive keeps of what each session used." }),
+    desc: msg({
+      id: 'settings.advanced.hive.usage.timelineDetailDays.desc',
+      defaultMessage: "How long the usage history keeps when each request happened, to the second, after a session ends. Past it, a session's use over time is kept in 1-hour steps, so the history stays small. Totals, tokens and costs stay exact; only where a card's or lane's share began or ended inside an hour is less exact, for sessions that old.",
+      description: 'What the advanced setting "Usage history: keep full detail for" does, and what is lost past it (Settings → Advanced, under Hive). A lane is a card loop: a builder and a reviewer taking cards in turn.'
+    }),
+    kind: 'number',
+    default: 14,
+    min: 1,
+    max: 3650,
+    unit: 'days',
+    applies: 'now'
+  },
   // Claude Code
   {
     id: 'claude-code.trust.prompt',
@@ -1096,6 +1303,21 @@ const SOURCES: readonly AdvancedSource[] = [
       { from: `${FIX}/signin-claude-2.1.291.json`, version: '2.1.291', text: 'authentication_failed' }, // i18n-ignore: a CLI's recorded text (#367)
       // A server connection's key refused (HI-1772): after its retries, the same error; Hive says the key was refused.
       { from: `${FIX}/advanced/stopfailure-server-401-claude-2.1.311.json`, version: '2.1.311', text: 'authentication_failed', shows: "A server connection's key refused (401), after Claude Code's 10 retries" } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  // A turn its connection's failure ended (HI-1612): the StopFailure's message, after Claude Code's own retries.
+  {
+    id: outagePatternId('claude-code'),
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.outage.connectionError.title', defaultMessage: 'Connection dropped: StopFailure message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.outage.connectionError.desc', defaultMessage: "What a StopFailure hook's message says when Claude Code couldn't reach its API after its retries: with Resume agents after a connection drops on, Hive waits for the connection and resumes the agent. Wrong, such agents stay stopped.", description: 'What the advanced setting "Connection dropped: StopFailure message" is for, and what goes wrong when it is wrong (Settings → Advanced). Resume agents after a connection drops is the title of another advanced setting.' }),
+    kind: 'pattern',
+    default: String.raw`\b(?:ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH|ENETDOWN)\b|Connection refused|Can't reach the API server|Connection error|Request timed out`,
+    flags: 'i',
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/advanced/stopfailure-connection-claude-2.1.312.json`, version: '2.1.312', text: 'API Error: Connection refused — a firewall or proxy may be blocking it (ECONNREFUSED)' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/stopfailure-connection-claude-2.1.312.json`, version: '2.1.312', text: "API Error: Can't reach the API server — check your internet or DNS (ENOTFOUND)" } // i18n-ignore: a CLI's recorded text (#367)
     ]
   },
   // A lane's end (HI-1706): the command Hive types to end Claude Code as a person would, and how long it waits for the exit.
@@ -1387,6 +1609,41 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/safeguard-prompt-claude-2.1.296.txt`, version: '2.1.296', text: ' ❯ 1. Switch automatically\n      Continue on Opus 4.8 now, and switch without asking from now on\n   2. Stay on Opus 5.5' }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  {
+    id: 'claude-code.screen.idleQuestion',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.screen.idleQuestion.title', defaultMessage: 'Screen: question while idle', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.screen.idleQuestion.desc', defaultMessage: "A question Claude Code puts on its screen by itself after a turn, sending Hive nothing (\"Teach auto mode about your environment?\"), as a line of its own in a dialog that replaces its input box (the same words in a prompt or a reply, with the input box drawn, aren't it). While it shows, Hive shows the agent waiting for you with the question, and types nothing into it: Enter would answer it. Wrong, Hive types its wakes into the question.", description: 'What the advanced setting "Screen: question while idle" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959). The quoted question is Claude Code\'s own, in English: keep it as it is.' }),
+    kind: 'pattern',
+    default: String.raw`^[ \t]*Teach auto mode about your environment\?[ \t]*$`,
+    flags: 'm',
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/advanced/envsetup-claude-2.1.312.txt`, version: '2.1.312', text: '  Teach auto mode about your environment?' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/envsetup-offer-claude-2.1.312.txt`, version: '2.1.312', text: ' Teach auto mode about your environment?' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  {
+    id: 'claude-code.screen.input',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.screen.input.title', defaultMessage: 'Screen: input box', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.screen.input.desc', defaultMessage: "Claude Code's input box, between two rules, its first group what it holds after its prompt mark. Hive reads it to tell that a line it typed is gone from the input (a screen of the CLI's took it), and then types it again. Wrong, such a line stays held, and nothing more is typed into the agent until you press Enter there.", description: 'What the advanced setting "Screen: input box" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959). A rule: a horizontal line drawn across the terminal.' }),
+    kind: 'pattern',
+    default: String.raw`^─{3,}[^\n]*\n❯[  ]?([^\n]*(?:\n(?!─{3,})[^\n]*)*)\n─{3,}`,
+    flags: 'm',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/input-claude-2.1.312.txt`, version: '2.1.312', text: `${'─'.repeat(120)}\n❯ hive wake line typed and not sent\n${'─'.repeat(120)}` }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'claude-code.autoModeSetup.offer',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.autoModeSetup.offer.title', defaultMessage: "Offer auto mode's environment setup", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto mode is one of Claude Code's permission modes." }),
+    desc: msg({ id: 'settings.advanced.claude-code.autoModeSetup.offer.desc', defaultMessage: "Claude Code offers, now and then in auto mode, to read the project, your recent sessions and optionally your shell history and other repositories, to teach auto mode about your environment. Hive never answers it: the agent waits for you. Off, Hive's Claude Code agents are started with the offer turned off for that launch (nothing is written to Claude Code's files, and auto mode decides as before); /auto-mode-setup still runs it when you want.", description: "What the advanced setting \"Offer auto mode's environment setup\" is for, and what happens when it is off (Settings → Advanced, HI-1959). /auto-mode-setup is Claude Code's command: keep it as it is." }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/envsetup-code-claude-2.1.312.txt`, version: '2.1.312', text: 'ft().skillOverrides?.["auto-mode-setup"]!=="off"', shows: "Claude Code's own code: the offer is off when its settings turn the auto-mode-setup skill off (not seen on a screen)" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   ...CLAUDE_FOOTER_MODES.map(
     (m): AdvancedSource => ({
       id: `claude-code.footer.${m.key}`,
@@ -1506,6 +1763,19 @@ const SOURCES: readonly AdvancedSource[] = [
     flags: 'i',
     applies: 'now',
     samples: [{ from: `${FIX}/signin-codex-0.160.0.jsonl`, version: '0.160.0', text: 'unexpected status 401 Unauthorized: Incorrect API key provided' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  // A turn its connection's failure ended (HI-1612): the error of its task_complete. A provider refusing connections
+  // doesn't fail the turn (Codex waits for the network: tests/fixtures/advanced/README.md), a stream dropped does.
+  {
+    id: outagePatternId('codex'),
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.outage.connectionError.title', defaultMessage: 'Connection dropped: error message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.outage.connectionError.desc', defaultMessage: "A turn's error, in Codex's session file, that means it lost its connection to its API: with Resume agents after a connection drops on, Hive waits for the connection and resumes the agent. Wrong, such agents stay stopped.", description: 'What the advanced setting "Connection dropped: error message" is for, and what goes wrong when it is wrong (Settings → Advanced). Resume agents after a connection drops is the title of another advanced setting.' }),
+    kind: 'pattern',
+    default: String.raw`\b(?:ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH|ENETDOWN)\b|stream disconnected|Transport error|network error|error sending request|connection (?:refused|reset|closed)`,
+    flags: 'i',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/turn-failed-codex-0.164.0.jsonl`, version: '0.164.0', text: 'stream disconnected before completion: Transport error: network error: error decoding response body' }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'codex.subagent.item',
@@ -1717,6 +1987,30 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions',
     samples: [HOOKS_TAKEN['codex']]
   },
+  // What Hive asks Codex's app server for a launch's hooks (HI-982: the Hooks dialog; the hook hashes it trusts at launch).
+  {
+    id: 'codex.hooks.listMethod',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.hooks.listMethod.title', defaultMessage: 'Hooks: listing request', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.hooks.listMethod.desc', defaultMessage: "The request Hive sends Codex's app server for the hooks a session has. Wrong, an agent's Hooks dialog lists only Hive's own and says Codex couldn't list the rest, and Hive trusts its hooks by its own hashes.", description: 'What the advanced setting "Hooks: listing request" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'hooks/list',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/hooks-list-codex-0.164.0.txt`, version: '0.164.0', text: 'hooks/list' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'codex.hooks.listSeconds',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.hooks.listSeconds.title', defaultMessage: 'Hooks: listing timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.hooks.listSeconds.desc', defaultMessage: "How long Hive gives Codex's app server to list a session's hooks (`hooks/list`). Past it, an agent's Hooks dialog lists only Hive's own and says Codex couldn't list the rest.", description: 'What the advanced setting "Hooks: listing timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `hooks/list` as it is (a request\'s name).' }),
+    kind: 'number',
+    default: 20,
+    min: 2,
+    max: 120,
+    unit: 's',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/hooks-list-codex-0.164.0.txt`, version: '0.164.0', text: 'hooks/list', shows: "Codex's app server taking the request Hive sends for a session's hooks (its source: not a run)" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   // How long Hive waits for Codex to render a session's prompt (#1285): it reads the developer_instructions Hive's guidance
   // follows from it. Past it, Hive adds none of its guidance rather than replace instructions it couldn't read.
   {
@@ -1770,6 +2064,28 @@ const SOURCES: readonly AdvancedSource[] = [
     unit: 's',
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/drawn-codex-0.163.0.txt`, version: '0.163.0', text: '› [Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it.', shows: "Codex showing a line Hive typed in its prompt, before Enter: what Hive waits to see" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  // A line break in a prompt Hive types into Codex (HI-1327): a key its input box takes as a new line, or a space.
+  {
+    id: 'codex.prompt.newlineKey',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.prompt.newlineKey.title', defaultMessage: 'Typed prompts: line breaks', description: "An advanced setting's title (Settings → Advanced), listed under Codex: what Hive presses for a line break in a prompt it types into Codex." }),
+    desc: msg({
+      id: 'settings.advanced.codex.prompt.newlineKey.desc',
+      defaultMessage:
+        "With Send prompts as typed on, what Hive presses in Codex for each line break of a prompt it types. Alt+Enter and Ctrl+J are keys Codex takes as a new line rather than sending, so the prompt arrives as written (tried with Codex 0.164.0). Automatic uses Alt+Enter with a Codex version it was tried with, and spaces with others; a key you choose is used with any version. Spaces puts the prompt on one line. If you changed Codex's own new-line keys, choose Spaces. A slash command always gets spaces.",
+      description: 'What the advanced setting "Typed prompts: line breaks" does (Settings → Advanced, under Codex). Send prompts as typed is another setting\'s title: use it as Settings shows it. Automatic, Spaces, Alt+Enter and Ctrl+J are the setting\'s choices: use the words its list shows (Alt+Enter and Ctrl+J are keys: name them as your language does). Keep 0.164.0 as it is (a version).'
+    }),
+    kind: 'choice',
+    choices: [
+      { value: 'auto', label: msg({ id: 'settings.advanced.codex.prompt.newlineKey.auto', defaultMessage: 'Automatic', description: 'A choice of the advanced setting "Typed prompts: line breaks": Alt+Enter with a Codex version it was tried with, spaces with others.' }) },
+      { value: 'spaces', label: msg({ id: 'settings.advanced.codex.prompt.newlineKey.spaces', defaultMessage: 'Spaces', description: 'A choice of the advanced setting "Typed prompts: line breaks": each line break becomes a space.' }) },
+      { value: 'alt-enter', label: msg({ id: 'settings.advanced.codex.prompt.newlineKey.altEnter', defaultMessage: 'Alt+Enter', description: 'A choice of the advanced setting "Typed prompts: line breaks": Hive presses Alt+Enter for each line break (a key: name it as your language does).' }) },
+      { value: 'ctrl-j', label: msg({ id: 'settings.advanced.codex.prompt.newlineKey.ctrlJ', defaultMessage: 'Ctrl+J', description: 'A choice of the advanced setting "Typed prompts: line breaks": Hive presses Ctrl+J for each line break (a key: name it as your language does).' }) }
+    ],
+    default: 'auto',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/newline-keys-codex-0.164.0.txt`, version: '0.164.0', text: 'alt(KeyCode::Enter)', shows: "Codex's own keymap taking Alt+Enter and Ctrl+J as a new line (its source), and Windows' console delivering each as one key (HI-1327's probe); the real-tier suite codex-newline saw both prompts arrive as written in Codex 0.164.0" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'codex.turnScreen.working',
@@ -1895,6 +2211,19 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/signin-error-copilot-1.0.95.jsonl`, version: '1.0.95', text: 'authentication' }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  // A turn that failed (HI-1960): Copilot 1.0.105 gives up on a model call with a session.error of this type and no
+  // Stop (each ErrorOccurred hook of its retries says recoverable, the last too).
+  {
+    id: 'copilot.turnFailed.errorType',
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.turnFailed.errorType.title', defaultMessage: 'Turn failed: error type', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.copilot.turnFailed.errorType.desc', defaultMessage: "A session error's type, in Copilot's session file, that means its turn ended because a model call failed after Copilot's retries (it sends no Stop then): Hive ends the turn as failed, with Copilot's message. Wrong, such an agent shows working until you look.", description: 'What the advanced setting "Turn failed: error type" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'pattern',
+    default: '^query$',
+    flags: 'i',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/connection-error-copilot-1.0.105.jsonl`, version: '1.0.105', text: 'query' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   {
     id: 'copilot.signIn.errorMessage',
     group: 'copilot',
@@ -1916,6 +2245,44 @@ const SOURCES: readonly AdvancedSource[] = [
     flags: 'i',
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/signin-error-copilot-1.0.95.jsonl`, version: '1.0.95', text: 'Authentication failed with provider at http://127.0.0.1:50713/v1 (HTTP 401).' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  // A question's text (HI-1945): from 1.0.104 the question's Notification says only "Information requested", so Hive
+  // takes the question from the asking tool's PreToolUse.
+  {
+    id: 'copilot.question.tool',
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.question.tool.title', defaultMessage: 'Question: tool name', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.copilot.question.tool.desc', defaultMessage: "The name Copilot's hooks give its tool that asks you a question. Hive shows that tool's question while the agent waits for your answer; when it doesn't match, the agent shows only Copilot's own notice.", description: 'What the advanced setting "Question: tool name" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'pattern',
+    default: '^(ask_user|AskUserQuestion)$',
+    flags: 'i',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/question-copilot-1.0.105.jsonl`, version: '1.0.105', text: 'AskUserQuestion' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'copilot.question.field',
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.question.field.title', defaultMessage: 'Question: text field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.copilot.question.field.desc', defaultMessage: "The field of the question tool's input, in Copilot's hooks, with the question's text. When it is wrong, the agent shows only Copilot's own notice while it waits for your answer.", description: 'What the advanced setting "Question: text field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'message',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/question-copilot-1.0.105.jsonl`, version: '1.0.105', fields: ['message', 'requestedSchema'] }]
+  },
+  // A turn its connection's failure ended (HI-1612): its error's message, after Copilot's own retries.
+  {
+    id: outagePatternId('copilot'),
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.outage.connectionError.title', defaultMessage: 'Connection dropped: error message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.copilot.outage.connectionError.desc', defaultMessage: "What Copilot's error says when it couldn't reach its model's API after its retries: with Resume agents after a connection drops on, Hive waits for the connection and resumes the agent. Wrong, such agents stay stopped.", description: 'What the advanced setting "Connection dropped: error message" is for, and what goes wrong when it is wrong (Settings → Advanced). Resume agents after a connection drops is the title of another advanced setting.' }),
+    kind: 'pattern',
+    default: String.raw`\b(?:ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH|ENETDOWN)\b|error sending request|Could not connect to|dns error`,
+    flags: 'i',
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/advanced/connection-error-copilot-1.0.105.jsonl`, version: '1.0.105', text: 'error resolving DNS: No such host is known. (os error 11001) [ENOTFOUND]' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/connection-error-copilot-1.0.105.jsonl`, version: '1.0.105', text: 'Could not connect to local model provider at http://127.0.0.1:50000/v1.' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
   },
   // A compaction's context before and after (#454): the three parts Copilot counts it in, in its compaction_start and
   // compaction_complete events, added up.
@@ -1996,7 +2363,7 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 60,
     unit: 's',
     applies: 'now',
-    samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.95', text: '"type": "session.shutdown"', shows: "Copilot stopped by Hive, writing its token totals (session.shutdown) and exiting by itself (exit code 0)" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.105', text: '"type": "session.shutdown"', shows: "Copilot stopped by Hive, writing its token totals (session.shutdown) and exiting by itself (exit code 0)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   // Terminals behave the same in every pane (#737): right-click is Hive's, and this hands it to Copilot instead.
   {
@@ -2300,7 +2667,7 @@ const SOURCES: readonly AdvancedSource[] = [
     default: ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Notification', 'Stop', 'ErrorOccurred', 'PreCompact', 'SessionEnd'], // i18n-ignore: a CLI's hook event names (#698)
     max: 20,
     applies: 'now',
-    samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.95', text: '"hook_event_name": "SessionEnd"' }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.105', text: '"hook_event_name": "SessionEnd"' }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'copilot.hooks.knownFields',
@@ -2311,7 +2678,7 @@ const SOURCES: readonly AdvancedSource[] = [
     default: ['hook_event_name', 'hookEventName', 'session_id', 'sessionId', 'transcript_path', 'transcriptPath', 'cwd', 'permission_mode', 'permissionMode', 'tool_name', 'toolName', 'tool_use_id', 'toolUseId', 'source', 'trigger', 'matcher', 'notification_type', 'model', 'agent_type', 'turn_id', 'timestamp', 'tool_input', 'prompt', 'initial_prompt', 'initialPrompt', 'toolInput', 'toolArgs', 'tool_result', 'toolResult', 'stop_hook_active', 'stop_reason', 'stopReason', 'reason', 'error', 'message', 'title', 'is_recoverable', 'recoverable'],
     max: 80,
     applies: 'now',
-    samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.95', fields: ['cwd', 'hook_event_name', 'session_id', 'timestamp', 'tool_input', 'tool_name'] }, { from: `${FIX}/console/copilot.json`, version: '1.0.95', fields: ['cwd', 'hook_event_name', 'session_id', 'stop_hook_active', 'stop_reason', 'timestamp', 'transcript_path'] }]
+    samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.105', fields: ['cwd', 'hook_event_name', 'session_id', 'timestamp', 'tool_input', 'tool_name'] }, { from: `${FIX}/console/copilot.json`, version: '1.0.105', fields: ['cwd', 'hook_event_name', 'session_id', 'stop_hook_active', 'stop_reason', 'timestamp', 'transcript_path'] }]
   }
 ]
 
@@ -2543,6 +2910,7 @@ const UNITS: Record<string, Msg> = {
   lanes: msg({ id: 'settings.advanced.unit.lanes', defaultMessage: '{n, plural, one {# lane} other {# lanes}}', description: "An advanced setting's value: a number of card-loop lanes the Progress panel shows." }),
   agents: msg({ id: 'settings.advanced.unit.agents', defaultMessage: '{n, plural, one {# agent} other {# agents}}', description: "An advanced setting's value: a number of agents." }),
   min: msg({ id: 'settings.advanced.unit.minutes', defaultMessage: '{n, number} min', description: 'An advanced setting\'s value in minutes, short: "10 min". {n} is the number.' }),
+  days: msg({ id: 'settings.advanced.unit.days', defaultMessage: '{n, plural, one {# day} other {# days}}', description: 'An advanced setting\'s value in days: "14 days".' }),
   captures: msg({ id: 'settings.advanced.unit.captures', defaultMessage: '{n, plural, one {# capture} other {# captures}}', description: "An advanced setting's value: a number of the flight recorder's captures (saved recordings of the developer console)." }),
   characters: msg({ id: 'settings.advanced.unit.characters', defaultMessage: '{n, plural, one {# character} other {# characters}}', description: "An advanced setting's value: a number of characters (letters, spaces and the like) in a piece of text." })
 }
@@ -2553,6 +2921,7 @@ const UNIT_LABELS: Record<string, Msg> = {
   lanes: msg({ id: 'settings.advanced.unitLabel.lanes', defaultMessage: 'lanes', description: 'Beside the box of an advanced setting that is a number of card-loop lanes the Progress panel shows (Settings → Advanced).' }),
   agents: msg({ id: 'settings.advanced.unitLabel.agents', defaultMessage: 'agents', description: 'Beside the box of an advanced setting that is a number of agents (Settings → Advanced).' }),
   min: msg({ id: 'settings.advanced.unitLabel.minutes', defaultMessage: 'min', description: 'Beside the box of an advanced setting given in minutes (Settings → Advanced): the unit, short, as in "10 min".' }),
+  days: msg({ id: 'settings.advanced.unitLabel.days', defaultMessage: 'days', description: 'Beside the box of an advanced setting given in days (Settings → Advanced), as in "14 days".' }),
   bytes: msg({ id: 'settings.advanced.unitLabel.bytes', defaultMessage: 'bytes', description: 'Beside the box of an advanced setting that is a size in bytes (Settings → Advanced), as in "4096 bytes".' }),
   captures: msg({ id: 'settings.advanced.unitLabel.captures', defaultMessage: 'captures', description: "Beside the box of an advanced setting that is a number of the flight recorder's captures (saved recordings of the developer console; Settings → Advanced)." }),
   characters: msg({ id: 'settings.advanced.unitLabel.characters', defaultMessage: 'characters', description: 'Beside the box of an advanced setting that is a number of characters in a piece of text (Settings → Advanced), as in "80 characters".' })
@@ -2605,7 +2974,7 @@ export function parseAdvancedFile(text: string): { values: Record<string, unknow
   const madeFor: Record<string, MadeFor> = {}
   if (isPlainObject(raw.madeFor))
     for (const [k, m] of Object.entries(raw.madeFor)) if (isPlainObject(m) && k in values) madeFor[k] = { version: typeof m.version === 'string' ? m.version : null, value: m.value }
-  return { values, madeFor, unknown: Object.keys(values).filter((k) => !BY_ID.has(k)) }
+  return { values, madeFor, unknown: Object.keys(values).filter((k) => !BY_ID.has(k) && !LEGACY_ADVANCED.has(k)) }
 }
 
 /** What a value takes, in words, in English (the Assistant's tools). */

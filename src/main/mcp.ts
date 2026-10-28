@@ -9,7 +9,7 @@ import { writeTextUnlessChanged } from './fsutil'
 import { HiveError, hiveError } from './hiveError'
 import { findSecretWarnings } from './mcpSecrets'
 import { allProviders } from './providers'
-import { workspace } from './workspace'
+import { currentWorkspace, inWorkspace, workspace } from './workspace'
 import { trash } from './trash'
 
 export { findSecretWarnings }
@@ -27,6 +27,7 @@ const M = {
   env: msg({ id: 'content.mcp.env', defaultMessage: 'Environment: {items}', description: "An MCP server's environment variables, shown before it is turned on: {items} lists them, each NAME=${VAR} (a reference, as it is) or \"NAME (set)\"." }),
   headers: msg({ id: 'content.mcp.headers', defaultMessage: 'Headers: {items}', description: "An MCP server's HTTP headers, shown before it is turned on: {items} lists them, each Name=${VAR} (a reference, as it is) or \"Name (set)\"." }),
   set: msg({ id: 'content.mcp.set', defaultMessage: '{name} (set)', description: "An environment variable or header ({name}) an MCP server's definition gives a value of its own, not shown (it may be a secret)." }),
+  offInWorkspace: msg({ id: 'mcp.error.offInWorkspace', defaultMessage: '{name} is off in the workspace: turn it on in the MCP view first (it can be turned on for the Hive Assistant there too).', description: 'An error turning an MCP server on for the Hive Assistant: the server is off in the workspace. {name} is the server; "MCP view" is a view in Hive: keep it as Hive shows it.' }),
   zipLarge: msg({ id: 'content.mcp.zipLarge', defaultMessage: 'The .zip is too large for an MCP server (over {mb} MB unpacked).', description: 'An error adding an MCP server from a .zip: its files take more than {mb} MB unpacked.' })
 }
 
@@ -57,6 +58,7 @@ export function mcpRuns(def: McpServerDef): string[] {
 export async function listMcp(): Promise<McpServerInfo[]> {
   if (!workspace.path) return []
   const enabled = new Set(workspace.config.mcp.enabled)
+  const assistant = new Set(listed(workspace.config.mcp.assistant))
   let files: string[] = []
   try {
     files = (await readdir(workspace.mcpDir)).filter((f) => f.endsWith('.json'))
@@ -73,10 +75,10 @@ export async function listMcp(): Promise<McpServerInfo[]> {
       const def = JSON.parse(await readFile(path, 'utf8')) as McpServerDef
       if (!def || typeof def !== 'object' || Array.isArray(def)) throw hiveError(msg({ id: 'content.mcp.listNotObject', defaultMessage: 'Definition must be a JSON object', description: "Why an MCP server in the workspace can't be used: its definition file (.hive/mcp/<name>.json) holds JSON that isn't an object." }))
       if (!def.command && !def.url) throw hiveError(msg({ id: 'content.mcp.listNoCommand', defaultMessage: 'Definition needs a "command" (stdio) or a "url" (http/sse)', description: "Why an MCP server in the workspace can't be used: its definition has neither of the two fields that say what it is. Keep \"command\", \"url\", stdio, http and sse as they are." }))
-      out.push({ name, path, def, revision, globallyEnabled: enabled.has(name), secretWarnings: findSecretWarnings(def), runs: mcpRuns(def) })
+      out.push({ name, path, def, revision, globallyEnabled: enabled.has(name), assistant: assistant.has(name), secretWarnings: findSecretWarnings(def), runs: mcpRuns(def) })
     } catch (e) {
       // Hive's own words are text the window shows in its language; JSON's reader's stay as it gave them.
-      out.push({ name, path, def: null, error: (e as Error).message, ...(e instanceof HiveError ? { errorText: e.text } : {}), globallyEnabled: enabled.has(name), secretWarnings: [], runs: [] })
+      out.push({ name, path, def: null, error: (e as Error).message, ...(e instanceof HiveError ? { errorText: e.text } : {}), globallyEnabled: enabled.has(name), assistant: assistant.has(name), secretWarnings: [], runs: [] })
     }
   }
   return out
@@ -114,6 +116,16 @@ async function setGlobalNow(name: string, enabled: boolean): Promise<void> {
   await workspace.saveWorkspaceConfig()
 }
 
+/** The Hive Assistant's own choice for a server (HI-1472), as a project's: it runs for it while on in the workspace too. */
+async function setAssistantNow(name: string, enabled: boolean): Promise<void> {
+  await workspace.saveWorkspaceConfigWith((c) => {
+    const on = new Set(listed(c.mcp.assistant))
+    if (enabled) on.add(name)
+    else on.delete(name)
+    return { mcp: { ...c.mcp, assistant: [...on].sort() } }
+  })
+}
+
 /**
  * Refuses when the server's definition is no longer `expected`, the one the user was shown what it runs from (replaced
  * or edited meanwhile), so a server never goes on with a definition the user hasn't seen.
@@ -130,9 +142,9 @@ async function checkShown(name: string, expected: McpShown): Promise<void> {
  * Turns a server on or off in the workspace (#1093, its master switch): it runs in the projects that have it on, and
  * nowhere while off; off keeps the projects' own choices, so on again restores them. Turning it on with `expected`:
  * refused when the definition is no longer the one shown (checkShown). `projects` (path → on, the enable dialog's
- * picks) sets those projects' choices first, in the same turn.
+ * picks) sets those projects' choices first, in the same turn, and `assistant` the Hive Assistant's (HI-1472).
  */
-export function setMcpGlobal(name: string, enabled: boolean, expected?: McpShown, projects: Record<string, boolean> = {}): Promise<void> {
+export function setMcpGlobal(name: string, enabled: boolean, expected?: McpShown, projects: Record<string, boolean> = {}, assistant?: boolean): Promise<void> {
   if (!validMcpName(name)) return Promise.reject(hiveError(M.invalidName))
   return inTurn(async () => {
     if (enabled && !existsSync(join(workspace.mcpDir, `${name}.json`))) throw noServer(name)
@@ -141,6 +153,7 @@ export function setMcpGlobal(name: string, enabled: boolean, expected?: McpShown
       const cfg = await workspace.projectConfig(p)
       if (listed(cfg.mcp.enabled).includes(name) !== on) await setProjectNow(p, name, on)
     }
+    if (assistant !== undefined && listed(workspace.config.mcp.assistant).includes(name) !== assistant) await setAssistantNow(name, assistant)
     await setGlobalNow(name, enabled)
   })
 }
@@ -169,6 +182,27 @@ export function setMcpProject(projectPath: string, name: string, enabled: boolea
     if (enabled && expected) await checkShown(name, expected)
     await setProjectNow(projectPath, name, enabled)
   })
+}
+
+/**
+ * Turns a workspace server on or off for the Hive Assistant (HI-1472), its own choice as a project's: it runs for it
+ * while the server is on in the workspace too. Turning it on with `expected`: refused when the definition is no longer
+ * the one shown (checkShown).
+ */
+export function setMcpAssistant(name: string, enabled: boolean, expected?: McpShown): Promise<void> {
+  if (!validMcpName(name)) return Promise.reject(hiveError(M.invalidName))
+  // The workspace asked (its window's, or the Agent API caller's), through every await in the turn.
+  const ws = currentWorkspace()
+  return inTurn(() =>
+    inWorkspace(ws, async () => {
+      if (enabled && !existsSync(join(workspace.mcpDir, `${name}.json`))) throw noServer(name)
+      // Turned on only where the workspace has it on (its enable shows what it runs and can tick the Assistant too); a
+      // choice made before stays while the workspace has it off.
+      if (enabled && !listed(workspace.config.mcp.enabled).includes(name)) throw hiveError(M.offInWorkspace, { name }, { kind: 'conflict' })
+      if (enabled) await checkShown(name, expected ?? { def: null })
+      await setAssistantNow(name, enabled)
+    })
+  )
 }
 
 /** A list from a config file: its names (a hand-edited file may hold anything). */
@@ -201,6 +235,7 @@ async function forgetInProjects(name: string): Promise<void> {
 async function offEverywhere(name: string): Promise<void> {
   await setGlobalNow(name, false)
   await forgetInProjects(name)
+  if (listed(workspace.config.mcp.assistant).includes(name)) await setAssistantNow(name, false)
 }
 
 export function validMcpName(name: string): boolean {

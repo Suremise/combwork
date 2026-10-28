@@ -139,6 +139,8 @@ export async function checkStart(r: CheckRunFor, log: WriteLog = appObserver, no
  */
 function whichCheck(r: CheckRunFor): { name: string | null; ran: boolean } {
   const command = r.command?.trim() || null
+  // A focused test's check (HI-1367) runs the reviewer's own command, recorded as run: any command counts.
+  if (r.check && r.checkCommand === '') return { name: r.check, ran: command !== null }
   if (r.check) return { name: r.check, ran: command !== null && command === r.checkCommand?.trim() }
   const name = command ? (Object.entries(r.commands).find(([, c]) => c === command)?.[0] ?? null) : null
   return { name, ran: name !== null }
@@ -308,7 +310,9 @@ async function record(run: ProgressRun, b: Bracket): Promise<Recorded | null> {
   // Its command as its reporter said (hive-progress: the check's command, or its command line); None's declared paths
   // as they are now: a list changed during the run is a new revision.
   const endPaths = b.for.platform === 'none' ? declaredPaths(b.ws, b.project, b.for.card) : undefined
-  const data = await checkEnd({ ...b.for, command: run.command }, b.start, { at: run.finishedAt, result: run.state, run: run.id, by: run.agentName, title: run.title, endPaths })
+  const ended = await checkEnd({ ...b.for, command: run.command }, b.start, { at: run.finishedAt, result: run.state, run: run.id, by: run.agentName, title: run.title, endPaths })
+  // Who ran it, by id (HI-1367): the merge queue takes a focused test's proof only from its card's reviewer.
+  const data = run.source === 'agent' && run.agentId ? { ...ended, agent: run.agentId } : ended
   if (b.ws.path !== b.workspacePath) return null
   const actor: Actor = run.source === 'agent' && run.agentId ? agentActor(run.agentId) : run.source === 'assistant' ? 'assistant' : 'outside'
   const facts = FactStore.forBoard(b.ws, { project: b.project, key: b.project })

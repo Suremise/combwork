@@ -1,4 +1,5 @@
 import { realpathSync } from 'original-fs'
+import { realpath } from 'original-fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'path'
 
 // Telling places apart by their real locations (fsutil.ts re-exports them). A module of their own, with no logger and so
@@ -15,6 +16,26 @@ export function realPath(p: string): string {
   for (;;) {
     try {
       return rest.length ? join(realpathSync.native(head), ...rest.reverse()) : realpathSync.native(head)
+    } catch {
+      const up = dirname(head)
+      if (up === head) return resolve(p)
+      rest.push(head.slice(up.length).replace(/^[\\/]/, ''))
+      head = up
+    }
+  }
+}
+
+/**
+ * `realPath`, resolved off main's thread (HI-1909: the usage history resolves its file on every request, a few ms of
+ * main's thread each under load): the same location, the same fallback for a path that doesn't exist yet.
+ */
+export async function realPathAsync(p: string): Promise<string> {
+  let head = resolve(p)
+  const rest: string[] = []
+  for (;;) {
+    try {
+      const real = await realpath(head)
+      return rest.length ? join(real, ...rest.reverse()) : real
     } catch {
       const up = dirname(head)
       if (up === head) return resolve(p)

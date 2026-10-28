@@ -19,6 +19,18 @@
     "defaultMessage": "You can add cards only to your project ({project}).",
     "description": "An error: an agent tried to add a card to another project, or to the whole workspace; it adds cards only to its own project ({project}, its folder name)."
   },
+  "tasks.error.answersNot": {
+    "defaultMessage": "{why, select, open {{request} isn't an open request on {card}.} other {A decision can't answer {request} on {card}: approve, decline or choose it in For you.}}",
+    "description": "An error (HI-1932): a decision named a request ({request}: its id, such as r12) of card {card} (its key) that it can't answer: it isn't open on the card (answered or closed meanwhile), or it is an approval or one of Hive's own requests (a review, the OK before merging, the round limit), which the user answers in For you. Keep the select keys."
+  },
+  "tasks.error.answersNotAgents": {
+    "defaultMessage": "Only the user, or the Assistant recording the user's decision, closes a request for the user.",
+    "description": "An error (HI-1932): an agent recorded a decision naming the card's requests it answers (For you); only the user, or the Hive Assistant writing down the user's own decision, may close them that way."
+  },
+  "tasks.error.answersShape": {
+    "defaultMessage": "answers takes the ids of 1 to {max, number} of the card’s open requests, with a decision and nothing else in the same change.",
+    "description": "An error (HI-1932): a decision naming the card's requests it answers was sent wrongly: answers must list between 1 and {max} request ids (For you's requests), together with the decision's text and no other change. Keep answers as it is (a field's name)."
+  },
   "tasks.error.archiveNone": {
     "defaultMessage": "cards: list the cards to archive.",
     "description": "An error: a call to archive cards listed none. \"cards:\" is the name of the call's field: keep it as it is."
@@ -115,9 +127,9 @@
     "defaultMessage": "The decision is empty.",
     "description": "An error: a decision recorded on a card has no text."
   },
-  "tasks.error.failedStays": {
-    "defaultMessage": "A failed review leaves {card} in Review: give the verdict without column.",
-    "description": "An error: a failed review also moved card {card} (its key, such as HI-12) out of Review; a failed card stays in Review. \"column\" is the name of the call's field: keep it as it is."
+  "tasks.error.failedToDoing": {
+    "defaultMessage": "A failed review sends {card} back to Doing, to its builder: give the verdict without column.",
+    "description": "An error: a failed review also tried to move card {card} (its key, such as HI-12) somewhere other than Doing; a failed card goes back to Doing, to the agent that built it. \"column\" is the name of the call's field: keep it as it is."
   },
   "tasks.error.holdCard": {
     "defaultMessage": "Only the user or the Assistant puts cards On Hold: ask the user to park {card}.",
@@ -128,12 +140,12 @@
     "description": "An error: an agent tried to add a card On Hold (a board column), which only the user or the Assistant may do."
   },
   "tasks.error.inDoingWith": {
-    "defaultMessage": "{card} is in Doing with {agent}, who is working on it: newer work is in progress, so it can't be moved to {column, select, review {Review} passed {Passed} done {Done} other {{column}}} by another agent. Leave it where it is; {agent} moves it to Review when done, and the user can move it.",
-    "description": "An error: an agent tried to move card {card} (its key, such as HI-12) on to {column} (select: a board column; translate each), but the card is in Doing with another agent ({agent}, its name), whose work is in progress. Doing and Review are board columns."
+    "defaultMessage": "{card} is in {active} with agent {agent}, who is working on it: newer work is in progress, so another agent can't move it to {stage}. Leave it where it is; agent {agent} moves it to {review} when done, and the user can move it.",
+    "description": "An error, read by agents: an agent tried to move card {card} (its key, such as HI-12) on to the stage {stage}, but the card is in {active} with another agent ({agent}, its name), whose work is in progress. {active}, {review} and {stage} are stage names as the board shows them (glossary 2.2)."
   },
   "tasks.error.inDoingWithAnother": {
-    "defaultMessage": "{card} is in Doing with another agent, who is working on it: newer work is in progress, so it can't be moved to {column, select, review {Review} passed {Passed} done {Done} other {{column}}} by another agent. Leave it where it is; another agent moves it to Review when done, and the user can move it.",
-    "description": "An error: an agent tried to move card {card} (its key, such as HI-12) on to {column} (select: a board column; translate each), but the card is in Doing with another agent (whose name isn't known), whose work is in progress. Doing and Review are board columns."
+    "defaultMessage": "{card} is in {active} with another agent, who is working on it: newer work is in progress, so another agent can't move it to {stage}. Leave it where it is; that agent moves it to {review} when done, and the user can move it.",
+    "description": "An error, read by agents: an agent tried to move card {card} (its key, such as HI-12) on to the stage {stage}, but the card is in {active} with another agent (whose name isn't known), whose work is in progress. {active}, {review} and {stage} are stage names as the board shows them (glossary 2.2)."
   },
   "tasks.error.kindNeedsReason": {
     "defaultMessage": "Changing a card's kind after it is made is an exception to its rules: pass override.reason with the user's reason.",
@@ -340,8 +352,8 @@
     "description": "An error: an agent tried to give a verdict on card {card} (its key, such as HI-12), which another agent ({agent}, its name) is reviewing."
   },
   "tasks.history.answerTold": {
-    "defaultMessage": "Told {agent} of your answer",
-    "description": "A line in a card's history: Hive told the agent {agent} (its name) of the user's answer to a request for them (For you: an approval, a reply, a decision, a choice at the round limit)."
+    "defaultMessage": "Told agent {agent} of your answer",
+    "description": "A line in a card's history: Hive told the agent {agent} (its name) of the user's answer to a request for them (For you: an approval, a reply, a decision, a choice at the round limit). A noun before the name (glossary §1 rule 4)."
   },
   "tasks.history.answerUntold": {
     "defaultMessage": "The Hive Assistant couldn't be told of your answer to {agent}'s question: only {agent} has it",
@@ -390,6 +402,10 @@
   "tasks.history.blocked": {
     "defaultMessage": "Blocked: {reason}",
     "description": "A line in a card's history: the card was marked blocked, with this reason ({reason}, written by whoever blocked it)."
+  },
+  "tasks.history.closedByDecision": {
+    "defaultMessage": "Closed a question for you with your decision: \"{question}\"",
+    "description": "A line in a card's history (HI-1932): a question waiting for the user (For you) was answered by a decision the user made, recorded on the card (by the user, or by the Hive Assistant writing down the user's words: the history line's author says who). {question} is the question, cut short."
   },
   "tasks.history.context": {
     "defaultMessage": "Read first: {refs}",
@@ -678,6 +694,10 @@
   "tasks.start.noProject": {
     "defaultMessage": "{card} has no project. Give it one first: the agent works in that project.",
     "description": "An error: card {card} (its key, such as HI-12) belongs to no project (only the workspace), so no agent can start it; give it a project first."
+  },
+  "tasks.start.noSlot": {
+    "defaultMessage": "{card} wasn't started: its project builds each card in a slot, and {active, select, yes {its start has none} other {this start got none}}, so its agent would have worked in the project folder. {active, select, yes {Put it back to Todo, then start it again.} other {The card is back where it was: start it again.}}",
+    "description": "An error: a Start of the card {card} (its key, such as HI-12) was refused. The card's project has each card built in a slot (a working folder of its own), but the card's start has no slot, so the agent would have worked in the project's own folder instead. {active} (select): yes, the card was already Active (in work) with no slot, and must be put back to Todo and started again; other, this start was undone and the card moved back to its column. Translate both."
   },
   "tasks.start.notGiven": {
     "defaultMessage": "{agent} wasn't given {card}: {why}.",

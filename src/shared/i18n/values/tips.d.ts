@@ -3,10 +3,14 @@
 interface HiveMessageValues {
   'tips.activityTab.text': undefined
   'tips.activityTab.title': undefined
+  'tips.activityWorkspace.text': undefined
+  'tips.activityWorkspace.title': undefined
   'tips.advancedSettings.text': undefined
   'tips.advancedSettings.title': undefined
   'tips.agentConsole.text': undefined
   'tips.agentConsole.title': undefined
+  'tips.agentHooks.text': undefined
+  'tips.agentHooks.title': undefined
   'tips.agentInSlot.text': undefined
   'tips.agentInSlot.title': undefined
   'tips.agentLayouts.text': undefined
@@ -47,6 +51,8 @@ interface HiveMessageValues {
   'tips.assistantLaneWatch.title': undefined
   'tips.assistantLanes.text': undefined
   'tips.assistantLanes.title': undefined
+  'tips.assistantMcp.text': undefined
+  'tips.assistantMcp.title': undefined
   'tips.assistantMessages.text': undefined
   'tips.assistantMessages.title': undefined
   'tips.assistantReplies.text': undefined
@@ -59,6 +65,8 @@ interface HiveMessageValues {
   'tips.assistantStatus.title': undefined
   'tips.assistantTeam.text': undefined
   'tips.assistantTeam.title': undefined
+  'tips.assistantTemplates.text': undefined
+  'tips.assistantTemplates.title': undefined
   'tips.assistantToldWaiting.text': undefined
   'tips.assistantToldWaiting.title': undefined
   'tips.assistantUndo.text': undefined
@@ -69,6 +77,8 @@ interface HiveMessageValues {
   'tips.attachFiles.title': undefined
   'tips.attachmentsTabs.text': undefined
   'tips.attachmentsTabs.title': undefined
+  'tips.autoModeSetup.text': undefined
+  'tips.autoModeSetup.title': undefined
   'tips.backupRetention.text': undefined
   'tips.backupRetention.title': undefined
   'tips.banners.text': undefined
@@ -109,6 +119,8 @@ interface HiveMessageValues {
   'tips.cardAttachmentsCleanup.title': undefined
   'tips.cardCost.text': { example: string | number }
   'tips.cardCost.title': undefined
+  'tips.cardCostRounds.text': undefined
+  'tips.cardCostRounds.title': undefined
   'tips.cardDecisions.text': undefined
   'tips.cardDecisions.title': undefined
   'tips.cardLinks.text': undefined
@@ -180,12 +192,16 @@ interface HiveMessageValues {
   'tips.filesTab.title': undefined
   'tips.flightRecorder.text': undefined
   'tips.flightRecorder.title': undefined
+  'tips.focusedTests.text': undefined
+  'tips.focusedTests.title': undefined
   'tips.followUpCheck.text': undefined
   'tips.followUpCheck.title': undefined
   'tips.forYou.text': undefined
   'tips.forYou.title': undefined
   'tips.forYouActions.text': undefined
   'tips.forYouActions.title': undefined
+  'tips.generalistRole.text': undefined
+  'tips.generalistRole.title': undefined
   'tips.gitCheck.text': undefined
   'tips.gitCheck.title': undefined
   'tips.gitHistory.text': undefined
@@ -276,6 +292,8 @@ interface HiveMessageValues {
   'tips.mergeQueueFolder.title': undefined
   'tips.mergeQueuePanel.text': undefined
   'tips.mergeQueuePanel.title': undefined
+  'tips.mergeQueueRecent.text': undefined
+  'tips.mergeQueueRecent.title': undefined
   'tips.mergeRebase.text': undefined
   'tips.mergeRebase.title': undefined
   'tips.mergeSlot.text': undefined
@@ -300,6 +318,8 @@ interface HiveMessageValues {
   'tips.noCodeCards.title': undefined
   'tips.off.message': undefined
   'tips.off.title': undefined
+  'tips.outageResume.text': undefined
+  'tips.outageResume.title': undefined
   'tips.overview.text': { key: string | number }
   'tips.overview.title': undefined
   'tips.ownShortcuts.text': undefined
@@ -422,6 +442,8 @@ interface HiveMessageValues {
   'tips.teamTemplates.title': undefined
   'tips.templateNames.text': undefined
   'tips.templateNames.title': undefined
+  'tips.templateWorkflow.text': undefined
+  'tips.templateWorkflow.title': undefined
   'tips.testedClis.text': undefined
   'tips.testedClis.title': undefined
   'tips.tileStrip.text': undefined

@@ -18,7 +18,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const store = await import('../src/main/boardStore')
 const { adoptNow } = await import('../src/main/workflow/adoption')
 const { cleanWorkflowRole } = await import('../src/main/projectAgents')
-const { agentWorkflowRole, buildsWork, reviewsWork, isWorkflowRole } = await import('../src/shared/workflow/roles')
+const { agentWorkflowRole, buildsWork, reviewsWork, takesCards, isWorkflowRole, workflowPairs: pairsOf, WORKFLOW_ROLES } = await import('../src/shared/workflow/roles')
 const { suggestPreset } = await import('../src/shared/workflow/presetStep')
 const { projectRowText } = await import('../src/shared/toolReplies')
 
@@ -58,15 +58,24 @@ describe('agentWorkflowRole (#1430)', () => {
     expect(isWorkflowRole('boss')).toBe(false)
   })
 
-  it('buildsWork and reviewsWork: either does both', () => {
-    expect([buildsWork('builder'), buildsWork('reviewer'), buildsWork('either')]).toEqual([true, false, true])
-    expect([reviewsWork('builder'), reviewsWork('reviewer'), reviewsWork('either')]).toEqual([false, true, true])
+  it('buildsWork and reviewsWork: either does both, a generalist neither (HI-686); takesCards: any but a reviewer', () => {
+    expect([buildsWork('builder'), buildsWork('reviewer'), buildsWork('either'), buildsWork('generalist')]).toEqual([true, false, true, false])
+    expect([reviewsWork('builder'), reviewsWork('reviewer'), reviewsWork('either'), reviewsWork('generalist')]).toEqual([false, true, true, false])
+    expect([takesCards('builder'), takesCards('reviewer'), takesCards('either'), takesCards('generalist')]).toEqual([true, false, true, true])
   })
 
-  it('a role as saved: builder, reviewer or either, else refused', () => {
+  it('a role as saved: builder, reviewer, either or generalist, else refused', () => {
     expect(cleanWorkflowRole('either')).toBe('either')
-    expect(() => cleanWorkflowRole('Reviewer')).toThrow(/builder, reviewer or either/)
-    expect(() => cleanWorkflowRole('')).toThrow(/builder, reviewer or either/)
+    expect(cleanWorkflowRole('generalist')).toBe('generalist')
+    expect(agentWorkflowRole({ name: 'HR1', workflowRole: 'generalist' })).toBe('generalist')
+    expect(WORKFLOW_ROLES).toEqual(['builder', 'reviewer', 'either', 'generalist'])
+    expect(() => cleanWorkflowRole('Reviewer')).toThrow(/builder, reviewer, either or generalist/)
+    expect(() => cleanWorkflowRole('')).toThrow(/builder, reviewer, either or generalist/)
+  })
+
+  it('a generalist is never a builder of a pair by name, nor its reviewer (HI-686)', () => {
+    expect(pairsOf([{ name: 'HB1', workflowRole: 'generalist' }, { name: 'HR1' }], [])).toEqual([])
+    expect(pairsOf([{ name: 'HB1' }, { name: 'HR1', workflowRole: 'generalist' }], [])).toEqual([])
   })
 })
 

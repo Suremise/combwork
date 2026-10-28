@@ -2,7 +2,7 @@ import { WorkflowLevelForm } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
 import { QuitCommand, WorkspaceCloseCommand } from '../components/CloseCommandSettings'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
-import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, ModelPrice, PermissionMode, ProviderId, TaskColumn } from '@shared/types'
+import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, McpServerInfo, ModelPrice, PermissionMode, ProviderId, TaskColumn } from '@shared/types'
 import { DEFAULT_COLUMN_COLORS, TASK_COLUMNS, columnColor, columnName } from '@shared/tasks'
 import { DEFAULT_MODE } from '@shared/assistant'
 import { PRICES_CHECKED, SHIPPED_PRICES, listedPriceModels, priceRows } from '@shared/prices'
@@ -28,7 +28,7 @@ import { AccountsSettings } from '../components/AccountsSettings'
 import { ConnectionChoice, useLaunchConnection } from '../components/ConnectionChoice'
 import { AdvancedSettings } from '../components/AdvancedSettings'
 import { ADVANCED_DEFS, groupName, shownText, type AdvancedState } from '@shared/advanced'
-import { choose, chooseTab, confirm, get, notify, set, useLanguage, useRememberedTab, useStore, WORKFLOW_DEFAULTS_TAB, WORKFLOW_DEFAULTS_TABS } from '../store'
+import { choose, chooseTab, confirm, get, notify, set, showView, useLanguage, useRememberedTab, useStore, WORKFLOW_DEFAULTS_TAB, WORKFLOW_DEFAULTS_TABS } from '../store'
 import { TabPanel, Tabs } from '../components/Tabs'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { LANGUAGES, SOURCE_LANGUAGE, languageOf } from '@shared/i18n/languages'
@@ -66,6 +66,7 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'board.colors': () => <ColumnColors />,
   'assistant.provider': () => <AssistantProviderPicker />,
   'assistant.connection': () => <AssistantConnectionPicker />,
+  'assistant.mcp': () => <AssistantMcpServers />,
   'assistant.mode': () => <AssistantModePicker />,
   'assistant.journal': () => <JournalSettingsPanel />,
   ...Object.fromEntries(PROVIDERS.map((p) => [`assistant.provider:${p.id}`, () => <AssistantProviderDefaults provider={p.id} />])),
@@ -565,6 +566,49 @@ function AssistantConnectionPicker() {
       {providers.map((p) => (
         <ConnectionChoice key={p.id} id={`assistant-connection-${p.id}`} provider={p.id} value={ws.config.assistantConnection?.[p.id] ?? ''} onChange={(v) => void call('connections:setAssistant', p.id, v || null).then(() => actions.refreshWorkspace()).catch((e) => notify('error', tr(msg({ id: 'settings.assistant.connection.failed', defaultMessage: "Couldn't change the Assistant's connection", description: "An error's title: saving the Assistant's connection (Settings → Assistant) failed." })), errorMessage(e)))} />
       ))}
+    </div>
+  )
+}
+
+/**
+ * The open workspace's MCP servers the Assistant gets (HI-1472): a switch each, its own choice as a project's MCP tab
+ * has, kept while the workspace has the server off.
+ */
+function AssistantMcpServers() {
+  const ws = useStore((s) => s.workspace?.path ?? null)
+  const version = useStore((s) => s.skillsVersion)
+  const [servers, setServers] = useState<McpServerInfo[] | null>(null)
+  useEffect(() => {
+    let current = true
+    if (ws) void call('mcp:list').then((l) => current && setServers(l), () => current && setServers([]))
+    return () => void (current = false)
+  }, [ws, version])
+  if (!ws) return <div className="faint">{tr(msg({ id: 'settings.assistant.mcp.noWorkspace', defaultMessage: "Open a workspace to choose its Assistant's MCP servers.", description: 'Settings → Assistant → MCP servers with no workspace open.' }))}</div>
+  if (!servers) return null
+  if (!servers.length)
+    return (
+      <p className="hint">
+        {tr(msg({ id: 'settings.assistant.mcp.none', defaultMessage: 'The workspace has no MCP servers.', description: 'Settings → Assistant → MCP servers when the workspace has none.' }))} <a onClick={() => showView('mcp')}>{tr(msg({ id: 'settings.assistant.mcp.manage', defaultMessage: 'Open the MCP view', description: 'A link in Settings → Assistant → MCP servers: shows the MCP view, where servers are added.' }))}</a>
+      </p>
+    )
+  return (
+    <div className="toggle-list assistant-mcp">
+      {servers.map((m) => {
+        const on = !!m.def && m.globallyEnabled && m.assistant
+        const gated = !m.globallyEnabled && !m.error
+        return (
+          <div key={m.name} className={cx('toggle-item', !on && 'disabled')} data-mcp={m.name} data-gated={gated || undefined}>
+            <Icon name={m.def?.url ? 'globe' : 'plug'} />
+            <div className="ti-text">
+              <div className="ti-name">
+                {m.name} {gated && <span className="badge mcp-gated">{tr(actions.MCP_OFF_IN_WORKSPACE)}</span>}
+              </div>
+              <div className="ti-desc">{actions.mcpErrorText(m) ?? m.def?.description ?? m.def?.command}</div>
+            </div>
+            <Switch checked={m.assistant} disabled={!!m.error || (gated && !m.assistant)} label={tr(msg({ id: 'settings.assistant.mcp.switch', defaultMessage: '{name} on for the Assistant', description: "A server's switch in Settings → Assistant → MCP servers, for screen readers. {name} is the server." }), { name: m.name })} onChange={(v) => void actions.setMcpServerForAssistant(m, v)} />
+          </div>
+        )
+      })}
     </div>
   )
 }

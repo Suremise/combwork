@@ -150,6 +150,7 @@ the *Active* and *Approved* categories; the ids agents use (`doing`, `passed`) d
 | **ready** (a slot: warm) | Set up, dependencies installed, waiting for work. | bereit | lista | prêt | 準備済み | gotowy | pronto | 就绪 |
 | **project key** | A project's 2–4 letters (`HI`, `AM`), used in card keys, branch names and agent names. | Projektschlüssel | clave del proyecto | clé du projet | プロジェクトキー | klucz projektu | chave do projeto | 项目键 |
 | **builder** / **reviewer** / **either** (workflow role) | Which side of the workflow an agent takes. | Bearbeiter / Reviewer / beides | autor / revisor / ambos | auteur / relecteur / les deux | ビルダー / レビュアー / どちらも | wykonawca / recenzent / dowolna | executor / revisor / ambos | 构建者 / 评审者 / 均可 |
+| **generalist** (workflow role, HI-686) | Takes no side: does what the user asks in its pane, never a lane's builder or reviewer. | Generalist | generalista | généraliste | ゼネラリスト | generalista | generalista | 通才 |
 | **lane** | Hive's record of a card loop (existing term). | Lane | carril | couloir | レーン | tor | raia | 通道 |
 | **Start lane…** | Start a card loop from the board or the Progress panel, without the Assistant. | Lane starten… | Iniciar carril… | Démarrer un couloir… | レーンを開始… | Uruchom tor… | Iniciar raia… | 启动通道… |
 

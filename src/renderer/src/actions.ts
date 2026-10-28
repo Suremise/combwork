@@ -1,7 +1,7 @@
 import { basename } from './util'
 import { call, errorMessage } from './api'
 import { agentLimit } from './advanced'
-import { agentOf, agentProviderOf, cardLabelOf, choose, openVersionControl, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
+import { agentOf, cancelDialog, agentProviderOf, cardLabelOf, choose, openVersionControl, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
 import { MANY_AGENTS, agentLimitText, chosenLayout, layoutColumns, layoutPanes, moveAgentTo, projectLayout, projectSessionView, sessionInAgentFolder, swapAgentsIn } from '@shared/defaults'
 import { moveToCell, neighbourCell, orderByCells, type CellDirection } from '@shared/paneCells'
 import { defaultProviderPending, isProviderEnabled, projectDefaultProvider, providerName } from '@shared/providers'
@@ -17,8 +17,10 @@ import { shownText } from '@shared/advanced'
 import { fmt, tr } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
 import { HAND_OVER_TEXT } from '@shared/handOver'
-import type { McpServerInfo, ProjectInfo, ProjectProviderConfig, ProviderId, SessionLayout, SessionListItem, SessionView, ToastAction } from '@shared/types'
+import type { McpServerInfo, ProjectInfo, ProjectProviderConfig, ProviderId, SessionLayout, SessionListItem, SessionView, TemplateLoadPlan, ToastAction } from '@shared/types'
+import type { TemplateWorkflow } from '@shared/workflow/templateOptions'
 import { TEMPLATE_NAME_MAX, namesFollowKey, templateAgentNames, usesKey, type TemplateEntry, type TemplateScope } from '@shared/templates'
+import { PLATFORM_NAME } from '@shared/platform/switching'
 import { templateLoadDetail } from '@shared/templateLoad'
 import { PRESET_TEXT } from '@shared/workflow/optionTexts'
 import { WORKFLOW_ROLE_TEXT } from '@shared/workflow/roles'
@@ -951,27 +953,39 @@ export async function archiveCurrent(path: string | null = get().selectedProject
 /**
  * Turns a workspace MCP server on or off in the workspace (#1093, its master switch). On asks first, showing what it
  * runs (#550) and which projects to turn it on in: those that have it on (their choices, kept while it was off) and the
- * selected project are ticked. Off turns it off everywhere at once and keeps the projects' choices.
+ * selected project are ticked, and the Hive Assistant where it has it on (HI-1472). Off turns it off everywhere at once
+ * and keeps the projects' and the Assistant's choices.
  */
-export async function setMcpServerEnabled(server: Pick<McpServerInfo, 'name' | 'def' | 'revision' | 'runs' | 'secretWarnings'>, on: boolean): Promise<boolean> {
+export async function setMcpServerEnabled(server: Pick<McpServerInfo, 'name' | 'def' | 'revision' | 'runs' | 'secretWarnings' | 'assistant'>, on: boolean): Promise<boolean> {
   let picks: Record<string, boolean> | undefined
+  let forAssistant: boolean | undefined
   if (on) {
     const s = get()
     const projects = s.workspace?.projects ?? []
     const initial = projects.filter((p) => p.config.mcp.enabled.includes(server.name) || p.path === s.selectedProject).map((p) => p.path)
     picks = Object.fromEntries(projects.map((p) => [p.path, initial.includes(p.path)]))
+    forAssistant = server.assistant
     const ok = await confirm({
       title: tr(msg({ id: 'mcp.enable.confirmTitle', defaultMessage: 'Turn on {name}?', description: 'Title of the confirmation before an MCP server is turned on in the workspace. {name} is the server.' }), { name: server.name }),
-      message: tr(msg({ id: 'mcp.enable.confirmMessage', defaultMessage: 'New sessions in the projects you tick start it. It runs:', description: 'The confirmation before an MCP server is turned on in the workspace, above the command it runs and the projects to tick.' })),
+      message: tr(msg({ id: 'mcp.enable.confirmMessage', defaultMessage: 'New sessions start it wherever you tick. It runs:', description: 'The confirmation before an MCP server is turned on in the workspace, above the command it runs and the projects (and the Hive Assistant) to tick.' })),
       list: server.runs,
-      content: createElement(McpProjectPicker, { projects, initial, warnings: server.secretWarnings, onChange: (now: Record<string, boolean>) => void (picks = now) }),
+      content: createElement(McpProjectPicker, {
+        projects,
+        initial,
+        assistant: server.assistant,
+        warnings: server.secretWarnings,
+        onChange: (now: Record<string, boolean>, assistant: boolean) => {
+          picks = now
+          forAssistant = assistant
+        }
+      }),
       confirmLabel: tr(msg({ id: 'mcp.enable.confirmButton', defaultMessage: 'Turn On', description: 'Button: turns the MCP server on in the workspace and the projects ticked.' }))
     })
     if (!ok) return false
   }
   const done = await attempt(tr(msg({ id: 'actions.mcp.updateFailed', defaultMessage: 'Could not update the server', description: "An error's title: turning an MCP server on or off in the workspace failed." })), async () => {
     // The definition shown: if it was replaced or edited meanwhile, Hive refuses, and the user looks again.
-    await call('mcp:setGlobal', server.name, on, on ? { def: server.def, revision: server.revision } : undefined, picks)
+    await call('mcp:setGlobal', server.name, on, on ? { def: server.def, revision: server.revision } : undefined, picks, forAssistant)
     return true
   })
   set((s) => ({ skillsVersion: s.skillsVersion + 1 }))
@@ -993,16 +1007,45 @@ export async function setMcpServerInProject(target: Pick<ProjectInfo, 'path' | '
   return !!done
 }
 
+/**
+ * Turns a workspace MCP server on or off for the Hive Assistant (HI-1472, Settings → Assistant), its own choice as a
+ * project's: it runs for it while it is on in the workspace too. On asks first, showing what it runs and what to know
+ * about its definition, and is refused if that definition was replaced or edited meanwhile; off is at once.
+ */
+export async function setMcpServerForAssistant(server: Pick<McpServerInfo, 'name' | 'def' | 'revision' | 'runs' | 'secretWarnings'>, on: boolean): Promise<boolean> {
+  if (on) {
+    const ok = await confirm({
+      title: tr(msg({ id: 'mcp.assistant.confirmTitle', defaultMessage: 'Turn on {name} for the Assistant?', description: 'Title of the confirmation before an MCP server is turned on for the Hive Assistant (Settings → Assistant). {name} is the server.' }), { name: server.name }),
+      message: tr(msg({ id: 'mcp.assistant.confirmMessage', defaultMessage: "The Assistant's next session starts it. It runs:", description: 'The confirmation before an MCP server is turned on for the Hive Assistant, above the command it runs.' })),
+      list: server.runs,
+      detail: server.secretWarnings.length ? server.secretWarnings.join('\n') : undefined,
+      confirmLabel: tr(msg({ id: 'mcp.assistant.confirmButton', defaultMessage: 'Turn On', description: 'Button: turns the MCP server on for the Hive Assistant.' }))
+    })
+    if (!ok) return false
+  }
+  const done = await attempt(tr(msg({ id: 'mcp.assistant.updateFailed', defaultMessage: 'Could not update the server', description: "An error's title: turning an MCP server on or off for the Hive Assistant failed." })), async () => {
+    // The definition shown: if it was replaced or edited meanwhile, Hive refuses, and the user looks again.
+    await call('mcp:setAssistant', server.name, on, on ? { def: server.def, revision: server.revision } : undefined)
+    return true
+  })
+  set((s) => ({ skillsVersion: s.skillsVersion + 1 }))
+  return !!done
+}
+
 /** Why a workspace MCP server can't be used, in the window's language (#849): Hive's own words, else the JSON reader's as it gave them. */
 export const mcpErrorText = (server: Pick<McpServerInfo, 'error' | 'errorText'>): string | undefined => (server.errorText ? shownText(server.errorText) : server.error)
 
 /**
  * Where a workspace MCP server runs (#1093), in words, from the projects as the window has them: "Off in the
- * workspace", "On in Amberlight" or "On in no project".
+ * workspace", "On in Amberlight", "On in Amberlight and for the Hive Assistant", "On for the Hive Assistant only"
+ * (HI-1472) or "On in no project".
  */
-export function mcpWhereText(server: Pick<McpServerInfo, 'name' | 'def' | 'globallyEnabled'>, projects: readonly ProjectInfo[]): string {
+export function mcpWhereText(server: Pick<McpServerInfo, 'name' | 'def' | 'globallyEnabled' | 'assistant'>, projects: readonly ProjectInfo[]): string {
   if (!server.globallyEnabled) return tr(MCP_OFF_IN_WORKSPACE)
   const on = projects.filter((p) => serverOnIn(server, p.config.mcp)).map((p) => p.name)
+  const assistant = !!server.def && server.assistant
+  if (on.length && assistant) return tr(msg({ id: 'mcp.where.someAndAssistant', defaultMessage: 'On in {projects} and for the Hive Assistant', description: 'Where an MCP server is on, under it in the MCP view: in some projects and for the Hive Assistant. {projects} lists the projects.' }), { projects: fmt.list(on) })
+  if (assistant) return tr(msg({ id: 'mcp.where.assistantOnly', defaultMessage: 'On for the Hive Assistant only', description: 'Where an MCP server is on, under it in the MCP view: for the Hive Assistant, in no project.' }))
   return on.length
     ? tr(msg({ id: 'mcp.where.some', defaultMessage: 'On in {projects}', description: 'Where an MCP server is on, under it in the MCP view. {projects} lists the projects.' }), { projects: fmt.list(on) })
     : tr(msg({ id: 'mcp.where.none', defaultMessage: 'On in no project', description: 'Where an MCP server is on, under it in the MCP view: on in the workspace, but no project has it on.' }))
@@ -1262,9 +1305,18 @@ export function moveAgentPane(dir: CellDirection, path: string | null = get().se
 // Agent templates (#126)
 // ---------------------------------------------------------------------------
 
+/** What a save says it did with the template's workflow (HI-1910): saved for the project's version control, kept from before. */
+const TW = {
+  saved: msg({ id: 'actions.template.workflowSaved', defaultMessage: "It holds this project's workflow for {platform}.", description: "Under the notification that a template was saved (HI-1910): it holds the project's workflow options for its version control ({platform}: None or Git, as Hive names them)." }),
+  kept: msg({ id: 'actions.template.workflowKept', defaultMessage: "{count, plural, one {The workflow for {platforms} it had is kept.} other {The workflows for {platforms} it had are kept.}}", description: "Under the notification that a template was saved over one of the same name (HI-1910): the workflow sections it had for {platforms} (None, Git: a list) are kept, {count} of them." }),
+  changed: msg({ id: 'actions.template.workflowChanged', defaultMessage: 'The template "{template}" changed while it loaded, so its workflow wasn’t filled in. Load it again to see its workflow as it is now.', description: "A warning after loading a template (HI-1910): its workflow section changed between the Load dialog's preview and the load ({template}: its name), so the Workflow form isn't filled in with it." }),
+  none: msg({ id: 'actions.template.workflowNone', defaultMessage: 'It holds no workflow.', description: "Under the notification that a template was saved (HI-1910): saved without the project's workflow, and it had none." })
+}
+
 /**
  * Save Template…: the project's agents and layout under a name, in the project (private) or, ticked, the workspace (for
- * every project). A name already there asks before it is replaced.
+ * every project). A name already there asks before it is replaced. HI-1910: ticked (by default), the project's workflow
+ * too, as its section for the project's version control; the notice says what it holds, and what it kept from before.
  */
 export async function saveTemplate(path: string): Promise<void> {
   const p = project(path)
@@ -1275,19 +1327,22 @@ export async function saveTemplate(path: string): Promise<void> {
   const key = get().projectKeys.find((k) => k.projectPath.toLowerCase() === path.toLowerCase())?.key ?? null
   const offerPatterns = namesFollowKey(p.agents.map((a) => a.name), key)
   let usePatterns = offerPatterns
+  let includeWorkflow = true
+  const platform = p.platform?.id ?? 'none'
   const name = await prompt({
     title: tr(msg({ id: 'actions.template.saveTitle', defaultMessage: 'Save as template', description: 'Title of the Save as Template dialog.' })),
-    message: tr(msg({ id: 'actions.template.saveMessage', defaultMessage: "A template keeps the project's {n, plural, one {agent} other {# agents}} (settings, roles and notes), its layout and its preset, to load into any project later. Sessions and worktrees aren't saved.", description: "The Save as Template dialog: what a template keeps of the project's {n} agents. Glossary: preset." }), { n: p.agents.length }),
+    message: tr(msg({ id: 'actions.template.saveMessage2', defaultMessage: "A template keeps the project's {n, plural, one {agent} other {# agents}} (settings, roles and notes), its layout and, ticked below, its workflow, to load into any project later. Sessions and worktrees aren't saved.", description: "The Save as Template dialog: what a template keeps of the project's {n} agents (HI-1910: its workflow options, when the box below is ticked). Glossary: workflow." }), { n: p.agents.length }),
     placeholder: tr(msg({ id: 'actions.template.namePlaceholder', defaultMessage: 'Template name', description: "Placeholder of the Save as Template dialog's name box." })),
     confirmLabel: tr(msg({ id: 'actions.template.save', defaultMessage: 'Save', description: 'Button: saves the template.' })),
     validate: (v) => (!v.trim() ? tr(msg({ id: 'actions.template.nameEmpty', defaultMessage: 'Enter a name.', description: "Why a template's name can't be used: it is empty." })) : v.trim().length > TEMPLATE_NAME_MAX ? tr(msg({ id: 'actions.template.nameTooLong', defaultMessage: 'At most {max} characters.', description: "Why a template's name can't be used: it is longer than {max} characters." }), { max: TEMPLATE_NAME_MAX }) : null),
     check: { label: tr(msg({ id: 'actions.template.everyProject', defaultMessage: 'For every project in the workspace (else for this project only)', description: "A tick box in the Save as Template dialog: the template is the workspace's (ticked) or this project's." })), initial: false, set: (v) => (workspaceScope = v) },
-    check2: offerPatterns ? { label: tr(msg({ id: 'actions.template.usePatterns', defaultMessage: 'Use the project key in names ({example} becomes {pattern}, named from the key of the project it is loaded into)', description: "A tick box in the Save as Template dialog (#1440): agent names that start with this project's key ({example}, e.g. HI-B1) are saved as a pattern ({pattern}: {key}-B{n}), so a project loading the template names them with its own key. Keep {key} and {n} as they are." }), { example: p.agents.map((a) => a.name).find((n) => n.toUpperCase().startsWith(`${key}-`)) ?? `${key}-B1`, pattern: '{key}-B{n}' }), initial: true, set: (v) => (usePatterns = v) } : undefined
+    check2: offerPatterns ? { label: tr(msg({ id: 'actions.template.usePatterns', defaultMessage: 'Use the project key in names ({example} becomes {pattern}, named from the key of the project it is loaded into)', description: "A tick box in the Save as Template dialog (#1440): agent names that start with this project's key ({example}, e.g. HI-B1) are saved as a pattern ({pattern}: {key}-B{n}), so a project loading the template names them with its own key. Keep {key} and {n} as they are." }), { example: p.agents.map((a) => a.name).find((n) => n.toUpperCase().startsWith(`${key}-`)) ?? `${key}-B1`, pattern: '{key}-B{n}' }), initial: true, set: (v) => (usePatterns = v) } : undefined,
+    check3: { label: tr(msg({ id: 'actions.template.includeWorkflow', defaultMessage: "Include this project's workflow (its rules for {platform}: review, checks by name, merging, stages; never its target branch, check commands or identity's name)", description: "A tick box in the Save as Template dialog (HI-1910), ticked by default: the template keeps the project's workflow options for its version control ({platform}: None or Git, as Hive names them), the rules only. Glossary: workflow, check, target branch, identity." }), { platform: tr(PLATFORM_NAME[platform]) }), initial: true, set: (v) => (includeWorkflow = v) }
   })
   if (name === null) return
   const scope: TemplateScope = workspaceScope ? 'workspace' : 'project'
   const saveFailed = (): string => tr(msg({ id: 'actions.template.saveFailed', defaultMessage: 'Could not save the template', description: "An error's title: saving a template failed." }))
-  let r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, false, usePatterns))
+  let r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, false, usePatterns, includeWorkflow))
   if (r && 'exists' in r) {
     const ok = await confirm({
       title: tr(msg({ id: 'actions.template.replaceTitle', defaultMessage: 'Replace the template?', description: 'Title of the question when a template of that name exists.' })),
@@ -1296,10 +1351,20 @@ export async function saveTemplate(path: string): Promise<void> {
       confirmLabel: tr(msg({ id: 'actions.template.replace', defaultMessage: 'Replace', description: 'Button: replaces the template of that name.' }))
     })
     if (!ok) return
-    r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, true, usePatterns))
+    r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, true, usePatterns, includeWorkflow))
   }
   if (r && 'saved' in r) set((s) => ({ templatesVersion: s.templatesVersion + 1 }))
-  if (r && 'saved' in r) notify('success', tr(msg({ id: 'actions.template.saved', defaultMessage: 'Template saved', description: "A notification's title: the template was saved." })), tr(msg({ id: 'actions.template.savedMessage', defaultMessage: '"{name}" ({n, plural, one {# agent} other {# agents}}), for {scope, select, workspace {the workspace} other {this project}}.', description: "Under the notification that a template ({name}) of {n} agents was saved for the workspace (workspace) or this project (other)." }), { name: r.saved.name, n: r.saved.agents.length, scope }))
+  if (r && 'saved' in r) {
+    // What it holds of the workflow (HI-1910): the section saved now, those kept from the template it replaced, or none.
+    const w = r.workflow
+    const lines = [
+      tr(msg({ id: 'actions.template.savedMessage', defaultMessage: '"{name}" ({n, plural, one {# agent} other {# agents}}), for {scope, select, workspace {the workspace} other {this project}}.', description: "Under the notification that a template ({name}) of {n} agents was saved for the workspace (workspace) or this project (other)." }), { name: r.saved.name, n: r.saved.agents.length, scope }),
+      ...(w.saved ? [tr(TW.saved, { platform: tr(PLATFORM_NAME[w.saved]) })] : []),
+      ...(w.kept.length ? [tr(TW.kept, { count: w.kept.length, platforms: fmt.list(w.kept.map((k) => tr(PLATFORM_NAME[k]))) })] : []),
+      ...(!w.saved && !w.kept.length ? [tr(TW.none)] : [])
+    ]
+    notify('success', tr(msg({ id: 'actions.template.saved', defaultMessage: 'Template saved', description: "A notification's title: the template was saved." })), lines.join(' '))
+  }
 }
 
 /**
@@ -1308,7 +1373,10 @@ export async function saveTemplate(path: string): Promise<void> {
  * into Provider Setup or Settings). `from`: the project a project's template is kept in, when it isn't this one (the Templates
  * view loads any template into any project). A preset it suggests that the project's options didn't start from is
  * offered (#1436): ticked, the Version Control tab's Workflow section opens with it chosen, not saved, so what it changes
- * shows before anything is.
+ * shows before anything is. HI-1910: a template's workflow for the project's version control is shown, and applied the
+ * same way (ticked by default): the Workflow section opens with it laid over the project's options as it reads them, to
+ * save there. A Git-only workflow in a project with no version control waits for Git: Set Up Git… closes the dialog and
+ * opens Version Control on Git's page (`templatePending`), and the dialog opens again once the project is Git.
  */
 export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'scope' | 'file' | 'name'>, from?: string): Promise<void> {
   const plan = await attempt(tr(msg({ id: 'actions.template.readFailed', defaultMessage: 'Could not read the template', description: "An error's title: reading a template failed." })), () => call('templates:plan', path, entry.scope, entry.file, from))
@@ -1335,8 +1403,16 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
   let names = plan.create.map((a) => a.name)
   // The connection chosen for each agent whose own can't be used here (HI-1769), by its index in the plan.
   let connections: Record<number, string | null> = Object.fromEntries(plan.connections.map((c) => [c.index, null]))
-  const suggested = plan.suggestedPreset
+  // Its workflow (HI-1910) replaces the suggestion: shown and applied where it has a section for this project's version
+  // control, waiting for Git where it has only Git's, said where one can't be used (never replaced by the suggestion).
+  const wf = plan.workflow
+  const suggested = wf ? null : plan.suggestedPreset
   let switchPreset = false
+  let applyWorkflow = true
+  let setUpGit = false
+  // The plan the dialog shows last, and what the load read (HR5's round 1: never a workflow other than the one shown).
+  let shown = plan
+  const got: { loaded: { workflow: TemplateWorkflow | null } | null } = { loaded: null }
   const ok = await confirm({
     title: tr(msg({ id: 'actions.template.loadTitle', defaultMessage: 'Load "{name}"?', description: 'Title of the question before loading a template ({name}) into a project.' }), { name: plan.name }),
     message: plan.remove.length
@@ -1345,7 +1421,22 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
     // Who goes and who comes: each new agent's settings, and its new worktree's branch and folder in this project (#268),
     // as a table (#511), with their names to choose (#702).
     detail: templateLoadDetail(plan, p.config, get().settings, (id) => get().providers[id]),
-    content: createElement(TemplateLoadNames, { path, scope: entry.scope, file: entry.file, from, initial: plan, onChange: (now: string[]) => void (names = now), onConnections: (now: Record<number, string | null>) => void (connections = now) }),
+    content: createElement(TemplateLoadNames, {
+      path,
+      scope: entry.scope,
+      file: entry.file,
+      from,
+      initial: plan,
+      onChange: (now: string[]) => void (names = now),
+      onConnections: (now: Record<number, string | null>) => void (connections = now),
+      onWorkflow: (v: boolean) => void (applyWorkflow = v),
+      onPlan: (now: TemplateLoadPlan) => void (shown = now),
+      // Closes this dialog (nothing loaded) for Version Control's Git page: never a dialog over a dialog.
+      onSetUpGit: () => {
+        setUpGit = true
+        cancelDialog()
+      }
+    }),
     wide: true,
     scrollDetail: true,
     confirmLabel: tr(msg({ id: 'actions.template.load', defaultMessage: 'Load template', description: 'Button: loads the template into the project.' })),
@@ -1354,12 +1445,28 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
     // The preset it suggests (#1436): off by default, and only ever chosen in the form, never saved from here.
     check: suggested ? { label: tr(msg({ id: 'actions.template.switchPreset', defaultMessage: 'Also switch this project to {preset}… (opens Version Control → Workflow with it chosen, to save there)', description: "A tick box when loading a template that suggests a preset ({preset}: Solo, Pair or Team, as the presets are named): after loading, the project's Version Control tab opens at Workflow with that preset chosen but not saved. Glossary: preset." }), { preset: tr(PRESET_TEXT[suggested]) }), initial: false, set: (v) => (switchPreset = v) } : undefined,
     run: async () => {
-      await call('templates:load', path, entry.scope, entry.file, expected, from, names, connections)
+      got.loaded = await call('templates:load', path, entry.scope, entry.file, expected, from, names, connections)
     }
   })
-  if (!ok) return
+  if (!ok) {
+    if (setUpGit) {
+      set({ templatePending: { path, entry: { scope: entry.scope, file: entry.file, name: entry.name }, ...(from ? { from } : {}) }, vcGitPreview: path })
+      openVersionControl(path, 'workflow')
+    }
+    return
+  }
   await refreshWorkspace()
-  if (suggested && switchPreset) {
+  const seen = shown.workflow
+  if (applyWorkflow && seen?.section) {
+    // The section the load read, only if it is the one shown: changed meanwhile, it is said, never filled in.
+    const section = got.loaded?.workflow ?? null
+    if (JSON.stringify(section) !== JSON.stringify(seen.section)) notify('warning', tr(TW.changed, { template: plan.name }))
+    else {
+      // Laid over the project's options as the Workflow form reads them, and left for the user to save (HR5: never here).
+      set({ workflowPrefill: { path, preset: seen.section.preset, template: { name: plan.name, platform: seen.platform, section: seen.section } } })
+      openVersionControl(path, 'workflow')
+    }
+  } else if (suggested && switchPreset) {
     // Filled in once the form has read the project's options (#1423's way), and left for the user to save.
     set({ workflowPrefill: { path, preset: suggested } })
     openVersionControl(path, 'workflow')
@@ -1585,7 +1692,7 @@ export async function releaseHeldSlot(path: string, slot: string): Promise<void>
     title: tr(msg({ id: 'actions.releaseHeld.title', defaultMessage: "Release {agent}'s slot {slot}?", description: "Title of the question before releasing a slot ({slot}, such as slot-b) that an agent's ({agent}) last session there still holds: it has ended, but Hive doesn't know that everything it started has." }), { agent, slot }),
     message: w.hive.self
       ? tr(msg({ id: 'actions.releaseHeld.messageSelf', defaultMessage: "{agent}'s last session in {slot} (run {run}) has ended in this Hive (process {pid}, running), but Hive doesn't know that everything it started there has: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Hive; its processes were kept running or Hive could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Hive's process id: they tell one launch from another." }), { agent, slot, run: w.run, pid: w.hive.pid })
-      : tr(msg({ id: 'actions.releaseHeld.messageGone', defaultMessage: "{slot} is held by {agent}'s session (run {run}) in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another." }), { agent, slot, run: w.run, pid: w.hive.pid }),
+      : tr(msg({ id: 'actions.releaseHeld.messageGone', defaultMessage: "{slot} is held by a session of agent {agent} (run {run}) in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another. A noun before the name (glossary §1 rule 4)." }), { agent, slot, run: w.run, pid: w.hive.pid }),
     ...(w.processes?.list.length ? { list: w.processes.list.map((p) => tr(msg({ id: 'actions.releaseHeld.process', defaultMessage: '{label} (process {pid})', description: "Release Slot…: one process the agent's session left running, as listed: what it runs ({label}, such as node serve.js) and its process id ({pid})." }), { label: p.label, pid: p.pid })), listOnly: true } : {}),
     detail: w.processes?.list.length
       ? tr(msg({ id: 'actions.releaseHeld.detailListed', defaultMessage: '{n, plural, one {Hive lists # process its session left running.} other {Hive lists # processes its session left running.}} Released while they run, they may still write in the slot as other work uses it.', description: "Release Slot…: under the list of processes the agent's session left running ({n}: how many)." }), { n: w.processes.list.length + w.processes.more })

@@ -204,17 +204,22 @@ describe('who moves cards to On Hold and Passed', () => {
     expect(history(merged).at(-1)).toBe('Coder (alpha): Moved to Done')
   })
 
-  it("a failed verdict can't move the card on: it stays in Review for its fixes", async () => {
+  it("a failed verdict can't move the card anywhere but back to Doing, its builder's (HI-1946)", async () => {
     const c = await run(() => tasks.createTask({ title: 'Not yet', project: 'alpha', agent: 'c1', column: 'review' }, user))
     await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
-    for (const column of ['passed', 'done'] as const) await expect(run(() => tasks.updateTask(c.number, { review: 'failed', column }, reviewer))).rejects.toThrow(/A failed review leaves #\d+ in Review/)
+    const was = await run(() => tasks.getTask(c.number))
+    // Refused before anything is written: no verdict, no move, no hold.
+    for (const column of ['passed', 'done', 'review', 'todo'] as const) await expect(run(() => tasks.updateTask(c.number, { review: 'failed', column }, reviewer))).rejects.toThrow(/A failed review sends #\d+ back to Doing, to its builder/)
     const still = await run(() => tasks.getTask(c.number))
-    expect([still.column, still.review?.agent]).toEqual(['review', 'r1'])
+    expect([still.column, still.review?.agent, still.history.length, still.held?.length]).toEqual(['review', 'r1', was.history.length, was.held?.length])
+    // To Doing named, or no column: the same verdict.
+    const failed = await run(() => tasks.updateTask(c.number, { review: 'failed', column: 'doing' }, reviewer))
+    expect([failed.column, failed.agent, failed.review]).toEqual(['doing', 'c1', undefined])
   })
 
   it("another agent's card in Doing can't be moved on to Passed by a project agent", async () => {
     const c = await run(() => tasks.createTask({ title: 'In progress', project: 'alpha', agent: 'c1', column: 'doing' }, user))
-    await expect(run(() => tasks.updateTask(c.number, { column: 'passed' }, reviewer))).rejects.toThrow(/can't be moved to Passed by another agent/)
+    await expect(run(() => tasks.updateTask(c.number, { column: 'passed' }, reviewer))).rejects.toThrow(/another agent can't move it to Approved/)
   })
 
   it('an unknown column lists the six', async () => {

@@ -162,7 +162,7 @@
   "service.keys.prefix": "{key} et la clé {other} d’un autre projet commencent pareil : aucune clé ne peut être le début d’une autre.",
   "service.keys.taken": "{key} est la clé d’un autre projet, ou l’a été : une clé reste à son projet pour de bon.",
   "service.keys.unknownProject": "Ce projet n’a pas encore d’identifiant, il ne peut donc pas avoir de clé : ouvre-le d’abord dans Hive.",
-  "service.laneStart.busy": "{agent} {status, select, working {travaille} starting {est en train de démarrer} waiting {attend ta réponse} background {attend des tâches en arrière-plan qu’il a lancées} signin {a besoin que tu te reconnectes} other {attend des cartes (une surveillance de cartes)}}. Démarre le couloir quand il est libre, ou choisis un autre agent.",
+  "service.laneStart.busy": "{status, select, working {L’agent {agent} travaille.} starting {L’agent {agent} est en train de démarrer.} waiting {L’agent {agent} attend ta réponse.} background {L’agent {agent} attend des tâches en arrière-plan qu’il a lancées.} signin {L’agent {agent} a besoin que tu te reconnectes.} other {L’agent {agent} attend des cartes (une surveillance de cartes).}} Démarre le couloir quand il est libre, ou choisis un autre agent.",
   "service.laneStart.done": "La carte {card} est déjà terminée.",
   "service.laneStart.needsReviewer": "Les règles du projet {project} font relire chaque carte par un agent relecteur : choisis un relecteur.",
   "service.laneStart.noCards": "Choisis les cartes du couloir.",

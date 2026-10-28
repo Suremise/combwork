@@ -907,7 +907,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
     // that has it out); then each card whose work is on that line follows it (LineRenamed); then the agent's record,
     // the rename dropped from the list. Cut short anywhere, the next Repair finishes it from there (branchesOf).
     for (const b of h.branches ?? []) {
-      if (b.kept) say(report, 'skipped', tr(msg({ id: 'main.move.branchTaken', defaultMessage: "{host}: {agent}'s branch {from} keeps its name: {to} is already a branch.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place isn't renamed, because a branch with its new name exists. {host} is the project; {agent} an agent; {from} and {to} are branch names." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to }), { host: h.name, what: { kind: 'branch', agent: b.agentName }, was: b.from, now: b.from, names: true, result: tr(R.taken) })
+      if (b.kept) say(report, 'skipped', tr(msg({ id: 'main.move.branchTaken', defaultMessage: '{host}: branch {from} of agent {agent} keeps its name: {to} is already a branch.', description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place isn't renamed, because a branch with its new name exists. {host} is the project; {agent} an agent; {from} and {to} are branch names. A noun before the name (glossary §1 rule 4)." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to }), { host: h.name, what: { kind: 'branch', agent: b.agentName }, was: b.from, now: b.from, names: true, result: tr(R.taken) })
     }
     const renames = (h.branches ?? []).filter((b) => !b.kept)
     // No reconciliation reads a line while it is renamed: runs under way finish first, and new ones wait (repairingMove).
@@ -917,7 +917,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
       // after, none once it's gone; the name it was to have is in the row's full line.
       const branchRow = { host: h.name, what: { kind: 'branch', agent: b.agentName }, was: b.from, names: true } as const
       const failed = (why: string): void => {
-        say(report, 'failed', tr(msg({ id: 'main.move.branchFailed', defaultMessage: "{host}: {agent}'s branch {from} couldn't be renamed to {to} ({why}).", description: "A line of Repair's report, after a workspace or project moved to another folder. {host} is the project; {agent} an agent; {from} and {to} are branch names; {why} is git's or the system's message." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to, why }), { ...branchRow, now: b.from, result: tr(R.renameFailed, { why }) })
+        say(report, 'failed', tr(msg({ id: 'main.move.branchFailed', defaultMessage: "{host}: branch {from} of agent {agent} couldn't be renamed to {to} ({why}).", description: "A line of Repair's report, after a workspace or project moved to another folder. {host} is the project; {agent} an agent; {from} and {to} are branch names; {why} is git's or the system's message. A noun before the name (glossary §1 rule 4)." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to, why }), { ...branchRow, now: b.from, result: tr(R.renameFailed, { why }) })
       }
       const whyOf = (e: unknown): string => (e instanceof Error ? e.message : String(e))
       try {
@@ -946,7 +946,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
       } else if (!has(b.to)) {
         // Neither name is a branch any more (deleted meanwhile): nothing to rename, and nothing left to finish.
         await ws.mutateProjectConfig(h.path, (cfg) => ({ pendingBranchRenames: dropRename(cfg.pendingBranchRenames, b.agentId) })).catch((e) => log.warn('dropping a branch rename', e))
-        say(report, 'skipped', tr(msg({ id: 'main.move.branchGone', defaultMessage: "{host}: {agent}'s branch {from} is gone, so it isn't renamed.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch to rename no longer exists. {host} is the project; {agent} an agent; {from} a branch name." }), { host: h.name, agent: b.agentName, from: b.from }), { ...branchRow, result: tr(R.gone) })
+        say(report, 'skipped', tr(msg({ id: 'main.move.branchGone', defaultMessage: "{host}: branch {from} of agent {agent} is gone, so it isn't renamed.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch to rename no longer exists. {host} is the project; {agent} an agent; {from} a branch name. A noun before the name (glossary §1 rule 4)." }), { host: h.name, agent: b.agentName, from: b.from }), { ...branchRow, result: tr(R.gone) })
         continue
       }
       try {
@@ -959,15 +959,15 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
           ...(space && space.toLowerCase() !== refPart(basename(ws.path ?? ''), 'workspace').toLowerCase() && !(cfg.branchSpaces ?? []).some((s) => s.toLowerCase() === space.toLowerCase()) ? { branchSpaces: [...(cfg.branchSpaces ?? []), space] } : {})
         }))
       } catch (e) {
-        say(report, 'failed', tr(msg({ id: 'main.move.branchUnrecorded', defaultMessage: "{host}: {agent}'s branch is now {to}, but Hive couldn't record it yet ({why}). Repair finishes it.", description: "A line of Repair's report, after a workspace or project moved to another folder: git renamed an agent's branch, and Hive's record of it (or of the cards on it) couldn't be written; the next Repair finishes it. {host} is the project; {agent} an agent; {to} the branch's new name; {why} the system's message." }), { host: h.name, agent: b.agentName, to: b.to, why: whyOf(e) }), { ...branchRow, now: b.to, result: tr(R.unrecorded, { why: whyOf(e) }) })
+        say(report, 'failed', tr(msg({ id: 'main.move.branchUnrecorded', defaultMessage: "{host}: the branch of agent {agent} is now {to}, but Hive couldn't record it yet ({why}). Repair finishes it.", description: "A line of Repair's report, after a workspace or project moved to another folder: git renamed an agent's branch, and Hive's record of it (or of the cards on it) couldn't be written; the next Repair finishes it. {host} is the project; {agent} an agent; {to} the branch's new name; {why} the system's message. A noun before the name (glossary §1 rule 4)." }), { host: h.name, agent: b.agentName, to: b.to, why: whyOf(e) }), { ...branchRow, now: b.to, result: tr(R.unrecorded, { why: whyOf(e) }) })
         continue
       }
       say(
         report,
         'done',
         b.remote
-          ? tr(msg({ id: 'main.move.branchRenamedRemote', defaultMessage: "{host}: {agent}'s branch {from} is now {to}; it still tracks {remote}'s {from}, so push it under the new name when you're ready.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, and it tracks a remote, which keeps the old name. {host} is the project; {agent} an agent; {from} and {to} are branch names; {remote} the remote (origin)." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to, remote: b.remote })
-          : tr(msg({ id: 'main.move.branchRenamed', defaultMessage: "{host}: {agent}'s branch {from} is now {to}.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, with Hive's record of it. {host} is the project; {agent} an agent; {from} and {to} are branch names." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to }),
+          ? tr(msg({ id: 'main.move.branchRenamedRemote', defaultMessage: "{host}: branch {from} of agent {agent} is now {to}; it still tracks {from} on remote {remote}, so push it under the new name when you're ready.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, and it tracks a remote, which keeps the old name. {host} is the project; {agent} an agent; {from} and {to} are branch names; {remote} the remote (origin). A noun before each name (glossary §1 rule 4)." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to, remote: b.remote })
+          : tr(msg({ id: 'main.move.branchRenamed', defaultMessage: '{host}: branch {from} of agent {agent} is now {to}.', description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, with Hive's record of it. {host} is the project; {agent} an agent; {from} and {to} are branch names. A noun before the name (glossary §1 rule 4)." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to }),
         { ...branchRow, now: b.to, result: tr(R.renamed, { remote: b.remote ?? 'none' }) }
       )
     }

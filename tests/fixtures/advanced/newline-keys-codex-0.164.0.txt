@@ -1,0 +1,25 @@
+Codex 0.164.0's keys for a new line in its input box (HI-1327), and how Windows' console delivers the keys Hive presses.
+Not a run of Codex.
+
+1. Codex's source at rust-v0.164.0 = 6aaac694803004a63c6f393d153c96d22521a6b9, codex-rs/tui/src/keymap.rs lines 1711-1727
+(the composer sends on plain Enter; the editor's insert_newline keys):
+
+                submit: default_bindings![plain(KeyCode::Enter)],
+                queue: default_bindings![plain(KeyCode::Tab)],
+...
+                insert_newline: default_bindings![
+                    ctrl(KeyCode::Char('j')),
+                    ctrl(KeyCode::Char('m')),
+                    plain(KeyCode::Enter),
+                    shift(KeyCode::Enter),
+                    alt(KeyCode::Enter)
+                ],
+
+2. HI-1327's probe (28 Oct 2026): Hive's node-pty (@lydell/node-pty, ConPTY, Windows 11 26200) running a PowerShell
+[Console]::ReadKey loop, which reads the console's KEY_EVENT records as crossterm does; bytes written as Hive types:
+
+wrote "\n" (LF)                                  -> KEY key=Enter mods=Control char=10
+wrote "\r" (CR)                                  -> KEY key=Enter mods=0 char=13
+wrote "\x1b\r" (ESC CR)                          -> KEY key=Enter mods=Alt char=13
+wrote "\x1b[74;36;10;1;8;1_\x1b[74;36;10;0;8;1_"  -> KEY key=J mods=Control char=10
+wrote "\x1b[13;28;13;1;16;1_\x1b[13;28;13;0;16;1_" -> KEY key=Enter mods=Shift char=13

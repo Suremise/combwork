@@ -7,6 +7,7 @@ import type { HiveEvent } from '@shared/types'
 import { call } from './api'
 import { playChime } from './chime'
 import { matchKeybinding, runCommand } from './commands'
+import { HooksDialog } from './components/HooksDialog'
 import { AboutDialog, AgentSetupDialog, DiagnosticsDialog, CommandPalette, CompactDialog, Dialogs, NotificationCenter, ProvidersBanner, QuitDialog, QuitPendingBanner, ShortcutsDialog, Toasts } from './components/Overlays'
 import { ConnectionsIntroBanner } from './components/ConnectionChoice'
 import { AddAgentDialog, AgentSettingsDialog, HandOverDialog, MergeDialog, TemplateAgentDialog } from './components/AgentDialogs'
@@ -18,6 +19,7 @@ import { ArchiveAllDialog, BoardView, MoveToDoingDialog, TaskDialog, TaskStartDi
 import { LaneStartDialog } from './components/LaneStartDialog'
 import { WorkspaceOverviewView } from './views/WorkspaceOverview'
 import { PerformanceView } from './views/Performance'
+import { WorkspaceActivityView } from './views/WorkspaceActivity'
 import { RemoveProjectDialog } from './components/ProjectRemoval'
 import { UpdateDialog } from './components/Updates'
 import { ModeMenuHost } from './components/PermissionMode'
@@ -34,8 +36,8 @@ import { AssistantPanel, AssistantSettingsDialog } from './components/Assistant'
 import { ProgressPanel, progressRunsChanged } from './components/Progress'
 import { queueBoardChanged, queueChangedEvent } from './queueSource'
 import { AssistantMain } from './components/AssistantView'
-import { loadAssistantChanges } from './assistantUndo'
-import { agentOnScreen, applyLeftovers, applyLiveState, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
+import { reloadAssistantChanges } from './assistantUndo'
+import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, noteAssistantAction, flushLiveStates, setLoaded, setWithLive, showWorkspace, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, dismissToast, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
 import { DocsView, McpView, NotesView, SkillView, WelcomeView } from './views/OtherViews'
 import { TemplatesView } from './components/Templates'
 import { ProjectView } from './views/ProjectView'
@@ -87,11 +89,11 @@ let chimesPlayed = 0
 function handleEvent(e: HiveEvent): void {
   switch (e.type) {
     case 'workspace-progress':
-      set({ openProgress: e.progress })
+      setLoaded({ openProgress: e.progress })
       break
     case 'recent-changed':
       // Opened, removed or cleared (in any window): this window's view of the list, asked for again (#144).
-      void call('workspace:recent').then((recent) => set({ recent })).catch(() => undefined)
+      void call('workspace:recent').then((recent) => setLoaded({ recent })).catch(() => undefined)
       break
     case 'workspace-changed': {
       const sel = get().selectedProject
@@ -102,8 +104,7 @@ function handleEvent(e: HiveEvent): void {
       if (other) set({ assistantOpen: assistantWasOpen(ws?.path), tasks: [], boardProject: null, taskOpen: null, taskStartFor: null, laneStartFor: null, taskDoing: null })
       if (other) void loadLeftovers()
       if (other) void loadAdvanced()
-      // Drop warnings about projects that belong to a workspace that is no longer open.
-      set((s) => ({ workspace: ws, toasts: s.toasts.filter((t) => !t.id.startsWith('mcp-') || !!ws?.projects.some((p) => t.id === `mcp-${p.path}`)) }))
+      showWorkspace(ws, other)
       if (ws && (!sel || !ws.projects.some((p) => p.path === sel))) set({ selectedProject: (ws.projects.find((p) => p.active) ?? ws.projects[0])?.path ?? null })
       if (!ws) set({ selectedProject: null })
       if (other) void loadTasks()
@@ -116,7 +117,8 @@ function handleEvent(e: HiveEvent): void {
       const key = projectKey(path, e.state.agentId)
       // As last told, a state not shown yet too (applyLiveState shows them a few times a second, HI-1806).
       const prev = liveStateOf(path, e.state.agentId)
-      if (e.state.status === 'starting' && !prev?.settingUp) set((s) => ({ sessionEpoch: { ...s.sessionEpoch, [key]: (s.sessionEpoch[key] ?? 0) + 1 } }))
+      // Its new terminal shown with its start, in the same update (HI-1862: a dozen agents started at once).
+      if (e.state.status === 'starting' && !prev?.settingUp) setWithLive((s) => ({ sessionEpoch: { ...s.sessionEpoch, [key]: (s.sessionEpoch[key] ?? 0) + 1 } }), true)
       // A new launch: the last one's failure no longer applies.
       if (e.state.status === 'starting') clearStartFailure(path, e.state.agentId)
       // An agent on screen is seen as it finishes: it never shows as unseen.
@@ -127,7 +129,7 @@ function handleEvent(e: HiveEvent): void {
       break
     }
     case 'session-exit': {
-      set((s) => ({ usageVersion: { ...s.usageVersion, [e.projectPath]: (s.usageVersion[e.projectPath] ?? 0) + 1 } }))
+      bumpUsage(e.projectPath)
       // Why and when it ended, for its stopped pane (HI-1881); a failed launch has none (its failed bar says so).
       if (e.ended) noteEnd(findProject(get(), e.projectPath)?.path ?? e.projectPath, e.agentId, e.ended)
       if (!e.failure) break
@@ -160,12 +162,14 @@ function handleEvent(e: HiveEvent): void {
       break
     }
     case 'usage-changed': {
-      const path = findProject(get(), e.projectPath)?.path ?? e.projectPath
-      set((s) => ({ usageVersion: { ...s.usageVersion, [path]: (s.usageVersion[path] ?? 0) + 1 } }))
+      bumpUsage(findProject(get(), e.projectPath)?.path ?? e.projectPath)
       break
     }
     case 'toast':
       pushToast(e.toast)
+      break
+    case 'toast-gone':
+      dismissToast(e.id)
       break
     case 'chime': {
       // Agents finishing together chime once: at most one every 2 seconds.
@@ -241,19 +245,21 @@ function handleEvent(e: HiveEvent): void {
       }
       break
     case 'skills-changed':
-      set((s) => ({ skillsVersion: s.skillsVersion + 1 }))
+      setLoaded((s) => ({ skillsVersion: s.skillsVersion + 1 }))
       break
     case 'modes-changed':
-      set((s) => ({ modesVersion: s.modesVersion + 1 }))
+      setLoaded((s) => ({ modesVersion: s.modesVersion + 1 }))
       break
     case 'journal-changed':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set((s) => ({ journalVersion: s.journalVersion + 1 }))
       break
-    case 'assistant-activity':
-      set((s) => ({ assistantActions: [...s.assistantActions, e.action].slice(-200) }))
-      // What it changed is kept for undo as it is made (#1283): the panel's list follows.
-      void loadAssistantChanges()
+    case 'assistant-activity': {
+      // One action each: a message changing many cards sends many at once, shown together (HI-1863).
+      noteAssistantAction(e.action)
+      // What it changed is kept for undo as it is made (#1283): the panel's list follows, read again once per burst.
+      reloadAssistantChanges()
       break
+    }
     case 'language-changed':
       // i18n.ts has switched the text; the language setting's notes read the rest.
       set((s) => ({ appInfo: s.appInfo && { ...s.appInfo, language: e.language } }))
@@ -275,7 +281,7 @@ function handleEvent(e: HiveEvent): void {
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) progressRunsChanged(e)
       break
     case 'merge-slots-changed':
-      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set({ mergeSlots: e.slots })
+      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) setLoaded({ mergeSlots: e.slots })
       break
     case 'queue-changed':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) queueChangedEvent(e.projectPath)
@@ -287,9 +293,11 @@ function handleEvent(e: HiveEvent): void {
       void loadTasks()
       break
     case 'lanes-changed':
-      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set({ lanes: e.lanes })
+      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) setLoaded({ lanes: e.lanes })
       break
     case 'assistant-questions': {
+      // A load's questions still waiting (setLoaded) count as shown: they are never notified again.
+      flushLiveStates()
       const before = get().assistantQuestions
       set({ assistantQuestions: e.questions })
       // With the panel hidden, the question comes as a notification the user can answer.
@@ -344,6 +352,7 @@ export function App() {
   useLanguage()
   // Whether one is open, not the workspace itself: its every change would render the whole window again (HI-1806).
   const workspace = useStore((s) => !!s.workspace)
+  const workspacePath = useStore((s) => s.workspace?.path ?? null)
   useAntivirusOffer()
   const assistantLeft = useStore(assistantOnLeft)
   const activity = useStore((s) => s.activity)
@@ -488,6 +497,8 @@ export function App() {
         return <WorkspaceOverviewView />
       case 'performance':
         return <PerformanceView />
+      case 'activity':
+        return workspacePath ? <WorkspaceActivityView key={workspacePath} workspacePath={workspacePath} /> : null
       default:
         return workspace ? null : <WelcomeView />
     }
@@ -542,6 +553,7 @@ export function App() {
       <CommandPalette />
       <QuitDialog />
       <CompactDialog />
+      <HooksDialog />
       <MoveRepairDialog />
       <SetAsideDialog />
       <BoardUpgradeAsk />

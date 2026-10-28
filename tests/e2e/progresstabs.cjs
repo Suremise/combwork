@@ -169,6 +169,15 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     // line counting them; only the run going on stays.
     const pulseRuns = () => panel.locator('.progress-tab-pulse .progress-run').evaluateAll((els) => els.map((e) => e.getAttribute('data-run')))
     check('…and the failed runs leave Pulse: only the run going on is a card there', !!(await until(async () => JSON.stringify(await pulseRuns()) === JSON.stringify([e2e]), HUNG_MS)), JSON.stringify(await pulseRuns()))
+    // HI-1923: the line sits above the runs, after the merge, out of their scrolling list: it stays in sight however many.
+    const order = await panel.locator('.progress-tab-pulse').evaluate((el) => {
+      const box = (sel) => el.querySelector(sel)?.getBoundingClientRect() ?? null
+      const line = box(':scope > .progress-attention')
+      const merge = box('.progress-merge-card')
+      const runs = box(':scope > .progress-body')
+      return { line: line && { top: line.top, bottom: line.bottom }, merge: merge && { bottom: merge.bottom }, runs: runs && { top: runs.top } }
+    })
+    check('…the line above the runs, after the merge, outside their scrolling list', !!order.line && !!order.merge && !!order.runs && order.merge.bottom <= order.line.top && order.line.bottom <= order.runs.top, JSON.stringify(order))
     const dot = panel.locator('.progress-tab-pulse .lane-run-dot')
     check("…the lane, with a dot for its current card's latest run: e2e, running", !!(await until(async () => (await dot.count()) === 1 && ((await dot.getAttribute('class')) ?? '').includes('running'), HUNG_MS)) && (await dot.getAttribute('aria-label')) === `${a.key}'s latest run: e2e, running`, await dot.getAttribute('aria-label').catch(() => ''))
     const runsBox = await panel.locator('.progress-tab-pulse > .progress-body').boundingBox()
@@ -211,6 +220,71 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     await panel.locator('.progress-runs-clear').click()
     check('Clear shows every run again', !!(await until(async () => /nightly/.test(await text()) && /lint/.test(await text()), HUNG_MS)))
 
+    // --- HI-1925: the finished runs docked at the bottom behind the lanes' edge, about 6.5 lane rows (61 px each),
+    // what runs above; every run its own line with its time, its details closed; several opened at once, folded again
+    // when Runs leaves the screen; dragged unsnapped, up to 10 rows, kept for the workspace; on a short window what
+    // fits, its height back as the window grows; a filter matching only yesterday's: "No runs match." under Today.
+    const dock = panel.locator('.progress-tab-runs > .progress-runs-dock')
+    const dockList = dock.locator('.progress-runs-dock-list')
+    const edge = dock.locator('.progress-lanes-edge')
+    const dockH = async () => (await dockList.boundingBox())?.height ?? 0
+    const near = (h, want) => Math.abs(h - want) <= 2
+    check('the finished runs are docked below the edge, about 6.5 lane rows high; what runs is above them', (await edge.count()) === 1 && !!(await until(async () => near(await dockH(), 6.5 * 61), HUNG_MS)) && (await dock.locator(`[data-run="${e2e}"]`).count()) === 0 && (await panel.locator(`.progress-tab-runs > .progress-runs-body [data-run="${e2e}"]`).count()) === 1, String(await dockH()))
+    check('…Today, then Yesterday, inside the dock', JSON.stringify(await dock.locator('.progress-runs-day > .progress-section').allTextContents()) === JSON.stringify(['Today', 'Yesterday']))
+    const unit = dock.locator('.progress-recent-item[data-run="k-today-unit"]')
+    const nightly = dock.locator('.progress-recent-item[data-run="k-nightly"]')
+    check("every run its own line, with when it ended, its details closed (no card's runs folded away)", (await unit.count()) === 1 && (await nightly.count()) === 1 && /\d/.test((await unit.locator('.progress-recent-at').textContent()) ?? '') && (await dock.locator('.progress-details').count()) === 0 && (await dock.locator('.progress-card-toggle').count()) === 0)
+    await unit.locator('.progress-recent').click()
+    await nightly.locator('.progress-recent').click()
+    check('…two opened at once', !!(await until(async () => (await dock.locator('.progress-details').count()) === 2, HUNG_MS)))
+    await showTab('pulse')
+    await showTab('runs')
+    check('…folded again once Runs left the screen', !!(await until(async () => (await dock.locator('.progress-recent-item[data-run="k-today-unit"]').count()) === 1, HUNG_MS)) && (await dock.locator('.progress-details').count()) === 0)
+    // A drag up of 100 px: 100 px taller, not a whole number of rows.
+    const dragEdge = async (dy) => {
+      const box = await edge.boundingBox()
+      const x = box.x + box.width / 2
+      const y = box.y + box.height / 2
+      await page.mouse.move(x, y)
+      await page.mouse.down()
+      await page.mouse.move(x, y + dy / 2)
+      await page.mouse.move(x, y + dy)
+      await page.mouse.up()
+    }
+    await dragEdge(-100)
+    check('dragged up 100 px: 100 px taller, unsnapped', !!(await until(async () => near(await dockH(), 6.5 * 61 + 100), HUNG_MS)), String(await dockH()))
+    const dockKey = `progress-runs-today:${ws.toLowerCase()}`
+    const keptRows = async () => (await inv('ui:get')).panes?.[dockKey]
+    check('…kept for the workspace', !!(await until(async () => Math.abs((await keptRows()) - (6.5 + 100 / 61)) < 0.02, HUNG_MS)), String(await keptRows()))
+    await dragEdge(-2000)
+    const most = Number(await edge.getAttribute('aria-valuemax'))
+    // The separator says it to a tenth of a row; the dock is drawn to the pixel.
+    check('dragged far up: no more than 10 rows, or what fits', most <= 10 && !!(await until(async () => Math.abs((await dockH()) - most * 61) <= 0.05 * 61 + 1 && Number(await edge.getAttribute('aria-valuenow')) === most, HUNG_MS)), `${most} ${await dockH()}`)
+    await dragEdge(2000)
+    check('dragged far down: a row at least', !!(await until(async () => near(await dockH(), 61), HUNG_MS)), String(await dockH()))
+    await edge.dblclick()
+    check('a double-click: back to 6.5 rows', !!(await until(async () => near(await dockH(), 6.5 * 61), HUNG_MS)) && !!(await until(async () => (await keptRows()) === undefined, HUNG_MS)), String(await dockH()))
+    await dragEdge(-61)
+    check('a row taller again (7.5 rows)', !!(await until(async () => near(await dockH(), 7.5 * 61), HUNG_MS)), String(await dockH()))
+    // A short window: what fits, the runs above keeping their room, the separator saying so; grown again, its height back.
+    await lib.fitWindow(app, page, { width: 1400, height: 520 })
+    const short = await until(async () => {
+      const h = await dockH()
+      return h > 0 && h < 7.5 * 61 - 2 ? h : null
+    }, HUNG_MS)
+    check('a short window: the dock shows what fits, smaller than chosen, its separator saying so', !!short && Math.abs(Number(await edge.getAttribute('aria-valuenow')) * 61 - short) < 8 && Number(await edge.getAttribute('aria-valuemax')) < 7.5, `${short} ${await edge.getAttribute('aria-valuenow')}/${await edge.getAttribute('aria-valuemax')}`)
+    await setWidth(440)
+    await shoot('runs-dock-short')
+    await lib.fitWindow(app, page, { width: 1400, height: 850 })
+    check('…grown again: its height back (7.5 rows), the choice kept', !!(await until(async () => near(await dockH(), 7.5 * 61), HUNG_MS)), String(await dockH()))
+    await setWidth(440)
+    await shoot('runs-dock-tall')
+    // A filter matching only yesterday's runs: Today says no run matches, Yesterday shows the match.
+    await panel.locator('.progress-runs-search').fill('nightly')
+    check('a filter matching only older runs: "No runs match." under Today, the match under Yesterday', !!(await until(async () => /No runs match\./.test((await dock.locator('.progress-runs-day[data-day="0"]').innerText().catch(() => '')) ?? '') && (await dock.locator('.progress-recent-item[data-run="k-nightly"]').count()) === 1, HUNG_MS)), await dock.innerText().catch(() => ''))
+    await panel.locator('.progress-runs-clear').click()
+    await edge.dblclick()
+
     // --- Merges and Lanes: theirs alone.
     await showTab('merges')
     check('Merges shows the merge, B1 holding, R1 waiting', !!(await until(async () => (await panel.locator('.progress-tab-merges .progress-merge-card').count()) === 1, HUNG_MS)) && /R1/.test((await panel.locator('.progress-tab-merges').innerText()) ?? ''))
@@ -224,6 +298,83 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     await shoot('lanes-wide')
     await setWidth(280)
     await shoot('lanes-narrow')
+
+    // --- HI-1926: a lane opens to its cards in order, each with its state, round and time; folded again once the tab
+    // is left. Its header says how long it has waited when it waits. Then seven lanes: stacked from the bottom, growing
+    // upwards to the top, then scrolling, the first and the last reachable.
+    await setWidth(440)
+    const tabsLane = panel.locator('.progress-tab-lanes .progress-lane').first()
+    await tabsLane.locator('.progress-lane-expand').click()
+    const queueRows = tabsLane.locator('.progress-lane-queue-row')
+    const queue = () => queueRows.evaluateAll((els) => els.map((e) => `${e.dataset.card}:${e.dataset.state}:${e.querySelector('.progress-lane-queue-round')?.textContent ?? ''}:${e.querySelector('.progress-lane-queue-time') ? 'time' : ''}`))
+    // The lane's cards in its order: the first being worked (its time so far), the next two not started (no time).
+    check('a lane opens to its cards in order: state, round and time so far for the one in progress, none for those to do', !!(await until(async () => {
+      const q = await queue()
+      return q.length === 3 && q[0].startsWith(`${a.number}:`) && q[0].endsWith(':r1:time') && q[1] === `${b.number}:todo:r1:` && q[2] === `${c.number}:todo:r1:`
+    }, HUNG_MS)), JSON.stringify(await queue()))
+    await queueRows.first().locator('.progress-lane-queue-key').click()
+    check("…a card's key opens it", !!(await until(async () => (await page.locator('[role="dialog"]').filter({ hasText: a.key }).count()) > 0, HUNG_MS)))
+    await page.keyboard.press('Escape')
+    await shoot('lanes-queue')
+    await showTab('pulse')
+    await showTab('lanes')
+    check('…folded again once the tab was left', !!(await until(async () => (await panel.locator('.progress-tab-lanes .progress-lane-queue').count()) === 0, HUNG_MS)))
+    const waited = panel.locator('.progress-tab-lanes .progress-lane-waited')
+    const why = panel.locator('.progress-tab-lanes .progress-lane-why')
+    check('…a lane that waits says for how long', (await why.count()) === 0 || !!(await until(async () => /\d/.test((await waited.first().textContent().catch(() => '')) ?? ''), HUNG_MS)), `${await why.first().textContent().catch(() => '')} ${await waited.first().textContent().catch(() => '')}`)
+    // A lane waiting for you (B1 asks about its card): its header says why and for how long, from when the wait began;
+    // past the bound (Settings → Advanced, set to its least, a minute) the time is marked.
+    const asked = await api(t1, 'POST', `/v1/tasks/${a.key}/ask`, { kind: 'decide', text: 'Which way should the lane go?' })
+    check('B1 asks the user about its card', asked.status === 200, JSON.stringify(asked.body))
+    const tabsWaited = tabsLane.locator('.progress-lane-waited')
+    check('…its lane waits for you, saying for how long', !!(await until(async () => /for you|you/i.test((await tabsLane.locator('.progress-lane-why').textContent().catch(() => '')) ?? '') && /\d/.test((await tabsWaited.textContent().catch(() => '')) ?? ''), HUNG_MS)), `${await tabsLane.locator('.progress-lane-why').textContent().catch(() => '')} ${await tabsWaited.textContent().catch(() => '')}`)
+    check('…not marked yet (under an hour)', !((await tabsWaited.getAttribute('class')) ?? '').includes('long'))
+    // Its card, opened in the lane's queue, waits for you too (HR5's round 1: an ordinary request, not only a block).
+    await tabsLane.locator('.progress-lane-expand').click()
+    check("…and its card in the lane's queue is waiting for you", !!(await until(async () => (await tabsLane.locator(`.progress-lane-queue-row[data-card="${a.number}"]`).getAttribute('data-state').catch(() => null)) === 'waiting', HUNG_MS)), await tabsLane.locator(`.progress-lane-queue-row[data-card="${a.number}"]`).getAttribute('data-state').catch(() => ''))
+    await tabsLane.locator('.progress-lane-expand').click()
+    await shoot('lanes-wait')
+    await inv('advanced:set', 'hive.lanes.waitYouMinutes', 1)
+    // The bound a minute: marked once a minute has passed (a condition, bounded for a hung run).
+    check('…past its bound (a minute, Settings → Advanced), the time is marked', !!(await until(async () => ((await tabsWaited.getAttribute('class').catch(() => '')) ?? '').includes('long'), 120_000)), await tabsWaited.textContent().catch(() => ''))
+    await shoot('lanes-wait-long')
+    await inv('advanced:set', 'hive.lanes.waitYouMinutes', null)
+    // Six more lanes (solo, their builders started by Hive): seven in all, more than fit.
+    for (let i = 2; i <= 7; i++) {
+      const bx = await lib.addAgent(inv, alpha, { name: `B${i}` })
+      const card = await inv('tasks:create', { title: `Lane card ${i}`, project: 'alpha' })
+      await inv('lanes:start', alpha, { builder: bx.id, reviewer: null, cards: [card.number], name: `solo ${i}` })
+    }
+    const laneList = panel.locator('.progress-tab-lanes .progress-lanes-list')
+    check('seven lanes in the Lanes tab', !!(await until(async () => (await panel.locator('.progress-tab-lanes .progress-lane').count()) === 7, HUNG_MS)), String(await panel.locator('.progress-tab-lanes .progress-lane').count()))
+    await lib.fitWindow(app, page, { width: 1400, height: 520 })
+    const fill = async () =>
+      laneList.evaluate((el) => {
+        const rows = [...el.querySelectorAll(':scope > .progress-lane')]
+        const box = el.getBoundingClientRect()
+        el.scrollTop = 0
+        const firstTop = rows[0].getBoundingClientRect().top - box.top
+        el.scrollTop = el.scrollHeight
+        const lastBottom = box.bottom - rows.at(-1).getBoundingClientRect().bottom
+        return { scrolls: el.scrollHeight > el.clientHeight + 1, firstTop, lastBottom }
+      })
+    check('…more than fit: they fill the tab to the top and scroll, the first and the last reachable', !!(await until(async () => {
+      const f = await fill()
+      return f.scrolls && f.firstTop >= -1 && f.firstTop < 20 && f.lastBottom >= -1 && f.lastBottom < 20
+    }, HUNG_MS)), JSON.stringify(await fill()))
+    await lib.fitWindow(app, page, { width: 1400, height: 850 })
+    // A few lanes in a tall panel: at the bottom, growing upwards (the space above them).
+    const bottomed = async () => laneList.evaluate((el) => {
+      const rows = [...el.querySelectorAll(':scope > .progress-lane')]
+      const box = el.getBoundingClientRect()
+      return el.scrollHeight <= el.clientHeight + 1 ? Math.round(box.bottom - rows.at(-1).getBoundingClientRect().bottom) : null
+    })
+    check('…in a tall panel, all of them shown, stacked from the bottom', !!(await until(async () => {
+      const gap = await bottomed()
+      return gap !== null && gap < 20
+    }, HUNG_MS)), String(await bottomed()))
+    await shoot('lanes-seven')
+    for (const l of await inv('lanes:list')) if ((l.name ?? '').startsWith('solo ')) await inv('lanes:end', l.id, true).catch(() => undefined)
 
     // --- The keyboard: arrow keys, Home and End move through the tabs, choosing as they go; the tab kept.
     // The tabs move the keyboard in an animation frame after choosing, which a busy window runs late: each key waits for
@@ -274,8 +425,8 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
   }
 
   // --- HI-1701: Today by card. A third launch with a busy Today kept, like Darren's (26 Oct): a heading per card, the
-  // card with the newest run first and Other last; closed once all its runs passed, open while one failed, the user's
-  // choice kept; a line per run (who, what, how long), the card's key not repeated, review copies' names only in the
+  // card with the newest run first and Other last; every card's runs shown, none folded (HI-1925: a line per run, only
+  // its details folded); a line per run (who, what, how long), the card's key not repeated, review copies' names only in the
   // hover, retries folded with a failure-aware icon and the merge queue's checks in one line; the filters filter runs
   // within cards and hide empty ones.
   const t0 = Math.max(Date.now() - 50 * 60_000, startOfToday + 60_000)
@@ -350,9 +501,9 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     await showTab('runs')
     const today = panel.locator('.progress-runs-day').first()
     const group = (card) => today.locator(`.progress-card-runs[data-card-runs="${card}"]`)
-    const heads = () => today.locator('.progress-card-runs').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-card-runs')}:${e.querySelector('.progress-card-toggle')?.getAttribute('aria-expanded')}`))
-    const want = [`${c.number}:false`, `${a.number}:true`, `${b.number}:false`, 'other:true']
-    check('Today by card: the card with the newest run first, Other last; open while a run failed, closed once all passed', !!(await until(async () => JSON.stringify(await heads()) === JSON.stringify(want), HUNG_MS)), JSON.stringify(await heads()))
+    const heads = () => today.locator('.progress-card-runs').evaluateAll((els) => els.map((e) => e.getAttribute('data-card-runs')))
+    const want = [String(c.number), String(a.number), String(b.number), 'other']
+    check('Today by card: the card with the newest run first, Other last; every card with its runs, none folded', !!(await until(async () => JSON.stringify(await heads()) === JSON.stringify(want), HUNG_MS)) && (await today.locator('.progress-card-toggle').count()) === 0, JSON.stringify(await heads()))
     const head = (card) => group(card).locator('.progress-card-head')
     const headText = async (card) => (await head(card).evaluate((el) => [...el.querySelectorAll('.progress-card-key, .progress-card-title, .progress-card-summary')].map((x) => x.textContent).join(' | ')).catch(() => ''))
     check(`${a.key}'s heading: its key, title and 10 runs · 3 failed, with a failure's icon`, (await headText(a.number)) === `${a.key} | Lane data | 10 runs · 3 failed` && (await head(a.number).locator('.progress-card-icon.codicon-error').count()) === 1, await headText(a.number))
@@ -374,32 +525,27 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     const tipText = async () => (await page.locator('body > .tip').allTextContents().catch(() => [])).join(' | ')
     check('…its card, revision and copy in the hover', !!(await until(async () => {
       if ((await tipText()).includes(`${a.key} · e2d018f · in copy-5`)) return true
-      await reviewRow.hover()
+      // The runs are docked at the bottom (HI-1925), where the window's notices show: those first.
+      for (const x of await page.locator('.toasts button[aria-label="Dismiss"]').all()) await x.click().catch(() => undefined)
+      await reviewRow.hover({ timeout: 2000 }).catch(() => undefined)
       return false
     }, HUNG_MS)), await tipText())
     await page.mouse.move(5, 5)
     await shoot('runs-by-card')
-    // Open and close a card's runs; the choice is kept (here, across tabs).
-    await group(c.number).locator('.progress-card-toggle').click()
-    check(`opening ${c.key} shows its run`, !!(await until(async () => JSON.stringify(await lines(c.number)) === JSON.stringify(['B1 · e2e: changes']), HUNG_MS)), JSON.stringify(await lines(c.number)))
+    // A card whose runs all passed shows its run too (HI-1925: nothing folded but details); a click on a heading folds nothing.
+    check(`${c.key}, all passed, shows its run`, JSON.stringify(await lines(c.number)) === JSON.stringify(['B1 · e2e: changes']), JSON.stringify(await lines(c.number)))
     await group(a.number).locator('.progress-card-head').click()
-    check(`closing ${a.key} (a click on its heading) hides its runs`, !!(await until(async () => (await rows(a.number).count()) === 0 && (await group(a.number).locator('.progress-card-toggle').getAttribute('aria-expanded')) === 'false', HUNG_MS)))
-    await showTab('pulse')
-    await showTab('runs')
-    check('…both choices kept', !!(await until(async () => JSON.stringify(await heads()) === JSON.stringify([`${c.number}:true`, `${a.number}:false`, `${b.number}:false`, 'other:true']), HUNG_MS)), JSON.stringify(await heads()))
-    await group(a.number).locator('.progress-card-toggle').click()
-    await until(async () => (await rows(a.number).count()) === aLines.length, HUNG_MS)
+    check(`a click on ${a.key}'s heading folds nothing`, (await rows(a.number).count()) === aLines.length)
     // The filters filter the runs in each card and hide a card with none.
     await panel.locator('.progress-runs-failed').click()
-    check(`Failed: ${a.key} (its failed runs) and Other, nothing else`, !!(await until(async () => JSON.stringify(await heads()) === JSON.stringify([`${a.number}:true`, 'other:true']), HUNG_MS)) && JSON.stringify(await lines(a.number)) === JSON.stringify(['B1 · cardloop on base c0ffee1', 'B1 · unit: 6 files ×2 · 2 failed']) && JSON.stringify(await lines('other')) === JSON.stringify(['Script · my check']), `${JSON.stringify(await heads())} ${JSON.stringify(await lines(a.number))}`)
+    check(`Failed: ${a.key} (its failed runs) and Other, nothing else`, !!(await until(async () => JSON.stringify(await heads()) === JSON.stringify([String(a.number), 'other']), HUNG_MS)) && JSON.stringify(await lines(a.number)) === JSON.stringify(['B1 · cardloop on base c0ffee1', 'B1 · unit: 6 files ×2 · 2 failed']) && JSON.stringify(await lines('other')) === JSON.stringify(['Script · my check']), `${JSON.stringify(await heads())} ${JSON.stringify(await lines(a.number))}`)
     await shoot('runs-by-card-failed')
     await panel.locator('.progress-runs-clear').click()
     await panel.locator('.progress-runs-choices select[aria-label="Agent"]').selectOption({ label: 'R1' })
-    check(`an agent: R1's runs, in ${a.key} and ${b.key}`, !!(await until(async () => JSON.stringify((await heads()).map((h) => h.split(':')[0])) === JSON.stringify([String(a.number), String(b.number)]), HUNG_MS)), JSON.stringify(await heads()))
+    check(`an agent: R1's runs, in ${a.key} and ${b.key}`, !!(await until(async () => JSON.stringify(await heads()) === JSON.stringify([String(a.number), String(b.number)]), HUNG_MS)), JSON.stringify(await heads()))
     await panel.locator('.progress-runs-clear').click()
     await panel.locator('.progress-runs-search').fill('nightly')
-    // Other's runs found all passed: it is closed (its open rule holds for what the filters leave).
-    check('words: the nightly build, in Other alone, closed: 1 run, all passed', !!(await until(async () => JSON.stringify(await heads()) === JSON.stringify(['other:false']) && (await headText('other')) === 'Other |  | 1 run · all passed', HUNG_MS)), `${JSON.stringify(await heads())} ${await headText('other')}`)
+    check('words: the nightly build, in Other alone: 1 run, all passed', !!(await until(async () => JSON.stringify(await heads()) === JSON.stringify(['other']) && (await headText('other')) === 'Other |  | 1 run · all passed', HUNG_MS)), `${JSON.stringify(await heads())} ${await headText('other')}`)
     await panel.locator('.progress-runs-clear').click()
     // A card's key opens the card.
     await group(b.number).locator('.progress-card-key').click()

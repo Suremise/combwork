@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ALL_PROJECTS, PASSED_SHOWN_MS, SHOW_ALL, activeFilter, onPulse, agentChoices, ProgressSync, barLook, shortRevision, filterChoices, filterMergeSlots, filterRuns, fractionDone, inStrip, isOpenRun, runDetails, runAgentName, runDetailsText, runStateWord, runStatusLine, stripRuns, stripSummary, unseenTrouble } from '@shared/progress'
 import { durationText } from '@shared/tasks'
 import type { MergeSlotInfo, ProgressRun, ProgressTelling } from '@shared/types'
@@ -7,7 +7,8 @@ import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { attempt, selectProject } from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
-import { cardLabelOf, findProject, flashPane, get, notify, projectKey, projectNames, revealAgent, set, setAssistantOpen, setProgressFilter, setProgressOpen, useDateStyle, useLanguage, useProgressFilter, useProgressOpen, useStore } from '../store'
+import { SHOW_IN_ACTIVITY } from '../views/WorkspaceActivity'
+import { activityAgentKey, cardLabelOf, findProject, flashPane, get, notify, openWorkspaceActivity, projectKey, projectNames, revealAgent, set, setAssistantOpen, setProgressFilter, setProgressOpen, useDateStyle, useLanguage, useProgressFilter, useProgressOpen, useStore } from '../store'
 import { useNow } from '../usage'
 import { useShallow } from 'zustand/react/shallow'
 import { cx, formatKeybinding, timeAgo } from '../util'
@@ -15,14 +16,15 @@ import { AssistantMark } from './AssistantMark'
 import { ProviderIcon } from './ProviderIcon'
 import { PaneResizer, usePaneSize } from './Resizer'
 import { useMergeSlots } from './MergeSlots'
-import { LanesSection, lanePair } from './ProgressLanes'
+import { DockEdge, LanesSection, PITCH_PX, lanePair } from './ProgressLanes'
 import { MergeCards } from './ProgressMerge'
 import { MergesList, QueueAnnouncer, QueueLines } from './ProgressQueue'
 import { useLanes } from '../laneSource'
 import { keepShown, useQueuesKept } from '../queueSource'
 import { justMerged, onPulseLine, queuedCount, shownQueues, shownReturns, unseenReturns } from '@shared/progressQueue'
-import { cardLook, cardRunsSummary, groupLook, NO_RUNS_FILTER, PROGRESS_TABS, queueChecksLabel, runAgentKey, runDayLabel, runDays, runGroupLabel, runMatches, runsByCard, tabAt, tabBadges, unresolvedFailures, runTitleIn, type CardRuns, type ProgressTab, type RunGroup, type RunsFilter, type RunsLook } from '@shared/progressTabs'
-import { formatDateTime } from '@shared/dates'
+import { cardLook, cardRunsSummary, groupLook, NO_RUNS_FILTER, PROGRESS_TABS, queueChecksLabel, runAgentKey, runDayLabel, runDays, runGroupLabel, runMatches, runsByCard, tabAt, tabBadges, unresolvedFailures, runTitleIn, type CardRuns, type ProgressTab, type RunDay, type RunGroup, type RunsFilter, type RunsLook } from '@shared/progressTabs'
+import { formatDateTime, formatTime } from '@shared/dates'
+import { RUNS_KEEP_PX } from '@shared/laneBar'
 import type { Lane } from '../laneSource'
 import { Icon, IconButton, SearchInput, Tooltip } from './ui'
 
@@ -59,6 +61,14 @@ function whyNotShown(s: StoreState, r: ProgressRun): string | null {
   if (!p) return tr(msg({ id: 'board.progress.projectGone', defaultMessage: 'Its project is no longer in this workspace.', description: "Why a Progress panel run's agent can't be shown: its project was removed from the workspace." }))
   if (!r.agentId || !p.agents.some((a) => a.id === r.agentId)) return tr(msg({ id: 'board.progress.agentGone', defaultMessage: '{agent} has been removed from {project}.', description: "Why a Progress panel run's agent can't be shown: the agent ({agent}) was removed from its project ({project})." }), { agent: runAgentName(r, tr), project: p.name })
   return null
+}
+
+/** Opens Activity's workspace level on the agent that reported a run (HI-1664): what it runs now, the Assistant's too. */
+function showRunActivity(r: ProgressRun): void {
+  const s = get()
+  if (whyNotShown(s, r)) return
+  const path = r.source === 'assistant' ? s.workspace!.assistant!.path : findProject(s, r.projectPath!)!.path
+  openWorkspaceActivity({ agents: [activityAgentKey(path, r.source === 'assistant' ? 'assistant' : r.agentId!)] })
 }
 
 /**
@@ -270,6 +280,21 @@ export function ProgressPanel() {
             <MergeCards slots={merging} projectName={nameOf} showProject={multi} stepOf={stepOf} now={now} />
             <QueueLines views={pulseQueues} showProject={multi} onOpen={() => setTab('merges')} />
             {(merging.length > 0 || pulseQueues.length > 0) && <div className="progress-divider" role="separator" />}
+            {/* Needs attention (#1309): failures nothing has passed since, a line that shows them in Runs. Above the runs, out of their scrolling list, so however many there are it stays in sight (HI-1923). */}
+            {failures.length > 0 && (
+              <button
+                type="button"
+                className="progress-attention"
+                onClick={() => {
+                  setRunsFilter({ ...NO_RUNS_FILTER, failedOnly: true })
+                  setTab('runs')
+                }}
+              >
+                <Icon name="error" />
+                <span>{tr(msg({ id: 'board.progress.attention', defaultMessage: '{n, plural, one {# run failed} other {# runs failed}}', description: "A line in the Progress panel's Pulse tab: runs failed and no later run of the same thing passed since; a click shows them in the Runs tab." }), { n: failures.length })}</span>
+                <Icon name="arrow-right" />
+              </button>
+            )}
             <div className="progress-body">
               {listed.length === 0 && !merging.length && !pulseQueues.length && !failures.length && (
                 <div className="pane-empty progress-empty">
@@ -279,28 +304,13 @@ export function ProgressPanel() {
               {listed.map((r) => (
                 <RunRow key={r.id} run={r} now={now} open={detail === r.id} onToggle={toggle} />
               ))}
-              {/* Needs attention (#1309): failures nothing has passed since, a line that shows them in Runs. */}
-              {failures.length > 0 && (
-                <button
-                  type="button"
-                  className="progress-attention"
-                  onClick={() => {
-                    setRunsFilter({ ...NO_RUNS_FILTER, failedOnly: true })
-                    setTab('runs')
-                  }}
-                >
-                  <Icon name="error" />
-                  <span>{tr(msg({ id: 'board.progress.attention', defaultMessage: '{n, plural, one {# run failed} other {# runs failed}}', description: "A line in the Progress panel's Pulse tab: runs failed and no later run of the same thing passed since; a click shows them in the Runs tab." }), { n: failures.length })}</span>
-                  <Icon name="arrow-right" />
-                </button>
-              )}
             </div>
             <LanesSection lanes={shownLanes} all={lanes} width={width} runs={shown} />
           </>
         )}
         {tab === 'merges' &&
           (merging.length || shownQueue.length ? (
-            <MergesList queues={shownQueue} slots={merging} runs={runs} now={now} projectName={nameOf} showProject={multi} stepOf={stepOf} />
+            <MergesList queues={shownQueue} slots={merging} runs={runs} now={now} projectName={nameOf} showProject={multi} stepOf={stepOf} agent={filter.agent ?? null} />
           ) : (
             <div className="pane-empty progress-empty">{tr(msg({ id: 'board.progress.noMerges', defaultMessage: "No merge is going on. While Hive's merge queue merges a card, or an agent merges its branch, it shows here with its cards, its checks and what waits.", description: "The Progress panel's Merges tab when nothing is merging: no merge queue shows, and no agent holds the merge slot. Glossary 2.5: merge queue." }))}</div>
           ))}
@@ -381,6 +391,11 @@ function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs
     now
   )
   const filtered = filter.failedOnly || !!lane || !!filter.agent || !!filter.query.trim()
+  // The finished runs' details opened, several at once (HI-1925): only while Runs is on screen, and its workspace.
+  const ws = useStore((s) => s.workspace?.path ?? null)
+  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set())
+  useEffect(() => setOpened(new Set()), [ws])
+  const flip = useCallback((id: string): void => setOpened((o) => (o.has(id) ? new Set([...o].filter((x) => x !== id)) : new Set([...o, id]))), [])
   return (
     <>
       <div className="progress-runs-filters">
@@ -417,64 +432,129 @@ function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs
           )}
         </div>
       </div>
+      {/* What runs or waits now, scrolling in the room the dock leaves (HI-1925). */}
       <div className="progress-body progress-runs-body">
-        {!running.length && !days.length && (
-          <div className="pane-empty progress-empty">
-            {filtered ? tr(msg({ id: 'board.runs.noneMatch', defaultMessage: 'No runs match.', description: "The Progress panel's Runs tab when no run matches its filters or search." })) : tr(msg({ id: 'board.runs.none', defaultMessage: 'No runs yet. When an agent runs tests or a build with progress reporting, every run shows here, kept by day.', description: "The Progress panel's Runs tab when Hive has no runs." }))}
-          </div>
-        )}
+        {!running.length && !days.length && !filtered && <div className="pane-empty progress-empty">{tr(msg({ id: 'board.runs.none', defaultMessage: 'No runs yet. When an agent runs tests or a build with progress reporting, every run shows here, kept by day.', description: "The Progress panel's Runs tab when Hive has no runs." }))}</div>}
         {running.map((r) => (
           <RunRow key={r.id} run={r} now={now} open={detail === r.id} onToggle={toggle} />
         ))}
-        {days.map((d) => (
-          <section key={d.day} className="progress-runs-day" aria-label={runDayLabel(d, now, tr)}>
-            <div className="progress-section">{runDayLabel(d, now, tr)}</div>
-            {runsByCard(d).map((c) => (
-              <CardGroup key={c.key} group={c} running={d.day === 0 && c.card !== null && runningCards.has(c.card)} now={now} detail={detail} toggle={toggle} />
-            ))}
-          </section>
-        ))}
       </div>
+      <RunsDock days={days} running={running.length > 0} filtered={filtered} runningCards={runningCards} now={now} opened={opened} flip={flip} />
     </>
   )
 }
 
+/** Where a workspace's finished runs' dock keeps its height (HI-1925), as the lanes' rows are kept. */
+const dockKey = (ws: string): string => `progress-runs-today:${ws.toLowerCase()}`
+/** The dock's height in lane rows (HI-1925, Darren: about 6–7 lanes, up to 10 as Pulse's): its default, its least and most. */
+const DOCK_ROWS = 6.5
+const DOCK_MIN_ROWS = 1
+const DOCK_MAX_ROWS = 10
+
+/**
+ * Runs' finished runs, docked at the bottom behind the shared edge (HI-1925): Today first, then the older days, each run
+ * a line by card, its details opened on a click (several at once); scrolling in its own height. Its height is in lane
+ * rows, unsnapped, kept per workspace; on a short panel it shows what fits while the runs going on keep RUNS_KEEP_PX
+ * (nothing going on: they give it all), and comes back to its height as the panel grows. Today always heads it: "No
+ * runs today" when nothing ended today, "No runs match." when a filter matches only older ones, and "No finished runs"
+ * alone when there are none.
+ */
+function RunsDock({ days, running, filtered, runningCards, now, opened, flip }: { days: RunDay[]; running: boolean; filtered: boolean; runningCards: ReadonlySet<number>; now: number; opened: ReadonlySet<string>; flip: (id: string) => void }) {
+  const ws = useStore((s) => s.workspace?.path ?? null)
+  const key = ws ? dockKey(ws) : null
+  const kept = useStore((s) => (key ? s.panes[key] : undefined))
+  const dock = useRef<HTMLDivElement>(null)
+  const [room, setRoom] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    const el = dock.current
+    const list = el?.querySelector<HTMLElement>('.progress-runs-dock-list')
+    const tab = el?.closest<HTMLElement>('.progress-tab-body')
+    const top = tab?.querySelector<HTMLElement>('.progress-runs-body')
+    if (!el || !list || !tab || !top) return
+    // As the lanes' (#484, HI-1673): the list's height and what the runs above can give up, keeping RUNS_KEEP_PX while
+    // something runs; less whatever of the dock runs past the panel's bottom.
+    const measure = (): void => {
+      const over = Math.max(0, el.getBoundingClientRect().bottom - tab.getBoundingClientRect().bottom)
+      const style = getComputedStyle(top)
+      const padding = parseFloat(style.paddingTop || '0') + parseFloat(style.paddingBottom || '0')
+      const r = list.getBoundingClientRect().height + top.getBoundingClientRect().height - padding - over - (running ? RUNS_KEEP_PX : 0)
+      setRoom((was) => (was !== null && Math.abs(was - r) < 1 ? was : r))
+    }
+    measure()
+    const watch = new ResizeObserver(measure)
+    watch.observe(list)
+    watch.observe(top)
+    watch.observe(tab)
+    return () => watch.disconnect()
+  }, [running])
+  const chosen = typeof kept === 'number' && Number.isFinite(kept) ? Math.max(DOCK_MIN_ROWS, Math.min(DOCK_MAX_ROWS, kept)) : DOCK_ROWS
+  // What fits now, in rows: the most it can be, and its least (under a row on a panel shorter than that).
+  const fits = room === null ? DOCK_MAX_ROWS : Math.max(0, room / PITCH_PX)
+  const max = Math.min(DOCK_MAX_ROWS, fits)
+  const min = Math.min(DOCK_MIN_ROWS, max)
+  const shown = Math.max(min, Math.min(chosen, max))
+  const today = days[0]?.day === 0 ? days[0] : null
+  const older = today ? days.slice(1) : days
+  const todayLabel = runDayLabel({ day: 0, at: now, groups: [] }, now, tr)
+  const rows = (d: RunDay) =>
+    runsByCard(d).map((c) => <CardGroup key={c.key} group={c} running={d.day === 0 && c.card !== null && runningCards.has(c.card)} now={now} opened={opened} flip={flip} />)
+  return (
+    <div className="progress-runs-dock" ref={dock} role="region" aria-label={tr(FINISHED_RUNS)}>
+      {key && (
+        <DockEdge
+          paneKey={key}
+          chosen={chosen}
+          shown={shown}
+          min={min}
+          max={max}
+          pitch={PITCH_PX}
+          label={tr(msg({ id: 'board.runs.dockEdge', defaultMessage: 'Finished runs’ height', description: "Accessible name of the handle on the top edge of the Progress panel's Runs tab's finished runs (docked at the bottom): drag it to make them taller or shorter." }))}
+          valueText={tr(msg({ id: 'board.runs.dockEdgeValue', defaultMessage: '{rows, plural, one {# lane row high} other {# lane rows high}}', description: "The value of the handle on the top edge of the Progress panel's Runs tab's finished runs, for screen readers: how tall they are, in the height of the Pulse tab's lane rows ({rows}, may be a fraction such as 6.5)." }), { rows: Math.round(shown * 10) / 10 })}
+          tip={tr(msg({ id: 'board.runs.dockEdgeTip', defaultMessage: 'Drag to make the finished runs taller or shorter; double-click for {rows, plural, one {# lane row} other {# lane rows}}', description: "Tooltip of the handle on the top edge of the Progress panel's Runs tab's finished runs. {rows} is their default height in the Pulse tab's lane rows (6.5)." }), { rows: DOCK_ROWS })}
+        />
+      )}
+      <div className="progress-runs-dock-list" style={{ height: shown * PITCH_PX }}>
+        {!days.length && !filtered ? (
+          <div className="faint progress-runs-none">{tr(msg({ id: 'board.runs.noFinished', defaultMessage: 'No finished runs', description: "The Progress panel's Runs tab's finished runs (docked at the bottom) when Hive has none." }))}</div>
+        ) : (
+          <>
+            <section className="progress-runs-day" data-day={0} aria-label={todayLabel}>
+              <div className="progress-section">{todayLabel}</div>
+              {today ? rows(today) : <div className="faint progress-runs-none">{filtered ? tr(NONE_MATCH) : tr(msg({ id: 'board.runs.noneToday', defaultMessage: 'No runs today', description: "Under Today in the Progress panel's Runs tab's finished runs: no run ended today (older days follow)." }))}</div>}
+            </section>
+            {older.map((d) => (
+              <section key={d.day} className="progress-runs-day" data-day={d.day} aria-label={runDayLabel(d, now, tr)}>
+                <div className="progress-section">{runDayLabel(d, now, tr)}</div>
+                {rows(d)}
+              </section>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const FINISHED_RUNS = msg({ id: 'board.runs.finished', defaultMessage: 'Finished runs', description: "Accessible name of the Progress panel's Runs tab's finished runs, docked at the bottom (Today, then older days)." })
+const NONE_MATCH = msg({ id: 'board.runs.noneMatch', defaultMessage: 'No runs match.', description: "The Progress panel's Runs tab when no run matches its filters or search." })
+
 /** A group's icon by how its runs went (HI-1701): a failure shows, a failure before a pass shows as a warning. */
 const LOOK_ICON: Record<RunsLook, string> = { failed: 'error', retried: 'warning', passed: 'pass', stale: 'warning', stopped: 'circle-slash' }
 
-/** Whether the user opened or closed a card's runs (by day and card), kept for the session (HI-1701). */
-const cardsOpened = new Map<string, boolean>()
-
 /**
  * A card's runs on a day (HI-1701): a heading with its key (it opens the card), title, how many runs and how they went,
- * and when the last ended; under it a line per run. Open while one of its runs is running or failed, closed once all
- * passed, unless the user chose; Other holds the runs for no card.
+ * and when the last ended; under it a line per run, always (HI-1925: every run its own line, only its details folded).
+ * Other holds the runs for no card.
  */
-function CardGroup({ group: c, running, now, detail, toggle }: { group: CardRuns; running: boolean; now: number; detail: string | null; toggle: (id: string) => void }) {
+function CardGroup({ group: c, running, now, opened, flip }: { group: CardRuns; running: boolean; now: number; opened: ReadonlySet<string>; flip: (id: string) => void }) {
   const key = useStore((s) => (c.card ? cardLabelOf(s, c.card) : null))
   const title = useStore((s) => (c.card ? (s.tasks.find((t) => t.number === c.card)?.title ?? null) : null))
   const look = cardLook(c)
-  const [chosen, setChosen] = useState(() => cardsOpened.get(c.key))
-  const open = chosen ?? (running || look === 'failed' || look === 'retried')
-  const flip = (): void => {
-    cardsOpened.set(c.key, !open)
-    setChosen(!open)
-  }
   const name = key ?? tr(msg({ id: 'board.runs.other', defaultMessage: 'Other', description: "The heading of a group in the Progress panel's Runs tab, where runs are grouped by card: the runs for no card (Hive's own, the user's scripts) follow." }))
   const at = c.last.finishedAt ?? c.last.updatedAt
   return (
-    <section className={cx('progress-card-runs', look, open && 'open')} data-card-runs={c.card ?? 'other'} aria-label={name}>
-      <div className="progress-card-head" onClick={flip}>
-        <IconButton
-          icon={open ? 'chevron-down' : 'chevron-right'}
-          className="progress-card-toggle"
-          title={tr(msg({ id: 'board.runs.toggleCard', defaultMessage: '{open, select, yes {Hide the runs of {card}} other {Show the runs of {card}}}', description: "Tooltip of the chevron on a card's heading in the Progress panel's Runs tab: hides or shows the card's runs ({card}: its key, such as HI-12, or Other for the runs for no card). Keep the select keys." }), { open: open ? 'yes' : 'no', card: name })} // i18n-ignore: a select's key, never shown
-          expanded={open}
-          onClick={(e) => {
-            e.stopPropagation()
-            flip()
-          }}
-        />
+    <section className={cx('progress-card-runs', look, 'open')} data-card-runs={c.card ?? 'other'} aria-label={name}>
+      <div className="progress-card-head">
         <Icon name={LOOK_ICON[look]} className="progress-card-icon" />
         {c.card ? (
           <button
@@ -499,11 +579,9 @@ function CardGroup({ group: c, running, now, detail, toggle }: { group: CardRuns
           {timeAgo(new Date(at).toISOString())}
         </span>
       </div>
-      {open && (
-        <div className="progress-card-items">
-          {c.items.map((g) => (g.runs.length === 1 && !g.queue ? <RecentRow key={g.key} run={g.last} cardKey={key} now={detail === g.last.id ? now : 0} open={detail === g.last.id} onToggle={toggle} /> : <GroupRow key={g.key} group={g} cardKey={key} now={now} detail={detail} toggle={toggle} />))}
-        </div>
-      )}
+      <div className="progress-card-items">
+        {c.items.map((g) => (g.runs.length === 1 && !g.queue ? <RecentRow key={g.key} run={g.last} cardKey={key} now={opened.has(g.last.id) ? now : 0} open={opened.has(g.last.id)} onToggle={flip} /> : <GroupRow key={g.key} group={g} cardKey={key} now={now} opened={opened} flip={flip} />))}
+      </div>
     </section>
   )
 }
@@ -512,7 +590,7 @@ function CardGroup({ group: c, running, now, detail, toggle }: { group: CardRuns
  * A run tried several times the same day (#1309), or the merge queue's checks of a card (HI-1701): one line, as a run's,
  * "B1 cardwork ×4 · 2 failed, then passed" or "Hive (merge queue) lint, typecheck"; opened, each run.
  */
-function GroupRow({ group: g, cardKey, now, detail, toggle }: { group: RunGroup; cardKey: string | null; now: number; detail: string | null; toggle: (id: string) => void }) {
+function GroupRow({ group: g, cardKey, now, opened, flip }: { group: RunGroup; cardKey: string | null; now: number; opened: ReadonlySet<string>; flip: (id: string) => void }) {
   const [open, setOpen] = useState(false)
   const what = g.queue ? queueChecksLabel(g, (items) => fmt.list(items, 'unit'), tr, (r) => runTitleIn(r, cardKey)) : runGroupLabel(g, null, tr, runTitleIn(g.last, cardKey))
   const who = runAgentName(g.last, tr)
@@ -526,13 +604,15 @@ function GroupRow({ group: g, cardKey, now, detail, toggle }: { group: RunGroup;
           <Icon name={LOOK_ICON[look]} /> <span className="progress-recent-who">{who}</span>
           <span className="progress-recent-text">{what}</span>
           <span className="faint progress-recent-took">{took}</span>
+          {/* When its latest try ended (HI-1925: each line says when). */}
+          <span className="faint progress-recent-at">{formatTime(g.last.finishedAt ?? g.last.updatedAt)}</span>
         </span>
         <Icon name={open ? 'chevron-up' : 'chevron-down'} className="progress-group-chevron" />
       </button>
       {open && (
         <div className="progress-group-runs">
           {[...g.runs].reverse().map((r) => (
-            <RecentRow key={r.id} run={r} cardKey={cardKey} now={detail === r.id ? now : 0} open={detail === r.id} onToggle={toggle} />
+            <RecentRow key={r.id} run={r} cardKey={cardKey} now={opened.has(r.id) ? now : 0} open={opened.has(r.id)} onToggle={flip} />
           ))}
         </div>
       )}
@@ -767,6 +847,7 @@ const RecentRow = memo(function RecentRow({ run: r, cardKey, now, open, onToggle
           <Icon name={icon} /> <span className="progress-recent-who">{runAgentName(r, tr)}</span>
           <span className="progress-recent-text">{runTitleIn(r, cardKey)}</span>
           <span className="faint progress-recent-took">{took}</span>
+          <span className="faint progress-recent-at">{formatTime(r.finishedAt ?? r.updatedAt)}</span>
         </Tooltip>
         <DetailsToggle run={r} open={open} onToggle={onToggle} />
       </div>
@@ -807,9 +888,14 @@ function RunDetails({ run: r, now }: { run: ProgressRun; now: number }) {
       {r.summary && <div className={cx('progress-summary', r.state !== 'failed' && 'plain')}>{r.summary}</div>}
       <div className="progress-detail-actions">
         {why === null ? (
-          <button type="button" className="btn small" onClick={() => showRunAgent(r)} aria-label={showLabel(r)}>
-            <Icon name="eye" /> {tr(SHOW_THE_AGENT)}
-          </button>
+          <>
+            <button type="button" className="btn small" onClick={() => showRunAgent(r)} aria-label={showLabel(r)}>
+              <Icon name="eye" /> {tr(SHOW_THE_AGENT)}
+            </button>
+            <button type="button" className="btn small subtle" onClick={() => showRunActivity(r)}>
+              <Icon name="type-hierarchy" /> {tr(SHOW_IN_ACTIVITY)}
+            </button>
+          </>
         ) : (
           <span className="progress-detail-why">{why}</span>
         )}

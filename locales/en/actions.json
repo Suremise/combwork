@@ -496,8 +496,8 @@
     "description": "Release Slot…: a tick box, on by default: Hive ends the listed processes before releasing the slot."
   },
   "actions.releaseHeld.messageGone": {
-    "defaultMessage": "{slot} is held by {agent}'s session (run {run}) in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.",
-    "description": "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another."
+    "defaultMessage": "{slot} is held by a session of agent {agent} (run {run}) in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.",
+    "description": "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another. A noun before the name (glossary §1 rule 4)."
   },
   "actions.releaseHeld.messageSelf": {
     "defaultMessage": "{agent}'s last session in {slot} (run {run}) has ended in this Hive (process {pid}, running), but Hive doesn't know that everything it started there has: until you release it, nothing else uses the slot.",
@@ -999,6 +999,10 @@
     "defaultMessage": "For every project in the workspace (else for this project only)",
     "description": "A tick box in the Save as Template dialog: the template is the workspace's (ticked) or this project's."
   },
+  "actions.template.includeWorkflow": {
+    "defaultMessage": "Include this project's workflow (its rules for {platform}: review, checks by name, merging, stages; never its target branch, check commands or identity's name)",
+    "description": "A tick box in the Save as Template dialog (HI-1910), ticked by default: the template keeps the project's workflow options for its version control ({platform}: None or Git, as Hive names them), the rules only. Glossary: workflow, check, target branch, identity."
+  },
   "actions.template.load": {
     "defaultMessage": "Load template",
     "description": "Button: loads the template into the project."
@@ -1083,9 +1087,9 @@
     "defaultMessage": "Could not save the template",
     "description": "An error's title: saving a template failed."
   },
-  "actions.template.saveMessage": {
-    "defaultMessage": "A template keeps the project's {n, plural, one {agent} other {# agents}} (settings, roles and notes), its layout and its preset, to load into any project later. Sessions and worktrees aren't saved.",
-    "description": "The Save as Template dialog: what a template keeps of the project's {n} agents. Glossary: preset."
+  "actions.template.saveMessage2": {
+    "defaultMessage": "A template keeps the project's {n, plural, one {agent} other {# agents}} (settings, roles and notes), its layout and, ticked below, its workflow, to load into any project later. Sessions and worktrees aren't saved.",
+    "description": "The Save as Template dialog: what a template keeps of the project's {n} agents (HI-1910: its workflow options, when the box below is ticked). Glossary: workflow."
   },
   "actions.template.saveTitle": {
     "defaultMessage": "Save as template",
@@ -1106,6 +1110,22 @@
   "actions.template.usePatterns": {
     "defaultMessage": "Use the project key in names ({example} becomes {pattern}, named from the key of the project it is loaded into)",
     "description": "A tick box in the Save as Template dialog (#1440): agent names that start with this project's key ({example}, e.g. HI-B1) are saved as a pattern ({pattern}: {key}-B{n}), so a project loading the template names them with its own key. Keep {key} and {n} as they are."
+  },
+  "actions.template.workflowChanged": {
+    "defaultMessage": "The template \"{template}\" changed while it loaded, so its workflow wasn’t filled in. Load it again to see its workflow as it is now.",
+    "description": "A warning after loading a template (HI-1910): its workflow section changed between the Load dialog's preview and the load ({template}: its name), so the Workflow form isn't filled in with it."
+  },
+  "actions.template.workflowKept": {
+    "defaultMessage": "{count, plural, one {The workflow for {platforms} it had is kept.} other {The workflows for {platforms} it had are kept.}}",
+    "description": "Under the notification that a template was saved over one of the same name (HI-1910): the workflow sections it had for {platforms} (None, Git: a list) are kept, {count} of them."
+  },
+  "actions.template.workflowNone": {
+    "defaultMessage": "It holds no workflow.",
+    "description": "Under the notification that a template was saved (HI-1910): saved without the project's workflow, and it had none."
+  },
+  "actions.template.workflowSaved": {
+    "defaultMessage": "It holds this project's workflow for {platform}.",
+    "description": "Under the notification that a template was saved (HI-1910): it holds the project's workflow options for its version control ({platform}: None or Git, as Hive names them)."
   },
   "actions.unsaved.changedMessage": {
     "defaultMessage": "Save them, then {action, select, switch {switch workspace} close {close the workspace} other {reload the window}} again.",

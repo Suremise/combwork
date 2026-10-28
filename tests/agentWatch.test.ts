@@ -1313,6 +1313,8 @@ describe('agent watches (main/watches.ts)', async () => {
     await watches.settled()
     expect(st.told.at(-1)).not.toMatch(/review was taken from you/)
     st.status = 'watching'
+    // Failed, it went back to Doing (HI-1946): its builder submits it again before it is reviewed again.
+    await inWorkspace(w, () => tasks.updateTask(c4, { column: 'review' }, { kind: 'agent', name: 'Reviewer (alpha)', self: { project: 'alpha', agentId: 'a2' }, scope: 'alpha' }))
     await inWorkspace(w, () => tasks.updateTask(c4, { review: 'start' }, me))
     await watches.registerWatch(w, alpha, 'a1', { cards: [c4], changes: ['verdict'] })
     await inWorkspace(w, () => tasks.endReviews('alpha', 'a1', 'its session ended', w))

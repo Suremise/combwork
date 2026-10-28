@@ -18,7 +18,7 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, templateListText, templatePlanText, templateLoadedText, type TemplatePlanPublic, type TemplateLoadPublic, agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import type { QueuePublic } from '../../shared/workflow/queue'
 import { LOOP_STEPS } from '../../shared/workflow/facts'
@@ -129,7 +129,7 @@ const settingsArgs = {
   mcpServers: { type: 'array', items: { type: 'string' }, description: "Only these of the project's MCP servers (names), [] none, [\"*\"] all (the default). The hive server is always given." },
   connection: { type: 'string', description: "The connection it runs on, by id or name (hive_list_providers lists those on here); its CLI is the provider. Empty: its CLI's default connection. A name two share is refused: use the id." }
 }
-const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either'], description: 'Its side in the workflow: builds cards, reviews them, or either (never its own). Default: guessed from its name.' }
+const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either', 'generalist'], description: 'Its side in the workflow: builds cards, reviews them, either (never its own), or generalist (does what it is asked in its pane; never in a lane or the reviewer pool). Default: guessed from its name.' }
 const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/agents/${enc(a.agent || '')}`
 /** Which agent is changing a card, for its history (Hive fills in the name). */
 const columnArg = { type: 'string', enum: [...COLUMN_IDS] }
@@ -169,9 +169,9 @@ function intentTools(): Tool[] {
       'hive_submit',
       'submit',
       'Submit a card in Doing for review: hands its committed work to review (a code card in Git needs its work committed; submitting never commits), and it moves on (to Review, or past it where its project has no review). Writes summary as a comment. A revision already reviewed needs note (what is different). In Review, a commit asked for while it is reviewed goes in with followUp. As a lane\'s builder, Hive then watches it for you, for its review. Replies with warnings (files outside its paths, other agents\' changes in a shared folder) and the watch.',
-      { summary: { type: 'string', description: 'What was done, a line first.' }, revision, note: { type: 'string', description: 'For a revision already reviewed: what this submission adds (an explanation).' }, paths: { type: 'array', items: { type: 'string' }, description: 'The files the work changed, relative to the project, for a project with no version control.' }, followUp: { type: 'boolean', description: 'Its builder, the card in Review: a commit its reviewer asked for becomes the revision under review. It stays in Review, no round counted; its reviewer is woken to start its review again.' } },
+      { summary: { type: 'string', description: 'What was done, a line first.' }, revision, note: { type: 'string', description: 'For a revision already reviewed: what this submission adds (an explanation).' }, paths: { type: 'array', items: { type: 'string' }, description: 'The files the work changed, relative to the project, for a project with no version control.' }, followUp: { type: 'boolean', description: 'Its builder, the card in Review: a commit its reviewer asked for becomes the revision under review. It stays in Review, no round counted; its reviewer is woken to start its review again.' }, tests: { type: 'array', items: { type: ['string', 'object'] }, description: "Where the project runs each card's focused tests at merge: tests the change needs beyond those its picker chooses, or, when it can't choose, all of them (reviewed with the change). Each the project's test id, or { id, needs } (needs: unit, fake, real, packaged)." } },
       ['summary'],
-      (a) => ({ summary: a.summary, revision: a.revision, note: a.note, paths: a.paths, followUp: a.followUp })
+      (a) => ({ summary: a.summary, revision: a.revision, note: a.note, paths: a.paths, followUp: a.followUp, tests: a.tests })
     ),
     intent('hive_declare_paths', 'declare-paths', "Declare the paths a card's work will change (relative to the project), for a folder shared with other agents. Moves nothing.", { paths: { type: 'array', items: { type: 'string' } } }, ['paths'], (a) => ({ paths: a.paths })),
     intent('hive_start_review', 'start-review', "Start reviewing a card in Review: you are its reviewer; it stays where it is. Replies with the revision, base and files to review, and the review copy to read and run commands in, when the project has them.", { submission }, [], (a) => ({ submission: a.submission })),
@@ -182,6 +182,14 @@ function intentTools(): Tool[] {
       { pass: { type: 'boolean' }, comment: { type: 'string', description: 'The verdict, a line first; findings numbered.' }, failKind: { type: 'string', enum: ['content', 'explanation'], description: 'A fail: the work itself (content) or only how it was explained (explanation).' }, submission },
       ['pass', 'comment'],
       (a) => ({ pass: a.pass, comment: a.comment, failKind: a.failKind, submission: a.submission })
+    ),
+    intent(
+      'hive_focused_skip',
+      'focused-skip',
+      "As a card's reviewer, decide on focused tests its merge skipped for their environment (a usage limit, a sign-in, the network), when Hive asks you: merge true merges it with them skipped, false returns it to its builder. why is recorded; the user can override.",
+      { request: { type: 'string', description: 'The request Hive named ("HI-12/r40").' }, merge: { type: 'boolean' }, why: { type: 'string', description: 'Why, in a sentence.' } },
+      ['request', 'merge', 'why'],
+      (a) => ({ request: a.request, merge: a.merge, why: a.why })
     ),
     intent('hive_report_merge', 'report-merge', "Report a card's work merged, where its agent merges it or merges aren't checked: Hive checks the merge is in its target (unless the project doesn't check merges) and moves it to Done.", { result: { type: 'string', description: 'The merge commit.' } }, [], (a) => ({ result: a.result })),
     intent(
@@ -585,14 +593,14 @@ const tools: Tool[] = [
   {
     name: 'hive_lane',
     description: ASSISTANT
-      ? `Lanes: Hive's record of a builder and reviewer taking a project's cards in order (card-loop), shown to the user. start: project, builder, reviewer, cards in order, rounds, waitMinutes, name, brief (the builder's brief, kept with the lane and given with each of its cards in the conversation that works it: never prompt it separately; left out, a running lane keeps its own; '' clears it) (the builder's running lane with any of these cards is updated instead: while one of its cards is in flight the new list is queued until that card is Done, and its builder is told; rounds and waitMinutes left out are the project's workflow options (Card loops)). A lane ends by itself once every card is Done. end: lane (its id) and abandoned=true to stop it unfinished. list: running and lately ended lanes (project narrows, all=true every one kept). Replies with each lane in a line: its agents, state (active, paused and why, ended, abandoned), cards, rounds, wait and id.${controlAllows(CONTROL, 'agents') ? '' : ' At Look and advise only list works: start and end need Control agents.'}`
+      ? `Lanes: Hive's record of a builder and reviewer taking a project's cards in order (card-loop), shown to the user. start: project, builder, reviewer (or pool=true: reviewed by the project's reviewer pool, where its Reviewers option is a shared pool), cards in order, rounds, waitMinutes, name, brief (the builder's brief, kept with the lane and given with each of its cards in the conversation that works it: never prompt it separately; left out, a running lane keeps its own; '' clears it) (the builder's running lane with any of these cards is updated instead: while one of its cards is in flight the new list is queued until that card is Done, and its builder is told; rounds and waitMinutes left out are the project's workflow options (Card loops)). A lane ends by itself once every card is Done. end: lane (its id) and abandoned=true to stop it unfinished. list: running and lately ended lanes (project narrows, all=true every one kept). Replies with each lane in a line: its agents, state (active, paused and why, ended, abandoned), cards, rounds, wait and id.${controlAllows(CONTROL, 'agents') ? '' : ' At Look and advise only list works: start and end need Control agents.'}`
       : "Your card loop's lane: Hive's record of a builder and reviewer taking cards in order, shown to the user. start (the builder): cards in order, reviewer, rounds, waitMinutes, name, brief (kept with the lane, given with each of its cards; left out: kept; '' clears it); again with a changed list updates it (while a card is in flight, from when that card is Done: you are told). rounds and waitMinutes left out are the project's workflow options (Card loops). join (the reviewer): builder (its name), and cards if it hasn't started one yet. next: your next card to start or carry on, or why the lane waits. The lane ends by itself once every card is Done; abandoning one is the user's. list: your project's lanes. Replies with the lane in a line: its agents, state, cards, rounds, wait and id.",
     inputSchema: {
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['start', 'join', 'next', 'end', 'list'] },
         cards: cardsArg('Cards, in the order they are done.'),
-        ...(ASSISTANT ? { project: { type: 'string' }, builder: { type: 'string', description: 'Agent name or id.' } } : { builder: { type: 'string', description: "join: the builder's name." } }),
+        ...(ASSISTANT ? { project: { type: 'string' }, builder: { type: 'string', description: 'Agent name or id.' }, pool: { type: 'boolean', description: "start: reviewed by the project's reviewer pool, with no reviewer of its own." } } : { builder: { type: 'string', description: "join: the builder's name." } }),
         reviewer: { type: 'string', description: 'Agent name or id.' },
         rounds: { type: 'number' },
         waitMinutes: { type: 'number' },
@@ -615,7 +623,7 @@ const tools: Tool[] = [
       }
       // An agent's lane is its project's, with itself as the builder (start) or the reviewer (join).
       const me = ASSISTANT ? {} : { project: PROJECT, ...(process.env.HIVE_AGENT_ID ? { [a.action === 'join' ? 'reviewer' : 'builder']: process.env.HIVE_AGENT_ID } : {}) }
-      if (a.action === 'start') return named((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'cards', 'rounds', 'waitMinutes', 'name', 'brief']), ...me })) as LaneChange, laneChangeText)
+      if (a.action === 'start') return named((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'pool', 'cards', 'rounds', 'waitMinutes', 'name', 'brief']), ...me })) as LaneChange, laneChangeText)
       if (a.action === 'join') return named((await api('POST', '/v1/lanes/join', { ...pick(['project', 'builder', 'cards']), ...me })) as LaneChange, laneChangeText)
       if (a.action === 'next') return named((await api('GET', '/v1/lanes/next')) as Parameters<typeof laneNextText>[0], laneNextText)
       if (a.action !== 'end') throw new Error('action must be start, join, next, end or list')
@@ -674,6 +682,33 @@ const tools: Tool[] = [
       if (a.action !== 'release') throw new Error('action must be list or release')
       if (typeof a.slot !== 'string' || !a.slot) throw new Error('slot is required: the name list gives')
       return slotReleasedText((await api('POST', `${base}/${enc(a.slot)}/release`, Object.fromEntries(['kind', 'confirm', 'end'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]])))) as Parameters<typeof slotReleasedText>[0])
+    }
+  },
+  {
+    name: 'hive_template',
+    description:
+      "A project's agent templates. list: those it can use (Hive's own, the workspace's, its own). plan: what loading one would do, changing nothing: who it removes and creates, names another project's agent has (each with a free one), what stops it, and the workflow options it would set. load: replaces every agent of the project with the template's and sets its workflow options for the project's version control (workflow: false leaves them); refused while an agent runs, and when its workflow needs Git the project hasn't (setting up Git is the user's). hive_undo puts the agents, layout and options back. Only when the user asked for it.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list', 'plan', 'load'] },
+        project: projectArg,
+        template: { type: 'string', description: 'plan, load: its file or name, as list gives them.' },
+        scope: { type: 'string', enum: ['hive', 'workspace', 'project'], description: 'When a name is in several.' },
+        from: { type: 'string', description: "A project's template kept in another project: that project." },
+        names: { type: 'object', additionalProperties: { type: 'string' }, description: "New names for some of its agents: its place (\"1\") or name (AL-B2) → the name. Names are unique across the workspace." },
+        workflow: { type: 'boolean', description: 'Set its workflow options (default true).' }
+      },
+      required: ['action', 'project']
+    },
+    run: async (a) => {
+      if (typeof a.project !== 'string' || !a.project) throw new Error('project is required')
+      const base = `/v1/projects/${enc(a.project)}/templates`
+      if (a.action === 'list') return templateListText((await api('GET', base)) as Parameters<typeof templateListText>[0])
+      if (a.action !== 'plan' && a.action !== 'load') throw new Error('action must be list, plan or load')
+      const body = Object.fromEntries(['template', 'scope', 'from', 'names', 'workflow'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
+      if (a.action === 'plan') return templatePlanText((await api('POST', `${base}/plan`, body)) as TemplatePlanPublic)
+      return templateLoadedText((await api('POST', `${base}/load`, body)) as TemplateLoadPublic)
     }
   },
   {
@@ -772,6 +807,7 @@ const tools: Tool[] = [
               override: overrideArg,
               kind: { type: 'string', enum: ['code', 'no-code'], description: "Changes its kind after it was made: an exception to its rules, only with override (the user's reason)." },
               confirmKind: { type: 'boolean', description: 'Answers an agent proposing no-code (kindProposed): true makes it no-code, false keeps it code. Only as the user says.' },
+              answers: { type: 'array', items: { type: 'string' }, description: "With decision only: the card's open requests (For you, their ids from hive_read_task) the user's decision answers, closed with it. Name only those the user's words answer; approvals and Hive's own requests stay theirs to answer in For you." },
               skipReview: { type: ['string', 'boolean'], description: "The user's reason it skips review, in their words (answers an agent's reviewSkipProposed too), or false to review it after all. Only before it is submitted." }
             }
           : { review: { type: 'string', enum: ['start', 'passed', 'failed'] } })
@@ -780,7 +816,7 @@ const tools: Tool[] = [
     },
     run: async (a) => {
       const body: Record<string, unknown> = { reply: 'short' }
-      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview', 'attachments']) if (a[k] !== undefined) body[k] = a[k]
+      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview', 'answers', 'attachments']) if (a[k] !== undefined) body[k] = a[k]
       const text = changedText((await api('PATCH', `/v1/tasks/${enc(String(a.number))}`, body)) as TaskChange)
       // #1346 item 8: an Assistant with its journal on recorded six decisions and wrote none of them down.
       return ASSISTANT && JOURNAL && typeof a.decision === 'string' && a.decision.trim() ? `${text}\nNote it in your journal (hive_journal_write).` : text

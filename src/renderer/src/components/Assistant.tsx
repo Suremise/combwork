@@ -9,13 +9,14 @@ import { agentOpenRun, runWords } from '@shared/progress'
 import { columnName } from '@shared/tasks'
 import { agentProvider, providerDescriptor } from '@shared/providers'
 import type { AgentInfo, AgentPatch, EffortLevel, PermissionMode, ModeInfo, ProgressRun, ProjectInfo, ProviderId } from '@shared/types'
+import { withSnapshot } from '@shared/assistantChangeList'
 import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
 import { legacyOf, placeText, placeTip } from '../agentPlace'
 import { connectionCellText, NoConnectionBanner, useConnections, useLaunchConnection } from './ConnectionChoice'
 import { assistantDefaults } from '@shared/connectionDefaults'
-import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingKey, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
+import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setLoaded, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingKey, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
 import { cardLabel } from '@shared/projectKeys'
 import { loadAssistantChanges } from '../assistantUndo'
 import { useInbox } from '../inbox'
@@ -51,7 +52,7 @@ const M = {
   inboxTip: msg({ id: 'assistant.panel.inboxTip', defaultMessage: "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.", description: "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox ({n}: how many). hive_inbox is a tool's name: keep it." }),
   inboxTipNoWakes: msg({ id: 'assistant.panel.inboxTipNoWakes', defaultMessage: "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet", description: "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox, when the setting Wake an idle agent (Settings → Advanced) is off (a hint line under it says so; {n}: how many)." }),
   noWakesHint: msg({ id: 'assistant.panel.noWakesHint', defaultMessage: 'Wake an idle agent is off, so nothing is typed by itself. Deliver Now types the line once.', description: "A hint line under the heading of the Assistant's ⋯ menu's list of its unread inbox, when the setting Wake an idle agent (Settings → Advanced) is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them." }),
-  inboxLine: msg({ id: 'assistant.panel.inboxLine', defaultMessage: '{id} from {from}: {text}', description: "An item of the Assistant's inbox in its ⋯ menu: its id, who it is from ({from}) and the start of its text ({text})." }),
+  inboxLine: msg({ id: 'assistant.panel.inboxLine', defaultMessage: '{id} · {from}: {text}', description: "An item of the Assistant's inbox in its ⋯ menu: its id, who it is from ({from}) and the start of its text ({text}). No preposition before the name (glossary §1 rule 4)." }),
   deliverNow: msg({ id: 'assistant.panel.deliverNow', defaultMessage: 'Deliver Now', description: "Menu item in the Assistant's ⋯ menu, shown while the setting Wake an idle agent is off: types the line telling it of what waits in its inbox into its terminal, once." }),
   deliverFailed: msg({ id: 'assistant.panel.deliverFailed', defaultMessage: "Could not deliver the Assistant's inbox", description: "An error's title: typing the line that tells the Assistant of what waits in its inbox (Deliver Now) failed." }),
   notDelivered: msg({ id: 'assistant.panel.notDelivered', defaultMessage: "The Assistant wasn't told now", description: "A notice's title: Deliver Now couldn't type the line into the Assistant's terminal now." }),
@@ -288,7 +289,8 @@ export function AssistantPanel() {
     if (!ws) return
     // Another workspace opened before this loaded: its own load is on the way.
     let current = true
-    void Promise.all([call('assistant:actions'), call('assistant:questions')]).then(([assistantActions, assistantQuestions]) => current && set({ assistantActions, assistantQuestions }))
+    // Those told by events meanwhile are kept, never twice (HI-1863).
+    void Promise.all([call('assistant:actions'), call('assistant:questions')]).then(([snapshot, assistantQuestions]) => current && setLoaded((s) => ({ assistantActions: withSnapshot(s.assistantActions, snapshot), assistantQuestions })))
     // Its changes kept for undo (#1283), by message.
     void loadAssistantChanges()
     return () => {

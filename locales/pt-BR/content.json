@@ -97,6 +97,7 @@
   "content.templates.noWorkspace": "Abra um espaço de trabalho primeiro.",
   "content.templates.nothing": "{problem} Nada foi alterado.",
   "content.templates.provider": "{problem, select, unknown {Este Hive não conhece o agente de código “{provider}” (atualize o Hive)} off {O {provider} está desativado (Configurações → Provedores)} other {O {provider} não está instalado (Configuração de provedores)}}",
+  "content.templates.restoring": "Desfazer está devolvendo os agentes deste projeto a como estavam antes de um modelo ser carregado",
   "content.templates.running": "O agente {agent} está em execução ou iniciando: pare-o primeiro.",
   "content.templates.scope": "Escopo desconhecido “{scope}”: hive, workspace ou project.",
   "content.templates.started": "Um agente foi iniciado nesse meio-tempo: nada foi alterado. Pare-o primeiro.",

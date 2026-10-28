@@ -38,7 +38,9 @@ export function boardSkillsLine(off: ReadonlySet<string> = new Set()): string {
   const routes = [
     on('work-on-card') && 'Given a card to work on, fix or continue, use the work-on-card skill',
     on('review-agent-work') && `asked to review or check ${on('work-on-card') ? 'one' : 'a card'}, use review-agent-work`,
-    on('card-loop') && "as a loop's builder or reviewer (one card or several, with rounds), use card-loop"
+    on('card-loop') && "as a loop's builder or reviewer (one card or several, with rounds), use card-loop",
+    // HI-686: work outside a card loop, a generalist's (Role in the workflow) above all.
+    on('generalist') && 'for other work, use generalist'
   ].filter((r): r is string => !!r)
   const others = (
     [

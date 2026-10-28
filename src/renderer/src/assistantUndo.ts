@@ -1,6 +1,6 @@
 import type { AssistantUndoResult } from '@shared/types'
 import { call } from './api'
-import { set } from './store'
+import { set, setLoaded } from './store'
 
 /**
  * Undo of the Assistant's changes in its panel (#1283, SPEC §16.14): the changes kept for undo (#1282's IPC), by the
@@ -13,7 +13,28 @@ let loads = 0
 export async function loadAssistantChanges(): Promise<void> {
   const mine = ++loads
   const groups = await call('assistant:changes').catch(() => null)
-  if (groups && mine === loads) set({ assistantChanges: groups })
+  if (groups && mine === loads) setLoaded({ assistantChanges: groups })
+}
+
+/** A load under way, and whether another was asked for meanwhile (HI-1863). */
+let loading: Promise<void> | null = null
+let again = false
+
+/**
+ * Loads the Assistant's changes again soon (HI-1863): at once, or, while a load is under way, once after it, however
+ * many were asked for meanwhile. A message changing 70 cards reads the list twice, not 70 times.
+ */
+export function reloadAssistantChanges(): void {
+  if (loading) {
+    again = true
+    return
+  }
+  loading = loadAssistantChanges().finally(() => {
+    loading = null
+    if (!again) return
+    again = false
+    reloadAssistantChanges()
+  })
 }
 
 /** Undoes one change or a message's changes: what each did, kept beside its row, then the list again. */

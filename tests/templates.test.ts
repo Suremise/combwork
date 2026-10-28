@@ -90,10 +90,12 @@ describe('the template format', () => {
     expect(readTemplate({ ...ok, agents: Array.from({ length: 25 }, (_, i) => ({ name: `A${i}`, provider: 'claude-code' })) })).toMatch(/up to 24/)
     expect(readTemplate({ ...ok, agents: [{ name: 'A', provider: 'claude-code' }, { name: 'a', provider: 'claude-code' }] })).toMatch(/Two agents are called/)
     // A role in the workflow: one of the three, or none (the guess from its name and note).
-    expect(readTemplate({ ...ok, agents: [{ name: 'A', provider: 'claude-code', role: 'boss' }] })).toBe("A's role in the workflow isn't builder, reviewer or either.")
+    expect(readTemplate({ ...ok, agents: [{ name: 'A', provider: 'claude-code', role: 'boss' }] })).toBe("A's role in the workflow isn't builder, reviewer, either or generalist.")
+    // A generalist is a role a template keeps (HI-686).
+    expect(readTemplate({ ...ok, agents: [{ name: 'G', provider: 'claude-code', role: 'generalist' }] })).toMatchObject({ agents: [{ name: 'G', role: 'generalist' }] })
     const guessed = readTemplate({ ...ok, agents: [{ name: 'HI-R1', provider: 'codex' }, { name: 'Checker', provider: 'codex', note: 'reviews UI' }, { name: 'HI-B1', provider: 'claude-code' }] })
     expect(typeof guessed !== 'string' && guessed.agents.map((a) => a.role)).toEqual(['reviewer', 'reviewer', 'builder'])
-    expect(readTemplate({ ...ok, agents: [{ name: 'A', provider: 'claude-code', note: 'x'.repeat(61) }] })).toMatch(/A's note is over 60 characters/)
+    expect(readTemplate({ ...ok, agents: [{ name: 'A', provider: 'claude-code', note: 'x'.repeat(61) }] })).toMatch(/The note of agent A is over 60 characters/)
     // Pairs: a builder and a reviewer it has, each in one pair; a suggestion and a reviewer mode it doesn't know are dropped.
     const team = { ...ok, agents: [{ name: 'B1', provider: 'claude-code' }, { name: 'B2', provider: 'claude-code' }, { name: 'R1', provider: 'codex', role: 'reviewer' }, { name: 'E1', provider: 'codex', role: 'either' }] }
     const paired = readTemplate({ ...team, pairs: [{ builder: 'b1', reviewer: 'R1' }], suggestedPreset: 'team', reviewerMode: 'pool' })
@@ -373,7 +375,7 @@ describe('saving and loading templates', () => {
     const renamed = await run(() => templates.templatePlan(beta, 'workspace', 'pair-2.json', undefined, B))
     expect([renamed.create.map((a) => a.name), renamed.templateNames, renamed.taken]).toEqual([B, ['Builder', 'Reviewer'], []])
     const r = await run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', ['b1'], undefined, B))
-    expect(r).toEqual({ created: B, removed: ['Old'] })
+    expect([r.created, r.removed]).toEqual([B, ['Old']])
     const cfg = cfgOf(beta)
     expect(await layoutOf(beta)).toBe('columns2')
     // Each with its role in the workflow and note (alpha's "builder" note), in the project folder (#1436).
@@ -585,9 +587,13 @@ describe('saving and loading templates', () => {
     expect(basename(file)).toBe('Solo act.hive-template.json')
     await run(() => templates.exportTemplate({ scope: 'workspace', file: 'solo-act.json' }, file))
     const text = readFileSync(file, 'utf8')
-    expect(text).not.toMatch(/[A-Za-z]:\\\\|hive-templates-|"id"|lastSessionId|worktree"\s*:\s*\{|needsSetup|"mode"/)
+    expect(text).not.toMatch(/[A-Za-z]:\\\\|hive-templates-|"id"|lastSessionId|worktree"\s*:\s*\{|needsSetup/)
     const exported = JSON.parse(text)
-    expect(Object.keys(exported).sort()).toEqual(['agents', 'layout', 'name', 'savedAt', 'version'])
+    // No agent's mode (its workflow's okBefore has a mode of its own).
+    expect(JSON.stringify(exported.agents)).not.toMatch(/"mode"/)
+    // Its project's workflow (HI-1910), the rules only: never the target, commands, the identity's name or the excluded folders.
+    expect(Object.keys(exported).sort()).toEqual(['agents', 'layout', 'name', 'savedAt', 'version', 'workflow'])
+    expect(JSON.stringify(exported.workflow)).not.toMatch(/"target"|"commands"|"excluded"|"commitMessage"|"pushTarget"|"name"|"email"/)
     const before = (await run(() => templates.listAllTemplates())).find((t) => t.scope === 'workspace' && t.file === 'solo-act.json')!
     // Into beta, which already has one of that name (the duplicate): a clash, until told what to do.
     expect(await run(() => templates.inspectImport(file))).toEqual({ path: file, name: 'Solo act', agents: before.agents.length, unknown: [] })
@@ -664,12 +670,18 @@ describe('saving and loading templates', () => {
     await expect(run(() => templates.addAgentFromTemplate(beta, 'hive', 'team-3x3.json', 0))).rejects.toThrow(/couldn't read beta's key/)
     await expect(run(() => templates.saveTemplate(beta, 'workspace', 'Unkeyed', false, true))).rejects.toThrow(/couldn't read beta's key/)
     expect(cfgOf(beta).agents.map((a: StoredAgent) => a.id)).toEqual(ids)
+    // Listed for beta (HI-1948: the window's menu names them so), its names keep {key} while main has no key for it.
+    const listedNames = async () => (await run(() => templates.listTemplates(beta))).find((t) => t.scope === 'hive' && t.file === 'team-3x3.json')?.agentNames
+    expect(await listedNames()).toEqual(['B1', 'B2', 'B3', 'R1', 'R2', 'R3'].map((n) => `{key}-${n}`))
     const { keyProjects, projectKeyOf } = await import('../src/main/projectKeys')
     await run(() => keyProjects(w))
     const key = (await run(() => projectKeyOf(w, beta)))!
     expect(key).toMatch(/^[A-Z]{2,4}$/)
     const plan = await run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))
     const want = ['B1', 'B2', 'B3', 'R1', 'R2', 'R3'].map((n) => `${key}-${n}`)
+    // Once it has one, every agent's name as its plan makes them, by place; the template's own patterns kept as they are.
+    expect(await listedNames()).toEqual(plan.templateNames)
+    expect((await run(() => templates.listTemplates(beta))).find((t) => t.file === 'team-3x3.json')?.agents.map((a) => a.name)).toEqual(['{key}-B{n}', '{key}-B{n}', '{key}-B{n}', '{key}-R{n}', '{key}-R{n}', '{key}-R{n}'])
     expect([plan.name, plan.blocked, plan.create.map((a) => a.name), plan.templateNames, plan.layout, plan.suggestedPreset, plan.swaps]).toEqual(['Team 3×3', [], want, want, 'grid6', 'team', []])
     expect(plan.pairs).toEqual([{ builder: 0, reviewer: 3 }, { builder: 1, reviewer: 4 }, { builder: 2, reviewer: 5 }])
     await run(() => templates.loadTemplate(beta, 'hive', 'team-3x3.json', ids))
@@ -846,5 +858,140 @@ describe('saving and loading templates', () => {
     const saves = await Promise.all([run(() => templates.saveTemplate(alpha, 'workspace', 'Racing')), run(() => templates.saveTemplate(beta, 'workspace', 'racing!'))])
     expect(new Set(saves.map((r) => ('saved' in r ? r.saved.file : r.exists))).size).toBe(2)
     expect(namesIn(wsDir).filter((n) => /^racing/i.test(n))).toEqual(['Racing', 'racing!'])
+  })
+})
+
+describe("a template's workflow (HI-1910)", () => {
+  let w: ReturnType<typeof createWorkspaceService>
+  const wsPath = join(base, 'ws-workflow')
+  const gitA = join(wsPath, 'gita')
+  const gitB = join(wsPath, 'gitb')
+  const plain = join(wsPath, 'plain')
+  const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
+  const fileOf = (name: string) => JSON.parse(readFileSync(join(wsPath, '.hive', 'templates', name), 'utf8'))
+  beforeAll(async () => {
+    const repo = (p: string, who: string) => {
+      execFileSync('git', ['init', '-q', '-b', 'main', p])
+      execFileSync('git', ['config', 'user.name', `${who} Person`], { cwd: p })
+      execFileSync('git', ['config', 'user.email', `${who.toLowerCase()}@example.com`], { cwd: p })
+      writeFileSync(join(p, 'a.txt'), 'a')
+      execFileSync('git', ['add', '.'], { cwd: p })
+      execFileSync('git', ['commit', '-qm', 'a'], { cwd: p })
+    }
+    for (const p of [gitA, gitB, plain]) mkdirSync(join(p, '.hive'), { recursive: true })
+    repo(gitA, 'A')
+    repo(gitB, 'B')
+    // A: Team, made its own: its target, commands, identity, stage names and loops. B: its own target and one command.
+    const a = { review: 'agent', noSelfReview: true, preChecks: ['lint', 'unit'], commands: { lint: 'npm run lint', unit: 'npm test' }, target: 'stable-line', identity: { name: 'A Person', email: 'a@example.com' }, stageNames: { review: 'Checking' }, loopRounds: 4, fileLocks: 'block' }
+    writeFileSync(join(gitA, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'wa1', name: 'WA-B1', workflowRole: 'builder', provider: 'claude-code' }], workflow: { platform: 'git', preset: 'team', options: a } }))
+    writeFileSync(join(gitB, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [], workflow: { platform: 'git', preset: null, options: { target: 'main', commands: { lint: 'pnpm lint' } } } }))
+    writeFileSync(join(plain, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'wp1', name: 'WP-B1', workflowRole: 'builder', provider: 'claude-code' }] }))
+    w = createWorkspaceService()
+    await w.open(wsPath)
+    providersOn()
+  })
+  afterAll(async () => disposeWorkspaceService(w))
+
+  it("saves the project's rules as its version control's section, ticked by default; unticked, none", async () => {
+    const r = await run(() => templates.saveTemplate(gitA, 'workspace', 'Team A'))
+    expect('saved' in r && r.workflow).toEqual({ saved: 'git', kept: [] })
+    const f = fileOf('team-a.json')
+    expect(Object.keys(f.workflow)).toEqual(['git'])
+    expect(f.workflow.git).toMatchObject({ preset: 'team', options: { review: 'agent', preChecks: ['lint', 'unit'], identity: true, stageNames: { review: 'Checking' }, loopRounds: 4, fileLocks: 'block' } })
+    // A's own facts never: its target, commands, identity's name and email.
+    expect(JSON.stringify(f.workflow)).not.toMatch(/stable-line|npm run lint|npm test|A Person|a@example\.com|"target"|"commands"/)
+    const plainOnly = await run(() => templates.saveTemplate(gitA, 'workspace', 'Agents only', false, false, false))
+    expect('saved' in plainOnly && plainOnly.workflow).toEqual({ saved: null, kept: [] })
+    expect('workflow' in fileOf('agents-only.json')).toBe(false)
+  })
+
+  it('saving over a template keeps its other section, and unticked keeps them all, saying which', async () => {
+    // From the None project into the Git one's template: its None section added, Git's kept.
+    const r = await run(() => templates.saveTemplate(plain, 'workspace', 'Team A', true))
+    expect('saved' in r && r.workflow).toEqual({ saved: 'none', kept: ['git'] })
+    expect(Object.keys(fileOf('team-a.json').workflow).sort()).toEqual(['git', 'none'])
+    const unticked = await run(() => templates.saveTemplate(gitA, 'workspace', 'Team A', true, false, false))
+    expect('saved' in unticked && unticked.workflow).toEqual({ saved: null, kept: ['none', 'git'] })
+    expect(Object.keys(fileOf('team-a.json').workflow).sort()).toEqual(['git', 'none'])
+  })
+
+  it("loaded into another Git project: the plan lays the section over B's options, B's target, commands and identity kept, a check B can't run flagged", async () => {
+    const plan = await run(() => templates.templatePlan(gitB, 'workspace', 'team-a.json'))
+    const wf = plan.workflow!
+    expect([wf.platform, wf.sections, wf.needsGit, wf.alsoGit]).toEqual(['git', ['none', 'git'], false, false])
+    expect(wf.overlay!.options).toMatchObject({ review: 'agent', preChecks: ['lint', 'unit'], target: 'main', commands: { lint: 'pnpm lint' }, identity: { name: 'B Person', email: 'b@example.com' } })
+    expect(wf.overlay!.missingCommands).toEqual(['unit'])
+    expect(JSON.stringify(wf)).not.toMatch(/stable-line|npm run lint|A Person|a@example\.com/)
+    // Nothing is saved by the plan, nor by the load: B's options are as they were.
+    const before = readFileSync(join(gitB, '.hive', 'project.json'), 'utf8')
+    await run(() => templates.loadTemplate(gitB, 'workspace', 'team-a.json', [], undefined, ['WB-B1']))
+    expect(JSON.parse(readFileSync(join(gitB, '.hive', 'project.json'), 'utf8')).workflow).toEqual(JSON.parse(before).workflow)
+  })
+
+  it("a Git-only template in a project with no version control needs Git first; one with both uses None's there, and says it has Git's", async () => {
+    await run(() => templates.saveTemplate(gitA, 'workspace', 'Git only'))
+    const gitOnly = (await run(() => templates.templatePlan(plain, 'workspace', 'git-only.json'))).workflow!
+    expect([gitOnly.platform, gitOnly.section, gitOnly.overlay, gitOnly.needsGit]).toEqual(['none', null, null, true])
+    const both = (await run(() => templates.templatePlan(plain, 'workspace', 'team-a.json'))).workflow!
+    expect([both.needsGit, both.alsoGit, both.overlay?.options.platform]).toEqual([false, true, 'none'])
+    // No workflow at all: no workflow part.
+    expect((await run(() => templates.templatePlan(plain, 'workspace', 'agents-only.json'))).workflow).toBeNull()
+  })
+
+  it("an imported template's rejected section stays said through the import, and its suggested preset isn't offered in its place (HR5's round 1)", async () => {
+    const dir = join(base, 'imports-workflow')
+    mkdirSync(dir, { recursive: true })
+    const agents = [{ name: 'IM-B1', role: 'builder', provider: 'claude-code' }]
+    // HR5's two cases: a section with a value Hive can't use, and a workflow that isn't one.
+    const cases: [string, unknown][] = [['Bad none', { none: { preset: null, options: { review: 'bogus' } } }], ['Bogus', 'bogus']]
+    for (const [name, workflow] of cases) {
+      const file = join(dir, `${name}.hive-template.json`)
+      writeFileSync(file, JSON.stringify({ version: TEMPLATE_VERSION, name, savedAt: '', layout: 'auto', suggestedPreset: 'pair', agents, workflow }))
+      const r = await run(() => templates.importTemplate(file, { scope: 'workspace' }))
+      expect('imported' in r).toBe(true)
+      const imported = 'imported' in r ? r.imported : null
+      expect(imported?.workflowDropped?.length).toBeGreaterThan(0)
+      expect(JSON.stringify(fileOf(imported!.file))).not.toMatch(/bogus/)
+      const plan = await run(() => templates.templatePlan(gitB, 'workspace', imported!.file))
+      // Said in the plan, not taken for no workflow: the window shows why, and offers no preset in its place.
+      expect(plan.workflow).toMatchObject({ platform: 'git', section: null, dropped: imported!.workflowDropped })
+      expect(plan.workflow?.dropped).toContain('none')
+    }
+  })
+
+  it('a load returns the workflow section it read, for the window to check against the one it showed', async () => {
+    await run(() => templates.saveTemplate(gitA, 'workspace', 'Rounds'))
+    const plan = await run(() => templates.templatePlan(gitB, 'workspace', 'rounds.json'))
+    const f = join(wsPath, '.hive', 'templates', 'rounds.json')
+    const t = JSON.parse(readFileSync(f, 'utf8'))
+    // Changed after the plan was shown: the load reads it as it is now, and says so.
+    t.workflow.git.options.loopRounds = 8
+    writeFileSync(f, JSON.stringify(t))
+    const ids = JSON.parse(readFileSync(join(gitB, '.hive', 'project.json'), 'utf8')).agents.map((a: { id: string }) => a.id)
+    const r = await run(() => templates.loadTemplate(gitB, 'workspace', 'rounds.json', ids, undefined, ['RD-B1']))
+    expect(plan.workflow?.section?.options.loopRounds).toBe(4)
+    expect(r.workflow?.options.loopRounds).toBe(8)
+  })
+
+  it("Hive's own: its preset as this project's form offers it, its pool kept", async () => {
+    // Its agents' names are made from the project's key.
+    const { keyProjects } = await import('../src/main/projectKeys')
+    await run(() => keyProjects(w))
+    const wf = (await run(() => templates.templatePlan(gitB, 'hive', 'team-6-pool.json'))).workflow!
+    expect(wf.section).toMatchObject({ preset: 'team', options: { reviewerMode: 'pool', review: 'agent' } })
+    expect(wf.overlay!.options.target).toBe('main')
+  })
+
+  it('an edit keeps the sections unless it sends them; sent, they go through the whitelist', async () => {
+    const ref = { scope: 'workspace' as const, file: 'team-a.json' }
+    const now = (await run(() => templates.listAllTemplates())).find((t) => t.scope === 'workspace' && t.file === 'team-a.json')!
+    const edit = { name: now.name, layout: now.layout, agents: now.agents }
+    const kept = await run(() => templates.updateTemplate(ref, edit, now.savedAt))
+    expect(Object.keys(kept.workflow ?? {}).sort()).toEqual(['git', 'none'])
+    const sent = await run(() => templates.updateTemplate(ref, { ...edit, workflow: { git: { ...kept.workflow!.git, options: { ...kept.workflow!.git!.options, target: 'evil', commands: { lint: 'evil' } } } } }, kept.savedAt))
+    expect(Object.keys(sent.workflow ?? {})).toEqual(['git'])
+    expect(JSON.stringify(fileOf('team-a.json').workflow)).not.toMatch(/evil/)
+    const removed = await run(() => templates.updateTemplate(ref, { ...edit, workflow: {} }, sent.savedAt))
+    expect(removed.workflow).toBeUndefined()
   })
 })

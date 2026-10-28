@@ -425,6 +425,14 @@ const APP_ROWS: Row[] = [
     desc: msg({ id: 'settings.assistant.connection.desc', defaultMessage: "Which connection the Assistant of the open workspace runs on. The workspace's default unless you choose one.", description: 'What the setting "Connection (this workspace)" does, under its title (Settings → Assistant).' }),
     type: 'custom'
   },
+  {
+    section: 'assistant',
+    key: 'mcp',
+    title: msg({ id: 'settings.assistant.mcp.title', defaultMessage: 'MCP servers (this workspace)', description: "A setting's title (Settings → Assistant): which of the open workspace's MCP servers the Assistant gets. MCP is a protocol's name: keep it." }),
+    desc: msg({ id: 'settings.assistant.mcp.desc', defaultMessage: "The workspace's MCP servers the Assistant gets, as a project's MCP tab chooses them: each runs for it only while it is on in the workspace too (its switch in the MCP view). Off until you turn one on here. Applies from its next session.", description: 'What the setting "MCP servers (this workspace)" does, under its title (Settings → Assistant). "MCP view" and "MCP tab" are places in Hive: keep them as Hive shows them.' }),
+    type: 'custom',
+    wide: true
+  },
   { section: 'assistant', key: 'provider', title: msg({ id: 'settings.assistant.provider.title', defaultMessage: 'Provider', description: "A setting's title (Settings → Assistant)." }), desc: msg({ id: 'settings.assistant.provider.desc', defaultMessage: 'The coding agent the Assistant runs, unless a workspace chooses another.', description: 'What the setting "Provider" does, under its title (Settings → Assistant).' }), tip: msg({ id: 'settings.assistant.provider.tip', defaultMessage: 'The Assistant is independent of your project agents: a Codex Assistant can look after Claude Code agents, and the other way round.', description: 'The info tip of the setting "Provider" (Settings → Assistant): more on what it does and when it applies.' }), type: 'custom' },
   {
     section: 'assistant',
@@ -778,6 +786,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('style', 'select', [['merge', V.style.merge], ['squash', V.style.squash], ['rebase', V.style.rebase]]),
     option('target', 'text'),
     option('mergeChecks', 'custom'),
+    option('focusedTests', 'boolean'),
     option('mergeInstall', 'select', [['onManifestChange', V.mergeInstall.onManifestChange], ['always', V.mergeInstall.always]]),
     option('strict', 'boolean'),
     option('pushTarget', 'boolean'),

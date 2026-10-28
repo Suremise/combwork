@@ -77,7 +77,6 @@ const CASES: [id: string, values: Record<string, string | number>, numbers: numb
   ['board.duration.hoursMinutes', { h: N, min: 5 }, 1],
   ['actions.duration.hoursMinutes', { h: N, m: 5 }, 1],
   ['panes.runtime.silent', { known: 'yes', minutes: N }, 1],
-  ['board.stalled.reviewWaitSilent', { agent: 'x', card: 7, silent: N, waited: 'x' }, 1],
   ['board.slots.minutes', { n: N }, 1],
   ['service.gitRepo.diverged', { branch: 'x', upstream: 'x', ahead: N, behind: N }, 2],
   ['workspace.move.unreadable', { count: N, files: 'x', more: 0 }, 1]

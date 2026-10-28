@@ -500,6 +500,15 @@ kbd {
   flex-direction: column;
   align-items: center;
   border-right: 1px solid var(--border-subtle);
+  /* Never past the status bar (HI-1957): a short window (thirteen buttons since HI-1664 need 624 px) shortens them,
+     then scrolls them (the wheel; no scroll bar in 48 px). */
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.activitybar > .tip-wrap {
+  flex: 0 1 48px;
+  min-height: 32px;
 }
 .activity-btn {
   width: 48px;
@@ -512,6 +521,9 @@ kbd {
   cursor: pointer;
   border: none;
   background: none;
+}
+.activitybar > .tip-wrap > .activity-btn {
+  height: auto;
 }
 .activity-btn .codicon {
   font-size: 24px;
@@ -3300,6 +3312,52 @@ p.hint {
   margin: 8px 0 0;
   color: var(--fg-muted);
 }
+.template-plan-note.warn {
+  color: var(--warning);
+}
+/* A template's workflow (HI-1910): in the Load template dialog, under its agents; in the Templates view, under its agents too. */
+.template-workflow {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+.template-workflow-h {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.template-workflow-apply {
+  gap: 6px;
+}
+.template-workflow-git {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.template-workflow-list {
+  margin: 6px 0 0;
+  padding-inline-start: 18px;
+}
+.template-workflow-list li {
+  padding-block: 2px;
+}
+.template-workflow-view {
+  margin-top: 16px;
+}
+.template-workflow-panel {
+  padding-top: 8px;
+}
+.template-workflow-panel > p {
+  margin: 0 0 4px;
+}
+.template-workflow-edit {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
 /* A confirm's list (the folders an antivirus change covers, #347): one item per line, a long path wrapping inside itself. */
 .dialog-body .dialog-list {
   display: flex;
@@ -4149,6 +4207,47 @@ p.hint {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   user-select: text;
+}
+/* An agent's Hooks dialog (HI-982): its two tables in the dialog's own scroll, a long command cut to two lines. */
+.hooks-head {
+  align-items: flex-start;
+  gap: 8px;
+}
+.hooks-body {
+  user-select: text;
+}
+.hooks-heading {
+  margin: 14px 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.hooks-note,
+.hooks-stale {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin: 4px 0;
+}
+.hooks-stale {
+  color: var(--warning, inherit);
+}
+.hooks-table td {
+  vertical-align: top;
+}
+.hooks-command code {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.hooks-why {
+  max-width: 340px;
+  overflow-wrap: anywhere;
+}
+.hooks-count {
+  font-weight: 600;
 }
 .about-table td:first-child {
   text-align: right;
@@ -5523,19 +5622,30 @@ h2.section#unused-worktrees {
 .split-list.sessions-list {
   width: 320px;
 }
-/* While searching: how many sessions and matches, after the Archived box. */
+/* While searching: how many sessions and matches, after the Archived box; the note while the CLIs' own sessions are read
+   (HI-1681). Each goes under the box when it doesn't fit beside it, and wraps within the list when it doesn't fit there
+   either (a long count in another language, the note), never past its edge (HI-1941); its spinner kept at its first line. */
 .sessions-scope {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
   margin-left: auto;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
+.sessions-scope > .codicon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+/* What doesn't fit beside the Archived box goes under it, never past the list's edge, at any width it is resized to. */
 .sessions-filters {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
   padding: 0 10px 6px 14px;
   font-size: 12px;
+  min-width: 0;
 }
 .session-row {
   position: relative;
@@ -6092,6 +6202,8 @@ body.pane-resizing .monaco-editor {
   position: absolute;
   inset: 32px 0 0 0;
   overflow: auto;
+  /* Its columns, which a page's size is measured from (HI-1951), never change with a scroll bar coming and going. */
+  scrollbar-gutter: stable;
 }
 .tile-grid {
   display: grid;
@@ -7730,6 +7842,30 @@ button.agent-place:hover {
 }
 .activity-agent-tab-card {
   font-variant-numeric: tabular-nums;
+}
+/* Activity's workspace level (HI-1664): the agent tabs grouped by project, each group after its name. */
+.activity-tab-group {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.activity-tab-group + .activity-tab-group {
+  margin-left: 8px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border-subtle);
+}
+.activity-tab-group-name {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+.activity-for-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 .activity-pick.on,
 .activity-live.on {
@@ -9886,6 +10022,36 @@ body.pane-resizing-v .monaco-editor {
 .for-you-section .task-section-h {
   margin-block-start: 0;
 }
+/* For you's resolved list (HI-1932): requests a decision of the user's answered, quieter than those still open. */
+.for-you-resolved {
+  margin-block-start: 8px;
+  font-size: 12px;
+}
+.for-you-request + .for-you-resolved {
+  border-top: 1px solid var(--border-subtle);
+  padding-block-start: 8px;
+}
+.for-you-resolved-h {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.for-you-resolved-row {
+  margin-block-start: 6px;
+  min-width: 0;
+}
+.for-you-resolved-q {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.for-you-resolved-by {
+  overflow-wrap: anywhere;
+}
+.for-you-resolved-when::before {
+  content: '· ';
+}
 .for-you-request + .for-you-request {
   margin-block-start: 10px;
   padding-block-start: 10px;
@@ -10311,6 +10477,45 @@ textarea.input.task-blocked-input {
 .card-work-sub {
   color: var(--fg-muted);
   margin-block-start: 4px;
+}
+/* A card's cost by round and role (HI-1906): amounts right-aligned in their columns, the totals set apart. */
+.card-work-costs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card-work-costs table {
+  border-collapse: collapse;
+  width: max-content;
+  max-width: 100%;
+}
+.card-work-costs th,
+.card-work-costs td {
+  padding: 2px 10px;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.card-work-costs th:first-child {
+  padding-inline-start: 0;
+  text-align: start;
+}
+.card-work-costs thead th {
+  color: var(--fg-muted);
+  font-weight: normal;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.card-work-costs tbody th {
+  font-weight: normal;
+}
+.card-work-costs tfoot th,
+.card-work-costs tfoot td,
+.card-work-costs td[data-role='total'] {
+  font-weight: 600;
+}
+.card-work-costs tfoot th,
+.card-work-costs tfoot td {
+  border-top: 1px solid var(--border-subtle);
 }
 .card-work-rev {
   border: 1px solid var(--border-subtle);
@@ -10961,6 +11166,27 @@ textarea.input.task-blocked-input {
   height: 24px;
   font-size: 12px;
 }
+/* Quick filters above the table (HI-1878: the shortcuts editor): each named by its heading, wrapping in a narrow view. */
+.table-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin-bottom: 8px;
+}
+.table-filter-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.table-filter-item .select,
+.table-filter-item .input {
+  height: 24px;
+  font-size: 12px;
+  field-sizing: content;
+  min-width: fit-content;
+}
 /* The archived cards' and shortcuts' filters never cut their choice short under a narrow heading (#886, #890: "All" is
    longer in most languages). */
 :is(.archived-cards, .kb-table) .table tr.table-filters .select {
@@ -11214,6 +11440,17 @@ textarea.input.task-blocked-input {
 }
 .inbox-row:hover {
   background: var(--bg-hover);
+}
+/* A card counted once (HI-1931): its row, then its requests and the agents stopped on it, indented under it. */
+.inbox-row.inbox-under {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-inline-start: 38px;
+}
+.inbox-group + .inbox-row,
+.inbox-row + .inbox-group,
+.inbox-group + .inbox-group {
+  border-top: 1px solid var(--border-subtle);
 }
 .inbox-text {
   flex: 1;
@@ -11869,6 +12106,76 @@ button.progress-run-show:focus-visible {
   flex: 1 1 0;
   padding-top: var(--space-2);
 }
+/* HI-1926: the Lanes tab's lanes stacked from the bottom, growing upwards to the top, then scrolling (no row limit). */
+.progress-lanes.full .progress-lanes-list {
+  display: flex;
+  flex-direction: column;
+}
+.progress-lanes.full .progress-lanes-list > :first-child {
+  margin-top: auto;
+}
+.progress-lanes.full .progress-lane {
+  flex-shrink: 0;
+}
+.progress-lane-expand {
+  flex-shrink: 0;
+  margin: -2px 0 -2px -4px;
+}
+.progress-lane-waited {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.progress-lane-waited.long {
+  color: var(--warning);
+  font-weight: 600;
+  opacity: 1;
+}
+/* A lane's cards in order (HI-1926): a line each, its state's icon, key, title, round, time and a Done card's commit. */
+.progress-lane-queue {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 4px 0 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+.progress-lane-queue-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 1px 0;
+}
+.progress-lane-queue-icon,
+.progress-lane-queue-key,
+.progress-lane-queue-round,
+.progress-lane-queue-time,
+.progress-lane-queue-commit {
+  flex-shrink: 0;
+}
+.progress-lane-queue-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-lane-queue-time,
+.progress-lane-queue-commit {
+  font-variant-numeric: tabular-nums;
+}
+.progress-lane-queue-row.done > .progress-lane-queue-icon {
+  color: var(--success);
+}
+.progress-lane-queue-row.doing > .progress-lane-queue-icon {
+  color: var(--accent);
+}
+.progress-lane-queue-row.waiting > .progress-lane-queue-icon {
+  color: var(--warning);
+}
+.progress-lane-queue-row.gone,
+.progress-lane-queue-row.unrecorded {
+  opacity: 0.7;
+}
 /* Needs attention (#1309): failures nothing has passed since, one line that opens them in Runs. */
 .progress-attention {
   display: flex;
@@ -11884,6 +12191,10 @@ button.progress-run-show:focus-visible {
   font: inherit;
   text-align: start;
   cursor: pointer;
+}
+/* Above the runs (HI-1923): never shrunk away as the runs and the lanes take the room. */
+.progress-tab-pulse > .progress-attention {
+  flex-shrink: 0;
 }
 .progress-attention > span {
   flex: 1 1 auto;
@@ -11933,9 +12244,6 @@ button.progress-run-show:focus-visible {
   padding: 2px 8px 2px 4px;
   font-size: 12px;
   cursor: pointer;
-}
-.progress-card-head:hover {
-  background: var(--bg-hover);
 }
 .progress-card-head > .codicon,
 .progress-card-key,
@@ -12033,8 +12341,34 @@ button.progress-card-key:hover {
   align-items: center;
   gap: 6px;
 }
-.progress-recent-took {
+.progress-recent-took,
+.progress-recent-at {
   flex-shrink: 0;
+}
+.progress-recent-at {
+  font-variant-numeric: tabular-nums;
+}
+/* Runs (HI-1925): what runs now on top, scrolling in what the dock leaves, down to nothing; the finished runs docked at
+   the bottom behind the lanes' edge, scrolling in their own height. */
+.progress-tab-runs > .progress-runs-body {
+  min-height: 0;
+}
+.progress-runs-dock {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-subtle);
+}
+.progress-runs-dock-list {
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+}
+.progress-runs-none {
+  padding: 3px 12px;
+  font-size: 12px;
 }
 .progress-recent:hover,
 .progress-recent-item.open > .progress-recent {
@@ -12433,6 +12767,90 @@ button.progress-card-key:hover {
 }
 .progress-queue-link:hover {
   text-decoration: underline;
+}
+/* A queue's Recent merges (HI-1924), under its card: a row an outcome or a pause, newest first, each opening its card.
+   Its icon and words say the outcome; colour is never the only cue. */
+.progress-queue-with-history + .progress-queue-with-history,
+.progress-queue-with-history + .progress-merge-card,
+.progress-merge-card + .progress-queue-with-history {
+  margin-top: 10px;
+}
+.progress-queue-history {
+  margin: 6px 0 0;
+  padding: 0 6px 0 10px;
+  min-width: 0;
+}
+.progress-queue-history-h {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+.progress-queue-history-list {
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.progress-queue-history-row {
+  padding: 4px 4px 4px 0;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+.progress-queue-history-row.opens {
+  cursor: pointer;
+}
+.progress-queue-history-row.opens:hover {
+  background: var(--bg-hover);
+}
+.progress-queue-history-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.progress-queue-history-top > .codicon {
+  flex-shrink: 0;
+}
+.progress-queue-history-row[data-outcome='merged'] .progress-queue-history-top > .codicon {
+  color: var(--success);
+}
+.progress-queue-history-row[data-outcome='returned'] .progress-queue-history-top > .codicon {
+  color: var(--error);
+}
+.progress-queue-history-row.pause .progress-queue-history-top > .codicon {
+  color: var(--warning);
+}
+.progress-queue-history-top > .progress-run-card {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.progress-queue-history-row.pause .progress-queue-outcome {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-queue-when {
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.progress-queue-history-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 2px;
+  margin: 2px 0 0 22px;
+  min-width: 0;
+}
+.progress-queue-history-detail > .progress-queue-outcome {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 /* Pulse's line per merge queue testing or paused (#1356): a click shows the Merges tab. */
 .progress-queue-lines {
@@ -13207,6 +13625,20 @@ button.progress-lane-why:focus-visible,
 .vc-init .hint {
   margin: 0;
 }
+/* Git's page before the folder has a repository (HI-1905): its line, its buttons, the hint, a failure, one under another. */
+.vc-init[data-vc-git-preview] {
+  flex-direction: column;
+  align-items: flex-start;
+  padding-top: 6px;
+}
+.vc-init-line {
+  margin: 0;
+}
+.vc-init-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 /* The switch Hive offers when it detects another version control (#1419): its sentence, then Switch… and Not Now. */
 .vc-offer {
   display: flex;
@@ -13465,6 +13897,60 @@ button.progress-lane-why:focus-visible,
 .git-row-actions {
   display: inline-flex;
   flex-shrink: 0;
+}
+/*
+ * A branch row (HI-1897): its name, then what it is and where it stands with its last commit (the part that gives way),
+ * then its time and actions, which never shrink and sit in the same place on every row. The name keeps a reasonable
+ * width and is cut with "…" only once the middle has given way; the middle's parts are cut with "…" in turn, its last
+ * commit first.
+ */
+/* Its whole name while the middle can give way (the middle takes only the room left: flex-basis 0); a very long name
+   at most 45% of the row, so the middle keeps a share; and short of room, no minimum of its own, so the time and the
+   actions always fit (HR5's HI-1897 round 1: a remote's Track and Stop tracking widened them past a fixed minimum). */
+.git-row.git-branch > .git-name {
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  max-inline-size: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.git-branch-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 0;
+  min-inline-size: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.git-branch-info > * {
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.git-branch-info > .git-subject {
+  flex: 1 1 0;
+}
+.git-row-tail {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  margin-inline-start: auto;
+}
+.git-row-tail > .git-meta {
+  min-inline-size: 7em;
+  text-align: end;
+}
+/* An action a row doesn't have: its place kept, so the others line up (an icon button's size). */
+.git-act-slot {
+  display: inline-block;
+  inline-size: 24px;
+  block-size: 1px;
+}
+.git-switch-slot {
+  visibility: hidden;
 }
 .git-form-note {
   margin-top: 8px;

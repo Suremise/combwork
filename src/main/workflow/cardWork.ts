@@ -84,13 +84,14 @@ function keptOf<T>(kept: Kept<T>, ws: WorkspaceService): Map<number, { key: stri
  * Each live card's value, kept by its key: only the cards whose key changed are read and made again, from their facts;
  * cards archived or gone since are let go.
  */
-function keptValues<T>(db: Db['reader'], kept: Map<number, { key: string; value: T }>, cards: readonly Row[], keyOf: (r: Row) => string, make: (r: Row, facts: Fact[]) => T): T[] {
+function keptValues<T>(db: Db['reader'], kept: Map<number, { key: string; value: T }>, cards: readonly Row[], keyOf: (r: Row) => string, make: (r: Row, facts: Fact[]) => T, some = false): T[] {
   const changed = cards.filter((r) => kept.get(r.number as number)?.key !== keyOf(r))
   if (changed.length) {
     const facts = factsOfCards(db, changed.map((r) => r.number as number))
     for (const r of changed) kept.set(r.number as number, { key: keyOf(r), value: make(r, facts.get(r.number as number) ?? []) })
   }
-  if (kept.size > cards.length) {
+  // Of some cards only (`some`), the others' are kept as they are.
+  if (!some && kept.size > cards.length) {
     const live = new Set(cards.map((r) => r.number as number))
     for (const n of kept.keys()) if (!live.has(n)) kept.delete(n)
   }
@@ -181,14 +182,37 @@ export function forYou(ws: WorkspaceService, project?: string | null): ForYouSum
   const items = boardRead(ws, (db) => {
     if (!hasFacts(db)) return []
     const cards = prepared(db, 'SELECT number, col, stage, pre_workflow, project FROM cards WHERE archived = 0 ORDER BY number').all() as Row[]
-    const heads = factHeads(db)
-    const keyOf = (r: Row): string => [r.col, r.stage, r.pre_workflow, r.project, heads.get(r.number as number) ?? ''].join('\n')
-    const all = keptValues(db, keptOf(forYous, ws), cards, keyOf, (r, facts) => (facts.length ? forYouItems({ card: r.number as number, project: String(r.project ?? ''), stage: cardOf(r).stage }, facts) : []))
+    const all = keptValues(db, keptOf(forYous, ws), cards, forYouKey(factHeads(db)), forYouOfRow)
     return cards.flatMap((r, i) => (project == null || String(r.project ?? '').toLowerCase() === project.toLowerCase() ? all[i] : []))
   })
   items.sort((a, b) => (a.since < b.since ? -1 : a.since > b.since ? 1 : a.card - b.card))
   return { items, count: items.length }
 }
+
+/**
+ * These cards' open requests for the user (HI-1932: what the Agent API's card lists, with their ids), by card: only
+ * these cards' rows and facts are read, kept with forYou's. A card archived or gone, or with none, isn't in it.
+ */
+export function forYouOfCards(ws: WorkspaceService, numbers: readonly number[]): Map<number, ForYouItem[]> {
+  const out = new Map<number, ForYouItem[]>()
+  if (!numbers.length) return out
+  boardRead(ws, (db) => {
+    if (!hasFacts(db)) return
+    const cards = prepared(db, 'SELECT number, col, stage, pre_workflow, project FROM cards WHERE archived = 0 AND number IN (SELECT value FROM json_each(?)) ORDER BY number').all(JSON.stringify([...new Set(numbers)])) as Row[]
+    const items = keptValues(db, keptOf(forYous, ws), cards, forYouKey(headsOf(db, cards.map((r) => r.number as number))), forYouOfRow, true)
+    cards.forEach((r, i) => {
+      if (items[i].length) out.set(r.number as number, items[i])
+    })
+  })
+  return out
+}
+
+/** What a card's For you items are kept by: its row and its facts' head. */
+const forYouKey =
+  (heads: ReadonlyMap<number, string>) =>
+  (r: Row): string =>
+    [r.col, r.stage, r.pre_workflow, r.project, heads.get(r.number as number) ?? ''].join('\n')
+const forYouOfRow = (r: Row, facts: Fact[]): ForYouItem[] => (facts.length ? forYouItems({ card: r.number as number, project: String(r.project ?? ''), stage: cardOf(r).stage }, facts) : [])
 
 /** Each workspace's For you items by card (forYou). */
 const forYous: Kept<ForYouItem[]> = new WeakMap()

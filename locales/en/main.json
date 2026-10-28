@@ -480,32 +480,32 @@
     "description": "Why Repair couldn't rename an agent's branch (in main.move.branchFailed's {why}): a branch with the new name appeared meanwhile."
   },
   "main.move.branchFailed": {
-    "defaultMessage": "{host}: {agent}'s branch {from} couldn't be renamed to {to} ({why}).",
-    "description": "A line of Repair's report, after a workspace or project moved to another folder. {host} is the project; {agent} an agent; {from} and {to} are branch names; {why} is git's or the system's message."
+    "defaultMessage": "{host}: branch {from} of agent {agent} couldn't be renamed to {to} ({why}).",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder. {host} is the project; {agent} an agent; {from} and {to} are branch names; {why} is git's or the system's message. A noun before the name (glossary §1 rule 4)."
   },
   "main.move.branchGone": {
-    "defaultMessage": "{host}: {agent}'s branch {from} is gone, so it isn't renamed.",
-    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch to rename no longer exists. {host} is the project; {agent} an agent; {from} a branch name."
+    "defaultMessage": "{host}: branch {from} of agent {agent} is gone, so it isn't renamed.",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch to rename no longer exists. {host} is the project; {agent} an agent; {from} a branch name. A noun before the name (glossary §1 rule 4)."
   },
   "main.move.branchQueued": {
     "defaultMessage": "a queued step still uses it; Repair renames it next time",
     "description": "Why Repair couldn't rename an agent's branch yet (in main.move.branchFailed's {why}): one of the board's queued steps (preparing a card's folder) names the branch."
   },
   "main.move.branchRenamed": {
-    "defaultMessage": "{host}: {agent}'s branch {from} is now {to}.",
-    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, with Hive's record of it. {host} is the project; {agent} an agent; {from} and {to} are branch names."
+    "defaultMessage": "{host}: branch {from} of agent {agent} is now {to}.",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, with Hive's record of it. {host} is the project; {agent} an agent; {from} and {to} are branch names. A noun before the name (glossary §1 rule 4)."
   },
   "main.move.branchRenamedRemote": {
-    "defaultMessage": "{host}: {agent}'s branch {from} is now {to}; it still tracks {remote}'s {from}, so push it under the new name when you're ready.",
-    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, and it tracks a remote, which keeps the old name. {host} is the project; {agent} an agent; {from} and {to} are branch names; {remote} the remote (origin)."
+    "defaultMessage": "{host}: branch {from} of agent {agent} is now {to}; it still tracks {from} on remote {remote}, so push it under the new name when you're ready.",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, and it tracks a remote, which keeps the old name. {host} is the project; {agent} an agent; {from} and {to} are branch names; {remote} the remote (origin). A noun before each name (glossary §1 rule 4)."
   },
   "main.move.branchTaken": {
-    "defaultMessage": "{host}: {agent}'s branch {from} keeps its name: {to} is already a branch.",
-    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place isn't renamed, because a branch with its new name exists. {host} is the project; {agent} an agent; {from} and {to} are branch names."
+    "defaultMessage": "{host}: branch {from} of agent {agent} keeps its name: {to} is already a branch.",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place isn't renamed, because a branch with its new name exists. {host} is the project; {agent} an agent; {from} and {to} are branch names. A noun before the name (glossary §1 rule 4)."
   },
   "main.move.branchUnrecorded": {
-    "defaultMessage": "{host}: {agent}'s branch is now {to}, but Hive couldn't record it yet ({why}). Repair finishes it.",
-    "description": "A line of Repair's report, after a workspace or project moved to another folder: git renamed an agent's branch, and Hive's record of it (or of the cards on it) couldn't be written; the next Repair finishes it. {host} is the project; {agent} an agent; {to} the branch's new name; {why} the system's message."
+    "defaultMessage": "{host}: the branch of agent {agent} is now {to}, but Hive couldn't record it yet ({why}). Repair finishes it.",
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: git renamed an agent's branch, and Hive's record of it (or of the cards on it) couldn't be written; the next Repair finishes it. {host} is the project; {agent} an agent; {to} the branch's new name; {why} the system's message. A noun before the name (glossary §1 rule 4)."
   },
   "main.move.cards": {
     "defaultMessage": "{n, plural, one {# card of {from} now belongs to {to}, with its agents.} other {# cards of {from} now belong to {to}, with their agents.}}",
@@ -786,6 +786,34 @@
   "main.move.workingRenamed": {
     "defaultMessage": "{n, plural, one {Working on: {projects}, as before its rename.} other {Working on: {projects}, as before their rename.}}",
     "description": "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): renamed projects stay Working on. Working on is how the sidebar marks projects: use its name as shown. {projects} lists them; {n} is how many."
+  },
+  "main.outage.gaveUpBody": {
+    "defaultMessage": "{n, plural, one {It was resumed once in the past hour} other {It was resumed # times in the past hour}} and stopped again, so Hive won't resume it again by itself. This PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
+    "description": "The notice that Hive stopped resuming an agent whose connection kept dropping. {n} is how many times it was resumed in the past hour. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them."
+  },
+  "main.outage.gaveUpTitle": {
+    "defaultMessage": "{agent}'s connection keeps dropping",
+    "description": "A notice's title: an agent's connection dropped again after Hive had resumed it several times in an hour, so Hive stopped resuming it. {agent} is the agent's name."
+  },
+  "main.outage.progressTitle": {
+    "defaultMessage": "{agent}: waiting for the connection",
+    "description": "A Progress panel run's title while Hive waits for an agent's connection to come back, to resume it. {agent} is the agent's name."
+  },
+  "main.outage.progressWaiting": {
+    "defaultMessage": "the connection to come back",
+    "description": "What a Progress panel run waits for, after \"Waiting for\": the connection of an agent whose turn a dropped connection ended."
+  },
+  "main.outage.resumedSummary": {
+    "defaultMessage": "Resumed: the connection dropped at {dropped} and came back at {back}.",
+    "description": "A Progress panel run's summary: Hive resumed an agent once its connection came back. {dropped} and {back} are times of day."
+  },
+  "main.outage.timedOutBody": {
+    "defaultMessage": "Hive waited {minutes, plural, one {# minute} other {# minutes}} and stopped waiting. If other apps can reach the internet, this PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
+    "description": "The notice that Hive stopped waiting for an agent's connection. {minutes} is how long it waited. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them."
+  },
+  "main.outage.timedOutTitle": {
+    "defaultMessage": "{agent}'s connection didn't come back",
+    "description": "A notice's title: Hive waited for an agent's connection to come back, to resume it, and gave up. {agent} is the agent's name."
   },
   "main.plan.close": {
     "defaultMessage": "You are getting close to the limit.",
@@ -1448,8 +1476,8 @@
     "description": "Why Hive won't remove a slot listed in Unused worktrees: the merge queue still merges a card ({card}: its key, such as HI-12) that worked in it. A clause."
   },
   "main.unused.slot.leased": {
-    "defaultMessage": "it is lent to {agent}",
-    "description": "Why Hive won't remove a slot listed in Unused worktrees (#1450): it is lent to the agent {agent} now. A clause."
+    "defaultMessage": "it is lent to agent {agent}",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees (#1450): it is lent to the agent {agent} now. A clause. A noun before the name (glossary §1 rule 4)."
   },
   "main.unused.slot.process": {
     "defaultMessage": "a process still has it open",

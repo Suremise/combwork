@@ -93,6 +93,8 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.accounts.statusSeconds.title': undefined
   'settings.advanced.claude-code.accounts.trustField.desc': undefined
   'settings.advanced.claude-code.accounts.trustField.title': undefined
+  'settings.advanced.claude-code.autoModeSetup.offer.desc': undefined
+  'settings.advanced.claude-code.autoModeSetup.offer.title': undefined
   'settings.advanced.claude-code.connections.remoteModels.desc': undefined
   'settings.advanced.claude-code.connections.remoteModels.title': undefined
   'settings.advanced.claude-code.exit.command.desc': undefined
@@ -113,6 +115,8 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.memory.setting.title': undefined
   'settings.advanced.claude-code.mouse.rightClickToCli.desc': undefined
   'settings.advanced.claude-code.mouse.rightClickToCli.title': undefined
+  'settings.advanced.claude-code.outage.connectionError.desc': undefined
+  'settings.advanced.claude-code.outage.connectionError.title': undefined
   'settings.advanced.claude-code.override.mcpIsolation.desc': undefined
   'settings.advanced.claude-code.override.mcpIsolation.title': undefined
   'settings.advanced.claude-code.override.preApproveHiveTools.desc': undefined
@@ -125,6 +129,10 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.safeguard.note.title': undefined
   'settings.advanced.claude-code.safeguard.prompt.desc': undefined
   'settings.advanced.claude-code.safeguard.prompt.title': undefined
+  'settings.advanced.claude-code.screen.idleQuestion.desc': undefined
+  'settings.advanced.claude-code.screen.idleQuestion.title': undefined
+  'settings.advanced.claude-code.screen.input.desc': undefined
+  'settings.advanced.claude-code.screen.input.title': undefined
   'settings.advanced.claude-code.signIn.stopError.desc': undefined
   'settings.advanced.claude-code.signIn.stopError.title': undefined
   'settings.advanced.claude-code.statusLine.fiveHour.desc': undefined
@@ -183,6 +191,10 @@ interface HiveMessageValues {
   'settings.advanced.codex.hooks.knownEvents.title': undefined
   'settings.advanced.codex.hooks.knownFields.desc': undefined
   'settings.advanced.codex.hooks.knownFields.title': undefined
+  'settings.advanced.codex.hooks.listMethod.desc': undefined
+  'settings.advanced.codex.hooks.listMethod.title': undefined
+  'settings.advanced.codex.hooks.listSeconds.desc': undefined
+  'settings.advanced.codex.hooks.listSeconds.title': undefined
   'settings.advanced.codex.hooks.preToolUseTimeoutSeconds.desc': undefined
   'settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title': undefined
   'settings.advanced.codex.hooks.timeoutSeconds.desc': { most: number }
@@ -193,6 +205,8 @@ interface HiveMessageValues {
   'settings.advanced.codex.mcp.toolTimeoutSeconds.title': undefined
   'settings.advanced.codex.mouse.rightClickToCli.desc': undefined
   'settings.advanced.codex.mouse.rightClickToCli.title': undefined
+  'settings.advanced.codex.outage.connectionError.desc': undefined
+  'settings.advanced.codex.outage.connectionError.title': undefined
   'settings.advanced.codex.override.mcpIsolation.desc': undefined
   'settings.advanced.codex.override.mcpIsolation.title': undefined
   'settings.advanced.codex.override.preApproveHiveTools.desc': undefined
@@ -201,6 +215,12 @@ interface HiveMessageValues {
   'settings.advanced.codex.override.terminalTitle.title': undefined
   'settings.advanced.codex.prompt.drawnSeconds.desc': undefined
   'settings.advanced.codex.prompt.drawnSeconds.title': undefined
+  'settings.advanced.codex.prompt.newlineKey.altEnter': undefined
+  'settings.advanced.codex.prompt.newlineKey.auto': undefined
+  'settings.advanced.codex.prompt.newlineKey.ctrlJ': undefined
+  'settings.advanced.codex.prompt.newlineKey.desc': undefined
+  'settings.advanced.codex.prompt.newlineKey.spaces': undefined
+  'settings.advanced.codex.prompt.newlineKey.title': undefined
   'settings.advanced.codex.promptInput.timeoutSeconds.desc': undefined
   'settings.advanced.codex.promptInput.timeoutSeconds.title': undefined
   'settings.advanced.codex.queue.hint.desc': undefined
@@ -253,6 +273,8 @@ interface HiveMessageValues {
   'settings.advanced.copilot.hooks.timeoutSeconds.title': undefined
   'settings.advanced.copilot.mouse.rightClickToCli.desc': undefined
   'settings.advanced.copilot.mouse.rightClickToCli.title': undefined
+  'settings.advanced.copilot.outage.connectionError.desc': undefined
+  'settings.advanced.copilot.outage.connectionError.title': undefined
   'settings.advanced.copilot.override.allMcpInstructions.desc': undefined
   'settings.advanced.copilot.override.allMcpInstructions.title': undefined
   'settings.advanced.copilot.override.mcpIsolation.desc': undefined
@@ -263,6 +285,10 @@ interface HiveMessageValues {
   'settings.advanced.copilot.override.preApproveHiveTools.title': undefined
   'settings.advanced.copilot.override.stripGitHubTokens.desc': undefined
   'settings.advanced.copilot.override.stripGitHubTokens.title': undefined
+  'settings.advanced.copilot.question.field.desc': undefined
+  'settings.advanced.copilot.question.field.title': undefined
+  'settings.advanced.copilot.question.tool.desc': undefined
+  'settings.advanced.copilot.question.tool.title': undefined
   'settings.advanced.copilot.ready.footer.desc': undefined
   'settings.advanced.copilot.ready.footer.title': undefined
   'settings.advanced.copilot.signIn.errorMessage.desc': undefined
@@ -273,6 +299,8 @@ interface HiveMessageValues {
   'settings.advanced.copilot.signIn.hookMessage.title': undefined
   'settings.advanced.copilot.trust.prompt.desc': undefined
   'settings.advanced.copilot.trust.prompt.title': undefined
+  'settings.advanced.copilot.turnFailed.errorType.desc': undefined
+  'settings.advanced.copilot.turnFailed.errorType.title': undefined
   'settings.advanced.copilotFooter.desc': { mode: string | number; footer: string | number; shared: string }
   'settings.advanced.copilotFooter.title': { mode: string | number }
   'settings.advanced.data.desc': undefined
@@ -290,8 +318,6 @@ interface HiveMessageValues {
   'settings.advanced.error.text': { title: string | number }
   'settings.advanced.hive.agents.perProject.desc': { usual: string | number; most: string | number }
   'settings.advanced.hive.agents.perProject.title': undefined
-  'settings.advanced.hive.assistant.otherMcpServers.desc': undefined
-  'settings.advanced.hive.assistant.otherMcpServers.title': undefined
   'settings.advanced.hive.assistant.startView.desc': undefined
   'settings.advanced.hive.assistant.startView.title': undefined
   'settings.advanced.hive.cards.attachmentMax.desc': undefined
@@ -306,6 +332,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.copies.review.title': undefined
   'settings.advanced.hive.disableHardwareAcceleration.desc': undefined
   'settings.advanced.hive.disableHardwareAcceleration.title': undefined
+  'settings.advanced.hive.focused.pickSeconds.desc': undefined
+  'settings.advanced.hive.focused.pickSeconds.title': undefined
   'settings.advanced.hive.guidance.desc': undefined
   'settings.advanced.hive.guidance.title': undefined
   'settings.advanced.hive.heapSnapshotNearLimit.desc': undefined
@@ -324,6 +352,12 @@ interface HiveMessageValues {
   'settings.advanced.hive.lanes.endWaitMinutes.title': undefined
   'settings.advanced.hive.lanes.gentleEnd.desc': undefined
   'settings.advanced.hive.lanes.gentleEnd.title': undefined
+  'settings.advanced.hive.lanes.waitReviewerMinutes.desc': undefined
+  'settings.advanced.hive.lanes.waitReviewerMinutes.title': undefined
+  'settings.advanced.hive.lanes.waitYouMinutes.desc': undefined
+  'settings.advanced.hive.lanes.waitYouMinutes.title': undefined
+  'settings.advanced.hive.lostLine.steadySeconds.desc': undefined
+  'settings.advanced.hive.lostLine.steadySeconds.title': undefined
   'settings.advanced.hive.mcp.connectSeconds.desc': undefined
   'settings.advanced.hive.mcp.connectSeconds.title': undefined
   'settings.advanced.hive.mcp.replySeconds.desc': undefined
@@ -334,8 +368,28 @@ interface HiveMessageValues {
   'settings.advanced.hive.notes.deliverWorkspaceNotes.title': undefined
   'settings.advanced.hive.notes.workspaceNotesMax.desc': undefined
   'settings.advanced.hive.notes.workspaceNotesMax.title': undefined
+  'settings.advanced.hive.outage.checkFirstSeconds.desc': undefined
+  'settings.advanced.hive.outage.checkFirstSeconds.title': undefined
+  'settings.advanced.hive.outage.checkMostSeconds.desc': undefined
+  'settings.advanced.hive.outage.checkMostSeconds.title': undefined
+  'settings.advanced.hive.outage.checkUrl.claude-code.desc': undefined
+  'settings.advanced.hive.outage.checkUrl.claude-code.title': undefined
+  'settings.advanced.hive.outage.checkUrl.codex.desc': undefined
+  'settings.advanced.hive.outage.checkUrl.codex.title': undefined
+  'settings.advanced.hive.outage.checkUrl.copilot.desc': undefined
+  'settings.advanced.hive.outage.checkUrl.copilot.title': undefined
+  'settings.advanced.hive.outage.notConnection.desc': undefined
+  'settings.advanced.hive.outage.notConnection.title': undefined
+  'settings.advanced.hive.outage.resume.desc': undefined
+  'settings.advanced.hive.outage.resume.title': undefined
+  'settings.advanced.hive.outage.resumesPerHour.desc': undefined
+  'settings.advanced.hive.outage.resumesPerHour.title': undefined
+  'settings.advanced.hive.outage.waitMinutes.desc': undefined
+  'settings.advanced.hive.outage.waitMinutes.title': undefined
   'settings.advanced.hive.progress.lanesShown.desc': undefined
   'settings.advanced.hive.progress.lanesShown.title': undefined
+  'settings.advanced.hive.progress.replySeconds.desc': undefined
+  'settings.advanced.hive.progress.replySeconds.title': undefined
   'settings.advanced.hive.prompt.asTyped.desc': undefined
   'settings.advanced.hive.prompt.asTyped.title': undefined
   'settings.advanced.hive.prompt.clearDraft.desc': undefined
@@ -348,6 +402,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.queue.checkedOutTarget.auto': undefined
   'settings.advanced.hive.queue.checkedOutTarget.desc': undefined
   'settings.advanced.hive.queue.checkedOutTarget.title': undefined
+  'settings.advanced.hive.queue.focusedJobs.desc': undefined
+  'settings.advanced.hive.queue.focusedJobs.title': undefined
   'settings.advanced.hive.queue.networkCodes.desc': undefined
   'settings.advanced.hive.queue.networkCodes.title': undefined
   'settings.advanced.hive.queue.signSeconds.desc': undefined
@@ -396,6 +452,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.terminal.osc52.block': undefined
   'settings.advanced.hive.terminal.osc52.desc': undefined
   'settings.advanced.hive.terminal.osc52.title': undefined
+  'settings.advanced.hive.usage.timelineDetailDays.desc': undefined
+  'settings.advanced.hive.usage.timelineDetailDays.title': undefined
   'settings.advanced.hive.wait.agentsMaxSeconds.desc': undefined
   'settings.advanced.hive.wait.agentsMaxSeconds.title': undefined
   'settings.advanced.hive.wait.cardMaxSeconds.desc': undefined
@@ -428,6 +486,7 @@ interface HiveMessageValues {
   'settings.advanced.unit.agents': { n: number }
   'settings.advanced.unit.captures': { n: number }
   'settings.advanced.unit.characters': { n: number }
+  'settings.advanced.unit.days': { n: number }
   'settings.advanced.unit.lanes': { n: number }
   'settings.advanced.unit.minutes': { n: number }
   'settings.advanced.unit.seconds': { n: number }
@@ -435,6 +494,7 @@ interface HiveMessageValues {
   'settings.advanced.unitLabel.bytes': undefined
   'settings.advanced.unitLabel.captures': undefined
   'settings.advanced.unitLabel.characters': undefined
+  'settings.advanced.unitLabel.days': undefined
   'settings.advanced.unitLabel.lanes': undefined
   'settings.advanced.unitLabel.minutes': undefined
   'settings.advanced.unitLabel.seconds': undefined
@@ -562,6 +622,12 @@ interface HiveMessageValues {
   'settings.assistant.journal.desc': undefined
   'settings.assistant.journal.tip': undefined
   'settings.assistant.journal.title': undefined
+  'settings.assistant.mcp.desc': undefined
+  'settings.assistant.mcp.manage': undefined
+  'settings.assistant.mcp.noWorkspace': undefined
+  'settings.assistant.mcp.none': undefined
+  'settings.assistant.mcp.switch': { name: string | number }
+  'settings.assistant.mcp.title': undefined
   'settings.assistant.mode.desc': undefined
   'settings.assistant.mode.tip': undefined
   'settings.assistant.mode.title': undefined

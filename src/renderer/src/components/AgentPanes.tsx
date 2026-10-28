@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { CardChip, useAgentCards, useAgentReviews } from './CardChip'
 import { StateMark } from './StateMark'
-import { AGENT_STATE_LABEL, AGENT_STATES, agentState, mostUrgent as mostUrgentState, projectAgentStates, stateSummary } from '@shared/agentState'
+import { AGENT_STATE_LABEL, AGENT_STATES, agentState, allStopped, mostUrgent as mostUrgentState, projectAgentStates, projectStateSummary } from '@shared/agentState'
 import { agentDoingCards } from '@shared/tasks'
 import { cardsText } from '@shared/agentTable'
 import { cardLabel } from '@shared/projectKeys'
@@ -22,7 +22,8 @@ import { watchText } from '@shared/agentWatch'
 import { formatDateTime, formatWhen } from '@shared/dates'
 import * as actions from '../actions'
 import { HAND_OVER_TEXT, handOverNow, onRunningLane } from '@shared/handOver'
-import { call, errorMessage } from '../api'
+import { call } from '../api'
+import { templateList, templatesStillHere } from '../templateList'
 import { NO_IDS, NO_PROJECTS, agentPage, get, agentProviderOf, clearStartFailure, closeTile, focusAgent, focusedAgentId, isAssistantPath, notify, openActivity, openInSessionsTab, paneAssignment, paneCells, projectKey, prompt, revealAgent, seenAgents, set, setProjectTab, showAgent, openVersionControl, showAttachments, showInOverview, showPage, shownLayout, startingKey, startingLabel, useLanguage, useStarting, useStore } from '../store'
 import { useLiveUsage, useLiveUsageState } from '../usage'
 import { commandKeybinding } from '../commands'
@@ -202,6 +203,7 @@ const RESUME = msg({ id: 'panes.resume.button', defaultMessage: 'Resume', descri
 const NEW_SESSION = msg({ id: 'panes.session.new', defaultMessage: 'New Session', description: 'Button and menu item (an agent\'s pane): starts the agent in a new conversation. Keep it short.' })
 const RESUME_SESSION = msg({ id: 'panes.resume.pick', defaultMessage: 'Resume a Session…', description: "Menu item (an agent's pane): opens the session picker to resume one of its sessions." })
 const MERGE = msg({ id: 'panes.agent.merge', defaultMessage: 'Merge…', description: "Button and menu item (a worktree agent's pane): opens the merge dialog for its branch." })
+const HOOKS = msg({ id: 'panes.menu.hooks', defaultMessage: 'Hooks…', description: "Menu item (an agent's menu): opens its Hooks dialog: the hooks its session has, and what Hive received from them. The … says it opens a dialog: keep it." })
 const AGENT_SETTINGS = msg({ id: 'panes.agent.settings', defaultMessage: 'Agent Settings…', description: "Menu item and button (an agent's pane): opens the agent's settings." })
 const STOP = msg({ id: 'panes.agent.stop', defaultMessage: 'Stop', description: "Button and menu item (an agent's pane): stops the agent's session (the conversation is kept). Keep it short." })
 
@@ -477,6 +479,8 @@ function agentMenu(project: ProjectInfo, a: AgentInfo, pick: () => void, usage?:
     ...sessionItems(project, a.live, usage?.session),
     // Its work in the project's Activity tab (#1254); the Assistant has none.
     ...(isAssistantPath(project.path) ? [] : [{ label: tr(msg({ id: 'panes.menu.activity', defaultMessage: 'Activity', description: "Menu item (an agent's menu): opens the project's Activity tab showing this agent's work: its sessions, turns, tool calls and processes." })), icon: 'type-hierarchy', onClick: () => openActivity(project.path, { agentId: a.id }) }]),
+    // Its hooks (HI-982): what its session has and what Hive received; while it runs.
+    { label: tr(HOOKS), icon: 'plug', disabled: !a.live, onClick: () => set({ hooksFor: { project: project.path, agentId: a.id } }) },
     { label: tr(msg({ id: 'panes.menu.handOver', defaultMessage: 'Hand Over to…', description: "Menu item (an agent's menu): hands its work over to another agent or a new conversation." })), icon: 'arrow-swap', onClick: () => set({ handOverFor: { project: project.path, agentId: a.id } }) },
     ...moveItems(project, a),
     // A slot its ended run still holds (#1506): the same item, for the user's explicit recovery; a carried slot's after it.
@@ -516,7 +520,7 @@ export function AddAgentButton({ project, className, label, iconOnly }: { projec
   const tip = full ? agentLimitText(limit, tr) : tr(msg({ id: 'panes.add.tip', defaultMessage: 'Configure Agent and Add…: choose its provider, where it works and its settings', description: 'Tooltip of the Add Agent button (an empty project or pane). "Configure Agent and Add…" names the dialog it opens: use its translation.' }))
   const fromTemplate = async (keyboard: boolean): Promise<void> => {
     const at = caret.current && below(caret.current)
-    const all = await templateList(project.path)
+    const all = await templatesStillHere(project.path)
     if (at && all) menu.openAt(...at, addFromTemplateItems(project, all), keyboard)
   }
   const open = (keyboard: boolean): void => {
@@ -698,24 +702,17 @@ const below = (el: Element): [number, number] => {
 const layoutName = (l: PageLayout): string =>
   tr(msg({ id: 'panes.template.layout', defaultMessage: '{layout, select, auto {automatic layout} single {one at a time} columns2 {two columns} columns3 {three columns} grid {grid of four} grid6 {grid of six} other {{layout}}}', description: "A template's layout, after how many agents it has (+ Add ▾ → Templates): its pane layout, lower case." }), { layout: l })
 
-/** The templates a project can use (the workspace's and its own), or null after saying why they couldn't be listed. */
-const templateList = (path: string): Promise<TemplateEntry[] | null> =>
-  call('templates:list', path).catch((e) => {
-    notify('error', tr(msg({ id: 'panes.template.listFailed', defaultMessage: 'Could not list the templates', description: "An error's title: Hive couldn't read the templates (+ Add ▾ → Templates, Add Agent from Template)." })), errorMessage(e))
-    return null
-  })
-
 /** Add Agent from Template: each usable template's agents, under its name and scope (#126). */
 function addFromTemplateItems(project: ProjectInfo, list: TemplateEntry[]): MenuEntry[] {
   const all = list.filter((t) => !t.problem)
   const full = project.agents.length >= agentLimit()
-  // Their names as this project's (#1123 names: Hive's own are patterns of its key, HI-B1); its key not known, `{key}` stays.
-  const key = get().projectKeys.find((k) => k.projectPath.toLowerCase() === project.path.toLowerCase())?.key || '{key}'
   return all.length
     ? all.flatMap((t) => [
         { header: true, label: tr(msg({ id: 'panes.template.heading', defaultMessage: '{template} · {scope, select, hive {Hive} workspace {workspace} other {this project}}', description: "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Hive: one of Hive's own templates, #1436)." }), { template: templateTitle(t), scope: t.scope }) },
         ...t.agents.map((a, i) => ({
-          label: templateAgentNames(t.agents, key)[i],
+          // Their names as this project's, as main made them with its key (HI-1948: Hive's own are patterns of it, HI-B1);
+          // none from main, `{key}` stays.
+          label: t.agentNames?.[i] ?? templateAgentNames(t.agents, '{key}')[i],
           icon: 'person-add',
           detail: [tr(WORKFLOW_ROLE_TEXT[a.role].name), a.note ?? '', providerName(a.provider)].filter(Boolean).join(' · '),
           disabled: full,
@@ -958,7 +955,7 @@ export function SessionToolbar({ project, view }: { project: ProjectInfo; view: 
   // + Add ▾: the dialog, the quick add, one agent of a template, and the templates themselves.
   const fromTemplate = async (keyboard: boolean): Promise<void> => {
     const at = add.current && below(add.current)
-    const all = await templateList(project.path)
+    const all = await templatesStillHere(project.path)
     if (at && all) addMenu.openAt(...at, addFromTemplateItems(project, all), keyboard)
   }
   const templates = async (keyboard: boolean): Promise<void> => {
@@ -1117,8 +1114,9 @@ export function SessionToolbar({ project, view }: { project: ProjectInfo; view: 
       {project.agents.length > 0 && (
         <Tooltip content={tr(msg({ id: 'panes.chip.tip', defaultMessage: "The project's agents by state: choose one to go to it", description: "Tooltip of the session toolbar's summary chip (\"1 waiting · 2 working\"), which opens a list of the agents." }))}>
           <button ref={chip} className={cx('summary-chip', urgent)} aria-haspopup="menu" aria-expanded={chipMenu.shown} onClick={(e) => openChip(e.detail === 0)}>
-            <StateMark state={urgent} decorative />
-            <span className="summary-chip-text">{stateSummary(states, true)}</span>
+            {/* Its count as the project header's (HI-1908): the agents with no session running are stopped, not idle. */}
+            <StateMark state={urgent} decorative className={allStopped(project.agents, states) ? 'stopped' : undefined} />
+            <span className="summary-chip-text">{projectStateSummary(project.agents, states)}</span>
             {!bare && <Icon name="chevron-down" />}
           </button>
         </Tooltip>

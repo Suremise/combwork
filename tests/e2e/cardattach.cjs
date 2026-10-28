@@ -1,3 +1,5 @@
+// Dev build only (HI-1842): its archived card comes due within HIVE_TEST_DAY_MS's short day, a test seam a packaged
+// build ignores.
 // Card attachments (HI-1700): an image pasted into a card dialog's comment box is a draft (a chip, a link at the caret,
 // nothing stored), and Post keeps it with the card: shown inline in the comment and in the card's Attachments list, kept
 // in the project's .hive/attachments/cards/<number>, and listed by path in the card's JSON (the Agent API, as
@@ -6,13 +8,15 @@
 // too). The tab's two tabs (HI-1841): Pane attachments and Card attachments, each its count and its own kind filters,
 // remembered; the card dialog's Show in Attachments opening Card attachments at its card, whatever its filter, without
 // changing the tab remembered; Pane attachments when the cards keep no files yet. Archived cards' attachments cleaned up
-// (HI-1842): Project Settings → Storage's choice, Clean Up Now's list and its removal, open and Done cards kept. Screenshots in both themes. Dev build, throwaway
+// (HI-1842): Project Settings → Storage's choice, Clean Up Now's list and its removal, open and Done cards kept (NOT RUN on a
+// packaged build: it makes a day short, HIVE_TEST_DAY_MS). Screenshots in both themes. Dev build, throwaway
 // profile and workspace (two plain-folder projects).
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 const { createHash } = require('crypto')
-const { showBoard, openByTitle } = require('./queueFixture.cjs')
+const q = require('./queueFixture.cjs')
+const { showBoard, openByTitle } = q
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 20000
 
@@ -252,6 +256,69 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     await show.click()
     const inView = () => olderGroup.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && el.closest('.scroll-page').scrollTop > 0 }).catch(() => false)
     check('…Show in Attachments: the filter back to All, the older card scrolled into view from below the fold, outlined', !!(await until(async () => (await selectedAttach()) === 'card' && (await page.locator('.attachment-filter', { hasText: 'All' }).getAttribute('aria-pressed')) === 'true' && (await inView()) && (await olderGroup.evaluate((el) => el.classList.contains('jumped')).catch(() => false)))), JSON.stringify([await selectedAttach(), await inView()]))
+    // --- A click opens the attachment viewer (HI-1958), a card's attachment as a pane's: arrows through the card
+    // attachments shown, Open in Its App for an image or a PDF and Show in Folder for any other kind (Darren's decision:
+    // #387, nothing attached is ever run), Remove from Card for a card's, Delete for a pane's, a file gone said in place.
+    // Open in Its App is never clicked here: it would start Windows' own viewer.
+    const viewer = page.locator('.dialog[role="dialog"]').filter({ has: page.locator('.image-viewer') })
+    const viewerTitle = () => viewer.getAttribute('aria-label', { timeout: 2000 }).then((x) => x ?? '', () => '')
+    const footer = async () => ({ open: await viewer.locator('[data-action="viewer-open"]').count(), show: await viewer.locator('[data-action="viewer-show"]').count(), remove: (await viewer.locator('[data-action="viewer-remove"]').innerText().catch(() => '')).trim(), position: (await viewer.locator('.dialog-footer .faint').first().innerText().catch(() => '')).trim() })
+    const otherGroup = section.locator(`[data-card="${other.number}"]`)
+    await page.locator('.attachment-filter', { hasText: 'All' }).click()
+    await otherGroup.locator('.thumb[data-kind="image"]').click()
+    check("a click on a card's image opens the viewer on it", !!(await until(async () => (await viewer.count()) === 1 && /session-shot\.png/.test(await viewerTitle()) && (await viewer.locator('.image-frame img').evaluate((img) => img.complete && img.naturalWidth > 0).catch(() => false)))), await viewerTitle())
+    const cardImage = await footer()
+    check('…Open in Its App for an image, Remove from Card, its place among the 9 card files', cardImage.open === 1 && cardImage.show === 0 && cardImage.remove === 'Remove from Card' && /^\d+ of 9 ·/.test(cardImage.position), JSON.stringify(cardImage))
+    for (const theme of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme } })
+      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
+      await page.screenshot({ path: path.join(shots, `cardattach-viewer-image-${theme}.png`) })
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+    // Its card's other file, the text file added after it, is the newer one: ← (newest first).
+    const startAt = cardImage.position
+    await page.keyboard.press('ArrowLeft')
+    check('← goes to the newer card attachment shown: the text file, previewed', !!(await until(async () => /notes\.txt/.test(await viewerTitle()) && /notes/.test(await viewer.locator('.attachment-frame').innerText().catch(() => '')))), await viewerTitle())
+    const cardText = await footer()
+    check('…Show in Folder for a text file, never Open in Its App', cardText.open === 0 && cardText.show === 1 && cardText.position !== startAt, JSON.stringify(cardText))
+    for (const theme of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme } })
+      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
+      await page.screenshot({ path: path.join(shots, `cardattach-viewer-text-${theme}.png`) })
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+    await page.keyboard.press('Escape')
+    check('Escape closes it', !!(await until(async () => (await viewer.count()) === 0)))
+    // The kind filter applies: on Text, the viewer goes through the text files alone.
+    await page.locator('.attachment-filter[data-kind="text"]').click()
+    await otherGroup.locator('.thumb[data-kind="text"]').click()
+    check('…with the Text filter on, it goes through the 7 text files only', !!(await until(async () => (await viewer.count()) === 1 && /^\d+ of 7 ·/.test((await footer()).position))), JSON.stringify(await footer()))
+    await page.keyboard.press('Escape')
+    await until(async () => (await viewer.count()) === 0)
+    await page.locator('.attachment-filter', { hasText: 'All' }).click()
+    // A file gone from disk (its row kept): the viewer says so in place, offers no open or show, and still removes it.
+    const notesKept = (await inv('cards:attachments', other.number)).find((a) => a.name === 'notes.txt')
+    fs.rmSync(notesKept.path)
+    await inv('tasks:update', other.number, { title: 'Session shot belongs here (its notes gone)' })
+    const goneTile = otherGroup.locator(`.thumb[data-attachment="${notesKept.id}"]`)
+    check('…its tile marked once the board is read again', !!(await until(async () => (await goneTile.locator('.codicon-warning').count()) === 1)))
+    await goneTile.click()
+    check("a click on it opens the viewer saying its file is gone, with neither Open nor Show", !!(await until(async () => (await viewer.locator('[data-missing]').innerText().catch(() => '')).includes('Its file is gone') && (await footer()).open === 0 && (await footer()).show === 0)), JSON.stringify(await footer()))
+    await page.screenshot({ path: path.join(shots, 'cardattach-viewer-missing-dark.png') })
+    await viewer.locator('[data-action="viewer-remove"]').click()
+    const ask = page.locator('.dialog[role="dialog"]').filter({ hasText: `Remove notes.txt from ${otherLabel}?` })
+    await ask.waitFor({ timeout: HUNG_MS })
+    await ask.locator('.dialog-footer button', { hasText: /^Remove$/ }).click()
+    check('Remove from Card asks, then takes it off the card; the viewer goes on to the next file shown', !!(await until(async () => (await inv('cards:attachments', other.number)).length === 1 && (await viewer.count()) === 1 && !/notes\.txt/.test(await viewerTitle()))), await viewerTitle())
+    await page.keyboard.press('Escape')
+    await until(async () => (await viewer.count()) === 0)
+    // A pane attachment's click opens the same viewer: Delete there, Open in Its App for its image.
+    await attachTab('pane').click()
+    await tile.click()
+    check("a click on a pane attachment opens the same viewer, with Delete", !!(await until(async () => (await viewer.count()) === 1 && /session-shot\.png/.test(await viewerTitle()) && (await footer()).remove === 'Delete' && (await footer()).open === 1)), JSON.stringify(await footer()))
+    await page.keyboard.press('Escape')
+    await until(async () => (await viewer.count()) === 0)
+
     // --- The Agent API: nothing is copied before the destination is allowed (HR4's HI-1700 round 1, finding 3).
     const post = async (body, bearer = token) => {
       const r = await fetch(`http://127.0.0.1:${PORT}/v1/tasks`, { method: 'POST', headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -277,58 +344,60 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     const denied = await post({ title: 'Not allowed', project: 'alpha', attachments: [shot] }, asToken)
     check("the Assistant's change refused at Look copies nothing and leaves nothing", denied.status === 403 && staged().length === 0 && (await inv('tasks:list')).length === before, JSON.stringify({ status: denied.status, staged: staged() }))
     await inv('session:stop', assistantHome, 'assistant').catch(() => undefined)
-    // --- Archived cards' attachments cleaned up (HI-1842): Project Settings → Storage's choice (here 3 days, a day being
-    // HIVE_TEST_DAY_MS long), then Clean Up Now lists the archived card once it is due and sends its files to the suite's
-    // trash, with Hive's comment on it; an open card and a Done card keep theirs. Round 2 (HR5): Move applies the list
-    // the dialog showed (a plan kept by main), and a file changed on disk while the dialog was open stays, said so.
-    // Each its own bytes: a card keeps the same bytes once.
-    let shade = 20
-    const cleanupFile = (name) => {
-      const f = path.join(alpha, 'docs', name)
-      fs.writeFileSync(f, lib.samplePng(40, ++shade))
-      return f
+    if (q.devSeam("archived cards' attachments cleaned up (HI-1842: a day made short, HIVE_TEST_DAY_MS)")) {
+      // --- Archived cards' attachments cleaned up (HI-1842): Project Settings → Storage's choice (here 3 days, a day being
+      // HIVE_TEST_DAY_MS long), then Clean Up Now lists the archived card once it is due and sends its files to the suite's
+      // trash, with Hive's comment on it; an open card and a Done card keep theirs. Round 2 (HR5): Move applies the list
+      // the dialog showed (a plan kept by main), and a file changed on disk while the dialog was open stays, said so.
+      // Each its own bytes: a card keeps the same bytes once.
+      let shade = 20
+      const cleanupFile = (name) => {
+        const f = path.join(alpha, 'docs', name)
+        fs.writeFileSync(f, lib.samplePng(40, ++shade))
+        return f
+      }
+      const archivedCard = await inv('tasks:create', { title: 'Archived card with a screenshot', project: 'alpha' })
+      const openCard = await inv('tasks:create', { title: 'Open card with a screenshot', project: 'alpha' })
+      const doneCard = await inv('tasks:create', { title: 'Done card with a screenshot', project: 'alpha', column: 'done' })
+      const changedCard = await inv('tasks:create', { title: 'Archived card with a log', project: 'alpha' })
+      for (const [c, name] of [[archivedCard, 'archived-shot.png'], [openCard, 'open-shot.png'], [doneCard, 'done-shot.png']]) await patchCard(c.number, { attachments: [cleanupFile(name)] })
+      await patchCard(changedCard.number, { attachments: [cleanupFile('goes.png'), cleanupFile('changes.png')] })
+      const readCardJson = async (num) => (await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${num}`, { headers: { Authorization: `Bearer ${token}` } })).json().catch(() => null)
+      const keptOf = async (c) => (await readCardJson(c.number))?.attachments ?? []
+      const archivedFiles = await keptOf(archivedCard)
+      const changedFiles = await keptOf(changedCard)
+      await inv('tasks:archive', archivedCard.number, true)
+      await inv('tasks:archive', changedCard.number, true)
+      await lib.openProjectSettings(page)
+      await page.locator('.settings-nav .row', { hasText: 'Storage' }).click()
+      const choice = page.locator('select[data-setting="cardAttachmentCleanup"]')
+      await choice.waitFor({ timeout: HUNG_MS })
+      check("Storage offers Remove archived cards' attachments, 30 days after archiving by default", (await choice.inputValue()) === '30' && (await choice.locator('option').allInnerTexts()).join('|') === 'Never|3 days after archiving|7 days after archiving|30 days after archiving|90 days after archiving', (await choice.locator('option').allInnerTexts()).join('|'))
+      await choice.selectOption('3')
+      check('…chosen 3 days, kept in project.json', !!(await until(async () => lib.projectConfig(userData, alpha)?.cardAttachmentCleanup === '3')), JSON.stringify(lib.projectConfig(userData, alpha)?.cardAttachmentCleanup))
+      const dueNow = async () => (await inv('storage:cardCleanupPreview', alpha)).items.map((i) => i.card)
+      check('…once they are due, the archived cards are listed, and only they', !!(await until(async () => JSON.stringify(await dueNow()) === JSON.stringify([archivedCard.number, changedCard.number]))), JSON.stringify(await dueNow()))
+      await page.locator('.card-cleanup-setting button', { hasText: 'Clean Up Now' }).click()
+      const cleanupDialog = page.locator('.dialog[role="dialog"]', { hasText: 'Clean Up Card Attachments' })
+      const dialogText = () => cleanupDialog.innerText().catch(() => '')
+      check('Clean Up Now lists the cards with their files and sizes', !!(await until(async () => /Archived card with a screenshot/.test(await dialogText()) && /Archived card with a log/.test(await dialogText()) && /2 files/.test(await dialogText()))), await dialogText())
+      for (const theme of ['dark', 'light']) {
+        await inv('settings:update', { appearance: { theme } })
+        await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
+        await cleanupDialog.screenshot({ path: path.join(shots, `cardattach-cleanup-${theme}.png`) })
+      }
+      await inv('settings:update', { appearance: { theme: 'dark' } })
+      // A file changed on disk while the dialog is open: its Move leaves it.
+      const changing = changedFiles.find((f) => f.name === 'changes.png')
+      fs.writeFileSync(changing.path, lib.samplePng(64, 64))
+      await cleanupDialog.getByRole('button', { name: /^Move 3 files/ }).click()
+      check('…its files go to the Recycle Bin (the suite’s trash), their rows with them', !!(await until(async () => archivedFiles.length === 1 && lib.trashed(path.basename(archivedFiles[0].path)).length === 1 && !fs.existsSync(archivedFiles[0].path) && (await keptOf(archivedCard)).length === 0)), JSON.stringify(archivedFiles))
+      check('…but a file changed since the list was made stays, row and all, and the notice says so', !!(await until(async () => JSON.stringify((await keptOf(changedCard)).map((f) => f.name)) === '["changes.png"]' && fs.existsSync(changing.path) && /Moved 2 files .* of 2 archived cards/.test(await page.locator('.toast, .notification').allInnerTexts().then((t) => t.join(' ')).catch(() => '')) && /1 file was left as it is/.test(await page.locator('.toast, .notification').allInnerTexts().then((t) => t.join(' ')).catch(() => '')))), JSON.stringify(await keptOf(changedCard)))
+      const cleaned = await readCardJson(archivedCard.number)
+      check("…and Hive's comment on it says how many and which", (cleaned?.comments?.at(-1)?.text ?? '').startsWith("Removed 1 attachment (archived-shot.png): this project removes archived cards' attachments 3 days after archiving") && cleaned.comments.at(-1).by === 'Hive' && cleaned.archived === true, cleaned?.comments?.at(-1)?.text)
+      check('an open card and a Done card keep theirs', (await keptOf(openCard)).length === 1 && (await keptOf(doneCard)).length === 1 && fs.existsSync((await keptOf(openCard))[0].path))
+      await page.screenshot({ path: path.join(shots, 'cardattach-cleanup-storage.png') })
     }
-    const archivedCard = await inv('tasks:create', { title: 'Archived card with a screenshot', project: 'alpha' })
-    const openCard = await inv('tasks:create', { title: 'Open card with a screenshot', project: 'alpha' })
-    const doneCard = await inv('tasks:create', { title: 'Done card with a screenshot', project: 'alpha', column: 'done' })
-    const changedCard = await inv('tasks:create', { title: 'Archived card with a log', project: 'alpha' })
-    for (const [c, name] of [[archivedCard, 'archived-shot.png'], [openCard, 'open-shot.png'], [doneCard, 'done-shot.png']]) await patchCard(c.number, { attachments: [cleanupFile(name)] })
-    await patchCard(changedCard.number, { attachments: [cleanupFile('goes.png'), cleanupFile('changes.png')] })
-    const readCardJson = async (num) => (await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${num}`, { headers: { Authorization: `Bearer ${token}` } })).json().catch(() => null)
-    const keptOf = async (c) => (await readCardJson(c.number))?.attachments ?? []
-    const archivedFiles = await keptOf(archivedCard)
-    const changedFiles = await keptOf(changedCard)
-    await inv('tasks:archive', archivedCard.number, true)
-    await inv('tasks:archive', changedCard.number, true)
-    await lib.openProjectSettings(page)
-    await page.locator('.settings-nav .row', { hasText: 'Storage' }).click()
-    const choice = page.locator('select[data-setting="cardAttachmentCleanup"]')
-    await choice.waitFor({ timeout: HUNG_MS })
-    check("Storage offers Remove archived cards' attachments, 30 days after archiving by default", (await choice.inputValue()) === '30' && (await choice.locator('option').allInnerTexts()).join('|') === 'Never|3 days after archiving|7 days after archiving|30 days after archiving|90 days after archiving', (await choice.locator('option').allInnerTexts()).join('|'))
-    await choice.selectOption('3')
-    check('…chosen 3 days, kept in project.json', !!(await until(async () => lib.projectConfig(userData, alpha)?.cardAttachmentCleanup === '3')), JSON.stringify(lib.projectConfig(userData, alpha)?.cardAttachmentCleanup))
-    const dueNow = async () => (await inv('storage:cardCleanupPreview', alpha)).items.map((i) => i.card)
-    check('…once they are due, the archived cards are listed, and only they', !!(await until(async () => JSON.stringify(await dueNow()) === JSON.stringify([archivedCard.number, changedCard.number]))), JSON.stringify(await dueNow()))
-    await page.locator('.card-cleanup-setting button', { hasText: 'Clean Up Now' }).click()
-    const cleanupDialog = page.locator('.dialog[role="dialog"]', { hasText: 'Clean Up Card Attachments' })
-    const dialogText = () => cleanupDialog.innerText().catch(() => '')
-    check('Clean Up Now lists the cards with their files and sizes', !!(await until(async () => /Archived card with a screenshot/.test(await dialogText()) && /Archived card with a log/.test(await dialogText()) && /2 files/.test(await dialogText()))), await dialogText())
-    for (const theme of ['dark', 'light']) {
-      await inv('settings:update', { appearance: { theme } })
-      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
-      await cleanupDialog.screenshot({ path: path.join(shots, `cardattach-cleanup-${theme}.png`) })
-    }
-    await inv('settings:update', { appearance: { theme: 'dark' } })
-    // A file changed on disk while the dialog is open: its Move leaves it.
-    const changing = changedFiles.find((f) => f.name === 'changes.png')
-    fs.writeFileSync(changing.path, lib.samplePng(64, 64))
-    await cleanupDialog.getByRole('button', { name: /^Move 3 files/ }).click()
-    check('…its files go to the Recycle Bin (the suite’s trash), their rows with them', !!(await until(async () => archivedFiles.length === 1 && lib.trashed(path.basename(archivedFiles[0].path)).length === 1 && !fs.existsSync(archivedFiles[0].path) && (await keptOf(archivedCard)).length === 0)), JSON.stringify(archivedFiles))
-    check('…but a file changed since the list was made stays, row and all, and the notice says so', !!(await until(async () => JSON.stringify((await keptOf(changedCard)).map((f) => f.name)) === '["changes.png"]' && fs.existsSync(changing.path) && /Moved 2 files .* of 2 archived cards/.test(await page.locator('.toast, .notification').allInnerTexts().then((t) => t.join(' ')).catch(() => '')) && /1 file was left as it is/.test(await page.locator('.toast, .notification').allInnerTexts().then((t) => t.join(' ')).catch(() => '')))), JSON.stringify(await keptOf(changedCard)))
-    const cleaned = await readCardJson(archivedCard.number)
-    check("…and Hive's comment on it says how many and which", (cleaned?.comments?.at(-1)?.text ?? '').startsWith("Removed 1 attachment (archived-shot.png): this project removes archived cards' attachments 3 days after archiving") && cleaned.comments.at(-1).by === 'Hive' && cleaned.archived === true, cleaned?.comments?.at(-1)?.text)
-    check('an open card and a Done card keep theirs', (await keptOf(openCard)).length === 1 && (await keptOf(doneCard)).length === 1 && fs.existsSync((await keptOf(openCard))[0].path))
-    await page.screenshot({ path: path.join(shots, 'cardattach-cleanup-storage.png') })
 
     // Storage: a row of their own.
     const storage = await inv('storage:project', alpha, true).catch(() => null)

@@ -237,6 +237,8 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
     backgroundWakes: false,
     // Its interface fills the screen: drawn while its terminal changed size, it can stay at the old width (#486).
     startupSizeRefresh: true,
+    // A model call it gave up on ends the turn with a session.error and no Stop (1.0.105, HI-1960).
+    failureEndsTurn: true,
     // A line typed in pieces that a busy Copilot reads with its Enter in one go isn't sent by that Enter; pasted, it is,
     // as text (#600, checked with 1.0.98).
     bracketedPaste: true,

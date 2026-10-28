@@ -77,6 +77,11 @@ const check = (name, ok, extra = '') => {
     const headerMark = header.locator('.state-mark').first()
     const grey = (mark) => mark.evaluate((m) => m.classList.contains('stopped') && m.classList.contains('idle') && getComputedStyle(m).borderTopColor === getComputedStyle(document.querySelector('.pane-status.stopped'), '::before').backgroundColor).catch(() => false)
     check('…its own mark in its header grey (still idle)', !!(await lib.until(() => grey(headerMark), HUNG_MS)), await headerMark.getAttribute('class'))
+    // The session toolbar's chip counts it as the project header does (HI-1908): stopped, not idle, both marks grey.
+    const chip = page.locator('.summary-chip')
+    const projectBadge = page.locator('.project-header .project-state')
+    const counted = async () => (await text(chip.locator('.summary-chip-text'))) === '1 stopped' && (await text(projectBadge.locator('.badge-text'))) === '1 stopped' && (await chip.locator('.state-mark.stopped').count()) === 1 && (await projectBadge.locator('.state-mark.stopped').count()) === 1
+    check('the chip says 1 stopped, as the project header does, both marks grey', !!(await lib.until(counted, HUNG_MS)), JSON.stringify([await text(chip), await text(projectBadge)]))
     // Its scrollback is still selected and copied (a page clipboard: never the real one).
     await page.evaluate(() => { window.__copied = null; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText: async () => '', writeText: async (t) => { window.__copied = t } } }) })
     const box = await host.boundingBox()
@@ -97,6 +102,7 @@ const check = (name, ok, extra = '') => {
     check('its tile says Stopped · {time}', !!(await lib.until(async () => /^Stopped · \S+/.test(await text(tileStatus)), HUNG_MS)), await text(tileStatus))
     const tileMark = page.locator(`.agent-tile[data-agent="${agent.id}"] .state-mark`).first()
     check('…its mark there grey too', !!(await lib.until(() => tileMark.evaluate((m) => m.classList.contains('stopped') && m.classList.contains('idle')), HUNG_MS)), await tileMark.getAttribute('class'))
+    check('…and in Tiles the chip says 1 stopped too', !!(await lib.until(counted, HUNG_MS)), await text(chip))
     await shots('tiles')
     await page.locator('.view-switch [data-view="panes"]').click()
     await lib.until(async () => (await bar.count()) === 1, HUNG_MS)
@@ -109,6 +115,7 @@ const check = (name, ok, extra = '') => {
     await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
     await lib.acceptClaudeTrust(inv, proj, agent.id).catch(() => {})
     check('…then it runs, still not stopped', !!(await lib.until(async () => (await live())?.status === 'ready' && (await notStopped()), HUNG_MS)))
+    check('…the chip no longer says stopped, its mark not grey', !!(await lib.until(async () => !/stopped/.test(await text(chip)) && (await chip.locator('.state-mark.stopped').count()) === 0, HUNG_MS)), await text(chip))
 
     // --- A lane's end's quit: "its lane ended".
     await inv('slots:test', proj, { op: 'quit', agent: agent.id })

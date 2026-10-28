@@ -13,7 +13,7 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import type { DatabaseSync } from 'node:sqlite'
 import { openDb, type Db } from '../db'
-import { BOARD_MIGRATIONS, boardChanged, boardRead, boardWriteOp, takeNumberIn } from '../boardStore'
+import { BOARD_MIGRATIONS, boardChanged, boardRead, boardReadToken, boardWriteOp, takeNumberIn } from '../boardStore'
 import { decomposeCard, writeCardRows } from '../schema/cardRows'
 import { cardKeys, cardOfKey, currentKeys, keysHeld } from '../schema/keysStep'
 import { KEY_FORM, normalKey } from '../../shared/projectKeys'
@@ -24,7 +24,8 @@ import type { Ruleset } from '../../shared/workflow/compile'
 import { loadRuleset } from '../../shared/workflow/compile'
 import { newLane, type LaneList } from '../../shared/workflow/laneList'
 import { LOOP_ROUNDS, LOOP_WAIT_HOURS } from '../../shared/lanes'
-import { shellLine, type QueueCommand, type QueueFileSide, type QueueStuck } from '../../shared/workflow/queue'
+import { shellLine, type QueueCommand, type QueueFileSide, type QueuePauseLogged, type QueueStuck } from '../../shared/workflow/queue'
+import { pauseLogged, pauseLogKey, pauseLogOf } from './queueLogs'
 
 /** What the runtime needs of a card: the board's card, with the columns the runtime keeps beside its document. */
 export interface CardRecord {
@@ -152,6 +153,8 @@ interface Conn {
   /** `quiet`: a write the window shows nothing of (the queue runner's lease and processes): no `tasks-changed` for it. */
   write<T>(fn: (db: DatabaseSync) => T, quiet?: boolean): T
   close(): void
+  /** What is committed now, as a token (boardReadToken): reads may be served from a cache while it is the same. Null: never. */
+  token?(): string | null
 }
 
 /**
@@ -161,6 +164,7 @@ interface Conn {
  */
 const boardConn = (ws: WorkspaceService): Conn => ({
   read: (fn) => boardRead(ws, fn),
+  token: () => boardReadToken(ws),
   // A fact (observed ones too) changes what the window shows of a card (its work view, #1223): `tasks-changed` once
   // the change commits.
   write: (fn, quiet) => {
@@ -196,6 +200,7 @@ export function withoutWriteFence<T>(fn: () => T): T {
 /** A connection whose writes check the fence of the work making them, inside each write. */
 const fenced = (c: Conn): Conn => ({
   read: (fn) => c.read(fn),
+  ...(c.token ? { token: () => c.token!() } : {}),
   write: (fn, quiet) =>
     c.write((db) => {
       fences.getStore()?.()
@@ -473,14 +478,36 @@ export class FactStore {
   // --- Facts, rulesets, actions.
 
   facts(card: number): Fact[] {
-    return this.conn.read((db) => (db.prepare('SELECT * FROM card_facts WHERE card = ? ORDER BY seq').all(card) as Record<string, string | number | null>[]).map(factOf))
+    return this.cached(`card:${card}`, () => this.conn.read((db) => (db.prepare('SELECT * FROM card_facts WHERE card = ? ORDER BY seq').all(card) as Record<string, string | number | null>[]).map(factOf)))
   }
 
   /** This project's facts of a kind (or of any of these), in the order written (the queue's order). */
   factsOfKind(kind: FactKind | readonly FactKind[]): Fact[] {
     const kinds = typeof kind === 'string' ? [kind] : kind
     const sql = `SELECT f.* FROM card_facts f JOIN cards c ON c.number = f.card WHERE f.kind IN (${kinds.map(() => '?').join(', ')}) AND c.project = ? ORDER BY f.rowid`
-    return this.conn.read((db) => (db.prepare(sql).all(...kinds, this.scope.project) as Record<string, string | number | null>[]).map(factOf))
+    return this.cached(`kinds:${kinds.join(',')}`, () => this.conn.read((db) => (db.prepare(sql).all(...kinds, this.scope.project) as Record<string, string | number | null>[]).map(factOf)))
+  }
+
+  /**
+   * Facts read since the board last committed anything (HI-1909: each agent's PreToolUse folded every current card's
+   * facts again, about 2,200 short reads a minute with a dozen agents), by what was read. Cleared as soon as anything is
+   * committed (the board's token moves on); never used inside a write, whose reads see its own changes. Each caller gets
+   * its own array; the facts in it are shared, and never changed.
+   */
+  private cache: { token: string; reads: Map<string, Fact[]> } | null = null
+
+  /** What is committed now, as a token (null inside a write, or a store that never caches): a cache of reads is good while it is the same. */
+  readToken(): string | null {
+    return this.conn.token?.() ?? null
+  }
+
+  private cached(key: string, read: () => Fact[]): Fact[] {
+    const token = this.readToken()
+    if (token === null) return read()
+    if (this.cache?.token !== token) this.cache = { token, reads: new Map() }
+    let facts = this.cache.reads.get(key)
+    if (!facts) this.cache.reads.set(key, (facts = read()))
+    return facts.slice()
   }
 
   ruleset(id: string): Ruleset {
@@ -651,11 +678,16 @@ export class FactStore {
   setQueuePause(target: string, pause: QueuePause | null, keep = false): boolean {
     const p = this.scope.project
     return this.conn.write((db) => {
-      if (keep && db.prepare('SELECT 1 FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target)) return false
+      const before = db.prepare('SELECT reason, card FROM workflow_queue_pauses WHERE project = ? AND target = ?').get(p, target) as { reason: string; card: string } | undefined
+      if (keep && before) return false
       db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ?').run(p, target)
+      const now = this.now().toISOString()
+      const at = pause ? (pause.at ?? now) : now
+      // Its log (HI-1924), in the same write.
+      this.logPause(db, target, before ?? null, pause ? { reason: pause.reason, card: pause.card, ...(pause.by ? { by: pause.by } : {}), ...(pause.message ? { message: pause.message } : {}), at } : null, now)
       if (!pause) return true
       const st = pause.stuck
-      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid, message, paused_by, paused_at, folder, branch, ref, expected, result, phase) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null, pause.message ?? null, pause.by ?? null, pause.at ?? this.now().toISOString(), st?.folder ?? null, st?.branch ?? null, st?.ref ?? null, st?.expected ?? null, st?.result ?? null, st?.phase ?? null)
+      db.prepare('INSERT INTO workflow_queue_pauses (project, target, reason, card, pid, message, paused_by, paused_at, folder, branch, ref, expected, result, phase) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(p, target, pause.reason, pause.card, pause.pid ?? null, pause.message ?? null, pause.by ?? null, at, st?.folder ?? null, st?.branch ?? null, st?.ref ?? null, st?.expected ?? null, st?.result ?? null, st?.phase ?? null)
       const ins = db.prepare('INSERT INTO workflow_queue_pause_files (project, target, ord, path, side) VALUES (?, ?, ?, ?, ?)')
       // A stuck advance's files are its listed files, each with its side; any other pause's, the files it names.
       if (st) st.files.forEach((f, i) => ins.run(p, target, i, f.path, f.side))
@@ -672,7 +704,27 @@ export class FactStore {
 
   /** Resumes a target's queue only from a pause of this reason, in one write (a pause saved since in its place stays). */
   clearQueuePause(target: string, reason: string): boolean {
-    return this.conn.write((db) => Number(db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ? AND reason = ?').run(this.scope.project, target, reason).changes) > 0)
+    return this.conn.write((db) => {
+      const before = db.prepare('SELECT reason, card FROM workflow_queue_pauses WHERE project = ? AND target = ? AND reason = ?').get(this.scope.project, target, reason) as { reason: string; card: string } | undefined
+      if (!before) return false
+      db.prepare('DELETE FROM workflow_queue_pauses WHERE project = ? AND target = ? AND reason = ?').run(this.scope.project, target, reason)
+      this.logPause(db, target, before, null, this.now().toISOString())
+      return true
+    })
+  }
+
+  /** A target's pause log (HI-1924), newest first. */
+  queuePauseLog(target: string): QueuePauseLogged[] {
+    return pauseLogOf(this.meta(pauseLogKey(target)))
+  }
+
+  /** The pause log after a pause saved or lifted, in the caller's write (`before`: the pause the target had; none, nothing ends). */
+  private logPause(db: DatabaseSync, target: string, before: { reason: string; card: string } | null, pause: Omit<QueuePauseLogged, 'ended'> | null, now: string): void {
+    if (!before && !pause) return
+    const key = this.metaKey(pauseLogKey(target))
+    const had = (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null
+    const log = pauseLogged(pauseLogOf(had), before, pause, now)
+    db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(log))
   }
 
   // --- The queue's runner (#1360): its lease, its processes, its worktrees. Quiet writes: the window shows none of them.

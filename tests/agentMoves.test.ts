@@ -23,6 +23,7 @@ const { advanced } = await import('../src/main/advanced')
 const service = await import('../src/main/workflow/service')
 const { ENFORCE } = service
 const { adoptNow } = await import('../src/main/workflow/adoption')
+const { runCardIntent } = await import('../src/main/cardIntents')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
 
@@ -286,11 +287,21 @@ describe("an agent's old moves as intents (#1268)", () => {
     expect(stage(w, card)).toBe('active')
   })
 
+  it("another agent's card in progress names its stages as the project renamed them (HR5's HI-1585 round 1)", async () => {
+    const { w, wt } = await workspace({ ...PAIR, stageNames: { active: 'Building', review: 'Checking', approved: 'Accepted', done: 'Finished' } })
+    const card = await started(w, wt)
+    await expect(update(w, card, reviewer, { column: 'review' })).rejects.toThrow(/in Building with agent Builder.*move it to Checking\. Leave it where it is; agent Builder moves it to Checking when done/)
+    await expect(update(w, card, reviewer, { column: 'done' })).rejects.toThrow(/in Building with agent Builder.*move it to Finished\./)
+    // The board's column stays the API's id.
+    expect((await inWorkspace(w, () => tasks.getTask(card))).column).toBe('doing')
+  })
+
   it("Todo is put back, its comment the why; a reviewer can't take a card in Doing on to Review", async () => {
     const { w, wt } = await workspace()
     const card = await started(w, wt)
     // As before 1.0: another agent's card in Doing is its work in progress.
-    await expect(update(w, card, reviewer, { column: 'review' }, 'Mine now')).rejects.toThrow(/in Doing with Builder/)
+    // The board's stage names, by default (HI-1585).
+    await expect(update(w, card, reviewer, { column: 'review' }, 'Mine now')).rejects.toThrow(/in Active with agent Builder.*move it to Review\./)
     const back = await update(w, card, builder, { column: 'todo' }, 'Waiting for #9 first.')
     expect(back.card.column).toBe('todo')
     expect(back.said).toContain('As put back: next time call hive_put_back')
@@ -356,7 +367,7 @@ describe("an agent's old moves as intents (#1268)", () => {
     expect(out.said).toContain('As start: next time call hive_start_card')
   })
 
-  it("with workflow rules off, an agent's moves take P3's path: nothing translated, a failed review stays in Review", async () => {
+  it("with workflow rules off, an agent's moves take P3's path: nothing translated, a failed review back to Doing as the verdict intent sends it (HI-1946)", async () => {
     await advanced.set(ENFORCE, false)
     const { w, wt } = await workspace()
     const card = await create(w)
@@ -374,9 +385,80 @@ describe("an agent's old moves as intents (#1268)", () => {
     expect(submit.card.column).toBe('review')
     await update(w, card, reviewer, { review: 'start' })
     const failed = await update(w, card, reviewer, { review: 'failed' }, 'FAILED')
-    // P3: a failed card stays in Review for its fixes.
-    expect(failed.card.column).toBe('review')
+    // P3 too: a failed card goes back to Doing, its builder's, as the verdict intent sends it (HI-1946).
+    expect(failed.card).toMatchObject({ column: 'doing', agent: 'a1' })
     expect(failed.said.some((l) => l.startsWith('As '))).toBe(false)
+    expect(kinds(w, card).slice(-2)).toEqual(['Verdict', 'Moved'])
+    expect(facts(w, card).at(-1)?.data).toMatchObject({ from: 'review', to: 'active' })
+  })
+})
+
+describe('a failed review by either route: back to Doing, its builder holding it (HI-1946)', () => {
+  /** A Git project with no workflow chosen yet (as a project just added is): its rules have no Review stage. */
+  async function bare(): Promise<{ w: WS; wt: string }> {
+    const ws = join(base, `ws-${++n}`)
+    const repo = gitRepo(join(ws, 'p'))
+    const wt = join(ws, 'p-card')
+    writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+    commit(repo, {}, 'ignore .hive')
+    sh(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
+    mkdirSync(join(repo, '.hive'), { recursive: true })
+    writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }] }))
+    return { w: await open(join(ws)), wt }
+  }
+  /** A card the builder started, committed and submitted, under the reviewer's review. */
+  async function reviewed(w: WS, wt: string, file: string): Promise<number> {
+    const card = await started(w, wt, file)
+    await update(w, card, builder, { column: 'review' }, 'Ready')
+    await update(w, card, reviewer, { review: 'start' })
+    return card
+  }
+  /** What a failed review left: the card's column, agent and review, its open holds, and its facts after the failure. */
+  async function after(w: WS, card: number, fail: () => Promise<unknown>) {
+    const had = facts(w, card).length
+    await fail()
+    const c = await inWorkspace(w, () => tasks.getTask(card))
+    const holding = (c.held ?? []).filter((h) => !h.to).map((h) => [h.agent, h.role])
+    return { column: c.column, agent: c.agent, review: c.review ?? null, open: holding, facts: facts(w, card).slice(had).map((f) => (f.kind === 'Moved' ? `Moved ${(f.data as { from: string; to: string }).from}→${(f.data as { to: string }).to}` : f.kind)) }
+  }
+  const WANTED = { column: 'doing', agent: 'a1', review: null, open: [['a1', 'build']], facts: ['Verdict', 'Moved review→active'] }
+  const viaPatch = (w: WS, card: number) => () => update(w, card, reviewer, { review: 'failed' }, 'FAILED')
+  const viaIntent = (w: WS, card: number) => () => inWorkspace(w, () => runCardIntent({ n: card, plain: false }, reviewer, { kind: 'verdict', pass: false, comment: 'FAILED' }))
+
+  it('in a project whose rules have no Review stage, with the rules on, off, and where they have one: the same', async () => {
+    for (const [name, make, enforce] of [
+      ['no Review stage', bare, true],
+      ['rules off', () => workspace(), false],
+      ['rules on, with Review', () => workspace(), true]
+    ] as const) {
+      await advanced.set(ENFORCE, enforce)
+      const { w, wt } = await make()
+      const [a, b] = [await reviewed(w, wt, 'a.txt'), await reviewed(w, wt, 'b.txt')]
+      expect(await after(w, a, viaPatch(w, a)), `${name}: PATCH`).toEqual(WANTED)
+      expect(await after(w, b, viaIntent(w, b)), `${name}: the verdict intent`).toEqual(WANTED)
+    }
+  })
+
+  it('a card from before 1.0 (P3 until it starts): back to Doing, its builder holding it; one Verdict, then the move', async () => {
+    const { w } = await bare()
+    const card = await create(w)
+    await store.boardWrite(w, async () => store.boardWriteOp(w, (db) => db.prepare('UPDATE cards SET pre_workflow = 1 WHERE number = ?').run(card)))
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'review', agent: 'a1' }, user))
+    await update(w, card, reviewer, { review: 'start' })
+    // Its first cycle starts as it goes into Doing (the recorder's Started for a card from before 1.0), then as above.
+    expect(await after(w, card, viaPatch(w, card))).toEqual({ ...WANTED, facts: ['Started', ...WANTED.facts] })
+  })
+
+  it('a failed review moved anywhere but Doing is refused before anything is written, by either path', async () => {
+    for (const make of [bare, () => workspace()]) {
+      const { w, wt } = await make()
+      const card = await reviewed(w, wt, 'c.txt')
+      const had = facts(w, card).length
+      const was = await inWorkspace(w, () => tasks.getTask(card))
+      for (const column of ['review', 'passed', 'done', 'todo'] as const) await expect(update(w, card, reviewer, { review: 'failed', column }, 'FAILED')).rejects.toThrow(/A failed review sends #\d+ back to Doing, to its builder/)
+      const now = await inWorkspace(w, () => tasks.getTask(card))
+      expect([now.column, now.review?.agent, now.history.length, now.comments.length, now.held?.length, facts(w, card).length]).toEqual([was.column, 'a2', was.history.length, was.comments.length, was.held?.length, had])
+    }
   })
 })
 

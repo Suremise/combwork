@@ -38,6 +38,7 @@ import { docOutline, findHeading, sectionText, type DocHeading } from '../shared
 import { providerService } from './providerService'
 import { config } from './config'
 import { refusal, type Refusal } from '../shared/workflow/refusals'
+import { testsGiven, type FocusedTest } from '../shared/workflow/focused'
 import { askAssistant, AskRefused } from './assistantAsk'
 import { agentWorkflowRole, isWorkflowRole, workflowPairs, type WorkflowRole } from '../shared/workflow/roles'
 import { deleteEntry, JournalBusy, JournalError, readEntry, recall, updateEntry, writeEntry } from './journal'
@@ -51,7 +52,7 @@ import { cancelWatch, encodeSince, registerAgentWatch, registerLaneWatch, regist
 import { readLaneCards, readLaneCondition } from '../shared/laneWatch'
 import { agentBusy, AGENT_WATCH_MAX_AGENTS, type AgentNow, type WatchedAgent } from '../shared/agentWatch'
 import { alreadyThere, cardChange, changesBetween, decodeSince, handoffsSince, markOf, movedIntoSince, readCondition, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_LIMIT_MINUTES, type CardChange, type CardMark } from '../shared/watch'
-import { waitMaxSeconds } from './advanced'
+import { advanced, waitMaxSeconds } from './advanced'
 import { titleNudge } from './titleNudge'
 import { insideReal, placeMatcher, placeRelative, readCapped, readJson, samePlace, writeJsonAtomic } from './fsutil'
 import { GUIDANCE_REVISION, skillRevisions } from './guidance'
@@ -61,14 +62,16 @@ import { listMcp } from './mcp'
 import { assertInShared, createHandover, handoversFor, NoteConflict, notesTree, readNote, writeNote } from './notes'
 import { mergeSlots, slotTestEvent } from './mergeSlotHost'
 import * as lanes from './lanes'
+import { checkLanePool, launchRecordedLane, recordedLaneNote, resumeLaneBuilder } from './laneStart'
 import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber } from '../shared/lanes'
 import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
 import { writePty } from './ptyHost'
 import { isResuming } from './restartResume'
-import { sessions } from './sessions'
+import { sessions, type HookObservation } from './sessions'
 import { agentPlace, folderFacts } from './agentFolders'
 import { releasableSlots, releaseSlot, SlotReleaseRefused, type HeldRow } from './slotRelease'
+import { findTemplate, loadForAssistant, planReply, templateRows } from './templateApi'
 import { slotAt } from '../shared/agentFolders'
 import { cardStall, laneOrderView, stepWaitOf } from './cardStall'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
@@ -91,7 +94,8 @@ import { connectionProblem, getAccount } from './accounts'
 import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
-import { cardFacts, cardKind, cardReviewSkip, factRow } from './workflow/cardWork'
+import { cardFacts, cardKind, cardReviewSkip, factRow, forYouOfCards } from './workflow/cardWork'
+import type { ForYouItem } from '../shared/workflow/workView'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
 import { detect, platformIdOf } from './platform/registry'
@@ -193,9 +197,19 @@ export async function startHookServer(): Promise<string> {
       return send(res, 200, {})
     }
     let done: (() => void) | null = null
+    // What Hive observes of it, for the launch's Hooks dialog (HI-982): from here, on its own authenticated route, so
+    // a body Hive can't read is recorded too.
+    let obs: HookObservation | null = null
+    let step = 'read'
     try {
       const raw = await readBody(req)
-      const body = JSON.parse(raw || '{}')
+      let body: Record<string, any>
+      try {
+        body = JSON.parse(raw || '{}')
+      } catch (e) {
+        obs = query.has('statusline') ? null : sessions.observeHook(run, {})
+        throw e
+      }
       done = beginWork(hookLabel(query.has('statusline'), body))
       if (query.has('statusline')) {
         // The reply becomes Claude Code's status line, so send nothing; or, chaining the user's own status line (#1285),
@@ -215,17 +229,25 @@ export async function startHookServer(): Promise<string> {
       // decides whose turn they are (#650: a notice of what is unread, or the drain carrying the turn on); other hooks
       // are answered at once so they never slow the agent down. Each is handled in the launch's order from when it came,
       // with its reply: the turn ledger learns what the Stop was told (#648).
+      obs = sessions.observeHook(run, body)
+      step = 'reply'
       const reply = sessions.hookReply(run, body)
+      step = 'handle'
       const handled = sessions.handleHook(run, body, reply)
+      let failed: { step: string; error: unknown } | undefined
       const answer = await reply.catch((e) => {
         log.warn('hook reply', e)
+        failed = { step: 'reply', error: e }
         return null
       })
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(answer ?? {}))
       await handled
+      if (obs) sessions.hookHandled(obs, answer, failed)
+      obs = null
     } catch (e) {
       log.warn('hook error', e)
+      if (obs) sessions.hookHandled(obs, null, { step, error: e })
       if (!res.headersSent) send(res, 400, { error: 'bad request' })
     } finally {
       done?.()
@@ -362,7 +384,8 @@ export function apiEnv(projectPath: string, agentId: string): Record<string, str
   const info = apiInfo()
   const token = agentToken(projectPath, agentId)
   if (!info.running || !info.url || !token) return {}
-  return { HIVE_API_URL: info.url, HIVE_API_TOKEN: token, HIVE_API_TOKEN_FILE: agentTokenFile(projectPath, agentId) }
+  // How long hive-progress waits for the API's answers (HI-1892: Settings → Advanced, its reply time).
+  return { HIVE_API_URL: info.url, HIVE_API_TOKEN: token, HIVE_API_TOKEN_FILE: agentTokenFile(projectPath, agentId), HIVE_PROGRESS_REPLY_SECONDS: String(advanced.number('hive.progress.replySeconds')) }
 }
 
 /** An open workspace by its folder path or its name. A name two open workspaces share is refused (409): use the path. */
@@ -666,7 +689,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 10
+export const API_VERSION = 11
 
 /** Who Hive takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -1180,10 +1203,10 @@ route('GET', '/v1/connections/:ref', async ({ params }) => {
   return connectionShown(c, ws, !agentCaller(), all)
 })
 
-/** A workflowRole argument (#1430): builder, reviewer or either. */
+/** A workflowRole argument (#1430): builder, reviewer, either or generalist (HI-686). */
 function workflowRoleArg(v: unknown): WorkflowRole {
   if (isWorkflowRole(v)) return v
-  throw new HttpError(400, 'workflowRole is "builder", "reviewer" or "either".')
+  throw new HttpError(400, 'workflowRole is "builder", "reviewer", "either" or "generalist".')
 }
 
 /** Why a worktree of an agent's own is refused (#1451): the Agent API's short note. */
@@ -1895,12 +1918,26 @@ route('POST', '/v1/lanes', async ({ body }) =>
       reviewer = await agentParam(p, body.reviewer).catch(() => null)
       if (!reviewer) note = `No agent "${String(body.reviewer)}" in ${basename(p)}: the lane has no reviewer until one joins it.`
     }
+    // Reviewed by the project's reviewer pool (HI-1581, G17), the Assistant's and a script's: refused as Start Lane…
+    // refuses it (the rules have no pool, nobody but the builder reviews), and with a reviewer of its own.
+    if (body?.pool !== undefined && typeof body.pool !== 'boolean') throw new HttpError(400, 'pool must be true or false')
+    const pool = body?.pool === true
+    if (pool && a) throw new HttpError(403, "A lane reviewed by the pool is started by the Assistant or the user (Start Lane): an agent's own lane names its reviewer")
+    if (pool && body?.reviewer !== undefined && body.reviewer !== null && body.reviewer !== '') throw new HttpError(400, 'A lane reviewed by the pool has no reviewer of its own: leave reviewer out')
+    if (pool) await checkLanePool(ws, p, builder)
     const start = async () => {
-      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: args.brief !== undefined ? (sessions.liveFor(p, builder)?.sessionId ?? null) : null, by: await laneBy() })
+      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: args.brief !== undefined ? (sessions.liveFor(p, builder)?.sessionId ?? null) : null, by: await laneBy(), ...(pool ? { pool: true } : {}) })
       // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
       const told = args.brief !== undefined ? await briefNote(ws, (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id) ?? { project: basename(p) }) : null
       if (args.brief !== undefined) await settleLaneBriefs(ws)
-      const notes = [note, told].filter(Boolean).join(' ')
+      // Started for its builder by the Assistant or a script (HI-1900: a lane over stopped agents sat active, nothing lent,
+      // nobody working it): its stopped agents started as Start Lane… starts them, its slot lent for a stopped builder; a
+      // running one is left as it is, and the reply says to tell it (HI-1934). A builder registering its own loop is
+      // already at work. A running lane updated while its builder isn't running: its builder started on it.
+      let launched = ''
+      if (!a && r.did === 'started') launched = recordedLaneNote(await launchRecordedLane(ws, p, r.lane.id))
+      else if (!a && r.did === 'updated') launched = await resumeLaneBuilder(p, r.lane)
+      const notes = [note, told, launched].filter(Boolean).join(' ')
       return notes ? { ...r, note: notes } : r
     }
     if (!assistantCaller()) return start()
@@ -1984,10 +2021,10 @@ async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promi
 }
 
 /** A queue as the Agent API gives it: no folder (a stuck advance's neither), and whether an outcome has a log rather than the log itself (lean). */
-const publicQueue = ({ projectPath: _p, paused, hiveMerges: _h, inFlight: _i, returns: _r, returnsMore: _more, ...v }: QueueView): QueuePublic => ({
+const publicQueue = ({ projectPath: _p, paused, hiveMerges: _h, inFlight: _i, returns: _r, returnsMore: _more, pauses: _pauses, ...v }: QueueView): QueuePublic => ({
   ...v,
   paused: paused ? (({ stuck, message: _m, ...p }) => (stuck ? { ...p, stuck: (({ folder: _f, ...s }) => s)(stuck) } : p))(paused) : null,
-  recent: v.recent.map(({ log: output, seen: _s, revision: _rev, ...r }) => (output ? { ...r, hasLog: true as const } : r))
+  recent: v.recent.map(({ log: output, seen: _s, revision: _rev, tookMs: _took, push: _push, logPath: _lp, ...r }) => (output ? { ...r, hasLog: true as const } : r))
 })
 
 /** A project agent asking to change a queue: refused, saying whose controls these are. */
@@ -2054,6 +2091,46 @@ route('POST', '/v1/projects/:name/slots/:slot/release', async ({ params, body })
     await workspaceOf(p).refresh()
     const what = r.kind === 'carried' ? `${r.slot} in ${basename(p)}: no longer kept for ${r.agent.name}` : `${r.slot} in ${basename(p)} from ${r.agent.name}'s ended run${r.ended ? ', its listed processes ended first' : ''}`
     return { done: `Released ${what}`, act: { agent: { id: r.agent.id, name: r.agent.name } }, result: { project: basename(p), ...r, agent: r.agent.name } }
+  })
+})
+
+/** The Assistant's alone (HI-1502): a template's list, plan and load. Project agents, scripts and the user's token are refused before any template is read. */
+function assistantTemplates(what: string): void {
+  if (!assistantCaller()) throw new HttpError(403, `Only the Hive Assistant can ${what} through the Agent API: templates are loaded in Hive's window.`)
+}
+
+/** A body's workflow argument: true unless false (HI-1502: its workflow is applied by default, as the window's tick box is). */
+function workflowArg(body: any): boolean {
+  if (body?.workflow !== undefined && typeof body.workflow !== 'boolean') throw new HttpError(400, 'workflow is true or false')
+  return body?.workflow !== false
+}
+
+// The templates a project can use (HI-1502): Hive's own, the workspace's and its own, a row each.
+route('GET', '/v1/projects/:name/templates', async ({ params }) => {
+  assistantTemplates("list a project's templates")
+  const p = projectByName(params[0])
+  return { project: basename(p), templates: await templateRows(p) }
+})
+
+// What loading a template would do (HI-1502): nothing is changed.
+route('POST', '/v1/projects/:name/templates/plan', async ({ params, body }) => {
+  assistantTemplates('plan loading a template')
+  const p = projectByName(params[0])
+  const e = await findTemplate(p, body ?? {})
+  return (await planReply(p, e, body?.names, workflowArg(body))).reply
+})
+
+// Loading a template (HI-1502): the window's load, its names given, its workflow saved unless workflow is false; undoable.
+route('POST', '/v1/projects/:name/templates/load', async ({ params, body }) => {
+  assistantTemplates('load a template')
+  const p = projectByName(params[0])
+  const applyWorkflow = workflowArg(body)
+  const named = typeof body?.template === 'string' ? clip(body.template, 60) : 'a template'
+  return assistantChange('agents', `load the template "${named}" into ${basename(p)}`, { kind: 'load-template', project: basename(p) }, async (guard) => {
+    const e = await findTemplate(p, body ?? {})
+    const r = await loadForAssistant(p, e, body?.names, applyWorkflow, guard)
+    const wf = r.workflow ? (r.workflow.saved ? `, and its workflow (${r.workflow.changes.length} options changed)` : '; its workflow was not saved') : ''
+    return { done: `Loaded the template "${r.template.name}" into ${r.project}: ${r.created.length} agents${wf}`, stays: UNDO_FINAL.templateCards, result: r }
   })
 })
 
@@ -2277,7 +2354,7 @@ async function queueLineFor(project: string, n: number): Promise<string | null> 
   }
 }
 
-async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()): Promise<TaskView> {
+async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>(), waitingOf?: ReadonlyMap<number, ForYouItem[]>): Promise<TaskView> {
   let agent: { id: string; name: string; status: string; backgroundTasks: number } | null = null
   let now: { name: string; running: boolean } | null = null
   if (c.agent && c.project) {
@@ -2317,6 +2394,10 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
     // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410), or a design nobody checks (#1382).
     stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c))
   }
+  // Its requests waiting for the user (HI-1932): their ids, for a decision that answers them. A listing reads them once
+  // for all its cards (`waitingOf`), never the whole board per card.
+  const waiting = (waitingOf ?? forYouOfCards(workspace, [c.number])).get(c.number) ?? []
+  if (waiting.length) view.forYou = waiting.map((i) => ({ request: i.request, kind: i.kind, gate: i.gate, text: i.text, ...(i.asker ? { asker: i.asker } : {}) }))
   // A review whose reviewer has gone or isn't running (Hive ends those, but one can show while that happens).
   if (c.review && c.project) {
     try {
@@ -2489,6 +2570,9 @@ function taskPatch(body: any): TaskPatch {
   }
   for (const k of ['labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context'] as const) if (body?.[k] !== undefined) out[k] = k === 'blockedBy' || k === 'links' ? cardRefsIn(body[k]) : body[k]
   if (body?.decision !== undefined && body.decision !== null) out.decision = String(body.decision)
+  // HI-1932: the open requests the decision answers, by id, as sent: never coerced (a nested list isn't an id), checked
+  // (shape, who, each request) by the route and where it is recorded.
+  if (body?.answers !== undefined && body.answers !== null) out.answers = body.answers as string[]
   if (body?.review !== undefined && body.review !== null && body.review !== '') {
     if (body.review !== 'start' && body.review !== 'passed' && body.review !== 'failed') throw new HttpError(400, `Unknown review "${String(body.review)}": start, passed or failed.`)
     out.review = body.review
@@ -2511,9 +2595,11 @@ route('GET', '/v1/tasks', async ({ query }) => {
   // ?q= (#1237): the board's search, through its full-text index.
   const cards = await tasks.listTasks({ project: project ? basename(projectByName(project)) : undefined, column: columnParam(query.get('column')), archived: query.get('archived') === 'true' ? true : undefined, scope: callerScope(), query: query.get('q') ?? undefined })
   const agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()
-  const views = await Promise.all(cards.map((c) => taskView(c, agents)))
-  // ?view=short: a row per card, without its description, comments and history.
-  return query.get('view') === 'short' ? views.map(taskRow) : views
+  // ?view=short: a row per card, without its description, comments, history and requests for the user (not read).
+  const short = query.get('view') === 'short'
+  const waiting = short ? new Map<number, ForYouItem[]>() : forYouOfCards(workspace, cards.map((c) => c.number))
+  const views = await Promise.all(cards.map((c) => taskView(c, agents, waiting)))
+  return short ? views.map(taskRow) : views
 })
 
 route('GET', '/v1/tasks/:n', async ({ params, query }) => {
@@ -2567,6 +2653,9 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const patch = taskPatch(body)
   const comment = typeof body?.comment === 'string' ? body.comment.trim() : ''
   const actor = await taskActor()
+  // A decision that answers requests (HI-1932) is that change alone: checked against the body as sent, before any of
+  // its other fields (its kind, skipping review, attachments: changed outside the patch) could be.
+  if (patch.answers !== undefined) tasks.checkDecisionAnswers(actor, body.answers, ['kind', 'confirmKind', 'skipReview', 'attachments'].some((k) => body[k] !== undefined))
   const changes: string[] = []
   // Its kind (#1277): changed after it was made (the Assistant's, with override.reason), or an agent's proposal answered.
   const kind = body?.kind
@@ -2975,6 +3064,7 @@ const INTENT_WORDS: Record<CardIntent['kind'], string> = {
   cannot: 'report a rule blocking',
   request: 'ask the builder of',
   loopStep: 'take a card loop step on',
+  focusedSkip: 'decide on the skipped focused tests of',
   removeFromQueue: 'take out of the merge queue',
   retryMerge: 'retry the merge of'
 }
@@ -2992,6 +3082,7 @@ const INTENT_DONE: Record<CardIntent['kind'], string> = {
   cannot: 'reported a rule blocking it',
   request: 'asked its builder',
   loopStep: 'took a card loop step',
+  focusedSkip: 'decided on its skipped focused tests',
   removeFromQueue: 'taken out of the merge queue',
   retryMerge: 'queued again (Retry merge)'
 }
@@ -3087,6 +3178,14 @@ function pathsField(body: any, required: boolean): string[] | undefined {
   return v.map((p: string) => p.trim())
 }
 
+/** A submit's focused tests (G20, HI-1367), when given: ids or { id, needs }, unique, each a valid id. */
+function testsField(body: any): FocusedTest[] | undefined {
+  if (body?.tests === undefined || body?.tests === null) return undefined
+  const t = testsGiven(body.tests)
+  if ('bad' in t) throw new HttpError(400, `tests: ${t.bad}. Give the test ids the change needs, each a string or { id, needs } (needs: unit, fake, real, packaged).`) // i18n-ignore: agent-facing
+  return t.tests
+}
+
 /** A body's submission number (start-review, verdict), when given. */
 function submissionField(body: any): number | undefined {
   const v = body?.submission
@@ -3133,7 +3232,8 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
   'put-back': (body) => ({ kind: 'putBack', why: textField(body, 'why', true) }),
   submit: (body) => {
     if (body?.followUp !== undefined && body?.followUp !== null && typeof body.followUp !== 'boolean') throw new HttpError(400, 'followUp is true or false.')
-    return { kind: 'submit', summary: textField(body, 'summary', true), revision: textField(body, 'revision'), note: textField(body, 'note'), paths: pathsField(body, false), ...(body?.followUp === true ? { followUp: true } : {}) }
+    const tests = testsField(body)
+    return { kind: 'submit', summary: textField(body, 'summary', true), revision: textField(body, 'revision'), note: textField(body, 'note'), paths: pathsField(body, false), ...(body?.followUp === true ? { followUp: true } : {}), ...(tests ? { tests } : {}) }
   },
   'declare-paths': (body) => ({ kind: 'declarePaths', paths: pathsField(body, true)! }),
   'start-review': (body) => ({ kind: 'startReview', submission: submissionField(body) }),
@@ -3144,6 +3244,10 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
     return { kind: 'verdict', pass: body.pass, comment: textField(body, 'comment', true), submission: submissionField(body), failKind }
   },
   'report-merge': (body) => ({ kind: 'reportMerge', result: textField(body, 'result') }),
+  'focused-skip': (body) => {
+    if (body?.merge !== true && body?.merge !== false) throw new HttpError(400, 'merge is true or false.')
+    return { kind: 'focusedSkip', request: textField(body, 'request', true)!, merge: body.merge, why: textField(body, 'why', true)! }
+  },
   ask: (body) => {
     const askKind = body?.kind ?? 'other'
     if (!ASK_KINDS.includes(askKind)) throw new HttpError(400, `Unknown kind "${String(askKind)}": ${ASK_KINDS.join(', ')}.`)
@@ -3322,7 +3426,11 @@ route('POST', '/v1/launch/connected', async () => {
   return { ok: sessions.hiveToolsConnected(assistant.assistantHome(ws), ASSISTANT_AGENT_ID) }
 })
 
-route('GET', '/v1/mcp', async () => (await inWorkspace(requireWorkspace(), () => listMcp())).map(({ name, def, globallyEnabled, error }) => ({ name, description: def?.description ?? '', globallyEnabled, error })))
+// The Assistant's own choices (HI-1472) are the workspace's to read: a project agent sees each server as before, without them.
+route('GET', '/v1/mcp', async () => {
+  const agent = !!agentCaller()
+  return (await inWorkspace(requireWorkspace(), () => listMcp())).map(({ name, def, globallyEnabled, assistant: forAssistant, error }) => ({ name, description: def?.description ?? '', globallyEnabled, ...(agent ? {} : { assistant: forAssistant }), error }))
+})
 
 route('POST', '/v1/notify', async ({ body }) => {
   const level: ToastLevel = ['info', 'success', 'warning', 'error'].includes(body?.level) ? body.level : 'info'

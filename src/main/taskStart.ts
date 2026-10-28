@@ -17,7 +17,7 @@ import { createLogger, userText } from './logger'
 import { workspace, workspaceOf } from './workspace'
 import { cardAttachments } from './cardAttachments'
 import { checkDocRef, type DocRefCheck } from './docSections'
-import { expectStartPrompt, startedSlot } from './slotCards'
+import { expectStartPrompt, placementDue, startedOutsideSlots } from './slotCards'
 import type { ContextLine } from '../shared/tasks'
 import { cardRef } from '../shared/projectKeys'
 
@@ -40,8 +40,11 @@ const BUSY_FOR_AGENTS: Record<string, string> = {
 /** A Start refused because the agent is busy: the window's words, and the agents' as they always were. */
 export function agentBusyError(agent: string, status: string): HiveError {
   const english = `${agent} ${BUSY_FOR_AGENTS[status] ?? BUSY_FOR_AGENTS.watching}. Start the task once it's idle, or give it to another agent.` // i18n-ignore: agent-facing: the Agent API's words, as before
-  return new HiveError(forAgents(withValues(AGENT_BUSY, { agent, status }), english))
+  return new HiveError(forAgents(withValues(AGENT_BUSY, { agent, status }), english), { kind: 'conflict' })
 }
+
+/** A Start undone because the card's start got no slot where its project builds in slots (HI-1966). */
+const NO_SLOT = msg({ id: 'tasks.start.noSlot', defaultMessage: "{card} wasn't started: its project builds each card in a slot, and {active, select, yes {its start has none} other {this start got none}}, so its agent would have worked in the project folder. {active, select, yes {Put it back to Todo, then start it again.} other {The card is back where it was: start it again.}}", description: "An error: a Start of the card {card} (its key, such as HI-12) was refused. The card's project has each card built in a slot (a working folder of its own), but the card's start has no slot, so the agent would have worked in the project's own folder instead. {active} (select): yes, the card was already Active (in work) with no slot, and must be put back to Todo and started again; other, this start was undone and the card moved back to its column. Translate both." })
 
 /** Cards being started now ("<workspace>#<n>"): a second Start of the same card is refused, not run twice. */
 const starting = new Set<string>()
@@ -69,7 +72,7 @@ const MAX_NOTE = 4000
 export async function startTask(n: number, target: TaskStartTarget, actor: TaskActor, note?: string, reason?: string): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; run?: string }> {
   if (note && note.length > MAX_NOTE) throw hiveError(msg({ id: 'tasks.start.noteTooLong', defaultMessage: 'The note is too long (at most {max, number} characters).', description: 'An error: the note given with a Start (what the agent should do now) is longer than it may be ({max}, a number of characters).' }), { max: MAX_NOTE }, { kind: 'invalid' })
   const key = `${(workspace.path ?? '').toLowerCase()}#${n}`
-  if (starting.has(key)) throw hiveError(msg({ id: 'tasks.start.alreadyStarting', defaultMessage: '{card} is already being started.', description: 'An error: card {card} (its key, such as HI-12) is being started already; a second Start of it is refused.' }), { card: cardRef(n) })
+  if (starting.has(key)) throw hiveError(msg({ id: 'tasks.start.alreadyStarting', defaultMessage: '{card} is already being started.', description: 'An error: card {card} (its key, such as HI-12) is being started already; a second Start of it is refused.' }), { card: cardRef(n) }, { kind: 'conflict' })
   starting.add(key)
   try {
     return await startReserved(n, target, actor, note?.trim() || undefined, reason?.trim() || undefined)
@@ -86,7 +89,7 @@ export async function startTask(n: number, target: TaskStartTarget, actor: TaskA
 function availability(p: string, agentId: string, agentName: string, actor: TaskActor): { live: boolean } {
   const st = sessions.liveFor(p, agentId)
   if (st && BUSY_STATUSES.has(st.status)) throw agentBusyError(agentName, st.status)
-  if (st && actor.kind !== 'user' && sessions.userMayBeTyping(p, agentId)) throw hiveError(msg({ id: 'tasks.start.userTyping', defaultMessage: "The user has just typed in {agent}'s terminal and may still be writing there. Ask the user first.", description: "An error: an agent or the Assistant tried to give a card to the agent {agent} (its name), but the user has just typed in that agent's terminal." }), { agent: agentName })
+  if (st && actor.kind !== 'user' && sessions.userMayBeTyping(p, agentId)) throw hiveError(msg({ id: 'tasks.start.userTyping', defaultMessage: "The user has just typed in {agent}'s terminal and may still be writing there. Ask the user first.", description: "An error: an agent or the Assistant tried to give a card to the agent {agent} (its name), but the user has just typed in that agent's terminal." }), { agent: agentName }, { kind: 'conflict' })
   return { live: !!st }
 }
 
@@ -117,7 +120,7 @@ async function startReserved(n: number, target: TaskStartTarget, actor: TaskActo
     agentName = a.name
     availability(p, a.id, a.name, actor)
     const agentKey = `${p.toLowerCase()}|${a.id}`
-    if (busyAgents.has(agentKey)) throw hiveError(msg({ id: 'tasks.start.beingGiven', defaultMessage: "{agent} is being given another card. Start this one once it's idle, or give it to another agent.", description: 'An error: the agent {agent} (its name) is being given another card right now, so this one cannot be started with it.' }), { agent: a.name })
+    if (busyAgents.has(agentKey)) throw hiveError(msg({ id: 'tasks.start.beingGiven', defaultMessage: "{agent} is being given another card. Start this one once it's idle, or give it to another agent.", description: 'An error: the agent {agent} (its name) is being given another card right now, so this one cannot be started with it.' }), { agent: a.name }, { kind: 'conflict' })
     busyAgents.add(agentKey)
     reserved = agentKey
   } else {
@@ -171,12 +174,12 @@ async function giveCard(
         startable(now)
         if (now.project.toLowerCase() !== before.project.toLowerCase()) {
           throw now.project
-            ? hiveError(msg({ id: 'tasks.start.movedProject', defaultMessage: '{card} moved to {project} meanwhile. Start it again.', description: 'An error: while card {card} (its key, such as HI-12) was being started, it was moved to the project {project} (a folder name).' }), { card: cardRef(n), project: now.project })
-            : hiveError(msg({ id: 'tasks.start.movedWorkspace', defaultMessage: '{card} moved to the workspace meanwhile. Start it again.', description: 'An error: while card {card} (its key, such as HI-12) was being started, it was taken out of its project, to the whole workspace.' }), { card: cardRef(n) })
+            ? hiveError(msg({ id: 'tasks.start.movedProject', defaultMessage: '{card} moved to {project} meanwhile. Start it again.', description: 'An error: while card {card} (its key, such as HI-12) was being started, it was moved to the project {project} (a folder name).' }), { card: cardRef(n), project: now.project }, { kind: 'conflict' })
+            : hiveError(msg({ id: 'tasks.start.movedWorkspace', defaultMessage: '{card} moved to the workspace meanwhile. Start it again.', description: 'An error: while card {card} (its key, such as HI-12) was being started, it was taken out of its project, to the whole workspace.' }), { card: cardRef(n) }, { kind: 'conflict' })
         }
-        if (now.column === 'done' && before.column !== 'done') throw hiveError(msg({ id: 'tasks.start.movedDone', defaultMessage: '{card} was moved to Done meanwhile. Start it again if there is more to do.', description: 'An error: while card {card} (its key, such as HI-12) was being started, it was moved to Done (a board column).' }), { card: cardRef(n) })
+        if (now.column === 'done' && before.column !== 'done') throw hiveError(msg({ id: 'tasks.start.movedDone', defaultMessage: '{card} was moved to Done meanwhile. Start it again if there is more to do.', description: 'An error: while card {card} (its key, such as HI-12) was being started, it was moved to Done (a board column).' }), { card: cardRef(n) }, { kind: 'conflict' })
         if (now.column !== before.column) throw columnError(msg({ id: 'tasks.start.movedColumn', defaultMessage: "{card} was moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}} meanwhile. Start it again if it's still to do.", description: 'An error: while card {card} (its key, such as HI-12) was being started, it was moved to the column {column} (select: a board column; translate each).' }), { card: cardRef(n), column: now.column })
-        if (now.agent !== before.agent) throw hiveError(msg({ id: 'tasks.start.reassigned', defaultMessage: "{card} was given to {who, select, another {another agent} other {nobody}} meanwhile. Start it again if it's still to do.", description: 'An error: while card {card} (its key, such as HI-12) was being started, it was given to another agent, or taken from its agent ({who}, select: translate each).' }), { card: cardRef(n), who: now.agent ? 'another' : 'nobody' })
+        if (now.agent !== before.agent) throw hiveError(msg({ id: 'tasks.start.reassigned', defaultMessage: "{card} was given to {who, select, another {another agent} other {nobody}} meanwhile. Start it again if it's still to do.", description: 'An error: while card {card} (its key, such as HI-12) was being started, it was given to another agent, or taken from its agent ({who}, select: translate each).' }), { card: cardRef(n), who: now.agent ? 'another' : 'nobody' }, { kind: 'conflict' })
       }
     })
   } catch (e) {
@@ -211,10 +214,15 @@ async function giveCard(
       const current = await setContextProblems(n, context.flatMap((l) => (l.problem ? [l.problem] : [])), { context: refs, project: card.project, agent: agentId, column: card.column })
       if (!current) throw hiveError(msg({ id: 'tasks.start.changed', defaultMessage: '{card} changed while it was being started (archived, moved, given to another agent, or its Read first edited): start it again if it should still go.', description: "An error: the card {card} (its key, such as HI-12) was changed while Hive was starting it (archived, moved to another column or project, given to another agent, deleted, or its Read first doc sections edited), so it wasn't given to the agent. Read first is the card's field: keep its name as the card dialog shows it." }), { card: cardRef(n) }, { kind: 'conflict' })
     }
+    // A start that got no slot where its project builds in slots (HI-1966) is undone, never its agent launched in the project
+    // folder; the user's Start across the rules (with its reason) starts where the agent is, as they chose.
+    // Already Active with no slot (HR2's round 1: a start from before this fix, given again) is refused the same way.
+    if (!(reason && actor.kind === 'user') && (await startedOutsideSlots(workspaceOf(p), p, n))) throw hiveError(NO_SLOT, { card: cardRef(n), active: before.column === 'doing' ? 'yes' : 'no' }, { kind: 'conflict' })
     const prompt = advanced.get<boolean>(RAW_CARD_START) ? rawTaskPrompt(card, note) : taskPrompt(card, !!sessions.hiveMcp(p), { from: before.column, note, context, attachments: await cardAttachments(workspace, n) })
     // Started in a slot (#1438): Hive gives it to the agent there once the slot is ready (a new conversation where the
-    // agent isn't running there), so nothing is typed where it is now.
-    if (before.column !== 'doing' && (await startedSlot(workspaceOf(p), p, n))) {
+    // agent isn't running there), so nothing is typed where it is now. Only while that placement is still to come: a card
+    // back from Review for more work keeps its placed cycle, so it is given here like any other (HI-1953).
+    if (before.column !== 'doing' && (await placementDue(workspaceOf(p), p, n))) {
       slotted = true
       toSlot(prompt)
       if (added && actor.kind !== 'user') emit({ type: 'agent-added', projectPath: p, agentId })
@@ -234,7 +242,7 @@ async function giveCard(
     }
     if (live)
       await deliverNow(p, { ...nd, conversation: sessions.liveFor(p, agentId)?.sessionId || null }, holds).catch((e: Error) => {
-        throw e instanceof NotGiven ? hiveError(msg({ id: 'tasks.start.notGiven', defaultMessage: "{agent} wasn't given {card}: {why}.", description: "An error: the card {card} (its key, such as HI-12) could not be typed into the terminal of the agent {agent} (its name); {why} says why." }), { agent: agentName, card: cardRef(n), why: errorText(e) }, { cause: e }) : e
+        throw e instanceof NotGiven ? hiveError(msg({ id: 'tasks.start.notGiven', defaultMessage: "{agent} wasn't given {card}: {why}.", description: "An error: the card {card} (its key, such as HI-12) could not be typed into the terminal of the agent {agent} (its name); {why} says why." }), { agent: agentName, card: cardRef(n), why: errorText(e) }, { cause: e, kind: 'conflict' }) : e
       })
     else run = (await launchWith(p, nd, (line) => sessions.start(p, { agentId, prompt: line }))).launched?.runId
   } catch (e) {

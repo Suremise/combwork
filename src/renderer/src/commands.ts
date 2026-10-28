@@ -16,7 +16,7 @@ import { noteCommandUsed } from './tips'
 import { requestStripMenu, type StripMenu } from './stripMenus'
 import { showAntivirus } from './components/Antivirus'
 import { focusTileAfter } from './components/AgentTiles'
-import { agentPage, assistantOnLeft, closeTile, showTilePage, tileFocusOf, tilePage, focusedAgentId, get, isAssistantPath, setAssistantSide, notify, openInSessionsTab, openProjectSettings, openVersionControl, revealAgent, set, setActivity, setAssistantOpen, setProgressOpen, progressIsOpen, showAssistantView, showView, showUnusedWorktrees, setProjectTab, showAgent, showPage, panePageCount, shownLayout, toggleCompactSidebar, type ProjectTab } from './store'
+import { agentPage, assistantOnLeft, closeTile, showTilePage, tileFocusOf, tilePage, tilesPageSize, focusedAgentId, get, isAssistantPath, setAssistantSide, notify, openInSessionsTab, openProjectSettings, openVersionControl, revealAgent, set, setActivity, setAssistantOpen, setProgressOpen, progressIsOpen, showAssistantView, showView, showUnusedWorktrees, setProjectTab, showAgent, showPage, panePageCount, shownLayout, toggleCompactSidebar, type ProjectTab } from './store'
 import { STRIP_TABS } from '@shared/projectTabs'
 
 /** A command's category: an id (CATEGORY_TEXT names it), as Settings → Keyboard Shortcuts groups and filters them. */
@@ -135,7 +135,7 @@ const tilesShown = (p: ProjectInfo): boolean => projectSessionView(p.config, get
 const pageCount = (): number => {
   const p = selected()
   if (!p) return 1
-  return tilesShown(p) ? tilePageCount(p.agents.length) : panePageCount(p)
+  return tilesShown(p) ? tilePageCount(p.agents.length, tilesPageSize(p)) : panePageCount(p)
 }
 
 /** Whether the selected project's agents move: two or more (in order), or one in panes side by side (to another cell, #762). */
@@ -405,6 +405,17 @@ const COMMAND_DEFS: CommandDef[] = [
     }
   },
   {
+    id: 'agent.hooks',
+    name: msg({ id: 'shell.command.agent.hooks', defaultMessage: 'Agent Hooks…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the focused agent's Hooks dialog (the hooks its session has, and what Hive received). The … says it opens a dialog first: keep it." }),
+    category: 'session',
+    when: () => !!selected()?.agents.length,
+    run: (path?: string, agentId?: string) => {
+      const p = path ? get().workspace?.projects.find((x) => x.path === path) : selected()
+      const id = agentId ?? (p ? focusedAgentId(p) : null)
+      if (p && id && p.agents.some((a) => a.id === id)) set({ hooksFor: { project: p.path, agentId: id } })
+    }
+  },
+  {
     id: 'agent.menu',
     name: msg({ id: 'shell.command.agent.menu', defaultMessage: 'Agent Menu…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the focused agent's ⋯ menu on its pane (everything its pane header doesn't show). The … says it opens a menu first: keep it." }),
     category: 'session',
@@ -496,6 +507,7 @@ const COMMAND_DEFS: CommandDef[] = [
   },
   { id: 'view.projects', name: msg({ id: 'shell.command.view.projects', defaultMessage: 'Show Projects', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+Shift+E', run: () => setActivity('projects') }, // i18n-ignore: a shortcut's keys
   { id: 'view.overview', name: msg({ id: 'shell.command.view.overview', defaultMessage: 'Show Workspace Overview', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+Shift+O', run: () => setActivity('overview') }, // i18n-ignore: a shortcut's keys
+  { id: 'view.activity', name: msg({ id: 'shell.command.view.activity', defaultMessage: 'Show Activity', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category: Activity's workspace level, what every project's agents run now." }), category: 'view', run: () => setActivity('activity') },
   { id: 'view.performance', name: msg({ id: 'shell.command.view.performance', defaultMessage: 'Show Performance', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', run: () => setActivity('performance') },
   { id: 'view.board', name: msg({ id: 'shell.command.view.board', defaultMessage: 'Show Task Board', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+Shift+J', run: () => setActivity('board') }, // i18n-ignore: a shortcut's keys
   {

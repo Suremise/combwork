@@ -13,10 +13,12 @@ import { config } from '../../config'
 import { claudeFileAllowed, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
-import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
+import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
-import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
+import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
 import { autoCompactOf, effectiveEnv, settingsScopes } from './autoCompact'
+import { claudeScopeHooks, rowsOfHooksTable } from '../../hookListing'
+import type { HookListing } from '../../../shared/hooks'
 import { connectionsManaged } from '../../connectionSeam'
 import { hiveStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
 import { MEMORY_ENV_OVERRIDES, connectionMemoryDir, memoryBase } from './memoryDir'
@@ -44,6 +46,8 @@ const SLOW_PREPARE_MS = 500
  * bottom, its choices within about a dozen lines of the end (more when a narrow pane wraps their descriptions).
  */
 const SAFEGUARD_PROMPT_LINES = 24
+/** The skill whose override turns off Claude Code's offer to teach auto mode about the environment (2.1.312, HI-1959). */
+const AUTO_MODE_SETUP = 'auto-mode-setup' // i18n-ignore: Claude Code's skill name
 /**
  * A ~/.claude/projects folder name that may hold an 8.3 short name: `~1` is encoded `-1`, after at most six characters
  * of the name, its own `-`s included (`BUILD-~1` is `BUILD--1`). `project-12` can't be one (HI-1681): looking in every
@@ -529,9 +533,17 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const env = effectiveEnv(ctx.env, scopes).env
     const named = MEMORY_ENV_OVERRIDES.some((v) => env[v]) || (env.CLAUDE_CONFIG_DIR ?? '') !== (home ?? '') || scopes.some((s) => s.unsure !== undefined || (s.json && typeof s.json === 'object' && (s.json as Record<string, unknown>)[field] != null))
     const memoryDir = home && !named && advanced.get<boolean>('claude-code.memory.realPath') ? await connectionMemoryDir(home, () => memoryBase(ctx.cwd)) : null
+    // What Hive passed, for the agent's Hooks dialog (HI-982: launchHooks).
+    keepBounded(this.hooksByRun, ctx.runId, hooks)
     // The user's --settings merged in: Hive passes only this file (#330).
     const settings = mergeLaunchSettings({ hooks, statusLine }, theirs, { url: ctx.hookUrl, envVar: 'HIVE_HOOK_TOKEN' })
     if (memoryDir) settings[field] = memoryDir
+    // Its offer to teach auto mode about the environment, turned off for this launch when the user said so (HI-1959,
+    // Settings → Advanced): the skill's override in Hive's settings file, never where their own --settings name it.
+    if (!advanced.get<boolean>('claude-code.autoModeSetup.offer')) {
+      const overrides = settings.skillOverrides && typeof settings.skillOverrides === 'object' ? (settings.skillOverrides as Record<string, unknown>) : {}
+      if (!(AUTO_MODE_SETUP in overrides)) settings.skillOverrides = { ...overrides, [AUTO_MODE_SETUP]: 'off' }
+    }
     await writeJsonAtomic(join(ctx.privateDir, 'settings.json'), settings)
     await writeJsonAtomic(join(dir, 'sync.json'), { launchedAt: new Date().toISOString(), hashes })
     // Instructions for this launch (the Hive Assistant's, and the Workspace notes note, #1433) are appended to Claude Code's
@@ -610,6 +622,40 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return deciding && obj(deciding.json)!.disableAllHooks === true ? deciding.label : null
   }
 
+  /** Hive's hooks as each launch's prepareLaunch built them (HI-982), until launchHooks takes them. */
+  private hooksByRun = new Map<string, Record<string, unknown[]>>()
+
+  /**
+   * The launch's hooks (HI-982): Hive's as passed (off where a setting turns hooks off: hooksOffIn), then each settings
+   * scope's as read now, at launch: configured, their loading unverified, since Claude Code doesn't say which it loaded.
+   * Listed again, the rows stay the launch's, with each file whose hooks changed since then said to have changed.
+   */
+  launchHooks(ctx: LaunchContext): LaunchHooks {
+    const passed = this.hooksByRun.get(ctx.runId) ?? {}
+    this.hooksByRun.delete(ctx.runId)
+    const secrets = [ctx.hookAuthFile, ctx.env.HIVE_HOOK_TOKEN ?? '']
+    const off = this.hooksOffIn(ctx)
+    const hive = rowsOfHooksTable(passed, { source: 'hive', status: off ? 'disabled' : 'passed', ...(off ? { why: off } : {}), observed: true }, secrets)
+    const read = (): ReturnType<typeof settingsScopes> => settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
+    // What of a scope decides its hooks: their table and the switches that turn them off.
+    const print = (json: unknown): string => {
+      const o = json && typeof json === 'object' ? (json as Record<string, unknown>) : {}
+      return JSON.stringify([o.hooks ?? null, o.disableAllHooks ?? null, o.allowManagedHooksOnly ?? null])
+    }
+    const first = read()
+    const atLaunch = new Map(first.map((s) => [s.file ?? s.label, print(s.json)]))
+    const own = claudeScopeHooks(first, secrets)
+    const listing: HookListing = { basis: 'launch', rows: [...hive.rows, ...own.rows], notes: own.notes }
+    return {
+      listing,
+      receivers: Object.fromEntries(hive.rows.map((r) => [r.event, r.type])),
+      now: async () => {
+        const changed = read().filter((s) => s.file && atLaunch.get(s.file) !== print(s.json))
+        return { ...listing, notes: [...listing.notes, ...changed.map((s) => ({ kind: 'changed' as const, file: s.file! }))] }
+      }
+    }
+  }
+
   backgroundTasks(appended: string, memo: Record<string, unknown>): BackgroundTaskEvent[] {
     return claudeBackgroundTasks(appended, memo)
   }
@@ -636,6 +682,31 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // The lines written last: on a screen cleared for the prompt it is at the top, with blank rows below.
     const bottom = screen.trimEnd().split('\n').slice(-SAFEGUARD_PROMPT_LINES).join('\n')
     return advanced.pattern('claude-code.safeguard.prompt').test(bottom)
+  }
+
+  /**
+   * Claude Code's question by itself after a turn (HI-1959: 2.1.312's offer to teach auto mode about the environment),
+   * which sends no hook: the advanced setting claude-code.screen.idleQuestion (its title, a line of its own), in the lines
+   * written last. Its dialog replaces the input box: with the box drawn, the same words are a prompt's or a reply's
+   * (HR3's round 1), never the dialog.
+   */
+  idleQuestion(screen: string): string | null {
+    const bottom = screen.trimEnd().split('\n').slice(-SAFEGUARD_PROMPT_LINES).join('\n')
+    const asked = advanced.pattern('claude-code.screen.idleQuestion').exec(bottom)
+    if (!asked || this.promptText(screen) !== null) return null
+    return asked[0].trim()
+  }
+
+  /**
+   * What Claude Code's input box holds (HI-1959), from the screen with dim cells blanked: the last box the advanced
+   * setting claude-code.screen.input finds, its rows joined and whitespace squashed ('' when empty); null without one.
+   */
+  promptText(screen: string): string | null {
+    const re = advanced.pattern('claude-code.screen.input')
+    let last: RegExpMatchArray | null = null
+    for (const m of screen.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`))) last = m
+    if (!last) return null
+    return (last[1] ?? '').replace(/\s+/g, ' ').trim()
   }
 
   startHint(text: string): StartHint | null {

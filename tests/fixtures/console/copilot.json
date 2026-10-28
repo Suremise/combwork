@@ -1,9 +1,9 @@
 {
   "format": 1,
   "provider": "copilot",
-  "cli": "1.0.95",
-  "hive": "0.6.0",
-  "recordedAt": "2026-10-12T12:52:04.418Z",
+  "cli": "1.0.105",
+  "hive": "1.0.0-rc.9",
+  "recordedAt": "2026-10-28T13:02:27.498Z",
   "events": [
     {
       "kind": "launch",
@@ -21,7 +21,7 @@
         ],
         "otherArgs": 6,
         "cwd": "<path>",
-        "version": "1.0.95"
+        "version": "1.0.105"
       },
       "made": {
         "status": "starting",
@@ -70,11 +70,33 @@
     },
     {
       "kind": "hook",
+      "name": "SessionStart",
+      "raw": {
+        "hook_event_name": "SessionStart",
+        "session_id": "1e66585d-427a-4f58-bce3-99d472a09ffe",
+        "timestamp": "2026-10-28T13:02:33.523Z",
+        "cwd": "<path>",
+        "source": "new",
+        "initial_prompt": "<text: 24 chars>"
+      },
+      "made": {
+        "event": {
+          "kind": "start",
+          "source": "new"
+        },
+        "status": "ready",
+        "actions": [
+          "answered"
+        ]
+      }
+    },
+    {
+      "kind": "hook",
       "name": "UserPromptSubmit",
       "raw": {
         "hook_event_name": "UserPromptSubmit",
-        "session_id": "7c99f8a3-f402-459e-aff2-ef4cd2cc274d",
-        "timestamp": "2026-10-12T12:52:07.931Z",
+        "session_id": "1e66585d-427a-4f58-bce3-99d472a09ffe",
+        "timestamp": "2026-10-28T13:02:33.882Z",
         "cwd": "<path>",
         "prompt": "<text: 24 chars>"
       },
@@ -91,25 +113,123 @@
       }
     },
     {
-      "kind": "hook",
-      "name": "SessionStart",
+      "kind": "transcript",
+      "name": "transcript",
       "raw": {
-        "hook_event_name": "SessionStart",
-        "session_id": "7c99f8a3-f402-459e-aff2-ef4cd2cc274d",
-        "timestamp": "2026-10-12T12:52:07.949Z",
-        "cwd": "<path>",
-        "source": "new",
-        "initial_prompt": "<text: 24 chars>"
+        "records": 7,
+        "newest": [
+          {
+            "type": "session.start",
+            "data": {
+              "sessionId": "<text: 36 chars>",
+              "version": 1,
+              "producer": "<text: 13 chars>",
+              "copilotVersion": "<text: 7 chars>",
+              "startTime": "<text: 24 chars>",
+              "selectedModel": "<text: 7 chars>",
+              "contextTier": null,
+              "context": {
+                "cwd": "<text: 95 chars>",
+                "gitRoot": "<text: 95 chars>",
+                "branch": "<text: 6 chars>",
+                "headCommit": "<text: 40 chars>"
+              },
+              "alreadyInUse": false,
+              "remoteSteerable": false
+            },
+            "id": "<text: 36 chars>",
+            "timestamp": "2026-10-28T13:02:31.246Z",
+            "parentId": null
+          },
+          {
+            "type": "session.model_change",
+            "data": {
+              "source": "<text: 7 chars>",
+              "contextTier": null,
+              "newModel": "<text: 7 chars>",
+              "previousModel": "<text: 7 chars>",
+              "reasoningEffort": null
+            },
+            "id": "<text: 36 chars>",
+            "timestamp": "2026-10-28T13:02:31.750Z",
+            "parentId": "<text: 36 chars>"
+          },
+          {
+            "type": "hook.start",
+            "data": {
+              "hookInvocationId": "<text: 36 chars>",
+              "hookType": "<text: 12 chars>",
+              "input": {
+                "source": "<text: 3 chars>",
+                "initialPrompt": "<text: 24 chars>",
+                "sessionId": "<text: 36 chars>",
+                "timestamp": 1793192553523,
+                "cwd": "<text: 95 chars>"
+              }
+            },
+            "id": "<text: 36 chars>",
+            "timestamp": "2026-10-28T13:02:33.523Z",
+            "parentId": "<text: 36 chars>"
+          },
+          {
+            "type": "hook.end",
+            "data": {
+              "hookInvocationId": "<text: 36 chars>",
+              "hookType": "<text: 12 chars>",
+              "success": true
+            },
+            "id": "<text: 36 chars>",
+            "timestamp": "2026-10-28T13:02:33.526Z",
+            "parentId": "<text: 36 chars>"
+          },
+          {
+            "type": "hook.start",
+            "data": {
+              "hookInvocationId": "<text: 36 chars>",
+              "hookType": "<text: 19 chars>",
+              "input": {
+                "sessionId": "<text: 36 chars>",
+                "prompt": "<text: 24 chars>",
+                "timestamp": 1793192553882,
+                "cwd": "<text: 95 chars>"
+              }
+            },
+            "id": "<text: 36 chars>",
+            "timestamp": "2026-10-28T13:02:33.882Z",
+            "parentId": "<text: 36 chars>"
+          },
+          {
+            "type": "hook.end",
+            "data": {
+              "hookInvocationId": "<text: 36 chars>",
+              "hookType": "<text: 19 chars>",
+              "success": true
+            },
+            "id": "<text: 36 chars>",
+            "timestamp": "2026-10-28T13:02:33.883Z",
+            "parentId": "<text: 36 chars>"
+          },
+          {
+            "type": "user.message",
+            "data": {
+              "content": "<text: 24 chars>",
+              "transformedContent": "<text: 92 chars>",
+              "messageId": "<text: 36 chars>",
+              "supportedNativeDocumentMimeTypes": [],
+              "delivery": "<text: 4 chars>",
+              "interactionId": "<text: 36 chars>",
+              "turnId": "<text: 1 chars>",
+              "parentAgentTaskId": "<text: 36 chars>"
+            },
+            "id": "<text: 36 chars>",
+            "timestamp": "2026-10-28T13:02:33.886Z",
+            "parentId": "<text: 36 chars>"
+          }
+        ]
       },
       "made": {
-        "event": {
-          "kind": "start",
-          "source": "new"
-        },
-        "status": "working",
-        "actions": [
-          "answered"
-        ]
+        "modelId": "gpt-4.1",
+        "modelName": "gpt-4.1"
       }
     },
     {
@@ -117,8 +237,8 @@
       "name": "PreToolUse",
       "raw": {
         "hook_event_name": "PreToolUse",
-        "session_id": "7c99f8a3-f402-459e-aff2-ef4cd2cc274d",
-        "timestamp": "2026-10-12T12:52:08.023Z",
+        "session_id": "1e66585d-427a-4f58-bce3-99d472a09ffe",
+        "timestamp": "2026-10-28T13:02:34.535Z",
         "cwd": "<path>",
         "tool_name": "Read",
         "tool_input": {
@@ -138,8 +258,8 @@
       "name": "PostToolUse",
       "raw": {
         "hook_event_name": "PostToolUse",
-        "session_id": "7c99f8a3-f402-459e-aff2-ef4cd2cc274d",
-        "timestamp": "2026-10-12T12:52:08.028Z",
+        "session_id": "1e66585d-427a-4f58-bce3-99d472a09ffe",
+        "timestamp": "2026-10-28T13:02:34.543Z",
         "cwd": "<path>",
         "tool_name": "Read",
         "tool_input": {
@@ -163,8 +283,8 @@
       "name": "Stop",
       "raw": {
         "hook_event_name": "Stop",
-        "session_id": "7c99f8a3-f402-459e-aff2-ef4cd2cc274d",
-        "timestamp": "2026-10-12T12:52:09.581Z",
+        "session_id": "1e66585d-427a-4f58-bce3-99d472a09ffe",
+        "timestamp": "2026-10-28T13:02:36.423Z",
         "cwd": "<path>",
         "transcript_path": "<path>",
         "stop_reason": "<text: 8 chars>",
@@ -187,58 +307,8 @@
       "kind": "transcript",
       "name": "transcript",
       "raw": {
-        "records": 19,
+        "records": 13,
         "newest": [
-          {
-            "type": "session.usage_record",
-            "data": {
-              "usage": {
-                "model": "<text: 7 chars>",
-                "modelDisplayName": "<text: 7 chars>",
-                "inputTokens": 1200,
-                "outputTokens": 40,
-                "cacheReadTokens": 1000,
-                "cacheWriteTokens": 0,
-                "cost": 0,
-                "duration": 8,
-                "timeToFirstTokenMs": "<redacted>",
-                "outputTtftMs": 6.7152,
-                "interTokenLatencyMs": "<redacted>",
-                "initiator": "<text: 4 chars>",
-                "interactionType": "<text: 18 chars>",
-                "isByok": true,
-                "byokKind": "<text: 10 chars>",
-                "modelProvider": "<text: 5 chars>",
-                "isAuto": false,
-                "maxPromptTokens": 64000,
-                "maxOutputTokens": 16384,
-                "transport": "<text: 4 chars>",
-                "requestBodyBytes": 81427,
-                "apiCallId": "<text: 5 chars>",
-                "rte": false,
-                "apiEndpoint": "<text: 17 chars>",
-                "accounting": {
-                  "sourceSessionId": "<text: 36 chars>",
-                  "sequence": 1,
-                  "usageId": "<text: 5 chars>"
-                },
-                "aiCreditsStatus": "<text: 11 chars>",
-                "availableToolCount": 38,
-                "toolTokenCount": "<redacted>",
-                "frontierSource": "<text: 9 chars>",
-                "cacheDetailsReported": true,
-                "numToolCalls": 1,
-                "toolCounts": {
-                  "view": 1
-                },
-                "finishReason": "<text: 10 chars>",
-                "contentFilterTriggered": false
-              }
-            },
-            "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:07.980Z",
-            "parentId": "<text: 36 chars>"
-          },
           {
             "type": "assistant.message",
             "data": {
@@ -262,7 +332,7 @@
               "apiCallId": "<text: 5 chars>"
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:08.021Z",
+            "timestamp": "2026-10-28T13:02:34.522Z",
             "parentId": "<text: 36 chars>"
           },
           {
@@ -278,7 +348,7 @@
               "toolTitle": "<text: 12 chars>"
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:08.022Z",
+            "timestamp": "2026-10-28T13:02:34.525Z",
             "parentId": "<text: 36 chars>"
           },
           {
@@ -295,7 +365,7 @@
               }
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:08.023Z",
+            "timestamp": "2026-10-28T13:02:34.535Z",
             "parentId": "<text: 36 chars>"
           },
           {
@@ -306,7 +376,7 @@
               "success": true
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:08.025Z",
+            "timestamp": "2026-10-28T13:02:34.537Z",
             "parentId": "<text: 36 chars>"
           },
           {
@@ -316,7 +386,7 @@
               "hookType": "<text: 11 chars>",
               "input": {
                 "sessionId": "<text: 36 chars>",
-                "timestamp": 1791809528028,
+                "timestamp": 1793192554543,
                 "cwd": "<text: 95 chars>",
                 "toolName": "<text: 4 chars>",
                 "toolArgs": {
@@ -332,7 +402,7 @@
               }
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:08.028Z",
+            "timestamp": "2026-10-28T13:02:34.543Z",
             "parentId": "<text: 36 chars>"
           },
           {
@@ -343,7 +413,7 @@
               "success": true
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:08.029Z",
+            "timestamp": "2026-10-28T13:02:34.545Z",
             "parentId": "<text: 36 chars>"
           },
           {
@@ -372,12 +442,14 @@
                 "metrics": {
                   "resultLength": 6,
                   "resultForLlmLength": 6,
+                  "context_token_limit": "<redacted>",
+                  "context_current_tokens": 24658,
                   "result_token_count": "<redacted>"
                 }
               }
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:08.031Z",
+            "timestamp": "2026-10-28T13:02:34.546Z",
             "parentId": "<text: 36 chars>"
           },
           {
@@ -386,7 +458,7 @@
               "turnId": "<text: 1 chars>"
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:08.035Z",
+            "timestamp": "2026-10-28T13:02:34.553Z",
             "parentId": "<text: 36 chars>"
           },
           {
@@ -396,7 +468,61 @@
               "interactionId": "<text: 36 chars>"
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:08.035Z",
+            "timestamp": "2026-10-28T13:02:34.553Z",
+            "parentId": "<text: 36 chars>"
+          },
+          {
+            "type": "session.usage_record",
+            "data": {
+              "usage": {
+                "model": "<text: 7 chars>",
+                "modelDisplayName": "<text: 7 chars>",
+                "inputTokens": 1200,
+                "outputTokens": 40,
+                "cacheReadTokens": 1000,
+                "cacheWriteTokens": 0,
+                "cost": 0,
+                "duration": 1526,
+                "timeToFirstTokenMs": "<redacted>",
+                "outputTtftMs": 1524.4074000000003,
+                "interTokenLatencyMs": "<redacted>",
+                "initiator": "<text: 5 chars>",
+                "interactionType": "<text: 18 chars>",
+                "isByok": true,
+                "byokKind": "<text: 10 chars>",
+                "modelProvider": "<text: 5 chars>",
+                "providerType": "<text: 6 chars>",
+                "isAuto": false,
+                "maxPromptTokens": 64000,
+                "maxOutputTokens": 16384,
+                "transport": "<text: 4 chars>",
+                "requestBodyBytes": 110565,
+                "requestBodyWireBytes": 110565,
+                "requestBodyEncoding": "<text: 8 chars>",
+                "apiCallId": "<text: 5 chars>",
+                "rte": false,
+                "apiEndpoint": "<text: 17 chars>",
+                "accounting": {
+                  "sourceSessionId": "<text: 36 chars>",
+                  "sequence": 2,
+                  "usageId": "<text: 5 chars>"
+                },
+                "aiCreditsStatus": "<text: 11 chars>",
+                "availableToolCount": 58,
+                "toolTokenCount": "<redacted>",
+                "customToolCallCount": 0,
+                "unmatchedToolResultCount": 0,
+                "orphanToolCallCount": 0,
+                "frontierSource": "<text: 9 chars>",
+                "cacheDetailsReported": true,
+                "numToolCalls": 0,
+                "toolCounts": {},
+                "finishReason": "<text: 4 chars>",
+                "contentFilterTriggered": false
+              }
+            },
+            "id": "<text: 36 chars>",
+            "timestamp": "2026-10-28T13:02:36.123Z",
             "parentId": "<text: 36 chars>"
           }
         ]
@@ -411,8 +537,8 @@
       "name": "SessionEnd",
       "raw": {
         "hook_event_name": "SessionEnd",
-        "session_id": "7c99f8a3-f402-459e-aff2-ef4cd2cc274d",
-        "timestamp": "2026-10-12T12:52:10.097Z",
+        "session_id": "1e66585d-427a-4f58-bce3-99d472a09ffe",
+        "timestamp": "2026-10-28T13:02:37.326Z",
         "cwd": "<path>",
         "reason": "<text: 9 chars>"
       },
@@ -434,54 +560,6 @@
         "records": 8,
         "newest": [
           {
-            "type": "session.usage_record",
-            "data": {
-              "usage": {
-                "model": "<text: 7 chars>",
-                "modelDisplayName": "<text: 7 chars>",
-                "inputTokens": 1200,
-                "outputTokens": 40,
-                "cacheReadTokens": 1000,
-                "cacheWriteTokens": 0,
-                "cost": 0,
-                "duration": 1517,
-                "timeToFirstTokenMs": "<redacted>",
-                "outputTtftMs": 1516.2358000000002,
-                "interTokenLatencyMs": "<redacted>",
-                "initiator": "<text: 5 chars>",
-                "interactionType": "<text: 18 chars>",
-                "isByok": true,
-                "byokKind": "<text: 10 chars>",
-                "modelProvider": "<text: 5 chars>",
-                "isAuto": false,
-                "maxPromptTokens": 64000,
-                "maxOutputTokens": 16384,
-                "transport": "<text: 4 chars>",
-                "requestBodyBytes": 81656,
-                "apiCallId": "<text: 5 chars>",
-                "rte": false,
-                "apiEndpoint": "<text: 17 chars>",
-                "accounting": {
-                  "sourceSessionId": "<text: 36 chars>",
-                  "sequence": 2,
-                  "usageId": "<text: 5 chars>"
-                },
-                "aiCreditsStatus": "<text: 11 chars>",
-                "availableToolCount": 38,
-                "toolTokenCount": "<redacted>",
-                "frontierSource": "<text: 9 chars>",
-                "cacheDetailsReported": true,
-                "numToolCalls": 0,
-                "toolCounts": {},
-                "finishReason": "<text: 4 chars>",
-                "contentFilterTriggered": false
-              }
-            },
-            "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:09.567Z",
-            "parentId": "<text: 36 chars>"
-          },
-          {
             "type": "assistant.message",
             "data": {
               "messageId": "<text: 36 chars>",
@@ -495,7 +573,7 @@
               "apiCallId": "<text: 5 chars>"
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:09.577Z",
+            "timestamp": "2026-10-28T13:02:36.353Z",
             "parentId": "<text: 36 chars>"
           },
           {
@@ -504,7 +582,7 @@
               "turnId": "<text: 1 chars>"
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:09.580Z",
+            "timestamp": "2026-10-28T13:02:36.418Z",
             "parentId": "<text: 36 chars>"
           },
           {
@@ -517,12 +595,12 @@
                 "transcriptPath": "<text: 168 chars>",
                 "stopReason": "<text: 8 chars>",
                 "stop_hook_active": false,
-                "timestamp": 1791809529581,
+                "timestamp": 1793192556423,
                 "cwd": "<text: 95 chars>"
               }
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:09.581Z",
+            "timestamp": "2026-10-28T13:02:36.423Z",
             "parentId": "<text: 36 chars>"
           },
           {
@@ -534,7 +612,16 @@
               "output": {}
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:09.582Z",
+            "timestamp": "2026-10-28T13:02:36.425Z",
+            "parentId": "<text: 36 chars>"
+          },
+          {
+            "type": "abort",
+            "data": {
+              "reason": "<text: 14 chars>"
+            },
+            "id": "<text: 36 chars>",
+            "timestamp": "2026-10-28T13:02:36.599Z",
             "parentId": "<text: 36 chars>"
           },
           {
@@ -545,12 +632,12 @@
               "input": {
                 "reason": "<text: 9 chars>",
                 "sessionId": "<text: 36 chars>",
-                "timestamp": 1791809530097,
+                "timestamp": 1793192557326,
                 "cwd": "<text: 95 chars>"
               }
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:10.097Z",
+            "timestamp": "2026-10-28T13:02:37.326Z",
             "parentId": "<text: 36 chars>"
           },
           {
@@ -561,7 +648,7 @@
               "success": true
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:10.098Z",
+            "timestamp": "2026-10-28T13:02:37.328Z",
             "parentId": "<text: 36 chars>"
           },
           {
@@ -572,7 +659,7 @@
                 "totalUserRequests": 1,
                 "totalNanoAiu": 0,
                 "aiCreditsStatus": "<text: 11 chars>",
-                "totalApiDurationMs": 1525,
+                "totalApiDurationMs": 1537,
                 "sessionStartTime": "<text: 24 chars>",
                 "codeChanges": {
                   "linesAdded": 0,
@@ -602,14 +689,14 @@
                 }
               ],
               "usageAccountingWatermarks": {
-                "7c99f8a3-f402-459e-aff2-ef4cd2cc274d": 2
+                "1e66585d-427a-4f58-bce3-99d472a09ffe": 2
               },
               "shutdownType": "<text: 7 chars>",
               "totalPremiumRequests": 0,
               "totalNanoAiu": 0,
-              "totalApiDurationMs": 1525,
-              "sessionStartTime": 1791809527048,
-              "eventsFileSizeBytes": 75071,
+              "totalApiDurationMs": 1537,
+              "sessionStartTime": 1793192551206,
+              "eventsFileSizeBytes": 45293,
               "codeChanges": {
                 "linesAdded": 0,
                 "linesRemoved": 0,
@@ -624,19 +711,19 @@
               },
               "agentMetrics": {
                 "main": {
-                  "totalApiDurationMs": 1525,
+                  "totalApiDurationMs": 1537,
                   "totalNanoAiu": 0,
                   "modelMetrics": "<object>"
                 }
               },
               "currentModel": "<text: 7 chars>",
-              "currentTokens": 18006,
-              "systemTokens": 6888,
-              "conversationTokens": 127,
-              "toolDefinitionsTokens": 10988
+              "currentTokens": 24122,
+              "systemTokens": 7171,
+              "conversationTokens": 87,
+              "toolDefinitionsTokens": 16861
             },
             "id": "<text: 36 chars>",
-            "timestamp": "2026-10-12T12:52:10.110Z",
+            "timestamp": "2026-10-28T13:02:37.335Z",
             "parentId": "<text: 36 chars>"
           }
         ]
@@ -644,6 +731,10 @@
       "made": {
         "modelId": "gpt-4.1",
         "modelName": "gpt-4.1",
+        "stopsAnswered": [
+          "<text: 24 chars>"
+        ],
+        "interruptedAt": "2026-10-28T13:02:36.599Z",
         "costUsd": 0,
         "premiumRequests": 0
       }

@@ -63,7 +63,7 @@ async function shots(page, name) {
   // the old command over the new one.
   // The saving step held while this file exists (HIVE_TEST_HOLD_DRAIN), as a slow save would keep it.
   const holdDrain = path.join(marks, 'hold-drain')
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47973), HIVE_TEST_RUN_ON_CLOSE: '1', HIVE_TEST_SLOW_IPC: 'closeCommand:setWorkspace=1500*2,settings:update=1500*2', HIVE_TEST_HOLD_DRAIN: holdDrain } })
+  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47792), HIVE_TEST_RUN_ON_CLOSE: '1', HIVE_TEST_SLOW_IPC: 'closeCommand:setWorkspace=1500*2,settings:update=1500*2', HIVE_TEST_HOLD_DRAIN: holdDrain } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, wsA)
 

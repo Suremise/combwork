@@ -4,11 +4,12 @@
 import { describe, expect, it } from 'vitest'
 import { cardSegment as segmentIn, chosenLaneRows, laneRowsRange, MORE_LANE_ROWS, currentCard, DEFAULT_LANE_ROWS, draggedLaneRows, droppedLaneOrder, failedVerdictGist, fitSegments as fitIn, frozenSegment as frozenIn, keptLaneOrder, keyedLaneRows, LANE_ORDER_MAX, laneCards as laneCardsIn, laneRowsNow, laneRunning, lanesShown, laneSummary, maxLaneRows, mergedLaneOrder, nudgedLaneOrder, panelOrder, reviewRounds, SEGMENT_NOTE_MAX, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, workNotes, type CardSegment, type SegmentState } from '../src/shared/laneBar'
 import type { WorkBadge } from '../src/shared/workflow/workView'
-import { cardOldRulesNote, laneOldRulesNote, pulseLanes } from '../src/shared/laneBar'
+import { cardOldRulesNote, laneCardTime, laneOldRulesNote, laneWaitTime, pulseLanes } from '../src/shared/laneBar'
+import { stampWait } from '../src/shared/lanes'
 import { laneLegend, legendSources, segmentStage } from '../src/shared/laneStages'
 import { mustCompile } from '../src/shared/workflow/compile'
 import { preset } from '../src/shared/workflow/options'
-import { refusalLines, type RuleId } from '../src/shared/workflow/refusals'
+import { refusal, refusalLines, type RuleId } from '../src/shared/workflow/refusals'
 import type { LaneCard, LaneState, StoredText, TaskCard, TaskColumn } from '../src/shared/types'
 import { fmt, setLanguage, tr } from '../src/shared/i18n'
 import type { Tr } from '../src/shared/tasks'
@@ -408,7 +409,7 @@ describe("the lanes section's height (#569)", () => {
 
 describe("a segment's hover: what the card's facts say (#1225)", () => {
   const short = (id: string): string => id.slice(0, 7)
-  const badge = (over: Partial<WorkBadge> = {}): WorkBadge => ({ card: 7, stage: 'review', preWorkflow: false, adopted: false, revision: 'a3f2c1d9e8', verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, reviewSkip: null, reviewSkipProposed: null, decisionSince: false, oldRules: false, stages: null, line: null, lines: [], underReview: null, startedAt: null, lastSeq: 3, ...over })
+  const badge = (over: Partial<WorkBadge> = {}): WorkBadge => ({ card: 7, stage: 'review', preWorkflow: false, adopted: false, revision: 'a3f2c1d9e8', verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, reviewSkip: null, reviewSkipProposed: null, decisionSince: false, oldRules: false, stages: null, line: null, lines: [], underReview: null, startedAt: null, endedAt: null, lastSeq: 3, ...over })
 
   it('the revision under review, the last verdict on its revision, and the checks on it', () => {
     expect(workNotes(badge({ verdict: { pass: false, revision: 'b71e09a4cc', current: true }, checks: { passed: 2, failed: 1, notCounted: 4 } }), 'review', null, short, tr)).toEqual(['Under review: a3f2c1d', 'Last verdict: failed on b71e09a', 'Checks on it: 2 passed, 1 failed'])
@@ -431,8 +432,9 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
   const refused = { move: 'submit', rule: 'submit.empty', values: { card: 'alpha-7' }, at: '', times: 1 }
 
   it('a refused request (#1279): its reason and next step as the agent got them, the card named as the window names it; repeats counted after', () => {
-    expect(workNotes(badge({ refused }), 'review', null, short, tr, names, 'AL-7')).toEqual(['AL-7: nothing committed to review. Commit the card\'s work, then submit for review. If the user didn\'t ask you to commit, ask them.', 'Under review: a3f2c1d'])
-    expect(workNotes(badge({ refused: { ...refused, times: 3 } }), 'doing', null, short, tr, names, 'AL-7')[0]).toBe('AL-7: nothing committed to review. Commit the card\'s work, then submit for review. If the user didn\'t ask you to commit, ask them. (refused 3 times)')
+    // Each a whole sentence on a line of its own (HI-1585), the repeats on one after them.
+    expect(workNotes(badge({ refused }), 'review', null, short, tr, names, 'AL-7')).toEqual(['AL-7: nothing committed to review.', "Commit the card's work, then submit for review. If the user didn't ask you to commit, ask them.", 'Under review: a3f2c1d'])
+    expect(workNotes(badge({ refused: { ...refused, times: 3 } }), 'doing', null, short, tr, names, 'AL-7').slice(0, 3)).toEqual(['AL-7: nothing committed to review.', "Commit the card's work, then submit for review. If the user didn't ask you to commit, ask them.", 'Refused 3 times in a row.'])
     // A rule's names in the window's words (move.notFromHere names the stage and the moves).
     expect(workNotes(badge({ revision: null, refused: { move: 'submit', rule: 'move.notFromHere', values: { card: 'alpha-7', stage: 'todo', move: 'submit', moves: 'start' }, at: '', times: 1 } }), 'todo', null, short, tr, names, 'AL-7')[0]).toMatch(/^AL-7 /)
   })
@@ -618,7 +620,7 @@ describe('stages in a lane (#1421): names over the categories, the divider, the 
     expect(laneOldRulesNote(false, tr)).toMatch(/Workflow rules aren’t enforced now/)
     const seg = cardSegment(7, card(7, 'doing'))
     const names = { list: (items: string[]) => items.join(', '), ruleName: (id: string) => id }
-    const b: WorkBadge = { card: 7, stage: 'active', preWorkflow: false, adopted: false, revision: null, verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, reviewSkip: null, reviewSkipProposed: null, decisionSince: false, oldRules: true, stages: null, line: null, lines: [], underReview: null, startedAt: null, lastSeq: 3 }
+    const b: WorkBadge = { card: 7, stage: 'active', preWorkflow: false, adopted: false, revision: null, verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, reviewSkip: null, reviewSkipProposed: null, decisionSince: false, oldRules: true, stages: null, line: null, lines: [], underReview: null, startedAt: null, endedAt: null, lastSeq: 3 }
     expect(segmentMarks({ frozen: null }, b, seg, (x) => x, tr, names).oldRules).toBe(cardOldRulesNote(true, tr))
     expect(segmentMarks({ frozen: null }, b, seg, (x) => x, tr, names, false).oldRules).toMatch(/aren’t enforced now/)
     // An ended lane's segments have no marks; nor a card without it.
@@ -663,5 +665,105 @@ describe("old rules keep their stages (HR4's #1421 round 1): the options now pro
     expect(now.find((g) => g.category === 'passed')!.stages).toEqual([])
     const ended = laneLegend(legendSources([{ project: 'alpha', stages: pair, cards: [7], frozen: [] }], () => soloNow, badges), tr)
     expect(ended.find((g) => g.category === 'passed')!.stages).toEqual([])
+  })
+})
+
+describe('refusals name the user as you in the window, as the user to agents (HI-1585, glossary §1 rule 10)', () => {
+  // The window's formats: the board's toast (forUser) and the card's stored refusals (CardWork), neither saying who reads.
+  const inCard = { one: (m: Parameters<typeof tr>[0], v?: Record<string, string | number>) => tr(m, v), list: (items: string[]) => fmt.list(items, 'unit'), names: true }
+  const toast = { ...inCard, forUser: true }
+  const override = { card: 'AL-1', stage: 'done', rules: 'review' }
+
+  it("agents' English is as before", () => {
+    const r = refusal('move.needsOverride', override)
+    expect(r.next).toBe("Move it anyway only with the user's reason: one they gave for it, or one they give once told which rules this skips.")
+    expect(r.change).toBe('These rules are set in Version Control, where the user can change them.')
+    expect(refusal('loop.followUpChecked', { card: 'AL-1' }).next).toBe("Wait for the reviewer's ok or gaps; if none comes, ask the user.")
+    expect(refusal('lane.lineBehind', { card: 'AL-2', line: 'hive/AL-2', target: 'main', earlier: 'AL-1' }).next).toBe('Leave it as it is: Hive brings hive/AL-2 up to date with main once you are idle, or asks the user, and tells you when AL-2 can start.')
+    expect(refusal('merge.hiveMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'answer' }).next).toBe('It is in the merge queue for main, which is paused until the user answers in For you: wait for Done, or for it to come back.')
+    expect(refusal('platform.unknown', { card: 'AL-1', offer: 'repositoryGone' }).next).toMatch(/^The project's Git repository is gone: ask the user to restore it/)
+  })
+
+  it('the window says you, on the card and in the toast alike, in English too', () => {
+    for (const f of [inCard, toast]) {
+      const l = refusalLines('move.needsOverride', override, f)
+      expect(l.next).toBe('Moving it anyway needs your reason: one you gave for it, or one you give once told which rules this skips.')
+      expect(l.change).toBe('These rules are set in Version Control, where you can change them.')
+    }
+    expect(refusalLines('loop.followUpChecked', { card: 'AL-1' }, inCard).next).toBe("The agent waits for the reviewer's ok or gaps; if none comes, it asks you.")
+    expect(refusalLines('merge.hiveMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'fix' }, inCard).next).toBe('It is in the merge queue for main, which is paused until you fix what stopped it and resume it; it moves to Done once merged, or comes back.')
+    expect(refusalLines('platform.unknown', { card: 'AL-1', offer: 'repositoryGone' }, inCard).next).toMatch(/^The project's Git repository is gone: restore it, or switch the project to None/)
+  })
+
+  it("who reads it is never kept in the refusal: one recorded before (no reader) or as an agent's reads as you in the window", () => {
+    const r = refusal('move.needsOverride', override)
+    expect(r.values).toEqual(override)
+    expect(refusalLines(r.rule, r.values, inCard).change).toBe('These rules are set in Version Control, where you can change them.')
+    // A recorded value never chooses for the window.
+    expect(refusalLines('move.needsOverride', { ...override, reader: 'agent' }, inCard).change).toBe('These rules are set in Version Control, where you can change them.')
+  })
+})
+
+describe("a lane's wait and its cards' times (HI-1926)", () => {
+  const T = Date.parse('2026-10-28T10:00:00.000Z')
+  const MIN = 60_000
+
+  it('a wait is stamped when it begins, kept while its reason, card and ask stay, reset when one changes', () => {
+    const reviewer = { reason: 'reviewer' as const, card: 5 }
+    // The lane listed before: the wait was seen to begin.
+    const a = stampWait(undefined, reviewer, T, true)!
+    expect(a).toMatchObject({ since: T, observed: true })
+    // Later, the same wait (a comment on the card changes nothing in it): kept.
+    expect(stampWait(a, { ...reviewer, blocked: undefined }, T + 10 * MIN, true)).toBe(a)
+    // Another reason, another card, another ask: a new wait.
+    expect(stampWait(a, { reason: 'you', card: 5 }, T + 11 * MIN, true)).toMatchObject({ since: T + 11 * MIN })
+    expect(stampWait(a, { reason: 'reviewer', card: 6 }, T + 12 * MIN, true)).toMatchObject({ since: T + 12 * MIN })
+    const you = stampWait(undefined, { reason: 'you', card: 5, ask: 'approve' }, T, true)!
+    expect(stampWait(you, { reason: 'you', card: 5, ask: 'decide' }, T + MIN, true)).toMatchObject({ since: T + MIN })
+    // No longer waiting: none; a wait with no card (a slot) is stamped too.
+    expect(stampWait(a, null, T + MIN, true)).toBeUndefined()
+    expect(stampWait(undefined, { reason: 'slot', card: null }, T, true)).toMatchObject({ since: T, observed: true })
+    // The first listing (Hive just started, or the workspace opened): not seen to begin, so at least that long.
+    expect(stampWait(undefined, reviewer, T, false)).toMatchObject({ since: T, observed: false })
+  })
+
+  it("its time, marked past its bound: for you (a request, a round limit) and a reviewer, each its own", () => {
+    expect(laneWaitTime(null, T, 60, 15)).toBeNull()
+    expect(laneWaitTime({ reason: 'reviewer' }, T, 60, 15)).toBeNull()
+    expect(laneWaitTime({ reason: 'reviewer', since: T - 14 * MIN }, T, 60, 15)).toEqual({ ms: 14 * MIN, long: false })
+    expect(laneWaitTime({ reason: 'reviewer', since: T - 15 * MIN }, T, 60, 15)).toEqual({ ms: 15 * MIN, long: true })
+    expect(laneWaitTime({ reason: 'you', since: T - 59 * MIN }, T, 60, 15)!.long).toBe(false)
+    expect(laneWaitTime({ reason: 'roundLimit', since: T - 60 * MIN }, T, 60, 15)!.long).toBe(true)
+    // The bounds are the settings': changed, they apply.
+    expect(laneWaitTime({ reason: 'you', since: T - 5 * MIN }, T, 5, 15)!.long).toBe(true)
+    expect(laneWaitTime({ reason: 'reviewer', since: T - 5 * MIN }, T, 60, 30)!.long).toBe(false)
+    // Other reasons are never marked long.
+    expect(laneWaitTime({ reason: 'slot', since: T - 999 * MIN }, T, 60, 15)!.long).toBe(false)
+  })
+
+  it("a card's time: so far while in progress, took and its commit once Done, from its own cycle; nothing it can't know", () => {
+    const iso = (ms: number) => new Date(ms).toISOString()
+    const badge = (start: number | null, end: number | null, merged: string | null = null) => ({ startedAt: start === null ? null : iso(start), endedAt: end === null ? null : iso(end), merged })
+    expect(laneCardTime('doing', badge(T - 20 * MIN, null), null, T)).toEqual({ soFar: 20 * MIN })
+    expect(laneCardTime('review', badge(T - 20 * MIN, null), null, T)).toEqual({ soFar: 20 * MIN })
+    expect(laneCardTime('done', badge(T - 50 * MIN, T - 10 * MIN, 'abc1234def'), null, T)).toEqual({ took: 40 * MIN, merged: 'abc1234def' })
+    // Done with no integration or acceptance known, Todo, or no start known: nothing.
+    expect(laneCardTime('done', badge(T - 50 * MIN, null), null, T)).toBeNull()
+    expect(laneCardTime('todo', badge(null, null), null, T)).toBeNull()
+    expect(laneCardTime('doing', undefined, null, T)).toBeNull()
+  })
+
+  it("an ended lane's card: what happened before the lane ended only; a later completion or a reopened cycle shows nothing, an unfinished card's time doesn't run on", () => {
+    const iso = (ms: number) => new Date(ms).toISOString()
+    const ended = iso(T - 60 * MIN)
+    const badge = (start: number, end: number | null, merged: string | null = null) => ({ startedAt: iso(start), endedAt: end === null ? null : iso(end), merged })
+    // Done before the lane ended: took, and its commit.
+    expect(laneCardTime('done', badge(T - 120 * MIN, T - 90 * MIN, 'abc'), ended, T)).toEqual({ took: 30 * MIN, merged: 'abc' })
+    // Completed after the lane ended: never rewrites the lane's history.
+    expect(laneCardTime('done', badge(T - 120 * MIN, T - 30 * MIN, 'late'), ended, T)).toBeNull()
+    // Reopened later (a cycle that started after the lane ended).
+    expect(laneCardTime('doing', badge(T - 10 * MIN, null), ended, T)).toBeNull()
+    // Unfinished when the lane ended: no growing "so far".
+    expect(laneCardTime('doing', badge(T - 120 * MIN, null), ended, T)).toBeNull()
   })
 })

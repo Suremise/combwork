@@ -101,6 +101,14 @@ describe("the conversation a placement resumes for its stopped builder (HI-1746)
     }
   })
 
+  it("two as new as each other: the one saved first, as the project's records sorted by activity gave it (HR5's HI-1236 round 1)", async () => {
+    // Saved a then z, at the same time (the agent's index, walked backwards, has z first).
+    await record('c-tie-a', { lease: 'l-tie', at: '2026-10-27T06:00:00.000Z' })
+    await record('c-tie-z', { lease: 'l-tie', at: '2026-10-27T06:00:00.000Z' })
+    state.transcripts = new Set(['c-tie-z', 'c-tie-a'])
+    expect(await run(() => sessions.leaseConversation(project, 'b1', 'l-tie'))).toEqual({ is: 'resume', id: 'c-tie-a', name: 'c-tie-a' })
+  })
+
   it('no record bound to the lease: none', async () => {
     state.transcripts = new Set(['c-old', 'c-new'])
     expect(await run(() => sessions.leaseConversation(project, 'b1', 'l-none'))).toEqual({ is: 'none' })

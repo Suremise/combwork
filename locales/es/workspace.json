@@ -1,4 +1,5 @@
 {
+  "workspace.activity.activity": "Actividad",
   "workspace.activity.assistant": "Hive Assistant",
   "workspace.activity.board": "Tablero de tareas",
   "workspace.activity.docs": "Documentación",
@@ -525,7 +526,7 @@
   "workspace.storage.reviewInChanges": "Revisar en Cambios",
   "workspace.storage.size": "Tamaño",
   "workspace.storage.skipped": "{count, plural, one {Se omitió # elemento:} many {Se omitieron # elementos:} other {Se omitieron # elementos:}}",
-  "workspace.storage.slot": "{slot}, prestado a {agent}",
+  "workspace.storage.slot": "{slot}, prestado al agente {agent}",
   "workspace.storage.storage": "Almacenamiento",
   "workspace.storage.title": "Limpiar el proyecto {name}",
   "workspace.storage.total": "Total",

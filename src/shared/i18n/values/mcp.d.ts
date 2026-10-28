@@ -3,7 +3,12 @@
 interface HiveMessageValues {
   'mcp.addFile.message': { file: string | number; files: number }
   'mcp.addFile.replaceDetail': undefined
+  'mcp.assistant.confirmButton': undefined
+  'mcp.assistant.confirmMessage': undefined
+  'mcp.assistant.confirmTitle': { name: string | number }
+  'mcp.assistant.updateFailed': undefined
   'mcp.enable.all': undefined
+  'mcp.enable.assistant': undefined
   'mcp.enable.confirmButton': undefined
   'mcp.enable.confirmMessage': undefined
   'mcp.enable.confirmTitle': { name: string | number }
@@ -13,6 +18,7 @@ interface HiveMessageValues {
   'mcp.enable.projectsLabel': undefined
   'mcp.error.invalidName': undefined
   'mcp.error.noServer': { name: string | number }
+  'mcp.error.offInWorkspace': { name: string | number }
   'mcp.import.changed': { count: number; names: string | number }
   'mcp.import.confirmButton': undefined
   'mcp.import.confirmMessage': { count: number; project: string | number }
@@ -28,7 +34,9 @@ interface HiveMessageValues {
   'mcp.tab.switch': { name: string | number; project: string | number }
   'mcp.tab.workspaceBadge': undefined
   'mcp.view.allProjects': undefined
+  'mcp.where.assistantOnly': undefined
   'mcp.where.none': undefined
   'mcp.where.off': undefined
   'mcp.where.some': { projects: string | number }
+  'mcp.where.someAndAssistant': { projects: string | number }
 }

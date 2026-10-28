@@ -21,6 +21,7 @@ import { AssistantSidePanel } from './AssistantView'
 import { BoardPanel } from './Board'
 import { WorkspaceOverviewPanel } from '../views/WorkspaceOverview'
 import { PerformancePanel } from '../views/Performance'
+import { WorkspaceActivityPanel } from '../views/WorkspaceActivity'
 import { fmt, tr, tRich } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
 import { WORKSPACE_NOTES_PATH, workspaceNotesPath } from '@shared/workspaceNotes'
@@ -175,6 +176,7 @@ export function Sidebar() {
     <div className={cx('sidebar', compact && 'compact')} style={{ width: compact ? RAIL_WIDTH : width }}>
       {view === 'projects' && (compact ? <ProjectsRail /> : <ProjectsPanel />)}
       {view === 'overview' && <WorkspaceOverviewPanel />}
+      {view === 'activity' && <WorkspaceActivityPanel />}
       {view === 'performance' && <PerformancePanel />}
       {view === 'board' && <BoardPanel />}
       {view === 'notes' && <NotesPanel />}

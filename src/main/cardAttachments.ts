@@ -21,6 +21,7 @@ import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import { formatBytes } from '../shared/units'
 import { legacyWorktree } from '../shared/agentFolders'
+import type { AttachmentContent } from '../shared/types'
 import { advanced } from './advanced'
 import { attachmentName, freeName, ownAttachmentsFolder } from './attachmentsFolder'
 import { afterBoardWrite, boardChanged, boardRead, boardWrite, boardWriteOp, cardKeys, onBoardUndone } from './boardStore'
@@ -97,6 +98,26 @@ export async function cardAttachments(ws: WorkspaceService, card: number): Promi
   })
   if (!found) return []
   return Promise.all(found.rows.sort(newest).map(async (r) => withPath(found.host, r, !(await exists(join(cardFolder(found.host, card), r.file))))))
+}
+
+/**
+ * A card attachment's text for the viewer's preview (HI-1958), by the card and its id, never a path from the window:
+ * read by readCardAttachment (HI-1751), so through one opened file, its folder chain and the file's identity checked
+ * again after the open and its row before the reply (HR2's round 1: checking a path, then reading it later, could follow
+ * a folder swapped for a link meanwhile). Whole, up to `max` bytes ('too-large' beyond); an image, a PDF or a file that
+ * isn't UTF-8 text is 'binary'. Anything it refuses (gone, outside its folder, changed meanwhile) is an error.
+ */
+export async function previewCardAttachment(ws: WorkspaceService, card: number, id: string, max: number): Promise<AttachmentContent> {
+  const found = boardRead(ws, (db) => {
+    const c = db.prepare('SELECT project FROM cards WHERE number = ?').get(card) as { project: string | null } | undefined // i18n-ignore: SQL
+    const r = c && (db.prepare('SELECT file FROM card_attachments WHERE card = ? AND id = ?').get(card, id) as { file: string } | undefined) // i18n-ignore: SQL
+    return c && r ? { project: c.project, file: r.file } : null
+  })
+  if (!found) throw hiveError(M.noAttachment, undefined, { kind: 'notFound' })
+  const r = await readCardAttachment(ws, { number: card, project: found.project }, found.file, null, max)
+  if ('problem' in r) throw hiveError(M.noAttachment, undefined, { kind: 'notFound' })
+  if (r.kind !== 'text') return { kind: 'binary', text: '' }
+  return r.next !== undefined ? { kind: 'too-large', text: '' } : { kind: 'text', text: r.content }
 }
 
 /** Every attachment of a project's cards (its Attachments tab), by card number, newest first; archived cards' too. */
@@ -797,8 +818,11 @@ export type AttachmentRead =
  */
 export type AttachmentReadProblem = { problem: 'unknown' | 'ambiguous' | 'missing' | 'outside' | 'changed' | 'offset'; choices?: string[]; size?: number }
 
-/** Tests: run between the file's open and the checks after it (a swap, a move, a deletion meanwhile). */
-export const attachmentReadSeams: { afterOpen: (() => Promise<void>) | null } = { afterOpen: null }
+/**
+ * Tests: run between the checks before the open and the open (`beforeOpen`: a folder swapped for a link, which Windows
+ * won't allow once the file is open), and between the open and the checks after it (a swap, a move, a deletion meanwhile).
+ */
+export const attachmentReadSeams: { beforeOpen: (() => Promise<void>) | null; afterOpen: (() => Promise<void>) | null } = { beforeOpen: null, afterOpen: null }
 
 /**
  * A card's attachment for an agent (HI-1751: HR2 couldn't read HI-1702's evidence, the document tools refusing `.hive`),
@@ -811,7 +835,7 @@ export const attachmentReadSeams: { afterOpen: (() => Promise<void>) | null } = 
  * (a first page leaving out a byte-order mark), so the pages' contents joined are its text; bytes that aren't UTF-8 make
  * it binary. An image, a PDF or a binary file gives its kind and path (the same offset rules), for the CLI's own reading.
  */
-export async function readCardAttachment(ws: WorkspaceService, card: { number: number; project: string | null }, name: string, offsetRaw: string | null = null): Promise<AttachmentRead | AttachmentReadProblem> {
+export async function readCardAttachment(ws: WorkspaceService, card: { number: number; project: string | null }, name: string, offsetRaw: string | null = null, page = ATTACHMENT_PAGE): Promise<AttachmentRead | AttachmentReadProblem> {
   const n = card.number
   const sameProject = (p: string | null | undefined): boolean => (p ?? null)?.toLowerCase() === card.project?.toLowerCase()
   const now = (): { project: string | null; rows: Row[] } | null =>
@@ -845,6 +869,7 @@ export async function readCardAttachment(ws: WorkspaceService, card: { number: n
   }
   const before = await plain()
   if (before !== 'ok') return { problem: before }
+  await attachmentReadSeams.beforeOpen?.()
   const fh = await open(path, 'r').catch(() => null)
   if (!fh) return { problem: 'missing' }
   try {
@@ -871,11 +896,11 @@ export async function readCardAttachment(ws: WorkspaceService, card: { number: n
     if (sniff.subarray(0, got).includes(0)) return binary('binary')
     // A page and up to 3 bytes after it, so its end can move back to a whole character (the byte after a cut is never
     // a UTF-8 continuation byte, 10xxxxxx): never more read than that.
-    const buf = Buffer.alloc(Math.min(ATTACHMENT_PAGE + 3, size - from))
+    const buf = Buffer.alloc(Math.min(page + 3, size - from))
     const { bytesRead } = await fh.read(buf, 0, buf.length, from)
     // Shorter than its size at the open: changed meanwhile (an offset that moved on by nothing would read forever).
     if (bytesRead < buf.length) return { problem: 'changed' }
-    let end = Math.min(bytesRead, ATTACHMENT_PAGE)
+    let end = Math.min(bytesRead, page)
     if (end < bytesRead) {
       let back = end
       while (back > 0 && (buf[back] & 0xc0) === 0x80) back--

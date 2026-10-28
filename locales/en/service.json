@@ -652,8 +652,8 @@
     "description": "An error changing a project's key: the project hasn't been given Hive's id (it hasn't been opened yet)."
   },
   "service.laneStart.busy": {
-    "defaultMessage": "{agent} {status, select, working {is working} starting {is starting} waiting {is waiting for your answer} background {is waiting on background tasks it started} signin {needs you to sign in again} other {is waiting on cards (a card watch)}}. Start the lane once it's idle, or choose another agent.",
-    "description": "An error starting a lane from the window: the agent {agent} can't start in a new conversation now, because of what it is doing ({status}; keep the select keys). The window offers to wait until it's idle."
+    "defaultMessage": "{status, select, working {Agent {agent} is working.} starting {Agent {agent} is starting.} waiting {Agent {agent} is waiting for your answer.} background {Agent {agent} is waiting on background tasks it started.} signin {Agent {agent} needs you to sign in again.} other {Agent {agent} is waiting on cards (a card watch).}} Start the lane once it's idle, or choose another agent.",
+    "description": "An error starting a lane from the window: the agent {agent} can't start in a new conversation now, because of what it is doing ({status}; keep the select keys). The window offers to wait until it's idle. Each {status} a whole sentence with a noun before the name (HI-1585: glossary §1 rules 3 and 4)."
   },
   "service.laneStart.done": {
     "defaultMessage": "{card} is Done already.",
@@ -684,8 +684,8 @@
     "description": "An error starting a lane from the window: the same agent was chosen as builder and reviewer."
   },
   "service.laneStart.starting": {
-    "defaultMessage": "{agent}'s lane is being started already.",
-    "description": "An error starting a lane from the window: one with the same builder ({agent}) is being started right now."
+    "defaultMessage": "The lane of agent {agent} is being started already.",
+    "description": "An error starting a lane from the window: one with the same builder ({agent}) is being started right now. A noun before the name (glossary §1 rule 4)."
   },
   "service.laneStart.unknownAgent": {
     "defaultMessage": "{agent} isn't one of {project}'s agents.",

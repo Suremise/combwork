@@ -51,8 +51,8 @@ const M = {
 const FIELD = msg({
   id: 'assistant.undo.field',
   defaultMessage:
-    '{field, select, title {title} description {description} labels {labels} blocked {blocked} blockedBy {blocked by} links {links} agent {agent} column {column} project {project} created {the card} cards {cards} reviewer {reviewer} rounds {rounds} waitMinutes {wait} name {name} provider {provider} model {model} effort {effort} permissionMode {permission mode} use200kContext {context size} mcpServers {MCP servers} lastSessionId {conversation} value {value} removed {removed models} run {the run} other {{field}}}',
-  description: "What part of something the Assistant changed (lower case, listed after a card or in why undo kept it): a card's title, labels, column…; a lane's cards, reviewer, rounds, wait; an agent's provider, model, effort…; a setting's value; run: an agent it started. Select keys: the field."
+    '{field, select, title {title} description {description} labels {labels} blocked {blocked} blockedBy {blocked by} links {links} agent {agent} column {column} project {project} created {the card} cards {cards} reviewer {reviewer} rounds {rounds} waitMinutes {wait} name {name} provider {provider} model {model} effort {effort} permissionMode {permission mode} use200kContext {context size} mcpServers {MCP servers} lastSessionId {conversation} value {value} removed {removed models} run {the run} agents {agents} layout {layout} workflow {workflow options} other {{field}}}',
+  description: "What part of something the Assistant changed (lower case, listed after a card or in why undo kept it): a card's title, labels, column…; a lane's cards, reviewer, rounds, wait; an agent's provider, model, effort…; a setting's value; run: an agent it started; agents, layout, workflow: a project's agents, page layout and workflow options a template's load replaced (HI-1502). Select keys: the field."
 })
 
 /** Why each kind of change, or part of one, can't be undone (UNDO_FINAL's codes, #1282's English in the Agent API). */
@@ -87,7 +87,8 @@ const FINAL: Record<UndoFinalWhy, Msg> = {
   retriedMerge: msg({ id: 'assistant.undo.why.retriedMerge', defaultMessage: "Its Retry merge stays in the card's work.", description: "What of the Assistant's Retry merge on a card (a command that queues a returned card again) stays when it is undone." }),
   queuePaused: msg({ id: 'assistant.undo.why.queuePaused', defaultMessage: 'A merge queue it paused stays paused: resume it if it should run.', description: "Why a change of the Assistant's can't be undone: it paused a project's merge queue." }),
   queueResumed: msg({ id: 'assistant.undo.why.queueResumed', defaultMessage: "A merge queue it resumed isn't paused again: pause it if it shouldn't run.", description: "Why a change of the Assistant's can't be undone: it resumed a project's merge queue." }),
-  slotReleased: msg({ id: 'assistant.undo.why.slotReleased', defaultMessage: "A slot it released isn't kept or held again: the next work that needs a slot may take it.", description: "Why a change of the Assistant's can't be undone: it released a slot (a folder cards are built in) that was kept for an agent or held by an agent's ended session." })
+  slotReleased: msg({ id: 'assistant.undo.why.slotReleased', defaultMessage: "A slot it released isn't kept or held again: the next work that needs a slot may take it.", description: "Why a change of the Assistant's can't be undone: it released a slot (a folder cards are built in) that was kept for an agent or held by an agent's ended session." }),
+  templateCards: msg({ id: 'assistant.undo.why.templateCards', defaultMessage: "The cards and lanes of the agents a template replaced stay as the load left them (cards put back, lanes ended): undo doesn't give them back.", description: "What of the Assistant loading a template into a project (it replaced the project's agents) stays when it is undone: the replaced agents' open cards were put back and their lanes ended (HI-1502)." })
 }
 
 const fieldsText = (fields: readonly string[]): string => fmt.list(fields.map((field) => tr(FIELD, { field })))

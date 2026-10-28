@@ -45,6 +45,7 @@ const { sessions } = await import('../src/main/sessions')
 const removal = await import('../src/main/projectRemoval')
 const { workspaceDb } = await import('../src/main/boardStore')
 const { changeSessions, readSessions, sessionRows, sessionsOf } = await import('../src/main/sessionStore')
+const { QUERIES } = await import('../src/main/schema/v1_0')
 type SessionsPlace = import('../src/main/sessionStore').SessionsPlace
 
 const at = '2026-10-19T10:00:00.000Z'
@@ -242,6 +243,39 @@ describe('changes', () => {
     const rows = sessionRows(f)
     expect(new Set(rows.map((r) => r.key)).size).toBe(rows.length)
     expect(sessionsOf({ rows, meta: new Map() })).toEqual(f)
+  })
+})
+
+describe("an agent's records and a card's (HI-1236)", () => {
+  it("are read by their indexes, never every record of the host, and are the same as filtering them", async () => {
+    const p = project('byagent', { version: 1, sessions: [
+      rec('s1', { agentId: 'a1', lastActiveAt: '2026-10-19T09:00:00.000Z', cards: [{ number: 5, title: 'Five' }] }),
+      rec('s2', { agentId: 'a2', cards: [{ number: 5, title: 'Five' }, { number: 6, title: 'Six', review: true }] }),
+      rec('s3', { agentId: 'a1', lastActiveAt: '2026-10-19T11:00:00.000Z' }),
+      rec('s4', { agentId: 'a1', lastActiveAt: '2026-10-19T08:00:00.000Z', cards: [{ number: 6, title: 'Six' }] })
+    ] })
+    await run(() => workspace.ensureProject(p))
+    await run(() => workspace.projectIds({ fresh: true }))
+    const all = (await run(() => workspace.sessionsFile(p))).sessions
+    const db = workspaceDb(wsPath).reader
+    const prepare = vi.spyOn(db, 'prepare')
+    let agent: SessionRecord[], five: SessionRecord[], six: SessionRecord[]
+    try {
+      agent = await run(() => workspace.sessionsOfAgent(p, 'a1'))
+      five = await run(() => workspace.sessionsOfCard(p, 5))
+      six = await run(() => workspace.sessionsOfCard(p, 6))
+      expect(prepare.mock.calls.filter(([sql]) => /FROM (sessions|session_cards) WHERE host = \?( ORDER|$)/.test(String(sql)))).toEqual([])
+      // Each by its index's query, on this connection.
+      expect(prepare.mock.calls.filter(([sql]) => sql === QUERIES['sessions.byAgent'].sql)).toHaveLength(1)
+      expect(prepare.mock.calls.filter(([sql]) => sql === QUERIES['sessions.byCard'].sql)).toHaveLength(2)
+    } finally {
+      prepare.mockRestore()
+    }
+    expect(agent.map((r) => r.id)).toEqual(['s3', 's1', 's4'])
+    expect(agent).toEqual([...all.filter((r) => r.agentId === 'a1')].sort((x, y) => y.lastActiveAt.localeCompare(x.lastActiveAt)))
+    expect(five).toEqual(all.filter((r) => r.cards?.some((c) => c.number === 5)))
+    expect(six.map((r) => r.id)).toEqual(['s2', 's4'])
+    expect(await run(() => workspace.sessionsOfCard(p, 99))).toEqual([])
   })
 })
 

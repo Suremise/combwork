@@ -38,6 +38,8 @@
 // - While fake-nohooks-<agent> is in CODEX_HOME it sends no hook at all, as when a Codex update broke them (#1336). A
 //   wake it read is answered with the next line of fake-wakes-<agent>.txt there, when there is one. With
 //   FAKE_CODEX_VERSION 0.162.1 or later, a turn draws Codex's Working line as it begins.
+// - "selfcompact" (HI-1916): a compaction it begins itself (PreCompact, PostCompact), then the turn under the same turn_id,
+//   as Codex 0.164.0 did.
 // - "compacting N" (#1514): a turn that compacts its conversation for N seconds first, as Codex's auto-compaction does
 //   at a turn's start, sending no hook meanwhile (no UserPromptSubmit: Hive sees no prompt, as with RR2 on 23 Oct). With
 //   fake-queue-<agent> in CODEX_HOME, a line typed while a turn runs is queued (as Codex queues input) and taken in the
@@ -133,6 +135,22 @@ if (args[0] === 'app-server') {
       else if (m.method === 'account/read') {
         const a = inConnection ? connectionAccount() : { email: 'fake@example.com', plan: 'plus' }
         process.stdout.write(JSON.stringify({ id: m.id, result: { account: a ? { type: 'chatgpt', email: a.email, planType: a.plan } : null, requiresOpenaiAuth: true, workspaceRouting: null } }) + '\n')
+      } else if (m.method && m.method !== 'hooks/list' && m.method !== 'initialized') {
+        // A request it doesn't know (an advanced setting naming another, HI-982), answered as Codex's app server does.
+        process.stdout.write(JSON.stringify({ id: m.id, error: { code: -32601, message: `unknown method: ${m.method}` } }) + '\n')
+      } else if (m.method === 'hooks/list' && process.env.CODEX_HOME && fs.existsSync(path.join(process.env.CODEX_HOME, 'fake-hooks-list-hang.txt'))) {
+        // No answer while fake-hooks-list-hang.txt is there (HI-982: Hive's listing timeout).
+      } else if (m.method === 'hooks/list' && process.env.CODEX_HOME && fs.existsSync(path.join(process.env.CODEX_HOME, 'fake-hooks-list.json'))) {
+        // A suite's hooks (HI-982: hooksview): those of fake-hooks-list.json, after the -c hooks.<event> it was given,
+        // listed as Codex 0.164 lists the session flags' (codexownhooks pins the fields), trusted.
+        const own = JSON.parse(fs.readFileSync(path.join(process.env.CODEX_HOME, 'fake-hooks-list.json'), 'utf8'))
+        const flags = []
+        for (let k = 1; k < args.length; k++) {
+          const c = args[k - 1] === '-c' && /^hooks\.([A-Za-z]+)=/.exec(args[k])
+          const command = c && /command\s*=\s*("(?:[^"\\]|\\.)*")/.exec(args[k])
+          if (command) flags.push({ key: `C:\\<session-flags>\\config.toml:${c[1].replace(/[A-Z]/g, (x, at) => (at ? '_' : '') + x.toLowerCase())}:0:0`, source: 'sessionFlags', command: JSON.parse(command[1]), trustStatus: 'trusted', currentHash: 'sha256:fake' })
+        }
+        process.stdout.write(JSON.stringify({ id: m.id, result: { data: [{ hooks: [...flags, ...own] }] } }) + '\n')
       } else if (m.id === 2) process.stdout.write(JSON.stringify({ id: 2, result: { data: [] } }) + '\n')
     }
   })
@@ -517,6 +535,14 @@ async function runPrompt(text) {
     userLine(text)
     await takeQueued()
   } else {
+    // "selfcompact" (HI-1916): as Codex 0.164 did for HR5 (27 Oct), a compaction it begins itself, then the turn run under
+    // that compaction's id: PreCompact and PostCompact, then its prompt, all under this turn's id.
+    if (/^selfcompact\b/.test(text)) {
+      await hook('PreCompact', { trigger: 'auto' })
+      await sleep(300)
+      await hook('PostCompact')
+      await sleep(200)
+    }
     userLine(text)
     await hook('UserPromptSubmit', { prompt: text })
   }
@@ -596,8 +622,9 @@ let ctrlC = 0
 if (process.stdin.isTTY) process.stdin.setRawMode(true)
 process.stdin.setEncoding('utf8')
 process.stdin.on('data', (data) => {
-  // A lone Esc is a key; other escape sequences (focus reports) aren't.
-  const keys = data === '\x1b' ? ['\x1b'] : [...data.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')]
+  // A lone Esc is a key; other escape sequences (focus reports) aren't. Alt+Enter (ESC CR, as Windows' console hands it
+  // on) is a key of its own: a new line in the prompt, not a send, as Codex 0.164's editor takes it (HI-1327).
+  const keys = data === '\x1b' ? ['\x1b'] : data.split('\x1b\r').flatMap((part, i) => [...(i > 0 ? ['alt-enter'] : []), ...part.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')])
   for (const ch of keys) {
     if (onKey?.(ch)) continue
     if (ch === '\x03') {
@@ -612,6 +639,8 @@ process.stdin.on('data', (data) => {
       if (text && !busy) void runPrompt(text)
       // Typed while a turn runs (#1514): queued for it, as Codex queues input.
       else if (text && queues()) queued.push(text)
+    } else if (ch === 'alt-enter') {
+      if (!busy || queues()) line += '\n'
     } else if (ch === '\x7f' || ch === '\b') line = line.slice(0, -1)
     else if (ch >= ' ' && (!busy || queues())) line += ch
   }

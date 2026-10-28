@@ -13,7 +13,7 @@ import { tempDir } from './tempDir'
 const HUNG_MS = 15_000
 
 // The card documents read (one card's, or a list of them), counted; the reads themselves unchanged.
-const reads = vi.hoisted(() => ({ docs: 0 }))
+const reads = vi.hoisted(() => ({ docs: 0, heads: 0 }))
 vi.mock('../src/main/boardStore', async (original) => {
   const real = await original<typeof import('../src/main/boardStore')>()
   return {
@@ -25,6 +25,12 @@ vi.mock('../src/main/boardStore', async (original) => {
     cardDocs: (...a: Parameters<typeof real.cardDocs>) => {
       const out = real.cardDocs(...a)
       reads.docs += out.length
+      return out
+    },
+    // The heads read again after a change (HI-1909), counted.
+    headChanges: (...a: Parameters<typeof real.headChanges>) => {
+      const out = real.headChanges(...a)
+      reads.heads += out?.docs.length ?? 0
       return out
     }
   }
@@ -114,6 +120,30 @@ describe('the live cards\' heads (HI-1690)', () => {
     const want = Array.from({ length: BOARD }, (_, i) => i + 1).filter((n) => COLUMNS[n % 5] === 'done' && n % 4 !== 0).reverse()
     expect(done.map((c) => c.number)).toEqual(want)
     expect(done.every((c) => c.column === 'done' && !c.archived)).toBe(true)
+  })
+})
+
+describe('the heads kept between board changes (HI-1909)', () => {
+  it('a change reads again only the cards it touched: moved, new and archived cards as allTasks has them', async () => {
+    await run(() => tasks.liveCardHeads(w))
+    const was = reads.heads
+    // Unchanged: the same lists, nothing read again.
+    expect(await run(() => tasks.liveCardHeads(w))).toEqual(await run(() => tasks.liveCardHeads(w)))
+    expect(reads.heads).toBe(was)
+    await run(() => tasks.updateTask(2, { column: 'done' }, user))
+    const made = await run(() => tasks.createTask({ title: 'New', project: 'alpha' }, user))
+    let heads = await run(() => tasks.liveCardHeads(w))
+    expect(reads.heads - was).toBeGreaterThan(0)
+    expect(reads.heads - was).toBeLessThan(10)
+    expect(heads.map(head)).toEqual((await run(() => tasks.allTasks(w, { archived: false }))).map(head))
+    expect(heads.some((c) => c.number === made.number)).toBe(true)
+    expect((await run(() => tasks.liveCardHeads(w, { done: true }))).map((c) => c.number)).toContain(2)
+    // Archived: gone from the heads.
+    const beta = heads.filter((c) => c.project === 'beta').map((c) => c.number)
+    await run(() => tasks.archiveProjectCards(w, 'beta', 'project-hidden'))
+    heads = await run(() => tasks.liveCardHeads(w))
+    expect(beta.length > 0 && !heads.some((c) => beta.includes(c.number))).toBe(true)
+    expect(heads.map(head)).toEqual((await run(() => tasks.allTasks(w, { archived: false }))).map(head))
   })
 })
 

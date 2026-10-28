@@ -24,7 +24,7 @@
 
 import { projectAgents } from '../shared/defaults'
 import { taskPrompt } from '../shared/tasks'
-import { agentWorkflowRole, buildsWork } from '../shared/workflow/roles'
+import { agentWorkflowRole, buildsWork, takesCards } from '../shared/workflow/roles'
 import { SLOT_NOTICES, workflowText } from '../shared/workflow/texts'
 import type { Fact, FactData, StartedData, StageId } from '../shared/workflow/facts'
 import { SLOTS_DELETE_MERGED, SLOTS_RENAME_ADOPTED } from '../shared/advanced'
@@ -36,7 +36,7 @@ import { app } from 'electron'
 import type { DatabaseSync } from 'node:sqlite'
 import { advanced } from './advanced'
 import { exitBy } from './exitLog'
-import { legacyWorktree, rebindSession } from './agentFolders'
+import { legacyWorktree, rebindSession, slotsMigrated } from './agentFolders'
 import { boardRead } from './boardStore'
 import { deliveriesOf, deliverNow, launchWith } from './deliveries'
 import { onHiveEvent } from './events'
@@ -199,7 +199,9 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
   if (!workflowEnforced()) return null
   const agents = projectAgents(await ws.projectConfig(projectPath))
   const agent = agents.find((a) => a.id === builder)
-  if (!builds(agent)) return null
+  // Any agent that takes cards (a generalist too, HI-686: never counted in the pool's size, but its card is built where
+  // the project's options say).
+  if (!agent || !takesCards(agentWorkflowRole(agent))) return null
   const name = (id: string): string => agents.find((a) => a.id === id)?.name ?? id
   const pool = await poolFor(ws, projectPath)
   const lane = card.lane ?? null
@@ -557,13 +559,42 @@ export function expectStartPrompt(projectPath: string, n: number): (prompt: stri
   }
 }
 
-/** The slot a card was started in (its latest start's), or null: a card outside slots, or not started. */
-export async function startedSlot(ws: WorkspaceService, projectPath: string, n: number): Promise<{ slot: string; lease: string } | null> {
+/**
+ * The slot whose placement will give the card to its builder (its current cycle in a slot, active and not placed yet),
+ * or null: a card outside slots, not started, or already placed. A card back from Review or Approved for more work keeps
+ * its placed cycle (no new start is written), so nothing would deliver a prompt offered for it (HI-1953).
+ */
+export async function placementDue(ws: WorkspaceService, projectPath: string, n: number): Promise<{ slot: string; lease: string } | null> {
+  // With the rules off nothing is placed.
+  if (!workflowEnforced()) return null
   const wf = await workflowFor(ws, projectPath).catch(() => null)
   const card = wf ? cardOf(wf, n) : null
   if (!wf || !card) return null
+  const cycle = cycleIn(wf.store.facts(n))
+  return cycle && !cycle.placed && wf.state(card).stage === 'active' ? { slot: cycle.started.slot, lease: cycle.started.lease } : null
+}
+
+/**
+ * Whether a card's current start was written outside the slots of a project that builds its cards in them (HI-1966): the
+ * rules enforced, the card Active, its last start with no lease, under a ruleset that builds in slots, and its folder
+ * neither a slot (a carried one stands in for one, #1441) nor its builder's own 0.9 worktree not migrated yet (#1434).
+ * startTask undoes such a start rather than launch its builder in the project folder. False when it can't be told.
+ */
+export async function startedOutsideSlots(ws: WorkspaceService, projectPath: string, n: number): Promise<boolean> {
+  if (!workflowEnforced()) return false
+  const wf = await workflowFor(ws, projectPath).catch(() => null)
+  const card = wf ? cardOf(wf, n) : null
+  if (!wf || !card) return false
   const s = wf.state(card)
-  return s.stage !== 'todo' && s.started?.lease && s.started.slot ? { slot: s.started.slot, lease: s.started.lease } : null
+  const started = s.started
+  if (s.stage !== 'active' || !started || started.lease || wf.rulesetOf(card, s).options.folder !== 'slots') return false
+  const folder = started.folder
+  if (folder !== 'project' && !samePlace(folder, projectPath)) {
+    if ((await poolFor(ws, projectPath)).slots().some((x) => samePlace(x.folder, folder))) return false
+    const legacy = legacyWorktree(projectAgents(await ws.projectConfig(projectPath)).find((a) => a.id === started.builder))
+    if (legacy && samePlace(legacy.path, folder) && !(await slotsMigrated(projectPath, started.builder))) return false
+  }
+  return true
 }
 
 // --- Quiet builders.

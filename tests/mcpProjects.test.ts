@@ -129,7 +129,8 @@ describe('MCP servers per project', () => {
     expect(await onIn('github')).toEqual(['amberlight'])
     expect(await onIn('notes')).toEqual(['apiary'])
     expect(await onIn('docs')).toEqual([])
-    expect(json(join(wsPath, '.hive', 'workspace.json')).mcp).toEqual({ enabled: ['github', 'notes'], model: 2 })
+    // The Hive Assistant's own choices too (HI-1472): none, with the old Advanced switch not set.
+    expect(json(join(wsPath, '.hive', 'workspace.json')).mcp).toEqual({ enabled: ['github', 'notes'], model: 2, assistant: [] })
     expect(json(join(amber, '.hive', 'project.json')).mcp).toEqual({ disabled: [], enabled: ['github'] })
     expect(json(join(apiary, '.hive', 'project.json')).mcp).toEqual({ disabled: [], enabled: ['notes'] })
     // Opened again: already moved, so a project's choice made since isn't undone.

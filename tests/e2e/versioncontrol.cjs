@@ -3,7 +3,8 @@
 // repository's root; "Workflow: Git · …" with no preset chosen, then Solo, then Custom (from Solo) as the options are saved,
 // which opens Workflow), the five sections in order, opening at Changes; Project Settings → Workflow's Open Version
 // Control and the presets notice's Choose… land on Workflow. A None project (no repository): Workflow only, where it
-// opens, with Initialise repository… under the header. A subfolder of a larger repository (a second workspace kept in
+// opens, no Initialise repository…; Git chosen there shows only Initialise repository…, saving nothing, gone with the tab
+// or None (HI-1905). A subfolder of a larger repository (a second workspace kept in
 // git): the whole-repository line. A narrow tab: the sections folded to icons, the selected one named, each reached
 // (#1461). Screenshots in both themes, in English and German. Dev build, throwaway profile and
 // workspaces; no CLI is started, and the Assistant is off.
@@ -114,18 +115,37 @@ function board(sql, ...args) {
     check('Project Settings has neither a Workflow nor a Card loops section', !!(await lib.until(async () => (await nav.count()) > 0, HUNG_MS)) && (await nav.filter({ hasText: /^\s*(Workflow|Card loops)\s*$/ }).count()) === 0 && (await page.locator('.tab-body .workflow-form').count()) === 0, (await nav.allInnerTexts()).join(' | '))
     await vcTab.click()
 
-    // --- A None project: Workflow only, and Initialise repository… under the header.
+    // --- A None project: Workflow only, no Initialise repository… (HI-1905: it is Git's, below).
     await page.getByText('plain', { exact: true }).first().click()
     await vcTab.click()
-    check('None is chosen, Git disabled', !!(await lib.until(async () => (await head.locator('[data-platform="none"][aria-checked="true"]').count()) === 1 && (await head.locator('[data-platform="git"]').getAttribute('aria-disabled')) === 'true', HUNG_MS)), await text(head))
+    const preview = page.locator('[data-vc-git-preview]')
+    check('None is chosen, Git can be chosen too (HI-1905)', !!(await lib.until(async () => (await head.locator('[data-platform="none"][aria-checked="true"]').count()) === 1 && (await head.locator('[data-platform="git"]').getAttribute('aria-disabled')) === 'false', HUNG_MS)), await text(head))
     const gitTip = await lib.hoverTip(page, head.locator('[data-platform="git"]'), (t) => /Initialise/.test(t))
-    check("Git's tooltip says why: no Git repository here (#1419)", gitTip === 'No Git repository here: Initialise repository… first.', gitTip)
+    check("Git's tooltip says it needs a repository first, nothing changing until then", gitTip === 'Git needs this folder to be a repository: Initialise repository… makes it one. Nothing changes until you do.', gitTip)
     check('the fact line says the folder has no version control', !!(await lib.until(async () => (await text(fact)) === 'This folder has no version control.', HUNG_MS)), await text(fact))
     check('None: Workflow only, where it opens', !!(await lib.until(async () => JSON.stringify(await sections()) === '["workflow"]' && (await selected()) === 'workflow', HUNG_MS)), JSON.stringify(await sections()))
-    check('Initialise repository… under the header', !!(await lib.until(async () => (await page.locator('[data-vc-init] [data-git-init]').count()) === 1, HUNG_MS)))
+    check("None's page has no Initialise repository…", (await page.locator('[data-git-init]').count()) === 0)
     check('the workflow link names None', (await text(link)).trim().startsWith('Workflow: None · '), await text(link))
     check('None: the workflow link at the end of the header row', await linkInPlace())
     await shots('none', page.locator('.vc-view'))
+
+    // --- Git chosen before the folder is a repository (HI-1905): Git's page, only Initialise repository…, nothing saved.
+    const plainSaved = () => (fs.existsSync(path.join(plain, '.hive', 'project.json')) ? fs.readFileSync(path.join(plain, '.hive', 'project.json'), 'utf8') : null)
+    const savedBefore = plainSaved()
+    const linkBefore = (await text(link)).trim()
+    await head.locator('[data-platform="git"]').click()
+    check("Git: its page says the folder isn't a repository yet, with Initialise repository… and what it does", !!(await lib.until(async () => (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1 && (await text(preview)).startsWith("This folder isn't a Git repository yet.") && (await preview.locator('[data-git-init]').count()) === 1 && /on a branch called main/.test(await text(preview)), HUNG_MS)), await text(page.locator('.vc-view')))
+    check("…and nothing else of Git's: no sections, no preset step", (await page.locator('.git-sections').count()) === 0 && (await page.locator('[data-preset-step]').count()) === 0 && (await page.locator('.git-body').count()) === 0)
+    check('…the workflow link and the fact line still None’s', (await text(link)).trim() === linkBefore && (await text(fact)) === 'This folder has no version control.', await text(link))
+    check('…and nothing saved', plainSaved() === savedBefore && (await inv('workflow:form', plain)).platform === 'none')
+    await shots('none-git-preview', page.locator('.vc-view'))
+    await head.locator('[data-platform="none"]').click()
+    check('None again: its page', !!(await lib.until(async () => (await preview.count()) === 0 && JSON.stringify(await sections()) === '["workflow"]', HUNG_MS)))
+    await head.locator('[data-platform="git"]').click()
+    await lib.until(async () => (await preview.count()) === 1, HUNG_MS)
+    await page.locator('.tabs .tab', { hasText: 'Tasks' }).first().click()
+    await vcTab.click()
+    check('leaving the tab and coming back: None, as saved', !!(await lib.until(async () => (await head.locator('[data-platform="none"][aria-checked="true"]').count()) === 1 && (await preview.count()) === 0, HUNG_MS)), await text(head))
 
     // --- German: the header and the sections as they wrap.
     const base = (await inv('app:info')).language

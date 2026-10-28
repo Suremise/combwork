@@ -97,28 +97,9 @@ describe('a launch', () => {
       // only in it (a resolution reads the agent as saved, HI-1770, so an unsaved variant can't stand in for one).
       const sig = async (a: object) => sessions.signature(await sessions.effective(proj, a as never))
       expect(await sig(agents[0])).not.toBe(await sig(agents[1]))
-      // The Assistant gets Hive's own tools, not the projects' servers, whatever it is given.
+      // The Assistant gets Hive's own tools, not the projects' servers, whatever it is given: its own choices are
+      // tests/assistantMcp.test.ts's (HI-1472), none until switched on.
       expect(Object.keys((await sessions.effective(w.assistantHome, { id: 'assistant', name: 'Assistant', mcpServers: ['notes'] } as never)).mcpServers).filter((n) => n !== 'hive')).toEqual([])
-      // With its switch on (#1284, #966 row 7): every server on in the workspace (it works across the projects, none of
-      // which decides for it), its own choice narrowing them, Hive's own still Hive's; off again, none.
-      const { advanced } = await import('../src/main/advanced')
-      const { ASSISTANT_OTHER_MCP } = await import('../src/shared/advanced')
-      advanced.load(join(base, 'advanced'))
-      const assistantGets = async (own?: string[]) => {
-        const e = await sessions.effective(w.assistantHome, { id: 'assistant', name: 'Assistant', ...(own ? { mcpServers: own } : {}) } as never)
-        expect(e.mcpServers.hive?.command).not.toBe('impostor')
-        return Object.keys(e.mcpServers).filter((n) => n !== 'hive').sort()
-      }
-      try {
-        await advanced.set(ASSISTANT_OTHER_MCP, true)
-        expect(await assistantGets()).toEqual(['github', 'notes', 'sandbox'])
-        expect(await assistantGets(['notes', 'idle'])).toEqual(['notes'])
-        await advanced.set(ASSISTANT_OTHER_MCP, false)
-        expect(await assistantGets()).toEqual([])
-      } finally {
-        await advanced.resetAll()
-        advanced.stop()
-      }
 
       // Each provider's launch config has the tester's server and not the builder's other one.
       const servers = (await sessions.effective(proj, agents[1] as never)).mcpServers

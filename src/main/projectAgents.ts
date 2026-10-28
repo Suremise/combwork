@@ -54,8 +54,12 @@ const M = {
   notChecked: msg({ id: 'worktrees.reuse.notChecked', defaultMessage: 'not checked', description: "Why an unused worktree isn't reused for a new agent: it wasn't checked. A clause, lower case." })
 }
 
-/** A shared helper's text for the window (`agentLimitText`, `mergeBlocked`, given the `tr` capturedText passes), as a HiveError. */
-const helperError = (fn: Parameters<typeof capturedText>[0]): HiveError => new HiveError(capturedText(fn)!)
+/**
+ * A shared helper's text for the window (`agentLimitText`, `mergeBlocked`, given the `tr` capturedText passes), as a
+ * HiveError: a refusal by the project's state (its agents per project, an agent at work), so the Agent API answers 409,
+ * never 500 (HI-1952).
+ */
+const helperError = (fn: Parameters<typeof capturedText>[0]): HiveError => new HiveError(capturedText(fn)!, { kind: 'conflict' })
 
 /** Branches and worktrees for the Add Agent dialog. */
 export async function gitInfo(projectPath: string): Promise<ProjectGitInfo> {
@@ -157,7 +161,7 @@ export async function addAgent(projectPath: string, opts: AddAgentOptions): Prom
         // The limit as it is now: Settings may have lowered it since the check above.
         const max = agentLimit(projectPath)
         if (list.length >= max) throw helperError((t) => agentLimitText(max, t))
-        if (list.some((a) => sameAgentName(a.name, name))) throw hiveError(msg({ id: 'worktrees.agent.nameTaken', defaultMessage: 'There is already an agent called "{name}".', description: 'An error: the project already has an agent with the name {name}.' }), { name })
+        if (list.some((a) => sameAgentName(a.name, name))) throw hiveError(msg({ id: 'worktrees.agent.nameTaken', defaultMessage: 'There is already an agent called "{name}".', description: 'An error: the project already has an agent with the name {name}.' }), { name }, { kind: 'conflict' })
         // Its connection as it is now (HI-1769): turned off or removed while it was being prepared, it isn't added.
         if (def.connection) assertConnectionHere(def.connection, def.provider!, projectPath, name)
         // An automatic layout follows the agents, so the new one shows; with one chosen by hand, a full page sends it to the next (#134).
@@ -344,14 +348,14 @@ export async function prepareAgent(projectPath: string, cfg: ProjectConfig, opts
 export function cleanRole(role: unknown): string {
   if (typeof role !== 'string') return ''
   const r = role.replace(/\s+/g, ' ').trim()
-  if (r.length > ROLE_MAX) throw hiveError(msg({ id: 'worktrees.agent.roleTooLong', defaultMessage: 'A role is at most {max} characters.', description: "An error: an agent's role (what it does, in a few words) is longer than it may be ({max}, a number)." }), { max: ROLE_MAX })
+  if (r.length > ROLE_MAX) throw hiveError(msg({ id: 'worktrees.agent.roleTooLong', defaultMessage: 'A role is at most {max} characters.', description: "An error: an agent's role (what it does, in a few words) is longer than it may be ({max}, a number)." }), { max: ROLE_MAX }, { kind: 'invalid' })
   return r
 }
 
-/** A workflow role as saved (#1430): builder, reviewer or either, else refused. */
+/** A workflow role as saved (#1430): builder, reviewer, either or generalist (HI-686), else refused. */
 export function cleanWorkflowRole(role: unknown): WorkflowRole {
   if (isWorkflowRole(role)) return role
-  throw hiveError(msg({ id: 'worktrees.agent.badWorkflowRole', defaultMessage: 'A role in the workflow is builder, reviewer or either.', description: "An error: an agent's role in the workflow was given as something else. builder, reviewer and either are values: keep them in English." }), undefined, { kind: 'invalid' })
+  throw hiveError(msg({ id: 'worktrees.agent.badWorkflowRole', defaultMessage: 'A role in the workflow is builder, reviewer, either or generalist.', description: "An error: an agent's role in the workflow was given as something else. builder, reviewer, either and generalist are values: keep them in English." }), undefined, { kind: 'invalid' })
 }
 
 export async function updateAgent(projectPath: string, agentId: string, patch: AgentPatch, opts: { check?: (current: AgentDef) => void } = {}): Promise<AgentDef> {
@@ -366,7 +370,7 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   const agents = projectAgents(cfg)
   if (patch.name !== undefined) {
     patch.name = patch.name.trim()
-    if (!patch.name) throw hiveError(msg({ id: 'worktrees.agent.enterName', defaultMessage: 'Enter a name.', description: "An error: an agent's name was emptied." }))
+    if (!patch.name) throw hiveError(msg({ id: 'worktrees.agent.enterName', defaultMessage: 'Enter a name.', description: "An error: an agent's name was emptied." }), undefined, { kind: 'invalid' })
   }
   // Empty values clear an override so the agent follows the project again (and an empty role: its name is its role).
   const { use200kContext, mcpServers, workflowRole, connection, ...rest } = patch
@@ -457,15 +461,27 @@ export async function removeAgent(projectPath: string, agentId: string, opts: { 
     const gone = result.worktree?.deleted ? [result.worktree.path] : []
     return { agents: left, ...pendingSetupPatch(now, { add: pending, drop: gone }) }
   })
-  if (opts.releaseCards) await releaseAgentCards(basename(projectPath), agentId, { kind: 'user' })
-  // A review it left going (from before Hive last started) ends with it.
-  await endReviews(basename(projectPath), agentId, 'the agent was removed', workspaceOf(projectPath)) // i18n-ignore: the reason's key (ReviewEnd): the history line is a message (#846)
-  // Its lanes, as builder or reviewer, are abandoned (#483).
-  await laneAgentRemoved(workspaceOf(projectPath), basename(projectPath), agentId).catch((e) => log.warn('abandoning the lanes of a removed agent', e))
-  // Its terminal's kept size and output go: a new agent never has its id (#489).
-  forgetPtys(agentPtyKey(projectPath, agentId))
-  await workspaceOf(projectPath).refresh()
+  await agentsGone(projectPath, [agentId], { releaseCards: !!opts.releaseCards })
   return result
+}
+
+/**
+ * What follows an agent's removal, once project.json no longer has it (Remove Agent, a template's load, undo of one:
+ * HI-1502): its open cards go back (unless `releaseCards` is false: Remove Agent's Keep them), a review it left going ends,
+ * its lanes are abandoned and its terminal's kept size and output go; then the workspace is read again.
+ */
+export async function agentsGone(projectPath: string, agentIds: readonly string[], opts: { releaseCards?: boolean } = {}): Promise<void> {
+  const project = basename(projectPath)
+  for (const agentId of agentIds) {
+    if (opts.releaseCards !== false) await releaseAgentCards(project, agentId, { kind: 'user' }).catch((e) => log.warn('Could not take back the cards of a removed agent', e))
+    // A review it left going (from before Hive last started) ends with it.
+    await endReviews(project, agentId, 'the agent was removed', workspaceOf(projectPath)).catch((e) => log.warn('Could not end the reviews of a removed agent', e)) // i18n-ignore: the reason's key (ReviewEnd): the history line is a message (#846)
+    // Its lanes, as builder or reviewer, are abandoned (#483).
+    await laneAgentRemoved(workspaceOf(projectPath), project, agentId).catch((e) => log.warn('abandoning the lanes of a removed agent', e))
+    // Its terminal's kept size and output go: a new agent never has its id (#489).
+    forgetPtys(agentPtyKey(projectPath, agentId))
+  }
+  await workspaceOf(projectPath).refresh()
 }
 
 /**

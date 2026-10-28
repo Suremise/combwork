@@ -125,6 +125,7 @@ const check = (name, ok, extra = '') => {
     const textAt = (t) => page.evaluate(([k, x]) => window.__hiveTerminalTextAt(k, x), [key, t])
     const selection = () => page.evaluate((k) => window.__hiveTerminalSelection(k), key)
     const ctrlCV = () => page.evaluate((k) => document.querySelector(`.terminal-host[data-pty="${CSS.escape(k)}"]`)?.getAttribute('data-ctrl-cv'), key)
+    const allKeys = () => page.evaluate((k) => document.querySelector(`.terminal-host[data-pty="${CSS.escape(k)}"]`)?.getAttribute('data-all-keys'), key)
     await inv('pty:write', key, TEXT)
     const at = await lib.until(async () => {
       const [s, al, d] = [await textAt('SELECTME'), await textAt('alpha beta'), await textAt('delta')]
@@ -201,6 +202,9 @@ const check = (name, ok, extra = '') => {
     check('…and the CLI gets no ^P', !inputSince(from).includes('\x10'), JSON.stringify(inputSince(from)))
     await closePalette()
     await inv('advanced:set', ALL_KEYS, true)
+    // The setting reaches the window as an event, after the call returns (and with the workspace's loads, up to their
+    // batch's end: HI-1938): a key pressed before then is still Hive's.
+    check('switched on: the pane gives all keys to the CLI', !!(await lib.until(async () => (await allKeys()) === 'cli', HUNG_MS, 100)), await allKeys())
     check('switched on, the pane has the focus again', !!(await focusPane()))
     from = readsOfInput().length
     await page.keyboard.press('Control+P')

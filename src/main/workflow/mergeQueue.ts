@@ -10,11 +10,16 @@
 
 import { spawn, type ChildProcess } from 'child_process'
 import { createHash, randomUUID } from 'crypto'
-import { existsSync, readFileSync } from 'original-fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'original-fs'
+import { tmpdir } from 'os'
 import { basename, join, resolve } from 'path'
 import { git, GIT_PREFIX } from '../git'
 import { endTree } from '../progressReporters/wrapper'
-import { MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type FactData, type QueueEntry } from '../../shared/workflow/facts'
+import { FOCUSED_SKIP_GATE, MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type FactData, type FocusedReturn, type QueueEntry } from '../../shared/workflow/facts'
+import { changedSince, changePaths, choiceStands, chosenTests, FOCUSED_CHECK, FOCUSED_MAX_RESULTS_BYTES, focusedCheckName, readResults, reviewProved, type FocusedResult, type FocusedTest } from '../../shared/workflow/focused'
+import { FOCUSED_PICK, FOCUSED_RUN } from '../../shared/workflow/options'
+import { boundedRead, pathChanges, runPick } from './focusedRun'
+import { pushesSettled, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf, type PushPending, type PushSettled } from './queueLogs'
 import type { TransientFailure } from '../../shared/types'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
@@ -64,11 +69,19 @@ export interface CheckContext {
   revision: string
   /** Nothing was installed before the checks (no setup command and no lock file): this check's run says so. */
   noInstall?: boolean
+  /**
+   * Variables Hive gives this check itself, past `checkEnv` (which takes every HIVE_* out of the base): G20's runner
+   * reads its tests, results file and jobs from them (HI-1367).
+   */
+  env?: Record<string, string>
+  /** Its run's title, when not the check's name (G20's: "focused tests (7)"). */
+  label?: string
 }
 
 /** What the merge checks of a test merge came to: green (every one passed and counted), red, or not proved. */
 /** A red outcome names the check (`install` for the install before them) and its log, when it holds its output (#1354). */
-type ChecksOutcome = { kind: 'green' } | { kind: 'red'; transient: boolean; cause?: TransientFailure; output: string; check: string; logPath?: string } | { kind: 'uncounted' }
+/** G20 (HI-1367): `focused`, its focused tests stopped it (returned, with why); `skip`, some were skipped and wait for a decision. */
+type ChecksOutcome = { kind: 'green' } | { kind: 'red'; transient: boolean; cause?: TransientFailure; output: string; check: string; logPath?: string } | { kind: 'uncounted' } | { kind: 'focused'; focused: FocusedReturn } | { kind: 'skip'; skipped: FocusedResult[]; expected: string; tree: string }
 
 export interface QueueConfig {
   /** The queue's own worktree (a merge slot, kept warm). */
@@ -91,6 +104,11 @@ export interface QueueConfig {
   install?: (folder: string, clean: boolean, ctx: CheckContext) => Promise<CheckResult & { skipped?: boolean }>
   /** The files whose change since the last install means a clean install (#187). */
   manifests?: string[]
+  /**
+   * G20 (HI-1367): how the queue picks a card's focused tests at the result (a check's environment, its time limit),
+   * the jobs its runner is given, and where the tests and results files go (Hive's own folder, never the queue's).
+   */
+  focused?: { env: () => Record<string, string>; pickTimeoutMs: () => number; jobs: () => number; dir: string }
   /**
    * What makes an agent build in this folder now (§16.9.2): the files it holds locks on there, a run going with it as
    * its working folder; null when none does. An idle agent, or one whose session lives there but works in a review copy,
@@ -220,7 +238,7 @@ export interface QueueStepInfo {
  * `pushUnreadable`: owed, and the target (or whether it still has the merge) couldn't be read to settle it.
  * `mergeChoice` (HI-1697): an upgraded project's merge style and commit message wait for the user's answer in For you.
  */
-export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget' | 'pushRejected' | 'pushFailed' | 'pushNoRemote' | 'pushUnreadable' | 'mergeChoice'
+export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget' | 'pushRejected' | 'pushFailed' | 'pushNoRemote' | 'pushUnreadable' | 'mergeChoice' | 'focusedSkip'
 
 /**
  * G18 (#1179): the push of a target Hive owes after merging into it, as store meta per target: the merge's result, its
@@ -604,6 +622,9 @@ export class MergeQueue {
     // choice carried to the cards waiting first. Still to be chosen with no question open (answered in words, say):
     // lifted too, so the next entry asks again.
     if (p?.reason === 'mergeChoice' && (!(await this.mergeAsked()) || !this.asking(p.card)) && (await this.fenced(target, () => this.chosen(target, p.card)).catch(lostIsNull))) return this.runOnce(target)
+    // G20 (HI-1367): lifted once its skipped focused tests are decided (the reviewer's answer or the user's); the entry is
+    // tested again from its test merge and takes that decision (`skipDecided`).
+    if (p?.reason === 'focusedSkip' && !this.skipAsking(p.card) && (await this.wf.locked(() => this.wf.store.clearQueuePause(target, 'focusedSkip')))) return this.runOnce(target)
     if (p) return null
     return this.fenced(target, async () => {
       // A push owed by an earlier merge goes first (G18: after a restart or a Resume), and the next entry waits for it.
@@ -634,16 +655,49 @@ export class MergeQueue {
 
   /** In a merge's `Integrated` write: the push of its target owed, when the options push it (G18). */
   private owePush(w: Write, entry: string, target: string, result: string): void {
-    if (this.pushes()) w.tx.setMeta(pushOwedKey(target), JSON.stringify({ result, card: w.card.key, entry } satisfies PushOwed))
+    if (!this.pushes()) return
+    w.tx.setMeta(pushOwedKey(target), JSON.stringify({ result, card: w.card.key, entry } satisfies PushOwed))
+    // The merge pending its push, for the queue's history (HI-1924), until a push settles it.
+    const pending = pushPendingOf(w.tx.meta(pushPendingKey(target))).filter((p) => p.entry !== entry)
+    w.tx.setMeta(pushPendingKey(target), JSON.stringify([...pending, { entry, result } satisfies PushPending]))
   }
 
-  /** Clears the owed push of a target, only if it is still the one for `result` (a newer merge's is kept). */
-  private clearOwed(target: string, result: string): Promise<void> {
+  /**
+   * Clears the owed push of a target, only if it is still the one for `result` (a newer merge's is kept), and settles
+   * the pending merges in `settled` (HI-1924) in the same write: only those, as they were captured before the push, so
+   * a merge made meanwhile stays pending.
+   */
+  private clearOwed(target: string, result: string, settled: PushSettled[] = []): Promise<void> {
     return this.wf.locked(() =>
       this.wf.store.tx((tx) => {
         if (pushOwedOf(tx.meta(pushOwedKey(target)))?.result === result) tx.setMeta(pushOwedKey(target), '')
+        if (!settled.length) return
+        const done = new Set(settled.map((s) => s.entry))
+        const pending = pushPendingOf(tx.meta(pushPendingKey(target)))
+        tx.setMeta(pushPendingKey(target), JSON.stringify(pending.filter((p) => !done.has(p.entry))))
+        tx.setMeta(pushLogKey(target), JSON.stringify(pushesSettled(pushLogOf(tx.meta(pushLogKey(target))), settled)))
       })
     )
+  }
+
+  /**
+   * The pending merges a push of `head` settles (HI-1924): each one `head` holds is pushed; one it doesn't (reset away)
+   * is `reset`. An ancestry that can't be read leaves that merge pending (said as Not pushed yet), never pushed.
+   */
+  private async pushedBy(pending: PushPending[], head: string): Promise<PushSettled[]> {
+    const at = new Date().toISOString()
+    const out: PushSettled[] = []
+    for (const p of pending) {
+      const has = p.result === head ? true : await G.isAncestor(this.project, p.result, head)
+      if (!isUnknown(has)) out.push({ entry: p.entry, state: has ? 'pushed' : 'reset', at })
+    }
+    return out
+  }
+
+  /** The pending merges, settled as not pushed (`why`): pushing turned off, or the target no longer has them. */
+  private notPushed(pending: PushPending[], why: 'off' | 'reset'): PushSettled[] {
+    const at = new Date().toISOString()
+    return pending.map((p) => ({ entry: p.entry, state: why, at }))
   }
 
   /**
@@ -656,8 +710,10 @@ export class MergeQueue {
   private async settlePush(target: string): Promise<QueueOutcome | null> {
     const owed = pushOwedOf(this.wf.store.meta(pushOwedKey(target)))
     if (!owed) return null
+    // The merges pending their push as they are now (HI-1924): only these are settled below.
+    const pending = pushPendingOf(this.wf.store.meta(pushPendingKey(target)))
     if (!this.pushes()) {
-      await this.clearOwed(target, owed.result)
+      await this.clearOwed(target, owed.result, this.notPushed(pending, 'off'))
       return null
     }
     // Unreadable now (HR2's #1179 round 1): never taken for settled. Still owed, and the queue pauses saying so in its
@@ -668,19 +724,25 @@ export class MergeQueue {
     const has = head ? await G.isAncestor(this.project, owed.result, head) : false
     if (isUnknown(has)) return this.pausePush(target, owed, 'pushUnreadable')
     if (!has) {
-      await this.clearOwed(target, owed.result)
+      // Nothing is pushed: the merges the target no longer has are settled as reset; one it still has stays pending,
+      // for the next push to settle (never taken for pushed on the local target alone).
+      const gone: PushPending[] = []
+      for (const p of pending) if (!head || (await G.isAncestor(this.project, p.result, head)) === false) gone.push(p)
+      await this.clearOwed(target, owed.result, this.notPushed(gone, 'reset'))
       return null
     }
     const dest = await this.pushDest(target)
     // The off switch as it is now, just before the push begins (HR2's #1179 round 1: the reads above take time).
     if (!this.pushes()) {
-      await this.clearOwed(target, owed.result)
+      await this.clearOwed(target, owed.result, this.notPushed(pending, 'off'))
       return null
     }
     if (!dest) return this.pausePush(target, owed, 'pushNoRemote')
-    const r = await this.git(this.project, ['push', '--', dest.remote, `refs/heads/${target}:${dest.ref}`], { env: pushEnv(), timeoutMs: PUSH_MS })
+    // The head read above, by its commit (HI-1924): what was pushed is exactly what the settled merges are checked against.
+    const pushed = head as string
+    const r = await this.git(this.project, ['push', '--', dest.remote, `${pushed}:${dest.ref}`], { env: pushEnv(), timeoutMs: PUSH_MS })
     if (r.ok) {
-      await this.clearOwed(target, owed.result)
+      await this.clearOwed(target, owed.result, await this.pushedBy(pending, pushed))
       return null
     }
     const said = `${r.err}\n${r.out}`.trim()
@@ -855,8 +917,11 @@ export class MergeQueue {
         // The merge checks, on exactly that result (dependencies from scratch when the manifests changed). Passed but not
         // proved (something changed the folder while one ran): tested again from a fresh test merge, then paused.
         step('checks', expected)
-        const checks = await this.mergeChecks(card, result)
+        const checks = await this.mergeChecks(card, result, entry, expected)
         if (checks.kind === 'red') return this.returnCard(card, entry, revision, target, 'checks', checks.transient, undefined, checks.output, checks.cause, { check: checks.check, ...(checks.logPath ? { logPath: checks.logPath } : {}) })
+        // Missing review proof or a missing runner isn't the work's fault: the same revision may go back (requeue.allowed).
+        if (checks.kind === 'focused') return this.returnCard(card, entry, revision, target, 'focused', checks.focused.why === 'noProof' || checks.focused.why === 'noRunner', undefined, undefined, undefined, undefined, undefined, checks.focused)
+        if (checks.kind === 'skip') return this.askSkip(target, card, entry, checks.skipped, { expected: checks.expected, tree: checks.tree })
         if (checks.kind === 'uncounted') {
           if (++uncounted > MAX_RETESTS) return this.pause(target, card, entry, 'uncounted')
           continue
@@ -1153,9 +1218,11 @@ export class MergeQueue {
    * entry's checks (`mergeInstall: 'always'`). Each check is bracketed and writes `CheckRan` at the result revision
    * (§16.13): green only if it exited 0 and counted; exit 0 but uncounted is `uncounted`, never green.
    */
-  private async mergeChecks(card: CardRecord, result: string): Promise<ChecksOutcome> {
+  private async mergeChecks(card: CardRecord, result: string, entry: QueueEntry, expected: string): Promise<ChecksOutcome> {
     const o = this.wf.rulesetOf(card).options
-    if (!o.mergeChecks.length) return { kind: 'green' }
+    // G20 runs with no G9 checks too (HI-1367), after the same install.
+    const focused = o.focusedTests && o.finish === 'hiveMerges'
+    if (!o.mergeChecks.length && !focused) return { kind: 'green' }
     const f = this.cfg.folder
     const ctx: CheckContext = { card: card.key, number: card.id, revision: result }
     const manifests = this.cfg.manifests ?? ['package.json', 'package-lock.json']
@@ -1186,14 +1253,148 @@ export class MergeQueue {
         durationMs: Math.max(0, Date.now() - start.t0),
         by: HIVE_RUNS,
         counted: b.counted,
-        ...(b.whyNot ? { whyNot: b.whyNot } : {})
+        ...(b.whyNot ? { whyNot: b.whyNot } : {}),
+        entry: entry.id
       }
       await this.write(card, (w) => w.fact('CheckRan', data))
       r.note?.({ name, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}) })
       if (!r.ok) return { kind: 'red', transient: !!r.transient, ...(r.cause ? { cause: r.cause } : {}), output: r.output, check: name, ...(r.logPath ? { logPath: r.logPath } : {}) }
       if (!b.counted) return { kind: 'uncounted' }
     }
+    if (focused) return this.focusedTests(card, entry, expected, result, { ...ctx, ...(noInstall ? { noInstall } : {}) })
     return { kind: 'green' }
+  }
+
+  /**
+   * G20 (HI-1367): the card's focused tests at the test merge's result. The approved submission's selection stands for
+   * the paths whose change is exactly the submission's; the others are picked here, at exactly the result under a
+   * check's bracket (`FocusedPicked`), and any the pick can't choose, or that need a real CLI or the packaged build there
+   * (a new test, or one whose needs grew), return the card. A real-CLI or packaged test of the approved selection is
+   * proved by a counted run of its card's reviewer at the submitted revision (`FocusedAccepted`, review evidence, never a
+   * run here); the rest run once, as the check `focused tests`, bracketed like a G9 check: green only when the runner
+   * exited 0, it counted, and its results file has exactly one result per test, none failed. Skipped tests (exit 0, the
+   * runner's way to say only skips) wait for a decision bound to this entry, target and merged tree (`askSkip`).
+   */
+  private async focusedTests(card: CardRecord, entry: QueueEntry, expected: string, result: string, ctx: CheckContext): Promise<ChecksOutcome> {
+    const s = this.wf.state(card)
+    const o = this.wf.rulesetOf(card, s).options
+    const sub = s.submissions.findLast((x) => x.revision === entry.revision) ?? s.latest
+    const choice = sub?.focused
+    if (!sub || !choice || !choiceStands(choice)) return { kind: 'focused', focused: { why: 'notChosen' } } // i18n-ignore: codes (a why, a check name), never shown as text
+    const run = o.commands[FOCUSED_RUN]?.trim()
+    if (!run) return { kind: 'focused', focused: { why: 'noRunner' } } // i18n-ignore: codes (a why, a check name), never shown as text
+    const f = this.cfg.folder
+    const deps = { env: this.cfg.focused?.env ?? (() => ({})), timeoutMs: this.cfg.focused?.pickTimeoutMs() ?? 60_000 }
+    const approved = chosenTests(choice)
+    // The result's own changes: every path not exactly as submitted, picked here (all the submission's when the result's are unread).
+    const now = await pathChanges(f, expected, result)
+    const changed = now ? changedSince(choice.change, now) : (choice.change ?? [])
+    let tests = approved
+    if (changed.length || !now) {
+      const pick = o.commands[FOCUSED_PICK]?.trim()
+      if (!pick || !now) return { kind: 'focused', focused: { why: 'repick', paths: changePaths(changed) } } // i18n-ignore: codes (a why, a check name), never shown as text
+      // At exactly the result, as a check (HR4's round 1 finding 5): a picker that writes in the folder proves nothing.
+      const start = await bracketStart(f)
+      const p = await runPick(deps, pick, f, expected, changed)
+      const b = await bracketEnd(f, result, start)
+      if (!b.counted) return { kind: 'uncounted' }
+      if (p.state !== 'chosen') return { kind: 'focused', focused: { why: 'repick', paths: changePaths(changed) } } // i18n-ignore: codes (a why, a check name), never shown as text
+      await this.write(card, (w) => w.fact('FocusedPicked', { entry: entry.id, revision: entry.revision, result, paths: changePaths(changed), tests: p.tests }))
+      // Needs combined by id (finding 4): a test that needs a real CLI or the packaged build only as the merge picks it has
+      // no review to prove it (realProof = review, the user's decision), new or not.
+      // Each review-only need the merge's pick finds that the reviewed selection didn't have for that id (HR4's round 2
+      // finding 2: real → real and packaged is new too).
+      const had = (id: string): FocusedTest['needs'] => approved.find((a) => a.id === id)?.needs ?? []
+      const unproved = p.tests.filter((t) => t.needs.some((n) => (n === 'real' || n === 'packaged') && !had(t.id).includes(n)))
+      if (unproved.length) return { kind: 'focused', focused: { why: 'newProof', tests: unproved.map((t) => t.id) } } // i18n-ignore: codes (a why, a check name), never shown as text
+      tests = chosenTests({ ...choice, source: 'picked', picked: approved, added: p.tests })
+    }
+    // Proof is its reviewer's (finding 1): a counted, passing run of that test's check at the submitted revision, by the
+    // card's lane reviewer or an agent whose pass approved the submission. A builder's own run never counts.
+    const reviewers = new Set([card.reviewer, ...passingReviewers(s)].filter((x): x is string => !!x))
+    const proved = tests.filter(reviewProved)
+    const runOf = (t: FocusedTest): FactData['CheckRan'] | undefined => s.checks.findLast((c) => c.name === focusedCheckName(t.id) && c.revision === entry.revision && c.result === 'passed' && c.counted && !!c.agent && reviewers.has(c.agent))
+    const missing = proved.filter((t) => !runOf(t))
+    if (missing.length) return { kind: 'focused', focused: { why: 'noProof', tests: missing.map((t) => t.id) } } // i18n-ignore: codes (a why, a check name), never shown as text
+    if (proved.length) {
+      await this.write(card, (w) => {
+        for (const t of proved) if (!w.state().focusedAccepted.some((a) => a.entry === entry.id && a.result === result && a.test === t.id)) w.fact('FocusedAccepted', { entry: entry.id, revision: entry.revision, result, test: t.id, run: runOf(t)!.run })
+      })
+    }
+    const ids = tests.filter((t) => !reviewProved(t)).map((t) => t.id)
+    // Nothing to run here: an explicit "nothing needed", or only tests proved by review.
+    if (!ids.length) return { kind: 'green' }
+    const dir = join(this.cfg.focused?.dir ?? tmpdir(), `${card.key.replace(/[^\w.-]/g, '_')}-${randomUUID()}`)
+    mkdirSync(dir, { recursive: true })
+    const testsFile = join(dir, 'tests.json')
+    const resultsFile = join(dir, 'results.json')
+    try {
+      writeFileSync(testsFile, JSON.stringify(ids))
+      const env = { HIVE_FOCUSED_TESTS: testsFile, HIVE_FOCUSED_RESULTS: resultsFile, HIVE_FOCUSED_JOBS: String(Math.max(1, this.cfg.focused?.jobs() ?? 2)) }
+      const start = await bracketStart(f)
+      const r = await this.cfg.runCheck(FOCUSED_CHECK, run, f, { ...ctx, env, label: `${FOCUSED_CHECK} (${ids.length})` }) // i18n-ignore: a run's title, no words beyond the check's name
+      const b = await bracketEnd(f, result, start)
+      const raw = await boundedRead(resultsFile, FOCUSED_MAX_RESULTS_BYTES)
+      const read = raw === null ? { bad: 'it wrote no results file' } : raw === false ? { bad: `its results file is over ${FOCUSED_MAX_RESULTS_BYTES} bytes` } : readResults(raw, ids) // i18n-ignore: a check's output, agent-facing
+      // A runner that didn't exit 0 failed, whatever its results say (finding 6): skips are reported with exit 0.
+      const failed = !r.ok || 'bad' in read || read.failed.length > 0
+      const data: FactData['CheckRan'] = { name: FOCUSED_CHECK, command: r.command ?? run, revision: result, tested: b.tested, result: failed ? 'failed' : 'passed', run: r.run ?? randomUUID(), durationMs: Math.max(0, Date.now() - start.t0), by: HIVE_RUNS, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}), entry: entry.id }
+      await this.write(card, (w) => w.fact('CheckRan', data))
+      r.note?.({ name: FOCUSED_CHECK, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}) })
+      if (failed) {
+        const why = 'bad' in read ? `Hive couldn't take its results: ${read.bad}.` : read.failed.length ? `Failed: ${read.failed.map((x) => x.test).join(', ')}.` : '' // i18n-ignore: a check's output, agent-facing
+        return { kind: 'red', transient: !!r.transient, ...(r.cause ? { cause: r.cause } : {}), output: [why, r.output].filter(Boolean).join('\n'), check: FOCUSED_CHECK, ...(r.logPath ? { logPath: r.logPath } : {}) }
+      }
+      if (!b.counted) return { kind: 'uncounted' }
+      if (!('bad' in read) && read.skipped.length) {
+        const tree = await git(f, ['rev-parse', `${result}^{tree}`])
+        const bound = { expected, tree: tree.ok ? tree.out.trim() : `unread:${result}` }
+        const decided = this.skipDecided(card, entry, read.skipped, bound)
+        if (decided === 'declined') return { kind: 'red', transient: false, output: `Skipped and not accepted: ${read.skipped.map((x) => `${x.test}${x.why ? ` (${x.why})` : ''}`).join(', ')}.`, check: FOCUSED_CHECK } // i18n-ignore: a check's output, agent-facing
+        if (decided !== 'approved') return { kind: 'skip', skipped: read.skipped, ...bound }
+      }
+      return { kind: 'green' }
+    } finally {
+      try {
+        rmSync(dir, { recursive: true, force: true })
+      } catch {
+        // Hive's own temporary folder: left for the system's clean-up
+      }
+    }
+  }
+
+  /**
+   * The decision on these skipped tests (G20): its reviewer's or the user's answer to the request bound to this entry,
+   * these tests, the target's head it was tested on and the merged result's tree (HR4's round 1 finding 3: a target that
+   * moved, or another result, needs a new decision; the tree, not the commit, as a test merge made again has new dates).
+   */
+  private skipDecided(card: CardRecord, entry: QueueEntry, skipped: FocusedResult[], bound: { expected: string; tree: string }): 'approved' | 'declined' | null {
+    const s = this.wf.state(card)
+    const tests = skipped.map((x) => x.test).sort().join('\n')
+    const asked = Object.values(s.made).filter((r) => r.gate === FOCUSED_SKIP_GATE && r.entry === entry.id && r.revision === bound.expected && r.result === bound.tree && (r.tests ?? []).slice().sort().join('\n') === tests)
+    const a = s.approvals.findLast((x) => asked.some((r) => r.request === x.request))
+    return a ? (a.answer === 'approved' ? 'approved' : 'declined') : null
+  }
+
+  /**
+   * Focused tests skipped for their environment (G20; the user's decision, 28 Oct): the entry waits, paused, for the
+   * card's reviewer agent to decide (hive_focused_skip), or the user under For you, who can override it. Asked once per
+   * entry, tests, target head and merged tree: a request for anything else is replaced by this one (its gate's earlier
+   * request of the entry retires). The answer looks at the queue again (`runOnce` lifts the pause once nothing is open).
+   */
+  private async askSkip(target: string, card: CardRecord, entry: QueueEntry, skipped: FocusedResult[], bound: { expected: string; tree: string }): Promise<QueueOutcome> {
+    const out = await this.pause(target, card, entry, 'focusedSkip', skipped.map((x) => x.test))
+    if (this.paused(target)?.reason !== 'focusedSkip' || this.paused(target)?.card !== card.key) return out
+    const tests = skipped.map((x) => x.test).sort()
+    const listed = skipped.map((x) => `${x.test}${x.why ? ` (${x.why})` : ''}`).join(', ')
+    await this.write(card, (w) => {
+      const same = (r: { gate: string; entry?: string; revision?: string | null; result?: string; tests?: string[] }): boolean => r.gate === FOCUSED_SKIP_GATE && r.entry === entry.id && r.revision === bound.expected && r.result === bound.tree && (r.tests ?? []).slice().sort().join('\n') === tests.join('\n')
+      if (w.state().requests.some(same)) return
+      const request = this.wf.askUser(w, 'approve', FOCUSED_SKIP_GATE, workflowText(FOR_YOU.focusedSkip, { card: card.key, tests: listed }), { unbound: true, entry: entry.id, revision: bound.expected, result: bound.tree, tests })
+      const reviewer = card.reviewer ?? passingReviewers(w.state()).at(-1) ?? null
+      if (reviewer) this.wf.wake(w, reviewer, `${card.key}'s focused tests were skipped at its merge for their environment: ${listed}. Decide whether it merges with them skipped (hive_focused_skip with request ${request}: merge true or false, and why); the user can override.`, 'answer') // i18n-ignore: a wake, agent-facing
+    })
+    return out
   }
 
   /**
@@ -1230,6 +1431,12 @@ export class MergeQueue {
   /** HI-1697: the project's merge style and commit message still to be chosen: the upgrade's mark, and no choice on the board. */
   private async mergeAsked(): Promise<boolean> {
     return !!(await this.cfg.mergeAsk?.()) && !this.wf.store.meta(MERGE_CHOICE_KEY)
+  }
+
+  /** Whether the card's question about its skipped focused tests (G20) is open. */
+  private skipAsking(key: string): boolean {
+    const card = this.wf.store.cardByKey(key)
+    return !!card && this.wf.state(card).requests.some((r) => r.gate === FOCUSED_SKIP_GATE)
   }
 
   /** Whether the card's question about the merge style and message (HI-1697) is open. */
@@ -1495,14 +1702,14 @@ export class MergeQueue {
   }
 
   /** A conflict, red checks or a hook: `IntegrationFailed`, the card back to its builder with the output (§16.9.1 step 8). */
-  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string, cause?: TransientFailure, check?: { check: string; logPath?: string }, conflicts?: ConflictsRecord): Promise<QueueOutcome> {
+  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string, cause?: TransientFailure, check?: { check: string; logPath?: string }, conflicts?: ConflictsRecord, focused?: FocusedReturn): Promise<QueueOutcome> {
     // Removed from the queue (or cancelled by a decision) while its test merge or checks ran: its cancellation stands,
     // the card where that left it (Approved), and the late failure isn't written.
     const wrote = await this.write(card, (w) => {
       if (!this.isOpen(w, entry)) return false
       // Why a transient failure was one, as codes (#1362): its cause, and the network error code that said so.
       const why = transient && cause ? { cause: cause.cause, ...(cause.code ? { code: cause.code } : {}) } : {}
-      const failed: FactData['IntegrationFailed'] = { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: keptLog(log) } : {}), ...check, ...(conflicts?.files.length ? { conflicts } : {}) }
+      const failed: FactData['IntegrationFailed'] = { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: keptLog(log) } : {}), ...check, ...(conflicts?.files.length ? { conflicts } : {}), ...(focused ? { focused } : {}) }
       w.fact('IntegrationFailed', failed)
       w.move('active', 'derived')
       // What came back and what to do next (#1354): the files, the check, its log and last lines, bounded.

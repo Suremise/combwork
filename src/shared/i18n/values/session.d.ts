@@ -109,6 +109,8 @@ interface HiveMessageValues {
   'session.notice.finished': { agent: string | number }
   'session.notice.finishedBody': undefined
   'session.notice.hooksMissingTitle': { agent: string | number }
+  'session.notice.lineLost': { text: string | number }
+  'session.notice.lineLostTitle': { agent: string | number }
   'session.notice.longConversation': { agent: string | number }
   'session.notice.needsInput': { agent: string | number }
   'session.notice.notWatching': { agent: string | number; cards: string | number }
@@ -124,6 +126,7 @@ interface HiveMessageValues {
   'session.plan.asking': undefined
   'session.plan.noToggle': { provider: string | number }
   'session.plan.typing': undefined
+  'session.prompt.cliAsks': undefined
   'session.prompt.untaken': undefined
   'session.purge.changed': undefined
   'session.purge.cliBack': undefined
@@ -133,6 +136,7 @@ interface HiveMessageValues {
   'session.purge.reading': undefined
   'session.purge.running': undefined
   'session.purge.unread': undefined
+  'session.restartMode.didntStop': { agent: string | number }
   'session.setup.failed': { code: string | number }
   'session.setup.failedTitle': { project: string | number; agent: string | number }
   'session.signIn.again': { provider: string | number }
@@ -179,7 +183,10 @@ interface HiveMessageValues {
   'session.state.working': undefined
   'session.status.asksAtStart': undefined
   'session.status.asksTrust': undefined
+  'session.status.cliAsks': { provider: string | number; question: string | number }
   'session.status.compacting': undefined
+  'session.status.connectionKeepsDropping': undefined
+  'session.status.connectionNotBack': undefined
   'session.status.failedTurn': undefined
   'session.status.safeguardAsks': { provider: string | number }
   'session.status.safeguardAsksTools': { provider: string | number; tools: string | number }
@@ -187,6 +194,7 @@ interface HiveMessageValues {
   'session.status.settingUp': { command: string | number }
   'session.status.signedInAgain': undefined
   'session.status.tasksDropped': { minutes: number }
+  'session.status.waitingForConnection': undefined
   'session.tracker.body': { reason: string | number; detail: string | number }
   'session.tracker.detail': undefined
   'session.tracker.helperFailed': { why: string | number }

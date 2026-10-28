@@ -120,7 +120,7 @@ const check = (name, ok, extra = '') => {
     await lib.until(() => idle(builder.id), HUNG_MS)
     check('…and the builder was woken once for it', wakes('Builder').filter(answerWake).length === 1, JSON.stringify(wakes('Builder')))
     // The card's history says whom Hive told of the answer (#1269 round 2), as the card dialog shows it.
-    const toldLine = 'Told Builder (alpha) of your answer'
+    const toldLine = 'Told agent Builder (alpha) of your answer'
     check("the card's history says whom Hive told of the answer", !!(await lib.until(async () => (await card(n))?.history.some((h) => h.by === 'Hive' && h.what === toldLine), HUNG_MS)), JSON.stringify((await card(n))?.history.map((h) => h.what)))
     await showBoard(page)
     await openByTitle(page, n)
@@ -128,7 +128,8 @@ const check = (name, ok, extra = '') => {
     await dialog.waitFor({ timeout: HUNG_MS })
     await dialog.locator('[data-section="history"]').click()
     const history = dialog.locator('.task-history')
-    check('the answer moved nothing: the card is not returned for review by it', (await card(n))?.column === 'review' && !(await card(n))?.history.some((h) => /Returned for review/.test(h.what)), JSON.stringify((await card(n))?.history.map((h) => `${h.by}: ${h.what}`)))
+    // Failed, it went back to Doing with its builder (HI-1946): the answer leaves it there.
+    check('the answer moved nothing: the card is not returned for review by it', (await card(n))?.column === 'doing' && !(await card(n))?.history.some((h) => /Returned for review/.test(h.what)), JSON.stringify((await card(n))?.history.map((h) => `${h.by}: ${h.what}`)))
     check('…and the card dialog shows it', !!(await lib.until(async () => (await history.innerText().catch(() => '')).includes(toldLine), HUNG_MS)))
     await history.screenshot({ path: path.join(lib.WORK, 'foryou-history.png') })
 
@@ -389,6 +390,110 @@ const check = (name, ok, extra = '') => {
       await zoom(1)
     }
     check('…and goes once it fits again', !!(await lib.until(async () => (await fMore.count()) === 0, HUNG_MS)), String(await fMore.count()))
+
+    // HI-1931: "need you" counts things, not requests. A card with three questions counts once, and shows "3 questions"
+    // in the popover with each under it; its builder stopped at a prompt (on its own cards, which are counted) isn't
+    // counted again, and shows under one of them.
+    await page.keyboard.press('Escape')
+    await lib.until(async () => (await fDialog.count()) === 0, HUNG_MS)
+    const needCount = async () => Number(((await needItem.innerText().catch(() => '')).match(/\d+/) ?? ['0'])[0])
+    await lib.until(async () => (await needCount()) > 0, HUNG_MS)
+    const before = await needCount()
+    const t = (await inv('tasks:create', { title: 'Three questions', project: 'beta' })).number
+    await inv('tasks:move', t, 'doing', { agent: maker.id })
+    for (const text of ['First: which icon?', 'Second: which colour?', 'Third: ship it today?']) await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${t}`, kind: 'decide', text })}`)
+    const forYouOf = async (num) => ((await inv('tasks:forYou')).items ?? []).filter((i) => i.card === num).length
+    check('three requests on one card', !!(await lib.until(async () => (await forYouOf(t)) === 3, HUNG_MS)), String(await forYouOf(t)))
+    check('…the status bar counts the card once', !!(await lib.until(async () => (await needCount()) === before + 1, HUNG_MS)), JSON.stringify({ before, now: await needCount() }))
+    const tip = await lib.hoverTip(page, needItem, (x) => /need/.test(x), HUNG_MS)
+    check('…its tooltip says cards (and agents), not requests', /\d+ cards? (and \d+ agents? )?needs? you\. Click to see them\./.test(tip), tip)
+    await page.mouse.move(5, 5)
+    if (!(await page.locator('.inbox-panel').count())) await needItem.click()
+    const group = page.locator(`.inbox-panel [data-card-group="${t}"]`)
+    check('…the popover: the card once, "3 questions", each under it', !!(await lib.until(async () => (await group.count()) === 1 && /3 questions/.test(await group.innerText()) && (await group.locator('.inbox-under[data-request]').count()) === 3, HUNG_MS)), await group.innerText().catch(() => ''))
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((x) => document.documentElement.setAttribute('data-theme', x), theme)
+      await page.locator('.inbox-panel').screenshot({ path: path.join(lib.WORK, `foryou-grouped-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await group.locator('.inbox-under[data-request]').nth(1).click()
+    const tDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
+    check('…a request under it opens its card', !!(await lib.until(async () => (await tDialog.count()) === 1 && (await tDialog.locator('.task-title-input').inputValue()) === 'Three questions', HUNG_MS)))
+    await page.keyboard.press('Escape')
+    await lib.until(async () => (await tDialog.count()) === 0, HUNG_MS)
+    // HI-1932: the user's answer, given in a chat with the Assistant, recorded by it as a decision naming the questions
+    // it answers, closes those: in one write, the asker told, the card's resolved list and history saying who recorded
+    // it. Maker's lane on the card pauses while any question waits for the user, and goes on once none does.
+    await makerSays(`hive hive_lane ${JSON.stringify({ action: 'start', cards: [`#${t}`] })}`)
+    const betaLane = async () => (await inv('lanes:list')).find((l) => l.project === 'beta' && l.cards.some((c) => c.number === t))
+    check("Maker's lane on the card pauses: waiting for the user", !!(await lib.until(async () => (await betaLane())?.state === 'paused' && (await betaLane())?.pausedOn === t, HUNG_MS)), JSON.stringify(await betaLane()))
+    const home = (await inv('workspace:refresh')).assistant.path
+    await inv('session:start', home, { agentId: 'assistant' })
+    const assistantLive = async () => (await inv('session:live')).find((x) => x.projectPath.toLowerCase() === home.toLowerCase() && x.agentId === 'assistant')
+    await lib.until(async () => ['waiting', 'ready'].includes((await assistantLive())?.status), HUNG_MS)
+    if ((await assistantLive())?.status === 'waiting') await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
+    check('the Assistant runs', !!(await lib.until(async () => (await assistantLive())?.status === 'ready', HUNG_MS)))
+    const tokenFile = path.join(userData, 'assistant-api', `${require('crypto').createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
+    const assistantToken = JSON.parse(fs.readFileSync(tokenFile, 'utf8')).token
+    const asAssistant = async (method, route, body) => {
+      const res = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${assistantToken}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
+      return { status: res.status, json: await res.json().catch(() => null) }
+    }
+    const read = await asAssistant('GET', `/v1/tasks/${t}`)
+    const waiting = read.json?.forYou ?? []
+    check("hive_read_task lists the card's open requests with their ids", read.status === 200 && waiting.length === 3 && waiting.every((x) => /\/r\d+$/.test(x.request)) && waiting[0].text === 'First: which icon?', JSON.stringify(read.json?.forYou))
+    const [first, second, third] = waiting.map((x) => x.request)
+    // The listing reads them for all its cards at once (HR1 r1); its short rows carry none.
+    const listed = await asAssistant('GET', '/v1/tasks?project=beta')
+    const shortRows = await asAssistant('GET', '/v1/tasks?project=beta&view=short')
+    check('…the listing has them too; its short rows not', listed.json?.find?.((c) => c.number === t)?.forYou?.length === 3 && shortRows.status === 200 && shortRows.json.every((c) => c.forYou === undefined), JSON.stringify({ listed: listed.json?.find?.((c) => c.number === t)?.forYou, short: shortRows.status }))
+    // Refused at the API's boundary, as sent (HR1 r1): ids that aren't strings, and other changes alongside, even those
+    // made outside the card's patch. Nothing of any of them is written.
+    const wrong = [
+      { decision: 'x', answers: [[first]] },
+      { decision: 'x', answers: [7] },
+      { decision: 'x', answers: [first], skipReview: 'Checks only.' },
+      { decision: 'x', answers: [first], kind: 'no-code', override: { reason: 'r' } },
+      { decision: 'x', answers: [first], attachments: [path.join(userData, 'none.png')] }
+    ]
+    const refusals = []
+    for (const body of wrong) refusals.push((await asAssistant('PATCH', `/v1/tasks/${t}`, body)).status)
+    const untouched = (await asAssistant('GET', `/v1/tasks/${t}`)).json
+    check('…a decision whose answers come wrongly is refused whole, nothing written', refusals.every((code) => code === 400) && !untouched?.decisions?.length && untouched?.forYou?.length === 3 && !untouched?.reviewSkipped && untouched?.kind !== 'no-code', JSON.stringify({ refusals, decisions: untouched?.decisions, forYou: untouched?.forYou?.length, reviewSkipped: untouched?.reviewSkipped, kind: untouched?.kind }))
+    const decided = await asAssistant('PATCH',`/v1/tasks/${t}`, { decision: 'The bee icon, in amber.', answers: [first, second] })
+    check("the Assistant's decision naming two of them is taken", decided.status === 200, JSON.stringify(decided.json))
+    check('…those two leave For you; the third stays, still counted', !!(await lib.until(async () => (await forYouOf(t)) === 1, HUNG_MS)) && (await inv('tasks:forYou')).items.some((i) => i.request === third), String(await forYouOf(t)))
+    check('…the lane still waits for the user, on the third', (await betaLane())?.state === 'paused' && (await betaLane())?.pausedOn === t, JSON.stringify(await betaLane()))
+    const cardNow = await card(t)
+    const decisionId = cardNow.decisions?.find((d) => d.text === 'The bee icon, in amber.')?.id
+    check('…the decision on the card, recorded by the Assistant', !!decisionId && cardNow.decisions.find((d) => d.id === decisionId).recordedBy === 'Assistant', JSON.stringify(cardNow.decisions))
+    check('…a history line for each, by the Assistant', cardNow.history.filter((h) => h.by === 'Assistant' && h.what.startsWith('Closed a question for you with your decision')).length === 2, JSON.stringify(cardNow.history.slice(-4)))
+    check('…Maker is told, once', !!(await lib.until(async () => wakes('Maker').filter((x) => x.includes('with a decision (recorded by Assistant): The bee icon, in amber.')).length === 1, HUNG_MS)), JSON.stringify(wakes('Maker').slice(-3)))
+    await openByTitle(page, t)
+    const resolvedIn = page.locator('.dialog').filter({ has: page.locator('.task-title-input') }).locator('[data-section="for-you"] [data-resolved] .for-you-resolved-row')
+    check("the card's For you section lists them: the question, the decision (by its id), recorded by the Assistant", !!(await lib.until(async () => (await resolvedIn.count()) === 2, HUNG_MS)) && (await resolvedIn.evaluateAll((els) => els.map((e) => e.dataset.decision))).every((d) => d === decisionId) && (await resolvedIn.first().innerText()).includes('By your decision: “The bee icon, in amber.”, recorded by the Assistant') && /Second: which colour\?/.test(await resolvedIn.first().innerText()), await resolvedIn.first().innerText().catch(() => ''))
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((x) => document.documentElement.setAttribute('data-theme', x), theme)
+      await page.locator('.dialog [data-section="for-you"]').screenshot({ path: path.join(lib.WORK, `foryou-resolved-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await page.keyboard.press('Escape')
+    // The third, answered in For you the ordinary way: none waits now, and the lane goes on.
+    await inv('tasks:answer', t, third, { outcome: 'answered', reply: 'Ship it today.' })
+    check('the third answered in For you: none waits, and the lane runs again', !!(await lib.until(async () => (await forYouOf(t)) === 0 && (await betaLane())?.state === 'active', HUNG_MS)), JSON.stringify(await betaLane()))
+    // Its builder stops at a permission prompt: an agent that needs you, on cards already counted.
+    const beforeMaker = await needCount()
+    await makerSays('ask work 300')
+    check('Maker waits at a prompt', !!(await lib.until(async () => (await liveIn(beta, maker.id))?.status === 'waiting', HUNG_MS)))
+    await needItem.click()
+    const makerRow = page.locator('.inbox-panel .inbox-row', { hasText: 'Maker' })
+    check('…listed under one of its cards, not counted again', !!(await lib.until(async () => (await makerRow.count()) === 1 && (await makerRow.evaluate((el) => el.classList.contains('inbox-under') && !!el.closest('[data-card-group]'))), HUNG_MS)) && (await needCount()) === beforeMaker, JSON.stringify({ count: await needCount(), was: beforeMaker, under: await makerRow.evaluate((el) => el.className).catch(() => '') }))
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((x) => document.documentElement.setAttribute('data-theme', x), theme)
+      await page.locator('.inbox-panel').screenshot({ path: path.join(lib.WORK, `foryou-grouped-agent-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await page.keyboard.press('Escape')
   } finally {
     await app.close()
   }

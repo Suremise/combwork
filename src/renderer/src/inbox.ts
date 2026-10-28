@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 import { inbox, type Inbox, type InboxItem } from '@shared/inbox'
+import { needYou, type NeedYou } from '@shared/needYou'
+import { agentDoingCards, agentReviewCards } from '@shared/tasks'
 import type { ForYouItem } from '@shared/workflow/workView'
 import { call } from './api'
 import { useForYou } from './forYou'
@@ -15,13 +17,19 @@ export function useInbox(): Inbox {
 }
 
 /**
- * What needs you (#1632): exactly what For you lists, the cards' requests (an approval, a decision, a question) and the
- * agents stopped in their panes (a prompt, a sign-in, a question, an error, a failed start). Finished agents are apart.
+ * What needs you (#1632): what For you lists, the cards' requests (an approval, a decision, a question) and the agents
+ * stopped in their panes (a prompt, a sign-in, a question, an error, a failed start); finished agents are apart. Counted
+ * as things (HI-1931, `needYou`): each card with requests once, each agent once, one on a counted card under it.
  */
-export function useNeedsYou(): Inbox & { requests: ForYouItem[]; count: number } {
+export function useNeedsYou(): Inbox & { requests: ForYouItem[]; grouped: NeedYou; count: number } {
   const box = useInbox()
   const requests = useForYou().summary.items
-  return useMemo(() => ({ ...box, requests, count: requests.length + box.needYou.length }), [box, requests])
+  const tasks = useStore((s) => s.tasks)
+  return useMemo(() => {
+    const cardsOf = (a: InboxItem): number[] => [...agentDoingCards(tasks, a.projectName, a.agentId), ...agentReviewCards(tasks, a.projectName, a.agentId)].map((c) => c.number)
+    const grouped = needYou(requests, box.needYou, cardsOf)
+    return { ...box, requests, grouped, count: grouped.count }
+  }, [box, requests, tasks])
 }
 
 /** Opens a card's request (For you) in its dialog. */

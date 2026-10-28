@@ -482,13 +482,15 @@ const placeholders = (n: number): string => Array.from({ length: n }, () => '?')
 const keyOf = (r: Rec): string => `${r.scope as string}\0${r.session as string}`
 
 /** Rows of a table for some scopes (all: null) or one session, grouped by session in their order. */
-function grouped<T>(db: DatabaseSync, table: string, where: { scopes: string[] | null } | { scope: string; session: string }, order: string, map: (r: Rec) => T): Map<string, T[]> {
+function grouped<T>(db: DatabaseSync, table: string, where: { scopes: string[] | null } | { scope: string; session: string } | { scope: string; sessions: string[] }, order: string, map: (r: Rec) => T): Map<string, T[]> {
   const [sql, args] =
-    'session' in where
-      ? [`WHERE scope = ? AND session = ?`, [where.scope, where.session]] // i18n-ignore: SQL
-      : where.scopes
-        ? [`WHERE scope IN (${placeholders(where.scopes.length)})`, where.scopes] // i18n-ignore: SQL
-        : ['', []]
+    'sessions' in where
+      ? [`WHERE scope = ? AND session IN (${placeholders(where.sessions.length)})`, [where.scope, ...where.sessions]] // i18n-ignore: SQL
+      : 'session' in where
+        ? [`WHERE scope = ? AND session = ?`, [where.scope, where.session]] // i18n-ignore: SQL
+        : where.scopes
+          ? [`WHERE scope IN (${placeholders(where.scopes.length)})`, where.scopes] // i18n-ignore: SQL
+          : ['', []]
   const out = new Map<string, T[]>()
   for (const r of db.prepare(`SELECT * FROM ${table} ${sql} ORDER BY scope, session, ${order}`).all(...args) as Rec[]) { // i18n-ignore: SQL
     const k = keyOf(r)
@@ -582,18 +584,86 @@ export function cardRows(db: DatabaseSync, cards: number[]): (SessionMeta & { ro
   return rows.map((r) => ({ ...metaOf(r), row: rowOf(r) }))
 }
 
-/** Sessions of a scope with their timelines (for spans of time no card has: a lane's), who each was and its summary. */
-export function storedTimelines(db: DatabaseSync, scope: string): (SessionMeta & { summary: UsageSummary; timeline: UsageTimeline | null; firstActivity: string | null; lastActivity: string | null })[] {
-  const where = { scopes: [scope] }
+/**
+ * Sessions of a scope with their timelines (for spans of time no card has: a lane's), who each was and its summary; only
+ * those named in `sessions` when given (HI-1906: a card's, by its ledger rows, not every session of the scope).
+ */
+export function storedTimelines(db: DatabaseSync, scope: string, sessions?: string[]): (SessionMeta & { summary: UsageSummary; timeline: UsageTimeline | null; firstActivity: string | null; lastActivity: string | null })[] {
+  if (sessions && !sessions.length) return []
+  const where = sessions ? { scope, sessions } : { scopes: [scope] }
   const rows = grouped(db, 'usage_timeline', where, 'seq', (r) => r)
   const charges = grouped(db, 'usage_charges', where, 'seq', (r) => r.usd as number)
   const compactions = grouped(db, 'usage_compactions', where, 'seq', compactionOf)
   const guards = grouped(db, 'usage_safeguards', where, 'kind, key', (r) => r)
-  return (db.prepare('SELECT * FROM usage_sessions WHERE scope = ?').all(scope) as Rec[]).map((s) => { // i18n-ignore: SQL
+  const list = sessions ? db.prepare(`SELECT * FROM usage_sessions WHERE scope = ? AND session IN (${placeholders(sessions.length)})`).all(scope, ...sessions) : db.prepare('SELECT * FROM usage_sessions WHERE scope = ?').all(scope) // i18n-ignore: SQL
+  return (list as Rec[]).map((s) => {
     const k = keyOf(s)
     const summary = summaryOf(s, compactions.get(k) ?? [], guards.get(k) ?? [])
     return { ...metaOf(s), summary, timeline: timelineOf((s.timeline_step as number | null) ?? null, rows.get(k) ?? [], charges.get(k) ?? []), firstActivity: summary.firstActivity, lastActivity: summary.lastActivity }
   })
+}
+
+// ---------------------------------------------------------------------------
+// The roll-up of old sessions' timelines (HI-1648), and the space it frees given back.
+// ---------------------------------------------------------------------------
+
+/**
+ * The sessions whose timeline is finer than `step` and whose last activity is before `before` (an ISO time), oldest
+ * first, at most `limit`: what a roll-up merges into `step`s. A session with no last activity, or one that isn't a time,
+ * is left alone (when it ran can't be told).
+ */
+export function rollUpCandidates(db: DatabaseSync, before: string, step: number, limit: number): { scope: string; session: string }[] {
+  return db.prepare('SELECT scope, session FROM usage_sessions WHERE timeline_step IS NOT NULL AND timeline_step < ? AND julianday(last_activity) < julianday(?) ORDER BY julianday(last_activity) LIMIT ?').all(step, before, limit) as { scope: string; session: string }[] // i18n-ignore: SQL
+}
+
+/**
+ * One session's timeline merged into steps of `step` (`merge`: shared/usageTimeline.ts coarsenTimeline), in a
+ * transaction of its own, so a close midway leaves it rolled up or as it was. Checked again inside it, as the session is
+ * then: still finer than `step` and last active before `before` (a resumed session is left alone). Its rows before and
+ * after; null when it was left alone.
+ */
+export function rollUpSession(db: DatabaseSync, scope: string, session: string, before: string, step: number, merge: (t: UsageTimeline) => UsageTimeline): { rows: number; merged: number } | null {
+  return transaction(db, () => {
+    // Old as rollUpCandidates tells it (julianday), so a session it picks is never refused here for how its time is written.
+    const s = db.prepare('SELECT timeline_step, coalesce(julianday(last_activity) < julianday(?), 0) AS old FROM usage_sessions WHERE scope = ? AND session = ?').get(before, scope, session) as { timeline_step: number | null; old: number } | undefined // i18n-ignore: SQL
+    if (!s || s.timeline_step === null || s.timeline_step >= step || !s.old) return null
+    const where = { scope, session }
+    const k = `${scope}\0${session}`
+    const t = timelineOf(s.timeline_step, grouped(db, 'usage_timeline', where, 'seq', (r) => r).get(k) ?? [], grouped(db, 'usage_charges', where, 'seq', (r) => r.usd as number).get(k) ?? [])
+    if (!t) return null
+    const merged = merge(t)
+    db.prepare('DELETE FROM usage_timeline WHERE scope = ? AND session = ?').run(scope, session) // i18n-ignore: SQL
+    db.prepare('DELETE FROM usage_charges WHERE scope = ? AND session = ?').run(scope, session) // i18n-ignore: SQL
+    putTimeline(db, scope, session, merged)
+    db.prepare('UPDATE usage_sessions SET timeline_step = ? WHERE scope = ? AND session = ?').run(merged.step, scope, session) // i18n-ignore: SQL
+    return { rows: t.rows.length, merged: merged.rows.length }
+  })
+}
+
+/** The file's size in pages and bytes, and its free pages. */
+export function fileSpace(db: DatabaseSync): { pages: number; free: number; pageSize: number } {
+  const pages = (db.prepare('PRAGMA page_count').get() as { page_count: number }).page_count // i18n-ignore: SQL
+  const free = (db.prepare('PRAGMA freelist_count').get() as { freelist_count: number }).freelist_count // i18n-ignore: SQL
+  const pageSize = (db.prepare('PRAGMA page_size').get() as { page_size: number }).page_size // i18n-ignore: SQL
+  return { pages, free, pageSize }
+}
+
+/** Whether the file gives its free pages back as it is told to (auto_vacuum incremental). */
+export const vacuumsIncrementally = (db: DatabaseSync): boolean => (db.prepare('PRAGMA auto_vacuum').get() as { auto_vacuum: number }).auto_vacuum === 2 // i18n-ignore: SQL
+
+/**
+ * Gives the file's free pages back to the disk (HI-1648). A file made before this, with auto_vacuum off, is vacuumed
+ * whole once, which turns it to incremental (the whole file written again: once); after that only its free pages go.
+ * Then the WAL is checkpointed, truncating it, so the file shrinks now rather than when Hive closes it. Whether it was
+ * the whole vacuum.
+ */
+export function giveSpaceBack(db: DatabaseSync): boolean {
+  if (db.isTransaction) throw new Error('giveSpaceBack inside a transaction') // i18n-ignore: a mistake in Hive's code, logged
+  const whole = !vacuumsIncrementally(db)
+  if (whole) db.exec('PRAGMA auto_vacuum = INCREMENTAL; VACUUM')
+  else db.exec('PRAGMA incremental_vacuum')
+  db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
+  return whole
 }
 
 /** A session of a scope as a sweep and the card attribution see it: where it was read, whose it was, the holds its rows were shared out by. */

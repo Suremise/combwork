@@ -230,6 +230,9 @@ export interface WorkQueueEntry {
   /** A conflict's hunks, file by file, as the queue's folder had them (HI-1181), bounded. */
   conflicts?: ConflictsRecord
   log?: string
+  /** A red check's return (HI-1924): the check that failed and its run's log, as the outcome recorded them. */
+  check?: string
+  logPath?: string
   transient?: boolean
   at?: string
   /** Queued again unchanged: after a temporary failure, or the user's Retry merge. */
@@ -287,6 +290,8 @@ export interface WorkView {
   rounds: number
   /** Open requests to the user (For you). */
   forYou: number
+  /** Requests answered by a decision of the user's (HI-1932), newest first, at most RESOLVED_SHOWN: For you's resolved list. */
+  resolvedByDecision: WorkResolved[]
   /**
    * A card loop's step waiting for its reviewer (a design, or a follow-up of reviewed work), null when none: until it is
    * answered, Retry merge is refused (HI-1667), so the window doesn't offer it.
@@ -301,6 +306,23 @@ export interface WorkView {
   /** When its current cycle started (its Started's or Adopted's time); null before its first start. */
   startedAt: string | null
 }
+
+/**
+ * A request answered by a decision the user made (HI-1932): its words as asked (an agent's own, or Hive's request as data
+ * for the window, `shown`), the decision it names (the card's decision's id: its text is the card's, joined in the window),
+ * who recorded it (the authenticated recorder: "You", "Assistant") and when.
+ */
+export interface WorkResolved {
+  request: string
+  question: string
+  shown?: StoredText
+  decision: string
+  recordedBy: string
+  at: string
+}
+
+/** How many of a card's resolved requests its view keeps (HI-1932). */
+export const RESOLVED_SHOWN = 10
 
 /**
  * A refused request (a `Refused` fact, #1279): its rule and values, from which the window says it in its language as the
@@ -440,6 +462,14 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     decisions: { generation: s.generation, received: s.received },
     rounds: s.rounds,
     forYou: s.requests.length,
+    resolvedByDecision: facts
+      .flatMap((f) => {
+        const d = f.kind === 'Approval' ? (f.data as FactData['Approval']) : null
+        const made = d?.byDecision ? s.made[d.request] : undefined
+        return d?.byDecision ? [{ request: d.request, question: made?.text ?? '', ...(made?.requestText ? { shown: made.requestText } : {}), decision: d.byDecision.decision, recordedBy: d.byDecision.recordedBy, at: d.byDecision.at }] : []
+      })
+      .reverse()
+      .slice(0, RESOLVED_SHOWN),
     loopStep: s.step?.step ?? null,
     retried: s.entries.some((x) => x.seq > (latest ?? 0) && x.requeue === 'retry'),
     lastSeq: s.lastSeq,
@@ -457,7 +487,7 @@ function queueEntryOf(entry: QueueEntry, facts: readonly Fact[]): WorkQueueEntry
     revision: entry.revision,
     target: entry.target,
     state: entry.state,
-    ...(f ? { failure: f.reason, transient: f.transient, ...(f.files?.length ? { files: f.files } : {}), ...(f.conflicts ? { conflicts: f.conflicts } : {}), ...(f.log ? { log: f.log } : {}) } : {}),
+    ...(f ? { failure: f.reason, transient: f.transient, ...(f.files?.length ? { files: f.files } : {}), ...(f.conflicts ? { conflicts: f.conflicts } : {}), ...(f.check ? { check: f.check } : {}), ...(f.logPath ? { logPath: f.logPath } : {}), ...(f.log ? { log: f.log } : {}) } : {}),
     ...(entry.cancelled ? { cancelled: entry.cancelled } : {}),
     ...(end ? { at: end.at } : {}),
     ...(entry.requeue ? { requeue: entry.requeue } : {})
@@ -529,6 +559,8 @@ export interface WorkBadge {
   underReview: string | null
   /** When its current cycle (on `line`) started: what orders a branch's cards, one after another (#1424). */
   startedAt: string | null
+  /** When this cycle's change was integrated (its merge), else accepted (no merge); null while neither (HI-1926). */
+  endedAt: string | null
   lastSeq: number
 }
 
@@ -591,6 +623,7 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     lines: v.lines,
     underReview: v.stage === 'review' && v.kind !== 'no-code' ? (latest?.revision ?? null) : null,
     startedAt: v.startedAt,
+    endedAt: v.integration?.at ?? v.accepted?.at ?? null,
     lastSeq: v.lastSeq
   }
 }

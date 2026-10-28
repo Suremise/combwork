@@ -25,6 +25,7 @@ import type { Refusal } from './workflow/refusals'
 import type { ReviewerMode, WorkflowRole } from './workflow/roles'
 import type { NamedFolder, ResumeHold, ShownPlace } from './agentFolders'
 import type { StageNameProblem } from './workflow/stages'
+import type { TemplateWorkflow, TemplateWorkflowOverlay } from './workflow/templateOptions'
 import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
 
@@ -801,7 +802,15 @@ export interface WorkspaceConfig {
    * and on in the project (mcpOnInProject). `model` 2: the settings are #1093's (before, `enabled` meant on for all
    * projects, unless a project turned it off); absent, they are moved to it when the workspace opens.
    */
-  mcp: { enabled: string[]; model?: 2 }
+  mcp: {
+    enabled: string[]
+    model?: 2
+    /**
+     * The servers the Hive Assistant has on (HI-1472, off until switched on), as a project's own choice: each runs for it
+     * only while it is on in the workspace too (mcpOnInProject). Absent until set or moved from the old Advanced switch.
+     */
+    assistant?: string[]
+  }
   /**
    * The Hive skills the workspace's agents aren't given (#1431, Skills → Delivered to agents), by name: every other skill
    * for their audience is delivered. A project can switch off more (ProjectConfig.skillDelivery), never one on again.
@@ -1160,6 +1169,13 @@ export interface TaskPatch {
   context?: string[]
   /** Records a decision the user made (#357), attributed to the user whoever records it. Editing or removing one is the user's (tasks:editDecision). */
   decision?: string
+  /**
+   * HI-1932: the card's open requests (For you, their ids) the `decision` answers, closed with it in one write. Only with
+   * a decision and no other field; only the user's or the Assistant's (never an agent's).
+   */
+  answers?: string[]
+  /** HI-1932, set by Hive itself: the id the decision is recorded with (the one its answers name). */
+  decisionId?: string
   /**
    * A column move across workflow rules (#1265, SPEC §16.8.4), with why: the Assistant's, required when its move skips
    * a rule (else refused, naming them); the user's reason, optional. Never an agent's.
@@ -1610,6 +1626,28 @@ export interface TemplateLoadPlan {
   connections: { index: number; id: string; name?: string; problem: ConnectionProblem }[]
   /** Why it can't be loaded now (empty: it can). */
   blocked: string[]
+  /** Its workflow (HI-1910) as it meets this project's: null when it has none. */
+  workflow: TemplateLoadWorkflow | null
+}
+
+/**
+ * A template's workflow in the Load template dialog (HI-1910): the section for the project's version control, laid
+ * over its options as they are now (`overlay`: the preview; the Workflow form lays the section over them again once it
+ * reads them, to save there), or why none applies.
+ */
+export interface TemplateLoadWorkflow {
+  /** The project's version control. */
+  platform: PlatformId
+  /** The template's usable sections, and those it had that can't be used (said). */
+  sections: PlatformId[]
+  dropped: PlatformId[]
+  /** The section used (Hive's own: its preset as this project's form offers it), or null. */
+  section: TemplateWorkflow | null
+  overlay: TemplateWorkflowOverlay | null
+  /** It has only a Git section and the project has no version control: its workflow needs Git first. */
+  needsGit: boolean
+  /** A None project, the template with both sections: None's is used, and it has a Git one too. */
+  alsoGit: boolean
 }
 
 export interface AgentInfo extends AgentDef {
@@ -2481,6 +2519,8 @@ export interface McpServerInfo {
   errorText?: Text
   /** On in the workspace (#1093, its master switch): it runs in the projects that have it on, and nowhere while off. */
   globallyEnabled: boolean
+  /** The Hive Assistant's own choice for it (HI-1472, workspace.json's mcp.assistant): it runs for it while on in the workspace too. */
+  assistant: boolean
   secretWarnings: string[]
   /** What it runs, shown before it is enabled (#550): the command or URL, folder, environment and header names. */
   runs: string[]
@@ -3185,6 +3225,8 @@ export type HiveEvent =
   /** What an agent's stopped launches left running changed (#507): found, ended, kept, or ended by themselves (no processes). */
   | { type: 'agent-leftovers'; leftovers: AgentLeftovers }
   | { type: 'toast'; toast: ToastMessage }
+  /** A notice no longer true (HI-1905: a project's platform notice once detection and the platform agree): every window drops it. */
+  | { type: 'toast-gone'; id: string }
   | { type: 'chime'; projectPath: string; silent?: boolean }
   | { type: 'settings-changed'; settings: AppSettings }
   /** Advanced settings (#367) changed: an override, advanced.json, a workspace's own or an installed CLI's version. */
@@ -3412,6 +3454,13 @@ export interface LaneStatus {
   agent?: string
   /** preparing (#1446): the slot being prepared. */
   slot?: string
+  /**
+   * When this wait began (HI-1926, epoch ms): when Hive first saw this reason for this card (and ask), kept while they
+   * stay the same. `atLeast`: Hive didn't see it begin (it was already waiting when this Hive first listed the lane), so
+   * it has waited at least that long.
+   */
+  since?: number
+  atLeast?: boolean
 }
 
 /**

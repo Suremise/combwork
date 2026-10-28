@@ -49,9 +49,12 @@ interface UsageBlock {
   cache_creation?: { ephemeral_1h_input_tokens?: number; ephemeral_5m_input_tokens?: number }
 }
 
-/** A request's usage, the local day it ran on and when (its place in the timeline: usageTimeline.ts), and its model (#1106). */
+/**
+ * A request's tokens, the local day it ran on and when (its place in the timeline: usageTimeline.ts), and its model (#1106).
+ * Its tokens only, not the usage block as written (HI-1912): the block's other fields took most of a saved state's space.
+ */
 interface Request {
-  u: UsageBlock
+  t: UsageTokens
   day: string
   at: string | undefined
   model: string | null
@@ -144,7 +147,7 @@ export class ClaudeUsageParser {
           if (!u) break
           const key = o.requestId ?? msg.id ?? o.uuid ?? String(this.byRequest.size)
           const known = this.byRequest.get(key)
-          this.byRequest.set(key, { u, day: known?.day || day, at: known?.at ?? (ts || usage.lastActivity || undefined), model: known?.model ?? usage.model })
+          this.byRequest.set(key, { t: tokensOf(u), day: known?.day || day, at: known?.at ?? (ts || usage.lastActivity || undefined), model: known?.model ?? usage.model })
           if (!known) this.uncovered.add(key)
           if (!side) {
             // The output (thinking included) stays in the context: what Claude Code compacts on is input + output.
@@ -220,7 +223,7 @@ export class ClaudeUsageParser {
     })
     const timeline = new TimelineBuilder()
     for (const [key, r] of this.byRequest) {
-      const t = tokensOf(r.u)
+      const t = r.t
       addTokens(usage, t)
       const d = dayOf(r.day)
       addTokens(d, t)
@@ -238,7 +241,7 @@ export class ClaudeUsageParser {
       const unreported = { inputTokens: 0, outputTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0 }
       for (const key of this.uncovered) {
         const r = this.byRequest.get(key)
-        if (r) addTokens(unreported, tokensOf(r.u))
+        if (r) addTokens(unreported, r.t)
       }
       if (Object.values(unreported).some((n) => n > 0)) usage.costUnreported = unreported
       usage.costReports = this.reports.map((rep, i) => {
@@ -246,7 +249,7 @@ export class ClaudeUsageParser {
         for (const key of rep.keys) {
           const r = this.byRequest.get(key)
           if (!r) continue
-          addTokens((byDay[r.day] ??= { inputTokens: 0, outputTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0 }), tokensOf(r.u))
+          addTokens((byDay[r.day] ??= { inputTokens: 0, outputTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0 }), r.t)
         }
         return { costUsd: charges[i], days: byDay }
       })

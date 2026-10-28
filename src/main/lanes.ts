@@ -3,7 +3,8 @@ import { join } from 'path'
 import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
-import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, type LaneAgent, type LaneCardFacts, type LaneChange, type LaneRecord } from '../shared/lanes'
+import { agentWorkflowRole } from '../shared/workflow/roles'
+import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type LaneCardFacts, type LaneChange, type LaneRecord, type WaitStamp } from '../shared/lanes'
 import type { HiveErrorKind, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { reviewingNow } from '../shared/workflow/reviewerPool'
 import { withValues, type Text } from '../shared/advanced'
@@ -436,7 +437,34 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   // Each running lane's cards' owner lanes (HI-1821): a card given to no agent is the lane's that owns it.
   const owned = ws.path ? cardOwnersNow(ws, [...new Set(lanes.filter(running).flatMap((l) => l.cards))]) : new Map<number, { lane: string | null }>()
   const owners = new Map([...owned].map(([n, o]) => [n, o.lane]))
-  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners))
+  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners)))
+}
+
+/**
+ * Each workspace's running lanes' waits as last listed (HI-1926): by lane, its stamp (none while it doesn't wait). One
+ * for every window on the workspace, so none resets another's; a workspace opened again starts afresh, and a lane that
+ * stops running leaves it. At most WAIT_STAMPS_MAX lanes, the oldest listed dropped first.
+ */
+const waitStamps = new WeakMap<WorkspaceService, { path: string | null; life: unknown; lanes: Map<string, WaitStamp | undefined> }>()
+const WAIT_STAMPS_MAX = 500
+
+/** Lanes with when each one's wait began (`status.since`), from its stamp; `atLeast` where Hive didn't see it begin. */
+function withWaitTimes(ws: WorkspaceService, list: LaneInfo[]): LaneInfo[] {
+  let c = waitStamps.get(ws)
+  if (!c || c.path !== ws.path || c.life !== ws.lifetime) waitStamps.set(ws, (c = { path: ws.path, life: ws.lifetime, lanes: new Map() }))
+  const at = Date.now()
+  return list.map((v) => {
+    if (v.state !== 'active' && v.state !== 'paused') {
+      c.lanes.delete(v.id)
+      return v
+    }
+    const known = c.lanes.has(v.id)
+    const stamp = stampWait(c.lanes.get(v.id), v.status, at, known)
+    c.lanes.delete(v.id)
+    c.lanes.set(v.id, stamp)
+    while (c.lanes.size > WAIT_STAMPS_MAX) c.lanes.delete(c.lanes.keys().next().value!)
+    return stamp && v.status ? { ...v, status: { ...v.status, since: stamp.since, ...(stamp.observed ? {} : { atLeast: true }) } } : v
+  })
 }
 
 /** A running lane's slot, and whether it waits for one (Start Lane… found none free, `slotWait`, and it has none yet). */
@@ -626,6 +654,20 @@ async function agentIn(ws: WorkspaceService, project: string, id: string): Promi
 }
 
 /**
+ * A generalist takes no side in the workflow (HI-686): never a lane's builder or reviewer, however the lane is started
+ * or joined (the window's Start Lane, the Agent API, the hive tools). Refused before anything changes; the other roles
+ * as before.
+ */
+async function refuseGeneralist(ws: WorkspaceService, project: string, ids: readonly (string | null | undefined)[]): Promise<void> {
+  if (!ws.path) return
+  const cfg = await ws.projectConfig(join(ws.path, project)).catch(() => null)
+  for (const id of ids) {
+    const a = id && cfg ? projectAgents(cfg).find((x) => x.id === id) : undefined
+    if (a && agentWorkflowRole(a) === 'generalist') throw new LaneError(400, `${a.name} is a generalist: it takes no side in the workflow, so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.`) // i18n-ignore: hive_lane's refusal, which only agents get
+  }
+}
+
+/**
  * A card in two lanes (HI-1821): the open cards (not Done, archived or gone) of a builder's start that another builder's
  * running lane of the project lists, or has in its queued list, as a warning for the start's reply; null: none. The
  * card's agent decides whose it is (a lane never takes another agent's card); the other lane gives it up with its own
@@ -676,6 +718,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   if (s.reviewer && !reviewer) throw new LaneError(404, 'Unknown agent: the reviewer must be an agent of the project') // i18n-ignore: hive_lane's refusal, which only agents get
   if (reviewer && reviewer.id === builder.id) throw new LaneError(400, "A lane's builder can't be its reviewer") // i18n-ignore: hive_lane's refusal, which only agents get
   if (reviewer && s.pool) throw new LaneError(400, 'A lane reviewed by the pool has no reviewer of its own') // i18n-ignore: hive_lane's refusal, which only agents get
+  await refuseGeneralist(ws, s.project, [builder.id, reviewer?.id])
   // A named reviewer makes it one reviewer per lane; the pool, none of its own (#1443).
   const pool = s.pool ? true : reviewer ? false : undefined
   // Rounds and wait the start doesn't give (#412): the project's workflow options as they resolve now (HI-1766).
@@ -793,6 +836,7 @@ export async function joinLane(ws: WorkspaceService, j: { project: string; build
   const builder = await agentIn(ws, j.project, j.builder)
   if (!reviewer || !builder) throw new LaneError(404, 'Unknown agent: the builder and reviewer must be agents of the project') // i18n-ignore: hive_lane's refusal, which only agents get
   if (reviewer.id === builder.id) throw new LaneError(400, "A lane's builder can't be its reviewer") // i18n-ignore: hive_lane's refusal, which only agents get
+  await refuseGeneralist(ws, j.project, [builder.id, reviewer.id])
   const found = await mutate(ws, (lanes, _checks, also) => {
     const l = lanes.find((x) => running(x) && same(x.project, j.project) && x.builder.id === builder.id)
     if (!l || (j.cards?.length && !l.cards.some((n) => j.cards!.includes(n)))) return null

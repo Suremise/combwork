@@ -27,6 +27,8 @@ const SAMPLE: RefusalValues = {
   reason: 'waits for the design',
   waitsFor: 'AM-3',
   side: 'builder',
+  // submit.focusedChosen (HI-1367): why its pick couldn't choose.
+  state: 'unknown',
   design: 'AM-12/s40',
   waiting: 'AM-12/s44',
   step: 'followUp',

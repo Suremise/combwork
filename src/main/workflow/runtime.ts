@@ -10,11 +10,13 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, atRoundLimit, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
-import { reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
+import { FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
+import { chosenTests, focusedCheckName, reviewProved, type FocusedChoice, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
+import { pathChanges, pickAtRevision, type PickOutcome } from './focusedRun'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
 import { refusal, type Refusal, type RuleId } from '../../shared/workflow/refusals'
 import { FOR_YOU, UNREADABLE, workflowEnglish, workflowText } from '../../shared/workflow/texts'
@@ -95,6 +97,22 @@ export interface Effects {
 /** What `slotFor` gives a start (#1438): the slot and lease, or why it waits for one; null, no slot. */
 export type SlotForStart = { slot: string; folder: string; lease: string; fresh: boolean } | { wait: string } | null
 
+/**
+ * What a reviewer is told of a submission's focused tests (G20, HI-1367) when it starts its review: the list to check
+ * against the change (and that it is the builder's own, standing in for a pick that couldn't choose), and the tests the
+ * merge queue won't run (real CLI, packaged), which count only from the reviewer's own run at this revision.
+ */
+function focusedForReview(f: FocusedChoice | undefined): Record<string, string | string[]> {
+  if (!f) return {}
+  const tests = chosenTests(f)
+  const yours = tests.filter(reviewProved)
+  return {
+    focusedTests: tests.map((t) => t.id),
+    ...(f.source === 'manual' ? { focusedChosenBy: `its builder, as its picker couldn't choose (${f.state === 'tooBroad' ? 'it said every test' : (f.why ?? 'failed')}): check they cover the change` } : {}), // i18n-ignore: agent-facing
+    ...(yours.length ? { runYourself: `${yours.map((t) => t.id).join(', ')}: the merge queue doesn't run these (a real CLI or the installed app); each counts from your run at this revision, hive-progress --check "${focusedCheckName('<test>')}" --card <card> -- <its command>` } : {}) // i18n-ignore: agent-facing
+  }
+}
+
 export interface WorkflowConfig {
   store: FactStore
   /** The project folder. */
@@ -145,6 +163,11 @@ export interface WorkflowConfig {
    * facts before a submit reads them); left out, none are.
    */
   checksSettled?: () => Promise<void>
+  /**
+   * G20 (HI-1367): how a submission's pick runs (a check's environment, its time limit). Left out, the project's picker
+   * still runs, with an empty environment and a minute's limit (unit tests); `pick` replaces it (a test's stub).
+   */
+  focused?: { env: () => Record<string, string>; timeoutMs: () => number; life?: AbortSignal; pick?: (command: string, folder: string, revision: string, base: string, changes: PathChange[]) => Promise<PickOutcome> }
   /** Run the actions after each write (false: leave them pending, as a crash right after the commit would). */
   autoRun?: boolean
   effects?: Effects
@@ -293,6 +316,8 @@ interface SubmitGathered {
   commits?: string[]
   paths?: string[]
   inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>
+  /** G20 (HI-1367): its submission's operation, aborted once a newer submission of the card or its workspace's close ended it. */
+  focusedOp?: AbortSignal
   warnings: string[]
   earlier: boolean
   fin: FinishInputs | Record<string, never>
@@ -439,10 +464,32 @@ export class Workflow {
    * back in Todo or on hold.
    */
   currentCards(): Map<string, { card: CardRecord; s: CardState }> {
+    // Read again only once the board has committed something (HI-1909: each agent's PreToolUse asks); never in a write.
+    const token = this.store.readToken()
+    if (token !== null && this.current?.token === token) return new Map(this.current.cards)
+    const cards = this.readCurrentCards()
+    if (token !== null) this.current = { token, cards }
+    return new Map(cards)
+  }
+
+  /**
+   * One agent's current card (currentCards), working out that agent's alone (HI-1909: each lock event asked for every
+   * agent's, a card state each, to take one).
+   */
+  currentCard(agent: string): { card: CardRecord; s: CardState } | undefined {
+    const token = this.store.readToken()
+    if (token !== null && this.current?.token === token) return this.current.cards.get(agent)
+    return this.readCurrentCards(agent).get(agent)
+  }
+
+  private current: { token: string; cards: Map<string, { card: CardRecord; s: CardState }> } | null = null
+
+  /** The current cards (currentCards), with `only` that agent's alone. */
+  private readCurrentCards(only?: string): Map<string, { card: CardRecord; s: CardState }> {
     const last = new Map<string, Fact>()
     for (const f of this.store.factsOfKind(['Started', 'Adopted'])) { // i18n-ignore: fact kinds, not text
       const b = (f.data as FactData['Started']).builder
-      if (b && b !== 'user') last.set(b, f)
+      if (b && b !== 'user' && (only === undefined || b === only)) last.set(b, f)
     }
     const out = new Map<string, { card: CardRecord; s: CardState }>()
     for (const [b, f] of last) {
@@ -462,10 +509,10 @@ export class Workflow {
    * Returns whether anything was written.
    */
   async recordLocks(agent: string, paths: string[], seen: LockSeen): Promise<boolean> {
-    const first = this.currentCards().get(agent)
+    const first = this.currentCard(agent)
     if (!first || ('card' in seen && (first.card.id !== seen.card || first.s.cycle !== seen.cycle))) return false
     return this.write(first.card, null, agentActor(agent), (w) => {
-      const now = this.currentCards().get(agent)
+      const now = this.currentCard(agent)
       if (!now || now.card.id !== first.card.id || now.s.cycle !== first.s.cycle) return false
       // Seen when the cards weren't read: only a card started before then.
       const startedAt = 'at' in seen ? this.store.facts(now.card.id).find((f) => f.seq === now.s.cycle)?.at : null
@@ -970,14 +1017,14 @@ export class Workflow {
    * is; `unbound`: a question no new submission retires (the round limit's, answered only by the user); `revision` and
    * `checklist`: an agent's ask about a revision of its choice, with a Test checklist (#1267).
    */
-  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, o: { asker?: string | null; unbound?: boolean; revision?: string; checklist?: string[]; entry?: string; result?: string; actions?: AskAction[] } = {}): string {
+  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, o: { asker?: string | null; unbound?: boolean; revision?: string; checklist?: string[]; entry?: string; result?: string; actions?: AskAction[]; tests?: string[] } = {}): string {
     const s = w.state()
     // Hive's own requests are messages (FOR_YOU): the English for agents and the Agent API, the message for the window.
     const english = typeof text === 'string' ? text : workflowEnglish(text)
     const shown = typeof text === 'string' ? {} : { requestText: text }
     const request = `${w.card.key}/r${s.lastSeq + 1}`
     // Bound to what the user is shown: the submission and revision, the stage and the decision generation it is asked at.
-    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, for: 'user', ...(o.asker ? { asker: o.asker } : {}), stage: w.current, generation: s.generation, ...(s.latest && !o.unbound ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}), ...(o.revision ? { revision: o.revision } : {}), ...(o.checklist ? { checklist: o.checklist } : {}), ...(o.entry ? { entry: o.entry } : {}), ...(o.result ? { result: o.result } : {}), ...(o.actions?.length ? { actions: o.actions } : {}) })
+    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, for: 'user', ...(o.asker ? { asker: o.asker } : {}), stage: w.current, generation: s.generation, ...(s.latest && !o.unbound ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}), ...(o.revision ? { revision: o.revision } : {}), ...(o.checklist ? { checklist: o.checklist } : {}), ...(o.entry ? { entry: o.entry } : {}), ...(o.result ? { result: o.result } : {}), ...(o.actions?.length ? { actions: o.actions } : {}), ...(o.tests ? { tests: o.tests } : {}) })
     w.action('notify', { text: english, ...(typeof text === 'string' ? {} : { shown: text }) })
     return request
   }
@@ -1119,7 +1166,30 @@ export class Workflow {
    * back into the merge queue after a transient failure (`requeue.allowed`). `followUp` (HI-1832): from Review, its
    * builder's commit the reviewer asked for, made the revision under review: no round, no move, no one reassigned.
    */
-  async submit(ref: unknown, actor: Actor, args: { summary: string; revision?: string; note?: string; paths?: string[]; drag?: Drag; followUp?: boolean }): Promise<Reply> {
+  async submit(ref: unknown, actor: Actor, args: { summary: string; revision?: string; note?: string; paths?: string[]; drag?: Drag; followUp?: boolean; tests?: FocusedTest[] }): Promise<Reply> {
+    const card0 = this.resolve(ref, actor)
+    if (isRefusal(card0)) return card0
+    return this.submitAs(ref, actor, args, this.submitOperation(card0.id))
+  }
+
+  /**
+   * A submission's operation (G20, HI-1367; HR4's rounds 1–3, finding 8), settled once: made by each `submit` call and
+   * only there, which ends the card's operation before it (a newer submission supersedes the one in flight), and ended
+   * too by its workspace closing. Every retry of that call (a re-gather after the evidence changed, a requeue's) carries
+   * the same operation and never makes one, so a superseded call can never end its replacement. It is checked wherever
+   * the call resumes after waiting: after gathering, after the evidence is checked again (before any re-gather), and
+   * under the write's lock; ended, the call is refused there (`submit.focusedChosen`, `cancelled`). Its pick ends with it.
+   */
+  private submitOperation(card: number): AbortSignal {
+    this.picks.get(card)?.abort()
+    const own = new AbortController()
+    this.picks.set(card, own)
+    const life = this.cfg.focused?.life
+    return life ? AbortSignal.any([own.signal, life]) : own.signal
+  }
+
+  /** `submit` within its operation (`op`): every retry of the call is this, with the same `op`. */
+  private async submitAs(ref: unknown, actor: Actor, args: { summary: string; revision?: string; note?: string; paths?: string[]; drag?: Drag; followUp?: boolean; tests?: FocusedTest[] }, op: AbortSignal): Promise<Reply> {
     const card0 = this.resolve(ref, actor)
     if (isRefusal(card0)) return card0
     let card = card0
@@ -1141,7 +1211,7 @@ export class Workflow {
       const now = await this.revisionNow(card, s)
       if (!isUnknown(now) && now && now === s.approved?.revision) {
         await this.cfg.hooks?.beforeWrite?.('submit')
-        if (await this.revalidate(card, s, o, evidence)) return this.regather(card, () => this.submit(ref, actor, args))
+        if (await this.revalidate(card, s, o, evidence)) return this.regather(card, () => this.submitAs(ref, actor, args, op))
         const g = await this.write(card, r, actor, (w) => {
           const bad = this.stillAt(w, s, 'submit') ?? this.evidenceChanged(w, o, evidence) ?? this.check(w, 'requeue', { agent, revision: now })
           if (bad) return bad
@@ -1153,20 +1223,28 @@ export class Workflow {
     }
     if (!(from === 'active' || ((from === 'approved' || from === 'review') && s.stale) || from === 'review')) return this.notFrom(card, actor, s, 'submit')
 
-    const g = await this.gatherSubmit(card, s, actor, args)
+    const g = await this.gatherSubmit(card, s, actor, args, undefined, false, op)
     if (!('inputs' in g)) return this.refuse(card, actor, 'submit', g)
+    const ended: GuardRefusal = { rule: 'submit.focusedChosen', values: { card: card.key, revision: (g.revision ?? '').slice(0, 7), state: 'unknown', why: 'cancelled' } } // i18n-ignore: codes
+    // Its operation ended while it gathered (G20: only where it picked): refused before anything.
+    if (g.focusedOp?.aborted) return this.refuse(card, actor, 'submit', ended)
     // The same revision again: a new submission only with a note (§16.8.1).
     const waiting = (from === 'review' || from === 'approved' || awaitsAgentMerge(g.r, g.s)) && !g.s.stale
     if (g.earlier && !waiting && !args.note && !args.drag) return this.refuse(card, actor, 'submit', { rule: 'submit.sameRevisionNote', values: { revision: g.revision!.slice(0, 7) } })
 
     await this.cfg.hooks?.beforeWrite?.('submit')
-    if (await this.revalidate(g.card, g.s, g.o, g.before)) return this.regather(card, () => this.submit(ref, actor, args))
+    const again = await this.revalidate(g.card, g.s, g.o, g.before)
+    // Ended while it waited or checked the evidence again (HR4's round 3): refused, never gathered again.
+    if (g.focusedOp?.aborted) return this.refuse(card, actor, 'submit', ended)
+    if (again) return this.regather(card, () => this.submitAs(ref, actor, args, op))
     let ahead: CardRecord[] | null = null
     // A follow-up (HI-1832): only from Review, unstale, and never a drag (the user's moves); elsewhere an ordinary submission.
     const followUp = !!args.followUp && !args.drag && from === 'review' && !g.s.stale
     const out = await this.write(card, g.r, actor, (w) => {
       const changed = this.stillAt(w, g.s, 'submit') ?? this.evidenceChanged(w, g.o, g.before, g.card)
       if (changed) return changed
+      // Ended (HR4's round 2 finding 1): a newer submission of the card, or its workspace closing, read under the lock.
+      if (g.focusedOp?.aborted) return ended
       // Every refusal before anything is written: an override never commits without its move.
       if (from === 'review' && !g.s.stale && !followUp) return { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: 'submit', moves: this.movesFrom(from, g.r).join(', ') } } as GuardRefusal
       // Read again under the transaction: still in Review, unstale, and the agent its builder now (not when the call began).
@@ -1219,7 +1297,7 @@ export class Workflow {
    * files, and its guards' inputs. None's paths it sets are kept with it (`setPaths`), written by its write. `r`: the
    * ruleset, for a state predicted after a start (a drag's) whose ruleset isn't stored yet.
    */
-  private async gatherSubmit(card0: CardRecord, s0: CardState, actor: Actor, args: { revision?: string; paths?: string[] }, r: Ruleset = this.rulesetOf(card0, s0), predicted = false): Promise<SubmitGathered | GuardRefusal> {
+  private async gatherSubmit(card0: CardRecord, s0: CardState, actor: Actor, args: { revision?: string; paths?: string[]; tests?: FocusedTest[] }, r: Ruleset = this.rulesetOf(card0, s0), predicted = false, op?: AbortSignal): Promise<SubmitGathered | GuardRefusal> {
     let card = card0
     let s = s0
     const o = r.options
@@ -1268,10 +1346,39 @@ export class Workflow {
     // card's builder). Read again in the write (`runsNow`): work started meanwhile counts.
     const runner = agent ?? (s.started?.builder && s.started.builder !== 'user' ? s.started.builder : null)
     if (runner && this.cfg.runsOf) inputs.runsGoing = this.cfg.runsOf(runner)
+    // G20 (HI-1367): the tests the change needs, picked in the card's folder at exactly this revision, or named by its
+    // builder; kept with the submission (its `focused`), and a pick that couldn't choose refuses without the builder's list.
+    let focusedOp: AbortSignal | undefined
+    if (r.guards.submit.includes('submit.focusedChosen') && card.kind === 'code' && revision && base && !predicted) {
+      // A move of the user's that submits (a drag) has no operation of its own: one for this gathering alone.
+      focusedOp = op ?? this.submitOperation(card.id)
+      inputs.focused = await this.pickFor(o, this.folderOf(s), revision, base, args.tests, focusedOp)
+    }
     const earlier = card.kind === 'code' && s.submissions.some((x) => x.revision === revision)
     const fin = o.review === 'none' ? await this.finishInputs(card, s, r, revision) : {}
     const only = card.kind === 'no-code' ? (id: GuardId) => NO_CODE_GUARDS.includes(id) : undefined
-    return { r, o, card, s, from, agent, runner, setPaths, revision, base, key, files, ...(commits ? { commits } : {}), ...(paths ? { paths } : {}), inputs, warnings, earlier, fin, before, ...(only ? { only } : {}) }
+    return { r, o, card, s, from, agent, runner, setPaths, revision, base, key, files, ...(commits ? { commits } : {}), ...(paths ? { paths } : {}), inputs, warnings, earlier, fin, before, ...(only ? { only } : {}), ...(focusedOp ? { focusedOp } : {}) }
+  }
+
+  /** Each card's latest submission's operation (`submitOperation`): a newer one aborts the one before (its pick, and its write). */
+  private readonly picks = new Map<number, AbortController>()
+
+  /**
+   * A submission's focused tests (G20, HI-1367): its change path by path, and the project's picker run on it at exactly
+   * the revision (`pickAtRevision`); the builder's `tests` are its additions, or, when the pick couldn't choose, the list
+   * that stands in for it (`manual`, reviewed with the change). Never throws; a pick its operation (`signal`) ended is
+   * `cancelled`, never manual.
+   */
+  private async pickFor(o: WorkflowOptions, folder: string, revision: string, base: string, tests: FocusedTest[] | undefined, signal: AbortSignal): Promise<FocusedChoice> {
+    const change = await pathChanges(folder, base, revision)
+    const command = o.commands[FOCUSED_PICK]?.trim()
+    const deps = { env: this.cfg.focused?.env ?? (() => ({})), timeoutMs: this.cfg.focused?.timeoutMs() ?? 60_000, signal }
+    let p: PickOutcome
+    if (!change) p = { state: 'unknown', tests: [], why: 'noChange' } // i18n-ignore: codes (a why, a check name), never shown as text
+    else if (!command) p = { state: 'unknown', tests: [], why: 'noPicker' } // i18n-ignore: codes (a why, a check name), never shown as text
+    else p = await (this.cfg.focused?.pick ?? ((c, f, rev, b, ch) => pickAtRevision(deps, c, f, rev, b, ch)))(command, folder, revision, base, change)
+    const manual = p.state !== 'chosen' && p.why !== 'cancelled' && !!tests
+    return { state: p.state, ...(p.why ? { why: p.why } : {}), source: manual ? 'manual' : 'picked', picked: p.tests, added: tests ?? [], change, ...(p.diagnostics ? { diagnostics: p.diagnostics } : {}) }
   }
 
   /** A submission's guard inputs in its write: as gathered, its builder's running work read again (HR2's #1265 round 2). */
@@ -1297,7 +1404,8 @@ export class Workflow {
       ...(args.followUp ? { followUp: true } : {}),
       ...(g.paths ? { paths: g.paths } : {}),
       ...(g.commits ? { commits: g.commits } : {}),
-      ...(g.warnings.length ? { warnings: g.warnings } : {})
+      ...(g.warnings.length ? { warnings: g.warnings } : {}),
+      ...(g.inputs.focused ? { focused: g.inputs.focused } : {})
     })
     if (g.revision) w.action('pin', { ref: `refs/hive/cards/${g.card.key.toLowerCase()}/${st.submissions.length + 1}`, revision: g.revision, submission: sub.seq })
     if (g.o.review === 'none') {
@@ -1334,7 +1442,7 @@ export class Workflow {
       return null
     })
     if (out) return this.refuse(card, actor, 'start review', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
-    return this.ok(card, 'review', 'review', { submission: sub.id, revision: sub.revision, base: sub.base, files: sub.files })
+    return this.ok(card, 'review', 'review', { submission: sub.id, revision: sub.revision, base: sub.base, files: sub.files, ...focusedForReview(sub.focused) })
   }
 
   /** verdict (§16.7.2): always recorded; a pass may finish, ask the user, or go stale at once if the head moved to another change. */
@@ -1411,6 +1519,44 @@ export class Workflow {
   }
 
   /**
+   * The card's reviewer agent decides on focused tests its merge skipped for their environment (G20, HI-1367; the
+   * user's decision, 28 Oct): `merge` true merges with them skipped, false returns the card. Recorded as its answer to
+   * the queue's request, by the reviewer, with why; the user can still answer it first (For you). Its queue looks again.
+   */
+  async focusedSkip(ref: unknown, actor: Actor, request: string, merge: boolean, why: string): Promise<Reply> {
+    const card = this.resolve(ref, actor)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    // Its reviewer agent's to decide (HR4's round 1 finding 2): the lane's, else one whose pass approved the submission.
+    // Not the Assistant's or anyone else's; the user answers on the user's own path (For you, `answer`). Read again in the
+    // write: the reviewer, the request still open, and still about the entry the queue is merging.
+    const agent = agentOf(actor)
+    const eligible = (c: CardRecord, st: CardState): boolean => !!agent && (agent === c.reviewer || passingReviewers(st).includes(agent))
+    const notReviewer = { rule: 'verdict.reviewing', values: { card: card.key } } as GuardRefusal
+    const notOpen = (st: CardState): GuardRefusal => ({ rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'focused skip', moves: '' } }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    if (!eligible(card, s)) return this.refuse(card, actor, 'focused skip', notReviewer) // i18n-ignore: intent names
+    const bound = (st: CardState): FactData['ApprovalRequested'] | undefined => {
+      const req = st.requests.find((x) => x.request === request && x.gate === FOCUSED_SKIP_GATE)
+      return req && req.entry && openEntry(st)?.id === req.entry ? req : undefined
+    }
+    if (!bound(s)) return this.refuse(card, actor, 'focused skip', notOpen(s)) // i18n-ignore: intent names
+    const r = this.rulesetOf(card, s)
+    const out = await this.write(card, r, actor, (w) => {
+      const st = w.state()
+      if (!eligible(this.store.card(card.id), st)) return notReviewer
+      const req = bound(st)
+      if (!req) return notOpen(st)
+      w.fact('Approval', { request, answer: merge ? 'approved' : 'declined', note: why, generation: st.generation }) // i18n-ignore: a fact's kind and codes, not text
+      const e = st.entries.find((x) => x.id === req.entry)
+      if (e) w.action('enqueue', { target: e.target })
+      w.answer = `${card.key}: its reviewer ${merge ? 'accepted' : 'declined'} the focused tests its merge skipped (${why})` // i18n-ignore: a wake, agent-facing
+      this.wake(w, st.started?.builder, w.answer, 'answer')
+      return null
+    })
+    return out ? this.refuse(card, actor, 'focused skip', out) : this.ok(card, s.stage, this.state(card).stage, { request, merge }) // i18n-ignore: intent names
+  }
+
+  /**
    * The user answers a request (§16.8.5): only the user (Darren's point 7, #1269: never an agent or the Assistant). An
    * approval satisfies its gate; a decline of a gate's request is a round, the card back to its builder; a reply (`note`)
    * is relayed. At the round limit the answer is the user's `choice`, and a carry on adds `rounds`. Never a decision (the
@@ -1452,6 +1598,12 @@ export class Workflow {
         if (card.reviewer && card.reviewer !== builder) this.wake(w, card.reviewer, said, 'answer')
         return null
       }
+      if (req.gate === FOCUSED_SKIP_GATE) {
+        // G20 (HI-1367): the user's decision on skipped focused tests, over its reviewer's: its queue looks again now.
+        const e = st.entries.find((x) => x.id === req.entry)
+        if (e) w.action('enqueue', { target: e.target })
+        if (card.reviewer) this.wake(w, card.reviewer, said, 'answer')
+      }
       if (req.gate === QUEUE_ADVANCE_GATE || req.gate === QUEUE_STUCK_GATE) {
         // The merge queue's own (#1351): its target's queue looks at the answer now (an approved update runs at once; a
         // stuck advance is looked at again, as Resume does).
@@ -1489,6 +1641,52 @@ export class Workflow {
     })
     if (out) return this.refuse(card, 'user', 'answer', out)
     return this.ok(card, from, this.state(card).stage)
+  }
+
+  /**
+   * A decision the user made answers some of a card's open requests (HI-1932, Darren's decision): the questions it names,
+   * each answered by it, in one write. Each must still be open and one a decision may answer (`decisionAnswers`), checked
+   * under the write: any that isn't refuses the whole of it, nothing written. Each request's asker (else the builder) is
+   * woken once with the requests it answers; nothing moves. The caller adds the decision itself in the same write
+   * (runIntent's patch) and checks who may (tasks.ts: the user or the Assistant, never an agent).
+   */
+  async answerByDecision(ref: unknown, requests: readonly string[], d: { text: string; decision: string; recordedBy: string }): Promise<Reply> {
+    const card = this.resolve(ref)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    const r = this.rulesetOf(card, s)
+    const notOpen = (st: CardState, request: string): GuardRefusal | null => {
+      const req = st.requests.find((x) => x.request === request)
+      return req && decisionAnswers(req) ? null : { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: `answer ${request}`, moves: '' } } // i18n-ignore: an intent's name and a request id
+    }
+    for (const id of requests) {
+      const no = notOpen(s, id)
+      if (no) return this.refuse(card, 'user', 'answer', no)
+    }
+    const at = new Date().toISOString()
+    const out = await this.write(card, r, 'user', (w) => {
+      const st = w.state()
+      // Under the transaction: every request still open and answerable, or none is answered.
+      for (const id of requests) {
+        const no = notOpen(st, id)
+        if (no) return no
+      }
+      const byAgent = new Map<string, string[]>()
+      for (const id of requests) {
+        const req = st.requests.find((x) => x.request === id)!
+        w.fact('Approval', { request: id, answer: 'answered', note: d.text, generation: st.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}), byDecision: { decision: d.decision, recordedBy: d.recordedBy, at } }) // i18n-ignore: a fact's kind and codes, not text
+        const asked = [...req.text.replace(/\s+/g, ' ').trim()]
+        const quoted = asked.length > QUESTION_QUOTE_MAX ? `${asked.slice(0, QUESTION_QUOTE_MAX - 1).join('')}…` : asked.join('')
+        const who = req.asker ?? st.started?.builder
+        if (who) byAgent.set(who, [...(byAgent.get(who) ?? []), `"${quoted}"`])
+      }
+      const said = (qs: string[]): string => `${card.key}: the user answered ${qs.join(' and ')} with a decision (recorded by ${d.recordedBy}): ${d.text}` // i18n-ignore: a wake, agent-facing
+      w.answer = said([...byAgent.values()].flat())
+      for (const [agent, qs] of byAgent) this.wake(w, agent, said(qs), 'answer')
+      return null
+    })
+    if (out) return this.refuse(card, 'user', 'answer', out)
+    return this.ok(card, s.stage, this.state(card).stage, { answered: [...requests] })
   }
 
   /** report merge (§16.9.3): the builder merged; Hive checks containment (unless Not checked), then Done. */

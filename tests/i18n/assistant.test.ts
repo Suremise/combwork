@@ -177,7 +177,7 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(tr(m('assistant.view.unpriced'), { count: 1 })).toBe('1 conversation without a price')
     expect(tr(m('assistant.templates.rowDesc'), { count: 1, layout: 'Two columns' })).toBe('1 agent · Two columns layout')
     expect(tr(m('assistant.templates.savedDetail'), { name: 'Pair', count: 2, layout: tr(m('assistant.templates.layoutPhrase'), { layout: 'columns2' }) })).toBe('"Pair": 2 agents, two columns layout.')
-    expect(tr(m('assistant.loadNames.filledNote'), { projects: 'beta', count: 1, names: 'Dev' })).toBe('Agent names are unique across the workspace, and beta already has an agent called Dev: a free name is filled in below. Change any name you like.')
+    expect(tr(m('assistant.loadNames.filledNote'), { projects: 'beta', count: 1, names: 'Dev' })).toBe('Agent names are unique across the workspace, and this name is taken already: Dev (projects: beta). A free name is filled in below. Change any name you like.')
   })
 
   it("who gets a skill, and where it goes", () => {

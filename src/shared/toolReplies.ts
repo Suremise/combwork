@@ -32,6 +32,11 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
   /** For a project agent: the cards in blockedBy and links that are another project's (it sees only their numbers). */
   elsewhere?: number[]
   /**
+   * Its requests waiting for the user (For you, HI-1932), oldest first: each one's id (what a decision's `answers` names),
+   * kind, gate, words and who asked. Absent when none waits.
+   */
+  forYou?: { request: string; kind: string; gate: string; text: string; asker?: string }[]
+  /**
    * Files kept with the card (HI-1700), newest first: full path (open it with your tools), name, size, who added it and
    * when, and where it came (a comment's author and time, the description, a session). `missing`: its file is gone.
    */
@@ -862,6 +867,92 @@ export function releasableText(r: ReleasablePublic): string {
 /** hive_release_slot release (#1561): what was released. */
 export function slotReleasedText(r: { project: string; kind: 'carried' | 'writer'; slot: string; agent: string; ended?: boolean }): string {
   return r.kind === 'carried' ? `Released ${r.slot} in ${r.project}: no longer kept for ${r.agent}; its folder and branch stay.` : `Released ${r.slot} in ${r.project}: ${r.agent}'s ended run no longer holds it${r.ended ? ', its listed processes ended first' : ''}.`
+}
+
+/** A template as the Agent API lists it (HI-1502, GET /v1/projects/{name}/templates). */
+export interface TemplateRowPublic {
+  scope: string
+  from?: string
+  file: string
+  name: string
+  agents: number
+  workflow: string[]
+  problem?: string
+}
+
+/** hive_template list (HI-1502): a line per template, with what load needs to name it (scope and file, from). */
+export function templateListText(r: { project: string; templates: TemplateRowPublic[] }): string {
+  if (!r.templates.length) return `No templates for ${r.project}.`
+  return r.templates
+    .map((t) => `${t.name} (scope ${t.scope}${t.from ? `, from ${t.from}` : ''}, file ${t.file}): ${t.agents} agents${t.workflow.length ? `, workflow for ${t.workflow.join(' and ')}` : ''}${t.problem ? `. Can't be used: ${t.problem}` : ''}`)
+    .join('\n')
+}
+
+/** A template's workflow as a plan or a load reports it (HI-1502). */
+interface TemplateWorkflowPublic {
+  platform: string
+  applies: boolean
+  needsGit: boolean
+  dropped: string[]
+  changes: { key: string; now: unknown; next: unknown }[]
+  missingCommands: string[]
+  identityOff: boolean
+  problems: string[]
+  saved?: boolean
+  notSaved?: string
+}
+
+/** A plan as the Agent API reports it (HI-1502, POST /v1/projects/{name}/templates/plan). */
+export interface TemplatePlanPublic {
+  project: string
+  template: { scope: string; file: string; name: string }
+  remove: string[]
+  create: { name: string; template: string; role: string; provider: string; pairedWith?: string }[]
+  taken: { name: string; project: string; suggestion: string }[]
+  connections: string[]
+  blocked: string[]
+  workflow: TemplateWorkflowPublic | null
+}
+
+/** A load as the Agent API reports it (HI-1502, POST /v1/projects/{name}/templates/load). */
+export interface TemplateLoadPublic {
+  project: string
+  template: { scope: string; file: string; name: string }
+  removed: string[]
+  created: string[]
+  renamed: { template: string; name: string }[]
+  connections: string[]
+  workflow: TemplateWorkflowPublic | null
+}
+
+const shownValue = (v: unknown): string => (typeof v === 'string' ? v : JSON.stringify(v ?? null))
+
+/** A workflow's part of a plan's or a load's reply: what it changes, checks with no command, the identity left off. */
+function templateWorkflowText(w: TemplateWorkflowPublic | null, will: boolean): string {
+  if (!w) return ''
+  if (!w.applies) return w.needsGit ? ' Its workflow is for Git only and this project has no version control.' : w.dropped.length ? ` Its workflow (${w.dropped.join(', ')}) can't be used here.` : ''
+  const changes = w.changes.length ? `${w.changes.length} options ${will ? 'change' : 'changed'} (${w.changes.map((c) => `${c.key}: ${shownValue(c.now)} → ${shownValue(c.next)}`).join('; ')})` : 'no option changes'
+  const saved = will ? `Workflow (${w.platform}): ${changes}` : w.saved ? `Workflow (${w.platform}) saved: ${changes}` : `Workflow not saved: ${w.notSaved ?? 'it has none for this project'}`
+  const missing = w.missingCommands.length ? `; checks with no command here (set them in Version Control): ${w.missingCommands.join(', ')}` : ''
+  const identity = w.identityOff ? '; identity stays off (no git identity here)' : ''
+  return ` ${saved}${missing}${identity}.${w.saved || will ? ' Lanes and cards in flight keep their rules.' : ''}`
+}
+
+/** hive_template plan (HI-1502): what loading would do, what stops it, names taken (with free ones) and its workflow. */
+export function templatePlanText(r: TemplatePlanPublic): string {
+  const made = r.create.map((a) => `${a.name}${a.name !== a.template ? ` (${a.template})` : ''} ${a.role}${a.pairedWith ? ` with ${a.pairedWith}` : ''}`).join(', ')
+  const head = `"${r.template.name}" into ${r.project}: removes ${r.remove.length ? r.remove.join(', ') : 'no agents'}; creates ${made}.`
+  const taken = r.taken.length ? ` Taken: ${r.taken.map((t) => `${t.name} (${t.project}'s): try "${t.suggestion}"`).join('; ')}.` : ''
+  const conn = r.connections.length ? ` ${r.connections.join(', ')} get the workspace's default connection.` : ''
+  const blocked = r.blocked.length ? ` Can't load yet: ${r.blocked.join(' ')}` : ''
+  return `${head}${taken}${conn}${templateWorkflowText(r.workflow, true)}${blocked}`
+}
+
+/** hive_template load (HI-1502): what was loaded, names given, and its workflow saved or why not. */
+export function templateLoadedText(r: TemplateLoadPublic): string {
+  const renamed = r.renamed.length ? ` (${r.renamed.map((x) => `${x.template} named ${x.name}`).join(', ')})` : ''
+  const conn = r.connections.length ? ` ${r.connections.join(', ')} got the workspace's default connection.` : ''
+  return `Loaded "${r.template.name}" into ${r.project}: removed ${r.removed.length ? r.removed.join(', ') : 'no agents'}; created ${r.created.join(', ')}${renamed}.${conn}${templateWorkflowText(r.workflow, false)} hive_undo can put the agents and options back.`
 }
 
 /** How Hive tells an agent of what waits for it, by the carrying-on switch that does it (#1432, shared/inboxSwitches.ts). */

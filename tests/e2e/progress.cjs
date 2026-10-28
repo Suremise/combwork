@@ -246,11 +246,9 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check('a finished run takes no more updates (409)', (await call(alfieToken, 'PATCH', `/v1/progress/${run1}`, { step: 2 })).status === 409)
   check('after a few seconds it leaves Pulse', !!(await until(async () => (await row.count()) === 0, 15000)))
   await showTab('runs')
-  // A run for no card is in Other (HI-1701), closed while all its runs passed; opened, it stays open.
+  // A run for no card is in Other (HI-1701), docked under Today (HI-1925): its run a line, its details closed.
   const other = panel.locator('.progress-card-runs[data-card-runs="other"]')
-  check('…and is in the Runs tab under Today, in Other, closed: 1 run, all passed', !!(await until(async () => ((await other.locator('.progress-card-summary').textContent().catch(() => '')) ?? '') === '1 run · all passed', HUNG_MS)) && (await panel.locator('.progress-runs-day .progress-section').first().textContent()) === 'Today' && (await other.locator('.progress-card-toggle').getAttribute('aria-expanded')) === 'false' && (await other.locator('.progress-recent').count()) === 0)
-  await openGroups()
-  check('…opened, the run passed', !!(await until(async () => (await panel.locator('.progress-recent.passed').count()) === 1, HUNG_MS)))
+  check('…and is in the Runs tab under Today, in Other: 1 run, all passed, its line shown, its details closed', !!(await until(async () => ((await other.locator('.progress-card-summary').textContent().catch(() => '')) ?? '') === '1 run · all passed', HUNG_MS)) && (await panel.locator('.progress-runs-dock .progress-runs-day .progress-section').first().textContent()) === 'Today' && (await other.locator('.progress-recent.passed').count()) === 1 && (await other.locator('.progress-details').count()) === 0)
   await showTab('pulse')
 
   // --- Failed, with the panel folded: the taskbar goes red until the panel is looked at; the run stays until dismissed.
@@ -696,8 +694,10 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check("with the Assistant's panel open, Progress sits to its left", boxes[0] !== null && boxes[1] !== null && boxes[0] < boxes[1], JSON.stringify(boxes))
   await page.screenshot({ path: path.join(shots, 'light-with-assistant.png') })
   await panel.locator('button[aria-label^="Fold the Progress panel"]').focus()
-  // From the fold button (the tabs come before it), past the filters, to the first run.
-  for (let i = 0; i <= (await panel.locator('.progress-filter select').count()); i++) await page.keyboard.press('Tab')
+  // From the fold button (the tabs come before it), past the filters and the failures' line (above the runs, HI-1923),
+  // to the first run.
+  const stops = (await panel.locator('.progress-filter select').count()) + (await panel.locator('.progress-tab-pulse > .progress-attention').count())
+  for (let i = 0; i <= stops; i++) await page.keyboard.press('Tab')
   const firstRow = panel.locator('.progress-run').first()
   check('light: the focused run shows the focus too', (await firstRow.evaluate((el) => getComputedStyle(el).outlineStyle)) === 'solid')
   await page.screenshot({ path: path.join(shots, 'light-run-focused.png') })

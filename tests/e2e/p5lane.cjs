@@ -145,8 +145,21 @@ const ancestor = (x, y) => {
     const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
     const shell = async (cmd) => {
       const before = shells().length
-      // Hive may type a wake into B1 as the suite types (a verdict's): typeLine types it again when the wake disturbed it.
-      await lib.typeLine(inv, lib.ptyKey(alpha, b1.id), fx.claudeHome, 'B1', `shell: ${cmd}`, { ready: () => idle(b1.id), live: () => live(b1.id), hungMs: HUNG_MS })
+      // Hive may type a wake into B1 as the suite types (a verdict's, a card's task): each try waits for B1 idle with its
+      // inbox quiet (HI-1918: idle between Hive's own turns isn't enough), and typeLine types it again when a wake disturbed it.
+      let seen = null
+      const typed = await lib.typeLine(inv, lib.ptyKey(alpha, b1.id), fx.claudeHome, 'B1', `shell: ${cmd}`, {
+        ready: async () => {
+          const state = await live(b1.id)
+          seen = { status: state?.status, composer: state?.runtime?.composer, pending: await lib.inboxPending(PORT, 'alpha', b1.name, tokens.b1) }
+          return lib.agentQuiet(PORT, 'alpha', state, tokens.b1)
+        },
+        strict: true,
+        live: () => live(b1.id),
+        hungMs: HUNG_MS
+      })
+      // Never typed unready (strict): what kept B1 from it, said with the failure (HI-1918).
+      if (!typed.attempt) throw new Error(`B1 never took "${cmd}": ${typed.lost.join('; ')}; last seen ${JSON.stringify(seen)}`)
       await waitHung(() => shells().length > before)
       await waitHung(() => idle(b1.id))
       if (!shells().slice(before).some((s) => s.cmd === cmd)) throw new Error(`B1 didn't run "${cmd}" (its line wasn't taken)`)

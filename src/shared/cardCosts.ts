@@ -3,7 +3,7 @@ import { estimateCost, usesOwnPrices } from './prices'
 import { fmt, msg, tr } from './i18n'
 import { TASK_COLUMNS } from './tasks'
 import { reviewRounds } from './laneBar'
-import { costText, money } from './usageTotals'
+import { costText, money, moneyUnit, moneyUnits, unitMoneyLabel } from './usageTotals'
 import { TOKENS_SPREAD, TOKENS_UNKNOWN, chargeShares, rowModel, type UsageRow, type UsageTimeline } from './usageTimeline'
 import type { Fact, FactData, StageId } from './workflow/facts'
 
@@ -493,13 +493,113 @@ export interface RoundCost {
 }
 
 /**
- * A card's cost per round and role (#1226), as data (no view yet: #820). `rounds` is empty for a card with no rounds:
- * `preWorkflow` says when that is because it is from before 1.0 (it has no facts to split by).
+ * A card's cost per round and role (#1226; shown in the card dialog's Work section, HI-1906). `rounds` is empty for a card
+ * with no rounds: `preWorkflow` says when that is because it is from before 1.0 (it has no facts to split by). Each
+ * round's parts are shares of `total`, the card's cost as cost per card counts it (its ledger rows), so they add up to it.
  */
 export interface CardRoundCosts {
   number: number
   preWorkflow: boolean
   rounds: RoundCost[]
+  /**
+   * What its agents used holding it outside all its rounds (a card adopted at the upgrade, held before its work began
+   * there), so the rounds and this add up to the total; null when there is none.
+   */
+  outside: Pick<RoundCost, 'build' | 'review' | 'agents'> | null
+  /** The card's cost, exactly as cost per card gives it; null with no rounds. */
+  total: CostPart | null
+}
+
+/** One agent's use of a card in one round, as its sessions' timelines give it, and how long (ms) it held the card then. */
+export interface RolePiece {
+  part: CostPart
+  held: number
+}
+
+const partTokenSum = (p: CostPart): number => p.inputTokens + p.outputTokens + p.cacheWriteTokens + p.cacheReadTokens
+
+/**
+ * A role's part of a card's cost (the ledger's, as the card's total counts it) shared out between the pieces of it
+ * (HI-1906): by what the timelines give each (cost, else tokens), else by how long each held the card, else equally, so
+ * the shares add up to the part. A share of less than all of it is Hive's (≈). What isn't known stays unknown: in the
+ * pieces whose own use isn't known, or in each piece with a share when none says which.
+ */
+export function shareRole(ledger: CostPart, pieces: RolePiece[]): CostPart[] {
+  if (!pieces.length) return []
+  const weigh: (p: RolePiece) => number = pieces.some((p) => p.part.cost > 0) ? (p) => p.part.cost : pieces.some((p) => partTokenSum(p.part) > 0) ? (p) => partTokenSum(p.part) : pieces.some((p) => p.held > 0) ? (p) => p.held : () => 1
+  const w = pieces.map(weigh)
+  const sum = w.reduce((a, b) => a + b, 0)
+  const unpricedPiece = pieces.some((p) => p.part.unpriced > 0)
+  const tokensUnknownPiece = pieces.some((p) => p.part.tokensUnknown > 0)
+  return pieces.map((p, i) => {
+    const f = w[i] / sum
+    const some = f > 0
+    const part = w[i] !== sum
+    return {
+      inputTokens: ledger.inputTokens * f,
+      outputTokens: ledger.outputTokens * f,
+      cacheWriteTokens: ledger.cacheWriteTokens * f,
+      cacheReadTokens: ledger.cacheReadTokens * f,
+      requests: ledger.requests * f,
+      cost: ledger.cost * f,
+      estimated: ledger.estimated || (part && some && ledger.priced > 0),
+      priced: some && ledger.priced > 0 ? 1 : 0,
+      unpriced: ledger.unpriced > 0 && (unpricedPiece ? p.part.unpriced > 0 : some) ? 1 : 0,
+      tokensUnknown: ledger.tokensUnknown > 0 && (tokensUnknownPiece ? p.part.tokensUnknown > 0 : some) ? 1 : 0,
+      tokensEstimated: ledger.tokensEstimated || (part && some)
+    }
+  })
+}
+
+/** An amount in a table of costs: its whole units (moneyUnit's), as allocated, and as shown. */
+export interface CostCell {
+  units: number
+  text: string
+}
+
+export interface CostTable {
+  /** In dollars: a cent, or a dollar when the total is $100 or more (as the card's own cost line shows it). */
+  unit: number
+  rounds: { build: CostCell; review: CostCell; total: CostCell }[]
+  build: CostCell
+  review: CostCell
+  total: CostCell
+}
+
+/**
+ * A card's cost by round and role as shown (HI-1906): the total's whole units (as the card's cost line rounds it, none
+ * under one) allocated once over every round's builder and reviewer parts, each its whole units and then those with the
+ * largest remainders (ties to the earlier round, then the builder), so every round and role total is the sum of what its
+ * parts show and the whole adds up to the card's cost. Exact amounts stay in the parts: only what is shown is allocated.
+ * ≈, + ? and Unknown are each part's own.
+ */
+export function costCells(total: CostPart, rounds: { build: CostPart; review: CostPart }[]): CostTable {
+  const unit = moneyUnit(total.cost)
+  // Rounded as the card's line rounds it; under one unit, nothing (the line says "< $0.01").
+  const whole = total.cost > 0 && total.cost < unit ? 0 : moneyUnits(total.cost)
+  const parts = rounds.flatMap((r) => [r.build, r.review])
+  const exact = parts.map((p) => Math.max(0, p.cost) / unit)
+  const units = exact.map((e) => Math.floor(e))
+  let left = whole - units.reduce((a, b) => a + b, 0)
+  const order = parts.map((_, i) => i).sort((a, b) => exact[b] - units[b] - (exact[a] - units[a]) || a - b)
+  for (let k = 0; left > 0 && order.length; k = (k + 1) % order.length, left--) units[order[k]]++
+  // Shares summed a little over the total (float error): taken from the smallest remainders.
+  for (let k = order.length - 1; left < 0 && k >= 0; k--) {
+    if (units[order[k]] === 0) continue
+    units[order[k]]--
+    left++
+  }
+  const cell = (p: CostPart, n: number): CostCell => ({ units: n, text: !p.priced && !p.unpriced ? '—' : costText(p, () => unitMoneyLabel(n, unit, p.cost)) })
+  const sum = (list: CostPart[]): CostPart => list.reduce((a, p) => addPart(a, p), emptyPart())
+  const out = rounds.map((r, i) => ({ build: cell(r.build, units[2 * i]), review: cell(r.review, units[2 * i + 1]), total: cell(sum([r.build, r.review]), units[2 * i] + units[2 * i + 1]) }))
+  const col = (j: number): number => out.reduce((a, _, i) => a + units[2 * i + j], 0)
+  return {
+    unit,
+    rounds: out,
+    build: cell(sum(rounds.map((r) => r.build)), col(0)),
+    review: cell(sum(rounds.map((r) => r.review)), col(1)),
+    total: cell(total, col(0) + col(1))
+  }
 }
 
 /** Tokens and requests as whole numbers (a row partly in a span gives fractions). */

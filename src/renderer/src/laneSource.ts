@@ -3,7 +3,7 @@ import { panelOrder } from '@shared/laneBar'
 import { columnSince, type LaneOrderView } from '@shared/tasks'
 import type { LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '@shared/types'
 import { call } from './api'
-import { get, set, useStore } from './store'
+import { get, set, setLoaded, useStore } from './store'
 
 /**
  * Where the Progress panel's lanes come from (#484): the one place that knows the lane data's shape (#483's
@@ -27,6 +27,8 @@ export interface Lane {
   name: string | null
   /** Its cards' numbers, in the order they are worked. The panel reads each card from the board itself, as it is now. */
   cards: number[]
+  /** Its cards as main read them (HI-1926: each one's round; an ended lane's as it left them), in the same order. */
+  info: LaneCard[]
   /** paused: it waits for the user (a blocked card, nothing else worked); ended: merged; abandoned: an agent was removed, or it was given up. */
   state: LaneInfo['state']
   /** Ended or abandoned: its cards as it left them (#512), never the board's now. */
@@ -80,9 +82,9 @@ export function useLanes(load = true): Lane[] {
   useEffect(() => {
     if (!ws || !load) return
     let current = true
-    void call('lanes:list').then((lanes) => current && set({ lanes }))
+    void call('lanes:list').then((lanes) => current && setLoaded({ lanes }))
     // The order as saved now: another window may have changed it while it had this workspace open.
-    void call('ui:get').then((ui) => current && set({ laneOrder: ui.laneOrder ?? {} }), () => undefined)
+    void call('ui:get').then((ui) => current && setLoaded({ laneOrder: ui.laneOrder ?? {} }), () => undefined)
     return () => {
       current = false
     }
@@ -98,7 +100,7 @@ export function useLanes(load = true): Lane[] {
     const lanes = raw.flatMap((d): Lane[] => {
       const project = pathOf.get(d.project.toLowerCase())
       const frozen = d.state === 'ended' || d.state === 'abandoned' ? d.cards : null
-      return project ? [{ id: d.id, project, builder: who(d.builder), reviewer: d.reviewer ? who(d.reviewer) : null, pool: !!d.pool, poolReview: d.poolReview ?? null, slot: d.slotInfo ?? null, name: d.name, cards: d.cards.map((c) => c.number), state: d.state, frozen, startedAt: d.startedAt, endedAt: d.endedAt, mergeCommit: d.mergeCommit, status: d.status ?? null, oldRules: !!d.oldRules, stages: d.stages ?? null }] : []
+      return project ? [{ id: d.id, project, builder: who(d.builder), reviewer: d.reviewer ? who(d.reviewer) : null, pool: !!d.pool, poolReview: d.poolReview ?? null, slot: d.slotInfo ?? null, name: d.name, cards: d.cards.map((c) => c.number), info: d.cards, state: d.state, frozen, startedAt: d.startedAt, endedAt: d.endedAt, mergeCommit: d.mergeCommit, status: d.status ?? null, oldRules: !!d.oldRules, stages: d.stages ?? null }] : []
     })
     return lanes.length ? panelOrder(lanes, order) : NO_LANES
   }, [raw, projects, order])

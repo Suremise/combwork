@@ -100,6 +100,7 @@ interface HiveMessageValues {
   'panes.menu.compact': undefined
   'panes.menu.discard': undefined
   'panes.menu.handOver': undefined
+  'panes.menu.hooks': undefined
   'panes.menu.moveDown': undefined
   'panes.menu.moveLeft': undefined
   'panes.menu.moveRight': undefined

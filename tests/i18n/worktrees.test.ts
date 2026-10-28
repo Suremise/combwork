@@ -99,8 +99,8 @@ describe("agents' and worktrees' refusals: English for agents as before, the win
       [await caught(run(() => agents.addAgent(proj, { name: 'R', location: 'new-worktree' }))), 'Agents aren’t pinned to worktrees in 1.0: slots are lent per card or lane.', 400, null],
       [await caught(run(() => agents.moveAgent(proj, 'nope', 0))), 'That agent no longer exists.', 404, 'Diesen Agenten gibt es nicht mehr.'],
       [await caught(run(() => agents.moveAgent(proj, 'a1', Number.NaN))), 'Choose where to move the agent.', 500, null],
-      [await caught(run(() => agents.updateAgent(proj, 'a1', { name: ' ' }))), 'Enter a name.', 500, 'Gib einen Namen ein.'],
-      [await caught(run(() => agents.updateAgent(proj, 'a1', { role: 'x'.repeat(200) }))), /^A role is at most \d+ characters\.$/, 500, /^Eine Rolle hat höchstens \d+ Zeichen\.$/],
+      [await caught(run(() => agents.updateAgent(proj, 'a1', { name: ' ' }))), 'Enter a name.', 400, 'Gib einen Namen ein.'],
+      [await caught(run(() => agents.updateAgent(proj, 'a1', { role: 'x'.repeat(200) }))), /^A role is at most \d+ characters\.$/, 400, /^Eine Rolle hat höchstens \d+ Zeichen\.$/],
       [await caught(run(() => agents.branchStatus(proj, 'a1'))), 'This agent works in the project folder, not a worktree.', 500, 'Dieser Agent arbeitet im Projektordner, nicht in einem Worktree.'],
       [await caught(wt.uniqueBranch(proj, 'main/x')), "Git can't make the branch main/x: a branch main is in the way. Choose another branch.", 500, 'Git kann den Branch main/x nicht anlegen: der Branch main ist im Weg.'],
       [await caught(wt.createWorktree(proj, join(treesRoot, 'bad'), 'bad..name', 'main')), '"bad..name" is not a valid branch name.', 500, '„bad..name“ ist kein gültiger Branch-Name.'],
@@ -112,7 +112,8 @@ describe("agents' and worktrees' refusals: English for agents as before, the win
       expect(e.message).toMatch(english)
       expect(apiErrorReply(e).body.error).toBe(e.message)
       expect(apiErrorReply(e).status, e.message).toBe(status)
-      expect(apiErrorReply(new Error(e.message)).status, `${e.message}: the status its English always gave`).toBe(status)
+      // Except the refusals HI-1952 gave a kind, which answered 500 (no pattern matched their English): now 400.
+      if (!/^(Enter a name\.|A role is at most)/.test(e.message)) expect(apiErrorReply(new Error(e.message)).status, `${e.message}: the status its English always gave`).toBe(status)
       // The window (IPC's conversion): in its language, or English where this test has no translation.
       expect((windowError(e) as Error).message).toMatch(german ?? english)
       expect(shownError(e)).toMatch(german ?? english)

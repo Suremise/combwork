@@ -128,11 +128,18 @@ export class ProgressRun {
   /** With no target: step lines for the wrapper it runs under (wrappedLines), or nothing. */
   private readonly lines: ((line: string) => void) | undefined
   private lineStep = -1
+  /** How its finish went (HI-1892): see `finishedAs`. */
+  private finishOutcome: FinishOutcome | null = null
+  /** When its start was sent, and the longest it may take: a finish waits for what is left of it first (HR2's round 1). */
+  private readonly startedAt = Date.now()
+  private readonly startTimeoutMs: number
 
-  constructor(target: ProgressTarget | null, start: ProgressStart, opts: { minIntervalMs?: number; fetch?: Fetch; lines?: (line: string) => void } = {}) {
+  /** `startTimeoutMs`: how long its start may take to answer (default 3 s; it is sent beside the command, never before it). */
+  constructor(target: ProgressTarget | null, start: ProgressStart, opts: { minIntervalMs?: number; fetch?: Fetch; lines?: (line: string) => void; startTimeoutMs?: number } = {}) {
     this.target = target
     this.fetchImpl = opts.fetch ?? (globalThis.fetch as unknown as Fetch)
     this.minIntervalMs = opts.minIntervalMs ?? 500
+    this.startTimeoutMs = opts.startTimeoutMs ?? 3000
     const total = count(start.total, MAX_TOTAL) || undefined
     this.maxStep = total ?? MAX_TOTAL
     this.hasTotal = total !== undefined
@@ -156,7 +163,7 @@ export class ProgressRun {
       pid: process.pid
     }
     this.id = target
-      ? this.send('POST', '/v1/progress', body, 3000).then((r) => (r && typeof (r as { id?: unknown }).id === 'string' ? (r as { id: string }).id : null))
+      ? this.send('POST', '/v1/progress', body, this.startTimeoutMs).then((r) => (r && typeof (r as { id?: unknown }).id === 'string' ? (r as { id: string }).id : null))
       : Promise.resolve(null)
     this.chain = this.id
     this.lines = target ? undefined : opts.lines
@@ -216,12 +223,19 @@ export class ProgressRun {
     this.chain = this.chain.then(() => this.id).then((id) => (id ? this.send('PATCH', `/v1/progress/${encodeURIComponent(id)}`, u, 2000) : null))
   }
 
+  /** How its finish went, once `finish` has resolved (null before, or with no target). */
+  finishedAs(): FinishOutcome | null {
+    return this.finishOutcome
+  }
+
   /**
    * Ends the run: ok or not, with an optional summary ("11 passed, 1 failed"), and what else is known: the exit code, a
    * log or record file. Inside hive-progress the log goes to the wrapper as a line (it reports the finish). Never rejects.
-   * Resolves with Hive's answer (a check run's says how it counted, #1654), or null when there is none in time.
+   * Resolves with Hive's answer (a check run's says how it counted, #1654), or null when there is none in time;
+   * `finishedAs` then says how it went. With `retry` (a check's run, HI-1892: its result is what a submit needs), a
+   * finish that got no reply is sent once more after `retry` ms: a 409 then says the first one arrived.
    */
-  async finish(ok: boolean, summary?: string, finishWaitMs = 3000, more: ProgressFinishMore = {}): Promise<unknown> {
+  async finish(ok: boolean, summary?: string, finishWaitMs = 3000, more: ProgressFinishMore = {}, retry?: number): Promise<unknown> {
     if (this.lines && more.logPath && !this.finished) this.lines(`##hive-progress log=${clip(more.logPath, MAX_LOG_PATH)}`)
     if (!this.target || this.finished) return null
     this.finished = true
@@ -232,16 +246,46 @@ export class ProgressRun {
     const late = this.pending?.total !== undefined ? this.pending : null
     this.pending = null
     if (late) this.chain = this.chain.then(() => this.id).then((id) => (id ? this.send('PATCH', `/v1/progress/${encodeURIComponent(id)}`, late, Math.min(2000, finishWaitMs / 2)) : null))
+    const body = { ok, ...(more.stopped ? { stopped: true } : {}), ...(summary ? { summary: clip(summary, MAX_SUMMARY) } : {}), ...(Number.isSafeInteger(more.exitCode) ? { exitCode: more.exitCode } : {}), ...(more.logPath ? { logPath: clip(more.logPath, MAX_LOG_PATH) } : {}) }
     const done = this.chain
       .then(() => this.id)
-      .then((id) => (id ? this.send('POST', `/v1/progress/${encodeURIComponent(id)}/finish`, { ok, ...(more.stopped ? { stopped: true } : {}), ...(summary ? { summary: clip(summary, MAX_SUMMARY) } : {}), ...(Number.isSafeInteger(more.exitCode) ? { exitCode: more.exitCode } : {}), ...(more.logPath ? { logPath: clip(more.logPath, MAX_LOG_PATH) } : {}) }, finishWaitMs) : null))
+      .then(async (id): Promise<unknown> => {
+        if (!id) {
+          this.finishOutcome = 'noStart'
+          return null
+        }
+        const path = `/v1/progress/${encodeURIComponent(id)}/finish`
+        let r = await this.call('POST', path, body, finishWaitMs)
+        if (!r && retry !== undefined) {
+          await new Promise((res) => setTimeout(res, retry))
+          r = await this.call('POST', path, body, finishWaitMs)
+          // The first one arrived after all (its reply was what got lost): ended, but how it counted isn't known.
+          if (r?.status === 409) {
+            this.finishOutcome = 'endedBefore'
+            return null
+          }
+        }
+        this.finishOutcome = r?.ok ? 'answered' : r ? 'refused' : 'noReply'
+        return r?.ok ? r.body : null
+      })
     let timer: ReturnType<typeof setTimeout> | undefined
-    const answer = await Promise.race([done, new Promise((r) => (timer = setTimeout(() => r(null), finishWaitMs + 250)))])
+    // Its start may still be waiting for Hive (a quick command's start goes as it ends): what is left of the start's own
+    // time comes first, so a start Hive takes within it is followed by the finish (HR2's round 1), then the finish's.
+    const startLeft = Math.max(0, this.startedAt + this.startTimeoutMs - Date.now())
+    const bound = startLeft + (retry !== undefined ? 2 * finishWaitMs + retry : finishWaitMs) + 250
+    const answer = await Promise.race([done, new Promise((r) => (timer = setTimeout(() => r(null), bound)))])
     clearTimeout(timer)
+    this.finishOutcome ??= 'noReply'
     return answer ?? null
   }
 
   private async send(method: string, path: string, body: unknown, timeoutMs: number): Promise<unknown> {
+    const r = await this.call(method, path, body, timeoutMs)
+    return r?.ok ? r.body : null
+  }
+
+  /** One call to the API: its status and body, or null when there was no reply (none in time, or no connection). */
+  private async call(method: string, path: string, body: unknown, timeoutMs: number): Promise<{ ok: boolean; status: number; body: unknown } | null> {
     const t = this.target
     if (!t) return null
     try {
@@ -251,12 +295,19 @@ export class ProgressRun {
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(timeoutMs)
       })
-      return res.ok ? await res.json().catch(() => ({})) : null
+      return { ok: res.ok, status: res.status ?? (res.ok ? 200 : 0), body: res.ok ? await res.json().catch(() => ({})) : null }
     } catch {
       return null
     }
   }
 }
+
+/**
+ * How a run's finish went (HI-1892): `answered`, Hive took it; `noStart`, Hive never took the run's start (no reply in
+ * time), so nothing of it was recorded; `endedBefore`, a finish sent again found the first had arrived (its reply lost);
+ * `refused`, Hive answered with an error; `noReply`, no reply to it at all.
+ */
+export type FinishOutcome = 'answered' | 'noStart' | 'endedBefore' | 'refused' | 'noReply'
 
 /** What a run is for (#1220): what it names, or nothing for Hive's defaults (the agent's card, the folder's head). */
 export interface RunAsk {
@@ -284,11 +335,35 @@ export interface RunLink {
 }
 
 /**
- * Asks Hive what a run is for before its command starts (POST /v1/progress/resolve): `link` when it answered, `refused`
- * with its reason (a revision that isn't checked out, an unknown card, a check with no command), or `unreachable` (no
- * Hive, an older one without the call, a timeout).
+ * Why Hive gave no answer (HI-1892): `slow`, no reply within the time allowed (it is there, but busy); `refused`, the
+ * connection was refused or not allowed (Hive isn't running, or this process may not reach it: a sandbox); `failed`,
+ * anything else (an older Hive without the call, an error), with what happened.
  */
-export async function resolveRun(target: ProgressTarget, ask: RunAsk, opts: { fetch?: Fetch; timeoutMs?: number } = {}): Promise<{ link: RunLink } | { refused: string } | { wait: string; ticket?: string } | { unreachable: true }> {
+export type Unreachable = { unreachable: true; why: 'slow' | 'refused' | 'failed'; detail: string }
+
+/** Why a call threw: a timeout, a refused or forbidden connection, or something else (its message). */
+function unreachableOf(e: unknown): Unreachable {
+  const err = e as { name?: string; message?: string; code?: string; cause?: { code?: string; message?: string } }
+  if (err?.name === 'TimeoutError' || err?.name === 'AbortError') return { unreachable: true, why: 'slow', detail: 'no reply in time' }
+  const code = err?.cause?.code ?? err?.code
+  if (code === 'ECONNREFUSED' || code === 'EACCES' || code === 'EPERM') return { unreachable: true, why: 'refused', detail: code }
+  return { unreachable: true, why: 'failed', detail: err?.cause?.message ?? err?.message ?? String(e) }
+}
+
+/**
+ * Asks Hive what a run is for before its command starts (POST /v1/progress/resolve): `link` when it answered, `refused`
+ * with its reason (a revision that isn't checked out, an unknown card, a check with no command), or `unreachable` with
+ * why (`Unreachable`). `retry` (HI-1892): a slow or failed ask is asked once more after that many ms (never a refused
+ * connection: that fails at once).
+ */
+export async function resolveRun(target: ProgressTarget, ask: RunAsk, opts: { fetch?: Fetch; timeoutMs?: number; retry?: number } = {}): Promise<{ link: RunLink } | { refused: string } | { wait: string; ticket?: string } | Unreachable> {
+  const first = await resolveOnce(target, ask, opts)
+  if (!('unreachable' in first) || first.why === 'refused' || opts.retry === undefined) return first
+  await new Promise((r) => setTimeout(r, opts.retry))
+  return resolveOnce(target, ask, opts)
+}
+
+async function resolveOnce(target: ProgressTarget, ask: RunAsk, opts: { fetch?: Fetch; timeoutMs?: number }): Promise<{ link: RunLink } | { refused: string } | { wait: string; ticket?: string } | Unreachable> {
   const fetchImpl = opts.fetch ?? (globalThis.fetch as unknown as Fetch)
   try {
     const res = await fetchImpl(`${target.url}/v1/progress/resolve`, {
@@ -317,10 +392,10 @@ export async function resolveRun(target: ProgressTarget, ask: RunAsk, opts: { fe
     if (res.status === 400 && body && typeof body.error === 'string') return { refused: body.error }
     // An isolated run with no check copy free yet (#1435): what it waits for, to ask again.
     if (res.status === 409 && body && typeof body.wait === 'string') return { wait: body.wait, ...(typeof body.ticket === 'string' && body.ticket ? { ticket: body.ticket } : {}) }
-  } catch {
-    // no Hive, or it didn't answer in time
+    return { unreachable: true, why: 'failed', detail: `Hive answered ${res.status ?? 'with an error'}` }
+  } catch (e) {
+    return unreachableOf(e)
   }
-  return { unreachable: true }
 }
 
 /**

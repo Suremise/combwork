@@ -11,7 +11,7 @@ import { EMPTY_TIPS_STATE, type TipsState } from '@shared/tips'
 import { agentPtyKey, agentsPerPage, layoutFitting, layoutPanes, mostUrgent, projectLayout, projectSessionView } from '@shared/defaults'
 import { cellPage, cellPageCount, pageCells, pageIds, placedCells, type PaneCells } from '@shared/paneCells'
 import { projectAgentStates, type AgentState } from '@shared/agentState'
-import { tileOrder, tilePageOf, tilePageShown, tilesOnPage } from '@shared/tiles'
+import { tileOrder, tilePageOf, tilePageShown, tilesOnPage, tilesPerPage } from '@shared/tiles'
 import { agentProvider, providersInUse, providerWarnings, setInstalledCheck } from '@shared/providers'
 import { setDateStyle } from '@shared/dates'
 import { language as shownLanguage, msg, onLanguageChange, tr } from '@shared/i18n'
@@ -19,14 +19,16 @@ import { chooseFocus, deferredFocus } from './deferredFocus'
 import type { ProjectTab } from '@shared/projectTabs'
 import type { VcSection } from '@shared/gitRepo'
 import type { ProgressFilter } from '@shared/progress'
-import type { TemplateAgent, TemplateRef } from '@shared/templates'
+import type { TemplateAgent, TemplateEntry, TemplateRef } from '@shared/templates'
 import type { GitTool } from '@shared/gitTool'
 import type { RunsFilter } from '@shared/progressTabs'
 import { loadActivityView, saveActivityView, type ActivityView } from './activityView'
-import { cardWorker } from '@shared/activity'
+import { currentCard, type ActivityCardAgent } from '@shared/activity'
 import { boardReader } from './boardReads'
 import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkflowForm, WorkspaceUsage, RecentWorkspace } from '@shared/types'
 import type { PresetId } from '@shared/workflow/options'
+import type { TemplateWorkflow, TemplateWorkflows } from '@shared/workflow/templateOptions'
+import type { PlatformId } from '@shared/platform/descriptors'
 import type {
   AgentApiInfo,
   AgentInfo,
@@ -56,10 +58,11 @@ import type { KeptReturn } from '@shared/progressQueue'
 import type { SessionAction } from './util'
 import { storeUpdated } from './pageMarks'
 import { keepSame } from '@shared/keepSame'
-import { newerEnd, type SessionEnd } from '@shared/sessionEnd'
+import { withAction } from '@shared/assistantChangeList'
+import { sessionEndBook, type EndsChange, type SessionEnd } from '@shared/sessionEnd'
 import { rememberTab, shownTab } from '@shared/tabs'
 
-export type Activity = 'projects' | 'overview' | 'performance' | 'board' | 'notes' | 'skills' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
+export type Activity = 'projects' | 'overview' | 'activity' | 'performance' | 'board' | 'notes' | 'skills' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
 export type { ProjectTab } from '@shared/projectTabs'
 
 /**
@@ -69,7 +72,7 @@ export type { ProjectTab } from '@shared/projectTabs'
  */
 /** A template being edited (#510): its revision and content as saved (what a save expects there), and the draft. */
 /** A template being edited: `pairs` by the agents' places (#1440), so they follow a move, a removal or a renumbering. */
-export type TemplateDraft = { name: string; description: string; layout: PageLayout; agents: TemplateAgent[]; pairs?: { builder: number; reviewer: number }[] }
+export type TemplateDraft = { name: string; description: string; layout: PageLayout; agents: TemplateAgent[]; pairs?: { builder: number; reviewer: number }[]; workflow?: TemplateWorkflows }
 export interface TemplateEdit {
   /** The template (where it is kept). */
   ref: TemplateRef
@@ -156,6 +159,8 @@ export interface PromptRequest {
   check?: { label: string; initial: boolean; set: (checked: boolean) => void }
   /** A second tick box under the first (Save Template's "Use the project key in names", #1440), alike. */
   check2?: { label: string; initial: boolean; set: (checked: boolean) => void }
+  /** A third (Save Template's "Include this project's workflow", HI-1910), alike. */
+  check3?: { label: string; initial: boolean; set: (checked: boolean) => void }
   /** A drop-down under the field (where to turn a new MCP server on, #713); `set` gets the pick before the dialog resolves with a value. */
   select?: { label: string; options: { label: string; value: string }[]; initial: string; set: (value: string) => void }
   /**
@@ -390,6 +395,8 @@ interface State {
   sessionBulk: Record<string, SessionBulkProgress[]>
   /** The agent whose Compact dialog is open. */
   compactFor: AgentRef | null
+  /** The agent whose Hooks dialog is open (HI-982). */
+  hooksFor: AgentRef | null
   /** Project whose Add Agent dialog is open. */
   addAgentFor: string | null
   /** Agent whose settings dialog (name, model, effort, permission mode) is open. */
@@ -431,6 +438,13 @@ interface State {
   tileFocus: Record<string, string>
   /** Per project: the page of tiles the Tiles view shows (from 0). */
   tilePage: Record<string, number>
+  /** Per project: how many tiles fit its Tiles view's area, as last measured (HI-1951); none: TILES_PER_PAGE. */
+  tilesFit: Record<string, number>
+  /**
+   * Per project: the agent the focus view just went back from (HI-1951, HR1's round 1), until the grid drawn again has
+   * measured its page: the window may have been resized meanwhile, so its page is worked out again with it in view.
+   */
+  tileReturn: Record<string, string>
   /**
    * Per project: whose folder the Changes and Files tabs show (a worktree agent's id; anything else = the project
    * folder). Changes also takes an unused worktree (#400): `unused:<its folder>`, or `unused` for the list of them all.
@@ -438,8 +452,18 @@ interface State {
   changesRoot: Record<string, string>
   /** Per project: the Version Control tab's section shown (#607, #1416; none: Changes for Git, Workflow for None). */
   vcSection: Record<string, VcSection>
-  /** "How do you work?"'s Customise… (#1423): the Workflow section opens with this preset filled in, not saved. */
-  workflowPrefill: { path: string; preset: PresetId } | null
+  /**
+   * "How do you work?"'s Customise… (#1423): the Workflow section opens with this preset filled in, not saved. A loaded
+   * template's workflow (HI-1910): its section for `platform`, laid over the project's options as the form reads them.
+   */
+  workflowPrefill: { path: string; preset: PresetId | null; template?: { name: string; platform: PlatformId; section: TemplateWorkflow } } | null
+  /**
+   * A template waiting for its project's Git (HI-1910): its Load dialog's Set up Git… opened Version Control on Git's
+   * page; once Initialise repository… has made the repository and the project is Git, its Load dialog opens again.
+   */
+  templatePending: { path: string; entry: Pick<TemplateEntry, 'scope' | 'file' | 'name'>; from?: string } | null
+  /** Version Control opens on Git's page for this project (HI-1905's view, before its repository: HI-1910's Set up Git…). */
+  vcGitPreview: string | null
   /** Projects added from this window (Add Project, New Project): their Version Control tab shows the step, so no notice (#1423). */
   presetStepShown: string[]
   /** Per project: bumped after a Git action in this window, so the Version Control tab and the status bar read git again. */
@@ -623,6 +647,7 @@ export const useStore = create<State>(() => ({
   keepAwake: 0,
   sessionBulk: {},
   compactFor: null,
+  hooksFor: null,
   addAgentFor: null,
   agentSettingsFor: null,
   templateAgentFor: null,
@@ -641,9 +666,13 @@ export const useStore = create<State>(() => ({
   pageFocus: {},
   tileFocus: {},
   tilePage: {},
+  tilesFit: {},
+  tileReturn: {},
   changesRoot: {},
   vcSection: {},
   workflowPrefill: null,
+  templatePending: null,
+  vcGitPreview: null,
   presetStepShown: [],
   gitVersion: {},
   unusedVersion: {},
@@ -696,14 +725,25 @@ const KEPT_SAME = ['workspace', 'tasks', 'boardState', 'projectKeys', 'movedCard
 const LIVE_BATCH_MS = 250
 /** Agents' states not shown yet (applyLiveState), by projectKey, the newest of each. */
 const pendingLive = new Map<string, LiveSessionState>()
+/**
+ * Changes to show with them (HI-1862): an agent's bookkeeping (its terminal's epoch, a run's end, its usage changed, its
+ * start over), in the order made, so a dozen agents starting at once render the window a few times, not ~12 each.
+ */
+const pendingWith: ((s: State) => Partial<State>)[] = []
 let liveTimer: ReturnType<typeof setTimeout> | null = null
+/**
+ * The parts set with setLoaded (HI-1938): a direct set of one shows the changes waiting first, so an older answer
+ * waiting never replaces what was set after it.
+ */
+const LOADED = new Set<string>(['lanes', 'laneOrder', 'mergeSlots', 'assistantActions', 'assistantQuestions', 'assistantChanges', 'queues', 'queueKept', 'advanced', 'recent', 'openProgress', 'skillsVersion', 'modesVersion'] satisfies (keyof State)[])
 
 /** Sets the store, noting which of its parts changed (HI-1775): a long task's line in hive.log names the updates made in it. */
 export const set: typeof useStore.setState = ((partial: Parameters<typeof useStore.setState>[0], replace?: boolean) => {
   let before = useStore.getState()
   let update = typeof partial === 'function' ? partial(before) : partial
-  // A workspace set (main's newer report, a change made here): the agents' states waiting are older, so shown first.
-  if (pendingLive.size && update && 'workspace' in update) {
+  // A workspace set (main's newer report, a change made here): the agents' states waiting are older, so shown first;
+  // likewise the loaded parts waiting (setLoaded) before a direct set of one.
+  if ((pendingLive.size || pendingWith.length) && update && ('workspace' in update || Object.keys(update).some((k) => LOADED.has(k)))) {
     flushLiveStates()
     before = useStore.getState()
     if (typeof partial === 'function') update = partial(before)
@@ -883,7 +923,7 @@ export function agentsOnScreen(s: State = get()): Map<string, string[]> {
   // The Tiles view (#976): the agent its focus view shows, else the page of tiles.
   if (p && (s.projectTabs[p.path] ?? 'session') === 'session' && projectSessionView(p.config, s.settings) === 'tiles') {
     const focus = tileFocusOf(p, s)
-    out.set(p.path, focus ? [focus] : tilesOnPage(tileAgents(p, s), tilePage(p, s)).map((t) => t.a.id))
+    out.set(p.path, focus ? [focus] : tilesOnPage(tileAgents(p, s), tilePage(p, s), tilesPageSize(p, s)).map((t) => t.a.id))
   } else if (p && (s.projectTabs[p.path] ?? 'session') === 'session') {
     const focused = s.focusedAgent[p.path]
     const shown = paneAssignment(p, focused && p.agents.some((a) => a.id === focused) ? focused : (p.agents[0]?.id ?? null))
@@ -910,12 +950,33 @@ export function tileAgents(p: Pick<ProjectInfo, 'path' | 'name' | 'agents'>, s: 
   return tileOrder(states, s.settings?.sessions.tileOrder ?? 'panes').map((i) => ({ a: p.agents[i], state: states[i] }))
 }
 
-/** The page of tiles a project's Tiles view shows. */
-export const tilePage = (p: Pick<ProjectInfo, 'path' | 'agents'>, s: Pick<State, 'tilePage'> = get()): number => tilePageShown(s.tilePage[p.path] ?? 0, p.agents.length)
+/** How many tiles a page of a project's Tiles view holds: as many as fit its area (HI-1951), TILES_PER_PAGE until measured. */
+export const tilesPageSize = (p: Pick<ProjectInfo, 'path'>, s: Pick<State, 'tilesFit'> = get()): number => tilesPerPage(s.tilesFit[p.path])
 
-/** Shows a page of a project's tiles. */
+/** The page of tiles a project's Tiles view shows. */
+export const tilePage = (p: Pick<ProjectInfo, 'path' | 'agents'>, s: Pick<State, 'tilePage' | 'tilesFit'> = get()): number => tilePageShown(s.tilePage[p.path] ?? 0, p.agents.length, tilesPageSize(p, s))
+
+/**
+ * Shows a page of a project's tiles: the user's (or a command's) choice, so a return from the focus view still waiting for
+ * the grid's measure (`tileReturn`) no longer decides the page (HR1's HI-1951 round 2).
+ */
 export function showTilePage(p: Pick<ProjectInfo, 'path' | 'agents'>, page: number): void {
-  set((s) => ({ tilePage: { ...s.tilePage, [p.path]: tilePageShown(page, p.agents.length) } }))
+  set((s) => {
+    const { [p.path]: _, ...tileReturn } = s.tileReturn
+    return { tilePage: { ...s.tilePage, [p.path]: tilePageShown(page, p.agents.length, tilesPageSize(p, s)) }, tileReturn }
+  })
+}
+
+/**
+ * How many tiles fit a project's Tiles view now (HI-1951, measured as its area resizes): the page holds that many, and
+ * the page shown becomes the one with `keep` on it (the tile the keyboard is on, else the first shown), so it stays in view.
+ */
+export function setTilesFit(p: Pick<ProjectInfo, 'path' | 'name' | 'agents'>, fit: number, keep: string | null): void {
+  set((s) => {
+    if (s.tilesFit[p.path] === fit) return {}
+    const at = keep ? tileAgents(p, s).findIndex((t) => t.a.id === keep) : -1
+    return { tilesFit: { ...s.tilesFit, [p.path]: fit }, ...(at >= 0 ? { tilePage: { ...s.tilePage, [p.path]: tilePageOf(at, tilesPerPage(fit)) } } : {}) }
+  })
 }
 
 /** The agent a project's focus view shows (#976), while it is one of its agents; null: the grid of tiles. */
@@ -936,9 +997,24 @@ export function closeTile(p: ProjectInfo): string | null {
   set((s) => {
     const { [p.path]: _, ...rest } = s.tileFocus
     const at = id ? tileAgents(p, s).findIndex((t) => t.a.id === id) : -1
-    return { tileFocus: rest, ...(at >= 0 ? { tilePage: { ...s.tilePage, [p.path]: tilePageOf(at) } } : {}) }
+    return { tileFocus: rest, ...(at >= 0 ? { tilePage: { ...s.tilePage, [p.path]: tilePageOf(at, tilesPageSize(p, s)) }, tileReturn: { ...s.tileReturn, [p.path]: id! } } : {}) }
   })
   return id
+}
+
+/** The agent a project's focus view went back from, while its grid hasn't measured its page since (null: none). */
+export function tileReturnOf(p: Pick<ProjectInfo, 'path' | 'agents'>, s: Pick<State, 'tileReturn'> = get()): string | null {
+  const id = s.tileReturn[p.path]
+  return id && p.agents.some((a) => a.id === id) ? id : null
+}
+
+/** The grid has measured with the returning agent in view: its page is the grid's own again. */
+export function clearTileReturn(p: Pick<ProjectInfo, 'path'>): void {
+  if (!get().tileReturn[p.path]) return
+  set((s) => {
+    const { [p.path]: _, ...rest } = s.tileReturn
+    return { tileReturn: rest }
+  })
 }
 
 /**
@@ -1072,6 +1148,7 @@ export function selectedProjectInfo() {
 }
 
 export function setActivity(a: Activity): void {
+  navigations++
   set((s) => ({
     activity: a,
     lastSideActivity: a === 'docs' || a === 'settings' ? s.lastSideActivity : a,
@@ -1130,19 +1207,76 @@ export function openActivity(path: string, filter: { agentId?: string; card?: nu
   setProjectTab(path, 'activity')
 }
 
-/** Whether a card has an Activity to open (HI-1743): in progress (Doing or Review) in a project of this window. */
-export const cardHasActivity = (c: Pick<TaskCard, 'column' | 'project' | 'archived'>): boolean => !c.archived && !!c.project && (c.column === 'doing' || c.column === 'review')
+/**
+ * Whether a card has an Activity to open (HI-1743, HI-1664): in progress (Doing or Review), a project's or the
+ * workspace's own. Who works on it now is found as it opens.
+ */
+export const cardHasActivity = (c: Pick<TaskCard, 'column' | 'archived'>): boolean => !c.archived && (c.column === 'doing' || c.column === 'review')
 
-/** Opens a card's Activity (HI-1743): its project's tab, frozen, on the agent working on it (its builder while it runs, else its reviewer). */
-export function openCardActivity(c: TaskCard): void {
-  const p = get().workspace?.projects.find((x) => x.name.toLowerCase() === c.project.toLowerCase())
-  if (!p || !cardHasActivity(c)) return
-  // The agent on this card now: a builder gone on to its next card isn't (HR6's round 1).
-  const asActivity = (t: TaskCard) => ({ number: t.number, label: '', title: t.title, column: t.column, builder: t.agent, reviewer: t.review?.agent ?? null })
-  const cards = get().tasks.filter((t) => !t.archived && t.project.toLowerCase() === c.project.toLowerCase()).map(asActivity)
-  const worker = cardWorker(asActivity(c), cards, (id) => !!p.agents.find((a) => a.id === id)?.live)
-  openActivity(p.path, { card: c.number, ...(worker ? { agentId: worker } : {}) })
+/** The key of an agent of a session host on Activity's workspace level (HI-1664): its host's path and its id, as the panes'. */
+export const activityAgentKey = (path: string, agentId: string): string => projectKey(path, agentId)
+
+/** Where Activity's workspace level keeps its view (HI-1664): the workspace's own, never a project's or another workspace's. */
+export const workspaceActivityKey = (workspacePath: string): string => `workspace:${workspacePath.toLowerCase()}`
+
+/**
+ * Opens Activity's workspace level (HI-1664), frozen: filtered to these agents (keys of activityAgentKey), the first's
+ * tab shown, for a card (`card`: said so, and its agents found again as agents start and stop); null: as it was left.
+ */
+export function openWorkspaceActivity(filter: { agents: string[]; card?: number } | null): void {
+  const ws = get().workspace?.path
+  if (!ws) return
+  const k = workspaceActivityKey(ws)
+  set((s) => {
+    const was = s.activityFilters[k] ?? loadActivityView(k)
+    const opened = Date.now()
+    const { forCard: _forCard, ...rest } = was
+    const view: ActivityView = filter ? { ...rest, agents: filter.agents, cards: [], ...(filter.card !== undefined ? { forCard: filter.card } : {}), ...(filter.agents[0] ? { tab: filter.agents[0] } : {}), opened } : { ...was, opened }
+    saveActivityView(k, view)
+    return { activityFilters: { ...s.activityFilters, [k]: view } }
+  })
+  showView('activity')
 }
+
+/**
+ * The agents working on a card now (HI-1664): its builder and its reviewer while each runs with this card as its current
+ * one (a builder gone on to its next card isn't: HR6's round 1, HR5's HI-1664 round 1), and every agent whose running
+ * session worked on it, a workspace card's too (main finds them by the cards' index, only now). Keys of
+ * activityAgentKey, each once.
+ */
+export async function cardActivityAgents(c: TaskCard): Promise<string[]> {
+  const s = get()
+  const p = c.project ? s.workspace?.projects.find((x) => x.name.toLowerCase() === c.project.toLowerCase()) : undefined
+  const asActivity = (t: TaskCard) => ({ number: t.number, label: '', title: t.title, column: t.column, builder: t.agent, reviewer: t.review?.agent ?? null })
+  const cards = p ? s.tasks.filter((t) => !t.archived && t.project.toLowerCase() === c.project.toLowerCase()).map(asActivity) : []
+  // On it now: running, with this card as its current one.
+  const onIt = (id: string | null): id is string => !!p && !!id && !!p.agents.find((a) => a.id === id)?.live && currentCard(id, cards)?.number === c.number
+  const out = p ? [c.agent, c.review?.agent ?? null].filter(onIt).map((id) => activityAgentKey(p.path, id)) : []
+  const found = (await window.hive.invoke('activity:cardAgents', c.number).catch(() => [])) as ActivityCardAgent[]
+  // A project card's agents found by their session only while it is still their current card: a builder's session runs
+  // on into its next card (a card loop), its record keeping this one. A workspace card's agents have no current card.
+  for (const a of found) if (!p || a.path.toLowerCase() !== p.path.toLowerCase() || onIt(a.agentId)) out.push(activityAgentKey(a.path, a.agentId))
+  return [...new Set(out)]
+}
+
+/**
+ * Opens a card's Activity (HI-1743, HI-1664): the workspace level, frozen, on the agents working on it now. Found first:
+ * if the window went elsewhere meanwhile (another view, another workspace, another opening: HR5's HI-1664 round 1), it
+ * isn't opened.
+ */
+export async function openCardActivity(c: TaskCard): Promise<void> {
+  if (!cardHasActivity(c)) return
+  const mine = ++navigations
+  const ws = get().workspace?.path
+  const agents = await cardActivityAgents(c)
+  cardOpenings.settled++
+  if (mine !== navigations || !ws || get().workspace?.path !== ws) return void cardOpenings.dropped++
+  openWorkspaceActivity({ agents, card: c.number })
+}
+
+/** A card's Activity openings settled, and those dropped as the window went elsewhere: a test copy's window reads them. */
+const cardOpenings = { settled: 0, dropped: 0 }
+;(window as unknown as { __hiveCardActivity?: typeof cardOpenings }).__hiveCardActivity = cardOpenings
 
 /** Shows an agent's pane on the Session tab and focuses it. */
 export function revealAgent(p: ProjectInfo, agentId: string): void {
@@ -1181,8 +1315,12 @@ export function flashPane(key: string): void {
 
 /** Shows a sidebar view without toggling it (setActivity hides the sidebar when that view is already shown). */
 export function showView(a: Exclude<Activity, 'docs' | 'settings'>): void {
+  navigations++
   set({ activity: a, lastSideActivity: a, sidebarVisible: true })
 }
+
+/** Each view shown, counted: a card's Activity found after the window went elsewhere isn't opened (openCardActivity). */
+let navigations = 0
 
 /** Shows the Hive Assistant view (activity bar) on its conversations, its modes, its attachments ('images') or its journal. */
 export function showAssistantView(section: 'conversations' | 'modes' | 'images' | 'journal' | 'digests'): void {
@@ -1250,6 +1388,30 @@ export function applyLiveState(state: LiveSessionState): void {
   // A launch's state: any end kept for an older run no longer applies (HI-1881).
   if (state.status !== 'stopped') noteRun(state.projectPath, state.agentId, state.runId)
   pendingLive.set(projectKey(state.projectPath, state.agentId), state)
+  showSoon()
+}
+
+/**
+ * Sets the store with the agents' states (HI-1862): at once when none came lately, else at the end of their batch, in
+ * the same update. For an agent's bookkeeping that comes in bursts with its states (many agents started or ended at
+ * once); `withNext` waits for the state that follows it at once (an agent's new terminal shown with its start).
+ */
+export function setWithLive(change: (s: State) => Partial<State>, withNext = false): void {
+  pendingWith.push(change)
+  if (!withNext) showSoon()
+}
+
+/**
+ * Sets a part of the workspace main sent (a load's answer, an event's): in the same batch as the agents' states (HI-1938),
+ * at once when none came lately, else at the batch's end. Opening a workspace loads a dozen parts, each answering on its
+ * own: shown together, not one render each. Only for the parts in LOADED (a direct set of one shows the batch first).
+ */
+export function setLoaded(change: Partial<State> | ((s: State) => Partial<State>)): void {
+  setWithLive(typeof change === 'function' ? change : () => change)
+}
+
+/** Shows what waits now, unless a batch is under way: then at its end. */
+function showSoon(): void {
   if (liveTimer) return
   flushLiveStates()
   liveTimer = setTimeout(liveWindowEnds, LIVE_BATCH_MS)
@@ -1258,32 +1420,35 @@ export function applyLiveState(state: LiveSessionState): void {
 /** The batch's time is up: the states that came meanwhile are shown, and the next ones wait a while again. */
 function liveWindowEnds(): void {
   liveTimer = null
-  if (!pendingLive.size) return
+  if (!pendingLive.size && !pendingWith.length) return
   flushLiveStates()
   liveTimer = setTimeout(liveWindowEnds, LIVE_BATCH_MS)
 }
 
 /** The run each agent's window last saw start (HI-1881), by projectKey: an exit of any other run is an older one's. */
-const lastRuns = new Map<string, string>()
+const endBook = sessionEndBook()
 
-/** Notes the run an agent's live state is of (its latest launch); an end kept for another run no longer applies. */
+/** A change to the ends kept, as a store update: none when they stay the same. */
+const endsUpdate =
+  (change: EndsChange) =>
+  (s: State): Partial<State> => {
+    const ends = change(s.sessionEnds)
+    return ends === s.sessionEnds ? {} : { sessionEnds: ends }
+  }
+
+/**
+ * Notes the run an agent's live state is of (its latest launch): an end of another run, kept or still to be shown, no
+ * longer applies. With the state that brought it (applyLiveState, next): one update for both.
+ */
 export function noteRun(projectPath: string, agentId: string, runId: string): void {
-  const key = projectKey(projectPath, agentId)
-  if (lastRuns.get(key) === runId) return
-  lastRuns.set(key, runId)
-  if (get().sessionEnds[key] && get().sessionEnds[key].runId !== runId)
-    set((s) => {
-      const { [key]: _, ...rest } = s.sessionEnds
-      return { sessionEnds: rest }
-    })
+  const change = endBook.run(projectKey(projectPath, agentId), runId)
+  if (change) setWithLive(endsUpdate(change), true)
 }
 
-/** Keeps an ended run's why and when (HI-1881), unless it is an older run's than the latest the window saw start. */
+/** Keeps an ended run's why and when (HI-1881), unless it is an older run's than the latest the window saw start, then or when it is shown. */
 export function noteEnd(projectPath: string, agentId: string, end: SessionEnd): void {
-  const key = projectKey(projectPath, agentId)
-  const last = lastRuns.get(key)
-  if (last && last !== end.runId) return
-  set((s) => ({ sessionEnds: { ...s.sessionEnds, [key]: newerEnd(s.sessionEnds[key], end) } }))
+  const change = endBook.end(projectKey(projectPath, agentId), end)
+  if (change) setWithLive(endsUpdate(change))
 }
 
 /** Drops the ends of agents no longer in the window's workspace (their agent, project or workspace gone). */
@@ -1291,7 +1456,7 @@ export function pruneEnds(keep: (key: string) => boolean): void {
   const ends = get().sessionEnds
   const gone = Object.keys(ends).filter((k) => !keep(k))
   if (!gone.length) return
-  for (const k of gone) lastRuns.delete(k)
+  for (const k of gone) endBook.forget(k)
   set((s) => ({ sessionEnds: Object.fromEntries(Object.entries(s.sessionEnds).filter(([k]) => keep(k))) }))
 }
 
@@ -1311,12 +1476,56 @@ export function liveStateOf(projectPath: string, agentId: string): LiveSessionSt
   return findProject(get(), projectPath)?.agents.find((a) => a.id === agentId)?.live
 }
 
-/** Shows the agents' states waiting (applyLiveState) now; also before the workspace is set, which they are older than. */
+/**
+ * Shows the agents' states waiting (applyLiveState) now, and the changes made with them (setWithLive) first, in one
+ * update; also before the workspace is set, which they are older than.
+ */
 export function flushLiveStates(): void {
-  if (!pendingLive.size) return
+  if (!pendingLive.size && !pendingWith.length) return
   const states = [...pendingLive.values()]
+  const changes = pendingWith.splice(0)
   pendingLive.clear()
-  set((s) => (s.workspace ? { workspace: states.reduce(withLiveState, s.workspace) } : {}))
+  set((s) => {
+    let now: State = s
+    let out: Partial<State> = {}
+    for (const change of changes) {
+      const part = change(now)
+      now = { ...now, ...part }
+      out = { ...out, ...part }
+    }
+    return states.length && now.workspace ? { ...out, workspace: states.reduce(withLiveState, now.workspace) } : out
+  })
+}
+
+/**
+ * An action of the Assistant's told by an event (HI-1863): shown with the agents' states, once by id (a snapshot of the
+ * panel's loaded meanwhile may have it), and only in the workspace it was told in.
+ */
+export function noteAssistantAction(action: AssistantAction): void {
+  const ws = get().workspace?.path ?? null
+  setWithLive((s) => {
+    if ((s.workspace?.path ?? null) !== ws) return {}
+    const actions = withAction(s.assistantActions, action)
+    return actions === s.assistantActions ? {} : { assistantActions: actions }
+  })
+}
+
+/**
+ * Shows the workspace main reported (workspace-changed), dropping warnings about projects no longer in it. Another
+ * workspace's: the previous one's Assistant actions go in the same update, after those still waiting were shown (set's
+ * flush), so none of them reaches this one's panel (HR3's HI-1863 round 2).
+ */
+export function showWorkspace(ws: WorkspaceInfo | null, other: boolean): void {
+  set((s) => ({
+    workspace: ws,
+    ...(other ? { assistantActions: [] } : {}),
+    toasts: s.toasts.filter((t) => !t.id.startsWith('mcp-') || !!ws?.projects.some((p) => t.id === `mcp-${p.path}`))
+  }))
+}
+
+/** A project's usage changed (a session's tokens, its end): what shows it reads it again, with the agents' states. */
+export function bumpUsage(path: string): void {
+  setWithLive((s) => ({ usageVersion: { ...s.usageVersion, [path]: (s.usageVersion[path] ?? 0) + 1 } }))
 }
 
 function withLiveState(workspace: WorkspaceInfo, state: LiveSessionState): WorkspaceInfo {
@@ -1411,7 +1620,9 @@ export async function whileStarting<T>(path: string, agentId: string, what: Star
   try {
     return await fn()
   } finally {
-    set((s) => {
+    // Its start over: shown with the agents' states (a dozen started at once end together, HI-1862). A start clicked
+    // meanwhile is still ignored, as while it was under way.
+    setWithLive((s) => {
       const { [key]: _, ...rest } = s.starting
       return { starting: rest }
     })
@@ -1464,6 +1675,15 @@ function openDialog(d: DialogRequest): void {
 /** Closes the dialog shown (its caller resolves it) and shows the next one waiting, if any. */
 export function closeDialog(): void {
   set({ dialog: dialogQueue.shift() ?? null, dialogBlocked: null })
+}
+
+/** Closes the dialog shown as its Cancel would (from what it shows: HI-1910's Set up Git…), its caller told so. */
+export function cancelDialog(): void {
+  const d = get().dialog
+  if (!d) return
+  closeDialog()
+  if (d.kind === 'confirm') d.resolve(false)
+  else if (d.kind === 'prompt' || d.kind === 'choice') d.resolve(null)
 }
 
 export function confirm(opts: Omit<ConfirmRequest, 'kind' | 'resolve'>): Promise<boolean> {

@@ -394,6 +394,18 @@ describe('the advanced store', () => {
     await vi.waitFor(() => expect(s.state(null).fileError).toMatch(/isn't valid JSON/), { timeout: 10_000 })
     expect(s.number('hive.mcp.replySeconds')).toBe(900)
     await expect(s.set('hive.mcp.replySeconds', 600)).rejects.toThrow('Fix advanced.json')
+    // Through the Agent API (the Assistant's PATCH /v1/settings/:id reaches this set): a refusal by the file's state, 409
+    // with its words and the caller's error in metrics, never Hive's 500 (HI-1952 round 1); so is a reset of them all.
+    const { apiErrorReply } = await import('../src/main/servers')
+    const { apiOutcome } = await import('../src/main/metrics')
+    for (const refused of [await s.set('hive.mcp.replySeconds', 600).catch((e: unknown) => e), await s.resetAll().catch((e: unknown) => e)]) {
+      const reply = apiErrorReply(refused)
+      expect(reply.status, String(refused)).toBe(409)
+      expect(reply.body.error).toMatch(/^advanced\.json isn't valid JSON.*Fix (or delete )?advanced\.json/s)
+      expect(apiOutcome({ finished: true, status: reply.status, waiting: false })).toBe('client-error')
+    }
+    // No setting by that id: 404.
+    expect(apiErrorReply(await s.set('hive.nope', 1).catch((e: unknown) => e)).status).toBe(404)
     // The broken file is left for the user to fix.
     expect(readFileSync(file, 'utf8')).toBe('{ "values": { "hive.mcp.replySeconds": 9')
   })

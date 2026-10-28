@@ -108,8 +108,9 @@ export function KeybindingsEditor({ project }: { project?: ProjectInfo }) {
   const settings = useStore((s) => s.settings)
   const [query, setQuery] = useState('')
   const [recording, setRecording] = useState<string | null>(null)
-  // A tab clicked while searching narrows the search for as long as it lasts; it isn't remembered (HR5's HI-1838 design check).
-  const [searchTab, setSearchTab] = useState<KeysTab | null>(null)
+  // A tab clicked while searching narrows that search, with the query it was made for; it isn't remembered (HR5's
+  // HI-1838 design check). A changed query drops it (HI-1885, as Advanced's HI-1839).
+  const [clicked, setClicked] = useState<{ query: string; tab: KeysTab } | null>(null)
   const idBase = useId()
   const global: KeybindingOverrides = settings?.keybindings ?? NO_KEYS
   const local: KeybindingOverrides = project?.config.keybindings ?? NO_KEYS
@@ -145,12 +146,13 @@ export function KeybindingsEditor({ project }: { project?: ProjectInfo }) {
   const categories = useMemo(() => [...new Set(rows.map((r) => r.c.category))], [rows])
   const tabIds = useMemo((): KeysTab[] => [ALL, ...categories], [categories])
   const remembered = useRememberedTab<KeysTab>(project ? 'shortcuts.project' : 'shortcuts', tabIds, ALL)
-  // Searching shows All (or the tab clicked meanwhile); cleared, the tab remembered before it is back.
+  // Searching shows All (or the tab clicked during this very query); cleared, the tab remembered before it is back.
   useEffect(() => {
-    if (!q) setSearchTab(null)
+    setClicked((c) => (c && c.query !== q ? null : c))
   }, [q])
-  const tab: KeysTab = q ? (searchTab && tabIds.includes(searchTab) ? searchTab : ALL) : remembered
-  const chooseKeysTab = (id: KeysTab): void => (q ? setSearchTab(id) : chooseTab(project ? 'shortcuts.project' : 'shortcuts', id))
+  const searchTab = q && clicked?.query === q && tabIds.includes(clicked.tab) ? clicked.tab : null
+  const tab: KeysTab = q ? (searchTab ?? ALL) : remembered
+  const chooseKeysTab = (id: KeysTab): void => (q ? setClicked({ query: q, tab: id }) : chooseTab(project ? 'shortcuts.project' : 'shortcuts', id))
   // Each tab's count: its commands, or while searching its matches.
   const count = (id: KeysTab): number => (id === ALL ? matching.length : matching.filter((r) => r.c.category === id).length)
   const shown = tab === ALL ? matching : matching.filter((r) => r.c.category === tab)
@@ -218,7 +220,7 @@ export function KeybindingsEditor({ project }: { project?: ProjectInfo }) {
       </div>
       {project && <p className="faint kb-note">{tr(msg({ id: 'settings.keys.projectNote', defaultMessage: 'Changes here apply while {project} is selected, over the global shortcuts. Other commands are set in Settings → Keyboard Shortcuts.', description: "Above a project's shortcuts (Project Settings → Keyboard Shortcuts). {project} is its name." }), { project: project.name })}</p>}
       <Tabs<KeysTab> idBase={idBase} className="kb-tabs" label={tr(T.tabs)} value={tab} onChange={chooseKeysTab} items={tabIds.map((id) => ({ id, label: id === ALL ? tr(T.all) : tr(CATEGORY_TEXT[id]), count: count(id) }))} />
-      {/* A tab's commands on one page (a settings page scrolls): sorting and the Source filter (All: the Category one too), no paging. */}
+      {/* A tab's commands on one page (a settings page scrolls): sorting and the Set filter, no paging. */}
       <TabPanel idBase={idBase} id={tab} selected>
         <DataTable
           id={project ? 'shortcuts-project' : 'shortcuts'}
@@ -229,6 +231,8 @@ export function KeybindingsEditor({ project }: { project?: ProjectInfo }) {
           pageSizes={ALL_ROWS}
           defaultPageSize={ALL_ROWS[0]}
           rowClassName={(r) => recording === r.c.id && 'recording'}
+          // Its filtered columns come last, after what a narrow editor keeps in view: above it, they are never scrolled away (HI-1878).
+          filtersAbove
           empty={tr(msg({ id: 'settings.keys.noMatch', defaultMessage: 'No commands match.', description: 'The keyboard shortcuts editor when its search finds nothing.' }))}
         />
       </TabPanel>
@@ -312,8 +316,8 @@ function keyColumns({ project, recording, setRecording, record, save, conflicts 
       sortValue: (r) => (r.key ? formatKeybinding(r.key) : null)
     },
     // After the shortcut (HI-1838): in a narrow editor the command and its shortcut stay in view, and Category is what
-    // the table scrolls to.
-    { key: 'category', header: tr(msg({ id: 'settings.keys.column.category', defaultMessage: 'Category', description: "A column of the keyboard shortcuts editor: the command's category (Project, Session…)." })), className: 'kb-category faint', cell: (r) => commandCategory(r.c), sortValue: (r) => commandCategory(r.c), filter: { kind: 'choice', value: (r) => commandCategory(r.c) } }, // i18n-ignore: class names
+    // the table scrolls to. No filter of its own: the tabs above choose the category (the Assistant's HI-1878 review).
+    { key: 'category', header: tr(msg({ id: 'settings.keys.column.category', defaultMessage: 'Category', description: "A column of the keyboard shortcuts editor: the command's category (Project, Session…)." })), className: 'kb-category faint', cell: (r) => commandCategory(r.c), sortValue: (r) => commandCategory(r.c) }, // i18n-ignore: class names
     {
       key: 'source',
       header: tr(msg({ id: 'settings.keys.column.set', defaultMessage: 'Set', description: 'A column of the keyboard shortcuts editor: where the shortcut comes from (changed, removed, this project…). Keep it short.' })),

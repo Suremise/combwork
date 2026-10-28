@@ -431,6 +431,14 @@
     "defaultMessage": "Hive isn't hearing from {agent}'s hooks",
     "description": "A notification's title: an agent's coding agent has stopped sending Hive its hooks (the calls that tell Hive what it is doing). {agent} is the agent."
   },
+  "session.notice.lineLost": {
+    "defaultMessage": "A screen of its CLI took it before it was sent. Send it again if it is still wanted: {text}",
+    "description": "The notification that a line Hive typed into an agent was lost (a screen of its coding agent took it). {text} is the line, as Hive typed it."
+  },
+  "session.notice.lineLostTitle": {
+    "defaultMessage": "{agent} didn't get a line Hive typed",
+    "description": "A notification's title: a line Hive typed into an agent's terminal (a message, a prompt) was taken by a screen of its coding agent before it was sent, so the agent never got it. {agent} is the agent."
+  },
   "session.notice.longConversation": {
     "defaultMessage": "{agent}: long conversation",
     "description": "A notice's title: an agent's transcript has grown past the size set in Settings → Sessions. {agent} is the agent."
@@ -491,6 +499,10 @@
     "defaultMessage": "Hive is typing a line into this agent. Try again in a moment.",
     "description": "Turning Plan mode on or off is refused for a moment: Hive is typing into the terminal."
   },
+  "session.prompt.cliAsks": {
+    "defaultMessage": "Its CLI shows a question for you: nothing is typed into it until you answer it there.",
+    "description": "Typing into an agent is refused: its coding agent shows a question of its own on its screen (such as Claude Code's offer to teach auto mode about your environment), which the keys would answer."
+  },
   "session.prompt.untaken": {
     "defaultMessage": "Its CLI hasn't taken the line Hive typed before; nothing more is typed until it does.",
     "description": "Typing into an agent is refused: its CLI hasn't taken the line Hive typed before."
@@ -526,6 +538,10 @@
   "session.purge.unread": {
     "defaultMessage": "Hive couldn't record what the session used, so it is kept.",
     "description": "Purge left a session alone: Hive couldn't save its usage in the usage history, which the totals keep."
+  },
+  "session.restartMode.didntStop": {
+    "defaultMessage": "{agent} didn't stop in time, so it wasn't restarted in the new mode. Try again once it has stopped.",
+    "description": "Switching a running agent's permission mode (it restarts in the new mode) is refused: the agent ({agent}, its name) was told to stop but hadn't ended yet, so nothing was started."
   },
   "session.setup.failed": {
     "defaultMessage": "The setup command exited with code {code}. Its output is in the agent's terminal. Fix it and start the agent again, or start it without setup.",
@@ -711,9 +727,21 @@
     "defaultMessage": "Asks whether to trust this folder",
     "description": "An agent's status: its CLI asks, before it starts, whether to trust the project's folder."
   },
+  "session.status.cliAsks": {
+    "defaultMessage": "{provider} asks: {question}",
+    "description": "An agent's status: its coding agent ({provider}, e.g. Claude Code) shows a question of its own on its screen and waits for the user to answer it there. {question} is the question, in the coding agent's own words (English)."
+  },
   "session.status.compacting": {
     "defaultMessage": "Compacting the conversation…",
     "description": "An agent's status while its CLI summarises the conversation to free up context space."
+  },
+  "session.status.connectionKeepsDropping": {
+    "defaultMessage": "Stopped: its connection keeps dropping",
+    "description": "An agent's status once Hive stopped resuming it: its connection dropped again after several resumes in an hour."
+  },
+  "session.status.connectionNotBack": {
+    "defaultMessage": "Stopped: its connection didn't come back",
+    "description": "An agent's status once Hive stopped waiting for its connection to come back."
   },
   "session.status.failedTurn": {
     "defaultMessage": "The turn ended on an error",
@@ -742,6 +770,10 @@
   "session.status.tasksDropped": {
     "defaultMessage": "{minutes, plural, one {Stopped counting its background tasks after # minute} other {Stopped counting its background tasks after # minutes}}",
     "description": "An agent's status: Hive stopped counting the background tasks it started after the time limit in Settings. {minutes} is that limit."
+  },
+  "session.status.waitingForConnection": {
+    "defaultMessage": "Waiting for the connection…",
+    "description": "An agent's status while Hive waits for its CLI's connection to come back, to resume it (Settings → Advanced, Resume agents after a connection drops)."
   },
   "session.tracker.body": {
     "defaultMessage": "{reason}. {detail} Help → Copy Diagnostics says why.",

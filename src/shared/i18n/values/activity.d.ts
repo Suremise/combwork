@@ -3,6 +3,10 @@
 interface HiveMessageValues {
   'activity.agents': { n: number }
   'activity.all': undefined
+  'activity.block.asked': { other: string; file: string | number; holder: string | number }
+  'activity.block.blocked': { other: string; file: string | number; holder: string | number }
+  'activity.block.for': { time: string | number }
+  'activity.block.tip': undefined
   'activity.cards': { n: number }
   'activity.cardsLabel': undefined
   'activity.closeDetails': undefined
@@ -55,5 +59,19 @@ interface HiveMessageValues {
   'activity.task': { type: string }
   'activity.thinking': undefined
   'activity.toolFor': { summary: string | number; time: string | number }
+  'activity.workspace.agentIn': { project: string | number; agent: string | number }
+  'activity.workspace.assistant': undefined
+  'activity.workspace.cardNobody': { card: string | number }
+  'activity.workspace.clearCard': undefined
+  'activity.workspace.empty': undefined
+  'activity.workspace.forCard': { card: string | number }
+  'activity.workspace.heading': undefined
+  'activity.workspace.noWorkspace': undefined
+  'activity.workspace.panelTip': undefined
+  'activity.workspace.projectTip': { project: string | number }
+  'activity.workspace.projects': undefined
+  'activity.workspace.showIn': undefined
+  'activity.workspace.whole': undefined
+  'activity.workspace.wholeTip': undefined
   'activity.writing': undefined
 }

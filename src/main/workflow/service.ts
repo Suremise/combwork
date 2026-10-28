@@ -12,7 +12,8 @@
 import { resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
-import { WORKFLOW_ENFORCE } from '../../shared/advanced'
+import { FOCUSED_PICK_SECONDS, WORKFLOW_ENFORCE } from '../../shared/advanced'
+import { childEnv } from '../ptyHost'
 import { boardSavepoint, boardWrite } from '../boardStore'
 import { samePlace } from '../fsutil'
 import { hiveError } from '../hiveError'
@@ -197,6 +198,8 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     locksSettled: () => locksSettled(ws, project.path),
     // #1651: a check run that has finished is in its card's facts before a submit reads them.
     checksSettled: () => checksSettled(ws, project.path),
+    // G20 (HI-1367): a submission's pick runs as a check does (a session command's environment), within its limit.
+    focused: { env: () => childEnv(), timeoutMs: () => Math.max(10, Number(advanced.get(FOCUSED_PICK_SECONDS)) || 180) * 1000, life },
     // A branch rename Repair recorded and hasn't finished (#1305): its new name, which a card on the old line follows.
     pendingRename: async (line) => (await ws.projectConfig(project.path)).pendingBranchRenames?.find((r) => r.from.toLowerCase() === line.toLowerCase())?.to ?? null,
     // A move Repair hasn't recorded (#1343): the workspace's or the project's last folder isn't where it is now.

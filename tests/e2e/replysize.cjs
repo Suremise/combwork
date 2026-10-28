@@ -108,9 +108,17 @@ const prose = (seed, n) => {
   await until(async () => (await live(home, 'assistant'))?.status === 'ready', HUNG_MS)
   const asTokenFile = path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
 
-  /** One hive tool call through hive-mcp.js: the text the agent gets (role 'assistant+settings': with Change settings on). */
+  /**
+   * The coder's own Agent API token, as its latest launch was given it (the fake CLI logs its launches, each with its
+   * agent's name: other agents of alpha start later, HI-1933).
+   */
+  const coderOwnToken = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).reverse().find((l) => l.env?.HIVE_API_TOKEN && l.env.HIVE_AGENT === coder.name && l.cwd.toLowerCase() === alpha.toLowerCase())?.env?.HIVE_API_TOKEN
+  /**
+   * One hive tool call through hive-mcp.js: the text the agent gets (role 'assistant+settings': with Change settings on;
+   * 'own': with the coder's own token, as the agent calls it, where the caller matters: its own lane starts nobody, HI-1933).
+   */
   const tool = (name, args, role = 'agent') => {
-    const extra = { HIVE_DEV_CONSOLE: '1', ...(role.startsWith('assistant') ? { HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', HIVE_JOURNAL: '1', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' } : { HIVE_API_TOKEN: apiToken, HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }) }
+    const extra = { HIVE_DEV_CONSOLE: '1', ...(role.startsWith('assistant') ? { HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', HIVE_JOURNAL: '1', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' } : role === 'own' ? { HIVE_API_TOKEN: coderOwnToken(), HIVE_API_TOKEN_FILE: '', HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id } : { HIVE_API_TOKEN: apiToken, HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }) }
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
       env: lib.childEnv({ HIVE_API_URL: API, HIVE_WORKSPACE: ws, ...extra }),
@@ -259,12 +267,15 @@ const prose = (seed, n) => {
   const tagged = measure('hive_update_tasks (3 cards, addLabels)', tool('hive_update_tasks', { numbers: [todo[20], todo[21], todo[22]], addLabels: ['0.9.4'] }), 400)
   const tagLines = tagged.split('\n')
   check('tagging says only the label added', tagLines[0] === '3 cards changed:' && tagLines.length === 4 && tagLines.slice(1).every((l) => /^([A-Z]{2,4}-\d+|#\d+) .+: Labels: added 0\.9\.4\. Now in Todo \(\d+\w+ of \d+\)(, [^,]+)?\.$/.test(l)), tagged)
-  // Lanes (#483): a start, a join (a lane made for a builder that hasn't registered yet), the listing and an end.
-  const laneStarted = measure('hive_lane (start)', tool('hive_lane', { action: 'start', cards: [todo[0], todo[1], todo[2]], reviewer: 'Tester', rounds: 10, waitMinutes: 360, name: 'measured lane' }), 400)
+  // Lanes (#483): a start, a join (a lane made for a builder that hasn't registered yet), the listing and an end. The
+  // start, join and listing with the coder's own token, as a card loop calls them (HI-1933: with the workspace's, the
+  // start is a script's, which since HI-1900 starts the lane's stopped agents and says so); the end (an abandon, the
+  // user's or the Assistant's) with the workspace's.
+  const laneStarted = measure('hive_lane (start)', tool('hive_lane', { action: 'start', cards: [todo[0], todo[1], todo[2]], reviewer: 'Tester', rounds: 10, waitMinutes: 360, name: 'measured lane' }, 'own'), 400)
   check('a lane start: its pair, state, cards (by key, #1219) and id', /^Lane started: Coder \/ Tester \(alpha\) measured lane: active, on [A-Z]{2,4}-\d+; .+; rounds 10, wait 6 h\. lane-[0-9a-f]+$/.test(laneStarted), laneStarted)
   const laneId = laneStarted.match(/lane-[0-9a-f]+$/)?.[0]
-  measure('hive_lane (join)', tool('hive_lane', { action: 'join', builder: 'Tester', cards: [todo[3]] }), 400)
-  const laneList = measure('hive_lane (list)', tool('hive_lane', { action: 'list' }), 600)
+  measure('hive_lane (join)', tool('hive_lane', { action: 'join', builder: 'Tester', cards: [todo[3]] }, 'own'), 400)
+  const laneList = measure('hive_lane (list)', tool('hive_lane', { action: 'list' }, 'own'), 600)
   check('lanes listed a line each', laneList.split('\n').length === 2 && laneList.includes(laneId), laneList)
   check('a lane ended', measure('hive_lane (end)', tool('hive_lane', { action: 'end', lane: laneId, abandoned: true }), 400).startsWith('Lane abandoned: '), texts['hive_lane (end)'])
   // The merge queue (#1353): alpha's workflow doesn't have Hive merge, so it has none, said in a line.
@@ -511,6 +522,15 @@ const prose = (seed, n) => {
   const releasable = measure('hive_release_slot (list)', tool('hive_release_slot', { action: 'list', project: 'alpha' }, 'assistant'), 200)
   check('release slot: nothing to release, in a line', releasable.startsWith('Nothing to release in alpha: '), releasable)
   check('…the tool is the Assistant\'s, not offered to project agents', toolDescription('hive_release_slot') === '' && toolDescription('hive_release_slot', 'assistant').length > 0)
+  // Templates (HI-1502): a line per template; a plan and a load (Team 3×3 into gamma, which has no agents, one named) in
+  // a few lines each; project agents aren't given the tool.
+  const templateList = measure('hive_template (list)', tool('hive_template', { action: 'list', project: 'gamma' }, 'assistant'), 1200)
+  check('templates: a line each, with the scope and file to name it by', templateList.split('\n').some((l) => l.startsWith('Team 3×3 (scope hive, file team-3x3.json): 6 agents')), templateList)
+  const templatePlan = measure('hive_template (plan)', tool('hive_template', { action: 'plan', project: 'gamma', template: 'team-3x3.json', names: { 1: 'Gamma lead' } }, 'assistant'), 1500)
+  check('…a plan: who comes, the name given beside its own', /^"Team 3×3" into gamma: removes no agents; creates Gamma lead \([A-Z]+-B1\) builder with [A-Z]+-R1/.test(templatePlan), templatePlan)
+  const templateLoaded = measure('hive_template (load)', tool('hive_template', { action: 'load', project: 'gamma', template: 'team-3x3.json', names: { 1: 'Gamma lead' } }, 'assistant'), 1500)
+  check('…a load: what it made, the name given, and that undo puts it back', /^Loaded "Team 3×3" into gamma: removed no agents; created Gamma lead, .*hive_undo can put the agents and options back\.$/.test(templateLoaded), templateLoaded)
+  check('…the tool is the Assistant\'s, not offered to project agents', toolDescription('hive_template') === '' && toolDescription('hive_template', 'assistant').length > 0)
 
   console.log('\n--- Agent API routes not behind a tool')
   const route = async (label, method, p, body) => measure(`API ${label}`, (await api(method, p, body)).text)
@@ -661,7 +681,9 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
     return { text: r.content[0].text, isError: !!r.isError }
   }
   // In a lane Tester reviews (#1382: a design needs a reviewer to check it), ended once the design is measured.
-  const designLane = tool('hive_lane', { action: 'start', cards: [todo[40]], reviewer: 'Tester', name: 'design step' }).text.match(/lane-[0-9a-f]+$/)?.[0]
+  const designStart = tool('hive_lane', { action: 'start', cards: [todo[40]], reviewer: 'Tester', name: 'design step' }, 'own').text
+  const designLane = designStart.match(/lane-[0-9a-f]+$/)?.[0]
+  check('a lane for the design step, Tester reviewing', !!designLane, designStart)
   const startedOwn = measure('hive_start_card', intent('hive_start_card', { card: `#${todo[40]}` }), 400)
   check('an intent says where the card went', new RegExp(`^[A-Z]+-\\d+: todo → active\\. folder: `).test(startedOwn), startedOwn)
   // …and what can come next on it, as its rules have it (#1530).

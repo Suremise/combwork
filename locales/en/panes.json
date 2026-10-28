@@ -395,6 +395,10 @@
     "defaultMessage": "Hand Over to…",
     "description": "Menu item (an agent's menu): hands its work over to another agent or a new conversation."
   },
+  "panes.menu.hooks": {
+    "defaultMessage": "Hooks…",
+    "description": "Menu item (an agent's menu): opens its Hooks dialog: the hooks its session has, and what Hive received from them. The … says it opens a dialog: keep it."
+  },
   "panes.menu.moveDown": {
     "defaultMessage": "Move Down",
     "description": "Menu item (an agent's menu, a grid layout): moves the agent's pane one cell down."

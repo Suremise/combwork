@@ -58,6 +58,8 @@ async function board(ctx) {
   const cards = (ctx.boardCards = {})
   cards.hold = await make('Parked idea', 'hold')
   await inv('tasks:update', cards.hold, { blocked: 'Waiting for the release' })
+  // The user's reason, though it fits a message's pattern ("Waiting for {what}"): not English left.
+  ctx.authored('Waiting for the release', '.task-blocked')
   cards.todo = await make('Next thing', 'todo')
   cards.blocked = await make('Needs a decision', 'todo')
   await inv('tasks:update', cards.blocked, { blocked: 'Which colour?' })

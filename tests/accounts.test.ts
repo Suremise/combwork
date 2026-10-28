@@ -897,8 +897,14 @@ describe("a workspace's accounts", () => {
           mkdirSync(join(f, '.hive'), { recursive: true })
           writeFileSync(join(f, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: `a-${i}`, name: `Agent ${i}`, provider: 'claude-code' }] }))
         }
-        await w.refresh()
+        const want = names.slice(0, n).join()
+        await refreshedTo((info) => info.projects.filter((p) => p.agents.length).map((p) => p.name).sort().join() === want)
       }
+      // The workspace as written: a refresh can hand back the info it had, when Hive wrote a project's config after the
+      // refresh read it (a new project given its id: #999's guard), with a refresh of its own to follow (HI-1919).
+      const refreshedTo = (shows: (info: Awaited<ReturnType<typeof w.refresh>>) => boolean): Promise<void> => vi.waitFor(async () => expect(shows(await w.refresh())).toBe(true), { timeout: HUNG_MS })
+      /** alpha's agent's own connection, as the workspace shows it (none: undefined). */
+      const alphaConnection = (info: Awaited<ReturnType<typeof w.refresh>>) => info.projects.find((p) => p.name === 'alpha')?.agents[0]?.connection
       beforeEach(async () => {
         held = []
         spy = vi.spyOn(provider('claude-code'), 'connectionTrusts').mockImplementation((dir, targets) => new Promise((answer) => held.push({ home: dir, projects: targets.length, answer })))
@@ -929,7 +935,7 @@ describe("a workspace's accounts", () => {
           mkdirSync(join(f, '.hive'), { recursive: true })
           writeFileSync(join(f, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: `a-${i}`, name: `Agent ${i}`, ...agentsOf[i] }] }))
         }
-        await w.refresh()
+        await refreshedTo((info) => info.projects.filter((p) => p.agents.length).length === 3)
         await vi.waitFor(() => expect(row().trust?.checking).toBe(true), { timeout: HUNG_MS })
         // Its set unchanged by them: no read of them, and its answer, once in, names alpha alone.
         mine()[0].answer([false, true])
@@ -954,7 +960,7 @@ describe("a workspace's accounts", () => {
         expect(others(other)).toHaveLength(0)
         // alpha's agent given Other as its own: alpha now counts for Other, and no longer for this one.
         writeFileSync(join(folders[0], '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-0', name: 'Agent 0', provider: 'claude-code', connection: other.id }] }))
-        await w.refresh()
+        await refreshedTo((info) => alphaConnection(info) === other.id)
         rowOf(other.id)
         await vi.waitFor(() => expect(others(other).map((h) => h.projects)).toEqual([1]), { timeout: HUNG_MS })
         await vi.waitFor(() => expect(mine().at(-1)!.projects).toBe(1), { timeout: HUNG_MS })
@@ -963,7 +969,7 @@ describe("a workspace's accounts", () => {
         // and the Assistant's home are Other's now, this one counts none.
         writeFileSync(join(folders[0], '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-0', name: 'Agent 0', provider: 'claude-code' }] }))
         accounts.moveConnection(other.id, 0)
-        await w.refresh()
+        await refreshedTo((info) => alphaConnection(info) === undefined)
         rowOf(other.id)
         await vi.waitFor(() => expect(others(other).at(-1)!.projects).toBe(2), { timeout: HUNG_MS })
         await vi.waitFor(() => expect(rowOf(a.id).trust).toEqual({ pending: [], unknown: false }), { timeout: HUNG_MS })
@@ -1123,10 +1129,14 @@ describe("a workspace's accounts", () => {
       })
       for (let i = 0; i < 3; i++) expect(await accounts.confirmAccount(a.id)).toMatchObject({ fresh: true, observed: { email: 'busy@example.com' } })
       // The login itself rewritten during a check, among the busy folder's other writes and events, its own reported
-      // with no name: checked again, the answer after it taken.
+      // with no name: checked again, the answer after it taken. Who is signed in is the login on disk, never the call's
+      // count: the watch sees the rewrite too and may check, or make confirm ask once more, in between (HI-1888).
+      const onDisk = () => (readFileSync(join(folderOf(a), '.credentials.json'), 'utf8').includes('someone else') ? 'else@example.com' : 'busy@example.com')
       let n = 0
       status.set(folderOf(a), async () => {
         n++
+        // The login as the check reads it, at its start: one overlapping the rewrite answers with the old one.
+        const email = onDisk()
         writeFileSync(join(folderOf(a), 'logs_2.sqlite-wal'), String(Math.random()))
         for (let i = 0; i < 5; i++) accounts.accountFolderEvent(a.id, null)
         if (n === 1) {
@@ -1134,9 +1144,11 @@ describe("a workspace's accounts", () => {
           accounts.accountFolderEvent(a.id, null)
         }
         for (let i = 0; i < 5; i++) accounts.accountFolderEvent(a.id, 'logs_2.sqlite-wal')
-        return { ok: true, loggedIn: true, email: `v${n}@example.com`, orgId: 'org-1' }
+        return { ok: true, loggedIn: true, email, orgId: 'org-1' }
       })
-      expect(await accounts.confirmAccount(a.id)).toMatchObject({ fresh: true, observed: { email: 'v2@example.com' } })
+      // Fresh, and of the login as it is now: asked again after the rewrite, not the answer read during it.
+      expect(await accounts.confirmAccount(a.id)).toMatchObject({ fresh: true, observed: { email: 'else@example.com' } })
+      expect(n).toBeGreaterThanOrEqual(2)
       // Rewritten during every check: never fresh.
       status.set(folderOf(a), async () => {
         writeFileSync(join(folderOf(a), '.credentials.json'), `{"token":"${Math.random()}${Date.now()}"}`)

@@ -7,7 +7,7 @@ import { placeKey, readKeptJson, writeKeptJson } from './fsutil'
 import { createLogger, userText } from './logger'
 import { keepAsBackup, openTable, readStore, rowKeys, storeValue, withStoreLock, writeStore, type StoreData, type StoreRow } from './storeRows'
 import { transaction, type Db } from './db'
-import { addSessionRecords, countSessions, readDeleted, readDeletedUsage, readSessionRecord, readSessionRecords, removeSessionRecords, sessionTexts, writeSessionRecord, writeSessionRecords } from './schema/sessionDeliveryTables'
+import { addSessionRecords, countSessions, readAgentSessionRecords, readCardSessionRecords, readDeleted, readDeletedUsage, readSessionRecord, readSessionRecords, removeSessionRecords, sessionTexts, writeSessionRecord, writeSessionRecords } from './schema/sessionDeliveryTables'
 import { withMode } from '../shared/defaults'
 import { timedStep } from './stallWork'
 
@@ -220,6 +220,29 @@ export async function readSession(place: SessionsPlace, id: string): Promise<Ses
   const rec = readSessionRecord(workspaceDb(resolve(place.workspace)).reader, place.scope, id)
   return rec ? recordOf(rec) : undefined
 }
+
+/**
+ * An agent's records of a host, most recently active first (HI-1236): read by the agent's index, no other record read
+ * (while the workspace's upgrade to 1.0 waits, picked from all of them).
+ */
+export async function readAgentSessions(place: SessionsPlace, agentId: string): Promise<SessionsFile['sessions']> {
+  await opening(place)
+  if (upgradeWaiting(place.workspace)) return byActivity(sessionsOf(readStore(place.workspace, 'sessions', place.scope)).sessions.filter((s) => s.agentId === agentId))
+  return readAgentSessionRecords(workspaceDb(resolve(place.workspace)).reader, place.scope, agentId).map(recordOf)
+}
+
+/**
+ * The records of a host that worked on a card (their `cards` have it), in the host's order (HI-1236): read by the
+ * cards' index, no other record read (while the workspace's upgrade to 1.0 waits, picked from all of them).
+ */
+export async function readCardSessions(place: SessionsPlace, card: number): Promise<SessionsFile['sessions']> {
+  await opening(place)
+  if (upgradeWaiting(place.workspace)) return sessionsOf(readStore(place.workspace, 'sessions', place.scope)).sessions.filter((s) => s.cards?.some((c) => c.number === card))
+  return readCardSessionRecords(workspaceDb(resolve(place.workspace)).reader, place.scope, card).map(recordOf)
+}
+
+/** Most recently active first, as the agent's index gives them. */
+const byActivity = (recs: SessionsFile['sessions']): SessionsFile['sessions'] => [...recs].sort((a, b) => (b.lastActiveAt ?? '').localeCompare(a.lastActiveAt ?? ''))
 
 /**
  * Changes a host's records from what is committed now, one change at a time across Hive's windows and processes: `fn`

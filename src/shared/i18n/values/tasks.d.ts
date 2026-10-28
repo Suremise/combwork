@@ -6,6 +6,9 @@ interface HiveMessageValues {
   'tasks.by.you': undefined
   'tasks.error.actionGone': { action: string; card: string | number }
   'tasks.error.addOwnOnly': { project: string | number }
+  'tasks.error.answersNot': { why: string; request: string | number; card: string | number }
+  'tasks.error.answersNotAgents': undefined
+  'tasks.error.answersShape': { max: number }
   'tasks.error.archiveNone': undefined
   'tasks.error.archiveNumbers': undefined
   'tasks.error.archived': { card: string | number }
@@ -30,11 +33,11 @@ interface HiveMessageValues {
   'tasks.error.decisionsUsers': undefined
   'tasks.error.emptyComment': undefined
   'tasks.error.emptyDecision': undefined
-  'tasks.error.failedStays': { card: string | number }
+  'tasks.error.failedToDoing': { card: string | number }
   'tasks.error.holdCard': { card: string | number }
   'tasks.error.holdNew': undefined
-  'tasks.error.inDoingWith': { card: string | number; agent: string | number; column: string }
-  'tasks.error.inDoingWithAnother': { card: string | number; column: string }
+  'tasks.error.inDoingWith': { card: string | number; active: string | number; agent: string | number; stage: string | number; review: string | number }
+  'tasks.error.inDoingWithAnother': { card: string | number; active: string | number; stage: string | number; review: string | number }
   'tasks.error.kindNeedsReason': undefined
   'tasks.error.kindNotAgents': undefined
   'tasks.error.labelFieldList': { field: string | number }
@@ -99,6 +102,7 @@ interface HiveMessageValues {
   'tasks.history.attachmentsCleaned': { n: number; names: string | number; days: number }
   'tasks.history.backWithBatch': { label: string | number }
   'tasks.history.blocked': { reason: string | number }
+  'tasks.history.closedByDecision': { question: string | number }
   'tasks.history.context': { refs: string | number }
   'tasks.history.contextRemoved': undefined
   'tasks.history.created': { column: string }
@@ -171,6 +175,7 @@ interface HiveMessageValues {
   'tasks.start.movedProject': { card: string | number; project: string | number }
   'tasks.start.movedWorkspace': { card: string | number }
   'tasks.start.noProject': { card: string | number }
+  'tasks.start.noSlot': { card: string | number; active: string }
   'tasks.start.notGiven': { agent: string | number; card: string | number; why: string | number }
   'tasks.start.noteTooLong': { max: number }
   'tasks.start.reassigned': { card: string | number; who: string }

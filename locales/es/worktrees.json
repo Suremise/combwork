@@ -1,6 +1,6 @@
 {
   "worktrees.agent.badPlacement": "Los paneles no se pueden colocar así en este diseño.",
-  "worktrees.agent.badWorkflowRole": "Un rol en el flujo de trabajo es builder, reviewer o either.",
+  "worktrees.agent.badWorkflowRole": "Un rol en el flujo de trabajo es builder, reviewer, either o generalist.",
   "worktrees.agent.chooseMove": "Elige adónde mover el agente.",
   "worktrees.agent.enterName": "Escribe un nombre.",
   "worktrees.agent.gone": "Ese agente ya no existe.",

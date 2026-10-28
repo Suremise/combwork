@@ -22,6 +22,7 @@ const view = (over: Partial<QueueView> = {}): QueueView => ({
   recent: [],
   returns: [],
   returnsMore: 0,
+  pauses: [],
   hiveMerges: false,
   inFlight: [],
   ...over

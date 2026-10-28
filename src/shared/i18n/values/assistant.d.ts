@@ -109,7 +109,7 @@ interface HiveMessageValues {
   'assistant.journal.workspaceOnly': undefined
   'assistant.journal.yesterday': undefined
   'assistant.loadNames.blocked': undefined
-  'assistant.loadNames.filledNote': { projects: string | number; count: number; names: string | number }
+  'assistant.loadNames.filledNote': { count: number; names: string | number; projects: string | number }
   'assistant.loadNames.sameTwice': undefined
   'assistant.loadNames.taken': { project: string | number; name: string | number }
   'assistant.mcpSecret.argument': { start: string | number }
@@ -468,7 +468,7 @@ interface HiveMessageValues {
   'assistant.template.badSetting': { name: string | number; setting: string }
   'assistant.template.badToken': { name: string | number; token: string | number }
   'assistant.template.from09': undefined
-  'assistant.template.longNote': { name: string | number; max: string | number }
+  'assistant.template.longNote': { name: string | number; max: number }
   'assistant.template.newer': undefined
   'assistant.template.noAgents': undefined
   'assistant.template.noVersion': undefined
@@ -512,6 +512,17 @@ interface HiveMessageValues {
   'assistant.templatePlan.stateReplaced': undefined
   'assistant.templatePlan.stateReplacedTip': undefined
   'assistant.templatePlan.withNote': { thing: string | number; note: string | number }
+  'assistant.templateWorkflow.alsoGit': undefined
+  'assistant.templateWorkflow.apply': undefined
+  'assistant.templateWorkflow.change': { option: string | number; now: string | number; next: string | number }
+  'assistant.templateWorkflow.changes': { n: number; platform: string | number }
+  'assistant.templateWorkflow.dropped': { count: number; platforms: string | number }
+  'assistant.templateWorkflow.head': undefined
+  'assistant.templateWorkflow.identityOff': undefined
+  'assistant.templateWorkflow.needsGit': undefined
+  'assistant.templateWorkflow.noCommand': { count: number; checks: string | number }
+  'assistant.templateWorkflow.noSection': { platform: string | number }
+  'assistant.templateWorkflow.setUpGit': undefined
   'assistant.templates.aProject': undefined
   'assistant.templates.addAgent': undefined
   'assistant.templates.addProjectFirst': undefined
@@ -643,6 +654,16 @@ interface HiveMessageValues {
   'assistant.templates.unknownProvider': { provider: string | number }
   'assistant.templates.unsavedTip': undefined
   'assistant.templates.where': { name: string | number; scope: string; project: string | number }
+  'assistant.templates.workflowAbsent': undefined
+  'assistant.templates.workflowAllOff': undefined
+  'assistant.templates.workflowEditHint': undefined
+  'assistant.templates.workflowFill': undefined
+  'assistant.templates.workflowFillChoose': undefined
+  'assistant.templates.workflowHead': undefined
+  'assistant.templates.workflowNone': { platform: string | number }
+  'assistant.templates.workflowPlatforms': undefined
+  'assistant.templates.workflowPreset': { preset: string; name: string | number }
+  'assistant.templates.workflowRemove': undefined
   'assistant.templates.workspace': undefined
   'assistant.undo.askFinal': { n: number }
   'assistant.undo.askMessage': undefined
@@ -699,6 +720,7 @@ interface HiveMessageValues {
   'assistant.undo.why.start': undefined
   'assistant.undo.why.startReview': undefined
   'assistant.undo.why.submit': undefined
+  'assistant.undo.why.templateCards': undefined
   'assistant.undo.why.verdict': undefined
   'assistant.undo.why.withdrawn': undefined
   'assistant.undo.working': undefined

@@ -152,6 +152,21 @@ describe('in ProjectInfo', () => {
     expect(notices(p)).toHaveLength(1)
   })
 
+  it('the notice goes once the platform and the folder agree again (HI-1905: switched to Git after git init)', async () => {
+    const p = await project('epsilon')
+    gitInit(p)
+    await info(p)
+    expect(notices(p)).toHaveLength(1)
+    const gone = () => events.flatMap((e) => (e.type === 'toast-gone' ? [e.id] : []))
+    expect(gone()).toEqual([])
+    await inWorkspace(w, () => w.mutateProjectConfig(p, (c) => ({ ...c, platform: 'git' })))
+    await info(p)
+    expect(gone()).toEqual([`platform:${p.toLowerCase()}`])
+    // Said once: read again, nothing more.
+    await info(p)
+    expect(gone()).toHaveLength(1)
+  })
+
   it('a Git project whose repository goes stays Git, and says so', async () => {
     const p = await project('beta', gitInit)
     expect(recorded(p)).toBe('git')

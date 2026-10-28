@@ -330,7 +330,7 @@ describe('S20: the repository gone (#1419)', () => {
     expect(platformOf(w, repo)).toMatchObject({ id: 'git', offer: { offer: 'none', why: 'repositoryGone' } })
     const wf = (await workflowFor(w, repo))!
     const r = await store.boardWrite(w, async () => wf.start(`#${card.number}`, agentActor('b1')))
-    expect(r).toMatchObject({ refused: true, rule: 'platform.unknown', values: { offer: 'repositoryGone' }, next: englishText(REPOSITORY_GONE_NEXT) })
+    expect(r).toMatchObject({ refused: true, rule: 'platform.unknown', values: { offer: 'repositoryGone' }, next: englishText({ m: REPOSITORY_GONE_NEXT, values: { reader: 'agent' } }) })
     expect(wf.state(wf.store.card(card.number)).stage).toBe('todo')
     // Switched to None: the next card starts under None's rules.
     await sw.setPlatform(w, repo, 'none', { expected: 'git' })
@@ -341,7 +341,7 @@ describe('S20: the repository gone (#1419)', () => {
 
   it("the refusal's next step in the window's words", () => {
     const english = { one: (m: Parameters<typeof englishText>[0] & object, v?: Record<string, string | number>) => englishText(v ? { m: m as never, values: v } : m), list: (x: string[]) => x.join(', '), names: false }
-    expect(refusalLines('platform.unknown', { card: 'AM-1', what: 'the line', rule: 'start', offer: 'repositoryGone' }, english as never).next).toBe(englishText(REPOSITORY_GONE_NEXT))
+    expect(refusalLines('platform.unknown', { card: 'AM-1', what: 'the line', rule: 'start', offer: 'repositoryGone' }, english as never).next).toBe(englishText({ m: REPOSITORY_GONE_NEXT, values: { reader: 'you' } }))
     expect(refusalLines('platform.unknown', { card: 'AM-1', what: 'the line', rule: 'start' }, english as never).next).toBe('Check Provider Setup or the folder, then try again.')
   })
 })

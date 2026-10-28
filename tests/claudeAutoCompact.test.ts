@@ -126,11 +126,11 @@ describe('Claude Code auto-compaction settings (#242)', () => {
     const cwd = join(dir, 'cli')
     mkdirSync(cwd, { recursive: true })
     writeFileSync(join(cwd, 'mine.json'), JSON.stringify({ autoCompactWindow: 250_000 }))
-    expect(cliSettings(['--settings', 'mine.json'], cwd)).toEqual({ label: '--settings mine.json', json: { autoCompactWindow: 250_000 } })
-    expect(cliSettings(['--settings={"env":{"X":"1"}}'], cwd)).toEqual({ label: '--settings', json: { env: { X: '1' } } })
+    expect(cliSettings(['--settings', 'mine.json'], cwd)).toEqual({ label: '--settings mine.json', kind: 'cli', file: join(cwd, 'mine.json'), json: { autoCompactWindow: 250_000 } })
+    expect(cliSettings(['--settings={"env":{"X":"1"}}'], cwd)).toEqual({ label: '--settings', kind: 'cli', json: { env: { X: '1' } } })
     // Claude Code reads only the last.
     expect(cliSettings(['--settings', 'mine.json', '--settings', '{"autoCompactWindow":600000}'], cwd)?.json).toEqual({ autoCompactWindow: 600_000 })
-    expect(cliSettings(['--settings', '{ broken'], cwd)).toEqual({ label: '--settings', json: null })
+    expect(cliSettings(['--settings', '{ broken'], cwd)).toEqual({ label: '--settings', kind: 'cli', json: null, notJson: true })
     expect(cliSettings(['--verbose'], cwd)).toBeNull()
     const scopes = settingsScopes(cwd, join(dir, 'nohome'), ['--settings', 'mine.json'])
     expect(scopes.map((s) => s.label)).toEqual(['managed settings', '--settings mine.json', "the project's .claude/settings.local.json", "the project's .claude/settings.json", "Claude Code's settings.json"])
@@ -221,10 +221,10 @@ describe('Claude Code auto-compaction settings (#242)', () => {
     writeFileSync(join(cwd, 'big.json'), sized(SETTINGS_FILE_LIMIT + 1, { autoCompactWindow: 250_000 }))
     expect(cliSettings(['--settings', 'exact.json'], cwd)).toMatchObject({ label: '--settings exact.json', json: { autoCompactWindow: 250_000 } })
     expect(cliSettings(['--settings', 'exact.json'], cwd)?.unsure).toBeUndefined()
-    expect(cliSettings(['--settings', 'big.json'], cwd)).toEqual({ label: '--settings big.json', json: null, unsure: "couldn't be read (it's over Claude Code's 2 MiB limit)" })
+    expect(cliSettings(['--settings', 'big.json'], cwd)).toEqual({ label: '--settings big.json', kind: 'cli', file: join(cwd, 'big.json'), json: null, unsure: "couldn't be read (it's over Claude Code's 2 MiB limit)" })
     // Not a regular file: a folder, or a device name (never opened, so never waited on).
     mkdirSync(join(cwd, 'folder.json'))
-    expect(cliSettings(['--settings', 'folder.json'], cwd)).toEqual({ label: '--settings folder.json', json: null, unsure: "couldn't be read (it isn't a file)" })
+    expect(cliSettings(['--settings', 'folder.json'], cwd)).toEqual({ label: '--settings folder.json', kind: 'cli', file: join(cwd, 'folder.json'), json: null, unsure: "couldn't be read (it isn't a file)" })
     expect(cliSettings(['--settings', 'CON'], cwd)?.json).toBeNull()
     // The user's settings.json as a folder: Hive can't tell what it gives, so the project's window is an estimate.
     mkdirSync(join(home, 'settings.json'))

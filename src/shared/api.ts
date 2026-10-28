@@ -1,6 +1,7 @@
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
-import type { ActivityDetail, ActivityNow, ActivityTurns, EndProcessResult } from './activity'
+import type { ActivityCardAgent, ActivityDetail, ActivityNow, ActivityTurns, EndProcessResult } from './activity'
+import type { SessionHooks } from './hooks'
 import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
@@ -138,6 +139,7 @@ import type { Fact } from './workflow/facts'
 import type { CommitMessage, WorkflowOptions } from './workflow/options'
 import type { Artifact, CompareScope, ImportResult, KeptEntry } from './benchmark'
 import type { AgentTemplate, TemplateDest, TemplateEntry, TemplateRef, TemplateScope } from './templates'
+import type { TemplateWorkflow } from './workflow/templateOptions'
 import type { ProjectPref, ProjectPrefValue } from './uiPrefs'
 import type { TipsChange, TipsState } from './tips'
 import type { AdvancedState } from './advanced'
@@ -490,6 +492,8 @@ export interface HiveRequests {
   /** A project's cards' attachments, by card (its Attachments tab). */
   'cards:projectAttachments': (projectPath: string) => CardAttachmentGroup[]
   'cards:removeAttachment': (n: number, id: string) => void
+  /** A card attachment's text, for the attachment viewer's preview (HI-1958): by card and id, as `attachments:read` gives a session's. */
+  'cards:readAttachment': (n: number, id: string) => AttachmentContent
   /** A session attachment of `host` (a pane's) copied to a card. */
   'cards:attachFromPane': (n: number, host: string, path: string) => CardAttachment
   /** Changes the words of one of a card's decisions, or removes it (text null): the user's (#357). */
@@ -567,6 +571,8 @@ export interface HiveRequests {
   'session:clearUsageCache': () => void
   'session:adopt': (projectPath: string, sessionId: string) => void
   'session:usage': (projectPath: string, sessionId: string) => SessionUsage | null
+  /** An agent's hooks for its Hooks dialog (HI-982): what its launch has and what Hive received; null when it isn't running. */
+  'session:hooks': (projectPath: string, agentId: string) => SessionHooks | null
   /** The window showed these agents' panes (all of the project's agents when none are named). */
   'session:markSeen': (projectPath: string, agentIds?: string[]) => void
   'session:live': () => LiveSessionState[]
@@ -626,11 +632,12 @@ export interface HiveRequests {
   'templates:list': (projectPath: string) => TemplateEntry[]
   /** Saves the project's agents and layout; a name already there is replaced only with `overwrite` (else `exists`). */
   /** `usePatterns` (#1440): the project's key in its agents' names kept as a pattern (`HI-B1` as `{key}-B{n}`). */
-  'templates:save': (projectPath: string, scope: TemplateScope, name: string, overwrite: boolean, usePatterns?: boolean) => { saved: TemplateEntry } | { exists: string }
+  /** `includeWorkflow` (HI-1910): the project's workflow as the template's section for its version control (unset: true). */
+  'templates:save': (projectPath: string, scope: TemplateScope, name: string, overwrite: boolean, usePatterns?: boolean, includeWorkflow?: boolean) => { saved: TemplateEntry; workflow: { saved: PlatformId | null; kept: PlatformId[] } } | { exists: string }
   /** What loading a template would do, and what stops it now. `from`: the project a project's template is kept in, if not this one. */
   'templates:plan': (projectPath: string, scope: TemplateScope, file: string, from?: string, names?: string[]) => TemplateLoadPlan
   /** Replaces the project's agents and layout with a template's; `expected` is the agents' ids as the user saw them. */
-  'templates:load': (projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[], connections?: Record<number, string | null>) => { created: string[]; removed: string[] }
+  'templates:load': (projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[], connections?: Record<number, string | null>) => { created: string[]; removed: string[]; workflow: TemplateWorkflow | null }
   /** Adds one agent of a template (the `index`-th), the others left alone. */
   'templates:addAgent': (projectPath: string, scope: TemplateScope, file: string, index: number, from?: string, name?: string) => AgentDef & { connectionFallback?: { name: string; problem: ConnectionProblem } }
   /** Every template of the workspace (#127, the Templates view): Hive's own (#1436), the workspace's, then each project's. */
@@ -638,7 +645,7 @@ export interface HiveRequests {
   /** Renames a template where it is kept (another of that name there refuses it). */
   'templates:rename': (ref: TemplateRef, name: string) => TemplateEntry
   /** An edited template (#271), saved where it is kept; `savedAt`: as it was when the editor opened it. */
-  'templates:update': (ref: TemplateRef, edited: Pick<AgentTemplate, 'name' | 'description' | 'layout' | 'agents' | 'pairs'>, savedAt: string | null) => TemplateEntry
+  'templates:update': (ref: TemplateRef, edited: Pick<AgentTemplate, 'name' | 'description' | 'layout' | 'agents' | 'pairs' | 'workflow'>, savedAt: string | null) => TemplateEntry
   /** Copies a template into the workspace or a project; a name taken there gets a number ("Pair (2)"). */
   'templates:duplicate': (ref: TemplateRef, to: TemplateDest) => TemplateEntry
   /** Deletes a template (to the Recycle Bin); Hive's own can't be (#1436). */
@@ -685,6 +692,10 @@ export interface HiveRequests {
   'transcript:read': (projectPath: string, sessionId: string, opts?: { knownVersion?: string; from?: number }) => Transcript | null
   /** The Activity tab (#1254): what runs in a project's agents' launches now (their processes, by Stop's tracking, and background tasks). */
   'activity:now': (projectPath: string) => ActivityNow
+  /** Activity's workspace level (HI-1664): what runs now in each of these session hosts of the window's workspace, in one call. */
+  'activity:nowAll': (paths: string[]) => { path: string; now: ActivityNow }[]
+  /** The agents of the window's workspace whose running session worked on this card (HI-1664, by the cards' index). */
+  'activity:cardAgents': (card: number) => ActivityCardAgent[]
   /** The project's sessions running or active within `hours`, from their records alone (no transcript looked for). */
   'activity:sessions': (projectPath: string, hours: number) => SessionListItem[]
   /** An item's whole input (a prompt, a tool call's input and result) as written, masked like the log; null for another kind. */
@@ -737,7 +748,9 @@ export interface HiveRequests {
    * `expected` (the server the user was shown): refused if it has been replaced or edited since; `projects` (path → on)
    * sets those projects' own choices in the same change.
    */
-  'mcp:setGlobal': (name: string, enabled: boolean, expected?: McpShown, projects?: Record<string, boolean>) => void
+  'mcp:setGlobal': (name: string, enabled: boolean, expected?: McpShown, projects?: Record<string, boolean>, assistant?: boolean) => void
+  /** The Hive Assistant's own choice for a workspace server (HI-1472). */
+  'mcp:setAssistant': (name: string, enabled: boolean, expected?: McpShown) => void
   /** On or off in one project, its own choice (#1093: it runs there while it is on in the workspace too); `expected` as for mcp:setGlobal. */
   'mcp:setProject': (projectPath: string, name: string, enabled: boolean, expected?: McpShown) => void
   'mcp:create': (name: string) => McpServerInfo

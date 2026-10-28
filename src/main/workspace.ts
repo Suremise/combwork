@@ -13,7 +13,8 @@ import { DEFAULT_PROJECT_CONFIG, DEFAULT_WORKSPACE_CONFIG, HIVE_DIR, mergeDefaul
 import { migrateWorkspacePreferences } from '../shared/workflow/preferences'
 import { settlePlacements } from '../shared/paneCells'
 import { migratedProjectMcp, migratedWorkspaceMcp } from '../shared/agentMcp'
-import { advancedDef, checkAdvanced } from '../shared/advanced'
+import { ASSISTANT_OTHER_MCP, advancedDef, checkAdvanced } from '../shared/advanced'
+import { advanced } from './advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { HiveError, hiveError } from './hiveError'
 import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSessionState, ProjectConfig, ProjectInfo, RemovedData, SessionRecord, WorkspaceConfig, WorkspaceInfo, WorkspaceMoved } from '../shared/types'
@@ -25,7 +26,7 @@ import { admit, dismiss, setFenceReason } from './openingFence'
 import { AfterOpen } from './openProgress'
 import { whenAll } from '../shared/atMost'
 import { createLogger, userText } from './logger'
-import { changeSessionRecord, changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
+import { changeSessionRecord, changeSessions, exportSessions, readAgentSessions, readCardSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
 import { worktreesRoot } from './worktrees'
 import { ensureHiveExcluded, gitDirOf, hiveVcs } from './hiveVcs'
@@ -354,6 +355,8 @@ export class WorkspaceService {
       }
       await this.close()
       this.generation++
+      // Launches wait until this open has moved its MCP settings (HI-1472): the path is the workspace's from now on.
+      this.mcpMoving = gate()
       this.path = abs
       this.place = placeKey(abs)
       // Its databases are kept open from now on, by this place (#1395); a save's lease doesn't close the database now it
@@ -365,9 +368,11 @@ export class WorkspaceService {
     // An open that fails from here gives back what it took (its admission, what it opened), unless another open or a
     // close of this window has taken over meanwhile.
     const gen = this.generation
+    const moving = this.mcpMoving
     try {
       return await this.opened(abs)
     } catch (e) {
+      moving.done()
       if (this.generation === gen && this.path === abs) await this.close().catch((c) => log.warn('closing a workspace whose open failed', c))
       throw e
     }
@@ -418,6 +423,9 @@ export class WorkspaceService {
       done('their ids') // i18n-ignore: a part of a log line's timing
       // Before any session starts with them: MCP settings from before #1093 move to its model.
       await this.migrateMcpModel().catch((e) => log.warn('moving the MCP settings to the workspace and project switches', e))
+      // Before the Assistant can start (HI-1472): its own MCP choices, from the old Advanced switch or none.
+      await this.migrateAssistantMcp(fresh).catch((e) => log.warn("moving the Assistant's MCP servers to its own choices", e))
+      this.mcpMoving.done()
       done('MCP settings') // i18n-ignore: a part of a log line's timing
     } finally {
       // Ended either way: an open that fails here leaves none of it going (its close follows).
@@ -477,7 +485,17 @@ export class WorkspaceService {
     }
   }
 
+  /**
+   * This open's MCP settings moved to their current model (#1093, HI-1472's Assistant choices): a launch's settings are
+   * worked out only after it, so one started while the workspace is opening never misses what the move gives it.
+   */
+  mcpSettled(): Promise<void> {
+    return this.mcpMoving.promise
+  }
+  private mcpMoving = gate(true)
+
   async close(): Promise<void> {
+    this.mcpMoving.done()
     // Its skills and modes still being brought up to date (HI-1705) finish first: they are written into this workspace's
     // .hive, by the path this service has until it closes. Only while they are going (HI-1747): an await of nothing would
     // let in what starts before the abort below, which a close with no closing tasks has always refused at once.
@@ -744,11 +762,30 @@ export class WorkspaceService {
       if (JSON.stringify(now) !== JSON.stringify(was.enabled)) await this.mutateProjectConfig(p, (c) => ({ mcp: { ...c.mcp, enabled: migratedProjectMcp(allProjects, c.mcp) } }))
     }
     const enabled = migratedWorkspaceMcp(allProjects, configs)
-    await this.saveWorkspaceConfigWith(() => ({ mcp: { enabled, model: 2 } }))
+    await this.saveWorkspaceConfigWith((c) => ({ mcp: { ...c.mcp, enabled, model: 2 } }))
     for (const [i, p] of paths.entries()) {
       if (configs[i]?.disabled?.length) await this.mutateProjectConfig(p, (c) => ({ mcp: { ...c.mcp, disabled: [] } })).catch((e) => log.warn(`emptying the old MCP list of ${userText(p)}`, e))
     }
     log.info(`MCP settings moved to the workspace and project switches (#1093): ${enabled.length} on in the workspace`)
+  }
+
+  /**
+   * The Hive Assistant's own MCP choices (HI-1472), once per workspace: none in a new workspace; in one from before, the
+   * servers on in the workspace when the old Advanced switch (`hive.assistant.otherMcpServers`, kept for this) was on,
+   * so what it got still runs, else none. A list already there (an empty one too) is the user's and stays. Worked out as
+   * it is saved, so a choice made meanwhile wins.
+   */
+  private async migrateAssistantMcp(fresh: boolean): Promise<void> {
+    if (Array.isArray(this.wsConfig.mcp.assistant)) return
+    const legacyOn = !fresh && advanced.legacy(ASSISTANT_OTHER_MCP) === true
+    let moved = 0
+    await this.saveWorkspaceConfigWith((c) => {
+      if (Array.isArray(c.mcp.assistant)) return {}
+      const assistant = legacyOn ? [...c.mcp.enabled].sort() : []
+      moved = assistant.length
+      return { mcp: { ...c.mcp, assistant } }
+    })
+    log.info(`the Assistant's MCP servers are its own choices (HI-1472): ${legacyOn ? `${moved} from the old Advanced switch` : 'none'}`)
   }
 
   /** Saves of workspace.json queued or running, and the text of the last one: the watcher sees Hive's own writes too. */
@@ -960,12 +997,12 @@ export class WorkspaceService {
   async setAdvanced(id: string, raw: unknown): Promise<void> {
     if (!this.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
     const def = advancedDef(id)
-    if (!def?.workspace) throw hiveError(msg({ id: 'service.workspace.advancedNotHere', defaultMessage: "{setting} can't be set for a workspace.", description: 'An error: the advanced setting {setting} (its title, or its id) has no value of its own for a workspace, only for Hive.' }), { setting: def?.text.title ?? id })
+    if (!def?.workspace) throw hiveError(msg({ id: 'service.workspace.advancedNotHere', defaultMessage: "{setting} can't be set for a workspace.", description: 'An error: the advanced setting {setting} (its title, or its id) has no value of its own for a workspace, only for Hive.' }), { setting: def?.text.title ?? id }, { kind: 'invalid' })
     const own = { ...this.wsConfig.advanced }
     if (raw === null || raw === undefined) delete own[id]
     else {
       const checked = checkAdvanced(def, raw)
-      if ('error' in checked) throw new HiveError(checked.errorText)
+      if ('error' in checked) throw new HiveError(checked.errorText, { kind: 'invalid' })
       own[id] = checked.value
     }
     if (Object.keys(own).length) this.wsConfig.advanced = own
@@ -1297,6 +1334,16 @@ export class WorkspaceService {
     return readSession(await this.sessionsPlace(projectPath), id)
   }
 
+  /** A host's session records of one agent, most recently active first (HI-1236: by the agent's index, not every record). */
+  async sessionsOfAgent(projectPath: string, agentId: string): Promise<SessionRecord[]> {
+    return readAgentSessions(await this.sessionsPlace(projectPath), agentId)
+  }
+
+  /** A host's session records that worked on a card, in their order (HI-1236: by the cards' index, not every record). */
+  async sessionsOfCard(projectPath: string, card: number): Promise<SessionRecord[]> {
+    return readCardSessions(await this.sessionsPlace(projectPath), card)
+  }
+
   /** Changes a host's session records from what is saved now, one change at a time; only what changed is written. */
   async mutateSessions<T>(projectPath: string, fn: (f: SessionsFile) => T): Promise<T> {
     return changeSessions(await this.sessionsPlace(projectPath), fn)
@@ -1433,9 +1480,15 @@ export class WorkspaceService {
   private sayPlatform(projectPath: string, p: ProjectPlatform): void {
     const key = projectPath.toLowerCase()
     const why = p.invalid !== undefined ? `invalid:${p.invalid}` : (p.offer?.why ?? '')
-    if ((this.platformOffers.get(key) ?? '') === why) return
+    const before = this.platformOffers.get(key) ?? ''
+    if (before === why) return
     this.platformOffers.set(key, why)
-    if (!why) return
+    // Nothing to say now (switched, or the folder back as it was): the notice said before goes (HI-1905: a project
+    // switched to Git right after Initialise repository… kept "Hive goes on treating it as … None").
+    if (!why) {
+      if (before) this.emit({ type: 'toast-gone', id: `platform:${key}` })
+      return
+    }
     if (p.invalid !== undefined) log.warn(`${userText(basename(projectPath))}'s project.json names no platform Hive has (${userText(p.invalid)}): it uses ${p.id}, as detected`)
     else log.info(`${userText(basename(projectPath))} is a ${p.id} project; its folder now says ${p.detected.platform}${p.detected.other ? ` (${p.detected.other} found)` : ''}`)
     // An offer has its button to the tab that makes it (#1419); an unknown setting is fixed in project.json.
@@ -1619,6 +1672,13 @@ export function createWorkspaceService(): WorkspaceService {
   const w = new WorkspaceService()
   services.add(w)
   return w
+}
+
+/** A promise to wait on until `done()` (at once when `open` is true); done more than once is harmless. */
+function gate(open = false): { promise: Promise<void>; done: () => void } {
+  let done = (): void => {}
+  const promise = open ? Promise.resolve() : new Promise<void>((r) => (done = r))
+  return { promise, done: () => done() }
 }
 
 /** Closes a window's workspace and forgets its service. */

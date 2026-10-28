@@ -2,6 +2,7 @@ import { join } from 'path'
 import type { StoredText, TaskCard, TaskPatch } from '../shared/types'
 import type { IntentDone } from '../shared/toolReplies'
 import type { AskAction, ForYouKind, LoopStepId } from '../shared/workflow/facts'
+import type { FocusedTest } from '../shared/workflow/focused'
 import { boardLock, getTask, loopStepNote, readTask, requestNote, runIntent, WorkflowRefusedError, type TaskActor } from './tasks'
 import { actorOf } from './workflow/recorder'
 import { isRefusal, type Moved, type Reply, type Workflow } from './workflow/runtime'
@@ -30,7 +31,7 @@ import { HISTORY, storedText } from '../shared/taskHistory'
 export type CardIntent =
   | { kind: 'start' }
   | { kind: 'putBack'; why: string }
-  | { kind: 'submit'; summary: string; revision?: string; note?: string; paths?: string[]; followUp?: boolean }
+  | { kind: 'submit'; summary: string; revision?: string; note?: string; paths?: string[]; followUp?: boolean; tests?: FocusedTest[] }
   | { kind: 'declarePaths'; paths: string[] }
   | { kind: 'startReview'; submission?: number }
   | { kind: 'verdict'; submission?: number; pass: boolean; failKind?: 'content' | 'explanation'; comment: string }
@@ -40,6 +41,8 @@ export type CardIntent =
   | { kind: 'request'; text: string }
   /** A card loop's step (#1382, #1467): a design or a follow-up for the reviewer's check, its answer, or going ahead unchecked. */
   | { kind: 'loopStep'; step: LoopStepId; text: string; design?: string }
+  /** G20 (HI-1367): the card's reviewer decides on focused tests its merge skipped (`merge`: with them skipped, or returned). */
+  | { kind: 'focusedSkip'; request: string; merge: boolean; why: string }
   /** The merge queue's controls (#1353): the user's, or the Assistant's with a reason (OP-9); never an agent's. */
   /** `guard`: the Assistant's change boundary, checked again inside the write. */
   | { kind: 'removeFromQueue'; reason: string; guard?: () => void }
@@ -97,7 +100,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'putBack':
         return w.putBack(named, who, { why: intent.why })
       case 'submit':
-        return w.submit(named, who, { summary: intent.summary, ...(intent.revision ? { revision: intent.revision } : {}), ...(intent.note ? { note: intent.note } : {}), ...(intent.paths ? { paths: intent.paths } : {}), ...(intent.followUp ? { followUp: true } : {}) })
+        return w.submit(named, who, { summary: intent.summary, ...(intent.revision ? { revision: intent.revision } : {}), ...(intent.note ? { note: intent.note } : {}), ...(intent.paths ? { paths: intent.paths } : {}), ...(intent.followUp ? { followUp: true } : {}), ...(intent.tests ? { tests: intent.tests } : {}) })
       case 'startReview':
         return w.startReview(named, who, { ...(intent.submission !== undefined ? { submission: intent.submission } : {}) })
       case 'verdict':
@@ -112,6 +115,8 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
         return w.requestToBuilder(named, who, intent.text)
       case 'loopStep':
         return w.loopStep(named, who, intent.step, intent.text, { waitMinutes: stepWait, reviewer: designReviewer, ...(intent.design ? { design: intent.design } : {}) })
+      case 'focusedSkip':
+        return w.focusedSkip(named, who, intent.request, intent.merge, intent.why)
       case 'removeFromQueue':
         return w.removeFromQueue(named, intent.reason, by, intent.guard)
       case 'retryMerge':

@@ -7,7 +7,7 @@ metadata:
 
 # Card loop
 
-Two agents take the same cards in turn: the **builder** does each card, commits it and submits it for review; the **reviewer** reviews it and fails it with findings, or passes it. This skill is one side of that loop. Waiting for the other side costs nothing: you end your turn and Hive wakes you. Each step is a tool (work-on-card); what a step needs first is the project's rules, which Hive checks, and a refusal says what to do next.
+Two agents take the same cards in turn: the **builder** does each card, commits it and submits it for review; the **reviewer** reviews it and fails it with findings, or passes it. Waiting for the other side costs nothing: you end your turn and Hive wakes you. Each step is a tool (work-on-card); what a step needs first is the project's rules, which Hive checks, and a refusal says what to do next.
 
 ## Inputs
 
@@ -41,7 +41,7 @@ Wait with `hive_wait_for_tasks`, `wake: true`, `limitMinutes` the lane's wait. *
 
 For each card, in order:
 1. Do its work with the **work-on-card** skill (`hive_start_card` first). The reviewer reviews what you submit (work-on-card, Finish): for a code card in Git, commit each round's work and name the commit in its summary; a no-code card has nothing to commit. `hive_submit`, and end your turn (Waiting, above).
-2. Woken by a request from the reviewer (a commit, a run): do it, watch again; a commit is a follow-up (below), a run a reply naming it.
+2. **A change asked of the card in Review**: make it (for a code card in Git, commit it), then `hive_submit` with `followUp: true` before you wait: until then nothing is handed over. A run asked for: reply naming it, then watch again.
 3. **Passed**: its finish is the project's, and the card says what's next (work-on-card, Finish). Then `hive_lane` `next`.
 4. **Failed**: the verdict sent it back to Doing. Fix the **blocking** findings (committed, for a code card in Git), and submit again with what changed (naming the commit, for a code card in Git): the next round. Suggestions that aren't blocking become follow-up cards (`hive_create_task`).
 
@@ -49,7 +49,7 @@ For each card, in order:
 
 **A design first** (the card, its decisions or the user asks for one, a finding keeps coming back, or you want one checked before building): in Doing, start the watch (`changes: ["comment"]`, `limitMinutes`: `designWaitMinutes` from `hive_start_card`'s reply), post it with `hive_loop_step` (`step: "design"`, the design as its text), and end your turn. `ok`: build it. `gaps`: revise and post again (watch first). Woken by something else: watch again until the reply's `until`. No answer by then: `step: "proceed"` with its `design`, and build as posted.
 
-**A follow-up** (a change asked of the card in Review or Passed, for its reviewer to check): in Review, a commit is `hive_submit` with `followUp: true` (it stays in Review, no round). Else make it (committed, for a code card in Git), start the watch (`changes: ["comment", "column", "verdict"]`), post it with `hive_loop_step` (`step: "followUp"`, saying what changed: for a code card in Git, its commit), and end your turn: a comment alone wakes nobody. `ok`: carry on; `gaps`: fix and post again. No answer by the wait: ask the user.
+**A follow-up** (a change asked of the card, for its reviewer to check): in Review, step 2 (no round). In Passed, make it (committed, for a code card in Git), start the watch (`changes: ["comment", "column", "verdict"]`), post it with `hive_loop_step` (`step: "followUp"`, saying what changed: for a code card in Git, its commit), and end your turn: a comment alone wakes nobody. `ok`: carry on; `gaps`: fix and post again. No answer by the wait: ask the user.
 
 **The lane's end:** once every card is Done, the lane ends by itself. A merge step that needs the user (a commit or merge your CLI or a permission check refuses, a conflict you can't settle) is `hive_cannot_within_rules` on that card (the rule, and why): their answer comes to your inbox; then finish the merge.
 

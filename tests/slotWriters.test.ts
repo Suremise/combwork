@@ -320,6 +320,79 @@ describe("a slot's writer through sessions.start (#1434 round 3)", () => {
     }
   })
 
+  describe('a permission-mode restart (HI-1869)', () => {
+    /**
+     * Its stop as a CLI's exit settles it (forget: its writer's release under way, its live entry gone, its exit waited
+     * for), or `never` (a CLI that doesn't end): no process runs here, so the harness stands in for the exit.
+     */
+    const stopAs = (how: 'exits' | 'never') => {
+      const real = manager.stop
+      manager.stop = function (this: { forget(id: string): void }, p: string, agentId: string) {
+        if (how === 'exits') this.forget(`${p.toLowerCase()}#${agentId}`)
+      }
+      return () => void (manager.stop = real)
+    }
+    const restart = () => inWorkspace(ws, () => sessions.restartInMode(project, 'b1', 'acceptEdits'))
+
+    it("waits for its old run's writer release, then the new run claims the slot", async () => {
+      hostOn()
+      const old = (await start()).runId
+      const waiting = vi.spyOn(manager as unknown as { earlierWritersSettled: (...a: unknown[]) => Promise<void> }, 'earlierWritersSettled')
+      const undo = stopAs('exits')
+      try {
+        const going = restart()
+        // At the wait, the old run's writer still on the slot: nothing claimed or launched, nothing refused.
+        await vi.waitFor(() => expect(waiting).toHaveBeenCalled(), { timeout: 15000 })
+        expect(writer()?.run).toBe(old)
+        expect(launched).toBe(1)
+        settleRunForTests(old, 'ended')
+        await going
+        expect(writer()?.run).not.toBe(old)
+        expect(writer()?.agent).toBe('b1')
+        expect(launched).toBe(2)
+      } finally {
+        undo()
+        waiting.mockRestore()
+      }
+    })
+
+    it('its old run held (its processes kept running): refused as busy, the slot left with it', async () => {
+      hostOn()
+      const old = (await start()).runId
+      const undo = stopAs('exits')
+      try {
+        const going = restart()
+        settleRunForTests(old, 'kept')
+        await expect(going).rejects.toThrow(/still has another session in it/)
+        expect(writer()?.run).toBe(old)
+        expect(launched).toBe(1)
+      } finally {
+        undo()
+      }
+    })
+
+    it("a CLI that doesn't stop in time: refused as not stopped, nothing started, its run keeping the slot", async () => {
+      hostOn()
+      const old = (await start()).runId
+      const undo = stopAs('never')
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      try {
+        const going = restart()
+        const refused = expect(going).rejects.toThrow(/didn't stop in time, so it wasn't restarted in the new mode/)
+        // Its wait for the exit begins after it has read the conversation (real I/O): the timer, once it is set, is run out.
+        const bound = Date.now() + 15_000
+        while (vi.getTimerCount() === 0 && Date.now() < bound) await new Promise((r) => setImmediate(r))
+        await vi.runAllTimersAsync()
+        await refused
+        expect(writer()?.run).toBe(old)
+        expect(launched).toBe(1)
+      } finally {
+        vi.useRealTimers()
+        undo()
+      }
+    })
+  })
+
   it("…but a run held (its processes kept running) is still refused once its outcome is known (HI-1867)", async () => {
     hostOn()
     const settle = manager.settleWriterOf as (run: string) => void

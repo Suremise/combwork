@@ -307,9 +307,15 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
       const id = tx.facts(n).findLast((f) => f.kind === 'Started' || f.kind === 'Adopted')?.ruleset
       return id ? { ruleset: id } : {}
     }
-    if (record.preWorkflow) {
-      store.updateCard(n, { preWorkflow: false })
-      // What it was decided before it became a 1.0 card, as it stands: what later receipts are matched with.
+    if (record.preWorkflow) store.updateCard(n, { preWorkflow: false })
+    // What it was decided before it became a 1.0 card, as it stands: what later receipts are matched with. Started by the
+    // runtime (HI-1966: the board's Start of it, or an intent), its mark was cleared in this write already: its first
+    // start, with decisions and none of them a fact yet (a 1.0 card's are facts as they are made).
+    const firstStart = (): boolean => {
+      const all = tx.facts(n)
+      return all.filter((f) => f.kind === 'Started').length === 1 && !all.some((f) => f.kind === 'Decision' || f.kind === 'Adopted')
+    }
+    if (record.preWorkflow || (!moves && after.column === 'doing' && before?.column !== 'doing' && !!before?.decisions?.length && firstStart())) {
       for (const d of before?.decisions ?? []) decision(d)
     }
     const facts = () => foldCard(tx.facts(n), was)
@@ -332,6 +338,25 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
         }
       })
     }
+    let verdict: number | null = null
+    let verdictFailed = false
+    // A verdict before the move it makes (HI-1946: a failed card back to Doing, a pass on to Passed), as the runtime
+    // writes them: Verdict, then Moved.
+    for (const h of moves ? history : []) {
+      if (h.whatText?.id !== HISTORY.reviewPassed.id && h.whatText?.id !== HISTORY.reviewFailed.id) continue
+      const s = facts()
+      const reviewer = before?.review?.agent ?? (ctx?.actor.kind === 'agent' ? (ctx.actor.self?.agentId ?? ctx.actor.name) : 'unknown')
+      // The generation the reviewer had received (HR4's round 1 finding 4): never decisions it hasn't seen.
+      verdictFailed = h.whatText.id === HISTORY.reviewFailed.id
+      verdict = tx.append(n, {
+        kind: 'Verdict', // i18n-ignore: a fact's kind and codes, not text
+        actor,
+        source: 'recorded',
+        ...ruleset(),
+        data: { reviewer, submission: s.latest?.id ?? 0, revision: s.latest?.revision ?? null, pass: h.whatText.id === HISTORY.reviewPassed.id, round: roundOf(before ?? after), generation: s.received[reviewer] ?? 0, comment }
+      }).seq
+    }
+    if (verdictFailed) roundLimit(tx, n, `${after.project}-${n}`, ruleset())
     let moved: number | null = null
     if (was !== to && moves) {
       moved = tx.append(n, { kind: 'Moved', actor, source: 'recorded', ...ruleset(), data: { from: was, to, cause: causeOf(ctx?.actor) } }).seq // i18n-ignore: a fact's kind and codes, not text
@@ -341,8 +366,6 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
     // wake is the runtime's own).
     if (!moves) moved = ctx?.byRuntime?.moved ?? null
     let submitted: number | null = null
-    let verdict: number | null = null
-    let verdictFailed = false
     if (intoReview && moves) {
       const s = facts()
       const builder = after.agent ?? s.started?.builder ?? null
@@ -371,21 +394,6 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
       const s = facts()
       tx.append(n, { kind: 'ReviewStarted', actor, source: 'recorded', ...ruleset(), data: { reviewer: after.review.agent, submission: s.latest?.id ?? 0, revision: s.latest?.revision ?? null } })
     }
-    for (const h of moves ? history : []) {
-      if (h.whatText?.id !== HISTORY.reviewPassed.id && h.whatText?.id !== HISTORY.reviewFailed.id) continue
-      const s = facts()
-      const reviewer = before?.review?.agent ?? (ctx?.actor.kind === 'agent' ? (ctx.actor.self?.agentId ?? ctx.actor.name) : 'unknown')
-      // The generation the reviewer had received (HR4's round 1 finding 4): never decisions it hasn't seen.
-      verdictFailed = h.whatText.id === HISTORY.reviewFailed.id
-      verdict = tx.append(n, {
-        kind: 'Verdict', // i18n-ignore: a fact's kind and codes, not text
-        actor,
-        source: 'recorded',
-        ...ruleset(),
-        data: { reviewer, submission: s.latest?.id ?? 0, revision: s.latest?.revision ?? null, pass: h.whatText.id === HISTORY.reviewPassed.id, round: roundOf(before ?? after), generation: s.received[reviewer] ?? 0, comment }
-      }).seq
-    }
-    if (verdictFailed) roundLimit(tx, n, `${after.project}-${n}`, ruleset())
     if ((before?.blocked ?? null) !== after.blocked) {
       if (after.blocked) tx.append(n, { kind: 'Blocked', actor, source: 'recorded', ...ruleset(), data: { reason: after.blocked } }) // i18n-ignore: a fact's kind and codes, not text
       else if (before?.blocked) tx.append(n, { kind: 'Unblocked', actor, source: 'recorded', ...ruleset(), data: {} }) // i18n-ignore: a fact's kind and codes, not text

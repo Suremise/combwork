@@ -3,7 +3,7 @@
 // clone's push shows nothing until Fetch); Pull fast-forwards; New branch… switches to it and Push sets its upstream;
 // a branch's Switch is disabled, with why, while an agent works in the project folder; History lists the commits and
 // Create tag… tags the commit; Add remote… adds one, and a GitHub remote with a personal email warns; a project without
-// git (None, #1416) says so under the header, with Initialise repository…. Remotes are local bare repositories in the suite's folder (never a real remote), git's
+// git (None, #1416) says so under the header, Initialise repository… shown once Git is chosen (HI-1905). Remotes are local bare repositories in the suite's folder (never a real remote), git's
 // global config is the suite's own (GIT_CONFIG_GLOBAL), and the agent is the fake Claude Code. Dev build, throwaway
 // profile and workspace.
 const lib = require('./lib.cjs')
@@ -190,9 +190,11 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   await page.getByText('beta', { exact: true }).first().click()
   await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
   const notes = page.locator('[data-vc-init]')
-  check('a project without git (None) says so, with Initialise repository… under the header and only Workflow', !!(await lib.until(async () => /has no version control/.test(await text(page.locator('[data-vc-fact]'))) && (await notes.locator('[data-git-init]').count()) === 1 && JSON.stringify(await page.locator('.git-sections [role="tab"]').evaluateAll((b) => b.map((x) => x.getAttribute('data-section')))) === '["workflow"]', HUNG_MS)), await text(page.locator('.vc-view')))
+  check('a project without git (None) says so, with only Workflow and no Initialise repository… (HI-1905: Git’s)', !!(await lib.until(async () => /has no version control/.test(await text(page.locator('[data-vc-fact]'))) && JSON.stringify(await page.locator('.git-sections [role="tab"]').evaluateAll((b) => b.map((x) => x.getAttribute('data-section')))) === '["workflow"]', HUNG_MS)) && (await notes.count()) === 0, await text(page.locator('.vc-view')))
   check('and has no status bar item', (await item.count()) === 0)
   await shot(page, '5-no-git')
+  await page.locator('[data-vc-head] [data-platform="git"]').click()
+  check('Git chosen there: Initialise repository…', !!(await lib.until(async () => (await notes.locator('[data-git-init]').count()) === 1, HUNG_MS)), await text(page.locator('.vc-view')))
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

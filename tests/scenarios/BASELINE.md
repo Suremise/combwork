@@ -36,6 +36,56 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## A decision that answers a card's open requests (HI-1932): fakes, Claude Code Haiku, fixtures v97, 28 October 2026
+
+`hive_update_task` gains `answers` (the Assistant's only: the ids of the card's open requests the user's decision answers,
+closed with it in one write), and `hive_read_task` lists a card's open requests for the user (`forYou`) with their ids.
+Two new scenarios: **assistant-decision-answers** (the user's answer covers both of Coder's questions: both named) and
+**assistant-decision-answers-one** (it covers only the first: only that one named).
+- **Fakes**: the 144 scenarios both ran are the same before (`hi1932-before`, `results/2026-10-28T12-23-06-fake`, the
+  tools as they were) and after (`hi1932-after`, `results/2026-10-28T14-01-55-fake`), but for assistant-agent-watch,
+  which failed one check before the change and passes after (unrelated to it); the two new ones pass. The tool list a
+  start is given grew 55 bytes on average (39,522 to 39,577).
+- **Haiku** (CLI 2.1.312, `--repeat 5`, $0.083; `results/2026-10-28T14-57-53-claude-code`): **5 of 5** for both
+  questions, **4 of 5** for one. The miss recorded the decision and named no request: the question stays open in For
+  you, the safe side (nothing was closed that the answer doesn't cover).
+- **Claude Code's default model** (`results/2026-10-28T15-04-45-claude-code`, $0.38): both pass.
+
+## A follow-up in Review handed over before the wait (HI-1843): fakes, Claude Code Haiku, fixtures v96, 28 October 2026
+
+HI-1832's Haiku trials of card-loop-follow-up passed 1 of 5, that one only through the plain submit's refusal. Their
+transcripts (the Claude test home, 27 Oct) show the other four reading card-loop, finding the card in Review with the
+commit made, and only starting a watch: committed and in Review was taken as handed over. card-loop's builder step 2
+now says it as one step: a change asked of the card in Review is made (committed, for a code card in Git), then
+`hive_submit` with `followUp: true` before the builder waits, as until then nothing is handed over. The follow-up paragraph
+points to step 2 rather than restating it. Trimmed elsewhere to stay under the skill's 11,000 characters; the
+always-present guidance is unchanged.
+- **Fakes**: the 24 card-loop scenarios pass before (`hi1843-before`, `results/2026-10-28T11-40-00-fake`, the skill as
+  it was) and after (`hi1843-after`, `results/2026-10-28T11-51-38-fake`); Performance → Compare's rules: 24 the same.
+- **Haiku** (CLI 2.1.312, `--repeat 5`, $0.036; `results/2026-10-28T12-02-25-claude-code`): **4 of 5** (was 1 of 5). The
+  fifth called `hive_submit` without `followUp`, was refused with the next step named ("submit it again with followUp:
+  true"), and waited without taking it: the remaining limitation, in the refusal's handling rather than the skill's words.
+- **Claude Code's default model** (`results/2026-10-28T12-06-18-claude-code`, $0.16): pass.
+
+## Three checks that failed a model doing it right (HI-1950): the fake Claude Code, fixtures v96, 28 October 2026
+
+HI-686's Claude Code trials (`results/2026-10-28T10-28-14-claude-code`, CLI 2.1.312, its default model) failed three
+scenarios where the agent did the right thing; the fakes passed them, as they only do what the checks expect:
+- **card-loop-lane**: the agent named its lane's cards by key (`["AL-1","AL-2"]`), the form the tools ask for (HI-1661),
+  and the check compared numbers. `namesCards` and `namesCard` accept each card's number or key, in order: used there and
+  in the other checks of an agent's own card lists (card-loop-uncommitted, card-loop-lane-defaults and -override,
+  card-loop-lane-join, card-loop-already-in-review).
+- **wrap-up**: the agent ran no tests, but the check matched `npm test` in its handover's own text. It now counts only
+  test runs among the shell commands (`testRunsOf`), as the review scenarios do.
+- **review-card**: the card was put in Review with `greet.js` in the initial commit, so its submission changed nothing and
+  the reviewer rightly asked for a commit rather than giving a verdict. It now has a real submission (`submittedCard`
+  with the card's own files, in a project that reviews: Pair, Implementer building, Coder reviewing).
+
+The fake Claude Code passes all nine scenarios these changes touch (`results/2026-10-28T11-21-57-fake`, with
+coordinator-start-reviewer, whose `submittedCard` now takes the files). Fifteen other setups still put a card straight in
+Review with its work in the initial commit; none has failed a real run yet, and a scenario whose review needs a
+submitted change should use `submittedCard`.
+
 ## Reading the owning skill, recorded (#1611): the three fakes, fixtures v91, 25 October 2026
 
 Claude Code's #1537 trial relayed the user's answer to a watching reviewer correctly without reading coordinate-agents.

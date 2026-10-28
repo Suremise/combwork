@@ -2,7 +2,7 @@ import { msg, type Msg } from './i18n/msg'
 import { shortRevision } from './progress'
 import type { Tr } from './tasks'
 import type { ProgressRun } from './types'
-import { RETURN_SEEN_SHOWN_MS, type QueuePauseInfo, type QueueRecent, type QueueView } from './workflow/queue'
+import { RECENT_MAX, RETURN_SEEN_SHOWN_MS, type QueuePauseInfo, type QueuePauseLogged, type QueuePushState, type QueueRecent, type QueueView } from './workflow/queue'
 
 export { RETURN_SEEN_SHOWN_MS }
 
@@ -155,20 +155,19 @@ export function queueEstimate(v: QueueView, runs: readonly ProgressRun[]): numbe
 }
 
 /**
- * The Hive run of a returned entry's failed check (its log is Show log's, #1349): the card's newest failed Hive run in
- * the project that ended by the return. Null for a return no check made (a conflict, a hook) or a run not kept.
+ * The Hive run of a returned entry's failed check (its log is Show log's, #1349): the card's Hive run in the project
+ * whose log the outcome recorded, never another attempt's found by time (HI-1924, HR1's round 1). Null for a return no
+ * check made (a conflict, a hook), an outcome that kept no log, or a run not kept.
  */
 export function returnRun(v: QueueView, r: QueueRecent, runs: readonly ProgressRun[]): ProgressRun | null {
-  if (r.reason !== 'checks') return null
+  if (r.reason !== 'checks' || !r.logPath) return null
   const project = v.projectPath.toLowerCase()
-  const by = at(r.at) + 5_000
-  let out: ProgressRun | null = null
-  for (const x of runs) {
-    if (x.source !== 'hive' || x.card !== r.card || x.state !== 'failed' || x.projectPath?.toLowerCase() !== project || x.finishedAt === null || x.finishedAt > by) continue
-    if (!out || x.finishedAt > out.finishedAt!) out = x
-  }
-  return out
+  const log = r.logPath.toLowerCase()
+  return runs.find((x) => x.source === 'hive' && x.card === r.card && x.projectPath?.toLowerCase() === project && x.logPath?.toLowerCase() === log) ?? null
 }
+
+/** The check a return names: the one its outcome recorded, else its run's (null: none known). */
+export const returnCheck = (r: QueueRecent, run: ProgressRun | null): string | null => r.check ?? (run ? runCheckName(run) : null)
 
 /** A Hive run's check as its title names it ("HI-12 · unit · a3f2c1d": unit), or its counted check's name. */
 export function runCheckName(r: ProgressRun): string {
@@ -213,14 +212,14 @@ export function mergedText(r: QueueRecent, tr: Tr): string {
 export function returnWhy(r: QueueRecent, check: string | null, target: string, tr: Tr, list: (items: string[]) => string): string {
   const files = r.files?.slice(0, 3) ?? []
   const more = (r.files?.length ?? 0) - files.length
-  const reason = r.reason === 'conflict' || r.reason === 'checks' || r.reason === 'hook' || r.reason === 'folderBusy' || r.reason === 'notUpToDate' ? r.reason : 'other'
+  const reason = r.reason === 'conflict' || r.reason === 'checks' || r.reason === 'hook' || r.reason === 'folderBusy' || r.reason === 'notUpToDate' || r.reason === 'focused' ? r.reason : 'other'
   const why = tr(
     msg({
       id: 'board.queue.returnWhy',
-      defaultMessage: '{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} other {{why}}}',
-      description: "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target; else {why} as Hive recorded it. Lower case. Keep the select keys and the word none."
+      defaultMessage: '{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} focused {its focused tests couldn’t be chosen or proved} other {{why}}}',
+      description: "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target, or its focused tests (G20: the tests its change needs) couldn't be chosen or proved by its review; else {why} as Hive recorded it. Lower case. Keep the select keys and the word none."
     }),
-    { reason, files: files.length ? (more > 0 ? tr(msg({ id: 'board.queue.filesMore', defaultMessage: '{files} and {n, plural, one {# more} other {# more}}', description: 'Files a merge conflict named, when there are more than shown: the first few ({files}, a list) and how many more ({n}).' }), { files: list(files), n: more }) : list(files)) : 'none', check: check ?? 'none', target, why: r.reason ?? '' } // i18n-ignore: select keys, never shown
+    { reason, files: files.length ? (more > 0 ? list([...files, tr(msg({ id: 'board.queue.filesMore', defaultMessage: '{n, plural, one {# more} other {# more}}', description: 'The last item of a list of the files a merge conflict named, when there are more than shown: how many more ({n}). The list joins it to the first few as your language joins a list (HI-1585: no "and" written around a list).' }), { n: more })]) : list(files)) : 'none', check: check ?? 'none', target, why: r.reason ?? '' } // i18n-ignore: select keys, never shown
   )
   return r.transient ? tr(msg({ id: 'board.queue.transient', defaultMessage: '{why} (temporary)', description: "A merge queue return that was the environment's failure, not the work's (a check that couldn't start, a network error): its reason ({why}) and that it was temporary." }), { why }) : why
 }
@@ -228,7 +227,7 @@ export function returnWhy(r: QueueRecent, check: string | null, target: string, 
 /** A return: "HI-108 returned to HB1: conflict in tasks.ts" (`builder` null: to no one Hive knows). */
 export function returnedText(r: QueueRecent, why: string, builder: string | null, tr: Tr): string {
   if (!builder) return tr(msg({ id: 'board.queue.returned', defaultMessage: '{card} returned: {why}', description: "A merge queue's card in the Progress panel: a card ({card}: its key) the queue returned (glossary 2.4: returned), and why ({why}: conflict in tasks.ts, checks failed: unit…)." }), { card: r.key, why })
-  return tr(msg({ id: 'board.queue.returnedTo', defaultMessage: '{card} returned to {builder}: {why}', description: "A merge queue's card in the Progress panel: a card ({card}: its key) the queue returned to its builder ({builder}: an agent's name; glossary 2.4: returned), and why ({why}: conflict in tasks.ts, checks failed: unit…)." }), { card: r.key, builder, why })
+  return tr(msg({ id: 'board.queue.returnedTo', defaultMessage: '{card} returned to builder {builder}: {why}', description: "A merge queue's card in the Progress panel: a card ({card}: its key) the queue returned to its builder ({builder}: an agent's name; glossary 2.4: returned), and why ({why}: conflict in tasks.ts, checks failed: unit…). A noun before the name (glossary §1 rule 4)." }), { card: r.key, builder, why })
 }
 
 const PAUSES: Record<string, Msg> = {
@@ -294,4 +293,59 @@ export function queueNews(before: QueueView | undefined, after: QueueView, now: 
   if (after.paused && (!before.paused || before.paused.at !== after.paused.at)) out.push({ key: `${after.projectPath}\n${after.target}:paused:${after.paused.at ?? ''}`, text: tr(msg({ id: 'board.queue.saidPaused', defaultMessage: 'Merge queue for {target} paused', description: "Announced to screen readers (politely) when a merge queue paused ({target}: its branch). Glossary 2.5: merge queue." }), { target: after.target }) })
   if (before.paused && !after.paused) out.push({ key: `${after.projectPath}\n${after.target}:resumed:${before.paused.at ?? ''}`, text: tr(msg({ id: 'board.queue.saidResumed', defaultMessage: 'Merge queue for {target} resumed', description: "Announced to screen readers (politely) when a merge queue resumed ({target}: its branch). Glossary 2.5: merge queue." }), { target: after.target }) })
   return out
+}
+
+/**
+ * A row of a queue's Recent merges (HI-1924, the Merges tab): an outcome (merged, returned, taken out) or a pause, by its
+ * time, newest first.
+ */
+export type HistoryRow = { kind: 'outcome'; at: string; key: string; r: QueueRecent } | { kind: 'pause'; at: string; key: string; p: QueuePauseLogged }
+
+/** How many rows a queue's Recent merges shows: the outcomes its model keeps. */
+export const HISTORY_SHOWN = RECENT_MAX
+
+/**
+ * A queue's Recent merges (HI-1924): its latest outcomes and pauses, newest first, at most HISTORY_SHOWN, of the cards
+ * `keep` keeps (the panel's agent filter: by number for an outcome, by key for a pause; a pause of the queue itself, on
+ * no card, always shows). `more`: Version Control has older ones (the model holds as many as it keeps).
+ */
+export function historyRows(v: QueueView, keep?: { number: (n: number) => boolean; key: (k: string) => boolean }): { rows: HistoryRow[]; more: boolean } {
+  const outcomes: HistoryRow[] = v.recent.filter((r) => !keep || keep.number(r.card)).map((r) => ({ kind: 'outcome', at: r.at, key: `${r.entry}:${r.outcome}`, r }))
+  const pauses: HistoryRow[] = v.pauses.filter((p) => !keep || !p.card || keep.key(p.card)).map((p) => ({ kind: 'pause', at: p.at, key: `pause:${p.at}:${p.reason}`, p }))
+  const rows = [...outcomes, ...pauses].sort((a, b) => (a.at === b.at ? 0 : a.at < b.at ? 1 : -1))
+  return { rows: rows.slice(0, HISTORY_SHOWN), more: rows.length > HISTORY_SHOWN || v.recent.length >= RECENT_MAX }
+}
+
+/** An outcome of Recent merges in a few words: "Merged", "Returned: conflict in tasks.ts", "Taken out: Remove from queue". */
+export function historyOutcome(r: QueueRecent, why: string, tr: Tr): string {
+  if (r.outcome === 'merged') return tr(msg({ id: 'board.queue.recent.merged', defaultMessage: 'Merged', description: "An outcome in the Progress panel's Recent merges (Merges tab): the merge queue merged the card. Its merge commit follows, as a short commit id." }))
+  if (r.outcome === 'returned') return tr(msg({ id: 'board.queue.recent.returned', defaultMessage: 'Returned: {why}', description: "An outcome in the Progress panel's Recent merges (Merges tab): the merge queue returned the card to its builder, and why ({why}: conflict in tasks.ts, checks failed: unit…). Glossary 2.4: returned." }), { why })
+  return tr(msg({ id: 'board.queue.recent.cancelled', defaultMessage: 'Taken out: {reason, select, removed {Remove from queue} stale {its pass no longer counted} hold {put On Hold} decision {a decision} integratedOutside {merged outside Hive} followUp {a follow-up} other {cancelled}}', description: "An outcome in the Progress panel's Recent merges (Merges tab): the card's entry was taken out of the merge queue, and why (Remove from queue is a button's name; On Hold a column's). Keep the select keys." }), { reason: r.reason ?? 'other' }) // i18n-ignore: a select key, never shown
+}
+
+/** Why a queue paused, in a few words (HI-1924, Recent merges; the whole sentence, pauseText, is its tooltip). */
+export function pauseWhyShort(p: Pick<QueuePauseLogged, 'reason' | 'by'>, tr: Tr): string {
+  const reason = p.reason === 'user' ? (p.by === 'assistant' ? 'assistant' : 'user') : p.reason // i18n-ignore: select keys, never shown
+  return tr(
+    msg({
+      id: 'board.queue.recent.paused',
+      defaultMessage:
+        'Paused: {reason, select, user {by you} assistant {by the Assistant} pushRejected {the remote refused the push} pushFailed {the push failed} pushNoRemote {no remote to push to} pushUnreadable {couldn’t read the branch to push it} targetMovesFast {the branch kept moving} folderBusy {its folder was busy} wrongBranch {its folder changed branch} staged {changes staged in its folder} unstagedChanges {changes in its folder} identity {no commit identity} needsYou {needs you} uncounted {the checks didn’t count} checkedOut {the branch was checked out} rulesOff {the rules were off} signingWaits {signing waited for you} signing {signing failed} hookTimedOut {a hook ran too long} subfolderTarget {no target branch named} mergeChoice {waiting for how to merge} approval {waiting for your OK} focusedSkip {waiting for your OK to skip focused tests} other {{code}}}',
+      description: "A pause in the Progress panel's Recent merges (Merges tab): the merge queue paused, and why in a few words (by the user or the Assistant; the push of the target branch refused, failed, with no remote or unreadable (G18); the branch moving, its checked-out folder busy, on another branch, with staged or other changes; no git identity; needs the user; checks that didn't count; rules off; commit signing; a git hook; no target branch for a project in a subfolder; the merge style choice after the upgrade; the user's approval; skipping focused tests). Else {code}, Hive's code for it. Lower case after the colon. Keep the select keys."
+    }),
+    { reason, code: p.reason }
+  )
+}
+
+/** A merge's push (G18) in Recent merges, or null when there is nothing to say. */
+export function pushStateText(state: QueuePushState | undefined, tr: Tr): string | null {
+  if (!state) return null
+  return tr(
+    msg({
+      id: 'board.queue.recent.push',
+      defaultMessage: '{state, select, pushed {Pushed} pending {Not pushed yet} off {Not pushed: pushing was turned off} reset {Not pushed: the branch no longer had it} other {Push not recorded}}',
+      description: "Beside a merge in the Progress panel's Recent merges (Merges tab), when the workflow pushes the target branch after merging (G18): pushed; not pushed yet; not pushed because the option was turned off, or because the branch was reset and no longer had the merge; or Hive has no record of its push (an older merge). Keep the select keys."
+    }),
+    { state }
+  )
 }

@@ -367,6 +367,14 @@
     "defaultMessage": "Connections: trusted folder field",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.claude-code.autoModeSetup.offer.desc": {
+    "defaultMessage": "Claude Code offers, now and then in auto mode, to read the project, your recent sessions and optionally your shell history and other repositories, to teach auto mode about your environment. Hive never answers it: the agent waits for you. Off, Hive's Claude Code agents are started with the offer turned off for that launch (nothing is written to Claude Code's files, and auto mode decides as before); /auto-mode-setup still runs it when you want.",
+    "description": "What the advanced setting \"Offer auto mode's environment setup\" is for, and what happens when it is off (Settings → Advanced, HI-1959). /auto-mode-setup is Claude Code's command: keep it as it is."
+  },
+  "settings.advanced.claude-code.autoModeSetup.offer.title": {
+    "defaultMessage": "Offer auto mode's environment setup",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto mode is one of Claude Code's permission modes."
+  },
   "settings.advanced.claude-code.connections.remoteModels.desc": {
     "defaultMessage": "The model names Ollama runs on ollama.com rather than on this PC (its cloud models, such as gpt-oss:120b-cloud), as a regular expression, for an Ollama connection's models typed in rather than read from Ollama (Read Models asks Ollama, which says). Such a connection's sessions aren't free (local). Wrong, a cloud model typed in is counted as free, or a local one as not free.",
     "description": "What the advanced setting \"Connections: Ollama cloud models\" is for, and what goes wrong when it is wrong (Settings → Advanced). Ollama, ollama.com and Read Models (a button) are names; \"free (local)\" is how Hive shows the cost of sessions run only on this PC."
@@ -447,6 +455,14 @@
     "defaultMessage": "Pass right-click to Claude Code",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.claude-code.outage.connectionError.desc": {
+    "defaultMessage": "What a StopFailure hook's message says when Claude Code couldn't reach its API after its retries: with Resume agents after a connection drops on, Hive waits for the connection and resumes the agent. Wrong, such agents stay stopped.",
+    "description": "What the advanced setting \"Connection dropped: StopFailure message\" is for, and what goes wrong when it is wrong (Settings → Advanced). Resume agents after a connection drops is the title of another advanced setting."
+  },
+  "settings.advanced.claude-code.outage.connectionError.title": {
+    "defaultMessage": "Connection dropped: StopFailure message",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.claude-code.override.mcpIsolation.desc": {
     "defaultMessage": "Hive starts Claude Code with --strict-mcp-config, so its sessions get only the MCP servers the workspace gives them. Turned off, the servers in your own Claude Code config and the project's .mcp.json load beside them, as they would outside Hive (Claude Code may ask you to approve a project's new servers first). The workspace's servers, Hive's own hive among them, win over yours of the same name.",
     "description": "What the advanced setting \"Only the workspace's MCP servers\" does (Settings → Advanced, under Claude Code). --strict-mcp-config is a command-line option and .mcp.json a file name: keep them. hive is the name of Hive's MCP server."
@@ -493,6 +509,22 @@
   },
   "settings.advanced.claude-code.safeguard.prompt.title": {
     "defaultMessage": "Safeguard stop: question",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.screen.idleQuestion.desc": {
+    "defaultMessage": "A question Claude Code puts on its screen by itself after a turn, sending Hive nothing (\"Teach auto mode about your environment?\"), as a line of its own in a dialog that replaces its input box (the same words in a prompt or a reply, with the input box drawn, aren't it). While it shows, Hive shows the agent waiting for you with the question, and types nothing into it: Enter would answer it. Wrong, Hive types its wakes into the question.",
+    "description": "What the advanced setting \"Screen: question while idle\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959). The quoted question is Claude Code's own, in English: keep it as it is."
+  },
+  "settings.advanced.claude-code.screen.idleQuestion.title": {
+    "defaultMessage": "Screen: question while idle",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.screen.input.desc": {
+    "defaultMessage": "Claude Code's input box, between two rules, its first group what it holds after its prompt mark. Hive reads it to tell that a line it typed is gone from the input (a screen of the CLI's took it), and then types it again. Wrong, such a line stays held, and nothing more is typed into the agent until you press Enter there.",
+    "description": "What the advanced setting \"Screen: input box\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959). A rule: a horizontal line drawn across the terminal."
+  },
+  "settings.advanced.claude-code.screen.input.title": {
+    "defaultMessage": "Screen: input box",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.claude-code.signIn.stopError.desc": {
@@ -727,6 +759,22 @@
     "defaultMessage": "Hooks: known fields",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.codex.hooks.listMethod.desc": {
+    "defaultMessage": "The request Hive sends Codex's app server for the hooks a session has. Wrong, an agent's Hooks dialog lists only Hive's own and says Codex couldn't list the rest, and Hive trusts its hooks by its own hashes.",
+    "description": "What the advanced setting \"Hooks: listing request\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.hooks.listMethod.title": {
+    "defaultMessage": "Hooks: listing request",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.codex.hooks.listSeconds.desc": {
+    "defaultMessage": "How long Hive gives Codex's app server to list a session's hooks (`hooks/list`). Past it, an agent's Hooks dialog lists only Hive's own and says Codex couldn't list the rest.",
+    "description": "What the advanced setting \"Hooks: listing timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `hooks/list` as it is (a request's name)."
+  },
+  "settings.advanced.codex.hooks.listSeconds.title": {
+    "defaultMessage": "Hooks: listing timeout",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.codex.hooks.preToolUseTimeoutSeconds.desc": {
     "defaultMessage": "How long Codex waits for Hive's answer before a tool runs (an edit waits for a file lock). If Hive doesn't answer in time, the tool goes ahead.",
     "description": "What the advanced setting \"Hooks: before a tool, timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -767,6 +815,14 @@
     "defaultMessage": "Pass right-click to Codex",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.codex.outage.connectionError.desc": {
+    "defaultMessage": "A turn's error, in Codex's session file, that means it lost its connection to its API: with Resume agents after a connection drops on, Hive waits for the connection and resumes the agent. Wrong, such agents stay stopped.",
+    "description": "What the advanced setting \"Connection dropped: error message\" is for, and what goes wrong when it is wrong (Settings → Advanced). Resume agents after a connection drops is the title of another advanced setting."
+  },
+  "settings.advanced.codex.outage.connectionError.title": {
+    "defaultMessage": "Connection dropped: error message",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.codex.override.mcpIsolation.desc": {
     "defaultMessage": "Hive's Codex sessions get the MCP servers the workspace gives them, and Hive turns off the ones in your own Codex config and the project's (enabled=false, for those sessions only). Turned off, those load beside the workspace's too, as they would outside Hive. Hive's own hive server always wins over one of yours with that name.",
     "description": "What the advanced setting \"Only the workspace's MCP servers\" does (Settings → Advanced, under Codex). enabled=false is a config value: keep it. hive is the name of Hive's MCP server."
@@ -798,6 +854,30 @@
   "settings.advanced.codex.prompt.drawnSeconds.title": {
     "defaultMessage": "Typed line: wait to be drawn",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.codex.prompt.newlineKey.altEnter": {
+    "defaultMessage": "Alt+Enter",
+    "description": "A choice of the advanced setting \"Typed prompts: line breaks\": Hive presses Alt+Enter for each line break (a key: name it as your language does)."
+  },
+  "settings.advanced.codex.prompt.newlineKey.auto": {
+    "defaultMessage": "Automatic",
+    "description": "A choice of the advanced setting \"Typed prompts: line breaks\": Alt+Enter with a Codex version it was tried with, spaces with others."
+  },
+  "settings.advanced.codex.prompt.newlineKey.ctrlJ": {
+    "defaultMessage": "Ctrl+J",
+    "description": "A choice of the advanced setting \"Typed prompts: line breaks\": Hive presses Ctrl+J for each line break (a key: name it as your language does)."
+  },
+  "settings.advanced.codex.prompt.newlineKey.desc": {
+    "defaultMessage": "With Send prompts as typed on, what Hive presses in Codex for each line break of a prompt it types. Alt+Enter and Ctrl+J are keys Codex takes as a new line rather than sending, so the prompt arrives as written (tried with Codex 0.164.0). Automatic uses Alt+Enter with a Codex version it was tried with, and spaces with others; a key you choose is used with any version. Spaces puts the prompt on one line. If you changed Codex's own new-line keys, choose Spaces. A slash command always gets spaces.",
+    "description": "What the advanced setting \"Typed prompts: line breaks\" does (Settings → Advanced, under Codex). Send prompts as typed is another setting's title: use it as Settings shows it. Automatic, Spaces, Alt+Enter and Ctrl+J are the setting's choices: use the words its list shows (Alt+Enter and Ctrl+J are keys: name them as your language does). Keep 0.164.0 as it is (a version)."
+  },
+  "settings.advanced.codex.prompt.newlineKey.spaces": {
+    "defaultMessage": "Spaces",
+    "description": "A choice of the advanced setting \"Typed prompts: line breaks\": each line break becomes a space."
+  },
+  "settings.advanced.codex.prompt.newlineKey.title": {
+    "defaultMessage": "Typed prompts: line breaks",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Codex: what Hive presses for a line break in a prompt it types into Codex."
   },
   "settings.advanced.codex.promptInput.timeoutSeconds.desc": {
     "defaultMessage": "How long Hive waits, as a Codex agent starts, for Codex to show the session's prompt (codex debug prompt-input, offline), from which it reads the developer_instructions it puts its guidance after. Too short on a slow machine, the agent starts with yours as they are and without Hive's guidance, and Hive says so.",
@@ -1007,6 +1087,14 @@
     "defaultMessage": "Pass right-click to Copilot",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.copilot.outage.connectionError.desc": {
+    "defaultMessage": "What Copilot's error says when it couldn't reach its model's API after its retries: with Resume agents after a connection drops on, Hive waits for the connection and resumes the agent. Wrong, such agents stay stopped.",
+    "description": "What the advanced setting \"Connection dropped: error message\" is for, and what goes wrong when it is wrong (Settings → Advanced). Resume agents after a connection drops is the title of another advanced setting."
+  },
+  "settings.advanced.copilot.outage.connectionError.title": {
+    "defaultMessage": "Connection dropped: error message",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.copilot.override.allMcpInstructions.desc": {
     "defaultMessage": "Hive starts Copilot with --allow-all-mcp-server-instructions, so Copilot puts the hive server's instructions (Hive's guidance for agents) in its system prompt, and the instructions of the other servers its agents get too. Turned off, Copilot includes only the servers it allows by itself, and Hive gives its guidance as custom instructions instead.",
     "description": "What the advanced setting \"Include every MCP server's instructions\" does (Settings → Advanced, under GitHub Copilot). --allow-all-mcp-server-instructions is a command-line option: keep it. hive is the name of Hive's MCP server."
@@ -1047,6 +1135,22 @@
     "defaultMessage": "Keep GH_TOKEN and GITHUB_TOKEN from Copilot",
     "description": "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default. GH_TOKEN and GITHUB_TOKEN are environment variables: keep them."
   },
+  "settings.advanced.copilot.question.field.desc": {
+    "defaultMessage": "The field of the question tool's input, in Copilot's hooks, with the question's text. When it is wrong, the agent shows only Copilot's own notice while it waits for your answer.",
+    "description": "What the advanced setting \"Question: text field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.question.field.title": {
+    "defaultMessage": "Question: text field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.copilot.question.tool.desc": {
+    "defaultMessage": "The name Copilot's hooks give its tool that asks you a question. Hive shows that tool's question while the agent waits for your answer; when it doesn't match, the agent shows only Copilot's own notice.",
+    "description": "What the advanced setting \"Question: tool name\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.question.tool.title": {
+    "defaultMessage": "Question: tool name",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.copilot.ready.footer.desc": {
     "defaultMessage": "Copilot only says it has started with the first prompt, so Hive takes its footer on screen to mean it is ready.",
     "description": "What the advanced setting \"Ready footer\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -1085,6 +1189,14 @@
   },
   "settings.advanced.copilot.trust.prompt.title": {
     "defaultMessage": "Trust question",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.copilot.turnFailed.errorType.desc": {
+    "defaultMessage": "A session error's type, in Copilot's session file, that means its turn ended because a model call failed after Copilot's retries (it sends no Stop then): Hive ends the turn as failed, with Copilot's message. Wrong, such an agent shows working until you look.",
+    "description": "What the advanced setting \"Turn failed: error type\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.turnFailed.errorType.title": {
+    "defaultMessage": "Turn failed: error type",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.copilotFooter.desc": {
@@ -1155,14 +1267,6 @@
     "defaultMessage": "Agents per project",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
-  "settings.advanced.hive.assistant.otherMcpServers.desc": {
-    "defaultMessage": "The Hive Assistant looks after the workspace with Hive's own tools only: the workspace's other MCP servers aren't given to it. Turned on, it gets every server that is on in the workspace (its switch in the MCP view), from its next session, as it works across every project. Its Control setting still decides what it may do with Hive's tools; another server's tools ask as its CLI's permission mode says. Whether its CLI's own servers load too is the CLI's \"Only the workspace's MCP servers\" setting.",
-    "description": "What the advanced setting \"The Assistant uses the workspace's other MCP servers\" does (Settings → Advanced, under Hive). Control is the name of an Assistant setting, MCP the name of a view in Hive and \"Only the workspace's MCP servers\" another setting's title: use them as Hive shows them."
-  },
-  "settings.advanced.hive.assistant.otherMcpServers.title": {
-    "defaultMessage": "The Assistant uses the workspace's other MCP servers",
-    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. MCP is a protocol's name; the Assistant is the Hive Assistant."
-  },
   "settings.advanced.hive.assistant.startView.desc": {
     "defaultMessage": "While the Hive Assistant's journal is on, Hive gives it a short view of the workspace when it starts and after each compaction: what is under way and waiting, and the journal's recent entries. Turned off, it gets none from its next start or compaction on, a running Assistant too, and reads what it needs with its tools.",
     "description": "What the advanced setting \"The Assistant starts with Hive's start view\" does (Settings → Advanced, under Hive)."
@@ -1218,6 +1322,14 @@
   "settings.advanced.hive.disableHardwareAcceleration.title": {
     "defaultMessage": "Disable hardware acceleration",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.hive.focused.pickSeconds.desc": {
+    "defaultMessage": "How long the project’s command that chooses a card’s focused tests may run, when it is submitted and at its merge. Past it, the command is ended and no tests count as chosen: the builder then names them itself.",
+    "description": "What the advanced setting \"Focused tests: longest the choice of tests runs\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.focused.pickSeconds.title": {
+    "defaultMessage": "Focused tests: longest the choice of tests runs",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in seconds: how long the project's command that chooses a card's focused tests may run, when the card is submitted and at its merge."
   },
   "settings.advanced.hive.guidance.desc": {
     "defaultMessage": "With Hive's tools, each project agent gets Hive's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the hive server's instructions, Codex after your own developer_instructions. Turned off, agents still get Hive's tools, without the guidance, from their next session. The Hive Assistant always gets its own: they are its role.",
@@ -1291,6 +1403,30 @@
     "defaultMessage": "Lanes: let the builder finish when its lane ends",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. A lane is a card loop: a builder and a reviewer taking cards in turn."
   },
+  "settings.advanced.hive.lanes.waitReviewerMinutes.desc": {
+    "defaultMessage": "After how long a lane whose card waits in Review with nobody reviewing it has its wait marked in the Progress panel's Lanes. Too short marks every review; too long, a card can sit unreviewed.",
+    "description": "What the advanced setting \"Lanes: a long wait for a reviewer\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.lanes.waitReviewerMinutes.title": {
+    "defaultMessage": "Lanes: a long wait for a reviewer",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.hive.lanes.waitYouMinutes.desc": {
+    "defaultMessage": "After how long a lane waiting for you (a request in For you, or a card at its round limit) has its wait marked in the Progress panel's Lanes. Too short marks every wait; too long, a lane can sit unnoticed.",
+    "description": "What the advanced setting \"Lanes: a long wait for you\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.lanes.waitYouMinutes.title": {
+    "defaultMessage": "Lanes: a long wait for you",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.hive.lostLine.steadySeconds.desc": {
+    "defaultMessage": "A line Hive typed into an agent that its CLI didn't take, gone from its input since (a screen of the CLI's took it): how long its input must stay empty, at its prompt, with nothing taken, before Hive types it again or, with nothing to type again, tells you. Raise it if a slow machine has a line typed twice.",
+    "description": "What the advanced setting \"Lost line: wait\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959)."
+  },
+  "settings.advanced.hive.lostLine.steadySeconds.title": {
+    "defaultMessage": "Lost line: wait",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A line: a message Hive typed into an agent's terminal."
+  },
   "settings.advanced.hive.mcp.connectSeconds.desc": {
     "defaultMessage": "How long Hive waits, once an agent is ready, for its CLI to connect Hive's tools before it tells the agent of new work anyway. A resumed session can be ready before its tools are, and a message then is a turn spent without them (#865). Lower it if messages reach agents late when their CLI doesn't connect Hive's tools.",
     "description": "What the advanced setting \"hive tools: wait to connect\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -1331,6 +1467,78 @@
     "defaultMessage": "Workspace notes: most an agent gets",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in bytes: how much of the shared note Workspace notes an agent's instructions get at most."
   },
+  "settings.advanced.hive.outage.checkFirstSeconds.desc": {
+    "defaultMessage": "How long after the turn ends Hive first checks the connection. Each check that finds it still down doubles the wait before the next, up to the longest wait below.",
+    "description": "What the advanced setting \"Resuming after a connection drops: first check after\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.checkFirstSeconds.title": {
+    "defaultMessage": "Resuming after a connection drops: first check after",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"30 s\")."
+  },
+  "settings.advanced.hive.outage.checkMostSeconds.desc": {
+    "defaultMessage": "The longest Hive waits between two checks of the connection.",
+    "description": "What the advanced setting \"Resuming after a connection drops: longest wait between checks\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.checkMostSeconds.title": {
+    "defaultMessage": "Resuming after a connection drops: longest wait between checks",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\")."
+  },
+  "settings.advanced.hive.outage.checkUrl.claude-code.desc": {
+    "defaultMessage": "The address Hive asks to see whether Claude Code's connection is back: its API host. Any reply counts, an error page too. An agent on a server connection is checked at its server's address instead.",
+    "description": "What the advanced setting \"Resuming after a connection drops: address checked for Claude Code\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.checkUrl.claude-code.title": {
+    "defaultMessage": "Resuming after a connection drops: address checked for Claude Code",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. Claude Code is a product name."
+  },
+  "settings.advanced.hive.outage.checkUrl.codex.desc": {
+    "defaultMessage": "The address Hive asks to see whether Codex's connection is back: its API host. Any reply counts, an error page too.",
+    "description": "What the advanced setting \"Resuming after a connection drops: address checked for Codex\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.checkUrl.codex.title": {
+    "defaultMessage": "Resuming after a connection drops: address checked for Codex",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. Codex is a product name."
+  },
+  "settings.advanced.hive.outage.checkUrl.copilot.desc": {
+    "defaultMessage": "The address Hive asks to see whether GitHub Copilot's connection is back: its API host. Any reply counts, an error page too.",
+    "description": "What the advanced setting \"Resuming after a connection drops: address checked for GitHub Copilot\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.checkUrl.copilot.title": {
+    "defaultMessage": "Resuming after a connection drops: address checked for GitHub Copilot",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. GitHub Copilot is a product name."
+  },
+  "settings.advanced.hive.outage.notConnection.desc": {
+    "defaultMessage": "A failed turn whose error this regular expression finds is never resumed, whatever a CLI's connection error pattern finds: a usage or rate limit, a sign-in, an overloaded server. Resuming wouldn't help those, and could repeat.",
+    "description": "What the advanced setting \"Resuming after a connection drops: errors that are never a dropped connection\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.notConnection.title": {
+    "defaultMessage": "Resuming after a connection drops: errors that are never a dropped connection",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive."
+  },
+  "settings.advanced.hive.outage.resume.desc": {
+    "defaultMessage": "When an agent's turn ends because its CLI couldn't reach its API (a router restarting, Wi-Fi dropping), Hive shows it waiting for the connection, checks the CLI's API host now and then, and once it answers tells the agent to rerun what was cut off and carry on. Never for a usage limit, an expired sign-in or an overloaded server. After three resumes in an hour that end the same way, or once the wait's limit passes, Hive stops and says what to try.",
+    "description": "What the advanced setting \"Resume agents after a connection drops\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.resume.title": {
+    "defaultMessage": "Resume agents after a connection drops",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.hive.outage.resumesPerHour.desc": {
+    "defaultMessage": "How many times in an hour Hive resumes the same agent. Once its turn ends on a connection error again after that many, Hive stops: the PC's own network may not have recovered.",
+    "description": "What the advanced setting \"Resuming after a connection drops: resumes in an hour\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.resumesPerHour.title": {
+    "defaultMessage": "Resuming after a connection drops: resumes in an hour",
+    "description": "An advanced setting's title (Settings → Advanced), followed by a number."
+  },
+  "settings.advanced.hive.outage.waitMinutes.desc": {
+    "defaultMessage": "How long Hive waits for the connection to come back before it stops waiting and tells you.",
+    "description": "What the advanced setting \"Resuming after a connection drops: wait at most\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.outage.waitMinutes.title": {
+    "defaultMessage": "Resuming after a connection drops: wait at most",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"120 min\")."
+  },
   "settings.advanced.hive.progress.lanesShown.desc": {
     "defaultMessage": "How many card-loop lanes the Progress panel shows before its lanes scroll, until you drag the section's top edge (the drag is kept per workspace). A workspace that runs many lanes at once can set its own.",
     "description": "What the advanced setting \"Progress panel: lanes shown\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -1339,8 +1547,16 @@
     "defaultMessage": "Progress panel: lanes shown",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.hive.progress.replySeconds.desc": {
+    "defaultMessage": "How long hive-progress waits for Hive to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Hive is slow. Raise it when a busy Hive makes checks fail with \"Hive is slow to answer\" (HI-1892). Kept at 2 minutes at most.",
+    "description": "What the advanced setting \"hive-progress: Hive's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.progress.replySeconds.title": {
+    "defaultMessage": "hive-progress: Hive's reply time",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. hive-progress is the command agents run long commands and checks through: keep it as it is."
+  },
   "settings.advanced.hive.prompt.asTyped.desc": {
-    "defaultMessage": "Hive puts each prompt it types into an agent (a message, a wake, a card's start) on one line: runs of spaces become one, line breaks become spaces, and control characters are left out. Turned on, Claude Code and Copilot get the text as written, spacing and line breaks included. Codex, and a slash command in any CLI, still get each line break and tab as a space: Hive types those key by key, where a line break would send the prompt early and a tab complete a word. Other control characters are left out either way: they would press keys.",
+    "defaultMessage": "Hive puts each prompt it types into an agent (a message, a wake, a card's start) on one line: runs of spaces become one, line breaks become spaces, and control characters are left out. Turned on, Claude Code and Copilot get the text as written, spacing and line breaks included. Codex, and a slash command in any CLI, still get each line break and tab as a space: Hive types those key by key, where a line break would send the prompt early and a tab complete a word. For Codex, Typed prompts: line breaks (under Codex) can press a new-line key instead. Other control characters are left out either way: they would press keys.",
     "description": "What the advanced setting \"Send prompts as typed\" does (Settings → Advanced, under Hive). Claude Code, Copilot and Codex are CLIs' names: keep them."
   },
   "settings.advanced.hive.prompt.asTyped.title": {
@@ -1386,6 +1602,14 @@
   "settings.advanced.hive.queue.checkedOutTarget.title": {
     "defaultMessage": "Merge queue: merge into a checked-out branch",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive: what the merge queue does when the branch it merges into (main, say) is checked out in a folder, usually the project folder, whose files then change."
+  },
+  "settings.advanced.hive.queue.focusedJobs.desc": {
+    "defaultMessage": "How many tests at once the merge queue’s run of a card’s focused tests may use, passed to the project’s command that runs them. More finishes sooner but loads the computer, which agents and your own work share.",
+    "description": "What the advanced setting \"Merge queue: focused tests run at once\" does, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.queue.focusedJobs.title": {
+    "defaultMessage": "Merge queue: focused tests run at once",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by a number: how many of a card's focused tests (the tests its change needs) the merge queue runs in parallel."
   },
   "settings.advanced.hive.queue.networkCodes.desc": {
     "defaultMessage": "A failed merge check whose last 40 lines of output this regular expression finds failed for the network, not the work: the card is returned to its builder marked temporary, and the builder may submit the same revision again (at most twice in a row) instead of a new one. The default finds Node's and npm's network error codes (ENOTFOUND, EAI_AGAIN, ECONNRESET, ECONNREFUSED, ETIMEDOUT). A project's check can also say so itself by exiting with code 75. (?!) finds nothing: then only a check that couldn't start, ran out of time or was ended counts as temporary.",
@@ -1579,6 +1803,14 @@
     "defaultMessage": "A CLI putting text on the clipboard",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive: what Hive does when an agent's CLI asks to set the clipboard (OSC 52)."
   },
+  "settings.advanced.hive.usage.timelineDetailDays.desc": {
+    "defaultMessage": "How long the usage history keeps when each request happened, to the second, after a session ends. Past it, a session's use over time is kept in 1-hour steps, so the history stays small. Totals, tokens and costs stay exact; only where a card's or lane's share began or ended inside an hour is less exact, for sessions that old.",
+    "description": "What the advanced setting \"Usage history: keep full detail for\" does, and what is lost past it (Settings → Advanced, under Hive). A lane is a card loop: a builder and a reviewer taking cards in turn."
+  },
+  "settings.advanced.hive.usage.timelineDetailDays.title": {
+    "defaultMessage": "Usage history: keep full detail for",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in days (\"14 days\"). The usage history is the record Hive keeps of what each session used."
+  },
   "settings.advanced.hive.wait.agentsMaxSeconds.desc": {
     "defaultMessage": "The longest hive_wait_for_agents waits for agents to finish before it answers. Kept a minute below Codex's hive tool timeout, as card waits are.",
     "description": "What the advanced setting \"Agent waits: longest\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -1707,6 +1939,10 @@
     "defaultMessage": "{n, plural, one {# character} other {# characters}}",
     "description": "An advanced setting's value: a number of characters (letters, spaces and the like) in a piece of text."
   },
+  "settings.advanced.unit.days": {
+    "defaultMessage": "{n, plural, one {# day} other {# days}}",
+    "description": "An advanced setting's value in days: \"14 days\"."
+  },
   "settings.advanced.unit.lanes": {
     "defaultMessage": "{n, plural, one {# lane} other {# lanes}}",
     "description": "An advanced setting's value: a number of card-loop lanes the Progress panel shows."
@@ -1734,6 +1970,10 @@
   "settings.advanced.unitLabel.characters": {
     "defaultMessage": "characters",
     "description": "Beside the box of an advanced setting that is a number of characters in a piece of text (Settings → Advanced), as in \"80 characters\"."
+  },
+  "settings.advanced.unitLabel.days": {
+    "defaultMessage": "days",
+    "description": "Beside the box of an advanced setting given in days (Settings → Advanced), as in \"14 days\"."
   },
   "settings.advanced.unitLabel.lanes": {
     "defaultMessage": "lanes",
@@ -2242,6 +2482,30 @@
   "settings.assistant.journal.title": {
     "defaultMessage": "Journal",
     "description": "A setting's title (Settings → Assistant): the Assistant's journal, its memory across sessions."
+  },
+  "settings.assistant.mcp.desc": {
+    "defaultMessage": "The workspace's MCP servers the Assistant gets, as a project's MCP tab chooses them: each runs for it only while it is on in the workspace too (its switch in the MCP view). Off until you turn one on here. Applies from its next session.",
+    "description": "What the setting \"MCP servers (this workspace)\" does, under its title (Settings → Assistant). \"MCP view\" and \"MCP tab\" are places in Hive: keep them as Hive shows them."
+  },
+  "settings.assistant.mcp.manage": {
+    "defaultMessage": "Open the MCP view",
+    "description": "A link in Settings → Assistant → MCP servers: shows the MCP view, where servers are added."
+  },
+  "settings.assistant.mcp.noWorkspace": {
+    "defaultMessage": "Open a workspace to choose its Assistant's MCP servers.",
+    "description": "Settings → Assistant → MCP servers with no workspace open."
+  },
+  "settings.assistant.mcp.none": {
+    "defaultMessage": "The workspace has no MCP servers.",
+    "description": "Settings → Assistant → MCP servers when the workspace has none."
+  },
+  "settings.assistant.mcp.switch": {
+    "defaultMessage": "{name} on for the Assistant",
+    "description": "A server's switch in Settings → Assistant → MCP servers, for screen readers. {name} is the server."
+  },
+  "settings.assistant.mcp.title": {
+    "defaultMessage": "MCP servers (this workspace)",
+    "description": "A setting's title (Settings → Assistant): which of the open workspace's MCP servers the Assistant gets. MCP is a protocol's name: keep it."
   },
   "settings.assistant.mode.desc": {
     "defaultMessage": "How the Assistant works in a new conversation (Coordinator, Planner, QA triager, Release manager, or your own), unless a workspace chooses another.",

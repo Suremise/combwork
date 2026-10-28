@@ -73,6 +73,12 @@ export interface WorkflowOptions {
    * differ from the last install in the queue's folder (always, whatever this says), or before every entry's checks.
    */
   mergeInstall: MergeInstall
+  /**
+   * G20 (HI-1367): each card's focused tests, chosen when it is submitted by the project's picker (`focused.pick` in
+   * `commands`) or named by its builder, and run by the merge queue at the merged result with its runner (`focused.run`).
+   * Hive merges only.
+   */
+  focusedTests: boolean
   /** G10. */
   okBefore: OkBefore
   /** G11. */
@@ -95,7 +101,10 @@ export interface WorkflowOptions {
   reviewerMode?: ReviewerMode
   /** N4: folders and files left out of None's deliverables (`.hive` always is). */
   excluded: string[]
-  /** The command of each named check (G3, G9, N3): a run counts as a check only as that command (§16.13). */
+  /**
+   * The command of each named check (G3, G9, N3): a run counts as a check only as that command (§16.13). G20's picker and
+   * runner are `focused.pick` and `focused.run` (FOCUSED_PICK, FOCUSED_RUN), which no check can be named.
+   */
   commands: Record<string, string>
   /**
    * N5: the project's own names for its stages (OP-30), resolved like the other options; a stage it doesn't name keeps
@@ -116,6 +125,10 @@ export interface WorkflowOptions {
   /** File locks between agents in the same folder, outside a slot (HI-1766, before 1.0 Settings → Agents). */
   fileLocks?: FileLockMode
 }
+
+/** G20's picker and runner, in `commands` (HI-1367): reserved names, never a check's. */
+export const FOCUSED_PICK = 'focused.pick'
+export const FOCUSED_RUN = 'focused.run'
 
 /** The options that are names, not rules (#1417): left out of a ruleset, so changing them alone applies at once. */
 export const NAME_OPTIONS: readonly OptionKey[] = ['stageNames']
@@ -158,6 +171,8 @@ export interface PresetInputs {
   identity?: { name: string; email: string } | null
   /** The repository's default branch, for Pair's and Team's G7 (#1355); `main` when it can't be read. */
   target?: string
+  /** G20's commands (HI-1367), when the project has them: Team turns G20 on only with a runner. */
+  focused?: { pick?: string; run?: string }
 }
 
 const BASE: Omit<WorkflowOptions, 'platform'> = {
@@ -174,6 +189,7 @@ const BASE: Omit<WorkflowOptions, 'platform'> = {
   commitMessage: 'hive',
   mergeChecks: [],
   mergeInstall: 'onManifestChange',
+  focusedTests: false,
   okBefore: { mode: 'never', labels: [] },
   folder: 'project',
   identity: null,
@@ -256,11 +272,12 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
     commands: commandsOf(checks.quick)
   }
   if (id === 'pair') return pair
-  // Team (#1361, Darren's point 1 on #1121): as Pair, with the unit tests too before review and on the merged result
-  // (each card's own focused tests come later: #1367), installed from scratch before every merge, and your OK for cards
-  // labelled ui or release. G15 and G17 as Pair's: slots up to date, one reviewer per lane (a pool is the Team 6 + pool
-  // template's choice, §16.6.3).
-  return { ...pair, preChecks: quickAndTests, mergeChecks: quickAndTests, mergeInstall: 'always', okBefore: { mode: 'labels', labels: ['ui', 'release'] }, commands: commandsOf(quickAndTests) }
+  // Team (#1361, Darren's point 1 on #1121): as Pair, with the unit tests too before review and on the merged result,
+  // each card's own focused tests there too (G20, HI-1367: only with the project's runner, else off, the form saying
+  // why), installed from scratch before every merge, and your OK for cards labelled ui or release. G15 and G17 as Pair's:
+  // slots up to date, one reviewer per lane (a pool is the Team 6 + pool template's choice, §16.6.3).
+  const focused = checks.focused?.run ? { [FOCUSED_RUN]: checks.focused.run, ...(checks.focused.pick ? { [FOCUSED_PICK]: checks.focused.pick } : {}) } : null
+  return { ...pair, preChecks: quickAndTests, mergeChecks: quickAndTests, mergeInstall: 'always', focusedTests: !!focused, okBefore: { mode: 'labels', labels: ['ui', 'release'] }, commands: { ...commandsOf(quickAndTests), ...focused } }
 }
 
 /** Why a combination of options can't be saved (§16.5.4's contradictions), each a whole sentence. */
@@ -273,6 +290,7 @@ export const CONTRADICTIONS = {
   quorumNeedsAgent: msg({ id: 'workflow.contradiction.quorumNeedsAgent', defaultMessage: 'Two reviewers per card need review by reviewer agents.', description: 'Why workflow options cannot be saved: two reviewers per card were set without reviewer agents.' }),
   upToDateNeedsSlots: msg({ id: 'workflow.contradiction.upToDateNeedsSlots', defaultMessage: 'Slots are brought up to date only when each card has its own folder.', description: 'Why workflow options cannot be saved: “Slots are brought up to date before each card” (G15) was set while everyone works in the project folder (glossary 2.5: slot).' }),
   poolNeedsAgent: msg({ id: 'workflow.contradiction.poolNeedsAgent', defaultMessage: 'A shared pool of reviewers needs review by reviewer agents.', description: 'Why workflow options cannot be saved: “Reviewers” was set to a shared pool (reviewer agents lanes share) without review by reviewer agents.' }),
+  focusedNeedsRunner: msg({ id: 'workflow.contradiction.focusedNeedsRunner', defaultMessage: 'Each card’s focused tests need the command that runs them.', description: 'Why workflow options cannot be saved (G20): “Each card’s focused tests” is on but the project has no command to run them (its runner, focused.run).' }),
   subfolderTarget: msg({ id: 'workflow.contradiction.subfolderTarget', defaultMessage: 'This project is inside a larger repository: name the branch its work merges into.', description: 'Why workflow options cannot be saved (OP-29): Hive or the agent merges, but the project is a subfolder of a bigger Git repository and its own options name no target branch (merges would affect the whole repository).' }),
   noneHasNoSlots: msg({ id: 'workflow.contradiction.noneHasNoSlots', defaultMessage: 'Without version control, everyone works in the project folder.', description: 'Why workflow options cannot be saved: separate folders per card were set for a project with no version control.' })
 } satisfies Record<string, Msg>
@@ -314,6 +332,7 @@ export const CONTRADICTION_ROWS: Record<Contradiction, OptionKey[]> = {
   poolNeedsAgent: ['reviewerMode', 'review'],
   upToDateNeedsSlots: ['slotsUpToDate', 'folder'],
   noneHasNoSlots: ['folder'],
+  focusedNeedsRunner: ['focusedTests'],
   subfolderTarget: ['target', 'finish']
 }
 
@@ -348,6 +367,8 @@ export function contradictions(o: WorkflowOptions, where: ContradictionPlace = {
     if (o.finish === 'committed' && o.folder !== 'project') out.push('committedNeedsFolder')
     // G15 depends on G11 alone (#1445): only a slot is brought up to date.
     if (o.slotsUpToDate && o.folder !== 'slots') out.push('upToDateNeedsSlots')
+    // G20 (HI-1367): its runner is needed; its picker isn't (without one, every card names its own tests).
+    if (o.focusedTests && o.finish === 'hiveMerges' && !o.commands[FOCUSED_RUN]?.trim()) out.push('focusedNeedsRunner')
   }
   if (o.okBefore.mode !== 'never' && reviewByYou(o.review)) out.push('okWithReview')
   if (where.subfolder && o.platform === 'git' && (o.finish === 'hiveMerges' || o.finish === 'agentMerges') && !o.targetOwn) out.push('subfolderTarget')
@@ -388,6 +409,7 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   commitMessage: oneOf<CommitMessage>(['hive', 'branch']),
   mergeChecks: strings,
   mergeInstall: oneOf<MergeInstall>(['onManifestChange', 'always']),
+  focusedTests: bool,
   okBefore: (v) => isRecord(v) && oneOf<OkBefore['mode']>(['never', 'labels', 'every'])(v.mode) && strings(v.labels),
   folder: oneOf<FolderMode>(['slots', 'project']),
   identity: (v) => v === null || (isRecord(v) && typeof v.name === 'string' && typeof v.email === 'string'),
@@ -428,7 +450,7 @@ export type FormGroupId = 'review' | 'checks' | 'merging' | 'where' | 'work' | '
 export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionKey[] }[]> = {
   git: [
     { id: 'review', options: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'] },
-    { id: 'checks', options: ['preChecks', 'mergeChecks', 'mergeInstall'] },
+    { id: 'checks', options: ['preChecks', 'mergeChecks', 'focusedTests', 'mergeInstall'] },
     { id: 'merging', options: ['finish', 'style', 'target', 'strict', 'pushTarget', 'commitMessage', 'dependenciesDone'] },
     { id: 'where', options: ['folder', 'slotsUpToDate', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'] },
     { id: 'loops', options: LOOP_OPTIONS },
@@ -458,8 +480,9 @@ export const FORM_OPTIONS: Record<PlatformId, OptionKey[]> = {
  * with everyone in the project folder (the only place a commit can take in another agent's files).
  */
 export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
-  if (key === 'mergeChecks') return o.finish === 'hiveMerges'
-  if (key === 'mergeInstall') return o.finish === 'hiveMerges' && o.mergeChecks.length > 0
+  if (key === 'mergeChecks' || key === 'focusedTests') return o.finish === 'hiveMerges'
+  // The install comes before G9's checks and G20's run alike (HI-1367): focused tests alone install too.
+  if (key === 'mergeInstall') return o.finish === 'hiveMerges' && (o.mergeChecks.length > 0 || o.focusedTests)
   // G8 strict (#1352): the merge queue brings work up to date, so only when Hive merges.
   if (key === 'strict') return o.finish === 'hiveMerges'
   // G18 (#1179): only the merge queue pushes.

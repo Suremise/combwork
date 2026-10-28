@@ -3,12 +3,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { join } from 'path'
 import { execFileSync } from 'child_process'
-import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
+import { B1, commit, moved, setup, sh, type Env } from './harness'
 import { tempDir } from '../tempDir'
 import { formShows, preset } from '../../src/shared/workflow/options'
 import { ruleOptions } from '../../src/shared/workflow/compile'
 import { MergeQueue, pushOwedKey, pushOwedOf, type QueueGitOptions, type QueueGitResult } from '../../src/main/workflow/mergeQueue'
 import { FactStore } from '../../src/main/workflow/factStore'
+import { pushLogKey, pushLogOf, pushPendingKey, pushPendingOf } from '../../src/main/workflow/queueLogs'
 import { Workflow } from '../../src/main/workflow/runtime'
 import { git } from '../../src/main/git'
 import * as G from '../../src/main/platform/git'
@@ -21,9 +22,13 @@ afterEach(() => {
   env = null
 })
 
-/** Pair (Hive merges), with the target `main` checked out nowhere, and a bare remote `origin` that main tracks. */
+/**
+ * Pair (Hive merges), with the target `main` checked out nowhere, and a bare remote `origin` that main tracks. No review:
+ * a submitted card goes straight into the queue, as the push is all these tests are about (HI-1930: a reviewer's start,
+ * review copy and verdict per card made them slow enough to reach the time limit on a loaded machine).
+ */
 function pushing(on = true): { e: Env; bare: string } {
-  const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], pushTarget: on }))
+  const e = (env = setup({ ...preset('git', 'pair'), review: 'none', noSelfReview: false, preChecks: [], mergeChecks: [], pushTarget: on }))
   sh(e.project, 'checkout', '-q', '--detach')
   const bare = join(tempDir('remote-'), 'origin.git')
   execFileSync('git', ['init', '-q', '--bare', '-b', 'main', bare])
@@ -39,14 +44,16 @@ async function queued(e: Env, title: string, file: string) {
   moved(s)
   commit(s.data!.folder as string, { [file]: `${title}\n` }, title)
   moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
-  moved(await e.wf.startReview(card.key, R1))
-  moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
   return card
 }
 
 const remoteMain = (bare: string): string => sh(bare, 'rev-parse', 'main')
 const localMain = (e: Env): string => sh(e.project, 'rev-parse', 'main')
 const owed = (e: Env) => pushOwedOf(e.store.meta(pushOwedKey('main')))
+const pending = (e: Env) => pushPendingOf(e.store.meta(pushPendingKey('main')))
+const settled = (e: Env) => pushLogOf(e.store.meta(pushLogKey('main')))
+/** A card's latest queue entry. */
+const entryOf = (e: Env, card: { id: number }): string => (e.store.facts(card.id).findLast((f) => f.kind === 'IntegrationRequested')!.data as { entry: string }).entry
 
 /** The queue's git, with `around` run in place of each push (it calls `run` for the real one). */
 const withPush = (around: (run: () => Promise<QueueGitResult>) => Promise<QueueGitResult>) => async (cwd: string, args: string[], opts?: QueueGitOptions): Promise<QueueGitResult> => {
@@ -89,13 +96,19 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
     expect(formShows('pushTarget', preset('git', 'pairAgent'))).toBe(false)
   })
 
-  it('refused (the remote has commits main lacks): paused, the card Done, the next card waits; after a pull, Resume pushes and the queue goes on', async () => {
-    const { e, bare } = pushing()
-    // Someone else pushes to the remote first.
+  /** The remote with a commit main lacks (someone else pushed first). */
+  function theirs(bare: string): void {
     const other = join(tempDir('other-'), 'clone')
     execFileSync('git', ['clone', '-q', bare, other])
     commit(other, { 'theirs.txt': 'theirs\n' }, 'theirs')
     sh(other, 'push', '-q', 'origin', 'main')
+  }
+
+  // Refused, then pulled and resumed: two tests (HI-1930), each about half the work of the one they were, so neither
+  // nears the time limit on a loaded machine. Resume then going on to the next card is the "can't be read" tests'.
+  it('refused (the remote has commits main lacks): paused, the card Done, the next card waits', async () => {
+    const { e, bare } = pushing()
+    theirs(bare)
     const a = await queued(e, 'A', 'a.txt')
     const b = await queued(e, 'B', 'b.txt')
     const out = await e.queue().drain('main')
@@ -105,14 +118,21 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
     expect(e.wf.state(b).stage).toBe('merging')
     expect(owed(e)).toMatchObject({ card: a.key })
     expect(await e.queue().runOnce('main')).toBeNull()
+  })
+
+  it('refused, then pulled: Resume pushes the owed merge, and nothing stays owed or paused', async () => {
+    const { e, bare } = pushing()
+    theirs(bare)
+    const a = await queued(e, 'A', 'a.txt')
+    expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'pushRejected', card: a.key })
     // The user pulls their commits into main, then resumes.
     sh(e.project, 'fetch', '-q', 'origin')
     sh(e.project, 'checkout', '-q', 'main')
     sh(e.project, 'merge', '-q', '--no-edit', 'origin/main')
     sh(e.project, 'checkout', '-q', '--detach')
     e.queue().resume('main')
-    expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
-    expect(e.wf.state(b).stage).toBe('done')
+    await e.queue().drain('main')
     expect(remoteMain(bare)).toBe(localMain(e))
     expect(owed(e)).toBeNull()
     expect(e.store.queuePause('main')).toBeNull()
@@ -267,6 +287,74 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
     expect(remoteMain(bare)).toBe(before)
     expect(owed(e)).toBeNull()
     expect(e.store.queuePause('main')).toBeNull()
+  })
+
+  it('each push is recorded for the history (HI-1924): owed while it waits, pushed once it went, by entry', async () => {
+    const { e } = pushing()
+    const a = await queued(e, 'A', 'a.txt')
+    const b = await queued(e, 'B', 'b.txt')
+    await e.queue().drain('main')
+    expect(pending(e)).toEqual([])
+    expect(settled(e).map((p) => [p.entry, p.state])).toEqual([
+      [entryOf(e, b), 'pushed'],
+      [entryOf(e, a), 'pushed']
+    ])
+  })
+
+  it('a failed push leaves its merge pending; the next push that goes settles it, with a merge it carries from before (HI-1924)', async () => {
+    const { e, bare } = pushing()
+    const before = remoteMain(bare)
+    sh(e.project, 'remote', 'set-url', 'origin', join(e.home, 'no-such-remote.git'))
+    const a = await queued(e, 'A', 'a.txt')
+    await e.queue().drain('main')
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'pushFailed' })
+    expect(pending(e).map((p) => p.entry)).toEqual([entryOf(e, a)])
+    expect(settled(e)).toEqual([])
+    // An earlier merge also pending (one owed before a crash, say): main has it, so the same push carries it.
+    e.store.setMeta(pushPendingKey('main'), JSON.stringify([{ entry: 'X/e1', result: before }, ...pending(e)]))
+    sh(e.project, 'remote', 'set-url', 'origin', bare)
+    e.queue().resume('main')
+    await e.queue().drain('main')
+    expect(remoteMain(bare)).toBe(localMain(e))
+    expect(pending(e)).toEqual([])
+    expect(settled(e).map((p) => [p.entry, p.state])).toEqual([
+      [entryOf(e, a), 'pushed'],
+      ['X/e1', 'pushed']
+    ])
+  })
+
+  it('the option turned off, or the target reset, with merges pending: settled as not pushed, never as pushed (HI-1924)', async () => {
+    const { e, bare } = pushing()
+    const before = remoteMain(bare)
+    const a = await queued(e, 'A', 'a.txt')
+    await expect(e.queue({ git: withPush(() => Promise.reject(new Error('crash'))) }).drain('main')).rejects.toThrow('crash')
+    e.options.pushTarget = false
+    await restarted(e).drain('main')
+    expect(settled(e).map((p) => [p.entry, p.state])).toEqual([[entryOf(e, a), 'off']])
+    e.options.pushTarget = true
+    const b = await queued(e, 'B', 'b.txt')
+    await expect(e.queue({ git: withPush(() => Promise.reject(new Error('crash'))) }).drain('main')).rejects.toThrow('crash')
+    sh(e.project, 'branch', '-q', '-f', 'main', before)
+    await restarted(e).drain('main')
+    expect(remoteMain(bare)).toBe(before)
+    expect(pending(e)).toEqual([])
+    expect(settled(e).map((p) => [p.entry, p.state])[0]).toEqual([entryOf(e, b), 'reset'])
+  })
+
+  it('the push goes by the commit read before it, so what is marked pushed is what went (HI-1924)', async () => {
+    const { e } = pushing()
+    const pushedArgs: string[][] = []
+    const b = await queued(e, 'B', 'b.txt')
+    await e
+      .queue({
+        git: async (cwd, args, opts) => {
+          if (args[0] === 'push') pushedArgs.push(args)
+          return withPush((run) => run())(cwd, args, opts)
+        }
+      })
+      .drain('main')
+    expect(pushedArgs).toEqual([['push', '--', 'origin', `${localMain(e)}:refs/heads/main`]])
+    expect(settled(e)[0]).toMatchObject({ entry: entryOf(e, b), state: 'pushed' })
   })
 
   it("a newer merge's owed push is never cleared by an older push's clear", async () => {

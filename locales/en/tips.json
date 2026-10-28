@@ -1,10 +1,18 @@
 {
   "tips.activityTab.text": {
-    "defaultMessage": "The Activity tab has a tab per running agent: its card, its turn and tool call, its background tasks, subagents and processes. It opens as a snapshot; Play follows it live. An agent's ⋯ menu, or a card in progress, opens it on that agent.",
+    "defaultMessage": "The Activity tab has a tab per running agent: its card, its turn and tool call, its background tasks, subagents and processes. It opens as a snapshot; Play follows it live. An agent's ⋯ menu opens it on that agent.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.activityTab.title": {
     "defaultMessage": "See what each agent is running",
+    "description": "A tip's title."
+  },
+  "tips.activityWorkspace.text": {
+    "defaultMessage": "Activity, in the activity bar, shows every project's running agents together, their tabs grouped by project. A card in progress opens it on the agents working on that card, and a run or a lane in the Progress panel on its agents (Show in Activity).",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.activityWorkspace.title": {
+    "defaultMessage": "Everything running, in one place",
     "description": "A tip's title."
   },
   "tips.advancedSettings.text": {
@@ -22,6 +30,14 @@
   "tips.agentConsole.title": {
     "defaultMessage": "Let agents see what their CLI sends",
     "description": "A tip's title."
+  },
+  "tips.agentHooks.text": {
+    "defaultMessage": "Hooks… in an agent's ⋯ menu lists the hooks its session has, yours too, and the last hooks Hive received: what Hive replied, and whether it applied or ignored each one and why.",
+    "description": "A tip. ⋯ is the button on an agent's pane header: keep it. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.agentHooks.title": {
+    "defaultMessage": "See why an agent's hooks went quiet",
+    "description": "A tip's title. Hooks are the commands a coding agent runs at its events (a session's start, a tool call, a turn's end)."
   },
   "tips.agentInSlot.text": {
     "defaultMessage": "Beside an agent's name on its pane: in slot-b while it builds a card in a slot (click it for Branches & remotes), carried: hb2 in the slot kept for it, home: hr4 for a reviewer's retired home. The project's hover lists them in a Slot column.",
@@ -183,6 +199,14 @@
     "defaultMessage": "A new conversation for each lane",
     "description": "A tip's title."
   },
+  "tips.assistantMcp.text": {
+    "defaultMessage": "The Assistant gets a workspace MCP server only once you turn it on for it, as for a project: Settings → Assistant → MCP servers, or tick Hive Assistant when turning a server on in the MCP view. A server with your own notes can reach it and no project.",
+    "description": "A tip (HI-1472). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Hive Assistant is a box to tick)."
+  },
+  "tips.assistantMcp.title": {
+    "defaultMessage": "MCP servers for the Assistant only",
+    "description": "A tip's title. MCP is a protocol's name: keep it."
+  },
   "tips.assistantMessages.text": {
     "defaultMessage": "The Assistant can't give a waiting or working agent a new task, but it can leave it a message, such as your answer: delivered as soon as the agent can take it. Its pane shows it as unread (✉) until then; click that to cancel it.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -231,6 +255,14 @@
     "defaultMessage": "The Assistant runs your team",
     "description": "A tip's title."
   },
+  "tips.assistantTemplates.text": {
+    "defaultMessage": "Ask the Assistant to load a template into a project, naming any agent you like: it shows what would change first, applies the template's workflow, and Undo puts the old agents back.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.assistantTemplates.title": {
+    "defaultMessage": "Have the Assistant set up a team",
+    "description": "A tip's title."
+  },
   "tips.assistantToldWaiting.text": {
     "defaultMessage": "While the Assistant watches the lanes, an agent showing a permission prompt or asking you something wakes it, and it tells you which agent, its card and what it asks. It never answers for you. Its watch can follow a release card outside the lanes too.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -270,6 +302,14 @@
   "tips.attachmentsTabs.title": {
     "defaultMessage": "Jump to a card's or a session's files",
     "description": "A tip's title (HI-1841)."
+  },
+  "tips.autoModeSetup.text": {
+    "defaultMessage": "In auto mode, Claude Code may offer to teach auto mode about your environment. Hive never answers it: the agent shows Needs input, and nothing is typed into it, until you do. Settings → Advanced → Claude Code can turn the offer off.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Claude Code is a product name, and auto mode its permission mode."
+  },
+  "tips.autoModeSetup.title": {
+    "defaultMessage": "Claude Code's offer waits for you",
+    "description": "A tip's title. Claude Code is a product name: keep it in English."
   },
   "tips.backupRetention.text": {
     "defaultMessage": "Hive compresses its transcript backups once a session ends, and Storage shows what they hold. To let old ones go, set Settings → Sessions → Keep transcript backups: only copies of sessions the CLI still has go to the Recycle Bin.",
@@ -429,6 +469,14 @@
   },
   "tips.cardCost.title": {
     "defaultMessage": "What a card cost",
+    "description": "A tip's title."
+  },
+  "tips.cardCostRounds.text": {
+    "defaultMessage": "A card's Work section ends with its cost by round: the builder's and reviewer's parts in each round, adding up to the card's cost. See whether extra rounds or one long read drove it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Work is a section of the card dialog)."
+  },
+  "tips.cardCostRounds.title": {
+    "defaultMessage": "What each review round cost",
     "description": "A tip's title."
   },
   "tips.cardDecisions.text": {
@@ -715,6 +763,14 @@
     "defaultMessage": "Catch rare events by themselves",
     "description": "A tip's title."
   },
+  "tips.focusedTests.text": {
+    "defaultMessage": "With Hive merging, Version Control → Workflow can run each card’s focused tests on the merged result: your project’s command chooses the tests a change needs when the card is submitted, and the merge queue runs them before it merges.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: merge queue."
+  },
+  "tips.focusedTests.title": {
+    "defaultMessage": "Each card’s own tests before it merges",
+    "description": "A tip's title: the workflow option that has Hive's merge queue run the tests a card's change needs on the merged result (G20)."
+  },
   "tips.followUpCheck.text": {
     "defaultMessage": "When you ask for a change to a card in Review or Approved for its reviewer to check, its builder posts the change as a follow-up: Hive wakes the reviewer, and the answer wakes the builder. One left unanswered for 15 minutes shows its card as stalled.",
     "description": "A tip (#1467). Review and Approved are board columns. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -738,6 +794,14 @@
   "tips.forYouActions.title": {
     "defaultMessage": "Answer with one click",
     "description": "A tip's title (#1630)."
+  },
+  "tips.generalistRole.text": {
+    "defaultMessage": "Give an agent the Generalist role in the workflow (Agent Settings) and it does whatever you ask in its pane: it is never put in a lane or asked to review. A card it takes still follows the project’s workflow.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Generalist is a role's name (Glossary: generalist)."
+  },
+  "tips.generalistRole.title": {
+    "defaultMessage": "An agent for whatever you ask",
+    "description": "A tip's title."
   },
   "tips.gitCheck.text": {
     "defaultMessage": "Help → Provider Setup… shows the git Hive found and its version. Worktree agents, merging and the Version Control tab’s Git sections need Git for Windows 2.38 or later.",
@@ -1099,6 +1163,14 @@
     "defaultMessage": "Watch the merge queue",
     "description": "A tip's title (glossary 2.5: merge queue)."
   },
+  "tips.mergeQueueRecent.text": {
+    "defaultMessage": "Under each merge queue in the Progress panel's Merges tab, Recent merges lists its latest merges, returns and pauses, with why, when and how long each took. Click one to open its card.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary 2.5: merge queue; 2.4: returned."
+  },
+  "tips.mergeQueueRecent.title": {
+    "defaultMessage": "See what the merge queue did lately",
+    "description": "A tip's title (glossary 2.5: merge queue)."
+  },
   "tips.mergeRebase.text": {
     "defaultMessage": "With Hive merging, set Merge style to Rebase and fast-forward in Version Control → Workflow: the merge queue rebases each card onto the target, tests exactly that, and moves the target forward to it.",
     "description": "A tip. Names of Hive's menus, views, settings and commands, and the option's value: keep them as Hive shows them. Glossary: merge queue."
@@ -1194,6 +1266,14 @@
   "tips.off.title": {
     "defaultMessage": "Tips are off",
     "description": "A notice after \"Don't show tips\" on the tip card."
+  },
+  "tips.outageResume.text": {
+    "defaultMessage": "Turn on Settings → Advanced → Resume agents after a connection drops, and an agent stopped by a router restart or a Wi-Fi blip waits for the connection, then reruns what was cut off by itself. Never for a usage limit or an expired sign-in.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.outageResume.title": {
+    "defaultMessage": "Agents can carry on after a connection drops",
+    "description": "A tip's title."
   },
   "tips.overview.text": {
     "defaultMessage": "The Workspace Overview shows what every project used, what runs now and the board, by day. {key}",
@@ -1681,6 +1761,14 @@
   },
   "tips.templateNames.title": {
     "defaultMessage": "Name a template's agents as you load it",
+    "description": "A tip's title."
+  },
+  "tips.templateWorkflow.text": {
+    "defaultMessage": "Save Template… can keep the project's workflow too: its rules, never its branch or commands. Loading it shows what changes, then opens Version Control → Workflow filled in, to save there.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.templateWorkflow.title": {
+    "defaultMessage": "Keep your workflow in a template",
     "description": "A tip's title."
   },
   "tips.testedClis.text": {

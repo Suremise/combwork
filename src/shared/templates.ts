@@ -3,6 +3,7 @@
 // state, the Assistant's mode: those belong to the project), checked as untrusted input when read. #127 adds the places
 // to manage them (the Templates view, a project's Templates tab) and sharing them as files (export, import). #1436: the
 // format's version 2 (no worktrees, each agent's role in the workflow, a suggested preset and pairs) and Hive's own.
+// HI-1910: its workflow, a section per version control (workflow/templateOptions.ts), read through its whitelist.
 import { AGENT_LIMIT_MAX, ROLE_MAX, SESSION_LAYOUTS, projectAgents } from './defaults'
 import { isKnownProvider } from './providers'
 import { cleanMcpServers } from './agentMcp'
@@ -10,6 +11,8 @@ import type { AgentDef, EffortLevel, PageLayout, PermissionMode, ProviderId } fr
 import { msg } from './i18n/msg'
 import { shownText, withValues, type Text } from './advanced'
 import { agentWorkflowRole, buildsWork, isWorkflowRole, reviewsWork, type ReviewerMode, type WorkflowRole } from './workflow/roles'
+import { hasWorkflow, readTemplateWorkflows, TEMPLATE_PLATFORMS, type TemplateWorkflows } from './workflow/templateOptions'
+import type { PlatformId } from './platform/descriptors'
 
 /** The format's version: a template made by a newer Hive (a higher one) is refused rather than half read; 0.9's (1) too (#1436). */
 export const TEMPLATE_VERSION = 2
@@ -92,6 +95,14 @@ export interface AgentTemplate {
   reviewerMode?: ReviewerMode
   /** Builders and their reviewers (#1436; optional), kept as the agents' pairing when it is loaded. */
   pairs?: TemplatePair[]
+  /** Its workflow (HI-1910; optional): a section per version control, the rules a project's options set. */
+  workflow?: TemplateWorkflows
+  /**
+   * The sections it had that can't be used (HR5's HI-1910 round 1): said where it is shown, and kept when it is written
+   * (an import, a copy), as platforms only, never what they held, so a rejected section is never taken for none (and
+   * the preset it suggests never offered in its place).
+   */
+  workflowDropped?: PlatformId[]
 }
 
 /** A template as listed: where it is kept and what it holds, or why it can't be used. */
@@ -109,10 +120,17 @@ export interface TemplateEntry {
   suggestedPreset?: SuggestedPreset
   reviewerMode?: ReviewerMode
   pairs?: TemplatePair[]
+  workflow?: TemplateWorkflows
+  workflowDropped?: PlatformId[]
   /** It can't be used (damaged, made by a newer Hive…): why, in English (the log, a refusal's message). */
   problem?: string
   /** Why, as text for the window to show in its language (#870), following a change of language. */
   problemText?: Text
+  /**
+   * Its agents' names in the project it is listed for (HI-1948: `listTemplates`), its patterns made with that project's
+   * key as main reads it; `{key}` kept while the project has none. Derived for display, never saved or loaded.
+   */
+  agentNames?: string[]
 }
 
 /**
@@ -184,8 +202,8 @@ const M = {
   agentNoName: msg({ id: 'assistant.template.agentNoName', defaultMessage: 'Agent {n} has no name (or one over 60 characters).', description: "Why a template file can't be used: its agent number {n} (1, 2…) has no usable name." }),
   sameName: msg({ id: 'assistant.template.sameName', defaultMessage: 'Two agents are called "{name}".', description: "Why a template file can't be used: two agents share a name." }),
   badProvider: msg({ id: 'assistant.template.badProvider', defaultMessage: "{name}'s coding agent isn't one Hive can use ({given, select, yes {{provider}} other {none}}).", description: "Why a template file can't be used: an agent's coding agent (Claude Code, Codex…) is no id Hive could know. {name} is the agent; {provider} what the file says; none when it says nothing." }),
-  badRole: msg({ id: 'assistant.template.badRole', defaultMessage: "{name}'s role in the workflow isn't builder, reviewer or either.", description: "Why a template file can't be used: an agent's role in the workflow (glossary: builder, reviewer, either) is none of the three. Keep builder, reviewer and either as they are (the file's values)." }),
-  longNote: msg({ id: 'assistant.template.longNote', defaultMessage: "{name}'s note is over {max} characters.", description: "Why a template file can't be used: an agent's note (what it is for, in the user's words) is too long." }),
+  badRole: msg({ id: 'assistant.template.badRole', defaultMessage: "{name}'s role in the workflow isn't builder, reviewer, either or generalist.", description: "Why a template file can't be used: an agent's role in the workflow (glossary: builder, reviewer, either) is none of the three. Keep builder, reviewer and either as they are (the file's values)." }),
+  longNote: msg({ id: 'assistant.template.longNote', defaultMessage: 'The note of agent {name} is over {max, number} characters.', description: "Why a template file can't be used: an agent's note (what it is for, in the user's words) is too long. {max} is the limit, a number. A noun before the name (glossary §1 rule 4)." }),
   badToken: msg({ id: 'assistant.template.badToken', defaultMessage: "{name} uses {token}: an agent’s name may only hold '{key}' (the project’s key) and '{n}' (its number among the agents with that name).", description: "Why a template file can't be used: an agent's name pattern ({name}) holds {token}, a token Hive doesn't know. The quoted '{key}' and '{n}' are shown as {key} and {n}: keep them, with their straight quotes, as they are." }),
   badPairs: msg({ id: 'assistant.template.badPairs', defaultMessage: 'Its pairs of builders and reviewers name agents it doesn’t have, or an agent twice.', description: "Why a template file can't be used: its list of builders paired with reviewers (glossary: builder, reviewer) doesn't match its agents." }),
   badSetting: msg({ id: 'assistant.template.badSetting', defaultMessage: "{name}'s {setting, select, model {model} effort {effort} other {permissionMode}} isn't one Hive can use.", description: "Why a template file can't be used: an agent's model, effort or permission mode is no value a coding agent takes. Keep permissionMode as it is (the file's field)." }),
@@ -266,7 +284,15 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
   const description = typeof raw.description === 'string' && raw.description.length <= TEMPLATE_DESCRIPTION_MAX ? raw.description.trim() : ''
   const suggestedPreset = SUGGESTED_PRESETS.find((p) => p === raw.suggestedPreset)
   const reviewerMode = raw.reviewerMode === 'lane' || raw.reviewerMode === 'pool' ? raw.reviewerMode : undefined
-  return { version, name: raw.name.trim(), savedAt, layout, ...(description ? { description } : {}), agents, ...(suggestedPreset ? { suggestedPreset } : {}), ...(reviewerMode ? { reviewerMode } : {}), ...(pairs.length ? { pairs } : {}) }
+  // Its workflow (HI-1910) through the whitelist: a section that can't be used is left out and said (`workflowDropped`),
+  // never refusing the template nor its other section.
+  // A workflow that isn't one at all rejects both; one written as rejected (`workflowDropped`, by a copy or an import)
+  // stays so where it has no usable section now.
+  const read = raw.workflow === undefined ? { workflow: {}, dropped: [] as PlatformId[] } : isObj(raw.workflow) ? readTemplateWorkflows(raw.workflow) : { workflow: {}, dropped: [...TEMPLATE_PLATFORMS] }
+  const workflow: TemplateWorkflows = read.workflow
+  const marked = Array.isArray(raw.workflowDropped) ? TEMPLATE_PLATFORMS.filter((p) => (raw.workflowDropped as unknown[]).includes(p)) : []
+  const dropped = TEMPLATE_PLATFORMS.filter((p) => !workflow[p] && (read.dropped.includes(p) || marked.includes(p)))
+  return { version, name: raw.name.trim(), savedAt, layout, ...(description ? { description } : {}), agents, ...(suggestedPreset ? { suggestedPreset } : {}), ...(reviewerMode ? { reviewerMode } : {}), ...(pairs.length ? { pairs } : {}), ...(hasWorkflow(workflow) ? { workflow } : {}), ...(dropped.length ? { workflowDropped: dropped } : {}) }
 }
 
 /**
@@ -321,9 +347,24 @@ export function exportable(t: AgentTemplate): AgentTemplate {
     agents: t.agents.map((a) => ({ ...a })),
     ...(t.suggestedPreset ? { suggestedPreset: t.suggestedPreset } : {}),
     ...(t.reviewerMode ? { reviewerMode: t.reviewerMode } : {}),
-    ...(t.pairs?.length ? { pairs: t.pairs.map((p) => ({ ...p })) } : {})
+    ...(t.pairs?.length ? { pairs: t.pairs.map((p) => ({ ...p })) } : {}),
+    // Its sections as read (HI-1910): whitelisted again, whatever the object holds.
+    ...exportedWorkflow(t.workflow, t.workflowDropped)
   }
 }
+
+/**
+ * A template's sections as written (HI-1910): whitelisted again, whatever the object holds; none, nothing. Those it had
+ * that can't be used (or that this whitelist rejects now) are written as rejected, by platform alone.
+ */
+function exportedWorkflow(w: TemplateWorkflows | undefined, had: readonly PlatformId[] | undefined): { workflow?: TemplateWorkflows; workflowDropped?: PlatformId[] } {
+  const read = hasWorkflow(w) ? readTemplateWorkflows(JSON.parse(JSON.stringify(w))) : { workflow: {} as TemplateWorkflows, dropped: [] as PlatformId[] }
+  const dropped = TEMPLATE_PLATFORMS.filter((p) => !read.workflow[p] && (read.dropped.includes(p) || !!had?.includes(p)))
+  return { ...(hasWorkflow(read.workflow) ? { workflow: read.workflow } : {}), ...(dropped.length ? { workflowDropped: dropped } : {}) }
+}
+
+/** A template's sections in their order (HI-1910), for whatever lists them. */
+export const workflowPlatforms = (w: TemplateWorkflows | undefined): PlatformId[] => TEMPLATE_PLATFORMS.filter((p) => !!w?.[p])
 
 /** The tokens a template's agent names may hold (#1123 names): the project's key, and the agent's number among its role. */
 const NAME_TOKENS = /\{(key|n)\}/g

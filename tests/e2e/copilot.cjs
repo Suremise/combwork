@@ -303,8 +303,9 @@ const check = (name, ok, extra = '') => {
     check('the command never ran', !fs.existsSync(path.join(proj, 'made-by-copilot.txt')))
 
     // Esc on the prompt for a file outside its folder (a read asks for the path, "Path permission needed"; in Ask a
-    // write asks to write it): Copilot records the refusal and ends the turn with neither a hook nor an abort, and Hive
-    // reads the end from its events (#475).
+    // write asks to write it): Copilot records the refusal and ends the turn with no Stop hook, and Hive reads the end
+    // from its events (#475). Up to 1.0.98 nothing followed the turn's end; from 1.0.104 an abort (user_initiated) does,
+    // which Hive reads as the user's interrupt (HI-1945): either way the agent is ready.
     const aEvents = path.join(copilotHome, 'session-state', sa.sessionId, 'events.jsonl')
     const aLog = () => fs.readFileSync(aEvents, 'utf8').split('\n').flatMap((l) => { try { return [JSON.parse(l)] } catch { return [] } })
     const refused = (e) => e.type === 'permission.completed' && e.data?.result?.kind === 'denied-interactively-by-user'
@@ -320,7 +321,10 @@ const check = (name, ok, extra = '') => {
         const at = evs.map((e, k) => (refused(e) ? k : -1)).filter((k) => k >= 0)[before] ?? -1
         return at >= 0 && evs.slice(at).some((e) => e.type === 'assistant.turn_end') ? evs.slice(at) : null
       }, 20000, 300)
-      check(`A: Copilot records the refusal of ${what} and the turn's end, with no abort or Stop`, !!after && !after.some((e) => e.type === 'abort' || (e.type === 'hook.start' && e.data?.hookType === 'agentStop')), JSON.stringify(after?.map((e) => e.type)))
+      // An abort, if any, only after the turn's end, and the user's.
+      const aborts = (after ?? []).flatMap((e, k) => (e.type === 'abort' ? [{ e, k }] : []))
+      const endAt = (after ?? []).findIndex((e) => e.type === 'assistant.turn_end')
+      check(`A: Copilot records the refusal of ${what} and the turn's end, with no Stop (an abort only after it)`, !!after && !after.some((e) => e.type === 'hook.start' && e.data?.hookType === 'agentStop') && aborts.every(({ e, k }) => k > endAt && e.data?.reason === 'user_initiated'), JSON.stringify(after?.map((e) => e.type)))
       check(`A: refusing ${what} with Esc leaves it ready, not waiting`, !!(await reach(a.id, ['ready'], 20000)), await status(a.id))
     }
     const outside = path.join(ws, 'outside-a.txt')

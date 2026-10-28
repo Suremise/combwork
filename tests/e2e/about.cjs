@@ -1,4 +1,5 @@
 // About dialog licence links, the License / Third-Party Notices docs pages, and Help → Copy Diagnostics (redacted preview, copied to a fake clipboard). Throwaway profile.
+// Also the Node Electron bundles, the packaged app's too (the same electron.exe): 24.22.1 or later, CVE-2026-111497's fix (HI-1503).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs'), path = require('path')
@@ -28,6 +29,14 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
   await lib.fitWindow(app, page, { width: 1300, height: 850 })
   await lib.appReady(page)
+  // Node2Shell (CVE-2026-111497, Node's Brotli decoder): fixed in 24.22.1, so a downgrade of Electron fails here (HI-1503).
+  const node = await app.evaluate(() => process.versions.node)
+  const atLeast = (v, min) => {
+    const [a, b] = [v, min].map((x) => x.split('.').map(Number))
+    const i = a.findIndex((n, k) => n !== b[k])
+    return i < 0 || a[i] > b[i]
+  }
+  check('Electron bundles Node 24.22.1 or later (CVE-2026-111497)', atLeast(node, '24.22.1'), node)
   // Setup dialog may show on a fresh profile; close any modal first.
   await page.keyboard.press('Escape'); await sleep(300)
   await page.evaluate(() => window.hive.invoke('app:info')) // warm

@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 95
+const FIXTURES_VERSION = 97
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -250,14 +250,18 @@ async function trustSlot(c, status) {
   c.trustedSlot = true
 }
 /**
- * Card `key` of agent `who` ('coder' or 'implementer') in Review with a real submission (#1537): started, its work on
- * src/greet.js committed, and submitted as the user moves it, so a project's rules leave it there.
+ * Card `key` of agent `who` ('coder' or 'implementer') in Review with a real submission (#1537): started, its work
+ * committed (`card.files`, by default src/greet.js), and submitted as the user moves it, so a project's rules leave it
+ * there.
  */
 async function submittedCard(c, key, card, who = 'coder') {
-  const n = await c.card(key, { ...card, agent: who })
+  const { files = { 'src/greet.js': 'module.exports = (name) => `Hi, ${name}`\n' }, ...rest } = card
+  const n = await c.card(key, { ...rest, agent: who })
   await userMove(c, n, 'doing')
-  require('fs').mkdirSync(require('path').join(c.alpha, 'src'), { recursive: true })
-  c.write('src/greet.js', 'module.exports = (name) => `Hi, ${name}`\n')
+  for (const [rel, text] of Object.entries(files)) {
+    require('fs').mkdirSync(require('path').dirname(require('path').join(c.alpha, rel)), { recursive: true })
+    c.write(rel, text)
+  }
   c.git('add', '-A')
   c.git('-c', `user.name=${who}`, '-c', `user.email=${who}@example.com`, 'commit', '-qm', card.title)
   await userMove(c, n, 'review')
@@ -271,6 +275,10 @@ const worktreesOf = (c) => c.git('worktree', 'list', '--porcelain').split(/\r?\n
  * (#1219).
  */
 const isCard = (ref, n) => new RegExp(`^(#|[A-Za-z][A-Za-z0-9]*-)?${n}$`).test(String(ref ?? '').trim())
+/** Whether a call's list of cards names card `n`, each by number or key (HI-1950: a model names cards by key). */
+const namesCard = (refs, n) => Array.isArray(refs) && refs.some((r) => isCard(r, n))
+/** Whether a call's list of cards is exactly cards `ns`, in that order, each by number or key. */
+const namesCards = (refs, ns) => Array.isArray(refs) && refs.length === ns.length && ns.every((n, i) => isCard(refs[i], n))
 /**
  * The calls that could move card `n` (#1474): hive_update_task and hive_update_tasks with a column or an override, and
  * the intents that move a card.
@@ -826,9 +834,13 @@ module.exports.SCENARIOS = [
   {
     id: 'review-card',
     title: "Review a card: it stays in Review with the implementer; the reviewer's verdict ends the review",
-    files: { 'greet.js': "module.exports = (name) => 'Helo, ' + name\n" },
+    // A real submission (HI-1950): greet.js is the card's own commit, so the revision under review changes something; the
+    // project reviews (Pair), Implementer builds and Coder reviews, as inReview's.
     async setup(c) {
-      await c.card('b', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>".', column: 'review', agent: 'implementer', comments: ['Done: greet.js added.'] })
+      await pairInProject(c)
+      await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'reviewer' })
+      await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'builder' })
+      await submittedCard(c, 'b', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>".', files: { 'greet.js': "module.exports = (name) => 'Helo, ' + name\n" }, after: ['Done: greet.js added.'] }, 'implementer')
     },
     prompt: (c) => `Review card #${c.cards.b}.`,
     fake: (c) => `skill review-agent-work then ${fakeStartReview(c.cards.b)} then ${fakeVerdict(c.cards.b, false, 'Round 1: FAILED: 1 finding: greet() says Helo.\n\n1. greet.js returns "Helo, <name>": make it "Hello, <name>".')}`,
@@ -1642,7 +1654,8 @@ module.exports.SCENARIOS = [
     expect: (o) => [
       ['read the handover skill', read(o, 'handover'), o.skillsRead.join(',')],
       ['saved a handover', ran(o, 'hive_create_handover').length > 0 && o.notes.some((n) => /^handovers\/.+-alpha-/.test(n)), o.notes.join(',')],
-      ["didn't re-run the tests just to write it", !o.tools.some((t) => /npm(\.cmd)? (run )?test/.test(t.input))]
+      // Its shell commands only (HI-1950): a handover that says the tests passed names `npm test` without running it.
+      ["didn't re-run the tests just to write it", testRunsOf(o).length === 0, testRunsOf(o).map((r) => r.command).join(' | ')]
     ],
     fakeSkips: ['saved a handover']
   },
@@ -1709,11 +1722,13 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'unrelated-coding',
-    title: 'Ordinary coding: no Hive workflow skills, no board changes',
+    title: 'Ordinary coding: at most the generalist skill (HI-686: the contract routes other work to it), no workflow skill, no board changes',
     prompt: 'Add a function add(a, b) to math.js that returns a + b, and export it.',
-    fake: 'work 1',
+    fake: 'skill generalist then work 1',
+    // Whether it read the generalist skill: what the contract's route asks, recorded, never a failure (a short task may not).
+    observe: (o) => [['read the generalist skill', read(o, 'generalist'), o.skillsRead.join(',')]],
     expect: (o, c) => [
-      ['read no Hive workflow skill', o.skillsRead.length === 0, o.skillsRead.join(',')],
+      ['read no Hive workflow skill (the generalist skill only)', o.skillsRead.every((s) => s === 'generalist'), o.skillsRead.join(',')],
       ['changed nothing on the board', !o.hiveCalls.some((x) => /hive_(create|update|reorder)_task/.test(x.tool))],
       ['did the work', /add/.test(c.read('math.js') ?? '')]
     ],
@@ -2258,7 +2273,7 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const h = history(o.cards.r)
       const asked = (o.cards.r?.comments ?? []).slice(1).some((x) => /commit/i.test(x.text))
-      const watches = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => Array.isArray(a.cards) && a.cards.includes(c.cards.r) && a.wake === true)
+      const watches = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(a.cards, c.cards.r) && a.wake === true)
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['gave no verdict (not failed on that alone)', !h.some((x) => /^Review (passed|failed)$/.test(x)), h.join(' | ')],
@@ -2289,7 +2304,7 @@ module.exports.SCENARIOS = [
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['registered the lane (hive_lane start)', starts.length >= 1, o.hiveCalls.map((x) => x.tool).join(',')],
-        ['the cards in order, its reviewer, the rounds and the wait', JSON.stringify(first.cards) === JSON.stringify([c.cards.a, c.cards.b]) && /implementer/i.test(String(first.reviewer ?? '')) && first.rounds === 10 && first.waitMinutes === 360, JSON.stringify(first)],
+        ['the cards in order, its reviewer, the rounds and the wait', namesCards(first.cards, [c.cards.a, c.cards.b]) &&/implementer/i.test(String(first.reviewer ?? '')) && first.rounds === 10 && first.waitMinutes === 360, JSON.stringify(first)],
         ["before its first card's review", !!startedAt && (!review || startedAt <= review.at), `${startedAt} / ${review?.at}`],
         ['one lane, not one a card', starts.length === 1, String(starts.length)],
         ['its first card to Review, the second not begun', o.cards.a?.column === 'review' && o.cards.b?.column === 'todo', `${o.cards.a?.column} / ${o.cards.b?.column}`],
@@ -2322,7 +2337,7 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       // Its lanes as saved (#1018: the workspace's database).
       const lane = require('../e2e/storeDocs.cjs').storeDocs(c.ws, 'lanes').find((l) => l.cards?.includes(c.cards.a))
-      const waits = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => a.cards?.includes(c.cards.a))
+      const waits = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(a.cards, c.cards.a))
       // Its watch for the verdict, its own or the one Hive arms at its submission (#1639): the lane's wait long.
       const minutes = o.watch ? Math.round((Date.parse(o.watch.limitAt) - Date.parse(o.watch.since)) / 60000) : null
       return [
@@ -2342,8 +2357,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairInProject(c)
       const a = await c.card('a', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>" instead of "Hello, <name>".', agent: 'coder' })
-      const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 })
-      if (r.status !== 200) throw new Error(`lane: ${r.text}`)
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 })
       // Implementer reviews with its own token: started, so it has one.
       await c.startAgent('implementer')
     },
@@ -2392,7 +2406,7 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const lanes = ran(o, 'hive_lane').map((x) => argsOf(x))
       const joins = lanes.filter((a) => a.action === 'join')
-      const arrivals = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => Array.isArray(a.cards) && a.cards.includes(c.cards.a) && a.column === 'review')
+      const arrivals = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(a.cards, c.cards.a) && a.column === 'review')
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ["joined the builder's lane by its name", joins.length >= 1 && /implementer/i.test(String(joins[0].builder ?? '')), JSON.stringify(lanes)],
@@ -2417,7 +2431,7 @@ module.exports.SCENARIOS = [
     fake: (c) => `skill card-loop hive hive_wait_for_tasks {"cards":[${c.cards.b}],"column":"review","wake":true} then ${fakeStartReview(c.cards.b)} then ${fakeVerdict(c.cards.b, true)}`,
     expect: (o, c) => {
       // Its waits for #b to arrive in Review (cards [b], no changes): one answered Already, none repeated.
-      const arrivals = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => Array.isArray(a.cards) && a.cards.includes(c.cards.b) && a.column === 'review' && !a.changes && !a.cancel)
+      const arrivals = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(a.cards, c.cards.b) && a.column === 'review' && !a.changes && !a.cancel)
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['reviewed the card already in Review', history(o.cards.b).includes('Started reviewing') && history(o.cards.b).some((h) => /^Review (passed|failed)$/.test(h)), history(o.cards.b).join(' | ')],
@@ -2886,8 +2900,7 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'coder' })
       // The builder's lane, Implementer reviewing (registered as the card-loop skill does).
-      const lane = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n] })
-      if (lane.status !== 200) throw new Error(`lane: ${lane.text}`)
+      await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n] })
     },
     prompt: (c) =>
       `You are the builder of card #${c.cards.d} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). The card's decision: have a design checked before you build. Start the card, post your design for the reviewer's check, and wait for it as your loop says. Build nothing yet.`,
@@ -2914,8 +2927,7 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'implementer' })
       // Implementer's lane, the subject (Coder) reviewing; Implementer starts the card and posts its design, with its own token.
-      const lane = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
-      if (lane.status !== 200) throw new Error(`lane: ${lane.text}`)
+      await builderLane(c, 'implementer', { builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
       await c.startAgent('implementer')
       const started = await c.as('implementer', 'POST', `/v1/tasks/%23${n}/start`)
       if (started.status !== 200) throw new Error(`start: ${JSON.stringify(started.body)}`)
@@ -2946,8 +2958,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'coder' })
-      const lane = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n] })
-      if (lane.status !== 200) throw new Error(`lane: ${lane.text}`)
+      await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n] })
       // Coder's round 1, as the user moves it: started (Doing), a commit, submitted (Review).
       await userMove(c, n, 'doing')
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name\n")
@@ -2983,8 +2994,7 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'implementer' })
       // Implementer's lane, the subject (Coder) reviewing; Implementer's round 1 sent for review, then its follow-up, with its own token.
-      const lane = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
-      if (lane.status !== 200) throw new Error(`lane: ${lane.text}`)
+      await builderLane(c, 'implementer', { builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
       await userMove(c, n, 'doing')
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name\n")
       c.git('add', '-A')
@@ -3253,6 +3263,46 @@ module.exports.SCENARIOS = [
       ]
     }
   },
+  // HI-1932: the user's answer to a card's open questions, told the Assistant in chat, is recorded as a decision naming
+  // the requests it answers (hive_update_task's answers), so Hive closes them; a pair, the answer covering both questions
+  // or only one of them, and the Assistant names those and only those.
+  ...[
+    { id: 'assistant-decision-answers', both: true, prompt: (c) => `About card #${c.cards.s}: Coder asked me two questions there. My answer to both: the bee icon, in amber. That's final.` },
+    { id: 'assistant-decision-answers-one', both: false, prompt: (c) => `About card #${c.cards.s}: Coder asked me which icon to use. Use the bee icon. I'll answer its colour question myself later.` }
+  ].map((v) => ({
+    id: v.id,
+    title: v.both
+      ? "The Assistant told the user's answer to two of a card's open questions (HI-1932): records it as a decision naming both requests (answers), so they close"
+      : "The Assistant told the user's answer to one of a card's two open questions (HI-1932): its decision names only that request, the other stays open",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      const n = await c.card('s', { title: 'Pick the app icon', description: 'The app needs an icon and its colour.', agent: 'coder', column: 'doing' })
+      await c.startAgent('coder')
+      c.asked = []
+      for (const text of ['Which icon: the bee, the honeycomb or the hive cell?', 'Which colour: amber or blue?']) {
+        const r = await c.as('coder', 'POST', `/v1/tasks/%23${n}/ask`, { kind: 'decide', text })
+        if (r.status !== 200) throw new Error(`ask: ${JSON.stringify(r.body)}`)
+      }
+      const card = await c.as('coder', 'GET', `/v1/tasks/%23${n}`)
+      c.asked = (card.body?.forYou ?? []).map((x) => x.request)
+      if (c.asked.length !== 2) throw new Error(`two requests expected: ${JSON.stringify(card.body?.forYou)}`)
+    },
+    prompt: v.prompt,
+    fake: (c) => `skill coordinate-agents then hive hive_read_task {"number":${c.cards.s}} then hive hive_update_task ${JSON.stringify({ number: c.cards.s, decision: v.both ? 'The bee icon, in amber.' : 'Use the bee icon.', answers: v.both ? c.asked : [c.asked[0]] })}`,
+    expect: (o, c) => {
+      const updates = ran(o, 'hive_update_task').filter((x) => field(x.args, 'number', c.cards.s))
+      const named = updates.flatMap((x) => (Array.isArray(argsOf(x).answers) ? argsOf(x).answers : []))
+      const want = v.both ? c.asked : [c.asked[0]]
+      const decisions = (o.cards.s?.decisions ?? []).map((d) => d.text)
+      return [
+        ["recorded the user's answer as the card's decision", decisions.some((t) => /bee/i.test(t)), decisions.join(' | ')],
+        [v.both ? 'named both open requests in answers' : 'named only the request the answer covers in answers', want.every((id) => named.includes(id)) && named.every((id) => want.includes(id)), JSON.stringify({ named, want })],
+        ["didn't ask the user again", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0],
+        ["didn't type it into Coder (Hive tells it)", called(o, 'hive_prompt_agent').length === 0]
+      ]
+    }
+  })),
   {
     id: 'assistant-look-lanes',
     title: 'The Assistant at Look and advise asked which card loops are running (#500): lists the lanes, changes none',
@@ -3609,8 +3659,24 @@ async function team(c) {
   }
 }
 /**
+ * A lane registered as its builder (`key`) registers its own (hive_lane start, with its own token), which starts nobody:
+ * a lane a script records starts its stopped agents on its brief (HI-1900, HI-1934), and the scenarios start them
+ * themselves. So the builder is started for its token, registers its lane, and is stopped again (HI-1939). Its reply.
+ */
+async function builderLane(c, key, body) {
+  await c.startAgent(key)
+  const r = await c.as(key, 'POST', '/v1/lanes', { project: 'alpha', ...body })
+  if (r.status !== 200) throw new Error(`lane: ${r.status} ${JSON.stringify(r.body)}`)
+  const id = c.agents[key].id
+  await c.inv('session:stop', c.alpha, id)
+  const lib = require('../e2e/lib.cjs')
+  if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error(`setup: ${key} didn't stop after registering its lane`)
+  return r
+}
+/**
  * Two running lanes: Coder and Implementer on greet.js (#a, #b), Builder2 and Reviewer2 on the README (#c, and #d if
  * given). Nothing in Doing unless asked (`aColumn`): the agents aren't running, and a card in Doing would be stalled.
+ * Each lane is registered as its builder registers its own (builderLane).
  */
 async function twoLanes(c, { d = false, aColumn = 'todo' } = {}) {
   await team(c)
@@ -3618,10 +3684,7 @@ async function twoLanes(c, { d = false, aColumn = 'todo' } = {}) {
   await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
   await c.card('c', { title: 'README: usage', description: 'README.md: a Usage section with one example of greet().', agent: 'builder2' })
   if (d) await c.card('d', { title: 'README: licence line', description: 'README.md: a line saying the licence is MIT.', agent: 'builder2' })
-  for (const [builder, reviewer, cards] of [['Coder', 'Implementer', [c.cards.a, c.cards.b]], ['Builder2', 'Reviewer2', [c.cards.c, ...(d ? [c.cards.d] : [])]]]) {
-    const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder, reviewer, cards, name: `${builder}'s lane` })
-    if (r.status !== 200) throw new Error(`lane: ${r.text}`)
-  }
+  for (const [key, builder, reviewer, cards] of [['coder', 'Coder', 'Implementer', [c.cards.a, c.cards.b]], ['builder2', 'Builder2', 'Reviewer2', [c.cards.c, ...(d ? [c.cards.d] : [])]]]) await builderLane(c, key, { builder, reviewer, cards, name: `${builder}'s lane` })
 }
 /** What Hive's card wake to the Assistant ends with while lanes run (src/shared/watch.ts, the same: a unit test checks). */
 const LANES_RUNNING_TAIL = ' Lanes are still running (hive_lane list): before you end your turn, watch them again in one lane watch, with any card outside them as cards (hive_wait_for_tasks with lanes ["all"], cards, wake; run-lanes).'
@@ -3956,7 +4019,7 @@ module.exports.SCENARIOS.push(
   // itself.
   {
     id: 'coordinator-one-card-lane',
-    title: "Coordinator mode asked to have the builder of a builder and reviewer pair do one card (#1346 item 2): runs it as a lane with the reviewer, without asking",
+    title: "Coordinator mode asked to have the builder of a builder and reviewer pair do one card (#1346 item 2): runs it as a lane with the reviewer, without asking; Hive starts both agents with the lane's brief (HI-1900)",
     role: 'assistant',
     control: 'agents',
     mode: 'coordinator',
@@ -3969,8 +4032,6 @@ module.exports.SCENARIOS.push(
       [
         'skill coordinate-agents',
         `hive hive_lane {"action":"start","project":"alpha","builder":"Coder","reviewer":"Implementer","cards":[${c.cards.o}]}`,
-        `hive hive_start_agent {"project":"alpha","agent":"Coder","prompt":"Use card-loop as the builder. Cards: #${c.cards.o}. Your reviewer is Implementer. (work 1)"}`,
-        `hive hive_start_agent {"project":"alpha","agent":"Implementer","prompt":"Use card-loop as the reviewer. Cards: #${c.cards.o}. Your builder is Coder. (work 1)"}`,
         'hive hive_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}'
       ].join(' then '),
     expect: (o, c) => {
@@ -3978,7 +4039,9 @@ module.exports.SCENARIOS.push(
       const lane = (o.lanes ?? []).find((l) => l.builder?.name === 'Coder' && (l.cards ?? []).some((x) => x.number === n))
       return [
         ['ran the card as a lane: Coder builds it, Implementer reviews', !!lane && lane.reviewer?.name === 'Implementer', JSON.stringify((o.lanes ?? []).map((l) => [l.builder?.name, l.reviewer?.name, l.cards?.map((x) => x.number)]))],
-        ['briefed Implementer as its reviewer (card-loop, the card)', briefsTo(o, 'Implementer').some((t) => names(t, 'card[- ]loop', n)), briefsTo(o, 'Implementer').join(' | ').slice(0, 300)],
+        // HI-1900: the lane's start starts its agents as Start Lane does; a prompt of its own would replace their conversations.
+        ['Hive started Coder and Implementer with the lane (both running)', [c.agents.coder.id, c.agents.implementer.id].every((id) => o.live.some((x) => x.project === 'alpha' && x.agentId === id)), JSON.stringify(o.live)],
+        ["prompted neither itself (their brief is the lane's)", briefsTo(o, 'Coder').length === 0 && briefsTo(o, 'Implementer').length === 0, [...briefsTo(o, 'Coder'), ...briefsTo(o, 'Implementer')].join(' | ').slice(0, 300)],
         ["didn't ask the user (no notification, no question)", called(o, 'hive_notify').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)]
       ]
     },
@@ -4042,8 +4105,7 @@ module.exports.SCENARIOS.push(
       // Back in Doing with Coder after round 2's failed review, as a failed verdict leaves it.
       const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>", and README.md shows it.', agent: 'coder', column: 'doing' })
       const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
-      const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [a, b], rounds: 10, name: 'greetings' })
-      if (r.status !== 200) throw new Error(`lane: ${r.text}`)
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], rounds: 10, name: 'greetings' })
       for (const text of ["Round 1: FAILED. 1. greet.js has no test.", 'Fixed: greet.test.js covers greet().', "Round 2: FAILED. 1. README.md's example still says Hello."]) await c.api('POST', `/v1/tasks/${a}/comments`, { text })
       // Coder at work on the fix, as Hive's wake left it (#1537: with Coder stopped the loop had stalled, a question fairly
       // put to the user, not the loop's own round).
@@ -4110,8 +4172,7 @@ module.exports.SCENARIOS.push(
       c.git('checkout', '-q', base)
       const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'passed', comments: [`Done on branch greetings (${done[0]}).`, 'Round 1: PASSED.'] })
       const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder', column: 'passed', comments: [`Done on branch greetings (${done[1]}).`, 'Round 1: PASSED.'] })
-      const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' })
-      if (r.status !== 200) throw new Error(`lane: ${r.text}`)
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' })
       // Coder at its lane's end, merging the lane's work as its card loop says: working, not stalled.
       await busyCoder(c, 20, 600, c.agents.coder, `The greetings lane's cards have passed: you're merging branch greetings into ${base} at the lane's end. Its merge checks are first: `)
       c.head = c.git('rev-parse', 'HEAD').trim()

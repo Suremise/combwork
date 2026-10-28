@@ -259,7 +259,7 @@ describe('task board', () => {
       for (const column of ['done', 'review'] as const) {
         const e = await refused(c.number, { column })
         expect(e).toBeInstanceOf(tasks.TaskConflictError)
-        expect(e?.message).toMatch(/is in Doing with Agent 1, who is working on it: newer work is in progress/)
+        expect(e?.message).toMatch(/is in Active with agent Agent 1, who is working on it: newer work is in progress/)
       }
       // Taking it and finishing it in one change: still refused (checked on the card as it was).
       expect(await refused(c.number, { agent: 'a2', column: 'done' })).toBeInstanceOf(tasks.TaskConflictError)

@@ -788,6 +788,7 @@ export function TerminalView({
       data-pty={ptyKey}
       data-right-click={rightClickToCli ? 'cli' : 'hive'}
       data-ctrl-cv={ctrlCVToCli ? 'cli' : 'hive'}
+      data-all-keys={allKeysToCli ? 'cli' : 'hive'}
       style={{ ['--terminal-bg' as string]: terminalTheme().background, ...style }}
       ref={host}
     >
