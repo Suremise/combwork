@@ -61,6 +61,7 @@ import { listMcp } from './mcp'
 import { assertInShared, createHandover, handoversFor, NoteConflict, notesTree, readNote, writeNote } from './notes'
 import { mergeSlots, slotTestEvent } from './mergeSlotHost'
 import * as lanes from './lanes'
+import { laneBusyCheck, launchRecordedLane, recordedLaneNote, resumeLaneBuilder } from './laneStart'
 import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber } from '../shared/lanes'
 import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
@@ -1897,11 +1898,20 @@ route('POST', '/v1/lanes', async ({ body }) =>
       if (!reviewer) note = `No agent "${String(body.reviewer)}" in ${basename(p)}: the lane has no reviewer until one joins it.`
     }
     const start = async () => {
-      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: args.brief !== undefined ? (sessions.liveFor(p, builder)?.sessionId ?? null) : null, by: await laneBy() })
+      // A new lane over a busy agent is refused before anything is recorded, as Start Lane… refuses it (HR2's HI-1900
+      // rounds 1 and 2: recorded with nobody started, it sat active): checked where startLane decides it is a new lane.
+      const beforeNew = a ? undefined : await laneBusyCheck(ws, p, builder, reviewer)
+      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: args.brief !== undefined ? (sessions.liveFor(p, builder)?.sessionId ?? null) : null, by: await laneBy(), ...(beforeNew ? { beforeNew } : {}) })
       // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
       const told = args.brief !== undefined ? await briefNote(ws, (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id) ?? { project: basename(p) }) : null
       if (args.brief !== undefined) await settleLaneBriefs(ws)
-      const notes = [note, told].filter(Boolean).join(' ')
+      // Started for its builder by the Assistant or a script (HI-1900: a lane over stopped agents sat active, nothing lent,
+      // nobody working it): its slot lent and its agents started as Start Lane… does. A builder registering its own
+      // loop is already at work. A running lane updated while its builder isn't running: its builder started on it.
+      let launched = ''
+      if (!a && r.did === 'started') launched = recordedLaneNote(await launchRecordedLane(ws, p, r.lane.id))
+      else if (!a && r.did === 'updated') launched = await resumeLaneBuilder(p, r.lane)
+      const notes = [note, told, launched].filter(Boolean).join(' ')
       return notes ? { ...r, note: notes } : r
     }
     if (!assistantCaller()) return start()

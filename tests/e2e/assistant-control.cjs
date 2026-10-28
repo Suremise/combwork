@@ -290,10 +290,19 @@ const check = (name, ok, extra = '') => {
   // A lane the Assistant starts unwatched (#402): the reply nudges it to watch the lanes; with a lane watch on them all (#531), it doesn't.
   const unwatched = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', cards: [o1, o2] })
   check('a lane started with no watch following it: the reply says to watch the lanes', unwatched.status === 200 && /No watch of yours follows this lane/.test(unwatched.body?.note ?? ''), JSON.stringify(unwatched.body))
+  // HI-1900: started as Start Lane… starts one, its builder given the lane's brief (never left active with nobody on it).
+  const builderId = (await inv('workspace:get')).projects.find((x) => x.name === 'alpha').agents.find((a) => a.name === 'Builder')?.id
+  const briefed = async () => ((await api('GET', '/v1/projects/alpha/agents/Builder/activity')).body?.currentTask ?? '').includes(`Lane ${unwatched.body?.lane?.id}`) || !!(await live(alpha, builderId))
+  check("…its builder is started with the lane's brief, and the reply says so (HI-1900)", /Started Builder with the lane's brief\./.test(unwatched.body?.note ?? '') && !!(await until(briefed, HUNG_MS)), JSON.stringify(unwatched.body?.note))
   const watching = await api('POST', '/v1/tasks/wait', { lanes: ['all'], wake: true })
   const rewatched = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', cards: [o1, o2] })
   check('…and with one, no nudge', watching.status === 200 && rewatched.status === 200 && !/No watch of yours/.test(rewatched.body?.note ?? ''), JSON.stringify({ watching: watching.body, rewatched: rewatched.body }))
   await api('POST', '/v1/tasks/wait', { cancel: true })
+  // HR2's HI-1900 round 1: its running lane updated while Builder is stopped starts Builder on it (never left active, stuck).
+  await inv('session:stop', alpha, builderId)
+  check('Builder stopped', !!(await until(async () => !(await live(alpha, builderId)), HUNG_MS)))
+  const updated = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', cards: [o2, o1] })
+  check("…its lane updated meanwhile starts Builder on it, and the reply says so", updated.status === 200 && updated.body?.did === 'updated' && /Builder wasn't running: started it on the lane\./.test(updated.body?.note ?? '') && !!(await until(async () => !!(await live(alpha, builderId)), HUNG_MS)), JSON.stringify(updated.body?.note))
   await api('POST', `/v1/lanes/${encodeURIComponent(rewatched.body?.lane?.id ?? unwatched.body?.lane?.id)}/end`, { abandoned: true })
 
   // No limit on its changes for one message (#1170; it stopped at 30): 40 more changes, then a batch, all apply.

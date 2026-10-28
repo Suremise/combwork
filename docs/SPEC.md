@@ -4293,6 +4293,19 @@ a stopped agent is launched with it as a task delivery (`launchWith`), an idle o
 to start leaves the lane recorded and says why. A running lane's menu has **End Lane** and **Abandon Lane…** (asks
 first; `lanes:end`).
 
+**The Assistant's and a script's lane start (HI-1900):** `POST /v1/lanes` naming its builder (`hive_lane start` from the
+Assistant) recorded the lane and nothing more, so a lane over stopped agents sat active with nothing lent and nobody
+working it (27 Oct, three lanes for 50 minutes). A new lane started so now starts as Start Lane does
+(`launchRecordedLane`): the slot lent first where the builder works in slots (`lendLane`; none free: the lane's slot
+wait recorded, shown as waiting for a slot, and slotCards' pass starts its agents once one is lent), then the builder
+and reviewer each with the generated brief (`launchAgents`). A new lane over a busy agent is refused before anything
+is recorded (`409`, as the window refuses it), checked where `startLane` decides under its lock that the call
+records a new lane (`beforeNew`: with rules off, a list sharing no card replaces the builder's lane, which is then kept), naming who is busy and every agent of the lane as not
+started; the builder's running lane is updated whatever the builder does. The reply's `note` says who started and
+where, or that it waits for a slot. A builder registering its own loop starts nothing (it is at work); a running lane
+the Assistant or a script updates while its builder isn't running gets its builder started on it with one line naming
+the lane (`resumeLaneBuilder`: `hive_lane next` names its card) [HR2's round 1: either left the lane active, stuck].
+
 #### 16.11.4 Rounds and following a lane
 
 - Rounds count reviewed submissions: a `Verdict` fail (content or explanation) or the user's decline (§16.8.1); queue

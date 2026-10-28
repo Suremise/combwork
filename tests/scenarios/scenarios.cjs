@@ -3956,7 +3956,7 @@ module.exports.SCENARIOS.push(
   // itself.
   {
     id: 'coordinator-one-card-lane',
-    title: "Coordinator mode asked to have the builder of a builder and reviewer pair do one card (#1346 item 2): runs it as a lane with the reviewer, without asking",
+    title: "Coordinator mode asked to have the builder of a builder and reviewer pair do one card (#1346 item 2): runs it as a lane with the reviewer, without asking; Hive starts both agents with the lane's brief (HI-1900)",
     role: 'assistant',
     control: 'agents',
     mode: 'coordinator',
@@ -3969,8 +3969,6 @@ module.exports.SCENARIOS.push(
       [
         'skill coordinate-agents',
         `hive hive_lane {"action":"start","project":"alpha","builder":"Coder","reviewer":"Implementer","cards":[${c.cards.o}]}`,
-        `hive hive_start_agent {"project":"alpha","agent":"Coder","prompt":"Use card-loop as the builder. Cards: #${c.cards.o}. Your reviewer is Implementer. (work 1)"}`,
-        `hive hive_start_agent {"project":"alpha","agent":"Implementer","prompt":"Use card-loop as the reviewer. Cards: #${c.cards.o}. Your builder is Coder. (work 1)"}`,
         'hive hive_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}'
       ].join(' then '),
     expect: (o, c) => {
@@ -3978,7 +3976,9 @@ module.exports.SCENARIOS.push(
       const lane = (o.lanes ?? []).find((l) => l.builder?.name === 'Coder' && (l.cards ?? []).some((x) => x.number === n))
       return [
         ['ran the card as a lane: Coder builds it, Implementer reviews', !!lane && lane.reviewer?.name === 'Implementer', JSON.stringify((o.lanes ?? []).map((l) => [l.builder?.name, l.reviewer?.name, l.cards?.map((x) => x.number)]))],
-        ['briefed Implementer as its reviewer (card-loop, the card)', briefsTo(o, 'Implementer').some((t) => names(t, 'card[- ]loop', n)), briefsTo(o, 'Implementer').join(' | ').slice(0, 300)],
+        // HI-1900: the lane's start starts its agents as Start Lane does; a prompt of its own would replace their conversations.
+        ['Hive started Coder and Implementer with the lane (both running)', [c.agents.coder.id, c.agents.implementer.id].every((id) => o.live.some((x) => x.project === 'alpha' && x.agentId === id)), JSON.stringify(o.live)],
+        ["prompted neither itself (their brief is the lane's)", briefsTo(o, 'Coder').length === 0 && briefsTo(o, 'Implementer').length === 0, [...briefsTo(o, 'Coder'), ...briefsTo(o, 'Implementer')].join(' | ').slice(0, 300)],
         ["didn't ask the user (no notification, no question)", called(o, 'hive_notify').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)]
       ]
     },

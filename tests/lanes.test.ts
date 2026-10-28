@@ -289,6 +289,23 @@ describe('the lanes service', () => {
     return fn()
   }
 
+  it("a new lane refused where it is decided (HR2's HI-1900 round 2): rules off, a list sharing no card replaces nothing; one sharing a card updates the lane, never asking", async () => {
+    await rulesOff()
+    const [c1, c2] = [await make('Kept'), await make('Other')]
+    const kept = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'B2 (alpha)' })
+    let asked = 0
+    const busy = () => (asked++, 'R1 is working, so the lane wasn\'t started, nor B2 or R1: start it again once R1 is idle.')
+    // A list sharing no card would replace it: refused, the running lane kept as it was.
+    await expect(lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c2.number], by: 'the Assistant', beforeNew: busy })).rejects.toMatchObject({ status: 409, message: expect.stringContaining('R1 is working') })
+    const now = (await lanes.listLanes(w)).filter((l) => l.builder.id === 'b2')
+    expect(now.map((l) => [l.id, l.state, l.cards.map((x) => x.number)])).toEqual([[kept.lane.id, 'active', [c1.number]]])
+    expect(asked).toBe(1)
+    // Sharing a card: an update of the running lane, whatever its agents are doing.
+    const updated = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number, c2.number], by: 'the Assistant', beforeNew: busy })
+    expect([updated.did, updated.lane.id, asked]).toEqual(['updated', kept.lane.id, 1])
+    await lanes.endLane(w, kept.lane.id, { abandoned: true })
+  })
+
   it('starts a lane, updates it when started again with a card in common, and starts anew with none', async () => {
     // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).
     await rulesOff()

@@ -4,7 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 type Live = { status: string; sessionId: string }
-const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void> }))
+const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[] }))
 
 vi.mock('../src/main/sessions', () => ({
   sessions: {
@@ -43,6 +43,14 @@ vi.mock('../src/main/lanes', () => ({
   rawLanes: async () => {
     await state.lanesHeld
     return state.lanes
+  },
+  setLaneSlotWait: async (_ws: unknown, id: string) => void state.slotWaits.push(id)
+}))
+// A lane's slot (#1438): lent as `state.lend` says, before its agents start.
+vi.mock('../src/main/slotCards', () => ({
+  lendLane: async (_ws: unknown, _p: string, laneId: string) => {
+    state.calls.push(`lend ${laneId}`)
+    return state.lend
   }
 }))
 vi.mock('../src/main/tasks', () => ({
@@ -51,7 +59,7 @@ vi.mock('../src/main/tasks', () => ({
 vi.mock('../src/main/workflow/service', () => ({ workflowEnforced: () => state.enforced }))
 vi.mock('../src/main/workflow/rulesets', () => ({ resolvedOf: () => ({ options: state.options }) }))
 
-const { laneStartInfo, startLaneFromWindow, startWaitingLane } = await import('../src/main/laneStart')
+const { laneBusyCheck, launchRecordedLane, laneStartInfo, recordedLaneNote, resumeLaneBuilder, startLaneFromWindow, startWaitingLane } = await import('../src/main/laneStart')
 const { allOff } = await import('../src/shared/workflow/options')
 
 const ws = {
@@ -71,6 +79,8 @@ beforeEach(() => {
   state.onStart = null
   state.lanes = []
   state.lanesHeld = null
+  state.lend = { slot: 'slot-c' }
+  state.slotWaits.length = 0
 })
 
 describe('Start Lane… with the reviewer pool (#1443)', () => {
@@ -203,5 +213,80 @@ describe("a lane's briefs say its own rounds, as recorded, never today's default
   it("Start Lane… from the window: the lane's recorded rounds, not the default read again", async () => {
     await withDefault(() => startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b1', reviewer: 'r1', cards: [1] }))
     expect(roundsIn()).toEqual(['3', '3'])
+  })
+})
+
+describe('a lane the Assistant or a script starts over stopped agents (HI-1900)', () => {
+  const ALPHA = 'D:\\ws\\alpha'
+  /** The lane as `hive_lane start` recorded it: B2 builds, R1 reviews, both stopped. */
+  const recorded = (): void => void (state.lanes = [{ id: 'lane-9', state: 'active', builder: { id: 'b2', name: 'B2' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1, 2], rounds: 3 }])
+  const inSlots = (): void => {
+    state.enforced = true
+    state.options = { ...allOff('git'), review: 'agent', folder: 'slots' }
+  }
+
+  it('in slots: its slot is lent first, then its builder and reviewer start with the lane brief, which names the slot', async () => {
+    recorded()
+    inSlots()
+    const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+    expect(state.calls).toEqual(['lend lane-9', 'start b2', 'start r1'])
+    expect(state.briefs).toHaveLength(2)
+    expect(state.briefs[0]).toContain('slot-c')
+    expect(state.briefs[0]).toContain('AL-1')
+    expect(recordedLaneNote(l)).toBe("Started B2 and R1 with the lane's brief, in slot-c.")
+  })
+
+  it("no slot free: nothing starts, the lane waits for one (its wait recorded, as the window's), and the reply says so", async () => {
+    recorded()
+    inSlots()
+    state.lend = { waiting: 'every working slot is taken' }
+    const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+    expect(state.calls).toEqual(['lend lane-9'])
+    expect(state.slotWaits).toEqual(['lane-9'])
+    expect(recordedLaneNote(l)).toBe('No slot is free (every working slot is taken): the lane waits for one, and its agents start once it is lent.')
+  })
+
+  it('outside slots: both start in a fresh conversation with the brief', async () => {
+    recorded()
+    expect(recordedLaneNote(await launchRecordedLane(ws, ALPHA, 'lane-9'))).toBe("Started B2 and R1 with the lane's brief.")
+    expect(state.calls).toEqual(['start b2', 'start r1'])
+  })
+
+  it('an agent busy now: nothing is lent or started, and the reply names who is busy', async () => {
+    recorded()
+    inSlots()
+    state.live.set('r1', { status: 'working', sessionId: 's-r1' })
+    const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+    expect(state.calls).toEqual([])
+    expect(recordedLaneNote(l)).toBe("R1 is busy, so none of the lane's agents was started (B2, R1): the lane is recorded; start them on it once idle.")
+  })
+
+  it('a lane no longer running starts nothing', async () => {
+    state.lanes = [{ id: 'lane-9', state: 'ended', builder: { id: 'b2', name: 'B2' }, reviewer: null, cards: [1], rounds: 3 }]
+    expect(await launchRecordedLane(ws, ALPHA, 'lane-9')).toBeNull()
+    expect(state.calls).toEqual([])
+  })
+})
+
+describe("a lane the Assistant or a script asks for while an agent can't start it (HR2's HI-1900 round 1)", () => {
+  const ALPHA = 'D:\\ws\\alpha'
+
+  it('a new lane over a busy agent is refused, naming every agent of the lane as not started; read as it is when asked', async () => {
+    const check = await laneBusyCheck(ws, ALPHA, 'b2', 'r1')
+    // Both stopped or idle: it may start (and its agents are started with it).
+    state.live.set('r1', { status: 'ready', sessionId: 's-r1' })
+    expect(check()).toBeNull()
+    state.live.set('r1', { status: 'watching', sessionId: 's-r1' })
+    expect(check()).toBe("R1 is watching, so the lane wasn't started, nor B2 or R1: start it again once R1 is idle.")
+    state.live.set('b2', { status: 'working', sessionId: 's-b2' })
+    expect(check()).toBe("B2 is working and R1 is watching, so the lane wasn't started, nor B2 or R1: start it again once they are idle.")
+  })
+
+  it('a running lane updated while its builder is stopped: its builder is started on the lane; one running is left as it is', async () => {
+    const lane = { id: 'lane-9', builder: { id: 'b2', name: 'B2' } }
+    expect(await resumeLaneBuilder(ALPHA, lane)).toBe("B2 wasn't running: started it on the lane.")
+    expect(state.calls).toEqual(['start b2'])
+    expect(await resumeLaneBuilder(ALPHA, lane)).toBe('')
+    expect(state.calls).toEqual(['start b2'])
   })
 })
