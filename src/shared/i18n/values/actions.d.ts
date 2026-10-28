@@ -279,6 +279,7 @@ interface HiveMessageValues {
   'actions.template.savedMessage': { name: string | number; n: number; scope: string }
   'actions.template.switchPreset': { preset: string | number }
   'actions.template.usePatterns': { example: string | number; pattern: string | number }
+  'actions.template.workflowChanged': { template: string | number }
   'actions.template.workflowKept': { count: number; platforms: string | number }
   'actions.template.workflowNone': undefined
   'actions.template.workflowSaved': { platform: string | number }

@@ -283,7 +283,9 @@ export async function saveTemplate(projectPath: string, scope: TemplateScope, na
     // The sections of the template it replaces stay, but for the one saved now.
     const kept = TEMPLATE_PLATFORMS.filter((p) => !!same?.workflow?.[p] && p !== own?.platform)
     const workflow: TemplateWorkflows = { ...Object.fromEntries(kept.map((p) => [p, same!.workflow![p]])), ...(own ? { [own.platform]: own.section } : {}) }
-    const saved = await write(d, same?.file ?? (await newFile(d, clean)), { ...checked, ...(hasWorkflow(workflow) ? { workflow } : {}) })
+    // A section it had that couldn't be used stays said, unless one is saved for it now (HR5's round 1).
+    const dropped = (same?.workflowDropped ?? []).filter((p) => p !== own?.platform)
+    const saved = await write(d, same?.file ?? (await newFile(d, clean)), { ...checked, ...(hasWorkflow(workflow) ? { workflow } : {}), ...(dropped.length ? { workflowDropped: dropped } : {}) })
     log.info(`Saved template ${userText(clean)} (${scope}, ${t.agents.length} agents${own ? `, ${own.platform}'s workflow` : ''}${kept.length ? `, kept ${kept.join(' and ')}'s` : ''})`)
     return { saved, workflow: { saved: own?.platform ?? null, kept } }
   })
@@ -337,6 +339,8 @@ export async function updateTemplate(ref: TemplateRef, edited: unknown, savedAt:
     const kept = { ...(now.suggestedPreset ? { suggestedPreset: now.suggestedPreset } : {}), ...(now.reviewerMode ? { reviewerMode: now.reviewerMode } : {}) }
     // Its workflow (HI-1910): as the editor sends it (read through the whitelist), else the one it had.
     const workflow = 'workflow' in rest ? checked.workflow : now.workflow
+    // Its sections that couldn't be used stay said where the edit sets none (HR5's round 1); a rejected one sent is said too.
+    const workflowDropped = TEMPLATE_PLATFORMS.filter((p) => !workflow?.[p] && (!!now.workflowDropped?.includes(p) || !!checked.workflowDropped?.includes(p)))
     const given = Array.isArray(sent) ? sent.filter((p): p is { builder: string; reviewer: string } => !!p && typeof p === 'object' && typeof (p as { builder?: unknown }).builder === 'string' && typeof (p as { reviewer?: unknown }).reviewer === 'string') : (now.pairs ?? [])
     const numbered = pairNames(checked.agents)
     const pairs = templatePairs(given.flatMap((p) => {
@@ -345,7 +349,7 @@ export async function updateTemplate(ref: TemplateRef, edited: unknown, savedAt:
       return b >= 0 && r >= 0 ? [{ name: numbered[b], role: checked.agents[b].role, pairedWith: numbered[r] }, { name: numbered[r], role: checked.agents[r].role }] : []
     }))
     const { workflow: _sent, workflowDropped: _dropped, ...edit } = checked
-    const t = { ...edit, ...kept, ...(pairs.length ? { pairs } : {}), ...(hasWorkflow(workflow) ? { workflow } : {}) }
+    const t = { ...edit, ...kept, ...(pairs.length ? { pairs } : {}), ...(hasWorkflow(workflow) ? { workflow } : {}), ...(workflowDropped.length ? { workflowDropped } : {}) }
     if ((now.savedAt ?? null) !== (savedAt ?? null)) throw refusal(msg({ id: 'content.templates.editedMeanwhile', defaultMessage: '"{name}" changed since you started editing it (saved again meanwhile): nothing was saved. Close the editor to see it as it is now.', description: 'An error saving an edited template: it was saved again elsewhere after the editor opened it.' }), { name: now.name }, 'conflict')
     if ((await listIn(ref)).some((e) => e.file !== ref.file && e.name.toLowerCase() === clean.toLowerCase())) throw refusal(M.nameTaken, { name: clean }, 'conflict')
     const saved = await write(ref, ref.file, t)
@@ -649,9 +653,10 @@ const loading = new Set<string>()
  *   half loaded is ever seen.
  * - The removed agents' worktrees and branches stay (to merge or reuse), their conversations stay in the Sessions tab,
  *   and their open cards go back (nobody has them; Doing ones to Todo).
- * - The template's suggested preset is only offered (the window opens the Workflow section with it), never applied here.
+ * - The template's suggested preset is only offered (the window opens the Workflow section with it), never applied here;
+ *   so is its workflow (HI-1910): returned as this load read it, for the window to fill in the Workflow form with.
  */
-export async function loadTemplate(projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[], connections?: Record<number, string | null>): Promise<{ created: string[]; removed: string[] }> {
+export async function loadTemplate(projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[], connections?: Record<number, string | null>): Promise<{ created: string[]; removed: string[]; workflow: TemplateWorkflow | null }> {
   projectPath = workspace.assertProject(projectPath)
   const key = projectPath.toLowerCase()
   if (loading.has(key)) throw refusal(msg({ id: 'content.templates.loading', defaultMessage: 'A template is already being loaded into this project.', description: 'An error loading a template while another load into the same project is under way.' }), undefined, 'conflict')
@@ -718,7 +723,9 @@ export async function loadTemplate(projectPath: string, scope: TemplateScope, fi
     }
     log.info(`Loaded template ${userText(plan.name)} into ${userText(projectPath)}: ${old.length} agents removed, ${staged.length} created${plan.swaps.length ? `, ${plan.swaps.length} on another provider` : ''}`)
     await workspaceOf(projectPath).refresh()
-    return { created: staged.map((s) => s.def.name), removed: old.map((a) => a.name) }
+    // The workflow section of the template as this load read it (HR5's HI-1910 round 1): the window applies it only if it
+    // is the one it showed, never one read before the template changed.
+    return { created: staged.map((s) => s.def.name), removed: old.map((a) => a.name), workflow: plan.workflow?.section ?? null }
   } finally {
     unfence()
     loading.delete(key)

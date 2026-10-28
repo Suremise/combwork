@@ -97,7 +97,11 @@ export interface AgentTemplate {
   pairs?: TemplatePair[]
   /** Its workflow (HI-1910; optional): a section per version control, the rules a project's options set. */
   workflow?: TemplateWorkflows
-  /** The sections it had that can't be used (as read: said where it is shown, never written back). */
+  /**
+   * The sections it had that can't be used (HR5's HI-1910 round 1): said where it is shown, and kept when it is written
+   * (an import, a copy), as platforms only, never what they held, so a rejected section is never taken for none (and
+   * the preset it suggests never offered in its place).
+   */
   workflowDropped?: PlatformId[]
 }
 
@@ -277,7 +281,12 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
   const reviewerMode = raw.reviewerMode === 'lane' || raw.reviewerMode === 'pool' ? raw.reviewerMode : undefined
   // Its workflow (HI-1910) through the whitelist: a section that can't be used is left out and said (`workflowDropped`),
   // never refusing the template nor its other section.
-  const { workflow, dropped } = raw.workflow === undefined ? { workflow: {}, dropped: [] } : readTemplateWorkflows(raw.workflow)
+  // A workflow that isn't one at all rejects both; one written as rejected (`workflowDropped`, by a copy or an import)
+  // stays so where it has no usable section now.
+  const read = raw.workflow === undefined ? { workflow: {}, dropped: [] as PlatformId[] } : isObj(raw.workflow) ? readTemplateWorkflows(raw.workflow) : { workflow: {}, dropped: [...TEMPLATE_PLATFORMS] }
+  const workflow: TemplateWorkflows = read.workflow
+  const marked = Array.isArray(raw.workflowDropped) ? TEMPLATE_PLATFORMS.filter((p) => (raw.workflowDropped as unknown[]).includes(p)) : []
+  const dropped = TEMPLATE_PLATFORMS.filter((p) => !workflow[p] && (read.dropped.includes(p) || marked.includes(p)))
   return { version, name: raw.name.trim(), savedAt, layout, ...(description ? { description } : {}), agents, ...(suggestedPreset ? { suggestedPreset } : {}), ...(reviewerMode ? { reviewerMode } : {}), ...(pairs.length ? { pairs } : {}), ...(hasWorkflow(workflow) ? { workflow } : {}), ...(dropped.length ? { workflowDropped: dropped } : {}) }
 }
 
@@ -335,14 +344,18 @@ export function exportable(t: AgentTemplate): AgentTemplate {
     ...(t.reviewerMode ? { reviewerMode: t.reviewerMode } : {}),
     ...(t.pairs?.length ? { pairs: t.pairs.map((p) => ({ ...p })) } : {}),
     // Its sections as read (HI-1910): whitelisted again, whatever the object holds.
-    ...exportedWorkflow(t.workflow)
+    ...exportedWorkflow(t.workflow, t.workflowDropped)
   }
 }
 
-/** A template's sections as written (HI-1910): whitelisted again, whatever the object holds; none, nothing. */
-function exportedWorkflow(w: TemplateWorkflows | undefined): { workflow?: TemplateWorkflows } {
-  const read = hasWorkflow(w) ? readTemplateWorkflows(JSON.parse(JSON.stringify(w))).workflow : undefined
-  return hasWorkflow(read) ? { workflow: read } : {}
+/**
+ * A template's sections as written (HI-1910): whitelisted again, whatever the object holds; none, nothing. Those it had
+ * that can't be used (or that this whitelist rejects now) are written as rejected, by platform alone.
+ */
+function exportedWorkflow(w: TemplateWorkflows | undefined, had: readonly PlatformId[] | undefined): { workflow?: TemplateWorkflows; workflowDropped?: PlatformId[] } {
+  const read = hasWorkflow(w) ? readTemplateWorkflows(JSON.parse(JSON.stringify(w))) : { workflow: {} as TemplateWorkflows, dropped: [] as PlatformId[] }
+  const dropped = TEMPLATE_PLATFORMS.filter((p) => !read.workflow[p] && (read.dropped.includes(p) || !!had?.includes(p)))
+  return { ...(hasWorkflow(read.workflow) ? { workflow: read.workflow } : {}), ...(dropped.length ? { workflowDropped: dropped } : {}) }
 }
 
 /** A template's sections in their order (HI-1910), for whatever lists them. */

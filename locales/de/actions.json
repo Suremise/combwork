@@ -277,6 +277,7 @@
   "actions.template.savedMessage": "„{name}“ ({n, plural, one {# Agent} other {# Agenten}}), für {scope, select, workspace {den Arbeitsbereich} other {dieses Projekt}}.",
   "actions.template.switchPreset": "Dieses Projekt auch auf {preset} umstellen… (öffnet Versionsverwaltung → Workflow mit dieser Voreinstellung; dort speichern)",
   "actions.template.usePatterns": "Projektschlüssel in Namen verwenden (aus {example} wird {pattern}, benannt nach dem Schlüssel des Projekts, in das sie geladen wird)",
+  "actions.template.workflowChanged": "{template} hat sich beim Laden geändert, daher wurde ihr Workflow nicht ausgefüllt. Lade sie erneut, um ihren Workflow so zu sehen, wie er jetzt ist.",
   "actions.template.workflowKept": "{count, plural, one {Der Workflow für {platforms}, den sie hatte, bleibt erhalten.} other {Die Workflows für {platforms}, die sie hatte, bleiben erhalten.}}",
   "actions.template.workflowNone": "Sie enthält keinen Workflow.",
   "actions.template.workflowSaved": "Sie enthält den Workflow dieses Projekts für {platform}.",

@@ -7,7 +7,10 @@
 // used, with a hint that it has Git's too. A Git-only template in plain: Load is greyed out until Git, unticking loads
 // only the agents; Set Up Git… closes the dialog for Version Control's Git page, and after Initialise repository… the
 // project is Git and the dialog opens again. The Templates view shows the sections under None | Git tabs, and its editor
-// removes one. Screenshots in both themes. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// removes one. HR5's round 1: an imported template whose section can't be used says so in the Load dialog and offers no
+// preset in its place; the workflow applied is the one the dialog shows last (edited and refreshed while it is open),
+// and one changed after that is said, never filled in. Screenshots in both themes. Dev build, throwaway profile,
+// workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -187,6 +190,59 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     await editor.locator('[data-workflow-remove="none"]').click()
     await page.locator('.template-editor .template-detail-actions button', { hasText: 'Save Template' }).click()
     check("the editor removes None's section, Git's kept", !!(await until(() => JSON.stringify(Object.keys(fileOf('team-a.json').workflow ?? {})) === '["git"]')), JSON.stringify(fileOf('team-a.json').workflow))
+
+    // --- HR5's round 1, 1: imported with a section Hive can't use: said, and no preset offered in its place.
+    await page.locator('.activitybar [aria-label="Projects"]').click()
+    await select('gitb')
+    // gitb last showed Version Control: its Session tab, for + Add ▾.
+    await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
+    const bad =path.join(lib.WORK, 'templateworkflow-bad.hive-template.json')
+    fs.writeFileSync(bad, JSON.stringify({ version: 2, name: 'Bad none', savedAt: '', layout: 'auto', suggestedPreset: 'pair', agents: [{ name: 'BD-B1', role: 'builder', provider: 'claude-code' }], workflow: { none: { preset: null, options: { review: 'bogus' } } } }))
+    const imported = await inv('templates:import', bad, { scope: 'workspace' })
+    check('imported, its rejected section kept as rejected (never what it held)', !!imported?.imported && JSON.stringify(imported.imported.workflowDropped) === '["none"]' && !/bogus/.test(fs.readFileSync(path.join(ws, '.hive', 'templates', imported.imported.file), 'utf8')), JSON.stringify(imported))
+    await templatesMenu('Bad none')
+    const badLoad = loadDialog('Bad none')
+    check('its Load dialog says the section can’t be used, and offers no preset in its place', !!(await until(async () => (await badLoad.locator('[data-workflow-dropped="none"]').count()) === 1)) && (await badLoad.locator('.dialog-check').count()) === 0, await text(badLoad))
+    await badLoad.getByRole('button', { name: 'Cancel' }).click()
+    await until(async () => (await badLoad.count()) === 0)
+
+    // --- HR5's round 1, 2: the workflow applied is the one shown last. A template edited while its dialog is open: the
+    // plan read again (a name changed) shows it, and Load fills that in; changed again after it, the load says so.
+    const roundsFile = path.join(ws, '.hive', 'templates', 'rounds.json')
+    const writeRounds = (n) => fs.writeFileSync(roundsFile, JSON.stringify({ version: 2, name: 'Rounds', savedAt: new Date().toISOString(), layout: 'auto', agents: [{ name: 'RD-B1', role: 'builder', provider: 'claude-code' }], workflow: { git: { preset: null, options: { loopRounds: n } } } }))
+    writeRounds(6)
+    await inv('templates:list', gitb)
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    const openRounds = async () => {
+      await lib.addMenuRun(page, 'Templates')
+      if (!(await until(async () => (await menuItems()).includes('Rounds')))) {
+        // The menu reads the templates when it opens: closed and opened again once the file is listed.
+        await page.keyboard.press('Escape')
+        await page.keyboard.press('Escape')
+        await lib.addMenuRun(page, 'Templates')
+        await until(async () => (await menuItems()).includes('Rounds'))
+      }
+      await item('Rounds').click()
+      return loadDialog('Rounds')
+    }
+    const rounds = await openRounds()
+    const roundsRow = rounds.locator('li[data-option="loopRounds"]')
+    const roundsTo = async (row, n) => (await text(row)).trim().endsWith(`→ ${n}`)
+    check('the dialog shows its rounds', !!(await until(() => roundsTo(roundsRow, 6))), await text(rounds.locator('.template-workflow')))
+    writeRounds(8)
+    await rounds.locator('.template-plan-name-input').first().fill('RD-B2')
+    check('edited while open: the plan read again shows the new value', !!(await until(() => roundsTo(roundsRow, 8))), await text(rounds.locator('.template-workflow')))
+    await loadButton(rounds).click()
+    const roundsBox = page.locator('[data-option="loopRounds"] input')
+    check('Load fills in the value shown, never the first one read', !!(await until(async () => (await page.locator('[data-from-template="Rounds"]').count()) === 1 && (await roundsBox.inputValue()) === '8')), await roundsBox.inputValue().catch(() => ''))
+    await page.locator('.workflow-actions button', { hasText: 'Discard Changes' }).click()
+    await until(async () => (await page.locator('[data-from-template]').count()) === 0)
+    await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
+    const again2 = await openRounds()
+    await until(() => roundsTo(again2.locator('li[data-option="loopRounds"]'), 8))
+    writeRounds(9)
+    await loadButton(again2).click()
+    check('changed after the dialog last read it: the load says so, and fills nothing in', !!(await until(async () => (await page.locator('.toast', { hasText: 'changed while it loaded' }).count()) === 1)) && (await page.locator('[data-from-template]').count()) === 0)
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

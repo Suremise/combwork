@@ -101,9 +101,23 @@ describe('a section read as untrusted', () => {
     expect(t.workflowDropped).toEqual(['none'])
     const out = exportable({ ...t, workflow: { git: { ...good, options: { ...good.options, target: 'sneaked in' } as never } } })
     expect(out.workflow).toEqual({ git: good })
-    expect('workflowDropped' in out).toBe(false)
-    // No usable section: no workflow written.
-    expect('workflow' in exportable({ ...t, workflow: { none: { preset: null, options: { review: 'nobody' } as never } } })).toBe(false)
+    // The rejected one written as rejected, by platform alone (HR5's round 1), never what it held.
+    expect(out.workflowDropped).toEqual(['none'])
+    expect(JSON.stringify(out)).not.toContain('nobody')
+    // No usable section: no workflow written, the one it had said as rejected.
+    const none = exportable({ ...t, workflow: { none: { preset: null, options: { review: 'nobody' } as never } }, workflowDropped: undefined })
+    expect(['workflow' in none, none.workflowDropped]).toEqual([false, ['none']])
+    // Read back (an import, a copy): still rejected, so never taken for no workflow.
+    const again = readTemplate(JSON.parse(JSON.stringify(none)))
+    expect(isAgentTemplate(again) && [again.workflow, again.workflowDropped]).toEqual([undefined, ['none']])
+  })
+
+  it('a workflow that isn’t one at all rejects both sections; a rejected mark where a usable section is now is dropped', () => {
+    const base = { version: TEMPLATE_VERSION, name: 'Odd', savedAt: '', layout: 'auto', agents: [{ name: 'B1', role: 'builder', provider: 'claude-code' }] }
+    const bogus = readTemplate({ ...base, workflow: 'bogus' })
+    expect(isAgentTemplate(bogus) && [bogus.workflow, bogus.workflowDropped]).toEqual([undefined, ['none', 'git']])
+    const marked = readTemplate({ ...base, workflow: { git: good }, workflowDropped: ['git', 'none', 'mercurial'] })
+    expect(isAgentTemplate(marked) && [Object.keys(marked.workflow ?? {}), marked.workflowDropped]).toEqual([['git'], ['none']])
   })
 })
 

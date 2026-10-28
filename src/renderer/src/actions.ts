@@ -17,7 +17,8 @@ import { shownText } from '@shared/advanced'
 import { fmt, tr } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
 import { HAND_OVER_TEXT } from '@shared/handOver'
-import type { McpServerInfo, ProjectInfo, ProjectProviderConfig, ProviderId, SessionLayout, SessionListItem, SessionView, ToastAction } from '@shared/types'
+import type { McpServerInfo, ProjectInfo, ProjectProviderConfig, ProviderId, SessionLayout, SessionListItem, SessionView, TemplateLoadPlan, ToastAction } from '@shared/types'
+import type { TemplateWorkflow } from '@shared/workflow/templateOptions'
 import { TEMPLATE_NAME_MAX, namesFollowKey, templateAgentNames, usesKey, type TemplateEntry, type TemplateScope } from '@shared/templates'
 import { PLATFORM_NAME } from '@shared/platform/switching'
 import { templateLoadDetail } from '@shared/templateLoad'
@@ -1308,6 +1309,7 @@ export function moveAgentPane(dir: CellDirection, path: string | null = get().se
 const TW = {
   saved: msg({ id: 'actions.template.workflowSaved', defaultMessage: "It holds this project's workflow for {platform}.", description: "Under the notification that a template was saved (HI-1910): it holds the project's workflow options for its version control ({platform}: None or Git, as Hive names them)." }),
   kept: msg({ id: 'actions.template.workflowKept', defaultMessage: "{count, plural, one {The workflow for {platforms} it had is kept.} other {The workflows for {platforms} it had are kept.}}", description: "Under the notification that a template was saved over one of the same name (HI-1910): the workflow sections it had for {platforms} (None, Git: a list) are kept, {count} of them." }),
+  changed: msg({ id: 'actions.template.workflowChanged', defaultMessage: '{template} changed while it loaded, so its workflow wasn’t filled in. Load it again to see its workflow as it is now.', description: "A warning after loading a template (HI-1910): its workflow section changed between the Load dialog's preview and the load ({template}: its name), so the Workflow form isn't filled in with it." }),
   none: msg({ id: 'actions.template.workflowNone', defaultMessage: 'It holds no workflow.', description: "Under the notification that a template was saved (HI-1910): saved without the project's workflow, and it had none." })
 }
 
@@ -1408,6 +1410,9 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
   let switchPreset = false
   let applyWorkflow = true
   let setUpGit = false
+  // The plan the dialog shows last, and what the load read (HR5's round 1: never a workflow other than the one shown).
+  let shown = plan
+  const got: { loaded: { workflow: TemplateWorkflow | null } | null } = { loaded: null }
   const ok = await confirm({
     title: tr(msg({ id: 'actions.template.loadTitle', defaultMessage: 'Load "{name}"?', description: 'Title of the question before loading a template ({name}) into a project.' }), { name: plan.name }),
     message: plan.remove.length
@@ -1425,6 +1430,7 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
       onChange: (now: string[]) => void (names = now),
       onConnections: (now: Record<number, string | null>) => void (connections = now),
       onWorkflow: (v: boolean) => void (applyWorkflow = v),
+      onPlan: (now: TemplateLoadPlan) => void (shown = now),
       // Closes this dialog (nothing loaded) for Version Control's Git page: never a dialog over a dialog.
       onSetUpGit: () => {
         setUpGit = true
@@ -1439,7 +1445,7 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
     // The preset it suggests (#1436): off by default, and only ever chosen in the form, never saved from here.
     check: suggested ? { label: tr(msg({ id: 'actions.template.switchPreset', defaultMessage: 'Also switch this project to {preset}… (opens Version Control → Workflow with it chosen, to save there)', description: "A tick box when loading a template that suggests a preset ({preset}: Solo, Pair or Team, as the presets are named): after loading, the project's Version Control tab opens at Workflow with that preset chosen but not saved. Glossary: preset." }), { preset: tr(PRESET_TEXT[suggested]) }), initial: false, set: (v) => (switchPreset = v) } : undefined,
     run: async () => {
-      await call('templates:load', path, entry.scope, entry.file, expected, from, names, connections)
+      got.loaded = await call('templates:load', path, entry.scope, entry.file, expected, from, names, connections)
     }
   })
   if (!ok) {
@@ -1450,10 +1456,16 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
     return
   }
   await refreshWorkspace()
-  if (applyWorkflow && wf?.section) {
-    // Laid over the project's options as the Workflow form reads them, and left for the user to save (HR5: never here).
-    set({ workflowPrefill: { path, preset: wf.section.preset, template: { name: plan.name, platform: wf.platform, section: wf.section } } })
-    openVersionControl(path, 'workflow')
+  const seen = shown.workflow
+  if (applyWorkflow && seen?.section) {
+    // The section the load read, only if it is the one shown: changed meanwhile, it is said, never filled in.
+    const section = got.loaded?.workflow ?? null
+    if (JSON.stringify(section) !== JSON.stringify(seen.section)) notify('warning', tr(TW.changed, { template: plan.name }))
+    else {
+      // Laid over the project's options as the Workflow form reads them, and left for the user to save (HR5: never here).
+      set({ workflowPrefill: { path, preset: seen.section.preset, template: { name: plan.name, platform: seen.platform, section: seen.section } } })
+      openVersionControl(path, 'workflow')
+    }
   } else if (suggested && switchPreset) {
     // Filled in once the form has read the project's options (#1423's way), and left for the user to save.
     set({ workflowPrefill: { path, preset: suggested } })

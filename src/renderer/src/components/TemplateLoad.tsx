@@ -28,12 +28,14 @@ const M = {
   takenNote: msg({ id: 'assistant.loadNames.filledNote', defaultMessage: 'Agent names are unique across the workspace, and {count, plural, one {this name is} other {these names are}} taken already: {names} (projects: {projects}). {count, plural, one {A free name is} other {Free names are}} filled in below. Change any name you like.', description: "Load template, above the plan: some of the template's names are taken by other projects' agents ({projects} lists the projects, {names} the names; {count} how many), so free names were filled in for them. Each sentence whole, the verb never agreeing with a list (HI-1585: glossary §1 rules 3 and 4)." })
 }
 
-export function TemplateLoadNames({ path, scope, file, from, initial, onChange, onConnections, onWorkflow, onSetUpGit }: { path: string; scope: TemplateScope; file: string; from?: string; initial: TemplateLoadPlan; onChange: (names: string[]) => void; onConnections?: (choices: Record<number, string | null>) => void; onWorkflow?: (apply: boolean) => void; onSetUpGit?: () => void }) {
+export function TemplateLoadNames({ path, scope, file, from, initial, onChange, onConnections, onWorkflow, onSetUpGit, onPlan }: { path: string; scope: TemplateScope; file: string; from?: string; initial: TemplateLoadPlan; onChange: (names: string[]) => void; onConnections?: (choices: Record<number, string | null>) => void; onWorkflow?: (apply: boolean) => void; onSetUpGit?: () => void; onPlan?: (plan: TemplateLoadPlan) => void }) {
   const project = useStore((s) => s.workspace?.projects.find((p) => p.path === path) ?? null)
   const projects = useStore((s) => s.workspace?.projects)
   const settings = useStore((s) => s.settings)
   const providers = useStore((s) => s.providers)
   const [plan, setPlan] = useState(initial)
+  // The plan shown now (HR5's HI-1910 round 1): its workflow is the one the load is checked against.
+  useEffect(() => onPlan?.(plan), [plan, onPlan])
   const keys = useStore((s) => s.projectKeys)
   // A name taken, or used twice, starts as a free one (#1440): loading is then one click.
   const [names, setNames] = useState(() => {

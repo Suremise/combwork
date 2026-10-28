@@ -373,7 +373,7 @@ describe('saving and loading templates', () => {
     const renamed = await run(() => templates.templatePlan(beta, 'workspace', 'pair-2.json', undefined, B))
     expect([renamed.create.map((a) => a.name), renamed.templateNames, renamed.taken]).toEqual([B, ['Builder', 'Reviewer'], []])
     const r = await run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', ['b1'], undefined, B))
-    expect(r).toEqual({ created: B, removed: ['Old'] })
+    expect([r.created, r.removed]).toEqual([B, ['Old']])
     const cfg = cfgOf(beta)
     expect(await layoutOf(beta)).toBe('columns2')
     // Each with its role in the workflow and note (alpha's "builder" note), in the project folder (#1436).
@@ -928,6 +928,41 @@ describe("a template's workflow (HI-1910)", () => {
     expect([both.needsGit, both.alsoGit, both.overlay?.options.platform]).toEqual([false, true, 'none'])
     // No workflow at all: no workflow part.
     expect((await run(() => templates.templatePlan(plain, 'workspace', 'agents-only.json'))).workflow).toBeNull()
+  })
+
+  it("an imported template's rejected section stays said through the import, and its suggested preset isn't offered in its place (HR5's round 1)", async () => {
+    const dir = join(base, 'imports-workflow')
+    mkdirSync(dir, { recursive: true })
+    const agents = [{ name: 'IM-B1', role: 'builder', provider: 'claude-code' }]
+    // HR5's two cases: a section with a value Hive can't use, and a workflow that isn't one.
+    const cases: [string, unknown][] = [['Bad none', { none: { preset: null, options: { review: 'bogus' } } }], ['Bogus', 'bogus']]
+    for (const [name, workflow] of cases) {
+      const file = join(dir, `${name}.hive-template.json`)
+      writeFileSync(file, JSON.stringify({ version: TEMPLATE_VERSION, name, savedAt: '', layout: 'auto', suggestedPreset: 'pair', agents, workflow }))
+      const r = await run(() => templates.importTemplate(file, { scope: 'workspace' }))
+      expect('imported' in r).toBe(true)
+      const imported = 'imported' in r ? r.imported : null
+      expect(imported?.workflowDropped?.length).toBeGreaterThan(0)
+      expect(JSON.stringify(fileOf(imported!.file))).not.toMatch(/bogus/)
+      const plan = await run(() => templates.templatePlan(gitB, 'workspace', imported!.file))
+      // Said in the plan, not taken for no workflow: the window shows why, and offers no preset in its place.
+      expect(plan.workflow).toMatchObject({ platform: 'git', section: null, dropped: imported!.workflowDropped })
+      expect(plan.workflow?.dropped).toContain('none')
+    }
+  })
+
+  it('a load returns the workflow section it read, for the window to check against the one it showed', async () => {
+    await run(() => templates.saveTemplate(gitA, 'workspace', 'Rounds'))
+    const plan = await run(() => templates.templatePlan(gitB, 'workspace', 'rounds.json'))
+    const f = join(wsPath, '.hive', 'templates', 'rounds.json')
+    const t = JSON.parse(readFileSync(f, 'utf8'))
+    // Changed after the plan was shown: the load reads it as it is now, and says so.
+    t.workflow.git.options.loopRounds = 8
+    writeFileSync(f, JSON.stringify(t))
+    const ids = JSON.parse(readFileSync(join(gitB, '.hive', 'project.json'), 'utf8')).agents.map((a: { id: string }) => a.id)
+    const r = await run(() => templates.loadTemplate(gitB, 'workspace', 'rounds.json', ids, undefined, ['RD-B1']))
+    expect(plan.workflow?.section?.options.loopRounds).toBe(4)
+    expect(r.workflow?.options.loopRounds).toBe(8)
   })
 
   it("Hive's own: its preset as this project's form offers it, its pool kept", async () => {

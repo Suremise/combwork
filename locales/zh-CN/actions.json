@@ -277,6 +277,7 @@
   "actions.template.savedMessage": "“{name}”（{n, plural, other {# 个智能体}}），用于{scope, select, workspace {工作区} other {此项目}}。",
   "actions.template.switchPreset": "同时将此项目切换为{preset}…（打开“版本控制”→“工作流程”并选中它，在那里保存）",
   "actions.template.usePatterns": "在名称中使用项目键（{example} 变为 {pattern}，按加载到的项目的键命名）",
+  "actions.template.workflowChanged": "{template} 在加载时发生了更改，因此未填写它的工作流程。请重新加载，以查看它现在的工作流程。",
   "actions.template.workflowKept": "{count, plural, other {它原有的 {platforms} 工作流程已保留。}}",
   "actions.template.workflowNone": "它不包含工作流程。",
   "actions.template.workflowSaved": "它包含此项目的 {platform} 工作流程。",
