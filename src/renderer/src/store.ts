@@ -388,6 +388,8 @@ interface State {
   sessionBulk: Record<string, SessionBulkProgress[]>
   /** The agent whose Compact dialog is open. */
   compactFor: AgentRef | null
+  /** The agent whose Hooks dialog is open (HI-982). */
+  hooksFor: AgentRef | null
   /** Project whose Add Agent dialog is open. */
   addAgentFor: string | null
   /** Agent whose settings dialog (name, model, effort, permission mode) is open. */
@@ -620,6 +622,7 @@ export const useStore = create<State>(() => ({
   keepAwake: 0,
   sessionBulk: {},
   compactFor: null,
+  hooksFor: null,
   addAgentFor: null,
   agentSettingsFor: null,
   templateAgentFor: null,

@@ -1014,6 +1014,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'session:clearUsageCache': () => sessions.forgetUsageCache(),
     'session:adopt': (p, id) => sessions.adopt(p, id),
     'session:usage': (p, id) => sessions.usage(workspace.assertSessionHost(p), id),
+    'session:hooks': (p, agentId) => sessions.sessionHooks(workspace.assertSessionHost(p), agentId),
     'session:markSeen': (p, ids) => sessions.markSeen(p, ids),
     'session:live': () => sessions.liveStates(),
     'session:setMode': (p, agentId, mode) => sessions.setPermissionMode(p, agentId, mode),
@@ -1156,7 +1157,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     // A project or the Assistant's home (HI-1664: Activity's workspace level shows the Assistant too).
     'activity:now': async (p) => {
       p = workspace.assertSessionHost(p)
-      return { launches: await projectLaunches(p), tasks: sessions.backgroundTasks(p) }
+      return { launches: await projectLaunches(p), tasks: sessions.backgroundTasks(p), blocks: sessions.hookBlocks(p) }
     },
     'activity:nowAll': (paths) => activityNowAll(paths),
     'activity:cardAgents': (card) => activityCardAgents(card),

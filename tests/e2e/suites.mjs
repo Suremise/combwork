@@ -152,6 +152,7 @@ export const SUITES = [
   { name: 'hookscopilot', needs: ['copilot'] },
   { name: 'hookshealth' },
   { name: 'hookstranscript' },
+  { name: 'hooksview' },
   { name: 'hwaccel' },
   { name: 'i18nlive' },
   { name: 'i18nreport' },

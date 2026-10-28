@@ -21,7 +21,7 @@ export async function activityNowAll(paths: unknown): Promise<{ path: string; no
     const h = workspace.assertSessionHost(p)
     if (!hosts.has(h.toLowerCase())) hosts.set(h.toLowerCase(), h)
   }
-  return Promise.all([...hosts.values()].map(async (path) => ({ path, now: { launches: await projectLaunches(path), tasks: sessions.backgroundTasks(path) } })))
+  return Promise.all([...hosts.values()].map(async (path) => ({ path, now: { launches: await projectLaunches(path), tasks: sessions.backgroundTasks(path), blocks: sessions.hookBlocks(path) } })))
 }
 
 /**

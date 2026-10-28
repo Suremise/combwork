@@ -4095,6 +4095,47 @@ p.hint {
   overflow-wrap: anywhere;
   user-select: text;
 }
+/* An agent's Hooks dialog (HI-982): its two tables in the dialog's own scroll, a long command cut to two lines. */
+.hooks-head {
+  align-items: flex-start;
+  gap: 8px;
+}
+.hooks-body {
+  user-select: text;
+}
+.hooks-heading {
+  margin: 14px 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.hooks-note,
+.hooks-stale {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin: 4px 0;
+}
+.hooks-stale {
+  color: var(--warning, inherit);
+}
+.hooks-table td {
+  vertical-align: top;
+}
+.hooks-command code {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.hooks-why {
+  max-width: 340px;
+  overflow-wrap: anywhere;
+}
+.hooks-count {
+  font-weight: 600;
+}
 .about-table td:first-child {
   text-align: right;
   color: var(--fg-faint);

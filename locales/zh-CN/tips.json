@@ -7,6 +7,8 @@
   "tips.advancedSettings.title": "自己修复 CLI 的变化",
   "tips.agentConsole.text": "“设置”→“Agent API”→“允许智能体读取开发者控制台”会为智能体提供一个只读工具，显示其 CLI 的钩子和状态行，以及 Hive 对每一项的解读（已脱敏），方便它们调试 Hive 看到的内容。",
   "tips.agentConsole.title": "让智能体看到 CLI 发送的内容",
+  "tips.agentHooks.text": "智能体 ⋯ 菜单中的“钩子…”会列出其会话拥有的钩子（包括你的），以及 Hive 最近收到的钩子：Hive 如何回复，以及它应用还是忽略了每个钩子及原因。",
+  "tips.agentHooks.title": "查看智能体的钩子为何不再到达",
   "tips.agentInSlot.text": "在窗格中智能体名称旁显示：在槽位中处理卡片时显示 在 slot-b（点击可前往“分支与远程仓库”），在为其保留的槽位中显示 保留：hb2，评审者在已退役的主目录中显示 主目录：hr4。项目的悬停提示会在“槽位”列中列出这些位置。",
   "tips.agentInSlot.title": "查看每个智能体在哪里工作",
   "tips.agentLayouts.text": "每个智能体都有自己的窗格：在会话工具栏右侧选择布局，按住标题拖动窗格即可重新排列。文件锁可防止两个智能体编辑同一个文件。",

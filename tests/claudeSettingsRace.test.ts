@@ -63,7 +63,7 @@ describe('a settings file that changes between the stat and the read (#333)', ()
 
   it('reads all of a file that grew but is within the limit', async () => {
     changes('{}', grown)
-    expect(cliSettings(['--settings', file], dir)).toEqual({ label: `--settings ${file}`, json: JSON.parse(grown) })
+    expect(cliSettings(['--settings', file], dir)).toEqual({ label: `--settings ${file}`, kind: 'cli', file, json: JSON.parse(grown) })
     changes('{}', grown)
     expect(await userSettings(['--settings', file], dir)).toEqual(JSON.parse(grown))
   })
@@ -78,7 +78,7 @@ describe('a settings file that changes between the stat and the read (#333)', ()
   it('refuses a file that grew past the limit, saying so (unsure for the compaction reader)', async () => {
     const big = sized(SETTINGS_FILE_LIMIT + 1, { autoCompactWindow: 150_000 })
     changes('{}', big)
-    expect(cliSettings(['--settings', file], dir)).toEqual({ label: `--settings ${file}`, json: null, unsure: "couldn't be read (it's over Claude Code's 2 MiB limit)" })
+    expect(cliSettings(['--settings', file], dir)).toEqual({ label: `--settings ${file}`, kind: 'cli', file, json: null, unsure: "couldn't be read (it's over Claude Code's 2 MiB limit)" })
     changes('{}', big)
     await expect(userSettings(['--settings', file], dir)).rejects.toThrow("can't be read: it's over Claude Code's 2 MiB limit for settings files.")
     // Exactly the limit is still read.

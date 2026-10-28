@@ -1,6 +1,10 @@
 {
   "activity.agents": "{n, plural, =0 {Todos os agentes} one {# agente} other {# agentes}}",
   "activity.all": "Todos",
+  "activity.block.asked": "{other, select, yes {Edição aguardando sua aprovação: {file} está bloqueado por um agente de outro projeto} other {Edição aguardando sua aprovação: {file} está bloqueado por {holder}}}",
+  "activity.block.blocked": "{other, select, yes {Edição bloqueada: {file} está bloqueado por um agente de outro projeto} other {Edição bloqueada: {file} está bloqueado por {holder}}}",
+  "activity.block.for": "Bloqueio de arquivo do Hive · {time}",
+  "activity.block.tip": "Mostrado enquanto o bloqueio durar: some quando o outro agente terminar, o agente tentar de novo ou seguir em frente, ou o turno dele terminar. O histórico fica em ⋯ → Hooks… do agente.",
   "activity.cards": "{n, plural, =0 {Todos os cartões} one {# cartão} other {# cartões}}",
   "activity.cardsLabel": "Cartões",
   "activity.closeDetails": "Fechar detalhes",

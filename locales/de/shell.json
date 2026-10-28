@@ -29,6 +29,7 @@
   "shell.command.agent.add": "Agent hinzufügen",
   "shell.command.agent.addWith": "Agent hinzufügen…",
   "shell.command.agent.focusN": "Agent {n} fokussieren",
+  "shell.command.agent.hooks": "Agent-Hooks…",
   "shell.command.agent.menu": "Agent-Menü…",
   "shell.command.agent.moveDown": "Agent nach unten verschieben",
   "shell.command.agent.moveLeft": "Agent nach links verschieben",

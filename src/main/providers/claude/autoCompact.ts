@@ -62,6 +62,11 @@ export interface SettingsScope {
   json: unknown
   /** Why Hive can't tell what it gives (it couldn't read it, or can't tell whether Claude Code does), after its label (#333). */
   unsure?: string
+  /** Which scope it is, and its file (HI-982: an agent's Hooks dialog), where it has one. */
+  kind?: 'managed' | 'cli' | 'local' | 'project' | 'user'
+  file?: string
+  /** The file is there but isn't JSON (Claude Code skips it): never read as "no settings". */
+  notJson?: true
 }
 
 /** Why a default is an estimate: what Hive can't read could still change it (#273). */
@@ -189,7 +194,7 @@ export const SETTINGS_READ_CHUNK = 64 * 1024
  * opened file is checked again and read to its end, a chunk at a time and never past a byte over the limit, since it
  * may have been replaced or grown since the stat.
  */
-function readSettings(file: string): { json: unknown; unsure?: string } {
+function readSettings(file: string): { json: unknown; unsure?: string; notJson?: true } {
   const unread = (why: string): { json: null; unsure: string } => ({ json: null, unsure: tr(msg({ id: 'providers.autoCompact.unreadable', defaultMessage: "couldn't be read ({why})", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Hive couldn't read (after its name). {why} says why (providers.autoCompact.why.*, or the system's message)." }), { why }) })
   let fd: number | null = null
   try {
@@ -212,7 +217,7 @@ function readSettings(file: string): { json: unknown; unsure?: string } {
     try {
       return { json: JSON.parse(Buffer.concat(chunks, n).toString('utf8').replace(/^\uFEFF/, '')) }
     } catch {
-      return { json: null }
+      return { json: null, notJson: true }
     }
   } catch (e) {
     return unread((e as NodeJS.ErrnoException).code ?? (e as Error).message)
@@ -248,12 +253,13 @@ export function cliSettings(args: readonly string[], cwd: string): SettingsScope
   if (!v) return null
   if (v.startsWith('{')) {
     try {
-      return { label: '--settings', json: JSON.parse(v) } // i18n-ignore: a command-line option
+      return { label: '--settings', kind: 'cli', json: JSON.parse(v) } // i18n-ignore: a command-line option
     } catch {
-      return { label: '--settings', json: null } // i18n-ignore: a command-line option
+      return { label: '--settings', kind: 'cli', json: null, notJson: true } // i18n-ignore: a command-line option
     }
   }
-  return { label: `--settings ${v}`, ...readSettings(isAbsolute(v) ? v : join(cwd, v)) } // i18n-ignore: a command-line option and its file
+  const file = isAbsolute(v) ? v : join(cwd, v)
+  return { label: `--settings ${v}`, kind: 'cli', file, ...readSettings(file) } // i18n-ignore: a command-line option and its file
 }
 
 /** The settings files `--setting-sources` can name. */
@@ -297,13 +303,13 @@ export function settingsScopes(cwd: string, configDir: string, args: readonly st
   const cli = cliSettings(args, cwd)
   const { sources, invalid } = settingSources(args)
   const reads = (s: SettingSource): boolean => !sources || sources.has(s)
-  const file = (label: string, clause: Msg, path: string): SettingsScope => ({ label, clause, ...readSettings(path) })
+  const file = (label: string, clause: Msg, path: string, kind: SettingsScope['kind']): SettingsScope => ({ label, clause, kind, file: path, ...readSettings(path) })
   return [
-    file(tr(msg({ id: 'providers.autoCompact.scope.managed', defaultMessage: 'managed settings', description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads, after \"in\" ({scope} in providers.autoCompact.keyIn, autoIn, disabledIn and envIn). The managed settings an administrator gives Claude Code." })), msg({ id: 'providers.autoCompact.unsureFile.managed', defaultMessage: 'managed settings {unsure}', description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Hive can't be sure of, a clause (\"managed settings couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). The managed settings an administrator gives Claude Code." }), join(programFiles, 'ClaudeCode', 'managed-settings.json')),
+    file(tr(msg({ id: 'providers.autoCompact.scope.managed', defaultMessage: 'managed settings', description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads, after \"in\" ({scope} in providers.autoCompact.keyIn, autoIn, disabledIn and envIn). The managed settings an administrator gives Claude Code." })), msg({ id: 'providers.autoCompact.unsureFile.managed', defaultMessage: 'managed settings {unsure}', description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Hive can't be sure of, a clause (\"managed settings couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). The managed settings an administrator gives Claude Code." }), join(programFiles, 'ClaudeCode', 'managed-settings.json'), 'managed'),
     ...(cli ? [cli] : []),
-    ...(reads('local') ? [file(tr(msg({ id: 'providers.autoCompact.scope.local', defaultMessage: "the project's .claude/settings.local.json", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads, after \"in\" ({scope} in providers.autoCompact.keyIn, autoIn, disabledIn and envIn). .claude/settings.local.json is a path: keep it." })), msg({ id: 'providers.autoCompact.unsureFile.local', defaultMessage: "the project's .claude/settings.local.json {unsure}", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Hive can't be sure of, a clause (\"the project's .claude/settings.local.json couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). .claude/settings.local.json is a path: keep it." }), join(cwd, '.claude', 'settings.local.json'))] : []),
-    ...(reads('project') ? [file(tr(msg({ id: 'providers.autoCompact.scope.project', defaultMessage: "the project's .claude/settings.json", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads, after \"in\" ({scope} in providers.autoCompact.keyIn, autoIn, disabledIn and envIn). .claude/settings.json is a path: keep it." })), msg({ id: 'providers.autoCompact.unsureFile.project', defaultMessage: "the project's .claude/settings.json {unsure}", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Hive can't be sure of, a clause (\"the project's .claude/settings.json couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). .claude/settings.json is a path: keep it." }), join(cwd, '.claude', 'settings.json'))] : []),
-    ...(reads('user') ? [file(tr(msg({ id: 'providers.autoCompact.scope.user', defaultMessage: "Claude Code's settings.json", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads, after \"in\" ({scope} in providers.autoCompact.keyIn, autoIn, disabledIn and envIn). The user's own settings file. settings.json is a file name: keep it." })), msg({ id: 'providers.autoCompact.unsureFile.user', defaultMessage: "Claude Code's settings.json {unsure}", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Hive can't be sure of, a clause (\"Claude Code's settings.json couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). The user's own settings file. settings.json is a file name: keep it." }), join(configDir, 'settings.json'))] : []),
+    ...(reads('local') ? [file(tr(msg({ id: 'providers.autoCompact.scope.local', defaultMessage: "the project's .claude/settings.local.json", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads, after \"in\" ({scope} in providers.autoCompact.keyIn, autoIn, disabledIn and envIn). .claude/settings.local.json is a path: keep it." })), msg({ id: 'providers.autoCompact.unsureFile.local', defaultMessage: "the project's .claude/settings.local.json {unsure}", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Hive can't be sure of, a clause (\"the project's .claude/settings.local.json couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). .claude/settings.local.json is a path: keep it." }), join(cwd, '.claude', 'settings.local.json'), 'local')] : []),
+    ...(reads('project') ? [file(tr(msg({ id: 'providers.autoCompact.scope.project', defaultMessage: "the project's .claude/settings.json", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads, after \"in\" ({scope} in providers.autoCompact.keyIn, autoIn, disabledIn and envIn). .claude/settings.json is a path: keep it." })), msg({ id: 'providers.autoCompact.unsureFile.project', defaultMessage: "the project's .claude/settings.json {unsure}", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Hive can't be sure of, a clause (\"the project's .claude/settings.json couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). .claude/settings.json is a path: keep it." }), join(cwd, '.claude', 'settings.json'), 'project')] : []),
+    ...(reads('user') ? [file(tr(msg({ id: 'providers.autoCompact.scope.user', defaultMessage: "Claude Code's settings.json", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads, after \"in\" ({scope} in providers.autoCompact.keyIn, autoIn, disabledIn and envIn). The user's own settings file. settings.json is a file name: keep it." })), msg({ id: 'providers.autoCompact.unsureFile.user', defaultMessage: "Claude Code's settings.json {unsure}", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Hive can't be sure of, a clause (\"Claude Code's settings.json couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). The user's own settings file. settings.json is a file name: keep it." }), join(configDir, 'settings.json'), 'user')] : []),
     ...(invalid !== undefined ? [{ label: `--setting-sources ${invalid}`.trim(), json: null, unsure: tr(msg({ id: 'providers.autoCompact.badSources', defaultMessage: "isn't a list Claude Code takes (user, project, local)", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: --setting-sources (a command-line option, before this) has a value Claude Code doesn't take. user, project and local are its values: keep them." })) }] : []),
     ...UNSURE_MODES.filter((m) => args.includes(m)).map((m) => ({ label: m, json: null, unsure: tr(msg({ id: 'providers.autoCompact.unsureMode', defaultMessage: 'may stop Claude Code reading some settings files', description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a command-line option (before this: --safe-mode, --bare) may change which settings files Claude Code reads." })) }))
   ]

@@ -68,7 +68,7 @@ import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
 import { writePty } from './ptyHost'
 import { isResuming } from './restartResume'
-import { sessions } from './sessions'
+import { sessions, type HookObservation } from './sessions'
 import { agentPlace, folderFacts } from './agentFolders'
 import { releasableSlots, releaseSlot, SlotReleaseRefused, type HeldRow } from './slotRelease'
 import { slotAt } from '../shared/agentFolders'
@@ -195,9 +195,19 @@ export async function startHookServer(): Promise<string> {
       return send(res, 200, {})
     }
     let done: (() => void) | null = null
+    // What Hive observes of it, for the launch's Hooks dialog (HI-982): from here, on its own authenticated route, so
+    // a body Hive can't read is recorded too.
+    let obs: HookObservation | null = null
+    let step = 'read'
     try {
       const raw = await readBody(req)
-      const body = JSON.parse(raw || '{}')
+      let body: Record<string, any>
+      try {
+        body = JSON.parse(raw || '{}')
+      } catch (e) {
+        obs = query.has('statusline') ? null : sessions.observeHook(run, {})
+        throw e
+      }
       done = beginWork(hookLabel(query.has('statusline'), body))
       if (query.has('statusline')) {
         // The reply becomes Claude Code's status line, so send nothing; or, chaining the user's own status line (#1285),
@@ -217,17 +227,25 @@ export async function startHookServer(): Promise<string> {
       // decides whose turn they are (#650: a notice of what is unread, or the drain carrying the turn on); other hooks
       // are answered at once so they never slow the agent down. Each is handled in the launch's order from when it came,
       // with its reply: the turn ledger learns what the Stop was told (#648).
+      obs = sessions.observeHook(run, body)
+      step = 'reply'
       const reply = sessions.hookReply(run, body)
+      step = 'handle'
       const handled = sessions.handleHook(run, body, reply)
+      let failed: { step: string; error: unknown } | undefined
       const answer = await reply.catch((e) => {
         log.warn('hook reply', e)
+        failed = { step: 'reply', error: e }
         return null
       })
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(answer ?? {}))
       await handled
+      if (obs) sessions.hookHandled(obs, answer, failed)
+      obs = null
     } catch (e) {
       log.warn('hook error', e)
+      if (obs) sessions.hookHandled(obs, null, { step, error: e })
       if (!res.headersSent) send(res, 400, { error: 'bad request' })
     } finally {
       done?.()

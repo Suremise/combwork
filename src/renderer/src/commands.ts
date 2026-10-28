@@ -405,6 +405,17 @@ const COMMAND_DEFS: CommandDef[] = [
     }
   },
   {
+    id: 'agent.hooks',
+    name: msg({ id: 'shell.command.agent.hooks', defaultMessage: 'Agent Hooks…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the focused agent's Hooks dialog (the hooks its session has, and what Hive received). The … says it opens a dialog first: keep it." }),
+    category: 'session',
+    when: () => !!selected()?.agents.length,
+    run: (path?: string, agentId?: string) => {
+      const p = path ? get().workspace?.projects.find((x) => x.path === path) : selected()
+      const id = agentId ?? (p ? focusedAgentId(p) : null)
+      if (p && id && p.agents.some((a) => a.id === id)) set({ hooksFor: { project: p.path, agentId: id } })
+    }
+  },
+  {
     id: 'agent.menu',
     name: msg({ id: 'shell.command.agent.menu', defaultMessage: 'Agent Menu…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the focused agent's ⋯ menu on its pane (everything its pane header doesn't show). The … says it opens a menu first: keep it." }),
     category: 'session',

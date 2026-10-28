@@ -7,6 +7,8 @@
   "tips.advancedSettings.title": "Corrija você mesmo uma mudança de CLI",
   "tips.agentConsole.text": "Configurações → Agent API → Permitir que agentes leiam o console do desenvolvedor dá aos agentes uma ferramenta somente leitura que mostra os hooks e a linha de status da CLI deles ao lado do que o Hive entendeu de cada um, com dados sensíveis ocultos, para que possam depurar o que o Hive vê.",
   "tips.agentConsole.title": "Deixe os agentes verem o que a CLI deles envia",
+  "tips.agentHooks.text": "Hooks… no menu ⋯ de um agente lista os hooks que a sessão dele tem, inclusive os seus, e os últimos hooks que o Hive recebeu: o que o Hive respondeu e se aplicou ou ignorou cada um, e por quê.",
+  "tips.agentHooks.title": "Veja por que os hooks de um agente pararam de chegar",
   "tips.agentInSlot.text": "Ao lado do nome de um agente no painel dele: em slot-b enquanto faz um cartão em um slot (clique para ir a Branches e remotes), adotado: hb2 no slot adotado para ele, pasta antiga: hr4 na pasta antiga de um revisor. O hover do projeto lista esses lugares em uma coluna Slot.",
   "tips.agentInSlot.title": "Veja onde cada agente trabalha",
   "tips.agentLayouts.text": "Cada agente tem o próprio painel: escolha um layout à direita da barra da sessão e arraste um painel pelo cabeçalho para reorganizá-los. Os bloqueios de arquivo impedem que dois agentes editem o mesmo arquivo.",

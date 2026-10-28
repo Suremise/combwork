@@ -98,6 +98,7 @@
   "panes.menu.compact": "Compacter…",
   "panes.menu.discard": "Abandonner le worktree et la branche…",
   "panes.menu.handOver": "Passer le relais à…",
+  "panes.menu.hooks": "Hooks…",
   "panes.menu.moveDown": "Déplacer vers le bas",
   "panes.menu.moveLeft": "Déplacer vers la gauche",
   "panes.menu.moveRight": "Déplacer vers la droite",

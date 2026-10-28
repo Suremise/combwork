@@ -183,6 +183,10 @@ interface HiveMessageValues {
   'settings.advanced.codex.hooks.knownEvents.title': undefined
   'settings.advanced.codex.hooks.knownFields.desc': undefined
   'settings.advanced.codex.hooks.knownFields.title': undefined
+  'settings.advanced.codex.hooks.listMethod.desc': undefined
+  'settings.advanced.codex.hooks.listMethod.title': undefined
+  'settings.advanced.codex.hooks.listSeconds.desc': undefined
+  'settings.advanced.codex.hooks.listSeconds.title': undefined
   'settings.advanced.codex.hooks.preToolUseTimeoutSeconds.desc': undefined
   'settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title': undefined
   'settings.advanced.codex.hooks.timeoutSeconds.desc': { most: number }

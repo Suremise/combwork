@@ -7,6 +7,8 @@
   "tips.advancedSettings.title": "Fix a CLI change yourself",
   "tips.agentConsole.text": "Settings → Agent API → Let agents read the developer console gives agents a read-only tool showing their CLI's hooks and status line next to what Hive made of each, redacted, so they can debug what Hive sees.",
   "tips.agentConsole.title": "Let agents see what their CLI sends",
+  "tips.agentHooks.text": "Hooks… in an agent's ⋯ menu lists the hooks its session has, yours too, and the last hooks Hive received: what Hive replied, and whether it applied or ignored each one and why.",
+  "tips.agentHooks.title": "See why an agent's hooks went quiet",
   "tips.agentInSlot.text": "Beside an agent's name on its pane: in slot-b while it builds a card in a slot (click it for Branches & remotes), carried: hb2 in the slot kept for it, home: hr4 for a reviewer's retired home. The project's hover lists them in a Slot column.",
   "tips.agentInSlot.title": "See where each agent works",
   "tips.agentLayouts.text": "Each agent has its own pane: choose a layout at the right of the session toolbar, and drag a pane by its header to rearrange them. File locks stop two agents editing the same file.",

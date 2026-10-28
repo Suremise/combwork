@@ -1,6 +1,7 @@
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
 import type { ActivityCardAgent, ActivityDetail, ActivityNow, ActivityTurns, EndProcessResult } from './activity'
+import type { SessionHooks } from './hooks'
 import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
@@ -557,6 +558,8 @@ export interface HiveRequests {
   'session:clearUsageCache': () => void
   'session:adopt': (projectPath: string, sessionId: string) => void
   'session:usage': (projectPath: string, sessionId: string) => SessionUsage | null
+  /** An agent's hooks for its Hooks dialog (HI-982): what its launch has and what Hive received; null when it isn't running. */
+  'session:hooks': (projectPath: string, agentId: string) => SessionHooks | null
   /** The window showed these agents' panes (all of the project's agents when none are named). */
   'session:markSeen': (projectPath: string, agentIds?: string[]) => void
   'session:live': () => LiveSessionState[]

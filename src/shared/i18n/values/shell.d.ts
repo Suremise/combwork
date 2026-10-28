@@ -31,6 +31,7 @@ interface HiveMessageValues {
   'shell.command.agent.add': undefined
   'shell.command.agent.addWith': undefined
   'shell.command.agent.focusN': { n: string | number }
+  'shell.command.agent.hooks': undefined
   'shell.command.agent.menu': undefined
   'shell.command.agent.moveDown': undefined
   'shell.command.agent.moveLeft': undefined

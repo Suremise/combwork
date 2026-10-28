@@ -1,6 +1,10 @@
 {
   "activity.agents": "{n, plural, =0 {Wszyscy agenci} one {# agent} few {# agentów} many {# agentów} other {# agenta}}",
   "activity.all": "Wszystko",
+  "activity.block.asked": "{other, select, yes {Edycja czeka na Twoją zgodę: plik {file} jest zablokowany przez agenta innego projektu} other {Edycja czeka na Twoją zgodę: plik {file} jest zablokowany przez {holder}}}",
+  "activity.block.blocked": "{other, select, yes {Edycja zablokowana: plik {file} jest zablokowany przez agenta innego projektu} other {Edycja zablokowana: plik {file} jest zablokowany przez {holder}}}",
+  "activity.block.for": "Blokada plików Hive · {time}",
+  "activity.block.tip": "Widoczne, dopóki trwa blokada: znika, gdy drugi agent skończy, agent spróbuje ponownie lub zajmie się czymś innym albo skończy się jego tura. Jej historia jest w ⋯ → Hooki… agenta.",
   "activity.cards": "{n, plural, =0 {Wszystkie karty} one {# karta} few {# karty} many {# kart} other {# karty}}",
   "activity.cardsLabel": "Karty",
   "activity.closeDetails": "Zamknij szczegóły",

@@ -7,6 +7,22 @@
     "defaultMessage": "All",
     "description": "The first entry of the Activity tab's Agents and Cards menus: no filter, everything."
   },
+  "activity.block.asked": {
+    "defaultMessage": "{other, select, yes {Edit waiting for your OK: {file} is locked by an agent of another project} other {Edit waiting for your OK: {file} is locked by {holder}}}",
+    "description": "In the Activity tab, under Now: Hive's file lock (Ask me) holds the agent's edit of a file another agent is editing until the user allows it. {file} is the file's path; {holder} the agent editing it."
+  },
+  "activity.block.blocked": {
+    "defaultMessage": "{other, select, yes {Edit blocked: {file} is locked by an agent of another project} other {Edit blocked: {file} is locked by {holder}}}",
+    "description": "In the Activity tab, under Now: Hive's file lock blocked the agent's edit of a file another agent is editing, while that stands. {file} is the file's path; {holder} the agent editing it."
+  },
+  "activity.block.for": {
+    "defaultMessage": "Hive's file lock · {time}",
+    "description": "The second line of a lock block in the Activity tab: what blocked the edit, and for how long it has stood ({time}, such as \"2 min\")."
+  },
+  "activity.block.tip": {
+    "defaultMessage": "Shown while the lock stands: it goes once the other agent finishes, the agent tries again or moves on, or its turn ends. Its history is in the agent's ⋯ → Hooks…",
+    "description": "Tooltip on a lock block in the Activity tab. ⋯ → Hooks… is the agent menu item: keep the arrow and the dots."
+  },
   "activity.cards": {
     "defaultMessage": "{n, plural, =0 {All cards} one {# card} other {# cards}}",
     "description": "A menu button above the Activity tab: only the agents working on these cards in progress have a tab (several can be ticked); with none ticked, all."
