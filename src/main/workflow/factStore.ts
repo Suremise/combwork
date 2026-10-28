@@ -13,7 +13,7 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import type { DatabaseSync } from 'node:sqlite'
 import { openDb, type Db } from '../db'
-import { BOARD_MIGRATIONS, boardChanged, boardRead, boardWriteOp, takeNumberIn } from '../boardStore'
+import { BOARD_MIGRATIONS, boardChanged, boardRead, boardReadToken, boardWriteOp, takeNumberIn } from '../boardStore'
 import { decomposeCard, writeCardRows } from '../schema/cardRows'
 import { cardKeys, cardOfKey, currentKeys, keysHeld } from '../schema/keysStep'
 import { KEY_FORM, normalKey } from '../../shared/projectKeys'
@@ -152,6 +152,8 @@ interface Conn {
   /** `quiet`: a write the window shows nothing of (the queue runner's lease and processes): no `tasks-changed` for it. */
   write<T>(fn: (db: DatabaseSync) => T, quiet?: boolean): T
   close(): void
+  /** What is committed now, as a token (boardReadToken): reads may be served from a cache while it is the same. Null: never. */
+  token?(): string | null
 }
 
 /**
@@ -161,6 +163,7 @@ interface Conn {
  */
 const boardConn = (ws: WorkspaceService): Conn => ({
   read: (fn) => boardRead(ws, fn),
+  token: () => boardReadToken(ws),
   // A fact (observed ones too) changes what the window shows of a card (its work view, #1223): `tasks-changed` once
   // the change commits.
   write: (fn, quiet) => {
@@ -196,6 +199,7 @@ export function withoutWriteFence<T>(fn: () => T): T {
 /** A connection whose writes check the fence of the work making them, inside each write. */
 const fenced = (c: Conn): Conn => ({
   read: (fn) => c.read(fn),
+  ...(c.token ? { token: () => c.token!() } : {}),
   write: (fn, quiet) =>
     c.write((db) => {
       fences.getStore()?.()
@@ -473,14 +477,36 @@ export class FactStore {
   // --- Facts, rulesets, actions.
 
   facts(card: number): Fact[] {
-    return this.conn.read((db) => (db.prepare('SELECT * FROM card_facts WHERE card = ? ORDER BY seq').all(card) as Record<string, string | number | null>[]).map(factOf))
+    return this.cached(`card:${card}`, () => this.conn.read((db) => (db.prepare('SELECT * FROM card_facts WHERE card = ? ORDER BY seq').all(card) as Record<string, string | number | null>[]).map(factOf)))
   }
 
   /** This project's facts of a kind (or of any of these), in the order written (the queue's order). */
   factsOfKind(kind: FactKind | readonly FactKind[]): Fact[] {
     const kinds = typeof kind === 'string' ? [kind] : kind
     const sql = `SELECT f.* FROM card_facts f JOIN cards c ON c.number = f.card WHERE f.kind IN (${kinds.map(() => '?').join(', ')}) AND c.project = ? ORDER BY f.rowid`
-    return this.conn.read((db) => (db.prepare(sql).all(...kinds, this.scope.project) as Record<string, string | number | null>[]).map(factOf))
+    return this.cached(`kinds:${kinds.join(',')}`, () => this.conn.read((db) => (db.prepare(sql).all(...kinds, this.scope.project) as Record<string, string | number | null>[]).map(factOf)))
+  }
+
+  /**
+   * Facts read since the board last committed anything (HI-1909: each agent's PreToolUse folded every current card's
+   * facts again, about 2,200 short reads a minute with a dozen agents), by what was read. Cleared as soon as anything is
+   * committed (the board's token moves on); never used inside a write, whose reads see its own changes. Each caller gets
+   * its own array; the facts in it are shared, and never changed.
+   */
+  private cache: { token: string; reads: Map<string, Fact[]> } | null = null
+
+  /** What is committed now, as a token (null inside a write, or a store that never caches): a cache of reads is good while it is the same. */
+  readToken(): string | null {
+    return this.conn.token?.() ?? null
+  }
+
+  private cached(key: string, read: () => Fact[]): Fact[] {
+    const token = this.readToken()
+    if (token === null) return read()
+    if (this.cache?.token !== token) this.cache = { token, reads: new Map() }
+    let facts = this.cache.reads.get(key)
+    if (!facts) this.cache.reads.set(key, (facts = read()))
+    return facts.slice()
   }
 
   ruleset(id: string): Ruleset {

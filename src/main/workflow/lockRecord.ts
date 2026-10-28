@@ -56,7 +56,7 @@ export function onLockEvent(e: HiveEvent): void {
   const ws = workspaceOf(projectPath)
   // The agent's current card as the runtime has it (none made yet this launch: none started since), so the same locks
   // held on into the agent's next card are recorded on that one too.
-  const current = workflowNow(ws, projectPath)?.currentCards().get(agentId)
+  const current = workflowNow(ws, projectPath)?.currentCard(agentId)
   const key = `${paths.join('\n')}|${current ? `${current.card.id}:${current.s.cycle}` : ''}`
   if (seen.get(id) === key) return
   seen.set(id, key)
