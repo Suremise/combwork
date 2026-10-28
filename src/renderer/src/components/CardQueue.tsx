@@ -189,7 +189,7 @@ export function CardQueue({ card, view: w, projectPath, short, reveal = 0 }: { c
 /** A return: why (the files for a conflict, the check by name), the output's last lines and Show log, Retry merge. */
 function Returned({ card, q, queue, short, runs, stage, retried }: { card: TaskCard; q: NonNullable<WorkView['queue']>; queue: QueueView | null; short: (id: string) => string; runs: readonly ProgressRun[]; stage: WorkView['stage']; retried: boolean }) {
   const [all, setAll] = useState(false)
-  const recent: QueueRecent = { card: card.number, key: card.key ?? '', title: card.title, entry: q.entry, outcome: 'returned', at: q.at ?? '', ...(q.failure ? { reason: q.failure } : {}), ...(q.transient ? { transient: true } : {}), ...(q.files ? { files: q.files } : {}) }
+  const recent: QueueRecent = { card: card.number, key: card.key ?? '', title: card.title, entry: q.entry, outcome: 'returned', at: q.at ?? '', ...(q.failure ? { reason: q.failure } : {}), ...(q.transient ? { transient: true } : {}), ...(q.files ? { files: q.files } : {}), ...(q.check ? { check: q.check } : {}), ...(q.logPath ? { logPath: q.logPath } : {}) }
   const run = queue ? returnRun(queue, recent, runs) : null
   const why = returnWhy(recent, returnCheck(recent, run), q.target, tr, list)
   const lines = (q.log ?? '').replace(/\s+$/, '').split(/\r?\n/)
