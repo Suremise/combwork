@@ -62,16 +62,22 @@ async function diffTooLarge(ctx) {
   if (await picker.count()) await picker.first().selectOption({ index: (await picker.first().locator('option').count()) - 1 })
   const rows = page.locator('.split-list .pane-body .row')
   const shownFile = page.locator('.split-main .editor-toolbar .path strong').first()
-  // Each row in turn until the diff shown is the big file's (its name, which is the file's own in every language).
+  // Its own row, by the file's name (the same in every language), once the list has it: never each row in turn, which
+  // ran out of time behind the files earlier screens left changed (HI-1914). Clicked again until its diff is the one shown.
+  const own = rows.filter({ hasText: BIG }).first()
+  const started = Date.now()
   const opened = await ctx.lib.until(async () => {
-    const n = await rows.count()
-    for (let i = 0; i < n; i++) {
-      await rows.nth(i).click({ timeout: 2000 }).catch(() => undefined)
-      if (await ctx.lib.until(async () => ((await shownFile.textContent({ timeout: 500 }).catch(() => null)) ?? '').endsWith(BIG), 1500)) return true
-    }
-    return false
+    if (!(await own.count())) return false
+    await own.click({ timeout: 2000 }).catch(() => undefined)
+    return ((await shownFile.textContent({ timeout: 500 }).catch(() => null)) ?? '').endsWith(BIG)
   }, ctx.hungMs)
-  if (!opened) throw new Error('the big file did not show in the Changes tab')
+  // How long finding its diff took, for comparing runs (HI-1914).
+  console.log(`${ctx.lang}: diff-too-large: its diff ${opened ? 'shown' : 'not shown'} after ${Date.now() - started} ms, ${await rows.count()} rows`)
+  if (!opened) {
+    // What the tab showed instead: its rows, the file shown, and the picker's choice.
+    const seen = { rows: await rows.allTextContents().catch(() => []), shown: await shownFile.textContent({ timeout: 500 }).catch(() => null), picker: (await picker.count()) ? await picker.first().inputValue().catch(() => null) : null }
+    throw new Error(`the big file did not show in the Changes tab: ${JSON.stringify(seen).slice(0, 600)}`)
+  }
   await shown(ctx, page.locator('.split-main .editor-host .empty-state'), 'the note in place of its changes')
   return page.locator('.split').first()
 }
