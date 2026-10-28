@@ -251,6 +251,8 @@ async function retryTemplates(ctx) {
   await failing(ctx, '')
   // Two templates to show: the project's agents saved for the workspace and for the project itself.
   for (const scope of ['workspace', 'project']) await ctx.inv('templates:save', ctx.project, scope, 'Pair', true)
+  // The user's name for them, though "Pair" is also a message (a workflow preset's): not English left.
+  ctx.authored('Pair', '.template-row, .template-detail-title')
   await ctx.page.locator('.sidebar .load-failed button').first().click()
   await shown(ctx, ctx.page.locator('.sidebar .template-row'), 'the templates')
 }
