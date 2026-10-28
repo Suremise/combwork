@@ -965,7 +965,7 @@ export async function setMcpServerEnabled(server: Pick<McpServerInfo, 'name' | '
     forAssistant = server.assistant
     const ok = await confirm({
       title: tr(msg({ id: 'mcp.enable.confirmTitle', defaultMessage: 'Turn on {name}?', description: 'Title of the confirmation before an MCP server is turned on in the workspace. {name} is the server.' }), { name: server.name }),
-      message: tr(msg({ id: 'mcp.enable.confirmMessage', defaultMessage: 'New sessions in the projects you tick start it. It runs:', description: 'The confirmation before an MCP server is turned on in the workspace, above the command it runs and the projects to tick.' })),
+      message: tr(msg({ id: 'mcp.enable.confirmMessage', defaultMessage: 'New sessions start it wherever you tick. It runs:', description: 'The confirmation before an MCP server is turned on in the workspace, above the command it runs and the projects (and the Hive Assistant) to tick.' })),
       list: server.runs,
       content: createElement(McpProjectPicker, {
         projects,

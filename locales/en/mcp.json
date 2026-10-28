@@ -36,8 +36,8 @@
     "description": "Button: turns the MCP server on in the workspace and the projects ticked."
   },
   "mcp.enable.confirmMessage": {
-    "defaultMessage": "New sessions in the projects you tick start it. It runs:",
-    "description": "The confirmation before an MCP server is turned on in the workspace, above the command it runs and the projects to tick."
+    "defaultMessage": "New sessions start it wherever you tick. It runs:",
+    "description": "The confirmation before an MCP server is turned on in the workspace, above the command it runs and the projects (and the Hive Assistant) to tick."
   },
   "mcp.enable.confirmTitle": {
     "defaultMessage": "Turn on {name}?",

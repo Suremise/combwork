@@ -8,7 +8,7 @@
   "mcp.enable.all": "Tous",
   "mcp.enable.assistant": "Assistant Hive",
   "mcp.enable.confirmButton": "Activer",
-  "mcp.enable.confirmMessage": "Les nouvelles sessions des projets que tu coches le démarrent. Il exécute :",
+  "mcp.enable.confirmMessage": "Les nouvelles sessions le démarrent partout où vous cochez. Il exécute :",
   "mcp.enable.confirmTitle": "Activer {name} ?",
   "mcp.enable.noProjects": "L’espace de travail n’a pas encore de projet : active-le dans l’onglet MCP d’un projet dès qu’il y en a un.",
   "mcp.enable.none": "Aucun",

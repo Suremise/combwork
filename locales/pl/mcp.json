@@ -8,7 +8,7 @@
   "mcp.enable.all": "Wszystkie",
   "mcp.enable.assistant": "Asystent Hive",
   "mcp.enable.confirmButton": "Włącz",
-  "mcp.enable.confirmMessage": "Uruchomią go nowe sesje w zaznaczonych projektach. Uruchamia:",
+  "mcp.enable.confirmMessage": "Nowe sesje uruchamiają go wszędzie, gdzie zaznaczysz. Uruchamia:",
   "mcp.enable.confirmTitle": "Włączyć {name}?",
   "mcp.enable.noProjects": "Obszar roboczy nie ma jeszcze projektów: włącz go w zakładce MCP projektu, gdy jakiś się pojawi.",
   "mcp.enable.none": "Żaden",

@@ -8,7 +8,7 @@
   "mcp.enable.all": "全部",
   "mcp.enable.assistant": "Hive 助手",
   "mcp.enable.confirmButton": "启用",
-  "mcp.enable.confirmMessage": "你勾选的项目中的新会话会启动它。它运行：",
+  "mcp.enable.confirmMessage": "在你勾选的地方，新会话都会启动它。它运行：",
   "mcp.enable.confirmTitle": "启用 {name}？",
   "mcp.enable.noProjects": "工作区还没有项目：有项目后，在该项目的“MCP”标签页中启用它。",
   "mcp.enable.none": "无",

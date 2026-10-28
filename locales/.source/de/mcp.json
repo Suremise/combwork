@@ -12,7 +12,7 @@
   "mcp.enable.all": "All",
   "mcp.enable.assistant": "Hive Assistant",
   "mcp.enable.confirmButton": "Turn On",
-  "mcp.enable.confirmMessage": "New sessions in the projects you tick start it. It runs:",
+  "mcp.enable.confirmMessage": "New sessions start it wherever you tick. It runs:",
   "mcp.enable.confirmTitle": "Turn on {name}?",
   "mcp.enable.noProjects": "The workspace has no projects yet: turn it on in a project's MCP tab once there is one.",
   "mcp.enable.none": "None",

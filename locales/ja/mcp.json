@@ -8,7 +8,7 @@
   "mcp.enable.all": "すべて",
   "mcp.enable.assistant": "Hive アシスタント",
   "mcp.enable.confirmButton": "オンにする",
-  "mcp.enable.confirmMessage": "チェックしたプロジェクトの新しいセッションで起動します。実行するコマンド：",
+  "mcp.enable.confirmMessage": "チェックしたところの新しいセッションで起動します。実行するコマンド：",
   "mcp.enable.confirmTitle": "{name}をオンにしますか？",
   "mcp.enable.noProjects": "ワークスペースにはまだプロジェクトがありません。プロジェクトができたら、その「MCP」タブでオンにしてください。",
   "mcp.enable.none": "なし",

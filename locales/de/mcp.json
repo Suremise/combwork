@@ -8,7 +8,7 @@
   "mcp.enable.all": "Alle",
   "mcp.enable.assistant": "Hive-Assistent",
   "mcp.enable.confirmButton": "Einschalten",
-  "mcp.enable.confirmMessage": "Neue Sitzungen in den angehakten Projekten starten diesen Server. Er führt aus:",
+  "mcp.enable.confirmMessage": "Neue Sitzungen starten ihn überall, wo du ein Häkchen setzt. Er führt aus:",
   "mcp.enable.confirmTitle": "{name} einschalten?",
   "mcp.enable.noProjects": "Der Arbeitsbereich hat noch keine Projekte: Schalte den Server im Tab „MCP“ eines Projekts ein, sobald es eines gibt.",
   "mcp.enable.none": "Keine",
