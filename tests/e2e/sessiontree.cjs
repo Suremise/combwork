@@ -15,6 +15,8 @@ const path = require('path')
 const { sessionsOf, putSessions } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
+// The whole list held 20 s by the test seam below, then read: a bound for a hung read beyond that.
+const HELD_LIST_HUNG_MS = 40000
 
 const userData = path.join(lib.WORK, 'sessiontree-profile')
 const ws = path.join(lib.WORK, 'sessiontree-ws')
@@ -136,7 +138,51 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   const terminalFile = path.join(claudeHome, 'projects', alpha.replace(/[^a-zA-Z0-9]/g, '-'), `${C.terminal}.jsonl`)
   write(terminalFile, claudeLines(C.terminal, 2, 'Started in a terminal') + JSON.stringify({ type: 'custom-title', customTitle: 'From the terminal' }) + '\n')
 
+  // HI-1941: what the Archived box's row says, at the list's narrowest width (the resizer's least), in English and German,
+  // both themes: it wraps under the box, never past the list's edge. Screenshots for the Assistant's OK.
+  const list = page.locator('.sessions-list')
+  const DE = path.join(lib.ROOT, 'locales', 'de')
+  const german = Object.assign({}, ...fs.readdirSync(DE).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(DE, f), 'utf8'))))
+  const base = (await inv('app:info')).language
+  /** The window shown in a language, as main sends a change of language (i18nlive's way). */
+  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+  const archivedBox = () => page.locator('.sessions-filters label').innerText().catch(() => '')
+  const narrowShots = async (name, el) => {
+    const width = await list.evaluate((e) => e.style.width)
+    await list.evaluate((e) => (e.style.width = '200px'))
+    await lib.until(async () => Math.round((await list.boundingBox()).width) === 200, HUNG_MS)
+    for (const [lang, language, label] of [['en', base, 'Archived'], ['de', { ...base, code: 'de', locale: 'de', messages: german }, german['sessions.filter.archived']]]) {
+      await speak(language)
+      await lib.until(async () => (await archivedBox()).trim() === label, HUNG_MS)
+      for (const theme of ['dark', 'light']) {
+        await inv('settings:update', { appearance: { theme } })
+        await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+        const fits = await el.evaluate((e) => {
+          const edge = e.closest('.sessions-list').getBoundingClientRect().right
+          const filters = e.parentElement
+          return e.getBoundingClientRect().right <= edge + 0.5 && filters.scrollWidth <= filters.clientWidth
+        })
+        check(`${name} at 200 px (${lang}, ${theme}): within the list, under the Archived box when it doesn't fit`, fits, await el.innerText().catch(() => ''))
+        await list.screenshot({ path: path.join(lib.WORK, `sessiontree-narrow-${name}-${lang}-${theme}.png`) })
+      }
+    }
+    await speak(base)
+    await lib.until(async () => (await archivedBox()).trim() === 'Archived', HUNG_MS)
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+    await list.evaluate((e, w) => (e.style.width = w), width)
+  }
+  // The whole list's first read held (its session:list, asked before Hive's own), so the note stays while it is shot.
+  await app.evaluate(() => {
+    process.env.HIVE_TEST_SLOW_IPC = 'session:list=20000*1'
+  })
   await page.locator('.tab', { hasText: 'Sessions' }).click()
+  const note = page.locator('.sessions-scope[data-loading="others"]')
+  check('the note shows while the sessions started outside Hive are read', !!(await lib.until(async () => (await note.count()) === 1, HUNG_MS)))
+  await narrowShots('loading', note)
+  check('…and goes once they are read', !!(await lib.until(async () => (await note.count()) === 0, HELD_LIST_HUNG_MS)))
+  await app.evaluate(() => {
+    delete process.env.HIVE_TEST_SLOW_IPC
+  })
   const tree = page.locator('.sessions-tree')
   const row = (name) => page.locator('.sessions-tree .session-row', { hasText: name })
   const branch = (label) => page.locator('.sessions-tree .session-branch', { has: page.locator('.label', { hasText: new RegExp(`^${label.replace(/[()]/g, '\\$&')}$`) }) })
@@ -208,6 +254,35 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   await lib.until(async () => (await page.locator('.sessions-tree .search-hit').count()) > 0, 10000)
   check('search finds transcript text, with the match under its session', JSON.stringify(await names()) === JSON.stringify(['Old notes']) && /zebra/i.test(await page.locator('.sessions-tree .search-hit').first().innerText()), JSON.stringify(await names()))
   check('the count says how many sessions and matches', /1 session · \d+ match/.test(await page.locator('.sessions-scope').innerText()), await page.locator('.sessions-scope').innerText())
+  await narrowShots('count', page.locator('.sessions-scope'))
+  // Longer counts, as the catalogues word them (HR1's HI-1941 round 1: Japanese and Spanish at 200 px ran past the edge),
+  // put into the count itself: each stays within the list, wrapping when it must.
+  {
+    const { IntlMessageFormat } = require('intl-messageformat')
+    const said = (code, values) => new IntlMessageFormat(JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', code, 'sessions.json'), 'utf8'))['sessions.search.count'], code).format(values)
+    const countEl = page.locator('.sessions-scope')
+    const width = await list.evaluate((e) => e.style.width)
+    await list.evaluate((e) => (e.style.width = '200px'))
+    await lib.until(async () => Math.round((await list.boundingBox()).width) === 200, HUNG_MS)
+    for (const [code, values] of [
+      ['ja', { kind: 'session', sessions: 200, hits: 8000, more: '+' }],
+      ['es', { kind: 'conversation', sessions: 12, hits: 40, more: '+' }],
+      ['de', { kind: 'session', sessions: 1200, hits: 8000, more: '+' }]
+    ]) {
+      const text = said(code, values)
+      const was = await countEl.evaluate((e) => e.textContent)
+      const fits = await countEl.evaluate((e, t) => {
+        e.textContent = t
+        const edge = e.closest('.sessions-list').getBoundingClientRect().right
+        const filters = e.parentElement
+        return e.getBoundingClientRect().right <= edge + 0.5 && filters.scrollWidth <= filters.clientWidth
+      }, text)
+      check(`a longer count at 200 px (${code}: ${text}) stays within the list`, fits, text)
+      await list.screenshot({ path: path.join(lib.WORK, `sessiontree-narrow-longcount-${code}-dark.png`) })
+      await countEl.evaluate((e, t) => (e.textContent = t), was)
+    }
+    await list.evaluate((e, w) => (e.style.width = w), width)
+  }
   await search.fill('')
   await lib.until(async () => (await names()).length > 1, 5000)
 
