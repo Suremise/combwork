@@ -99,6 +99,8 @@ import { initUpdater, installNow, installsOnQuit } from './updater'
 import { flushMetrics } from './metrics'
 import { watchMainStalls } from './mainStalls'
 import { fileHolders } from './fileHolders'
+import { onAgentStartChange, startSeq } from './agentStarts'
+import { agentStartOf, withAgentStarts } from './cardStall'
 import { createWorkspaceService, disposeWorkspaceService, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
 import { closeWithCommand, quitCommandPlanned, quitRunsAny, runQuitCommand, type RunOutcome } from './closeCommand/closeCommands'
 import { journalSettingsOf } from './journalService'
@@ -929,7 +931,14 @@ app.whenReady().then(async () => {
   setInterval(archiveOldDoneEverywhere, 3_600_000).unref()
   setInterval(queueCleanupEverywhere, CARD_CLEANUP_EVERY_MS).unref()
 
-  workspace.setLiveProvider((p, cfg, scope) => sessions.liveInfo(p, cfg, scope))
+  // Each agent's start as main's stall check reads it (HI-1977), so the board's Stalled mark agrees; a change is told at
+  // once, before the card's move it comes with (a refresh of the project came after it, and the mark showed meanwhile),
+  // and the project read again so its kept info (a window loading it) has it too.
+  workspace.setLiveProvider(async (p, cfg, scope) => withAgentStarts(p, await sessions.liveInfo(p, cfg, scope)))
+  onAgentStartChange((p, agentId) => {
+    emit({ type: 'agent-start', projectPath: p, agentId, start: agentStartOf(p, agentId) ?? null, seq: startSeq() })
+    workspaceFor(p)?.scheduleRefresh()
+  })
   sessions.apiEnv = apiEnv
   // hive-progress on every session's PATH (#137): shims in Hive's bin folder, timings beside them.
   void installShims(join(app.getPath('userData'), 'bin'), { exec: process.execPath, script: unpackedScript('hive-progress.js'), data: join(app.getPath('userData'), 'progress') }).then((dir) => {

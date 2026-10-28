@@ -5,7 +5,7 @@ import { gitProblemText } from '@shared/gitTool'
 import { agentRuntime, hooksMissingText } from '@shared/runtime'
 import { LOOP_STEP_WAIT_MINUTES } from '@shared/lanes'
 import { projectInfoPreferences } from '@shared/workflow/preferences'
-import { COLUMN_TEXT, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, cardMatches, newSinceStart, archivedAt, columnColor, columnName, laneOrderWaitReason, loopStepWait, loopStepWaitReason, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stalledReason, taskOverview, type BoardFoldChange, type LaneOrderView } from '@shared/tasks'
+import { COLUMN_TEXT, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, cardMatches, newSinceStart, archivedAt, columnColor, columnName, laneOrderWaitReason, loopStepWait, loopStepWaitReason, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stallAgentOf, stalledReason, startFailedReason, taskOverview, type BoardFoldChange, type LaneOrderView } from '@shared/tasks'
 import { enabledProviders, isProviderEnabled, projectDefaultProvider, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
@@ -131,7 +131,9 @@ function stallAgentsNow(projects: ProjectInfo[]): ReturnType<typeof stallAgentsO
 /** Why the card is stalled (cardStalled), in the window's language, and which kind of stall it is. */
 function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | null): { text: string; kind: StallKind } | null {
   const { agent } = cardAgent(projects, c)
-  const nobody = stalledReason(c, agent ? { name: agent.name, running: !!agent.live } : null, tr)
+  // Main's start state (HI-1977): an agent starting isn't stalled, one whose start failed says why.
+  const now = agent ? stallAgentOf(agent) : null
+  const nobody = startFailedReason(c, now, tr) ?? stalledReason(c, now, tr)
   if (nobody) return { text: nobody, kind: 'nobody' }
   const { loopers, watchers } = stallAgentsNow(projects)
   const looping = notWatchingReason(c, loopers, tr)

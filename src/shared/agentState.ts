@@ -41,12 +41,12 @@ export function agentState(live: StateFields | null | undefined, extras: AgentSt
 
 /**
  * What the board says of an agent: a card it has in Doing or Review blocked on the user, or one in Doing while it isn't
- * running (the board's stalledReason for an agent still there).
+ * running (the board's stalledReason for an agent still there): one whose start is under way isn't (HI-1977).
  */
-export function boardExtras(projectName: string, agent: Pick<AgentInfo, 'id' | 'live'>, cards: readonly Pick<TaskCard, 'project' | 'agent' | 'column' | 'blocked' | 'archived'>[]): AgentStateExtras {
+export function boardExtras(projectName: string, agent: Pick<AgentInfo, 'id' | 'live' | 'start'>, cards: readonly Pick<TaskCard, 'project' | 'agent' | 'column' | 'blocked' | 'archived'>[]): AgentStateExtras {
   const name = projectName.toLowerCase()
   const mine = cards.filter((c) => !c.archived && c.agent === agent.id && c.project.toLowerCase() === name && (c.column === 'doing' || c.column === 'review'))
-  return { blocked: mine.some((c) => !!c.blocked), stalled: !agent.live && mine.some((c) => c.column === 'doing') }
+  return { blocked: mine.some((c) => !!c.blocked), stalled: !agent.live && !(agent.start && 'starting' in agent.start) && mine.some((c) => c.column === 'doing') }
 }
 
 /**

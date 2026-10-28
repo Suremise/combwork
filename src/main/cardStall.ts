@@ -1,13 +1,13 @@
 import { basename, join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { agentRuntime } from '../shared/runtime'
-import { columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, type LaneOrderView } from '../shared/tasks'
-import type { TaskCard } from '../shared/types'
+import { columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, type LaneOrderView, type StallAgent } from '../shared/tasks'
+import type { AgentInfo, AgentStart, TaskCard } from '../shared/types'
 import { LOOP_STEP_WAIT_MINUTES } from '../shared/lanes'
 import { projectPreferences } from './workflow/preferences'
 import { queueReturnOf, staleApprovalOf } from './queueReturn'
 import { isResuming } from './restartResume'
-import { startNow } from './agentStarts'
+import { startNow, startSeq } from './agentStarts'
 import { sessions } from './sessions'
 import { workspaceOf, type WorkspaceService } from './workspace'
 
@@ -105,12 +105,7 @@ function liveOf(wsPath: string): { name: string; project: string; agentId: strin
     .map((s) => ({ name: s.agentName ?? s.agentId, project: basename(s.projectPath), agentId: s.agentId, notWatching: s.notWatching, untaken: !!s.untakenLine, cards: s.watch?.cards ?? [], watchSince: s.watch?.since, status: s.status, silentMinutes: agentRuntime(s).silentMinutes }))
 }
 
-/** A card's agent as the stall check reads it: its name, whether it runs, and why its start failed when it does (HI-1976). */
-export interface StallAgent {
-  name: string
-  running: boolean
-  failed?: string | null
-}
+export type { StallAgent }
 
 /**
  * An agent as it is now, for the stall check: running while its session runs, while this run's restart resume will
@@ -123,10 +118,29 @@ export function agentNowOf(projectPath: string, agentId: string, name: string): 
   return { name, running, ...(!running && start.failed ? { failed: start.failed } : {}) }
 }
 
-/** A Doing card's agent whose start failed (HI-1976): stalled with the failure, which "isn't running" would hide. Agent-facing. */
-function startFailedReason(c: Pick<TaskCard, 'column' | 'archived' | 'agent'>, agentNow: StallAgent | null): string | null {
-  if (c.archived || c.column !== 'doing' || !c.agent || !agentNow || agentNow.running || !agentNow.failed) return null
-  return `${agentNow.name}'s start failed: ${agentNow.failed}` // i18n-ignore: agent-facing (the Agent API's stalled)
+/**
+ * The agent's start as the window's agent info carries it (HI-1977), so the board's Stalled mark agrees with this check:
+ * starting while agentNowOf has it running with no session yet, else why its last start failed.
+ */
+export function agentStartOf(projectPath: string, agentId: string): AgentStart | undefined {
+  const now = agentNowOf(projectPath, agentId, '')
+  if (now.failed) return { failed: now.failed }
+  return now.running && !sessions.liveFor(projectPath, agentId) ? { starting: true } : undefined
+}
+
+/**
+ * A project's agents with their starts (agentStartOf), for its ProjectInfo, each with the count of start changes they
+ * were read at (`startSeq`): the window keeps a change it was told later than that (an older read reaching it after).
+ */
+export function withAgentStarts<T extends { agents: AgentInfo[] }>(projectPath: string, info: T): T {
+  const startsAt = startSeq()
+  return {
+    ...info,
+    agents: info.agents.map((a) => {
+      const start = agentStartOf(projectPath, a.id)
+      return { ...a, startSeq: startsAt, ...(start ? { start } : {}) }
+    })
+  }
 }
 
 /**
