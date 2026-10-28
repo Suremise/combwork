@@ -1332,6 +1332,8 @@ class SessionManager {
   }
 
   private async effectiveHere(projectPath: string, agent: AgentDef | undefined, reads: LaunchReads, readPc?: ProjectConfig): Promise<EffectiveSettings> {
+    // A workspace still opening moves its MCP settings first (HI-1472): never a launch without what that gives it.
+    await workspace.mcpSettled()
     const s = config.settings
     let pc = readPc ?? (await workspace.projectConfig(projectPath))
     const assistant = workspace.isAssistantHome(projectPath)

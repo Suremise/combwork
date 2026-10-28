@@ -5,7 +5,7 @@
 // moves once per workspace, before the Assistant can start: a new workspace gets none. Each case has workspaces of its own.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -126,6 +126,36 @@ describe("the Assistant's MCP servers move from the old Advanced switch (HI-1472
     expect(advanced.legacy('hive.assistant.otherMcpServers')).toBe(true)
     await advanced.resetAll()
     expect(json(join(profile, 'advanced.json')).values['hive.assistant.otherMcpServers']).toBe(true)
+  })
+
+  it('an Assistant launch worked out while the move is held waits for it, and gets what it moves', async () => {
+    legacySwitch(true)
+    const { ws } = oldWorkspace()
+    const w = createWorkspaceService()
+    // The move held until released: the open is under way, the workspace's path already set.
+    let release = (): void => {}
+    const held = new Promise<void>((r) => (release = r))
+    let entered = false
+    const inner = w as unknown as { migrateAssistantMcp: (fresh: boolean) => Promise<void> }
+    const original = inner.migrateAssistantMcp.bind(w)
+    inner.migrateAssistantMcp = async (fresh: boolean) => {
+      entered = true
+      await held
+      return original(fresh)
+    }
+    const opening = w.open(ws)
+    try {
+      await vi.waitFor(() => expect(entered).toBe(true), { timeout: 15000 })
+      // Started while the move is held: without waiting for it, it would read no choices and give none.
+      const launch = assistantGets(w)
+      release()
+      expect(await launch).toEqual(['notes', 'sandbox'])
+      await opening
+    } finally {
+      release()
+      await opening.catch(() => undefined)
+      await disposeWorkspaceService(w)
+    }
   })
 
   it('a choice saved while the move is under way wins over it', async () => {

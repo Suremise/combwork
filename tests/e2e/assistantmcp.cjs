@@ -89,12 +89,12 @@ const check = (name, ok, extra = '') => {
     const group = enable.getByRole('group', { name: 'Projects to turn it on in' })
     check("extra's enable dialog lists the Hive Assistant after the projects, unticked", !!(await lib.until(async () => (await group.getByRole('checkbox', { name: 'Hive Assistant', exact: true }).count()) === 1, HUNG_MS)) && !(await group.getByRole('checkbox', { name: 'Hive Assistant', exact: true }).isChecked()) && (await group.locator('label').last().getAttribute('data-assistant')) !== null)
     await shots('enable')
-    // All and None are the projects': the Assistant only ever by its own box.
-    await enable.getByRole('button', { name: 'All', exact: true }).click()
-    check('…All ticks the projects, not the Assistant', (await group.getByRole('checkbox', { name: 'demo', exact: true }).isChecked()) && !(await group.getByRole('checkbox', { name: 'Hive Assistant', exact: true }).isChecked()))
+    // All projects and No projects: the Assistant only ever by its own box.
+    await enable.getByRole('button', { name: 'All projects', exact: true }).click()
+    check('…All projects ticks the projects, not the Assistant', (await group.getByRole('checkbox', { name: 'demo', exact: true }).isChecked()) && !(await group.getByRole('checkbox', { name: 'Hive Assistant', exact: true }).isChecked()))
     await group.getByRole('checkbox', { name: 'Hive Assistant', exact: true }).check()
-    await enable.getByRole('button', { name: 'None', exact: true }).click()
-    check('…and None unticks them, leaving the Assistant as ticked', !(await group.getByRole('checkbox', { name: 'demo', exact: true }).isChecked()) && (await group.getByRole('checkbox', { name: 'Hive Assistant', exact: true }).isChecked()))
+    await enable.getByRole('button', { name: 'No projects', exact: true }).click()
+    check('…and No projects unticks them, leaving the Assistant as ticked', !(await group.getByRole('checkbox', { name: 'demo', exact: true }).isChecked()) && (await group.getByRole('checkbox', { name: 'Hive Assistant', exact: true }).isChecked()))
     await enable.getByRole('button', { name: 'Cancel' }).click()
     check('…cancelled, nothing changes', !!(await lib.until(async () => (await enable.count()) === 0, HUNG_MS)) && !wsMcp().enabled.includes('extra') && JSON.stringify(wsMcp().assistant) === '["notes"]')
 

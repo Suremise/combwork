@@ -1273,7 +1273,7 @@ Hive approves only its own `hive` tools in advance, for every CLI (for the Assis
 
 A server in the workspace is **available** to every project, and runs in a project only when it is **on in the workspace and on in that project**, so a big server you need in one project doesn't fill every other project's agents' context with its tools. A server you add starts off everywhere.
 
-- **In the workspace:** the switch beside a server in the MCP view (**Workspace** in the server's own view) is its master switch. Turning it on shows what the server runs and asks which projects to turn it on in: the selected project, and any project that had it on before, are ticked; **All** and **None** tick or untick every project. Turning it off turns it off everywhere at once, and each project keeps its choice, so turning it on again shows the same projects ticked.
+- **In the workspace:** the switch beside a server in the MCP view (**Workspace** in the server's own view) is its master switch. Turning it on shows what the server runs and asks which projects to turn it on in: the selected project, and any project that had it on before, are ticked; **All projects** and **No projects** tick or untick every project. Turning it off turns it off everywhere at once, and each project keeps its choice, so turning it on again shows the same projects ticked.
 - **In a project:** its **MCP** tab lists every workspace server with that project's own switch. Turn on the ones that project's agents need. While a server is off in the workspace, its row there is greyed and says **Off in the workspace**: the project's switch keeps its state, but no session gets the server until the workspace turns it on.
 
 New projects start with every server off. Each server in the MCP view says where it runs ("On in Amberlight", "On in Amberlight and for the Hive Assistant", "On for the Hive Assistant only", "On in no project", "Off in the workspace"). Sessions of every provider use **only** the servers on in the workspace and in their project.
@@ -1286,7 +1286,7 @@ If a project has its own `.mcp.json` (or, for Codex, `.codex/config.toml` server
 
 The Hive Assistant gets a workspace server the way a project does: only while it is **on in the workspace and on for the Assistant**. It starts with none, so a server with personal notes, say, can reach the Assistant and no project's agents.
 
-- **When you turn a server on in the workspace,** the list of projects to tick ends with **Hive Assistant**, unticked unless the Assistant had it on before. **All** and **None** tick and untick the projects only.
+- **When you turn a server on in the workspace,** the list of projects to tick ends with **Hive Assistant**, unticked unless the Assistant had it on before. **All projects** and **No projects** leave it as it is.
 - **In Settings → Assistant, MCP servers (this workspace)** lists the workspace's servers with the Assistant's own switch. Turning one on shows what it runs first. A server off in the workspace is greyed there and says **Off in the workspace**: turn it on in the MCP view first. The Assistant keeps its choice while the workspace has a server off.
 - **It applies from the Assistant's next session;** a running Assistant shows that it needs a restart.
 

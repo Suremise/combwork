@@ -24,8 +24,8 @@
     "description": "An error's title: turning an MCP server on or off for the Hive Assistant failed."
   },
   "mcp.enable.all": {
-    "defaultMessage": "All",
-    "description": "The MCP server enable dialog: a button that ticks every project."
+    "defaultMessage": "All projects",
+    "description": "The MCP server enable dialog: a button that ticks every project (not the Hive Assistant, which has its own box)."
   },
   "mcp.enable.assistant": {
     "defaultMessage": "Hive Assistant",
@@ -48,8 +48,8 @@
     "description": "The MCP server enable dialog when the workspace has no projects to choose."
   },
   "mcp.enable.none": {
-    "defaultMessage": "None",
-    "description": "The MCP server enable dialog: a button that unticks every project."
+    "defaultMessage": "No projects",
+    "description": "The MCP server enable dialog: a button that unticks every project (not the Hive Assistant, which has its own box)."
   },
   "mcp.enable.projects": {
     "defaultMessage": "Turn on in",

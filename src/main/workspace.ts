@@ -350,6 +350,8 @@ export class WorkspaceService {
       }
       await this.close()
       this.generation++
+      // Launches wait until this open has moved its MCP settings (HI-1472): the path is the workspace's from now on.
+      this.mcpMoving = gate()
       this.path = abs
       this.place = placeKey(abs)
       // Its databases are kept open from now on, by this place (#1395); a save's lease doesn't close the database now it
@@ -361,9 +363,11 @@ export class WorkspaceService {
     // An open that fails from here gives back what it took (its admission, what it opened), unless another open or a
     // close of this window has taken over meanwhile.
     const gen = this.generation
+    const moving = this.mcpMoving
     try {
       return await this.opened(abs)
     } catch (e) {
+      moving.done()
       if (this.generation === gen && this.path === abs) await this.close().catch((c) => log.warn('closing a workspace whose open failed', c))
       throw e
     }
@@ -416,6 +420,7 @@ export class WorkspaceService {
       await this.migrateMcpModel().catch((e) => log.warn('moving the MCP settings to the workspace and project switches', e))
       // Before the Assistant can start (HI-1472): its own MCP choices, from the old Advanced switch or none.
       await this.migrateAssistantMcp(fresh).catch((e) => log.warn("moving the Assistant's MCP servers to its own choices", e))
+      this.mcpMoving.done()
       done('MCP settings') // i18n-ignore: a part of a log line's timing
     } finally {
       // Ended either way: an open that fails here leaves none of it going (its close follows).
@@ -475,7 +480,17 @@ export class WorkspaceService {
     }
   }
 
+  /**
+   * This open's MCP settings moved to their current model (#1093, HI-1472's Assistant choices): a launch's settings are
+   * worked out only after it, so one started while the workspace is opening never misses what the move gives it.
+   */
+  mcpSettled(): Promise<void> {
+    return this.mcpMoving.promise
+  }
+  private mcpMoving = gate(true)
+
   async close(): Promise<void> {
+    this.mcpMoving.done()
     // Its skills and modes still being brought up to date (HI-1705) finish first: they are written into this workspace's
     // .hive, by the path this service has until it closes. Only while they are going (HI-1747): an await of nothing would
     // let in what starts before the abort below, which a close with no closing tasks has always refused at once.
@@ -1633,6 +1648,13 @@ export function createWorkspaceService(): WorkspaceService {
   const w = new WorkspaceService()
   services.add(w)
   return w
+}
+
+/** A promise to wait on until `done()` (at once when `open` is true); done more than once is harmless. */
+function gate(open = false): { promise: Promise<void>; done: () => void } {
+  let done = (): void => {}
+  const promise = open ? Promise.resolve() : new Promise<void>((r) => (done = r))
+  return { promise, done: () => done() }
 }
 
 /** Closes a window's workspace and forgets its service. */

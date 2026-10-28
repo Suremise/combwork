@@ -30,10 +30,10 @@ export function McpProjectPicker({ projects, initial, assistant, warnings, onCha
         <strong>{tr(msg({ id: 'mcp.enable.projects', defaultMessage: 'Turn on in', description: 'The MCP server enable dialog: the label above the projects to tick.' }))}</strong>
         <span style={{ flex: 1 }} />
         <button type="button" className="btn small subtle" onClick={() => pick(projects.map((p) => p.path), forAssistant)}>
-          {tr(msg({ id: 'mcp.enable.all', defaultMessage: 'All', description: 'The MCP server enable dialog: a button that ticks every project.' }))}
+          {tr(msg({ id: 'mcp.enable.all', defaultMessage: 'All projects', description: 'The MCP server enable dialog: a button that ticks every project (not the Hive Assistant, which has its own box).' }))}
         </button>
         <button type="button" className="btn small subtle" onClick={() => pick([], forAssistant)}>
-          {tr(msg({ id: 'mcp.enable.none', defaultMessage: 'None', description: 'The MCP server enable dialog: a button that unticks every project.' }))}
+          {tr(msg({ id: 'mcp.enable.none', defaultMessage: 'No projects', description: 'The MCP server enable dialog: a button that unticks every project (not the Hive Assistant, which has its own box).' }))}
         </button>
       </div>
       <div className="choice-list" role="group" aria-label={tr(msg({ id: 'mcp.enable.projectsLabel', defaultMessage: 'Projects to turn it on in', description: 'Accessible name of the list of projects to tick in the MCP server enable dialog.' }))}>
