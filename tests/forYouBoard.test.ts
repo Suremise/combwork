@@ -765,6 +765,43 @@ describe("a decision that answers a card's open requests (HI-1932)", () => {
     expect(forYou(w).items.map((i) => i.request)).toEqual([ids[2]])
   })
 
+  it("a card's own requests are read from its rows only, never the whole board's (HR1 r1: the Agent API lists them per card)", async () => {
+    const { w, card, ids } = await asked()
+    // Others with a question each, so a whole-board read would show in the rows read.
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    const others: number[] = []
+    for (let i = 0; i < 8; i++) {
+      const other = await create(w)
+      await inWorkspace(w, () => wf.askTheUser(`#${other}`, 'agent:a1', { kind: 'decide', text: `Other ${i}?` }))
+      others.push(other)
+    }
+    const { forYouOfCards, forgetForYou } = await import('../src/main/workflow/cardWork')
+    const { StatementSync } = await import('node:sqlite')
+    // The most rows any statement may give: the two cards' facts.
+    const bound = facts(w, card).length + facts(w, others[3]).length
+    const read: { sql: string; rows: number }[] = []
+    const all = StatementSync.prototype.all
+    const spy = vi.spyOn(StatementSync.prototype, 'all').mockImplementation(function (this: import('node:sqlite').StatementSync, ...args: Parameters<typeof all>) {
+      const rows = all.apply(this, args)
+      read.push({ sql: this.sourceSQL, rows: rows.length })
+      return rows
+    })
+    try {
+      forgetForYou(w)
+      const got = forYouOfCards(w, [card, others[3]])
+      expect([...got.keys()]).toEqual([card, others[3]])
+      expect(got.get(card)!.map((i) => i.request)).toEqual(ids)
+      // Each statement read the two cards' rows and facts at most: none every live card's.
+      expect(read.length).toBeGreaterThan(0)
+      for (const r of read) expect(r.rows, r.sql).toBeLessThanOrEqual(bound)
+      expect(read.some((r) => /WHERE archived = 0 ORDER BY number/.test(r.sql) && !/json_each/.test(r.sql))).toBe(false)
+    } finally {
+      spy.mockRestore()
+    }
+    // The same as For you's own, for those cards.
+    expect(forYouOfCards(w, [card]).get(card)).toEqual(forYou(w).items.filter((i) => i.card === card))
+  })
+
   it('under the write, a request closed between the check and the write refuses it whole: no decision, no answer', async () => {
     const { w, card, ids } = await asked()
     const { Workflow } = await import('../src/main/workflow/runtime')

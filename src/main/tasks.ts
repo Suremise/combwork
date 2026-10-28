@@ -1957,6 +1957,17 @@ const DECIDE = {
 }
 
 /**
+ * Who may send a decision's `answers` and its shape (HI-1932), checked before anything is written: the user's or the
+ * Assistant's only; 1 to DECISION_ANSWERS_MAX ids, each a string as sent (never coerced); `wrong` when anything else
+ * comes with it or the decision is missing. The Agent API checks its raw body with it too, as some of its fields
+ * (kind, skipReview, attachments) are changed outside the card's patch.
+ */
+export function checkDecisionAnswers(actor: TaskActor, answers: unknown, wrong: boolean): asserts answers is string[] {
+  if (actor.kind !== 'user' && actor.kind !== 'assistant') throw new TaskPermissionError(DECIDE.agents)
+  if (wrong || !Array.isArray(answers) || !answers.length || answers.length > DECISION_ANSWERS_MAX || answers.some((x) => typeof x !== 'string' || !x.trim() || x.length > 64)) throw hiveError(DECIDE.shape, { max: DECISION_ANSWERS_MAX }, { kind: 'invalid' })
+}
+
+/**
  * A decision the user made answers some of a card's open requests (HI-1932, Darren's decision of 28 Oct: the Assistant
  * records it naming the requests it answers, and Hive closes them). The user's or the Assistant's only, never an
  * agent's: no agent closes its own request. `answers`: 1 to DECISION_ANSWERS_MAX request ids (duplicates once), with a
@@ -1967,12 +1978,9 @@ const DECIDE = {
  */
 async function decideAndAnswer(n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3] = {}): Promise<TaskCard> {
   const ws = workspace
-  if (actor.kind !== 'user' && actor.kind !== 'assistant') throw new TaskPermissionError(DECIDE.agents)
   const { answers, decision, ...rest } = patch
-  const shape = (): HiveError => hiveError(DECIDE.shape, { max: DECISION_ANSWERS_MAX }, { kind: 'invalid' })
   const t = typeof decision === 'string' ? text(decision, MAX_DECISION, 'decision').trim() : ''
-  const others = Object.entries(rest).some(([, v]) => v !== undefined) || !!opts.comment
-  if (!Array.isArray(answers) || !answers.length || answers.length > DECISION_ANSWERS_MAX || answers.some((x) => typeof x !== 'string' || !x.trim() || x.length > 64) || !t || others) throw shape()
+  checkDecisionAnswers(actor, answers, !t || Object.entries(rest).some(([, v]) => v !== undefined) || !!opts.comment)
   const requests = [...new Set(answers.map((x) => x.trim()))]
   const head = ws.path ? cardHeads(ws, [n])[0] : undefined
   if (!head) throw unknownTask(n)

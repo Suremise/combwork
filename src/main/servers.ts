@@ -94,7 +94,8 @@ import { connectionProblem, getAccount } from './accounts'
 import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
-import { cardFacts, cardKind, cardReviewSkip, factRow, forYou } from './workflow/cardWork'
+import { cardFacts, cardKind, cardReviewSkip, factRow, forYouOfCards } from './workflow/cardWork'
+import type { ForYouItem } from '../shared/workflow/workView'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
 import { detect, platformIdOf } from './platform/registry'
@@ -2353,7 +2354,7 @@ async function queueLineFor(project: string, n: number): Promise<string | null> 
   }
 }
 
-async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()): Promise<TaskView> {
+async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>(), waitingOf?: ReadonlyMap<number, ForYouItem[]>): Promise<TaskView> {
   let agent: { id: string; name: string; status: string; backgroundTasks: number } | null = null
   let now: { name: string; running: boolean } | null = null
   if (c.agent && c.project) {
@@ -2393,8 +2394,9 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
     // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410), or a design nobody checks (#1382).
     stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c))
   }
-  // Its requests waiting for the user (HI-1932): their ids, for a decision that answers them.
-  const waiting = c.project ? forYou(workspace, c.project).items.filter((i) => i.card === c.number) : []
+  // Its requests waiting for the user (HI-1932): their ids, for a decision that answers them. A listing reads them once
+  // for all its cards (`waitingOf`), never the whole board per card.
+  const waiting = (waitingOf ?? forYouOfCards(workspace, [c.number])).get(c.number) ?? []
   if (waiting.length) view.forYou = waiting.map((i) => ({ request: i.request, kind: i.kind, gate: i.gate, text: i.text, ...(i.asker ? { asker: i.asker } : {}) }))
   // A review whose reviewer has gone or isn't running (Hive ends those, but one can show while that happens).
   if (c.review && c.project) {
@@ -2568,8 +2570,9 @@ function taskPatch(body: any): TaskPatch {
   }
   for (const k of ['labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context'] as const) if (body?.[k] !== undefined) out[k] = k === 'blockedBy' || k === 'links' ? cardRefsIn(body[k]) : body[k]
   if (body?.decision !== undefined && body.decision !== null) out.decision = String(body.decision)
-  // HI-1932: the open requests the decision answers, by id; checked (shape, who, each request) where it is recorded.
-  if (body?.answers !== undefined && body.answers !== null) out.answers = Array.isArray(body.answers) ? body.answers.map((x: unknown) => String(x)) : ([] as string[])
+  // HI-1932: the open requests the decision answers, by id, as sent: never coerced (a nested list isn't an id), checked
+  // (shape, who, each request) by the route and where it is recorded.
+  if (body?.answers !== undefined && body.answers !== null) out.answers = body.answers as string[]
   if (body?.review !== undefined && body.review !== null && body.review !== '') {
     if (body.review !== 'start' && body.review !== 'passed' && body.review !== 'failed') throw new HttpError(400, `Unknown review "${String(body.review)}": start, passed or failed.`)
     out.review = body.review
@@ -2592,9 +2595,11 @@ route('GET', '/v1/tasks', async ({ query }) => {
   // ?q= (#1237): the board's search, through its full-text index.
   const cards = await tasks.listTasks({ project: project ? basename(projectByName(project)) : undefined, column: columnParam(query.get('column')), archived: query.get('archived') === 'true' ? true : undefined, scope: callerScope(), query: query.get('q') ?? undefined })
   const agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()
-  const views = await Promise.all(cards.map((c) => taskView(c, agents)))
-  // ?view=short: a row per card, without its description, comments and history.
-  return query.get('view') === 'short' ? views.map(taskRow) : views
+  // ?view=short: a row per card, without its description, comments, history and requests for the user (not read).
+  const short = query.get('view') === 'short'
+  const waiting = short ? new Map<number, ForYouItem[]>() : forYouOfCards(workspace, cards.map((c) => c.number))
+  const views = await Promise.all(cards.map((c) => taskView(c, agents, waiting)))
+  return short ? views.map(taskRow) : views
 })
 
 route('GET', '/v1/tasks/:n', async ({ params, query }) => {
@@ -2648,6 +2653,9 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const patch = taskPatch(body)
   const comment = typeof body?.comment === 'string' ? body.comment.trim() : ''
   const actor = await taskActor()
+  // A decision that answers requests (HI-1932) is that change alone: checked against the body as sent, before any of
+  // its other fields (its kind, skipping review, attachments: changed outside the patch) could be.
+  if (patch.answers !== undefined) tasks.checkDecisionAnswers(actor, body.answers, ['kind', 'confirmKind', 'skipReview', 'attachments'].some((k) => body[k] !== undefined))
   const changes: string[] = []
   // Its kind (#1277): changed after it was made (the Assistant's, with override.reason), or an agent's proposal answered.
   const kind = body?.kind

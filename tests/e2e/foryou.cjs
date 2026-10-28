@@ -442,7 +442,24 @@ const check = (name, ok, extra = '') => {
     const waiting = read.json?.forYou ?? []
     check("hive_read_task lists the card's open requests with their ids", read.status === 200 && waiting.length === 3 && waiting.every((x) => /\/r\d+$/.test(x.request)) && waiting[0].text === 'First: which icon?', JSON.stringify(read.json?.forYou))
     const [first, second, third] = waiting.map((x) => x.request)
-    const decided = await asAssistant('PATCH', `/v1/tasks/${t}`, { decision: 'The bee icon, in amber.', answers: [first, second] })
+    // The listing reads them for all its cards at once (HR1 r1); its short rows carry none.
+    const listed = await asAssistant('GET', '/v1/tasks?project=beta')
+    const shortRows = await asAssistant('GET', '/v1/tasks?project=beta&view=short')
+    check('…the listing has them too; its short rows not', listed.json?.find?.((c) => c.number === t)?.forYou?.length === 3 && shortRows.status === 200 && shortRows.json.every((c) => c.forYou === undefined), JSON.stringify({ listed: listed.json?.find?.((c) => c.number === t)?.forYou, short: shortRows.status }))
+    // Refused at the API's boundary, as sent (HR1 r1): ids that aren't strings, and other changes alongside, even those
+    // made outside the card's patch. Nothing of any of them is written.
+    const wrong = [
+      { decision: 'x', answers: [[first]] },
+      { decision: 'x', answers: [7] },
+      { decision: 'x', answers: [first], skipReview: 'Checks only.' },
+      { decision: 'x', answers: [first], kind: 'no-code', override: { reason: 'r' } },
+      { decision: 'x', answers: [first], attachments: [path.join(userData, 'none.png')] }
+    ]
+    const refusals = []
+    for (const body of wrong) refusals.push((await asAssistant('PATCH', `/v1/tasks/${t}`, body)).status)
+    const untouched = (await asAssistant('GET', `/v1/tasks/${t}`)).json
+    check('…a decision whose answers come wrongly is refused whole, nothing written', refusals.every((code) => code === 400) && !untouched?.decisions?.length && untouched?.forYou?.length === 3 && !untouched?.reviewSkipped && untouched?.kind !== 'no-code', JSON.stringify({ refusals, decisions: untouched?.decisions, forYou: untouched?.forYou?.length, reviewSkipped: untouched?.reviewSkipped, kind: untouched?.kind }))
+    const decided = await asAssistant('PATCH',`/v1/tasks/${t}`, { decision: 'The bee icon, in amber.', answers: [first, second] })
     check("the Assistant's decision naming two of them is taken", decided.status === 200, JSON.stringify(decided.json))
     check('…those two leave For you; the third stays, still counted', !!(await lib.until(async () => (await forYouOf(t)) === 1, HUNG_MS)) && (await inv('tasks:forYou')).items.some((i) => i.request === third), String(await forYouOf(t)))
     check('…the lane still waits for the user, on the third', (await betaLane())?.state === 'paused' && (await betaLane())?.pausedOn === t, JSON.stringify(await betaLane()))
