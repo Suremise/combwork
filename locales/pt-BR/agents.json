@@ -360,6 +360,8 @@
   "agents.workflowRole.builderText": "Trabalha nos cartões e os envia para Revisão.",
   "agents.workflowRole.either": "Ambos",
   "agents.workflowRole.eitherText": "Executa ou revisa, mas nunca revisa o próprio trabalho.",
+  "agents.workflowRole.generalist": "Generalista",
+  "agents.workflowRole.generalistText": "Faz o que você pedir no painel dele; não fica de nenhum lado no fluxo de trabalho.",
   "agents.workflowRole.label": "Papel no fluxo de trabalho",
   "agents.workflowRole.reviewer": "Revisor",
   "agents.workflowRole.reviewerText": "Revisa os cartões dos executores e dá o veredito: bem-sucedido ou reprovado."

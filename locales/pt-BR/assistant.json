@@ -462,7 +462,7 @@
   "assistant.template.badName": "O nome está faltando ou tem mais de {max} caracteres.",
   "assistant.template.badPairs": "Os pares de executores e revisores citam agentes que ele não tem, ou um agente duas vezes.",
   "assistant.template.badProvider": "O agente de código do agente {name} não pode ser usado pelo Hive ({given, select, yes {{provider}} other {nenhum}}).",
-  "assistant.template.badRole": "O papel de {name} no fluxo de trabalho não é builder, reviewer nem either.",
+  "assistant.template.badRole": "O papel de {name} no fluxo de trabalho não é builder, reviewer, either nem generalist.",
   "assistant.template.badSetting": "O {setting, select, model {modelo} effort {esforço} other {permissionMode}} do agente {name} não pode ser usado pelo Hive.",
   "assistant.template.badToken": "{name} usa {token}: o nome de um agente só pode ter '{key}' (a chave do projeto) e '{n}' (o número dele entre os agentes com esse nome).",
   "assistant.template.from09": "Este modelo é do Hive 0.9 e não pode ser carregado no 1.0. Recrie-o a partir dos seus agentes com “Salvar modelo…”.",

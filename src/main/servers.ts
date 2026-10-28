@@ -1201,10 +1201,10 @@ route('GET', '/v1/connections/:ref', async ({ params }) => {
   return connectionShown(c, ws, !agentCaller(), all)
 })
 
-/** A workflowRole argument (#1430): builder, reviewer or either. */
+/** A workflowRole argument (#1430): builder, reviewer, either or generalist (HI-686). */
 function workflowRoleArg(v: unknown): WorkflowRole {
   if (isWorkflowRole(v)) return v
-  throw new HttpError(400, 'workflowRole is "builder", "reviewer" or "either".')
+  throw new HttpError(400, 'workflowRole is "builder", "reviewer", "either" or "generalist".')
 }
 
 /** Why a worktree of an agent's own is refused (#1451): the Agent API's short note. */

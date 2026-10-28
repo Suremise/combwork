@@ -360,6 +360,8 @@
   "agents.workflowRole.builderText": "Pracuje nad kartami i przekazuje je do recenzji.",
   "agents.workflowRole.either": "Dowolna",
   "agents.workflowRole.eitherText": "Wykonuje lub recenzuje, ale nigdy nie recenzuje własnej pracy.",
+  "agents.workflowRole.generalist": "Generalista",
+  "agents.workflowRole.generalistText": "Robi wszystko, o co poprosisz w jego panelu; w przepływie pracy nie stoi po żadnej stronie.",
   "agents.workflowRole.label": "Rola w przepływie pracy",
   "agents.workflowRole.reviewer": "Recenzent",
   "agents.workflowRole.reviewerText": "Recenzuje karty wykonawców i ocenia je jako zaliczone lub niezaliczone."

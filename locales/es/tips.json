@@ -192,6 +192,8 @@
   "tips.forYou.title": "Responde lo que te espera",
   "tips.forYouActions.text": "Cuando la pregunta de un agente trata de algo que solo tú puedes hacer en su tarjeta, puede ofrecerlo como un botón bajo la pregunta: Mover a Hecho, Hacerla sin código o Desbloquear, con el motivo que sugiere, que puedes cambiar. Un clic lo hace y responde al agente.",
   "tips.forYouActions.title": "Responde con un clic",
+  "tips.generalistRole.text": "Da a un agente el Rol en el flujo de trabajo Generalista (Configuración del agente) y hará lo que le pidas en su panel: nunca entra en un carril ni se le pide revisar. Una tarjeta que tome sigue el flujo de trabajo del proyecto.",
+  "tips.generalistRole.title": "Un agente para lo que le pidas",
   "tips.gitCheck.text": "Ayuda → Configuración de proveedores… muestra el git que encontró Hive y su versión. Los agentes con worktree, la fusión y las secciones Git de la pestaña Control de versiones necesitan Git for Windows 2.38 o posterior.",
   "tips.gitCheck.title": "¿Está git listo para los worktrees?",
   "tips.gitHistory.text": "Control de versiones → Historial se abre en la rama en la que se fusiona tu trabajo. Elige otra en su encabezado, tuya o de un remoto, y retrocede a commits más antiguos bajo la lista.",

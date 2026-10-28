@@ -98,6 +98,12 @@ describe('Start Lane… with the reviewer pool (#1443)', () => {
     expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: [{ id: 'r1', name: 'R1' }, { id: 'r2', name: 'R2' }] })
   })
 
+  it('never offers a generalist in the pool, whatever its name (HI-686)', async () => {
+    pool()
+    const withGeneralist = { ...(ws as object), projectConfig: async () => ({ version: 2, agents: [{ id: 'b1', name: 'B1', workflowRole: 'builder' }, { id: 'r1', name: 'R1' }, { id: 'g1', name: 'GR1', workflowRole: 'generalist' }] }) } as never
+    expect(await laneStartInfo(withGeneralist, 'D:\\ws\\alpha')).toEqual({ pool: [{ id: 'r1', name: 'R1' }] })
+  })
+
   it("records the lane with the pool and starts only its builder, whose brief names the pool's reviewers", async () => {
     pool()
     const r = await startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b1', reviewer: null, pool: true, cards: [1] })

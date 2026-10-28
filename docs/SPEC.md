@@ -1235,7 +1235,7 @@ Five layers [note "Core model v2"], from the bottom:
 2. **Facts** (§16.4): a typed, append-only log per card, recorded by Hive or observed from the platform.
 3. **Workflow** (§16.5, §16.6): the project's options, compiled into a **ruleset**: stages (in six fixed
    categories), and for every move the guards that must hold and the actions Hive then takes.
-4. **Roles** (§16.10.6): builder, reviewer and either for agents; approver (the user); integrator (Hive).
+4. **Roles** (§16.10.6): builder, reviewer, either and generalist (HI-686) for agents; approver (the user); integrator (Hive).
 5. **Runtime** (§16.7, §16.8): intents from agents and moves from the user pass through one place
    (`tasks.ts` → `boardWrite`); guards are evaluated there; the card's stage is derived from its facts; observed
    facts that contradict recorded ones are reconciled.
@@ -4063,8 +4063,8 @@ repeating them (#533) [note §8].
   it will create, every one editable to any name unique in the workspace, with a free name pre-filled on a clash.
 - **Shipped defaults** (OP-19 for the exact set): Solo (1 builder), Pair (builder Claude Code + reviewer Codex), Pair:
   one provider, Team 3×3, Team 6×6 (Darren's setup), Team 6 + pool (2 pooled reviewers) [#1123 c].
-- **The workflow role is not #686's guidance role** (None, Generalist, Builder, Reviewer, Researcher, QA, built after
-  1.0): two fields, kept apart in the data model [#1117 c2].
+- **The workflow role is not a guidance role** [#1117 c2]: HI-686's design ended with no separate guidance role or
+  Agent Roles view, only the Generalist workflow role below and its skill (Darren, 27 Oct, parts 5–6).
 - **Agents' workflow role** [#1430] **Built [#1430]**: `AgentDef.workflowRole` (`builder | reviewer | either`, in
   `project.json`), apart from the free-text `role`, shown as **Note**. `agentWorkflowRole()` (`shared/workflow/roles.ts`,
   with `ReviewerMode` for G17) reads it, or, unset, the guess from before 1.0: a note saying *review* is a reviewer and
@@ -4077,6 +4077,19 @@ repeating them (#533) [note §8].
   it; changing it (hive_update_agent) is the Assistant's within Control, undoable, like every change to an agent
   through the Agent API: project agents have neither tool.
   `review.notAuthor` stays by authorship (who built the card), which the role doesn't change.
+- **Generalist** [HI-686, Darren's design parts 4–6 and the skill he approved, 28 Oct] **Built**: a fourth
+  `WorkflowRole`, `generalist` ("Does whatever you ask in its pane; takes no side in the workflow"), in Add Agent, Agent
+  Settings, the templates' agent editor (and v2 files), the agents table and the Agent API (`workflowRole`, the hive
+  tools' enum). `buildsWork` is builder or either and `reviewsWork` reviewer or either, so a generalist is never a lane's
+  builder or reviewer (Start Lane, `startWaitingLane`; and the lane service refuses one named as either, however a lane
+  is started, changed or joined, before anything changes: `refuseGeneralist`, `400`, HR2's round 1), never in the
+  reviewer pool or the review copies' count, and isn't
+  counted in the slot pool's size (`setBuilderCount`). It has no rules of its own (part 6: workflow rules are only
+  Version Control → Workflow's): a card it takes is started, built, reviewed and merged as the project's options say,
+  `leaseForStart` giving it the card's slot where cards are built in slots (`takesCards`: any role but reviewer). Add
+  Agent's default and the guess for agents from before 1.0 are unchanged. The bundled **generalist** skill (audience
+  agents; Darren's approved text) holds the habits of general work; every agent gets it, and the session contract's skill
+  line routes "other work in your pane" to it (`boardSkillsLine`). Guidance, not a rule: it adds no step.
 - **Templates v2 and Hive's own** [#1436] **Built [#1436]**: `TEMPLATE_VERSION` 2 (`shared/templates.ts`). Each agent
   `role: WorkflowRole` (none given: #1430's guess) and an optional `note` (the agent's free text); `worktree` is gone,
   with the plan's worktree types (`worktrees`, `oldWorktrees`, `mergedInto`, `setup`), the load's removal of old

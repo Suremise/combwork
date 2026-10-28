@@ -362,6 +362,8 @@ interface HiveMessageValues {
   'agents.workflowRole.builderText': undefined
   'agents.workflowRole.either': undefined
   'agents.workflowRole.eitherText': undefined
+  'agents.workflowRole.generalist': undefined
+  'agents.workflowRole.generalistText': undefined
   'agents.workflowRole.label': undefined
   'agents.workflowRole.reviewer': undefined
   'agents.workflowRole.reviewerText': undefined
