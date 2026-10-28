@@ -467,6 +467,18 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions'
   },
   {
+    id: 'hive.progress.replySeconds',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.progress.replySeconds.title', defaultMessage: "hive-progress: Hive's reply time", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. hive-progress is the command agents run long commands and checks through: keep it as it is." }),
+    desc: msg({ id: 'settings.advanced.hive.progress.replySeconds.desc', defaultMessage: "How long hive-progress waits for Hive to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Hive is slow. Raise it when a busy Hive makes checks fail with \"Hive is slow to answer\" (HI-1892). Kept at 2 minutes at most.", description: "What the advanced setting \"hive-progress: Hive's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)." }),
+    kind: 'number',
+    default: 15,
+    min: 1,
+    max: 120,
+    unit: 's',
+    applies: 'sessions'
+  },
+  {
     id: 'hive.mcp.connectSeconds',
     group: 'hive',
     title: msg({ id: 'settings.advanced.hive.mcp.connectSeconds.title', defaultMessage: 'hive tools: wait to connect', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),

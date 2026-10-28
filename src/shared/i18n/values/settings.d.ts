@@ -332,6 +332,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.notes.workspaceNotesMax.title': undefined
   'settings.advanced.hive.progress.lanesShown.desc': undefined
   'settings.advanced.hive.progress.lanesShown.title': undefined
+  'settings.advanced.hive.progress.replySeconds.desc': undefined
+  'settings.advanced.hive.progress.replySeconds.title': undefined
   'settings.advanced.hive.prompt.asTyped.desc': undefined
   'settings.advanced.hive.prompt.asTyped.title': undefined
   'settings.advanced.hive.prompt.clearDraft.desc': undefined

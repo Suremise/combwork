@@ -9,7 +9,7 @@ import { createRequire } from 'module'
 import { pathToFileURL } from 'url'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { estimateFor, evictionOrder, KEEP_KEYS, ProgressRun, progressTarget, recordTiming, wrappedLines } from '../src/main/progressReporters/report.mts'
-import { cmdEscapeArgument, commandEnv, commandLabel, isolatedPollDelay, parseArgs, parseProcessList, runWrapped, spawnSpec, StepFilter, stepLine, timingKey, treeToEnd, uncountedLine, wasInterrupted } from '../src/main/progressReporters/wrapper'
+import { cmdEscapeArgument, commandEnv, commandLabel, isolatedPollDelay, parseArgs, parseProcessList, replyTimeoutMs, runWrapped, spawnSpec, StepFilter, stepLine, timingKey, treeToEnd, uncountedLine, wasInterrupted, type WrapperIo } from '../src/main/progressReporters/wrapper'
 import { installShims, shimFiles, withBinOnPath } from '../src/main/progressReporters/shims'
 import { hiveInstructions, progressRule, wrapsLongCommands } from '../src/shared/hiveGuidance'
 import { launchParts } from '../src/main/guidance'
@@ -44,6 +44,13 @@ const calls: { method: string; path: string; auth: string; body: Record<string, 
  */
 const resolves: Record<string, unknown>[] = []
 let resolveReply: { status: number; body: Record<string, unknown> } | 'hang' = { status: 404, body: { error: 'No such route' } }
+/** How long the stand-in holds a resolve before answering it (HI-1892: a slow Hive). */
+let resolveDelayMs = 0
+/**
+ * How the stand-in takes a run's start and finish (HI-1892): `hangStart`, its start never answered; `hangFinish`, no
+ * finish answered; `hangFinishOnce`, the first finish taken but not answered, a second refused as Hive does (409).
+ */
+let lose: 'none' | 'hangStart' | 'hangFinish' | 'hangFinishOnce' = 'none'
 /** What the stand-in answers a run's finish (#1654: how a check's run counted). */
 let finishReply: Record<string, unknown> = {}
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
@@ -61,14 +68,24 @@ beforeAll(async () => {
         resolves.push(raw ? JSON.parse(raw) : {})
         // 'hang': it never answers (the wrapper's own timeout ends the wait).
         if (resolveReply === 'hang') return
-        res.setHeader('Content-Type', 'application/json')
-        return res.writeHead(resolveReply.status).end(JSON.stringify(resolveReply.body))
+        const reply = resolveReply
+        const answer = () => {
+          res.setHeader('Content-Type', 'application/json')
+          res.writeHead(reply.status).end(JSON.stringify(reply.body))
+        }
+        if (resolveDelayMs) return void setTimeout(answer, resolveDelayMs)
+        return answer()
       }
       calls.push({ method: req.method ?? '', path: req.url ?? '', auth: req.headers.authorization ?? '', body: raw ? JSON.parse(raw) : {} })
       writeFileSync(seenFile, JSON.stringify(calls))
       res.setHeader('Content-Type', 'application/json')
       if (refuse) return res.writeHead(401).end('{"error":"no"}')
-      if (req.method === 'POST' && req.url?.endsWith('/finish')) return res.end(JSON.stringify(finishReply))
+      if (lose === 'hangStart' && req.method === 'POST' && req.url === '/v1/progress') return
+      if (req.method === 'POST' && req.url?.endsWith('/finish')) {
+        if (lose === 'hangFinish') return
+        if (lose === 'hangFinishOnce') return calls.filter((c) => c.path.endsWith('/finish')).length > 1 ? res.writeHead(409).end('{"error":"That run has finished"}') : undefined
+        return res.end(JSON.stringify(finishReply))
+      }
       res.end(req.method === 'POST' && req.url === '/v1/progress' ? JSON.stringify({ id: `run-${calls.length}` }) : '{}')
     })
   })
@@ -80,6 +97,8 @@ beforeEach(() => {
   calls.length = 0
   resolves.length = 0
   resolveReply = { status: 404, body: { error: 'No such route' } }
+  resolveDelayMs = 0
+  lose = 'none'
   finishReply = {}
   refuse = false
   rmSync(seenFile, { force: true })
@@ -91,10 +110,10 @@ const env = (extra: Record<string, string | undefined> = {}) => ({ ...process.en
  * Runs the wrapper, collecting what it writes. By default the run is reported only at a step line with the total, or at
  * the end, however long the command takes to start; `startWaitMs` 0 reports it at once, before the command's output.
  */
-async function wrap(argv: string[], e: Record<string, string | undefined>, startWaitMs = 60_000, cwd = dir) {
+async function wrap(argv: string[], e: Record<string, string | undefined>, startWaitMs = 60_000, cwd = dir, more: Partial<WrapperIo> = { resolveTimeoutMs: 1000 }) {
   let out = ''
   let err = ''
-  const code = await runWrapped(argv, { env: e, cwd, stdout: { write: (b) => (out += String(b)) }, stderr: { write: (b) => (err += String(b)) }, stdin: 'ignore', minIntervalMs: 100, startWaitMs, resolveTimeoutMs: 1000 })
+  const code = await runWrapped(argv, { env: e, cwd, stdout: { write: (b) => (out += String(b)) }, stderr: { write: (b) => (err += String(b)) }, stdin: 'ignore', minIntervalMs: 100, startWaitMs, ...more })
   return { code, out, err }
 }
 /**
@@ -357,6 +376,72 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     finishReply = { ok: true, check: { name: 'node', counted: false, whyNot: 'notCheck', platform: 'git' } }
     expect(await wrap(['--', node, '-e', 'process.exit(3)'], env(), 0)).toEqual({ code: 3, out: '', err: '' })
   })
+
+  it("waits for Hive's reply as its setting says (HI-1892): a resolve held past 5 s, answered within it, runs the check and records it", async () => {
+    resolveReply = { status: 200, body: { card: 'HI-12', revision: null, testedCheckout: null, check: { name: 'typecheck', command: `"${node}" -e "0"` }, folder: dir } }
+    resolveDelayMs = 5500
+    finishReply = { ok: true, check: { name: 'typecheck', counted: true, platform: 'git' } }
+    // No timeout of the test's own: the one Hive hands the session (8 s here), as a session gets it.
+    const r = await wrap(['--check', 'typecheck'], env({ HIVE_PROGRESS_REPLY_SECONDS: '8' }), 0, dir, {})
+    expect(r).toEqual({ code: 0, out: '', err: '' })
+    expect(resolves).toHaveLength(1)
+    expect(calls.map((c) => [c.method, c.path.replace(/run-\d+/, 'ID'), c.body.check ?? c.body.ok])).toEqual([
+      ['POST', '/v1/progress', 'typecheck'],
+      ['POST', '/v1/progress/ID/finish', true]
+    ])
+  }, 30_000)
+
+  it("the setting's reply time, within 1 s and 2 minutes whatever is set; 15 s without it (HI-1892)", () => {
+    expect(replyTimeoutMs({})).toBe(15_000)
+    expect(replyTimeoutMs({ HIVE_PROGRESS_REPLY_SECONDS: '40' })).toBe(40_000)
+    expect(replyTimeoutMs({ HIVE_PROGRESS_REPLY_SECONDS: '100000' })).toBe(120_000)
+    expect(replyTimeoutMs({ HIVE_PROGRESS_REPLY_SECONDS: '0.2' })).toBe(1000)
+    expect(replyTimeoutMs({ HIVE_PROGRESS_REPLY_SECONDS: 'soon' })).toBe(15_000)
+  })
+
+  it('a check with no reply asks once more, then runs nothing and says Hive is slow; a refused connection says it couldn\'t be reached at once, asking once (HI-1892)', async () => {
+    resolveReply = 'hang'
+    const slow = await wrap(['--check', 'lint'], env(), 0, dir, { resolveTimeoutMs: 1000, retryMs: 50 })
+    expect(slow).toEqual({ code: 2, out: '', err: 'hive-progress: Hive is slow to answer: no reply to look up the command for lint in 1 s, asked 2 times, so nothing was run. Try again; Settings → Advanced → "hive-progress: Hive\'s reply time" gives it longer.\n' })
+    expect(resolves).toHaveLength(2)
+    // Nothing listens at the address: no retry, and none of the minute it would otherwise wait.
+    const closed = createServer()
+    await new Promise<void>((r) => closed.listen(0, '127.0.0.1', r))
+    const gone = `http://127.0.0.1:${(closed.address() as { port: number }).port}`
+    await new Promise<void>((r) => closed.close(() => r()))
+    const from = Date.now()
+    const refused = await wrap(['--check', 'lint'], env({ HIVE_API_URL: gone }), 0, dir, { resolveTimeoutMs: 60_000, retryMs: 60_000 })
+    expect(Date.now() - from).toBeLessThan(HUNG_MS)
+    expect(refused).toMatchObject({ code: 2, out: '' })
+    expect(refused.err).toBe(`hive-progress: Hive couldn't be reached to look up the command for lint (connection refused at ${gone}), so nothing was run. Is Hive running? A sandbox that blocks local network access (Claude Code's Bash sandbox does) stops it too: run the command outside the sandbox.\n`)
+    expect(calls).toEqual([])
+  })
+
+  it("a check's result Hive didn't confirm is sent once more, and hive-progress says when it may not be recorded (HI-1889's lost report); its exit code is the command's", async () => {
+    resolveReply = { status: 200, body: { card: 'HI-12', revision: null, testedCheckout: null, check: { name: 'typecheck', command: `"${node}" -e "0"` }, folder: dir } }
+    const quick = { resolveTimeoutMs: 1000, retryMs: 50, checkFinishWaitMs: 500 }
+    const finishes = () => calls.filter((c) => c.path.endsWith('/finish')).length
+    // The first finish arrived, its reply lost: the one sent again is refused (it has finished), so it was recorded.
+    lose = 'hangFinishOnce'
+    expect(await wrap(['--check', 'typecheck'], env(), 0, dir, quick)).toEqual({ code: 0, out: '', err: "hive-progress: Hive recorded check typecheck, but its reply was lost, so how it counted isn't known.\n" })
+    expect(finishes()).toBe(2)
+    // No reply to either.
+    calls.length = 0
+    lose = 'hangFinish'
+    expect(await wrap(['--check', 'typecheck'], env(), 0, dir, quick)).toEqual({ code: 0, out: '', err: "hive-progress: Hive didn't confirm it recorded check typecheck (no reply to its result, asked twice): if submitting says it hasn't passed, run it again.\n" })
+    expect(finishes()).toBe(2)
+    // Its start never taken: nothing of it was recorded.
+    calls.length = 0
+    lose = 'hangStart'
+    expect(await wrap(['--check', 'typecheck'], env(), 0, dir, quick)).toEqual({ code: 0, out: '', err: "hive-progress: Hive didn't take this run's report (no reply in time), so check typecheck wasn't recorded: run it again.\n" })
+    expect(finishes()).toBe(0)
+    // A plain run's finish is never sent again, and says nothing.
+    calls.length = 0
+    lose = 'hangFinish'
+    resolveReply = { status: 404, body: { error: 'No such route' } }
+    expect(await wrap(['--', node, '-e', 'process.exit(3)'], env(), 0, dir, quick)).toEqual({ code: 3, out: '', err: '' })
+    expect(finishes()).toBe(1)
+  }, 30_000)
 
   it('says why for each reason a check run is not counted (#1654)', () => {
     const line = (whyNot: string, more: Record<string, unknown> = {}, isolated = false) => uncountedLine({ check: { name: 'lint', counted: false, whyNot, platform: 'git', ...more } }, isolated)
