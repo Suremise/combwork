@@ -202,8 +202,9 @@ function board(sql, ...args) {
     check('the copied files inherit Hive’s slot default, From Hive defaults', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/hive.json'), HUNG_MS)), `${JSON.stringify(projectJson().slots)} ${await copyOrigin.innerText().catch(() => '')}`)
     await shot('copy-global', slotsGroup.locator('[data-slot-option="copy"]'))
     await page.keyboard.press('Control+,')
-    // The workspace's part of Settings → Version Control (HI-1768).
+    // The workspace's part of Settings → Version Control (HI-1768), its own tab since HI-1837.
     await page.locator('.settings-nav .row', { hasText: 'Version Control' }).first().click()
+    await page.locator('[role="tab"][data-setting-tab="workflow.workspaceDefaults"]').click()
     const wsCopy = page.locator('[data-slot-default="copy"][data-level="workspace"]')
     check('Settings → Version Control’s Workspace defaults have the copied files, inheriting Hive’s', !!(await until(async () => (await wsCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'global' && (await wsCopy.innerText()).includes('config/hive.json'), HUNG_MS)), await wsCopy.innerText().catch(() => ''))
     const wsJson = () => JSON.parse(fs.readFileSync(path.join(fx.ws, '.hive', 'workspace.json'), 'utf8'))

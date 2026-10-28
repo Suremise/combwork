@@ -1238,7 +1238,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
           {status.files.length === 0 && <div className="pane-empty">{agent && own?.branch ? tr(C.noAgentChanges, { branch: own.branch }) : agent ? tr(C.clean) : spare ? tr(C.nothingOn, { branch: unusedName(spare), base: base ?? '' }) : tr(C.clean)}</div>}
           {status.files.map((f) => (
             <Tooltip block key={f.path} content={tr(f.staged ? C.staged : C.unstaged, { status: tr(C.gitStatus, { status: f.status === '?' ? 'untracked' : f.status }), path: f.path })}>
-              <div className={cx('row', file === f.path && 'selected')} style={{ width: '100%' }} onClick={() => setFile(f.path)}>
+              <div className={cx('row', file === f.path && 'selected')} data-path={f.path} style={{ width: '100%' }} onClick={() => setFile(f.path)}>
                 <span className="label">{f.path.split('/').pop()}</span>
                 <span className="desc" style={{ flex: 1, minWidth: 0 }}>{f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : ''}</span>
                 <span className={cx('git-status', f.status === '?' ? 'U' : f.status)}>{f.status === '?' ? 'U' : f.status /* i18n-ignore: git's status letter */}</span>
