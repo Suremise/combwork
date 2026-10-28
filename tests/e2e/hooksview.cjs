@@ -47,7 +47,9 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), ...claude, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off' })
+  // Each app server the fake Codex runs, by its pid (HI-982: none left after a listing times out).
+  const appServers = path.join(userData, 'fake-appservers.txt')
+  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), ...claude, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off', FAKE_CODEX_APPSERVER_LOG: appServers })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -151,6 +153,25 @@ const check = (name, ok, extra = '') => {
     check("the holder's allowed edit is in its own", holderFired.some((f) => f.event === 'PreToolUse' && f.response === 'allowed'))
     const clNotes = (await inv('session:hooks', alpha, cl.id)).listing.notes
     check("Cl: Claude Code's settings.json changed since launch is said so", clNotes.some((n) => n.kind === 'changed' && n.file.toLowerCase() === claudeSettings.toLowerCase()), JSON.stringify(clNotes))
+
+    // --- Codex's listing by its advanced settings (Settings → Advanced): a request it doesn't know, then one it never
+    // answers, each said in the dialog (Hive's own still listed), with no app server left running.
+    const cxNotes = async () => (await inv('session:hooks', alpha, cx.id)).listing
+    await inv('advanced:set', 'codex.hooks.listMethod', 'hooks/nope')
+    let listed = await cxNotes()
+    check("with another listing request, Codex's answer (an error) is said, Hive's own still listed", listed.notes.some((n) => n.kind === 'cliUnknown' && /unknown method: hooks\/nope/.test(n.why)) && listed.rows.filter((r) => r.source === 'hive').length >= 5 && !listed.rows.some((r) => r.source === 'user'), JSON.stringify(listed.notes))
+    await inv('advanced:set', 'codex.hooks.listMethod', 'hooks/list')
+    fs.writeFileSync(path.join(codexHome, 'fake-hooks-list-hang.txt'), 'x')
+    await inv('advanced:set', 'codex.hooks.listSeconds', 2)
+    const asked = Date.now()
+    listed = await cxNotes()
+    check('a listing Codex never answers ends at its timeout, said in the dialog', listed.notes.some((n) => n.kind === 'cliUnknown') && Date.now() - asked < HUNG_MS, `${Date.now() - asked} ms ${JSON.stringify(listed.notes)}`)
+    const ran = () => (fs.existsSync(appServers) ? fs.readFileSync(appServers, 'utf8').split(/\r?\n/).map(Number).filter((n) => n > 0) : [])
+    check('…and no app server Hive started is left running', ran().length > 0 && !!(await lib.until(() => ran().every((pid) => !lib.processRunning(pid)), HUNG_MS)), JSON.stringify(ran().filter((pid) => lib.processRunning(pid))))
+    fs.rmSync(path.join(codexHome, 'fake-hooks-list-hang.txt'))
+    await inv('advanced:set', 'codex.hooks.listSeconds', 20)
+    listed = await cxNotes()
+    check('back at the defaults, Codex lists them again', !listed.notes.length && listed.rows.some((r) => r.source === 'user'), JSON.stringify(listed.notes))
 
     // --- The dialog on screen, from the agent's ⋯ menu.
     await lib.agentMenu(page, 'Cl')

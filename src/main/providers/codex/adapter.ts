@@ -236,7 +236,7 @@ function hookOverrides(url: string, authFile: string, hashes?: Record<string, st
 
 /** Asks Codex (its app server) for the keys and hashes of the given hooks. */
 async function hooksFromCodex(executable: string, hookArgs: string[], cwd: string, env?: NodeJS.ProcessEnv): Promise<Record<string, string> | null> {
-  const result = await askAppServer(executable, hookArgs, cwd, 'hooks/list', { cwds: [cwd] }, env)
+  const result = await askAppServer(executable, hookArgs, cwd, advanced.get<string>('codex.hooks.listMethod'), { cwds: [cwd] }, env, advanced.number('codex.hooks.listSeconds') * 1000)
   const out: Record<string, string> = {}
   for (const entry of result?.data ?? []) for (const h of entry.hooks ?? []) if (h.key && h.currentHash) out[h.key] = h.currentHash
   return Object.keys(out).length ? out : null
@@ -1018,7 +1018,7 @@ export class CodexAdapter implements ProviderAdapter {
       listing,
       receivers: Object.fromEntries(HOOKS.map((h) => [h.event, 'command'])),
       now: async () => {
-        const answer = await appServerAnswer(ctx.executable, overrides, ctx.cwd, 'hooks/list', { cwds: [ctx.cwd] }, ctx.env, 20000)
+        const answer = await appServerAnswer(ctx.executable, overrides, ctx.cwd, advanced.get<string>('codex.hooks.listMethod'), { cwds: [ctx.cwd] }, ctx.env, advanced.number('codex.hooks.listSeconds') * 1000)
         if (!answer.ok) return { ...listing, notes: [{ kind: 'cliUnknown', why: answer.error.slice(0, 300) }] }
         const all = ((answer.result as { data?: { hooks?: unknown[] }[] } | null)?.data ?? []).flatMap((e) => (Array.isArray(e?.hooks) ? e.hooks : []))
         const got = codexListedHooks(all as never[], { command, flagsFile: SESSION_FLAGS }, secrets)

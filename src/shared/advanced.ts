@@ -1745,6 +1745,30 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions',
     samples: [HOOKS_TAKEN['codex']]
   },
+  // What Hive asks Codex's app server for a launch's hooks (HI-982: the Hooks dialog; the hook hashes it trusts at launch).
+  {
+    id: 'codex.hooks.listMethod',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.hooks.listMethod.title', defaultMessage: 'Hooks: listing request', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.hooks.listMethod.desc', defaultMessage: "The request Hive sends Codex's app server for the hooks a session has. Wrong, an agent's Hooks dialog lists only Hive's own and says Codex couldn't list the rest, and Hive trusts its hooks by its own hashes.", description: 'What the advanced setting "Hooks: listing request" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'hooks/list',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/hooks-list-codex-0.164.0.txt`, version: '0.164.0', text: 'hooks/list' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'codex.hooks.listSeconds',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.hooks.listSeconds.title', defaultMessage: 'Hooks: listing timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.hooks.listSeconds.desc', defaultMessage: "How long Hive gives Codex's app server to list a session's hooks (`hooks/list`). Past it, an agent's Hooks dialog lists only Hive's own and says Codex couldn't list the rest.", description: 'What the advanced setting "Hooks: listing timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `hooks/list` as it is (a request\'s name).' }),
+    kind: 'number',
+    default: 20,
+    min: 2,
+    max: 120,
+    unit: 's',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/hooks-list-codex-0.164.0.txt`, version: '0.164.0', text: 'hooks/list', shows: "Codex's app server taking the request Hive sends for a session's hooks (its source: not a run)" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   // How long Hive waits for Codex to render a session's prompt (#1285): it reads the developer_instructions Hive's guidance
   // follows from it. Past it, Hive adds none of its guidance rather than replace instructions it couldn't read.
   {
