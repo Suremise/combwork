@@ -782,6 +782,33 @@ export function rollbackKeys(typed: readonly number[]): number {
 }
 
 /**
+ * How many Backspaces take back a prompt Hive stopped part-way in an input box whose Ctrl+U deletes only the row the
+ * cursor is on (capabilities.ctrlUClearsRow, HI-1974: Claude Code 2.1.312 kept a stopped wake's first rows, and the
+ * next wake was sent after them): one for each code point Hive wrote (`written`: the one-line prompt, or what
+ * typeSegments recorded, each line's UTF-16 units and a key between lines). A Backspace deletes characters, however
+ * wide they are drawn or wherever its rows wrapped (tried on 2.1.312 with CJK text, an emoji sequence and long words).
+ * It never stops short; a character made of several code points can make it press a few more, which delete only a
+ * draft clearing the input was to remove (Settings → Advanced), and nothing in an empty input.
+ */
+export function backspaceKeys(written: string | readonly number[]): number {
+  return typeof written === 'string' ? [...written].length : written.reduce((n, chars, i) => n + chars + (i > 0 ? 1 : 0), 0)
+}
+
+/**
+ * For the wakeputoff suite (unpackaged builds only, HI-1974): a line Hive has typed waits before its Enter while
+ * HIVE_TEST_HOLD_TYPED's file exists, checked as it waits, so what stops a line part-way can stop it there.
+ */
+async function heldTyped(label: string, check: () => void): Promise<void> {
+  const file = app.isPackaged ? undefined : process.env.HIVE_TEST_HOLD_TYPED
+  if (!file || !existsSync(file)) return
+  log.info(`${userText(label)}: the line Hive typed is held before its Enter (a test's)`)
+  while (existsSync(file)) {
+    await new Promise((r) => setTimeout(r, 50))
+    check()
+  }
+}
+
+/**
  * What Hive writes for a prompt's line (sendPrompt), without control characters, pasted (bracketed) or typed, so
  * nothing in it can end the paste or press a key (HI-1920: typed, a Ctrl+C in it reached Codex as Ctrl+C). Kept as
  * written (`asTyped`, #1286), its line breaks go into a paste as the Enter a terminal pastes them with, and typed, each
@@ -3485,6 +3512,9 @@ class SessionManager {
     let typed = false
     // What a multi-line prompt typed so far, by line (HI-1327): taken back as exactly that if stopped part-way.
     let lines: number[] | null = null
+    // What a one-line prompt writes (pasted, or typed in pieces): taken back character by character where Ctrl+U
+    // deletes one wrapped row (backspaceKeys).
+    let typedOut = ''
     let sent: { at: number; prompts: number; from: number } | null = null
     // Settings → Advanced (#1286): whether Hive clears the CLI's input first (and takes back a prompt it stopped), and
     // whether it keeps the prompt as written.
@@ -3514,11 +3544,13 @@ class SessionManager {
       // find); none, no wait, as for an empty line.
       const out = segments ? segments.flatMap((s) => ('text' in s && s.text.trim() ? [s.text] : [])).at(-1) ?? '' : promptInput(line, paste, asTyped)
       const drawn = l?.screen && l.adapter.descriptor.capabilities.enterOnceDrawn && out.trim() ? drawnLine(l.screen, out) : null
+      typedOut = out
       if (paste) writePty(key, `\x1b[200~${out}\x1b[201~`)
       else if (segments) {
         lines = [0]
         await typeSegments(key, segments, () => (check(), true), lines)
       } else await typeInto(key, out, () => (check(), true))
+      if (l) await heldTyped(this.label(l.state), check)
       await new Promise((r) => setTimeout(r, 300))
       check()
       if (drawn && !drawn()) {
@@ -3566,12 +3598,22 @@ class SessionManager {
     } catch (e) {
       if (clearDraft && typed && same() && this.userTypedAt(projectPath, agentId) < since) {
         // A multi-line prompt: one Ctrl+U for each of its lines with text and each line break, each its own key, so no
-        // line of it is left to go with a later prompt (HR6's round 1 of HI-1327); none past it.
-        const n = lines ? rollbackKeys(lines) : 1
-        for (let i = 0; i < n; i++) {
-          if (!same() || this.userTypedAt(projectPath, agentId) >= since) break
-          writePty(key, '\x15')
-          if (i + 1 < n) await new Promise((r) => setTimeout(r, 10))
+        // line of it is left to go with a later prompt (HR6's round 1 of HI-1327); none past it. A CLI whose Ctrl+U
+        // deletes one wrapped row gets a Backspace for each character instead, a few at a time as typing goes (HI-1974).
+        if (l?.adapter.descriptor.capabilities.ctrlUClearsRow) {
+          const n = backspaceKeys(lines ?? typedOut)
+          for (let i = 0; i < n; i += 8) {
+            if (!same() || this.userTypedAt(projectPath, agentId) >= since) break
+            writePty(key, '\x7f'.repeat(Math.min(8, n - i)))
+            if (i + 8 < n) await new Promise((r) => setTimeout(r, 10))
+          }
+        } else {
+          const n = lines ? rollbackKeys(lines) : 1
+          for (let i = 0; i < n; i++) {
+            if (!same() || this.userTypedAt(projectPath, agentId) >= since) break
+            writePty(key, '\x15')
+            if (i + 1 < n) await new Promise((r) => setTimeout(r, 10))
+          }
         }
       }
       throw e

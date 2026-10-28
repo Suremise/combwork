@@ -146,6 +146,12 @@ export interface ProviderCapabilities {
    */
   enterOnceDrawn: boolean
   /**
+   * Its input box's Ctrl+U deletes only the row the cursor is on of a line wrapped onto several, not the whole line
+   * (HI-1974: Claude Code 2.1.312; Codex and Copilot clear the line). Hive then presses it once for each row a prompt it
+   * stopped part-way took, or the rest stays in the input and goes with the next prompt. Absent: it clears the line.
+   */
+  ctrlUClearsRow?: boolean
+  /**
    * The keys its input box takes as a new line rather than a send (HI-1327), which Hive may press for a line break in a
    * prompt it types when prompts go as typed: the one it presses is the adapter's `typedNewline()` (an Advanced choice).
    * Absent: a CLI whose prompts go in as a bracketed paste, or none known, and line breaks typed become spaces.

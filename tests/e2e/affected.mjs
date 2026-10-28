@@ -357,7 +357,7 @@ export const AREAS = [
   { paths: ['src/main/agentMessages.ts'], suites: ['agentmessage', 'deliveries', 'replysize'] },
   // Deliveries and hive_inbox (#647).
   // The delivery service, its writer and readiness (#647, #649): every way into an agent goes through them.
-  { paths: ['src/main/deliveries.ts', 'src/shared/deliveries.ts', 'src/main/schema/sessionDeliveryTables.ts', 'src/main/schema/sessionDeliveryCodec.ts', 'src/main/lineWriter.ts', 'src/main/readiness.ts'], suites: ['deliveries', 'idlequestion', 'agentmessage', 'viewer', 'replysize', 'loopwakes', 'agentwatch', 'wakeuntaken', 'wakepaste', 'cardloop', 'decisionwake', 'loopwatch', 'lanewatch', 'assistantmode', 'assistant-control', 'signin', 'watchrelease', 'inboxnotices', 'hivetools', 'carryingon', 'codexqueued'] },
+  { paths: ['src/main/deliveries.ts', 'src/shared/deliveries.ts', 'src/main/schema/sessionDeliveryTables.ts', 'src/main/schema/sessionDeliveryCodec.ts', 'src/main/lineWriter.ts', 'src/main/readiness.ts'], suites: ['deliveries', 'idlequestion', 'agentmessage', 'viewer', 'replysize', 'loopwakes', 'agentwatch', 'wakeuntaken', 'wakepaste', 'cardloop', 'decisionwake', 'loopwatch', 'lanewatch', 'assistantmode', 'assistant-control', 'signin', 'watchrelease', 'inboxnotices', 'hivetools', 'carryingon', 'codexqueued', 'wakeputoff'] },
   { paths: ['src/main/inboxNotices.ts', 'src/shared/doorbell.ts', 'tests/e2e/fake-claude/fake-claude.cjs'], suites: ['inboxnotices', 'deliveries', 'agentmessage', 'turnledger', 'carryingon'] },
   { paths: ['src/shared/inboxSwitches.ts'], suites: ['carryingon', 'inboxnotices'] },
   // A long conversation's Hand Over (#1057): the notice, the footer, the dialog and the hand-over's own checks.
@@ -497,7 +497,7 @@ export const AREAS = [
   // An agent's Hooks dialog and Activity's lock blocks (HI-982), on the fake Claude Code and the fake Codex.
   { paths: ['tests/e2e/hooksview.cjs', 'src/main/hookListing.ts', 'src/shared/hooks.ts', 'src/renderer/src/components/HooksDialog.tsx', 'src/main/servers.ts', 'src/main/providers/codex/', 'src/main/providers/claude/', 'src/main/providers/copilot/'], suites: ['hooksview'] },
   // The fake Codex CLI: every suite that runs it.
-  { paths: ['tests/e2e/fake-codex/'], suites: ['accounts', 'attachread','carryingon', 'codexqueued', 'attention', 'footerfit', 'skilldelivery', 'models', 'sessiontree', 'termsize', 'freshpath', 'defaultprovider', 'providerdetect', 'codexfolder', 'turnledger', 'flightrecorder', 'hookshealth', 'hookstranscript', 'workspacenotes', 'reviewcopies', 'slotguidance', 'p7lane', 'codexnewline', 'hooksview'] },
+  { paths: ['tests/e2e/fake-codex/'], suites: ['accounts', 'attachread','carryingon', 'codexqueued', 'attention', 'footerfit', 'skilldelivery', 'models', 'sessiontree', 'termsize', 'freshpath', 'defaultprovider', 'providerdetect', 'codexfolder', 'turnledger', 'flightrecorder', 'hookshealth', 'hookstranscript', 'workspacenotes', 'reviewcopies', 'slotguidance', 'p7lane', 'codexnewline', 'hooksview', 'wakeputoff'] },
   // Hive's bundled skills and modes, read at runtime (not documentation).
   { paths: ['resources/skills/', 'src/main/bundledHistory.json'], suites: ['skills', 'skillaudience', 'skilldelivery', 'cardloop', 'replysize', 'slotguidance'] },
   { paths: ['resources/modes/', 'src/main/assistantMode.ts'], suites: ['assistant', 'assistant-control', 'assistantend', 'assistantmode', 'assistantresume'] },

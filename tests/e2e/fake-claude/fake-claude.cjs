@@ -1091,11 +1091,40 @@ function drawTrust() {
   out(`\r\nQuick safety check: Do you trust the files in ${cwd}?\r\n ${trustMenu.on === 'No' ? '>' : ' '} No, exit\r\n ${trustMenu.on === 'Yes' ? '>' : ' '} Yes, I trust this folder\r\n Enter to confirm · Esc to cancel\r\n`)
 }
 let ctrlC = 0
-/** The screen rows the input line takes (begun at the row's start), wrapped at the terminal's width and at its line breaks. */
-const lineRows = () => {
+/**
+ * A character's cells as a terminal draws it (HI-1974, HR6's round 1): two for East Asian wide and full-width ones and
+ * pictographs, none for joiners, variation selectors and combining marks, one for the rest.
+ */
+const cells = (ch) => (/\p{M}|\u200d|[\ufe00-\ufe0f]/u.test(ch) ? 0 : /[\u1100-\u115f\u2e80-\u303e\u3041-\u33ff\u3400-\u4dbf\u4e00-\u9fff\ua000-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]|\p{Extended_Pictographic}/u.test(ch) ? 2 : 1)
+/**
+ * The input line on the screen's rows, each its characters, as the terminal wraps it: at its width by each character's
+ * cells (one that doesn't fit begins the next row) and at its line breaks; begun after the box's `❯ ` (inputBox), else
+ * at the row's start.
+ */
+const lineLayout = () => {
   const cols = process.stdout.columns || 80
-  return line.split('\n').reduce((n, part) => n + Math.max(1, Math.ceil(part.length / cols)), 0)
+  const rows = [[]]
+  let x = inputBox ? 2 : 0
+  for (const ch of line) {
+    if (ch === '\n') {
+      rows.push([])
+      x = 0
+      continue
+    }
+    const w = cells(ch)
+    if (x + w > cols) {
+      rows.push([])
+      x = 0
+    }
+    rows[rows.length - 1].push(ch)
+    x += w
+  }
+  return rows
 }
+/** The screen rows the input line takes (lineLayout). */
+const lineRows = () => lineLayout().length
+/** Draws the input line again (after a key took some of it back), from its first row: `rows`, the rows it took before. */
+const redrawLine = (rows) => out(`\r${rows > 1 ? `\x1b[${rows - 1}A` : ''}\x1b[J${inputBox ? '❯ ' : ''}${line.replace(/\n/g, '\r\n')}${inputBox ? boxBelow() : ''}`)
 /** Inside a bracketed paste, which can come in several reads. */
 let inPaste = false
 /** fake-log-input.txt in its home at its start: each read of its input, as it came, goes into fake-input.jsonl there (#1286). */
@@ -1143,10 +1172,15 @@ process.stdin.on('data', (data) => {
     ctrlC = 0
     // What is typed shows on its input line, as in Claude Code (a pasted image's path too, #195).
     if (ch === '\x15') {
-      // The whole line goes, as in Claude Code, the rows it wrapped onto too (#1398: a narrow pane kept a line's first row).
-      if (line) out(`\r${lineRows() > 1 ? `\x1b[${lineRows() - 1}A` : ''}\x1b[J${inputBox ? `❯ ${boxBelow()}` : ''}`)
-      line = ''
-      enters = 0
+      // Only the screen row the cursor is on goes, as in Claude Code 2.1.312 (HI-1974: a narrow pane kept a stopped
+      // wake's first rows, sent with the next): the rows before it stay. At a row begun by a line break, that break goes.
+      if (line) {
+        const rows = lineRows()
+        const last = lineLayout().at(-1)
+        line = last.length ? [...line].slice(0, -last.length).join('') : line.slice(0, -1)
+        redrawLine(rows)
+      }
+      if (!line) enters = 0
     } else if ((ch === '\r' || ch === '\n') && !onEnter && Date.now() < drawingUntil) {
       // Still drawing the resumed conversation: the Enter is lost, what was typed stays on the line (#334).
       continue
@@ -1188,8 +1222,12 @@ process.stdin.on('data', (data) => {
       // A prompt sent while it is busy (a turn, a compaction) is dropped: recorded in fake-dropped.jsonl in its home (#725).
       else if (text && home) fs.appendFileSync(path.join(home, 'fake-dropped.jsonl'), JSON.stringify({ agent: process.env.HIVE_AGENT || 'agent', text: text.slice(0, 200), at: new Date().toISOString() }) + '\n')
     } else if (ch === '\x7f' || ch === '\b') {
-      if (line) out('\b \b')
-      line = line.slice(0, -1)
+      // One character, however wide it is drawn or whichever row it is on, as in Claude Code 2.1.312 (HI-1974).
+      if (line) {
+        const rows = lineRows()
+        line = [...line].slice(0, -1).join('')
+        redrawLine(rows)
+      }
     } else if (ch >= ' ') {
       if (!line) enters = 0
       line += ch

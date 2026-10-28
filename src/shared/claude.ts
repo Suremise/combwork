@@ -260,6 +260,8 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
     startupSizeRefresh: false,
     bracketedPaste: true,
     enterOnceDrawn: false,
+    // Its Ctrl+U deletes one wrapped row (HI-1974, seen on 2.1.312).
+    ctrlUClearsRow: true,
     // --add-dir (2.1.309).
     extraDirs: true,
     // Each account a folder of its own (HI-980), its transcripts and memory shared with the others through projects\.

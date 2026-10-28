@@ -5003,6 +5003,21 @@ under Hive in Advanced (no CLI's recording to check it against), defaulting to w
 - `hive.prompt.clearDraft` (on; at once): off, no Ctrl+U on any of `sessions.ts`'s paths (before a prompt, taking back
   one stopped part-way, before `/compact`). Codex's `/permissions` menu steps keep theirs: the menu can't open behind
   a draft.
+  - **A wrapped line stopped part-way** (HI-1974): Claude Code 2.1.312's Ctrl+U deletes only the row the cursor is on
+    of a line wrapped onto several (Codex and Copilot clear the line: each tried in a 50-column terminal). A wake put
+    off as it was typed (no longer wanted, the agent busy) kept its first rows in LB1's input, and the next wake was
+    sent after them. A CLI whose descriptor says `ctrlUClearsRow` (Claude Code) gets the stopped line taken back with
+    Backspaces instead, one for each code point Hive wrote (`backspaceKeys`), eight to a write as typing goes. A
+    Backspace deletes a character however wide it is drawn and wherever its rows wrapped, so no count of rows or
+    cells is needed (a count of rows missed wide characters: HR6's round 1). Tried on 2.1.312: 150 CJK characters, an
+    emoji sequence, a decomposed é and long words, pasted or typed, all cleared, and the next text went alone. A
+    character of several code points can make it press a few more, which delete only a draft the switch was clearing
+    anyway, and nothing in an empty input. The same guards hold: the same run, nothing the user typed since.
+  - **Still checked as it is typed:** a line's `wanted()` (deliveries.ts) is asked before each piece and before Enter,
+    as before: idle wakes turned off, Deliver Now made again (#1504) and a user's own task whose reason changed stop
+    it part-way, and it is taken back. The suites `wakeputoff` (fake Claude Code and Codex) and `wakepaste-codex` /
+    `wakepaste-copilot` (the real CLIs) hold a wrapped doorbell before its Enter (`HIVE_TEST_HOLD_TYPED`) and turn
+    idle wakes off.
 **Group E's rows 26, 27 and 30** (#1292; Darren's choices on #1120 point 5), each as Hive did by default, at once:
 - `hive.terminal.allKeysToCli` (off): on, every key in an agent's pane goes to its CLI but the command palette's
   shortcut (Show All Commands, as the user bound it), so every command stays in reach (`appTakesTerminalKey` in

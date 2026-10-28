@@ -15,7 +15,7 @@ const { copilot } = await import('../src/main/providers/copilot/adapter')
 const { TerminalScreen } = await import('../src/main/terminalScreen')
 const { advanced } = await import('../src/main/advanced')
 const { PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId } = await import('../src/shared/advanced')
-const { promptInput, rollbackKeys, typedPrompt, withoutInvisible } = await import('../src/main/sessions')
+const { backspaceKeys, promptInput, rollbackKeys, typedPrompt, withoutInvisible } = await import('../src/main/sessions')
 const { TYPED_NEWLINE_KEYS } = await import('../src/shared/terminalInput')
 const { providerService } = await import('../src/main/providerService')
 const { NEWLINE_TRIED } = await import('../src/main/providers/codex/adapter')
@@ -356,18 +356,76 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
       expect(writes).toEqual(['\x15', '\x1b[200~hello\x1b[201~', '\r'])
     })
 
-    it('a prompt stopped part-way is taken back with Ctrl+U only while the draft switch is on', async () => {
-      for (const clear of [true, false]) {
+    it('a prompt stopped part-way is taken back only while the draft switch is on (Copilot: Ctrl+U; Claude Code: Backspaces)', async () => {
+      for (const [adapter, back] of [[copilot, ['\x15']], [claudeCode, ['\x7f\x7f\x7f\x7f\x7f']]] as const) {
+        for (const clear of [true, false]) {
+          writes.length = 0
+          await running(adapter, '\x1b[?2004h')
+          // The guard passes until the line is typed, then refuses (the agent got busy): Hive stops before Enter.
+          let checks = 0
+          const guard = (): void => {
+            if (++checks > (clear ? 2 : 1)) throw new Error('busy now')
+          }
+          await withSwitches({ [PROMPT_CLEAR_DRAFT]: clear }, () => expect(sessions.sendPrompt(p, id, 'hello', guard)).rejects.toThrow('busy now'))
+          expect(writes, `${adapter.id}, clear ${clear}`).toEqual(clear ? ['\x15', '\x1b[200~hello\x1b[201~', ...back] : ['\x1b[200~hello\x1b[201~'])
+        }
+      }
+    })
+
+    // HI-1974: Claude Code 2.1.312's Ctrl+U deletes only the wrapped row the cursor is on, so one left a stopped wake's
+    // first rows in LB1's input and the next wake was sent after them; and a row count misses wide characters (HR6's
+    // round 1). Its input here is a stand-in written apart from Hive's code, as tried on 2.1.312: a paste is text, a
+    // Backspace deletes one character as the user sees it (a grapheme: stricter than the code points Hive counts), Enter
+    // sends what is there. A Ctrl+U it gets on text is recorded: it would take back one row, never what Hive needs.
+    const claudeInput = () => {
+      const graphemes = (text: string): string[] => [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)].map((g) => g.segment)
+      const input = { text: '', sent: [] as string[], ctrlUOnText: 0 }
+      let inPaste = false
+      echo.to = {
+        write: (data: string) => {
+          for (const part of data.split(/(\x1b\[20[01]~)/)) {
+            if (part === '\x1b[200~' || part === '\x1b[201~') inPaste = part === '\x1b[200~'
+            else if (inPaste) input.text += part
+            else
+              for (const ch of part) {
+                if (ch === '\x7f') input.text = graphemes(input.text).slice(0, -1).join('')
+                else if (ch === '\x15') input.ctrlUOnText += input.text ? 1 : 0
+                else if (ch === '\r') {
+                  input.sent.push(input.text)
+                  input.text = ''
+                } else input.text += ch
+              }
+          }
+        }
+      }
+      return input
+    }
+
+    it('a line with wide characters stopped part-way in Claude Code is taken back whole, and the next prompt goes alone', async () => {
+      const wide = `${'界'.repeat(500)} 👩‍💻 ${'supercalifragilisticexpialidocious-and-more '.repeat(3)}${'é'.normalize('NFD')} end`
+      for (const line of [wide, '[Hive] New in your inbox: 1 card event (LE-191) (m315). Call hive_inbox to read it. (Your watch is still on, waiting for LE-191: do what this asks, then end your turn, and Hive wakes you when it changes.)']) {
         writes.length = 0
         await running(claudeCode, '\x1b[?2004h')
-        // The guard passes until the line is typed, then refuses (the agent got busy): Hive stops before Enter.
+        const input = claudeInput()
         let checks = 0
         const guard = (): void => {
-          if (++checks > (clear ? 2 : 1)) throw new Error('busy now')
+          if (++checks > 2) throw new Error('It is no longer wanted.')
         }
-        await withSwitches({ [PROMPT_CLEAR_DRAFT]: clear }, () => expect(sessions.sendPrompt(p, id, 'hello', guard)).rejects.toThrow('busy now'))
-        expect(writes, `clear ${clear}`).toEqual(clear ? ['\x15', '\x1b[200~hello\x1b[201~', '\x15'] : ['\x1b[200~hello\x1b[201~'])
+        await expect(sessions.sendPrompt(p, id, line, guard)).rejects.toThrow('no longer wanted')
+        expect(input, line.slice(0, 20)).toEqual({ text: '', sent: [], ctrlUOnText: 0 })
+        await sessions.sendPrompt(p, id, 'the next prompt')
+        expect(input.sent, line.slice(0, 20)).toEqual(['the next prompt'])
       }
+    })
+
+    it('backspaceKeys: one for each code point written, and one for each key between typed lines', () => {
+      expect(backspaceKeys('')).toBe(0)
+      expect(backspaceKeys('hello')).toBe(5)
+      // Wide or not, one each; a character of several code points (an emoji sequence, a decomposed é) counts each.
+      expect(backspaceKeys('界界')).toBe(2)
+      expect(backspaceKeys('👩‍💻')).toBe(3)
+      expect(backspaceKeys('é'.normalize('NFD'))).toBe(2)
+      expect(backspaceKeys([5, 0, 3])).toBe(5 + 1 + 0 + 1 + 3)
     })
   })
 
