@@ -360,6 +360,8 @@
   "agents.workflowRole.builderText": "Works on cards and sends them to Review.",
   "agents.workflowRole.either": "Either",
   "agents.workflowRole.eitherText": "Builds or reviews, but never reviews its own work.",
+  "agents.workflowRole.generalist": "Generalist",
+  "agents.workflowRole.generalistText": "Does whatever you ask in its pane; takes no side in the workflow.",
   "agents.workflowRole.label": "Role in the workflow",
   "agents.workflowRole.reviewer": "Reviewer",
   "agents.workflowRole.reviewerText": "Reviews the builders’ cards and passes or fails them."

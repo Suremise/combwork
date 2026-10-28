@@ -462,7 +462,7 @@
   "assistant.template.badName": "Brak nazwy albo jest dłuższa niż {max} znaków.",
   "assistant.template.badPairs": "Jego pary wykonawców i recenzentów wskazują agentów, których nie ma, albo jednego agenta dwa razy.",
   "assistant.template.badProvider": "Agent {name} ma agenta programistycznego, którego Hive nie obsługuje ({given, select, yes {{provider}} other {brak}}).",
-  "assistant.template.badRole": "Rola agenta {name} w przepływie pracy nie jest builder, reviewer ani either.",
+  "assistant.template.badRole": "Rola agenta {name} w przepływie pracy nie jest builder, reviewer, either ani generalist.",
   "assistant.template.badSetting": "Agent {name}: Hive nie obsługuje tej wartości ({setting, select, model {model} effort {wysiłek} other {permissionMode}}).",
   "assistant.template.badToken": "{name} używa {token}: nazwa agenta może zawierać tylko '{key}' (klucz projektu) i '{n}' (jego numer wśród agentów o tej nazwie).",
   "assistant.template.from09": "Ten szablon pochodzi z Hive 0.9 i nie da się go wczytać w 1.0. Utwórz go ponownie z agentów przez „Zapisz szablon…”.",

@@ -90,7 +90,9 @@ describe('the template format', () => {
     expect(readTemplate({ ...ok, agents: Array.from({ length: 25 }, (_, i) => ({ name: `A${i}`, provider: 'claude-code' })) })).toMatch(/up to 24/)
     expect(readTemplate({ ...ok, agents: [{ name: 'A', provider: 'claude-code' }, { name: 'a', provider: 'claude-code' }] })).toMatch(/Two agents are called/)
     // A role in the workflow: one of the three, or none (the guess from its name and note).
-    expect(readTemplate({ ...ok, agents: [{ name: 'A', provider: 'claude-code', role: 'boss' }] })).toBe("A's role in the workflow isn't builder, reviewer or either.")
+    expect(readTemplate({ ...ok, agents: [{ name: 'A', provider: 'claude-code', role: 'boss' }] })).toBe("A's role in the workflow isn't builder, reviewer, either or generalist.")
+    // A generalist is a role a template keeps (HI-686).
+    expect(readTemplate({ ...ok, agents: [{ name: 'G', provider: 'claude-code', role: 'generalist' }] })).toMatchObject({ agents: [{ name: 'G', role: 'generalist' }] })
     const guessed = readTemplate({ ...ok, agents: [{ name: 'HI-R1', provider: 'codex' }, { name: 'Checker', provider: 'codex', note: 'reviews UI' }, { name: 'HI-B1', provider: 'claude-code' }] })
     expect(typeof guessed !== 'string' && guessed.agents.map((a) => a.role)).toEqual(['reviewer', 'reviewer', 'builder'])
     expect(readTemplate({ ...ok, agents: [{ name: 'A', provider: 'claude-code', note: 'x'.repeat(61) }] })).toMatch(/The note of agent A is over 60 characters/)

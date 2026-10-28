@@ -1,6 +1,6 @@
 {
   "worktrees.agent.badPlacement": "Os painéis não podem ser posicionados assim neste layout.",
-  "worktrees.agent.badWorkflowRole": "Um papel no fluxo de trabalho é builder, reviewer ou either.",
+  "worktrees.agent.badWorkflowRole": "Um papel no fluxo de trabalho é builder, reviewer, either ou generalist.",
   "worktrees.agent.chooseMove": "Escolha para onde mover o agente.",
   "worktrees.agent.enterName": "Digite um nome.",
   "worktrees.agent.gone": "Esse agente não existe mais.",

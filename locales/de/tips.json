@@ -184,6 +184,8 @@
   "tips.forYou.title": "Beantworte, was auf dich wartet",
   "tips.forYouActions.text": "Geht es bei der Frage eines Agenten um etwas, das nur du auf seiner Karte tun kannst, kann er es als Schaltfläche unter der Frage anbieten: Nach Erledigt verschieben, Ohne Code machen oder Blockierung aufheben, mit seiner vorgeschlagenen Begründung, die du ändern kannst. Ein Klick erledigt es und beantwortet dem Agenten die Frage.",
   "tips.forYouActions.title": "Mit einem Klick antworten",
+  "tips.generalistRole.text": "Gib einem Agenten in den Agent-Einstellungen die Rolle im Workflow „Generalist“, und er erledigt alles, worum du in seinem Bereich bittest: Er kommt nie in eine Lane und wird nie zum Review gebeten. Eine Karte, die er übernimmt, folgt trotzdem dem Workflow des Projekts.",
+  "tips.generalistRole.title": "Ein Agent für alles, worum du bittest",
   "tips.gitCheck.text": "Hilfe → Anbieter-Einrichtung… zeigt, welches Git Hive gefunden hat, und dessen Version. Worktree-Agenten, Mergen und die Git-Bereiche des Tabs „Versionsverwaltung“ brauchen Git for Windows 2.38 oder neuer.",
   "tips.gitCheck.title": "Ist Git bereit für Worktrees?",
   "tips.gitHistory.text": "Versionsverwaltung → Verlauf öffnet den Branch, in den deine Arbeit gemergt wird. Wähle in der Überschrift einen anderen, deinen oder den eines Remotes, und blättere unter der Liste zu älteren Commits zurück.",

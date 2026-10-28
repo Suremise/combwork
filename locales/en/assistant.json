@@ -1852,7 +1852,7 @@
     "description": "Why a template file can't be used: an agent's coding agent (Claude Code, Codex…) is no id Hive could know. {name} is the agent; {provider} what the file says; none when it says nothing."
   },
   "assistant.template.badRole": {
-    "defaultMessage": "{name}'s role in the workflow isn't builder, reviewer or either.",
+    "defaultMessage": "{name}'s role in the workflow isn't builder, reviewer, either or generalist.",
     "description": "Why a template file can't be used: an agent's role in the workflow (glossary: builder, reviewer, either) is none of the three. Keep builder, reviewer and either as they are (the file's values)."
   },
   "assistant.template.badSetting": {

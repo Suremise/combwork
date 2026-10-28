@@ -360,6 +360,8 @@
   "agents.workflowRole.builderText": "Travaille sur les cartes et les envoie en Relecture.",
   "agents.workflowRole.either": "Les deux",
   "agents.workflowRole.eitherText": "Réalise ou relit des cartes, mais ne relit jamais son propre travail.",
+  "agents.workflowRole.generalist": "Généraliste",
+  "agents.workflowRole.generalistText": "Fait ce que tu lui demandes dans son volet ; ne prend aucun côté dans le flux de travail.",
   "agents.workflowRole.label": "Rôle dans le flux de travail",
   "agents.workflowRole.reviewer": "Relecteur",
   "agents.workflowRole.reviewerText": "Relit les cartes des auteurs et les déclare validées ou refusées."

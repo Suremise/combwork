@@ -462,7 +462,7 @@
   "assistant.template.badName": "Su nombre falta o tiene más de {max} caracteres.",
   "assistant.template.badPairs": "Sus parejas de autores y revisores nombran agentes que no tiene, o un agente dos veces.",
   "assistant.template.badProvider": "El agente de programación del agente {name} no es uno que Hive pueda usar ({given, select, yes {{provider}} other {ninguno}}).",
-  "assistant.template.badRole": "El rol de {name} en el flujo de trabajo no es builder, reviewer ni either.",
+  "assistant.template.badRole": "El rol de {name} en el flujo de trabajo no es builder, reviewer, either ni generalist.",
   "assistant.template.badSetting": "El {setting, select, model {modelo} effort {esfuerzo} other {permissionMode}} del agente {name} no es uno que Hive pueda usar.",
   "assistant.template.badToken": "{name} usa {token}: el nombre de un agente solo puede contener '{key}' (la clave del proyecto) y '{n}' (su número entre los agentes con ese nombre).",
   "assistant.template.from09": "Esta plantilla es de Hive 0.9 y no se puede cargar en 1.0. Vuelve a crearla a partir de tus agentes con “Guardar plantilla…”.",

@@ -129,7 +129,7 @@ const settingsArgs = {
   mcpServers: { type: 'array', items: { type: 'string' }, description: "Only these of the project's MCP servers (names), [] none, [\"*\"] all (the default). The hive server is always given." },
   connection: { type: 'string', description: "The connection it runs on, by id or name (hive_list_providers lists those on here); its CLI is the provider. Empty: its CLI's default connection. A name two share is refused: use the id." }
 }
-const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either'], description: 'Its side in the workflow: builds cards, reviews them, or either (never its own). Default: guessed from its name.' }
+const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either', 'generalist'], description: 'Its side in the workflow: builds cards, reviews them, either (never its own), or generalist (does what it is asked in its pane; never in a lane or the reviewer pool). Default: guessed from its name.' }
 const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/agents/${enc(a.agent || '')}`
 /** Which agent is changing a card, for its history (Hive fills in the name). */
 const columnArg = { type: 'string', enum: [...COLUMN_IDS] }

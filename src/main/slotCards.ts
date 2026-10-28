@@ -24,7 +24,7 @@
 
 import { projectAgents } from '../shared/defaults'
 import { taskPrompt } from '../shared/tasks'
-import { agentWorkflowRole, buildsWork } from '../shared/workflow/roles'
+import { agentWorkflowRole, buildsWork, takesCards } from '../shared/workflow/roles'
 import { SLOT_NOTICES, workflowText } from '../shared/workflow/texts'
 import type { Fact, FactData, StartedData, StageId } from '../shared/workflow/facts'
 import { SLOTS_DELETE_MERGED, SLOTS_RENAME_ADOPTED } from '../shared/advanced'
@@ -199,7 +199,9 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
   if (!workflowEnforced()) return null
   const agents = projectAgents(await ws.projectConfig(projectPath))
   const agent = agents.find((a) => a.id === builder)
-  if (!builds(agent)) return null
+  // Any agent that takes cards (a generalist too, HI-686: never counted in the pool's size, but its card is built where
+  // the project's options say).
+  if (!agent || !takesCards(agentWorkflowRole(agent))) return null
   const name = (id: string): string => agents.find((a) => a.id === id)?.name ?? id
   const pool = await poolFor(ws, projectPath)
   const lane = card.lane ?? null

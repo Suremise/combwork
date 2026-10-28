@@ -1,6 +1,6 @@
 {
   "worktrees.agent.badPlacement": "Die Bereiche lassen sich in diesem Layout nicht so anordnen.",
-  "worktrees.agent.badWorkflowRole": "Eine Rolle im Workflow ist builder, reviewer oder either.",
+  "worktrees.agent.badWorkflowRole": "Eine Rolle im Workflow ist builder, reviewer, either oder generalist.",
   "worktrees.agent.chooseMove": "Wähle, wohin der Agent verschoben werden soll.",
   "worktrees.agent.enterName": "Gib einen Namen ein.",
   "worktrees.agent.gone": "Diesen Agenten gibt es nicht mehr.",

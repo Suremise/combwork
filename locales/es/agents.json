@@ -360,6 +360,8 @@
   "agents.workflowRole.builderText": "Trabaja en las tarjetas y las envía a Revisión.",
   "agents.workflowRole.either": "Ambos",
   "agents.workflowRole.eitherText": "Trabaja o revisa, pero nunca revisa su propio trabajo.",
+  "agents.workflowRole.generalist": "Generalista",
+  "agents.workflowRole.generalistText": "Hace lo que le pidas en su panel; no toma partido en el flujo de trabajo.",
   "agents.workflowRole.label": "Rol en el flujo de trabajo",
   "agents.workflowRole.reviewer": "Revisor",
   "agents.workflowRole.reviewerText": "Revisa las tarjetas de los autores y las da por superadas o no superadas."
