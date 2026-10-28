@@ -298,6 +298,11 @@ const check = (name, ok, extra = '') => {
   const rewatched = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', cards: [o1, o2] })
   check('…and with one, no nudge', watching.status === 200 && rewatched.status === 200 && !/No watch of yours/.test(rewatched.body?.note ?? ''), JSON.stringify({ watching: watching.body, rewatched: rewatched.body }))
   await api('POST', '/v1/tasks/wait', { cancel: true })
+  // HR2's HI-1900 round 1: its running lane updated while Builder is stopped starts Builder on it (never left active, stuck).
+  await inv('session:stop', alpha, builderId)
+  check('Builder stopped', !!(await until(async () => !(await live(alpha, builderId)), HUNG_MS)))
+  const updated = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', cards: [o2, o1] })
+  check("…its lane updated meanwhile starts Builder on it, and the reply says so", updated.status === 200 && updated.body?.did === 'updated' && /Builder wasn't running: started it on the lane\./.test(updated.body?.note ?? '') && !!(await until(async () => !!(await live(alpha, builderId)), HUNG_MS)), JSON.stringify(updated.body?.note))
   await api('POST', `/v1/lanes/${encodeURIComponent(rewatched.body?.lane?.id ?? unwatched.body?.lane?.id)}/end`, { abandoned: true })
 
   // No limit on its changes for one message (#1170; it stopped at 30): 40 more changes, then a batch, all apply.

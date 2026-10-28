@@ -4293,10 +4293,12 @@ Assistant) recorded the lane and nothing more, so a lane over stopped agents sat
 working it (27 Oct, three lanes for 50 minutes). A new lane started so now starts as Start Lane does
 (`launchRecordedLane`): the slot lent first where the builder works in slots (`lendLane`; none free: the lane's slot
 wait recorded, shown as waiting for a slot, and slotCards' pass starts its agents once one is lent), then the builder
-and reviewer each with the generated brief (`launchAgents`). The difference left is the busy agent: the window refuses
-before recording, here the lane is recorded and nothing started, the reply's `note` naming who is busy. The reply's
-`note` says who started and where, or that it waits for a slot. A builder registering its own loop starts nothing (it
-is at work); a running lane updated while its builder isn't running says so.
+and reviewer each with the generated brief (`launchAgents`). A new lane over a busy agent is refused before anything
+is recorded (`409`, `laneStartBusy`, as the window refuses it), naming who is busy and every agent of the lane as not
+started; the builder's running lane is updated whatever the builder does. The reply's `note` says who started and
+where, or that it waits for a slot. A builder registering its own loop starts nothing (it is at work); a running lane
+the Assistant or a script updates while its builder isn't running gets its builder started on it with one line naming
+the lane (`resumeLaneBuilder`: `hive_lane next` names its card) [HR2's round 1: either left the lane active, stuck].
 
 #### 16.11.4 Rounds and following a lane
 

@@ -217,6 +217,8 @@ export interface RecordedLaneLaunch {
   waitingForSlot?: string
   /** The builder or reviewer busy now (working, waiting on cards…): nothing was started, the lane is recorded. */
   busy: string[]
+  /** With `busy`: every agent of the lane, none of them started. */
+  notStarted?: string[]
 }
 
 /**
@@ -236,7 +238,7 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
   const reviewer = lane.reviewer ? (agents.find((a) => a.id === lane.reviewer!.id) ?? null) : null
   if (!builder) return null
   const busy = [builder, reviewer].filter((a): a is AgentDef => !!a && BUSY.has(sessions.liveFor(projectPath, a.id)?.status ?? '')).map((a) => a.name)
-  if (busy.length) return { started: [], busy }
+  if (busy.length) return { started: [], busy, notStarted: [builder, reviewer].flatMap((a) => (a ? [a.name] : [])) }
   const cards: { key: string; title: string }[] = []
   for (const n of lane.cards) {
     const c = await getTask(n).catch(() => null)
@@ -263,10 +265,42 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
   return { started, busy: [] }
 }
 
+/**
+ * Why a new lane the Assistant or a script asks for can't start now (HR2's HI-1900 round 1), checked before anything is
+ * recorded, as the window's Start Lane checks: its builder or reviewer busy (working, waiting on cards…), with each agent
+ * of the lane then named, none started. Null when it may start, or when the builder has a running lane in the project
+ * (the call updates that lane, whose builder needn't be idle).
+ */
+export async function laneStartBusy(ws: WorkspaceService, projectPath: string, builderId: string, reviewerId: string | null | undefined): Promise<string | null> {
+  const project = basename(projectPath).toLowerCase()
+  if ((await rawLanes(ws)).some((l) => l.state === 'active' && l.project.toLowerCase() === project && l.builder.id === builderId)) return null
+  const agents = projectAgents(await ws.projectConfig(projectPath))
+  const lane = [builderId, reviewerId].flatMap((id) => agents.filter((a) => id && a.id === id))
+  const busy = lane.filter((a) => BUSY.has(sessions.liveFor(projectPath, a.id)?.status ?? ''))
+  if (!busy.length) return null
+  return `${busy.map((a) => `${a.name} is ${sessions.liveFor(projectPath, a.id)?.status ?? 'busy'}`).join(' and ')}, so the lane wasn't started, nor ${lane.map((a) => a.name).join(' or ')}: start it again once ${busy.length > 1 ? 'they are' : `${busy[0].name} is`} idle.` // i18n-ignore: the lane start's refusal (the Assistant and scripts read it)
+}
+
+/**
+ * A running lane the Assistant or a script updated while its builder isn't running (HR2's HI-1900 round 1): its builder
+ * started with one line naming its lane, as coordinate-agents had the Assistant do, so the lane goes on (`hive_lane next`
+ * names its card; a card in a slot is placed there as it starts). What happened, for the reply.
+ */
+export async function resumeLaneBuilder(projectPath: string, lane: { id: string; builder: { id: string; name: string } }): Promise<string> {
+  if (sessions.liveFor(projectPath, lane.builder.id)) return ''
+  try {
+    await sessions.start(projectPath, { agentId: lane.builder.id, prompt: `Use card-loop as the builder of lane ${lane.id}: hive_lane next names your card.` }) // i18n-ignore: the builder's prompt (agent-facing)
+    log.info(`Lane ${lane.id}: started its builder ${userText(lane.builder.name)}, who wasn't running`)
+    return `${lane.builder.name} wasn't running: started it on the lane.` // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
+  } catch (e) {
+    return `${lane.builder.name} isn't running and couldn't be started (${(e as Error).message}): start it for the lane to go on.` // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
+  }
+}
+
 /** What `launchRecordedLane` did, for the lane start's reply (agent-facing English: the Assistant and scripts read it). */
 export function recordedLaneNote(l: RecordedLaneLaunch | null): string {
   if (!l) return ''
-  if (l.busy.length) return `${l.busy.join(' and ')} ${l.busy.length > 1 ? 'are' : 'is'} busy, so the lane's agents weren't started: the lane is recorded; tell ${l.busy.length > 1 ? 'them' : 'it'} about it, or start the agents once idle.` // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
+  if (l.busy.length) return `${l.busy.join(' and ')} ${l.busy.length > 1 ? 'are' : 'is'} busy, so none of the lane's agents was started (${(l.notStarted ?? l.busy).join(', ')}): the lane is recorded; start them on it once idle.` // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
   if (l.waitingForSlot !== undefined) return `No slot is free (${l.waitingForSlot}): the lane waits for one, and its agents start once it is lent.` // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
   const ok = l.started.filter((s) => s.how !== 'failed').map((s) => s.name)
   const failed = l.started.filter((s) => s.how === 'failed').map((s) => `${s.name} didn't start (${s.why ?? 'unknown'})`) // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
