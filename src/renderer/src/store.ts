@@ -1784,26 +1784,6 @@ async function workflowForms(): Promise<Record<string, WorkflowForm>> {
 
 export const boardStagesFor =(s: Pick<State, 'workspace' | 'workflowVersion'>): string => `${s.workspace?.path ?? ''}|${s.workflowVersion}|${(s.workspace?.projects ?? []).map((p) => `${p.path}:${p.platform?.id ?? ''}`).join('|')}`
 
-/** Key reads outside the board's (readProjectKeys): only the latest is kept. */
-let keysLoad = 0
-
-/**
- * The projects' keys read from main between the board's reads (HI-1948: a menu naming agents with a key the window
- * doesn't have yet). Kept as readTasks keeps its own: only the latest such read, only for the workspace it was made for
- * (one this window has left since is dropped), and never over keys a board read brought since it began. Returns whether
- * the window is still on that workspace.
- */
-export async function readProjectKeys(): Promise<boolean> {
-  const ws = get().workspace?.path
-  if (!ws) return false
-  const mine = ++keysLoad
-  const reads = get().boardReads
-  const keys = await window.hive.invoke('project:keys').catch(() => null)
-  if (get().workspace?.path !== ws) return false
-  if (keys && mine === keysLoad && get().boardReads === reads) set({ projectKeys: keys })
-  return true
-}
-
 /** A project's key and its old keys, as the board has them (#1221). */
 export type ProjectKeys = { projectPath: string; key: string; aliases: string[] }
 
