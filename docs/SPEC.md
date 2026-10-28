@@ -5000,10 +5000,13 @@ under Hive in Advanced (no CLI's recording to check it against), defaulting to w
   - **A wrapped line stopped part-way** (HI-1974): Claude Code 2.1.312's Ctrl+U deletes only the row the cursor is on
     of a line wrapped onto several (Codex and Copilot clear the line: each tried in a 50-column terminal). A wake put
     off as it was typed (no longer wanted, the agent busy) kept its first rows in LB1's input, and the next wake was
-    sent after them. A CLI whose descriptor says `ctrlUClearsRow` (Claude Code) gets one Ctrl+U for each row the
-    stopped line took (`rowKeys`: its length over the terminal's width less 6, one more once it wraps), each its own
-    key. One too many deletes the row before it, which can only be a draft the switch was clearing anyway, and does
-    nothing in an empty input.
+    sent after them. A CLI whose descriptor says `ctrlUClearsRow` (Claude Code) gets the stopped line taken back with
+    Backspaces instead, one for each code point Hive wrote (`backspaceKeys`), eight to a write as typing goes. A
+    Backspace deletes a character however wide it is drawn and wherever its rows wrapped, so no count of rows or
+    cells is needed (a count of rows missed wide characters: HR6's round 1). Tried on 2.1.312: 150 CJK characters, an
+    emoji sequence, a decomposed é and long words, pasted or typed, all cleared, and the next text went alone. A
+    character of several code points can make it press a few more, which delete only a draft the switch was clearing
+    anyway, and nothing in an empty input. The same guards hold: the same run, nothing the user typed since.
   - **Still checked as it is typed:** a line's `wanted()` (deliveries.ts) is asked before each piece and before Enter,
     as before: idle wakes turned off, Deliver Now made again (#1504) and a user's own task whose reason changed stop
     it part-way, and it is taken back. The suites `wakeputoff` (fake Claude Code and Codex) and `wakepaste-codex` /
