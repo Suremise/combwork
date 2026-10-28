@@ -255,6 +255,34 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   check('search finds transcript text, with the match under its session', JSON.stringify(await names()) === JSON.stringify(['Old notes']) && /zebra/i.test(await page.locator('.sessions-tree .search-hit').first().innerText()), JSON.stringify(await names()))
   check('the count says how many sessions and matches', /1 session · \d+ match/.test(await page.locator('.sessions-scope').innerText()), await page.locator('.sessions-scope').innerText())
   await narrowShots('count', page.locator('.sessions-scope'))
+  // Longer counts, as the catalogues word them (HR1's HI-1941 round 1: Japanese and Spanish at 200 px ran past the edge),
+  // put into the count itself: each stays within the list, wrapping when it must.
+  {
+    const { IntlMessageFormat } = require('intl-messageformat')
+    const said = (code, values) => new IntlMessageFormat(JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', code, 'sessions.json'), 'utf8'))['sessions.search.count'], code).format(values)
+    const count = page.locator('.sessions-scope')
+    const width = await list.evaluate((e) => e.style.width)
+    await list.evaluate((e) => (e.style.width = '200px'))
+    await lib.until(async () => Math.round((await list.boundingBox()).width) === 200, HUNG_MS)
+    for (const [code, values] of [
+      ['ja', { kind: 'session', sessions: 200, hits: 8000, more: '+' }],
+      ['es', { kind: 'conversation', sessions: 12, hits: 40, more: '+' }],
+      ['de', { kind: 'session', sessions: 1200, hits: 8000, more: '+' }]
+    ]) {
+      const text = said(code, values)
+      const was = await count.evaluate((e) => e.textContent)
+      const fits = await count.evaluate((e, t) => {
+        e.textContent = t
+        const edge = e.closest('.sessions-list').getBoundingClientRect().right
+        const row = e.parentElement
+        return e.getBoundingClientRect().right <= edge + 0.5 && row.scrollWidth <= row.clientWidth
+      }, text)
+      check(`a longer count at 200 px (${code}: ${text}) stays within the list`, fits, text)
+      await list.screenshot({ path: path.join(lib.WORK, `sessiontree-narrow-longcount-${code}-dark.png`) })
+      await count.evaluate((e, t) => (e.textContent = t), was)
+    }
+    await list.evaluate((e, w) => (e.style.width = w), width)
+  }
   await search.fill('')
   await lib.until(async () => (await names()).length > 1, 5000)
 

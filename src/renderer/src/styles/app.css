@@ -5555,22 +5555,18 @@ h2.section#unused-worktrees {
 .split-list.sessions-list {
   width: 320px;
 }
-/* While searching: how many sessions and matches, after the Archived box. */
+/* While searching: how many sessions and matches, after the Archived box; the note while the CLIs' own sessions are read
+   (HI-1681). Each goes under the box when it doesn't fit beside it, and wraps within the list when it doesn't fit there
+   either (a long count in another language, the note), never past its edge (HI-1941); its spinner kept at its first line. */
 .sessions-scope {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
   margin-left: auto;
-  white-space: nowrap;
-}
-/* The note while the CLIs' own sessions are read (HI-1681) is a sentence: it wraps within the list rather than run past
-   its edge (HI-1941), its spinner kept at its first line. */
-.sessions-scope[data-loading] {
-  align-items: flex-start;
   min-width: 0;
-  white-space: normal;
+  overflow-wrap: anywhere;
 }
-.sessions-scope[data-loading] > .codicon {
+.sessions-scope > .codicon {
   flex-shrink: 0;
   margin-top: 1px;
 }
