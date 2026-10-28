@@ -347,12 +347,12 @@ describe("a queue's Recent merges (HI-1924)", () => {
 
   it("the agent filter keeps its cards' outcomes and pauses; a pause of the queue itself always shows", () => {
     const v = view({ recent: [recent({ card: 1, entry: 'x' }), recent({ card: 2, entry: 'y' })], pauses: [pause({ card: 'HI-1' }), pause({ card: 'HI-2', at: iso(NOW - 40_000) }), pause({ card: '', at: iso(NOW - 45_000) })] })
-    const { rows } = historyRows(v, { number: (n) => n === 1, key: (k) => k === 'HI-1' })
+    const { rows } = historyRows(v, { number: (c) => c === 1, key: (k) => k === 'HI-1' })
     expect(rows.map((r) => (r.kind === 'outcome' ? r.r.entry : r.p.card))).toEqual(['HI-1', '', 'x'])
   })
 
   it('says each outcome, pause and push in a few words', () => {
-    setLanguage('en')
+    setLanguage('en', {})
     expect(historyOutcome(recent({}), '', tr)).toBe('Merged')
     expect(historyOutcome(recent({ outcome: 'returned', reason: 'conflict', files: ['a.ts'] }), 'conflict in a.ts', tr)).toBe('Returned: conflict in a.ts')
     expect(historyOutcome(recent({ outcome: 'cancelled', reason: 'removed' }), '', tr)).toBe('Taken out: Remove from queue')

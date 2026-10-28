@@ -78,14 +78,14 @@ describe("the queue's time taken over an entry (HI-1924)", () => {
 
 /** Facts as a card's store gives them, in order, a second apart (`at` in seconds from T0). */
 const T0 = Date.parse('2026-10-28T09:00:00.000Z')
-function facts(list: [FactKind, number, Record<string, unknown>][]): Fact[] {
+function factsOf(list: [FactKind, number, Record<string, unknown>][]): Fact[] {
   return list.map(([kind, s, data], i) => ({ seq: i + 1, card: 1, kind, at: new Date(T0 + s * 1000).toISOString(), actor: { kind: 'hive' }, source: 'recorded', data }) as unknown as Fact)
 }
 const check = (entry: string | undefined, durationS: number) => ({ name: 'quick', command: 'q', revision: 'r', tested: 'r', result: 'passed', run: 'x', durationMs: durationS * 1000, by: HIVE_RUNS, counted: true, ...(entry ? { entry } : {}) })
 
 describe('entryTook from facts alone (HI-1924)', () => {
   it('two targets at once: each entry counts only the checks naming it', () => {
-    const f = facts([
+    const f = factsOf([
       ['IntegrationRequested', 0, { entry: 'm', target: 'main' }],
       ['IntegrationRequested', 1, { entry: 'r', target: 'release' }],
       ['CheckRan', 30, check('m', 20)],
@@ -98,7 +98,7 @@ describe('entryTook from facts alone (HI-1924)', () => {
   })
 
   it('no merge checks: from its merge (IntegrationStarted) to Integrated', () => {
-    const f = facts([
+    const f = factsOf([
       ['IntegrationRequested', 0, { entry: 'e', target: 'main' }],
       ['IntegrationStarted', 50, { entry: 'e' }],
       ['Integrated', 53, { entry: 'e', target: 'main' }]
@@ -107,13 +107,13 @@ describe('entryTook from facts alone (HI-1924)', () => {
   })
 
   it("old checks that don't name their entry: counted between its request and outcome, unless another entry of the card was open then", () => {
-    const alone = facts([
+    const alone = factsOf([
       ['IntegrationRequested', 0, { entry: 'e', target: 'main' }],
       ['CheckRan', 30, check(undefined, 20)],
       ['Integrated', 35, { entry: 'e', target: 'main' }]
     ])
     expect(entryTook(alone, 'e')).toBe(25_000)
-    const overlapping = facts([
+    const overlapping = factsOf([
       ['IntegrationRequested', 0, { entry: 'e', target: 'main' }],
       ['IntegrationRequested', 1, { entry: 'o', target: 'release' }],
       ['CheckRan', 30, check(undefined, 20)],
@@ -124,7 +124,7 @@ describe('entryTook from facts alone (HI-1924)', () => {
   })
 
   it('a cancel before anything ran, or an entry with no outcome yet: no time', () => {
-    const f = facts([
+    const f = factsOf([
       ['IntegrationRequested', 0, { entry: 'c', target: 'main' }],
       ['IntegrationCancelled', 5, { entry: 'c', reason: 'removed' }],
       ['IntegrationRequested', 6, { entry: 'open', target: 'main' }]
