@@ -51,6 +51,8 @@ let resolveDelayMs = 0
  * finish answered; `hangFinishOnce`, the first finish taken but not answered, a second refused as Hive does (409).
  */
 let lose: 'none' | 'hangStart' | 'hangFinish' | 'hangFinishOnce' = 'none'
+/** How long the stand-in holds a run's start before taking it (HR2's round 1: a start Hive takes late, in time). */
+let startDelayMs = 0
 /** What the stand-in answers a run's finish (#1654: how a check's run counted). */
 let finishReply: Record<string, unknown> = {}
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
@@ -81,6 +83,7 @@ beforeAll(async () => {
       res.setHeader('Content-Type', 'application/json')
       if (refuse) return res.writeHead(401).end('{"error":"no"}')
       if (lose === 'hangStart' && req.method === 'POST' && req.url === '/v1/progress') return
+      if (startDelayMs && req.method === 'POST' && req.url === '/v1/progress') return void setTimeout(() => res.end(JSON.stringify({ id: `run-${calls.length}` })), startDelayMs)
       if (req.method === 'POST' && req.url?.endsWith('/finish')) {
         if (lose === 'hangFinish') return
         if (lose === 'hangFinishOnce') return calls.filter((c) => c.path.endsWith('/finish')).length > 1 ? res.writeHead(409).end('{"error":"That run has finished"}') : undefined
@@ -98,6 +101,7 @@ beforeEach(() => {
   resolves.length = 0
   resolveReply = { status: 404, body: { error: 'No such route' } }
   resolveDelayMs = 0
+  startDelayMs = 0
   lose = 'none'
   finishReply = {}
   refuse = false
@@ -442,6 +446,18 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     expect(await wrap(['--', node, '-e', 'process.exit(3)'], env(), 0, dir, quick)).toEqual({ code: 3, out: '', err: '' })
     expect(finishes()).toBe(1)
   }, 30_000)
+
+  it("a quick check's start Hive takes late but within its time is followed by its finish, never given up first (HR2's round 1)", async () => {
+    // Its finish's own budget (twice 300 ms and a 50 ms pause) is shorter than the start's wait: the start's time comes first.
+    startDelayMs = 1500
+    const run = new ProgressRun({ url, token: 'agent-token', workspace: '' }, { title: 'quick', check: 'typecheck' }, { startTimeoutMs: 5000 })
+    await run.finish(true, undefined, 300, {}, 50)
+    expect(run.finishedAs()).toBe('answered')
+    expect(calls.map((c) => [c.method, c.path.replace(/run-\d+/, 'ID')])).toEqual([
+      ['POST', '/v1/progress'],
+      ['POST', '/v1/progress/ID/finish']
+    ])
+  })
 
   it('says why for each reason a check run is not counted (#1654)', () => {
     const line = (whyNot: string, more: Record<string, unknown> = {}, isolated = false) => uncountedLine({ check: { name: 'lint', counted: false, whyNot, platform: 'git', ...more } }, isolated)

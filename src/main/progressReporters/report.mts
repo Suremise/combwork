@@ -130,12 +130,16 @@ export class ProgressRun {
   private lineStep = -1
   /** How its finish went (HI-1892): see `finishedAs`. */
   private finishOutcome: FinishOutcome | null = null
+  /** When its start was sent, and the longest it may take: a finish waits for what is left of it first (HR2's round 1). */
+  private readonly startedAt = Date.now()
+  private readonly startTimeoutMs: number
 
   /** `startTimeoutMs`: how long its start may take to answer (default 3 s; it is sent beside the command, never before it). */
   constructor(target: ProgressTarget | null, start: ProgressStart, opts: { minIntervalMs?: number; fetch?: Fetch; lines?: (line: string) => void; startTimeoutMs?: number } = {}) {
     this.target = target
     this.fetchImpl = opts.fetch ?? (globalThis.fetch as unknown as Fetch)
     this.minIntervalMs = opts.minIntervalMs ?? 500
+    this.startTimeoutMs = opts.startTimeoutMs ?? 3000
     const total = count(start.total, MAX_TOTAL) || undefined
     this.maxStep = total ?? MAX_TOTAL
     this.hasTotal = total !== undefined
@@ -159,7 +163,7 @@ export class ProgressRun {
       pid: process.pid
     }
     this.id = target
-      ? this.send('POST', '/v1/progress', body, opts.startTimeoutMs ?? 3000).then((r) => (r && typeof (r as { id?: unknown }).id === 'string' ? (r as { id: string }).id : null))
+      ? this.send('POST', '/v1/progress', body, this.startTimeoutMs).then((r) => (r && typeof (r as { id?: unknown }).id === 'string' ? (r as { id: string }).id : null))
       : Promise.resolve(null)
     this.chain = this.id
     this.lines = target ? undefined : opts.lines
@@ -265,7 +269,10 @@ export class ProgressRun {
         return r?.ok ? r.body : null
       })
     let timer: ReturnType<typeof setTimeout> | undefined
-    const bound = (retry !== undefined ? 2 * finishWaitMs + retry : finishWaitMs) + 250
+    // Its start may still be waiting for Hive (a quick command's start goes as it ends): what is left of the start's own
+    // time comes first, so a start Hive takes within it is followed by the finish (HR2's round 1), then the finish's.
+    const startLeft = Math.max(0, this.startedAt + this.startTimeoutMs - Date.now())
+    const bound = startLeft + (retry !== undefined ? 2 * finishWaitMs + retry : finishWaitMs) + 250
     const answer = await Promise.race([done, new Promise((r) => (timer = setTimeout(() => r(null), bound)))])
     clearTimeout(timer)
     this.finishOutcome ??= 'noReply'
