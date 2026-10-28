@@ -41,3 +41,42 @@ export function newerEnd(kept: SessionEnd | undefined, next: SessionEnd): Sessio
   if (kept.runId === next.runId) return kept
   return next.startedAt < kept.startedAt ? kept : next
 }
+
+/** A change to the ends kept, by agent: the same object when nothing changes. */
+export type EndsChange = (ends: Record<string, SessionEnd>) => Record<string, SessionEnd>
+
+/**
+ * The run each agent's window last saw start (HI-1881), and the changes to the ends it keeps, worked out as they are
+ * applied (HI-1862: shown with the agents' states, a while after they were made). A run starting drops an end of any
+ * other run, kept or still to be shown; an end is kept only while no other run has started since, checked again as it
+ * is applied, so an older run's end never outlives a newer run's start.
+ */
+export function sessionEndBook(): {
+  run: (key: string, runId: string) => EndsChange | null
+  end: (key: string, end: SessionEnd) => EndsChange | null
+  forget: (key: string) => void
+} {
+  const lastRuns = new Map<string, string>()
+  const otherRun = (key: string, runId: string): boolean => {
+    const last = lastRuns.get(key)
+    return !!last && last !== runId
+  }
+  return {
+    // Null when it is the run already known: nothing to drop.
+    run: (key, runId) => {
+      if (lastRuns.get(key) === runId) return null
+      lastRuns.set(key, runId)
+      return (ends) => {
+        if (!ends[key] || !otherRun(key, ends[key].runId)) return ends
+        const { [key]: _, ...rest } = ends
+        return rest
+      }
+    },
+    // Null for an older run's end than the latest seen start.
+    end: (key, end) => {
+      if (otherRun(key, end.runId)) return null
+      return (ends) => (otherRun(key, end.runId) ? ends : { ...ends, [key]: newerEnd(ends[key], end) })
+    },
+    forget: (key) => void lastRuns.delete(key)
+  }
+}

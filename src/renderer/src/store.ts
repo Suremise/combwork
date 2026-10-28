@@ -55,7 +55,7 @@ import type { KeptReturn } from '@shared/progressQueue'
 import type { SessionAction } from './util'
 import { storeUpdated } from './pageMarks'
 import { keepSame } from '@shared/keepSame'
-import { newerEnd, type SessionEnd } from '@shared/sessionEnd'
+import { sessionEndBook, type EndsChange, type SessionEnd } from '@shared/sessionEnd'
 import { rememberTab, shownTab } from '@shared/tabs'
 
 export type Activity = 'projects' | 'overview' | 'performance' | 'board' | 'notes' | 'skills' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
@@ -1280,28 +1280,29 @@ function liveWindowEnds(): void {
 }
 
 /** The run each agent's window last saw start (HI-1881), by projectKey: an exit of any other run is an older one's. */
-const lastRuns = new Map<string, string>()
+const endBook = sessionEndBook()
 
-/** Notes the run an agent's live state is of (its latest launch); an end kept for another run no longer applies. */
+/** A change to the ends kept, as a store update: none when they stay the same. */
+const endsUpdate =
+  (change: EndsChange) =>
+  (s: State): Partial<State> => {
+    const ends = change(s.sessionEnds)
+    return ends === s.sessionEnds ? {} : { sessionEnds: ends }
+  }
+
+/**
+ * Notes the run an agent's live state is of (its latest launch): an end of another run, kept or still to be shown, no
+ * longer applies. With the state that brought it (applyLiveState, next): one update for both.
+ */
 export function noteRun(projectPath: string, agentId: string, runId: string): void {
-  const key = projectKey(projectPath, agentId)
-  if (lastRuns.get(key) === runId) return
-  lastRuns.set(key, runId)
-  // With the state that brought it (applyLiveState, next): one update for both.
-  if (get().sessionEnds[key] && get().sessionEnds[key].runId !== runId)
-    setWithLive((s) => {
-      if (s.sessionEnds[key]?.runId === runId || !s.sessionEnds[key]) return {}
-      const { [key]: _, ...rest } = s.sessionEnds
-      return { sessionEnds: rest }
-    }, true)
+  const change = endBook.run(projectKey(projectPath, agentId), runId)
+  if (change) setWithLive(endsUpdate(change), true)
 }
 
-/** Keeps an ended run's why and when (HI-1881), unless it is an older run's than the latest the window saw start. */
+/** Keeps an ended run's why and when (HI-1881), unless it is an older run's than the latest the window saw start, then or when it is shown. */
 export function noteEnd(projectPath: string, agentId: string, end: SessionEnd): void {
-  const key = projectKey(projectPath, agentId)
-  const last = lastRuns.get(key)
-  if (last && last !== end.runId) return
-  setWithLive((s) => ({ sessionEnds: { ...s.sessionEnds, [key]: newerEnd(s.sessionEnds[key], end) } }))
+  const change = endBook.end(projectKey(projectPath, agentId), end)
+  if (change) setWithLive(endsUpdate(change))
 }
 
 /** Drops the ends of agents no longer in the window's workspace (their agent, project or workspace gone). */
@@ -1309,7 +1310,7 @@ export function pruneEnds(keep: (key: string) => boolean): void {
   const ends = get().sessionEnds
   const gone = Object.keys(ends).filter((k) => !keep(k))
   if (!gone.length) return
-  for (const k of gone) lastRuns.delete(k)
+  for (const k of gone) endBook.forget(k)
   set((s) => ({ sessionEnds: Object.fromEntries(Object.entries(s.sessionEnds).filter(([k]) => keep(k))) }))
 }
 
