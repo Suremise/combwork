@@ -166,6 +166,8 @@
   "panes.session.renameTitle": "セッションの名前を変更",
   "panes.session.showAttachments": "セッションの添付ファイルを表示",
   "panes.session.starting": "{kind, select, resume {再開中…} other {開始中…}}",
+  "panes.stopped.label": "停止 · {time}",
+  "panes.stopped.line": "停止 · {time} · {why, select, you {あなたが停止} assistant {アシスタントが停止} agent {エージェントが停止} lane {レーンが終了} closed {ワークスペースを閉じた} quit {Hiveを終了} exited {CLIが終了} crashed {CLIがコード {code} で終了} other {停止}}",
   "panes.tab.failed": "開始に失敗：{why}",
   "panes.tab.mcp": "MCPサーバー：{servers}",
   "panes.tab.notRunning": "停止中",

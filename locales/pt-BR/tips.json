@@ -398,6 +398,8 @@
   "tips.startFreshIdle.title": "Comece de novo com os agentes ociosos quando o trabalho terminar",
   "tips.startNewAll.text": "Começar de novo, no menu Agentes do cabeçalho do projeto, dá a cada agente uma nova sessão depois de uma pergunta; Arquivar e começar de novo arquiva as antigas antes. As conversas continuam na aba Sessões.",
   "tips.startNewAll.title": "Sessões novas para todos os agentes",
+  "tips.stoppedPane.text": "Quando a sessão de um agente termina, o painel dele fica esmaecido e a barra diz quando e por quê (parado por você, sua raia terminou, sua CLI terminou…). A última saída continua legível, e Retomar ou Nova sessão ali o iniciam de novo.",
+  "tips.stoppedPane.title": "Um agente parado parece parado",
   "tips.storageCleanup.text": "Configurações do projeto → Armazenamento mostra quanto espaço os backups, os arquivados, os anexos e os worktrees de um projeto ocupam. Limpar… move anexos e backups antigos para a Lixeira e mostra antes exatamente o que vai.",
   "tips.storageCleanup.title": "Veja o que o Hive guarda e faça uma limpeza",
   "tips.storagePurge.text": "Expurgar… em Configurações do projeto → Armazenamento, ou Expurgar os arquivos do Hive… em uma sessão, remove o que o Hive guarda das sessões: backups, anexos e sobras. Ele lista cada arquivo antes; os arquivos dos agentes e seus totais de uso ficam.",

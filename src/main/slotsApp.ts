@@ -664,7 +664,7 @@ function laneEnd(projectPath: string, lease: SlotLease, slotName: string, w: Slo
     waitsFor: () => laneEndWaitsFor(projectPath, w.agent, w.run),
     note,
     retire: async (why) => void (await cancelFromSource(projectPath, LANE_END_SOURCE, lease.id, why)),
-    quit: (why, force) => sessions.quit(projectPath, w.agent, w.run, { fenced, why, force, ready: () => laneEndHeldNow(projectPath, w.agent, w.run) }),
+    quit: (why, force) => sessions.quit(projectPath, w.agent, w.run, { fenced, why, force, ready: () => laneEndHeldNow(projectPath, w.agent, w.run), cause: 'lane' }),
     watch: (look) => {
       const offEvents = onHiveEvent((e) => {
         if ((e.type === 'session-status' && e.state.agentId === w.agent && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
@@ -799,7 +799,7 @@ export async function slotTest(pool: SlotPool, op: SlotTestOp): Promise<unknown>
     case 'quit': {
       // A lane's end's quit of a running CLI (HI-1706's cliquit, the real Claude Code and Codex): its run now, unfenced.
       const r = sessions.runNow(pool.deps.project, op.agent)
-      return r ? sessions.quit(pool.deps.project, op.agent, r.run, { fenced: () => true, why: 'a test asked' }) : 'gone' // i18n-ignore: for the log
+      return r ? sessions.quit(pool.deps.project, op.agent, r.run, { fenced: () => true, why: 'a test asked', cause: 'lane' }) : 'gone' // i18n-ignore: for the log
     }
     default:
       throw new Error('unknown slot test op') // i18n-ignore: a test channel, never shown

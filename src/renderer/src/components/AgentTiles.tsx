@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import type { AgentState } from '@shared/agentState'
+import { stoppedLabel, useStoppedEnd } from '../stopped'
 import { agentDoingCards, agentReviewCards } from '@shared/tasks'
 import { cardsText } from '@shared/agentTable'
 import { compactThreshold, pageEndIndex, transcriptWarnLimit } from '@shared/defaults'
@@ -93,11 +94,13 @@ const back = (project: ProjectInfo): void => focusTileAfter(closeTile(project))
 
 const NOT_RUNNING = msg({ id: 'panes.tiles.notRunning', defaultMessage: 'Not running', description: "An agent's status on its tile (the Tiles view) and in the focus view's strip: its session isn't running." })
 
-/** An agent's status in words: its session's, why its launch failed, or that it isn't running. */
+/** An agent's status in words: its session's, why its launch failed, when it stopped (HI-1881), or that it isn't running. */
 function useStatus(project: ProjectInfo, a: AgentInfo): string {
   const failure = useStore((s) => (a.live ? undefined : s.startFailures[projectKey(project.path, a.id)]))
+  const end = useStoppedEnd(project.path, a)
   if (a.live) return statusText(a.live)
   if (failure) return tr(FAILED_TO_START, { why: failure.reason.split('\n')[0] })
+  if (end) return stoppedLabel(end)
   return tr(NOT_RUNNING)
 }
 
@@ -189,6 +192,8 @@ function Tile({ project, a, state, tabStop, movable, onFocus, onMenu }: { projec
   const settings = useStore((s) => s.settings)
   const flash = useStore((s) => s.paneFlash)
   const status = useStatus(project, a)
+  // Stopped (HI-1881): its own mark grey, as its pane's header has it.
+  const stoppedEnd = useStoppedEnd(project.path, a)
   const usage = useLiveUsage(project, a.id)
   const now = useNow()
   const live = a.live
@@ -253,7 +258,7 @@ function Tile({ project, a, state, tabStop, movable, onFocus, onMenu }: { projec
         </span>
       )}
       <span className="tile-head">
-        <StateMark state={state} />
+        <StateMark state={state} className={stoppedEnd ? 'stopped' : undefined} label={stoppedEnd ? stoppedLabel(stoppedEnd) : undefined} />
         <span className="tile-name">{a.name}</span>
         <span className="tile-provider">{providerName(agentProviderOf(project, a))}</span>
       </span>
@@ -572,6 +577,8 @@ function StripItem({ project, a, state, active, drag }: { project: ProjectInfo; 
     else if (document.activeElement !== ref.current) ref.current?.focus()
   })
   const status = useStatus(project, a)
+  // Stopped (HI-1881): its own mark grey, as its pane's header has it.
+  const stoppedEnd = useStoppedEnd(project.path, a)
   const cards = useRowCards(project, a.id)
   const [nameRef, clipped] = useClipped<HTMLSpanElement>()
   const shown = cards[0]?.card.number
@@ -602,7 +609,7 @@ function StripItem({ project, a, state, active, drag }: { project: ProjectInfo; 
             }
           : {})}
       >
-        <StateMark state={state} />
+        <StateMark state={state} className={stoppedEnd ? 'stopped' : undefined} label={stoppedEnd ? stoppedLabel(stoppedEnd) : undefined} />
         {/* Its name in full on hover when it is cut short. */}
         <Tooltip content={clipped ? a.name : null} block>
           <span ref={nameRef} className="tile-strip-name">

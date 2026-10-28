@@ -1232,6 +1232,8 @@ kbd {
 .state-mark.stalled { width: 8px; height: 8px; margin: 0.5px; background: var(--state-stalled); border-radius: 1px; }
 .state-mark.working { background: var(--state-working); border-radius: 50%; animation: pulse 1.2s ease-in-out infinite; }
 .state-mark.idle { border: 2px solid var(--state-idle); border-radius: 50%; }
+/* A stopped agent's own mark (HI-1881): still idle, its ring grey as its status's dot. */
+.state-mark.idle.stopped { border-color: var(--fg-faint); }
 @media (prefers-reduced-motion: reduce) {
   .state-mark.working { animation: none; }
 }
@@ -2519,6 +2521,11 @@ textarea.input {
      IntersectionObserver), and visibility alone doesn't change that, so hidden terminals were drawn with every write. */
   transform: translateX(-200vw);
 }
+/* A stopped agent's terminal (HI-1881): dimmed to show it isn't at work; its text still scrolls, selects and copies. */
+.terminal-host.dimmed .terminal-mount {
+  opacity: 0.5;
+  filter: saturate(0.4);
+}
 .terminal-mount {
   width: 100%;
   height: 100%;
@@ -2564,6 +2571,27 @@ textarea.input {
 .session-ended > .codicon {
   font-size: 16px;
   color: var(--fg-muted);
+}
+/* A stopped agent's bar (HI-1881): over its dimmed terminal, plainly a stop, with when and why. */
+.session-ended.stopped {
+  border-inline-start: 3px solid var(--fg-faint);
+  background: var(--bg-elevated, var(--bg-sidebar));
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.18);
+}
+.session-ended.stopped > .grow {
+  color: var(--fg-strong);
+  font-weight: 600;
+}
+/* Its header's status: a grey dot before "Stopped · 20:46". */
+.pane-status.stopped::before {
+  content: '';
+  display: inline-block;
+  inline-size: 7px;
+  block-size: 7px;
+  margin-inline-end: 5px;
+  border-radius: 50%;
+  background: var(--fg-faint);
+  vertical-align: middle;
 }
 .session-empty-card {
   text-align: center;

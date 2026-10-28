@@ -111,6 +111,7 @@
 //   it couldn't refresh: "Failed to authenticate: OAuth session expired and could not be refreshed", exit 1 (#577).
 //   With "late": true instead, nothing shows it until a prompt is sent: the prompt isn't taken (no turn, no hook) and
 //   "Not logged in · Run /login" shows under it, as Claude Code's status line did in #1321.
+// - "/crash" typed in it exits with 1 at once, a CLI crashing by itself (HI-1881's stopped pane says so).
 // - `--model fail-start` makes it refuse to start, printing an error and exiting with 1, as Claude Code does for an
 //   argument it rejects.
 // - `-p --input-format stream-json` answers the Agent SDK's initialize control request with Claude Code 2.1.289's
@@ -1095,6 +1096,8 @@ process.stdin.on('data', (data) => {
         onEnter = null
         f()
       } else if (text === '/exit') void quit()
+      // A crash, for its stopped pane's "exited with code 1" (HI-1881): not a command Claude Code has.
+      else if (text === '/crash') process.exit(1)
       // /rename: the session's name, as Claude Code keeps it (no hook; Hive sees it in the transcript).
       else if ((text === '/compact' || text.startsWith('/compact ')) && !busy) void compact(text.slice(8).trim())
       else if (text === '/login' && !busy) void login()

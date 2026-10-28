@@ -398,6 +398,8 @@
   "tips.startFreshIdle.title": "Untätige Agenten neu beginnen lassen, wenn die Arbeit fertig ist",
   "tips.startNewAll.text": "„Neu beginnen“ im Menü „Agenten“ des Projektkopfs gibt nach einer Rückfrage jedem Agenten eine neue Sitzung; „Archivieren und neu beginnen“ archiviert vorher ihre alten. Ihre Unterhaltungen bleiben im Tab „Sitzungen“.",
   "tips.startNewAll.title": "Neue Sitzungen für jeden Agenten",
+  "tips.stoppedPane.text": "Endet die Sitzung eines Agenten, wird sein Bereich abgeblendet, und seine Leiste zeigt, wann und warum (von dir gestoppt, ihre Lane ist beendet, seine CLI hat sich beendet …). Seine letzte Ausgabe bleibt lesbar, und „Fortsetzen“ oder „Neue Sitzung“ dort startet ihn wieder.",
+  "tips.stoppedPane.title": "Ein gestoppter Agent sieht gestoppt aus",
   "tips.storageCleanup.text": "Projekteinstellungen → Speicher zeigt, wie viel Platz Sicherungen, Archiv, Anhänge und Worktrees eines Projekts belegen. „Aufräumen…“ verschiebt alte Anhänge und Sicherungen in den Papierkorb und zeigt dir vorher genau, was weggeht.",
   "tips.storageCleanup.title": "Sehen, was Hive aufbewahrt, und aufräumen",
   "tips.storagePurge.text": "„Bereinigen…“ unter Projekteinstellungen → Speicher oder „Dateien von Hive bereinigen…“ an einer Sitzung entfernt alles, was Hive für Sitzungen aufbewahrt: Sicherungen, Anhänge, Reste. Es listet vorher jede Datei auf; Dateien der Coding-Agenten und deine Nutzungssummen bleiben.",

@@ -182,6 +182,8 @@
   "panes.session.showAttachments": "Show Session's Attachments",
   "panes.session.starting": "{kind, select, resume {Resuming…} other {Starting…}}",
   "panes.session.tip": "{session}\nRunning since {since}\nSession {id}\nClick to read it in the Sessions tab; right-click to rename it.",
+  "panes.stopped.label": "Stopped · {time}",
+  "panes.stopped.line": "Stopped · {time} · {why, select, you {stopped by you} assistant {stopped by the Assistant} agent {stopped by an agent} lane {its lane ended} closed {its workspace closed} quit {Hive quit} exited {its CLI exited} crashed {its CLI exited with code {code}} other {stopped}}",
   "panes.tab.failed": "failed to start: {why}",
   "panes.tab.mcp": "MCP servers: {servers}",
   "panes.tab.notRunning": "not running",

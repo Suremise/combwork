@@ -358,8 +358,11 @@ export function TerminalView({
   agentId,
   provider,
   style,
-  onFocus
+  onFocus,
+  dimmed
 }: {
+  /** Its agent is stopped (HI-1881): shown dimmed, still scrolled, selected and copied as ever. */
+  dimmed?: boolean
   ptyKey: string
   visible: boolean
   onExit?: (code: number) => void
@@ -781,7 +784,7 @@ export function TerminalView({
 
   return (
     <div
-      className={cx('terminal-host', !visible && 'hidden')}
+      className={cx('terminal-host', !visible && 'hidden', dimmed && 'dimmed')}
       data-pty={ptyKey}
       data-right-click={rightClickToCli ? 'cli' : 'hive'}
       data-ctrl-cv={ctrlCVToCli ? 'cli' : 'hive'}

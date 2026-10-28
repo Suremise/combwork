@@ -792,7 +792,8 @@ route('POST', '/v1/projects/:name/stop', async ({ params, query, body }) => {
   const p = projectByName(params[0])
   if (assistantCaller()) throw new HttpError(400, 'Use hive_stop_agent (POST /v1/projects/{name}/agents/{agent}/stop) to stop agents.')
   const agent = query.get('agent') ?? body?.agent
-  sessions.stop(p, agent ? await agentParam(p, agent) : undefined)
+  // Its cause from the caller's token (HI-1881): an agent's; a script's or another caller's unknown, just "stopped".
+  sessions.stop(p, agent ? await agentParam(p, agent) : undefined, agentCaller() ? 'agent' : undefined)
   return { ok: true }
 })
 
@@ -1294,7 +1295,8 @@ route('POST', '/v1/projects/:name/agents/:agent/stop', async ({ params, body }) 
       if (sessions.liveFor(p, agentId)?.runId !== st.runId) return { done: `${a.name} in ${basename(p)} had already stopped`, result: { ok: true, wasRunning: false } }
       if (!assistant.allows('agents')) throw new HttpError(403, `The user's settings (Settings → Assistant → Control: ${assistant.LEVEL_NAME[assistant.controlLevel()]}) no longer let you stop agents.`)
     }
-    sessions.stop(p, agentId)
+    // Its cause from the caller's token (HI-1881): the Assistant's, an agent's, or unknown (a script).
+    sessions.stop(p, agentId, ws ? 'assistant' : agentCaller() ? 'agent' : undefined)
     return { done: `Stopped ${a.name} in ${basename(p)}`, result: { ok: true, wasRunning: true } }
   })
 })

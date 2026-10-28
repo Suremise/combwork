@@ -15,13 +15,14 @@ import { commandKeybinding } from '../commands'
 import { legacyOf, placeText, placeTip } from '../agentPlace'
 import { connectionCellText, NoConnectionBanner, useConnections, useLaunchConnection } from './ConnectionChoice'
 import { assistantDefaults } from '@shared/connectionDefaults'
-import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
+import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingKey, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
 import { cardLabel } from '@shared/projectKeys'
 import { loadAssistantChanges } from '../assistantUndo'
 import { useInbox } from '../inbox'
 import { useInboxSwitch } from '../advanced'
 import { useLiveUsage } from '../usage'
 import { cx, formatKeybinding, sessionLabel, timeAgo } from '../util'
+import { stoppedLine, useStoppedEnd } from '../stopped'
 import { Overrides, ProviderChoice, contextChoice, contextValue, type ContextChoice } from './AgentDialogs'
 import { PaneFooter, RESUME_TINT } from './AgentPanes'
 import { AssistantChanges, useDoneCount } from './AssistantChanges'
@@ -270,6 +271,11 @@ export function AssistantPanel() {
   const left = useStore(assistantOnLeft)
   const a = useStore((s) => s.workspace?.assistant ?? null)
   const epochs = useStore((s) => s.sessionEpoch)
+  // Its terminal dimmed while it is stopped (HI-1881): not while it starts again, nor after a failed start.
+  const notStopped = useStore((s) => {
+    const host = s.workspace?.assistant?.path
+    return !host || !!s.starting[startingKey(host, AGENT)] || !!s.startFailures[projectKey(host, AGENT)]
+  })
   const flash = useStore((s) => (a && s.paneFlash?.key === projectKey(a.path, AGENT) ? s.paneFlash.at : 0))
   const width = usePaneSize('assistant', 430)
   // The overview's share of the height once dragged; until then it takes what it needs (up to a third).
@@ -352,6 +358,7 @@ export function AssistantPanel() {
               agentId={AGENT}
               provider={agentProviderOf(a, agent)}
               autoFocus={!!agent.live}
+              dimmed={!agent.live && !notStopped}
             />
           )}
           {!agent.live && <AssistantIdle project={a} a={agent} ended={hasTerminal} />}
@@ -429,6 +436,8 @@ function AssistantIdle({ project, a, ended }: { project: ProjectInfo; a: AgentIn
   const picker = useConversationPicker()
   // From the click until the Assistant runs (#1177).
   const starting = useStarting(project.path, AGENT)
+  // Why and when it stopped (HI-1881), on its ended bar.
+  const end = useStoppedEnd(project.path, a)
   const resuming = starting?.kind === 'resume'
   const startingNew = starting?.kind === 'start'
   const resume = a.resume ? (
@@ -438,9 +447,9 @@ function AssistantIdle({ project, a, ended }: { project: ProjectInfo; a: AgentIn
   ) : null
   if (ended) {
     return (
-      <div className="session-ended compact assistant-ended">
-        <Icon name="debug-disconnect" />
-        <span className="grow">{tr(M.ended)}</span>
+      <div className={cx('session-ended', 'compact', 'assistant-ended', !starting && 'stopped')} data-stopped={end?.why ?? (starting ? undefined : '')}>
+        <Icon name={starting ? 'loading' : 'debug-disconnect'} spin={!!starting} />
+        <span className="grow">{starting ? startingLabel(starting) : end ? stoppedLine(end) : tr(M.ended)}</span>
         {resume}
         <button className="btn act-start solid small" disabled={!!starting} aria-busy={startingNew || undefined} onClick={() => void actions.newSession(project.path, AGENT)}>
           <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.new)}

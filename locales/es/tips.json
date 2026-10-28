@@ -398,6 +398,8 @@
   "tips.startFreshIdle.title": "Empieza de nuevo con los agentes inactivos al terminar el trabajo",
   "tips.startNewAll.text": "Empezar de nuevo, en el menú Agentes del encabezado del proyecto, da a cada agente una sesión nueva tras una pregunta; Archivar y empezar de nuevo archiva antes las anteriores. Sus conversaciones siguen en la pestaña Sesiones.",
   "tips.startNewAll.title": "Sesiones nuevas para todos los agentes",
+  "tips.stoppedPane.text": "Cuando termina la sesión de un agente, su panel se atenúa y su barra dice cuándo y por qué (detenido por ti, su carril terminó, su CLI terminó…). Su última salida sigue legible, y Reanudar o Nueva sesión ahí lo vuelven a iniciar.",
+  "tips.stoppedPane.title": "Un agente detenido se ve detenido",
   "tips.storageCleanup.text": "Configuración del proyecto → Almacenamiento muestra cuánto espacio ocupan las copias de seguridad, el archivo, los adjuntos y los worktrees de un proyecto. Limpiar… mueve los adjuntos y las copias antiguas a la Papelera de reciclaje, y antes te muestra exactamente qué se va.",
   "tips.storageCleanup.title": "Mira lo que guarda Hive y haz limpieza",
   "tips.storagePurge.text": "Purgar… en Configuración del proyecto → Almacenamiento, o Purgar los archivos de Hive… en una sesión, quita lo que Hive guarda de las sesiones: copias, adjuntos y restos. Antes muestra cada archivo; los archivos de los agentes y tus totales de uso no cambian.",

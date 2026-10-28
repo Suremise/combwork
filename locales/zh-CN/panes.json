@@ -166,6 +166,8 @@
   "panes.session.renameTitle": "重命名会话",
   "panes.session.showAttachments": "显示会话的附件",
   "panes.session.starting": "{kind, select, resume {正在恢复…} other {正在启动…}}",
+  "panes.stopped.label": "已停止 · {time}",
+  "panes.stopped.line": "已停止 · {time} · {why, select, you {由你停止} assistant {由助手停止} agent {由智能体停止} lane {其通道已结束} closed {其工作区已关闭} quit {Hive 已退出} exited {其 CLI 已退出} crashed {其 CLI 以代码 {code} 退出} other {已停止}}",
   "panes.tab.failed": "启动失败：{why}",
   "panes.tab.mcp": "MCP 服务器：{servers}",
   "panes.tab.notRunning": "未运行",

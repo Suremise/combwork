@@ -422,6 +422,8 @@ export const AREAS = [
   { paths: ['src/shared/projectTabs.ts'], suites: ['tabstrip', 'startall', 'gitview'] },
   { paths: ['src/shared/startAll.ts'], suites: ['startall', 'removeall'] },
   { paths: ['src/shared/startFailure.ts'], suites: ['startfail'] },
+  // A stopped agent's look (HI-1881): its pane's bar, its dimmed terminal, its header and tile.
+  { paths: ['src/shared/sessionEnd.ts', 'src/renderer/src/stopped.ts'], suites: ['stoppedpane', 'image', 'startfail', 'tilesview'] },
   { paths: ['src/main/templates.ts', 'src/shared/templates.ts', 'src/shared/templateLoad.ts', 'src/renderer/src/components/TemplatePlan.tsx', 'src/renderer/src/components/TemplateLoad.tsx', 'src/shared/templateDefaults.ts'], suites: ['templatenames', 'templates', 'templateshare', 'templatesv2'] },
   { paths: ['src/main/templateUpgrade.ts', 'tests/e2e/templatesv2.cjs'], suites: ['templatesv2'] },
   { paths: ['src/main/agentNames.ts', 'src/shared/agentNames.ts'], suites: ['agents', 'agents-ui', 'templatenames', 'templates'] },
