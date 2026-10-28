@@ -2,7 +2,7 @@
 // hook steps, and the watches themselves (main/watches.ts): a watch is kept in the workspace, fires once when a watched
 // card changes or its limit passes, wakes its agent only when it is idle and the user isn't typing (else later), and
 // ends on wake or cancel. The sessions are stand-ins here (the e2e cardloop suite runs real ones).
-import { readCard } from './boardDb'
+import { readCard, writeCard } from './boardDb'
 import { moveFolder } from './moveFolder'
 import { closeAllBoards } from '../src/main/boardStore'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
@@ -415,6 +415,18 @@ describe('watches (main/watches.ts)', async () => {
     await watches.evaluateWatches(w)
     await watches.settled()
   }
+  /**
+   * A card failed by its reviewer (`by`, as history names it) as before HI-1946, when a failed card stayed in Review for
+   * its fixes: a card failed then may still be there (#214, #434). Today's verdict sends it back to Doing, so the card is
+   * written as that rule left it, in one change: its review ended, "Review failed" in its history, still in Review.
+   */
+  const failedInReview = async (w: Parameters<typeof watches.evaluateWatches>[0], num: number, by: string): Promise<void> => {
+    const doc = readCard(w, num)
+    const at = new Date().toISOString()
+    const history = [...(doc.history as unknown[]), { at, by, what: 'Review failed', whatText: { id: 'tasks.history.reviewFailed' }, id: `failed-${num}-${Date.now()}` }]
+    const { review: _review, ...rest } = doc
+    await writeCard(w, num, { ...rest, history, updatedAt: at })
+  }
   const { sessions } = await import('../src/main/sessions')
   const { tableTestHooks: storeTestHooks } = await import('../src/main/storeTables')
   /** The watches a workspace has saved (#1018: rows in its database, what watches.json's `watches` held). */
@@ -824,15 +836,15 @@ describe('watches (main/watches.ts)', async () => {
     const r = await watches.registerWatch(w, alpha, 'a1', { cards: [passed.number], ...verdictOrPassed })
     expect(r).toEqual({ already: expect.objectContaining({ number: passed.number, column: 'passed', changes: ['column'] }) })
     expect(watches.watchFor(alpha, 'a1')).toBeNull()
-    // A card in Review after a failed review: "→ Review" holds, whoever asks (its reviewer, the card's own agent, the
-    // Assistant) and whatever its history.
+    // A card in Review after a failed review (one failed before HI-1946, still there): "→ Review" holds, whoever asks (its
+    // reviewer, the card's own agent, the Assistant) and whatever its history.
     const failed = await inWorkspace(w, () => tasks.createTask({ title: 'C', project: 'alpha', agent: 'a2', column: 'review' }, user))
     const rev = { kind: 'agent', name: 'R (alpha)', self: { project: 'alpha', agentId: 'a1' }, scope: 'alpha' } as const
     await inWorkspace(w, () => tasks.updateTask(failed.number, { review: 'start' }, rev))
     const intoReview = { cards: [failed.number], changes: ['column' as const], column: 'review' as const, moveInto: true as const }
     // Its reviewer, mid-review.
     expect(await watches.registerWatch(w, alpha, 'a1', intoReview)).toEqual({ already: expect.objectContaining({ number: failed.number, column: 'review' }) })
-    await inWorkspace(w, () => tasks.updateTask(failed.number, { review: 'failed' }, rev, { comment: 'Round 1: FAILED' }))
+    await failedInReview(w, failed.number, 'R (alpha)')
     for (const [host, id] of [[alpha, 'a1'], [alpha, 'a2'], [w.assistantHome, 'assistant']] as const) {
       expect(await watches.registerWatch(w, host, id, intoReview)).toEqual({ already: expect.objectContaining({ number: failed.number, column: 'review' }) })
       expect(watches.watchFor(host, id)).toBeNull()
@@ -853,7 +865,7 @@ describe('watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
-  it('a failed card its agent returns for review without leaving Review wakes the reviewer waiting for it to come back (#214)', async () => {
+  it('a failed card its agent returns for review without leaving Review wakes the reviewer waiting for it to come back (#214; a card failed before HI-1946)', async () => {
     const { w, alpha } = await open()
     const st = fake(alpha)
     // a1 reviews here (the stand-in session); a2 did the work.
@@ -866,7 +878,7 @@ describe('watches (main/watches.ts)', async () => {
     // after it: both wait, and its own verdict doesn't wake it.
     const back = { cards: [c.number], changes: ['column' as const], column: 'review' as const, moveInto: true as const, fresh: true as const }
     expect('watching' in (await watches.registerWatch(w, alpha, 'a1', back))).toBe(true)
-    await inWorkspace(w, () => tasks.updateTask(c.number, { review: 'failed' }, rev, { comment: 'Round 1: FAILED' }))
+    await failedInReview(w, c.number, 'Builder (alpha)')
     await evaluated(w)
     expect(st.typed).toEqual([])
     expect('watching' in (await watches.registerWatch(w, alpha, 'a1', back))).toBe(true)
@@ -921,7 +933,7 @@ describe('watches (main/watches.ts)', async () => {
         vi.useRealTimers()
         watches.testHooks.settleMs = 0
       }
-      expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] #${a} is in Review: Reviewer \\(alpha\\) passed it \\(latest comment by Reviewer \\(alpha\\): "Round 1: PASSED"\\); #${b} is in Review: Reviewer \\(alpha\\) failed it \\(latest comment by Reviewer \\(alpha\\): "Round 1: FAILED"\\)\\. Your card watch has ended`))
+      expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] #${a} is in Review: Reviewer \\(alpha\\) passed it \\(latest comment by Reviewer \\(alpha\\): "Round 1: PASSED"\\); #${b} is in Doing: Reviewer \\(alpha\\) failed it \\(latest comment by Reviewer \\(alpha\\): "Round 1: FAILED"\\)\\. Your card watch has ended`))
       await disposeWorkspaceService(w)
     })
 
@@ -941,8 +953,9 @@ describe('watches (main/watches.ts)', async () => {
       const r = await watches.registerWatch(w, alpha, 'a1', { cards: [b], ...verdictOrDone })
       expect('watching' in r).toBe(true)
       await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
-      expect(st.told[1]).toMatch(new RegExp(`^\\[Hive\\] #${b} is in Review: Reviewer \\(alpha\\) failed it`))
-      // After that wake, the builder's own work (a comment, a move to Doing and back) isn't news to its next watch…
+      expect(st.told[1]).toMatch(new RegExp(`^\\[Hive\\] #${b} is in Doing: Reviewer \\(alpha\\) failed it`))
+      // After that wake, the builder's own work (a comment in Doing, where the failure sent it, and a move back to Review)
+      // isn't news to its next watch…
       st.status = 'watching'
       await inWorkspace(w, () => tasks.updateTask(b, { column: 'doing' }, builder, { comment: 'Fixing' }))
       await inWorkspace(w, () => tasks.updateTask(b, { column: 'review' }, builder, { comment: 'Fixed' }))
@@ -972,7 +985,7 @@ describe('watches (main/watches.ts)', async () => {
         st.status = 'watching'
         await watches.registerWatch(w, alpha, 'a1', { cards: [b], ...verdictOrDone })
         await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
-        expect(st.told[1]).toContain(`#${b} is in Review: Reviewer (alpha) failed it`)
+        expect(st.told[1]).toContain(`#${b} is in Doing: Reviewer (alpha) failed it`)
       } finally {
         vi.useRealTimers()
       }
@@ -990,14 +1003,15 @@ describe('watches (main/watches.ts)', async () => {
         await verdict(w, b, 'failed')
         await evaluated(w)
         expect(st.typed).toHaveLength(1)
-        expect(st.told[0]).toMatch(new RegExp(`#${a} is in Review: Reviewer \\(alpha\\) passed it.*#${b} is in Review: Reviewer \\(alpha\\) failed it`))
-        // Reviewed again and failed again, word for word, in the same millisecond as the first failure.
+        expect(st.told[0]).toMatch(new RegExp(`#${a} is in Review: Reviewer \\(alpha\\) passed it.*#${b} is in Doing: Reviewer \\(alpha\\) failed it`))
+        // Submitted again, reviewed again and failed again, word for word, in the same millisecond as the first failure.
+        await inWorkspace(w, () => tasks.updateTask(b, { column: 'review' }, builder))
         await inWorkspace(w, () => tasks.updateTask(b, { review: 'start' }, rev))
         await verdict(w, b, 'failed')
         st.status = 'watching'
         await watches.registerWatch(w, alpha, 'a1', { cards: [b], ...verdictOrDone })
         await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
-        expect(st.told[1]).toContain(`#${b} is in Review: Reviewer (alpha) failed it`)
+        expect(st.told[1]).toContain(`#${b} is in Doing: Reviewer (alpha) failed it`)
         // The failure the wake told isn't told again: watching once more without a new change, nothing comes.
         st.status = 'watching'
         await watches.registerWatch(w, alpha, 'a1', { cards: [b], ...verdictOrDone })

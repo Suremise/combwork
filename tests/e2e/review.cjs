@@ -141,11 +141,13 @@ function mcp(config, msgs) {
   check("its session ending stops the review, and says so in the card's history", !!r2 && r2.history.some((h) => h.what === 'Review by Reviewer stopped: its session ended'), JSON.stringify(r2?.history?.slice(-2)))
   check('the card is still in Review with its agent', r2 && r2.column === 'review' && r2.agent === coder.id)
 
-  // --- A review with a verdict: failed leaves it in Review; passed with Done moves it there.
+  // --- A review with a verdict: failed sends it back to Doing with its agent (HI-1946); passed with Done moves it there.
   await say(reviewer.id, `boardreview ${n} start`)
   const verdict = await say(reviewer.id, `boardreview ${n} failed`)
   const r3 = await card(n)
-  check('a failed verdict ends the review, the card staying in Review', verdict?.status === 200 && !r3.review && r3.column === 'review' && r3.agent === coder.id && r3.history.at(-1).what === 'Review failed', JSON.stringify(r3.history.slice(-1)))
+  check('a failed verdict ends the review, the card back in Doing with its agent', verdict?.status === 200 && !r3.review && r3.column === 'doing' && r3.agent === coder.id && JSON.stringify(r3.history.slice(-2).map((h) => h.what)) === '["Review failed","Moved to Doing"]', JSON.stringify(r3.history.slice(-2)))
+  // Its fixes done, the user moves it to Review again (its next round), to be reviewed again.
+  await inv('tasks:update', n, { column: 'review' })
   await say(reviewer.id, `boardreview ${n} start`)
   const passed = await say(reviewer.id, `boardreview ${n} passed done`)
   const r4 = await card(n)
