@@ -105,6 +105,8 @@ interface HiveMessageValues {
   'tips.branchCleanup.title': undefined
   'tips.cardAttachments.text': undefined
   'tips.cardAttachments.title': undefined
+  'tips.cardAttachmentsCleanup.text': undefined
+  'tips.cardAttachmentsCleanup.title': undefined
   'tips.cardCost.text': { example: string | number }
   'tips.cardCost.title': undefined
   'tips.cardDecisions.text': undefined

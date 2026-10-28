@@ -103,6 +103,8 @@
   "tips.branchCleanup.title": "Gemergte Branches aufräumen",
   "tips.cardAttachments.text": "Füge Dateien in die Beschreibung oder einen Kommentar einer Karte ein oder ziehe sie hinein: Sie werden beim Speichern oder Posten mit der Karte behalten, darin gezeigt und dem Agenten aufgelistet, der sie startet. Der Pin auf dem Anhang-Chip eines Bereichs kopiert eine Datei auf die Karte des Agenten.",
   "tips.cardAttachments.title": "Einen Screenshot bei seiner Karte behalten",
+  "tips.cardAttachmentsCleanup.text": "Dateien, die mit einer Karte aufbewahrt werden, kommen 30 Tage nach ihrem Archivieren in den Papierkorb. Wähle 3, 7 oder 90 Tage oder Nie unter Projekteinstellungen → Speicher, wo „Jetzt aufräumen…“ entfernt, was fällig ist. Offene und erledigte Karten behalten ihre.",
+  "tips.cardAttachmentsCleanup.title": "Screenshots archivierter Karten räumen sich selbst auf",
   "tips.cardCost.text": "Das Panel einer Karte zeigt, was ihre Agenten verbraucht haben, während sie sie hatten, „{example}“, mit den Anteilen von Bearbeiter und Reviewer und den Tokens beim Darüberfahren. „Leistung“ listet die Kosten jeder Karte, und beim Darüberfahren über eine Lane im Fortschrittspanel siehst du ihren Overhead.",
   "tips.cardCost.title": "Was eine Karte gekostet hat",
   "tips.cardDecisions.text": "Die Entscheidungen einer Karte, über ihren Kommentaren, halten fest, was du entschieden hast: Agenten prüfen ihre Arbeit vor dem Review daran, und Reviewer lassen Arbeit durchfallen, die eine davon missachtet. Sag dem Assistenten eine Entscheidung, und er trägt sie dort ein; ein Agent, der auf deine Antwort wartet, erfährt es.",

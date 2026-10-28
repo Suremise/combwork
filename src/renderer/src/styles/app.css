@@ -7306,6 +7306,12 @@ button.agent-place:hover {
 }
 /* Too narrow for the note and every button on one line, the buttons wrap onto the next, right-aligned; the note
    ("Checked just now") keeps its words whole (#1306: it was squeezed into a cut column at the left edge). */
+/* Remove archived cards' attachments (HI-1842): its choice and Clean Up Now… on one line. */
+.card-cleanup-setting {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
 .storage-actions {
   display: flex;
   flex-wrap: wrap;

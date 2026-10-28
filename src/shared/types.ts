@@ -1334,6 +1334,8 @@ export interface ProjectConfig {
   compactSuggestTokens: number | null
   /** Overrides settings.sessions.transcriptWarnMB for this project; null inherits. */
   transcriptWarnMB: number | null
+  /** Archived cards' attachments go this many days after archiving, or never (HI-1842, shared/cardCleanup.ts). */
+  cardAttachmentCleanup: 'off' | '3' | '7' | '30' | '90'
   /** The project's agents, in the order they were added. All are equal; a new project has none. */
   agents: AgentDef[]
   /**

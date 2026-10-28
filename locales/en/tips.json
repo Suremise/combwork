@@ -415,6 +415,14 @@
     "defaultMessage": "Keep a screenshot with its card",
     "description": "A tip's title (HI-1700)."
   },
+  "tips.cardAttachmentsCleanup.text": {
+    "defaultMessage": "Files kept with a card go to the Recycle Bin 30 days after it is archived. Choose 3, 7 or 90 days, or Never, in Project Settings → Storage, where Clean Up Now… removes what is due at once. Open and Done cards keep theirs.",
+    "description": "A tip (HI-1842). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.cardAttachmentsCleanup.title": {
+    "defaultMessage": "Archived cards' screenshots clean up after themselves",
+    "description": "A tip's title (HI-1842)."
+  },
   "tips.cardCost.text": {
     "defaultMessage": "A card's panel says what its agents used while they held it, \"{example}\", with the builder's and reviewer's parts and tokens on hover. Performance lists every card's cost, and a lane's hover in the Progress panel its overhead.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {example} is a card's cost line as the board shows it (\"cost: ≈ $1.84 · 2 rounds\")."

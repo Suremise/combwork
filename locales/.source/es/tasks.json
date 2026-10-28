@@ -94,6 +94,7 @@
   "tasks.history.archivedRemoved": "Archived: {project} was removed from Hive",
   "tasks.history.assistantAskUntold": "The Hive Assistant couldn't be told of {agent}'s request on this card: read it in the card's comments and act on it yourself if it needs doing",
   "tasks.history.assistantAsked": "Asked the Hive Assistant: \"{text}\"",
+  "tasks.history.attachmentsCleaned": "{n, plural, one {Removed # attachment} other {Removed # attachments}} ({names}): this project removes archived cards' attachments {days, plural, one {# day} other {# days}} after archiving (Project Settings → Storage). {n, plural, one {It is} other {They are}} in the Recycle Bin.",
   "tasks.history.backWithBatch": "Brought back with its batch ({label})",
   "tasks.history.blocked": "Blocked: {reason}",
   "tasks.history.context": "Read first: {refs}",

@@ -917,6 +917,14 @@ interface HiveMessageValues {
   'settings.prices.yours': undefined
   'settings.project.agents.desc': undefined
   'settings.project.agents.title': undefined
+  'settings.project.cardAttachmentCleanup.desc': undefined
+  'settings.project.cardAttachmentCleanup.option.3': undefined
+  'settings.project.cardAttachmentCleanup.option.30': undefined
+  'settings.project.cardAttachmentCleanup.option.7': undefined
+  'settings.project.cardAttachmentCleanup.option.90': undefined
+  'settings.project.cardAttachmentCleanup.option.off': undefined
+  'settings.project.cardAttachmentCleanup.tip': undefined
+  'settings.project.cardAttachmentCleanup.title': undefined
   'settings.project.chime.desc': undefined
   'settings.project.chime.tip': undefined
   'settings.project.chime.title': undefined

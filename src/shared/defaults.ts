@@ -159,6 +159,7 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   providers: {},
   compactSuggestTokens: null,
   transcriptWarnMB: null,
+  cardAttachmentCleanup: '30',
   agents: [],
   layout: 'auto',
   worktreeCopy: null,

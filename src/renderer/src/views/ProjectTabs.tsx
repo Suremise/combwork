@@ -20,7 +20,8 @@ import { effortText, runsAsName } from '@shared/models'
 import { PROJECT_KEY_DESC, PROJECT_SETTINGS_SECTIONS, settingEntry, shownSetting, type SettingsSectionInfo } from '@shared/settingsCatalog'
 import { shownText } from '@shared/advanced'
 import { NumberField } from '../components/NumberField'
-import { StorageView } from '../components/Storage'
+import { CardCleanupSetting, StorageView } from '../components/Storage'
+import { CARD_CLEANUP_DEFAULT } from '@shared/cardCleanup'
 import { TaskStrip } from '../components/Board'
 import { ProviderIcon } from '../components/ProviderIcon'
 import { confirmDangerousMode } from '../components/PermissionMode'
@@ -2089,6 +2090,13 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       ...rowText('project.storage'),
       wide: true,
       render: () => <StorageView path={project.path} />
+    },
+    {
+      section: 'storage',
+      key: 'cardAttachmentCleanup',
+      ...rowText('project.cardAttachmentCleanup'),
+      modified: cfg.cardAttachmentCleanup !== CARD_CLEANUP_DEFAULT,
+      render: () => <CardCleanupSetting path={project.path} name={project.name} value={cfg.cardAttachmentCleanup} onChange={(v) => void update({ cardAttachmentCleanup: v })} />
     },
     {
       section: 'keys',

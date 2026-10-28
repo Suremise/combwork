@@ -44,6 +44,7 @@
   "service.cardAttach.refused": "{path} n’est pas un fichier qui peut être joint ici : donnez le chemin d’un fichier de votre propre projet (son dossier, ses slots) ou du dossier temporaire. Rien n’a été joint.",
   "service.cardAttach.tooLarge": "{name} dépasse {max}, le maximum qu’une carte garde dans un fichier (Paramètres → Avancé → Pièces jointes des cartes : plus gros fichier). Rien n’a été joint.",
   "service.cardAttach.tooMuch": "Au plus {files, number} fichiers et {total} peuvent être joints à la fois. Rien n’a été joint.",
+  "service.cardCleanup.stale": "Cette liste n’est plus à jour : rien n’a été retiré. Rouvre Nettoyer maintenant….",
   "service.files.badName": "« {name} » n’est pas un nom valide",
   "service.files.exists": "« {name} » existe déjà",
   "service.files.existsIn": "{root, select, yes {« {name} » existe déjà à la racine du projet} other {« {name} » existe déjà dans {folder}}}",

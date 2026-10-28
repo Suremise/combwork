@@ -44,6 +44,7 @@
   "service.cardAttach.refused": "{path} não é um arquivo que possa ser anexado aqui: informe o caminho de um arquivo do seu próprio projeto (a pasta dele, os slots dele) ou da pasta temporária. Nada foi anexado.",
   "service.cardAttach.tooLarge": "{name} passa de {max}, o máximo que um cartão mantém em um arquivo (Configurações → Avançado → Anexos de cartões: maior arquivo). Nada foi anexado.",
   "service.cardAttach.tooMuch": "No máximo {files, number} arquivos e {total} podem ser anexados de uma vez. Nada foi anexado.",
+  "service.cardCleanup.stale": "Esta lista está desatualizada: nada foi removido. Abra Limpar agora… de novo.",
   "service.files.badName": "“{name}” não é um nome válido",
   "service.files.exists": "“{name}” já existe",
   "service.files.existsIn": "{root, select, yes {“{name}” já existe na raiz do projeto} other {“{name}” já existe em {folder}}}",

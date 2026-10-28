@@ -23,7 +23,7 @@ import { FactStore } from './workflow/factStore'
 import { gitStep } from './platform/git'
 import type { CardKind } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
-import { linkToComment, moveCardFolder, publish, trashCardFolder, type Staging } from './cardAttachments'
+import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCardFolder, type CleanupFile, type Staging } from './cardAttachments'
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT } from '../shared/workflow/stages'
@@ -2264,6 +2264,49 @@ export async function commentAsHive(n: number, said: string | StoredText, ws: Wo
     changed(ws)
     return true
   })
+}
+
+/** Why the clean-up left a card's planned files (HI-1842 round 2): what changed since its plan. */
+export type CleanupLeft = 'gone' | 'unarchived' | 'moved' | 'hidden' | 'policy' | 'changed' | 'unsafe'
+
+/**
+ * The clean-up of an archived card's attachments (HI-1842, cardAttachmentCleanup.ts): its planned files to the Recycle
+ * Bin and their rows, with a comment of Hive's saying how many, which and why, in one change of the board, refused when
+ * the run's workspace is no longer open (`alive`, checked again once the lock is held). In the change, the card is
+ * checked again: still on the board, archived and in the planned project, that project still shown (not hidden or
+ * removed), and still due under the project's setting as it is now (`days`, read here); then each file
+ * (removeCardAttachments). What it left says why.
+ */
+export async function cleanUpAttachments(
+  n: number,
+  plan: { project: string; files: CleanupFile[]; visible: () => boolean; days: () => Promise<number | null>; due: (card: TaskCard, days: number) => boolean },
+  ws: WorkspaceService,
+  alive: () => boolean
+): Promise<{ files: { name: string; size: number }[]; left: number; why?: CleanupLeft }> {
+  return boardWrite(
+    ws,
+    async () => {
+      const card = await getTask(n, ws).catch(() => null)
+      const leave = (why: CleanupLeft) => ({ files: [], left: plan.files.length, why })
+      if (!card) return leave('gone')
+      if (!card.archived) return leave('unarchived')
+      if ((card.project ?? '').toLowerCase() !== plan.project.toLowerCase()) return leave('moved')
+      // Its project hidden or removed since the plan: its cards wait for it to come back (HR5's round 2).
+      if (!plan.visible()) return leave('hidden')
+      const days = await plan.days()
+      if (days === null || !plan.due(card, days)) return leave('policy')
+      const done = await removeCardAttachments(ws, n, plan.files)
+      if (done.unsafe) return leave('unsafe')
+      if (done.removed.length) {
+        const said = storedText(HISTORY.attachmentsCleaned, { n: done.removed.length, names: done.removed.map((f) => f.name).join(', '), days })
+        addComment(card, BY.hive, englishSaid(said), said)
+        await saveCard(ws, n, card)
+        changed(ws)
+      }
+      return { files: done.removed, left: done.left, ...(done.left ? { why: 'changed' as const } : {}) } // i18n-ignore: a reason's key (CleanupLeft)
+    },
+    { alive }
+  )
 }
 
 /** Why an agent's reviews stop, as its callers say it (in English), and its key in the history line's message. */
