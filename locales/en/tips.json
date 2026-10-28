@@ -1131,6 +1131,14 @@
     "defaultMessage": "Watch the merge queue",
     "description": "A tip's title (glossary 2.5: merge queue)."
   },
+  "tips.mergeQueueRecent.text": {
+    "defaultMessage": "Under each merge queue in the Progress panel's Merges tab, Recent merges lists its latest merges, returns and pauses, with why, when and how long each took. Click one to open its card.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary 2.5: merge queue; 2.4: returned."
+  },
+  "tips.mergeQueueRecent.title": {
+    "defaultMessage": "See what the merge queue did lately",
+    "description": "A tip's title (glossary 2.5: merge queue)."
+  },
   "tips.mergeRebase.text": {
     "defaultMessage": "With Hive merging, set Merge style to Rebase and fast-forward in Version Control → Workflow: the merge queue rebases each card onto the target, tests exactly that, and moves the target forward to it.",
     "description": "A tip. Names of Hive's menus, views, settings and commands, and the option's value: keep them as Hive shows them. Glossary: merge queue."

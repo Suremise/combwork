@@ -282,6 +282,8 @@
   "tips.mergeQueueFolder.title": "Merging into the folder you work in",
   "tips.mergeQueuePanel.text": "The Progress panel's Merges tab shows each merge queue: the card it is testing and how long its checks usually take, the cards waiting, and a card it returned until you've seen it. Pause queue and Resume queue are there too.",
   "tips.mergeQueuePanel.title": "Watch the merge queue",
+  "tips.mergeQueueRecent.text": "Under each merge queue in the Progress panel's Merges tab, Recent merges lists its latest merges, returns and pauses, with why, when and how long each took. Click one to open its card.",
+  "tips.mergeQueueRecent.title": "See what the merge queue did lately",
   "tips.mergeRebase.text": "With Hive merging, set Merge style to Rebase and fast-forward in Version Control → Workflow: the merge queue rebases each card onto the target, tests exactly that, and moves the target forward to it.",
   "tips.mergeRebase.title": "A linear history, with no merge commits",
   "tips.mergeSlot.text": "When several agents finish at once, each claims the project's merge slot before it merges main in, checks and merges, so nobody's checks have to run twice. Who holds it and who waits shows in the Overview and the Progress panel.",

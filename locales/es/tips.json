@@ -282,6 +282,8 @@
   "tips.mergeQueueFolder.title": "Fusionar en la carpeta en la que trabajas",
   "tips.mergeQueuePanel.text": "La pestaña Fusiones del panel Progreso muestra cada cola de fusión: la tarjeta que está probando y cuánto suelen tardar sus comprobaciones, las tarjetas que esperan y una tarjeta que devolvió, hasta que la hayas visto. Pausar la cola y Reanudar la cola también están ahí.",
   "tips.mergeQueuePanel.title": "Sigue la cola de fusión",
+  "tips.mergeQueueRecent.text": "Bajo cada cola de fusión, en la pestaña Fusiones del panel Progreso, Fusiones recientes muestra sus últimas fusiones, devoluciones y pausas, con el motivo, cuándo y cuánto tardó cada una. Haz clic en una para abrir su tarjeta.",
+  "tips.mergeQueueRecent.title": "Mira lo que hizo la cola de fusión últimamente",
   "tips.mergeRebase.text": "Si Hive fusiona, pon Tipo de fusión en Rebase y avance rápido en Control de versiones → Flujo de trabajo: la cola de fusión hace rebase de cada tarjeta sobre el destino, prueba exactamente eso y adelanta el destino hasta ahí.",
   "tips.mergeRebase.title": "Un historial lineal, sin commits de fusión",
   "tips.mergeSlot.text": "Cuando varios agentes terminan a la vez, cada uno toma el turno de fusión del proyecto antes de fusionar main en su rama, comprobar y fusionar, para que nadie tenga que repetir sus comprobaciones. Quién lo tiene y quién espera se ve en Resumen y en el panel Progreso.",

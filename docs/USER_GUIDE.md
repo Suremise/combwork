@@ -860,6 +860,17 @@ When Hive merges a project's cards itself (**Who merges: Hive merges**, the merg
 - **Run by** another Hive, when the dev and the installed Hive share the workspace and the other one runs this queue. If that Hive ends unexpectedly (a crash, say), this one takes the queue over within about half a minute: what the other was checking is ended and tested again here, in a folder of its own, and merged once.
 - **Queue in Version Control** opens the project's Version Control tab at its **Merge queue**.
 
+##### Recent merges <a id="recent-merges"></a>
+
+Under each queue's card (and under a merge slot an agent holds for that project, so what merges now comes first), **Recent merges** lists what the queue did lately, newest first, up to 20 rows:
+
+- **✓ Merged**, with the merge commit (click it to copy the whole commit id).
+- **✗ Returned**, with why in a few words: *conflict in tasks.ts*, *checks failed: unit*, its focused tests.
+- **⊘ Taken out**, with why: *Remove from queue*, put On Hold, merged outside Hive…
+- **⏸ Paused**, with why (*by you*, *the push failed*, *needs you*…; point at it for the whole sentence), and how long it lasted, or *still paused*.
+
+Each row has the card's key and title, the time (point at it for how long ago), and how long the queue took over the card: from its first merge check to the outcome, or the merge alone when the target has no merge checks. A card returned before anything ran (a conflict at its test merge) shows no time. When the project pushes the target after merging (**Push the target branch after merging**), a merge also says **Pushed**, **Not pushed yet**, or **Not pushed** and why (pushing was turned off, or the branch no longer had it); an older merge that Hive has no record of says **Push not recorded**. Click a row to open its card. The list follows the panel's project and agent filters (an agent's cards; a pause of the whole queue always shows), updates as the queue works, and says *No merges yet.* when there's nothing to show. **More in Version Control** opens the full history.
+
 The queue's card shows while the queue has something: a card testing, waiting or paused, a return you haven't seen, a merge of the last few seconds, a Hive running it, or a card still in flight under rules that have Hive merge into that target. With nothing going on, it shows, *Nothing queued.*, while the project's options have Hive merge. So when you switch the next cards to **The agent merges** (or a project to no version control), the cards already going through the queue keep going, and its card stays, with Pause, Resume and Remove, until they are merged or out of the queue and you've seen how they ended. Pulse has a line for a queue testing or paused, *main: testing AL-61 · 2 queued*, which opens **Merges**. Each change is said to a screen reader once, politely: *AL-61 merged*, *AL-108 returned: conflict in tasks.ts*, the queue paused or resumed. The project filter applies to the queues too, and **Runs**' agent filter has **Hive (merge queue)** for the queue's checks.
 
 #### Show progress for any command <a id="show-progress-for-any-command"></a>

@@ -310,7 +310,7 @@ export function ProgressPanel() {
         )}
         {tab === 'merges' &&
           (merging.length || shownQueue.length ? (
-            <MergesList queues={shownQueue} slots={merging} runs={runs} now={now} projectName={nameOf} showProject={multi} stepOf={stepOf} />
+            <MergesList queues={shownQueue} slots={merging} runs={runs} now={now} projectName={nameOf} showProject={multi} stepOf={stepOf} agent={filter.agent ?? null} />
           ) : (
             <div className="pane-empty progress-empty">{tr(msg({ id: 'board.progress.noMerges', defaultMessage: "No merge is going on. While Hive's merge queue merges a card, or an agent merges its branch, it shows here with its cards, its checks and what waits.", description: "The Progress panel's Merges tab when nothing is merging: no merge queue shows, and no agent holds the merge slot. Glossary 2.5: merge queue." }))}</div>
           ))}
