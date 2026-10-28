@@ -15,7 +15,7 @@ const { copilot } = await import('../src/main/providers/copilot/adapter')
 const { TerminalScreen } = await import('../src/main/terminalScreen')
 const { advanced } = await import('../src/main/advanced')
 const { PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId } = await import('../src/shared/advanced')
-const { promptInput, typedPrompt, withoutInvisible } = await import('../src/main/sessions')
+const { promptInput, rollbackKeys, typedPrompt, withoutInvisible } = await import('../src/main/sessions')
 const { TYPED_NEWLINE_KEYS } = await import('../src/shared/terminalInput')
 const { providerService } = await import('../src/main/providerService')
 const { NEWLINE_TRIED } = await import('../src/main/providers/codex/adapter')
@@ -27,11 +27,11 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
   const liveKey = `${p.toLowerCase()}#${id}`
   const screens: InstanceType<typeof TerminalScreen>[] = []
   /** An idle launch of `adapter` whose screen has had `output` (the CLI's own) drawn on it. */
-  const running = async (adapter: unknown, output: string) => {
+  const running = async (adapter: unknown, output: string, cliVersion: string | null = null) => {
     const screen = new TerminalScreen(60, 20)
     screens.push(screen)
     await new Promise<void>((r) => screen.write(output, r))
-    s.live.set(liveKey, { state: { runId: 'r1', status: 'ready', projectPath: p, agentId: id, agentName: 'B1' }, adapter, screen, prompts: 0 })
+    s.live.set(liveKey, { state: { runId: 'r1', status: 'ready', projectPath: p, agentId: id, agentName: 'B1' }, adapter, screen, prompts: 0, cliVersion })
     return screen
   }
   afterEach(() => {
@@ -150,14 +150,96 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
         expect(advanced.get<string>(NEWLINE)).toBe('auto')
         expect(NEWLINE_TRIED).toEqual(['0.164.0'])
         expect([codex.typedNewline('0.164.0'), codex.typedNewline('0.165.0'), codex.typedNewline(null)]).toEqual(['alt-enter', null, null])
-        echo.to = await running(codex, '')
-        await onVersion('0.164.0', () => withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written)))
+        echo.to = await running(codex, '', '0.164.0')
+        await withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written))
         expect(asRead(ALT_ENTER)).toBe('A plan:\n  1. one\n\n 2. two  ')
-        writes.length = 0
-        echo.to = await running(codex, '')
-        await onVersion('0.165.0', () => withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written)))
+        for (const version of ['0.165.0', null]) {
+          writes.length = 0
+          echo.to = await running(codex, '', version)
+          await withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written))
+          expect(typedText(), String(version)).toBe('A plan:   1. one   2. two  ')
+          expect(writes.some((w) => w.includes('\x1b'))).toBe(false)
+        }
+      })
+
+      it("goes by the version the running Codex was launched with, not the one installed since (HR6's round 1)", async () => {
+        // Launched as 0.163.0 (untried); 0.164.0 installed meanwhile: still spaces.
+        echo.to = await running(codex, '', '0.163.0')
+        await onVersion('0.164.0', () => withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written)))
         expect(typedText()).toBe('A plan:   1. one   2. two  ')
-        expect(writes.some((w) => w.includes('\x1b'))).toBe(false)
+        // The converse: launched as 0.164.0, an untried version installed since: still its key.
+        writes.length = 0
+        echo.to = await running(codex, '', '0.164.0')
+        await onVersion('0.163.0', () => withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written)))
+        expect(asRead(ALT_ENTER)).toBe('A plan:\n  1. one\n\n 2. two  ')
+      })
+
+      /**
+       * A stand-in for Codex 0.164's input box (HR6's round 1): Alt+Enter a new line, Ctrl+U deletes to the line's start
+       * (at a line's start, the line break before it), Enter sends; what it sends is recorded. Drawn on `screen` too.
+       */
+      const composer = (screen: InstanceType<typeof TerminalScreen>) => {
+        const box = { lines: [''], sent: [] as string[] }
+        echo.to = {
+          write: (d: string) => {
+            screen.write(d)
+            if (d === ALT_ENTER) box.lines.push('')
+            else
+              for (const ch of d) {
+                const last = box.lines.length - 1
+                if (ch === '\x15') {
+                  if (box.lines[last] === '' && last > 0) box.lines.pop()
+                  else box.lines[last] = ''
+                } else if (ch === '\r') {
+                  box.sent.push(box.lines.join('\n'))
+                  box.lines = ['']
+                } else if (ch >= ' ') box.lines[last] += ch
+              }
+          }
+        }
+        return box
+      }
+
+      it('stopped part-way through a multi-line prompt, what Hive typed is taken back whole, and the next prompt goes alone', async () => {
+        const box = composer(await running(codex, '', '0.164.0'))
+        // The agent gets busy once two of its line breaks are in, its CLI still running.
+        const guard = (): void => {
+          if (writes.filter((w) => w === ALT_ENTER).length >= 2) throw new Error('it got busy')
+        }
+        await expect(withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, 'first line\n\n  third', guard))).rejects.toThrow('it got busy')
+        expect(box.lines).toEqual([''])
+        expect(box.sent).toEqual([])
+        await withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, 'fresh\nwork'))
+        expect(box.sent).toEqual(['fresh\nwork'])
+        expect(rollbackKeys([10, 0, 0])).toBe(3)
+        expect(rollbackKeys([5, 3])).toBe(3)
+        expect(rollbackKeys([0])).toBe(0)
+      })
+
+      it('the user typing meanwhile: nothing of theirs is taken back', async () => {
+        const box = composer(await running(codex, '', '0.164.0'))
+        const guard = (): void => {
+          if (writes.filter((w) => w === ALT_ENTER).length >= 1) {
+            sessions.noteUserInput((sessions as unknown as { key(p: string, a: string): string }).key(p, id), 'x')
+            throw new Error('the user typed')
+          }
+        }
+        await expect(withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, 'one\ntwo', guard))).rejects.toThrow('the user typed')
+        expect(writes.filter((w) => w === '\x15')).toHaveLength(1)
+        expect(box.lines).toEqual(['one', ''])
+      })
+
+      it("a last line of spaces doesn't make Enter wait for it to be drawn", async () => {
+        const box = composer(await running(codex, '', '0.164.0'))
+        // A minute's wait would fail this test by its own time limit: Enter must follow at once.
+        const number = advanced.number.bind(advanced)
+        const spy = vi.spyOn(advanced, 'number').mockImplementation((k: string) => (k === drawnWaitId('codex') ? 60 : number(k)))
+        try {
+          await withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, 'first\n   '))
+        } finally {
+          spy.mockRestore()
+        }
+        expect(box.sent).toEqual(['first\n   '])
       })
 
       it('a key chosen is used with any version, Alt+Enter too; Spaces chosen, never a key', async () => {

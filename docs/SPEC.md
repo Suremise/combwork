@@ -4791,7 +4791,15 @@ under Hive in Advanced (no CLI's recording to check it against), defaulting to w
   - **Tried in real Codex:** the real-tier suite `codex-newline` (Codex test home, its non-admin sandbox; Darren's OK, 28
     Oct) saw Alt+Enter and Ctrl+J prompts each recorded as written in one prompt by Codex 0.164.0.
   - **Gated by version:** `auto` is Alt+Enter only for a version in the adapter's `NEWLINE_TRIED` (0.164.0); another
-    version, or one not known, gets spaces. A key chosen (`alt-enter`, `ctrl-j`) applies to any version.
+    version, or one not known, gets spaces. A key chosen (`alt-enter`, `ctrl-j`) applies to any version. The version
+    is the one the running agent was launched with (`LiveSession.cliVersion`), never the CLI installed since.
+  - **Stopped part-way:** Codex's Ctrl+U deletes only to the line's start, or the line break before it at a line's
+    start. So taking back a multi-line prompt Hive stopped typing (`sendPrompt`'s catch, the same conditions as
+    before: the same run, nothing the user typed since) presses Ctrl+U once for each line of it with text and once
+    for each line break (`rollbackKeys`, from what `typeSegments` recorded as written). Each press is its own key,
+    and none goes past Hive's own text, so nothing of a stopped prompt can go out with a later one.
+  - **Enter once drawn:** Enter waits to see the last piece with visible text drawn. With none (lines of spaces), there
+    is no wait.
   - **The keys:** Codex 0.164.0's editor takes `ctrl(J)`, `ctrl(M)`, `shift(Enter)` and `alt(Enter)` as a new line;
     its composer sends only on plain Enter (`tui/src/keymap.rs`). Windows' console turns a written LF into
     Ctrl+Enter, which Codex doesn't bind. It delivers `ESC CR` as one Alt+Enter key, and win32-input-mode Ctrl+J as J
