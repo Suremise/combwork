@@ -157,7 +157,17 @@ const commitIn = (dir, files, message, trailer) => {
     fs.writeFileSync(path.join(shots, 'brief-builder.txt'), brief ?? '')
     check("B1's brief: reviewed by the pool, naming its reviewers", !!brief && brief.includes(`reviewed by the pool (${r1.name}, ${r2.name} and E1)`), String(brief).slice(0, 500))
     check('…and only B1 started', !(await live(alpha, r1.id)) && !(await live(alpha, r2.id)) && !(await live(alpha, e1.id)))
-    const l2 = (await inv('lanes:start', alpha, { builder: b2.id, reviewer: null, pool: true, cards: [b, e] })).lane
+    // B2's through the Agent API (HI-1581: the Assistant's hive_lane start with pool, here as a script): refused with a
+    // reviewer of its own, then started as Start Lane's is, its builder alone.
+    const lanesApi = async (body) => {
+      const res = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${workspaceToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      return { status: res.status, body: await res.json().catch(() => null) }
+    }
+    const withReviewer = await lanesApi({ project: 'alpha', builder: b2.name, reviewer: r1.name, pool: true, cards: [b, e] })
+    check('a pool lane through the API with a reviewer of its own is refused (HI-1581)', withReviewer.status === 400 && /no reviewer of its own/.test(withReviewer.body?.error ?? ''), JSON.stringify(withReviewer))
+    const viaApi = await lanesApi({ project: 'alpha', builder: b2.name, pool: true, cards: [b, e] })
+    const l2 = viaApi.body?.lane
+    check("…with pool: true, B2's lane is the pool's and B2 alone starts, in its slot (HI-1581)", viaApi.status === 200 && l2?.pool === true && l2?.reviewer === null && new RegExp(`Started ${b2.name} with the lane's brief, in slot-`).test(viaApi.body?.note ?? '') && !!(await until(() => live(alpha, b2.id), HUNG_MS)), JSON.stringify(viaApi))
     const l3 = (await inv('lanes:start', alpha, { builder: e1.id, reviewer: null, pool: true, cards: [d] })).lane
     check("B2's and E1's lanes start on the pool", l2.pool === true && l3.pool === true, JSON.stringify([l2, l3]))
     const panel = page.locator('.progress-panel')

@@ -126,6 +126,20 @@ function poolOf(cfg: ProjectConfig, options: WorkflowOptions | null): AgentDef[]
   return projectAgents(cfg).filter((a) => reviewsWork(agentWorkflowRole(a)))
 }
 
+/**
+ * A pool lane the Assistant or a script asks for (HI-1581, `POST /v1/lanes` with `pool`), refused as Start Lane… refuses
+ * it: where the project's rules have no pool (one reviewer per lane, or rules off), or nobody but the builder reviews.
+ */
+export async function checkLanePool(ws: WorkspaceService, projectPath: string, builderId: string): Promise<void> {
+  const project = basename(projectPath)
+  const cfg = await ws.projectConfig(projectPath)
+  const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
+  const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
+  const pool = poolOf(cfg, options)
+  if (!pool) throw hiveError(M.poolNotOffered, { project }, { kind: 'invalid' })
+  if (!pool.some((a) => a.id !== builderId)) throw hiveError(M.poolEmpty, { project }, { kind: 'invalid' })
+}
+
 /** What Start Lane… offers for a project (#1443): Pool in its reviewer list, with the pool's agents, where the rules have one. */
 export async function laneStartInfo(ws: WorkspaceService, projectPath: string): Promise<LaneStartInfo> {
   const cfg = await ws.projectConfig(projectPath)

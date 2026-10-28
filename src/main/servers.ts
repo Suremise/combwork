@@ -61,7 +61,7 @@ import { listMcp } from './mcp'
 import { assertInShared, createHandover, handoversFor, NoteConflict, notesTree, readNote, writeNote } from './notes'
 import { mergeSlots, slotTestEvent } from './mergeSlotHost'
 import * as lanes from './lanes'
-import { laneBusyCheck, launchRecordedLane, recordedLaneNote, resumeLaneBuilder } from './laneStart'
+import { checkLanePool, laneBusyCheck, launchRecordedLane, recordedLaneNote, resumeLaneBuilder } from './laneStart'
 import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber } from '../shared/lanes'
 import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
@@ -1897,11 +1897,18 @@ route('POST', '/v1/lanes', async ({ body }) =>
       reviewer = await agentParam(p, body.reviewer).catch(() => null)
       if (!reviewer) note = `No agent "${String(body.reviewer)}" in ${basename(p)}: the lane has no reviewer until one joins it.`
     }
+    // Reviewed by the project's reviewer pool (HI-1581, G17), the Assistant's and a script's: refused as Start Lane…
+    // refuses it (the rules have no pool, nobody but the builder reviews), and with a reviewer of its own.
+    if (body?.pool !== undefined && typeof body.pool !== 'boolean') throw new HttpError(400, 'pool must be true or false')
+    const pool = body?.pool === true
+    if (pool && a) throw new HttpError(403, "A lane reviewed by the pool is started by the Assistant or the user (Start Lane): an agent's own lane names its reviewer")
+    if (pool && body?.reviewer !== undefined && body.reviewer !== null && body.reviewer !== '') throw new HttpError(400, 'A lane reviewed by the pool has no reviewer of its own: leave reviewer out')
+    if (pool) await checkLanePool(ws, p, builder)
     const start = async () => {
       // A new lane over a busy agent is refused before anything is recorded, as Start Lane… refuses it (HR2's HI-1900
       // rounds 1 and 2: recorded with nobody started, it sat active): checked where startLane decides it is a new lane.
       const beforeNew = a ? undefined : await laneBusyCheck(ws, p, builder, reviewer)
-      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: args.brief !== undefined ? (sessions.liveFor(p, builder)?.sessionId ?? null) : null, by: await laneBy(), ...(beforeNew ? { beforeNew } : {}) })
+      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: args.brief !== undefined ? (sessions.liveFor(p, builder)?.sessionId ?? null) : null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(beforeNew ? { beforeNew } : {}) })
       // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
       const told = args.brief !== undefined ? await briefNote(ws, (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id) ?? { project: basename(p) }) : null
       if (args.brief !== undefined) await settleLaneBriefs(ws)
