@@ -27,6 +27,7 @@ import { fmt, msg, tr, type Msg } from '@shared/i18n'
 const M = {
   projects: msg({ id: 'workspace.activity.projects', defaultMessage: 'Projects', description: 'The activity bar (left edge): the Projects view.' }),
   overview: msg({ id: 'workspace.activity.overview', defaultMessage: 'Workspace Overview', description: 'The activity bar (left edge): the Workspace Overview.' }),
+  activity: msg({ id: 'workspace.activity.activity', defaultMessage: 'Activity', description: "The activity bar (left edge): the Activity view (what every project's agents run now, HI-1664)." }),
   performance: msg({ id: 'workspace.activity.performance', defaultMessage: 'Performance', description: "The activity bar (left edge): the Performance view (how agents' turns perform)." }),
   board: msg({ id: 'workspace.activity.board', defaultMessage: 'Task Board', description: 'The activity bar (left edge): the task board.' }),
   notes: msg({ id: 'workspace.activity.notes', defaultMessage: 'Shared Notes', description: 'The activity bar (left edge): the workspace\'s shared notes.' }),
@@ -71,6 +72,7 @@ const ASSISTANT_ICON = 'hive-assistant'
 const ACTIVITIES: { id: Activity; icon: string; label: Msg; command: string }[] = [
   { id: 'projects', icon: 'files', label: M.projects, command: 'view.projects' },
   { id: 'overview', icon: 'dashboard', label: M.overview, command: 'view.overview' },
+  { id: 'activity', icon: 'type-hierarchy', label: M.activity, command: 'view.activity' },
   { id: 'performance', icon: 'pulse', label: M.performance, command: 'view.performance' },
   { id: 'board', icon: 'project', label: M.board, command: 'view.board' },
   { id: 'notes', icon: 'notebook', label: M.notes, command: 'view.notes' },

@@ -1,4 +1,8 @@
 {
+  "workspace.activity.activity": {
+    "defaultMessage": "Activity",
+    "description": "The activity bar (left edge): the Activity view (what every project's agents run now, HI-1664)."
+  },
   "workspace.activity.assistant": {
     "defaultMessage": "Hive Assistant",
     "description": "The activity bar (left edge): the Hive Assistant's view. Hive's name stays as it is."

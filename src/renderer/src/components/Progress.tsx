@@ -7,7 +7,8 @@ import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { attempt, selectProject } from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
-import { cardLabelOf, findProject, flashPane, get, notify, projectKey, projectNames, revealAgent, set, setAssistantOpen, setProgressFilter, setProgressOpen, useDateStyle, useLanguage, useProgressFilter, useProgressOpen, useStore } from '../store'
+import { SHOW_IN_ACTIVITY } from '../views/WorkspaceActivity'
+import { activityAgentKey, cardLabelOf, findProject, flashPane, get, notify, openWorkspaceActivity, projectKey, projectNames, revealAgent, set, setAssistantOpen, setProgressFilter, setProgressOpen, useDateStyle, useLanguage, useProgressFilter, useProgressOpen, useStore } from '../store'
 import { useNow } from '../usage'
 import { useShallow } from 'zustand/react/shallow'
 import { cx, formatKeybinding, timeAgo } from '../util'
@@ -59,6 +60,14 @@ function whyNotShown(s: StoreState, r: ProgressRun): string | null {
   if (!p) return tr(msg({ id: 'board.progress.projectGone', defaultMessage: 'Its project is no longer in this workspace.', description: "Why a Progress panel run's agent can't be shown: its project was removed from the workspace." }))
   if (!r.agentId || !p.agents.some((a) => a.id === r.agentId)) return tr(msg({ id: 'board.progress.agentGone', defaultMessage: '{agent} has been removed from {project}.', description: "Why a Progress panel run's agent can't be shown: the agent ({agent}) was removed from its project ({project})." }), { agent: runAgentName(r, tr), project: p.name })
   return null
+}
+
+/** Opens Activity's workspace level on the agent that reported a run (HI-1664): what it runs now, the Assistant's too. */
+function showRunActivity(r: ProgressRun): void {
+  const s = get()
+  if (whyNotShown(s, r)) return
+  const path = r.source === 'assistant' ? s.workspace!.assistant!.path : findProject(s, r.projectPath!)!.path
+  openWorkspaceActivity({ agents: [activityAgentKey(path, r.source === 'assistant' ? 'assistant' : r.agentId!)] })
 }
 
 /**
@@ -807,9 +816,14 @@ function RunDetails({ run: r, now }: { run: ProgressRun; now: number }) {
       {r.summary && <div className={cx('progress-summary', r.state !== 'failed' && 'plain')}>{r.summary}</div>}
       <div className="progress-detail-actions">
         {why === null ? (
-          <button type="button" className="btn small" onClick={() => showRunAgent(r)} aria-label={showLabel(r)}>
-            <Icon name="eye" /> {tr(SHOW_THE_AGENT)}
-          </button>
+          <>
+            <button type="button" className="btn small" onClick={() => showRunAgent(r)} aria-label={showLabel(r)}>
+              <Icon name="eye" /> {tr(SHOW_THE_AGENT)}
+            </button>
+            <button type="button" className="btn small subtle" onClick={() => showRunActivity(r)}>
+              <Icon name="type-hierarchy" /> {tr(SHOW_IN_ACTIVITY)}
+            </button>
+          </>
         ) : (
           <span className="progress-detail-why">{why}</span>
         )}
