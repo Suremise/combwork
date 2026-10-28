@@ -17,7 +17,7 @@ import { createLogger, userText } from './logger'
 import { workspace, workspaceOf } from './workspace'
 import { cardAttachments } from './cardAttachments'
 import { checkDocRef, type DocRefCheck } from './docSections'
-import { expectStartPrompt, startedSlot } from './slotCards'
+import { expectStartPrompt, placementDue } from './slotCards'
 import type { ContextLine } from '../shared/tasks'
 import { cardRef } from '../shared/projectKeys'
 
@@ -213,8 +213,9 @@ async function giveCard(
     }
     const prompt = advanced.get<boolean>(RAW_CARD_START) ? rawTaskPrompt(card, note) : taskPrompt(card, !!sessions.hiveMcp(p), { from: before.column, note, context, attachments: await cardAttachments(workspace, n) })
     // Started in a slot (#1438): Hive gives it to the agent there once the slot is ready (a new conversation where the
-    // agent isn't running there), so nothing is typed where it is now.
-    if (before.column !== 'doing' && (await startedSlot(workspaceOf(p), p, n))) {
+    // agent isn't running there), so nothing is typed where it is now. Only while that placement is still to come: a card
+    // back from Review for more work keeps its placed cycle, so it is given here like any other (HI-1953).
+    if (before.column !== 'doing' && (await placementDue(workspaceOf(p), p, n))) {
       slotted = true
       toSlot(prompt)
       if (added && actor.kind !== 'user') emit({ type: 'agent-added', projectPath: p, agentId })
