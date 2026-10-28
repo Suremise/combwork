@@ -13,7 +13,8 @@ import { DEFAULT_PROJECT_CONFIG, DEFAULT_WORKSPACE_CONFIG, HIVE_DIR, mergeDefaul
 import { migrateWorkspacePreferences } from '../shared/workflow/preferences'
 import { settlePlacements } from '../shared/paneCells'
 import { migratedProjectMcp, migratedWorkspaceMcp } from '../shared/agentMcp'
-import { advancedDef, checkAdvanced } from '../shared/advanced'
+import { ASSISTANT_OTHER_MCP, advancedDef, checkAdvanced } from '../shared/advanced'
+import { advanced } from './advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { HiveError, hiveError } from './hiveError'
 import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSessionState, ProjectConfig, ProjectInfo, RemovedData, SessionRecord, WorkspaceConfig, WorkspaceInfo, WorkspaceMoved } from '../shared/types'
@@ -413,6 +414,8 @@ export class WorkspaceService {
       done('their ids') // i18n-ignore: a part of a log line's timing
       // Before any session starts with them: MCP settings from before #1093 move to its model.
       await this.migrateMcpModel().catch((e) => log.warn('moving the MCP settings to the workspace and project switches', e))
+      // Before the Assistant can start (HI-1472): its own MCP choices, from the old Advanced switch or none.
+      await this.migrateAssistantMcp(fresh).catch((e) => log.warn("moving the Assistant's MCP servers to its own choices", e))
       done('MCP settings') // i18n-ignore: a part of a log line's timing
     } finally {
       // Ended either way: an open that fails here leaves none of it going (its close follows).
@@ -739,11 +742,30 @@ export class WorkspaceService {
       if (JSON.stringify(now) !== JSON.stringify(was.enabled)) await this.mutateProjectConfig(p, (c) => ({ mcp: { ...c.mcp, enabled: migratedProjectMcp(allProjects, c.mcp) } }))
     }
     const enabled = migratedWorkspaceMcp(allProjects, configs)
-    await this.saveWorkspaceConfigWith(() => ({ mcp: { enabled, model: 2 } }))
+    await this.saveWorkspaceConfigWith((c) => ({ mcp: { ...c.mcp, enabled, model: 2 } }))
     for (const [i, p] of paths.entries()) {
       if (configs[i]?.disabled?.length) await this.mutateProjectConfig(p, (c) => ({ mcp: { ...c.mcp, disabled: [] } })).catch((e) => log.warn(`emptying the old MCP list of ${userText(p)}`, e))
     }
     log.info(`MCP settings moved to the workspace and project switches (#1093): ${enabled.length} on in the workspace`)
+  }
+
+  /**
+   * The Hive Assistant's own MCP choices (HI-1472), once per workspace: none in a new workspace; in one from before, the
+   * servers on in the workspace when the old Advanced switch (`hive.assistant.otherMcpServers`, kept for this) was on,
+   * so what it got still runs, else none. A list already there (an empty one too) is the user's and stays. Worked out as
+   * it is saved, so a choice made meanwhile wins.
+   */
+  private async migrateAssistantMcp(fresh: boolean): Promise<void> {
+    if (Array.isArray(this.wsConfig.mcp.assistant)) return
+    const legacyOn = !fresh && advanced.legacy(ASSISTANT_OTHER_MCP) === true
+    let moved = 0
+    await this.saveWorkspaceConfigWith((c) => {
+      if (Array.isArray(c.mcp.assistant)) return {}
+      const assistant = legacyOn ? [...c.mcp.enabled].sort() : []
+      moved = assistant.length
+      return { mcp: { ...c.mcp, assistant } }
+    })
+    log.info(`the Assistant's MCP servers are its own choices (HI-1472): ${legacyOn ? `${moved} from the old Advanced switch` : 'none'}`)
   }
 
   /** Saves of workspace.json queued or running, and the text of the last one: the watcher sees Hive's own writes too. */

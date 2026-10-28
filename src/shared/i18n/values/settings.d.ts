@@ -290,8 +290,6 @@ interface HiveMessageValues {
   'settings.advanced.error.text': { title: string | number }
   'settings.advanced.hive.agents.perProject.desc': { usual: string | number; most: string | number }
   'settings.advanced.hive.agents.perProject.title': undefined
-  'settings.advanced.hive.assistant.otherMcpServers.desc': undefined
-  'settings.advanced.hive.assistant.otherMcpServers.title': undefined
   'settings.advanced.hive.assistant.startView.desc': undefined
   'settings.advanced.hive.assistant.startView.title': undefined
   'settings.advanced.hive.cards.attachmentMax.desc': undefined
@@ -562,6 +560,12 @@ interface HiveMessageValues {
   'settings.assistant.journal.desc': undefined
   'settings.assistant.journal.tip': undefined
   'settings.assistant.journal.title': undefined
+  'settings.assistant.mcp.desc': undefined
+  'settings.assistant.mcp.manage': undefined
+  'settings.assistant.mcp.noWorkspace': undefined
+  'settings.assistant.mcp.none': undefined
+  'settings.assistant.mcp.switch': { name: string | number }
+  'settings.assistant.mcp.title': undefined
   'settings.assistant.mode.desc': undefined
   'settings.assistant.mode.tip': undefined
   'settings.assistant.mode.title': undefined

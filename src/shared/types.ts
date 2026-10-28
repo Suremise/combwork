@@ -799,7 +799,15 @@ export interface WorkspaceConfig {
    * and on in the project (mcpOnInProject). `model` 2: the settings are #1093's (before, `enabled` meant on for all
    * projects, unless a project turned it off); absent, they are moved to it when the workspace opens.
    */
-  mcp: { enabled: string[]; model?: 2 }
+  mcp: {
+    enabled: string[]
+    model?: 2
+    /**
+     * The servers the Hive Assistant has on (HI-1472, off until switched on), as a project's own choice: each runs for it
+     * only while it is on in the workspace too (mcpOnInProject). Absent until set or moved from the old Advanced switch.
+     */
+    assistant?: string[]
+  }
   /**
    * The Hive skills the workspace's agents aren't given (#1431, Skills → Delivered to agents), by name: every other skill
    * for their audience is delivered. A project can switch off more (ProjectConfig.skillDelivery), never one on again.
@@ -2436,6 +2444,8 @@ export interface McpServerInfo {
   errorText?: Text
   /** On in the workspace (#1093, its master switch): it runs in the projects that have it on, and nowhere while off. */
   globallyEnabled: boolean
+  /** The Hive Assistant's own choice for it (HI-1472, workspace.json's mcp.assistant): it runs for it while on in the workspace too. */
+  assistant: boolean
   secretWarnings: string[]
   /** What it runs, shown before it is enabled (#550): the command or URL, folder, environment and header names. */
   runs: string[]

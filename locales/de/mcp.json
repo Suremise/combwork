@@ -1,7 +1,12 @@
 {
   "mcp.addFile.message": "Fügt {file} zum Arbeitsbereich hinzu (.hive/mcp){files, plural, =0 {} one {, mit der Datei in einem eigenen Ordner} other {, mit den # Dateien in einem eigenen Ordner}}, ausgeschaltet. Schalte ihn in der Ansicht „MCP“ ein, um die Projekte zu wählen, in denen er läuft. Er führt aus:",
   "mcp.addFile.replaceDetail": "„Ersetzen“ verschiebt den vorhandenen Server (und bei einem aus einer .zip hinzugefügten auch dessen Ordner) in den Papierkorb und fügt diesen ausgeschaltet hinzu: Projekte, in denen der alte an war, verlieren ihn. Oder wähle einen anderen Namen.",
+  "mcp.assistant.confirmButton": "Einschalten",
+  "mcp.assistant.confirmMessage": "Die nächste Sitzung des Assistenten startet ihn. Er führt aus:",
+  "mcp.assistant.confirmTitle": "{name} für den Assistenten einschalten?",
+  "mcp.assistant.updateFailed": "Der Server konnte nicht aktualisiert werden",
   "mcp.enable.all": "Alle",
+  "mcp.enable.assistant": "Hive-Assistent",
   "mcp.enable.confirmButton": "Einschalten",
   "mcp.enable.confirmMessage": "Neue Sitzungen in den angehakten Projekten starten diesen Server. Er führt aus:",
   "mcp.enable.confirmTitle": "{name} einschalten?",
@@ -11,6 +16,7 @@
   "mcp.enable.projectsLabel": "Projekte, in denen er eingeschaltet wird",
   "mcp.error.invalidName": "Ungültiger Servername",
   "mcp.error.noServer": "Der Arbeitsbereich hat keinen MCP-Server namens {name}.",
+  "mcp.error.offInWorkspace": "{name} ist im Arbeitsbereich aus: Schalte ihn zuerst in der MCP-Ansicht ein (dort kann er auch für den Hive-Assistenten eingeschaltet werden).",
   "mcp.import.changed": "{count, plural, one {Der Server {names} wurde in der Konfiguration des Projekts geändert, nachdem du ihn gesehen hast, und daher ausgeschaltet kopiert: Prüfe, was er ausführt, und schalte ihn mit seinem Schalter in der Ansicht „MCP“ ein.} other {Die Server {names} wurden in der Konfiguration des Projekts geändert, nachdem du sie gesehen hast, und daher ausgeschaltet kopiert: Prüfe, was sie ausführen, und schalte sie mit ihren Schaltern in der Ansicht „MCP“ ein.}}",
   "mcp.import.confirmButton": "Kopieren und einschalten",
   "mcp.import.confirmMessage": "{count, plural, one {Der Server wird im Projekt {project} sofort eingeschaltet; andere Projekte können ihn in ihrem Tab „MCP“ einschalten. Er führt aus:} other {Die Server werden im Projekt {project} sofort eingeschaltet; andere Projekte können sie in ihrem Tab „MCP“ einschalten. Sie führen aus:}}",
@@ -26,7 +32,9 @@
   "mcp.tab.switch": "{name} im Projekt {project} an",
   "mcp.tab.workspaceBadge": "Arbeitsbereich",
   "mcp.view.allProjects": "Arbeitsbereich",
+  "mcp.where.assistantOnly": "Nur für den Hive-Assistenten an",
   "mcp.where.none": "In keinem Projekt an",
   "mcp.where.off": "Im Arbeitsbereich aus",
-  "mcp.where.some": "In {projects} an"
+  "mcp.where.some": "In {projects} an",
+  "mcp.where.someAndAssistant": "An in {projects} und für den Hive-Assistenten"
 }

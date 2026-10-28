@@ -45,6 +45,8 @@
   "tips.assistantLaneWatch.title": "Ein Blick auf alle Lanes",
   "tips.assistantLanes.text": "Wenn der Assistent einen Agenten mit seinen nächsten Karten startet, gibt er ihm im selben Schritt eine neue Unterhaltung (die alte bleibt im Tab „Sitzungen“). Kurze Unterhaltungen kosten viel weniger: Bitte ihn, das bei jeder neuen Karte genauso zu machen.",
   "tips.assistantLanes.title": "Eine neue Unterhaltung für jede Lane",
+  "tips.assistantMcp.text": "Der Assistent erhält einen MCP-Server des Arbeitsbereichs nur, wenn du ihn für ihn einschaltest, wie bei einem Projekt: in Einstellungen → Assistent → MCP-Server oder durch Ankreuzen von Hive-Assistent, wenn du einen Server in der MCP-Ansicht einschaltest. Ein Server mit deinen eigenen Notizen kann so den Assistenten erreichen und kein Projekt.",
+  "tips.assistantMcp.title": "MCP-Server nur für den Assistenten",
   "tips.assistantMessages.text": "Der Assistent kann einem wartenden oder arbeitenden Agenten keine neue Aufgabe geben, aber eine Nachricht hinterlassen, etwa deine Antwort: Sie wird zugestellt, sobald der Agent sie annehmen kann. Bis dahin zeigt sein Bereich sie als ungelesen (✉); ein Klick darauf bricht sie ab.",
   "tips.assistantMessages.title": "Der Assistent erreicht auch beschäftigte Agenten",
   "tips.assistantReplies.text": "Antwortest du einem Agenten in seinem Bereich, während der Assistent ihn oder seine Karte beobachtet, erfährt der Assistent die erste Zeile und fragt dich nicht noch einmal. Einstellungen → Allgemein → Dein Name legt fest, wie er dich nennt; unter Einstellungen → Assistent schaltest du es aus.",

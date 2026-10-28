@@ -1,7 +1,12 @@
 {
   "mcp.addFile.message": "Adiciona {file} ao espaço de trabalho (.hive/mcp){files, plural, =0 {} one {, com o arquivo dele em uma pasta própria} other {, com os # arquivos dele em uma pasta própria}}, desativado. Ative-o na visualização MCP para escolher os projetos em que ele roda. Ele executa:",
   "mcp.addFile.replaceDetail": "Substituir move o atual (e a pasta de um adicionado de um .zip) para a Lixeira e adiciona este, desativado: os projetos que tinham o antigo ativado o perdem. Ou escolha outro nome.",
+  "mcp.assistant.confirmButton": "Ativar",
+  "mcp.assistant.confirmMessage": "A próxima sessão do Assistente o inicia. Ele executa:",
+  "mcp.assistant.confirmTitle": "Ativar {name} para o Assistente?",
+  "mcp.assistant.updateFailed": "Não foi possível atualizar o servidor",
   "mcp.enable.all": "Todos",
+  "mcp.enable.assistant": "Assistente do Hive",
   "mcp.enable.confirmButton": "Ativar",
   "mcp.enable.confirmMessage": "Novas sessões nos projetos que você marcar o iniciam. Ele executa:",
   "mcp.enable.confirmTitle": "Ativar {name}?",
@@ -11,6 +16,7 @@
   "mcp.enable.projectsLabel": "Projetos em que ativá-lo",
   "mcp.error.invalidName": "Nome de servidor inválido",
   "mcp.error.noServer": "O espaço de trabalho não tem nenhum servidor MCP chamado {name}.",
+  "mcp.error.offInWorkspace": "{name} está desativado no espaço de trabalho: ative-o primeiro na visualização MCP (lá ele também pode ser ativado para o Assistente do Hive).",
   "mcp.import.changed": "{count, plural, one {{names} mudou na configuração do projeto depois que você o viu, então foi copiado desativado: confira o que ele executa e ative-o pelo interruptor dele na visualização MCP.} other {{names} mudaram na configuração do projeto depois que você os viu, então foram copiados desativados: confira o que eles executam e ative-os pelos interruptores deles na visualização MCP.}}",
   "mcp.import.confirmButton": "Copiar e ativar",
   "mcp.import.confirmMessage": "{count, plural, one {Ele é ativado no projeto {project} na hora; outros projetos podem ativá-lo na aba MCP deles. Ele executa:} other {Eles são ativados no projeto {project} na hora; outros projetos podem ativá-los na aba MCP deles. Eles executam:}}",
@@ -26,7 +32,9 @@
   "mcp.tab.switch": "{name} ativado no projeto {project}",
   "mcp.tab.workspaceBadge": "espaço de trabalho",
   "mcp.view.allProjects": "Espaço de trabalho",
+  "mcp.where.assistantOnly": "Ativado apenas para o Assistente do Hive",
   "mcp.where.none": "Ativado em nenhum projeto",
   "mcp.where.off": "Desativado no espaço de trabalho",
-  "mcp.where.some": "Ativado em {projects}"
+  "mcp.where.some": "Ativado em {projects}",
+  "mcp.where.someAndAssistant": "Ativado em {projects} e para o Assistente do Hive"
 }

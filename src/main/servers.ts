@@ -3314,7 +3314,11 @@ route('POST', '/v1/launch/connected', async () => {
   return { ok: sessions.hiveToolsConnected(assistant.assistantHome(ws), ASSISTANT_AGENT_ID) }
 })
 
-route('GET', '/v1/mcp', async () => (await inWorkspace(requireWorkspace(), () => listMcp())).map(({ name, def, globallyEnabled, error }) => ({ name, description: def?.description ?? '', globallyEnabled, error })))
+// The Assistant's own choices (HI-1472) are the workspace's to read: a project agent sees each server as before, without them.
+route('GET', '/v1/mcp', async () => {
+  const agent = !!agentCaller()
+  return (await inWorkspace(requireWorkspace(), () => listMcp())).map(({ name, def, globallyEnabled, assistant: forAssistant, error }) => ({ name, description: def?.description ?? '', globallyEnabled, ...(agent ? {} : { assistant: forAssistant }), error }))
+})
 
 route('POST', '/v1/notify', async ({ body }) => {
   const level: ToastLevel = ['info', 'success', 'warning', 'error'].includes(body?.level) ? body.level : 'info'

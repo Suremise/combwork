@@ -1276,11 +1276,23 @@ A server in the workspace is **available** to every project, and runs in a proje
 - **In the workspace:** the switch beside a server in the MCP view (**Workspace** in the server's own view) is its master switch. Turning it on shows what the server runs and asks which projects to turn it on in: the selected project, and any project that had it on before, are ticked; **All** and **None** tick or untick every project. Turning it off turns it off everywhere at once, and each project keeps its choice, so turning it on again shows the same projects ticked.
 - **In a project:** its **MCP** tab lists every workspace server with that project's own switch. Turn on the ones that project's agents need. While a server is off in the workspace, its row there is greyed and says **Off in the workspace**: the project's switch keeps its state, but no session gets the server until the workspace turns it on.
 
-New projects start with every server off. Each server in the MCP view says where it runs ("On in Amberlight", "On in no project", "Off in the workspace"). Sessions of every provider use **only** the servers on in the workspace and in their project.
+New projects start with every server off. Each server in the MCP view says where it runs ("On in Amberlight", "On in Amberlight and for the Hive Assistant", "On for the Hive Assistant only", "On in no project", "Off in the workspace"). Sessions of every provider use **only** the servers on in the workspace and in their project.
 
 Upgrading from 0.9.0 or earlier changes nothing that runs: a server that was on for all projects is on in the workspace and in every project that hadn't turned it off, and one you had turned on in some projects is on in the workspace and those projects.
 
 If a project has its own `.mcp.json` (or, for Codex, `.codex/config.toml` servers), Hive tells you which of its servers aren't in the workspace and offers to copy them there; until then they stay disabled. **Copy to workspace** shows what each runs, then copies it and turns it on in the workspace and in that project straight away (other projects can turn it on in their **MCP** tab).
+
+### Servers for the Hive Assistant <a id="servers-for-the-hive-assistant"></a>
+
+The Hive Assistant gets a workspace server the way a project does: only while it is **on in the workspace and on for the Assistant**. It starts with none, so a server with personal notes, say, can reach the Assistant and no project's agents.
+
+- **When you turn a server on in the workspace,** the list of projects to tick ends with **Hive Assistant**, unticked unless the Assistant had it on before. **All** and **None** tick and untick the projects only.
+- **In Settings → Assistant, MCP servers (this workspace)** lists the workspace's servers with the Assistant's own switch. Turning one on shows what it runs first. A server off in the workspace is greyed there and says **Off in the workspace**: turn it on in the MCP view first. The Assistant keeps its choice while the workspace has a server off.
+- **It applies from the Assistant's next session;** a running Assistant shows that it needs a restart.
+
+The Assistant's own choice is separate from every project's: turning a server on for it never turns it on in a project, and the other way round.
+
+Upgrading: if you had turned on **The Assistant uses the workspace's other MCP servers** in Settings → Advanced, each workspace you open gives the Assistant the servers that were on in it, so nothing it used goes away. That setting is gone; a new workspace's Assistant starts with none.
 
 ### Giving a server to some agents only <a id="giving-a-server-to-some-agents-only"></a>
 
@@ -1661,7 +1673,7 @@ Hive changes some of what each CLI does in the sessions it starts, never by edit
 
 Under **Hive**, **Hive's guidance for agents** (`hive.guidance`, on): with Hive's tools, each project agent gets Hive's guidance (how to use the tools, the board and handovers, and the project's latest handover), as the hive server's instructions on Claude Code and Copilot, and on Codex after the `developer_instructions` Codex itself would use (yours, a profile's or a trusted project's, as Codex reads them for the agent's own arguments), which Hive no longer replaces. If Codex can't say which those are (**Reading a session's instructions: timeout** under Codex), Hive never replaces them: the agent starts without Hive's guidance, and the Assistant with its role alone, and Hive tells you once. Off, agents get Hive's tools without the guidance, from their next session. The Hive Assistant always gets its own guidance and role: without them it would be just another agent, so there is no switch for them.
 
-Under **Hive**, **The Assistant uses the workspace's other MCP servers** (`hive.assistant.otherMcpServers`, off) gives the Hive Assistant, from its next session, every MCP server that is on in the workspace (its switch in the MCP view), as it works across every project; off, it has only Hive's own tools, as before. Its **Control** setting still decides what it may do with Hive's tools; another server's tools ask as its CLI's permission mode says. Whether its CLI's own servers load too is that CLI's **Only the workspace's MCP servers**.
+The Hive Assistant's MCP servers are chosen per workspace in Settings → Assistant ([Servers for the Hive Assistant](#servers-for-the-hive-assistant)); the Advanced switch that gave it every workspace server is gone.
 
 Under **Hive**, seven more switches cover what Hive does with a pane's keys and with what it types into the CLIs, the same for every CLI. Each is as Hive has always done by default, and applies at once (the start view at the Assistant's next start or compaction, a running Assistant's too):
 

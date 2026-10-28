@@ -45,6 +45,8 @@
   "tips.assistantLaneWatch.title": "Jedna obserwacja wszystkich torów",
   "tips.assistantLanes.text": "Gdy Asystent zleca agentowi kolejny zestaw kart, w tym samym kroku daje mu nową rozmowę (stara zostaje w zakładce Sesje). Krótkie rozmowy kosztują dużo mniej: poproś o to samo przy każdej nowej karcie.",
   "tips.assistantLanes.title": "Nowa rozmowa dla każdego toru",
+  "tips.assistantMcp.text": "Asystent dostaje serwer MCP obszaru roboczego tylko wtedy, gdy włączysz go dla niego, tak jak dla projektu: w Ustawienia → Asystent → Serwery MCP albo zaznaczając Asystent Hive przy włączaniu serwera w widoku MCP. Serwer z Twoimi notatkami może trafić do Asystenta i do żadnego projektu.",
+  "tips.assistantMcp.title": "Serwery MCP tylko dla Asystenta",
   "tips.assistantMessages.text": "Asystent nie może dać nowego zadania agentowi, który czeka lub pracuje, ale może zostawić mu wiadomość, na przykład Twoją odpowiedź: trafi do agenta, gdy tylko będzie mógł ją przyjąć. Do tego czasu panel agenta pokazuje ją jako nieprzeczytaną (✉); kliknij to, żeby ją anulować.",
   "tips.assistantMessages.title": "Asystent dotrze do zajętego agenta",
   "tips.assistantReplies.text": "Gdy odpowiadasz agentowi w jego panelu, a Asystent obserwuje tego agenta lub jego kartę, Asystent dostaje pierwszy wiersz odpowiedzi, więc nie pyta Cię ponownie. Ustawienia → Ogólne → Twoje imię określa, jak Cię nazywa; w Ustawienia → Asystent możesz to wyłączyć.",

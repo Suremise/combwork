@@ -4,7 +4,7 @@ import { maskText } from '../shared/redact'
 import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
-import { ASSISTANT_OTHER_MCP, COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { capturedText, errorText, hiveError, HiveError, shownError } from './hiveError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
@@ -1378,12 +1378,11 @@ class SessionManager {
     // The workspace's servers on in the project (#713); the agent's own choice narrows them (#537): all of them unless
     // it names some. Never one named as Hive's own (a hand-made .hive/mcp/hive.json): the CLIs pre-approve that one's tools.
     const forAgent = agent ?? projectAgents(pc)[0]
-    // The Assistant looks after the workspace with Hive's own tools, not the projects' MCP servers; with its switch on
-    // (#1284, #966 row 7), the workspace's servers too: those on in the workspace, as it works across every project.
-    const assistantServers = assistant && advanced.get<boolean>(ASSISTANT_OTHER_MCP)
+    // The Assistant gets the workspace's servers it has on (HI-1472, as a project's own choice, Settings → Assistant),
+    // each while on in the workspace too; never a project's.
     const mcpServers: Record<string, McpServerDef> = {}
     for (const m of await reads.servers()) {
-      const on = assistant ? assistantServers && !!m.globallyEnabled : serverOnIn(m, pc.mcp)
+      const on = assistant ? serverOnIn(m, { enabled: m.assistant ? [m.name] : [] }) : serverOnIn(m, pc.mcp)
       if (on && m.def && agentGetsMcp(forAgent, m.name) && m.name.toLowerCase() !== 'hive') mcpServers[m.name] = toLaunchDef(m.def, workspace.mcpDir)
     }
     const hive = this.hiveMcp(projectPath, agent?.id)

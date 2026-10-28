@@ -45,6 +45,8 @@
   "tips.assistantLaneWatch.title": "Une seule surveillance pour tous les couloirs",
   "tips.assistantLanes.text": "Quand l’Assistant lance un agent sur sa prochaine série de cartes, il lui donne une nouvelle conversation dans la même étape (l’ancienne reste dans l’onglet Sessions). Les conversations courtes coûtent bien moins cher : demande-lui de faire de même pour toute nouvelle carte.",
   "tips.assistantLanes.title": "Une nouvelle conversation pour chaque couloir",
+  "tips.assistantMcp.text": "L’Assistant reçoit un serveur MCP de l’espace de travail seulement quand vous l’activez pour lui, comme pour un projet : dans Paramètres → Assistant → Serveurs MCP, ou en cochant Assistant Hive quand vous activez un serveur dans la vue MCP. Un serveur avec vos propres notes peut atteindre l’Assistant et aucun projet.",
+  "tips.assistantMcp.title": "Serveurs MCP pour l’Assistant uniquement",
   "tips.assistantMessages.text": "L’Assistant ne peut pas confier un nouveau travail à un agent en attente ou au travail, mais il peut lui laisser un message, comme ta réponse : il est remis dès que l’agent peut le prendre. Son volet l’affiche comme non lu (✉) jusque-là ; clique dessus pour l’annuler.",
   "tips.assistantMessages.title": "L’Assistant peut joindre un agent occupé",
   "tips.assistantReplies.text": "Quand tu réponds à un agent dans son volet pendant que l’Assistant surveille l’agent ou sa carte, l’Assistant reçoit la première ligne de ta réponse, pour ne pas te reposer la question. Paramètres → Général → Ton nom définit comment il te nomme ; Paramètres → Assistant permet de désactiver cela.",

@@ -183,6 +183,14 @@
     "defaultMessage": "A new conversation for each lane",
     "description": "A tip's title."
   },
+  "tips.assistantMcp.text": {
+    "defaultMessage": "The Assistant gets a workspace MCP server only once you turn it on for it, as for a project: Settings → Assistant → MCP servers, or tick Hive Assistant when turning a server on in the MCP view. A server with your own notes can reach it and no project.",
+    "description": "A tip (HI-1472). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Hive Assistant is a box to tick)."
+  },
+  "tips.assistantMcp.title": {
+    "defaultMessage": "MCP servers for the Assistant only",
+    "description": "A tip's title. MCP is a protocol's name: keep it."
+  },
   "tips.assistantMessages.text": {
     "defaultMessage": "The Assistant can't give a waiting or working agent a new task, but it can leave it a message, such as your answer: delivered as soon as the agent can take it. Its pane shows it as unread (✉) until then; click that to cancel it.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

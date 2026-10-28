@@ -1247,12 +1247,16 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
 
     'mcp:list': () => mcp.listMcp(),
-    'mcp:setGlobal': async (name, enabled, expected, projects) => {
+    'mcp:setGlobal': async (name, enabled, expected, projects, assistant) => {
       // The projects to set are this window's workspace's.
       const picks = projects && typeof projects === 'object' ? Object.fromEntries(Object.entries(projects).map(([p, on]) => [workspace.assertProject(p), on === true])) : {}
-      await mcp.setMcpGlobal(name, enabled, expected, picks)
+      await mcp.setMcpGlobal(name, enabled, expected, picks, typeof assistant === 'boolean' ? assistant : undefined)
       emit({ type: 'skills-changed' })
       workspace.scheduleRefresh()
+    },
+    'mcp:setAssistant': async (name, enabled, expected) => {
+      await mcp.setMcpAssistant(name, enabled === true, expected)
+      emit({ type: 'skills-changed' })
     },
     'mcp:setProject': async (p, name, enabled, expected) => {
       await mcp.setMcpProject(workspace.assertProject(p), name, enabled, expected)

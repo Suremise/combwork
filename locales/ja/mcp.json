@@ -1,7 +1,12 @@
 {
   "mcp.addFile.message": "{file}をワークスペース（.hive/mcp）にオフの状態で追加します{files, plural, =0 {} other {（#個のファイルは専用のフォルダーに入ります）}}。「MCP」ビューでオンにすると、動かすプロジェクトを選べます。実行するコマンド：",
   "mcp.addFile.replaceDetail": "「置き換え」を選ぶと、既存のサーバー（.zipから追加したものはそのフォルダーも）をごみ箱に移し、このサーバーをオフの状態で追加します。古いサーバーをオンにしていたプロジェクトでは使えなくなります。別の名前を選ぶこともできます。",
+  "mcp.assistant.confirmButton": "オンにする",
+  "mcp.assistant.confirmMessage": "アシスタントの次のセッションで起動します。実行内容：",
+  "mcp.assistant.confirmTitle": "アシスタントで {name} をオンにしますか？",
+  "mcp.assistant.updateFailed": "サーバーを更新できませんでした",
   "mcp.enable.all": "すべて",
+  "mcp.enable.assistant": "Hive アシスタント",
   "mcp.enable.confirmButton": "オンにする",
   "mcp.enable.confirmMessage": "チェックしたプロジェクトの新しいセッションで起動します。実行するコマンド：",
   "mcp.enable.confirmTitle": "{name}をオンにしますか？",
@@ -11,6 +16,7 @@
   "mcp.enable.projectsLabel": "オンにするプロジェクト",
   "mcp.error.invalidName": "サーバー名が無効です",
   "mcp.error.noServer": "ワークスペースに{name}という名前のMCPサーバーはありません。",
+  "mcp.error.offInWorkspace": "{name} はワークスペースでオフです。先に MCP ビューでオンにしてください（そこで Hive アシスタント用にもオンにできます）。",
   "mcp.import.changed": "{count, plural, other {{names}は確認後にプロジェクトの設定で変更されたため、オフの状態でコピーしました。実行する内容を確認してから「MCP」ビューのスイッチでオンにしてください。}}",
   "mcp.import.confirmButton": "コピーしてオン",
   "mcp.import.confirmMessage": "{count, plural, other {{project}ではすぐにオンになります。ほかのプロジェクトは「MCP」タブでオンにできます。実行するコマンド：}}",
@@ -26,7 +32,9 @@
   "mcp.tab.switch": "{name}：{project}でオン",
   "mcp.tab.workspaceBadge": "ワークスペース",
   "mcp.view.allProjects": "ワークスペース",
+  "mcp.where.assistantOnly": "Hive アシスタントのみでオン",
   "mcp.where.none": "どのプロジェクトでもオフ",
   "mcp.where.off": "ワークスペースでオフ",
-  "mcp.where.some": "{projects}でオン"
+  "mcp.where.some": "{projects}でオン",
+  "mcp.where.someAndAssistant": "{projects} と Hive アシスタントでオン"
 }

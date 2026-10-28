@@ -1,7 +1,12 @@
 {
   "mcp.addFile.message": "Dodaje {file} do obszaru roboczego (.hive/mcp){files, plural, =0 {} one {, z jego plikiem w osobnym folderze} few {, z jego # plikami w osobnym folderze} many {, z jego # plikami w osobnym folderze} other {, z jego # pliku w osobnym folderze}}, wyłączony. Włącz go w widoku MCP, aby wybrać projekty, w których działa. Uruchamia:",
   "mcp.addFile.replaceDetail": "Zastąp przenosi go (i folder serwera dodanego z pliku .zip) do Kosza i dodaje ten, wyłączony: projekty, które miały włączony stary, tracą go. Możesz też wybrać inną nazwę.",
+  "mcp.assistant.confirmButton": "Włącz",
+  "mcp.assistant.confirmMessage": "Następna sesja Asystenta go uruchomi. Uruchamia:",
+  "mcp.assistant.confirmTitle": "Włączyć {name} dla Asystenta?",
+  "mcp.assistant.updateFailed": "Nie udało się zaktualizować serwera",
   "mcp.enable.all": "Wszystkie",
+  "mcp.enable.assistant": "Asystent Hive",
   "mcp.enable.confirmButton": "Włącz",
   "mcp.enable.confirmMessage": "Uruchomią go nowe sesje w zaznaczonych projektach. Uruchamia:",
   "mcp.enable.confirmTitle": "Włączyć {name}?",
@@ -11,6 +16,7 @@
   "mcp.enable.projectsLabel": "Projekty, w których go włączyć",
   "mcp.error.invalidName": "Nieprawidłowa nazwa serwera",
   "mcp.error.noServer": "Obszar roboczy nie ma serwera MCP o nazwie {name}.",
+  "mcp.error.offInWorkspace": "{name} jest wyłączony w obszarze roboczym: najpierw włącz go w widoku MCP (tam można go też włączyć dla Asystenta Hive).",
   "mcp.import.changed": "{count, plural, one {Serwer {names} zmienił się w konfiguracji projektu, odkąd został Ci pokazany, więc skopiowano go wyłączonego: sprawdź, co uruchamia, i włącz go jego przełącznikiem w widoku MCP.} few {Serwery {names} zmieniły się w konfiguracji projektu, odkąd zostały Ci pokazane, więc skopiowano je wyłączone: sprawdź, co uruchamiają, i włącz je ich przełącznikami w widoku MCP.} many {Serwery {names} zmieniły się w konfiguracji projektu, odkąd zostały Ci pokazane, więc skopiowano je wyłączone: sprawdź, co uruchamiają, i włącz je ich przełącznikami w widoku MCP.} other {Serwery {names} zmieniły się w konfiguracji projektu, odkąd zostały Ci pokazane, więc skopiowano je wyłączone: sprawdź, co uruchamiają, i włącz je ich przełącznikami w widoku MCP.}}",
   "mcp.import.confirmButton": "Skopiuj i włącz",
   "mcp.import.confirmMessage": "{count, plural, one {Zostanie od razu włączony w projekcie {project}; inne projekty mogą go włączyć w swojej zakładce MCP. Uruchamia:} few {Zostaną od razu włączone w projekcie {project}; inne projekty mogą je włączyć w swojej zakładce MCP. Uruchamiają:} many {Zostaną od razu włączone w projekcie {project}; inne projekty mogą je włączyć w swojej zakładce MCP. Uruchamiają:} other {Zostaną od razu włączone w projekcie {project}; inne projekty mogą je włączyć w swojej zakładce MCP. Uruchamiają:}}",
@@ -26,7 +32,9 @@
   "mcp.tab.switch": "{name} włączony w projekcie {project}",
   "mcp.tab.workspaceBadge": "obszar roboczy",
   "mcp.view.allProjects": "Obszar roboczy",
+  "mcp.where.assistantOnly": "Włączony tylko dla Asystenta Hive",
   "mcp.where.none": "Włączony w żadnym projekcie",
   "mcp.where.off": "Wyłączony w obszarze roboczym",
-  "mcp.where.some": "Włączony w: {projects}"
+  "mcp.where.some": "Włączony w: {projects}",
+  "mcp.where.someAndAssistant": "Włączony w {projects} i dla Asystenta Hive"
 }

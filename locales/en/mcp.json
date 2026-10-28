@@ -7,9 +7,29 @@
     "defaultMessage": "Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one, turned off: projects that had the old one on lose it. Or choose another name.",
     "description": "When a server of that name exists, under Replace or Choose Another Name."
   },
+  "mcp.assistant.confirmButton": {
+    "defaultMessage": "Turn On",
+    "description": "Button: turns the MCP server on for the Hive Assistant."
+  },
+  "mcp.assistant.confirmMessage": {
+    "defaultMessage": "The Assistant's next session starts it. It runs:",
+    "description": "The confirmation before an MCP server is turned on for the Hive Assistant, above the command it runs."
+  },
+  "mcp.assistant.confirmTitle": {
+    "defaultMessage": "Turn on {name} for the Assistant?",
+    "description": "Title of the confirmation before an MCP server is turned on for the Hive Assistant (Settings → Assistant). {name} is the server."
+  },
+  "mcp.assistant.updateFailed": {
+    "defaultMessage": "Could not update the server",
+    "description": "An error's title: turning an MCP server on or off for the Hive Assistant failed."
+  },
   "mcp.enable.all": {
     "defaultMessage": "All",
     "description": "The MCP server enable dialog: a button that ticks every project."
+  },
+  "mcp.enable.assistant": {
+    "defaultMessage": "Hive Assistant",
+    "description": "The MCP server enable dialog: the box that turns the server on for the Hive Assistant, after the projects."
   },
   "mcp.enable.confirmButton": {
     "defaultMessage": "Turn On",
@@ -46,6 +66,10 @@
   "mcp.error.noServer": {
     "defaultMessage": "The workspace has no MCP server named {name}.",
     "description": "An error turning a server on in a project. {name} is its name."
+  },
+  "mcp.error.offInWorkspace": {
+    "defaultMessage": "{name} is off in the workspace: turn it on in the MCP view first (it can be turned on for the Hive Assistant there too).",
+    "description": "An error turning an MCP server on for the Hive Assistant: the server is off in the workspace. {name} is the server; \"MCP view\" is a view in Hive: keep it as Hive shows it."
   },
   "mcp.import.changed": {
     "defaultMessage": "{count, plural, one {{names} changed in the project's config after you saw it, so it was copied turned off: check what it runs and turn it on with its switch in the MCP view.} other {{names} changed in the project's config after you saw them, so they were copied turned off: check what they run and turn them on with their switches in the MCP view.}}",
@@ -107,6 +131,10 @@
     "defaultMessage": "Workspace",
     "description": "Beside the switch in an MCP server's view that turns it on or off in the workspace (on: it runs in the projects that have it on)."
   },
+  "mcp.where.assistantOnly": {
+    "defaultMessage": "On for the Hive Assistant only",
+    "description": "Where an MCP server is on, under it in the MCP view: for the Hive Assistant, in no project."
+  },
   "mcp.where.none": {
     "defaultMessage": "On in no project",
     "description": "Where an MCP server is on, under it in the MCP view: on in the workspace, but no project has it on."
@@ -118,5 +146,9 @@
   "mcp.where.some": {
     "defaultMessage": "On in {projects}",
     "description": "Where an MCP server is on, under it in the MCP view. {projects} lists the projects."
+  },
+  "mcp.where.someAndAssistant": {
+    "defaultMessage": "On in {projects} and for the Hive Assistant",
+    "description": "Where an MCP server is on, under it in the MCP view: in some projects and for the Hive Assistant. {projects} lists the projects."
   }
 }

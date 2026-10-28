@@ -1,12 +1,12 @@
-// "The CLI's own setting" (#1284, #966 row 1) and the Assistant's other MCP servers' switch (row 7), on a fake Claude
+// "The CLI's own setting" (#1284, #966 row 1), and the Assistant's other MCP servers' switch (row 7) gone, on a fake Claude
 // Code session (fake-claude/), so nothing signs in or spends tokens.
 // 1. A project's agents on the CLI's own setting: the stopped agent's badge says "CLI's own" and its menu marks the
 //    choice; launched, the CLI gets no --permission-mode; its hooks report the mode it runs in, which Hive records as
 //    seen while the badge keeps saying "CLI's own"; a conversation of its own, stopped and resumed, resumes with no flag
 //    and the same state; the running agent's menu says why nothing switches live, and a switch restarts it in the mode
 //    chosen (then passed again).
-// 2. The new Advanced row for the Assistant's servers, off by default.
-// Screenshots of the badge, the menus and the row in both themes (cliownmode-*.png in the run's folder).
+// 2. The Advanced row for the Assistant's servers is gone (HI-1472: its own choices, the assistantmcp suite).
+// Screenshots of the badge and the menus in both themes (cliownmode-*.png in the run's folder).
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -121,14 +121,11 @@ const check = (name, ok, extra = '') => {
     await inv('session:stop', alpha, def.id)
     await lib.until(async () => !(await live()), HUNG_MS)
 
-    // ---- 2. The Assistant's other MCP servers: a row under Hive in Settings → Advanced, off by default.
+    // ---- 2. The Assistant's servers are its own choices now (HI-1472, the assistantmcp suite): the old Advanced row is gone.
     await page.keyboard.press('Control+,')
     await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
-    await page.getByRole('textbox', { name: 'Search settings' }).fill('other MCP servers')
-    const row = page.locator('.advanced-row[data-advanced="hive.assistant.otherMcpServers"]')
-    check("Advanced lists the Assistant's servers' switch, off", !!(await lib.until(async () => (await row.count()) === 1, HUNG_MS)) && (await row.getByRole('switch').getAttribute('aria-checked')) === 'false', await row.innerText().catch(() => 'no row'))
-    check('…its text says what turning it on does', /every server that is on in the workspace/.test(await row.innerText()))
-    await shots('advanced-row')
+    await page.locator('.advanced-list').waitFor({ timeout: HUNG_MS })
+    check("Advanced no longer lists the Assistant's servers' switch", (await page.locator('.advanced-row[data-advanced="hive.assistant.otherMcpServers"]').count()) === 0)
   } catch (e) {
     check('the suite ran to its end', false, e?.stack ?? String(e))
   } finally {
