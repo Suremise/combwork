@@ -380,6 +380,8 @@ interface HiveMessageValues {
   'tips.resumeAfterUpdate.title': undefined
   'tips.resumeAll.text': undefined
   'tips.resumeAll.title': undefined
+  'tips.retryWait.text': undefined
+  'tips.retryWait.title': undefined
   'tips.reviewCopies.text': undefined
   'tips.reviewCopies.title': undefined
   'tips.reviewSkip.text': undefined

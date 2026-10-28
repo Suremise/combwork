@@ -80,7 +80,7 @@ import { emit, emitTo, onHiveEvent, tellListeners, toast } from './events'
 import { presentWindow, showOsNotification, testNotifyLog, testQuiet } from './testQuiet'
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
-import { COMPACTING_TEXT, HOOKS_MISSING_NOTE } from '../shared/runtime'
+import { COMPACTING_TEXT, HOOKS_MISSING_NOTE, retryWaitCurrent } from '../shared/runtime'
 import { applyStep, compactionOver, expireTasks, failedTurnStep, hookStep, idleAfter, idleQuestionGone, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
 import { memoModel, memoTools, memoTurn, noteSafeguard, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
 import { admit, describe as describeTurn, endRunning, expectInjected, failureTurn, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
@@ -248,6 +248,10 @@ const MAX_SCREEN_STOPS = 200
  * Unpackaged test builds can shorten it (HIVE_TEST_SILENT_MS).
  */
 const silentMs = (): number => (!app.isPackaged && Number(process.env.HIVE_TEST_SILENT_MS) > 0 ? Number(process.env.HIVE_TEST_SILENT_MS) : 5 * 60_000)
+/** HI-1972: a running turn with no hook this long has its CLI's records looked at for a retry wait (an adapter may say otherwise)… */
+const DEFAULT_RETRY_LOOK_AFTER_MS = 20_000
+/** …then again at most this often while it stays quiet. */
+const RETRY_LOOK_EVERY_MS = 15_000
 /** How many times silentMs a running turn with a tool call open may be silent before its state is unknown (a long test run). */
 const OPEN_CALL_SILENCE = 12
 /** How many of the CLI's Stop answers (LiveDetails.stopsAnswered) a launch keeps: a turn has few. */
@@ -496,6 +500,14 @@ interface LiveSession {
   stopsAnswered?: number[]
   /** Its screen's reading of the CLI's turn (idle, working, not sure), for this launch's CLI version (ProviderAdapter.turnScreen). */
   turnScreen?: (screen: string) => 'idle' | 'working' | null
+  /** The environment it was launched with: where its CLI keeps its records (HI-1972, ProviderAdapter.retryWait). */
+  launchEnv?: NodeJS.ProcessEnv
+  /** When its latest hook reached Hive (ms, as it arrived). */
+  lastHookAt?: number
+  /** Its CLI's retry wait (HI-1972, checkRetry): a look under way, when it last looked, and the turn the wait shown is of. */
+  retryLooking?: boolean
+  retryLookedAt?: number
+  retryTurn?: object
   /** Its transcript says its background task ended, which starts a turn of the CLI's own (backgroundWakes), not begun yet in the ledger. */
   woke?: boolean
   /**
@@ -2347,6 +2359,7 @@ class SessionManager {
     }
     const delivered = await adapter.prepareLaunch(ctx)
     times?.mark('prepareLaunch')
+    l.launchEnv = ctx.env
     // What the session got, measured on the copies its CLI reads (not their sources: a kept old copy is what it reads).
     const deliveredSizes = await deliveredSkillSizes(adapter, ctx, delivered).catch(() => ({ catalog: 0, bytes: 0, unmeasured: Object.values(delivered).filter((d) => d.revision).length }))
     times?.mark('skillSizes')
@@ -2480,11 +2493,12 @@ class SessionManager {
     if (l.initialPrompt) this.notePrompt(l, true)
     l.initialPrompt = undefined
     l.startAllowed = undefined
-    // After each look at the transcript, the silence check: what the CLI recorded (a turn's end) comes first (#648); then
-    // whether its hooks are arriving (#1336).
+    // After each look at the transcript, whether its CLI waits to retry (HI-1972), then the silence check: what the CLI
+    // recorded (a turn's end) comes first (#648); then whether its hooks are arriving (#1336).
     l.backupTimer = setInterval(() => {
       void this.backup(projectPath, agent.id)
         .catch((e) => log.warn('transcript look failed', e))
+        .then(() => this.checkRetry(projectPath, agent.id))
         .then(() => this.checkSilence(projectPath, agent.id))
         .then(() => this.checkHooks(projectPath, agent.id))
         .catch((e) => log.warn('hooks check failed', e))
@@ -5387,7 +5401,10 @@ class SessionManager {
     const launch = this.findLaunch(runId, body.session_id)?.[1]
     // The launch's hooks before this one: what the old conversation had seen, if this one switches conversations.
     const before = launch?.hooksSeen ?? 0
-    if (launch) launch.hooksSeen = before + 1
+    if (launch) {
+      launch.hooksSeen = before + 1
+      launch.lastHookAt = at
+    }
     // Its start is heard (#1336); whether it answers a prompt is the turn ledger's to say, in the launch's order.
     if (launch?.hooksWatch) hookSeen(launch.hooksWatch, at)
     return this.inHookOrder(runId ?? `session:${String(body.session_id ?? '')}`, () => this.handleHookNow(runId, body, arrived, before, reply, at))
@@ -5480,6 +5497,11 @@ class SessionManager {
     const was = ledger.active
     const took = admit(ledger, hook.event, ids, { hiveContinued: continued, woke, now: at })
     if (ledger.active !== was) l.woke = false
+    // Its CLI is heard from again (HI-1972): whatever it waited to retry has gone on.
+    if (took.verdict !== 'stale' && st.retryWait) {
+      st.retryWait = undefined
+      this.emitState(st)
+    }
     // What the ledger made of it, for the Hooks dialog (HI-982), apart from Hive's reply: an ignored hook may have had one.
     const obs = this.hookObs.get(body)
     if (obs) Object.assign(obs.fired, took.verdict === 'stale' ? { ledger: 'ignored', ledgerWhy: clip(took.why, HOOK_SHORT_MAX).text } : { ledger: took.verdict === 'apply' ? 'applied' : 'continued' })
@@ -5564,7 +5586,10 @@ class SessionManager {
       l.turnStarts = [...(l.turnStarts ?? []), a.startedAt].slice(-20)
     }
     const turn: LiveSessionState['turn'] = !a ? undefined : unknown ? { state: 'unknown', ...(a.id ? { id: a.id } : {}), silentSince: new Date(unknown.since).toISOString() } : { state: a.state === 'running' ? 'running' : 'over', ...(a.id ? { id: a.id } : {}) }
-    if (JSON.stringify(turn) === JSON.stringify(st.turn)) return
+    // A retry wait (HI-1972) is its turn's: gone with it, when it ends or another begins.
+    const retryGone = !!st.retryWait && (!a || a !== l.retryTurn || a.state !== 'running')
+    if (retryGone) st.retryWait = undefined
+    if (!retryGone && JSON.stringify(turn) === JSON.stringify(st.turn)) return
     st.turn = turn
     this.emitState(st)
   }
@@ -5644,6 +5669,61 @@ class SessionManager {
   }
 
   /**
+   * Whether its CLI is waiting to retry its model request (HI-1972: Codex after a 429 shows only "Working" for minutes):
+   * once a running turn has had no hook for the adapter's while, its records are looked at, at most every
+   * RETRY_LOOK_EVERY_MS and one look at a time. What a look finds is applied in hook order, only if the same launch and
+   * turn still run and no hook came while it looked (a hook says something newer), and only a newer wait than the one
+   * shown. It turns an unknown turn back to running (its state is known); an expired wait is cleared here, so it never
+   * holds silence handling back.
+   */
+  private checkRetry(projectPath: string, agentId: string): void {
+    const id = liveId(projectPath, agentId)
+    const l = this.live.get(id)
+    if (!l?.ledger || !l.adapter.retryWait || !l.launchEnv) return
+    const st = l.state
+    const now = Date.now()
+    if (st.retryWait && !retryWaitCurrent(st.retryWait, now)) {
+      st.retryWait = undefined
+      this.emitState(st)
+    }
+    const turn = l.ledger.active
+    const sessionId = st.sessionId
+    if (!sessionId || !turn || turn.state !== 'running' || st.status !== 'working' || l.retryLooking) return
+    const lastHook = Math.max(l.lastHookAt ?? 0, turn.startedAt)
+    if (now - lastHook < (l.adapter.retryLookAfterMs?.() ?? DEFAULT_RETRY_LOOK_AFTER_MS)) return
+    if (l.retryLookedAt !== undefined && now - l.retryLookedAt < RETRY_LOOK_EVERY_MS) return
+    l.retryLookedAt = now
+    l.retryLooking = true
+    const seen = l.hooksSeen ?? 0
+    void l.adapter
+      .retryWait({ sessionId, env: l.launchEnv, transcriptPath: l.transcriptPath, since: lastHook })
+      .catch((e: unknown) => {
+        log.warn(`${userText(this.label(st))}: could not look for a retry wait`, e)
+        return null
+      })
+      .then((wait) =>
+        this.inHookOrder(st.runId, () => {
+          if (!wait || this.live.get(id) !== l || l.ledger?.active !== turn || turn.state !== 'running' || (l.hooksSeen ?? 0) !== seen || !retryWaitCurrent(wait)) return
+          const prev = l.retryTurn === turn ? st.retryWait : undefined
+          if (prev && Date.parse(wait.at) <= Date.parse(prev.at)) return
+          st.retryWait = { ...wait, since: prev?.since ?? wait.since }
+          l.retryTurn = turn
+          // Known again: waiting to retry, not silent.
+          if (st.turn?.state === 'unknown') {
+            heard(l.ledger)
+            this.noteTurn(l)
+          }
+          this.emitState(st)
+          // i18n-ignore: the log (English)
+          log.info(`${userText(this.label(st))}: ${l.adapter.descriptor.name} is waiting to retry its model request (${wait.status ?? 'no status'}, try ${wait.attempt}${wait.max ? `/${wait.max}` : ''}) until ${wait.retryAt ?? 'it says'}`)
+        })
+      )
+      .finally(() => {
+        l.retryLooking = false
+      })
+  }
+
+  /**
    * A running turn Hive has heard nothing of for a while (silentMs): its end, if the CLI's record or its screen shows it,
    * open tool calls or not (their ends may be lost too); else, after the longer silence an open call allows (a test run
    * can take long), its state is unknown (#648). Unknown isn't idle: nothing is typed into it, and the user can Mark
@@ -5656,6 +5736,8 @@ class SessionManager {
     const quiet = (): boolean => {
       const st = l.state
       const silent = silentFor(l.ledger!)
+      // Its CLI says it waits to retry (HI-1972): its state is known, while that wait is current.
+      if (st.retryWait && retryWaitCurrent(st.retryWait)) return false
       return silent !== null && silent >= silentMs() && st.status === 'working' && !l.compacting && !isCompacting(st)
     }
     if (!quiet()) return

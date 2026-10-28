@@ -2011,6 +2011,40 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/hooks-list-codex-0.164.0.txt`, version: '0.164.0', text: 'hooks/list', shows: "Codex's app server taking the request Hive sends for a session's hooks (its source: not a run)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  // Codex waiting to retry its model request (HI-1972): its only record is a row of its log database, read by these.
+  {
+    id: 'codex.retry.logTarget',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.retry.logTarget.title', defaultMessage: 'Retry wait: log entries', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry wait: the coding agent waiting to try its model request again (after being rate-limited)." }),
+    desc: msg({ id: 'settings.advanced.codex.retry.logTarget.desc', defaultMessage: "Where in its own log (logs_2.sqlite in its home folder) Codex says it is waiting to retry its model request, after being rate-limited for example. Hive reads the latest such entry of a session's turn and shows the wait as its status. Wrong, a waiting agent just shows Working.", description: 'What the advanced setting "Retry wait: log entries" is for, and what goes wrong when it is wrong (Settings → Advanced). logs_2.sqlite is a file name: keep it.' }),
+    kind: 'text',
+    default: 'codex_core::responses_retry',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/retry-log-codex-0.164.0.txt`, version: '0.164.0', text: 'WARN codex_core::responses_retry' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'codex.retry.pattern',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.retry.pattern.title', defaultMessage: 'Retry wait: message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry wait: the coding agent waiting to try its model request again." }),
+    desc: msg({ id: 'settings.advanced.codex.retry.pattern.desc', defaultMessage: 'How Codex words that log entry: a regular expression whose named groups give the try (attempt), the tries allowed (max), the wait (seconds, or millis) and the HTTP status that refused the request (status: 429 is a rate limit). Wrong, a waiting agent just shows Working.', description: 'What the advanced setting "Retry wait: message" is for (Settings → Advanced). attempt, max, seconds, millis and status are the names of the regular expression\'s groups: keep them.' }),
+    kind: 'pattern',
+    default: String.raw`retrying sampling request \((?<attempt>\d+)/(?<max>\d+) in (?:(?<seconds>\d+(?:\.\d+)?)s|(?<millis>\d+(?:\.\d+)?)ms)\)(?:.*?last status: (?<status>\d{3})\b)?`,
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/retry-log-codex-0.164.0.txt`, version: '0.164.0', text: 'stream disconnected - retrying sampling request (1/5 in 399.9997619s)... turn_id=00000000-0000-4000-8000-0000000000a1 retries=1 max_retries=5 sampling_error=exceeded retry limit, last status: 429 Too Many Requests' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'codex.retry.checkAfterSeconds',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.retry.checkAfterSeconds.title', defaultMessage: 'Retry wait: look after', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"20 s\"). A retry wait: the coding agent waiting to try its model request again." }),
+    desc: msg({ id: 'settings.advanced.codex.retry.checkAfterSeconds.desc', defaultMessage: "How long a working Codex session has to go without a hook before Hive looks in Codex's log for a wait to retry its model request, then every 15 seconds while it stays quiet.", description: 'What the advanced setting "Retry wait: look after" does (Settings → Advanced).' }),
+    kind: 'number',
+    default: 20,
+    min: 5,
+    max: 600,
+    unit: 's',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/retry-log-codex-0.164.0.txt`, version: '0.164.0', text: 'retrying sampling request', shows: "Codex's log entry saying it waits to retry, which Hive looks for once a session has been quiet this long" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   // How long Hive waits for Codex to render a session's prompt (#1285): it reads the developer_instructions Hive's guidance
   // follows from it. Past it, Hive adds none of its guidance rather than replace instructions it couldn't read.
   {

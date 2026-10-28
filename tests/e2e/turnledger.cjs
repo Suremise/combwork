@@ -7,6 +7,8 @@
 //   (after a silence, HIVE_TEST_SILENT_MS here) ends it;
 // - with no sign of the end at all, the state is unknown (never idle): the pane says how long it has been silent, with
 //   Mark idle, and it takes a task once marked;
+// - Codex waiting to retry after a 429, recorded only in its log database (HI-1972): its pane says so and when it
+//   retries, and its next hook clears it;
 // - Codex running a turn under the id of a compaction it began itself (HI-1916) is heard, and ends at its Stop;
 // - the hook journal (logs/hooks.log) has each hook with its launch, turn id, call id, order and statuses.
 // Idle compactions and recaps (#612) are the idlestatus suite's. Dev build, throwaway profile, workspace and CLI homes.
@@ -34,6 +36,9 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws, claudeHome, codexHome]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [claudeHome, codexHome]) fs.mkdirSync(d, { recursive: true })
   fs.writeFileSync(path.join(codexHome, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
+  // HI-1972: Codex's log is looked at for a retry wait after its shortest quiet while, not 20 s.
+  fs.mkdirSync(userData, { recursive: true })
+  fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'codex.retry.checkAfterSeconds': 5 } }))
   lib.gitProject(proj)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([proj.toLowerCase()]))
   lib.enableProviders(userData, ['claude-code', 'codex'])
@@ -150,6 +155,24 @@ const check = (name, ok, extra = '') => {
   await header.getByRole('button', { name: 'Mark idle' }).click()
   check('Mark idle makes it idle', !!(await is(codex, 'ready', 'over')))
   check('and it takes a task', !!(await turn(codex, 'work 1')) && !!(await is(codex, 'finished', 'over')))
+
+  // HI-1972: its model request refused with a 429, recorded only in Codex's log database, no hook while it waits to
+  // retry. Silent past SILENT_MS it goes unknown first; its log's wait, read after the quiet while, says what it waits on.
+  await turn(codex, 'ratelimited')
+  const waiting = await until(async () => {
+    const s = await live(codex)
+    return s?.retryWait?.status === 429 && s
+  }, HUNG_MS)
+  check("Codex: a 429 in its log is read as its wait to retry (try 1 of 5), its turn running again", waiting?.retryWait?.attempt === 1 && waiting.retryWait.max === 5 && waiting.status === 'working' && waiting.turn?.state === 'running', JSON.stringify(waiting && { retryWait: waiting.retryWait, turn: waiting.turn }))
+  const retryText = () => header.locator('.pane-status.retrying').innerText().catch(() => '')
+  const shown = await until(async () => /^Rate-limited \(429\) · retrying at .+ \(1 of 5\)$/.test((await retryText()).trim()), HUNG_MS)
+  check('its pane says it was rate-limited and when it retries, not Working…', !!shown, await retryText())
+  await page.screenshot({ path: path.join(lib.WORK, 'turnledger-retrying.png') })
+  check('the log says it waits to retry', !!(await until(() => /Codex is waiting to retry its model request \(429, try 1\/5\) until \d{4}-/.test(hiveLog()), HUNG_MS)))
+  // Its retry goes through: it carries on, and its next hook clears the wait.
+  fs.writeFileSync(path.join(codexHome, 'fake-retried-Codex'), '')
+  const over = await is(codex, 'finished', 'over')
+  check('its retry going through clears it: the turn ends as usual', !!over && !over.retryWait, JSON.stringify(over?.retryWait))
 
   // Codex 0.164 compacting by itself, then running its turn under that compaction's id (HI-1916: HR5's "no hooks" on 27
   // Oct): heard as a turn, and finished at its Stop, with nothing of it stale.

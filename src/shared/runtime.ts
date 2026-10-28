@@ -1,8 +1,9 @@
 import { shownText } from './advanced'
+import { formatTime } from './dates'
 import { msg, tr as trNow } from './i18n'
 import { providerDescriptor } from './providers'
 import type { Tr } from './tasks'
-import type { LiveSessionState, RuntimeFacts } from './types'
+import type { LiveSessionState, RetryWait, RuntimeFacts } from './types'
 
 /**
  * An agent's runtime as separate facts (#648), rather than one word standing for several. Each is stored where Hive
@@ -49,6 +50,39 @@ export function unknownStateText(st: Pick<LiveSessionState, 'turn'> | null | und
   const minutes = st.turn.silentSince ? minutesSince(st.turn.silentSince, now) : null
   if (tr) return tr(msg({ id: 'panes.runtime.silent', defaultMessage: 'Silent {known, select, yes {{minutes, number}} other {?}} min · state unknown', description: "An agent's status (its pane, the agents table): Hive has heard nothing of its turn for {minutes} minutes (? when it can't tell: known is no) and can't tell what it is doing. Keep it short." }), { known: minutes === null ? 'no' : 'yes', minutes: minutes ?? 0 })
   return `Silent ${minutes ?? '?'} min · state unknown` // i18n-ignore: agent-facing (the Agent API's agent state)
+}
+
+/** How long past its retry time (or, with none, past when it was told) a retry wait still counts (HI-1972). */
+export const RETRY_GRACE_MS = 30_000
+
+/** Whether a retry wait (HI-1972) still stands at `now`: its retry time, or when it was told, less than RETRY_GRACE_MS ago. */
+export function retryWaitCurrent(w: RetryWait, now = Date.now()): boolean {
+  const end = Date.parse(w.retryAt ?? w.at)
+  return Number.isFinite(end) && end + RETRY_GRACE_MS > now
+}
+
+const RETRY_TEXT = msg({
+  id: 'panes.runtime.retrying',
+  defaultMessage: "{why, select, limited {Rate-limited ({status})} status {Request failed ({status})} network {Can't reach {provider}} other {Request failed}} · {when, select, at {retrying at {time}} other {retrying…}} {tries, select, of {({attempt, number} of {max, number})} other {(try {attempt, number})}}",
+  description:
+    "An agent's status (its pane, the agents table): its coding agent is waiting to try its model request again. why: rate-limited (the service refused it as too many requests; {status} is the HTTP status, 429), refused with another HTTP status ({status}), the service ({provider}, a product name) couldn't be reached, or failed otherwise. {time} is when it tries again (a clock time); {attempt} is which try that is, of {max}. Keep it short."
+})
+
+/**
+ * "Rate-limited (429) · retrying at 15:05 (1 of 5)" for an agent whose CLI is waiting to retry its model request in
+ * the running turn (HI-1972); null otherwise, or once the wait has passed. In the window's language with tr, else
+ * English (the Agent API's, with the time in ISO).
+ */
+export function retryWaitText(st: (Pick<LiveSessionState, 'retryWait' | 'turn'> & Partial<Pick<LiveSessionState, 'provider'>>) | null | undefined, now = Date.now(), tr?: Tr): string | null {
+  const w = st?.retryWait
+  if (!w || !retryWaitCurrent(w, now) || (st!.turn?.state !== 'running' && st!.turn?.state !== 'unknown')) return null
+  const provider = st!.provider ? providerDescriptor(st!.provider).name : ''
+  const why = w.network ? 'network' : w.status === 429 ? 'limited' : w.status !== null ? 'status' : 'other' // i18n-ignore: select keys, never shown
+  if (tr) return tr(RETRY_TEXT, { why, status: String(w.status ?? ''), provider, when: w.retryAt ? 'at' : 'other', time: w.retryAt ? formatTime(w.retryAt) : '', tries: w.max !== null ? 'of' : 'other', attempt: w.attempt, max: w.max ?? 0 }) // i18n-ignore: select keys, never shown
+  // i18n-ignore: agent-facing (the Agent API's agent state)
+  const said = why === 'network' ? `Can't reach ${provider || 'its provider'}` : why === 'limited' ? `Rate-limited (${w.status})` : why === 'status' ? `Request failed (${w.status})` : 'Request failed'
+  // i18n-ignore: agent-facing (the Agent API's agent state)
+  return `${said} · ${w.retryAt ? `retrying at ${w.retryAt}` : 'retrying…'} (${w.max !== null ? `${w.attempt} of ${w.max}` : `try ${w.attempt}`})`
 }
 
 /**
@@ -99,7 +133,7 @@ export const shownMergeSlot = (st: Pick<LiveSessionState, 'mergeSlot' | 'mergeSl
  * Null when its facts say no turn runs: then Hive's policy words apply (watching, finished, ready, its background tasks:
  * ui.statusText).
  */
-export function runtimeLabel(st: Pick<LiveSessionState, 'runtime' | 'turn' | 'backgroundTasks' | 'statusMessage' | 'statusText' | 'mergeSlot' | 'mergeSlotText'> & Partial<Pick<LiveSessionState, 'hooksMissing' | 'provider'>>, now = Date.now()): string | null {
+export function runtimeLabel(st: Pick<LiveSessionState, 'runtime' | 'turn' | 'backgroundTasks' | 'statusMessage' | 'statusText' | 'mergeSlot' | 'mergeSlotText'> & Partial<Pick<LiveSessionState, 'hooksMissing' | 'provider' | 'retryWait'>>, now = Date.now()): string | null {
   const tr = trNow
   const rt = agentRuntime(st, now)
   if (rt.lifecycle === 'stopped') return tr(msg({ id: 'panes.runtime.stopped', defaultMessage: 'Stopped', description: "An agent's status: its session isn't running." }))
@@ -109,6 +143,9 @@ export function runtimeLabel(st: Pick<LiveSessionState, 'runtime' | 'turn' | 'ba
   if (rt.lifecycle === 'starting') return shownStatusMessage(st) || tr(msg({ id: 'panes.runtime.starting', defaultMessage: 'Starting…', description: "An agent's status: its CLI is starting." }))
   if (rt.lifecycle === 'signin') return tr(msg({ id: 'panes.runtime.signin', defaultMessage: 'Needs sign-in', description: "An agent's status: its CLI waits for the user to sign in." }))
   if (rt.maintenance === 'compacting') return tr(COMPACTING_TEXT)
+  // Its CLI says it waits to retry its model request (HI-1972): what it waits on, rather than "Working…".
+  const retry = st.retryWait ? retryWaitText({ retryWait: st.retryWait, turn: st.turn, provider: st.provider }, now, tr) : null
+  if (retry) return retry
   if (rt.turn === 'unknown') return unknownStateText(st, now, tr)
   if (rt.turn === 'running') return shownStatusMessage(st) || shownMergeSlot(st) || tr(msg({ id: 'panes.runtime.working', defaultMessage: 'Working…', description: "An agent's status: it is working on a turn." }))
   return null

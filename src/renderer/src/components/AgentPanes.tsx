@@ -19,7 +19,7 @@ import type { StartFailure } from '@shared/startFailure'
 import type { AgentLeftovers } from '@shared/agentProcesses'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { watchText } from '@shared/agentWatch'
-import { formatDateTime, formatWhen } from '@shared/dates'
+import { formatDateTime, formatTime, formatWhen } from '@shared/dates'
 import * as actions from '../actions'
 import { HAND_OVER_TEXT, handOverNow, onRunningLane } from '@shared/handOver'
 import { call } from '../api'
@@ -40,7 +40,7 @@ import { ModeBadge } from './PermissionMode'
 import { contextLines, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
 import { safeguardText } from '@shared/safeguards'
 import { unpricedModel, unpricedText } from '@shared/prices'
-import { hooksMissingNote, hooksMissingText, unknownStateText } from '@shared/runtime'
+import { hooksMissingNote, hooksMissingText, retryWaitText, unknownStateText } from '@shared/runtime'
 import { Icon, IconButton, ReviewMark, SafeguardMark, signInNote, statusText, Tooltip, useContextMenu, useFolds, type MenuEntry } from './ui'
 import { useConnections } from './ConnectionChoice'
 import { startBlockedReason, useStartBlocked } from './BoardUpgrade'
@@ -750,6 +750,35 @@ function useStripMenu(project: string | null, which: StripMenu, open: () => void
   }, [project, which, agent])
 }
 
+/**
+ * What a pane's retry status means (HI-1972): its CLI waits to retry its model request, and why; under a rate limit
+ * with a large conversation (past the compact suggestion's threshold, `large`), that a new conversation sends less.
+ */
+function RetryTip({ live, large }: { live: LiveSessionState; large: boolean }) {
+  const w = live.retryWait
+  if (!w) return null
+  const why = w.network ? 'network' : w.status === 429 ? 'limited' : 'other' // i18n-ignore: select keys, never shown
+  return (
+    <>
+      <div>
+        {tr(
+          msg({
+            id: 'panes.header.retryTip',
+            defaultMessage: '{provider} is waiting to send its model request again: {why, select, limited {its service refused it as too many requests (rate-limited).} network {it couldn\'t reach its service.} other {the request failed.}} It tries again by itself{when, select, at { at {time}} other {}}; nothing is needed from you.',
+            description: "Tooltip of a pane's status while its coding agent ({provider}, a product name) waits to retry its model request. why: rate-limited, the service unreachable, or failed otherwise. {time} is when it tries again (a clock time)."
+          }),
+          { provider: providerDescriptor(live.provider).name, why, when: w.retryAt ? 'at' : 'other', time: w.retryAt ? formatTime(w.retryAt) : '' } // i18n-ignore: select keys, never shown
+        )}
+      </div>
+      {large && w.status === 429 && (
+        <div className="faint">
+          {tr(msg({ id: 'panes.header.retryLarge', defaultMessage: 'This conversation is large, and each request sends all of it. A new conversation (a handover, then a fresh session) sends less, which can help under a rate limit.', description: "Tooltip of a pane's status while its coding agent is rate-limited and its conversation is large: a suggestion, not something Hive does." }))}
+        </div>
+      )}
+    </>
+  )
+}
+
 /** The pane header's status, with what to do when a refused sign-in stopped the agent (#309). */
 function SignInTip({ live, children }: { live: LiveSessionState | null; children: ReactNode }) {
   const note = signInNote(live)
@@ -1299,6 +1328,11 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
         // A line Hive typed that its CLI didn't take (#430): the user sees to it, nothing more is typed meanwhile.
         <Tooltip content={tr(msg({ id: 'panes.header.untakenTip', defaultMessage: "Hive typed this, but its CLI hasn't taken it (it wasn't reading its input): \"{line}\". Click its terminal and press Enter. Hive types nothing more into it until its CLI takes it.", description: "Tooltip of a pane's status when a line Hive typed into the agent's CLI wasn't taken ({line}: the line)." }), { line: live.untakenLine.text })}>
           <span className="faint pane-status asks">{tr(msg({ id: 'panes.header.untaken', defaultMessage: "A line Hive typed wasn't taken", description: "A pane's status: a line Hive typed into the agent's CLI wasn't taken." }))}</span>
+        </Tooltip>
+      ) : retryWaitText(live, Date.now(), tr) ? (
+        // Its CLI waits to retry its model request (HI-1972): what it waits on and until when, rather than "Working…".
+        <Tooltip content={<RetryTip live={live!} large={suggested} />}>
+          <span className="faint pane-status retrying">{retryWaitText(live, Date.now(), tr)}</span>
         </Tooltip>
       ) : unknownStateText(live, Date.now(), tr) ? (
         // A running turn Hive has heard nothing of, with no sign of its end (#648): not idle, so nothing is typed into it.

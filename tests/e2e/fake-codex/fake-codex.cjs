@@ -24,6 +24,8 @@
 //   the 5-hour window and W% of the weekly one (HI-1882). Anything else: a short turn.
 //   The turn ledger's cases (#648): "latetool" (a command whose PostToolUse reaches Hive after the turn's Stop),
 //   "loststop" (no Stop reaches Hive; its rollout records the turn's end, task_complete) and "silent" (neither).
+//   "ratelimited" (HI-1972): a 429 recorded only in its log database (logs_2.sqlite), then no hook until
+//   fake-retried-<agent> is in CODEX_HOME.
 //   Notices (#650), as Codex 0.162.1 takes them: context in a PostToolUse reply reaches "the model", and a Stop blocked
 //   carries the same turn on to another Stop with stop_hook_active. Each ("[Hive] …") is logged in fake-notices.jsonl in
 //   CODEX_HOME; with fake-follow-notices.txt (or fake-follow-notices-<agent>.txt) there, it reads its inbox (hive_inbox)
@@ -488,6 +490,29 @@ function nextScripted() {
   return first.trim() || null
 }
 
+/**
+ * "ratelimited" (HI-1972): its model request refused with a 429, as Codex 0.164.0 records it, only in its log database
+ * (logs_2.sqlite in CODEX_HOME: "retrying sampling request (1/5 in 400s)… last status: 429"), sending no hook. It waits,
+ * as Codex does for its retry, until fake-retried-<agent> is in CODEX_HOME (taken), then goes on with its turn.
+ */
+async function rateLimited() {
+  const home = process.env.CODEX_HOME
+  if (!home) return
+  const { DatabaseSync } = require('node:sqlite')
+  const db = new DatabaseSync(path.join(home, 'logs_2.sqlite'))
+  try {
+    db.exec('CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, ts_nanos INTEGER NOT NULL, level TEXT NOT NULL, target TEXT NOT NULL, feedback_log_body TEXT, module_path TEXT, file TEXT, line INTEGER, thread_id TEXT, process_uuid TEXT, estimated_bytes INTEGER NOT NULL DEFAULT 0)')
+    db.exec('CREATE INDEX IF NOT EXISTS idx_logs_thread_id_ts ON logs(thread_id, ts DESC, ts_nanos DESC, id DESC)')
+    const now = Date.now()
+    db.prepare("INSERT INTO logs (ts, ts_nanos, level, target, feedback_log_body, thread_id, process_uuid) VALUES (?, ?, 'WARN', 'codex_core::responses_retry', ?, ?, ?)").run(Math.floor(now / 1000), (now % 1000) * 1e6, `session_loop{thread_id=${sessionId}}: stream disconnected - retrying sampling request (1/5 in 399.9997619s)... turn_id=${turnId} retries=1 max_retries=5 sampling_error=exceeded retry limit, last status: 429 Too Many Requests`, sessionId, `pid:${process.pid}:fake`)
+  } finally {
+    db.close()
+  }
+  const go = path.join(home, `fake-retried-${String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')}`)
+  while (!fs.existsSync(go)) await sleep(100)
+  fs.rmSync(go, { force: true })
+}
+
 /** Whether a line typed while a turn runs is queued and taken in it (fake-queue-<agent> in CODEX_HOME, #1514). */
 function queues() {
   const home = process.env.CODEX_HOME
@@ -575,6 +600,8 @@ async function runPrompt(text) {
       questions++
     } else if (step === 'hold') {
       await key(['g'])
+    } else if (step === 'ratelimited') {
+      await rateLimited()
     } else if (step === 'approve') {
       if (!(await approve())) {
         // Rejected: the turn is interrupted (a question stays).

@@ -12,6 +12,8 @@ const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 60000
 const WORKERS = ['usage history', 'git', 'repository lock', 'WAL checkpoints', 'stall watchdog', 'log writer']
+// Listed too, but started only by a Codex session's first look at its log (HI-1972): none runs here.
+const LISTED = [...WORKERS, "Codex's log"]
 
 const userData = path.join(lib.WORK, 'pworkers-profile')
 const ws = path.join(lib.WORK, 'pworkers-ws')
@@ -58,7 +60,7 @@ const threadLines = (report) => {
       if (WORKERS.some((n) => /^(ended|on main's thread)/.test(lines[n] ?? ''))) return true
       return WORKERS.every((n) => lines[n] === 'its own thread')
     }, HUNG_MS)
-    check('Copy Diagnostics lists the worker threads', Object.keys(lines).length === WORKERS.length, JSON.stringify(lines))
+    check('Copy Diagnostics lists the worker threads', Object.keys(lines).length === LISTED.length, JSON.stringify(lines))
     for (const n of WORKERS) check(`${n}: its own thread`, !!allRunning && lines[n] === 'its own thread', lines[n] ?? 'not listed')
   } finally {
     await app.close().catch(() => undefined)

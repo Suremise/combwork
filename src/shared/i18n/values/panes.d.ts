@@ -75,6 +75,8 @@ interface HiveMessageValues {
   'panes.header.markIdleFailed': undefined
   'panes.header.more': undefined
   'panes.header.notRunning': undefined
+  'panes.header.retryLarge': undefined
+  'panes.header.retryTip': { provider: string | number; why: string; when: string; time: string | number }
   'panes.header.stopTip': undefined
   'panes.header.unknownTip': undefined
   'panes.header.untaken': undefined
@@ -150,6 +152,7 @@ interface HiveMessageValues {
   'panes.runtime.hooksMissing': { provider: string | number }
   'panes.runtime.hooksMissingNote': { provider: string | number; why: string; where: string | number; after: string }
   'panes.runtime.needsInput': undefined
+  'panes.runtime.retrying': { why: string; status: string | number; provider: string | number; when: string; time: string | number; tries: string; attempt: number; max: number }
   'panes.runtime.signin': undefined
   'panes.runtime.silent': { known: string; minutes: number }
   'panes.runtime.starting': undefined

@@ -2057,6 +2057,22 @@ export interface HooksMissing {
   offIn?: string
 }
 
+/**
+ * A CLI waiting to retry its model request (HI-1972), as its own records say (Codex's log): when it was told (`at`, ISO),
+ * the turn's first such wait (`since`), when it tries again (`retryAt`; null when the CLI doesn't say), which try it is
+ * of how many (`max` null when it doesn't say), and the HTTP status that refused it (429: rate-limited), when it names
+ * one. `network`: the provider couldn't be reached at all (for CLIs that say so; Codex's records don't).
+ */
+export interface RetryWait {
+  at: string
+  since: string
+  retryAt: string | null
+  attempt: number
+  max: number | null
+  status: number | null
+  network?: true
+}
+
 export interface LiveSessionState {
   provider: ProviderId
   /** This launch, until the process exits; hooks name it so they reach the right agent. */
@@ -2103,6 +2119,11 @@ export interface LiveSessionState {
    * can Mark idle. `id`: the CLI's own turn id, when it names turns.
    */
   turn?: { state: 'running' | 'over' | 'unknown'; id?: string; silentSince?: string }
+  /**
+   * Its CLI is waiting to retry its model request in the running turn (HI-1972: Codex's log after a 429), as Hive last
+   * read it: shown as its status while `retryAt` is ahead (retryWaitCurrent), cleared by its next hook or the turn's end.
+   */
+  retryWait?: RetryWait
   /**
    * Facts of its runtime besides its turn and background tasks, each set where Hive learns it, never read back from the
    * status word (#648; shared/runtime.ts agentRuntime() gathers them all, and the labels are projected from them).

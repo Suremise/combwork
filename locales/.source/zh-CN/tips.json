@@ -378,6 +378,8 @@
   "tips.resumeAfterUpdate.title": "Updates leave your agents where they were",
   "tips.resumeAll.text": "After a restart, Resume All Agents in the project header resumes every stopped agent's last session in one go.",
   "tips.resumeAll.title": "Resume all agents at once",
+  "tips.retryWait.text": "When Codex's requests are refused, often by a rate limit, Codex waits minutes before trying again while its screen says only Working. Hive reads the wait from Codex's log, and the agent's status says when it tries again.",
+  "tips.retryWait.title": "See when Codex is rate-limited",
   "tips.reviewCopies.text": "A reviewer reviews in a review copy: a folder at exactly the submitted revision, which nothing else writes, so the builder can carry on meanwhile. Its checks there count for that submission. Settings → Advanced turns it off.",
   "tips.reviewCopies.title": "Reviewers test exactly what was submitted",
   "tips.reviewSkip.text": "Building an installer or a quick trial needs no reviewer? Tick Skip review in the New Card dialog: submitting the card finishes it, and a code card still goes on to its merge, with its merge checks.",

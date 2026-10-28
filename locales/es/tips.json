@@ -378,6 +378,8 @@
   "tips.resumeAfterUpdate.title": "Las actualizaciones dejan tus agentes donde estaban",
   "tips.resumeAll.text": "Tras un reinicio, Reanudar todos los agentes, en el encabezado del proyecto, reanuda de una vez la última sesión de cada agente detenido.",
   "tips.resumeAll.title": "Reanuda todos los agentes a la vez",
+  "tips.retryWait.text": "Cuando se rechazan las solicitudes de Codex, a menudo por un límite de solicitudes, Codex espera minutos antes de reintentar mientras su pantalla solo dice Working. Hive lee la espera del registro de Codex, y el estado del agente dice cuándo lo vuelve a intentar.",
+  "tips.retryWait.title": "Ver cuándo Codex tiene un límite de solicitudes",
   "tips.reviewCopies.text": "Un revisor revisa en una copia de revisión: una carpeta justo en la versión entregada, en la que nada más escribe, así que el autor puede seguir mientras tanto. Sus comprobaciones allí cuentan para esa entrega. Configuración → Avanzado lo desactiva.",
   "tips.reviewCopies.title": "Los revisores prueban justo lo que se entregó",
   "tips.reviewSkip.text": "¿Compilar un instalador o un ensayo rápido no necesita revisor? Marca Omitir revisión en el diálogo Nueva tarjeta: enviarla la termina, y una tarjeta con código sigue hacia su fusión, con sus comprobaciones de fusión.",

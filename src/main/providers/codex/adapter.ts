@@ -7,7 +7,7 @@ import { basename, join, resolve } from 'path'
 import { readdir, readFile, stat } from 'original-fs/promises'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'original-fs'
 import { parse as parseToml } from 'smol-toml'
-import type { AgentInstallInfo, McpServerDef, MemorySource, PermissionMode, ReadinessIssue, SubSession } from '../../../shared/types'
+import type { AgentInstallInfo, McpServerDef, MemorySource, PermissionMode, ReadinessIssue, RetryWait, SubSession } from '../../../shared/types'
 import { assertSessionId, isSessionId } from '../../../shared/defaults'
 import type { StartHint } from '../../../shared/startFailure'
 import { CODEX, CODEX_DESCRIPTOR, CODEX_MODE_FLAGS, CODEX_PERMISSION_MODES } from '../../../shared/codex'
@@ -26,6 +26,7 @@ import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, T
 import { codexBackgroundMemo, codexBackgroundTasks, type CodexBackgroundMemo } from './background'
 import { codexSafeguards } from './safeguards'
 import { codexTranscriptTurns } from './turns'
+import { codexRetryWait } from './retryLog'
 import type { SafeguardEvent } from '../../../shared/safeguards'
 import { CodexConversationParser, CodexUsageParser, codexImageData, parseRollout, patchPaths, rolloutDetails, rolloutSubSession } from './rollout'
 import { parseCodexModels } from './models'
@@ -1132,6 +1133,15 @@ export class CodexAdapter implements ProviderAdapter {
   turnScreen(version: string | null): ((screen: string) => 'idle' | 'working' | null) | null {
     if (!version || compareVersions(version, TURN_SCREEN_SINCE) < 0) return null
     return codexTurnScreen
+  }
+
+  /** Codex waiting to retry its model request (HI-1972): its log database's newest record of it (retryLog.ts). */
+  retryWait(q: { sessionId: string; env: NodeJS.ProcessEnv; since: number }): Promise<RetryWait | null> {
+    return codexRetryWait(q)
+  }
+
+  retryLookAfterMs(): number {
+    return advanced.number('codex.retry.checkAfterSeconds') * 1000
   }
 
   /**
