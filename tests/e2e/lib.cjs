@@ -1080,6 +1080,16 @@ function logFakeInput(home) {
  *   would: 'enter', a Ctrl+U between the line and its Enter; 'before', a wake's text on the line (read) before it.
  * Returns { attempt, lost }: the attempt taken (1 = the first; 0 if none of `tries` was), and why each before it wasn't.
  */
+/**
+ * Whether Hive has nothing left to type into an agent (HI-1918): none of its deliveries unread (queued, offered or
+ * uncertain: a doorbell, a card's task, a wake), as GET …/deliveries reads them with a token of its project (its own).
+ * An agent idle between Hive's own turns isn't enough: a line typed then meets the next doorbell. For typeLine's ready.
+ */
+async function inboxQuiet(apiPort, project, agent, token) {
+  const res = await fetch(`http://127.0.0.1:${apiPort}/v1/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agent)}/deliveries?limit=1`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null)
+  return (res?.ok ? await res.json().catch(() => null) : null)?.unread === 0
+}
+
 async function typeLine(inv, key, home, agent, text, { live = null, taken = null, ready = null, tries = 3, hungMs = TURN_HUNG_MS, disturb = null } = {}) {
   if (!live && !taken) throw new Error('typeLine: give it live or taken')
   if (!fs.existsSync(path.join(home, 'fake-log-input.txt'))) throw new Error(`typeLine: the fake's input log is off in ${home} (lib.logFakeInput before it starts)`)
@@ -1565,4 +1575,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { projectConfig, commitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, typeLine, fakePrompts, skip }
+module.exports = { projectConfig, commitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, inboxQuiet, typeLine, fakePrompts, skip }
