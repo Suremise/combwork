@@ -168,19 +168,28 @@ export interface TemplatePlanReply {
   workflow: WorkflowShown | null
 }
 
-/** Each taken name with a free one to try (`suggestTemplateAgentName`): the workspace's names and the template's others aren't. */
-async function suggestions(projectPath: string, plan: TemplateLoadPlan): Promise<TemplatePlanReply['taken']> {
-  if (!plan.taken.length) return []
+/**
+ * Each taken name with a free one to try (`suggestTemplateAgentName`), from the workspace's agents as they are now: their
+ * names and the template's others (`chosen`) aren't.
+ */
+async function suggestions(projectPath: string, taken: readonly { name: string; project: string }[], chosen: readonly string[]): Promise<TemplatePlanReply['taken']> {
+  if (!taken.length) return []
   const project = basename(projectPath)
   const key = await projectKeyOf(workspaceOf(projectPath), projectPath).catch(() => null)
   const others = (await workspaceAgents(projectPath)).filter((a) => a.project.toLowerCase() !== project.toLowerCase())
-  const used = [...others.map((a) => a.name), ...plan.create.map((a) => a.name)]
+  const used = [...others.map((a) => a.name), ...chosen]
   const out: TemplatePlanReply['taken'] = []
-  for (const t of plan.taken) {
+  for (const t of taken) {
     const suggestion = suggestTemplateAgentName(t.name, project, key, [...used, ...out.map((o) => o.suggestion)])
     out.push({ ...t, suggestion })
   }
   return out
+}
+
+/** A load refused for names another project's agent has: each with a free one to give in names. */
+async function takenRefusal(projectPath: string, taken: readonly { name: string; project: string }[], chosen: readonly string[]): Promise<HiveError> {
+  const free = await suggestions(projectPath, taken, chosen)
+  return refused(`${free.map((t) => `"${t.name}" is ${t.project}'s agent: try "${t.suggestion}"`).join('; ')}. Agent names are unique across the workspace: give each a free name in names. Nothing was changed.`, 'conflict')
 }
 
 /** The plan with the names given (`names`), its workflow checked, as the Agent API reports it; nothing is changed. */
@@ -200,7 +209,7 @@ export async function planReply(projectPath: string, e: TemplateEntry, names: un
       const partner = pair ? name(pair.builder === i ? pair.reviewer : pair.builder) : undefined
       return { name: a.name, template: plan.templateNames[i], role: a.role, provider: a.provider, ...(partner ? { pairedWith: partner } : {}) }
     }),
-    taken: await suggestions(projectPath, plan),
+    taken: await suggestions(projectPath, plan.taken, plan.create.map((a) => a.name)),
     connections: plan.connections.map((c) => plan.create[c.index]?.name ?? String(c.index)),
     blocked: [...why, ...(applyWorkflow && wf?.shown.needsGit ? [NEEDS_GIT] : []), ...(applyWorkflow ? (wf?.shown.problems ?? []) : [])],
     workflow: wf?.shown ?? null
@@ -238,13 +247,16 @@ const kept = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
  * with a free name for each taken one, and, with `applyWorkflow`, when its workflow needs Git or can't be saved here.
  * The load itself checks its workflow again inside its guard (`check`), on the plan it stages, so the agents and the
  * options saved are one read of the template; the options are saved once the agents are published, against the
- * project's as read then (changed meanwhile: not saved, said). Each is recorded for undo.
+ * project's as read then (changed meanwhile: not saved, said). `guard` (the Assistant's control and launch) is checked at
+ * each write, under its lock: refused before the agents are published, nothing changes; after, the options aren't saved
+ * and the reply says why. Each is recorded for undo.
  */
-export async function loadForAssistant(projectPath: string, e: TemplateEntry, names: unknown, applyWorkflow: boolean): Promise<TemplateLoadReply> {
+export async function loadForAssistant(projectPath: string, e: TemplateEntry, names: unknown, applyWorkflow: boolean, guard?: () => void): Promise<TemplateLoadReply> {
   const ws = workspaceOf(projectPath)
   const from = e.scope === 'project' ? e.project : undefined
   const { reply: planned, plan: shown } = await planReply(projectPath, e, names, applyWorkflow)
-  if (planned.taken.length) throw refused(`${planned.taken.map((t) => `"${t.name}" is ${t.project}'s agent: try "${t.suggestion}"`).join('; ')}. Agent names are unique across the workspace: give each a free name in names.`, 'conflict')
+  const chosenNames = shown.create.map((a) => a.name)
+  if (planned.taken.length) throw await takenRefusal(projectPath, planned.taken, chosenNames)
   if (planned.blocked.length) throw refused(`The template can't be loaded yet: ${planned.blocked.join(' ')}`, 'conflict')
   const chosen = namesFromKeys(e.agents.map((a: TemplateAgent) => a.name), shown.templateNames, names)
   let wf: Awaited<ReturnType<typeof workflowOf>> = null
@@ -253,6 +265,9 @@ export async function loadForAssistant(projectPath: string, e: TemplateEntry, na
     names: chosen,
     // The connections the plan flags take the workspace's default, as the window's dialog does unless changed.
     connections: Object.fromEntries(shown.connections.map((c) => [c.index, null])),
+    // The Assistant's guard at the publish itself, and every name taken since this plan refused with a free one too.
+    guard,
+    taken: (clash) => takenRefusal(projectPath, clash, chosenNames),
     check: async (plan) => {
       wf = applyWorkflow ? await workflowOf(projectPath, plan) : null
       if (wf?.shown.needsGit) throw refused(NEEDS_GIT, 'conflict')
@@ -266,7 +281,7 @@ export async function loadForAssistant(projectPath: string, e: TemplateEntry, na
   let workflow: TemplateLoadReply['workflow'] = null
   if (w?.change) {
     try {
-      const saved = await setWorkflowOptions(ws, projectPath, w.change)
+      const saved = await setWorkflowOptions(ws, projectPath, w.change, { ...(guard ? { check: guard } : {}) })
       recorded.workflow = { before: kept(w.before), after: kept(ownOf(saved)) }
       await noteChange(ws, { kind: 'agent', project: basename(projectPath), fields: [{ field: 'workflow', old: recorded.workflow.before, new: recorded.workflow.after }] })
       workflow = { ...w.shown, saved: true }

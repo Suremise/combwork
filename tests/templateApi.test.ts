@@ -8,7 +8,7 @@
 import { execFileSync } from 'child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { StoredAgent } from '../src/shared/agentFolders'
@@ -96,11 +96,11 @@ describe('loading a template for the Assistant, and undoing it', () => {
   /** A template the Assistant names, found as the route finds it. */
   const find = (p: string, template: string, scope?: string) => run(() => api.findTemplate(p, { template, ...(scope ? { scope } : {}) }))
   /** One load, recorded as the route's assistantChange records it, in a new message of the user's. */
-  const load = async (p: string, template: string, given?: unknown, workflow = true) => {
+  const load = async (p: string, template: string, given?: unknown, workflow = true, guard?: () => void) => {
     control.newTurn(wsPath)
     const group = control.currentTurn(wsPath).id
     const e = await find(p, template)
-    const r = await changes.recordingChanges(wsPath, 'load-template', `load the template "${template}"`, () => run(() => api.loadForAssistant(p, e, given, workflow)))
+    const r = await changes.recordingChanges(wsPath, 'load-template', `load the template "${template}"`, () => run(() => api.loadForAssistant(p, e, given, workflow, guard)))
     return { r, group }
   }
   const undo = (group: string) => run(() => undoChanges(w, { group }, 'assistant'))
@@ -254,11 +254,70 @@ describe('loading a template for the Assistant, and undoing it', () => {
   })
 
   it('a name taken by another project while the load staged refuses it, nothing published', async () => {
+    let taker: { id: string } | null = null
     templates.testHooks.staged = async (name) => {
-      if (name === k('B1')) await run(() => addAgent(beta, { name: k('R3'), location: 'project' }))
+      if (name === k('B1')) taker = await run(() => addAgent(beta, { name: k('R3'), location: 'project' }))
     }
-    await expect(load(alpha, 'team-3x3.json')).rejects.toThrow(new RegExp(k('R3')))
+    // beta's agent named away again at the end, so the tests after this one load as before.
+    onTestFinished(async () => {
+      if (taker) await run(() => updateAgent(beta, taker!.id, { name: 'Beta extra' }))
+    })
+    const refusal = await load(alpha, 'team-3x3.json').then(() => null, (e: Error) => e.message)
+    const free = new RegExp(`"${k('R3')}" is beta's agent: try "([^"]+)"\\. Agent names are unique across the workspace: give each a free name in names\\. Nothing was changed\\.`).exec(refusal ?? '')?.[1]
+    expect(free, refusal ?? '').toBeTruthy()
     expect(names(alpha)).toEqual(['Ann', 'Rob'])
+    // The free name it gave is usable: loading with it goes through.
+    templates.testHooks.staged = undefined
+    const { r } = await load(alpha, 'team-3x3.json', { [k('R3')]: free })
+    expect(r.created.at(-1)).toBe(free)
+  })
+
+  it("the Assistant's guard refused during the load's staging: nothing is published", async () => {
+    let revoked = false
+    templates.testHooks.staged = async (name) => {
+      if (name === k('B2')) revoked = true
+    }
+    const guard = (): void => {
+      if (revoked) throw new Error('Not allowed by Settings → Assistant → Control')
+    }
+    await expect(load(alpha, 'team-3x3.json', undefined, true, guard)).rejects.toThrow(/Not allowed by Settings → Assistant → Control/)
+    expect(names(alpha)).toEqual(['Ann', 'Rob'])
+  })
+
+  it("the guard refused once the agents are published: the options aren't saved, said", async () => {
+    const optionsBefore = await own(alpha)
+    let revoked = false
+    const guard = (): void => {
+      // Refused from the first write after the agents are there (the options' save).
+      if (names(alpha)[0] === k('B1')) revoked = true
+      if (revoked) throw new Error('Not allowed by Settings → Assistant → Control')
+    }
+    const { r } = await load(alpha, 'team-3x3.json', undefined, true, guard)
+    expect(r.created).toHaveLength(6)
+    expect(r.workflow).toMatchObject({ saved: false, notSaved: expect.stringMatching(/Not allowed by Settings → Assistant → Control/) })
+    expect(await own(alpha)).toEqual(optionsBefore)
+  })
+
+  it('undo of the options refused while it waits for the project lock: they stay, and the undo stops', async () => {
+    const { group } = await load(alpha, 'team-3x3.json')
+    const loadedOptions = await own(alpha)
+    let revoked = false
+    const guard = (): void => {
+      if (revoked) throw new Error('Not allowed by Settings → Assistant → Control')
+    }
+    // The guard turns down just before the options' write takes the project file's lock.
+    const mutate = w.mutateProjectConfig.bind(w)
+    w.mutateProjectConfig = ((...a: Parameters<typeof mutate>) => {
+      revoked = true
+      return mutate(...a)
+    }) as typeof mutate
+    try {
+      await expect(run(() => undoChanges(w, { group }, 'assistant', guard))).rejects.toThrow(/Not allowed by Settings → Assistant → Control/)
+    } finally {
+      w.mutateProjectConfig = mutate
+    }
+    expect(await own(alpha)).toEqual(loadedOptions)
+    expect(names(alpha)[0]).toBe(k('B1'))
   })
 
   it("a Git-only workflow into a project with no version control is refused; workflow: false loads its agents alone", async () => {

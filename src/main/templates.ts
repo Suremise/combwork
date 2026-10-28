@@ -647,6 +647,9 @@ export const testHooks: {
 /** Loads under way, by project: one at a time each. */
 const loading = new Set<string>()
 
+/** Names another project's agent has, worded as the caller refuses them (HI-1502: the Agent API's with a free name for each). */
+type Taken = (clash: { name: string; project: string }[]) => Error | Promise<Error>
+
 /** A load's result as the Agent API reports it and undo records it (HI-1502): the agents and layout before and after. */
 export interface TemplateLoaded {
   created: string[]
@@ -682,10 +685,12 @@ export async function loadTemplate(projectPath: string, scope: TemplateScope, fi
 /**
  * The load (loadTemplate), with what the Agent API needs (HI-1502): `check` runs with the plan about to be staged, inside
  * the load's guard and fence, before anything is made (its refusal refuses the load), so what the caller does with the
- * plan's workflow is the same read of the template as the agents it loads; the result has the agents and layout before
- * and after, for undo.
+ * plan's workflow is the same read of the template as the agents it loads; `guard` runs at the publish itself, under the
+ * project file's lock (its throw publishes nothing); `taken` words a refusal for names another project's agent has, in the
+ * plan or at the names lock (the window's words without it); the result has the agents and layout before and after, for
+ * undo.
  */
-export async function loadTemplateWith(projectPath: string, scope: TemplateScope, file: string, expected: string[], o: { from?: string; names?: string[]; connections?: Record<number, string | null>; check?: (plan: TemplateLoadPlan) => Promise<void> } = {}): Promise<TemplateLoaded> {
+export async function loadTemplateWith(projectPath: string, scope: TemplateScope, file: string, expected: string[], o: { from?: string; names?: string[]; connections?: Record<number, string | null>; check?: (plan: TemplateLoadPlan) => Promise<void>; guard?: () => void; taken?: Taken } = {}): Promise<TemplateLoaded> {
   projectPath = workspace.assertProject(projectPath)
   return whileReplacing(projectPath, M.fenced, async () => {
     // The plan's reads of the repository, which staging goes on using (#732).
@@ -694,7 +699,7 @@ export async function loadTemplateWith(projectPath: string, scope: TemplateScope
     if (why.length) throw new TemplateError({ lines: [msg({ id: 'content.templates.cantLoad', defaultMessage: "The template can't be loaded yet:", description: "An error loading a template, above the list of what stops it (each line a reason)." }), ...why.map((item) => withValues(msg({ id: 'content.templates.bullet', defaultMessage: '• {item}', description: 'A line of a list of reasons: a bullet, then the reason {item}.' }), { item }))] })
     const changed = (ids: string[]): boolean => !Array.isArray(expected) || ids.length !== expected.length || ids.some((id, i) => id !== expected[i])
     if (changed(plan.remove.map((a) => a.id))) throw refusal(msg({ id: 'content.templates.changedSince', defaultMessage: "The project's agents changed since you looked: open the template again.", description: "An error loading a template: the project's agents changed after the Load template dialog showed them." }), undefined, 'conflict')
-    if (plan.taken.length) throw new TemplateError(takenText(plan.taken), { kind: 'conflict' })
+    if (plan.taken.length) throw o.taken ? await o.taken(plan.taken) : new TemplateError(takenText(plan.taken), { kind: 'conflict' })
     const connectionAt = connectionsFor(projectPath, plan, o.connections)
     await o.check?.(plan)
     const cfg = await workspace.projectConfig(projectPath)
@@ -718,9 +723,11 @@ export async function loadTemplateWith(projectPath: string, scope: TemplateScope
         next: staged.map((s) => s.def),
         layout: plan.layout,
         check: (list) => {
+          // The caller's guard (the Assistant's control and launch, HI-1502) at the write itself, under the lock.
+          o.guard?.()
           if (changed(list.map((a) => a.id))) throw refusal(msg({ id: 'content.templates.changedWhile', defaultMessage: "The project's agents changed while the template was loading: nothing was changed. Open the template again.", description: "An error loading a template: the project's agents changed while it loaded, so nothing changed." }), undefined, 'conflict')
         },
-        taken: (clash) => new TemplateError(takenText(clash, true), { kind: 'conflict' })
+        taken: o.taken ?? ((clash) => new TemplateError(takenText(clash, true), { kind: 'conflict' }))
       })
     } catch (e) {
       for (const s of staged) await s.discard()
@@ -761,7 +768,7 @@ async function whileReplacing<T>(projectPath: string, fenceWhy: Msg, fn: () => P
  * removed agent's worktree whose setup never ran is remembered for the next agent given it (#289). Returns the agents and
  * layout it replaced; what follows a removal (`agentsGone`) is the caller's, once it is published.
  */
-async function replaceProjectAgents(projectPath: string, r: { next: AgentDef[]; layout: PageLayout; check: (list: AgentDef[], now: ProjectConfig) => void; taken: (clash: { name: string; project: string }[]) => Error }): Promise<{ agents: AgentDef[]; layout: PageLayout }> {
+async function replaceProjectAgents(projectPath: string, r: { next: AgentDef[]; layout: PageLayout; check: (list: AgentDef[], now: ProjectConfig) => void; taken: Taken }): Promise<{ agents: AgentDef[]; layout: PageLayout }> {
   let before: { agents: AgentDef[]; layout: PageLayout } | null = null
   await withAgentNames(projectPath, async () => {
     const others = (await workspaceAgents(projectPath)).filter((a) => a.project.toLowerCase() !== basename(projectPath).toLowerCase())
@@ -769,7 +776,7 @@ async function replaceProjectAgents(projectPath: string, r: { next: AgentDef[]; 
       const owner = nameTaken(d.name, others)
       return owner ? [{ name: d.name, project: owner.project }] : []
     })
-    if (clash.length) throw r.taken(clash)
+    if (clash.length) throw await r.taken(clash)
     await workspace.mutateProjectConfig(projectPath, (now) => {
       const list = projectAgents(now)
       r.check(list, now)
@@ -794,7 +801,7 @@ async function replaceProjectAgents(projectPath: string, r: { next: AgentDef[]; 
  * only if `check` passes on the agents as they are now; the agents it removes (those the load made) go as any removed
  * agent does (`agentsGone`). The restored agents keep their ids, so their conversations are theirs again.
  */
-export async function restoreProjectAgents(projectPath: string, back: { agents: AgentDef[]; layout: PageLayout }, check: (list: AgentDef[], now: ProjectConfig) => void, taken: (clash: { name: string; project: string }[]) => Error): Promise<void> {
+export async function restoreProjectAgents(projectPath: string, back: { agents: AgentDef[]; layout: PageLayout }, check: (list: AgentDef[], now: ProjectConfig) => void, taken: Taken): Promise<void> {
   projectPath = workspace.assertProject(projectPath)
   await whileReplacing(projectPath, M.restoring, async () => {
     const was = await replaceProjectAgents(projectPath, { next: back.agents, layout: back.layout, check, taken })

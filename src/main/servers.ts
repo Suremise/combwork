@@ -2127,9 +2127,9 @@ route('POST', '/v1/projects/:name/templates/load', async ({ params, body }) => {
   const p = projectByName(params[0])
   const applyWorkflow = workflowArg(body)
   const named = typeof body?.template === 'string' ? clip(body.template, 60) : 'a template'
-  return assistantChange('agents', `load the template "${named}" into ${basename(p)}`, { kind: 'load-template', project: basename(p) }, async () => {
+  return assistantChange('agents', `load the template "${named}" into ${basename(p)}`, { kind: 'load-template', project: basename(p) }, async (guard) => {
     const e = await findTemplate(p, body ?? {})
-    const r = await loadForAssistant(p, e, body?.names, applyWorkflow)
+    const r = await loadForAssistant(p, e, body?.names, applyWorkflow, guard)
     const wf = r.workflow ? (r.workflow.saved ? `, and its workflow (${r.workflow.changes.length} options changed)` : '; its workflow was not saved') : ''
     return { done: `Loaded the template "${r.template.name}" into ${r.project}: ${r.created.length} agents${wf}`, stays: UNDO_FINAL.templateCards, result: r }
   })
