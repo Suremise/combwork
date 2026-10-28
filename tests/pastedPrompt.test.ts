@@ -15,7 +15,8 @@ const { copilot } = await import('../src/main/providers/copilot/adapter')
 const { TerminalScreen } = await import('../src/main/terminalScreen')
 const { advanced } = await import('../src/main/advanced')
 const { PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId } = await import('../src/shared/advanced')
-const { promptInput, withoutInvisible } = await import('../src/main/sessions')
+const { promptInput, typedPrompt, withoutInvisible } = await import('../src/main/sessions')
+const { TYPED_NEWLINE_KEYS } = await import('../src/shared/terminalInput')
 
 describe('a prompt Hive puts into a CLI (#597)', () => {
   const p = 'C:/hive-test/pasted-prompt'
@@ -84,7 +85,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
 
   describe("Settings → Advanced's switches for what Hive types (#1286)", () => {
     /** Runs `fn` with these switches as given (the others as they are). */
-    const withSwitches = async (values: Record<string, boolean>, fn: () => Promise<void>): Promise<void> => {
+    const withSwitches = async (values: Record<string, boolean | string>, fn: () => Promise<void>): Promise<void> => {
       const get = advanced.get.bind(advanced)
       const spy = vi.spyOn(advanced, 'get').mockImplementation(((key: string, ws?: Record<string, unknown> | null) => (key in values ? values[key] : get(key, ws))) as typeof advanced.get)
       try {
@@ -121,6 +122,77 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
       await withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written))
       expect(writes.some((w) => w.includes('\x1b[200~'))).toBe(false)
       expect(typedText()).toBe('A plan:   1. one   2. two  ')
+    })
+
+    describe("Codex's new-line key for a typed prompt's line breaks (HI-1327)", () => {
+      const NEWLINE = 'codex.prompt.newlineKey'
+      const ALT_ENTER = TYPED_NEWLINE_KEYS['alt-enter']
+      const CTRL_J = TYPED_NEWLINE_KEYS['ctrl-j']
+      /** The prompt as Codex would read it: Hive's writes between Ctrl+U and Enter, each key back as a line break. */
+      const asRead = (key: string): string => writes.slice(1, -1).join('').split(key).join('\n')
+
+      it('is off by default (spaces) until tried on real Codex: the prompt goes on one line as before', async () => {
+        expect(advanced.get<string>(NEWLINE)).toBe('spaces')
+        expect(codex.typedNewline()).toBeNull()
+        echo.to = await running(codex, '')
+        await withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written))
+        expect(typedText()).toBe('A plan:   1. one   2. two  ')
+        expect(writes.some((w) => w.includes('\x1b'))).toBe(false)
+      })
+
+      for (const [choice, key] of [['alt-enter', ALT_ENTER], ['ctrl-j', CTRL_J]] as const) {
+        it(`${choice}: each line break is that key, written whole; indentation and blank lines kept, a tab a space, other control characters out, one Enter at the end`, async () => {
+          echo.to = await running(codex, '')
+          await withSwitches({ [PROMPT_AS_TYPED]: true, [NEWLINE]: choice }, () => sessions.sendPrompt(p, id, written))
+          expect(asRead(key)).toBe('A plan:\n  1. one\n\n 2. two  ')
+          // Each key its own write; no other write has an escape in it; the one Enter is the last write.
+          expect(writes.filter((w) => w === key)).toHaveLength(3)
+          expect(writes.filter((w) => w !== key).some((w) => w.includes('\x1b'))).toBe(false)
+          expect(writes.slice(0, -1).filter((w) => w !== key).some((w) => w.includes('\r'))).toBe(false)
+          expect(writes.at(-1)).toBe('\r')
+        })
+      }
+
+      it("escapes and control characters in the text never reach Codex, beside line breaks and across a chunk's end", async () => {
+        echo.to = await running(codex, '')
+        // CRLF, a lone CR and an LF; an escape sequence spanning the first chunk's end (8 characters), and ones beside breaks.
+        await withSwitches({ [PROMPT_AS_TYPED]: true, [NEWLINE]: 'alt-enter' }, () => sessions.sendPrompt(p, id, 'abcdefg\x1b[31m\x1b\r\nx\x1b\x07\ry\x1b\nz\x9b'))
+        expect(asRead(ALT_ENTER)).toBe('abcdefg[31m\nx\ny\nz')
+        // Between Hive's own Ctrl+U and Enter: nothing but text and the keys.
+        expect(writes.slice(1, -1).filter((w) => w !== ALT_ENTER).some((w) => /[\x00-\x1f\x7f-\x9f]/.test(w))).toBe(false)
+      })
+
+      it('leading and trailing line breaks are keys too', async () => {
+        echo.to = await running(codex, '')
+        await withSwitches({ [PROMPT_AS_TYPED]: true, [NEWLINE]: 'alt-enter' }, () => sessions.sendPrompt(p, id, '\nmiddle\n'))
+        expect(asRead(ALT_ENTER)).toBe('\nmiddle\n')
+      })
+
+      it('a slash command, and the prompt with Send prompts as typed off, still go on one line', async () => {
+        echo.to = await running(codex, '')
+        await withSwitches({ [PROMPT_AS_TYPED]: true, [NEWLINE]: 'alt-enter' }, () => sessions.sendPrompt(p, id, '/review the\nwork'))
+        expect(typedText()).toBe('/review the work')
+        writes.length = 0
+        echo.to = await running(codex, '')
+        await withSwitches({ [PROMPT_AS_TYPED]: false, [NEWLINE]: 'alt-enter' }, () => sessions.sendPrompt(p, id, 'A plan:\r\n  1. one\n\n\t2. two'))
+        expect(typedText()).toBe('A plan: 1. one 2. two')
+        expect(writes.some((w) => w.includes('\x1b'))).toBe(false)
+      })
+
+      it('the agent stopping between writes: nothing more is written, no key and no Enter', async () => {
+        const screen = await running(codex, '')
+        // The session goes as the first key reaches it.
+        echo.to = { write: (d: string) => (screen.write(d), d === ALT_ENTER && s.live.delete(liveKey)) }
+        await expect(withSwitches({ [PROMPT_AS_TYPED]: true, [NEWLINE]: 'alt-enter' }, () => sessions.sendPrompt(p, id, 'one\ntwo\nthree'))).rejects.toThrow()
+        const at = writes.indexOf(ALT_ENTER)
+        expect(at).toBeGreaterThan(0)
+        expect(writes.slice(at + 1)).toEqual([])
+      })
+
+      it('typedPrompt: the pieces, each line through promptInput and each break a key', () => {
+        expect(typedPrompt('a\r\n\tb\rc\n', 'K')).toEqual([{ text: 'a' }, { key: 'K' }, { text: ' b' }, { key: 'K' }, { text: 'c' }, { key: 'K' }])
+        expect(typedPrompt('x\x1b[2Jy', 'K')).toEqual([{ text: 'x[2Jy' }])
+      })
     })
 
     it('promptInput: each case of pasted or typed, as typed or not', () => {

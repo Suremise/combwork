@@ -13,7 +13,7 @@ import { folderChanging, folderSteady, inFolder } from './folderFence'
 import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, writeFile } from 'original-fs/promises'
 import { constants as fsConstants, existsSync, realpathSync } from 'original-fs'
-import { typedText } from '../shared/terminalInput'
+import { TYPED_NEWLINE_KEYS, typedText } from '../shared/terminalInput'
 import { failedStart, type StartFailure } from '../shared/startFailure'
 import { BrowserWindow, Notification, app, clipboard } from 'electron'
 import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
@@ -660,6 +660,37 @@ async function typeInto(key: string, text: string, still: () => boolean = () => 
     if (!still()) throw hiveError(M.stoppedBeforePrompt)
     writePty(key, text.slice(i, i + CHUNK))
     if (i + CHUNK < text.length) await new Promise((r) => setTimeout(r, 10))
+  }
+}
+
+/** A typed prompt's pieces (HI-1327): its text, and the keys Hive presses for its line breaks. */
+export type TypedSegment = { text: string } | { key: string }
+
+/**
+ * A prompt typed as written into a CLI whose input box takes a key as a new line (HI-1327): its line breaks (CRLF, CR
+ * or LF) as that key, `newline` (a fixed sequence of Hive's, TYPED_NEWLINE_KEYS), and each line as promptInput types it
+ * (a tab a space, the other control characters, escapes included, left out). The key is its own piece, written whole,
+ * so nothing in the text can be taken for one, and no chunk can split it.
+ */
+export function typedPrompt(line: string, newline: string): TypedSegment[] {
+  const out: TypedSegment[] = []
+  line.split(/\r\n?|\n/).forEach((part, i) => {
+    if (i > 0) out.push({ key: newline })
+    const text = promptInput(part, false, true)
+    if (text) out.push({ text })
+  })
+  return out
+}
+
+/** Types a prompt's pieces (typedPrompt): its text in chunks, each key in one write; `still` checked before each write. */
+async function typeSegments(key: string, segments: readonly TypedSegment[], still: () => boolean): Promise<void> {
+  for (const s of segments) {
+    if ('text' in s) await typeInto(key, s.text, still)
+    else {
+      if (!still()) throw hiveError(M.stoppedBeforePrompt)
+      writePty(key, s.key)
+      await new Promise((r) => setTimeout(r, 10))
+    }
   }
 }
 
@@ -3344,9 +3375,14 @@ class SessionManager {
       // Enter once the CLI has drawn the line (#600: a busy Codex drops an Enter it reads with the line): its end shows
       // on the screen once more than before it was typed.
       const paste = !!l?.screen?.bracketedPaste() && l.adapter.descriptor.capabilities.bracketedPaste && !line.startsWith('/')
-      const out = promptInput(line, paste, asTyped)
+      // Typed as written into a CLI with a new-line key (HI-1327, Settings → Advanced): its line breaks are that key. A
+      // slash command keeps spaces.
+      const newline = !paste && asTyped && !line.startsWith('/') ? l?.adapter.typedNewline?.() : null
+      const segments = newline ? typedPrompt(line, TYPED_NEWLINE_KEYS[newline]) : null
+      const out = segments ? segments.flatMap((s) => ('text' in s ? [s.text] : [])).at(-1) ?? '' : promptInput(line, paste, asTyped)
       const drawn = l?.screen && l.adapter.descriptor.capabilities.enterOnceDrawn ? drawnLine(l.screen, out) : null
       if (paste) writePty(key, `\x1b[200~${out}\x1b[201~`)
+      else if (segments) await typeSegments(key, segments, () => (check(), true))
       else await typeInto(key, out, () => (check(), true))
       await new Promise((r) => setTimeout(r, 300))
       check()

@@ -12,6 +12,7 @@ import { assertSessionId, isSessionId } from '../../../shared/defaults'
 import type { StartHint } from '../../../shared/startFailure'
 import { CODEX, CODEX_DESCRIPTOR, CODEX_MODE_FLAGS, CODEX_PERMISSION_MODES } from '../../../shared/codex'
 import { providerSettings } from '../../../shared/providers'
+import type { TypedNewline } from '../../../shared/terminalInput'
 import { HIVE_TOOLS } from '../../../shared/assistantTools'
 import { config } from '../../config'
 import { isFile, placeMatcher } from '../../fsutil'
@@ -601,6 +602,12 @@ export class CodexAdapter implements ProviderAdapter {
       }
     }
     return info
+  }
+
+  /** The key for a line break in a prompt Hive types (HI-1327): Settings → Advanced's choice, if Codex takes it as one. */
+  typedNewline(): TypedNewline | null {
+    const chosen = advanced.get<string>('codex.prompt.newlineKey')
+    return this.descriptor.capabilities.typedNewlines?.find((k) => k === chosen) ?? null
   }
 
   /** Codex's Windows sandbox is set up once (windows.sandbox in its config); without it every command needs approval. */

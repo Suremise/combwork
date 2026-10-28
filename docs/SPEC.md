@@ -4783,8 +4783,21 @@ under Hive in Advanced (no CLI's recording to check it against), defaulting to w
 - `hive.prompt.asTyped` (off; at once): on, `sendPrompt` keeps the prompt as written: in a bracketed paste its line
   breaks go in as CR (as a terminal pastes them) and tabs and spacing are kept; typed key by key (a CLI without
   `bracketedPaste`, a slash command) each line break or tab becomes a space: Codex's prompts stay flat with the switch
-  on (the Assistant's decision on #1286; a safe Codex newline is #1327). Other control characters stay out either way,
+  on (the Assistant's decision on #1286). Other control characters stay out either way,
   so nothing in a prompt can end a paste or press a key (`promptInput`).
+- `codex.prompt.newlineKey` (HI-1327; `spaces`, `alt-enter` or `ctrl-j`; default `spaces` until a real-Codex trial
+  proves a key): with `hive.prompt.asTyped` on, a prompt typed into a CLI whose descriptor lists `typedNewlines` gets
+  each line break as the key its adapter's `typedNewline()` picks.
+  - **The keys:** Codex 0.164.0's editor takes `ctrl(J)`, `ctrl(M)`, `shift(Enter)` and `alt(Enter)` as a new line;
+    its composer sends only on plain Enter (`tui/src/keymap.rs`). Windows' console turns a written LF into
+    Ctrl+Enter, which Codex doesn't bind. It delivers `ESC CR` as one Alt+Enter key, and win32-input-mode Ctrl+J as J
+    with Ctrl (HI-1327's probe, `tests/fixtures/advanced/newline-keys-codex-0.164.0.txt`).
+  - **Building the prompt:** `typedPrompt()` splits on CRLF, CR or LF, puts each line through `promptInput`'s typed
+    filter (a tab becomes a space; controls and escapes are left out), and puts Hive's fixed key between the lines
+    (`TYPED_NEWLINE_KEYS`, its one source). `typeSegments` writes each key whole, checking that the agent is still
+    there before each write.
+  - **Unchanged:** a slash command, and the switch off, still go on one line. A user who remapped Codex's new-line keys
+    chooses `spaces`. Hive never edits Codex's config.
 - `hive.prompt.clearDraft` (on; at once): off, no Ctrl+U on any of `sessions.ts`'s paths (before a prompt, taking back
   one stopped part-way, before `/compact`). Codex's `/permissions` menu steps keep theirs: the menu can't open behind
   a draft.

@@ -3,6 +3,7 @@ import type { ProviderDescriptor } from '../../shared/providers'
 import type { StartHint } from '../../shared/startFailure'
 import type { SafeguardEvent } from '../../shared/safeguards'
 import type { Text } from '../../shared/advanced'
+import type { TypedNewline } from '../../shared/terminalInput'
 
 export interface LaunchSkill {
   name: string
@@ -411,6 +412,11 @@ export interface ProviderAdapter {
   accountSharedTarget?(name: string): string
   /** Whether a file in an account's folder is one that changes when the CLI signs in or out there: watched, never read. */
   accountLoginFile?(name: string): boolean
+  /**
+   * The key Hive presses for a line break in a prompt it types (HI-1327): one of the descriptor's `typedNewlines`, as
+   * Settings → Advanced chooses it; null: a space (as before). Absent: always a space.
+   */
+  typedNewline?(): TypedNewline | null
   /** A connection's sign-in, when it differs from loginCommand (HI-1757: Codex keeps the login in the connection's folder). */
   accountLoginCommand?(executable: string): CommandSpec
   /**
