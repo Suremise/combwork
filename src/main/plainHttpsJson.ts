@@ -1,7 +1,8 @@
 /**
  * A GET of a JSON reply from the network, with Node's own https rather than fetch (#1582). fetch decompresses a
  * `Content-Encoding: br` reply with Node's bundled Brotli decoder, which CVE-2026-111497 makes unsafe on data from the
- * network until Electron bundles Node 24.22.1 (#1503); https never decompresses anything. This asks for the reply
+ * network before Node 24.22.1 (bundled since Electron 44.10.0, HI-1503: kept, so the next such flaw can't reach it
+ * either); https never decompresses anything. This asks for the reply
  * unencoded and refuses an encoded one, so no network reply reaches a decoder. `tests/networkDecoding.test.ts` keeps
  * fetch out of the main process.
  */

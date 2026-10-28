@@ -1,4 +1,5 @@
 // File editor and previews, end to end in a throwaway profile. No clipboard use.
+// Also the packaged app's own Node: 24.22.1 or later, CVE-2026-111497's fix (HI-1503; `about` checks the dev build's).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -45,6 +46,15 @@ const HUNG_MS = 10000
   const page = await app.firstWindow()
   page.on('pageerror', (e) => results.push(`PAGEERROR ${e.message}`))
   await lib.appReady(page)
+  // Node2Shell (CVE-2026-111497, Node's Brotli decoder): fixed in Node 24.22.1, so a packaged app on an older Electron,
+  // or a stale dist, fails here (HI-1503).
+  const node = await app.evaluate(() => process.versions.node)
+  const atLeast = (v, min) => {
+    const [a, b] = [v, min].map((x) => x.split('.').map(Number))
+    const i = a.findIndex((n, k) => n !== b[k])
+    return i < 0 || a[i] > b[i]
+  }
+  check(`the packaged app bundles Node 24.22.1 or later (CVE-2026-111497): ${node}`, atLeast(node, '24.22.1'))
   // A real PDF, made by Chromium.
   const pdf = await app.evaluate(async ({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows()[0]
