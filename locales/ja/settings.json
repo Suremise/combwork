@@ -334,6 +334,8 @@
   "settings.advanced.hive.notes.workspaceNotesMax.title": "Workspace notes：エージェントが受け取る最大量",
   "settings.advanced.hive.progress.lanesShown.desc": "進捗パネルで、スクロールせずに表示するカードループのレーン数です。セクションの上端をドラッグすると変わります（ドラッグした高さはワークスペースごとに保存されます）。多くのレーンを同時に実行するワークスペースでは、独自の値を設定できます。",
   "settings.advanced.hive.progress.lanesShown.title": "進捗パネル：表示するレーン数",
+  "settings.advanced.hive.progress.replySeconds.desc": "コマンドやチェックを始める前に hive-progress が Hive の応答を待つ時間と、その開始が受け付けられるまで待つ時間です。チェックには応答が必要です（そのコマンドはプロジェクトのものです）。応答がなければもう一度尋ね、それでもなければ何も実行せず、Hive の応答が遅いと伝えます。忙しい Hive でチェックが「Hive is slow to answer」で失敗する場合に増やしてください（HI-1892）。最大 2 分です。",
+  "settings.advanced.hive.progress.replySeconds.title": "hive-progress：Hive の応答時間",
   "settings.advanced.hive.prompt.asTyped.desc": "Hiveはエージェントに入力する各プロンプト（メッセージ、ウェイク、カードの開始）を1行にまとめます。連続するスペースは1つに、改行はスペースになり、制御文字は除かれます。オンにすると、Claude CodeとCopilotはスペースや改行も含めて書かれたとおりのテキストを受け取ります。Codexと、どのCLIでもスラッシュコマンドでは、改行やタブは引き続きスペースとして渡されます。Hiveはこれらを1キーずつ入力するため、改行はプロンプトを早く送信し、タブは単語を補完してしまうからです。その他の制御文字はどちらの場合も除かれます。キーを押したことになるためです。",
   "settings.advanced.hive.prompt.asTyped.title": "プロンプトを書かれたとおりに送る",
   "settings.advanced.hive.prompt.clearDraft.desc": "Hiveはエージェントのプロンプトや「コンパクト化」をCLIに入力する前にCtrl+Uを押してCLIの入力欄を消去し、途中で止めたプロンプトを取り消すときにももう一度押します。オフにすると、Hiveは一切押しません。CLIの入力欄に残ったテキストはHiveが入力する内容の前に残って一緒に送信され、途中で止めたプロンプトは入力欄に残り、下書きがあると「コンパクト化」が失敗することがあります。Codexのモードを変更するときは、そのメニューに必要なため、引き続き先に入力欄を消去します。",

@@ -334,6 +334,8 @@
   "settings.advanced.hive.notes.workspaceNotesMax.title": "Workspace notes：每个智能体最多获得",
   "settings.advanced.hive.progress.lanesShown.desc": "进度面板在通道开始滚动前显示多少个卡片循环通道，直到你拖动该区域的上边缘（拖动结果按工作区保存）。同时运行许多通道的工作区可以单独设置。",
   "settings.advanced.hive.progress.lanesShown.title": "进度面板：显示的通道数",
+  "settings.advanced.hive.progress.replySeconds.desc": "在命令或检查开始前，hive-progress 等待 Hive 回应的时长，以及等待其开始被接受的时长。检查需要这个回应（它的命令是项目的命令）：没有回应时会再问一次，仍无回应就什么也不运行，并说明 Hive 回应缓慢。如果 Hive 繁忙时检查因“Hive is slow to answer”而失败（HI-1892），请调高此值。最长 2 分钟。",
+  "settings.advanced.hive.progress.replySeconds.title": "hive-progress：Hive 回应时长",
   "settings.advanced.hive.prompt.asTyped.desc": "Hive 会把它输入给智能体的每条提示词（一条消息、一次唤醒、一张卡片的开始）放在一行中：连续的空格合并为一个，换行变为空格，控制字符被省略。开启后，Claude Code 和 Copilot 会收到原样的文本，包括空格和换行。Codex 以及任何 CLI 中的斜杠命令，仍会把每个换行和制表符作为空格收到：Hive 会逐键输入它们，而逐键输入时换行会提前发送提示词，制表符会补全单词。其他控制字符无论如何都会被省略：它们会触发按键。",
   "settings.advanced.hive.prompt.asTyped.title": "按原样发送提示词",
   "settings.advanced.hive.prompt.clearDraft.desc": "Hive 在向智能体的 CLI 输入提示词或“压缩”之前，会按 Ctrl+U 清除 CLI 输入框中的内容；要撤回中途停止的提示词时，它也会再按一次。关闭后，Hive 从不按这个键：CLI 输入框中残留的文本会留在 Hive 输入的内容之前并一起发送，中途停止的提示词会留在输入框中，有草稿时“压缩”可能会失败。更改 Codex 的模式时仍会先清除其输入框，因为它的菜单需要这样。",

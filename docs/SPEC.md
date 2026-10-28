@@ -4475,7 +4475,16 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   and "counts as check: typecheck"; a run's default card is the agent's card in Doing only when it has exactly one (a
   run counted for the wrong card is worse than none); hive-progress resolves the card, revision and check before the
   command starts (`POST /v1/progress/resolve`), so a refusal runs nothing; `--isolated` is refused until P7's check
-  copies [#1220]; the lane hover gains the revision under review, the last verdict and on which
+  copies [#1220]. **Hive slow to answer (HI-1892):** hive-progress waits for the resolve, and for its run's start to
+  be taken, as Settings → Advanced → *hive-progress: Hive's reply time* says (`hive.progress.replySeconds`, 15 s,
+  1–120 s, handed to sessions as `HIVE_PROGRESS_REPLY_SECONDS`; a fixed 5 s gave up on a busy Hive's checks). A check
+  needs the answer, so an ask that got none (slow, or an error) is asked once more after 1 s (never an isolated
+  check's first ask, which may lend a copy) before it runs nothing, saying why: *Hive is slow to answer: no reply … in
+  N s, asked 2 times* (try again, or give it longer), or, the connection refused or not allowed, at once and asked
+  once, *Hive couldn't be reached … (connection refused at <url>)* with the hint that a sandbox blocking local network
+  access (Claude Code's Bash sandbox) does the same. A check's finish that got no reply is sent once more (a `409` then
+  says the first arrived), and hive-progress says when its result may not be recorded: its start never taken, no
+  reply to its finish, or a finish refused; its exit code stays the command's. The lane hover gains the revision under review, the last verdict and on which
   revision, checks on it and the merge commit.
 - **P4** [#1120 c]: a refused move marks the segment (a notch, red, by pattern and colour) with the one-line reason and
   next step; a stale pass is marked ("Pass was for a3f2c1d; now at b71e09a"); overrides marked with who, rule and why;

@@ -1339,6 +1339,14 @@
     "defaultMessage": "Progress panel: lanes shown",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.hive.progress.replySeconds.desc": {
+    "defaultMessage": "How long hive-progress waits for Hive to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Hive is slow. Raise it when a busy Hive makes checks fail with \"Hive is slow to answer\" (HI-1892). Kept at 2 minutes at most.",
+    "description": "What the advanced setting \"hive-progress: Hive's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.hive.progress.replySeconds.title": {
+    "defaultMessage": "hive-progress: Hive's reply time",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. hive-progress is the command agents run long commands and checks through: keep it as it is."
+  },
   "settings.advanced.hive.prompt.asTyped.desc": {
     "defaultMessage": "Hive puts each prompt it types into an agent (a message, a wake, a card's start) on one line: runs of spaces become one, line breaks become spaces, and control characters are left out. Turned on, Claude Code and Copilot get the text as written, spacing and line breaks included. Codex, and a slash command in any CLI, still get each line break and tab as a space: Hive types those key by key, where a line break would send the prompt early and a tab complete a word. Other control characters are left out either way: they would press keys.",
     "description": "What the advanced setting \"Send prompts as typed\" does (Settings → Advanced, under Hive). Claude Code, Copilot and Codex are CLIs' names: keep them."
