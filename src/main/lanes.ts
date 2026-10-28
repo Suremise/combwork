@@ -3,6 +3,7 @@ import { join } from 'path'
 import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
+import { agentWorkflowRole } from '../shared/workflow/roles'
 import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, type LaneAgent, type LaneCardFacts, type LaneChange, type LaneRecord } from '../shared/lanes'
 import type { HiveErrorKind, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { reviewingNow } from '../shared/workflow/reviewerPool'
@@ -626,6 +627,20 @@ async function agentIn(ws: WorkspaceService, project: string, id: string): Promi
 }
 
 /**
+ * A generalist takes no side in the workflow (HI-686): never a lane's builder or reviewer, however the lane is started
+ * or joined (the window's Start Lane, the Agent API, the hive tools). Refused before anything changes; the other roles
+ * as before.
+ */
+async function refuseGeneralist(ws: WorkspaceService, project: string, ids: readonly (string | null | undefined)[]): Promise<void> {
+  if (!ws.path) return
+  const cfg = await ws.projectConfig(join(ws.path, project)).catch(() => null)
+  for (const id of ids) {
+    const a = id && cfg ? projectAgents(cfg).find((x) => x.id === id) : undefined
+    if (a && agentWorkflowRole(a) === 'generalist') throw new LaneError(400, `${a.name} is a generalist: it takes no side in the workflow, so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.`) // i18n-ignore: hive_lane's refusal, which only agents get
+  }
+}
+
+/**
  * A card in two lanes (HI-1821): the open cards (not Done, archived or gone) of a builder's start that another builder's
  * running lane of the project lists, or has in its queued list, as a warning for the start's reply; null: none. The
  * card's agent decides whose it is (a lane never takes another agent's card); the other lane gives it up with its own
@@ -682,6 +697,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   if (s.reviewer && !reviewer) throw new LaneError(404, 'Unknown agent: the reviewer must be an agent of the project') // i18n-ignore: hive_lane's refusal, which only agents get
   if (reviewer && reviewer.id === builder.id) throw new LaneError(400, "A lane's builder can't be its reviewer") // i18n-ignore: hive_lane's refusal, which only agents get
   if (reviewer && s.pool) throw new LaneError(400, 'A lane reviewed by the pool has no reviewer of its own') // i18n-ignore: hive_lane's refusal, which only agents get
+  await refuseGeneralist(ws, s.project, [builder.id, reviewer?.id])
   // A named reviewer makes it one reviewer per lane; the pool, none of its own (#1443).
   const pool = s.pool ? true : reviewer ? false : undefined
   // Rounds and wait the start doesn't give (#412): the project's workflow options as they resolve now (HI-1766).
@@ -801,6 +817,7 @@ export async function joinLane(ws: WorkspaceService, j: { project: string; build
   const builder = await agentIn(ws, j.project, j.builder)
   if (!reviewer || !builder) throw new LaneError(404, 'Unknown agent: the builder and reviewer must be agents of the project') // i18n-ignore: hive_lane's refusal, which only agents get
   if (reviewer.id === builder.id) throw new LaneError(400, "A lane's builder can't be its reviewer") // i18n-ignore: hive_lane's refusal, which only agents get
+  await refuseGeneralist(ws, j.project, [builder.id, reviewer.id])
   const found = await mutate(ws, (lanes, _checks, also) => {
     const l = lanes.find((x) => running(x) && same(x.project, j.project) && x.builder.id === builder.id)
     if (!l || (j.cards?.length && !l.cards.some((n) => j.cards!.includes(n)))) return null

@@ -4049,7 +4049,9 @@ repeating them (#533) [note §8].
   `WorkflowRole`, `generalist` ("Does whatever you ask in its pane; takes no side in the workflow"), in Add Agent, Agent
   Settings, the templates' agent editor (and v2 files), the agents table and the Agent API (`workflowRole`, the hive
   tools' enum). `buildsWork` is builder or either and `reviewsWork` reviewer or either, so a generalist is never a lane's
-  builder or reviewer (Start Lane, `startWaitingLane`), never in the reviewer pool or the review copies' count, and isn't
+  builder or reviewer (Start Lane, `startWaitingLane`; and the lane service refuses one named as either, however a lane
+  is started, changed or joined, before anything changes: `refuseGeneralist`, `400`, HR2's round 1), never in the
+  reviewer pool or the review copies' count, and isn't
   counted in the slot pool's size (`setBuilderCount`). It has no rules of its own (part 6: workflow rules are only
   Version Control → Workflow's): a card it takes is started, built, reviewed and merged as the project's options say,
   `leaseForStart` giving it the card's slot where cards are built in slots (`takesCards`: any role but reviewer). Add
