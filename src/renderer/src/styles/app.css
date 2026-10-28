@@ -5563,11 +5563,26 @@ h2.section#unused-worktrees {
   margin-left: auto;
   white-space: nowrap;
 }
+/* The note while the CLIs' own sessions are read (HI-1681) is a sentence: it wraps within the list rather than run past
+   its edge (HI-1941), its spinner kept at its first line. */
+.sessions-scope[data-loading] {
+  align-items: flex-start;
+  min-width: 0;
+  white-space: normal;
+}
+.sessions-scope[data-loading] > .codicon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+/* What doesn't fit beside the Archived box goes under it, never past the list's edge, at any width it is resized to. */
 .sessions-filters {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
   padding: 0 10px 6px 14px;
   font-size: 12px;
+  min-width: 0;
 }
 .session-row {
   position: relative;
