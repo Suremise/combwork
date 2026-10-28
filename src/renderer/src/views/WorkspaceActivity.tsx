@@ -101,7 +101,10 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   const [turns, setTurns] = useState<ReadonlyMap<string, ActivityTurns>>(new Map())
   const [selected, setSelected] = useState<string | null>(null)
   const [live, setLive] = useState(false)
+  // Drawn again when an agent's live state changed (its status, its line); `members` only when an agent started, stopped
+  // or began another session: what the session lists and a card's agents depend on (HR5's HI-1664 round 1).
   const [tick, setTick] = useState(0)
+  const [members, setMembers] = useState(0)
   const hostsRef = useRef(hosts)
   hostsRef.current = hosts
 
@@ -161,6 +164,7 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     const turnQueue = turnReads.current
     let lastNow = ''
     let lastLive = ''
+    let lastMembers = ''
     let ticks = 0
     readLists()
     const read = (): void => {
@@ -180,12 +184,17 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
           }
         )
       const liveNow = hostsRef.current.map((h) => `${hk(h.path)}=${h.agents.map((a) => (a.live ? `${a.id}:${a.live.sessionId}:${a.live.status}:${statusText(a.live)}` : a.id)).join(',')}`).join('|')
-      const changed = liveNow !== lastLive
-      if (changed) {
+      if (liveNow !== lastLive) {
         lastLive = liveNow
         setTick((t) => t + 1)
       }
-      if ((changed && ticks > 0) || ++ticks % LIST_EVERY === 0) readLists()
+      const membersNow = hostsRef.current.map((h) => `${hk(h.path)}=${h.agents.map((a) => (a.live ? `${a.id}:${a.live.sessionId}` : '')).join(',')}`).join('|')
+      const joined = membersNow !== lastMembers
+      if (joined) {
+        lastMembers = membersNow
+        setMembers((m) => m + 1)
+      }
+      if ((joined && ticks > 0) || ++ticks % LIST_EVERY === 0) readLists()
       readTurns(shownSessionsRef.current.filter((x) => x.live))
     }
     read()
@@ -219,9 +228,9 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     return () => {
       stop = true
     }
-    // At each start or stop (tick), the opening, or another card.
+    // At each start or stop (members), the opening, or another card: never for a status change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, forCard, tick])
+  }, [active, forCard, members])
 
   const agents = useMemo<ReadonlyMap<string, ActivityAgent[]>>(
     () => new Map(hostsRef.current.map((h) => [hk(h.path), activityAgents(h)])),

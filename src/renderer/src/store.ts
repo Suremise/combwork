@@ -23,7 +23,7 @@ import type { TemplateAgent, TemplateRef } from '@shared/templates'
 import type { GitTool } from '@shared/gitTool'
 import type { RunsFilter } from '@shared/progressTabs'
 import { loadActivityView, saveActivityView, type ActivityView } from './activityView'
-import { cardWorker, type ActivityCardAgent } from '@shared/activity'
+import { currentCard, type ActivityCardAgent } from '@shared/activity'
 import { boardReader } from './boardReads'
 import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkflowForm, WorkspaceUsage, RecentWorkspace } from '@shared/types'
 import type { PresetId } from '@shared/workflow/options'
@@ -1073,6 +1073,7 @@ export function selectedProjectInfo() {
 }
 
 export function setActivity(a: Activity): void {
+  navigations++
   set((s) => ({
     activity: a,
     lastSideActivity: a === 'docs' || a === 'settings' ? s.lastSideActivity : a,
@@ -1163,30 +1164,44 @@ export function openWorkspaceActivity(filter: { agents: string[]; card?: number 
 }
 
 /**
- * The agents working on a card now (HI-1664): its builder while it runs, else its reviewer, in its project (a builder gone
- * on to its next card isn't: HR6's round 1), and every agent whose running session worked on it, a workspace card's too
- * (main finds them by the cards' index, only now). Keys of activityAgentKey, each once.
+ * The agents working on a card now (HI-1664): its builder and its reviewer while each runs with this card as its current
+ * one (a builder gone on to its next card isn't: HR6's round 1, HR5's HI-1664 round 1), and every agent whose running
+ * session worked on it, a workspace card's too (main finds them by the cards' index, only now). Keys of
+ * activityAgentKey, each once.
  */
 export async function cardActivityAgents(c: TaskCard): Promise<string[]> {
   const s = get()
-  const out: string[] = []
   const p = c.project ? s.workspace?.projects.find((x) => x.name.toLowerCase() === c.project.toLowerCase()) : undefined
-  if (p) {
-    const asActivity = (t: TaskCard) => ({ number: t.number, label: '', title: t.title, column: t.column, builder: t.agent, reviewer: t.review?.agent ?? null })
-    const cards = s.tasks.filter((t) => !t.archived && t.project.toLowerCase() === c.project.toLowerCase()).map(asActivity)
-    const worker = cardWorker(asActivity(c), cards, (id) => !!p.agents.find((a) => a.id === id)?.live)
-    if (worker) out.push(activityAgentKey(p.path, worker))
-  }
+  const asActivity = (t: TaskCard) => ({ number: t.number, label: '', title: t.title, column: t.column, builder: t.agent, reviewer: t.review?.agent ?? null })
+  const cards = p ? s.tasks.filter((t) => !t.archived && t.project.toLowerCase() === c.project.toLowerCase()).map(asActivity) : []
+  // On it now: running, with this card as its current one.
+  const onIt = (id: string | null): id is string => !!p && !!id && !!p.agents.find((a) => a.id === id)?.live && currentCard(id, cards)?.number === c.number
+  const out = p ? [c.agent, c.review?.agent ?? null].filter(onIt).map((id) => activityAgentKey(p.path, id)) : []
   const found = (await window.hive.invoke('activity:cardAgents', c.number).catch(() => [])) as ActivityCardAgent[]
-  for (const a of found) out.push(activityAgentKey(a.path, a.agentId))
+  // A project card's agents found by their session only while it is still their current card: a builder's session runs
+  // on into its next card (a card loop), its record keeping this one. A workspace card's agents have no current card.
+  for (const a of found) if (!p || a.path.toLowerCase() !== p.path.toLowerCase() || onIt(a.agentId)) out.push(activityAgentKey(a.path, a.agentId))
   return [...new Set(out)]
 }
 
-/** Opens a card's Activity (HI-1743, HI-1664): the workspace level, frozen, on the agents working on it now. */
+/**
+ * Opens a card's Activity (HI-1743, HI-1664): the workspace level, frozen, on the agents working on it now. Found first:
+ * if the window went elsewhere meanwhile (another view, another workspace, another opening: HR5's HI-1664 round 1), it
+ * isn't opened.
+ */
 export async function openCardActivity(c: TaskCard): Promise<void> {
   if (!cardHasActivity(c)) return
-  openWorkspaceActivity({ agents: await cardActivityAgents(c), card: c.number })
+  const mine = ++navigations
+  const ws = get().workspace?.path
+  const agents = await cardActivityAgents(c)
+  cardOpenings.settled++
+  if (mine !== navigations || !ws || get().workspace?.path !== ws) return void cardOpenings.dropped++
+  openWorkspaceActivity({ agents, card: c.number })
 }
+
+/** A card's Activity openings settled, and those dropped as the window went elsewhere: a test copy's window reads them. */
+const cardOpenings = { settled: 0, dropped: 0 }
+;(window as unknown as { __hiveCardActivity?: typeof cardOpenings }).__hiveCardActivity = cardOpenings
 
 /** Shows an agent's pane on the Session tab and focuses it. */
 export function revealAgent(p: ProjectInfo, agentId: string): void {
@@ -1225,8 +1240,12 @@ export function flashPane(key: string): void {
 
 /** Shows a sidebar view without toggling it (setActivity hides the sidebar when that view is already shown). */
 export function showView(a: Exclude<Activity, 'docs' | 'settings'>): void {
+  navigations++
   set({ activity: a, lastSideActivity: a, sidebarVisible: true })
 }
+
+/** Each view shown, counted: a card's Activity found after the window went elsewhere isn't opened (openCardActivity). */
+let navigations = 0
 
 /** Shows the Hive Assistant view (activity bar) on its conversations, its modes, its attachments ('images') or its journal. */
 export function showAssistantView(section: 'conversations' | 'modes' | 'images' | 'journal' | 'digests'): void {
