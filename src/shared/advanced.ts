@@ -1711,6 +1711,19 @@ const SOURCES: readonly AdvancedSource[] = [
     samples: [{ from: `${FIX}/advanced/input-claude-2.1.312.txt`, version: '2.1.312', text: `${'─'.repeat(120)}\n❯ hive wake line typed and not sent\n${'─'.repeat(120)}` }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
+    id: 'claude-code.prompt.clearKeySeconds',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.prompt.clearKeySeconds.title', defaultMessage: 'Clearing the input: wait for each key', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.prompt.clearKeySeconds.desc', defaultMessage: "Claude Code's Ctrl+U deletes one row of a draft that wraps onto several, so before Hive types into it, it presses Ctrl+U a key at a time until the input box (Screen: input box) shows empty. This is how long Hive waits for Claude Code to show each key's effect. Not shown in time, Hive types nothing and tries again later: too short, and a busy Claude Code makes Hive put its messages off more often.", description: 'What the advanced setting "Clearing the input: wait for each key" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1979). Ctrl+U names keys: use the key names your language uses. "Screen: input box" is another advanced setting\'s title: use its translation.' }),
+    kind: 'number',
+    default: 2,
+    min: 1,
+    max: 30,
+    unit: 's',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/input-clear-claude-2.1.312.txt`, version: '2.1.312', text: 'Ctrl+Y to paste deleted text', shows: "Claude Code's input box after each Ctrl+U on a draft typed onto four rows: one row gone each time, then empty" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
     id: 'claude-code.autoModeSetup.offer',
     group: 'claude-code',
     title: msg({ id: 'settings.advanced.claude-code.autoModeSetup.offer.title', defaultMessage: "Offer auto mode's environment setup", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto mode is one of Claude Code's permission modes." }),

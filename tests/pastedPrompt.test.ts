@@ -3,6 +3,8 @@
 // the line and its Enter in one go still sends it; a slash command, a CLI without the capability, or one with
 // bracketed paste off gets it typed in pieces, as before. The real helpers, on a stand-in live session; the terminal's
 // writes are recorded, never sent.
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // The CLI's echo (#600): with `echo.to` set, what Hive types is drawn on that screen, as a CLI reading its input draws it.
@@ -20,17 +22,24 @@ const { TYPED_NEWLINE_KEYS } = await import('../src/shared/terminalInput')
 const { providerService } = await import('../src/main/providerService')
 const { NEWLINE_TRIED } = await import('../src/main/providers/codex/adapter')
 
+/** Claude Code 2.1.312's input box, empty: its prompt mark and a no-break space between two rules, its footer under it. */
+const RULE = '─'.repeat(60)
+const EMPTY_BOX = `\r\n${RULE}\r\n❯ \r\n${RULE}\r\n  ? for shortcuts`
+
 describe('a prompt Hive puts into a CLI (#597)', () => {
   const p = 'C:/hive-test/pasted-prompt'
   const id = 'b1'
   const s = sessions as unknown as { live: Map<string, unknown> }
   const liveKey = `${p.toLowerCase()}#${id}`
   const screens: InstanceType<typeof TerminalScreen>[] = []
-  /** An idle launch of `adapter` whose screen has had `output` (the CLI's own) drawn on it. */
-  const running = async (adapter: unknown, output: string, cliVersion: string | null = null) => {
+  /**
+   * An idle launch of `adapter` whose screen has had `output` (the CLI's own) drawn on it; Claude Code's with its input
+   * box under it, empty (HI-1979: Hive types into it only once it reads that box empty), unless `box` is false.
+   */
+  const running = async (adapter: unknown, output: string, cliVersion: string | null = null, box = true) => {
     const screen = new TerminalScreen(60, 20)
     screens.push(screen)
-    await new Promise<void>((r) => screen.write(output, r))
+    await new Promise<void>((r) => screen.write(adapter === claudeCode && box ? `${output}${EMPTY_BOX}` : output, r))
     s.live.set(liveKey, { state: { runId: 'r1', status: 'ready', projectPath: p, agentId: id, agentName: 'B1' }, adapter, screen, prompts: 0, cliVersion })
     return screen
   }
@@ -362,9 +371,8 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
           writes.length = 0
           await running(adapter, '\x1b[?2004h')
           // The guard passes until the line is typed, then refuses (the agent got busy): Hive stops before Enter.
-          let checks = 0
           const guard = (): void => {
-            if (++checks > (clear ? 2 : 1)) throw new Error('busy now')
+            if (writes.some((w) => w.startsWith('\x1b[200~'))) throw new Error('busy now')
           }
           await withSwitches({ [PROMPT_CLEAR_DRAFT]: clear }, () => expect(sessions.sendPrompt(p, id, 'hello', guard)).rejects.toThrow('busy now'))
           expect(writes, `${adapter.id}, clear ${clear}`).toEqual(clear ? ['\x15', '\x1b[200~hello\x1b[201~', ...back] : ['\x1b[200~hello\x1b[201~'])
@@ -407,15 +415,150 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
         writes.length = 0
         await running(claudeCode, '\x1b[?2004h')
         const input = claudeInput()
-        let checks = 0
+        // Refused once the line is in (as a wake no longer wanted is), never before.
         const guard = (): void => {
-          if (++checks > 2) throw new Error('It is no longer wanted.')
+          if (writes.some((w) => w.startsWith('\x1b[200~'))) throw new Error('It is no longer wanted.')
         }
         await expect(sessions.sendPrompt(p, id, line, guard)).rejects.toThrow('no longer wanted')
+        expect(writes.some((w) => w.startsWith('\x1b[200~')), 'the line was written before it was stopped').toBe(true)
         expect(input, line.slice(0, 20)).toEqual({ text: '', sent: [], ctrlUOnText: 0 })
         await sessions.sendPrompt(p, id, 'the next prompt')
         expect(input.sent, line.slice(0, 20)).toEqual(['the next prompt'])
       }
+    })
+
+    describe("Claude Code's draft cleared before Hive types (HI-1979)", () => {
+      /**
+       * Claude Code's input as tried on 2.1.312, drawn on the session's screen as its box between two rules, written apart
+       * from Hive's code: the draft wrapped at the box's width and at its line breaks; a Ctrl+U deletes the row the cursor
+       * is on (at a row begun by a line break, that break); a paste is text; Enter sends what is there. After `answers`
+       * keys it stops reading (a busy CLI): nothing more changes, on screen or in it, until `answers` is raised.
+       */
+      const drawnClaude = (screen: InstanceType<typeof TerminalScreen>, draft: string) => {
+        const input = { text: draft, sent: [] as string[], ctrlU: 0, answers: Infinity }
+        const width = 58
+        const rows = (): string[] =>
+          input.text.split('\n').flatMap((part) => {
+            const cps = [...part]
+            if (!cps.length) return ['']
+            const out: string[] = []
+            for (let i = 0; i < cps.length; i += width) out.push(cps.slice(i, i + width).join(''))
+            return out
+          })
+        const draw = (): void => screen.write(`\x1b[H\x1b[2J${RULE}\r\n❯ ${input.text ? rows().join('\r\n  ') : ''}\r\n${RULE}\r\n  ? for shortcuts`)
+        let inPaste = false
+        echo.to = {
+          write: (data: string) => {
+            if (input.ctrlU >= input.answers) return
+            for (const part of data.split(/(\x1b\[20[01]~)/)) {
+              if (part === '\x1b[200~' || part === '\x1b[201~') inPaste = part === '\x1b[200~'
+              else if (inPaste) input.text += part
+              else
+                for (const ch of part) {
+                  if (ch === '\x15') {
+                    input.ctrlU++
+                    const last = rows().at(-1) ?? ''
+                    input.text = last ? [...input.text].slice(0, -[...last].length).join('') : input.text.slice(0, -1)
+                  } else if (ch === '\r') {
+                    input.sent.push(input.text)
+                    input.text = ''
+                  } else input.text += ch
+                }
+            }
+            draw()
+          }
+        }
+        draw()
+        return input
+      }
+      /** Runs `fn` with Advanced's wait for each key short (a refusal needn't take its 2 s). */
+      const shortWait = async <T,>(fn: () => Promise<T>): Promise<T> => {
+        const number = advanced.number.bind(advanced)
+        const spy = vi.spyOn(advanced, 'number').mockImplementation((setting: string) => (setting === 'claude-code.prompt.clearKeySeconds' ? 0.3 : number(setting)))
+        try {
+          return await fn()
+        } finally {
+          spy.mockRestore()
+        }
+      }
+      const pasted = (): boolean => writes.some((w) => w.startsWith('\x1b[200~'))
+      const DRAFT = `${'a draft the user left there, wrapping onto three rows. '.repeat(3)}end`
+
+      it('a draft wrapped onto three rows: a Ctrl+U for each, then the prompt, sent alone', async () => {
+        const input = drawnClaude(await running(claudeCode, '\x1b[?2004h', null, false), DRAFT)
+        await sessions.sendPrompt(p, id, 'the prompt')
+        expect(writes.filter((w) => w === '\x15')).toHaveLength(3)
+        expect(input.sent).toEqual(['the prompt'])
+      })
+
+      it('a draft taller than the screen, with line breaks: cleared whole (its top rule off screen meanwhile), then sent alone', async () => {
+        const tall = Array.from({ length: 14 }, (_, i) => `line ${i} ${'x'.repeat(70)}`).join('\n')
+        const screen = await running(claudeCode, '\x1b[?2004h', null, false)
+        const input = drawnClaude(screen, tall)
+        expect(claudeCode.promptText!(screen.textWithoutDim()), 'the box is taller than the screen').toBeNull()
+        await sessions.sendPrompt(p, id, 'the prompt')
+        // Two rows each, and its 13 line breaks.
+        expect(writes.filter((w) => w === '\x15')).toHaveLength(14 * 2 + 13)
+        expect(input.sent).toEqual(['the prompt'])
+      })
+
+      it('the CLI stops answering keys: refused, nothing of the prompt written or taken back; a later try clears it and sends it alone', async () => {
+        const input = drawnClaude(await running(claudeCode, '\x1b[?2004h', null, false), DRAFT)
+        input.answers = 1
+        await shortWait(() => expect(sessions.sendPrompt(p, id, 'the prompt')).rejects.toThrow(/couldn't be seen empty/))
+        expect([pasted(), writes.some((w) => w.includes('\x7f')), writes.includes('\r')]).toEqual([false, false, false])
+        expect(input.text, 'two rows left').toBe(DRAFT.slice(0, 116))
+        input.answers = Infinity
+        writes.length = 0
+        await sessions.sendPrompt(p, id, 'the prompt')
+        expect(input.sent).toEqual(['the prompt'])
+      })
+
+      it('the user typing as it is cleared: it stops at once, refused; the rest of their draft stays', async () => {
+        const input = drawnClaude(await running(claudeCode, '\x1b[?2004h', null, false), DRAFT)
+        const guard = (): void => {
+          if (writes.filter((w) => w === '\x15').length >= 2) throw new Error('The user is typing there.')
+        }
+        await expect(sessions.sendPrompt(p, id, 'the prompt', guard)).rejects.toThrow('The user is typing there.')
+        expect(writes).toEqual(['\x15', '\x15'])
+        expect(input.text).toBe(DRAFT.slice(0, 58))
+      })
+
+      it('an input box it can\'t find: refused after one Ctrl+U, nothing typed; once the box shows, the prompt goes', async () => {
+        const screen = await running(claudeCode, '\x1b[?2004h> ', null, false)
+        await shortWait(() => expect(sessions.sendPrompt(p, id, 'the prompt')).rejects.toThrow(/couldn't be seen empty/))
+        expect(writes).toEqual(['\x15'])
+        await new Promise<void>((r) => screen.write(EMPTY_BOX, r))
+        writes.length = 0
+        await sessions.sendPrompt(p, id, 'the prompt')
+        expect(writes).toEqual(['\x15', '\x1b[200~the prompt\x1b[201~', '\r'])
+      })
+
+      it('an empty box: the one Ctrl+U, as before, and no wait for an answer it can\'t give', async () => {
+        await running(claudeCode, '\x1b[?2004h')
+        const t = Date.now()
+        await sessions.sendPrompt(p, id, 'the prompt')
+        expect(writes).toEqual(['\x15', '\x1b[200~the prompt\x1b[201~', '\r'])
+        expect(Date.now() - t).toBeLessThan(1500)
+      })
+
+      it('Codex and Copilot: one Ctrl+U, whatever their screen shows', async () => {
+        for (const adapter of [codex, copilot]) {
+          writes.length = 0
+          await running(adapter, '\x1b[?2004h')
+          await sessions.sendPrompt(p, id, 'the prompt')
+          expect(writes.filter((w) => w === '\x15'), adapter.id).toHaveLength(1)
+        }
+      })
+
+      it("the recorded screens: Claude Code 2.1.312's box read row by row as each Ctrl+U took one, then empty", () => {
+        const screensRead = readFileSync(join(__dirname, 'fixtures', 'advanced', 'input-clear-claude-2.1.312.txt'), 'utf8').replace(/\r\n/g, '\n').split(/^== .*$/m).slice(1)
+        const read = screensRead.map((x) => claudeCode.promptText!(x))
+        expect(read.map((x) => x?.length ?? null)).toEqual([...read.map((x) => x?.length ?? null)].sort((a, b) => (b ?? 0) - (a ?? 0)))
+        expect(read).toHaveLength(5)
+        expect(read.slice(0, 4).every((x) => !!x)).toBe(true)
+        expect(read[4]).toBe('')
+      })
     })
 
     it('backspaceKeys: one for each code point written, and one for each key between typed lines', () => {

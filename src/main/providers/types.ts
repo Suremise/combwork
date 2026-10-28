@@ -589,6 +589,11 @@ export interface ProviderAdapter {
    */
   promptText?(screen: string): string | null
   /**
+   * What promptText reads, as drawn: its rows and their spacing kept (HI-1979: a Ctrl+U that deletes an empty row, a
+   * line break's, changes this and not promptText's words). Null where promptText is.
+   */
+  promptBox?(screen: string): string | null
+  /**
    * The installed CLI's models and what each can do (#125), when it can say (null: couldn't, or an unexpected reply).
    * Asking may start the CLI briefly, but never a session, a prompt or a sign-in. env: the sessions' environment.
    */

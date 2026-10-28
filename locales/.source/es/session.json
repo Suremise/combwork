@@ -129,6 +129,7 @@
   "session.plan.noToggle": "{provider} has no Plan mode toggle.",
   "session.plan.typing": "Hive is typing a line into this agent. Try again in a moment.",
   "session.prompt.cliAsks": "Its CLI shows a question for you: nothing is typed into it until you answer it there.",
+  "session.prompt.inputNotCleared": "Its input couldn't be seen empty after Hive cleared it: nothing is typed into it until it can be.",
   "session.prompt.untaken": "Its CLI hasn't taken the line Hive typed before; nothing more is typed until it does.",
   "session.purge.changed": "The session's copies changed since the preview.",
   "session.purge.cliBack": "The CLI has this session's transcript again.",

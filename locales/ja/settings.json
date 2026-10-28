@@ -123,6 +123,8 @@
   "settings.advanced.claude-code.override.promptSnapshotOff.title": "アシスタントを現在の指示で再開",
   "settings.advanced.claude-code.override.statusLine.desc": "HiveはClaude Codeを独自のステータスラインで起動します。これはセッションのモデル、コンテキスト、コスト、プランの上限をエージェントのフッター用にHiveへ送り、入力欄の下には何も表示しません。オフにすると、Claude Codeの設定にあるステータスラインが再び表示されます。Hiveのコマンドは引き続きステータスを読み取り、Claude Codeが渡すのと同じ入力で自分のコマンドを実行し、その出力を表示します。自分のステータスラインがなければ何も変わりません。",
   "settings.advanced.claude-code.override.statusLine.title": "自分のステータスラインの代わりにHiveのものを使う",
+  "settings.advanced.claude-code.prompt.clearKeySeconds.desc": "Claude Code の Ctrl+U は、複数行に折り返した下書きの1行しか消しません。そのため Hive は入力する前に、入力欄（画面：入力欄）が空と表示されるまで Ctrl+U を1回ずつ押します。これは、Claude Code が各キーの結果を表示するまで Hive が待つ時間です。時間内に表示されなければ、Hive は何も入力せず、後でやり直します。短すぎると、Claude Code が忙しいときに Hive がメッセージを後回しにする回数が増えます。",
+  "settings.advanced.claude-code.prompt.clearKeySeconds.title": "入力の消去：キーごとの待ち時間",
   "settings.advanced.claude-code.safeguard.note.desc": "安全分類器が応答を止めたときにClaude Codeがトランスクリプトに残す注記と、モデル向けに加える通知です（#606）。誤っていると、Hiveはこの停止を見逃します。エージェントのペインに盾が表示されず、「パフォーマンス」でも数えられません。",
   "settings.advanced.claude-code.safeguard.note.title": "セーフガード停止：トランスクリプトの注記",
   "settings.advanced.claude-code.safeguard.prompt.desc": "セーフガード停止の後にClaude Codeが出す、モデルを切り替えるかどうかの質問です。最後に書いた行にある、開いているダイアログの選択肢で判断します。開いている間、Hiveはエージェントが応答を待っていることとその理由を表示します。誤っていると、エージェントには「Claude needs your permission」としか表示されません。",

@@ -125,6 +125,7 @@
   "session.plan.noToggle": "{provider} não tem uma opção para ativar o modo Planejar.",
   "session.plan.typing": "O Hive está digitando uma linha neste agente. Tente de novo em instantes.",
   "session.prompt.cliAsks": "A CLI está mostrando uma pergunta para você: nada é digitado nela até você responder lá.",
+  "session.prompt.inputNotCleared": "A entrada não apareceu vazia depois que o Hive a limpou: nada é digitado nela até aparecer.",
   "session.prompt.untaken": "A CLI ainda não aceitou a linha que o Hive digitou antes; nada mais é digitado até que ela aceite.",
   "session.purge.changed": "As cópias da sessão mudaram desde a pré-visualização.",
   "session.purge.cliBack": "A CLI tem de novo a transcrição desta sessão.",

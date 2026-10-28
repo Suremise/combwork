@@ -125,6 +125,7 @@
   "session.plan.noToggle": "{provider} no tiene un interruptor del modo Plan.",
   "session.plan.typing": "Hive está escribiendo una línea en este agente. Vuelve a intentarlo en un momento.",
   "session.prompt.cliAsks": "Su CLI te muestra una pregunta: no se escribe nada en ella hasta que la respondas allí.",
+  "session.prompt.inputNotCleared": "Su entrada no se vio vacía después de que Hive la vaciara: no se escribe nada en ella hasta que se vea.",
   "session.prompt.untaken": "Su CLI no ha tomado la línea que Hive escribió antes; no se escribe nada más hasta que la tome.",
   "session.purge.changed": "Las copias de la sesión cambiaron desde la vista previa.",
   "session.purge.cliBack": "La CLI vuelve a tener la transcripción de esta sesión.",

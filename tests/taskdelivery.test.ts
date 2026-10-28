@@ -58,10 +58,14 @@ function withFacts<T extends { status: string }>(state: T): T {
   return state
 }
 
+/** Claude Code's screen with its input box empty (HI-1979: Hive types into it only once it reads that), bracketed paste off. */
+const BOX = `${'─'.repeat(60)}\n❯ \n${'─'.repeat(60)}\n  ? for shortcuts`
+const emptyBox = { text: () => BOX, textWithoutDim: () => BOX, bracketedPaste: () => false }
+
 /** A running agent, idle, as SessionManager keeps one (no process). */
 function idle(agentId: string): { status: string } {
   const state = withFacts({ provider: 'claude', runId: `run-${agentId}`, projectPath: p, agentId, cwd: p, sessionId: '', status: 'ready', startedAt: '', launchSignature: '', unseen: false })
-  s.live.set(`${p.toLowerCase()}#${agentId}`, { state, adapter: claudeCode, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null })
+  s.live.set(`${p.toLowerCase()}#${agentId}`, { state, adapter: claudeCode, screen: emptyBox, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null })
   return state
 }
 // Its doorbell (#650: the task's id, never its text, which the agent reads with hive_inbox).
@@ -118,7 +122,8 @@ describe('a Start typed into a running agent', () => {
     const { error, card } = await startWith('d2', user)
     expect(error).toMatch(/is working/)
     expect(submitted()).toBe(false)
-    expect(pty.typed.at(-1)).toBe('\x15')
+    // Taken back with Backspaces, as Claude Code's Ctrl+U clears only one wrapped row (HI-1974).
+    expect(pty.typed.at(-1)).toMatch(/^\x7f+$/)
     expect([card.column, card.agent]).toEqual(['review', 'd2'])
   })
 

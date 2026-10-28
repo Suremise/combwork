@@ -150,13 +150,17 @@ describe('SessionManager.compact: typing the /compact', () => {
   const project = join(ws, 'proj')
   const FOCUS = 'x'.repeat(24_000) // 3,000 pieces of 8 every 10 ms: about 30 s, longer than BEGIN_MS
 
-  /** A running Claude Code agent, idle, as SessionManager keeps it (no process: what is typed is recorded). */
-  async function running(runId = 'run-1') {
+  /**
+   * A running Claude Code agent, idle, as SessionManager keeps it (no process: what is typed is recorded). Its screen shows
+   * its input box empty (HI-1979: Hive types into it only once it reads that), or `shows` instead.
+   */
+  async function running(runId = 'run-1', shows = `${'─'.repeat(60)}\n❯ \n${'─'.repeat(60)}\n  ? for shortcuts`) {
     const { sessions } = await import('../src/main/sessions')
     const { claudeCode } = await import('../src/main/providers/claude/adapter')
     const live = (sessions as unknown as { live: Map<string, unknown> }).live
     const state = { provider: 'claude', runId, projectPath: project, agentId: 'a1', cwd: project, sessionId: '', status: 'ready' as SessionStatus, statusMessage: undefined as string | undefined, startedAt: '', launchSignature: '', unseen: false }
-    const l = { state, adapter: claudeCode, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null } as { state: typeof state; compacting?: Compaction }
+    const screen = { text: () => shows, textWithoutDim: () => shows, bracketedPaste: () => false }
+    const l = { state, adapter: claudeCode, screen, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null } as { state: typeof state; compacting?: Compaction }
     live.set(`${project.toLowerCase()}#a1`, l)
     return { sessions, live, l, state }
   }
@@ -213,6 +217,17 @@ describe('SessionManager.compact: typing the /compact', () => {
       // Ended as the CLI never begins it, so the next one can start.
       await vi.advanceTimersByTimeAsync(BEGIN_MS + 100)
     }
+  })
+
+  it("Claude Code's input box not seen empty (HI-1979): Compact is refused after one Ctrl+U, and /compact isn't typed", async () => {
+    const { sessions, l, state } = await running('run-1', 'no input box on this screen')
+    const compact = sessions.compact(project, 'short', 'a1')
+    const failed = expect(compact).rejects.toThrow(/couldn't be seen empty/)
+    await vi.advanceTimersByTimeAsync(5_000)
+    await failed
+    expect(typed.map((t) => t.data)).toEqual(['\x15'])
+    // Nothing is left reserved: the agent is as it was, and the next Compact can start.
+    expect([state.status, l.compacting]).toEqual(['ready', undefined])
   })
 
   it('while Hive types a prompt into the agent, Compact is refused (the two would mix)', async () => {

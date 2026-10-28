@@ -991,11 +991,11 @@ async function startSubagent(secs, k) {
 
 // Its input and its footer, as Claude Code 2.1.296 marks them (no taller than the fake's prompt before #648).
 /**
- * With fake-input-box.txt in its home at its start, its input is Claude Code 2.1.312's box (HI-1959): a rule, `❯` and a
- * no-break space, the line typed after it, and a rule and its footer below (drawn back after the line is cleared);
- * otherwise `❯ ` on its own, as before.
+ * Its input is Claude Code 2.1.312's box (HI-1959; by default since HI-1979, as the real CLI draws it): a rule, `❯`
+ * and a no-break space, the line typed after it, and a rule and its footer below (drawn back after the line changes).
+ * With fake-plain-prompt.txt in its home at its start, `❯ ` on its own, as before.
  */
-const inputBox = !!home && fs.existsSync(path.join(home, 'fake-input-box.txt'))
+const inputBox = !(home && fs.existsSync(path.join(home, 'fake-plain-prompt.txt')))
 const RULE = '─'.repeat(40)
 const boxBelow = () => `\x1b7\r\n${RULE}\r\n  ? for shortcuts\x1b8`
 const promptLine = () => out(inputBox ? `\r\n${RULE}\r\n❯ ${boxBelow()}` : '\r\n❯ \r\n  ? for shortcuts\r\n')
@@ -1123,8 +1123,24 @@ const lineLayout = () => {
 }
 /** The screen rows the input line takes (lineLayout). */
 const lineRows = () => lineLayout().length
-/** Draws the input line again (after a key took some of it back), from its first row: `rows`, the rows it took before. */
-const redrawLine = (rows) => out(`\r${rows > 1 ? `\x1b[${rows - 1}A` : ''}\x1b[J${inputBox ? '❯ ' : ''}${line.replace(/\n/g, '\r\n')}${inputBox ? boxBelow() : ''}`)
+/**
+ * Draws the input line again (after a key took some of it back), from its first row: `rows`, the rows it took before.
+ * In the box, from its top rule, as Claude Code draws its whole box again (HI-1979: a draft taller than the screen
+ * scrolled the rule off, and the box drawn back without it could never be read again).
+ */
+const redrawLine = (rows) => {
+  const up = rows - 1 + (inputBox ? 1 : 0)
+  out(`\r${up > 0 ? `\x1b[${up}A` : ''}\x1b[J${inputBox ? `${RULE}\r\n❯ ` : ''}${line.replace(/\n/g, '\r\n')}${inputBox ? boxBelow() : ''}`)
+}
+/** In the box (inputBox): the rows its line took as last drawn, while what was typed since isn't drawn yet. */
+let undrawn = null
+/** Draws what was typed into the box since it was last drawn (a read's end, or a key that changes the line otherwise). */
+const drawTyped = () => {
+  if (undrawn === null) return
+  const rows = undrawn
+  undrawn = null
+  redrawLine(rows)
+}
 /** Inside a bracketed paste, which can come in several reads. */
 let inPaste = false
 /** fake-log-input.txt in its home at its start: each read of its input, as it came, goes into fake-input.jsonl there (#1286). */
@@ -1159,8 +1175,9 @@ process.stdin.on('data', (data) => {
     }
     // A line break or tab in a bracketed paste is text, as in Claude Code: the line keeps it (#1286).
     if (inPaste && (ch === '\r' || ch === '\n' || ch === '\t')) {
+      if (inputBox && undrawn === null) undrawn = lineRows()
       line += ch === '\t' ? ch : '\n'
-      out(ch === '\t' ? ch : '\r\n')
+      if (!inputBox) out(ch === '\t' ? ch : '\r\n')
       continue
     }
     // A Ctrl+U or an Enter in a paste is text: nothing is cleared or sent.
@@ -1170,6 +1187,8 @@ process.stdin.on('data', (data) => {
       continue
     }
     ctrlC = 0
+    // Any other key draws what was typed into the box first.
+    if (ch < ' ') drawTyped()
     // What is typed shows on its input line, as in Claude Code (a pasted image's path too, #195).
     if (ch === '\x15') {
       // Only the screen row the cursor is on goes, as in Claude Code 2.1.312 (HI-1974: a narrow pane kept a stopped
@@ -1230,10 +1249,12 @@ process.stdin.on('data', (data) => {
       }
     } else if (ch >= ' ') {
       if (!line) enters = 0
+      if (inputBox && undrawn === null) undrawn = lineRows()
       line += ch
-      out(ch)
+      if (!inputBox) out(ch)
     }
   }
+  drawTyped()
 })
 
 /** "linger N": N processes left running after it ends (linger.cjs), started through one that exits at once. */

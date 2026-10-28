@@ -125,6 +125,7 @@
   "session.plan.noToggle": "{provider} nie ma przełącznika trybu Plan.",
   "session.plan.typing": "Hive wpisuje wiersz do tego agenta. Spróbuj ponownie za chwilę.",
   "session.prompt.cliAsks": "Jego CLI wyświetla pytanie do ciebie: nic nie zostanie wpisane, dopóki tam na nie nie odpowiesz.",
+  "session.prompt.inputNotCleared": "Po wyczyszczeniu przez Hive jego pole wpisywania nie było widoczne jako puste: nic nie zostanie wpisane, dopóki takie nie będzie.",
   "session.prompt.untaken": "Poprzedni wiersz wpisany przez Hive nie trafił jeszcze do CLI; dopóki nie trafi, nic więcej nie zostanie wpisane.",
   "session.purge.changed": "Kopie sesji zmieniły się od podglądu.",
   "session.purge.cliBack": "CLI znów ma transkrypcję tej sesji.",

@@ -503,6 +503,10 @@
     "defaultMessage": "Its CLI shows a question for you: nothing is typed into it until you answer it there.",
     "description": "Typing into an agent is refused: its coding agent shows a question of its own on its screen (such as Claude Code's offer to teach auto mode about your environment), which the keys would answer."
   },
+  "session.prompt.inputNotCleared": {
+    "defaultMessage": "Its input couldn't be seen empty after Hive cleared it: nothing is typed into it until it can be.",
+    "description": "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Hive pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards."
+  },
   "session.prompt.untaken": {
     "defaultMessage": "Its CLI hasn't taken the line Hive typed before; nothing more is typed until it does.",
     "description": "Typing into an agent is refused: its CLI hasn't taken the line Hive typed before."

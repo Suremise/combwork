@@ -125,6 +125,7 @@
   "session.plan.noToggle": "{provider} hat keinen Schalter für den Planmodus.",
   "session.plan.typing": "Hive tippt gerade eine Zeile in diesen Agenten. Versuche es gleich noch einmal.",
   "session.prompt.cliAsks": "Die CLI zeigt dir eine Frage: Bis du sie dort beantwortest, wird nichts hineingetippt.",
+  "session.prompt.inputNotCleared": "Die Eingabe war nach dem Leeren durch Hive nicht leer zu sehen: Bis das der Fall ist, wird nichts hineingetippt.",
   "session.prompt.untaken": "Die CLI hat die zuvor von Hive getippte Zeile noch nicht angenommen; bis dahin wird nichts weiter getippt.",
   "session.purge.changed": "Die Kopien der Sitzung haben sich seit der Vorschau geändert.",
   "session.purge.cliBack": "Die CLI hat das Transkript dieser Sitzung wieder.",

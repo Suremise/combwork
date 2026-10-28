@@ -125,6 +125,7 @@
   "session.plan.noToggle": "{provider}にはプランモードの切り替えがありません。",
   "session.plan.typing": "Hiveがこのエージェントに入力中です。しばらくしてからもう一度お試しください。",
   "session.prompt.cliAsks": "CLIが質問を表示しています。そこで答えるまで、何も入力しません。",
+  "session.prompt.inputNotCleared": "Hive が消去した後も入力欄が空と確認できませんでした。確認できるまで何も入力しません。",
   "session.prompt.untaken": "Hiveが前に入力した行をCLIがまだ受け取っていません。受け取るまで、それ以上は入力しません。",
   "session.purge.changed": "プレビューの後にセッションのコピーが変更されました。",
   "session.purge.cliBack": "CLIにこのセッションのトランスクリプトが戻っています。",
