@@ -112,5 +112,5 @@ export const HIVE_TOOLS: readonly string[] = [
   'hive_message_agent', 'hive_hand_over', 'hive_list_tasks', 'hive_read_task', 'hive_read_attachment', 'hive_create_task', 'hive_update_task', 'hive_update_tasks', 'hive_reorder_tasks', 'hive_start_task', 'hive_list_skills', 'hive_wait_for_tasks',
   'hive_list_settings', 'hive_read_setting', 'hive_update_setting', 'hive_merge_slot', 'hive_lane', 'hive_queue', 'hive_release_slot', 'hive_template', 'hive_inbox', 'hive_console',
   'hive_journal_write', 'hive_journal_recall', 'hive_journal_entry', 'hive_journal_update',
-  'hive_start_card', ...INTENT_TOOLS, 'hive_ask_assistant', 'hive_undo'
+  'hive_start_card', ...INTENT_TOOLS, 'hive_focused_skip', 'hive_ask_assistant', 'hive_undo'
 ]

@@ -113,12 +113,16 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     const [a, b] = [await make('S3 a'), await make('S3 b')]
     const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })).lane
     await move(a, 'doing')
+    const asked = Date.now()
     const r = await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a, b], by: 'B1 (alpha)' })
     expect(r.did).toBe('updated')
     expect(r.note).toMatch(new RegExp(`queued: it applies once #${a} is Done`))
     expect(r.lane.cards.map((c) => c.number)).toEqual([a])
     expect(r.lane.queued).toEqual([a, b])
-    expect(r.lane.status).toEqual({ reason: 'listChanges', card: a })
+    expect(r.lane.status).toEqual({ reason: 'listChanges', card: a, since: expect.any(Number) })
+    // HI-1926: since is when the wait began, the list change.
+    expect(r.lane.status!.since).toBeGreaterThanOrEqual(asked)
+    expect(r.lane.status!.since).toBeLessThanOrEqual(Date.now())
     // The runtime reads a queued card as the lane's already (its ruleset).
     expect(facts().card(b).lane).toBe(l.id)
     await move(a, 'done')
@@ -181,9 +185,13 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     expect(laneNextText({ ...first, lane: { ...first.lane, cards: first.lane.cards } })).toBe(`Next: #${a} Wait a. Start it.`)
     await move(a, 'doing')
     expect(laneNextText(await lanes.laneNext(w, 'alpha', 'b1'))).toBe(`Carry on with #${a} Wait a.`)
+    const passed = Date.now()
     await move(a, 'passed')
     const paused = await lane(l.id)
-    expect([paused.state, paused.status, paused.pausedOn]).toEqual(['paused', { reason: 'notMerged', card: a }, a])
+    expect([paused.state, paused.status, paused.pausedOn]).toEqual(['paused', { reason: 'notMerged', card: a, since: expect.any(Number) }, a])
+    // HI-1926: since is when the wait began, the pass.
+    expect(paused.status!.since).toBeGreaterThanOrEqual(passed)
+    expect(paused.status!.since).toBeLessThanOrEqual(Date.now())
     expect(laneNextText(await lanes.laneNext(w, 'alpha', 'b1'))).toBe(`The lane waits: waiting: #${a} not merged. Start nothing new meanwhile.`)
     await advanced.set(ENFORCE, false)
     expect((await lane(l.id)).status).toBeNull()

@@ -176,6 +176,22 @@ export const RESUME_AFTER_UPDATE = 'hive.restart.resumeAfterUpdate'
 /** How long an agent resumed after a restart has to be ready, in seconds (HI-1707): read by main's restartResume. */
 export const RESTART_READY_SECONDS = 'hive.restart.resumeReadySeconds'
 
+/** Agents whose turn a dropped connection ended are resumed once it is back (HI-1612): read by main's outageResume. */
+export const OUTAGE_RESUME = 'hive.outage.resume'
+/** Errors that are never a dropped connection (a usage limit, a sign-in, "overloaded"), whatever a CLI's pattern finds (HI-1612). */
+export const OUTAGE_NOT_CONNECTION = 'hive.outage.notConnection'
+/** The first check for the connection, in seconds, and the longest between two (HI-1612): backing off from one to the other. */
+export const OUTAGE_CHECK_FIRST_SECONDS = 'hive.outage.checkFirstSeconds'
+export const OUTAGE_CHECK_MOST_SECONDS = 'hive.outage.checkMostSeconds'
+/** How long Hive waits for the connection before it gives up, in minutes (HI-1612). */
+export const OUTAGE_WAIT_MINUTES = 'hive.outage.waitMinutes'
+/** The resumes in an hour after which a turn ending on a connection error again stops them (HI-1612). */
+export const OUTAGE_RESUMES_PER_HOUR = 'hive.outage.resumesPerHour'
+/** The address Hive checks for a CLI's connection (HI-1612): its API host. */
+export const outageCheckUrlId = (provider: ProviderId): string => `hive.outage.checkUrl.${provider}`
+/** A CLI's words for a turn that its connection's failure ended (HI-1612): `<provider>.outage.connectionError`. */
+export const outagePatternId = (provider: ProviderId): string => `${provider}.outage.connectionError`
+
 /** The longest one of the merge queue's checks or installs runs, in minutes (#1349): read by main's queueChecks. */
 export const QUEUE_CHECK_MINUTES = 'hive.queue.checkMinutes'
 /** The network error codes that make a failed merge check temporary (#1362): read by queueChecksApp.ts. */
@@ -565,6 +581,100 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 600,
     unit: 's',
     workspace: true,
+    applies: 'now'
+  },
+  // Resuming agents after a connection drops (HI-1612, Darren's decision: off by default, for everyone).
+  {
+    id: OUTAGE_RESUME,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.resume.title', defaultMessage: 'Resume agents after a connection drops', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.resume.desc', defaultMessage: "When an agent's turn ends because its CLI couldn't reach its API (a router restarting, Wi-Fi dropping), Hive shows it waiting for the connection, checks the CLI's API host now and then, and once it answers tells the agent to rerun what was cut off and carry on. Never for a usage limit, an expired sign-in or an overloaded server. After three resumes in an hour that end the same way, or once the wait's limit passes, Hive stops and says what to try.", description: 'What the advanced setting "Resume agents after a connection drops" does (Settings → Advanced).' }),
+    kind: 'boolean',
+    default: false,
+    applies: 'now'
+  },
+  {
+    id: OUTAGE_WAIT_MINUTES,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.waitMinutes.title', defaultMessage: 'Resuming after a connection drops: wait at most', description: "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"120 min\")." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.waitMinutes.desc', defaultMessage: 'How long Hive waits for the connection to come back before it stops waiting and tells you.', description: 'What the advanced setting "Resuming after a connection drops: wait at most" does (Settings → Advanced).' }),
+    kind: 'number',
+    default: 120,
+    min: 5,
+    max: 1440,
+    unit: 'min',
+    applies: 'now'
+  },
+  {
+    id: OUTAGE_RESUMES_PER_HOUR,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.resumesPerHour.title', defaultMessage: 'Resuming after a connection drops: resumes in an hour', description: "An advanced setting's title (Settings → Advanced), followed by a number." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.resumesPerHour.desc', defaultMessage: "How many times in an hour Hive resumes the same agent. Once its turn ends on a connection error again after that many, Hive stops: the PC's own network may not have recovered.", description: 'What the advanced setting "Resuming after a connection drops: resumes in an hour" does (Settings → Advanced).' }),
+    kind: 'number',
+    default: 3,
+    min: 1,
+    max: 20,
+    applies: 'now'
+  },
+  {
+    id: OUTAGE_CHECK_FIRST_SECONDS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.checkFirstSeconds.title', defaultMessage: 'Resuming after a connection drops: first check after', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"30 s\")." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.checkFirstSeconds.desc', defaultMessage: 'How long after the turn ends Hive first checks the connection. Each check that finds it still down doubles the wait before the next, up to the longest wait below.', description: 'What the advanced setting "Resuming after a connection drops: first check after" does (Settings → Advanced).' }),
+    kind: 'number',
+    default: 30,
+    min: 1,
+    max: 600,
+    unit: 's',
+    applies: 'now'
+  },
+  {
+    id: OUTAGE_CHECK_MOST_SECONDS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.checkMostSeconds.title', defaultMessage: 'Resuming after a connection drops: longest wait between checks', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\")." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.checkMostSeconds.desc', defaultMessage: 'The longest Hive waits between two checks of the connection.', description: 'What the advanced setting "Resuming after a connection drops: longest wait between checks" does (Settings → Advanced).' }),
+    kind: 'number',
+    default: 300,
+    min: 1,
+    max: 3600,
+    unit: 's',
+    applies: 'now'
+  },
+  {
+    id: OUTAGE_NOT_CONNECTION,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.notConnection.title', defaultMessage: 'Resuming after a connection drops: errors that are never a dropped connection', description: "An advanced setting's title (Settings → Advanced), listed under Hive." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.notConnection.desc', defaultMessage: "A failed turn whose error this regular expression finds is never resumed, whatever a CLI's connection error pattern finds: a usage or rate limit, a sign-in, an overloaded server. Resuming wouldn't help those, and could repeat.", description: 'What the advanced setting "Resuming after a connection drops: errors that are never a dropped connection" does (Settings → Advanced).' }),
+    kind: 'pattern',
+    default: String.raw`usage limit|rate.?limit|hit your limit|quota|credit balance|billing|overloaded|\b(?:401|403|429|529)\b|too many requests|log ?in|sign.?in|authenticat|unauthori[sz]ed|forbidden|api key`,
+    flags: 'i',
+    applies: 'now'
+  },
+  {
+    id: outageCheckUrlId('claude-code'),
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.checkUrl.claude-code.title', defaultMessage: 'Resuming after a connection drops: address checked for Claude Code', description: "An advanced setting's title (Settings → Advanced), listed under Hive. Claude Code is a product name." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.checkUrl.claude-code.desc', defaultMessage: "The address Hive asks to see whether Claude Code's connection is back: its API host. Any reply counts, an error page too. An agent on a server connection is checked at its server's address instead.", description: 'What the advanced setting "Resuming after a connection drops: address checked for Claude Code" does (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'https://api.anthropic.com',
+    applies: 'now'
+  },
+  {
+    id: outageCheckUrlId('codex'),
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.checkUrl.codex.title', defaultMessage: 'Resuming after a connection drops: address checked for Codex', description: "An advanced setting's title (Settings → Advanced), listed under Hive. Codex is a product name." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.checkUrl.codex.desc', defaultMessage: "The address Hive asks to see whether Codex's connection is back: its API host. Any reply counts, an error page too.", description: 'What the advanced setting "Resuming after a connection drops: address checked for Codex" does (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'https://chatgpt.com',
+    applies: 'now'
+  },
+  {
+    id: outageCheckUrlId('copilot'),
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.outage.checkUrl.copilot.title', defaultMessage: 'Resuming after a connection drops: address checked for GitHub Copilot', description: "An advanced setting's title (Settings → Advanced), listed under Hive. GitHub Copilot is a product name." }),
+    desc: msg({ id: 'settings.advanced.hive.outage.checkUrl.copilot.desc', defaultMessage: "The address Hive asks to see whether GitHub Copilot's connection is back: its API host. Any reply counts, an error page too.", description: 'What the advanced setting "Resuming after a connection drops: address checked for GitHub Copilot" does (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'https://api.githubcopilot.com',
     applies: 'now'
   },
   {
@@ -1183,6 +1293,21 @@ const SOURCES: readonly AdvancedSource[] = [
       { from: `${FIX}/advanced/stopfailure-server-401-claude-2.1.311.json`, version: '2.1.311', text: 'authentication_failed', shows: "A server connection's key refused (401), after Claude Code's 10 retries" } // i18n-ignore: a CLI's recorded text (#367)
     ]
   },
+  // A turn its connection's failure ended (HI-1612): the StopFailure's message, after Claude Code's own retries.
+  {
+    id: outagePatternId('claude-code'),
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.outage.connectionError.title', defaultMessage: 'Connection dropped: StopFailure message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.outage.connectionError.desc', defaultMessage: "What a StopFailure hook's message says when Claude Code couldn't reach its API after its retries: with Resume agents after a connection drops on, Hive waits for the connection and resumes the agent. Wrong, such agents stay stopped.", description: 'What the advanced setting "Connection dropped: StopFailure message" is for, and what goes wrong when it is wrong (Settings → Advanced). Resume agents after a connection drops is the title of another advanced setting.' }),
+    kind: 'pattern',
+    default: String.raw`\b(?:ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH|ENETDOWN)\b|Connection refused|Can't reach the API server|Connection error|Request timed out`,
+    flags: 'i',
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/advanced/stopfailure-connection-claude-2.1.312.json`, version: '2.1.312', text: 'API Error: Connection refused — a firewall or proxy may be blocking it (ECONNREFUSED)' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/stopfailure-connection-claude-2.1.312.json`, version: '2.1.312', text: "API Error: Can't reach the API server — check your internet or DNS (ENOTFOUND)" } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
   // A lane's end (HI-1706): the command Hive types to end Claude Code as a person would, and how long it waits for the exit.
   {
     id: 'claude-code.exit.command',
@@ -1591,6 +1716,19 @@ const SOURCES: readonly AdvancedSource[] = [
     flags: 'i',
     applies: 'now',
     samples: [{ from: `${FIX}/signin-codex-0.160.0.jsonl`, version: '0.160.0', text: 'unexpected status 401 Unauthorized: Incorrect API key provided' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  // A turn its connection's failure ended (HI-1612): the error of its task_complete. A provider refusing connections
+  // doesn't fail the turn (Codex waits for the network: tests/fixtures/advanced/README.md), a stream dropped does.
+  {
+    id: outagePatternId('codex'),
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.outage.connectionError.title', defaultMessage: 'Connection dropped: error message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.outage.connectionError.desc', defaultMessage: "A turn's error, in Codex's session file, that means it lost its connection to its API: with Resume agents after a connection drops on, Hive waits for the connection and resumes the agent. Wrong, such agents stay stopped.", description: 'What the advanced setting "Connection dropped: error message" is for, and what goes wrong when it is wrong (Settings → Advanced). Resume agents after a connection drops is the title of another advanced setting.' }),
+    kind: 'pattern',
+    default: String.raw`\b(?:ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH|ENETDOWN)\b|stream disconnected|Transport error|network error|error sending request|connection (?:refused|reset|closed)`,
+    flags: 'i',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/turn-failed-codex-0.164.0.jsonl`, version: '0.164.0', text: 'stream disconnected before completion: Transport error: network error: error decoding response body' }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'codex.subagent.item',
@@ -2026,6 +2164,19 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/signin-error-copilot-1.0.95.jsonl`, version: '1.0.95', text: 'authentication' }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  // A turn that failed (HI-1960): Copilot 1.0.105 gives up on a model call with a session.error of this type and no
+  // Stop (each ErrorOccurred hook of its retries says recoverable, the last too).
+  {
+    id: 'copilot.turnFailed.errorType',
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.turnFailed.errorType.title', defaultMessage: 'Turn failed: error type', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.copilot.turnFailed.errorType.desc', defaultMessage: "A session error's type, in Copilot's session file, that means its turn ended because a model call failed after Copilot's retries (it sends no Stop then): Hive ends the turn as failed, with Copilot's message. Wrong, such an agent shows working until you look.", description: 'What the advanced setting "Turn failed: error type" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'pattern',
+    default: '^query$',
+    flags: 'i',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/connection-error-copilot-1.0.105.jsonl`, version: '1.0.105', text: 'query' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   {
     id: 'copilot.signIn.errorMessage',
     group: 'copilot',
@@ -2070,6 +2221,21 @@ const SOURCES: readonly AdvancedSource[] = [
     default: 'message',
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/question-copilot-1.0.105.jsonl`, version: '1.0.105', fields: ['message', 'requestedSchema'] }]
+  },
+  // A turn its connection's failure ended (HI-1612): its error's message, after Copilot's own retries.
+  {
+    id: outagePatternId('copilot'),
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.outage.connectionError.title', defaultMessage: 'Connection dropped: error message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.copilot.outage.connectionError.desc', defaultMessage: "What Copilot's error says when it couldn't reach its model's API after its retries: with Resume agents after a connection drops on, Hive waits for the connection and resumes the agent. Wrong, such agents stay stopped.", description: 'What the advanced setting "Connection dropped: error message" is for, and what goes wrong when it is wrong (Settings → Advanced). Resume agents after a connection drops is the title of another advanced setting.' }),
+    kind: 'pattern',
+    default: String.raw`\b(?:ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH|ENETDOWN)\b|error sending request|Could not connect to|dns error`,
+    flags: 'i',
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/advanced/connection-error-copilot-1.0.105.jsonl`, version: '1.0.105', text: 'error resolving DNS: No such host is known. (os error 11001) [ENOTFOUND]' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/connection-error-copilot-1.0.105.jsonl`, version: '1.0.105', text: 'Could not connect to local model provider at http://127.0.0.1:50000/v1.' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
   },
   // A compaction's context before and after (#454): the three parts Copilot counts it in, in its compaction_start and
   // compaction_complete events, added up.

@@ -4717,6 +4717,24 @@ class SessionManager {
     await this.delivery().now(projectPath, { agentId, kind: 'control', from: HIVE_SENDER, body: CARRY_ON_PROMPT, source: 'carry-on', ref: st.runId, need: 'stalled', forRun: st.runId }, () => !!stalled())
   }
 
+  /**
+   * An agent whose turn a dropped connection ended, while Hive waits for the connection (HI-1612, outageResume.ts): its
+   * status says what the wait is doing; null puts back the failed turn's own. Only for that launch, still stopped there.
+   */
+  connectionWait(projectPath: string, agentId: string, runId: string, text: TextPart | null): void {
+    const st = this.liveFor(projectPath, agentId)
+    if (!st || st.runId !== runId || !st.failedTurn) return
+    const failed = failedTurnStep(st.failedTurn.message)
+    setStatus(st, text ?? failed.messageText ?? failed.message ?? null)
+    this.emitState(st)
+  }
+
+  /** An agent's name as notices show it ("hive", or "hive · HB2" in a project with several). */
+  agentLabel(projectPath: string, agentId: string): string {
+    const st = this.liveFor(projectPath, agentId)
+    return st ? this.label(st) : agentId
+  }
+
   /** The launch a hook call belongs to: named by its run id, else (older launch folders) by session id. */
   private findLaunch(runId: string | null, sessionId: unknown): [string, LiveSession] | null {
     if (runId) {
@@ -4781,6 +4799,9 @@ class SessionManager {
       void this.inHookOrder(l.state.runId, () => {
         if (this.live.get(id) !== l || rec.key === l.failureDone) return
         l.failure = rec
+        // A CLI that sends no Stop after a failed turn (Copilot, HI-1960): its record ends the running turn, failed, as
+        // that Stop would (failedIfRecorded gives it the CLI's words).
+        if (l.adapter.descriptor.capabilities.failureEndsTurn && l.ledger && failureTurn(l.ledger, rec) === 'running') return this.endTurnFrom(id, l, 'transcript', `${l.adapter.descriptor.name} recorded its turn failed at ${d.turnFailedAt}`) // i18n-ignore: the log and the hook journal (English)
         this.settleFailure(id, l)
       })
     }

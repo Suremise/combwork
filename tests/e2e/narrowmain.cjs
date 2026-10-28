@@ -132,6 +132,34 @@ const check = (name, ok, extra = '') => {
   await run('light, 125%, no agents', 'alpha', [['New Session', '.session-empty-card .btn.act-start']], 1)
   await page.screenshot({ path: path.join(lib.WORK, 'narrowmain-light-125-alpha.png') })
 
+  // The window at its least (900 × 560, WINDOW_MIN), at 100% and 125%: every activity bar button, Settings last, scrolled
+  // into view, is what is under the pointer at its middle (elementFromPoint, no click) and ends above the status bar
+  // (HI-1957: thirteen buttons since HI-1664 put Settings under it in a 650 px window; termsize clicks Settings there).
+  await lib.fitWindow(app, page, { width: 900, height: 560 })
+  for (const z of [1, 1.25]) {
+    await zoom(z)
+    // Laid out at the new size and zoom first.
+    await lib.until(() => page.evaluate((f) => Math.abs(innerHeight * f - 560) < 2 && devicePixelRatio > 0, z), 5000)
+    const bar = await page.evaluate(() => {
+      const ab = document.querySelector('.activitybar')
+      const status = document.querySelector('.statusbar').getBoundingClientRect()
+      const misses = []
+      for (const btn of ab.querySelectorAll('.activity-btn')) {
+        btn.scrollIntoView({ block: 'nearest' })
+        const r = btn.getBoundingClientRect()
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+        if (!hit || !btn.contains(hit) || r.bottom > status.top + 0.5) misses.push(`${btn.getAttribute('aria-label')} ${Math.round(r.top)}-${Math.round(r.bottom)}${hit && !btn.contains(hit) ? ` under ${String(hit.className).slice(0, 30)}` : ''}`)
+      }
+      const buttons = ab.querySelectorAll('.activity-btn').length
+      const heights = [...ab.querySelectorAll('.activity-btn')].map((b) => Math.round(b.getBoundingClientRect().height))
+      ab.scrollTop = 0
+      return { buttons, heights: [...new Set(heights)], misses }
+    })
+    check(`least window, ${z * 100}%: every activity bar button, scrolled to, is on top at its middle, above the status bar`, bar.buttons >= 13 && bar.misses.length === 0, JSON.stringify(bar))
+    await page.screenshot({ path: path.join(lib.WORK, `narrowmain-least-${z * 100}.png`) })
+  }
+  await lib.fitWindow(app, page, { width: 1400, height: 850 })
+
   // A roomy window: the empty state is as before, centred and whole, with no scrolling.
   await zoom(1)
   await inv('ui:setPane', `progress-open:${ws.toLowerCase()}`, 0)

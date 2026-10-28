@@ -149,6 +149,11 @@ if (require.main === module) {
         agents,
         claudeHome,
         hungMs: HUNG_MS,
+        /**
+         * Text a case writes into Hive as a user would, and where Hive shows it (a selector), so English left skips it
+         * there (HI-1915: a template named "Pair", a blocked reason "Waiting for the release").
+         */
+        authored: (text, within) => english?.authored.push({ text, within }),
         /** Runs a command by its id, as the menu does (App.tsx's menu-command event). */
         command: (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args }),
         /** The Agent API, with the test copy's token. */

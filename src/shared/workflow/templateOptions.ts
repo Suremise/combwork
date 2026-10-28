@@ -5,13 +5,14 @@
 // (`overlayTemplateWorkflow`): a section naming a target, commands or an identity's name never carries them anywhere.
 
 import type { PlatformId } from '../platform/descriptors'
-import { allOff, contradictions, FORM_GROUPS, OPTION_TAKES, PRESETS, type OptionKey, type PresetId, type WorkflowOptions } from './options'
+import { allOff, contradictions, FOCUSED_RUN, FORM_GROUPS, OPTION_TAKES, PRESETS, type OptionKey, type PresetId, type WorkflowOptions } from './options'
 import { stageNameProblems } from './stages'
 
 /**
  * The options a template carries (Darren, 28 Oct ~01:25): the rules of review, checks (by name), carrying a pass over,
  * merging, your OK, where cards are built, the identity's on/off, agents' runs, dependencies, card loops and the stage
- * names; and G16 and file locks, how agents share a folder (HR5's OK on the design).
+ * names; and G16 and file locks, how agents share a folder (HR5's OK on the design). G20, each card's focused tests
+ * (HI-1367), is a rule too: its runner and picker are commands, the loading project's own (HR4's OK, HI-1949).
  */
 export const TEMPLATE_CARRIED = [
   'review',
@@ -22,6 +23,7 @@ export const TEMPLATE_CARRIED = [
   'okBefore',
   'preChecks',
   'mergeChecks',
+  'focusedTests',
   'mergeInstall',
   'finish',
   'style',
@@ -100,9 +102,10 @@ export function readTemplateWorkflow(raw: unknown, platform: PlatformId): Templa
     options[k] = copy(v)
   }
   const section = { preset: preset as PresetId | null, options: options as TemplateOptions }
-  // Whole: options that could be saved, on every rule off.
+  // Whole: options that could be saved, on every rule off. G20's runner is a command, never in a section: the loading
+  // project's own, flagged when it lays the section over its options (HI-1949).
   const whole = { ...allOff(platform), ...section.options, identity: section.options.identity ? { name: '', email: '' } : null } as WorkflowOptions
-  if (contradictions(whole).length || stageNameProblems(whole.stageNames).length) return null
+  if (contradictions(whole).some((c) => c !== 'focusedNeedsRunner') || stageNameProblems(whole.stageNames).length) return null
   return section
 }
 
@@ -140,7 +143,7 @@ export interface TemplateWorkflowOverlay {
   options: WorkflowOptions
   /** Each carried option it changes, its value now and with it. */
   changes: { key: OptionKey; now: unknown; next: unknown }[]
-  /** Its check names this project has no command for (each once): kept, flagged, never given another project's. */
+  /** Its check names this project has no command for (each once), and G20's runner (`focused.run`) when it needs one: kept, flagged, never given another project's. */
   missingCommands: string[]
   /** It turns the identity on, but this project's git config has none: it stays off. */
   identityOff: boolean
@@ -169,5 +172,7 @@ export function overlayTemplateWorkflow(section: TemplateWorkflow, base: Workflo
     .map((k) => ({ key: k as OptionKey, now: base.options[k], next: options[k] }))
   const named = [...new Set([...options.preChecks, ...(base.platform === 'git' ? options.mergeChecks : [])])]
   const missingCommands = named.filter((n) => !options.commands[n]?.trim())
+  // G20 on where Hive merges needs this project's runner (HI-1949): flagged as a check's command is; saving still refuses it.
+  if (base.platform === 'git' && options.focusedTests && options.finish === 'hiveMerges' && !options.commands[FOCUSED_RUN]?.trim()) missingCommands.push(FOCUSED_RUN)
   return { preset: section.preset, own, options, changes, missingCommands, identityOff }
 }

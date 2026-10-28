@@ -113,6 +113,8 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.memory.setting.title': undefined
   'settings.advanced.claude-code.mouse.rightClickToCli.desc': undefined
   'settings.advanced.claude-code.mouse.rightClickToCli.title': undefined
+  'settings.advanced.claude-code.outage.connectionError.desc': undefined
+  'settings.advanced.claude-code.outage.connectionError.title': undefined
   'settings.advanced.claude-code.override.mcpIsolation.desc': undefined
   'settings.advanced.claude-code.override.mcpIsolation.title': undefined
   'settings.advanced.claude-code.override.preApproveHiveTools.desc': undefined
@@ -197,6 +199,8 @@ interface HiveMessageValues {
   'settings.advanced.codex.mcp.toolTimeoutSeconds.title': undefined
   'settings.advanced.codex.mouse.rightClickToCli.desc': undefined
   'settings.advanced.codex.mouse.rightClickToCli.title': undefined
+  'settings.advanced.codex.outage.connectionError.desc': undefined
+  'settings.advanced.codex.outage.connectionError.title': undefined
   'settings.advanced.codex.override.mcpIsolation.desc': undefined
   'settings.advanced.codex.override.mcpIsolation.title': undefined
   'settings.advanced.codex.override.preApproveHiveTools.desc': undefined
@@ -263,6 +267,8 @@ interface HiveMessageValues {
   'settings.advanced.copilot.hooks.timeoutSeconds.title': undefined
   'settings.advanced.copilot.mouse.rightClickToCli.desc': undefined
   'settings.advanced.copilot.mouse.rightClickToCli.title': undefined
+  'settings.advanced.copilot.outage.connectionError.desc': undefined
+  'settings.advanced.copilot.outage.connectionError.title': undefined
   'settings.advanced.copilot.override.allMcpInstructions.desc': undefined
   'settings.advanced.copilot.override.allMcpInstructions.title': undefined
   'settings.advanced.copilot.override.mcpIsolation.desc': undefined
@@ -287,6 +293,8 @@ interface HiveMessageValues {
   'settings.advanced.copilot.signIn.hookMessage.title': undefined
   'settings.advanced.copilot.trust.prompt.desc': undefined
   'settings.advanced.copilot.trust.prompt.title': undefined
+  'settings.advanced.copilot.turnFailed.errorType.desc': undefined
+  'settings.advanced.copilot.turnFailed.errorType.title': undefined
   'settings.advanced.copilotFooter.desc': { mode: string | number; footer: string | number; shared: string }
   'settings.advanced.copilotFooter.title': { mode: string | number }
   'settings.advanced.data.desc': undefined
@@ -352,6 +360,24 @@ interface HiveMessageValues {
   'settings.advanced.hive.notes.deliverWorkspaceNotes.title': undefined
   'settings.advanced.hive.notes.workspaceNotesMax.desc': undefined
   'settings.advanced.hive.notes.workspaceNotesMax.title': undefined
+  'settings.advanced.hive.outage.checkFirstSeconds.desc': undefined
+  'settings.advanced.hive.outage.checkFirstSeconds.title': undefined
+  'settings.advanced.hive.outage.checkMostSeconds.desc': undefined
+  'settings.advanced.hive.outage.checkMostSeconds.title': undefined
+  'settings.advanced.hive.outage.checkUrl.claude-code.desc': undefined
+  'settings.advanced.hive.outage.checkUrl.claude-code.title': undefined
+  'settings.advanced.hive.outage.checkUrl.codex.desc': undefined
+  'settings.advanced.hive.outage.checkUrl.codex.title': undefined
+  'settings.advanced.hive.outage.checkUrl.copilot.desc': undefined
+  'settings.advanced.hive.outage.checkUrl.copilot.title': undefined
+  'settings.advanced.hive.outage.notConnection.desc': undefined
+  'settings.advanced.hive.outage.notConnection.title': undefined
+  'settings.advanced.hive.outage.resume.desc': undefined
+  'settings.advanced.hive.outage.resume.title': undefined
+  'settings.advanced.hive.outage.resumesPerHour.desc': undefined
+  'settings.advanced.hive.outage.resumesPerHour.title': undefined
+  'settings.advanced.hive.outage.waitMinutes.desc': undefined
+  'settings.advanced.hive.outage.waitMinutes.title': undefined
   'settings.advanced.hive.progress.lanesShown.desc': undefined
   'settings.advanced.hive.progress.lanesShown.title': undefined
   'settings.advanced.hive.progress.replySeconds.desc': undefined

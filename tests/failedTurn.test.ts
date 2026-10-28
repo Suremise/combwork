@@ -19,6 +19,7 @@ const { claudeCode } = await import('../src/main/providers/claude/adapter')
 const { copilot } = await import('../src/main/providers/copilot/adapter')
 const { codex } = await import('../src/main/providers/codex/adapter')
 const { rolloutDetails } = await import('../src/main/providers/codex/rollout')
+const { eventsDetails } = await import('../src/main/providers/copilot/events')
 const { inbox } = await import('../src/shared/inbox')
 
 const wsPath = join(base, 'ws')
@@ -41,6 +42,9 @@ const HANG = { timeout: 10_000 }
 const ROLLOUT = readFileSync(join(__dirname, 'fixtures', 'advanced', 'turn-failed-codex-0.164.0.jsonl'), 'utf8')
 const T = (JSON.parse(ROLLOUT.split('\n')[1]) as { payload: { turn_id: string } }).payload.turn_id
 const WORDS = 'stream disconnected before completion: Transport error: network error: error decoding response body'
+/** Copilot 1.0.105 launched by Hive with its model's API unreachable (HI-1960): the hooks Hive got and its session.error. */
+type CopilotRun = { hooks: Record<string, unknown>[]; sessionError: { timestamp: string; data: { message: string } } }
+const COPILOT = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'advanced', 'errorhooks-copilot-1.0.105.json'), 'utf8')) as { refused: CopilotRun; notFound: CopilotRun }
 /** Its parser's whole output for the rollout, as the session reads it (the failure and the turn's end). */
 const RECORD = rolloutDetails(ROLLOUT)
 /** The same rollout with the turn ending well (no error): a good end. */
@@ -217,6 +221,44 @@ describe('a turn that ended on an error (#1632, #1658)', () => {
     await read(st, RECORD)
     await vi.waitFor(() => expect(needs(st)).toEqual([`error/${WORDS}`]), HANG)
     await run(() => sessions.handleHook(st.runId, { session_id: 'x', cwd: p, hook_event_name: 'Stop', turn_id: T, last_assistant_message: 'work' }, { decision: 'block', reason: 'Continue with the requested work' }))
+    expect(needs(st)).toEqual([])
+  })
+
+  it("Copilot (HI-1960): its retries' ErrorOccurred hooks, all recoverable, leave the turn running; the session.error it ends with ends it failed, with its words", async () => {
+    for (const which of ['refused', 'notFound'] as const) {
+      const st = agent(`cp-${which}`, copilot, 'copilot')
+      for (const h of COPILOT[which].hooks) await hook(st, h)
+      expect(COPILOT[which].hooks.filter((h) => h.hook_event_name === 'ErrorOccurred').map((h) => h.recoverable)).toEqual([true, true, true, true, true, true])
+      expect(st.status).toBe('working')
+      // Its events.jsonl read, as readDetails passes it on: no Stop comes, so the record ends the turn. Stamped now, after
+      // the hooks this test sent (the recording's own time is before them, which would make it an older turn's).
+      await read(st, eventsDetails(JSON.stringify({ ...COPILOT[which].sessionError, timestamp: new Date(Date.now() + 1000).toISOString() })))
+      await vi.waitFor(() => expect(st.status).toBe('finished'), HANG)
+      const words = COPILOT[which].sessionError.data.message.trim()
+      expect(needs(st)).toEqual([`error/${words}`])
+      expect(st.failedTurn?.message).toBe(words)
+      // Its next prompt starts a turn: it needs the user no more.
+      await hook(st, { hook_event_name: 'UserPromptSubmit', prompt: 'go on' })
+      expect(needs(st)).toEqual([])
+    }
+  })
+
+  it("Copilot's session file: a query error is a failed turn until the next prompt; a sign-in error stays a sign-in; one from before the launch is history", async () => {
+    const line = JSON.stringify(COPILOT.refused.sessionError)
+    expect(eventsDetails(line)).toMatchObject({ turnFailed: COPILOT.refused.sessionError.data.message.trim(), turnFailedAt: COPILOT.refused.sessionError.timestamp })
+    expect(eventsDetails(line).turnFailedTurn).toBeUndefined()
+    const nextPrompt = JSON.stringify({ type: 'user.message', data: { content: 'go on' }, timestamp: '2026-10-28T13:40:00.000Z' })
+    expect(eventsDetails(`${line}\n${nextPrompt}`).turnFailed).toBeUndefined()
+    const signIn = readFileSync(join(__dirname, 'fixtures', 'advanced', 'signin-error-copilot-1.0.95.jsonl'), 'utf8')
+    expect(eventsDetails(signIn)).toMatchObject({ signIn: expect.stringContaining('HTTP 401') })
+    expect(eventsDetails(signIn).turnFailed).toBeUndefined()
+    // A conversation resumed after it (its log read from its start): the old failure ends nothing.
+    const st = agent('cp-old', copilot, 'copilot')
+    st.startedAt = '2026-10-29T00:00:00.000Z'
+    await hook(st, { hook_event_name: 'UserPromptSubmit', prompt: 'go' })
+    await read(st, eventsDetails(line))
+    await settled(st)
+    expect(st.status).toBe('working')
     expect(needs(st)).toEqual([])
   })
 

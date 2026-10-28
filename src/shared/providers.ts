@@ -122,6 +122,12 @@ export interface ProviderCapabilities {
    */
   startHook?: boolean
   /**
+   * A turn the CLI records as failed sends no Stop (Copilot 1.0.105, HI-1960: every ErrorOccurred of a model call it
+   * gave up on is recoverable, and its turn ends with only a session.error): the record ends the running turn failed.
+   * Without it, a recorded failure waits for the turn's Stop (Codex's).
+   */
+  failureEndsTurn?: boolean
+  /**
    * The CLI draws a full-screen interface that a resize while it starts can leave drawn at the wrong width, until the
    * next resize (Copilot, #486): Hive gives it a size refresh, as resizing the window by hand would, once it has
    * started (its first status), again once it is ready, and after Hive switches its mode live.

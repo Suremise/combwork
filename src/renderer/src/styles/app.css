@@ -500,6 +500,15 @@ kbd {
   flex-direction: column;
   align-items: center;
   border-right: 1px solid var(--border-subtle);
+  /* Never past the status bar (HI-1957): a short window (thirteen buttons since HI-1664 need 624 px) shortens them,
+     then scrolls them (the wheel; no scroll bar in 48 px). */
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.activitybar > .tip-wrap {
+  flex: 0 1 48px;
+  min-height: 32px;
 }
 .activity-btn {
   width: 48px;
@@ -512,6 +521,9 @@ kbd {
   cursor: pointer;
   border: none;
   background: none;
+}
+.activitybar > .tip-wrap > .activity-btn {
+  height: auto;
 }
 .activity-btn .codicon {
   font-size: 24px;

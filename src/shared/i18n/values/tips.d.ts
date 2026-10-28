@@ -314,6 +314,8 @@ interface HiveMessageValues {
   'tips.noCodeCards.title': undefined
   'tips.off.message': undefined
   'tips.off.title': undefined
+  'tips.outageResume.text': undefined
+  'tips.outageResume.title': undefined
   'tips.overview.text': { key: string | number }
   'tips.overview.title': undefined
   'tips.ownShortcuts.text': undefined
