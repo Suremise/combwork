@@ -13152,6 +13152,20 @@ button.progress-lane-why:focus-visible,
 .vc-init .hint {
   margin: 0;
 }
+/* Git's page before the folder has a repository (HI-1905): its line, its buttons, the hint, a failure, one under another. */
+.vc-init[data-vc-git-preview] {
+  flex-direction: column;
+  align-items: flex-start;
+  padding-top: 6px;
+}
+.vc-init-line {
+  margin: 0;
+}
+.vc-init-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 /* The switch Hive offers when it detects another version control (#1419): its sentence, then Switch… and Not Now. */
 .vc-offer {
   display: flex;

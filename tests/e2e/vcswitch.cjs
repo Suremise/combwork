@@ -8,7 +8,8 @@
 // - gamma (Git, its own options): `.git` moved away. The offer and the notice (Open Version Control), a card's start
 //   refused with the switch as its next step; Switch to None…'s warning lists a running lane and a card in flight; after
 //   it, the card in flight keeps its stage and Git's rules and a new card starts under None's. Then Initialise
-//   repository…: Git is offered, switched to, its kept options back, and the next card starts under Git's rules.
+//   repository… from Git's page (HI-1905): the switch that follows warns of the lane and the card in flight, and is
+//   cancelled; Git is offered, switched to, its kept options back, and the next card starts under Git's rules.
 // - delta (Git): Mercurial found. The offer, Switch to None…, a new card under None; Git then refused with the reason.
 // - a stale switch (the dialog open while another switch is made) is refused.
 // - a project inside a larger repository (another workspace): the whole-repository line, and OP-29's refusal.
@@ -202,8 +203,25 @@ function writeProject(dir, cfg) {
     check('the card in flight keeps its stage and Git rules', (await column(c1)) === 'doing' && (await startedUnder(c1)) === 'git' && !(await h.kinds(c1)).includes('Override'))
     const c3Start = await q.intent(h, g1, c3, 'start')
     check("a new card starts under None's rules", c3Start.status === 200 && (await startedUnder(c3)) === 'none', JSON.stringify({ c3Start, data: await started(c3) }))
-    // Initialise repository… on None's page: Git is offered without a restart.
-    await inv('git:init', gamma, { gitignore: 'none', name: 'Hive Test', email: 'test@example.com' })
+    // Initialise repository… from Git's page (HI-1905): with a lane and a card in flight keeping None's rules, the switch
+    // that follows warns first; cancelled, the project stays None, and Git is offered without a restart.
+    await head.locator('[data-platform="git"]').click()
+    const preview = page.locator('[data-vc-git-preview]')
+    check("gamma: Git's page offers Initialise repository…", !!(await until(async () => (await preview.locator('[data-git-init]').count()) === 1, HUNG_MS)), await text(page.locator('.vc-view')))
+    await preview.locator('[data-git-init]').click()
+    const initDialog = page.locator('.dialog').filter({ has: page.locator('[data-git-init-form]') })
+    await until(async () => (await initDialog.count()) === 1, HUNG_MS)
+    await initDialog.locator('#git-init-gitignore').selectOption('none').catch(() => undefined)
+    if (await initDialog.locator('#git-init-name').count()) await initDialog.locator('#git-init-name').fill('Hive Test')
+    if (await initDialog.locator('#git-init-email').count()) await initDialog.locator('#git-init-email').fill('test@example.com')
+    await initDialog.getByRole('button', { name: 'Initialise', exact: true }).click()
+    check('initialised, the switch to Git warns first: the running lane and the card in flight keep their rules', !!(await until(async () => {
+      const w = (await initDialog.count()) === 0 && (await dialog.count()) === 1 ? await text(dialog) : ''
+      return /Switch gamma to Git\?/.test(w) && /gamma lane/.test(w) && w.includes(c1Key) ? w : null
+    }, HUNG_MS)), await text(dialog))
+    await shoot(dialog, 'warning-after-init')
+    await page.keyboard.press('Escape')
+    check('…cancelled: the repository stays, the project None, its page None’s', !!(await until(async () => (await dialog.count()) === 0 && (await preview.count()) === 0 && (await head.locator('[data-platform="none"][aria-checked="true"]').count()) === 1, HUNG_MS)) && fs.existsSync(path.join(gamma, '.git')) && (await inv('workflow:form', gamma)).platform === 'none')
     check('after Initialise repository…, Git is offered', !!(await until(async () => (await offer.getAttribute('data-vc-offer').catch(() => null)) === 'gitFound', HUNG_MS)) && (await text(offer)).startsWith(`Git found at ${gamma}: switch to Git?`), await text(offer))
     await shoot(page.locator('.vc-view'), 'offer-git')
     await offer.locator('[data-action="vc-offer-switch"]').click()

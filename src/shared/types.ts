@@ -3140,6 +3140,8 @@ export type HiveEvent =
   /** What an agent's stopped launches left running changed (#507): found, ended, kept, or ended by themselves (no processes). */
   | { type: 'agent-leftovers'; leftovers: AgentLeftovers }
   | { type: 'toast'; toast: ToastMessage }
+  /** A notice no longer true (HI-1905: a project's platform notice once detection and the platform agree): every window drops it. */
+  | { type: 'toast-gone'; id: string }
   | { type: 'chime'; projectPath: string; silent?: boolean }
   | { type: 'settings-changed'; settings: AppSettings }
   /** Advanced settings (#367) changed: an override, advanced.json, a workspace's own or an installed CLI's version. */

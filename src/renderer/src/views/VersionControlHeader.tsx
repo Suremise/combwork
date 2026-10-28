@@ -21,6 +21,7 @@ import { Icon, Tooltip } from '../components/ui'
 /** The tab's words (the board's workflow link, #1420, says it as the tab does). */
 export const M = {
   choice: msg({ id: 'git.vc.choice', defaultMessage: 'Version control', description: 'Accessible name of the None · Git choice atop the Version Control tab (glossary 2.1: version control).' }),
+  previewTip: msg({ id: 'git.vc.previewTip', defaultMessage: 'Git needs this folder to be a repository: Initialise repository… makes it one. Nothing changes until you do.', description: 'Tooltip of Git in the None · Git choice atop the Version Control tab of a project whose folder has no repository of its own: clicking it shows Git’s page, which only offers Initialise repository… (keep it as translated on that button).' }),
   switchTip: msg({ id: 'git.vc.switchTip', defaultMessage: 'Switch this project to {platform}, from its next card. Hive shows what changes first.', description: 'Tooltip of the version control not in use, in the None · Git choice atop the Version Control tab: clicking it asks before switching. {platform} is None or Git.' }),
   repo: msg({ id: 'git.vc.fact.repo', defaultMessage: 'This folder is a Git repository at {root}.', description: 'Atop the Version Control tab: what Hive found in the project folder. {root} is the repository root (glossary 2.1: repository root).' }),
   subfolder: msg({ id: 'git.vc.fact.subfolder', defaultMessage: 'This folder is inside a Git repository at {root}: branch and merge actions affect that whole repository.', description: 'Atop the Version Control tab, when the project is a subfolder of a larger repository. {root} is that repository’s root.' }),
@@ -52,7 +53,8 @@ const S = {
   queue: msg({ id: 'git.vc.switch.queue', defaultMessage: 'Their merge queue carries on, and stays in this tab and the Progress panel until it’s clear.', description: 'In the warning before switching from Git to None, under the Git cards in flight: their merge queue goes on until it is empty.' }),
   nothing: msg({ id: 'git.vc.switch.nothing', defaultMessage: 'Nothing is in flight: every card works under {to} from now.', description: 'In the warning before switching version control when no card has started and no lane runs. {to} is None or Git.' }),
   confirm: msg({ id: 'git.vc.switch.confirm', defaultMessage: 'Switch', description: 'The confirm button of the warning before switching a project’s version control.' }),
-  done: msg({ id: 'git.vc.switch.done', defaultMessage: '{project} uses {platform} from its next card', description: 'A notice after switching a project’s version control. {project} is its name, {platform} None or Git.' })
+  done: msg({ id: 'git.vc.switch.done', defaultMessage: '{project} uses {platform} from its next card', description: 'A notice after switching a project’s version control. {project} is its name, {platform} None or Git.' }),
+  notSwitched: msg({ id: 'git.vc.switch.notSwitched', defaultMessage: "{project} is a Git repository now, but it wasn't switched to Git: {error}", description: 'A notice after Initialise repository… chosen from Git’s page made the repository but switching the project to Git failed. {project} is its name, {error} why (already translated).' })
 }
 
 /** Offers hidden with Not now, by project and offer: until Hive starts again (in memory, as the upgrade banner's). */
@@ -93,6 +95,40 @@ export async function switchPlatform(project: ProjectInfo, from: PlatformId, to:
     }
   })
   if (ok) notify('success', tr(S.done, { project: project.name, platform: names.to }))
+}
+
+/**
+ * After Initialise repository… chosen from Git's page (HI-1905): the repository is made with its first commit, so the
+ * project the dialog initialised switches to Git, as the user chose. Quietly, unless lanes or cards in flight keep None's
+ * rules (then the switch's warning, which they can cancel). Refused, changed meanwhile or failed: the repository stays,
+ * and the notice says it wasn't switched. Already Git (someone else switched it): nothing to do.
+ */
+export async function switchAfterInit(project: ProjectInfo): Promise<void> {
+  const notSwitched = (error: string): void => notify('error', tr(S.notSwitched, { project: project.name, error }))
+  let check: PlatformSwitchCheck
+  try {
+    check = await call('workflow:checkPlatform', project.path, 'git')
+  } catch (e) {
+    notSwitched(errorMessage(e))
+    return
+  }
+  if (check.from === 'git') return
+  if (check.refused) {
+    const t = switchRefusalText(check.refused)
+    notSwitched(tr(t.m, t.values))
+    return
+  }
+  if (check.lanes.length || check.inFlight.length) {
+    await switchPlatform(project, 'none', 'git')
+    return
+  }
+  try {
+    await call('workflow:setPlatform', project.path, 'git', { expected: 'none' })
+  } catch (e) {
+    notSwitched(errorMessage(e))
+    return
+  }
+  notify('success', tr(S.done, { project: project.name, platform: tr(PLATFORM_NAME.git) }))
 }
 
 /** What else the switch does: the options restored or none, a Git folder under None, and what keeps the old rules. */
@@ -203,8 +239,13 @@ export function useWorkflowForm(project: ProjectInfo): WorkflowForm | null {
   return form?.for === project.path ? form.form : null
 }
 
-/** `form`: the project's workflow form (useWorkflowForm), read once for the tab: its header and the preset step. */
-export function VersionControlHeader({ project, platform, form }: { project: ProjectInfo; platform: PlatformId; form: WorkflowForm | null }) {
+/**
+ * `form`: the project's workflow form (useWorkflowForm), read once for the tab: its header and the preset step.
+ * `preview` (HI-1905): the tab shows Git's page for a None folder with no repository of its own, a view only: Git is
+ * chosen in the choice while the project's platform, its fact and its workflow link stay None's. `onPreview` turns it on
+ * (Git's click, instead of a refusal or the switch) or off (None's).
+ */
+export function VersionControlHeader({ project, platform, form, preview, onPreview }: { project: ProjectInfo; platform: PlatformId; form: WorkflowForm | null; preview?: boolean; onPreview?: (on: boolean) => void }) {
   useLanguage()
   const preset = form ? presetState(form) : null
   const [, redraw] = useState(0)
@@ -215,12 +256,28 @@ export function VersionControlHeader({ project, platform, form }: { project: Pro
       <div className="vc-head" data-vc-head="">
         <div className="segmented vc-choice" role="radiogroup" aria-label={tr(M.choice)}>
           {CHOICES.map((id) => {
-            if (id === platform)
+            const chosen = preview ? 'git' : platform
+            if (id === chosen)
               return (
                 <button key={id} type="button" role="radio" aria-checked className="active" data-platform={id}>
                   {tr(PLATFORM_NAME[id])}
                 </button>
               )
+            // Back to None from Git's page, or to Git's page from None: a view, nothing switched or saved.
+            if (onPreview && platform === 'none') {
+              const button = (
+                <button key={id} type="button" role="radio" aria-checked={false} aria-disabled={false} data-platform={id} onClick={() => onPreview(id === 'git')}>
+                  {tr(PLATFORM_NAME[id])}
+                </button>
+              )
+              return id === 'git' ? (
+                <Tooltip key={id} content={tr(M.previewTip)}>
+                  {button}
+                </Tooltip>
+              ) : (
+                button
+              )
+            }
             // Git only where a Git repository is found and nothing else is: why not, in its tooltip (#1419).
             const refused = project.platform ? switchRefused(id, project.platform.detected) : null
             const why = refused ? switchRefusalText(refused) : null
