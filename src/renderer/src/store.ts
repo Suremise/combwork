@@ -55,6 +55,7 @@ import type { KeptReturn } from '@shared/progressQueue'
 import type { SessionAction } from './util'
 import { storeUpdated } from './pageMarks'
 import { keepSame } from '@shared/keepSame'
+import { withAction } from '@shared/assistantChangeList'
 import { sessionEndBook, type EndsChange, type SessionEnd } from '@shared/sessionEnd'
 import { rememberTab, shownTab } from '@shared/tabs'
 
@@ -1349,6 +1350,32 @@ export function flushLiveStates(): void {
     }
     return states.length && now.workspace ? { ...out, workspace: states.reduce(withLiveState, now.workspace) } : out
   })
+}
+
+/**
+ * An action of the Assistant's told by an event (HI-1863): shown with the agents' states, once by id (a snapshot of the
+ * panel's loaded meanwhile may have it), and only in the workspace it was told in.
+ */
+export function noteAssistantAction(action: AssistantAction): void {
+  const ws = get().workspace?.path ?? null
+  setWithLive((s) => {
+    if ((s.workspace?.path ?? null) !== ws) return {}
+    const actions = withAction(s.assistantActions, action)
+    return actions === s.assistantActions ? {} : { assistantActions: actions }
+  })
+}
+
+/**
+ * Shows the workspace main reported (workspace-changed), dropping warnings about projects no longer in it. Another
+ * workspace's: the previous one's Assistant actions go in the same update, after those still waiting were shown (set's
+ * flush), so none of them reaches this one's panel (HR3's HI-1863 round 2).
+ */
+export function showWorkspace(ws: WorkspaceInfo | null, other: boolean): void {
+  set((s) => ({
+    workspace: ws,
+    ...(other ? { assistantActions: [] } : {}),
+    toasts: s.toasts.filter((t) => !t.id.startsWith('mcp-') || !!ws?.projects.some((p) => t.id === `mcp-${p.path}`))
+  }))
 }
 
 /** A project's usage changed (a session's tokens, its end): what shows it reads it again, with the agents' states. */

@@ -16,6 +16,27 @@ export async function loadAssistantChanges(): Promise<void> {
   if (groups && mine === loads) set({ assistantChanges: groups })
 }
 
+/** A load under way, and whether another was asked for meanwhile (HI-1863). */
+let loading: Promise<void> | null = null
+let again = false
+
+/**
+ * Loads the Assistant's changes again soon (HI-1863): at once, or, while a load is under way, once after it, however
+ * many were asked for meanwhile. A message changing 70 cards reads the list twice, not 70 times.
+ */
+export function reloadAssistantChanges(): void {
+  if (loading) {
+    again = true
+    return
+  }
+  loading = loadAssistantChanges().finally(() => {
+    loading = null
+    if (!again) return
+    again = false
+    reloadAssistantChanges()
+  })
+}
+
 /** Undoes one change or a message's changes: what each did, kept beside its row, then the list again. */
 export async function undoChanges(sel: { change: string } | { group: string }): Promise<AssistantUndoResult[]> {
   try {

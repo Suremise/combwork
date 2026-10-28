@@ -13,8 +13,9 @@ if (process.env.LOCALAPPDATA) process.env.TEMP = process.env.TMP = startRunTemp(
 export default defineConfig({
   // Hive's main-process modules import Electron; unit tests use a stub (no Electron binary needed, e.g. in CI). They
   // also use Electron's original-fs (no .asar handling, #246), which is Node's fs outside Electron: vi.mock('fs') and
-  // vi.mock('fs/promises') reach them too.
-  resolve: { alias: { electron: fileURLToPath(new URL('./tests/electron-stub.ts', import.meta.url)), 'original-fs': 'fs' } },
+  // vi.mock('fs/promises') reach them too. `@shared` is the renderer's name for src/shared, for a test of a renderer module
+  // (HI-1863: its store).
+  resolve: { alias: { electron: fileURLToPath(new URL('./tests/electron-stub.ts', import.meta.url)), 'original-fs': 'fs', '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)) } },
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',

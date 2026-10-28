@@ -33,8 +33,8 @@ import { AssistantPanel, AssistantSettingsDialog } from './components/Assistant'
 import { ProgressPanel, progressRunsChanged } from './components/Progress'
 import { queueBoardChanged, queueChangedEvent } from './queueSource'
 import { AssistantMain } from './components/AssistantView'
-import { loadAssistantChanges } from './assistantUndo'
-import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, setWithLive, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, dismissToast, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
+import { reloadAssistantChanges } from './assistantUndo'
+import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, noteAssistantAction, setWithLive, showWorkspace, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, dismissToast, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
 import { DocsView, McpView, NotesView, SkillView, WelcomeView } from './views/OtherViews'
 import { TemplatesView } from './components/Templates'
 import { ProjectView } from './views/ProjectView'
@@ -101,8 +101,7 @@ function handleEvent(e: HiveEvent): void {
       if (other) set({ assistantOpen: assistantWasOpen(ws?.path), tasks: [], boardProject: null, taskOpen: null, taskStartFor: null, laneStartFor: null, taskDoing: null })
       if (other) void loadLeftovers()
       if (other) void loadAdvanced()
-      // Drop warnings about projects that belong to a workspace that is no longer open.
-      set((s) => ({ workspace: ws, toasts: s.toasts.filter((t) => !t.id.startsWith('mcp-') || !!ws?.projects.some((p) => t.id === `mcp-${p.path}`)) }))
+      showWorkspace(ws, other)
       if (ws && (!sel || !ws.projects.some((p) => p.path === sel))) set({ selectedProject: (ws.projects.find((p) => p.active) ?? ws.projects[0])?.path ?? null })
       if (!ws) set({ selectedProject: null })
       if (other) void loadTasks()
@@ -248,11 +247,13 @@ function handleEvent(e: HiveEvent): void {
     case 'journal-changed':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set((s) => ({ journalVersion: s.journalVersion + 1 }))
       break
-    case 'assistant-activity':
-      set((s) => ({ assistantActions: [...s.assistantActions, e.action].slice(-200) }))
-      // What it changed is kept for undo as it is made (#1283): the panel's list follows.
-      void loadAssistantChanges()
+    case 'assistant-activity': {
+      // One action each: a message changing many cards sends many at once, shown together (HI-1863).
+      noteAssistantAction(e.action)
+      // What it changed is kept for undo as it is made (#1283): the panel's list follows, read again once per burst.
+      reloadAssistantChanges()
       break
+    }
     case 'language-changed':
       // i18n.ts has switched the text; the language setting's notes read the rest.
       set((s) => ({ appInfo: s.appInfo && { ...s.appInfo, language: e.language } }))
