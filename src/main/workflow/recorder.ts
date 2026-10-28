@@ -307,9 +307,15 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
       const id = tx.facts(n).findLast((f) => f.kind === 'Started' || f.kind === 'Adopted')?.ruleset
       return id ? { ruleset: id } : {}
     }
-    if (record.preWorkflow) {
-      store.updateCard(n, { preWorkflow: false })
-      // What it was decided before it became a 1.0 card, as it stands: what later receipts are matched with.
+    if (record.preWorkflow) store.updateCard(n, { preWorkflow: false })
+    // What it was decided before it became a 1.0 card, as it stands: what later receipts are matched with. Started by the
+    // runtime (HI-1966: the board's Start of it, or an intent), its mark was cleared in this write already: its first
+    // start, with decisions and none of them a fact yet (a 1.0 card's are facts as they are made).
+    const firstStart = (): boolean => {
+      const all = tx.facts(n)
+      return all.filter((f) => f.kind === 'Started').length === 1 && !all.some((f) => f.kind === 'Decision' || f.kind === 'Adopted')
+    }
+    if (record.preWorkflow || (!moves && after.column === 'doing' && before?.column !== 'doing' && !!before?.decisions?.length && firstStart())) {
       for (const d of before?.decisions ?? []) decision(d)
     }
     const facts = () => foldCard(tx.facts(n), was)

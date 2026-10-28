@@ -171,6 +171,7 @@ interface HiveMessageValues {
   'tasks.start.movedProject': { card: string | number; project: string | number }
   'tasks.start.movedWorkspace': { card: string | number }
   'tasks.start.noProject': { card: string | number }
+  'tasks.start.noSlot': { card: string | number; active: string }
   'tasks.start.notGiven': { agent: string | number; card: string | number; why: string | number }
   'tasks.start.noteTooLong': { max: number }
   'tasks.start.reassigned': { card: string | number; who: string }

@@ -679,6 +679,10 @@
     "defaultMessage": "{card} has no project. Give it one first: the agent works in that project.",
     "description": "An error: card {card} (its key, such as HI-12) belongs to no project (only the workspace), so no agent can start it; give it a project first."
   },
+  "tasks.start.noSlot": {
+    "defaultMessage": "{card} wasn't started: its project builds each card in a slot, and {active, select, yes {its start has none} other {this start got none}}, so its agent would have worked in the project folder. {active, select, yes {Put it back to Todo, then start it again.} other {The card is back where it was: start it again.}}",
+    "description": "An error: a Start of the card {card} (its key, such as HI-12) was refused. The card's project has each card built in a slot (a working folder of its own), but the card's start has no slot, so the agent would have worked in the project's own folder instead. {active} (select): yes, the card was already Active (in work) with no slot, and must be put back to Todo and started again; other, this start was undone and the card moved back to its column. Translate both."
+  },
   "tasks.start.notGiven": {
     "defaultMessage": "{agent} wasn't given {card}: {why}.",
     "description": "An error: the card {card} (its key, such as HI-12) could not be typed into the terminal of the agent {agent} (its name); {why} says why."

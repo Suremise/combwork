@@ -1565,6 +1565,17 @@ that starts after the upgrade loses the mark and is a 1.0 card from then on [Dar
   `closeSettled`, or refused). Each time a workspace opens, `workflow/stageRepair.ts` clears the mark of every card with
   facts, and brings a card the board has in Done while its stage isn't into line: a `Moved` to done with cause `repair`,
   its asked questions closed, "Recorded as Done, as the board had it" in its history.
+  **Fixed in rc.10** [HI-1966]: the user's and the Assistant's Start of such a card (`hive_start_task`, the board's move
+  to Doing), and its agent's old move to Doing, took P3's recorded start: no slot was lent, and the `Started` fact named
+  the agent's 0.9 worktree (or the project folder). On rc.9 the Assistant's Start of HI-1612 launched HB2 in the main
+  checkout, on main. Now its start (into Active from Todo, or from Done) goes through the runtime, as an intent's does:
+  its slot is lent where the project builds in slots, the mark clears, and its decisions from before become facts in that
+  write, as P3's start recorded them. Its other moves keep P3's path until it starts. As well, a Start whose card still
+  started with no slot in a project that builds in slots (not a slot's folder, nor its builder's 0.9 worktree not yet
+  migrated) is undone, the card back where it was, "wasn't started: its project builds each card in a slot…", never its
+  agent launched in the project folder. A Start of a card already Active with no slot (a start from before this fix) is
+  refused the same way, the card left Active: "Put it back to Todo, then start it again" [HR2's round 1]. The user's
+  Start across the rules, with its reason, starts where the agent is.
 
 **P3 records facts from today's moves, refusing nothing** [#1216]: every card change writes its facts in its own
 transaction (into Doing with an agent `Started`; into Review `Submitted`; a review's start and verdict; each column change
@@ -5266,8 +5277,8 @@ stays for: a column the card's ruleset lacks (Review with no review), a review t
 column or On Hold while being worked on (as the user's moves, until the skills use the intents); a move back into
 Doing from Review or Passed (fixes or more work in the same cycle: nothing started, no rule to skip); a move to the
 column a card is in (but a failed card from before returned to Review is its submission); another agent's card in
-Doing moved on (P3's refusal); scripts (the workspace token); cards from before 1.0 until they start (as the user's,
-§16.7.1); and every agent move with the rules off (§16.6.6). An adopted card's stage is its column's until a rule moves it (no `Moved`
+Doing moved on (P3's refusal); scripts (the workspace token); cards from before 1.0 until they start, their start
+itself the runtime's (as the user's, §16.7.1; HI-1966); and every agent move with the rules off (§16.6.6). An adopted card's stage is its column's until a rule moves it (no `Moved`
 written at adoption): the runtime folds a card's facts from its cached stage, so an adopted card's intents work (S40).
 With the old moves translated, a lane's next card waits until the one before it is Done (§16.11.2, OP-36) also for
 a builder following today's card-loop skill: its move of the next card to Doing is refused (`lane.oneAtATime`) until it

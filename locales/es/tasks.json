@@ -164,6 +164,7 @@
   "tasks.start.archived": "La tarjeta {card} está archivada. Devuélvela primero.",
   "tasks.start.beingGiven": "El agente {agent} está recibiendo otra tarjeta. Inicia esta cuando esté inactivo o dásela a otro agente.",
   "tasks.start.changed": "{card} cambió mientras se iniciaba (archivada, movida, dada a otro agente o con su Leer primero editado): vuelve a iniciarla si aún debe empezar.",
+  "tasks.start.noSlot": "{card} no se inició: su proyecto construye cada tarjeta en un slot propio, y {active, select, yes {su inicio no tiene ninguno} other {este inicio no obtuvo ninguno}}, así que su agente habría trabajado en la carpeta del proyecto. {active, select, yes {Devuélvela a Pendiente y luego iníciala de nuevo.} other {La tarjeta volvió a donde estaba: iníciala de nuevo.}}",
   "tasks.start.movedColumn": "Mientras tanto, la tarjeta {card} se movió a la columna {column, select, hold {En espera} todo {Pendiente} doing {En curso} review {Revisión} passed {Aprobado} done {Hecho} other {{column}}}. Iníciala de nuevo si aún queda por hacer.",
   "tasks.start.movedDone": "Mientras tanto, la tarjeta {card} pasó a Hecho. Iníciala de nuevo si queda más por hacer.",
   "tasks.start.movedProject": "Mientras tanto, la tarjeta {card} se movió al proyecto {project}. Iníciala de nuevo.",
