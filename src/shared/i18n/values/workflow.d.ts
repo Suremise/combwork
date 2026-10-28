@@ -227,12 +227,12 @@ interface HiveMessageValues {
   'workflow.refused.integrate.upToDate.next': undefined
   'workflow.refused.lane.lineBehind.change': undefined
   'workflow.refused.lane.lineBehind.message': { card: string | number; line: string | number; earlier: string | number; target: string | number }
-  'workflow.refused.lane.lineBehind.next': { line: string | number; target: string | number; card: string | number }
+  'workflow.refused.lane.lineBehind.next': { reader: string; line: string | number; target: string | number; card: string | number }
   'workflow.refused.lane.oneAtATime.change': undefined
   'workflow.refused.lane.oneAtATime.message': { card: string | number; earlier: string | number }
   'workflow.refused.lane.oneAtATime.next': { earlier: string | number; card: string | number }
   'workflow.refused.loop.followUpChecked.message': { card: string | number }
-  'workflow.refused.loop.followUpChecked.next': undefined
+  'workflow.refused.loop.followUpChecked.next': { reader: string }
   'workflow.refused.loop.followUpMerging.message': { card: string | number }
   'workflow.refused.loop.followUpMerging.next': undefined
   'workflow.refused.loop.noReviewer.message': { card: string | number }
@@ -254,18 +254,18 @@ interface HiveMessageValues {
   'workflow.refused.merge.hiveMerges.message': { card: string | number }
   'workflow.refused.merge.hiveMerges.next': undefined
   'workflow.refused.merge.hiveMerges.nextMerged': undefined
-  'workflow.refused.merge.hiveMerges.nextPaused': { target: string | number }
-  'workflow.refused.merge.hiveMerges.nextPausedAnswer': { target: string | number }
-  'workflow.refused.merge.hiveMerges.nextPausedFix': { target: string | number }
-  'workflow.refused.merge.hiveMerges.nextPausedFolder': { target: string | number }
-  'workflow.refused.merge.hiveMerges.nextPausedRules': { target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPaused': { reader: string; target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPausedAnswer': { reader: string; target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPausedFix': { reader: string; target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPausedFolder': { reader: string; target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPausedRules': { reader: string; target: string | number }
   'workflow.refused.merge.hiveMerges.nextQueued': { target: string | number; n: number }
   'workflow.refused.merge.hiveMerges.nextReturned': undefined
   'workflow.refused.merge.hiveMerges.nextStale': { current: string | number }
   'workflow.refused.merge.hiveMerges.nextTesting': { target: string | number }
-  'workflow.refused.move.needsOverride.change': undefined
+  'workflow.refused.move.needsOverride.change': { reader: string }
   'workflow.refused.move.needsOverride.message': { card: string | number; stage: string | number; rules: string | number }
-  'workflow.refused.move.needsOverride.next': undefined
+  'workflow.refused.move.needsOverride.next': { reader: string }
   'workflow.refused.move.noStage.change': undefined
   'workflow.refused.move.noStage.message': { card: string | number; stage: string | number }
   'workflow.refused.move.noStage.next': { stages: string | number }
@@ -281,7 +281,7 @@ interface HiveMessageValues {
   'workflow.refused.paths.excluded.next': { folder: string | number }
   'workflow.refused.platform.unknown.message': { card: string | number; what: string | number; rule: string | number }
   'workflow.refused.platform.unknown.next': undefined
-  'workflow.refused.platform.unknown.nextGone': undefined
+  'workflow.refused.platform.unknown.nextGone': { reader: string }
   'workflow.refused.queue.advancing.message': { card: string | number; target: string | number }
   'workflow.refused.queue.advancing.next': { target: string | number }
   'workflow.refused.requeue.allowed.change': undefined

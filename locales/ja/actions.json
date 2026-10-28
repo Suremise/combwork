@@ -123,7 +123,7 @@
   "actions.releaseHeld.detailListed": "{n, plural, other {セッションが実行したまま残したプロセスが#個あります。}}実行中に解放すると、ほかの作業がスロットを使っている間もそれらがスロットに書き込むことがあります。",
   "actions.releaseHeld.detailUnknown": "セッションが起動したプロセスのうち、どれがまだ実行中かHiveにはわかりません。スロットにもう何も書き込んでいないことを確かめてから解放してください。",
   "actions.releaseHeld.endFirst": "先にこれらのプロセスを終了する",
-  "actions.releaseHeld.messageGone": "{slot}は、すでに終了したHive（プロセス{pid}）にある{agent}のセッション（実行ID {run}）が保持しています。起動したものがまだ実行中かHiveにはわかりません。解放するまで、ほかの作業はこのスロットを使いません。",
+  "actions.releaseHeld.messageGone": "{slot}は、すでに終了したHive（プロセス{pid}）にあるエージェント{agent}のセッション（実行ID {run}）が保持しています。起動したものがまだ実行中かHiveにはわかりません。解放するまで、ほかの作業はこのスロットを使いません。",
   "actions.releaseHeld.messageSelf": "{slot}での{agent}の最後のセッション（実行ID {run}）はこのHive（プロセス{pid}、実行中）で終了しましたが、そこで起動したものがすべて終了したかはHiveにはわかりません。解放するまで、ほかの作業はこのスロットを使いません。",
   "actions.releaseHeld.process": "{label}（プロセス{pid}）",
   "actions.releaseHeld.readFailed": "スロットに書き込んでいるセッションを読み取れませんでした",

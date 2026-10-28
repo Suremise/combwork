@@ -41,7 +41,7 @@ interface HiveMessageValues {
   'worktrees.missing.noAgent': undefined
   'worktrees.missing.noBranch': { agent: string | number; branch: string | number }
   'worktrees.missing.noTree': { agent: string | number }
-  'worktrees.missing.slotFailed': { agent: string | number; slot: string | number; why: string | number }
+  'worktrees.missing.slotFailed': { slot: string | number; agent: string | number; why: string | number }
   'worktrees.missing.stillListed': { folder: string | number }
   'worktrees.missing.stopFirst': { agent: string | number }
   'worktrees.missing.thereRecreate': { agent: string | number; folder: string | number }

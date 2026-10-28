@@ -26,7 +26,7 @@ import { alongside, isRefusal, type Reply, type Workflow, type Write } from './w
 import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCardFolder, type CleanupFile, type Staging } from './cardAttachments'
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, skipReviewOf } from '../shared/workflow/compile'
-import { isStageId, STAGE_TEXT } from '../shared/workflow/stages'
+import { isStageId, STAGE_TEXT, stageName } from '../shared/workflow/stages'
 import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, STAGE_CATEGORY, type AskActionKind, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
@@ -1976,10 +1976,12 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     const moving = patch.review === undefined && (patch.column === 'review' || patch.column === 'passed' || patch.column === 'done')
     if (actor.kind === 'agent' && actor.self && moving && card.column === 'doing' && card.agent && card.agent !== actor.self.agentId) {
       const column = patch.column!
+      // Stages by the names the board shows (#1604: agents read "Active", never the column's id), as refusals name them.
+      const stages = { active: stageName('active'), review: stageName('review'), stage: stageName(column === 'passed' ? 'approved' : column) }
       throw new TaskConflictError(
         card.agentName
-          ? withValues(msg({ id: 'tasks.error.inDoingWith', defaultMessage: "{card} is in Doing with {agent}, who is working on it: newer work is in progress, so it can't be moved to {column, select, review {Review} passed {Passed} done {Done} other {{column}}} by another agent. Leave it where it is; {agent} moves it to Review when done, and the user can move it.", description: 'An error: an agent tried to move card {card} (its key, such as HI-12) on to {column} (select: a board column; translate each), but the card is in Doing with another agent ({agent}, its name), whose work is in progress. Doing and Review are board columns.' }), { card: cardRef(n), agent: card.agentName, column })
-          : withValues(msg({ id: 'tasks.error.inDoingWithAnother', defaultMessage: "{card} is in Doing with another agent, who is working on it: newer work is in progress, so it can't be moved to {column, select, review {Review} passed {Passed} done {Done} other {{column}}} by another agent. Leave it where it is; another agent moves it to Review when done, and the user can move it.", description: "An error: an agent tried to move card {card} (its key, such as HI-12) on to {column} (select: a board column; translate each), but the card is in Doing with another agent (whose name isn't known), whose work is in progress. Doing and Review are board columns." }), { card: cardRef(n), column })
+          ? withValues(msg({ id: 'tasks.error.inDoingWith', defaultMessage: "{card} is in {active} with agent {agent}, who is working on it: newer work is in progress, so another agent can't move it to {stage}. Leave it where it is; agent {agent} moves it to {review} when done, and the user can move it.", description: 'An error, read by agents: an agent tried to move card {card} (its key, such as HI-12) on to the stage {stage}, but the card is in {active} with another agent ({agent}, its name), whose work is in progress. {active}, {review} and {stage} are stage names as the board shows them (glossary 2.2).' }), { card: cardRef(n), agent: card.agentName, ...stages })
+          : withValues(msg({ id: 'tasks.error.inDoingWithAnother', defaultMessage: "{card} is in {active} with another agent, who is working on it: newer work is in progress, so another agent can't move it to {stage}. Leave it where it is; that agent moves it to {review} when done, and the user can move it.", description: "An error, read by agents: an agent tried to move card {card} (its key, such as HI-12) on to the stage {stage}, but the card is in {active} with another agent (whose name isn't known), whose work is in progress. {active}, {review} and {stage} are stage names as the board shows them (glossary 2.2)." }), { card: cardRef(n), ...stages })
       )
     }
     const said: StoredText[] = []

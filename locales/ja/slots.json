@@ -4,6 +4,6 @@
   "slots.release.notEnded": "一覧のプロセスの一部がまだ実行中です。WindowsがHiveによる終了を許可しなかったため、{slot}は解放されませんでした。もう一度試すか、終了せずに解放してください。",
   "slots.release.otherHive": "{slot}は、まだ実行中の別のHive（プロセス{pid}）が保持しています。そちらで解放するか、先にそのHiveを終了してください。",
   "slots.setting.bad": "そのようなスロット設定はHiveにありません。",
-  "slots.setting.badSize": "レビュー用とチェック用のコピーの数は1から32までの整数で指定してください。",
-  "slots.setting.badText": "スロットのスクリプトやファイルの一覧は、4,000文字以内のテキストで指定してください。"
+  "slots.setting.badSize": "レビュー用とチェック用のコピーの数は{min, number}から{max, number}までの整数で指定してください。",
+  "slots.setting.badText": "スロットのスクリプトやファイルの一覧は、{max, number}文字以内のテキストで指定してください。"
 }

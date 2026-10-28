@@ -2443,7 +2443,7 @@ async function startCard(card: TaskCard, project: ProjectInfo, target: TaskStart
     r = await call('tasks:start', card.number, target, { confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}) })
     if ('ask' in r) return false
   }
-  notify('success', tr(msg({ id: 'board.start.started', defaultMessage: '{card} started on {agent}', description: "A toast's title after a card started: its name: its key, such as AM-12, or #12 for a card with none and the agent ({agent}, its name). The card's title follows." }), { card: cardLabel(card), agent: r.agentName }), card.title, [{ label: tr(msg({ id: 'board.start.show', defaultMessage: 'Show', description: "A button on the toast after a card started: shows the agent it started on." })), command: 'agent.show', args: [project.path, r.agentId] }])
+  notify('success', tr(msg({ id: 'board.start.started', defaultMessage: '{card} started on agent {agent}', description: "A toast's title after a card started: its name: its key, such as AM-12, or #12 for a card with none and the agent ({agent}, its name). The card's title follows. A noun before the name (glossary §1 rule 4)." }), { card: cardLabel(card), agent: r.agentName }), card.title, [{ label: tr(msg({ id: 'board.start.show', defaultMessage: 'Show', description: "A button on the toast after a card started: shows the agent it started on." })), command: 'agent.show', args: [project.path, r.agentId] }])
   return true
 }
 

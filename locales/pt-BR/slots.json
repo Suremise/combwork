@@ -4,6 +4,6 @@
   "slots.release.notEnded": "Alguns dos processos listados ainda estão em execução: o Windows não deixou o Hive encerrá-los, então {slot} não foi liberado. Tente de novo ou libere-o sem encerrá-los.",
   "slots.release.otherHive": "{slot} está retido por outro Hive que ainda está em execução (processo {pid}): libere-o lá ou feche esse Hive antes.",
   "slots.setting.bad": "O Hive não tem essa configuração de slot.",
-  "slots.setting.badSize": "O número de cópias de revisão e verificação é um número inteiro de 1 a 32.",
-  "slots.setting.badText": "Um script de slot ou uma lista de arquivos é um texto de no máximo 4.000 caracteres."
+  "slots.setting.badSize": "O número de cópias de revisão e verificação é um número inteiro de {min, number} a {max, number}.",
+  "slots.setting.badText": "Um script de slot ou uma lista de arquivos é um texto de no máximo {max, number} caracteres."
 }

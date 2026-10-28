@@ -490,7 +490,7 @@ interface LaneReorder {
 }
 
 const SLOT_LINK = msg({ id: 'board.lanes.slotLink', defaultMessage: 'Show {slot} in Branches & remotes', description: "Tooltip and accessible name of a lane's slot in its header (Progress panel, #1446): opens the project's Version Control tab at Branches & remotes, where its slots are listed. {slot} is the slot's name (slot-b): keep it as it is. Branches & remotes is a section of the tab: use its name as shown there." })
-const WAITS_LINK = msg({ id: 'board.lanes.waitsLink', defaultMessage: '{why}. Click to show it.', description: "Tooltip of why a lane waits, in its header (Progress panel, #1446), when a click shows what it waits for: its slot or the slots in use (Branches & remotes), or the runs it waits on (the Runs tab). {why} is the reason as the header says it (\"waiting for a slot\")." })
+const WAITS_LINK = msg({ id: 'board.lanes.waitsLink', defaultMessage: 'Click to show it.', description: "Tooltip of why a lane waits, in its header (Progress panel, #1446), when a click shows what it waits for: its slot or the slots in use (Branches & remotes), or the runs it waits on (the Runs tab). It follows the reason, on a line of its own (\"waiting for a slot\")." })
 
 /** Whether a lane's wait has something to show (#1446): the slots it waits for, or the runs preparing its slot or a copy. */
 const waitsOn = (s: LaneStatus | null): boolean => !!s && (s.reason === 'slot' || s.reason === 'preparing' || s.reason === 'checkCopy')
@@ -642,7 +642,7 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced }: {
               type="button"
               className={cx('link', 'progress-lane-why', l.state === 'paused' && 'paused')}
               data-action="lane-waits"
-              title={tr(WAITS_LINK, { why })}
+              title={`${why}\n${tr(WAITS_LINK)}`}
               onClick={(e) => {
                 e.stopPropagation()
                 showWaitedOn(l, project.path)

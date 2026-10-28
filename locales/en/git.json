@@ -1444,12 +1444,12 @@
     "description": "In the warning before switching version control, above the cards already started (glossary: old rules). {from} is None or Git. Unlike other option changes, a switch can’t be applied to them."
   },
   "git.vc.switch.lane": {
-    "defaultMessage": "{builder}’s lane “{name}”",
-    "description": "A running lane in the warning before switching version control. {builder} is the agent building its cards, {name} the lane’s name."
+    "defaultMessage": "Lane “{name}” (builder {builder})",
+    "description": "A running lane in the warning before switching version control. {builder} is the agent building its cards, {name} the lane’s name. A noun before the name (glossary §1 rule 4)."
   },
   "git.vc.switch.laneUnnamed": {
-    "defaultMessage": "{builder}’s lane",
-    "description": "A running lane with no name in the warning before switching version control. {builder} is the agent building its cards."
+    "defaultMessage": "Lane (builder {builder})",
+    "description": "A running lane with no name in the warning before switching version control. {builder} is the agent building its cards. A noun before the name (glossary §1 rule 4)."
   },
   "git.vc.switch.lanes": {
     "defaultMessage": "{n, plural, one {This running lane keeps {from}’s rules until it ends:} other {These running lanes keep {from}’s rules until they end:}}",
@@ -1504,8 +1504,8 @@
     "description": "Badge on a branch checked out in a worktree that isn't an agent's."
   },
   "git.worktree.slotLease": {
-    "defaultMessage": "{kind, select, card {{slot}: {agent} on {card}} lane {{slot}: {agent}, lane {lane}} carried {{slot}: carried for {agent}} other {{slot}: not lent}}",
-    "description": "A slot's row in Git → Branches & remotes, Worktrees (#1450): its name and its lease: lent to an agent ({agent}) for a card ({card}: its key) or a lane ({lane}: its name), carried for an agent (its old worktree, adopted), or not lent."
+    "defaultMessage": "{kind, select, card {{slot}: {agent} on {card}} lane {{slot}: {agent}, lane {lane}} carried {{slot}: carried, agent {agent}} other {{slot}: not lent}}",
+    "description": "A slot's row in Git → Branches & remotes, Worktrees (#1450): its name and its lease: lent to an agent ({agent}) for a card ({card}: its key) or a lane ({lane}: its name), carried for an agent (its old worktree, adopted), or not lent. carried: a noun before the name (glossary §1 rule 4)."
   },
   "git.worktree.unused": {
     "defaultMessage": "Unused worktree",

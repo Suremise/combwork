@@ -59,7 +59,7 @@ const T = {
   reviewCopiesDesc: msg({ id: 'workflow.slots.reviewCopiesDesc', defaultMessage: 'Set in Settings → Advanced, for every project.', description: 'Under the row “Reviewers review in review copies” of “Slots and copies”: where it is changed.' }),
   on: msg({ id: 'workflow.slots.on', defaultMessage: 'On', description: 'A setting’s value: on.' }),
   off: msg({ id: 'workflow.slots.off', defaultMessage: 'Off', description: 'A setting’s value: off.' }),
-  held: msg({ id: 'workflow.slots.held', defaultMessage: "Held by {agent}'s ended session", description: "In the list of slots (Version Control → Slots and copies): the agent's ({agent}) last session there has ended, but Hive doesn't know that everything it started has, so nothing else uses the slot until it is released (#1506)." }),
+  held: msg({ id: 'workflow.slots.held', defaultMessage: 'Held by an ended session of agent {agent}', description: "In the list of slots (Version Control → Slots and copies): the agent's ({agent}) last session there has ended, but Hive doesn't know that everything it started has, so nothing else uses the slot until it is released (#1506). A noun before the name (glossary §1 rule 4)." }),
   release: msg({ id: 'workflow.slots.release', defaultMessage: 'Release…', description: 'A button beside a held slot in the list of slots: asks, then frees it for other work (#1506).' }),
   openAdvanced: msg({ id: 'workflow.slots.openAdvanced', defaultMessage: 'Open Advanced', description: 'A button beside “Reviewers review in review copies”: opens Settings → Advanced.' }),
   saveFailed: msg({ id: 'workflow.slots.saveFailed', defaultMessage: 'Couldn’t save the slot settings', description: 'An error saving a setting under “Slots and copies”.' }),

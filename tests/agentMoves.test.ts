@@ -290,7 +290,7 @@ describe("an agent's old moves as intents (#1268)", () => {
     const { w, wt } = await workspace()
     const card = await started(w, wt)
     // As before 1.0: another agent's card in Doing is its work in progress.
-    await expect(update(w, card, reviewer, { column: 'review' }, 'Mine now')).rejects.toThrow(/in Doing with Builder/)
+    await expect(update(w, card, reviewer, { column: 'review' }, 'Mine now')).rejects.toThrow(/in Active with agent Builder/)
     const back = await update(w, card, builder, { column: 'todo' }, 'Waiting for #9 first.')
     expect(back.card.column).toBe('todo')
     expect(back.said).toContain('As put back: next time call hive_put_back')

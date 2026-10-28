@@ -156,12 +156,14 @@ export function overrideNote(o: WorkOverride, tr: Tr, names: OverrideNames): str
 }
 
 /**
- * A refused request (#1279), in the window's language as the agent got it in English: its reason and next step, on one
- * line, then how many times in a row it was refused. `name`: the card as the window names it.
+ * A refused request (#1279), in the window's language as the agent got it in English: its reason and its next step, each
+ * a whole sentence on a line of its own (glossary §1 rule 3, HI-1585), then how many times in a row it was refused when
+ * more than once. `name`: the card as the window names it.
  */
-export function refusedNote(r: WorkRefusal, tr: Tr, lines: NonNullable<OverrideNames['refusal']>, name?: string): string {
+export function refusedNote(r: WorkRefusal, tr: Tr, lines: NonNullable<OverrideNames['refusal']>, name?: string): string[] {
   const l = lines(r.rule, { ...r.values, ...(name && r.values.card !== undefined ? { card: name } : {}) })
-  return tr(msg({ id: 'board.lane.workRefused', defaultMessage: '{message} {next}{times, plural, one {} other { (refused # times)}}', description: "A line in a lane segment's hover (Progress panel), for its red notch: the card's latest request was refused by its workflow rules: why ({message}) and what to do next ({next}), each a whole sentence already translated, then, when it was refused more than once in a row, how many times ({times}; nothing when once). Glossary: refused, rule." }), { times: r.times, message: l.message, next: l.next })
+  const times = r.times > 1 ? [tr(msg({ id: 'board.lane.workRefused', defaultMessage: 'Refused {times, number} times in a row.', description: "A line in a lane segment's hover (Progress panel), for its red notch, after the refusal's reason and next step (each a line of its own): the card's latest request was refused by its workflow rules this many times in a row ({times}, more than one). Glossary: refused, rule." }), { times: r.times })] : []
+  return [l.message, l.next, ...times]
 }
 
 /** A content-stale pass (#1279): "Pass was for a3f2c1d; now at b71e09a", revisions through the project's platform. */
@@ -173,7 +175,7 @@ export function workNotes(b: WorkBadge | undefined, state: SegmentState, laneMer
   const out: string[] = []
   // A no-code card has no commits (#1279): it says so, and has no revision or merge lines.
   if (b?.noCode) out.push(tr(msg({ id: 'board.lane.workNoCode', defaultMessage: 'No-code card: no commits', description: "A line in a lane segment's hover (Progress panel): the card is a no-code card (its work isn't code), so it has no commits to show. Glossary: no-code card." })))
-  if (b?.refused && names?.refusal) out.push(refusedNote(b.refused, tr, names.refusal, name))
+  if (b?.refused && names?.refusal) out.push(...refusedNote(b.refused, tr, names.refusal, name))
   // Stale until it is submitted again; once Done (merged, or moved there past its rules) it no longer matters.
   if (b?.stalePass && state !== 'done') out.push(stalePassNote(b.stalePass, short, tr))
   if (b?.revision && !b.noCode) out.push(tr(msg({ id: 'board.lane.workRevision', defaultMessage: '{review, select, yes {Under review: {revision}} other {Revision: {revision}}}', description: "A line in a lane segment's hover (Progress panel): the card's revision (a short commit id, a3f2c1d), the one under review when the card is in Review." }), { review: b.stage === 'review' ? 'yes' : 'no', revision: short(b.revision) }))
@@ -223,7 +225,8 @@ export interface SegmentMarks {
 export function segmentMarks(lane: { frozen: unknown }, b: WorkBadge | undefined, s: CardSegment, short: (id: string) => string, tr: Tr, names: OverrideNames, enforced = true): SegmentMarks {
   if (lane.frozen || !b) return {}
   return {
-    ...(b.refused && names.refusal ? { refused: refusedNote(b.refused, tr, names.refusal, s.name) } : {}),
+    // Its sentences side by side, for the mark's accessible name and a folded segment's line: each one whole.
+    ...(b.refused && names.refusal ? { refused: refusedNote(b.refused, tr, names.refusal, s.name).join(' ') } : {}),
     ...(b.stalePass && s.state !== 'done' ? { stale: stalePassNote(b.stalePass, short, tr) } : {}),
     ...(b.override ? { override: overrideNote(b.override, tr, names) } : {}),
     ...(b.oldRules && s.state !== 'done' ? { oldRules: cardOldRulesNote(enforced, tr) } : {})

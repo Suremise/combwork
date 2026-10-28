@@ -121,12 +121,12 @@ interface HiveMessageValues {
   'main.move.alsoMoved': { n: number; things: string | number; from: string | number; to: string | number }
   'main.move.assistant': undefined
   'main.move.branchBoth': undefined
-  'main.move.branchFailed': { host: string | number; agent: string | number; from: string | number; to: string | number; why: string | number }
-  'main.move.branchGone': { host: string | number; agent: string | number; from: string | number }
+  'main.move.branchFailed': { host: string | number; from: string | number; agent: string | number; to: string | number; why: string | number }
+  'main.move.branchGone': { host: string | number; from: string | number; agent: string | number }
   'main.move.branchQueued': undefined
-  'main.move.branchRenamed': { host: string | number; agent: string | number; from: string | number; to: string | number }
-  'main.move.branchRenamedRemote': { host: string | number; agent: string | number; from: string | number; to: string | number; remote: string | number }
-  'main.move.branchTaken': { host: string | number; agent: string | number; from: string | number; to: string | number }
+  'main.move.branchRenamed': { host: string | number; from: string | number; agent: string | number; to: string | number }
+  'main.move.branchRenamedRemote': { host: string | number; from: string | number; agent: string | number; to: string | number; remote: string | number }
+  'main.move.branchTaken': { host: string | number; from: string | number; agent: string | number; to: string | number }
   'main.move.branchUnrecorded': { host: string | number; agent: string | number; to: string | number; why: string | number }
   'main.move.cards': { n: number; from: string | number; to: string | number }
   'main.move.cardsNotMoved': { host: string | number; agent: string | number; path: string | number; why: string | number }

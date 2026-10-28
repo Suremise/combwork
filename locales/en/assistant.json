@@ -432,8 +432,8 @@
     "description": "Load template: why its button can't be used yet."
   },
   "assistant.loadNames.filledNote": {
-    "defaultMessage": "Agent names are unique across the workspace, and {projects} already {count, plural, one {has an agent} other {has agents}} called {names}: {count, plural, one {a free name is} other {free names are}} filled in below. Change any name you like.",
-    "description": "Load template, above the plan: some of the template's names are taken by other projects' agents ({projects} lists the projects, {names} the names; {count} how many), so free names were filled in for them."
+    "defaultMessage": "Agent names are unique across the workspace, and {count, plural, one {this name is} other {these names are}} taken already: {names} (projects: {projects}). {count, plural, one {A free name is} other {Free names are}} filled in below. Change any name you like.",
+    "description": "Load template, above the plan: some of the template's names are taken by other projects' agents ({projects} lists the projects, {names} the names; {count} how many), so free names were filled in for them. Each sentence whole, the verb never agreeing with a list (HI-1585: glossary §1 rules 3 and 4)."
   },
   "assistant.loadNames.sameTwice": {
     "defaultMessage": "Another of its agents has this name.",
@@ -712,8 +712,8 @@
     "description": "The Assistant's overview: a row that shows the inactive projects folded into it."
   },
   "assistant.panel.inboxLine": {
-    "defaultMessage": "{id} from {from}: {text}",
-    "description": "An item of the Assistant's inbox in its ⋯ menu: its id, who it is from ({from}) and the start of its text ({text})."
+    "defaultMessage": "{id} · {from}: {text}",
+    "description": "An item of the Assistant's inbox in its ⋯ menu: its id, who it is from ({from}) and the start of its text ({text}). No preposition before the name (glossary §1 rule 4)."
   },
   "assistant.panel.inboxTip": {
     "defaultMessage": "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.",
@@ -1712,8 +1712,8 @@
     "description": "What a skill that ships with Hive (use-hive-api) is for: under its name in the Skills view and a project's Skills tab. Keep HTTP and API; hive tools are the tools Hive gives agents (hive_…), keep hive in lower case."
   },
   "assistant.skills.shipped.workOnCard": {
-    "defaultMessage": "Carry a card from Hive's task board through its work, from Doing to Review with a summary. Use when given a card to work on (\"work on AM-12\", a card Hive started you on, more work on one back from Review). Not for reviewing one, nor a card loop (card-loop).",
-    "description": "What a skill that ships with Hive (work-on-card) is for: under its name in the Skills view and a project's Skills tab. card-loop is another skill's name: keep it. Doing and Review are columns of the task board: use their names as the board shows them. \"work on AM-12\" is what you would ask an agent: translate it."
+    "defaultMessage": "Carry a card from Hive's task board through its work, from Active to Review with a summary. Use when given a card to work on (\"work on AM-12\", a card Hive started you on, more work on one back from Review). Not for reviewing one, nor a card loop (card-loop).",
+    "description": "What a skill that ships with Hive (work-on-card) is for: under its name in the Skills view and a project's Skills tab. card-loop is another skill's name: keep it. Active and Review are stages of the task board (glossary 2.2): use their names as the board shows them. \"work on AM-12\" is what you would ask an agent: translate it."
   },
   "assistant.skills.shipped.workspaceNote": {
     "defaultMessage": "Record a lasting decision, convention or gotcha in the workspace's shared notes. Use when asked to remember or document something for later, or when other agents will need what you learned. Not for work in progress.",
@@ -1868,8 +1868,8 @@
     "description": "Why a template file can't be used: Hive 0.9 made it (its agents had worktrees of their own; 1.0's don't). Save as Template is a command: as Hive names it."
   },
   "assistant.template.longNote": {
-    "defaultMessage": "{name}'s note is over {max} characters.",
-    "description": "Why a template file can't be used: an agent's note (what it is for, in the user's words) is too long."
+    "defaultMessage": "The note of agent {name} is over {max, number} characters.",
+    "description": "Why a template file can't be used: an agent's note (what it is for, in the user's words) is too long. {max} is the limit, a number. A noun before the name (glossary §1 rule 4)."
   },
   "assistant.template.newer": {
     "defaultMessage": "It was made by a newer version of Hive: update Hive to use it.",
@@ -1920,8 +1920,8 @@
     "description": "Load template, beside an agent that goes: its worktree is kept. {why} says why (\"2 commits not merged into main\"). Lower case: it follows the agent's name in brackets."
   },
   "assistant.templateLoad.pairedWith": {
-    "defaultMessage": "with {name}",
-    "description": "Load template, under an agent's role: the agent it is paired with ({name}): a builder's reviewer, or a reviewer's builder. Lower case."
+    "defaultMessage": "paired: {name}",
+    "description": "Load template, under an agent's role: the agent it is paired with ({name}): a builder's reviewer, or a reviewer's builder. Lower case. The name after a colon (glossary §1 rule 4)."
   },
   "assistant.templateLoad.removedHeading": {
     "defaultMessage": "Removed:",
@@ -1932,8 +1932,8 @@
     "description": "Load template's confirmation, as text: an agent that goes, after a bullet. {note} is what happens to its worktree."
   },
   "assistant.templateLoad.roleLine": {
-    "defaultMessage": "{role}{paired, select, yes {, with {name}} other {}}",
-    "description": "Load template's confirmation, as text: an agent's role in the workflow ({role}: Builder, Reviewer, Either) and the agent it is paired with ({name})."
+    "defaultMessage": "{role}{paired, select, yes { (paired: {name})} other {}}",
+    "description": "Load template's confirmation, as text: an agent's role in the workflow ({role}: Builder, Reviewer, Either) and the agent it is paired with ({name}). The name after a colon (glossary §1 rule 4)."
   },
   "assistant.templateLoad.swapped": {
     "defaultMessage": "{problem, select, off {{from} is turned off (Settings → Providers): {to} instead.} other {{from} isn’t installed: {to} instead.}}",
@@ -2436,8 +2436,8 @@
     "description": "A badge on a template open in its editor with unsaved changes."
   },
   "assistant.templates.pairedWith": {
-    "defaultMessage": "with {name}",
-    "description": "A template's table, under an agent's role: the agent it is paired with ({name}). Lower case."
+    "defaultMessage": "paired: {name}",
+    "description": "A template's table, under an agent's role: the agent it is paired with ({name}). Lower case. The name after a colon (glossary §1 rule 4)."
   },
   "assistant.templates.panelHint": {
     "defaultMessage": "Save a project's agents as a template from its Session tab (<b>Save Template…</b>). Export one to share it; Import brings one in.",

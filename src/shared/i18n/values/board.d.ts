@@ -435,7 +435,7 @@ interface HiveMessageValues {
   'board.lane.workChecks': { passed: number; failed: number }
   'board.lane.workMerged': { commit: string | number }
   'board.lane.workNoCode': undefined
-  'board.lane.workRefused': { message: string | number; next: string | number; times: number }
+  'board.lane.workRefused': { times: number }
   'board.lane.workRevision': { review: string; revision: string | number }
   'board.lane.workStalePass': { now: string; approved: string | number; current: string | number }
   'board.lane.workVerdict': { pass: string; revision: string; current: string }
@@ -511,7 +511,7 @@ interface HiveMessageValues {
   'board.lanes.usualOrderSaid': undefined
   'board.lanes.waitingForYou': { n: number }
   'board.lanes.waits': { reason: string; card: string | number; ask: string; agent: string | number }
-  'board.lanes.waitsLink': { why: string | number }
+  'board.lanes.waitsLink': undefined
   'board.lanes.waitsPreparing': { slot: string | number }
   'board.links.archivedTitle': { card: string | number; title: string | number; column: string | number }
   'board.links.title': { card: string | number; title: string | number; column: string | number }
@@ -608,7 +608,7 @@ interface HiveMessageValues {
   'board.progress.title': undefined
   'board.progress.waiting': undefined
   'board.queue.empty': undefined
-  'board.queue.filesMore': { files: string | number; n: number }
+  'board.queue.filesMore': { n: number }
   'board.queue.inVersionControl': undefined
   'board.queue.merged': { card: string | number; result: string | number }
   'board.queue.moreReturned': { n: number }
@@ -795,7 +795,7 @@ interface HiveMessageValues {
   'board.stalled.reviewVerdictWait': { agent: string | number; card: string | number; waited: string | number }
   'board.stalled.reviewWait': { agent: string | number; card: string | number; waited: string | number }
   'board.stalled.reviewWaitBusy': { agent: string | number; card: string | number; waited: string | number }
-  'board.stalled.reviewWaitSilent': { agent: string | number; card: string | number; silent: number; waited: string | number }
+  'board.stalled.reviewWaitSilent': { agent: string | number; card: string | number; silent: string | number; waited: string | number }
   'board.stalled.wakeUntaken': { agent: string | number; card: string | number }
   'board.start.busy': { status: string | number }
   'board.start.idle': { status: string | number }

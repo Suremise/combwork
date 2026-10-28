@@ -20,8 +20,8 @@ const MAX_TEXT = 4000
 
 const M = {
   bad: msg({ id: 'slots.setting.bad', defaultMessage: 'That isn’t a slot setting Hive has.', description: 'An error: a request to change a setting of “Slots and copies” named one that doesn’t exist.' }),
-  badSize: msg({ id: 'slots.setting.badSize', defaultMessage: 'The number of review and check copies is a whole number from 1 to 32.', description: 'An error: the number of review and check copies given isn’t a whole number from 1 to 32.' }),
-  badText: msg({ id: 'slots.setting.badText', defaultMessage: 'A slot script or list of files is text of at most 4,000 characters.', description: 'An error: a slot script or list of copied files given isn’t text, or is too long.' })
+  badSize: msg({ id: 'slots.setting.badSize', defaultMessage: 'The number of review and check copies is a whole number from {min, number} to {max, number}.', description: 'An error: the number of review and check copies given isn’t a whole number from 1 to 32. {min} and {max} are the limits (1 and 32).' }),
+  badText: msg({ id: 'slots.setting.badText', defaultMessage: 'A slot script or list of files is text of at most {max, number} characters.', description: 'An error: a slot script or list of copied files given isn’t text, or is too long. {max} is the limit (4,000).' })
 }
 
 /** What a project now stores of its slot settings, after the change. */
@@ -34,8 +34,8 @@ export interface SlotSettingsNow {
 export async function setSlotSetting(ws: WorkspaceService, projectPath: string, key: SlotSettingKey, value: string | number | null): Promise<SlotSettingsNow> {
   if (!KEYS.includes(key)) throw hiveError(M.bad, undefined, { kind: 'invalid' })
   if (key === 'copiesSize') {
-    if (value !== null && (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 32)) throw hiveError(M.badSize, undefined, { kind: 'invalid' })
-  } else if (value !== null && (typeof value !== 'string' || value.length > MAX_TEXT)) throw hiveError(M.badText, undefined, { kind: 'invalid' })
+    if (value !== null && (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 32)) throw hiveError(M.badSize, { min: 1, max: 32 }, { kind: 'invalid' })
+  } else if (value !== null && (typeof value !== 'string' || value.length > MAX_TEXT)) throw hiveError(M.badText, { max: MAX_TEXT }, { kind: 'invalid' })
   const cfg = await ws.mutateProjectConfig(projectPath, (c) => {
     if (key === 'copiesSize') {
       const copies = { ...c.copies }
@@ -79,7 +79,7 @@ const DEFAULT_KEYS: readonly SlotDefaultKey[] = ['copy']
 export async function setSlotDefault(ws: WorkspaceService, level: WorkflowLevel, key: SlotDefaultKey, value: string | null, check?: (now: SlotDefaults | undefined) => void): Promise<SlotDefaults> {
   if (level !== 'global' && level !== 'workspace') throw hiveError(M.bad, undefined, { kind: 'invalid' })
   if (!DEFAULT_KEYS.includes(key)) throw hiveError(M.bad, undefined, { kind: 'invalid' })
-  if (value !== null && (typeof value !== 'string' || value.length > MAX_TEXT)) throw hiveError(M.badText, undefined, { kind: 'invalid' })
+  if (value !== null && (typeof value !== 'string' || value.length > MAX_TEXT)) throw hiveError(M.badText, { max: MAX_TEXT }, { kind: 'invalid' })
   const next = (now: SlotDefaults | undefined): SlotDefaults => {
     const d = { ...now }
     if (value === null) delete d[key]

@@ -496,8 +496,8 @@
     "description": "Release Slot…: a tick box, on by default: Hive ends the listed processes before releasing the slot."
   },
   "actions.releaseHeld.messageGone": {
-    "defaultMessage": "{slot} is held by {agent}'s session (run {run}) in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.",
-    "description": "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another."
+    "defaultMessage": "{slot} is held by a session of agent {agent} (run {run}) in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.",
+    "description": "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another. A noun before the name (glossary §1 rule 4)."
   },
   "actions.releaseHeld.messageSelf": {
     "defaultMessage": "{agent}'s last session in {slot} (run {run}) has ended in this Hive (process {pid}, running), but Hive doesn't know that everything it started there has: until you release it, nothing else uses the slot.",

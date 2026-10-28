@@ -151,7 +151,7 @@ describe('batch card changes (hive_update_tasks)', () => {
     const busy = await make('Gamma in progress', 'gamma', 'doing', 'g2')
     const free = await make('Gamma free', 'gamma', 'todo')
     const items = await run(() => tasks.updateTasks([busy.number, free.number], { column: 'review' }, gammaAgent1))
-    expect(items[0].error).toMatch(/in Doing with Agent 2, who is working on it/)
+    expect(items[0].error).toMatch(/in Active with agent Agent 2, who is working on it/)
     expect(items[0].card).toBeNull()
     expect((await cardOf(busy.number)).column).toBe('doing')
     expect(items[1].card?.column).toBe('review')

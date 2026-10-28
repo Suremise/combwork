@@ -4,6 +4,6 @@
   "slots.release.notEnded": "Some of the processes listed still run: Windows didn't let Hive end them, so {slot} wasn't released. Try again, or release it without ending them.",
   "slots.release.otherHive": "{slot} is held by another Hive that is still running (process {pid}): release it there, or quit that Hive first.",
   "slots.setting.bad": "That isn’t a slot setting Hive has.",
-  "slots.setting.badSize": "The number of review and check copies is a whole number from 1 to 32.",
-  "slots.setting.badText": "A slot script or list of files is text of at most 4,000 characters."
+  "slots.setting.badSize": "The number of review and check copies is a whole number from {min, number} to {max, number}.",
+  "slots.setting.badText": "A slot script or list of files is text of at most {max, number} characters."
 }

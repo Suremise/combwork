@@ -74,7 +74,7 @@ const queueFolders = () =>
     const viewB = async () => (await b.inv('queue:list', fx.alpha, 'integration'))[0]
     check("B doesn't run it: its model says A's profile runs it", !!(await waitHung(async () => (await viewB())?.runBy === profileA && (await viewB()).runHere === false)), JSON.stringify(await viewB()))
     const tab = await q.mergesTab(b)
-    check(`…B's Merges tab says "Run by ${profileA}"`, !!(await waitHung(async () => (await tab.text('integration')).includes(`Run by ${profileA}`))), await tab.text('integration'))
+    check(`…B's Merges tab says "Run by ${profileA}"`, !!(await waitHung(async () => (await tab.text('integration')).includes(`Run by profile ${profileA}`))), await tab.text('integration'))
     check('…and only one check runs (A\'s)', fs.readFileSync(fx.started, 'utf8').trim() === String(checkPid) && queueFolders().length === 1)
     await b.page.mouse.move(5, 5)
     await b.page.screenshot({ path: path.join(fx.shots, 'queuelease-1-run-by-a.png') })

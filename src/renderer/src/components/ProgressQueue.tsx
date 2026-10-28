@@ -89,7 +89,7 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
           </Tooltip>
         )}
       </div>
-      {v.runBy && !v.runHere && <div className="progress-queue-line faint">{tr(msg({ id: 'board.queue.runBy', defaultMessage: 'Run by {profile}', description: "On a merge queue's card in the Progress panel: another Hive on this workspace runs the queue ({profile}: its profile's name, such as Hive-Dev)." }), { profile: v.runBy })}</div>}
+      {v.runBy && !v.runHere && <div className="progress-queue-line faint">{tr(msg({ id: 'board.queue.runBy', defaultMessage: 'Run by profile {profile}', description: "On a merge queue's card in the Progress panel: another Hive on this workspace runs the queue ({profile}: its profile's name, such as Hive-Dev). A noun before the name (glossary §1 rule 4)." }), { profile: v.runBy })}</div>}
       {v.paused && (
         <div className="progress-queue-paused" data-reason={v.paused.reason}>
           <Icon name="debug-pause" />

@@ -302,7 +302,7 @@ export async function keptText(projectPath: string, k: SlotKept): Promise<string
   switch (k.why) {
     case 'leased': {
       const agent = projectAgents(await workspace.projectConfig(projectPath)).find((a) => a.id === k.agent)?.name ?? k.agent
-      return tr(msg({ id: 'main.unused.slot.leased', defaultMessage: 'it is lent to {agent}', description: "Why Hive won't remove a slot listed in Unused worktrees (#1450): it is lent to the agent {agent} now. A clause." }), { agent })
+      return tr(msg({ id: 'main.unused.slot.leased', defaultMessage: 'it is lent to agent {agent}', description: "Why Hive won't remove a slot listed in Unused worktrees (#1450): it is lent to the agent {agent} now. A clause. A noun before the name (glossary §1 rule 4)." }), { agent })
     }
     case 'session':
       return tr(msg({ id: 'main.unused.slot.session', defaultMessage: 'a session runs in it ({detail})', description: "Why Hive won't remove a slot listed in Unused worktrees: an agent's session runs in it ({detail}: the agent and its state). A clause." }), { detail: k.detail })

@@ -33,8 +33,8 @@ interface HiveMessageValues {
   'tasks.error.failedStays': { card: string | number }
   'tasks.error.holdCard': { card: string | number }
   'tasks.error.holdNew': undefined
-  'tasks.error.inDoingWith': { card: string | number; agent: string | number; column: string }
-  'tasks.error.inDoingWithAnother': { card: string | number; column: string }
+  'tasks.error.inDoingWith': { card: string | number; active: string | number; agent: string | number; stage: string | number; review: string | number }
+  'tasks.error.inDoingWithAnother': { card: string | number; active: string | number; stage: string | number; review: string | number }
   'tasks.error.kindNeedsReason': undefined
   'tasks.error.kindNotAgents': undefined
   'tasks.error.labelFieldList': { field: string | number }

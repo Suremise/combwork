@@ -128,12 +128,12 @@
     "description": "An error: an agent tried to add a card On Hold (a board column), which only the user or the Assistant may do."
   },
   "tasks.error.inDoingWith": {
-    "defaultMessage": "{card} is in Doing with {agent}, who is working on it: newer work is in progress, so it can't be moved to {column, select, review {Review} passed {Passed} done {Done} other {{column}}} by another agent. Leave it where it is; {agent} moves it to Review when done, and the user can move it.",
-    "description": "An error: an agent tried to move card {card} (its key, such as HI-12) on to {column} (select: a board column; translate each), but the card is in Doing with another agent ({agent}, its name), whose work is in progress. Doing and Review are board columns."
+    "defaultMessage": "{card} is in {active} with agent {agent}, who is working on it: newer work is in progress, so another agent can't move it to {stage}. Leave it where it is; agent {agent} moves it to {review} when done, and the user can move it.",
+    "description": "An error, read by agents: an agent tried to move card {card} (its key, such as HI-12) on to the stage {stage}, but the card is in {active} with another agent ({agent}, its name), whose work is in progress. {active}, {review} and {stage} are stage names as the board shows them (glossary 2.2)."
   },
   "tasks.error.inDoingWithAnother": {
-    "defaultMessage": "{card} is in Doing with another agent, who is working on it: newer work is in progress, so it can't be moved to {column, select, review {Review} passed {Passed} done {Done} other {{column}}} by another agent. Leave it where it is; another agent moves it to Review when done, and the user can move it.",
-    "description": "An error: an agent tried to move card {card} (its key, such as HI-12) on to {column} (select: a board column; translate each), but the card is in Doing with another agent (whose name isn't known), whose work is in progress. Doing and Review are board columns."
+    "defaultMessage": "{card} is in {active} with another agent, who is working on it: newer work is in progress, so another agent can't move it to {stage}. Leave it where it is; that agent moves it to {review} when done, and the user can move it.",
+    "description": "An error, read by agents: an agent tried to move card {card} (its key, such as HI-12) on to the stage {stage}, but the card is in {active} with another agent (whose name isn't known), whose work is in progress. {active}, {review} and {stage} are stage names as the board shows them (glossary 2.2)."
   },
   "tasks.error.kindNeedsReason": {
     "defaultMessage": "Changing a card's kind after it is made is an exception to its rules: pass override.reason with the user's reason.",
@@ -340,8 +340,8 @@
     "description": "An error: an agent tried to give a verdict on card {card} (its key, such as HI-12), which another agent ({agent}, its name) is reviewing."
   },
   "tasks.history.answerTold": {
-    "defaultMessage": "Told {agent} of your answer",
-    "description": "A line in a card's history: Hive told the agent {agent} (its name) of the user's answer to a request for them (For you: an approval, a reply, a decision, a choice at the round limit)."
+    "defaultMessage": "Told agent {agent} of your answer",
+    "description": "A line in a card's history: Hive told the agent {agent} (its name) of the user's answer to a request for them (For you: an approval, a reply, a decision, a choice at the round limit). A noun before the name (glossary §1 rule 4)."
   },
   "tasks.history.answerUntold": {
     "defaultMessage": "The Hive Assistant couldn't be told of your answer to {agent}'s question: only {agent} has it",

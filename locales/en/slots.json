@@ -20,11 +20,11 @@
     "description": "An error: a request to change a setting of “Slots and copies” named one that doesn’t exist."
   },
   "slots.setting.badSize": {
-    "defaultMessage": "The number of review and check copies is a whole number from 1 to 32.",
-    "description": "An error: the number of review and check copies given isn’t a whole number from 1 to 32."
+    "defaultMessage": "The number of review and check copies is a whole number from {min, number} to {max, number}.",
+    "description": "An error: the number of review and check copies given isn’t a whole number from 1 to 32. {min} and {max} are the limits (1 and 32)."
   },
   "slots.setting.badText": {
-    "defaultMessage": "A slot script or list of files is text of at most 4,000 characters.",
-    "description": "An error: a slot script or list of copied files given isn’t text, or is too long."
+    "defaultMessage": "A slot script or list of files is text of at most {max, number} characters.",
+    "description": "An error: a slot script or list of copied files given isn’t text, or is too long. {max} is the limit (4,000)."
   }
 }

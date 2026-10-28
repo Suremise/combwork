@@ -509,7 +509,7 @@
   "workspace.storage.reviewInChanges": "Revisar em Alterações",
   "workspace.storage.size": "Tamanho",
   "workspace.storage.skipped": "{count, plural, one {# item não movido:} other {# itens não movidos:}}",
-  "workspace.storage.slot": "{slot}, emprestado a {agent}",
+  "workspace.storage.slot": "{slot}, emprestado ao agente {agent}",
   "workspace.storage.storage": "Armazenamento",
   "workspace.storage.title": "Limpar {name}",
   "workspace.storage.total": "Total",
