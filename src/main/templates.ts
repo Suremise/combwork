@@ -704,6 +704,12 @@ export async function loadTemplateWith(projectPath: string, scope: TemplateScope
     await o.check?.(plan)
     const cfg = await workspace.projectConfig(projectPath)
     const staged: { def: AgentDef; discard: () => Promise<void> }[] = []
+    // What the caller's guard threw or its names refusal made: the caller's refusals, passed on unwrapped.
+    const fromCaller = new WeakSet<object>()
+    const callers = <T>(e: T): T => {
+      if (e && typeof e === 'object') fromCaller.add(e)
+      return e
+    }
     let before: { agents: AgentDef[]; layout: PageLayout }
     try {
       for (const [i, a] of plan.create.entries()) {
@@ -724,14 +730,20 @@ export async function loadTemplateWith(projectPath: string, scope: TemplateScope
         layout: plan.layout,
         check: (list) => {
           // The caller's guard (the Assistant's control and launch, HI-1502) at the write itself, under the lock.
-          o.guard?.()
+          try {
+            o.guard?.()
+          } catch (e) {
+            throw callers(e)
+          }
           if (changed(list.map((a) => a.id))) throw refusal(msg({ id: 'content.templates.changedWhile', defaultMessage: "The project's agents changed while the template was loading: nothing was changed. Open the template again.", description: "An error loading a template: the project's agents changed while it loaded, so nothing changed." }), undefined, 'conflict')
         },
-        taken: o.taken ?? ((clash) => new TemplateError(takenText(clash, true), { kind: 'conflict' }))
+        taken: o.taken ? async (clash) => callers(await o.taken!(clash)) : (clash) => new TemplateError(takenText(clash, true), { kind: 'conflict' })
       })
     } catch (e) {
       for (const s of staged) await s.discard()
-      throw e instanceof TemplateError ? e : refusal(msg({ id: 'content.templates.failed', defaultMessage: 'Nothing was changed: {error}', description: "An error loading a template: making its agents failed, so nothing changed; {error} is why (often git's own words)." }), { error: errorText(e) })
+      // A refusal (Hive's, or the caller's guard's or names' own, HI-1502) goes on as it is, its kind and status kept; a
+      // failure making the agents is said as one.
+      throw e instanceof HiveError || fromCaller.has(e as object) ? e : refusal(msg({ id: 'content.templates.failed', defaultMessage: 'Nothing was changed: {error}', description: "An error loading a template: making its agents failed, so nothing changed; {error} is why (often git's own words)." }), { error: errorText(e) })
     }
     log.info(`Loaded template ${userText(plan.name)} into ${userText(projectPath)}: ${before.agents.length} agents removed, ${staged.length} created${plan.swaps.length ? `, ${plan.swaps.length} on another provider` : ''}`)
     await agentsGone(projectPath, before.agents.map((a) => a.id))

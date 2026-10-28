@@ -29,6 +29,7 @@ const { config } = await import('../src/main/config')
 const { providerService } = await import('../src/main/providerService')
 const { sessions } = await import('../src/main/sessions')
 const store = await import('../src/main/boardStore')
+const { apiErrorReply } = await import('../src/main/servers')
 
 // Projects, boards and git are written: under a full run's load the default 5 s is too short (a bound, not a wait).
 vi.setConfig({ testTimeout: 60_000 })
@@ -262,7 +263,10 @@ describe('loading a template for the Assistant, and undoing it', () => {
     onTestFinished(async () => {
       if (taker) await run(() => updateAgent(beta, taker!.id, { name: 'Beta extra' }))
     })
-    const refusal = await load(alpha, 'team-3x3.json').then(() => null, (e: Error) => e.message)
+    const err = await load(alpha, 'team-3x3.json').then(() => null, (e: Error) => e)
+    // A conflict, as the Agent API answers it (409), however late the clash is found (HR5's round 2).
+    expect(apiErrorReply(err).status).toBe(409)
+    const refusal = err?.message ?? null
     const free = new RegExp(`"${k('R3')}" is beta's agent: try "([^"]+)"\\. Agent names are unique across the workspace: give each a free name in names\\. Nothing was changed\\.`).exec(refusal ?? '')?.[1]
     expect(free, refusal ?? '').toBeTruthy()
     expect(names(alpha)).toEqual(['Ann', 'Rob'])
@@ -272,16 +276,22 @@ describe('loading a template for the Assistant, and undoing it', () => {
     expect(r.created.at(-1)).toBe(free)
   })
 
-  it("the Assistant's guard refused during the load's staging: nothing is published", async () => {
-    let revoked = false
-    templates.testHooks.staged = async (name) => {
-      if (name === k('B2')) revoked = true
+  it("the Assistant's guard refused during the load's staging: nothing is published, the refusal reaches the route as it was", async () => {
+    for (const status of [403, 409]) {
+      let revoked = false
+      templates.testHooks.staged = async (name) => {
+        if (name === k('B2')) revoked = true
+      }
+      // The guard's own refusal (Control turned down: 403; its launch ended: 409), as assistant.admit's guard throws it.
+      const guard = (): void => {
+        if (revoked) throw new control.ChangeRefused(status, 'Not allowed by Settings → Assistant → Control')
+      }
+      const err = await load(alpha, 'team-3x3.json', undefined, true, guard).then(() => null, (e: unknown) => e)
+      // assistantChange gives the route a ChangeRefused's own status (httpOf): never wrapped as a failure (500).
+      expect(err).toBeInstanceOf(control.ChangeRefused)
+      expect((err as InstanceType<typeof control.ChangeRefused>).status).toBe(status)
+      expect(names(alpha)).toEqual(['Ann', 'Rob'])
     }
-    const guard = (): void => {
-      if (revoked) throw new Error('Not allowed by Settings → Assistant → Control')
-    }
-    await expect(load(alpha, 'team-3x3.json', undefined, true, guard)).rejects.toThrow(/Not allowed by Settings → Assistant → Control/)
-    expect(names(alpha)).toEqual(['Ann', 'Rob'])
   })
 
   it("the guard refused once the agents are published: the options aren't saved, said", async () => {
