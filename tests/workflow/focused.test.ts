@@ -4,7 +4,7 @@
 // holds only for paths whose change is exactly the submission's; real-CLI and packaged tests count from the review's
 // run at the submitted revision (realProof = review); skipped tests wait for the reviewer's or the user's decision.
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tempDir } from '../tempDir'
 import { B1, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness'
@@ -466,6 +466,49 @@ describe("HR4's round 1: what the merge takes as proof, decisions and results", 
       life.abort()
       refusedBy(await submitting, 'submit.focusedChosen')
       expect(env.wf.state(card).submissions).toEqual([])
+    })
+  }
+
+  // HR4's round 3: the operation is settled once per submit call; its retries (a re-gather after the evidence changed)
+  // carry it and never make one. OLD held after its pick, NEW started (ending OLD), the evidence changed by a stat-only
+  // touch of the index: OLD is refused, never gathered again, and NEW is the one submitted.
+  for (const tests of [undefined, [{ id: 'mine', needs: [] }]] as (FocusedTest[] | undefined)[]) {
+    it(`8: a superseded submission held before its write never restarts through a re-gather (tests: ${JSON.stringify(tests)})`, async () => {
+      const p = steered()
+      p.set({ pick: [] })
+      let release!: () => void
+      const held = new Promise<void>((r) => (release = r))
+      let atBoundary = false
+      let calls = 0
+      env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], mergeChecks: [], okBefore: { mode: 'never', labels: [] }, focusedTests: true, commands: { 'focused.pick': p.command, 'focused.run': runner().command } }, {
+        focused: { env: base, timeoutMs: () => 60_000 },
+        hooks: {
+          beforeWrite: async (move) => {
+            if (move !== 'submit' || ++calls > 1) return
+            atBoundary = true
+            await held
+          }
+        }
+      })
+      const e = env
+      const { card, folder } = await built(e)
+      const old = e.wf.submit(card.key, B1, { summary: 'OLD', ...(tests ? { tests: [...tests] } : {}) })
+      await vi.waitFor(() => expect(atBoundary).toBe(true), { timeout: 30_000 })
+      // NEW starts and is held in its picker: its operation has ended OLD's.
+      const pid = join(tempDir('focused-pid-'), 'pid')
+      const go = join(tempDir('focused-go-'), 'go')
+      p.set({ pick: [], holdFor: go, pidTo: pid })
+      const next = e.wf.submit(card.key, B1, { summary: 'NEW', ...(tests ? { tests: [...tests] } : {}) })
+      await vi.waitFor(() => expect(existsSync(pid)).toBe(true), { timeout: 30_000 })
+      // A stat-only change of the evidence: the index touched, its contents the same.
+      const index = join(folder, sh(folder, 'rev-parse', '--git-path', 'index'))
+      const later = new Date(Date.now() + 5_000)
+      utimesSync(existsSync(index) ? index : sh(folder, 'rev-parse', '--git-path', 'index'), later, later)
+      release()
+      refusedBy(await old, 'submit.focusedChosen')
+      writeFileSync(go, 'go')
+      moved(await next)
+      expect(e.wf.state(card).submissions.map((x) => x.summary)).toEqual(['NEW'])
     })
   }
 

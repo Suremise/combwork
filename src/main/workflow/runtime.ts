@@ -1147,6 +1147,29 @@ export class Workflow {
   async submit(ref: unknown, actor: Actor, args: { summary: string; revision?: string; note?: string; paths?: string[]; drag?: Drag; followUp?: boolean; tests?: FocusedTest[] }): Promise<Reply> {
     const card0 = this.resolve(ref, actor)
     if (isRefusal(card0)) return card0
+    return this.submitAs(ref, actor, args, this.submitOperation(card0.id))
+  }
+
+  /**
+   * A submission's operation (G20, HI-1367; HR4's rounds 1–3, finding 8), settled once: made by each `submit` call and
+   * only there, which ends the card's operation before it (a newer submission supersedes the one in flight), and ended
+   * too by its workspace closing. Every retry of that call (a re-gather after the evidence changed, a requeue's) carries
+   * the same operation and never makes one, so a superseded call can never end its replacement. It is checked wherever
+   * the call resumes after waiting: after gathering, after the evidence is checked again (before any re-gather), and
+   * under the write's lock; ended, the call is refused there (`submit.focusedChosen`, `cancelled`). Its pick ends with it.
+   */
+  private submitOperation(card: number): AbortSignal {
+    this.picks.get(card)?.abort()
+    const own = new AbortController()
+    this.picks.set(card, own)
+    const life = this.cfg.focused?.life
+    return life ? AbortSignal.any([own.signal, life]) : own.signal
+  }
+
+  /** `submit` within its operation (`op`): every retry of the call is this, with the same `op`. */
+  private async submitAs(ref: unknown, actor: Actor, args: { summary: string; revision?: string; note?: string; paths?: string[]; drag?: Drag; followUp?: boolean; tests?: FocusedTest[] }, op: AbortSignal): Promise<Reply> {
+    const card0 = this.resolve(ref, actor)
+    if (isRefusal(card0)) return card0
     let card = card0
     let s = this.state(card)
     if (!s.started) return this.notFrom(card, actor, s, 'submit')
@@ -1166,7 +1189,7 @@ export class Workflow {
       const now = await this.revisionNow(card, s)
       if (!isUnknown(now) && now && now === s.approved?.revision) {
         await this.cfg.hooks?.beforeWrite?.('submit')
-        if (await this.revalidate(card, s, o, evidence)) return this.regather(card, () => this.submit(ref, actor, args))
+        if (await this.revalidate(card, s, o, evidence)) return this.regather(card, () => this.submitAs(ref, actor, args, op))
         const g = await this.write(card, r, actor, (w) => {
           const bad = this.stillAt(w, s, 'submit') ?? this.evidenceChanged(w, o, evidence) ?? this.check(w, 'requeue', { agent, revision: now })
           if (bad) return bad
@@ -1178,17 +1201,20 @@ export class Workflow {
     }
     if (!(from === 'active' || ((from === 'approved' || from === 'review') && s.stale) || from === 'review')) return this.notFrom(card, actor, s, 'submit')
 
-    const g = await this.gatherSubmit(card, s, actor, args)
+    const g = await this.gatherSubmit(card, s, actor, args, undefined, false, op)
     if (!('inputs' in g)) return this.refuse(card, actor, 'submit', g)
-    // Ended while it gathered (a newer submission of the card, its workspace closing): refused before anything, and never
-    // gathered again (which would end the newer one in turn).
-    if (g.focusedOp?.aborted) return this.refuse(card, actor, 'submit', { rule: 'submit.focusedChosen', values: { card: card.key, revision: (g.revision ?? '').slice(0, 7), state: 'unknown', why: 'cancelled' } }) // i18n-ignore: codes
+    const ended: GuardRefusal = { rule: 'submit.focusedChosen', values: { card: card.key, revision: (g.revision ?? '').slice(0, 7), state: 'unknown', why: 'cancelled' } } // i18n-ignore: codes
+    // Its operation ended while it gathered (G20: only where it picked): refused before anything.
+    if (g.focusedOp?.aborted) return this.refuse(card, actor, 'submit', ended)
     // The same revision again: a new submission only with a note (§16.8.1).
     const waiting = (from === 'review' || from === 'approved' || awaitsAgentMerge(g.r, g.s)) && !g.s.stale
     if (g.earlier && !waiting && !args.note && !args.drag) return this.refuse(card, actor, 'submit', { rule: 'submit.sameRevisionNote', values: { revision: g.revision!.slice(0, 7) } })
 
     await this.cfg.hooks?.beforeWrite?.('submit')
-    if (await this.revalidate(g.card, g.s, g.o, g.before)) return this.regather(card, () => this.submit(ref, actor, args))
+    const again = await this.revalidate(g.card, g.s, g.o, g.before)
+    // Ended while it waited or checked the evidence again (HR4's round 3): refused, never gathered again.
+    if (g.focusedOp?.aborted) return this.refuse(card, actor, 'submit', ended)
+    if (again) return this.regather(card, () => this.submitAs(ref, actor, args, op))
     let ahead: CardRecord[] | null = null
     // A follow-up (HI-1832): only from Review, unstale, and never a drag (the user's moves); elsewhere an ordinary submission.
     const followUp = !!args.followUp && !args.drag && from === 'review' && !g.s.stale
@@ -1196,7 +1222,7 @@ export class Workflow {
       const changed = this.stillAt(w, g.s, 'submit') ?? this.evidenceChanged(w, g.o, g.before, g.card)
       if (changed) return changed
       // Ended (HR4's round 2 finding 1): a newer submission of the card, or its workspace closing, read under the lock.
-      if (g.focusedOp?.aborted) return { rule: 'submit.focusedChosen', values: { card: card.key, revision: (g.revision ?? '').slice(0, 7), state: 'unknown', why: 'cancelled' } } as GuardRefusal // i18n-ignore: codes
+      if (g.focusedOp?.aborted) return ended
       // Every refusal before anything is written: an override never commits without its move.
       if (from === 'review' && !g.s.stale && !followUp) return { rule: 'move.notFromHere', values: { card: card.key, stage: from, move: 'submit', moves: this.movesFrom(from, g.r).join(', ') } } as GuardRefusal
       // Read again under the transaction: still in Review, unstale, and the agent its builder now (not when the call began).
@@ -1249,7 +1275,7 @@ export class Workflow {
    * files, and its guards' inputs. None's paths it sets are kept with it (`setPaths`), written by its write. `r`: the
    * ruleset, for a state predicted after a start (a drag's) whose ruleset isn't stored yet.
    */
-  private async gatherSubmit(card0: CardRecord, s0: CardState, actor: Actor, args: { revision?: string; paths?: string[]; tests?: FocusedTest[] }, r: Ruleset = this.rulesetOf(card0, s0), predicted = false): Promise<SubmitGathered | GuardRefusal> {
+  private async gatherSubmit(card0: CardRecord, s0: CardState, actor: Actor, args: { revision?: string; paths?: string[]; tests?: FocusedTest[] }, r: Ruleset = this.rulesetOf(card0, s0), predicted = false, op?: AbortSignal): Promise<SubmitGathered | GuardRefusal> {
     let card = card0
     let s = s0
     const o = r.options
@@ -1301,33 +1327,26 @@ export class Workflow {
     // G20 (HI-1367): the tests the change needs, picked in the card's folder at exactly this revision, or named by its
     // builder; kept with the submission (its `focused`), and a pick that couldn't choose refuses without the builder's list.
     let focusedOp: AbortSignal | undefined
-    if (r.guards.submit.includes('submit.focusedChosen') && card.kind === 'code' && revision && base && !predicted) ({ choice: inputs.focused, op: focusedOp } = await this.chooseFocused(card, o, this.folderOf(s), revision, base, args.tests))
+    if (r.guards.submit.includes('submit.focusedChosen') && card.kind === 'code' && revision && base && !predicted) {
+      // A move of the user's that submits (a drag) has no operation of its own: one for this gathering alone.
+      focusedOp = op ?? this.submitOperation(card.id)
+      inputs.focused = await this.pickFor(o, this.folderOf(s), revision, base, args.tests, focusedOp)
+    }
     const earlier = card.kind === 'code' && s.submissions.some((x) => x.revision === revision)
     const fin = o.review === 'none' ? await this.finishInputs(card, s, r, revision) : {}
     const only = card.kind === 'no-code' ? (id: GuardId) => NO_CODE_GUARDS.includes(id) : undefined
     return { r, o, card, s, from, agent, runner, setPaths, revision, base, key, files, ...(commits ? { commits } : {}), ...(paths ? { paths } : {}), inputs, warnings, earlier, fin, before, ...(only ? { only } : {}), ...(focusedOp ? { focusedOp } : {}) }
   }
 
+  /** Each card's latest submission's operation (`submitOperation`): a newer one aborts the one before (its pick, and its write). */
+  private readonly picks = new Map<number, AbortController>()
+
   /**
    * A submission's focused tests (G20, HI-1367): its change path by path, and the project's picker run on it at exactly
    * the revision (`pickAtRevision`); the builder's `tests` are its additions, or, when the pick couldn't choose, the list
-   * that stands in for it (`manual`, reviewed with the change). Never throws.
+   * that stands in for it (`manual`, reviewed with the change). Never throws; a pick its operation (`signal`) ended is
+   * `cancelled`, never manual.
    */
-  private async chooseFocused(card: CardRecord, o: WorkflowOptions, folder: string, revision: string, base: string, tests: FocusedTest[] | undefined): Promise<{ choice: FocusedChoice; op: AbortSignal }> {
-    // One submission per card at a time (HR4's rounds 1 and 2, finding 8): a newer one ends the one before, as its
-    // workspace closing ends any. `op` stays aborted for the ended one through its write, which is then refused whatever
-    // its choice (a builder's list stands in for a pick that couldn't choose, never for a submission that was ended).
-    this.picks.get(card.id)?.abort()
-    const own = new AbortController()
-    this.picks.set(card.id, own)
-    const life = this.cfg.focused?.life
-    const op = life ? AbortSignal.any([own.signal, life]) : own.signal
-    return { choice: await this.pickFor(o, folder, revision, base, tests, op), op }
-  }
-
-  /** Each card's latest submission's operation: a newer one aborts the one before (its pick, and its write). */
-  private readonly picks = new Map<number, AbortController>()
-
   private async pickFor(o: WorkflowOptions, folder: string, revision: string, base: string, tests: FocusedTest[] | undefined, signal: AbortSignal): Promise<FocusedChoice> {
     const change = await pathChanges(folder, base, revision)
     const command = o.commands[FOCUSED_PICK]?.trim()
