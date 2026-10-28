@@ -75,6 +75,8 @@
   "tips.attachFiles.title": "Załącz dowolny plik do promptu",
   "tips.attachmentsTabs.text": "Zakładka Załączniki ma Załączniki z paneli i Załączniki kart. Pokaż w Załącznikach, obok załączników karty, otwiera Załączniki kart przy tej karcie; Pokaż załączniki sesji, w menu ⋯ agenta, otwiera Załączniki z paneli przy jego sesji.",
   "tips.attachmentsTabs.title": "Przejdź do plików karty lub sesji",
+  "tips.autoModeSetup.text": "W trybie Auto Claude Code może zaproponować, że nauczy tryb Auto twojego środowiska. Hive nigdy nie odpowiada: agent pokazuje Czeka na odpowiedź i nic nie jest do niego wpisywane, dopóki nie odpowiesz. Ustawienia → Zaawansowane → Claude Code mogą wyłączyć tę propozycję.",
+  "tips.autoModeSetup.title": "Propozycja Claude Code czeka na ciebie",
   "tips.backupRetention.text": "Hive kompresuje swoje kopie zapasowe transkrypcji po zakończeniu sesji, a Miejsce na dysku pokazuje, ile zawierają. Aby pozbyć się starych, ustaw Ustawienia → Sesje → Przechowuj kopie zapasowe transkrypcji: do Kosza trafiają tylko kopie sesji, które CLI wciąż ma.",
   "tips.backupRetention.title": "Kopie zapasowe zajmują mniej miejsca i mogą wygasać",
   "tips.banners.text": "Gdy korzystasz z Hive, informacja, że agent skończył lub Cię potrzebuje, pojawia się jako baner w oknie, a nie jako powiadomienie Windows nad Asystentem. Ustawienia → Powiadomienia określają, gdzie się pokazuje, dla których obszarów roboczych i na jak długo.",

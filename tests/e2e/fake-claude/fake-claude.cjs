@@ -86,6 +86,11 @@
 //   hook), and the idle notification follows as after a turn. Answered so, it stays on its model and records nothing
 //   (as HB3's stop); "safeguardpromptswitch" is answered "Switch automatically": its record of the flagged request
 //   (model_refusal_fallback, for the session) and the model it switched to (Opus 4.8, or Sonnet 5.5 if on Opus 4.8).
+// - Its offer to teach auto mode, as Claude Code 2.1.312 made it to HB4 (HI-1959): "envsetup": after its turn's Stop,
+//   "Teach auto mode about your environment?" on a cleared screen, with no hook; keys go to it, not the input: Esc puts
+//   it off (its input back, empty), Enter answers it (recorded in fake-envsetup.jsonl). With fake-input-box.txt in its
+//   home at its start, its input is 2.1.312's box (a rule, `❯` and a no-break space, a rule below). The test making
+//   fake-clear-line-<agent> clears its input line while idle, as that screen took HB4's wake.
 // - Notices (#650), as Claude Code 2.1.296 takes them: context in a PostToolUse or Stop reply reaches "the model", and a
 //   Stop answered with context (or a block) carries the turn on to another Stop with stop_hook_active. Each notice
 //   ("[Hive] …") is logged in fake-notices.jsonl (agent, where, text). With fake-follow-notices.txt in its home (any
@@ -663,6 +668,7 @@ async function runPrompt(text, enter = null) {
   if (late) await hook('PreToolUse', late)
   await endTurn(`Done: ${text}${mode}`, Number(/\bcontext\s+(\d+)/i.exec(text)?.[1] ?? 20), /\bloststop\b/i.test(text), { late, carryOn: /\bstopcontinue\b/i.test(text) })
   if (/\bsafeguardprompt(switch)?\b/i.test(text)) await safeguardPrompt(/\bsafeguardpromptswitch\b/i.test(text))
+  if (/\benvsetup\b/i.test(text)) envSetup()
   // "statusmodel ID": the status line reports the model it runs as ID, as Claude Code's does (HI-1772: a server's model).
   const statusModel = /\bstatusmodel\s+(\S+)/i.exec(text)
   if (statusModel) await statusLine({ model: { id: statusModel[1], display_name: statusModel[1] } })
@@ -720,6 +726,26 @@ async function safeguardPrompt(switchTo) {
     idleNotice()
   }
   await hook('Notification', { notification_type: 'permission_prompt', message: 'Claude needs your permission' })
+}
+
+/**
+ * "envsetup": after its turn's Stop it offers to teach auto mode about the environment, as Claude Code 2.1.312 did to
+ * HB4 (HI-1959): its question on a cleared screen, and no hook. While it shows, keys go to it, not to the input: Esc puts
+ * it off (the screen cleared, its input back, empty), Enter answers it (Yes: recorded in fake-envsetup.jsonl, which a
+ * suite checks Hive never does), anything else is taken by it and lost.
+ */
+let envSetupOpen = false
+function envSetup() {
+  envSetupOpen = true
+  out("\x1b[2J\x1b[H Teach auto mode about your environment?\r\n\r\n Auto mode works better when it knows your environment. Takes about a minute.\r\n\r\n ❯ 1. Yes\r\n   2. Not now\r\n   3. Don't show again\r\n\r\n Enter to select · ↑/↓ to navigate · Esc to cancel\r\n")
+}
+function envSetupAnswered(answer) {
+  envSetupOpen = false
+  if (home) fs.appendFileSync(path.join(home, 'fake-envsetup.jsonl'), JSON.stringify({ agent: process.env.HIVE_AGENT || 'agent', answer, at: new Date().toISOString() }) + '\n')
+  line = ''
+  enters = 0
+  out('\x1b[2J\x1b[H')
+  promptLine()
 }
 
 /** Reads a Hive skill as Claude Code's Skill tool does, recording the call and its answer in the transcript. */
@@ -859,6 +885,14 @@ function take(name) {
 /** What Claude Code does by itself while idle (#612): a compaction before the prompt cache expires, and a recap. */
 async function whileIdle() {
   if (busy) return
+  // fake-clear-line-<agent>: its input line goes, as when a screen of Claude Code's took it (HI-1959: the offer to teach
+  // auto mode ate HB4's wake), its input drawn back empty.
+  if (take('fake-clear-line')) {
+    line = ''
+    enters = 0
+    out('\x1b[2J\x1b[H')
+    promptLine()
+  }
   if (take('fake-recap')) {
     write({ type: 'system', subtype: 'away_summary', content: 'The fake did its turns. (disable recaps in /config)', isMeta: false })
     out('\r\n※ recap: the fake did its turns.\r\n')
@@ -937,7 +971,15 @@ async function startSubagent(secs, k) {
 }
 
 // Its input and its footer, as Claude Code 2.1.296 marks them (no taller than the fake's prompt before #648).
-const promptLine = () => out('\r\n❯ \r\n  ? for shortcuts\r\n')
+/**
+ * With fake-input-box.txt in its home at its start, its input is Claude Code 2.1.312's box (HI-1959): a rule, `❯` and a
+ * no-break space, the line typed after it, and a rule and its footer below (drawn back after the line is cleared);
+ * otherwise `❯ ` on its own, as before.
+ */
+const inputBox = !!home && fs.existsSync(path.join(home, 'fake-input-box.txt'))
+const RULE = '─'.repeat(40)
+const boxBelow = () => `\x1b7\r\n${RULE}\r\n  ? for shortcuts\x1b8`
+const promptLine = () => out(inputBox ? `\r\n${RULE}\r\n❯ ${boxBelow()}` : '\r\n❯ \r\n  ? for shortcuts\r\n')
 /** While it works: its spinner, then its input and footer below (BUSY_LINES lines down from where it starts). */
 const BUSY = '\r\n✻ Brewing… (esc to interrupt)\r\n❯ \r\n  ? for shortcuts\r\n'
 const BUSY_LINES = 4
@@ -1061,6 +1103,12 @@ process.stdin.on('data', (data) => {
       inPaste = ch === '\ue000'
       continue
     }
+    // Its offer to teach auto mode on screen (HI-1959): Esc puts it off, Enter answers it, the rest it takes.
+    if (envSetupOpen) {
+      if (ch === '\x1b') envSetupAnswered('later')
+      else if (ch === '\r' && !inPaste) envSetupAnswered('accept')
+      continue
+    }
     // A line break or tab in a bracketed paste is text, as in Claude Code: the line keeps it (#1286).
     if (inPaste && (ch === '\r' || ch === '\n' || ch === '\t')) {
       line += ch === '\t' ? ch : '\n'
@@ -1077,7 +1125,7 @@ process.stdin.on('data', (data) => {
     // What is typed shows on its input line, as in Claude Code (a pasted image's path too, #195).
     if (ch === '\x15') {
       // The whole line goes, as in Claude Code, the rows it wrapped onto too (#1398: a narrow pane kept a line's first row).
-      if (line) out(`\r${lineRows() > 1 ? `\x1b[${lineRows() - 1}A` : ''}\x1b[J`)
+      if (line) out(`\r${lineRows() > 1 ? `\x1b[${lineRows() - 1}A` : ''}\x1b[J${inputBox ? `❯ ${boxBelow()}` : ''}`)
       line = ''
       enters = 0
     } else if ((ch === '\r' || ch === '\n') && !onEnter && Date.now() < drawingUntil) {

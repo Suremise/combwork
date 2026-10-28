@@ -563,6 +563,17 @@ export interface ProviderAdapter {
    */
   safeguardAsk?(ask: Ask, screen: string): boolean
   /**
+   * The question a CLI puts on its screen by itself while idle, sending no hook (HI-1959: Claude Code's offer to teach
+   * auto mode about the environment), from the screen as shown; null when none shows. The agent waits for the user
+   * while it does, and nothing is typed into it: the question takes the keys, and Enter answers it.
+   */
+  idleQuestion?(screen: string): string | null
+  /**
+   * What the CLI's ordinary input holds, from the screen with dim cells blanked (TerminalScreen.textWithoutDim: a hint in
+   * an empty input is dim): '' when empty, null when no ordinary input is drawn (a dialog, a redraw, a blank screen).
+   */
+  promptText?(screen: string): string | null
+  /**
    * The installed CLI's models and what each can do (#125), when it can say (null: couldn't, or an unexpected reply).
    * Asking may start the CLI briefly, but never a session, a prompt or a sign-in. env: the sessions' environment.
    */

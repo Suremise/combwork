@@ -46,6 +46,8 @@ const SLOW_PREPARE_MS = 500
  * bottom, its choices within about a dozen lines of the end (more when a narrow pane wraps their descriptions).
  */
 const SAFEGUARD_PROMPT_LINES = 24
+/** The skill whose override turns off Claude Code's offer to teach auto mode about the environment (2.1.312, HI-1959). */
+const AUTO_MODE_SETUP = 'auto-mode-setup' // i18n-ignore: Claude Code's skill name
 /**
  * A ~/.claude/projects folder name that may hold an 8.3 short name: `~1` is encoded `-1`, after at most six characters
  * of the name, its own `-`s included (`BUILD-~1` is `BUILD--1`). `project-12` can't be one (HI-1681): looking in every
@@ -536,6 +538,12 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // The user's --settings merged in: Hive passes only this file (#330).
     const settings = mergeLaunchSettings({ hooks, statusLine }, theirs, { url: ctx.hookUrl, envVar: 'HIVE_HOOK_TOKEN' })
     if (memoryDir) settings[field] = memoryDir
+    // Its offer to teach auto mode about the environment, turned off for this launch when the user said so (HI-1959,
+    // Settings → Advanced): the skill's override in Hive's settings file, never where their own --settings name it.
+    if (!advanced.get<boolean>('claude-code.autoModeSetup.offer')) {
+      const overrides = settings.skillOverrides && typeof settings.skillOverrides === 'object' ? (settings.skillOverrides as Record<string, unknown>) : {}
+      if (!(AUTO_MODE_SETUP in overrides)) settings.skillOverrides = { ...overrides, [AUTO_MODE_SETUP]: 'off' }
+    }
     await writeJsonAtomic(join(ctx.privateDir, 'settings.json'), settings)
     await writeJsonAtomic(join(dir, 'sync.json'), { launchedAt: new Date().toISOString(), hashes })
     // Instructions for this launch (the Hive Assistant's, and the Workspace notes note, #1433) are appended to Claude Code's
@@ -674,6 +682,31 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // The lines written last: on a screen cleared for the prompt it is at the top, with blank rows below.
     const bottom = screen.trimEnd().split('\n').slice(-SAFEGUARD_PROMPT_LINES).join('\n')
     return advanced.pattern('claude-code.safeguard.prompt').test(bottom)
+  }
+
+  /**
+   * Claude Code's question by itself after a turn (HI-1959: 2.1.312's offer to teach auto mode about the environment),
+   * which sends no hook: the advanced setting claude-code.screen.idleQuestion (its title, a line of its own), in the lines
+   * written last. Its dialog replaces the input box: with the box drawn, the same words are a prompt's or a reply's
+   * (HR3's round 1), never the dialog.
+   */
+  idleQuestion(screen: string): string | null {
+    const bottom = screen.trimEnd().split('\n').slice(-SAFEGUARD_PROMPT_LINES).join('\n')
+    const asked = advanced.pattern('claude-code.screen.idleQuestion').exec(bottom)
+    if (!asked || this.promptText(screen) !== null) return null
+    return asked[0].trim()
+  }
+
+  /**
+   * What Claude Code's input box holds (HI-1959), from the screen with dim cells blanked: the last box the advanced
+   * setting claude-code.screen.input finds, its rows joined and whitespace squashed ('' when empty); null without one.
+   */
+  promptText(screen: string): string | null {
+    const re = advanced.pattern('claude-code.screen.input')
+    let last: RegExpMatchArray | null = null
+    for (const m of screen.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`))) last = m
+    if (!last) return null
+    return (last[1] ?? '').replace(/\s+/g, ' ').trim()
   }
 
   startHint(text: string): StartHint | null {

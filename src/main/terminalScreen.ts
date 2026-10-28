@@ -77,6 +77,29 @@ export class TerminalScreen {
     return lines.join('\n')
   }
 
+  /**
+   * The visible lines with dim cells blanked (HI-1959): what the user or Hive typed, without a CLI's dim hint where
+   * nothing is typed (Claude Code 2.1.312's empty input shows `Try "how does <filepath> work?"`, dim).
+   */
+  textWithoutDim(): string {
+    const buf = this.term?.buffer.active
+    if (!buf) return ''
+    const lines: string[] = []
+    for (let i = 0; i < this.term!.rows; i++) {
+      const line = buf.getLine(buf.viewportY + i)
+      let row = ''
+      const width = line?.length ?? 0
+      for (let x = 0; x < width; x++) {
+        const cell = line!.getCell(x)
+        // The second half of a wide character: drawn with the first.
+        if (!cell || cell.getWidth() === 0) continue
+        row += cell.isDim() ? ' '.repeat(cell.getWidth()) : cell.getChars() || ' '
+      }
+      lines.push(row.trimEnd())
+    }
+    return lines.join('\n')
+  }
+
   dispose(): void {
     this.term?.dispose()
     this.term = null

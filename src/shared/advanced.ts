@@ -537,6 +537,18 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
+    id: 'hive.lostLine.steadySeconds',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.lostLine.steadySeconds.title', defaultMessage: 'Lost line: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A line: a message Hive typed into an agent's terminal." }),
+    desc: msg({ id: 'settings.advanced.hive.lostLine.steadySeconds.desc', defaultMessage: "A line Hive typed into an agent that its CLI didn't take, gone from its input since (a screen of the CLI's took it): how long its input must stay empty, at its prompt, with nothing taken, before Hive types it again or, with nothing to type again, tells you. Raise it if a slow machine has a line typed twice.", description: 'What the advanced setting "Lost line: wait" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959).' }),
+    kind: 'number',
+    default: 2,
+    min: 1,
+    max: 30,
+    unit: 's',
+    applies: 'now'
+  },
+  {
     id: 'hive.wait.cardMaxSeconds',
     group: 'hive',
     title: msg({ id: 'settings.advanced.hive.wait.cardMaxSeconds.title', defaultMessage: 'Card waits: longest', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
@@ -1596,6 +1608,41 @@ const SOURCES: readonly AdvancedSource[] = [
     flags: 'i',
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/safeguard-prompt-claude-2.1.296.txt`, version: '2.1.296', text: ' ❯ 1. Switch automatically\n      Continue on Opus 4.8 now, and switch without asking from now on\n   2. Stay on Opus 5.5' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'claude-code.screen.idleQuestion',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.screen.idleQuestion.title', defaultMessage: 'Screen: question while idle', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.screen.idleQuestion.desc', defaultMessage: "A question Claude Code puts on its screen by itself after a turn, sending Hive nothing (\"Teach auto mode about your environment?\"), as a line of its own in a dialog that replaces its input box (the same words in a prompt or a reply, with the input box drawn, aren't it). While it shows, Hive shows the agent waiting for you with the question, and types nothing into it: Enter would answer it. Wrong, Hive types its wakes into the question.", description: 'What the advanced setting "Screen: question while idle" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959). The quoted question is Claude Code\'s own, in English: keep it as it is.' }),
+    kind: 'pattern',
+    default: String.raw`^[ \t]*Teach auto mode about your environment\?[ \t]*$`,
+    flags: 'm',
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/advanced/envsetup-claude-2.1.312.txt`, version: '2.1.312', text: '  Teach auto mode about your environment?' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/envsetup-offer-claude-2.1.312.txt`, version: '2.1.312', text: ' Teach auto mode about your environment?' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  {
+    id: 'claude-code.screen.input',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.screen.input.title', defaultMessage: 'Screen: input box', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.screen.input.desc', defaultMessage: "Claude Code's input box, between two rules, its first group what it holds after its prompt mark. Hive reads it to tell that a line it typed is gone from the input (a screen of the CLI's took it), and then types it again. Wrong, such a line stays held, and nothing more is typed into the agent until you press Enter there.", description: 'What the advanced setting "Screen: input box" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959). A rule: a horizontal line drawn across the terminal.' }),
+    kind: 'pattern',
+    default: String.raw`^─{3,}[^\n]*\n❯[  ]?([^\n]*(?:\n(?!─{3,})[^\n]*)*)\n─{3,}`,
+    flags: 'm',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/input-claude-2.1.312.txt`, version: '2.1.312', text: `${'─'.repeat(120)}\n❯ hive wake line typed and not sent\n${'─'.repeat(120)}` }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'claude-code.autoModeSetup.offer',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.autoModeSetup.offer.title', defaultMessage: "Offer auto mode's environment setup", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto mode is one of Claude Code's permission modes." }),
+    desc: msg({ id: 'settings.advanced.claude-code.autoModeSetup.offer.desc', defaultMessage: "Claude Code offers, now and then in auto mode, to read the project, your recent sessions and optionally your shell history and other repositories, to teach auto mode about your environment. Hive never answers it: the agent waits for you. Off, Hive's Claude Code agents are started with the offer turned off for that launch (nothing is written to Claude Code's files, and auto mode decides as before); /auto-mode-setup still runs it when you want.", description: "What the advanced setting \"Offer auto mode's environment setup\" is for, and what happens when it is off (Settings → Advanced, HI-1959). /auto-mode-setup is Claude Code's command: keep it as it is." }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/envsetup-code-claude-2.1.312.txt`, version: '2.1.312', text: 'ft().skillOverrides?.["auto-mode-setup"]!=="off"', shows: "Claude Code's own code: the offer is off when its settings turn the auto-mode-setup skill off (not seen on a screen)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   ...CLAUDE_FOOTER_MODES.map(
     (m): AdvancedSource => ({

@@ -77,6 +77,8 @@ interface HiveMessageValues {
   'tips.attachFiles.title': undefined
   'tips.attachmentsTabs.text': undefined
   'tips.attachmentsTabs.title': undefined
+  'tips.autoModeSetup.text': undefined
+  'tips.autoModeSetup.title': undefined
   'tips.backupRetention.text': undefined
   'tips.backupRetention.title': undefined
   'tips.banners.text': undefined

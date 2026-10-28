@@ -75,6 +75,8 @@
   "tips.attachFiles.title": "Joindre n’importe quel fichier à un prompt",
   "tips.attachmentsTabs.text": "L’onglet Pièces jointes a Pièces jointes des volets et Pièces jointes des cartes. Afficher dans Pièces jointes, à côté des pièces jointes d’une carte, ouvre Pièces jointes des cartes sur cette carte ; Afficher les pièces jointes de la session, dans le menu ⋯ d’un agent, ouvre Pièces jointes des volets sur sa session.",
   "tips.attachmentsTabs.title": "Aller aux fichiers d’une carte ou d’une session",
+  "tips.autoModeSetup.text": "En mode Auto, Claude Code peut proposer d’apprendre ton environnement au mode Auto. Hive n’y répond jamais : l’agent affiche Réponse attendue, et rien n’y est tapé tant que tu n’as pas répondu. Paramètres → Avancé → Claude Code peut désactiver la proposition.",
+  "tips.autoModeSetup.title": "La proposition de Claude Code t’attend",
   "tips.backupRetention.text": "Hive compresse ses sauvegardes des transcriptions dès qu’une session se termine, et Stockage montre ce qu’elles contiennent. Pour laisser partir les anciennes, règle Paramètres → Sessions → Conserver les sauvegardes des transcriptions : seules les copies des sessions que la CLI possède encore vont dans la Corbeille.",
   "tips.backupRetention.title": "Des sauvegardes plus légères, qui peuvent expirer",
   "tips.banners.text": "Pendant que tu utilises Hive, un agent qui termine ou a besoin de toi apparaît en bannière dans la fenêtre, pas en notification Windows par-dessus l’Assistant. Paramètres → Notifications choisit où elle s’affiche, pour quels espaces de travail et combien de temps.",
