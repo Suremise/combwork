@@ -55,7 +55,7 @@ import type { KeptReturn } from '@shared/progressQueue'
 import type { SessionAction } from './util'
 import { storeUpdated } from './pageMarks'
 import { keepSame } from '@shared/keepSame'
-import { newerEnd, type SessionEnd } from '@shared/sessionEnd'
+import { sessionEndBook, type EndsChange, type SessionEnd } from '@shared/sessionEnd'
 import { rememberTab, shownTab } from '@shared/tabs'
 
 export type Activity = 'projects' | 'overview' | 'performance' | 'board' | 'notes' | 'skills' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
@@ -692,6 +692,11 @@ const KEPT_SAME = ['workspace', 'tasks', 'boardState', 'projectKeys', 'movedCard
 const LIVE_BATCH_MS = 250
 /** Agents' states not shown yet (applyLiveState), by projectKey, the newest of each. */
 const pendingLive = new Map<string, LiveSessionState>()
+/**
+ * Changes to show with them (HI-1862): an agent's bookkeeping (its terminal's epoch, a run's end, its usage changed, its
+ * start over), in the order made, so a dozen agents starting at once render the window a few times, not ~12 each.
+ */
+const pendingWith: ((s: State) => Partial<State>)[] = []
 let liveTimer: ReturnType<typeof setTimeout> | null = null
 
 /** Sets the store, noting which of its parts changed (HI-1775): a long task's line in hive.log names the updates made in it. */
@@ -699,7 +704,7 @@ export const set: typeof useStore.setState = ((partial: Parameters<typeof useSto
   let before = useStore.getState()
   let update = typeof partial === 'function' ? partial(before) : partial
   // A workspace set (main's newer report, a change made here): the agents' states waiting are older, so shown first.
-  if (pendingLive.size && update && 'workspace' in update) {
+  if ((pendingLive.size || pendingWith.length) && update && 'workspace' in update) {
     flushLiveStates()
     before = useStore.getState()
     if (typeof partial === 'function') update = partial(before)
@@ -1246,6 +1251,21 @@ export function applyLiveState(state: LiveSessionState): void {
   // A launch's state: any end kept for an older run no longer applies (HI-1881).
   if (state.status !== 'stopped') noteRun(state.projectPath, state.agentId, state.runId)
   pendingLive.set(projectKey(state.projectPath, state.agentId), state)
+  showSoon()
+}
+
+/**
+ * Sets the store with the agents' states (HI-1862): at once when none came lately, else at the end of their batch, in
+ * the same update. For an agent's bookkeeping that comes in bursts with its states (many agents started or ended at
+ * once); `withNext` waits for the state that follows it at once (an agent's new terminal shown with its start).
+ */
+export function setWithLive(change: (s: State) => Partial<State>, withNext = false): void {
+  pendingWith.push(change)
+  if (!withNext) showSoon()
+}
+
+/** Shows what waits now, unless a batch is under way: then at its end. */
+function showSoon(): void {
   if (liveTimer) return
   flushLiveStates()
   liveTimer = setTimeout(liveWindowEnds, LIVE_BATCH_MS)
@@ -1254,32 +1274,35 @@ export function applyLiveState(state: LiveSessionState): void {
 /** The batch's time is up: the states that came meanwhile are shown, and the next ones wait a while again. */
 function liveWindowEnds(): void {
   liveTimer = null
-  if (!pendingLive.size) return
+  if (!pendingLive.size && !pendingWith.length) return
   flushLiveStates()
   liveTimer = setTimeout(liveWindowEnds, LIVE_BATCH_MS)
 }
 
 /** The run each agent's window last saw start (HI-1881), by projectKey: an exit of any other run is an older one's. */
-const lastRuns = new Map<string, string>()
+const endBook = sessionEndBook()
 
-/** Notes the run an agent's live state is of (its latest launch); an end kept for another run no longer applies. */
+/** A change to the ends kept, as a store update: none when they stay the same. */
+const endsUpdate =
+  (change: EndsChange) =>
+  (s: State): Partial<State> => {
+    const ends = change(s.sessionEnds)
+    return ends === s.sessionEnds ? {} : { sessionEnds: ends }
+  }
+
+/**
+ * Notes the run an agent's live state is of (its latest launch): an end of another run, kept or still to be shown, no
+ * longer applies. With the state that brought it (applyLiveState, next): one update for both.
+ */
 export function noteRun(projectPath: string, agentId: string, runId: string): void {
-  const key = projectKey(projectPath, agentId)
-  if (lastRuns.get(key) === runId) return
-  lastRuns.set(key, runId)
-  if (get().sessionEnds[key] && get().sessionEnds[key].runId !== runId)
-    set((s) => {
-      const { [key]: _, ...rest } = s.sessionEnds
-      return { sessionEnds: rest }
-    })
+  const change = endBook.run(projectKey(projectPath, agentId), runId)
+  if (change) setWithLive(endsUpdate(change), true)
 }
 
-/** Keeps an ended run's why and when (HI-1881), unless it is an older run's than the latest the window saw start. */
+/** Keeps an ended run's why and when (HI-1881), unless it is an older run's than the latest the window saw start, then or when it is shown. */
 export function noteEnd(projectPath: string, agentId: string, end: SessionEnd): void {
-  const key = projectKey(projectPath, agentId)
-  const last = lastRuns.get(key)
-  if (last && last !== end.runId) return
-  set((s) => ({ sessionEnds: { ...s.sessionEnds, [key]: newerEnd(s.sessionEnds[key], end) } }))
+  const change = endBook.end(projectKey(projectPath, agentId), end)
+  if (change) setWithLive(endsUpdate(change))
 }
 
 /** Drops the ends of agents no longer in the window's workspace (their agent, project or workspace gone). */
@@ -1287,7 +1310,7 @@ export function pruneEnds(keep: (key: string) => boolean): void {
   const ends = get().sessionEnds
   const gone = Object.keys(ends).filter((k) => !keep(k))
   if (!gone.length) return
-  for (const k of gone) lastRuns.delete(k)
+  for (const k of gone) endBook.forget(k)
   set((s) => ({ sessionEnds: Object.fromEntries(Object.entries(s.sessionEnds).filter(([k]) => keep(k))) }))
 }
 
@@ -1307,12 +1330,30 @@ export function liveStateOf(projectPath: string, agentId: string): LiveSessionSt
   return findProject(get(), projectPath)?.agents.find((a) => a.id === agentId)?.live
 }
 
-/** Shows the agents' states waiting (applyLiveState) now; also before the workspace is set, which they are older than. */
+/**
+ * Shows the agents' states waiting (applyLiveState) now, and the changes made with them (setWithLive) first, in one
+ * update; also before the workspace is set, which they are older than.
+ */
 export function flushLiveStates(): void {
-  if (!pendingLive.size) return
+  if (!pendingLive.size && !pendingWith.length) return
   const states = [...pendingLive.values()]
+  const changes = pendingWith.splice(0)
   pendingLive.clear()
-  set((s) => (s.workspace ? { workspace: states.reduce(withLiveState, s.workspace) } : {}))
+  set((s) => {
+    let now: State = s
+    let out: Partial<State> = {}
+    for (const change of changes) {
+      const part = change(now)
+      now = { ...now, ...part }
+      out = { ...out, ...part }
+    }
+    return states.length && now.workspace ? { ...out, workspace: states.reduce(withLiveState, now.workspace) } : out
+  })
+}
+
+/** A project's usage changed (a session's tokens, its end): what shows it reads it again, with the agents' states. */
+export function bumpUsage(path: string): void {
+  setWithLive((s) => ({ usageVersion: { ...s.usageVersion, [path]: (s.usageVersion[path] ?? 0) + 1 } }))
 }
 
 function withLiveState(workspace: WorkspaceInfo, state: LiveSessionState): WorkspaceInfo {
@@ -1407,7 +1448,9 @@ export async function whileStarting<T>(path: string, agentId: string, what: Star
   try {
     return await fn()
   } finally {
-    set((s) => {
+    // Its start over: shown with the agents' states (a dozen started at once end together, HI-1862). A start clicked
+    // meanwhile is still ignored, as while it was under way.
+    setWithLive((s) => {
       const { [key]: _, ...rest } = s.starting
       return { starting: rest }
     })

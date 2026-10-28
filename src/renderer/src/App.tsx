@@ -34,7 +34,7 @@ import { ProgressPanel, progressRunsChanged } from './components/Progress'
 import { queueBoardChanged, queueChangedEvent } from './queueSource'
 import { AssistantMain } from './components/AssistantView'
 import { loadAssistantChanges } from './assistantUndo'
-import { agentOnScreen, applyLeftovers, applyLiveState, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, dismissToast, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
+import { agentOnScreen, applyLeftovers, applyLiveState, bumpUsage, setWithLive, liveStateOf, assistantOnLeft, assistantWasOpen, clearStartFailure, dismissToast, filesListeners, findProject, get, loadTasks, noteAgentAdded, noteEnd, notify, projectKey, pushToast, set, useLanguage, useProviderWarnings, useStore } from './store'
 import { DocsView, McpView, NotesView, SkillView, WelcomeView } from './views/OtherViews'
 import { TemplatesView } from './components/Templates'
 import { ProjectView } from './views/ProjectView'
@@ -115,7 +115,8 @@ function handleEvent(e: HiveEvent): void {
       const key = projectKey(path, e.state.agentId)
       // As last told, a state not shown yet too (applyLiveState shows them a few times a second, HI-1806).
       const prev = liveStateOf(path, e.state.agentId)
-      if (e.state.status === 'starting' && !prev?.settingUp) set((s) => ({ sessionEpoch: { ...s.sessionEpoch, [key]: (s.sessionEpoch[key] ?? 0) + 1 } }))
+      // Its new terminal shown with its start, in the same update (HI-1862: a dozen agents started at once).
+      if (e.state.status === 'starting' && !prev?.settingUp) setWithLive((s) => ({ sessionEpoch: { ...s.sessionEpoch, [key]: (s.sessionEpoch[key] ?? 0) + 1 } }), true)
       // A new launch: the last one's failure no longer applies.
       if (e.state.status === 'starting') clearStartFailure(path, e.state.agentId)
       // An agent on screen is seen as it finishes: it never shows as unseen.
@@ -126,7 +127,7 @@ function handleEvent(e: HiveEvent): void {
       break
     }
     case 'session-exit': {
-      set((s) => ({ usageVersion: { ...s.usageVersion, [e.projectPath]: (s.usageVersion[e.projectPath] ?? 0) + 1 } }))
+      bumpUsage(e.projectPath)
       // Why and when it ended, for its stopped pane (HI-1881); a failed launch has none (its failed bar says so).
       if (e.ended) noteEnd(findProject(get(), e.projectPath)?.path ?? e.projectPath, e.agentId, e.ended)
       if (!e.failure) break
@@ -159,8 +160,7 @@ function handleEvent(e: HiveEvent): void {
       break
     }
     case 'usage-changed': {
-      const path = findProject(get(), e.projectPath)?.path ?? e.projectPath
-      set((s) => ({ usageVersion: { ...s.usageVersion, [path]: (s.usageVersion[path] ?? 0) + 1 } }))
+      bumpUsage(findProject(get(), e.projectPath)?.path ?? e.projectPath)
       break
     }
     case 'toast':
