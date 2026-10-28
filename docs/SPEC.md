@@ -4020,7 +4020,8 @@ repeating them (#533) [note §8].
   `extra`), only its builder starts, and its brief says *reviewed by the pool (…)*, with no reviewer for `hive_lane`.
   The Assistant and scripts start one with `POST /v1/lanes` `pool: true` (`hive_lane` `start`, HI-1581): refused as
   Start Lane refuses it (`checkLanePool`: `poolNotOffered`, `poolEmpty`), with a reviewer of its own (`400`), and for
-  an agent's own lane (`403`); it then starts as Start Lane's does (HI-1900's `launchRecordedLane`: the builder only).
+  an agent's own lane (`403`); it then starts as Start Lane's does (HI-1900's `launchRecordedLane`: the builder only,
+  where it is stopped).
   Nobody joins it (`hive_lane join` is refused); a builder's own `hive_lane start` naming no reviewer keeps the pool, one
   naming a reviewer makes it one per lane.
 - **Assignment**: a pool lane's submission writes `assignReviewer` (`card_actions`) instead of waking a reviewer, and so
@@ -4378,14 +4379,17 @@ first; `lanes:end`).
 
 **The Assistant's and a script's lane start (HI-1900):** `POST /v1/lanes` naming its builder (`hive_lane start` from the
 Assistant) recorded the lane and nothing more, so a lane over stopped agents sat active with nothing lent and nobody
-working it (27 Oct, three lanes for 50 minutes). A new lane started so now starts as Start Lane does
-(`launchRecordedLane`): the slot lent first where the builder works in slots (`lendLane`; none free: the lane's slot
-wait recorded, shown as waiting for a slot, and slotCards' pass starts its agents once one is lent), then the builder
-and reviewer each with the generated brief (`launchAgents`). A new lane over a busy agent is refused before anything
-is recorded (`409`, as the window refuses it), checked where `startLane` decides under its lock that the call
-records a new lane (`beforeNew`: with rules off, a list sharing no card replaces the builder's lane, which is then kept), naming who is busy and every agent of the lane as not
-started; the builder's running lane is updated whatever the builder does. The reply's `note` says who started and
-where, or that it waits for a slot. A builder registering its own loop starts nothing (it is at work); a running lane
+working it (27 Oct, three lanes for 50 minutes). A new lane started so now starts its **stopped** agents as Start Lane
+does (`launchRecordedLane`): with the builder stopped, its slot lent first where it works in slots (`lendLane`; none
+free: the lane's slot wait recorded with `stoppedOnly`, shown as waiting for a slot, and slotCards' pass starts its
+agents stopped then once one is lent), then each stopped agent with the generated brief (`launchAgents`, `stoppedOnly`).
+**A running agent, idle or busy, is left as it is** (HI-1934, Darren's decision, 28 Oct): the lane is recorded for it
+as before HI-1900, never refused nor given a new conversation (one started meanwhile too), and no slot is lent for a
+running builder (it takes one as it starts the lane's card). [HI-1900 first refused a new lane over a busy agent and
+gave an idle one a new conversation: lanes the Assistant, scripts and the test suites register for running agents
+were refused, and their agents' conversations and tokens replaced.] The reply's `note` says who started and where, or
+that it waits for a slot, and names each agent left running: *B1 is running, so Hive left it as it is: tell it about
+the lane* (the caller tells it, coordinate-agents). A builder registering its own loop starts nothing (it is at work); a running lane
 the Assistant or a script updates while its builder isn't running gets its builder started on it with one line naming
 the lane (`resumeLaneBuilder`: `hive_lane next` names its card) [HR2's round 1: either left the lane active, stuck].
 

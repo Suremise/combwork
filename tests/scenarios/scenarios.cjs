@@ -2342,8 +2342,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairInProject(c)
       const a = await c.card('a', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>" instead of "Hello, <name>".', agent: 'coder' })
-      const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 })
-      if (r.status !== 200) throw new Error(`lane: ${r.text}`)
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 })
       // Implementer reviews with its own token: started, so it has one.
       await c.startAgent('implementer')
     },
@@ -2886,8 +2885,7 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'coder' })
       // The builder's lane, Implementer reviewing (registered as the card-loop skill does).
-      const lane = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n] })
-      if (lane.status !== 200) throw new Error(`lane: ${lane.text}`)
+      await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n] })
     },
     prompt: (c) =>
       `You are the builder of card #${c.cards.d} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). The card's decision: have a design checked before you build. Start the card, post your design for the reviewer's check, and wait for it as your loop says. Build nothing yet.`,
@@ -2914,8 +2912,7 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'implementer' })
       // Implementer's lane, the subject (Coder) reviewing; Implementer starts the card and posts its design, with its own token.
-      const lane = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
-      if (lane.status !== 200) throw new Error(`lane: ${lane.text}`)
+      await builderLane(c, 'implementer', { builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
       await c.startAgent('implementer')
       const started = await c.as('implementer', 'POST', `/v1/tasks/%23${n}/start`)
       if (started.status !== 200) throw new Error(`start: ${JSON.stringify(started.body)}`)
@@ -2946,8 +2943,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'coder' })
-      const lane = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n] })
-      if (lane.status !== 200) throw new Error(`lane: ${lane.text}`)
+      await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n] })
       // Coder's round 1, as the user moves it: started (Doing), a commit, submitted (Review).
       await userMove(c, n, 'doing')
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name\n")
@@ -2983,8 +2979,7 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'implementer' })
       // Implementer's lane, the subject (Coder) reviewing; Implementer's round 1 sent for review, then its follow-up, with its own token.
-      const lane = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
-      if (lane.status !== 200) throw new Error(`lane: ${lane.text}`)
+      await builderLane(c, 'implementer', { builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
       await userMove(c, n, 'doing')
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name\n")
       c.git('add', '-A')
@@ -3609,11 +3604,24 @@ async function team(c) {
   }
 }
 /**
+ * A lane registered as its builder (`key`) registers its own (hive_lane start, with its own token), which starts nobody:
+ * a lane a script records starts its stopped agents on its brief (HI-1900, HI-1934), and the scenarios start them
+ * themselves. So the builder is started for its token, registers its lane, and is stopped again (HI-1939). Its reply.
+ */
+async function builderLane(c, key, body) {
+  await c.startAgent(key)
+  const r = await c.as(key, 'POST', '/v1/lanes', { project: 'alpha', ...body })
+  if (r.status !== 200) throw new Error(`lane: ${r.status} ${JSON.stringify(r.body)}`)
+  const id = c.agents[key].id
+  await c.inv('session:stop', c.alpha, id)
+  const lib = require('../e2e/lib.cjs')
+  if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error(`setup: ${key} didn't stop after registering its lane`)
+  return r
+}
+/**
  * Two running lanes: Coder and Implementer on greet.js (#a, #b), Builder2 and Reviewer2 on the README (#c, and #d if
  * given). Nothing in Doing unless asked (`aColumn`): the agents aren't running, and a card in Doing would be stalled.
- * Each lane is registered as its builder registers its own (hive_lane start, with its own token), which starts nobody:
- * since HI-1900 a lane a script records is launched, its agents started on its brief (HI-1939). So each builder is
- * started for its token, registers its lane, and is stopped again, as the scenarios expect them.
+ * Each lane is registered as its builder registers its own (builderLane).
  */
 async function twoLanes(c, { d = false, aColumn = 'todo' } = {}) {
   await team(c)
@@ -3621,15 +3629,7 @@ async function twoLanes(c, { d = false, aColumn = 'todo' } = {}) {
   await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
   await c.card('c', { title: 'README: usage', description: 'README.md: a Usage section with one example of greet().', agent: 'builder2' })
   if (d) await c.card('d', { title: 'README: licence line', description: 'README.md: a line saying the licence is MIT.', agent: 'builder2' })
-  for (const [key, builder, reviewer, cards] of [['coder', 'Coder', 'Implementer', [c.cards.a, c.cards.b]], ['builder2', 'Builder2', 'Reviewer2', [c.cards.c, ...(d ? [c.cards.d] : [])]]]) {
-    await c.startAgent(key)
-    const r = await c.as(key, 'POST', '/v1/lanes', { project: 'alpha', builder, reviewer, cards, name: `${builder}'s lane` })
-    if (r.status !== 200) throw new Error(`lane: ${r.status} ${JSON.stringify(r.body)}`)
-    const id = c.agents[key].id
-    await c.inv('session:stop', c.alpha, id)
-    const lib = require('../e2e/lib.cjs')
-    if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error(`setup: ${builder} didn't stop after registering its lane`)
-  }
+  for (const [key, builder, reviewer, cards] of [['coder', 'Coder', 'Implementer', [c.cards.a, c.cards.b]], ['builder2', 'Builder2', 'Reviewer2', [c.cards.c, ...(d ? [c.cards.d] : [])]]]) await builderLane(c, key, { builder, reviewer, cards, name: `${builder}'s lane` })
 }
 /** What Hive's card wake to the Assistant ends with while lanes run (src/shared/watch.ts, the same: a unit test checks). */
 const LANES_RUNNING_TAIL = ' Lanes are still running (hive_lane list): before you end your turn, watch them again in one lane watch, with any card outside them as cards (hive_wait_for_tasks with lanes ["all"], cards, wake; run-lanes).'
