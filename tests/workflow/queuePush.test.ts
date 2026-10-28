@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { join } from 'path'
 import { execFileSync } from 'child_process'
-import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
+import { B1, commit, moved, setup, sh, type Env } from './harness'
 import { tempDir } from '../tempDir'
 import { formShows, preset } from '../../src/shared/workflow/options'
 import { ruleOptions } from '../../src/shared/workflow/compile'
@@ -21,9 +21,13 @@ afterEach(() => {
   env = null
 })
 
-/** Pair (Hive merges), with the target `main` checked out nowhere, and a bare remote `origin` that main tracks. */
+/**
+ * Pair (Hive merges), with the target `main` checked out nowhere, and a bare remote `origin` that main tracks. No review:
+ * a submitted card goes straight into the queue, as the push is all these tests are about (HI-1930: a reviewer's start,
+ * review copy and verdict per card made them slow enough to reach the time limit on a loaded machine).
+ */
 function pushing(on = true): { e: Env; bare: string } {
-  const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], pushTarget: on }))
+  const e = (env = setup({ ...preset('git', 'pair'), review: 'none', noSelfReview: false, preChecks: [], mergeChecks: [], pushTarget: on }))
   sh(e.project, 'checkout', '-q', '--detach')
   const bare = join(tempDir('remote-'), 'origin.git')
   execFileSync('git', ['init', '-q', '--bare', '-b', 'main', bare])
@@ -39,8 +43,6 @@ async function queued(e: Env, title: string, file: string) {
   moved(s)
   commit(s.data!.folder as string, { [file]: `${title}\n` }, title)
   moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
-  moved(await e.wf.startReview(card.key, R1))
-  moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
   return card
 }
 
@@ -89,13 +91,19 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
     expect(formShows('pushTarget', preset('git', 'pairAgent'))).toBe(false)
   })
 
-  it('refused (the remote has commits main lacks): paused, the card Done, the next card waits; after a pull, Resume pushes and the queue goes on', async () => {
-    const { e, bare } = pushing()
-    // Someone else pushes to the remote first.
+  /** The remote with a commit main lacks (someone else pushed first). */
+  function theirs(bare: string): void {
     const other = join(tempDir('other-'), 'clone')
     execFileSync('git', ['clone', '-q', bare, other])
     commit(other, { 'theirs.txt': 'theirs\n' }, 'theirs')
     sh(other, 'push', '-q', 'origin', 'main')
+  }
+
+  // Refused, then pulled and resumed: two tests (HI-1930), each about half the work of the one they were, so neither
+  // nears the time limit on a loaded machine. Resume then going on to the next card is the "can't be read" tests'.
+  it('refused (the remote has commits main lacks): paused, the card Done, the next card waits', async () => {
+    const { e, bare } = pushing()
+    theirs(bare)
     const a = await queued(e, 'A', 'a.txt')
     const b = await queued(e, 'B', 'b.txt')
     const out = await e.queue().drain('main')
@@ -105,14 +113,21 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
     expect(e.wf.state(b).stage).toBe('merging')
     expect(owed(e)).toMatchObject({ card: a.key })
     expect(await e.queue().runOnce('main')).toBeNull()
+  })
+
+  it('refused, then pulled: Resume pushes the owed merge, and nothing stays owed or paused', async () => {
+    const { e, bare } = pushing()
+    theirs(bare)
+    const a = await queued(e, 'A', 'a.txt')
+    expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'pushRejected', card: a.key })
     // The user pulls their commits into main, then resumes.
     sh(e.project, 'fetch', '-q', 'origin')
     sh(e.project, 'checkout', '-q', 'main')
     sh(e.project, 'merge', '-q', '--no-edit', 'origin/main')
     sh(e.project, 'checkout', '-q', '--detach')
     e.queue().resume('main')
-    expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
-    expect(e.wf.state(b).stage).toBe('done')
+    await e.queue().drain('main')
     expect(remoteMain(bare)).toBe(localMain(e))
     expect(owed(e)).toBeNull()
     expect(e.store.queuePause('main')).toBeNull()
