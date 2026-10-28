@@ -288,12 +288,14 @@ const check = (name, ok, extra = '') => {
   const doneTop = await api('PATCH', `/v1/tasks/${cardNo}`, { position: 'top' })
   check("the Assistant can't put Done in order, and the user isn't asked", doneTop.status === 403 && (await page.locator('.assistant-question').count()) === 0, JSON.stringify(doneTop))
   // A lane the Assistant starts unwatched (#402): the reply nudges it to watch the lanes; with a lane watch on them all (#531), it doesn't.
+  const builderId = (await inv('workspace:get')).projects.find((x) => x.name === 'alpha').agents.find((a) => a.name === 'Builder')?.id
+  const wasLive = await live(alpha, builderId)
   const unwatched = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', cards: [o1, o2] })
   check('a lane started with no watch following it: the reply says to watch the lanes', unwatched.status === 200 && /No watch of yours follows this lane/.test(unwatched.body?.note ?? ''), JSON.stringify(unwatched.body))
-  // HI-1900: started as Start Lane… starts one, its builder given the lane's brief (never left active with nobody on it).
-  const builderId = (await inv('workspace:get')).projects.find((x) => x.name === 'alpha').agents.find((a) => a.name === 'Builder')?.id
-  const briefed = async () => ((await api('GET', '/v1/projects/alpha/agents/Builder/activity')).body?.currentTask ?? '').includes(`Lane ${unwatched.body?.lane?.id}`) || !!(await live(alpha, builderId))
-  check("…its builder is started with the lane's brief, and the reply says so (HI-1900)", /Started Builder with the lane's brief\./.test(unwatched.body?.note ?? '') && !!(await until(briefed, HUNG_MS)), JSON.stringify(unwatched.body?.note))
+  // HI-1934 (Darren's option (a) of HI-1900): Builder running, it is left as it is (no new conversation), and the reply says to tell it.
+  // The reply comes once the lane's launch is over, so a new conversation would show by now.
+  const nowLive = await live(alpha, builderId)
+  check("…its builder, running, is left as it is, and the reply says to tell it (HI-1934)", !!wasLive?.sessionId && nowLive?.sessionId === wasLive.sessionId && nowLive?.runId === wasLive.runId && /Builder is running, so Hive left it as it is: tell it about the lane\./.test(unwatched.body?.note ?? ''), JSON.stringify({ note: unwatched.body?.note, before: wasLive?.sessionId, after: nowLive?.sessionId }))
   const watching = await api('POST', '/v1/tasks/wait', { lanes: ['all'], wake: true })
   const rewatched = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', cards: [o1, o2] })
   check('…and with one, no nudge', watching.status === 200 && rewatched.status === 200 && !/No watch of yours/.test(rewatched.body?.note ?? ''), JSON.stringify({ watching: watching.body, rewatched: rewatched.body }))
