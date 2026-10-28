@@ -992,12 +992,12 @@ export class WorkspaceService {
   async setAdvanced(id: string, raw: unknown): Promise<void> {
     if (!this.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
     const def = advancedDef(id)
-    if (!def?.workspace) throw hiveError(msg({ id: 'service.workspace.advancedNotHere', defaultMessage: "{setting} can't be set for a workspace.", description: 'An error: the advanced setting {setting} (its title, or its id) has no value of its own for a workspace, only for Hive.' }), { setting: def?.text.title ?? id })
+    if (!def?.workspace) throw hiveError(msg({ id: 'service.workspace.advancedNotHere', defaultMessage: "{setting} can't be set for a workspace.", description: 'An error: the advanced setting {setting} (its title, or its id) has no value of its own for a workspace, only for Hive.' }), { setting: def?.text.title ?? id }, { kind: 'invalid' })
     const own = { ...this.wsConfig.advanced }
     if (raw === null || raw === undefined) delete own[id]
     else {
       const checked = checkAdvanced(def, raw)
-      if ('error' in checked) throw new HiveError(checked.errorText)
+      if ('error' in checked) throw new HiveError(checked.errorText, { kind: 'invalid' })
       own[id] = checked.value
     }
     if (Object.keys(own).length) this.wsConfig.advanced = own

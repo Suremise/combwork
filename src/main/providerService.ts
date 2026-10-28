@@ -190,8 +190,8 @@ class ProviderService {
   /** detected(), refusing when Hive is still looking: what calls it would otherwise commit to a guess (#506). */
   async settle(id?: ProviderId): Promise<void> {
     if (await this.detected(id)) return
-    if (!id) throw hiveError(msg({ id: 'service.providers.stillLookingAll', defaultMessage: 'Hive is still looking for the coding agent CLIs. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet." }))
-    throw hiveError(msg({ id: 'service.providers.stillLooking', defaultMessage: 'Hive is still looking for {cli}. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLI {cli} (\"Codex\"), so it can't use it yet." }), { cli: provider(id).descriptor.name })
+    if (!id) throw hiveError(msg({ id: 'service.providers.stillLookingAll', defaultMessage: 'Hive is still looking for the coding agent CLIs. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet." }), undefined, { kind: 'conflict' })
+    throw hiveError(msg({ id: 'service.providers.stillLooking', defaultMessage: 'Hive is still looking for {cli}. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLI {cli} (\"Codex\"), so it can't use it yet." }), { cli: provider(id).descriptor.name }, { kind: 'conflict' })
   }
 
   /**
@@ -364,7 +364,7 @@ class ProviderService {
   runAccountLogin(id: ProviderId, accountId: string, env: Record<string, string>, onExit: (code: number) => void, setUp?: { env: Record<string, string>; cwd: string }): string {
     const adapter = provider(id)
     const info = this.info(id)
-    if (!info.path) throw hiveError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: adapter.descriptor.name })
+    if (!info.path) throw hiveError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: adapter.descriptor.name }, { kind: 'conflict' })
     const key = `task:${id}:login:${accountId}`
     if (hasPty(key)) return key
     // The connection's own sign-in where the CLI has one (HI-1757), without the variables it would read as a login. A
@@ -389,7 +389,7 @@ class ProviderService {
       const cmd = adapter.installCommand()
       return this.runTask(id, task, cmd.file, cmd.args, `${name} install`, undefined, shown) // i18n-ignore: the task's name in the log
     }
-    if (!info.path) throw hiveError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: name })
+    if (!info.path) throw hiveError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: name }, { kind: 'conflict' })
     if (task === 'update') {
       if (this.liveSessionCount(id) > 0) throw hiveError(msg({ id: 'service.providers.stopFirst', defaultMessage: 'Stop all running {cli} agents before updating it.', description: 'An error updating the coding agent CLI {cli} ("Codex") while agents run it.' }), { cli: name }, { kind: 'conflict' })
       const pending = this.updateRetries.get(id)
@@ -411,7 +411,7 @@ class ProviderService {
       const cmd = adapter.loginCommand(info.path)
       return this.runTask(id, task, cmd.file, cmd.args, `${name} sign-in`, undefined, shown) // i18n-ignore: the task's name in the log
     }
-    if (!adapter.setupCommand) throw hiveError(msg({ id: 'service.providers.noSetup', defaultMessage: '{cli} has no setup task.', description: 'An error: the coding agent CLI {cli} ("Codex") has no setup task for Hive to run.' }), { cli: name })
+    if (!adapter.setupCommand) throw hiveError(msg({ id: 'service.providers.noSetup', defaultMessage: '{cli} has no setup task.', description: 'An error: the coding agent CLI {cli} ("Codex") has no setup task for Hive to run.' }), { cli: name }, { kind: 'invalid' })
     const cmd = adapter.setupCommand(info.path)
     return this.runTask(id, task, cmd.file, cmd.args, `${name} setup`, cmd.keys ? { keys: cmd.keys, ready: cmd.readyPattern, busyTitle: cmd.busyTitle, busyScreen: cmd.busyScreen, done: cmd.done } : undefined, shown)
   }

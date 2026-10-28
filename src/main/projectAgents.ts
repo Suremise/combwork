@@ -54,8 +54,12 @@ const M = {
   notChecked: msg({ id: 'worktrees.reuse.notChecked', defaultMessage: 'not checked', description: "Why an unused worktree isn't reused for a new agent: it wasn't checked. A clause, lower case." })
 }
 
-/** A shared helper's text for the window (`agentLimitText`, `mergeBlocked`, given the `tr` capturedText passes), as a HiveError. */
-const helperError = (fn: Parameters<typeof capturedText>[0]): HiveError => new HiveError(capturedText(fn)!)
+/**
+ * A shared helper's text for the window (`agentLimitText`, `mergeBlocked`, given the `tr` capturedText passes), as a
+ * HiveError: a refusal by the project's state (its agents per project, an agent at work), so the Agent API answers 409,
+ * never 500 (HI-1952).
+ */
+const helperError = (fn: Parameters<typeof capturedText>[0]): HiveError => new HiveError(capturedText(fn)!, { kind: 'conflict' })
 
 /** Branches and worktrees for the Add Agent dialog. */
 export async function gitInfo(projectPath: string): Promise<ProjectGitInfo> {
@@ -157,7 +161,7 @@ export async function addAgent(projectPath: string, opts: AddAgentOptions): Prom
         // The limit as it is now: Settings may have lowered it since the check above.
         const max = agentLimit(projectPath)
         if (list.length >= max) throw helperError((t) => agentLimitText(max, t))
-        if (list.some((a) => sameAgentName(a.name, name))) throw hiveError(msg({ id: 'worktrees.agent.nameTaken', defaultMessage: 'There is already an agent called "{name}".', description: 'An error: the project already has an agent with the name {name}.' }), { name })
+        if (list.some((a) => sameAgentName(a.name, name))) throw hiveError(msg({ id: 'worktrees.agent.nameTaken', defaultMessage: 'There is already an agent called "{name}".', description: 'An error: the project already has an agent with the name {name}.' }), { name }, { kind: 'conflict' })
         // Its connection as it is now (HI-1769): turned off or removed while it was being prepared, it isn't added.
         if (def.connection) assertConnectionHere(def.connection, def.provider!, projectPath, name)
         // An automatic layout follows the agents, so the new one shows; with one chosen by hand, a full page sends it to the next (#134).
@@ -344,7 +348,7 @@ export async function prepareAgent(projectPath: string, cfg: ProjectConfig, opts
 export function cleanRole(role: unknown): string {
   if (typeof role !== 'string') return ''
   const r = role.replace(/\s+/g, ' ').trim()
-  if (r.length > ROLE_MAX) throw hiveError(msg({ id: 'worktrees.agent.roleTooLong', defaultMessage: 'A role is at most {max} characters.', description: "An error: an agent's role (what it does, in a few words) is longer than it may be ({max}, a number)." }), { max: ROLE_MAX })
+  if (r.length > ROLE_MAX) throw hiveError(msg({ id: 'worktrees.agent.roleTooLong', defaultMessage: 'A role is at most {max} characters.', description: "An error: an agent's role (what it does, in a few words) is longer than it may be ({max}, a number)." }), { max: ROLE_MAX }, { kind: 'invalid' })
   return r
 }
 
@@ -366,7 +370,7 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   const agents = projectAgents(cfg)
   if (patch.name !== undefined) {
     patch.name = patch.name.trim()
-    if (!patch.name) throw hiveError(msg({ id: 'worktrees.agent.enterName', defaultMessage: 'Enter a name.', description: "An error: an agent's name was emptied." }))
+    if (!patch.name) throw hiveError(msg({ id: 'worktrees.agent.enterName', defaultMessage: 'Enter a name.', description: "An error: an agent's name was emptied." }), undefined, { kind: 'invalid' })
   }
   // Empty values clear an override so the agent follows the project again (and an empty role: its name is its role).
   const { use200kContext, mcpServers, workflowRole, connection, ...rest } = patch

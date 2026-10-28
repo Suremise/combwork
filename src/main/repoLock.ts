@@ -127,7 +127,7 @@ const profile = (): string => {
 export async function commonGitDir(folder: string): Promise<string> {
   const r = await git(folder, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
   const dir = r.ok ? r.out.trim() : ''
-  if (!dir) throw hiveError(msg({ id: 'git.repoLock.noGitDir', defaultMessage: "Hive couldn't find the git folder of {folder}, so nothing was changed: {why}", description: "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Hive's merge lock lives). {why} is git's message." }), { folder, why: r.err || r.out })
+  if (!dir) throw hiveError(msg({ id: 'git.repoLock.noGitDir', defaultMessage: "Hive couldn't find the git folder of {folder}, so nothing was changed: {why}", description: "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Hive's merge lock lives). {why} is git's message." }), { folder, why: r.err || r.out }, { kind: 'conflict' })
   return dir
 }
 

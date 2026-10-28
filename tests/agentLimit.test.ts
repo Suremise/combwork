@@ -99,6 +99,18 @@ describe('Hive keeps to it', () => {
     expect(count(alpha)).toBe(12)
   })
 
+  it("through the Agent API it is a refusal (409, its words), recorded as the caller's error, never Hive's (HI-1952)", async () => {
+    const { apiErrorReply } = await import('../src/main/servers')
+    const { apiOutcome } = await import('../src/main/metrics')
+    const refused = await add(alpha).then(
+      () => null,
+      (e: unknown) => e
+    )
+    const reply = apiErrorReply(refused)
+    expect(reply).toEqual({ status: 409, body: { error: 'A project can have up to 12 agents (Settings → Advanced → Agents per project).' } })
+    expect(apiOutcome({ finished: true, status: reply.status, waiting: false })).toBe('client-error')
+  })
+
   it("Settings' value, and the workspace's own before it", async () => {
     await advanced.set(AGENTS_PER_PROJECT, 13)
     expect(agentLimit(alpha)).toBe(13)
