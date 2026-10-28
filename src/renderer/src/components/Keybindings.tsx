@@ -218,7 +218,7 @@ export function KeybindingsEditor({ project }: { project?: ProjectInfo }) {
       </div>
       {project && <p className="faint kb-note">{tr(msg({ id: 'settings.keys.projectNote', defaultMessage: 'Changes here apply while {project} is selected, over the global shortcuts. Other commands are set in Settings → Keyboard Shortcuts.', description: "Above a project's shortcuts (Project Settings → Keyboard Shortcuts). {project} is its name." }), { project: project.name })}</p>}
       <Tabs<KeysTab> idBase={idBase} className="kb-tabs" label={tr(T.tabs)} value={tab} onChange={chooseKeysTab} items={tabIds.map((id) => ({ id, label: id === ALL ? tr(T.all) : tr(CATEGORY_TEXT[id]), count: count(id) }))} />
-      {/* A tab's commands on one page (a settings page scrolls): sorting and the Source filter (All: the Category one too), no paging. */}
+      {/* A tab's commands on one page (a settings page scrolls): sorting and the Set filter, no paging. */}
       <TabPanel idBase={idBase} id={tab} selected>
         <DataTable
           id={project ? 'shortcuts-project' : 'shortcuts'}
@@ -314,8 +314,8 @@ function keyColumns({ project, recording, setRecording, record, save, conflicts 
       sortValue: (r) => (r.key ? formatKeybinding(r.key) : null)
     },
     // After the shortcut (HI-1838): in a narrow editor the command and its shortcut stay in view, and Category is what
-    // the table scrolls to.
-    { key: 'category', header: tr(msg({ id: 'settings.keys.column.category', defaultMessage: 'Category', description: "A column of the keyboard shortcuts editor: the command's category (Project, Session…)." })), className: 'kb-category faint', cell: (r) => commandCategory(r.c), sortValue: (r) => commandCategory(r.c), filter: { kind: 'choice', value: (r) => commandCategory(r.c) } }, // i18n-ignore: class names
+    // the table scrolls to. No filter of its own: the tabs above choose the category (the Assistant's HI-1878 review).
+    { key: 'category', header: tr(msg({ id: 'settings.keys.column.category', defaultMessage: 'Category', description: "A column of the keyboard shortcuts editor: the command's category (Project, Session…)." })), className: 'kb-category faint', cell: (r) => commandCategory(r.c), sortValue: (r) => commandCategory(r.c) }, // i18n-ignore: class names
     {
       key: 'source',
       header: tr(msg({ id: 'settings.keys.column.set', defaultMessage: 'Set', description: 'A column of the keyboard shortcuts editor: where the shortcut comes from (changed, removed, this project…). Keep it short.' })),
