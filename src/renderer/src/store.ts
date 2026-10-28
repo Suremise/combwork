@@ -23,7 +23,7 @@ import type { TemplateAgent, TemplateRef } from '@shared/templates'
 import type { GitTool } from '@shared/gitTool'
 import type { RunsFilter } from '@shared/progressTabs'
 import { loadActivityView, saveActivityView, type ActivityView } from './activityView'
-import { cardWorker } from '@shared/activity'
+import { cardWorker, type ActivityCardAgent } from '@shared/activity'
 import { boardReader } from './boardReads'
 import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkflowForm, WorkspaceUsage, RecentWorkspace } from '@shared/types'
 import type { PresetId } from '@shared/workflow/options'
@@ -58,7 +58,7 @@ import { keepSame } from '@shared/keepSame'
 import { sessionEndBook, type EndsChange, type SessionEnd } from '@shared/sessionEnd'
 import { rememberTab, shownTab } from '@shared/tabs'
 
-export type Activity = 'projects' | 'overview' | 'performance' | 'board' | 'notes' | 'skills' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
+export type Activity = 'projects' | 'overview' | 'activity' | 'performance' | 'board' | 'notes' | 'skills' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
 export type { ProjectTab } from '@shared/projectTabs'
 
 /**
@@ -1131,18 +1131,61 @@ export function openActivity(path: string, filter: { agentId?: string; card?: nu
   setProjectTab(path, 'activity')
 }
 
-/** Whether a card has an Activity to open (HI-1743): in progress (Doing or Review) in a project of this window. */
-export const cardHasActivity = (c: Pick<TaskCard, 'column' | 'project' | 'archived'>): boolean => !c.archived && !!c.project && (c.column === 'doing' || c.column === 'review')
+/**
+ * Whether a card has an Activity to open (HI-1743, HI-1664): in progress (Doing or Review), a project's or the
+ * workspace's own. Who works on it now is found as it opens.
+ */
+export const cardHasActivity = (c: Pick<TaskCard, 'column' | 'archived'>): boolean => !c.archived && (c.column === 'doing' || c.column === 'review')
 
-/** Opens a card's Activity (HI-1743): its project's tab, frozen, on the agent working on it (its builder while it runs, else its reviewer). */
-export function openCardActivity(c: TaskCard): void {
-  const p = get().workspace?.projects.find((x) => x.name.toLowerCase() === c.project.toLowerCase())
-  if (!p || !cardHasActivity(c)) return
-  // The agent on this card now: a builder gone on to its next card isn't (HR6's round 1).
-  const asActivity = (t: TaskCard) => ({ number: t.number, label: '', title: t.title, column: t.column, builder: t.agent, reviewer: t.review?.agent ?? null })
-  const cards = get().tasks.filter((t) => !t.archived && t.project.toLowerCase() === c.project.toLowerCase()).map(asActivity)
-  const worker = cardWorker(asActivity(c), cards, (id) => !!p.agents.find((a) => a.id === id)?.live)
-  openActivity(p.path, { card: c.number, ...(worker ? { agentId: worker } : {}) })
+/** The key of an agent of a session host on Activity's workspace level (HI-1664): its host's path and its id, as the panes'. */
+export const activityAgentKey = (path: string, agentId: string): string => projectKey(path, agentId)
+
+/** Where Activity's workspace level keeps its view (HI-1664): the workspace's own, never a project's or another workspace's. */
+export const workspaceActivityKey = (workspacePath: string): string => `workspace:${workspacePath.toLowerCase()}`
+
+/**
+ * Opens Activity's workspace level (HI-1664), frozen: filtered to these agents (keys of activityAgentKey), the first's
+ * tab shown, for a card (`card`: said so, and its agents found again as agents start and stop); null: as it was left.
+ */
+export function openWorkspaceActivity(filter: { agents: string[]; card?: number } | null): void {
+  const ws = get().workspace?.path
+  if (!ws) return
+  const k = workspaceActivityKey(ws)
+  set((s) => {
+    const was = s.activityFilters[k] ?? loadActivityView(k)
+    const opened = Date.now()
+    const { forCard: _forCard, ...rest } = was
+    const view: ActivityView = filter ? { ...rest, agents: filter.agents, cards: [], ...(filter.card !== undefined ? { forCard: filter.card } : {}), ...(filter.agents[0] ? { tab: filter.agents[0] } : {}), opened } : { ...was, opened }
+    saveActivityView(k, view)
+    return { activityFilters: { ...s.activityFilters, [k]: view } }
+  })
+  showView('activity')
+}
+
+/**
+ * The agents working on a card now (HI-1664): its builder while it runs, else its reviewer, in its project (a builder gone
+ * on to its next card isn't: HR6's round 1), and every agent whose running session worked on it, a workspace card's too
+ * (main finds them by the cards' index, only now). Keys of activityAgentKey, each once.
+ */
+export async function cardActivityAgents(c: TaskCard): Promise<string[]> {
+  const s = get()
+  const out: string[] = []
+  const p = c.project ? s.workspace?.projects.find((x) => x.name.toLowerCase() === c.project.toLowerCase()) : undefined
+  if (p) {
+    const asActivity = (t: TaskCard) => ({ number: t.number, label: '', title: t.title, column: t.column, builder: t.agent, reviewer: t.review?.agent ?? null })
+    const cards = s.tasks.filter((t) => !t.archived && t.project.toLowerCase() === c.project.toLowerCase()).map(asActivity)
+    const worker = cardWorker(asActivity(c), cards, (id) => !!p.agents.find((a) => a.id === id)?.live)
+    if (worker) out.push(activityAgentKey(p.path, worker))
+  }
+  const found = (await window.hive.invoke('activity:cardAgents', c.number).catch(() => [])) as ActivityCardAgent[]
+  for (const a of found) out.push(activityAgentKey(a.path, a.agentId))
+  return [...new Set(out)]
+}
+
+/** Opens a card's Activity (HI-1743, HI-1664): the workspace level, frozen, on the agents working on it now. */
+export async function openCardActivity(c: TaskCard): Promise<void> {
+  if (!cardHasActivity(c)) return
+  openWorkspaceActivity({ agents: await cardActivityAgents(c), card: c.number })
 }
 
 /** Shows an agent's pane on the Session tab and focuses it. */

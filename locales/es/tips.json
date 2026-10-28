@@ -1,6 +1,8 @@
 {
-  "tips.activityTab.text": "La pestaña Actividad tiene una pestaña por cada agente en ejecución: su tarjeta, su turno y llamada a herramienta, sus tareas en segundo plano, subagentes y procesos. Se abre como una instantánea; Reproducir la sigue en directo. El menú ⋯ de un agente, o una tarjeta en curso, la abre en ese agente.",
+  "tips.activityTab.text": "La pestaña Actividad tiene una pestaña por cada agente en ejecución: su tarjeta, su turno y llamada a herramienta, sus tareas en segundo plano, subagentes y procesos. Se abre como una instantánea; Reproducir la sigue en directo. El menú ⋯ de un agente la abre en ese agente.",
   "tips.activityTab.title": "Mira lo que ejecuta cada agente",
+  "tips.activityWorkspace.text": "Actividad, en la barra de actividad, muestra juntos los agentes en ejecución de cada proyecto, sus pestañas agrupadas por proyecto. Una tarjeta en curso la abre en los agentes que trabajan en esa tarjeta, y una ejecución o un carril del panel Progreso en sus agentes (Mostrar en Actividad).",
+  "tips.activityWorkspace.title": "Todo lo que se ejecuta, en un solo lugar",
   "tips.advancedSettings.text": "Tras actualizarse un agente de programación, ¿Hive ya no ve su pregunta de confianza ni sus errores de inicio de sesión? Configuración → Avanzado tiene los textos y campos que busca Hive, y sus tiempos de espera: cambia uno, con el valor predeterminado al lado, o edita advanced.json.",
   "tips.advancedSettings.title": "Corrige tú mismo un cambio de la CLI",
   "tips.agentConsole.text": "Configuración → Agent API → Permitir que los agentes lean la consola de desarrollador da a los agentes una herramienta de solo lectura que muestra los hooks y la línea de estado de su CLI junto a lo que Hive entendió de cada uno, con los datos sensibles ocultos, para que puedan depurar lo que ve Hive.",

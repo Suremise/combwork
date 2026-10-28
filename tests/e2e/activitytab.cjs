@@ -8,7 +8,8 @@
 // shown again after another view it is frozen again. No spinners: working is a pulse. The agent's own processes (its
 // CLI, its terminal, hive-mcp.js) show only on request; a command shows as given. Hide finished (on by default) hides the
 // agents with nothing running; Activity in an agent's menu opens its tab, filtered, frozen; a card in progress has
-// Activity in its dialog and its menu, on its builder's tab; a finished card has none. Details show a prompt with its
+// Activity in its dialog and its menu, opening the workspace level on its builder (HI-1664, activityworkspace covers it);
+// a finished card has none. Details show a prompt with its
 // secret masked; a process the agent left running ends from its details after a confirmation, its CLI has no End
 // Process. Both themes. Fake Claude Code only (no sign-in, no tokens). Dev build, throwaway profile, workspace and CLI
 // homes; quiet.
@@ -250,11 +251,13 @@ function transcript(sid, startMin) {
     await lib.until(async () => (await page.locator('.dialog[role="dialog"]').count()) === 0, HUNG_MS)
     await cardOne.click()
     await dialogActivity.click()
-    const cardsPick = head.locator('.activity-pick').nth(1)
-    check("the card dialog's Activity: its builder's tab, filtered to the card, frozen", !!(await lib.until(async () => /1 card/.test(await cardsPick.innerText().catch(() => '')) && (await hb1Tab.getAttribute('aria-selected')) === 'true' && /Card one/.test(await cardHead.innerText().catch(() => '')), HUNG_MS, 250)) && (await live.getAttribute('aria-pressed')) === 'false')
-    await cardsPick.click()
-    await lib.menuEntry(page, 'All').click()
-    await page.keyboard.press('Escape')
+    // The workspace level (HI-1664), on its builder; the project's tab is as it was.
+    const wsTab = page.locator('.activity-workspace .activity-agent-tab[data-agent="hb1"]')
+    check("the card dialog's Activity: the workspace level on its builder, frozen", !!(await lib.until(async () => /Working on/.test(await page.locator('.activity-workspace .activity-for-card').innerText().catch(() => '')) && (await wsTab.getAttribute('aria-selected').catch(() => null)) === 'true', HUNG_MS, 250)) && (await page.locator('.activity-workspace .activity-live').getAttribute('aria-pressed')) === 'false')
+    await page.locator('.activity-btn[aria-label="Projects"]').click()
+    await page.locator('.tab', { hasText: 'Activity' }).click()
+    check("…and the project's tab is unchanged: all agents, all cards", !!(await lib.until(async () => /All agents/.test(await agentsPick.innerText().catch(() => '')) && /All cards/.test(await head.locator('.activity-pick').nth(1).innerText().catch(() => '')), HUNG_MS, 250)))
+    await hb1Tab.click()
 
     // --- A long title (HI-1884): the row stays one line, the key and the column whole, only the title cut with "…" and
     // whole in its tooltip; at the normal width and a narrow one, in both themes.

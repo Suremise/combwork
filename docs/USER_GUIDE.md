@@ -387,8 +387,16 @@ Hive only ever ends processes the agent's session started: never one you started
 - **Hide finished** (on unless you turn it off) hides the agents with nothing running. **Agents ▾** and **Cards ▾** (tick several, or **All**) narrow the tabs to those agents, or to the agents working on those cards. The tab remembers them for each project.
 
 - Click a row to see its details: its status, its input exactly (a prompt, a tool call's input, a command line, with secrets hidden as in Hive's log) and what it did last.
-- **Activity** in an agent's **⋯** menu opens that agent's tab. A card in **Doing** or **Review** has **Activity** in its dialog and its right-click menu: it opens on the agent working on it.
+- **Activity** in an agent's **⋯** menu opens that agent's tab. A card's **Activity** opens Activity across the workspace instead, on the agents working on it (below).
 - A process an agent's session started has **End Process…** in its details. It ends only that process, after you confirm, and only while it is still the one listed. The agent's own CLI isn't ended here: use **Stop**.
+
+#### Activity across the workspace <a id="activity-across-the-workspace"></a>
+
+**Activity** in the activity bar (**Show Activity** in the command palette) is the same view for the whole workspace: every project's running agents together, their tabs grouped by project, with the Hive Assistant as a group of its own while it runs. It works like a project's tab: it opens frozen, **Play** follows it live, and **Agents ▾** (each agent with its project) and **Cards ▾** narrow it. It keeps its own filters, apart from each project's. Its sidebar has **Whole workspace** and a row per project, with how many of its agents run: a project's row opens that project's own Activity tab, which stays as it is.
+
+- **From a card**: a card in **Doing** or **Review**, a project's or the workspace's own, has **Activity** in its dialog and its right-click menu. It opens on the agents working on that card now (its builder, else its reviewer, and any agent whose running session worked on it), with *Working on HI-12* above. When nobody works on it any more it says so: the card has its history. The **×** on *Working on HI-12* shows every agent again.
+- **From the Progress panel**: a run's details have **Show in Activity**, for the agent that ran it, and a lane's right-click menu has **Show in Activity**, for its builder and reviewer.
+- It reads nothing while it isn't shown or the window is minimised, and only the projects with an agent running.
 
 ### Reading past sessions <a id="reading-past-sessions"></a>
 

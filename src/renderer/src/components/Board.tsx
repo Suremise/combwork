@@ -336,7 +336,7 @@ function cardMenu(c: TaskCard, readOnly: string | null): MenuEntry[] {
           { label: tr(msg({ id: 'board.menu.start', defaultMessage: 'Start…', description: 'Menu item on a card (right-click): gives it to an agent to start (opens a dialog).' })), icon: 'play', disabled: !c.project || !!readOnly, ...(readOnly ? { detail: readOnly } : {}), onClick: () => set({ taskStartFor: c.number }) },
           ...(c.column === 'todo' && c.project ? [{ label: tr(msg({ id: 'board.menu.startLane', defaultMessage: 'Start Lane with It…', description: "Menu item on a Todo card (right-click): opens Start Lane with this card first in the lane's list (a lane: a builder and a reviewer working through cards in turn). Glossary: lane." })), icon: 'list-ordered', disabled: !!readOnly, onClick: () => openLaneStart(c.project, [c.number]) }] : []),
           // What runs on it now (HI-1743), for a card in progress.
-          ...(cardHasActivity(c) ? [{ label: tr(ACTIVITY), icon: 'type-hierarchy', onClick: () => openCardActivity(c) }] : []),
+          ...(cardHasActivity(c) ? [{ label: tr(ACTIVITY), icon: 'type-hierarchy', onClick: () => void openCardActivity(c) }] : []),
           { separator: true },
           { header: true, label: tr(msg({ id: 'board.menu.moveTo', defaultMessage: 'Move to', description: "A heading in a card's right-click menu, above the board columns it can move to." })) },
           ...TASK_COLUMNS.filter((x) => x.id !== c.column).map((x) => ({ label: tr(COLUMN_TEXT[x.id].label), icon: 'arrow-right', disabled: !!readOnly, onClick: () => (x.id === 'doing' ? moveToDoing({ n: c.number, project: c.project, agent: c.agent }) : void moveCard(c, x.id)) })),
@@ -2118,7 +2118,7 @@ export function TaskDialog() {
                 {/* Only for a card in progress (HI-1743): what runs on it now; its history is the card's. */}
                 {cardHasActivity(card) && (
                   <Tooltip content={tr(ACTIVITY_TIP)}>
-                    <button className="btn subtle" onClick={() => void tryClose().then((closed) => closed && openCardActivity(card))}>
+                    <button className="btn subtle" onClick={() => void tryClose().then((closed) => (closed ? openCardActivity(card) : undefined))}>
                       <Icon name="type-hierarchy" /> {tr(ACTIVITY)}
                     </button>
                   </Tooltip>

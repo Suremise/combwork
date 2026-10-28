@@ -1,6 +1,8 @@
 {
-  "tips.activityTab.text": "The Activity tab has a tab per running agent: its card, its turn and tool call, its background tasks, subagents and processes. It opens as a snapshot; Play follows it live. An agent's ⋯ menu, or a card in progress, opens it on that agent.",
+  "tips.activityTab.text": "The Activity tab has a tab per running agent: its card, its turn and tool call, its background tasks, subagents and processes. It opens as a snapshot; Play follows it live. An agent's ⋯ menu opens it on that agent.",
   "tips.activityTab.title": "See what each agent is running",
+  "tips.activityWorkspace.text": "Activity, in the activity bar, shows every project's running agents together, their tabs grouped by project. A card in progress opens it on the agents working on that card, and a run or a lane in the Progress panel on its agents (Show in Activity).",
+  "tips.activityWorkspace.title": "Everything running, in one place",
   "tips.advancedSettings.text": "After a coding agent's update, Hive no longer sees its trust question or its sign-in errors? Settings → Advanced has the text and fields Hive looks for, and its timeouts: change one, with the default beside it, or edit advanced.json.",
   "tips.advancedSettings.title": "Fix a CLI change yourself",
   "tips.agentConsole.text": "Settings → Agent API → Let agents read the developer console gives agents a read-only tool showing their CLI's hooks and status line next to what Hive made of each, redacted, so they can debug what Hive sees.",

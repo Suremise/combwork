@@ -3,6 +3,8 @@
 interface HiveMessageValues {
   'tips.activityTab.text': undefined
   'tips.activityTab.title': undefined
+  'tips.activityWorkspace.text': undefined
+  'tips.activityWorkspace.title': undefined
   'tips.advancedSettings.text': undefined
   'tips.advancedSettings.title': undefined
   'tips.agentConsole.text': undefined

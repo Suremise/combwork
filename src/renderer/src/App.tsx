@@ -17,6 +17,7 @@ import { ArchiveAllDialog, BoardView, MoveToDoingDialog, TaskDialog, TaskStartDi
 import { LaneStartDialog } from './components/LaneStartDialog'
 import { WorkspaceOverviewView } from './views/WorkspaceOverview'
 import { PerformanceView } from './views/Performance'
+import { WorkspaceActivityView } from './views/WorkspaceActivity'
 import { RemoveProjectDialog } from './components/ProjectRemoval'
 import { UpdateDialog } from './components/Updates'
 import { ModeMenuHost } from './components/PermissionMode'
@@ -343,6 +344,7 @@ export function App() {
   useLanguage()
   // Whether one is open, not the workspace itself: its every change would render the whole window again (HI-1806).
   const workspace = useStore((s) => !!s.workspace)
+  const workspacePath = useStore((s) => s.workspace?.path ?? null)
   useAntivirusOffer()
   const assistantLeft = useStore(assistantOnLeft)
   const activity = useStore((s) => s.activity)
@@ -481,6 +483,8 @@ export function App() {
         return <WorkspaceOverviewView />
       case 'performance':
         return <PerformanceView />
+      case 'activity':
+        return workspacePath ? <WorkspaceActivityView key={workspacePath} workspacePath={workspacePath} /> : null
       default:
         return workspace ? null : <WelcomeView />
     }
