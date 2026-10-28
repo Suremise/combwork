@@ -243,8 +243,8 @@ export class AdvancedStore {
   /** Sets an override now: only inside transact (or set), in a change's turn. */
   async setNow(id: string, raw: unknown): Promise<void> {
     const def = advancedDef(id)
-    if (!def) throw hiveError(msg({ id: 'service.advanced.unknown', defaultMessage: 'No advanced setting "{id}".', description: 'An error changing an advanced setting: Hive has none with the id {id}.' }), { id })
-    if (this.fileError) throw hiveError(msg({ id: 'service.advanced.fixFirst', defaultMessage: '{problem} Fix advanced.json (Settings → Advanced → Open advanced.json) before changing settings here.', description: "An error changing an advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() })
+    if (!def) throw hiveError(msg({ id: 'service.advanced.unknown', defaultMessage: 'No advanced setting "{id}".', description: 'An error changing an advanced setting: Hive has none with the id {id}.' }), { id }, { kind: 'notFound' })
+    if (this.fileError) throw hiveError(msg({ id: 'service.advanced.fixFirst', defaultMessage: '{problem} Fix advanced.json (Settings → Advanced → Open advanced.json) before changing settings here.', description: "An error changing an advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() }, { kind: 'conflict' })
     const values = { ...this.values }
     const madeFor = { ...this.madeFor }
     if (raw === null || raw === undefined) {
@@ -286,7 +286,7 @@ export class AdvancedStore {
 
   resetAll(): Promise<void> {
     return this.serial(async () => {
-      if (this.fileError) throw hiveError(msg({ id: 'service.advanced.fixOrDelete', defaultMessage: '{problem} Fix or delete advanced.json first (Settings → Advanced → Open advanced.json).', description: "An error resetting every advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() })
+      if (this.fileError) throw hiveError(msg({ id: 'service.advanced.fixOrDelete', defaultMessage: '{problem} Fix or delete advanced.json first (Settings → Advanced → Open advanced.json).', description: "An error resetting every advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() }, { kind: 'conflict' })
       await this.write(Object.fromEntries(Object.entries(this.values).filter(([id]) => !advancedDef(id))), {})
     })
   }
