@@ -254,6 +254,7 @@
   "shell.modes.someSkipped": "Einige Agenten wurden nicht umgestellt",
   "shell.modes.switched": "Berechtigungsmodus gewechselt",
   "shell.noticeTarget.agentGone": "{agent} ist nicht mehr in {project}",
+  "shell.noticeTarget.cardElsewhere": "{card} ist auf dem Board von {workspace}, das nicht geöffnet ist",
   "shell.noticeTarget.cardGone": "{card} ist nicht mehr auf dem Board",
   "shell.notifications.clearAll": "Alle löschen",
   "shell.notifications.none": "Keine Benachrichtigungen",

@@ -256,6 +256,7 @@ interface HiveMessageValues {
   'shell.modes.someSkipped': undefined
   'shell.modes.switched': undefined
   'shell.noticeTarget.agentGone': { agent: string | number; project: string | number }
+  'shell.noticeTarget.cardElsewhere': { card: string | number; workspace: string | number }
   'shell.noticeTarget.cardGone': { card: string | number }
   'shell.notifications.clearAll': undefined
   'shell.notifications.none': undefined

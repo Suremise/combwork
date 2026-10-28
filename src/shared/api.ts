@@ -128,6 +128,7 @@ import type {
   WorkflowLevel,
   WorkflowLevelCheck,
   ProjectStages,
+  ToastTarget,
   WorkspaceInfo
 } from './types'
 import type { PlatformId } from './platform/descriptors'
@@ -228,6 +229,8 @@ export interface HiveRequests {
   'notice:open': (projectPath: string | null) => void
   /** A banner's button (#1437): brings up the window that has its project, shows the project and runs the command there. */
   'notice:action': (projectPath: string, command: string, args: unknown[]) => void
+  /** A notice's target (HI-1961): brings up the window that has its project or workspace (else this one) and opens it there. */
+  'notice:target': (target: ToastTarget) => void
 
   'settings:get': () => AppSettings
   'settings:update': (patch: SettingsPatch) => AppSettings

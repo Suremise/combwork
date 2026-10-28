@@ -160,6 +160,32 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
       await until(async () => (await gone.count()) >= 1)
       return gone.last()
     })
+
+    // --- A card's number is its workspace's alone (HR6 round 1, finding 1): notices kept from this workspace, clicked
+    // after the window moved to another whose own cards have the same numbers, never open that board's cards (a project
+    // card and a workspace card); each says its workspace isn't open.
+    await closeToasts()
+    const wsCard = (await api('POST', '/v1/tasks', { title: 'Plan the release' })).body
+    check('a workspace card (no project) to name', typeof wsCard?.number === 'number' && !wsCard.project, JSON.stringify(wsCard))
+    const wsKey = wsCard.key || `#${wsCard.number}`
+    await notify({ card: key }, 'Old: the project card')
+    await notify({ card: String(wsCard.number) }, 'Old: the workspace card')
+    const ws2 = path.join(lib.WORK, 'notifytarget-ws2')
+    fs.rmSync(ws2, { recursive: true, force: true })
+    lib.gitProject(path.join(ws2, 'gamma'))
+    await lib.openWorkspace(inv, page, ws2)
+    for (let i = 0; i <= wsCard.number; i++) await api('POST', '/v1/tasks', { title: `Gamma ${i}`, project: 'gamma' })
+    const numbers = (await inv('tasks:list')).map((c) => c.number)
+    check("the other workspace's board has cards with the same numbers", numbers.includes(card.number) && numbers.includes(wsCard.number), JSON.stringify(numbers))
+    for (const [title, label] of [['Old: the project card', key], ['Old: the workspace card', wsKey]]) {
+      await closeToasts()
+      if ((await page.locator('.notif-panel').count()) === 0) await page.keyboard.press('Control+Alt+U')
+      await until(async () => (await row(title).count()) === 1)
+      await row(title).locator('.toast-open').click()
+      const elsewhere = page.locator('.toasts .toast', { hasText: `${label} is on notifytarget-ws's board, which isn't open` })
+      check(`${title}: says its workspace isn't open`, !!(await until(async () => (await elsewhere.count()) === 1)))
+      check(`${title}: no card of this board opened`, (await page.locator('.dialog').count()) === 0)
+    }
   } finally {
     await app.close().catch(() => {})
   }

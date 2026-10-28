@@ -25,12 +25,14 @@ interface RendererStore {
 const rendererStore = '../src/renderer/src/store'
 const rendererTarget = '../src/renderer/src/noticeTarget'
 const store = (await import(/* @vite-ignore */ rendererStore)) as RendererStore
-const { openNoticeTarget } = (await import(/* @vite-ignore */ rendererTarget)) as { openNoticeTarget: (t: ToastTarget) => void }
+const { openNoticeTarget, showNoticeTarget } = (await import(/* @vite-ignore */ rendererTarget)) as { openNoticeTarget: (t: ToastTarget) => void; showNoticeTarget: (t: ToastTarget) => void }
 
 const ALPHA = 'C:/ws/alpha'
 const ws = { path: 'C:/ws', projects: [{ path: ALPHA, name: 'alpha', agents: [{ id: 'a-1', name: 'HB4' }], config: { agents: [{ id: 'a-1', name: 'HB4' }] } }] } as unknown as WorkspaceInfo
 const agent = (agentId: string, projectPath = ALPHA): ToastTarget => ({ kind: 'agent', projectPath, agentId, name: 'HB4', project: 'alpha' })
-const card = (number: number): ToastTarget => ({ kind: 'card', number, label: `AL-${number}`, projectPath: ALPHA })
+const card = (number: number, workspacePath = 'C:/ws', projectPath: string | null = ALPHA): ToastTarget => ({ kind: 'card', number, label: `AL-${number}`, projectPath, workspacePath })
+/** Another workspace, whose board has a card 12 of its own. */
+const other = { path: 'C:/ws-b', projects: [{ path: 'C:/ws-b/beta', name: 'beta', agents: [], config: { agents: [] } }] } as unknown as WorkspaceInfo
 
 beforeEach(() => {
   calls.length = 0
@@ -64,7 +66,28 @@ describe("a notice's target (HI-1961)", () => {
   it("a project this window doesn't have: handed to the window that has it", () => {
     const elsewhere = agent('a-1', 'C:/other/beta')
     openNoticeTarget(elsewhere)
-    expect(calls.filter((c) => c.channel === 'notice:action')).toEqual([{ channel: 'notice:action', args: ['C:/other/beta', 'notice.openTarget', [elsewhere]] }])
+    expect(calls.filter((c) => c.channel.startsWith('notice:'))).toEqual([{ channel: 'notice:target', args: [elsewhere] }])
     expect(store.get().toasts).toEqual([])
+  })
+
+  // HR6 round 1, finding 1: a card's number is its workspace's alone. A notice kept from workspace C:/ws, clicked after
+  // this window moved to C:/ws-b (which has a card 12 of its own), never opens C:/ws-b's card 12, with a project or without.
+  for (const [what, projectPath] of [['a project card', ALPHA], ['a workspace card (no project)', null]] as const) {
+    it(`${what} of another workspace with the same number: handed on by its workspace, never this board's card`, () => {
+      store.set({ workspace: other, tasks: [{ number: 12, project: 'beta', column: 'doing' }] })
+      const old = card(12, 'C:/ws', projectPath)
+      openNoticeTarget(old)
+      expect(store.get().taskOpen).toBeNull()
+      expect(calls.filter((c) => c.channel.startsWith('notice:'))).toEqual([{ channel: 'notice:target', args: [old] }])
+      // No window has C:/ws: main hands it back to this one (notice.openTarget), which says so.
+      showNoticeTarget(old)
+      expect(store.get().taskOpen).toBeNull()
+      expect(store.get().toasts.map((t) => t.title)).toEqual(["AL-12 is on ws's board, which isn't open"])
+    })
+  }
+
+  it('a card of this workspace, named by another case of its path: its dialog', () => {
+    openNoticeTarget(card(12, 'c:/WS'))
+    expect(store.get().taskOpen).toBe(12)
   })
 })

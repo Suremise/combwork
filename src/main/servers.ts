@@ -3443,7 +3443,8 @@ async function notifyTarget(raw: unknown): Promise<ToastTarget | undefined> {
     const n = cardOfRef(ws, card, callerScope())
     if (n === null) throw new HttpError(404, `Unknown card ${card}`)
     const c = await tasks.getTask(n, ws)
-    return { kind: 'card', number: n, label: cardLabel(c), projectPath: c.project && ws.path ? join(ws.path, c.project) : null }
+    // Its workspace too: a card's number is its workspace's alone (HR6 round 1, finding 1).
+    return { kind: 'card', number: n, label: cardLabel(c), projectPath: c.project && ws.path ? join(ws.path, c.project) : null, workspacePath: ws.path! }
   }
   if (!agent) throw new HttpError(400, 'target names an agent or a card')
   const own = agentCaller()

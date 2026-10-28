@@ -1019,6 +1019,10 @@
     "defaultMessage": "{agent} isn't in {project} any more",
     "description": "A notice after clicking a notification about an agent (HI-1961): the agent it named ({agent}) has been removed from its project ({project}) since, so its pane can't be shown."
   },
+  "shell.noticeTarget.cardElsewhere": {
+    "defaultMessage": "{card} is on {workspace}'s board, which isn't open",
+    "description": "A notice after clicking a notification about a card (HI-1961): the card ({card}, its key, e.g. HI-12) is in another workspace ({workspace}, its folder's name), open in no Hive window now, so it can't be opened."
+  },
   "shell.noticeTarget.cardGone": {
     "defaultMessage": "{card} isn't on the board any more",
     "description": "A notice after clicking a notification about a card (HI-1961): the card it named ({card}, its key, e.g. HI-12) has been deleted since, so it can't be opened."

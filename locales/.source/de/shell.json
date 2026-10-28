@@ -255,6 +255,7 @@
   "shell.modes.someSkipped": "Some agents were not switched",
   "shell.modes.switched": "Permission mode switched",
   "shell.noticeTarget.agentGone": "{agent} isn't in {project} any more",
+  "shell.noticeTarget.cardElsewhere": "{card} is on {workspace}'s board, which isn't open",
   "shell.noticeTarget.cardGone": "{card} isn't on the board any more",
   "shell.notifications.clearAll": "Clear all",
   "shell.notifications.none": "No notifications",

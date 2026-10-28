@@ -254,6 +254,7 @@
   "shell.modes.someSkipped": "一部のエージェントは切り替わりませんでした",
   "shell.modes.switched": "権限モードを切り替えました",
   "shell.noticeTarget.agentGone": "{agent}はもう{project}にいません",
+  "shell.noticeTarget.cardElsewhere": "{card}は{workspace}のボードにありますが、そのワークスペースは開かれていません",
   "shell.noticeTarget.cardGone": "{card}はもうボードにありません",
   "shell.notifications.clearAll": "すべてクリア",
   "shell.notifications.none": "通知はありません",

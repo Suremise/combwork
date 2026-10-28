@@ -3051,7 +3051,7 @@ export interface ToastAction {
  */
 export type ToastTarget =
   | { kind: 'agent'; projectPath: string; agentId: string; name: string; project: string }
-  | { kind: 'card'; number: number; label: string; projectPath: string | null }
+  | { kind: 'card'; number: number; label: string; projectPath: string | null; workspacePath: string }
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'up-to-date' | 'error'
 
