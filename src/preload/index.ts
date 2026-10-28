@@ -1,3 +1,5 @@
+// The preload runs in the window, beside its page (HI-1964): its DOM is said here, not found by chance through a test's import.
+/// <reference lib="dom" />
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import type { HiveBridge } from '../shared/api'
 import type { HiveEvent } from '../shared/types'
