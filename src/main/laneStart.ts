@@ -210,6 +210,69 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
   return started
 }
 
+/** What `launchRecordedLane` did: the agents started (as Start Lane…'s), the slot lent or waited for, or those busy. */
+export interface RecordedLaneLaunch {
+  started: LaneStartResult['started']
+  slot?: string
+  waitingForSlot?: string
+  /** The builder or reviewer busy now (working, waiting on cards…): nothing was started, the lane is recorded. */
+  busy: string[]
+}
+
+/**
+ * A new lane the Assistant or a script recorded (HI-1900, `POST /v1/lanes` naming its builder): started as Start Lane…
+ * starts one, so it never sits active with nobody working it (its agents stopped, nothing lent). Its slot lent first
+ * where the builder works in slots (none free: the lane waits for one, shown so, and slotCards' pass starts its agents
+ * once one is), then its builder and reviewer each in a fresh conversation with the lane's brief. An agent busy now (the
+ * window refuses then) starts nothing: the lane stays recorded and the caller is told who is busy. Null when the lane
+ * isn't running, or its builder is no agent of the project that builds.
+ */
+export async function launchRecordedLane(ws: WorkspaceService, projectPath: string, laneId: string): Promise<RecordedLaneLaunch | null> {
+  const lane = (await rawLanes(ws)).find((l) => l.id === laneId)
+  if (!lane || lane.state !== 'active') return null
+  const cfg = await ws.projectConfig(projectPath)
+  const agents = projectAgents(cfg)
+  const builder = agents.find((a) => a.id === lane.builder.id)
+  const reviewer = lane.reviewer ? (agents.find((a) => a.id === lane.reviewer!.id) ?? null) : null
+  if (!builder) return null
+  const busy = [builder, reviewer].filter((a): a is AgentDef => !!a && BUSY.has(sessions.liveFor(projectPath, a.id)?.status ?? '')).map((a) => a.name)
+  if (busy.length) return { started: [], busy }
+  const cards: { key: string; title: string }[] = []
+  for (const n of lane.cards) {
+    const c = await getTask(n).catch(() => null)
+    if (c) cards.push({ key: cardLabel(c), title: c.title })
+  }
+  const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
+  const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
+  const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
+  const where = await builderWhere(projectPath, builder, options)
+  if (where.inSlots) {
+    const got = await lendLane(ws, projectPath, laneId, builder.id, options?.target || null)
+    if ('waiting' in got) {
+      await setLaneSlotWait(ws, laneId, { since: new Date().toISOString(), note: '' })
+      return { started: [], waitingForSlot: got.waiting, busy: [] }
+    }
+    const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, where, got.slot, '')
+    const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief)
+    log.info(`Lane ${laneId} lent ${userText(got.slot)}: ${started.map((s) => `${userText(s.name)} ${s.how}`).join(', ')}`)
+    return { started, slot: got.slot, busy: [] }
+  }
+  const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, where, null, '')
+  const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief)
+  log.info(`Lane ${laneId} started: ${started.map((s) => `${userText(s.name)} ${s.how}`).join(', ')}`)
+  return { started, busy: [] }
+}
+
+/** What `launchRecordedLane` did, for the lane start's reply (agent-facing English: the Assistant and scripts read it). */
+export function recordedLaneNote(l: RecordedLaneLaunch | null): string {
+  if (!l) return ''
+  if (l.busy.length) return `${l.busy.join(' and ')} ${l.busy.length > 1 ? 'are' : 'is'} busy, so the lane's agents weren't started: the lane is recorded; tell ${l.busy.length > 1 ? 'them' : 'it'} about it, or start the agents once idle.` // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
+  if (l.waitingForSlot !== undefined) return `No slot is free (${l.waitingForSlot}): the lane waits for one, and its agents start once it is lent.` // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
+  const ok = l.started.filter((s) => s.how !== 'failed').map((s) => s.name)
+  const failed = l.started.filter((s) => s.how === 'failed').map((s) => `${s.name} didn't start (${s.why ?? 'unknown'})`) // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
+  return [ok.length ? `Started ${ok.join(' and ')} with the lane's brief${l.slot ? `, in ${l.slot}` : ''}.` : '', failed.length ? `${failed.join('; ')}: start ${failed.length > 1 ? 'them' : 'it'} yourself.` : ''].filter(Boolean).join(' ')
+}
+
 /**
  * A lane started from the window that waited for a slot, now lent `slot` (#1438, slotCards' pass): its agents started,
  * each once, as Start Lane… would have, from the lane as it is now (its builder and reviewer, still the project's

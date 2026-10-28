@@ -61,6 +61,7 @@ import { listMcp } from './mcp'
 import { assertInShared, createHandover, handoversFor, NoteConflict, notesTree, readNote, writeNote } from './notes'
 import { mergeSlots, slotTestEvent } from './mergeSlotHost'
 import * as lanes from './lanes'
+import { launchRecordedLane, recordedLaneNote } from './laneStart'
 import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber } from '../shared/lanes'
 import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
@@ -1901,7 +1902,13 @@ route('POST', '/v1/lanes', async ({ body }) =>
       // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
       const told = args.brief !== undefined ? await briefNote(ws, (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id) ?? { project: basename(p) }) : null
       if (args.brief !== undefined) await settleLaneBriefs(ws)
-      const notes = [note, told].filter(Boolean).join(' ')
+      // Started for its builder by the Assistant or a script (HI-1900: a lane over stopped agents sat active, nothing lent,
+      // nobody working it): its slot lent and its agents started as Start Lane… does. A builder registering its own
+      // loop is already at work. A running lane updated while its builder is stopped goes on only once it runs: said.
+      let launched = ''
+      if (!a && r.did === 'started') launched = recordedLaneNote(await launchRecordedLane(ws, p, r.lane.id))
+      else if (!a && r.did === 'updated' && !sessions.liveFor(p, builder)) launched = `${r.lane.builder.name} isn't running: start it for the lane to go on.`
+      const notes = [note, told, launched].filter(Boolean).join(' ')
       return notes ? { ...r, note: notes } : r
     }
     if (!assistantCaller()) return start()
