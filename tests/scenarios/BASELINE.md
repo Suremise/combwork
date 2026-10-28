@@ -36,6 +36,22 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## A follow-up in Review handed over before the wait (HI-1843): fakes, Claude Code Haiku, fixtures v96, 28 October 2026
+
+HI-1832's Haiku trials of card-loop-follow-up passed 1 of 5, that one only through the plain submit's refusal. Their
+transcripts (the Claude test home, 27 Oct) show the other four reading card-loop, finding the card in Review with the
+commit made, and only starting a watch: committed and in Review was taken as handed over. card-loop's builder step 2
+now says it as one step: a change asked of the card in Review is made (committed, for a code card in Git), then
+`hive_submit` with `followUp: true` before the builder waits, as until then nothing is handed over. The follow-up paragraph
+points to step 2 rather than restating it. Trimmed elsewhere to stay under the skill's 11,000 characters; the
+always-present guidance is unchanged.
+- **Fakes**: the 24 card-loop scenarios pass before (`hi1843-before`, `results/2026-10-28T11-40-00-fake`, the skill as
+  it was) and after (`hi1843-after`, `results/2026-10-28T11-51-38-fake`); Performance → Compare's rules: 24 the same.
+- **Haiku** (CLI 2.1.312, `--repeat 5`, $0.036; `results/2026-10-28T12-02-25-claude-code`): **4 of 5** (was 1 of 5). The
+  fifth called `hive_submit` without `followUp`, was refused with the next step named ("submit it again with followUp:
+  true"), and waited without taking it: the remaining limitation, in the refusal's handling rather than the skill's words.
+- **Claude Code's default model** (`results/2026-10-28T12-06-18-claude-code`, $0.16): pass.
+
 ## Three checks that failed a model doing it right (HI-1950): the fake Claude Code, fixtures v96, 28 October 2026
 
 HI-686's Claude Code trials (`results/2026-10-28T10-28-14-claude-code`, CLI 2.1.312, its default model) failed three
