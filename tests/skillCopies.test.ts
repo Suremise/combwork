@@ -336,14 +336,14 @@ describe('choosing the skills delivered (#1431)', () => {
   it("the guidance names only the skills delivered: switching one off drops it from the session contract", () => {
     const all = hiveInstructions('p')
     expect(all).toContain(boardSkillsLine())
-    for (const skill of ['work-on-card', 'review-agent-work', 'card-loop']) {
+    for (const skill of ['work-on-card', 'review-agent-work', 'card-loop', 'generalist']) {
       expect(all, skill).toContain(skill)
       const without = hiveInstructions('p', 'agent', true, new Set([skill]))
       expect(without, skill).not.toContain(skill)
     }
     expect(hiveInstructions('p', 'agent', true, new Set(['handover']))).not.toMatch(/\bhandovers,/)
     expect(boardSkillsLine(new Set(['work-on-card']))).toMatch(/Asked to review or check a card, use review-agent-work/)
-    expect(boardSkillsLine(new Set(['work-on-card', 'review-agent-work', 'card-loop', 'handover', 'pick-up', 'workspace-note', 'merge-ready', 'split-work', 'use-hive-api']))).toBe("The board shows your project's cards, each named by its key (AM-12).")
+    expect(boardSkillsLine(new Set(['work-on-card', 'review-agent-work', 'card-loop', 'handover', 'pick-up', 'workspace-note', 'merge-ready', 'split-work', 'use-hive-api', 'generalist']))).toBe("The board shows your project's cards, each named by its key (AM-12).")
     // The Assistant's own skills aren't chosen here.
     expect(hiveInstructions('', 'assistant', true, new Set(['handover']))).toBe(hiveInstructions('', 'assistant'))
   })

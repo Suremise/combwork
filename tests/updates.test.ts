@@ -3,7 +3,7 @@
 // installed only over an older copy read from disk, never one that can't be read.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { compareVersions, installDecision, readBuildIdentity, updateDecision, type BuildIdentity } from '../src/shared/updates'
 import { asarPackageVersion, installedCopy, runningIdentity } from '../src/main/buildIdentity'
@@ -71,7 +71,9 @@ describe('the copy installed on disk (#1647)', () => {
     const real = join(dir(), 'app.asar')
     mkdirSync(join(real, '..'), { recursive: true })
     await asar.createPackage(src, real)
-    expect(asarPackageVersion(real)).toBe('1.0.0-rc.2')
+    // createPackage resolves on its write stream's end() (@electron/asar 3.4.1), before the last file (package.json) is
+    // written: under load the archive is read cut short (HI-1975), so wait for it to be whole. The timeout bounds a hung run.
+    await vi.waitFor(() => expect(asarPackageVersion(real)).toBe('1.0.0-rc.2'), { timeout: 10_000 })
   })
 
   it('known when its identity and app agree; a legacy release without one; unreadable otherwise, never the running version', () => {
