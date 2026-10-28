@@ -72,6 +72,7 @@ interface HiveMessageValues {
   'shell.command.layout': { layout: string | number }
   'shell.command.mcp.import': undefined
   'shell.command.notes.open': undefined
+  'shell.command.notice.openTarget': undefined
   'shell.command.palette.show': undefined
   'shell.command.progress.toggle': undefined
   'shell.command.project.focus': undefined
@@ -254,6 +255,9 @@ interface HiveMessageValues {
   'shell.modes.nothingDetail': undefined
   'shell.modes.someSkipped': undefined
   'shell.modes.switched': undefined
+  'shell.noticeTarget.agentGone': { agent: string | number; project: string | number }
+  'shell.noticeTarget.cardElsewhere': { card: string | number; workspace: string | number }
+  'shell.noticeTarget.cardGone': { card: string | number }
   'shell.notifications.clearAll': undefined
   'shell.notifications.none': undefined
   'shell.notifications.title': undefined
@@ -399,4 +403,6 @@ interface HiveMessageValues {
   'shell.titlebar.pin': undefined
   'shell.titlebar.pinTip': { on: string }
   'shell.toast.dismiss': undefined
+  'shell.toast.openAgent': { agent: string | number }
+  'shell.toast.openCard': { card: string | number }
 }

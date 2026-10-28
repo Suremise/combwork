@@ -7,7 +7,7 @@ import { attachableSource, cardAttachments, cardHost, checkBatch, readCardAttach
 import { withAttachmentPaths, type CardAttachment } from '../shared/cardAttachments'
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
-import type { AgentApiInfo, AgentDef, AgentInfo, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, WorkspaceConnections } from '../shared/types'
+import type { AgentApiInfo, AgentDef, AgentInfo, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, defaultProviderPending, isKnownProvider, isProviderEnabled, offeredModes, projectDefaultProvider, providerDescriptor, providerName } from '../shared/providers'
 import type { SafeguardNote } from '../shared/safeguards'
@@ -118,7 +118,7 @@ import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
 import { consoleSources } from './devConsoleSources'
 import { englishError, HiveError, shownError } from './hiveError'
 import { CONSOLE_KINDS, hiveName, mayRead, type ConsoleEvent, type ConsoleKind, type ConsoleReader, type ConsoleSource } from '../shared/devConsole'
-import { cardName, cardRef, namesOf } from '../shared/projectKeys'
+import { cardLabel, cardName, cardRef, namesOf } from '../shared/projectKeys'
 
 const log = createLogger('servers')
 const MAX_BODY = 2 * 1024 * 1024
@@ -3435,9 +3435,38 @@ route('GET', '/v1/mcp', async () => {
 route('POST', '/v1/notify', async ({ body }) => {
   const level: ToastLevel = ['info', 'success', 'warning', 'error'].includes(body?.level) ? body.level : 'info'
   if (!body?.title) throw new HttpError(400, 'title is required')
-  toast(level, String(body.title).slice(0, 200), body.message ? String(body.message).slice(0, 2000) : undefined, undefined, body.source ? String(body.source) : 'agent')
-  return { ok: true }
+  const target = await notifyTarget(body.target)
+  toast(level, String(body.title).slice(0, 200), body.message ? String(body.message).slice(0, 2000) : undefined, undefined, body.source ? String(body.source) : 'agent', target)
+  return { ok: true, ...(target ? { opens: target.kind === 'agent' ? target.name : target.label } : {}) }
 })
+
+/**
+ * A notice's target (HI-1961): an agent (`agent`, its id or name, in `project`, by default the caller's own) whose pane
+ * a click opens, or a card (`card`, its key) whose dialog it opens. At most one; one that isn't there is refused.
+ */
+async function notifyTarget(raw: unknown): Promise<ToastTarget | undefined> {
+  if (raw === undefined || raw === null) return undefined
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw new HttpError(400, 'target is { agent, project? } or { card }')
+  const t = raw as { agent?: unknown; project?: unknown; card?: unknown }
+  const agent = typeof t.agent === 'string' && t.agent ? t.agent : null
+  const card = typeof t.card === 'string' || typeof t.card === 'number' ? String(t.card).trim() : ''
+  if (agent && card) throw new HttpError(400, 'target is an agent or a card, not both')
+  if (card) {
+    const ws = requireWorkspace()
+    const n = cardOfRef(ws, card, callerScope())
+    if (n === null) throw new HttpError(404, `Unknown card ${card}`)
+    const c = await tasks.getTask(n, ws)
+    // Its workspace too: a card's number is its workspace's alone (HR6 round 1, finding 1).
+    return { kind: 'card', number: n, label: cardLabel(c), projectPath: c.project && ws.path ? join(ws.path, c.project) : null, workspacePath: ws.path! }
+  }
+  if (!agent) throw new HttpError(400, 'target names an agent or a card')
+  const own = agentCaller()
+  const projectPath = typeof t.project === 'string' && t.project ? projectByName(t.project) : own?.projectPath
+  if (!projectPath) throw new HttpError(400, 'Say which project the agent is in: target.project')
+  const id = await agentParam(projectPath, agent)
+  const def = projectAgents(await workspace.projectConfig(projectPath)).find((x) => x.id === id)
+  return { kind: 'agent', projectPath, agentId: id, name: def?.name ?? agent, project: basename(projectPath) }
+}
 
 // ---------------------------------------------------------------------------
 // Progress: long runs (tests, builds) for the Progress panel

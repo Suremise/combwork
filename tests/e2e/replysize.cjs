@@ -211,6 +211,8 @@ const prose = (seed, n) => {
   measure('hive_read_latest_handover', tool('hive_read_latest_handover', {}))
   check('a handover is saved and named', /^Handover saved as handovers\/.+\.md\.$/.test(measure('hive_create_handover', tool('hive_create_handover', { title: 'Measured', content: prose(400, 3500) }), 300)), texts.hive_create_handover)
   measure('hive_notify', tool('hive_notify', { title: 'Hello', message: 'Measuring' }), 100)
+  // With a target (HI-1961): the reply says what a click opens, the agent as the project names it.
+  check('a notice with a target says what a click opens', measure('hive_notify (target)', tool('hive_notify', { title: 'Tester waits', target: { agent: 'tester' } }), 100) === 'Notification shown; a click opens Tester.', texts['hive_notify (target)'])
   // The Assistant's inbox (#647; these calls use the workspace token, not an agent's): nothing new; an ack of an id that isn't its own says so, and nothing about it.
   check('the inbox with nothing new says so', measure('hive_inbox', tool('hive_inbox', {}, 'assistant'), 200) === 'Nothing new.', texts.hive_inbox)
   check("an ack of an id that isn't its own", measure('hive_inbox (ack)', tool('hive_inbox', { ack: ['m99'] }, 'assistant'), 100) === 'Nothing acked. Not in your inbox: m99.', texts['hive_inbox (ack)'])

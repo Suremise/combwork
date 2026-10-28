@@ -55,6 +55,8 @@ interface HiveMessageValues {
   'tips.assistantMcp.title': undefined
   'tips.assistantMessages.text': undefined
   'tips.assistantMessages.title': undefined
+  'tips.assistantNoticeOpens.text': undefined
+  'tips.assistantNoticeOpens.title': undefined
   'tips.assistantReplies.text': undefined
   'tips.assistantReplies.title': undefined
   'tips.assistantSettings.text': undefined

@@ -18,7 +18,7 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, templateListText, templatePlanText, templateLoadedText, type TemplatePlanPublic, type TemplateLoadPublic, agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, templateListText, templatePlanText, templateLoadedText, type TemplatePlanPublic, type TemplateLoadPublic, agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, notifiedText, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import type { QueuePublic } from '../../shared/workflow/queue'
 import { LOOP_STEPS } from '../../shared/workflow/facts'
@@ -31,6 +31,9 @@ import { cardName, cardRef, namedBy, namesFrom } from '../../shared/projectKeys'
 const VERSION = '1.0.0'
 const API = (process.env.HIVE_API_URL || 'http://127.0.0.1:47821').replace(/\/$/, '')
 const PROJECT = process.env.HIVE_PROJECT || ''
+
+/** hive_notify's target (HI-1961): an agent's project defaults to this bridge's own (the Assistant has none: it names one). */
+const notifyTargetOf = (t: any): unknown => (t && typeof t === 'object' && t.agent && !t.project && PROJECT ? { ...t, project: PROJECT } : t)
 /** The session's workspace: with several Hive windows open, the API answers for this one. */
 const WORKSPACE = process.env.HIVE_WORKSPACE || ''
 /** The Hive Assistant's session gets the tools to run agents, as far as its control level allows. */
@@ -358,15 +361,20 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_notify',
-    description: 'Show the user a notification in Hive. Levels: info (default), success, warning, error.',
+    description: 'Show the user a notification in Hive. Levels: info (default), success, warning, error. When it is about one agent (one waiting for the user, say) or one card, give it as target: a click on the notification then opens that agent\'s pane or the card.',
     inputSchema: {
       type: 'object',
-      properties: { title: { type: 'string' }, message: { type: 'string' }, level: { type: 'string', enum: ['info', 'success', 'warning', 'error'] } },
+      properties: {
+        title: { type: 'string' },
+        message: { type: 'string' },
+        level: { type: 'string', enum: ['info', 'success', 'warning', 'error'] },
+        target: { type: 'object', description: 'What a click opens: { agent, project } (its name or id; project defaults to yours) or { card } (its key, "HI-12").', properties: { agent: { type: 'string' }, project: { type: 'string' }, card: { type: 'string' } } }
+      },
       required: ['title']
     },
     run: async (a) => {
-      await api('POST', '/v1/notify', { title: a.title, message: a.message, level: a.level, source: PROJECT || 'agent' })
-      return 'Notification shown.'
+      const r = (await api('POST', '/v1/notify', { title: a.title, message: a.message, level: a.level, source: PROJECT || 'agent', ...(a.target ? { target: notifyTargetOf(a.target) } : {}) })) as { opens?: string }
+      return notifiedText(r ?? {})
     }
   },
   {

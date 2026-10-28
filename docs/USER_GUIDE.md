@@ -1818,6 +1818,8 @@ With no Hive window focused, you get Windows notifications as always. Plan usage
 
 Hive's own messages (warnings, what an action did) are kept in the **Notifications** panel: the bell at the bottom of the activity bar, or **Ctrl+Alt+U**. While some are unread the bell shows a dot and turns orange; opening the panel marks them read.
 
+A notification the Hive Assistant or an agent sends you about one agent or one card (**HB4 needs an Enter in its pane**) opens it when you click it: the agent's pane, or the card. That works on the notification in the corner and on its row in the Notifications panel. Such a notification shows a **›** after its text and highlights under the pointer, and hovering it says what it opens (*Open HB4's pane*); a plain one has neither. If the agent was removed or the card deleted since, Hive says so instead.
+
 ### When a sign-in expires <a id="when-a-sign-in-expires"></a>
 
 All of Claude Code's agents share one sign-in, and so do all of Codex's. When it expires (or Codex's API key is refused), the CLI stops each agent's next turn. Hive then shows those agents as **Needs sign-in**, with a violet dot, in the agent row, the pane header, the Overview and the Assistant's lists. Hover one to see what the CLI said and how to sign in. You're told once for that CLI, however many of its agents stopped ("3 agents need you to sign in to Claude Code"), and **Help → Provider Setup** shows it signed out.

@@ -544,6 +544,13 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       emitTo(target, { type: 'menu-command', command: 'project.focus', args: [projectPath] })
       emitTo(target, { type: 'menu-command', command, args: Array.isArray(args) ? args : [] })
     },
+    'notice:target': (target) => {
+      // The window that has its project, or a workspace card's workspace; else this one, which says it's gone.
+      const where = target?.projectPath ?? (target?.kind === 'card' ? target.workspacePath : null)
+      const at = (typeof where === 'string' && where ? windowForPath(where)?.win : null) ?? win()
+      presentWindow(at)
+      emitTo(at, { type: 'menu-command', command: 'notice.openTarget', args: [target] })
+    },
     'window:edit': (role) => {
       const wc = win().webContents
       ;({ undo: () => wc.undo(), redo: () => wc.redo(), cut: () => wc.cut(), copy: () => wc.copy(), paste: () => wc.paste(), selectAll: () => wc.selectAll() })[role]()

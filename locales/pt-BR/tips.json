@@ -53,6 +53,8 @@
   "tips.assistantMcp.title": "Servidores MCP só para o Assistente",
   "tips.assistantMessages.text": "O Assistente não pode dar um trabalho novo a um agente que está esperando ou trabalhando, mas pode deixar uma mensagem para ele, como a sua resposta: ela é entregue assim que o agente puder recebê-la. Até lá, o painel do agente a mostra como não lida (✉); clique ali para cancelá-la.",
   "tips.assistantMessages.title": "O Assistente alcança um agente ocupado",
+  "tips.assistantNoticeOpens.text": "Uma notificação do Assistente ou de um agente sobre um agente ou um cartão abre o que ela trata quando você clica nela: o painel do agente, ou o cartão. As mais antigas ficam no painel Notificações e também abrem de lá.",
+  "tips.assistantNoticeOpens.title": "Clique em uma notificação para ir ao que ela trata",
   "tips.assistantReplies.text": "Quando você responde a um agente no painel dele enquanto o Assistente observa o agente ou o cartão dele, o Assistente recebe a primeira linha e não pergunta de novo. Configurações → Geral → Seu nome define como ele chama você; Configurações → Assistente desativa isso.",
   "tips.assistantReplies.title": "O Assistente ouve suas respostas aos agentes",
   "tips.assistantSettings.text": "Não sabe qual configuração ajudaria? Pergunte ao Assistente: ele explica qualquer uma e diz onde ela fica. Com Configurações → Assistente → Controle → Alterar configurações ativado, ele pode fazer a alteração, que você pode reverter no painel dele.",

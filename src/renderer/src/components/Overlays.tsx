@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import iconUrl from '../assets/icon.svg'
 import { call, errorMessage } from '../api'
 import { commandCategory, commandKeybinding, commandLabel, commands, runCommand } from '../commands'
 import { closeDialog, dismissToast, findProject, NO_PROJECTS, notify, set, setActivity, useLanguage, useProviderWarnings, useStore } from '../store'
 import { cacheState, useLiveUsage } from '../usage'
 import { actClass, cx, formatKeybinding, formatTokens, timeAgo } from '../util'
+import { openNoticeTarget } from '../noticeTarget'
 import { TerminalView } from './TerminalView'
 import { UpdateStatusRow } from './Updates'
 import { discardDrafts, saveAllDrafts, unsavedFiles } from './FileView'
-import type { ProviderId, ProviderTask, QuitChoice, QuitSession, SessionStatus, TestedCli } from '@shared/types'
+import type { ProviderId, ProviderTask, QuitChoice, QuitSession, SessionStatus, TestedCli, ToastMessage } from '@shared/types'
 import { PROVIDERS, enabledProviders, installSourceText, isProviderEnabled, providerDescriptor, shownText } from '@shared/providers'
 import { distinguishingParents } from '@shared/folderLabels'
 import { GIT_DOWNLOAD, GIT_MIN, gitFixText, gitOldText, gitProblemText } from '@shared/gitTool'
@@ -431,6 +432,46 @@ export function CommandPalette() {
   )
 }
 
+const TARGET = {
+  agent: msg({ id: 'shell.toast.openAgent', defaultMessage: "Open {agent}'s pane", description: "Tooltip on a notification an agent or the Assistant sent about an agent (HI-1961): clicking it shows that agent's pane (where its terminal is). {agent} is the agent's name." }),
+  card: msg({ id: 'shell.toast.openCard', defaultMessage: 'Open {card}', description: 'Tooltip on a notification an agent or the Assistant sent about a card (HI-1961): clicking it opens the card ({card}, its key, e.g. HI-12).' })
+}
+
+/**
+ * A notice's title and message, and what goes under them. With a target (HI-1961), a button that opens it (after
+ * `onOpen`), its text as written and a chevron after it; the buttons under it (its actions) are beside it, never inside.
+ */
+function ToastText({ t, onOpen, children }: { t: ToastMessage; onOpen: () => void; children?: ReactNode }) {
+  const text = (
+    <>
+      <div className="toast-title">{t.title}</div>
+      {t.message && <div className="toast-msg">{t.message}</div>}
+    </>
+  )
+  const target = t.target
+  if (!target) return <div className="toast-text">{text}{children}</div>
+  const tip = target.kind === 'agent' ? tr(TARGET.agent, { agent: target.name }) : tr(TARGET.card, { card: target.label })
+  return (
+    <div className="toast-text">
+      <button
+        type="button"
+        className="toast-open"
+        data-opens={target.kind}
+        title={tip}
+        onClick={() => {
+          onOpen()
+          openNoticeTarget(target)
+        }}
+      >
+        <div className="toast-open-text">{text}</div>
+        {/* It opens something, which a plain notice doesn't: the chevron says so (with the pointer and the hover). */}
+        <Icon name="chevron-right" className="toast-open-chevron" />
+      </button>
+      {children}
+    </div>
+  )
+}
+
 export function Toasts() {
   const toasts = useStore((s) => s.toasts)
   return (
@@ -438,9 +479,7 @@ export function Toasts() {
       {toasts.map((t) => (
         <div key={t.id} className={cx('toast', t.level)}>
           <Icon name={LEVEL_ICON[t.level]} className="lead" />
-          <div className="toast-text">
-            <div className="toast-title">{t.title}</div>
-            {t.message && <div className="toast-msg">{t.message}</div>}
+          <ToastText t={t} onOpen={() => dismissToast(t.id)}>
             {!!t.actions?.length && (
               <div className="toast-actions">
                 {t.actions.map((a) => (
@@ -457,7 +496,7 @@ export function Toasts() {
                 ))}
               </div>
             )}
-          </div>
+          </ToastText>
           <IconButton icon="close" title={tr(msg({ id: 'shell.toast.dismiss', defaultMessage: 'Dismiss', description: 'Button on a notice in the corner: closes it.' }))} onClick={() => dismissToast(t.id)} />
         </div>
       ))}
@@ -494,11 +533,9 @@ export function NotificationCenter() {
         {items.map((t) => (
           <div key={t.id} className="notif-item">
             <Icon name={LEVEL_ICON[t.level]} className={cx('lead')} />
-            <div className="toast-text">
-              <div className="toast-title">{t.title}</div>
-              {t.message && <div className="toast-msg">{t.message}</div>}
+            <ToastText t={t} onOpen={() => set({ showNotifications: false })}>
               <div className="time">{timeAgo(t.timestamp)}</div>
-            </div>
+            </ToastText>
           </div>
         ))}
       </div>

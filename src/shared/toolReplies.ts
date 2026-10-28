@@ -204,6 +204,9 @@ export function askedAssistantText(a: AskedAssistant): string {
   return `${a.card}: asked the Hive Assistant (${a.delivery} in its inbox). Its answer comes to your inbox.`
 }
 
+/** "Notification shown; a click opens HB4." (HI-1961: `opens`, the agent or card its target names.) */
+export const notifiedText = (r: { opens?: string }): string => (r.opens ? `Notification shown; a click opens ${r.opens}.` : 'Notification shown.')
+
 /** One of the Assistant's changes as GET /v1/assistant/changes lists it (#1282). */
 export interface ChangeListed {
   id: string

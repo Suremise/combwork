@@ -53,6 +53,8 @@
   "tips.assistantMcp.title": "MCP servers for the Assistant only",
   "tips.assistantMessages.text": "The Assistant can't give a waiting or working agent a new task, but it can leave it a message, such as your answer: delivered as soon as the agent can take it. Its pane shows it as unread (✉) until then; click that to cancel it.",
   "tips.assistantMessages.title": "The Assistant can reach a busy agent",
+  "tips.assistantNoticeOpens.text": "A notification from the Assistant or an agent about one agent or one card opens it when you click it: the agent's pane, or the card. Older ones are in the Notifications panel, and open from there too.",
+  "tips.assistantNoticeOpens.title": "Click a notification to go to it",
   "tips.assistantReplies.text": "When you answer an agent in its pane while the Assistant watches it or its card, the Assistant is told the first line, so it doesn't ask you again. Settings → General → Your name sets how it names you; Settings → Assistant turns it off.",
   "tips.assistantReplies.title": "The Assistant hears your answers to agents",
   "tips.assistantSettings.text": "Not sure which setting would help? Ask the Assistant: it explains any of them and says where it is. With Settings → Assistant → Control → Change settings on, it can make the change, which you can revert from its panel.",

@@ -53,6 +53,8 @@
   "tips.assistantMcp.title": "Serveurs MCP pour l’Assistant uniquement",
   "tips.assistantMessages.text": "L’Assistant ne peut pas confier un nouveau travail à un agent en attente ou au travail, mais il peut lui laisser un message, comme ta réponse : il est remis dès que l’agent peut le prendre. Son volet l’affiche comme non lu (✉) jusque-là ; clique dessus pour l’annuler.",
   "tips.assistantMessages.title": "L’Assistant peut joindre un agent occupé",
+  "tips.assistantNoticeOpens.text": "Une notification de l’Assistant ou d’un agent au sujet d’un agent ou d’une carte l’ouvre quand tu cliques dessus : le volet de l’agent, ou la carte. Les plus anciennes sont dans le panneau Notifications et s’ouvrent aussi depuis là.",
+  "tips.assistantNoticeOpens.title": "Clique sur une notification pour y aller",
   "tips.assistantReplies.text": "Quand tu réponds à un agent dans son volet pendant que l’Assistant surveille l’agent ou sa carte, l’Assistant reçoit la première ligne de ta réponse, pour ne pas te reposer la question. Paramètres → Général → Ton nom définit comment il te nomme ; Paramètres → Assistant permet de désactiver cela.",
   "tips.assistantReplies.title": "L’Assistant entend tes réponses aux agents",
   "tips.assistantSettings.text": "Tu ne sais pas quel paramètre t’aiderait ? Demande à l’Assistant : il les explique tous et dit où chacun se trouve. Avec Paramètres → Assistant → Contrôle → Modifier les paramètres activé, il peut faire la modification, que tu peux annuler depuis son panneau.",

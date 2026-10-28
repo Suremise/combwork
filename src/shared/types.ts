@@ -3097,6 +3097,14 @@ export interface ToastAction {
   args?: unknown[]
 }
 
+/**
+ * What a notice is about, which a click on it opens (HI-1961: `hive_notify`'s target): an agent's pane, or a card's
+ * dialog. Its names are as they were when it was shown, for saying it's gone.
+ */
+export type ToastTarget =
+  | { kind: 'agent'; projectPath: string; agentId: string; name: string; project: string }
+  | { kind: 'card'; number: number; label: string; projectPath: string | null; workspacePath: string }
+
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'up-to-date' | 'error'
 
 /** Hive's own updates (electron-updater, GitHub Releases). */
@@ -3133,6 +3141,8 @@ export interface ToastMessage {
   title: string
   message?: string
   actions?: ToastAction[]
+  /** What a click on it opens (HI-1961). */
+  target?: ToastTarget
   timestamp: string
   source?: string
   /** Kept in the Notifications panel (the bell) only, not shown as a toast: a notice told another way, or not at all (#157). */

@@ -53,6 +53,8 @@
   "tips.assistantMcp.title": "Servidores MCP solo para el Asistente",
   "tips.assistantMessages.text": "El Asistente no puede dar una tarea nueva a un agente que espera o trabaja, pero puede dejarle un mensaje, como tu respuesta: se entrega en cuanto el agente puede recibirlo. Hasta entonces, su panel lo muestra como sin leer (✉); haz clic ahí para cancelarlo.",
   "tips.assistantMessages.title": "El Asistente puede llegar a un agente ocupado",
+  "tips.assistantNoticeOpens.text": "Una notificación del Asistente o de un agente sobre un agente o una tarjeta lo abre al hacer clic: el panel del agente o la tarjeta. Las anteriores están en el panel Notificaciones y también se abren desde allí.",
+  "tips.assistantNoticeOpens.title": "Haz clic en una notificación para ir a lo que trata",
   "tips.assistantReplies.text": "Cuando respondes a un agente en su panel mientras el Asistente lo vigila a él o a su tarjeta, el Asistente recibe la primera línea, así no te vuelve a preguntar. Configuración → General → Tu nombre define cómo te nombra; Configuración → Asistente lo desactiva.",
   "tips.assistantReplies.title": "El Asistente oye tus respuestas a los agentes",
   "tips.assistantSettings.text": "¿No sabes qué opción te ayudaría? Pregunta al Asistente: te explica cualquiera y te dice dónde está. Con Configuración → Asistente → Control → Cambiar la configuración activado, puede hacer el cambio, que puedes revertir desde su panel.",

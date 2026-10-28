@@ -1,6 +1,6 @@
 import type { BrowserWindow } from 'electron'
 import { randomUUID } from 'crypto'
-import type { HiveEvent, ToastAction, ToastLevel, ToastMessage } from '../shared/types'
+import type { HiveEvent, ToastAction, ToastLevel, ToastMessage, ToastTarget } from '../shared/types'
 
 /**
  * Where events and terminal output go. With several windows, each shows one workspace: an event about a
@@ -58,8 +58,9 @@ export function logNotice(level: ToastLevel, title: string, message?: string): T
   return t
 }
 
-export function toast(level: ToastLevel, title: string, message?: string, actions?: ToastAction[], source?: string): ToastMessage {
-  const t: ToastMessage = { id: randomUUID(), level, title, message, actions, source, timestamp: new Date().toISOString() }
+/** `target`: what a click on it opens (HI-1961: an agent's pane, a card). */
+export function toast(level: ToastLevel, title: string, message?: string, actions?: ToastAction[], source?: string, target?: ToastTarget): ToastMessage {
+  const t: ToastMessage = { id: randomUUID(), level, title, message, actions, ...(target ? { target } : {}), source, timestamp: new Date().toISOString() }
   emit({ type: 'toast', toast: t })
   return t
 }
