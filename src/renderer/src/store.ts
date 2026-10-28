@@ -1811,19 +1811,51 @@ export const NO_PROJECTS: ProjectInfo[] = []
 export const NO_IDS: string[] = []
 
 /**
- * The Assistant added an agent. The user's view doesn't move: on the project they're looking at, its page's
- * button gets a dot; another project opens on the new agent's page next time.
+ * Agents' start changes told by main (HI-1977), by project path and agent (`agentKey`), with their count (`seq`): kept
+ * until a read of the project as new as the change replaces them. A read made before a change can arrive after it (HR6's
+ * round 1: the projects are read in turn, and the change told at once); the change stands over that older read.
  */
+const startsTold = new Map<string, { seq: number; start: AgentStart | null }>()
+const agentKey = (path: string, agentId: string): string => `${path.toLowerCase()}|${agentId}`
+
 /**
  * An agent's start changed (HI-1977): its AgentInfo's `start`, set at once (not with the agents' batched states), so the
  * card's move it comes before never shows without it.
  */
-export function agentStartChanged(path: string, agentId: string, start: AgentStart | null): void {
-  set((s) => {
-    const project = findProject(s, path)
-    if (!s.workspace || !project) return {}
-    return { workspace: { ...s.workspace, projects: s.workspace.projects.map((p) => (p !== project ? p : { ...p, agents: p.agents.map((a) => (a.id === agentId ? withStart(a, start) : a)) })) } }
+export function agentStartChanged(path: string, agentId: string, start: AgentStart | null, seq: number): void {
+  const key = agentKey(findProject(get(), path)?.path ?? path, agentId)
+  if ((startsTold.get(key)?.seq ?? -1) >= seq) return
+  startsTold.set(key, { seq, start })
+  const ws = get().workspace
+  if (ws) set({ workspace: withStartsTold(ws) })
+}
+
+/**
+ * The workspace with each start change told after its agent was read (startsTold, newer than its `startSeq`); a change
+ * the read already has is forgotten. The same workspace when nothing changes.
+ */
+export function withStartsTold(ws: WorkspaceInfo): WorkspaceInfo {
+  if (!startsTold.size) return ws
+  let changed = false
+  const projects = ws.projects.map((p) => {
+    let mine = false
+    const agents = p.agents.map((a) => {
+      const key = agentKey(p.path, a.id)
+      const told = startsTold.get(key)
+      if (!told) return a
+      if (told.seq <= (a.startSeq ?? -1)) {
+        startsTold.delete(key)
+        return a
+      }
+      if (JSON.stringify(a.start ?? null) === JSON.stringify(told.start)) return a
+      mine = true
+      return withStart(a, told.start)
+    })
+    if (!mine) return p
+    changed = true
+    return { ...p, agents }
   })
+  return changed ? { ...ws, projects } : ws
 }
 
 function withStart(a: AgentInfo, start: AgentStart | null): AgentInfo {
@@ -1832,6 +1864,17 @@ function withStart(a: AgentInfo, start: AgentStart | null): AgentInfo {
   return rest
 }
 
+// However the workspace is set (an event's refresh, an action's answer), a start change told since its read stands.
+useStore.subscribe((s, prev) => {
+  if (!s.workspace || s.workspace === prev.workspace) return
+  const ws = withStartsTold(s.workspace)
+  if (ws !== s.workspace) useStore.setState({ workspace: ws })
+})
+
+/**
+ * The Assistant added an agent. The user's view doesn't move: on the project they're looking at, its page's
+ * button gets a dot; another project opens on the new agent's page next time.
+ */
 export function noteAgentAdded(path: string, agentId: string): void {
   set((s) => {
     const shown = s.selectedProject?.toLowerCase() === path.toLowerCase() && s.activity === 'projects'

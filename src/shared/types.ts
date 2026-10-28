@@ -1666,6 +1666,8 @@ export interface AgentInfo extends AgentDef {
    * its session spawning, a restart's resume), or why its last one failed. Absent: neither, or it runs.
    */
   start?: AgentStart
+  /** The count of start changes main had made when `start` was read (HI-1977): a change told with a higher one is newer. */
+  startSeq?: number
 }
 
 /** An agent's start as the stall check reads it (HI-1977): under way, or why it failed. */
@@ -3306,8 +3308,11 @@ export type HiveEvent =
   | { type: 'assistant-questions'; projectPath: string; questions: AssistantQuestion[] }
   /** An agent was added by the Hive Assistant: the view doesn't move to it. */
   | { type: 'agent-added'; projectPath: string; agentId: string }
-  /** An agent's start changed (HI-1977): under way, failed with why, or neither (null), as its AgentInfo's `start`. */
-  | { type: 'agent-start'; projectPath: string; agentId: string; start: AgentStart | null }
+  /**
+   * An agent's start changed (HI-1977): under way, failed with why, or neither (null), as its AgentInfo's `start`; `seq`,
+   * the count of start changes with it, newer than an AgentInfo whose `startSeq` is lower.
+   */
+  | { type: 'agent-start'; projectPath: string; agentId: string; start: AgentStart | null; seq: number }
   /** A worktree agent's unmerged work changed (null: git couldn't check it). */
   | { type: 'branch-status'; projectPath: string; agentId: string; status: AgentBranchStatus | null }
   | { type: 'plan-usage'; provider: ProviderId; usage: PlanUsage; connection?: string }

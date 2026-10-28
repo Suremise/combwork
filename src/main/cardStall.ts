@@ -7,7 +7,7 @@ import { LOOP_STEP_WAIT_MINUTES } from '../shared/lanes'
 import { projectPreferences } from './workflow/preferences'
 import { queueReturnOf, staleApprovalOf } from './queueReturn'
 import { isResuming } from './restartResume'
-import { startNow } from './agentStarts'
+import { startNow, startSeq } from './agentStarts'
 import { sessions } from './sessions'
 import { workspaceOf, type WorkspaceService } from './workspace'
 
@@ -128,13 +128,17 @@ export function agentStartOf(projectPath: string, agentId: string): AgentStart |
   return now.running && !sessions.liveFor(projectPath, agentId) ? { starting: true } : undefined
 }
 
-/** A project's agents with their starts (agentStartOf), for its ProjectInfo. */
+/**
+ * A project's agents with their starts (agentStartOf), for its ProjectInfo, each with the count of start changes they
+ * were read at (`startSeq`): the window keeps a change it was told later than that (an older read reaching it after).
+ */
 export function withAgentStarts<T extends { agents: AgentInfo[] }>(projectPath: string, info: T): T {
+  const startsAt = startSeq()
   return {
     ...info,
     agents: info.agents.map((a) => {
       const start = agentStartOf(projectPath, a.id)
-      return start ? { ...a, start } : a
+      return { ...a, startSeq: startsAt, ...(start ? { start } : {}) }
     })
   }
 }

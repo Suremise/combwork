@@ -12,7 +12,7 @@ import { tempDir } from './tempDir'
 const base = tempDir('hive-boardstartstall-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-const { resetAgentStartsForTests, startBegun, startEnded } = await import('../src/main/agentStarts')
+const { resetAgentStartsForTests, startBegun, startEnded, startSeq } = await import('../src/main/agentStarts')
 const { agentNowOf, agentStartOf, cardStall, withAgentStarts } = await import('../src/main/cardStall')
 const { stallAgentOf, stalledReason, startFailedReason } = await import('../src/shared/tasks')
 const { setLanguage, tr } = await import('../src/shared/i18n')
@@ -44,6 +44,15 @@ describe("the board's Stalled mark while an agent starts (HI-1977)", () => {
     expect(agents[1]).not.toHaveProperty('start')
     expect(boardMark()).toBeNull()
     expect(notice()).toBeNull()
+  })
+
+  it("each read carries the count of start changes it has, which each change raises (HR6's round 1: the window orders reads and changes by it)", () => {
+    const before = startSeq()
+    expect(withAgentStarts(p, info).agents.map((a) => a.startSeq)).toEqual([before, before])
+    startBegun(p, 'b1', '#7', { fresh: true })
+    startEnded(p, 'b1', '#7', { failed: 'its slot could not be prepared' })
+    expect(startSeq()).toBe(before + 2)
+    expect(withAgentStarts(p, info).agents[0]).toMatchObject({ startSeq: before + 2, start: { failed: 'its slot could not be prepared' } })
   })
 
   it("a failed start: the board's mark says why, the same words as the notice", () => {

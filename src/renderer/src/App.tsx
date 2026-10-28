@@ -315,7 +315,7 @@ function handleEvent(e: HiveEvent): void {
       noteAgentAdded(e.projectPath, e.agentId)
       break
     case 'agent-start':
-      agentStartChanged(e.projectPath, e.agentId, e.start)
+      agentStartChanged(e.projectPath, e.agentId, e.start, e.seq)
       break
     case 'branch-status':
       set((st) => ({ branchStatus: { ...st.branchStatus, [projectKey(e.projectPath, e.agentId)]: e.status } }))

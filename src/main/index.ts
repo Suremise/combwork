@@ -99,7 +99,7 @@ import { initUpdater, installNow, installsOnQuit } from './updater'
 import { flushMetrics } from './metrics'
 import { watchMainStalls } from './mainStalls'
 import { fileHolders } from './fileHolders'
-import { onAgentStartChange } from './agentStarts'
+import { onAgentStartChange, startSeq } from './agentStarts'
 import { agentStartOf, withAgentStarts } from './cardStall'
 import { createWorkspaceService, disposeWorkspaceService, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
 import { closeWithCommand, quitCommandPlanned, quitRunsAny, runQuitCommand, type RunOutcome } from './closeCommand/closeCommands'
@@ -936,7 +936,7 @@ app.whenReady().then(async () => {
   // and the project read again so its kept info (a window loading it) has it too.
   workspace.setLiveProvider(async (p, cfg, scope) => withAgentStarts(p, await sessions.liveInfo(p, cfg, scope)))
   onAgentStartChange((p, agentId) => {
-    emit({ type: 'agent-start', projectPath: p, agentId, start: agentStartOf(p, agentId) ?? null })
+    emit({ type: 'agent-start', projectPath: p, agentId, start: agentStartOf(p, agentId) ?? null, seq: startSeq() })
     workspaceFor(p)?.scheduleRefresh()
   })
   sessions.apiEnv = apiEnv

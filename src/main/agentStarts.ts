@@ -37,7 +37,16 @@ export function onAgentStartChange(fn: (projectPath: string, agentId: string) =>
   return () => listeners.delete(fn)
 }
 
+/** Counts the changes (HR6's round 1): what a project's info read carries, so the window keeps a change told after it. */
+let seq = 0
+
+/** The count of changes so far: a read of the starts made now has every change up to it. */
+export function startSeq(): number {
+  return seq
+}
+
 function changed(projectPath: string, agentId: string): void {
+  seq++
   for (const fn of listeners) fn(projectPath, agentId)
 }
 
