@@ -149,6 +149,11 @@ export const AREAS = [
   { paths: ['src/main/gitTool.ts', 'src/shared/gitTool.ts'], suites: ['gitmissing', 'providers'] },
   // The Git view (#607): the Git tab's sections and the status bar's item.
   { paths: ['src/main/gitRepo.ts', 'src/shared/gitRepo.ts', 'src/shared/branchCleanup.ts', 'src/renderer/src/views/GitTab.tsx', 'src/renderer/src/views/GitBranches.tsx', 'src/renderer/src/gitReads.ts'], suites: ['gitbranchcards', 'gitcleanup', 'gitupdate', 'gitview', 'gitremotes', 'changes', 'changespicker', 'gitmissing', 'unusedwt', 'inbox', 'gitinit', 'versioncontrol', 'mergedialogslots'] },
+  // The shared tab strip (HI-1837, HI-1839) and every suite driving one: Version Control's sections, Settings' workflow
+  // defaults, Advanced's per CLI, Keyboard Shortcuts' categories, the Attachments tab's pane and card tabs.
+  { paths: ['src/renderer/src/components/Tabs.tsx', 'src/shared/tabs.ts'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'agentslots', 'gitbranchcards', 'lanesslots', 'lanestages', 'mergedialogslots', 'slotrelease', 'unusedslots', 'p6lane', 'workflowdefaults', 'workflowoptions', 'advanced', 'keys', 'cardattach', 'image', 'i18nshots'] },
+  // Where a Version Control or workflow default came from (HI-1837).
+  { paths: ['src/renderer/src/components/OriginText.tsx'], suites: ['versioncontrol', 'workflowdefaults', 'workflowoptions'] },
   { paths: ['src/renderer/src/views/VersionControl.tsx', 'src/renderer/src/views/VersionControlHeader.tsx'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'gitinit', 'changes', 'queuecard', 'workflowoptions'] },
   // "How do you work?" (#1423): the step, its notice, the answer and the adoption on a board made by 1.0.
   { paths: ['src/renderer/src/components/PresetStep.tsx', 'src/shared/workflow/presetStep.ts', 'src/main/workflow/presetStep.ts', 'src/main/workflow/adoption.ts'], suites: ['presetstep', 'vcswitch', 'workflowoptions'] },
@@ -171,13 +176,13 @@ export const AREAS = [
   { paths: ['src/main/skillCopies.ts', 'src/shared/skillDelivery.ts', 'src/main/providers/common.ts'], suites: ['skilldelivery', 'skills'] },
   { paths: ['src/main/workspaceNotes.ts', 'src/shared/workspaceNotes.ts', 'src/renderer/src/components/WorkspaceNotes.tsx', 'src/main/providers/claude/adapter.ts', 'src/main/providers/codex/adapter.ts', 'src/main/providers/copilot/adapter.ts'], suites: ['workspacenotes'] },
   { paths: ['src/main/cardSessions.ts', 'src/renderer/src/components/CardChip.tsx'], suites: ['cardchip', 'sessionorigin'] },
-  { paths: ['src/main/cardAttachments.ts', 'src/shared/cardAttachments.ts', 'src/renderer/src/components/CardAttachments.tsx', 'src/renderer/src/cardAttachLinks.ts', 'src/main/attachmentsFolder.ts', 'src/main/cardAttachmentCleanup.ts', 'src/shared/cardCleanup.ts', 'tests/e2e/cardattach.cjs'], suites: ['cardattach', 'storage', 'files', 'carddialog', 'attachread'] },
+  { paths: ['src/main/cardAttachments.ts', 'src/shared/cardAttachments.ts', 'src/renderer/src/components/CardAttachments.tsx', 'src/renderer/src/cardAttachLinks.ts', 'src/main/attachmentsFolder.ts', 'src/main/cardAttachmentCleanup.ts', 'src/main/cardCleanupFs.ts', 'src/shared/cardCleanup.ts', 'tests/e2e/cardattach.cjs'], suites: ['cardattach', 'storage', 'files', 'carddialog', 'attachread'] },
   // A card's attachment read through Hive (HI-1751).
   { paths: ['tests/e2e/attachread.cjs'], suites: ['attachread'] },
   // Accounts (HI-980): the store, its checks and watches, Settings → Accounts, and the fake's sign-in.
   { paths: ['src/main/accounts.ts', 'src/shared/accounts.ts', 'src/renderer/src/components/AccountsSettings.tsx', 'tests/e2e/accounts.cjs'], suites: ['accounts', 'connections', 'connections-codex', 'connections-server'] },
   // Server connections (HI-1772): the key store and its masking, the server's form, models and launch variables.
-  { paths: ['src/main/serverConnections.ts', 'src/main/keyStore.ts', 'src/main/keyMatcher.ts', 'src/main/keyCoverage.ts', 'src/shared/serverConnection.ts', 'src/renderer/src/components/ServerConnections.tsx', 'tests/e2e/connections-server.cjs'], suites: ['connections-server'] },
+  { paths: ['src/main/serverConnections.ts', 'src/main/serverMarks.ts', 'src/main/keyStore.ts', 'src/main/keyMatcher.ts', 'src/main/keyCoverage.ts', 'src/shared/serverConnection.ts', 'src/renderer/src/components/ServerConnections.tsx', 'tests/e2e/connections-server.cjs'], suites: ['connections-server'] },
   // Launching on a connection (HI-1755): the launch step, the switch at a safe point, the seam, the Connection choice.
   { paths: ['src/main/connectionSeam.ts', 'src/main/connectionSwitch.ts', 'src/renderer/src/components/ConnectionChoice.tsx', 'tests/e2e/connections.cjs'], suites: ['connections', 'connectionrows', 'connections-codex'] },
   { paths: ['tests/e2e/connections-codex.cjs', 'tests/e2e/fake-codex/', 'src/main/providers/codex/', 'src/shared/codex.ts'], suites: ['connections-codex'] },
@@ -301,7 +306,7 @@ export const AREAS = [
   { paths: ['src/main/restartResume.ts', 'src/shared/restartResume.ts', 'tests/e2e/restartresume.cjs'], suites: ['restartresume', 'unexpectedclose'] },
   // "The main process was busy" (#1109): sleep isn't a stall, and a stall names what was running.
   { paths: ['src/shared/projectView.ts', 'src/main/fileHolders.ts', 'tests/e2e/projectview.cjs'], suites: ['projectview', 'tilesview', 'placement', 'templates'] },
-  { paths: ['src/main/mainStalls.ts', 'src/main/threadPool.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/stalls.cjs'], suites: ['stalls'] },
+  { paths: ['src/main/mainStalls.ts', 'src/shared/mainStalls.ts', 'src/renderer/src/views/PerformanceStalls.tsx', 'src/main/threadPool.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/stalls.cjs'], suites: ['stalls'] },
   { paths: ['src/main/exitLog.ts', 'src/main/memory.ts', 'src/main/diagnostics.ts', 'src/main/updater.ts', 'src/main/installDir.ts'], suites: ['crashdumps'] },
   // .hive kept out of version control, and its notice (#345).
   { paths: ['src/main/hiveVcs.ts', 'src/shared/hiveVcsText.ts', 'src/renderer/src/components/HiveVcsNotice.tsx'], suites: ['hivevcs', 'gitinit'] },
@@ -350,6 +355,10 @@ export const AREAS = [
   { paths: ['src/main/reviewsOnOpen.ts'], suites: ['review', 'stopswitch', 'recent'] },
   { paths: ['src/renderer/src/components/Board.tsx', 'src/renderer/src/components/CardWork.tsx', 'src/renderer/src/components/Overlays.tsx', 'src/shared/laneBar.ts', 'src/main/tasks.ts', 'src/shared/workflow/workView.ts', 'tests/e2e/boardgates.cjs'], suites: ['boardgates'] },
   { paths: ['src/main/cardIntents.ts', 'tests/e2e/intents.cjs'], suites: ['intents', 'replysize'] },
+  // The nudge an agent's reply adds for a long card title (HI-1872).
+  { paths: ['src/main/titleNudge.ts'], suites: ['replysize'] },
+  // An agent's request for the Assistant on a card, hive_ask_assistant (HI-1866).
+  { paths: ['src/main/assistantAsk.ts'], suites: ['intents', 'replysize'] },
   { paths: ['src/renderer/src/components/CardKind.tsx', 'src/renderer/src/components/CardReviewSkip.tsx', 'src/renderer/src/components/reviewSkipTip.ts', 'tests/e2e/nocode.cjs'], suites: ['nocode'] },
   { paths: ['src/renderer/src/components/ForYou.tsx', 'src/renderer/src/forYou.ts', 'src/renderer/src/sharedRead.ts', 'src/renderer/src/components/Shell.tsx', 'src/main/answerRelay.ts'], suites: ['foryou'] },
   // A request's or a decision's short plain form (#1635): For you's chip, the inbox's rows, a card's decision count.
@@ -462,7 +471,7 @@ export const AREAS = [
   // The run context: every suite (above); isolation checks what it gives a test Hive and the children a suite starts.
   { paths: ['tests/e2e/runContext.cjs', 'src/main/testQuiet.ts'], suites: ['isolation'] },
   // The fake Codex CLI: every suite that runs it.
-  { paths: ['tests/e2e/fake-codex/'], suites: ['attachread', 'carryingon', 'codexqueued', 'attention', 'footerfit', 'skilldelivery', 'models', 'sessiontree', 'termsize', 'freshpath', 'defaultprovider', 'providerdetect', 'codexfolder', 'turnledger', 'flightrecorder', 'hookshealth', 'hookstranscript', 'workspacenotes', 'reviewcopies', 'slotguidance', 'p7lane'] },
+  { paths: ['tests/e2e/fake-codex/'], suites: ['accounts', 'attachread','carryingon', 'codexqueued', 'attention', 'footerfit', 'skilldelivery', 'models', 'sessiontree', 'termsize', 'freshpath', 'defaultprovider', 'providerdetect', 'codexfolder', 'turnledger', 'flightrecorder', 'hookshealth', 'hookstranscript', 'workspacenotes', 'reviewcopies', 'slotguidance', 'p7lane'] },
   // Hive's bundled skills and modes, read at runtime (not documentation).
   { paths: ['resources/skills/', 'src/main/bundledHistory.json'], suites: ['skills', 'skillaudience', 'skilldelivery', 'cardloop', 'replysize', 'slotguidance'] },
   { paths: ['resources/modes/', 'src/main/assistantMode.ts'], suites: ['assistant', 'assistant-control', 'assistantend', 'assistantmode', 'assistantresume'] },
@@ -473,7 +482,9 @@ export const AREAS = [
   { paths: ['tests/e2e/layoutReport.cjs'], suites: ['i18nreport', 'i18nshots'] },
   { paths: ['tests/e2e/i18nshots/', 'locales/', 'src/renderer/src/views/ProjectTabs.tsx', 'src/renderer/src/components/Progress.tsx', 'src/renderer/src/components/NoticeBanners.tsx', 'src/renderer/src/components/Overlays.tsx', 'src/renderer/src/views/SettingsView.tsx', 'src/main/progress.ts'], suites: ['i18nshots'] },
   // The installer's copies (npm run dist first).
-  { paths: ['electron-builder.yml', 'scripts/dist.mjs', 'scripts/distCopy.mjs'], suites: ['packaged', 'packaged-mcp', 'packaged-progress', 'packaged-transcript'] },
+  { paths: ['electron-builder.yml', 'scripts/dist.mjs', 'scripts/distCopy.mjs'], suites: ['packaged', 'packaged-mcp', 'packaged-progress', 'packaged-transcript', 'packaged-workers'] },
+  // Hive's worker threads in the installed copy, their scripts inside app.asar (HI-1880).
+  { paths: ['src/main/workerThreads.ts', 'src/main/places.ts', 'src/main/usageWorker.ts', 'src/main/gitWorker.ts', 'src/main/repoLockWorker.ts', 'src/main/walCheckpointWorker.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/packaged-workers.cjs'], suites: ['packaged-workers'] },
   // Session records in the workspace's database (#1061): the suites that read or write them, Remove from Hive and Repair.
   { paths: ['src/main/sessionStore.ts', 'tests/e2e/storeDocs.cjs', 'src/main/schema/sessionDeliveryTables.ts', 'src/main/schema/sessionDeliveryCodec.ts', 'tests/e2e/sessionDeliveryCodec.cjs'], suites: ['agents', 'assistantimages', 'assistantmode', 'cardchip', 'overview', 'providerdetect', 'quit', 'restart', 'resume', 'review', 'safeguards', 'sessionname', 'sessioncleanup', 'sessionorigin', 'sessionsize', 'sessiontree', 'wtrecreate', 'storage', 'transcript', 'wsmove', 'changespicker', 'dialogs', 'files', 'i18nlive', 'performance', 'projectrename', 'wsoverview', 'removeall', 'codex', 'codex-handover'] },
   // Background tasks read from Claude Code's transcript (#640: one the agent stopped wakes nothing).

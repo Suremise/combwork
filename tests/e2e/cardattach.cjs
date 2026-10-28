@@ -1,3 +1,5 @@
+// Dev build only (HI-1842): its archived card comes due within HIVE_TEST_DAY_MS's short day, a test seam a packaged
+// build ignores.
 // Card attachments (HI-1700): an image pasted into a card dialog's comment box is a draft (a chip, a link at the caret,
 // nothing stored), and Post keeps it with the card: shown inline in the comment and in the card's Attachments list, kept
 // in the project's .hive/attachments/cards/<number>, and listed by path in the card's JSON (the Agent API, as
