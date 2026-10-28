@@ -3,7 +3,7 @@
 // watch, is laneWatch.test.ts's; the holds a Start and a placement take, taskStartSlot.test.ts's and slotCards.test.ts's.
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { START_HOLD_MS, resetAgentStartsForTests, startBegun, startEnded, startFailed, startNow, startSucceeded } from '../src/main/agentStarts'
+import { START_HOLD_MS, resetAgentStartsForTests, startBegins, startBegun, startEnded, startFailed, startNow } from '../src/main/agentStarts'
 import { tempDir } from './tempDir'
 
 const p = join(tempDir('agentstarts-'), 'alpha')
@@ -42,7 +42,7 @@ describe('an agent being started (HI-1976)', () => {
 })
 
 describe('a start that failed (HI-1976)', () => {
-  it('is said with why (its lines as one), over any hold, until a session of it starts', () => {
+  it('is said with why (its lines as one), over any hold, until a session of it is started again', () => {
     startBegun(p, 'b1', '#12', { fresh: true })
     startEnded(p, 'b1', '#12', { failed: "Hive couldn't get slot-g ready:\n  git worktree add failed" })
     expect(startNow(p, 'b1')).toEqual({ starting: false, failed: "Hive couldn't get slot-g ready: | git worktree add failed" })
@@ -51,7 +51,7 @@ describe('a start that failed (HI-1976)', () => {
     expect(startNow(p, 'b1').failed).toMatch(/git worktree add failed/)
     startEnded(p, 'b1', '#12')
     expect(startNow(p, 'b1').failed).toMatch(/git worktree add failed/)
-    startSucceeded(p, 'b1')
+    startBegins(p, 'b1')
     expect(startNow(p, 'b1')).toEqual({ starting: false, failed: null })
   })
 

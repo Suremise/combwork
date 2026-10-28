@@ -15,7 +15,7 @@ import { copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, writeFi
 import { constants as fsConstants, existsSync, realpathSync } from 'original-fs'
 import { TYPED_NEWLINE_KEYS, typedText } from '../shared/terminalInput'
 import { failedStart, type StartFailure } from '../shared/startFailure'
-import { startFailed, startSucceeded } from './agentStarts'
+import { startBegins, startFailed } from './agentStarts'
 import { BrowserWindow, Notification, app, clipboard } from 'electron'
 import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { formatDateTime } from '../shared/dates'
@@ -1683,15 +1683,16 @@ class SessionManager {
     if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw hiveError(msg({ id: 'session.start.cleaning', defaultMessage: "Hive is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Hive is moving or removing its files." }), undefined, { kind: 'conflict' })
     const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve(), outcome: Promise.resolve(null as never), runId: randomBytes(12).toString('hex') }
     this.starting.set(id, pending)
+    // A new start: an earlier one's failure is over (HI-1976). Cleared here, before it runs, never once it settles: its
+    // CLI may exit meanwhile, and that failure (onExit's) must stand (HR6's round 1).
+    startBegins(projectPath, agentId)
     // A start that takes over a second says where the time went (#1177: a resume waited ~45 s after an upgrade).
     const times = new StepTimes()
     const run = this.startReserved(projectPath, agentId, id, opts, times)
     pending.done = run.catch(() => undefined)
     pending.outcome = run
     try {
-      const started = await run
-      startSucceeded(projectPath, agentId)
-      return started
+      return await run
     } catch (e) {
       // Given up before any process of it ran: its slot's writer released now (#1434). One that ran is its exit's.
       if (!this.writers.get(pending.runId)?.spawned) this.settleWriterOf(pending.runId)

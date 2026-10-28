@@ -61,8 +61,11 @@ export function startFailed(projectPath: string, agentId: string, why: string): 
   entryOf(projectPath, agentId).failed = oneLine(why)
 }
 
-/** A session of the agent started: an earlier failure is over. */
-export function startSucceeded(projectPath: string, agentId: string): void {
+/**
+ * A session of the agent is being started (sessions.ts, before its launch runs): an earlier failure is over. Never once
+ * the start settles: its CLI may have exited meanwhile, a failure that stands.
+ */
+export function startBegins(projectPath: string, agentId: string): void {
   const e = entries.get(keyOf(projectPath, agentId))
   if (!e) return
   e.failed = undefined
