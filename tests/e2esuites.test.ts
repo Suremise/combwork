@@ -199,6 +199,8 @@ describe('the suites a change needs (affected.mjs)', () => {
     expect(affectedSuites(['resources/skills/card-loop/SKILL.md'], names).suites).toEqual(expect.arrayContaining(['skills', 'skillaudience', 'skilldelivery', 'cardloop']))
     expect(affectedSuites(['resources/modes/planner.md'], names).suites).toEqual(expect.arrayContaining(['assistant', 'assistant-control']))
     expect(affectedSuites(['tests/e2e/fake-codex/fake-codex.cjs'], names).suites).toEqual(['accounts', 'attachread', 'attention', 'carryingon', 'codexfolder', 'codexqueued', 'connections-codex', 'defaultprovider', 'flightrecorder', 'footerfit', 'freshpath', 'hookshealth', 'hookstranscript', 'models', 'p7lane', 'providerdetect', 'reviewcopies', 'sessiontree', 'skilldelivery', 'slotguidance', 'termsize', 'turnledger', 'workspacenotes'])
+    // The shared tab strip selects every suite driving one, its keyboard and attachment users too (HI-1902).
+    for (const f of ['src/renderer/src/components/Tabs.tsx', 'src/shared/tabs.ts']) expect(affectedSuites([f], names).suites, f).toEqual(expect.arrayContaining(['keys', 'cardattach', 'image', 'vcswitch', 'versioncontrol', 'workflowdefaults', 'advanced']))
     expect(affectedSuites(['tests/e2e/fake-bridge.cjs'], names).all).toBe(true)
     expect(affectedSuites(['resources/tray.png'], names).all).toBe(true)
     expect(affectedSuites(['scripts/build-icons.mjs'], names).all).toBe(true)
