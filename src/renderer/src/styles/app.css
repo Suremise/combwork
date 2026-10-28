@@ -11921,6 +11921,7 @@ button.progress-run-show:focus-visible {
 }
 .progress-lane-waited.long {
   color: var(--warning);
+  font-weight: 600;
   opacity: 1;
 }
 /* A lane's cards in order (HI-1926): a line each, its state's icon, key, title, round, time and a Done card's commit. */

@@ -322,6 +322,19 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     const waited = panel.locator('.progress-tab-lanes .progress-lane-waited')
     const why = panel.locator('.progress-tab-lanes .progress-lane-why')
     check('…a lane that waits says for how long', (await why.count()) === 0 || !!(await until(async () => /\d/.test((await waited.first().textContent().catch(() => '')) ?? ''), HUNG_MS)), `${await why.first().textContent().catch(() => '')} ${await waited.first().textContent().catch(() => '')}`)
+    // A lane waiting for you (B1 asks about its card): its header says why and for how long, from when the wait began;
+    // past the bound (Settings → Advanced, set to its least, a minute) the time is marked.
+    const asked = await api(t1, 'POST', `/v1/tasks/${a.key}/ask`, { kind: 'decide', text: 'Which way should the lane go?' })
+    check('B1 asks the user about its card', asked.status === 200, JSON.stringify(asked.body))
+    const tabsWaited = tabsLane.locator('.progress-lane-waited')
+    check('…its lane waits for you, saying for how long', !!(await until(async () => /for you|you/i.test((await tabsLane.locator('.progress-lane-why').textContent().catch(() => '')) ?? '') && /\d/.test((await tabsWaited.textContent().catch(() => '')) ?? ''), HUNG_MS)), `${await tabsLane.locator('.progress-lane-why').textContent().catch(() => '')} ${await tabsWaited.textContent().catch(() => '')}`)
+    check('…not marked yet (under an hour)', !((await tabsWaited.getAttribute('class')) ?? '').includes('long'))
+    await shoot('lanes-wait')
+    await inv('advanced:set', 'hive.lanes.waitYouMinutes', 1)
+    // The bound a minute: marked once a minute has passed (a condition, bounded for a hung run).
+    check('…past its bound (a minute, Settings → Advanced), the time is marked', !!(await until(async () => ((await tabsWaited.getAttribute('class').catch(() => '')) ?? '').includes('long'), 120_000)), await tabsWaited.textContent().catch(() => ''))
+    await shoot('lanes-wait-long')
+    await inv('advanced:set', 'hive.lanes.waitYouMinutes', null)
     // Six more lanes (solo, their builders started by Hive): seven in all, more than fit.
     for (let i = 2; i <= 7; i++) {
       const bx = await lib.addAgent(inv, alpha, { name: `B${i}` })
