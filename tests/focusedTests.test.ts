@@ -7,7 +7,7 @@ import { createRequire } from 'module'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
-import { exitCode, parseJobs, recordPathFrom, resultRecords, sortIds, suiteResults, unitResults } from '../scripts/focusedTests.mjs'
+import { exitCode, parseJobs, recordPathFrom, resultRecords, sortIds, suiteResults, unitResults, withExit } from '../scripts/focusedTests.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { SUITES } from './e2e/suites.mjs'
 import { tempDir } from './tempDir'
@@ -105,6 +105,14 @@ describe("each test's result", () => {
     expect(r.get('board')).toEqual({ result: 'failed', why: 'the run record is not valid: the code changed while the suites ran' })
     expect(r.get('files')).toEqual({ result: 'skipped', why: 'environment: network' })
     expect([...(suiteResults(null, ['board'], 'no run record: exited with 2') as Map<string, Result>).values()]).toEqual([{ result: 'failed', why: 'no run record: exited with 2' }])
+  })
+
+  it("a process that didn't exit 0 fails what it ran when its report shows no failure (HR4's round 1 finding 6)", () => {
+    const passed = new Map([['a', { result: 'passed' }], ['b', { result: 'skipped', why: 'usage limit' }]])
+    expect([...withExit(passed, 7, 'Vitest').values()]).toEqual([{ result: 'failed', why: 'Vitest exited with 7, though its report has no failure' }, { result: 'failed', why: 'Vitest exited with 7, though its report has no failure' }])
+    expect(withExit(passed, 0, 'Vitest')).toBe(passed)
+    const failing = new Map([['a', { result: 'failed', why: 'x' }], ['b', { result: 'passed' }]])
+    expect(withExit(failing, 1, 'Vitest')).toBe(failing)
   })
 
   it('writes exactly one record per id, in order, a missing one failed; exits 0 only when none failed', () => {

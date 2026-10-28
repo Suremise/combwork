@@ -127,6 +127,16 @@ export function resultRecords(ids, results) {
   })
 }
 
+/**
+ * A run's results against how its process ended (HR4's HI-1367 round 1 finding 6): a process that didn't exit 0 with no
+ * failure in its report to explain it failed every test it ran, whatever the report says. Exported for its unit test.
+ */
+export function withExit(results, code, what) {
+  if (code === 0 || [...results.values()].some((r) => r.result === 'failed')) return results
+  const why = `${what} exited with ${code}, though its report has no failure`
+  return new Map([...results].map(([id]) => [id, { result: 'failed', why }]))
+}
+
 /** Runs a child to its end, its output shown (and stdout kept when asked): { code, out }. */
 function run(command, args, { cwd, env, keep = false }) {
   return new Promise((done) => {
@@ -150,14 +160,14 @@ async function runUnit(cwd, ids, jobs) {
   try {
     const report = join(dir, 'vitest.json')
     // Node runs Vitest's own script (no npx, no shell); the environment is the run context's allowlist, as a test's child.
-    await run(process.execPath, [vitest, 'run', `--maxWorkers=${jobs}`, '--reporter=default', '--reporter=json', `--outputFile.json=${report}`, ...ids], { cwd, env: runContext.baseEnv() })
+    const r = await run(process.execPath, [vitest, 'run', `--maxWorkers=${jobs}`, '--reporter=default', '--reporter=json', `--outputFile.json=${report}`, ...ids], { cwd, env: runContext.baseEnv() })
     let parsed = null
     try {
       parsed = JSON.parse(readFileSync(report, 'utf8'))
     } catch {
       parsed = null
     }
-    return unitResults(parsed, ids, cwd)
+    return withExit(unitResults(parsed, ids, cwd), r.code, 'Vitest')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -176,7 +186,7 @@ async function runSuites(cwd, ids, jobs) {
   } catch {
     record = null
   }
-  return suiteResults(record, ids, `no run record: tests/e2e/run.mjs exited with ${r.code} (see its output)`)
+  return withExit(suiteResults(record, ids, `no run record: tests/e2e/run.mjs exited with ${r.code} (see its output)`), r.code, 'tests/e2e/run.mjs')
 }
 
 async function main() {

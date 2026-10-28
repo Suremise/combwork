@@ -16,9 +16,9 @@ import { basename, join, resolve } from 'path'
 import { git, GIT_PREFIX } from '../git'
 import { endTree } from '../progressReporters/wrapper'
 import { FOCUSED_SKIP_GATE, MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type FactData, type FocusedReturn, type QueueEntry } from '../../shared/workflow/facts'
-import { changedSince, changePaths, choiceStands, chosenTests, FOCUSED_CHECK, focusedCheckName, readResults, reviewProved, type FocusedResult, type FocusedTest } from '../../shared/workflow/focused'
+import { changedSince, changePaths, choiceStands, chosenTests, FOCUSED_CHECK, FOCUSED_MAX_RESULTS_BYTES, focusedCheckName, readResults, reviewProved, type FocusedResult, type FocusedTest } from '../../shared/workflow/focused'
 import { FOCUSED_PICK, FOCUSED_RUN } from '../../shared/workflow/options'
-import { pathChanges, runPick } from './focusedRun'
+import { boundedRead, pathChanges, runPick } from './focusedRun'
 import type { TransientFailure } from '../../shared/types'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
@@ -80,7 +80,7 @@ export interface CheckContext {
 /** What the merge checks of a test merge came to: green (every one passed and counted), red, or not proved. */
 /** A red outcome names the check (`install` for the install before them) and its log, when it holds its output (#1354). */
 /** G20 (HI-1367): `focused`, its focused tests stopped it (returned, with why); `skip`, some were skipped and wait for a decision. */
-type ChecksOutcome = { kind: 'green' } | { kind: 'red'; transient: boolean; cause?: TransientFailure; output: string; check: string; logPath?: string } | { kind: 'uncounted' } | { kind: 'focused'; focused: FocusedReturn } | { kind: 'skip'; skipped: FocusedResult[] }
+type ChecksOutcome = { kind: 'green' } | { kind: 'red'; transient: boolean; cause?: TransientFailure; output: string; check: string; logPath?: string } | { kind: 'uncounted' } | { kind: 'focused'; focused: FocusedReturn } | { kind: 'skip'; skipped: FocusedResult[]; expected: string; tree: string }
 
 export interface QueueConfig {
   /** The queue's own worktree (a merge slot, kept warm). */
@@ -879,7 +879,7 @@ export class MergeQueue {
         if (checks.kind === 'red') return this.returnCard(card, entry, revision, target, 'checks', checks.transient, undefined, checks.output, checks.cause, { check: checks.check, ...(checks.logPath ? { logPath: checks.logPath } : {}) })
         // Missing review proof or a missing runner isn't the work's fault: the same revision may go back (requeue.allowed).
         if (checks.kind === 'focused') return this.returnCard(card, entry, revision, target, 'focused', checks.focused.why === 'noProof' || checks.focused.why === 'noRunner', undefined, undefined, undefined, undefined, undefined, checks.focused)
-        if (checks.kind === 'skip') return this.askSkip(target, card, entry, checks.skipped)
+        if (checks.kind === 'skip') return this.askSkip(target, card, entry, checks.skipped, { expected: checks.expected, tree: checks.tree })
         if (checks.kind === 'uncounted') {
           if (++uncounted > MAX_RETESTS) return this.pause(target, card, entry, 'uncounted')
           continue
@@ -1224,12 +1224,13 @@ export class MergeQueue {
 
   /**
    * G20 (HI-1367): the card's focused tests at the test merge's result. The approved submission's selection stands for
-   * the paths whose change is exactly the submission's; the others are picked here (`FocusedPicked`), and any the pick
-   * can't choose, or that need a real CLI or the packaged build, return the card. A real-CLI or packaged test of the
-   * approved selection is proved by its reviewer's counted run at the submitted revision (`FocusedAccepted`, review
-   * evidence, never a run here); the rest run once, as the check `focused tests`, bracketed like a G9 check: green only
-   * when its results file has exactly one result per test, none failed, and it counted. Skipped tests wait for a
-   * decision (`askSkip`): one already given for this entry and these tests is taken.
+   * the paths whose change is exactly the submission's; the others are picked here, at exactly the result under a
+   * check's bracket (`FocusedPicked`), and any the pick can't choose, or that need a real CLI or the packaged build there
+   * (a new test, or one whose needs grew), return the card. A real-CLI or packaged test of the approved selection is
+   * proved by a counted run of its card's reviewer at the submitted revision (`FocusedAccepted`, review evidence, never a
+   * run here); the rest run once, as the check `focused tests`, bracketed like a G9 check: green only when the runner
+   * exited 0, it counted, and its results file has exactly one result per test, none failed. Skipped tests (exit 0, the
+   * runner's way to say only skips) wait for a decision bound to this entry, target and merged tree (`askSkip`).
    */
   private async focusedTests(card: CardRecord, entry: QueueEntry, expected: string, result: string, ctx: CheckContext): Promise<ChecksOutcome> {
     const s = this.wf.state(card)
@@ -1245,19 +1246,28 @@ export class MergeQueue {
     // The result's own changes: every path not exactly as submitted, picked here (all the submission's when the result's are unread).
     const now = await pathChanges(f, expected, result)
     const changed = now ? changedSince(choice.change, now) : (choice.change ?? [])
-    let added: FocusedTest[] = []
+    let tests = approved
     if (changed.length || !now) {
       const pick = o.commands[FOCUSED_PICK]?.trim()
-      const p = pick && now ? await runPick(deps, pick, f, expected, changed) : null
-      if (!p || p.state !== 'chosen') return { kind: 'focused', focused: { why: 'repick', paths: changePaths(changed) } } // i18n-ignore: codes (a why, a check name), never shown as text
-      added = p.tests.filter((t) => !approved.some((a) => a.id === t.id))
+      if (!pick || !now) return { kind: 'focused', focused: { why: 'repick', paths: changePaths(changed) } } // i18n-ignore: codes (a why, a check name), never shown as text
+      // At exactly the result, as a check (HR4's round 1 finding 5): a picker that writes in the folder proves nothing.
+      const start = await bracketStart(f)
+      const p = await runPick(deps, pick, f, expected, changed)
+      const b = await bracketEnd(f, result, start)
+      if (!b.counted) return { kind: 'uncounted' }
+      if (p.state !== 'chosen') return { kind: 'focused', focused: { why: 'repick', paths: changePaths(changed) } } // i18n-ignore: codes (a why, a check name), never shown as text
       await this.write(card, (w) => w.fact('FocusedPicked', { entry: entry.id, revision: entry.revision, result, paths: changePaths(changed), tests: p.tests }))
-      // realProof = review (the user's decision): a real-CLI or packaged test only the merge adds has no review to prove it.
-      const unproved = added.filter(reviewProved)
+      // Needs combined by id (finding 4): a test that needs a real CLI or the packaged build only as the merge picks it has
+      // no review to prove it (realProof = review, the user's decision), new or not.
+      const unproved = p.tests.filter((t) => reviewProved(t) && !approved.some((a) => a.id === t.id && reviewProved(a)))
       if (unproved.length) return { kind: 'focused', focused: { why: 'newProof', tests: unproved.map((t) => t.id) } } // i18n-ignore: codes (a why, a check name), never shown as text
+      tests = chosenTests({ ...choice, source: 'picked', picked: approved, added: p.tests })
     }
-    const proved = approved.filter(reviewProved)
-    const runOf = (t: FocusedTest): FactData['CheckRan'] | undefined => s.checks.findLast((c) => c.name === focusedCheckName(t.id) && c.revision === entry.revision && c.result === 'passed' && c.counted)
+    // Proof is its reviewer's (finding 1): a counted, passing run of that test's check at the submitted revision, by the
+    // card's lane reviewer or an agent whose pass approved the submission. A builder's own run never counts.
+    const reviewers = new Set([card.reviewer, ...passingReviewers(s)].filter((x): x is string => !!x))
+    const proved = tests.filter(reviewProved)
+    const runOf = (t: FocusedTest): FactData['CheckRan'] | undefined => s.checks.findLast((c) => c.name === focusedCheckName(t.id) && c.revision === entry.revision && c.result === 'passed' && c.counted && !!c.agent && reviewers.has(c.agent))
     const missing = proved.filter((t) => !runOf(t))
     if (missing.length) return { kind: 'focused', focused: { why: 'noProof', tests: missing.map((t) => t.id) } } // i18n-ignore: codes (a why, a check name), never shown as text
     if (proved.length) {
@@ -1265,7 +1275,7 @@ export class MergeQueue {
         for (const t of proved) if (!w.state().focusedAccepted.some((a) => a.entry === entry.id && a.result === result && a.test === t.id)) w.fact('FocusedAccepted', { entry: entry.id, revision: entry.revision, result, test: t.id, run: runOf(t)!.run })
       })
     }
-    const ids = [...approved, ...added].filter((t) => !reviewProved(t)).map((t) => t.id)
+    const ids = tests.filter((t) => !reviewProved(t)).map((t) => t.id)
     // Nothing to run here: an explicit "nothing needed", or only tests proved by review.
     if (!ids.length) return { kind: 'green' }
     const dir = join(this.cfg.focused?.dir ?? tmpdir(), `${card.key.replace(/[^\w.-]/g, '_')}-${randomUUID()}`)
@@ -1278,26 +1288,24 @@ export class MergeQueue {
       const start = await bracketStart(f)
       const r = await this.cfg.runCheck(FOCUSED_CHECK, run, f, { ...ctx, env, label: `${FOCUSED_CHECK} (${ids.length})` }) // i18n-ignore: a run's title, no words beyond the check's name
       const b = await bracketEnd(f, result, start)
-      let raw = ''
-      try {
-        raw = readFileSync(resultsFile, 'utf8')
-      } catch {
-        raw = ''
-      }
-      const read = raw ? readResults(raw, ids) : { bad: 'it wrote no results file' } // i18n-ignore: a check's output, agent-facing
-      const failed = 'bad' in read || read.failed.length > 0 || (!r.ok && !read.skipped.length)
-      const data: FactData['CheckRan'] = { name: FOCUSED_CHECK, command: r.command ?? run, revision: result, tested: b.tested, result: !failed && r.ok ? 'passed' : 'failed', run: r.run ?? randomUUID(), durationMs: Math.max(0, Date.now() - start.t0), by: HIVE_RUNS, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}) }
+      const raw = await boundedRead(resultsFile, FOCUSED_MAX_RESULTS_BYTES)
+      const read = raw === null ? { bad: 'it wrote no results file' } : raw === false ? { bad: `its results file is over ${FOCUSED_MAX_RESULTS_BYTES} bytes` } : readResults(raw, ids) // i18n-ignore: a check's output, agent-facing
+      // A runner that didn't exit 0 failed, whatever its results say (finding 6): skips are reported with exit 0.
+      const failed = !r.ok || 'bad' in read || read.failed.length > 0
+      const data: FactData['CheckRan'] = { name: FOCUSED_CHECK, command: r.command ?? run, revision: result, tested: b.tested, result: failed ? 'failed' : 'passed', run: r.run ?? randomUUID(), durationMs: Math.max(0, Date.now() - start.t0), by: HIVE_RUNS, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}) }
       await this.write(card, (w) => w.fact('CheckRan', data))
       r.note?.({ name: FOCUSED_CHECK, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}) })
       if (failed) {
         const why = 'bad' in read ? `Hive couldn't take its results: ${read.bad}.` : read.failed.length ? `Failed: ${read.failed.map((x) => x.test).join(', ')}.` : '' // i18n-ignore: a check's output, agent-facing
-        return { kind: 'red', transient: !!r.transient && !raw, ...(r.cause ? { cause: r.cause } : {}), output: [why, r.output].filter(Boolean).join('\n'), check: FOCUSED_CHECK, ...(r.logPath ? { logPath: r.logPath } : {}) }
+        return { kind: 'red', transient: !!r.transient, ...(r.cause ? { cause: r.cause } : {}), output: [why, r.output].filter(Boolean).join('\n'), check: FOCUSED_CHECK, ...(r.logPath ? { logPath: r.logPath } : {}) }
       }
       if (!b.counted) return { kind: 'uncounted' }
       if (!('bad' in read) && read.skipped.length) {
-        const decided = this.skipDecided(card, entry, read.skipped)
+        const tree = await git(f, ['rev-parse', `${result}^{tree}`])
+        const bound = { expected, tree: tree.ok ? tree.out.trim() : `unread:${result}` }
+        const decided = this.skipDecided(card, entry, read.skipped, bound)
         if (decided === 'declined') return { kind: 'red', transient: false, output: `Skipped and not accepted: ${read.skipped.map((x) => `${x.test}${x.why ? ` (${x.why})` : ''}`).join(', ')}.`, check: FOCUSED_CHECK } // i18n-ignore: a check's output, agent-facing
-        if (decided !== 'approved') return { kind: 'skip', skipped: read.skipped }
+        if (decided !== 'approved') return { kind: 'skip', skipped: read.skipped, ...bound }
       }
       return { kind: 'green' }
     } finally {
@@ -1309,11 +1317,15 @@ export class MergeQueue {
     }
   }
 
-  /** The decision on these skipped tests for this entry (G20): its reviewer's or the user's answer, or none yet. */
-  private skipDecided(card: CardRecord, entry: QueueEntry, skipped: FocusedResult[]): 'approved' | 'declined' | null {
+  /**
+   * The decision on these skipped tests (G20): its reviewer's or the user's answer to the request bound to this entry,
+   * these tests, the target's head it was tested on and the merged result's tree (HR4's round 1 finding 3: a target that
+   * moved, or another result, needs a new decision; the tree, not the commit, as a test merge made again has new dates).
+   */
+  private skipDecided(card: CardRecord, entry: QueueEntry, skipped: FocusedResult[], bound: { expected: string; tree: string }): 'approved' | 'declined' | null {
     const s = this.wf.state(card)
     const tests = skipped.map((x) => x.test).sort().join('\n')
-    const asked = Object.values(s.made).filter((r) => r.gate === FOCUSED_SKIP_GATE && r.entry === entry.id && (r.tests ?? []).slice().sort().join('\n') === tests)
+    const asked = Object.values(s.made).filter((r) => r.gate === FOCUSED_SKIP_GATE && r.entry === entry.id && r.revision === bound.expected && r.result === bound.tree && (r.tests ?? []).slice().sort().join('\n') === tests)
     const a = s.approvals.findLast((x) => asked.some((r) => r.request === x.request))
     return a ? (a.answer === 'approved' ? 'approved' : 'declined') : null
   }
@@ -1321,16 +1333,18 @@ export class MergeQueue {
   /**
    * Focused tests skipped for their environment (G20; the user's decision, 28 Oct): the entry waits, paused, for the
    * card's reviewer agent to decide (hive_focused_skip), or the user under For you, who can override it. Asked once per
-   * entry and set of tests; the answer looks at the queue again (`runOnce` lifts the pause once nothing is open).
+   * entry, tests, target head and merged tree: a request for anything else is replaced by this one (its gate's earlier
+   * request of the entry retires). The answer looks at the queue again (`runOnce` lifts the pause once nothing is open).
    */
-  private async askSkip(target: string, card: CardRecord, entry: QueueEntry, skipped: FocusedResult[]): Promise<QueueOutcome> {
+  private async askSkip(target: string, card: CardRecord, entry: QueueEntry, skipped: FocusedResult[], bound: { expected: string; tree: string }): Promise<QueueOutcome> {
     const out = await this.pause(target, card, entry, 'focusedSkip', skipped.map((x) => x.test))
     if (this.paused(target)?.reason !== 'focusedSkip' || this.paused(target)?.card !== card.key) return out
     const tests = skipped.map((x) => x.test).sort()
     const listed = skipped.map((x) => `${x.test}${x.why ? ` (${x.why})` : ''}`).join(', ')
     await this.write(card, (w) => {
-      if (w.state().requests.some((r) => r.gate === FOCUSED_SKIP_GATE && r.entry === entry.id)) return
-      const request = this.wf.askUser(w, 'approve', FOCUSED_SKIP_GATE, workflowText(FOR_YOU.focusedSkip, { card: card.key, tests: listed }), { unbound: true, entry: entry.id, tests })
+      const same = (r: { gate: string; entry?: string; revision?: string | null; result?: string; tests?: string[] }): boolean => r.gate === FOCUSED_SKIP_GATE && r.entry === entry.id && r.revision === bound.expected && r.result === bound.tree && (r.tests ?? []).slice().sort().join('\n') === tests.join('\n')
+      if (w.state().requests.some(same)) return
+      const request = this.wf.askUser(w, 'approve', FOCUSED_SKIP_GATE, workflowText(FOR_YOU.focusedSkip, { card: card.key, tests: listed }), { unbound: true, entry: entry.id, revision: bound.expected, result: bound.tree, tests })
       const reviewer = card.reviewer ?? passingReviewers(w.state()).at(-1) ?? null
       if (reviewer) this.wf.wake(w, reviewer, `${card.key}'s focused tests were skipped at its merge for their environment: ${listed}. Decide whether it merges with them skipped (hive_focused_skip with request ${request}: merge true or false, and why); the user can override.`, 'answer') // i18n-ignore: a wake, agent-facing
     })

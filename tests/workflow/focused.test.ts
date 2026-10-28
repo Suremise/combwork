@@ -3,8 +3,8 @@
 // with the project's runner, on real temporary repositories. A selection never passes by default; the approved list
 // holds only for paths whose change is exactly the submission's; real-CLI and packaged tests count from the review's
 // run at the submitted revision (realProof = review); skipped tests wait for the reviewer's or the user's decision.
-import { afterEach, describe, expect, it } from 'vitest'
-import { readFileSync, writeFileSync } from 'fs'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tempDir } from '../tempDir'
 import { B1, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness'
@@ -42,7 +42,7 @@ const want = ${JSON.stringify(results)}
 fs.writeFileSync(${JSON.stringify(seen)}, JSON.stringify({ ids, jobs: process.env.HIVE_FOCUSED_JOBS }))
 const out = ids.filter((t) => want[t] !== 'none').map((t) => ({ test: t, result: want[t] || 'passed', ...(want[t] === 'skipped' ? { why: 'usage limit' } : {}) }))
 fs.writeFileSync(process.env.HIVE_FOCUSED_RESULTS, JSON.stringify(out))
-process.exit(out.every((r) => r.result === 'passed') && out.length === ids.length ? 0 : 1)`
+process.exit(out.some((r) => r.result === 'failed') || out.length !== ids.length ? 1 : 0)`
   return { command: script(body), seen }
 }
 
@@ -255,7 +255,7 @@ describe('run by the merge queue at the merged result', () => {
     expect(e.wf.state(card).entries.at(-1)?.failure).toMatchObject({ focused: { why: 'noProof', tests: ['claude-real'] } })
     // The reviewer's counted run at the submitted revision, then the same revision back into the queue.
     const c = e.store.card(card.id)
-    await e.wf.write(c, e.wf.rulesetOf(c, e.wf.state(c)), R1, (w) => w.fact('CheckRan', { name: 'focused:claude-real', command: 'npm run e2e -- claude-real', revision, tested: revision, result: 'passed', run: 'review-run', durationMs: 1, by: 'R1', counted: true }))
+    await e.wf.write(c, e.wf.rulesetOf(c, e.wf.state(c)), R1, (w) => w.fact('CheckRan', { name: 'focused:claude-real', command: 'npm run e2e -- claude-real', revision, tested: revision, result: 'passed', run: 'review-run', durationMs: 1, by: 'R1', agent: 'R1', counted: true }))
     moved(await e.wf.submit(card.key, B1, { summary: 'again' }))
     const [o2] = await queue(e).drain('main')
     expect(o2).toMatchObject({ outcome: 'integrated' })
@@ -290,5 +290,166 @@ describe('run by the merge queue at the merged result', () => {
     const [o] = await queue(e).drain('main')
     expect(o).toMatchObject({ outcome: 'integrated' })
     expect(e.kinds(card.id)).toContain('FocusedPicked')
+  })
+})
+
+/** A picker reading what to print from a control file the test changes between the submit and the merge. */
+function steered(): { command: string; set: (c: { pick?: unknown[]; writeReadme?: boolean; holdFor?: string; pidTo?: string }) => void } {
+  const control = join(tempDir('focused-control-'), 'control.json')
+  const set = (c: object): void => writeFileSync(control, JSON.stringify(c))
+  set({ pick: [] })
+  const body = `const fs = require('fs')
+const c = JSON.parse(fs.readFileSync(${JSON.stringify(control)}, 'utf8'))
+if (c.pidTo) fs.writeFileSync(c.pidTo, String(process.pid))
+if (c.writeReadme) { const t = fs.readFileSync('README.md'); fs.writeFileSync('README.md', 'x'); fs.writeFileSync('README.md', t) }
+const out = () => process.stdout.write((c.pick || []).map((t) => JSON.stringify(t)).join('\\n'))
+if (c.holdFor) { const t = Date.now(); const tick = () => (fs.existsSync(c.holdFor) || Date.now() - t > 60000 ? out() : setTimeout(tick, 50)); tick() } else out()`
+  return { command: script(body), set }
+}
+
+/** A runner that writes `results` as given, whatever its tests, and exits `code`. */
+function fixedRunner(results: (ids: string[]) => unknown, code: number): string {
+  const f = join(tempDir('focused-fixed-'), 'results.cjs')
+  writeFileSync(f, `module.exports = ${results.toString()}`)
+  return script(`const fs = require('fs')
+const ids = JSON.parse(fs.readFileSync(process.env.HIVE_FOCUSED_TESTS, 'utf8'))
+const r = require(${JSON.stringify(f)})(ids)
+fs.writeFileSync(process.env.HIVE_FOCUSED_RESULTS, typeof r === 'string' ? r : JSON.stringify(r))
+process.exit(${code})`)
+}
+
+/** A counted, passing run of a focused test's check at `revision`, by `agent`. */
+async function proofBy(e: Env, card: { id: number }, revision: string, test: string, agent: string, run = `run-${agent}`) {
+  const c = e.store.card(card.id)
+  await e.wf.write(c, e.wf.rulesetOf(c, e.wf.state(c)), `agent:${agent}`, (w) => w.fact('CheckRan', { name: `focused:${test}`, command: 'its command', revision, tested: revision, result: 'passed', run, durationMs: 1, by: agent, agent, counted: true }))
+}
+
+describe("HR4's round 1: what the merge takes as proof, decisions and results", () => {
+  it("1: a real-CLI test's proof is its reviewer's run: the builder's own counted run is refused", async () => {
+    const e = team(picker([{ test: 'claude-real', needs: ['real'] }]), runner().command)
+    const { card, revision } = await built(e)
+    await approved(e, card)
+    await proofBy(e, card, revision, 'claude-real', 'B1')
+    const [o] = await queue(e).drain('main')
+    expect(o).toMatchObject({ outcome: 'returned', reason: 'focused' })
+    expect(e.wf.state(card).entries.at(-1)?.failure).toMatchObject({ focused: { why: 'noProof', tests: ['claude-real'] } })
+    expect(e.wf.state(card).focusedAccepted).toEqual([])
+  })
+
+  it("2: only the card's reviewer agent decides a skip: not the Assistant, not a request for another entry", async () => {
+    const e = team(picker([{ test: 'board', needs: ['fake'] }]), runner({ board: 'skipped' }).command)
+    const { card } = await built(e)
+    await approved(e, card)
+    const [o] = await queue(e).drain('main')
+    expect(o).toMatchObject({ outcome: 'paused', reason: 'focusedSkip' })
+    const req = e.wf.state(card).requests.find((r) => r.gate === 'focusedSkip')!
+    for (const who of ['assistant', 'user', 'hive', B1] as const) expect(isRefusal(await e.wf.focusedSkip(card.key, who, req.request, true, 'not theirs')), who).toBe(true)
+    expect(e.wf.state(card).approvals).toEqual([])
+    expect(isRefusal(await e.wf.focusedSkip(card.key, R1, `${card.key}/r999`, true, 'no such request'))).toBe(true)
+  })
+
+  it('3: a skip decided for one merged result is asked again once the target moved; its answer never carries over', async () => {
+    const e = team(picker([{ test: 'board', needs: ['fake'] }]), runner({ board: 'skipped' }).command)
+    const { card } = await built(e)
+    await approved(e, card)
+    const q = queue(e)
+    expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'paused', reason: 'focusedSkip' })
+    const first = e.wf.state(card).requests.find((r) => r.gate === 'focusedSkip')!
+    // The target moves on, then the old request is approved.
+    commit(e.project, { 'other.txt': 'other\n' }, 'target moves')
+    moved(await e.wf.focusedSkip(card.key, R1, first.request, true, 'the usage limit'))
+    const [o] = await q.drain('main')
+    expect(o).toMatchObject({ outcome: 'paused', reason: 'focusedSkip' })
+    const again = e.wf.state(card).requests.find((r) => r.gate === 'focusedSkip')!
+    expect(again.request).not.toBe(first.request)
+    expect(e.kinds(card.id)).not.toContain('Integrated')
+  })
+
+  it("4: a test the merge's pick finds needs a real CLI now, though approved as fake, has no proof: returned", async () => {
+    const p = steered()
+    p.set({ pick: [{ test: 'one', needs: ['fake'] }] })
+    const e = team(p.command, runner().command)
+    const { card } = await built(e, { 'README.md': 'card\n' + readFileSync(join(e.project, 'README.md'), 'utf8') })
+    await approved(e, card)
+    commit(e.project, { 'README.md': readFileSync(join(e.project, 'README.md'), 'utf8') + 'target\n' }, 'target moves')
+    p.set({ pick: [{ test: 'one', needs: ['real'] }] })
+    const [o] = await queue(e).drain('main')
+    expect(o).toMatchObject({ outcome: 'returned', reason: 'focused' })
+    expect(e.wf.state(card).entries.at(-1)?.failure).toMatchObject({ focused: { why: 'newProof', tests: ['one'] } })
+  })
+
+  it("5: the merge's pick is bracketed: one that writes in the folder proves nothing, even choosing no tests", async () => {
+    const p = steered()
+    const e = team(p.command, runner().command)
+    const { card } = await built(e, { 'README.md': 'card\n' + readFileSync(join(e.project, 'README.md'), 'utf8') })
+    await approved(e, card)
+    commit(e.project, { 'README.md': readFileSync(join(e.project, 'README.md'), 'utf8') + 'target\n' }, 'target moves')
+    p.set({ pick: [], writeReadme: true })
+    const [o] = await queue(e).drain('main')
+    expect(o).toMatchObject({ outcome: 'paused', reason: 'uncounted' })
+    expect(e.kinds(card.id)).not.toContain('Integrated')
+  })
+
+  it("6: a runner that didn't exit 0 failed, whatever its results say: all passed, or only skips", async () => {
+    for (const results of [(ids: string[]) => ids.map((t) => ({ test: t, result: 'passed' })), (ids: string[]) => ids.map((t) => ({ test: t, result: 'skipped', why: 'x' }))]) {
+      const e = team(picker([{ test: 'board', needs: ['fake'] }]), fixedRunner(results, 7))
+      const { card } = await built(e)
+      await approved(e, card)
+      const [o] = await queue(e).drain('main')
+      expect(o).toMatchObject({ outcome: 'returned', reason: 'checks' })
+      expect(e.wf.state(card).checks.at(-1)).toMatchObject({ name: 'focused tests', result: 'failed' })
+      env!.close()
+      env = null
+    }
+  })
+
+  it('9: a results file over its bound is refused before it is parsed', async () => {
+    const e = team(picker([{ test: 'board', needs: ['fake'] }]), fixedRunner(() => `[${'{"test":"board","result":"passed","why":"' + 'x'.repeat(2 * 1024 * 1024) + '"}'}]`, 0))
+    const { card } = await built(e)
+    await approved(e, card)
+    const [o] = await queue(e).drain('main')
+    expect(o).toMatchObject({ outcome: 'returned', reason: 'checks' })
+    expect(e.wf.state(card).entries.at(-1)?.failure?.log).toMatch(/over \d+ bytes/)
+  })
+
+  it("8: a pick still running when its workspace closes is ended, its process tree too, and chooses nothing", async () => {
+    const life = new AbortController()
+    const p = steered()
+    const pid = join(tempDir('focused-pid-'), 'pid')
+    p.set({ pick: [], holdFor: join(tempDir('focused-never-'), 'go'), pidTo: pid })
+    env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], mergeChecks: [], okBefore: { mode: 'never', labels: [] }, focusedTests: true, commands: { 'focused.pick': p.command, 'focused.run': runner().command } }, { focused: { env: base, timeoutMs: () => 60_000, life: life.signal } })
+    const e = env
+    const { card } = await built(e)
+    const submitting = e.wf.submit(card.key, B1, { summary: 'x' })
+    await vi.waitFor(() => expect(existsSync(pid)).toBe(true), { timeout: 30_000 })
+    const n = Number(readFileSync(pid, 'utf8'))
+    life.abort()
+    refusedBy(await submitting, 'submit.focusedChosen')
+    const alive = (): boolean => {
+      try {
+        process.kill(n, 0)
+        return true
+      } catch {
+        return false
+      }
+    }
+    await vi.waitFor(() => expect(alive()).toBe(false), { timeout: 30_000 })
+  })
+
+  it('8: a newer submission of the card ends the pick of the one before', async () => {
+    const p = steered()
+    const pid = join(tempDir('focused-pid-'), 'pid')
+    const go = join(tempDir('focused-go-'), 'go')
+    p.set({ pick: [], holdFor: go, pidTo: pid })
+    const e = team(p.command, runner().command)
+    const { card } = await built(e)
+    const first = e.wf.submit(card.key, B1, { summary: 'first' })
+    await vi.waitFor(() => expect(existsSync(pid)).toBe(true), { timeout: 30_000 })
+    p.set({ pick: [] })
+    const second = await e.wf.submit(card.key, B1, { summary: 'second' })
+    moved(second)
+    expect(isRefusal(await first)).toBe(true)
+    expect(e.wf.state(card).submissions).toHaveLength(1)
+    writeFileSync(go, 'go')
   })
 })

@@ -2970,7 +2970,7 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    - **At submit** (`submit.focusedChosen`): Hive reads the change path by path (`git diff --raw` with full blob ids,
      modes and rename endpoints) and runs the picker in the card's folder under a check's bracket (§16.13): at exactly
      the revision, clean at both ends, nothing written in between, else its pick is `unknown` (a check copy has no
-     dependencies, and Hive's own picker needs them). Its stdin is the paths, `HIVE_FOCUSED_BASE` the base; its stdout
+     dependencies, and Hive's own picker needs them; a newer submission of the card, or its workspace closing, ends it with its tree, `cancelled`). Its stdin is the paths, `HIVE_FOCUSED_BASE` the base; its stdout
      JSON lines `{"test", "needs": [unit | fake | real | packaged]}` or `{"every": true}`, its stderr kept apart as
      diagnostics, bounded (256 KB, 500 tests), ended with its tree at Advanced `hive.focused.pickSeconds` (180 s). A
      pick that fails, times out, can't be read or says every test refuses the submit unless the builder names the tests
@@ -2978,18 +2978,21 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
      (`Submitted.focused`), with the change it was chosen for.
    - **At the merge**, after G9's checks and the same install (G20 alone installs too): the approved selection stands for
      each path whose change in the result is exactly the submission's (status, endpoints, modes and blob ids; HR4's s22:
-     exact identity only). Every other path is picked again in the queue's folder at the result (`FocusedPicked`); a
-     pick there that can't choose returns the card (`focused`, `repick`, naming the paths). Real-CLI and packaged tests
-     never run in the queue (realProof = review, the user's decision): each counts from its reviewer's counted run at the
-     submitted revision, `CheckRan` named `focused:<test>`, accepted as review evidence (`FocusedAccepted`), never a run
+     exact identity only). Every other path is picked again in the queue's folder at the result, under a check's bracket
+     (one that writes there proves nothing: `uncounted`), as `FocusedPicked`; a pick there that can't choose returns the
+     card (`focused`, `repick`, naming the paths), and needs are combined by id (a test that needs more there is new). Real-CLI and packaged tests
+     never run in the queue (realProof = review, the user's decision): each counts from a counted run at the
+     submitted revision by the card's lane reviewer or an agent whose pass approved it (`CheckRan.agent`; a builder's own
+     never counts), `CheckRan` named `focused:<test>` (`hive-progress --check "focused:<test>" -- <command>`), accepted as review evidence (`FocusedAccepted`), never a run
      at the result; one missing returns the card (`noProof`, which may go back unchanged once that run exists), and one
      only the merge's pick adds returns it (`newProof`). The rest run once as the check `focused tests`, bracketed like a
      G9 check, the list in a file (`HIVE_FOCUSED_TESTS`), the results written to another (`HIVE_FOCUSED_RESULTS`), and
-     Advanced `hive.queue.focusedJobs` (2) as `HIVE_FOCUSED_JOBS`: green only when it counted and the results hold exactly
-     one passed result per test. A failed test, a missing, duplicate or unknown record, or a runner failure returns the
+     Advanced `hive.queue.focusedJobs` (2) as `HIVE_FOCUSED_JOBS`: green only when the runner exited 0, it counted, and the results (read at most 1 MB) hold
+     exactly one result per test, none failed; a runner exits 0 when nothing failed, skips included. A failed test, a missing, duplicate or unknown record, or a runner failure returns the
      card with its output. A test **skipped** for its environment pauses the queue (`focusedSkip`) and asks the card's
      reviewer agent (`hive_focused_skip`) and the user under For you (`FOCUSED_SKIP_GATE`), the user able to answer
-     first; the entry is then tested again and takes that decision for the same tests.
+     first; the request and its decision are bound to the entry, the tests, the target's head and the merged tree, so
+     the entry is tested again and takes that decision only for exactly that result (a moved target is asked again).
 6. **Advance the target only on green** (§16.9.2), after writing `IntegrationStarted` (§16.4.5). If the target moved
    since the test (it isn't at the expected revision), the entry goes back to step 2 against the new head; after
    **3** such retests in a row the entry pauses ("main moves faster than its checks: retest or merge by hand") [HB3's

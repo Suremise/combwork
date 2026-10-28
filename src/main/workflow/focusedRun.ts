@@ -8,6 +8,7 @@
 // - Its outcome is never "pass by default": a failure, a time-out or output Hive can't read is `unknown`.
 
 import { spawn as nodeSpawn, type ChildProcess } from 'child_process'
+import { open } from 'original-fs/promises'
 import { git } from '../git'
 import { endTree, shellSpec } from '../progressReporters/wrapper'
 import { bracketEnd, bracketStart, checkEnv, programFound, type Spawn } from './queueChecks'
@@ -74,6 +75,8 @@ export interface PickDeps {
   /** A session command's environment (the app's `childEnv()`); `checkEnv` takes out what a check never gets. */
   env: () => Record<string, string>
   timeoutMs: number
+  /** Ends the pick early (a newer submission of its card, its workspace closing): its tree ended, `cancelled`. */
+  signal?: AbortSignal
 }
 
 /**
@@ -97,6 +100,7 @@ export function runPick(deps: PickDeps, command: string, folder: string, base: s
       settled = true
       clearTimeout(timer)
       clearTimeout(after)
+      deps.signal?.removeEventListener('abort', cancel)
       resolve(o)
     }
     const timer = setTimeout(() => {
@@ -106,6 +110,12 @@ export function runPick(deps: PickDeps, command: string, folder: string, base: s
       after.unref?.()
     }, deps.timeoutMs)
     timer.unref?.()
+    const cancel = (): void => {
+      if (child) endTree(child, platform)
+      done({ state: 'unknown', tests: [], why: 'cancelled', ...diagnostics() }) // i18n-ignore: codes (a why), never shown as text
+    }
+    if (deps.signal?.aborted) return cancel()
+    deps.signal?.addEventListener('abort', cancel, { once: true })
     try {
       const env = { ...checkEnv(deps.env()), HIVE_FOCUSED_BASE: base }
       if (!programFound(command, env, folder, platform)) return done({ state: 'unknown', tests: [], why: 'failed', diagnostics: `Hive couldn't find the program this command starts: ${command}` }) // i18n-ignore: the picker's diagnostics, agent-facing
@@ -154,7 +164,37 @@ export async function pickAtRevision(deps: PickDeps, command: string, folder: st
   const start = await bracketStart(folder)
   if (start.head !== revision) return { state: 'unknown', tests: [], why: 'moved' } // i18n-ignore: codes (a why, a check name), never shown as text
   const picked = await runPick(deps, command, folder, base, changes)
+  if (deps.signal?.aborted) return { state: 'unknown', tests: [], why: 'cancelled' } // i18n-ignore: codes (a why), never shown as text
   const end = await bracketEnd(folder, revision, start)
   if (!end.counted) return { state: 'unknown', tests: [], why: end.whyNot === 'dirty' ? 'dirty' : end.whyNot === 'changed' ? 'changed' : 'moved', ...(picked.diagnostics ? { diagnostics: picked.diagnostics } : {}) } // i18n-ignore: codes (a why, a check name), never shown as text
   return picked
+}
+
+/**
+ * A file another process wrote, read only up to `max` bytes (G20's results, HI-1367: a runner's output is never read
+ * whole into Hive's main process): its text; null when it isn't there; false when it holds more than `max`, also when
+ * it grows past it while read.
+ */
+export async function boundedRead(file: string, max: number): Promise<string | null | false> {
+  let h: Awaited<ReturnType<typeof open>> | null = null
+  try {
+    h = await open(file, 'r')
+  } catch {
+    return null
+  }
+  try {
+    if ((await h.stat()).size > max) return false
+    const buf = Buffer.alloc(max + 1)
+    let n = 0
+    while (n < buf.length) {
+      const { bytesRead } = await h.read(buf, n, buf.length - n, n)
+      if (!bytesRead) break
+      n += bytesRead
+    }
+    return n > max ? false : buf.subarray(0, n).toString('utf8')
+  } catch {
+    return null
+  } finally {
+    await h.close().catch(() => undefined)
+  }
 }

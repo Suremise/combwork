@@ -25,7 +25,7 @@ export interface FocusedTest {
 export type FocusedPickState = 'chosen' | 'unknown' | 'tooBroad'
 
 /** Why a pick is `unknown`, as a code (the window and the agents' reply say it in words). */
-export type FocusedPickWhy = 'noPicker' | 'failed' | 'timedOut' | 'badOutput' | 'tooMany' | 'moved' | 'dirty' | 'changed' | 'noChange'
+export type FocusedPickWhy = 'noPicker' | 'failed' | 'timedOut' | 'badOutput' | 'tooMany' | 'moved' | 'dirty' | 'changed' | 'noChange' | 'cancelled'
 
 /** One path's change, exactly: the identity the queue compares (`sameChange`). Null where a side has none. */
 export interface PathChange {
@@ -61,6 +61,8 @@ export const FOCUSED_MAX_ID = 500
 /** The picker's output read, at most (more is `tooMany`); its diagnostics kept, at most. */
 export const FOCUSED_MAX_OUTPUT = 256 * 1024
 export const FOCUSED_MAX_DIAGNOSTICS = 4000
+/** The runner's results file, read at most (larger is refused before it is parsed). */
+export const FOCUSED_MAX_RESULTS_BYTES = 1024 * 1024
 
 /** Whether a string can be a test id: 1 to FOCUSED_MAX_ID characters, no control characters (NUL included). */
 // oxlint-disable-next-line no-control-regex

@@ -111,6 +111,8 @@ export interface CheckRanData {
   run: string
   durationMs: number
   by: string
+  /** The agent that ran it (its id), when an agent did: a focused test's proof is its reviewer's own run (HI-1367). */
+  agent?: string
   counted: boolean
   whyNot?: 'notCheck' | 'notContained' | 'dirty' | 'changed' | 'moved' | 'revisionChanged'
   /**

@@ -167,7 +167,7 @@ export interface WorkflowConfig {
    * G20 (HI-1367): how a submission's pick runs (a check's environment, its time limit). Left out, the project's picker
    * still runs, with an empty environment and a minute's limit (unit tests); `pick` replaces it (a test's stub).
    */
-  focused?: { env: () => Record<string, string>; timeoutMs: () => number; pick?: (command: string, folder: string, revision: string, base: string, changes: PathChange[]) => Promise<PickOutcome> }
+  focused?: { env: () => Record<string, string>; timeoutMs: () => number; life?: AbortSignal; pick?: (command: string, folder: string, revision: string, base: string, changes: PathChange[]) => Promise<PickOutcome> }
   /** Run the actions after each write (false: leave them pending, as a crash right after the commit would). */
   autoRun?: boolean
   effects?: Effects
@@ -1293,7 +1293,7 @@ export class Workflow {
     if (runner && this.cfg.runsOf) inputs.runsGoing = this.cfg.runsOf(runner)
     // G20 (HI-1367): the tests the change needs, picked in the card's folder at exactly this revision, or named by its
     // builder; kept with the submission (its `focused`), and a pick that couldn't choose refuses without the builder's list.
-    if (r.guards.submit.includes('submit.focusedChosen') && card.kind === 'code' && revision && base && !predicted) inputs.focused = await this.chooseFocused(o, this.folderOf(s), revision, base, args.tests)
+    if (r.guards.submit.includes('submit.focusedChosen') && card.kind === 'code' && revision && base && !predicted) inputs.focused = await this.chooseFocused(card, o, this.folderOf(s), revision, base, args.tests)
     const earlier = card.kind === 'code' && s.submissions.some((x) => x.revision === revision)
     const fin = o.review === 'none' ? await this.finishInputs(card, s, r, revision) : {}
     const only = card.kind === 'no-code' ? (id: GuardId) => NO_CODE_GUARDS.includes(id) : undefined
@@ -1305,10 +1305,28 @@ export class Workflow {
    * the revision (`pickAtRevision`); the builder's `tests` are its additions, or, when the pick couldn't choose, the list
    * that stands in for it (`manual`, reviewed with the change). Never throws.
    */
-  private async chooseFocused(o: WorkflowOptions, folder: string, revision: string, base: string, tests: FocusedTest[] | undefined): Promise<FocusedChoice> {
+  private async chooseFocused(card: CardRecord, o: WorkflowOptions, folder: string, revision: string, base: string, tests: FocusedTest[] | undefined): Promise<FocusedChoice> {
+    // One pick per card at a time (HR4's round 1 finding 8): a newer submission's ends the one before, as its workspace
+    // closing ends any; an ended pick is `unknown` (cancelled), and its submission's write is refused as stale anyway.
+    this.picks.get(card.id)?.abort()
+    const own = new AbortController()
+    this.picks.set(card.id, own)
+    const life = this.cfg.focused?.life
+    const signal = life ? AbortSignal.any([own.signal, life]) : own.signal
+    try {
+      return await this.pickFor(o, folder, revision, base, tests, signal)
+    } finally {
+      if (this.picks.get(card.id) === own) this.picks.delete(card.id)
+    }
+  }
+
+  /** The picks running now, by card: a newer one aborts the one before. */
+  private readonly picks = new Map<number, AbortController>()
+
+  private async pickFor(o: WorkflowOptions, folder: string, revision: string, base: string, tests: FocusedTest[] | undefined, signal: AbortSignal): Promise<FocusedChoice> {
     const change = await pathChanges(folder, base, revision)
     const command = o.commands[FOCUSED_PICK]?.trim()
-    const deps = { env: this.cfg.focused?.env ?? (() => ({})), timeoutMs: this.cfg.focused?.timeoutMs() ?? 60_000 }
+    const deps = { env: this.cfg.focused?.env ?? (() => ({})), timeoutMs: this.cfg.focused?.timeoutMs() ?? 60_000, signal }
     let p: PickOutcome
     if (!change) p = { state: 'unknown', tests: [], why: 'noChange' } // i18n-ignore: codes (a why, a check name), never shown as text
     else if (!command) p = { state: 'unknown', tests: [], why: 'noPicker' } // i18n-ignore: codes (a why, a check name), never shown as text
@@ -1463,16 +1481,25 @@ export class Workflow {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
-    const req = s.requests.find((x) => x.request === request && x.gate === FOCUSED_SKIP_GATE)
-    // Its reviewer's to decide: the lane's, else the one whose pass approved it (another agent is refused; the user
-    // answers under For you).
+    // Its reviewer agent's to decide (HR4's round 1 finding 2): the lane's, else one whose pass approved the submission.
+    // Not the Assistant's or anyone else's; the user answers on the user's own path (For you, `answer`). Read again in the
+    // write: the reviewer, the request still open, and still about the entry the queue is merging.
     const agent = agentOf(actor)
-    if (agent && agent !== (card.reviewer ?? passingReviewers(s).at(-1))) return this.refuse(card, actor, 'focused skip', { rule: 'verdict.reviewing', values: { card: card.key } }) // i18n-ignore: intent names
-    if (!req) return this.refuse(card, actor, 'focused skip', { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move: 'focused skip', moves: '' } }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    const eligible = (c: CardRecord, st: CardState): boolean => !!agent && (agent === c.reviewer || passingReviewers(st).includes(agent))
+    const notReviewer = { rule: 'verdict.reviewing', values: { card: card.key } } as GuardRefusal
+    const notOpen = (st: CardState): GuardRefusal => ({ rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'focused skip', moves: '' } }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    if (!eligible(card, s)) return this.refuse(card, actor, 'focused skip', notReviewer) // i18n-ignore: intent names
+    const bound = (st: CardState): FactData['ApprovalRequested'] | undefined => {
+      const req = st.requests.find((x) => x.request === request && x.gate === FOCUSED_SKIP_GATE)
+      return req && req.entry && openEntry(st)?.id === req.entry ? req : undefined
+    }
+    if (!bound(s)) return this.refuse(card, actor, 'focused skip', notOpen(s)) // i18n-ignore: intent names
     const r = this.rulesetOf(card, s)
     const out = await this.write(card, r, actor, (w) => {
       const st = w.state()
-      if (!st.requests.some((x) => x.request === request)) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'focused skip', moves: '' } } as GuardRefusal // i18n-ignore: intent names
+      if (!eligible(this.store.card(card.id), st)) return notReviewer
+      const req = bound(st)
+      if (!req) return notOpen(st)
       w.fact('Approval', { request, answer: merge ? 'approved' : 'declined', note: why, generation: st.generation }) // i18n-ignore: a fact's kind and codes, not text
       const e = st.entries.find((x) => x.id === req.entry)
       if (e) w.action('enqueue', { target: e.target })

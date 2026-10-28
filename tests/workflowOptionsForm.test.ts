@@ -205,6 +205,21 @@ describe('the Workflow section (#1278)', () => {
     expect(f.presets.find((p) => p.id === 'pair')!.options).toMatchObject({ finish: 'hiveMerges', target: 'main', mergeChecks: ['typecheck', 'lint'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint' } })
   })
 
+  it("Team turns on each card's focused tests with the project's own runner, and every preset keeps its commands (HI-1367)", async () => {
+    const own = { commands: { 'focused.pick': 'node pick.js', 'focused.run': 'node run.js', mine: 'make mine' } }
+    const { w, repo } = await workspace({ project: own, scripts: { typecheck: 'tsc' } })
+    const f = await form.workflowForm(w, repo)
+    const team = f.presets.find((p) => p.id === 'team')!.options
+    expect(team).toMatchObject({ focusedTests: true, commands: { 'focused.pick': 'node pick.js', 'focused.run': 'node run.js', mine: 'make mine', typecheck: 'npm run typecheck' } })
+    expect(f.presets.find((p) => p.id === 'pair')!.options).toMatchObject({ focusedTests: false, commands: { 'focused.run': 'node run.js', mine: 'make mine' } })
+    const { platform: _tp, ...teamOptions } = team
+    await form.setWorkflowOptions(w, repo, { preset: 'team', options: teamOptions })
+    expect((await w.projectConfig(repo)).workflow?.options).toMatchObject({ focusedTests: true, commands: { 'focused.run': 'node run.js', mine: 'make mine' } })
+    // Without a runner, Team leaves it off.
+    const bare = await workspace({ scripts: { typecheck: 'tsc' } })
+    expect((await form.workflowForm(bare.w, bare.repo)).presets.find((p) => p.id === 'team')!.options.focusedTests).toBe(false)
+  })
+
   it("writes a Git project's options holding its repository's lock first, so a branch clean-up in this Hive or another never sees its target move (#1642)", async () => {
     const { w, repo } = await workspace()
     git(repo, 'branch', 'release')

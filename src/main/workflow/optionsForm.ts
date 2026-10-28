@@ -24,7 +24,7 @@ import { englishText, linesOf, withValues, type Text } from '../../shared/advanc
 import { msg } from '../../shared/i18n/msg'
 import { tr } from '../../shared/i18n'
 import { MERGE_ANSWER, OPTION_TEXT, VALUE_TEXT } from '../../shared/workflow/optionTexts'
-import { allOff, NAME_OPTIONS, PRESETS, preset, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, FOCUSED_PICK, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
 import { setPresetAsked, writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
 import type { PlatformId } from '../../shared/platform/descriptors'
@@ -98,6 +98,14 @@ export async function workflowForm(ws: WorkspaceService, projectPath: string): P
   const below = resolveOptions(project.platform, { ...levels, project: null })
   const now = checkOptions(project.platform, levels)
   const inputs = await presetInputs(project.path, project.platform)
+  // G20's commands as the project has them now (HR4's HI-1367 round 1 finding 7): Team turns G20 on with its runner, and
+  // every preset keeps the project's own commands (a preset fills in its checks' commands over them, never drops them).
+  const commands = (now.problems.length ? resolveOptions(project.platform, levels) : now.resolved).options.commands
+  const focused = commands[FOCUSED_RUN] ? { focused: { run: commands[FOCUSED_RUN], ...(commands[FOCUSED_PICK] ? { pick: commands[FOCUSED_PICK] } : {}) } } : {}
+  const offered = (id: PresetId): WorkflowOptions => {
+    const o = preset(project.platform, id, { ...inputs, ...focused })
+    return { ...o, commands: { ...commands, ...o.commands } }
+  }
   return {
     platform: project.platform,
     preset: cfg.workflow?.platform === project.platform ? cfg.workflow.preset : null,
@@ -108,7 +116,7 @@ export async function workflowForm(ws: WorkspaceService, projectPath: string): P
     invalid: now.problems.length ? now.problems.map(problemEnglish).join(' ') : null,
     inherited: below.options,
     inheritedOrigins: below.origins,
-    presets: PRESETS[project.platform].map((p) => ({ ...p, options: preset(project.platform, p.id, inputs) })),
+    presets: PRESETS[project.platform].map((p) => ({ ...p, options: offered(p.id) })),
     identity: inputs.identity ?? null,
     enforced: workflowEnforced()
   }
