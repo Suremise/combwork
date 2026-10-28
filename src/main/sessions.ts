@@ -3291,6 +3291,10 @@ class SessionManager {
     l.untakenText = text
     l.untakenPrompts = l.prompts ?? 0
     this.emitState(l.state)
+    // Its screen as it is now, not only at its next draw (HR3's round 1): a dialog that took the line and has closed may
+    // have left the input empty already, and nothing more may be drawn.
+    const id = liveId(projectPath, agentId)
+    if (l.adapter?.idleQuestion && l.screen) void this.inHookOrder(runId, () => (this.live.get(id) === l ? this.lookAtIdleScreen(id, l) : undefined)).catch((e) => log.warn('lost line: check failed', e))
     const label = this.label(l.state)
     const body = retried
       ? msg({ id: 'session.notice.untakenRetried', defaultMessage: "Hive typed it and pressed Enter twice, but its CLI wasn't reading its input. Show it, click its terminal and press Enter.", description: "The notification that an agent's CLI didn't take a line Hive typed into it." })
@@ -4512,7 +4516,8 @@ class SessionManager {
    */
   private lookAtIdleScreen(id: string, l: LiveSession): void {
     const st = l.state
-    const question = l.adapter.idleQuestion!(l.screen!.text())
+    if (!l.adapter.idleQuestion || !l.screen) return
+    const question = l.adapter.idleQuestion(l.screen.text())
     if (question && !l.idleAsk && AT_PROMPT.has(st.status)) {
       const text = withValues(msg({ id: 'session.status.cliAsks', defaultMessage: '{provider} asks: {question}', description: "An agent's status: its coding agent ({provider}, e.g. Claude Code) shows a question of its own on its screen and waits for the user to answer it there. {question} is the question, in the coding agent's own words (English)." }), { provider: l.adapter.descriptor.name, question })
       const ask: Ask = { kind: 'question', blocking: true, message: englishText(text), text }

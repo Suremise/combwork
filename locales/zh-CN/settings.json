@@ -125,7 +125,7 @@
   "settings.advanced.claude-code.safeguard.note.title": "安全拦截：会话记录注记",
   "settings.advanced.claude-code.safeguard.prompt.desc": "安全拦截后 Claude Code 询问是否切换模型的问题，根据它最后写出的几行中打开的对话框选项来识别。对话框打开期间，Hive 会显示智能体正在等你处理及原因；若设置有误，智能体只显示需要你的授权。",
   "settings.advanced.claude-code.safeguard.prompt.title": "安全拦截：询问",
-  "settings.advanced.claude-code.screen.idleQuestion.desc": "Claude Code 在一轮结束后自行显示在屏幕上、不向 Hive 发送任何内容的问题（\"Teach auto mode about your environment?\"）。显示期间，Hive 会把智能体显示为带着该问题等待你回答，并且不向其中输入任何内容：按 Enter 会回答它。如果设置错误，Hive 会把唤醒内容输入到这个问题里。",
+  "settings.advanced.claude-code.screen.idleQuestion.desc": "Claude Code 在一轮结束后自行显示在屏幕上、不向 Hive 发送任何内容的问题（\"Teach auto mode about your environment?\"），它是取代输入框的对话框中单独的一行（在显示输入框时，提示或回复里出现的相同文字不算）。显示期间，Hive 会把智能体显示为带着该问题等待你回答，并且不向其中输入任何内容：按 Enter 会回答它。如果设置错误，Hive 会把唤醒内容输入到这个问题里。",
   "settings.advanced.claude-code.screen.idleQuestion.title": "屏幕：空闲时的问题",
   "settings.advanced.claude-code.screen.input.desc": "Claude Code 位于两条横线之间的输入框，其第一组是提示符号之后的内容。Hive 读取它来判断自己输入的一行已从输入框中消失（被 CLI 的某个界面接走），然后重新输入。如果设置错误，这样的一行会一直被挂起，在你于那里按下 Enter 之前，不会再向智能体输入任何内容。",
   "settings.advanced.claude-code.screen.input.title": "屏幕：输入框",

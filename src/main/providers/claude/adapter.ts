@@ -686,12 +686,15 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
 
   /**
    * Claude Code's question by itself after a turn (HI-1959: 2.1.312's offer to teach auto mode about the environment),
-   * which sends no hook: the advanced setting claude-code.screen.idleQuestion, in the lines written last (its dialog
-   * replaces the input at the bottom).
+   * which sends no hook: the advanced setting claude-code.screen.idleQuestion (its title, a line of its own), in the lines
+   * written last. Its dialog replaces the input box: with the box drawn, the same words are a prompt's or a reply's
+   * (HR3's round 1), never the dialog.
    */
   idleQuestion(screen: string): string | null {
     const bottom = screen.trimEnd().split('\n').slice(-SAFEGUARD_PROMPT_LINES).join('\n')
-    return advanced.pattern('claude-code.screen.idleQuestion').exec(bottom)?.[0] ?? null
+    const asked = advanced.pattern('claude-code.screen.idleQuestion').exec(bottom)
+    if (!asked || this.promptText(screen) !== null) return null
+    return asked[0].trim()
   }
 
   /**

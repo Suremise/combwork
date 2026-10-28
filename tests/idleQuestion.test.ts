@@ -22,11 +22,22 @@ const QUESTION = 'Teach auto mode about your environment?'
 const RULE = '─'.repeat(60)
 
 describe("Claude Code's question by itself and its input box, on its screen (2.1.312)", () => {
-  it('reads the question from the recorded screen, and none from an idle screen, a typed line or a safeguard prompt', () => {
+  it('reads the question from both of its dialogs, and none from an idle screen, a typed line or a safeguard prompt', () => {
     expect(claudeCode.idleQuestion(fixture('advanced/envsetup-claude-2.1.312.txt'))).toBe(QUESTION)
+    expect(claudeCode.idleQuestion(fixture('advanced/envsetup-offer-claude-2.1.312.txt'))).toBe(QUESTION)
     expect(claudeCode.idleQuestion(fixture('screen-claude-2.1.296-idle.txt'))).toBeNull()
     expect(claudeCode.idleQuestion(fixture('advanced/input-claude-2.1.312.txt'))).toBeNull()
     expect(claudeCode.idleQuestion(fixture('advanced/safeguard-prompt-claude-2.1.296.txt'))).toBeNull()
+  })
+
+  it("isn't fooled by the question's words in a prompt or a reply: the dialog replaces the input box (HR3's round 1)", () => {
+    // Typed into the input (a prompt about this very feature), whole or as a line of its own.
+    expect(claudeCode.idleQuestion(`${RULE}\n❯ Explain: ${QUESTION}\n${RULE}\n  ⏵⏵ auto mode on`)).toBeNull()
+    expect(claudeCode.idleQuestion(`${RULE}\n❯ Explain this dialog:\n  ${QUESTION}\n${RULE}`)).toBeNull()
+    // Quoted in a reply, on a line of its own, with the input box under it.
+    expect(claudeCode.idleQuestion(`● Claude Code may ask:\n\n  ${QUESTION}\n\n  It reads your project first.\n\n${RULE}\n❯ \n${RULE}\n  ⏵⏵ auto mode on`)).toBeNull()
+    // Within a line of a reply: never the dialog's title.
+    expect(claudeCode.idleQuestion(`● It asked "${QUESTION}" after the turn.`)).toBeNull()
   })
 
   it("reads what its input holds: the recorded line, an empty box, wrapped rows joined; none under a dialog or a menu's ❯", () => {
@@ -131,6 +142,9 @@ describe('the agent and its question by itself (HI-1959)', () => {
     expect(writes).toEqual([])
     // Gone (the user put it off), typing goes on.
     await draw(e, EMPTY_INPUT)
+    expect(sessions.cliAsks(project, id)).toBe(false)
+    // Its words in a prompt the user is writing are no question of the CLI's (HR3's round 1).
+    await draw(e, `${RULE}\n❯ Explain: ${QUESTION}\n${RULE}`)
     expect(sessions.cliAsks(project, id)).toBe(false)
   })
 
@@ -257,6 +271,37 @@ describe('a held line the screen took (HI-1959, the 12:47 comment)', () => {
     secondLook(e)
     expect(e.state.untakenLine).toBeUndefined()
     expect(JSON.stringify(notified.mock.calls.at(-1))).toContain('Call hive_inbox to read it, act on it, then ack it.')
+  })
+
+  it('a line marked held when its input is already empty, with nothing drawn after, is looked at at once (HR3\'s round 1)', async () => {
+    later()
+    quiet()
+    const e = running()
+    // The dialog took the line and closed before the line was marked: its empty input is all there is, and stays so.
+    await draw(e, EMPTY_INPUT)
+    held(e)
+    await vi.waitFor(() => expect(e.lostSeen).toBeTruthy(), { timeout: 10_000 })
+    secondLook(e)
+    expect(e.state.untakenLine).toBeUndefined()
+  })
+
+  it('a line marked held with its text, or the user\'s, still in the input, or taken late, is kept however it was looked at', async () => {
+    later()
+    quiet()
+    const e = running()
+    await draw(e, `${RULE}\n❯ my own words\n${RULE}`)
+    held(e)
+    // Looked at in hook order like any look: nothing seen lost.
+    await (sessions as unknown as { inHookOrder(k: string, fn: () => void): Promise<void> }).inHookOrder('run1', () => undefined)
+    expect(e.lostSeen).toBeUndefined()
+    expect(e.state.untakenLine).toBeTruthy()
+    // Empty, but a prompt taken since the mark (a late hook): no loss at the first look, nor at a second.
+    await draw(e, EMPTY_INPUT)
+    e.prompts = 1
+    look(e)
+    expect(e.lostSeen).toBeUndefined()
+    secondLook(e)
+    expect(e.state.untakenLine).toBeTruthy()
   })
 
   it("the timer's own second look, after the wait, lets a swallowed line go", async () => {

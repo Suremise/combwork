@@ -1488,11 +1488,15 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'claude-code.screen.idleQuestion',
     group: 'claude-code',
     title: msg({ id: 'settings.advanced.claude-code.screen.idleQuestion.title', defaultMessage: 'Screen: question while idle', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
-    desc: msg({ id: 'settings.advanced.claude-code.screen.idleQuestion.desc', defaultMessage: "A question Claude Code puts on its screen by itself after a turn, sending Hive nothing (\"Teach auto mode about your environment?\"). While it shows, Hive shows the agent waiting for you with the question, and types nothing into it: Enter would answer it. Wrong, Hive types its wakes into the question.", description: 'What the advanced setting "Screen: question while idle" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959). The quoted question is Claude Code\'s own, in English: keep it as it is.' }),
+    desc: msg({ id: 'settings.advanced.claude-code.screen.idleQuestion.desc', defaultMessage: "A question Claude Code puts on its screen by itself after a turn, sending Hive nothing (\"Teach auto mode about your environment?\"), as a line of its own in a dialog that replaces its input box (the same words in a prompt or a reply, with the input box drawn, aren't it). While it shows, Hive shows the agent waiting for you with the question, and types nothing into it: Enter would answer it. Wrong, Hive types its wakes into the question.", description: 'What the advanced setting "Screen: question while idle" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959). The quoted question is Claude Code\'s own, in English: keep it as it is.' }),
     kind: 'pattern',
-    default: String.raw`Teach auto mode about your environment\?`,
+    default: String.raw`^[ \t]*Teach auto mode about your environment\?[ \t]*$`,
+    flags: 'm',
     applies: 'now',
-    samples: [{ from: `${FIX}/advanced/envsetup-claude-2.1.312.txt`, version: '2.1.312', text: 'Teach auto mode about your environment?' }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [
+      { from: `${FIX}/advanced/envsetup-claude-2.1.312.txt`, version: '2.1.312', text: '  Teach auto mode about your environment?' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/envsetup-offer-claude-2.1.312.txt`, version: '2.1.312', text: ' Teach auto mode about your environment?' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
   },
   {
     id: 'claude-code.screen.input',
