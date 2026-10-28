@@ -1389,15 +1389,24 @@ async function gateOf(ws: WorkspaceService, n: number, patch: TaskPatch, actor: 
       return null
     }
   })()
-  if (!rec || rec.preWorkflow) return null
+  if (!rec) return null
   const to = CATEGORY_STAGE[patch.column]
   const s = wf.state(rec)
+  if (rec.preWorkflow && !startsOld(s.stage, to)) return null
   // A stage its ruleset lacks: refused by the runtime with why (the window's move, `anyStage`); the board's other moves
   // keep P3's recorded move until the window asks through tasks:move (#1275), so today's columns go on working.
   if (s.stage === to || (!o.anyStage && !hasStage(wf.rulesetOf(rec, s), to))) return null
   const agent = patch.agent !== undefined ? await agentIdIn(ws, head.project, patch.agent) : typeof head.agent === 'string' && head.agent ? head.agent : null
   return { wf, to, by: actor.kind, ...(agent ? { builder: agent } : {}) }
 }
+
+/**
+ * Whether a move of a card from before 1.0 is its start (HI-1966): into Active from Todo, or from Done (reopened). That
+ * start is the runtime's, as an intent's is (HI-1674), so it gets a slot where the project builds in slots and the card
+ * becomes a 1.0 card; P3's recorded start lent none and recorded the agent's 0.9 worktree, or the project folder (rc.9:
+ * the Assistant's Start of HI-1612 launched HB2 in the main checkout). Its other moves keep P3's path until it starts.
+ */
+const startsOld = (stage: StageId, to: StageId): boolean => to === 'active' && (stage === 'todo' || stage === 'done')
 
 /** An agent's move or review translated into the intent it stands for (#1268): the card's runtime, and which. */
 interface AgentGate {
@@ -1443,12 +1452,14 @@ async function agentGateOf(ws: WorkspaceService, n: number, patch: TaskPatch, ac
       return null
     }
   })()
-  if (!rec || rec.preWorkflow) return null
+  if (!rec) return null
   // A column its rules don't have (Review in a project with no review), and a review there: P3's move, as the user's
   // (#1290), so today's columns go on working until the skills use the intents.
   // So does a card in such a column (moved there by P3's path), and one On Hold (the user's: an agent takes it out when
   // the user asks it to work on it).
   const s = wf.state(rec)
+  // A card from before 1.0: only its start is translated (HI-1966), the rest P3's until then.
+  if (rec.preWorkflow && (review || !startsOld(s.stage, CATEGORY_STAGE[column as TaskColumn]))) return null
   const r = wf.rulesetOf(rec, s)
   // A card On Hold never started is started by its move to Doing, as from Todo (HR2's #1268 round 1: a new cycle always
   // goes through Start's guards); one held while being worked on goes back to it by P3's move.

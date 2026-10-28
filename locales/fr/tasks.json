@@ -164,6 +164,7 @@
   "tasks.start.archived": "La carte {card} est archivée. Restaure-la d’abord.",
   "tasks.start.beingGiven": "L’agent {agent} est en train de recevoir une autre carte. Démarre celle-ci une fois qu’il est inactif, ou confie-la à un autre agent.",
   "tasks.start.changed": "La carte {card} a changé pendant son démarrage (archivée, déplacée, confiée à un autre agent ou son À lire d’abord modifié) : démarre-la à nouveau si elle doit toujours partir.",
+  "tasks.start.noSlot": "La carte {card} n’a pas démarré : son projet construit chaque carte dans un emplacement à elle, et ce démarrage n’en a obtenu aucun, donc son agent aurait travaillé dans le dossier du projet. La carte est revenue là où elle était : démarre-la à nouveau.",
   "tasks.start.movedColumn": "La carte {card} a été déplacée vers {column, select, hold {Suspendu} todo {À faire} doing {En cours} review {Relecture} passed {Validé} done {Terminé} other {{column}}} entre-temps. Redémarre-la si elle est toujours à faire.",
   "tasks.start.movedDone": "La carte {card} a été déplacée vers Terminé entre-temps. Redémarre-la s’il reste du travail.",
   "tasks.start.movedProject": "La carte {card} a été déplacée vers le projet {project} entre-temps. Redémarre-la.",

@@ -164,6 +164,7 @@
   "tasks.start.archived": "{card}はアーカイブされています。先に戻してください。",
   "tasks.start.beingGiven": "{agent}には別のカードを割り当て中です。アイドルになってからこのカードを開始するか、別のエージェントに割り当ててください。",
   "tasks.start.changed": "{card}は開始中に変更されました（アーカイブ、移動、別のエージェントへの割り当て、または「最初に読む」の編集）。まだ開始する必要があれば、もう一度開始してください。",
+  "tasks.start.noSlot": "{card}は開始されませんでした：このプロジェクトはカードごとに専用のスロットで作業しますが、この開始ではスロットを得られず、エージェントがプロジェクトフォルダーで作業するところでした。カードは元の場所に戻りました。もう一度開始してください。",
   "tasks.start.movedColumn": "その間に{card}が「{column, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{column}}}」に移動されました。まだ作業が必要なら、もう一度開始してください。",
   "tasks.start.movedDone": "その間に{card}が「完了」に移動されました。まだ作業が残っていれば、もう一度開始してください。",
   "tasks.start.movedProject": "その間に{card}が{project}に移動しました。もう一度開始してください。",

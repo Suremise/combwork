@@ -164,6 +164,7 @@
   "tasks.start.archived": "Karta {card} jest zarchiwizowana. Najpierw ją przywróć.",
   "tasks.start.beingGiven": "Agent {agent} właśnie dostaje inną kartę. Rozpocznij tę, gdy będzie bezczynny, albo przekaż ją innemu agentowi.",
   "tasks.start.changed": "{card} zmieniła się podczas uruchamiania (zarchiwizowana, przeniesiona, dana innemu agentowi albo zmieniono jej „Przeczytaj najpierw”): uruchom ją ponownie, jeśli nadal ma ruszyć.",
+  "tasks.start.noSlot": "Karta {card} nie została uruchomiona: jej projekt buduje każdą kartę we własnym slocie, a to uruchomienie żadnego nie dostało, więc jej agent pracowałby w folderze projektu. Karta wróciła tam, gdzie była: uruchom ją ponownie.",
   "tasks.start.movedColumn": "Kartę {card} przeniesiono w międzyczasie do kolumny {column, select, hold {Wstrzymane} todo {Do zrobienia} doing {Aktywne} review {Recenzja} passed {Zatwierdzone} done {Gotowe} other {{column}}}. Rozpocznij ją ponownie, jeśli nadal jest do zrobienia.",
   "tasks.start.movedDone": "Kartę {card} przeniesiono w międzyczasie do Gotowych. Rozpocznij ją ponownie, jeśli zostało coś do zrobienia.",
   "tasks.start.movedProject": "Kartę {card} przeniesiono w międzyczasie do projektu {project}. Rozpocznij ją ponownie.",

@@ -36,7 +36,7 @@ import { app } from 'electron'
 import type { DatabaseSync } from 'node:sqlite'
 import { advanced } from './advanced'
 import { exitBy } from './exitLog'
-import { legacyWorktree, rebindSession } from './agentFolders'
+import { legacyWorktree, rebindSession, slotsMigrated } from './agentFolders'
 import { boardRead } from './boardStore'
 import { deliveriesOf, deliverNow, launchWith } from './deliveries'
 import { onHiveEvent } from './events'
@@ -572,6 +572,29 @@ export async function placementDue(ws: WorkspaceService, projectPath: string, n:
   if (!wf || !card) return null
   const cycle = cycleIn(wf.store.facts(n))
   return cycle && !cycle.placed && wf.state(card).stage === 'active' ? { slot: cycle.started.slot, lease: cycle.started.lease } : null
+}
+
+/**
+ * Whether a card's current start was written outside the slots of a project that builds its cards in them (HI-1966): the
+ * rules enforced, the card Active, its last start with no lease, under a ruleset that builds in slots, and its folder
+ * neither a slot (a carried one stands in for one, #1441) nor its builder's own 0.9 worktree not migrated yet (#1434).
+ * startTask undoes such a start rather than launch its builder in the project folder. False when it can't be told.
+ */
+export async function startedOutsideSlots(ws: WorkspaceService, projectPath: string, n: number): Promise<boolean> {
+  if (!workflowEnforced()) return false
+  const wf = await workflowFor(ws, projectPath).catch(() => null)
+  const card = wf ? cardOf(wf, n) : null
+  if (!wf || !card) return false
+  const s = wf.state(card)
+  const started = s.started
+  if (s.stage !== 'active' || !started || started.lease || wf.rulesetOf(card, s).options.folder !== 'slots') return false
+  const folder = started.folder
+  if (folder !== 'project' && !samePlace(folder, projectPath)) {
+    if ((await poolFor(ws, projectPath)).slots().some((x) => samePlace(x.folder, folder))) return false
+    const legacy = legacyWorktree(projectAgents(await ws.projectConfig(projectPath)).find((a) => a.id === started.builder))
+    if (legacy && samePlace(legacy.path, folder) && !(await slotsMigrated(projectPath, started.builder))) return false
+  }
+  return true
 }
 
 // --- Quiet builders.

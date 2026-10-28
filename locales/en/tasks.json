@@ -679,6 +679,10 @@
     "defaultMessage": "{card} has no project. Give it one first: the agent works in that project.",
     "description": "An error: card {card} (its key, such as HI-12) belongs to no project (only the workspace), so no agent can start it; give it a project first."
   },
+  "tasks.start.noSlot": {
+    "defaultMessage": "{card} wasn't started: its project builds each card in a slot, and this start got none, so its agent would have worked in the project folder. The card is back where it was: start it again.",
+    "description": "An error: a Start of the card {card} (its key, such as HI-12) was undone. The card's project has each card built in a slot (a working folder of its own), but this start wasn't given one, so the agent would have worked in the project's own folder instead. The card was moved back to its column."
+  },
   "tasks.start.notGiven": {
     "defaultMessage": "{agent} wasn't given {card}: {why}.",
     "description": "An error: the card {card} (its key, such as HI-12) could not be typed into the terminal of the agent {agent} (its name); {why} says why."
