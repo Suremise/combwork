@@ -13,7 +13,8 @@ import { tempDir } from './tempDir'
 // What the test started that is still running: stopped by its command line (it names the test's folder) and start,
 // never by a pid remembered from earlier, which Windows may have given another process since: under load that could
 // be a concurrent run's Vitest worker (#547: a likely cause of one exiting with code 1, not reproduced).
-const { stopProcessesIn } = createRequire(import.meta.url)('./e2e/folderProcesses.cjs') as { stopProcessesIn: (folder: string, since?: number) => number }
+type Identity = { pid: number; started: number }
+const { stopProcessesIn, identify, endExactly } = createRequire(import.meta.url)('./e2e/folderProcesses.cjs') as { stopProcessesIn: (folder: string, since?: number) => number; identify: (pids: number[]) => Identity[]; endExactly: (targets: Identity[]) => number }
 
 vi.mock('../src/main/events', () => ({ emit: () => undefined, sendPty: () => undefined }))
 vi.mock('../src/main/providers', () => ({ allProviders: () => [] }))
@@ -128,8 +129,9 @@ if (process.argv[4] === '--stay') {
     // terminal, kept as a leftover that held its slot. Here the gate is ended under its running CLI the same way.
     const ran = join(dir, 'orphan-ran.txt')
     const cliPid = join(dir, 'orphan-pid.txt')
-    let gatePid = 0
-    let gateEnded = false
+    // The gate's identity, taken while it waits for its word (it can't end before), so ending it later never takes a
+    // process that got its pid since (#603).
+    let gate: Identity | undefined
     const exited = new Promise<void>((resolve) => {
       spawnPty('gate-orphan', {
         file: process.execPath,
@@ -137,20 +139,20 @@ if (process.argv[4] === '--stay') {
         cwd: dir,
         env,
         track: (pid, cancelled) => {
-          gatePid = pid
+          gate = identify([pid])[0]
           return trackLaunch({ runId: 'gate5', projectPath: dir, agentId: 'g5', agentName: 'Orphan', gated: true }, pid, cancelled).then((t): GateWord => (t.tracked ? { go: true } : { go: false, reason: t.reason }))
         },
-        onExit: () => {
-          gateEnded = true
-          resolve()
-        }
+        onExit: () => resolve()
       })
     })
     await vi.waitFor(() => expect(existsSync(cliPid) && Number(readFileSync(cliPid, 'utf8')) > 0).toBe(true), { timeout: 30_000, interval: 50 })
     const pid = Number(readFileSync(cliPid, 'utf8'))
-    expect(gateEnded).toBe(false)
-    process.kill(gatePid) // its handle is held (node-pty's, until its onExit, which hasn't come): the pid can't be another's
+    expect(gate).toBeDefined()
+    // Just the gate, not its tree: its CLI must outlive it.
+    expect(endExactly([gate!])).toBe(1)
     await exited
+    // Once it has ended, its identity names no process: nothing else is ended.
+    expect(endExactly([gate!])).toBe(0)
     expect(alive(pid)).toBe(true)
     // Its launch ends with nothing left: the CLI is ended, not listed to keep.
     expect(await launchEnded('gate5')).toBeNull()
@@ -165,8 +167,9 @@ if (process.argv[4] === '--stay') {
     const cliPid = join(dir, 'wrapped-pid.txt')
     const wrapper = join(dir, 'wrapper.cmd')
     writeFileSync(wrapper, `@echo off\r\n"${process.execPath}" "${cli}" "${join(dir, 'wrapped-ran.txt')}" "${cliPid}" --stay\r\n`)
-    let gatePid = 0
-    let gateEnded = false
+    // The gate's identity, taken while it waits for its word (it can't end before), so ending it later never takes a
+    // process that got its pid since (#603).
+    let gate: Identity | undefined
     const exited = new Promise<void>((resolve) => {
       spawnPty('gate-wrapped', {
         file: process.env.ComSpec || 'cmd.exe',
@@ -174,20 +177,20 @@ if (process.argv[4] === '--stay') {
         cwd: dir,
         env,
         track: (pid, cancelled) => {
-          gatePid = pid
+          gate = identify([pid])[0]
           return trackLaunch({ runId: 'gate6', projectPath: dir, agentId: 'g6', agentName: 'Wrapped', gated: true }, pid, cancelled).then((t): GateWord => (t.tracked ? { go: true } : { go: false, reason: t.reason }))
         },
-        onExit: () => {
-          gateEnded = true
-          resolve()
-        }
+        onExit: () => resolve()
       })
     })
     await vi.waitFor(() => expect(existsSync(cliPid) && Number(readFileSync(cliPid, 'utf8')) > 0).toBe(true), { timeout: 30_000, interval: 50 })
     const pid = Number(readFileSync(cliPid, 'utf8'))
-    expect(gateEnded).toBe(false)
-    process.kill(gatePid) // its handle is held (node-pty's, until its onExit, which hasn't come): the pid can't be another's
+    expect(gate).toBeDefined()
+    // Just the gate, not its tree: its CLI must outlive it.
+    expect(endExactly([gate!])).toBe(1)
     await exited
+    // Once it has ended, its identity names no process: nothing else is ended.
+    expect(endExactly([gate!])).toBe(0)
     expect(alive(pid)).toBe(true)
     expect(await launchEnded('gate6')).toBeNull()
     expect(alive(pid)).toBe(false)
