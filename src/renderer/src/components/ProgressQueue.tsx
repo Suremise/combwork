@@ -235,25 +235,41 @@ async function removeFromQueue(n: number, key: string): Promise<void> {
 }
 
 /**
- * The Merges tab (#1356 item 3): the merge queues' cards and the merge slot's, side by side, by project then target (a
- * slot's target is the branch it merges into).
+ * The Merges tab (#1356 item 3): the merge queues' cards and the merge slot's, by project then target (a slot's target
+ * is the branch it merges into). What merges now comes first, history after (HI-1924, the Assistant's screenshot OK): a
+ * project's slots sit under its queue's card (the queue for their target, else the project's first), then the queue's
+ * Recent merges; a project with no queue lists its slots alone.
  */
 export function MergesList({ queues, slots, runs, now, projectName, showProject, stepOf, agent = null }: { queues: QueueView[]; slots: MergeSlotInfo[]; runs: readonly ProgressRun[]; now: number; projectName: (path: string) => string; showProject: boolean; stepOf: (s: MergeSlotInfo) => string | null; agent?: string | null }) {
   useLanguage()
   const [folded, toggle] = useMergeFold()
+  const slotCard = (s: MergeSlotInfo) => <MergeCard key={`s:${s.project}#${s.branch}`} slot={s} project={projectName(s.project)} showProject={showProject} step={stepOf(s)} now={now} folded={folded} onFold={toggle} />
+  const byTarget = (a: { target: string }, b: { target: string }): number => a.target.localeCompare(b.target)
+  const sorted = [...queues].sort(byTarget)
+  const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
+  // Each slot's queue: its project's queue for its target, else that project's first.
+  const home = (s: MergeSlotInfo): QueueView | undefined => sorted.find((v) => same(v.projectPath, s.project) && v.target === s.branch) ?? sorted.find((v) => same(v.projectPath, s.project))
+  const under = new Map<QueueView, MergeSlotInfo[]>()
+  const alone: MergeSlotInfo[] = []
+  for (const s of [...slots].sort((a, b) => a.branch.localeCompare(b.branch))) {
+    const v = home(s)
+    if (v) under.set(v, [...(under.get(v) ?? []), s])
+    else alone.push(s)
+  }
   const items = [
-    ...queues.map((v) => ({
+    ...sorted.map((v) => ({
       key: `q:${v.projectPath}#${v.target}`,
       project: projectName(v.projectPath),
       target: v.target,
       el: (
         <div key={`q:${v.projectPath}#${v.target}`} className="progress-queue-with-history">
           <QueueCard view={v} runs={runs} now={now} showProject={showProject} />
+          {under.get(v)?.map(slotCard)}
           <RecentMerges view={v} runs={runs} now={now} agent={agent} />
         </div>
       )
     })),
-    ...slots.map((s) => ({ key: `s:${s.project}#${s.branch}`, project: projectName(s.project), target: s.branch, el: <MergeCard key={`s:${s.project}#${s.branch}`} slot={s} project={projectName(s.project)} showProject={showProject} step={stepOf(s)} now={now} folded={folded} onFold={toggle} /> }))
+    ...alone.map((s) => ({ key: `s:${s.project}#${s.branch}`, project: projectName(s.project), target: s.branch, el: slotCard(s) }))
   ].sort((a, b) => a.project.localeCompare(b.project) || a.target.localeCompare(b.target) || a.key.localeCompare(b.key))
   return (
     <div className="progress-merge full" role="region" aria-label={tr(msg({ id: 'board.merge.region', defaultMessage: 'Merging', description: "Accessible name of the top of the Progress panel: a card for each merge going on." }))}>

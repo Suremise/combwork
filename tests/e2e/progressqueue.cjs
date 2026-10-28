@@ -260,6 +260,13 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     check('…Two returned on top: a conflict in a.txt, no time taken', !!(await until(async () => (await twoHistory.count()) === 1 && /Returned: conflict in a\.txt/.test(await twoHistory.innerText()), HUNG_MS)) && !/took /.test(await twoHistory.innerText()) && (await history.locator('.progress-queue-history-row').first().getAttribute('data-entry'))?.startsWith(`${twoKey}/`), await historyText())
     check('…the pause ended: how long it lasted', /lasted /.test(await pauseRow.innerText()) && (await pauseRow.getAttribute('data-ended')) === '', await pauseRow.innerText())
     check("…no push said (the project doesn't push)", (await oneHistory.locator('.progress-queue-push').count()) === 0)
+    // What merges now first, history after (the Assistant's screenshot OK): alpha's merge slot between its queue's card
+    // and its Recent merges, never under them.
+    const order = await panel.locator('.progress-tab-merges').evaluate((el) => {
+      const at = (sel) => [...el.querySelectorAll('.progress-merge-card, [data-queue-history]')].findIndex((n) => n.matches(sel))
+      return { queue: at('.progress-queue-card[data-queue="alpha#integration"]'), slot: at('.progress-merge-card:not(.progress-queue-card)'), history: at('[data-queue-history="alpha#integration"]') }
+    })
+    check("…alpha's merge slot sits between its queue's card and its Recent merges", order.queue >= 0 && order.queue < order.slot && order.slot < order.history, JSON.stringify(order))
     await shoot('merges-history')
     // The agent filter: One's builder's rows only (the pause of the whole queue still shows); then all agents again.
     await projectFilter.selectOption({ label: 'alpha' })

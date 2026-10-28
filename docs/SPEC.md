@@ -4676,7 +4676,8 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   merged or returned (with why), a queue paused or resumed. The Runs tab's Agent filter has **Hive (merge queue)** for
   Hive's own runs, which fold by card and check like any run. Display only: it follows the queue's state; the controls
   are #1353's.
-  **Recent merges [HI-1924]:** under each queue's card, its latest outcomes (merged with the merge commit, which copies;
+  **Recent merges [HI-1924]:** under each queue's card and the project's merge slots (the slot for its target, else
+  under the project's first queue: what merges now first, history after), its latest outcomes (merged with the merge commit, which copies;
   returned with `returnWhy`; taken out with its reason) and pauses (why in a few words, the sentence as its tooltip; how
   long it lasted, or still paused), newest first, at most 20, then *More in Version Control* when there may be more.
   A row has the card's key and title, its time (how long ago on hover) and how long the queue took over the entry: from

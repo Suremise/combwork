@@ -861,7 +861,7 @@ When Hive merges a project's cards itself (**Who merges: Hive merges**, the merg
 
 ##### Recent merges <a id="recent-merges"></a>
 
-Under each queue's card, **Recent merges** lists what the queue did lately, newest first, up to 20 rows:
+Under each queue's card (and under a merge slot an agent holds for that project, so what merges now comes first), **Recent merges** lists what the queue did lately, newest first, up to 20 rows:
 
 - **✓ Merged**, with the merge commit (click it to copy the whole commit id).
 - **✗ Returned**, with why in a few words: *conflict in tasks.ts*, *checks failed: unit*, its focused tests.
