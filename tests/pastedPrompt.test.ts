@@ -315,8 +315,18 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
       expect(promptInput('a\r\nb\tc\x1b', true, true)).toBe('a\rb\tc')
       expect(promptInput('a\r\nb\tc\x1b', false, true)).toBe('a b c')
       expect(promptInput('a b\x1b', true, false)).toBe('a b')
-      // Typed and not as typed: as before, the line as it comes (already on one line).
+      // Typed and not as typed: the line as it comes (already on one line), without control characters (HI-1920: a
+      // Ctrl+C in it reached Codex as Ctrl+C, an escape could press arrow keys).
       expect(promptInput('a b', false, false)).toBe('a b')
+      expect(promptInput('stop\x03 here \x1b[A up\x7f \x9b end', false, false)).toBe('stop here [A up  end')
+    })
+
+    it('typed into Codex with Send prompts as typed off (the default), no control character reaches it (HI-1920)', async () => {
+      echo.to = await running(codex, '')
+      await withSwitches({ [PROMPT_AS_TYPED]: false }, () => sessions.sendPrompt(p, id, 'A plan:\r\n  1. one\n\n\t2. two  \x03 then \x1b[A\x7f'))
+      // Collapsed first, then left out: the Ctrl+C between two spaces leaves both, as a paste does.
+      expect(typedText()).toBe('A plan: 1. one 2. two  then [A')
+      expect(writes.slice(1, -1).some((w) => /[\x00-\x1f\x7f-\x9f]/.test(w))).toBe(false)
     })
 
     // Claude Code 2.1.309 leaves a prompt with one of these unsent ("Removed 1 invisible character · review and press Enter
