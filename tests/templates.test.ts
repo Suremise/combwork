@@ -670,12 +670,18 @@ describe('saving and loading templates', () => {
     await expect(run(() => templates.addAgentFromTemplate(beta, 'hive', 'team-3x3.json', 0))).rejects.toThrow(/couldn't read beta's key/)
     await expect(run(() => templates.saveTemplate(beta, 'workspace', 'Unkeyed', false, true))).rejects.toThrow(/couldn't read beta's key/)
     expect(cfgOf(beta).agents.map((a: StoredAgent) => a.id)).toEqual(ids)
+    // Listed for beta (HI-1948: the window's menu names them so), its names keep {key} while main has no key for it.
+    const listedNames = async () => (await run(() => templates.listTemplates(beta))).find((t) => t.scope === 'hive' && t.file === 'team-3x3.json')?.agentNames
+    expect(await listedNames()).toEqual(['B1', 'B2', 'B3', 'R1', 'R2', 'R3'].map((n) => `{key}-${n}`))
     const { keyProjects, projectKeyOf } = await import('../src/main/projectKeys')
     await run(() => keyProjects(w))
     const key = (await run(() => projectKeyOf(w, beta)))!
     expect(key).toMatch(/^[A-Z]{2,4}$/)
     const plan = await run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))
     const want = ['B1', 'B2', 'B3', 'R1', 'R2', 'R3'].map((n) => `${key}-${n}`)
+    // Once it has one, every agent's name as its plan makes them, by place; the template's own patterns kept as they are.
+    expect(await listedNames()).toEqual(plan.templateNames)
+    expect((await run(() => templates.listTemplates(beta))).find((t) => t.file === 'team-3x3.json')?.agents.map((a) => a.name)).toEqual(['{key}-B{n}', '{key}-B{n}', '{key}-B{n}', '{key}-R{n}', '{key}-R{n}', '{key}-R{n}'])
     expect([plan.name, plan.blocked, plan.create.map((a) => a.name), plan.templateNames, plan.layout, plan.suggestedPreset, plan.swaps]).toEqual(['Team 3×3', [], want, want, 'grid6', 'team', []])
     expect(plan.pairs).toEqual([{ builder: 0, reviewer: 3 }, { builder: 1, reviewer: 4 }, { builder: 2, reviewer: 5 }])
     await run(() => templates.loadTemplate(beta, 'hive', 'team-3x3.json', ids))

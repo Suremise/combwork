@@ -126,6 +126,11 @@ export interface TemplateEntry {
   problem?: string
   /** Why, as text for the window to show in its language (#870), following a change of language. */
   problemText?: Text
+  /**
+   * Its agents' names in the project it is listed for (HI-1948: `listTemplates`), its patterns made with that project's
+   * key as main reads it; `{key}` kept while the project has none. Derived for display, never saved or loaded.
+   */
+  agentNames?: string[]
 }
 
 /**

@@ -22,7 +22,8 @@ import { watchText } from '@shared/agentWatch'
 import { formatDateTime, formatWhen } from '@shared/dates'
 import * as actions from '../actions'
 import { HAND_OVER_TEXT, handOverNow, onRunningLane } from '@shared/handOver'
-import { call, errorMessage } from '../api'
+import { call } from '../api'
+import { templateList, templatesStillHere } from '../templateList'
 import { NO_IDS, NO_PROJECTS, agentPage, get, agentProviderOf, clearStartFailure, closeTile, focusAgent, focusedAgentId, isAssistantPath, notify, openActivity, openInSessionsTab, paneAssignment, paneCells, projectKey, prompt, revealAgent, seenAgents, set, setProjectTab, showAgent, openVersionControl, showAttachments, showInOverview, showPage, shownLayout, startingKey, startingLabel, useLanguage, useStarting, useStore } from '../store'
 import { useLiveUsage, useLiveUsageState } from '../usage'
 import { commandKeybinding } from '../commands'
@@ -519,7 +520,7 @@ export function AddAgentButton({ project, className, label, iconOnly }: { projec
   const tip = full ? agentLimitText(limit, tr) : tr(msg({ id: 'panes.add.tip', defaultMessage: 'Configure Agent and Add…: choose its provider, where it works and its settings', description: 'Tooltip of the Add Agent button (an empty project or pane). "Configure Agent and Add…" names the dialog it opens: use its translation.' }))
   const fromTemplate = async (keyboard: boolean): Promise<void> => {
     const at = caret.current && below(caret.current)
-    const all = await templateList(project.path)
+    const all = await templatesStillHere(project.path)
     if (at && all) menu.openAt(...at, addFromTemplateItems(project, all), keyboard)
   }
   const open = (keyboard: boolean): void => {
@@ -701,24 +702,17 @@ const below = (el: Element): [number, number] => {
 const layoutName = (l: PageLayout): string =>
   tr(msg({ id: 'panes.template.layout', defaultMessage: '{layout, select, auto {automatic layout} single {one at a time} columns2 {two columns} columns3 {three columns} grid {grid of four} grid6 {grid of six} other {{layout}}}', description: "A template's layout, after how many agents it has (+ Add ▾ → Templates): its pane layout, lower case." }), { layout: l })
 
-/** The templates a project can use (the workspace's and its own), or null after saying why they couldn't be listed. */
-const templateList = (path: string): Promise<TemplateEntry[] | null> =>
-  call('templates:list', path).catch((e) => {
-    notify('error', tr(msg({ id: 'panes.template.listFailed', defaultMessage: 'Could not list the templates', description: "An error's title: Hive couldn't read the templates (+ Add ▾ → Templates, Add Agent from Template)." })), errorMessage(e))
-    return null
-  })
-
 /** Add Agent from Template: each usable template's agents, under its name and scope (#126). */
 function addFromTemplateItems(project: ProjectInfo, list: TemplateEntry[]): MenuEntry[] {
   const all = list.filter((t) => !t.problem)
   const full = project.agents.length >= agentLimit()
-  // Their names as this project's (#1123 names: Hive's own are patterns of its key, HI-B1); its key not known, `{key}` stays.
-  const key = get().projectKeys.find((k) => k.projectPath.toLowerCase() === project.path.toLowerCase())?.key || '{key}'
   return all.length
     ? all.flatMap((t) => [
         { header: true, label: tr(msg({ id: 'panes.template.heading', defaultMessage: '{template} · {scope, select, hive {Hive} workspace {workspace} other {this project}}', description: "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Hive: one of Hive's own templates, #1436)." }), { template: templateTitle(t), scope: t.scope }) },
         ...t.agents.map((a, i) => ({
-          label: templateAgentNames(t.agents, key)[i],
+          // Their names as this project's, as main made them with its key (HI-1948: Hive's own are patterns of it, HI-B1);
+          // none from main, `{key}` stays.
+          label: t.agentNames?.[i] ?? templateAgentNames(t.agents, '{key}')[i],
           icon: 'person-add',
           detail: [tr(WORKFLOW_ROLE_TEXT[a.role].name), a.note ?? '', providerName(a.provider)].filter(Boolean).join(' · '),
           disabled: full,
@@ -961,7 +955,7 @@ export function SessionToolbar({ project, view }: { project: ProjectInfo; view: 
   // + Add ▾: the dialog, the quick add, one agent of a template, and the templates themselves.
   const fromTemplate = async (keyboard: boolean): Promise<void> => {
     const at = add.current && below(add.current)
-    const all = await templateList(project.path)
+    const all = await templatesStillHere(project.path)
     if (at && all) addMenu.openAt(...at, addFromTemplateItems(project, all), keyboard)
   }
   const templates = async (keyboard: boolean): Promise<void> => {

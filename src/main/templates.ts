@@ -174,12 +174,15 @@ const byName = (a: TemplateEntry, b: TemplateEntry): number => a.name.localeComp
 
 /**
  * The templates a project can use: Hive's own (#1436, in their order), then the workspace's and its own, each by name
- * (a name in both scopes is listed twice).
+ * (a name in both scopes is listed twice), each with its agents' names in this project (`agentNames`, HI-1948).
  */
 export async function listTemplates(projectPath: string): Promise<TemplateEntry[]> {
   projectPath = workspace.assertProject(projectPath)
   const out = [...(await listIn({ scope: 'workspace', project: projectPath })), ...(await listIn({ scope: 'project', project: projectPath }))]
-  return [...(await listIn({ scope: 'hive' })), ...out.sort(byName)]
+  // Each usable one's agents named for this project (HI-1948), as its plan names them: the window's menu shows these,
+  // never a key of its own that may not be read yet. No key yet: `{key}` stays.
+  const key = (await keyFor(projectPath)) ?? '{key}'
+  return [...(await listIn({ scope: 'hive' })), ...out.sort(byName)].map((e) => (e.problem ? e : { ...e, agentNames: templateAgentNames(e.agents, key) }))
 }
 
 /** Every template of the workspace (the Templates view): Hive's own, the workspace's, then each project's, each by name. */
