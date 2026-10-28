@@ -38,6 +38,7 @@ import { docOutline, findHeading, sectionText, type DocHeading } from '../shared
 import { providerService } from './providerService'
 import { config } from './config'
 import { refusal, type Refusal } from '../shared/workflow/refusals'
+import { testsGiven, type FocusedTest } from '../shared/workflow/focused'
 import { askAssistant, AskRefused } from './assistantAsk'
 import { agentWorkflowRole, isWorkflowRole, workflowPairs, type WorkflowRole } from '../shared/workflow/roles'
 import { deleteEntry, JournalBusy, JournalError, readEntry, recall, updateEntry, writeEntry } from './journal'
@@ -2993,6 +2994,7 @@ const INTENT_WORDS: Record<CardIntent['kind'], string> = {
   cannot: 'report a rule blocking',
   request: 'ask the builder of',
   loopStep: 'take a card loop step on',
+  focusedSkip: 'decide on the skipped focused tests of',
   removeFromQueue: 'take out of the merge queue',
   retryMerge: 'retry the merge of'
 }
@@ -3010,6 +3012,7 @@ const INTENT_DONE: Record<CardIntent['kind'], string> = {
   cannot: 'reported a rule blocking it',
   request: 'asked its builder',
   loopStep: 'took a card loop step',
+  focusedSkip: 'decided on its skipped focused tests',
   removeFromQueue: 'taken out of the merge queue',
   retryMerge: 'queued again (Retry merge)'
 }
@@ -3105,6 +3108,14 @@ function pathsField(body: any, required: boolean): string[] | undefined {
   return v.map((p: string) => p.trim())
 }
 
+/** A submit's focused tests (G20, HI-1367), when given: ids or { id, needs }, unique, each a valid id. */
+function testsField(body: any): FocusedTest[] | undefined {
+  if (body?.tests === undefined || body?.tests === null) return undefined
+  const t = testsGiven(body.tests)
+  if ('bad' in t) throw new HttpError(400, `tests: ${t.bad}. Give the test ids the change needs, each a string or { id, needs } (needs: unit, fake, real, packaged).`) // i18n-ignore: agent-facing
+  return t.tests
+}
+
 /** A body's submission number (start-review, verdict), when given. */
 function submissionField(body: any): number | undefined {
   const v = body?.submission
@@ -3151,7 +3162,8 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
   'put-back': (body) => ({ kind: 'putBack', why: textField(body, 'why', true) }),
   submit: (body) => {
     if (body?.followUp !== undefined && body?.followUp !== null && typeof body.followUp !== 'boolean') throw new HttpError(400, 'followUp is true or false.')
-    return { kind: 'submit', summary: textField(body, 'summary', true), revision: textField(body, 'revision'), note: textField(body, 'note'), paths: pathsField(body, false), ...(body?.followUp === true ? { followUp: true } : {}) }
+    const tests = testsField(body)
+    return { kind: 'submit', summary: textField(body, 'summary', true), revision: textField(body, 'revision'), note: textField(body, 'note'), paths: pathsField(body, false), ...(body?.followUp === true ? { followUp: true } : {}), ...(tests ? { tests } : {}) }
   },
   'declare-paths': (body) => ({ kind: 'declarePaths', paths: pathsField(body, true)! }),
   'start-review': (body) => ({ kind: 'startReview', submission: submissionField(body) }),
@@ -3162,6 +3174,10 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
     return { kind: 'verdict', pass: body.pass, comment: textField(body, 'comment', true), submission: submissionField(body), failKind }
   },
   'report-merge': (body) => ({ kind: 'reportMerge', result: textField(body, 'result') }),
+  'focused-skip': (body) => {
+    if (body?.merge !== true && body?.merge !== false) throw new HttpError(400, 'merge is true or false.')
+    return { kind: 'focusedSkip', request: textField(body, 'request', true)!, merge: body.merge, why: textField(body, 'why', true)! }
+  },
   ask: (body) => {
     const askKind = body?.kind ?? 'other'
     if (!ASK_KINDS.includes(askKind)) throw new HttpError(400, `Unknown kind "${String(askKind)}": ${ASK_KINDS.join(', ')}.`)

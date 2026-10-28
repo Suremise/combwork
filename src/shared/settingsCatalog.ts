@@ -759,6 +759,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('style', 'select', [['merge', V.style.merge], ['squash', V.style.squash], ['rebase', V.style.rebase]]),
     option('target', 'text'),
     option('mergeChecks', 'custom'),
+    option('focusedTests', 'boolean'),
     option('mergeInstall', 'select', [['onManifestChange', V.mergeInstall.onManifestChange], ['always', V.mergeInstall.always]]),
     option('strict', 'boolean'),
     option('pushTarget', 'boolean'),

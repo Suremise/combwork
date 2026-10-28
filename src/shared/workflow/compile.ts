@@ -99,6 +99,8 @@ function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
   if (needsChange(o) && o.folder === 'project') g.submit.push('submit.trailer')
   if (o.identity) g.submit.push('submit.identity')
   if (o.preChecks.length) g.submit.push('submit.checksPassed')
+  // G20 (HI-1367): each card's focused tests are chosen, or named by its builder, before it goes to review.
+  if (o.focusedTests && o.finish === 'hiveMerges') g.submit.push('submit.focusedChosen')
   if (o.stopOwnRuns) g.submit.push('submit.ownRunsStopped')
   if (review) g.submit.push('submit.decisionsReceived')
   if (o.finish === 'hiveMerges') g.requeue.push('submit.notDuplicate', 'requeue.allowed', ...(review ? (['integrate.approved'] as const) : []))
@@ -116,7 +118,7 @@ function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
   if (o.finish === 'hiveMerges') {
     if (review) g.integrate.push('integrate.approved')
     if (o.strict) g.integrate.push('integrate.upToDate')
-    if (o.mergeChecks.length) g.integrate.push('integrate.checksPassed')
+    if (o.mergeChecks.length || o.focusedTests) g.integrate.push('integrate.checksPassed')
     g.integrate.push('done.contained')
   }
   if (o.finish === 'committed') g.finish.push('done.contained')

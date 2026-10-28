@@ -15,6 +15,7 @@ export const GUARDS = {
   'submit.clean': { needs: 'revisions' },
   'submit.trailer': { needs: 'revisions' },
   'submit.checksPassed': { needs: 'revisions' },
+  'submit.focusedChosen': { needs: 'integration' },
   'submit.identity': { needs: 'authorship' },
   'submit.ownRunsStopped': { needs: null },
   'submit.decisionsReceived': { needs: null },

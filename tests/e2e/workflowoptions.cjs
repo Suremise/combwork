@@ -305,7 +305,7 @@ async function theForm(page, app, inv) {
     // --- Pair (Hive merges, #1355): Hive merges, G9's checks suggested from the scripts with their commands, the install.
     await applyChoice('pair')
     check('Pair: Hive merges into the repository’s own default branch, by name (master here)', (await row('finish').locator('select').inputValue()) === 'hiveMerges' && (await row('target').locator('input').inputValue()) === 'master', await row('target').locator('input').inputValue())
-    check('…G9 in Checks: the quick checks from its scripts, with their commands', JSON.stringify(await inGroup('checks')) === JSON.stringify(['preChecks', 'mergeChecks', 'mergeInstall']) && JSON.stringify(await values('mergeChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('mergeChecks')))
+    check('…G9 in Checks: the quick checks from its scripts, with their commands', JSON.stringify(await inGroup('checks')) === JSON.stringify(['preChecks', 'mergeChecks', 'focusedTests', 'mergeInstall']) && JSON.stringify(await values('mergeChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('mergeChecks')))
     check('…G8 shown in Merging while Hive merges', (await inGroup('merging')).includes('strict'))
     // G18 (#1179): pushing the target after a merge, shown while Hive merges, off in the preset; switched on and saved.
     const push = row('pushTarget').locator('[role="switch"]')
@@ -329,10 +329,16 @@ async function theForm(page, app, inv) {
     await discard()
 
     // --- Team (#1361): Pair plus the unit tests before review and on the merged result, a clean install every time,
-    // your OK for ui and release; its note says per-card focused tests come later.
+    // your OK for ui and release; each card's focused tests (G20, HI-1367) only with the project's runner, which this one
+    // hasn't: off, its note saying where to set it.
     const note = section.locator('.workflow-preset-note')
     await applyChoice('team')
-    check('Team: its note says per-card focused tests come later', !!(await lib.until(async () => (await note.count()) === 1 && (await note.innerText()).includes('focused tests there too comes in a later version'), HUNG_MS)))
+    check('Team: its note says where to set the command that runs each card’s focused tests', !!(await lib.until(async () => (await note.count()) === 1 && (await note.innerText()).includes('Each card’s focused tests'), HUNG_MS)))
+    check('…G20 off with no runner', (await row('focusedTests').locator('[role="switch"]').getAttribute('aria-checked')) === 'false')
+    await row('focusedTests').locator('[role="switch"]').click()
+    check('…switched on: its two commands to fill in, and why it can’t be saved without the runner', !!(await lib.until(async () => (await row('focusedTests').locator('input').count()) === 2 && (await row('focusedTests').innerText()).includes('need the command that runs them'), HUNG_MS)), await row('focusedTests').innerText())
+    await themes('focused', row('focusedTests'))
+    await row('focusedTests').locator('[role="switch"]').click()
     const teamChecks = JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint', 'test', 'npm test'])
     check('…quick checks + unit tests before review and on the merged result', JSON.stringify(await values('preChecks')) === teamChecks && JSON.stringify(await values('mergeChecks')) === teamChecks)
     check('…installed from scratch before every merge, your OK for ui or release', (await row('mergeInstall').locator('select').inputValue()) === 'always' && (await row('okBefore').locator('input').inputValue()) === 'ui, release')

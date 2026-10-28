@@ -3,6 +3,10 @@
     "defaultMessage": "“Committed is done” needs everyone in the project folder.",
     "description": "Why workflow options cannot be saved: “Committed is done” was chosen while each card has its own folder."
   },
+  "workflow.contradiction.focusedNeedsRunner": {
+    "defaultMessage": "Each card’s focused tests need the command that runs them.",
+    "description": "Why workflow options cannot be saved (G20): “Each card’s focused tests” is on but the project has no command to run them (its runner, focused.run)."
+  },
   "workflow.contradiction.hiveMergesNeedsGit": {
     "defaultMessage": "Merging needs Git: without version control, work is accepted where it is.",
     "description": "Why workflow options cannot be saved: a merge option was set for a project with no version control."
@@ -42,6 +46,10 @@
   "workflow.forYou.decidedAfterMerge": {
     "defaultMessage": "{card} was decided after it merged: does it need a follow-up?",
     "description": "A For you request (Decide): a decision was recorded on the card while its work was being merged, so the merged work didn't see it. {card} is a card key like AM-12."
+  },
+  "workflow.forYou.focusedSkip": {
+    "defaultMessage": "{card}’s focused tests were skipped at its merge: {tests}. Merge it with them skipped?",
+    "description": "A For you request (Approve, G20, HI-1367): the merge queue ran the card’s focused tests ({tests}: test names, each with why it was skipped in brackets, as its project’s runner said) and some were skipped for their environment (a usage limit, a sign-in, the network). Approve merges the card with them skipped; Decline returns it. The card’s reviewer agent is asked too."
   },
   "workflow.forYou.lineAsk": {
     "defaultMessage": "{line} still has {card}'s work, squashed into {target}: approve and Hive brings the branch up to date once, or decline and do it yourself before {next} starts.",
@@ -170,6 +178,14 @@
   "workflow.form.fileLocksNote": {
     "defaultMessage": "Applies to agents working in the same folder, outside a slot.",
     "description": "Under the workflow option “File locks”: a slot is a folder Hive lends to a card or its lane (glossary 2.5: slot), so agents in different slots never share a file."
+  },
+  "workflow.form.focusedPick": {
+    "defaultMessage": "Command that chooses the tests (optional)",
+    "description": "The placeholder and label of a field under “Each card’s focused tests” (G20) in Project Settings → Workflow: the project’s command that lists the tests a change needs. Left empty, each card’s builder names its tests."
+  },
+  "workflow.form.focusedRun": {
+    "defaultMessage": "Command that runs them",
+    "description": "The placeholder and label of a field under “Each card’s focused tests” (G20) in Project Settings → Workflow: the project’s command that runs a list of tests."
   },
   "workflow.form.folders": {
     "defaultMessage": "Folders and files, separated by commas",
@@ -587,6 +603,14 @@
     "defaultMessage": "Who merges",
     "description": "A workflow option (glossary 2.6, G5)."
   },
+  "workflow.option.focusedTests.desc": {
+    "defaultMessage": "When a card is submitted, the project’s command chooses the tests its change needs (or its builder names them, for its reviewer to check), and the merge queue runs them on the merged result, moving the target only once they pass.",
+    "description": "What the workflow option “Each card’s focused tests pass on the merged result” does (glossary 2.1: merge queue)."
+  },
+  "workflow.option.focusedTests.title": {
+    "defaultMessage": "Each card’s focused tests pass on the merged result",
+    "description": "A workflow option (glossary 2.6, G20): the tests a card’s change needs are chosen when it is submitted, and Hive’s merge queue runs them on its work merged with the target branch."
+  },
   "workflow.option.folder.desc": {
     "defaultMessage": "In its own folder, a slot Hive lends to the card or its lane, each card is built on a branch of its own, apart from other agents’ work; in the project folder, everyone sees each other’s unfinished changes.",
     "description": "What the workflow option “Where cards are built” does (glossary 2.5: slot, a worktree Hive lends to a card or a lane)."
@@ -783,9 +807,9 @@
     "defaultMessage": "Custom",
     "description": "The workflow preset shown when the options no longer match a preset (glossary 2.1)."
   },
-  "workflow.preset.note.team": {
-    "defaultMessage": "Team checks the merged result with the quick checks and the unit tests. Running each card’s own focused tests there too comes in a later version.",
-    "description": "Under the preset choice of Project Settings → Workflow while Team is chosen (glossary 2.1: Team; G9: the merged result)."
+  "workflow.preset.note.teamFocused": {
+    "defaultMessage": "Team runs each card’s focused tests on the merged result when the project has a command that runs them: set it under Each card’s focused tests.",
+    "description": "Under the preset choice of Project Settings → Workflow while Team is chosen (glossary 2.1: Team; G20: Each card’s focused tests is an option’s name, as translated there)."
   },
   "workflow.preset.pair": {
     "defaultMessage": "Pair",
@@ -1263,6 +1287,18 @@
     "defaultMessage": "Commit the card's work, then move it again.",
     "description": "The next step after the user's move of a card to Review was refused with nothing committed: commit the work, then move the card again."
   },
+  "workflow.refused.submit.focusedChosen.change": {
+    "defaultMessage": "This rule is set in Version Control → Each card’s focused tests.",
+    "description": "Where the rule that refused a submit for focused tests (G20) is changed."
+  },
+  "workflow.refused.submit.focusedChosen.message": {
+    "defaultMessage": "Review refused: {card}'s focused tests couldn't be chosen for {revision}: {state, select, tooBroad {its project's picker says the change needs every test.} other {{why, select, noPicker {the project has no picker.} timedOut {its project's picker took too long.} badOutput {its project's picker gave output Hive can't read.} tooMany {its project's picker named too many tests.} moved {its folder moved to another revision while the picker ran.} dirty {its folder had uncommitted changes.} changed {files changed in its folder while the picker ran.} noChange {its change couldn't be read.} other {its project's picker failed.}}}}",
+    "description": "A refused submit (G20, HI-1367): the tests the card's change needs couldn't be chosen. {card} is its key, {revision} a short commit id; {state} and {why} pick the reason (keep each branch's key as it is)."
+  },
+  "workflow.refused.submit.focusedChosen.next": {
+    "defaultMessage": "Name the tests the change needs with tests on submit, for the reviewer to check, or fix what stopped the picker, then submit again.",
+    "description": "The next step after a refused submit for focused tests (G20), addressed to the agent: tests is the submit tool’s argument, kept as typed."
+  },
   "workflow.refused.submit.followUpNotBuilder.message": {
     "defaultMessage": "{card}'s follow-up is its builder's to submit: you aren't building it.",
     "description": "A refused follow-up submission (HI-1832: a commit its reviewer asked for, submitted while the card is in Review): only the agent building the card submits one. {card} is a card key."
@@ -1438,6 +1474,10 @@
   "workflow.rule.submit.decisionsReceived": {
     "defaultMessage": "The builder has read every decision",
     "description": "A rule of the workflow, named where a move skips or can't check it: the agent who built the card has read every decision on it (glossary 2.5: builder)."
+  },
+  "workflow.rule.submit.focusedChosen": {
+    "defaultMessage": "Each card’s focused tests are chosen before review",
+    "description": "A rule of the workflow, named where a move skips or can’t check it (G20, HI-1367): the tests a card’s change needs are chosen, or named by its builder, when it is submitted."
   },
   "workflow.rule.submit.identity": {
     "defaultMessage": "Commits use the project's identity",
@@ -1942,6 +1982,10 @@
   "workflow.why.finish": {
     "defaultMessage": "Merged through Hive’s queue, red work never reaches the target branch; working solo, a card is done once it’s committed.",
     "description": "Why the presets set “Who merges” as they do (glossary 2.1: merge queue)."
+  },
+  "workflow.why.focusedTests": {
+    "defaultMessage": "Each card’s own tests on the merged result catch what its change breaks there, without running every test for every card.",
+    "description": "Why Team turns on “Each card’s focused tests pass on the merged result” when the project has the command that runs them."
   },
   "workflow.why.folder": {
     "defaultMessage": "Pairs and teams build in parallel, each card apart from the others.",

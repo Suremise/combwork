@@ -1886,7 +1886,8 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
 | `approval.given` | An `Approval` (approved) answers the request the rule made, for this submission (or one that replays to it), at the current decision generation. | — | G1/N1 "You" or "…then you", G10 |
 | `integrate.approved` | The revision has passes from the required number of distinct reviewers (G1b) and the approvals its ruleset needs, all at the current decision generation, none stale. | sameness | G1 ≠ No review |
 | `integrate.upToDate` | The revision contains the target's current head. | containment | G8 (strict) |
-| `integrate.checksPassed` | The merge checks passed on the test merge (target + change). | integration | G9 |
+| `integrate.checksPassed` | The merge checks passed on the test merge (target + change). | integration | G9, G20 |
+| `submit.focusedChosen` | The submission's focused tests are chosen: its project's picker answered at exactly the revision, or its builder named them (`tests`) in place of a pick that failed, timed out or said every test. | integration | G20 |
 | `done.contained` | The revision to finish (the approved one, else the submitted one) or the same change is in the target, and the change is non-empty (§16.4.4). | containment | G5 = Hive merges, the agent merges, or Committed is done |
 
 **Actions** (Hive does…):
@@ -1996,6 +1997,7 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G16 | **Warn when a commit includes another agent's files** | On / Off | Shared folder only; a warning on submit, never a refusal [#1112 down] |
 | G17 | **Reviewers** | One per lane · A shared pool | §16.10.5 |
 | G18 | **Push the target branch after merging** | On / Off (default Off) | The merge queue (§16.9.1), Hive merges only. Not a rule: in no ruleset, read as the options are when the queue pushes (#1179). |
+| G20 | **Each card's focused tests pass on the merged result** | On / Off, with the project's commands `focused.pick` (optional) and `focused.run` | `submit.focusedChosen`; the merge queue's step 5 (§16.9.1), Hive merges only. Built [HI-1367]. |
 | G19 | **Commit message** | Hive's: the card's key and title, with trailers (default) · The branch's own, with no card key or trailers | The message of the queue's merge commit or squash commit (§16.9.1 step 4); shown when Hive merges with Merge commit or Squash (Rebase makes no commit of its own). Not a rule, as G18: in no ruleset, read as the options are when the queue merges (HI-1697). |
 | — | Card loops: wake reviewers and builders, rounds, wait (hours), design check wait (minutes) | On, 10, 6, 30 | Workflow options since HI-1766 (§16.6.7), for None and Git, a group of their own. |
 
@@ -2019,7 +2021,7 @@ afterwards makes it **Custom** (the header says which preset it started from). T
 | G6 style | — | Merge commit | Merge commit | Today's default (§5 Agents, §15.12). |
 | G7 target | The repository's default branch (the folder's own line) [#1482] | `main` | `main` | **Built [#1355]:** the repository's default branch, by name (`main`, else `master`, else the branch it is on; `main` when it can't be read), filled in when the preset is chosen and shown before saving, so a repository whose default is another branch isn't given one it lacks. |
 | G8 strict | — | Off | Off | The queue tests target + change anyway and a clean update keeps the pass, so strict mostly changes the history's shape; it is on offer for teams that want every merge up to date (OP-18; HB3's round 1 finding 4). |
-| G9 merge checks | — | Quick checks | Quick checks + unit + each card's focused tests, dependencies installed clean | #1010's merge gate; #187 (§16.9.1 step 5). **Built [#1361], narrowed for now** (Darren, point 1 on #1121): Team's G9 is quick checks + unit tests, installed from scratch before every merge (`mergeInstall: always`); each card's focused tests come with #1367. |
+| G9 merge checks | — | Quick checks | Quick checks + unit + each card's focused tests, dependencies installed clean | #1010's merge gate; #187 (§16.9.1 step 5). **Built [#1361], narrowed for now** (Darren, point 1 on #1121): Team's G9 is quick checks + unit tests, installed from scratch before every merge (`mergeInstall: always`); each card's focused tests are G20 [HI-1367], on in Team when the project has its runner. |
 | G10 your OK | Never | Never | Cards labelled `ui` or `release` | Darren's practice (screenshots, release steps). |
 | G11 where | Project folder | Slots | Slots | Pairs and teams build in parallel. |
 | G12 identity | Off | On | On | #809. |
@@ -2960,8 +2962,37 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    installed nothing: the checks then fail on what's missing rather than pass on what was there [HR3's #1349 round 2]; `npm ci` for a lock file with no setup command; or nothing, which the first check's run
    says once. The install is a run too, titled with its command line, which can hold a token, so it is
    `titleFromCommand` and the Agent API never gives its title out (#620). A log that can't be written (a full disk)
-   never stops a run: it is closed and given as no log, and every run started is finished. G9 empty: no checks and no
-   install, so a clean test merge alone merges.
+   never stops a run: it is closed and given as no log, and every run started is finished. G9 and G20 empty: no checks
+   and no install, so a clean test merge alone merges.
+   **Each card's focused tests (G20, built [HI-1367]; design HI-1367/s11–s24 with the user's decisions of 28 Oct).** A
+   project gives two commands, `focused.pick` (optional) and `focused.run`, in its `commands`. A selection never passes
+   by default:
+   - **At submit** (`submit.focusedChosen`): Hive reads the change path by path (`git diff --raw` with full blob ids,
+     modes and rename endpoints) and runs the picker in the card's folder under a check's bracket (§16.13): at exactly
+     the revision, clean at both ends, nothing written in between, else its pick is `unknown` (a check copy has no
+     dependencies, and Hive's own picker needs them; its submission's **operation** ends it with its tree, `cancelled`: each submit call makes one operation, which ends the card's operation before it, and its workspace closing ends any; every retry of the call (a re-gather after the evidence changed) carries that operation and never makes one, so a superseded call never ends its replacement; it is checked after gathering, after the evidence is checked again and under the write's lock, and an ended call is refused there, with the builder's own list or not). Its stdin is the paths, `HIVE_FOCUSED_BASE` the base; its stdout
+     JSON lines `{"test", "needs": [unit | fake | real | packaged]}` or `{"every": true}`, its stderr kept apart as
+     diagnostics, bounded (256 KB, 500 tests), ended with its tree at Advanced `hive.focused.pickSeconds` (180 s). A
+     pick that fails, times out, can't be read or says every test refuses the submit unless the builder names the tests
+     (`tests` on submit, `manual`), which its reviewer reviews; the selection is kept with the submission
+     (`Submitted.focused`), with the change it was chosen for.
+   - **At the merge**, after G9's checks and the same install (G20 alone installs too): the approved selection stands for
+     each path whose change in the result is exactly the submission's (status, endpoints, modes and blob ids; HR4's s22:
+     exact identity only). Every other path is picked again in the queue's folder at the result, under a check's bracket
+     (one that writes there proves nothing: `uncounted`), as `FocusedPicked`; a pick there that can't choose returns the
+     card (`focused`, `repick`, naming the paths), and needs are combined by id (a test that needs more there is new). Real-CLI and packaged tests
+     never run in the queue (realProof = review, the user's decision): each counts from a counted run at the
+     submitted revision by the card's lane reviewer or an agent whose pass approved it (`CheckRan.agent`; a builder's own
+     never counts), `CheckRan` named `focused:<test>` (`hive-progress --check "focused:<test>" -- <command>`), accepted as review evidence (`FocusedAccepted`), never a run
+     at the result; one missing returns the card (`noProof`, which may go back unchanged once that run exists), and one
+     only the merge's pick adds returns it (`newProof`). The rest run once as the check `focused tests`, bracketed like a
+     G9 check, the list in a file (`HIVE_FOCUSED_TESTS`), the results written to another (`HIVE_FOCUSED_RESULTS`), and
+     Advanced `hive.queue.focusedJobs` (2) as `HIVE_FOCUSED_JOBS`: green only when the runner exited 0, it counted, and the results (read at most 1 MB) hold
+     exactly one result per test, none failed; a runner exits 0 when nothing failed, skips included. A failed test, a missing, duplicate or unknown record, or a runner failure returns the
+     card with its output. A test **skipped** for its environment pauses the queue (`focusedSkip`) and asks the card's
+     reviewer agent (`hive_focused_skip`) and the user under For you (`FOCUSED_SKIP_GATE`), the user able to answer
+     first; the request and its decision are bound to the entry, the tests, the target's head and the merged tree, so
+     the entry is tested again and takes that decision only for exactly that result (a moved target is asked again).
 6. **Advance the target only on green** (§16.9.2), after writing `IntegrationStarted` (§16.4.5). If the target moved
    since the test (it isn't at the expected revision), the entry goes back to step 2 against the new head; after
    **3** such retests in a row the entry pauses ("main moves faster than its checks: retest or merge by hand") [HB3's

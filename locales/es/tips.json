@@ -180,6 +180,8 @@
   "tips.filesTab.title": "Edita archivos sin salir de Hive",
   "tips.flightRecorder.text": "Activa un disparador de la caja negra en Configuración → Avanzado (paradas de seguridad, algo desconocido de una CLI, un cambio de versión de la CLI, un agente que se quedó en silencio), y Hive guarda los eventos recientes de la consola de desarrollador del agente, con los datos sensibles ocultos, en el momento en que ocurre, con un aviso.",
   "tips.flightRecorder.title": "Captura los eventos poco frecuentes sin hacer nada",
+  "tips.focusedTests.text": "Cuando Hive fusiona, Control de versiones → Flujo de trabajo puede ejecutar las pruebas específicas de cada tarjeta en el resultado fusionado: el comando de tu proyecto elige las pruebas que necesita un cambio cuando se envía la tarjeta, y la cola de fusión las ejecuta antes de fusionarla.",
+  "tips.focusedTests.title": "Las pruebas propias de cada tarjeta antes de fusionarla",
   "tips.followUpCheck.text": "Cuando pides un cambio en una tarjeta de Revisión o Aprobado para que lo compruebe su revisor, su autor publica el cambio como seguimiento: Hive despierta al revisor y la respuesta despierta al autor. Si queda 15 minutos sin respuesta, la tarjeta aparece como estancada.",
   "tips.followUpCheck.title": "Haz comprobar un seguimiento sin una nueva ronda",
   "tips.forYou.text": "Una tarjeta con la etiqueta Para ti te espera: una aprobación, una decisión o una pregunta. El icono del Tablero de tareas las cuenta, y Para ti en el tablero muestra solo esas. Abre la tarjeta para aprobar, rechazar o responder: el agente que espera se entera al instante.",
