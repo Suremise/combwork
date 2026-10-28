@@ -64,7 +64,10 @@ export interface Turn {
   continued: number
   /** How it ended (for the log): 'stop', 'interrupt', 'idle', 'transcript', 'screen', 'user'… */
   endedBy?: string
-  /** It took over the id of a compaction the CLI began itself (HI-1916): that compaction's news under it is old news. */
+  /**
+   * It took over the id of a compaction the CLI began itself (HI-1916), and no compaction of its own has begun since: a
+   * compaction's end or SessionStart under its id is still that compaction's (old news). A compaction start is its own.
+   */
   fromCompaction?: true
 }
 
@@ -224,9 +227,13 @@ export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { h
   }
   // Launch-wide hooks (naming the latest turn, or none); the CLI's session ending is the launch's.
   if (launchWide) {
-    // The compaction a turn took the id of (HI-1916) ended before or as it began: its news, late or repeated, mustn't
-    // make the turn ready or "Compacting" while it runs.
-    if (turn && a?.fromCompaction && running && (ev.kind === 'compactStart' || ev.kind === 'compactEnd' || ev.kind === 'start')) return { verdict: 'stale', why: `${what(ev)} of the compaction its turn took the id of` } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
+    // The compaction a turn took the id of (HI-1916): until a compaction of the turn's own begins (its PreCompact, which
+    // the CLI sends first), an end or SessionStart under the id is that one's, late or repeated, and old news. From a
+    // start on, its compactions are handled as any turn's (HR6's round 1: one later in a long turn is a real one).
+    if (turn && a?.fromCompaction && running) {
+      if (ev.kind === 'compactStart') a.fromCompaction = undefined
+      else if (ev.kind === 'compactEnd' || ev.kind === 'start') return { verdict: 'stale', why: `${what(ev)} of the compaction its turn took the id of` } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
+    }
     if (ev.kind === 'end') end(ledger, 'end')
     return { verdict: 'apply', event: ev }
   }

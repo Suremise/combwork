@@ -257,20 +257,41 @@ describe('the turn ledger', () => {
       expect([a.status, a.ledger.active?.state, a.stale]).toEqual(['finished', 'over', ['a prompt of a turn that is over']])
     })
 
-    it("the compaction's late or repeated news under the id doesn't make the running turn ready or Compacting", () => {
+    it("the compaction's own late end or SessionStart under the id is old news: the running turn stays working", () => {
       for (const over of [true, false]) {
         const a = compacted(over)
         feed(a, { kind: 'prompt' }, ids('k1'))
         feed(a, { kind: 'toolStart' }, ids('k1', { call: 'c1' }))
         feed(a, { kind: 'compactEnd' }, ids('k1'))
-        feed(a, { kind: 'compactStart', trigger: 'auto' }, ids('k1'))
         feed(a, { kind: 'start', source: 'compact' }, ids('k1'))
+        feed(a, { kind: 'compactEnd' }, ids('k1'))
         expect([a.status, a.statusMessage, a.ledger.active?.state, openCalls(a.ledger)], `over ${over}`).toEqual(['working', undefined, 'running', 1])
-        expect(a.stale, `over ${over}`).toEqual(['a compaction end of the compaction its turn took the id of', 'a compaction start of the compaction its turn took the id of', 'a session start of the compaction its turn took the id of'])
+        expect(a.stale, `over ${over}`).toEqual(['a compaction end of the compaction its turn took the id of', 'a session start of the compaction its turn took the id of', 'a compaction end of the compaction its turn took the id of'])
         // The launch's SessionEnd still ends it.
         feed(a, { kind: 'end' }, ids('k1'))
         expect(a.status).toBe('stopped')
       }
+    })
+
+    it("a compaction of the turn's own later on (HR6's round 1: a long turn fills its context again) is handled as any turn's: working throughout, seen as compacting", () => {
+      const a = compacted(true)
+      feed(a, { kind: 'prompt' }, ids('k1'))
+      feed(a, { kind: 'toolStart' }, ids('k1', { call: 'c1' }))
+      feed(a, { kind: 'toolEnd' }, ids('k1', { call: 'c1' }))
+      // Its PreCompact: admitted, and the status rules see a compaction mid-turn (autoCompact: the runtime's compacting).
+      const start = admit(a.ledger, { kind: 'compactStart', trigger: 'auto' }, ids('k1'), { now: a.ledger.seq })
+      expect(start).toEqual({ verdict: 'apply', event: { kind: 'compactStart', trigger: 'auto' } })
+      const step = hookStep((start as { event: HookEvent }).event, input(a))
+      expect([step.next, step.actions]).toEqual([null, ['autoCompact']])
+      applyStep(a, step)
+      // Its SessionStart and PostCompact: admitted too, as a mid-turn compaction's (the turn stays working).
+      feed(a, { kind: 'start', source: 'compact' }, ids('k1'))
+      feed(a, { kind: 'compactEnd' }, ids('k1'))
+      feed(a, { kind: 'toolStart' }, ids('k1', { call: 'c2' }))
+      expect([a.status, a.statusMessage, a.ledger.active?.state, openCalls(a.ledger), a.stale]).toEqual(['working', undefined, 'running', 1, []])
+      feed(a, { kind: 'toolEnd' }, ids('k1', { call: 'c2' }))
+      feed(a, { kind: 'stop', lastMessage: null }, ids('k1'))
+      expect(a.status).toBe('finished')
     })
 
     it("an older compaction's id after a newer turn began is old news", () => {
