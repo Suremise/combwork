@@ -766,23 +766,26 @@ export async function recordEndedLaunches(): Promise<void> {
   // and lists any as empty. The look stops once it changes, and a run settled meanwhile (lost: `unknown`) is let go.
   const helper = host.instance
   const tracked = (run: string): boolean => host.instance === helper && (running.has(run) || looking.has(run)) && !outcomes.has(run)
-  scan: while (pending.size && helper !== null) {
-    for (const run of [...pending]) {
-      if (!tracked(run)) {
+  // No helper as it begins: nothing can be seen empty.
+  if (helper !== null) {
+    scan: while (pending.size) {
+      for (const run of [...pending]) {
+        if (!tracked(run)) {
+          if (host.instance !== helper) break scan
+          // Settled meanwhile: kept if its own look saw it end.
+          if (outcomes.get(run) === 'ended') ended.push(run)
+          pending.delete(run)
+          continue
+        }
+        const list = await listJob(run).catch(() => null)
         if (host.instance !== helper) break scan
-        // Settled meanwhile: kept if its own look saw it end.
-        if (outcomes.get(run) === 'ended') ended.push(run)
+        if (!emptyJob(list) || !tracked(run)) continue
         pending.delete(run)
-        continue
+        ended.push(run)
       }
-      const list = await listJob(run).catch(() => null)
-      if (host.instance !== helper) break scan
-      if (!emptyJob(list) || !tracked(run)) continue
-      pending.delete(run)
-      ended.push(run)
+      if (!pending.size || Date.now() >= until) break
+      await new Promise((r) => setTimeout(r, QUIT_LOOK_EVERY_MS))
     }
-    if (!pending.size || Date.now() >= until) break
-    await new Promise((r) => setTimeout(r, QUIT_LOOK_EVERY_MS))
   }
   endedRuns = [...new Set([...endedRuns, ...ended])].slice(-MAX_RUN_RECORDS)
   if (ended.length || pending.size) log.info(`Kept ${ended.length} ended run(s) for their slot writers as Hive quits${pending.size ? `; ${pending.size} launch(es) not seen to end` : ''}`)
