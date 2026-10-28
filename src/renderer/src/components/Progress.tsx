@@ -604,6 +604,8 @@ function GroupRow({ group: g, cardKey, now, opened, flip }: { group: RunGroup; c
           <Icon name={LOOK_ICON[look]} /> <span className="progress-recent-who">{who}</span>
           <span className="progress-recent-text">{what}</span>
           <span className="faint progress-recent-took">{took}</span>
+          {/* When its latest try ended (HI-1925: each line says when). */}
+          <span className="faint progress-recent-at">{formatTime(g.last.finishedAt ?? g.last.updatedAt)}</span>
         </span>
         <Icon name={open ? 'chevron-up' : 'chevron-down'} className="progress-group-chevron" />
       </button>
