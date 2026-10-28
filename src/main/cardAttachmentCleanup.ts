@@ -99,6 +99,8 @@ interface PlanResult {
   /** The last card examined (the next batch starts after it), and whether the board had more past it. */
   last: number
   more: boolean
+  /** The automatic run's: the PC was in use again, and the batch stopped after `last` (the next one carries on from it). */
+  paused?: boolean
 }
 
 const yieldMain = (): Promise<void> => new Promise((r) => setImmediate(r))
@@ -124,10 +126,11 @@ function watchLife(life: Life): void {
 /**
  * A batch of a project's plan, for a lifetime: at most EXAMINE cards that can be due (archived, not with a hidden or
  * removed project, with attachments: the board's index, so cards that never qualify use up no batch) after `after`, at
- * most `due` of them planned, a card at a time with a yield between. Null when the lifetime ended meanwhile, or the
- * project's clean-up is off.
+ * most `due` of them planned, a card at a time with a yield between. `idle` (the automatic run's) is asked after each
+ * yield: the PC in use again, the batch stops there, `paused`, its cursor at the last card it read (Clean Up Now's has
+ * none: it runs at once). Null when the lifetime ended meanwhile, or the project's clean-up is off.
  */
-export async function planBatch(ws: WorkspaceService, projectPath: string, after: number, now: number, due = PLAN, examine = EXAMINE): Promise<(PlanResult & { days: number }) | null> {
+export async function planBatch(ws: WorkspaceService, projectPath: string, after: number, now: number, due = PLAN, examine = EXAMINE, idle?: () => boolean): Promise<(PlanResult & { days: number }) | null> {
   const life = lifeOf(ws)
   if (!life) return null
   const days = await daysOf(ws, projectPath)
@@ -147,6 +150,7 @@ export async function planBatch(ws: WorkspaceService, projectPath: string, after
     }
     await yieldMain()
     if (!alive(life)) return null
+    if (idle && !idle()) return { ...out, paused: true, days }
     out.last = n
     const card = await tasks.getTask(n, ws).catch(() => null)
     if (!card || !cleanupDue(card, days, now)) continue
@@ -228,8 +232,17 @@ export async function cleanUpProject(ws: WorkspaceService, projectPath: string, 
   let wrapped = after === 0
   let taken = 0
   while (taken < RUN_CARDS) {
-    const batch = await planBatch(ws, projectPath, after, opts.now ?? Date.now(), Math.min(PLAN, RUN_CARDS - taken))
+    if (!idle()) {
+      own.set(key, after)
+      return { ...out, stopped: true }
+    }
+    const batch = await planBatch(ws, projectPath, after, opts.now ?? Date.now(), Math.min(PLAN, RUN_CARDS - taken), EXAMINE, idle)
     if (!batch) return { ...out, stopped: !alive(life) }
+    if (batch.paused) {
+      // Its planned cards wait too: the next run reads them again (from before the first), then the rest.
+      own.set(key, batch.cards.length ? batch.cards[0].card - 1 : batch.last)
+      return { ...out, stopped: true }
+    }
     for (const c of batch.cards) {
       if (!alive(life)) return { ...out, stopped: true }
       if (!idle()) {

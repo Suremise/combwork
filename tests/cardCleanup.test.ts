@@ -276,6 +276,23 @@ describe("cleaning up archived cards' attachments (HI-1842)", () => {
     expect(p).toBeTruthy()
   })
 
+  it('input while it plans pauses it at once, even through cards not due yet; idle again, it carries on from there', async () => {
+    const { w, p } = await workspace('3')
+    const cs: number[] = []
+    for (let i = 0; i < 3; i++) cs.push((await card(w, { archived: true, files: [`i${i}.txt`] })).n)
+    // The PC in use again after the first card is read: the batch stops there, though no card is due yet.
+    let asked = 0
+    const batch = await inWorkspace(w, () => cleanup.planBatch(w, p, 0, later(1), 20, 100, () => asked++ < 1))
+    expect(batch).toMatchObject({ paused: true, last: cs[0], cards: [] })
+    // The automatic run: asked before its batch and after each card's yield; in use after the first card, it stops.
+    let calls = 0
+    expect(await inWorkspace(w, () => cleanup.cleanUpProject(w, p, { idle: () => calls++ < 2, now: later(1) }))).toMatchObject({ files: 0, stopped: true })
+    expect(calls).toBe(3)
+    // Idle again (and due): it carries on from where it stopped, round to the start, and every card's file goes.
+    expect((await run(w, p, 4)).files).toBe(3)
+    expect(cs.every((c) => rows(w, c) === 0)).toBe(true)
+  })
+
   it("a project hidden or removed between the preview and its Move keeps its cards' files", async () => {
     const { w, p } = await workspace()
     const c = await card(w, { archived: true, files: ['hidden.txt'] })
